@@ -132,17 +132,40 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_ARCTANGENT
+#define REAL_MATH_EXTERNAL_DOT_PRODUCT3D
+#define REAL_MATH_EXTERNAL_PLANE3D_DISTANCE_TO_POINT
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "ai/ai_profile.h"
+#include "ai/path.h"
+#include "cache/sound_cache.h"
+#include "effects/decal_definitions.h"
+#include "effects/decals.h"
 #include "game/game.h"
+#include "game/players.h"
+#include "hs/hs.h"
 #include "interface/interface.h"
+#include "input/input.h"
 #include "math/real_math.h"
+#include "physics/bsp3d.h"
+#include "physics/collision_bsp_definitions.h"
+#include "physics/collision_usage.h"
+#include "physics/collisions.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_debug.h"
 #include "render/render.h"
 #include "render/render_cameras_internal.h"
 #include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "structures/structure_bsp_definitions.h"
+#include "structures/structure_vector_tests.h"
+#include "tag_files/tag_files.h"
+#include "text/draw_string.h"
+#include "units/bipeds.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -152,6 +175,7 @@ enum
 	MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES = 512,
 
 	NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS = 16,
+	MAXIMUM_BSP3D_DEPTH = 128,
 };
 
 enum
@@ -170,6 +194,9 @@ enum
 };
 
 /* ---------- macros */
+
+#define vehicle_runtime_try_and_get(index) \
+	((struct vehicle_runtime_datum *)object_try_and_get_and_verify_type((index), _object_mask_vehicle))
 
 /* ---------- structures */
 
@@ -238,6 +265,26 @@ struct render_debug_globals_definition
 	boolean string_overflow_reported;
 };
 
+struct render_debug_vehicle_data
+{
+	word flags;
+	short unknown426;
+	byte unknown428[4];
+	real speed;
+	real slide;
+	real turn;
+	byte unknown438[0x40];
+	long stuck;
+};
+
+struct vehicle_runtime_datum
+{
+	long definition_index;
+	struct _object_datum object;
+	struct _unit_datum unit;
+	struct render_debug_vehicle_data vehicle;
+};
+
 typedef char render_debug_cache_entry_size_check[
 	sizeof(struct render_debug_cache_entry) == 0x38 ? 1 : -1];
 typedef char render_debug_globals_size_check[
@@ -256,6 +303,14 @@ typedef char render_debug_globals_entry_overflow_offset_check[
 	offsetof(struct render_debug_globals_definition, entry_overflow_reported) == 0x740A ? 1 : -1];
 typedef char render_debug_globals_string_overflow_offset_check[
 	offsetof(struct render_debug_globals_definition, string_overflow_reported) == 0x740B ? 1 : -1];
+typedef char render_debug_vehicle_speed_offset_check[
+	offsetof(struct vehicle_runtime_datum, vehicle.speed) == 0x42C ? 1 : -1];
+typedef char render_debug_vehicle_slide_offset_check[
+	offsetof(struct vehicle_runtime_datum, vehicle.slide) == 0x430 ? 1 : -1];
+typedef char render_debug_vehicle_turn_offset_check[
+	offsetof(struct vehicle_runtime_datum, vehicle.turn) == 0x434 ? 1 : -1];
+typedef char render_debug_vehicle_stuck_offset_check[
+	offsetof(struct vehicle_runtime_datum, vehicle.stuck) == 0x478 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -281,8 +336,27 @@ static void build_pill_points(
 static void render_debug_add_cache_entry(
 	short type,
 	...);
+static void render_debug_bsp(
+	void);
+static void render_debug_camera(
+	void);
+static void render_debug_input(
+	void);
+static void render_debug_player(
+	void);
+static void render_debug_structure(
+	void);
+static void render_debug_structure_decals(
+	void);
 
 /* ---------- globals */
+
+extern boolean debug_bsp;
+extern boolean debug_camera;
+extern boolean debug_input;
+extern boolean debug_permanent_decals;
+extern boolean debug_player;
+extern boolean debug_structure;
 
 static struct render_debug_globals_definition render_debug_globals;
 
@@ -471,6 +545,142 @@ void render_debug_box_outline(
 			_render_debug_cache_box_outline,
 			bounds,
 			color);
+	}
+
+	return;
+}
+
+void render_debug(
+	void)
+{
+	short entry_index;
+
+	ai_debug_render();
+	ai_profile_render();
+	render_debug_object_damage();
+	render_debug_scripting();
+	render_debug_trigger_volumes();
+	texture_cache_debug_render();
+	sound_cache_debug_render();
+	render_debug_recording();
+	render_debug_detail_objects();
+	collision_debug_render();
+	collision_log_render();
+	render_debug_obstacle_path();
+	render_debug_fog_planes();
+	render_debug_decals();
+	render_debug_camera();
+	render_debug_player();
+	render_debug_structure();
+	render_debug_bsp();
+	render_debug_input();
+	render_debug_structure_decals();
+	players_debug_render();
+
+	for (entry_index = 0; entry_index < render_debug_globals.entry_count; entry_index++)
+	{
+		struct render_debug_cache_entry *entry = &render_debug_globals.entries[entry_index];
+
+		switch (entry->type)
+		{
+			case _render_debug_cache_circle:
+				render_debug_circle(
+					TRUE,
+					&entry->circle.plane,
+					entry->circle.projection,
+					entry->circle.sign,
+					&entry->circle.center,
+					entry->circle.radius,
+					&entry->circle.color,
+					entry->circle.offset);
+				break;
+
+			case _render_debug_cache_point:
+				render_debug_point(
+					TRUE,
+					&entry->point.point,
+					entry->point.size,
+					&entry->point.color);
+				break;
+
+			case _render_debug_cache_line:
+				render_debug_line(
+					TRUE,
+					&entry->line.point0,
+					&entry->line.point1,
+					&entry->line.color);
+				break;
+
+			case _render_debug_cache_sphere:
+				render_debug_sphere(
+					TRUE,
+					&entry->point.point,
+					entry->point.size,
+					&entry->point.color);
+				break;
+
+			case _render_debug_cache_cylinder:
+				render_debug_cylinder(
+					TRUE,
+					&entry->pill.base,
+					&entry->pill.height,
+					entry->pill.width,
+					&entry->pill.color);
+				break;
+
+			case _render_debug_cache_pill:
+				render_debug_pill(
+					TRUE,
+					&entry->pill.base,
+					&entry->pill.height,
+					entry->pill.width,
+					&entry->pill.color);
+				break;
+
+			case _render_debug_cache_box:
+				render_debug_box(
+					TRUE,
+					&entry->box.bounds,
+					&entry->box.color);
+				break;
+
+			case _render_debug_cache_box_outline:
+				render_debug_box_outline(
+					TRUE,
+					&entry->box.bounds,
+					&entry->box.color);
+				break;
+
+			case _render_debug_cache_string:
+				render_debug_string(
+					TRUE,
+					entry->string.string);
+				break;
+
+			case _render_debug_cache_string_at_point:
+				render_debug_string_at_point(
+					TRUE,
+					&entry->string_at_point.point,
+					entry->string_at_point.string,
+					&entry->string_at_point.color);
+				break;
+
+			default:
+				match_vassert(
+					"c:\\halo\\SOURCE\\render\\render_debug.c",
+					1269,
+					FALSE,
+					NULL);
+				break;
+		}
+	}
+
+	if (render_debug_globals.game_time != (short)game_time_get() - 1)
+	{
+		render_debug_globals.game_time = (short)game_time_get();
+		render_debug_globals.entry_count = 0;
+		render_debug_globals.string_offset = 0;
+		render_debug_globals.strings[0] = 0;
 	}
 
 	return;
@@ -1093,6 +1303,407 @@ void render_debug_string_at_point(
 			string,
 			point,
 			color);
+	}
+
+	return;
+}
+
+static void render_debug_camera(
+	void)
+{
+	if (debug_camera)
+	{
+		char text[2048];
+		struct location location;
+		struct collision_result collision;
+		real_vector3d down;
+		real_vector3d forward;
+		real_point3d collision_point;
+		short material_index;
+		short lightmap_index;
+		long surface_index;
+		real s;
+		real t;
+
+		scenario_location_from_point(
+			&location,
+			&render.camera.position);
+		_snprintf(
+			text,
+			sizeof(text),
+			"point(%01.2f,%01.2f,%01.2f) leaf(#%d [%d]) cluster(#%d [%d])",
+			render.camera.position.x,
+			render.camera.position.y,
+			render.camera.position.z,
+			location.leaf_index,
+			render.leaf_index,
+			location.cluster_index,
+			render.cluster_index);
+
+		scale_vector3d(
+			global_down3d,
+			1000.0f,
+			&down);
+		if (collision_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_structure_bit),
+			&render.camera.position,
+			&down,
+			NONE,
+			&collision))
+		{
+			_snprintf(
+				text + csstrlen(text),
+				sizeof(text) - csstrlen(text),
+				"|nground_point(%01.2f,%01.2f,%01.2f) facing(%01.2f) surface(#%d)",
+				collision.point.x,
+				collision.point.y,
+				collision.point.z,
+				(real)atan2(render.camera.forward.j, render.camera.forward.i) * 57.29578f,
+				collision.surface_index);
+		}
+
+		scale_vector3d(
+			&render.camera.forward,
+			50.0f,
+			&forward);
+		if (structure_test_vector(
+			&render.camera.position,
+			&forward,
+			&collision_point,
+			&lightmap_index,
+			&material_index,
+			&surface_index,
+			&s,
+			&t))
+		{
+			struct structure_material *material = TAG_BLOCK_GET_ELEMENT(
+				&TAG_BLOCK_GET_ELEMENT(
+					&global_structure_bsp_get()->lightmaps,
+					lightmap_index,
+					struct structure_lightmap)->materials,
+				material_index,
+				struct structure_material);
+
+			_snprintf(
+				text + csstrlen(text),
+				sizeof(text) - csstrlen(text),
+				"|n%s",
+				material->shader.name);
+		}
+
+		interface_set_bitmap_text_draw_mode(
+			_interface_font_terminal,
+			NONE,
+			0,
+			0,
+			_interface_color_table_dialog,
+			0);
+		rasterizer_draw_string(
+			NULL,
+			NULL,
+			NULL,
+			0,
+			text);
+	}
+
+	return;
+}
+
+static void render_debug_player(
+	void)
+{
+	if (debug_player &&
+		render.local_player_index != NONE &&
+		local_player_get_player_index(render.local_player_index) != NONE)
+	{
+		struct player_datum *player = player_get(
+			local_player_get_player_index(render.local_player_index));
+
+		if (player->unit_index != NONE)
+		{
+			struct biped_datum *biped = biped_try_and_get(player->unit_index);
+
+			if (biped && biped->biped.elevator_object_index != NONE)
+			{
+				render_debug_string(
+					TRUE,
+					"riding an elevator");
+			}
+
+			if (biped->object.parent_object_index != NONE && biped->unit.parent_seat_index != NONE)
+			{
+				struct vehicle_runtime_datum *vehicle = vehicle_runtime_try_and_get(
+					biped->object.parent_object_index);
+				char text[1024];
+
+				sprintf(
+					text,
+					"speed %5f|nslide %5f|nturn  %5f%s",
+					vehicle->vehicle.speed,
+					vehicle->vehicle.slide,
+					vehicle->vehicle.turn,
+					vehicle->vehicle.stuck ? "|nstuck!" : "");
+				render_debug_string(
+					TRUE,
+					text);
+			}
+		}
+	}
+
+	return;
+}
+
+static void render_debug_structure(
+	void)
+{
+	if (debug_structure)
+	{
+		struct collision_bsp *collision_bsp = global_collision_bsp_get();
+		long edge_index;
+
+		for (edge_index = 0; edge_index < collision_bsp->edges.count; edge_index++)
+		{
+			struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+				&collision_bsp->edges,
+				edge_index,
+				struct collision_edge);
+			struct collision_vertex *vertex0 = TAG_BLOCK_GET_ELEMENT(
+				&collision_bsp->vertices,
+				edge->vertex_indices[0],
+				struct collision_vertex);
+			struct collision_vertex *vertex1 = TAG_BLOCK_GET_ELEMENT(
+				&collision_bsp->vertices,
+				edge->vertex_indices[1],
+				struct collision_vertex);
+
+			render_debug_line(
+				TRUE,
+				&vertex0->point,
+				&vertex1->point,
+				global_real_argb_green);
+		}
+	}
+
+	return;
+}
+
+static void render_debug_bsp(
+	void)
+{
+	if (debug_bsp)
+	{
+		char text[2048];
+		long plane_designators[MAXIMUM_BSP3D_DEPTH];
+		short plane_count = 0;
+		struct bsp3d *bsp = global_bsp3d_get();
+		char *current = text + sprintf(text, " node plane|n");
+		long node_index = 0;
+
+		while (!(node_index & LONG_MIN))
+		{
+			struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(
+				&bsp->nodes,
+				node_index,
+				struct bsp3d_node);
+			real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(
+				&bsp->planes,
+				node->plane_designator,
+				real_plane3d);
+			real_point3d const *point = &render.camera.position;
+			boolean side =
+				point->x*plane->n.i +
+				point->y*plane->n.j +
+				point->z*plane->n.k -
+				plane->d >= 0.0f;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\render\\render_debug.c",
+				1618,
+				plane_count<MAXIMUM_BSP3D_DEPTH);
+			plane_designators[plane_count++] = node->plane_designator;
+			current += sprintf(
+				current,
+				"%5d %5d %c|n",
+				node_index,
+				node->plane_designator,
+				side ? '+' : '-');
+			node_index = node->children[side];
+		}
+
+		if (node_index != NONE)
+		{
+			sprintf(
+				current,
+				" leaf %5d",
+				node_index & LONG_MAX);
+		}
+		else
+		{
+			sprintf(
+				current,
+				"solid");
+		}
+
+		interface_set_bitmap_text_draw_mode(
+			_interface_font_terminal,
+			NONE,
+			0,
+			0,
+			_interface_color_table_dialog,
+			0);
+		rasterizer_draw_string(
+			NULL,
+			NULL,
+			NULL,
+			0,
+			text);
+
+		if (input_key_is_down(_key_b))
+		{
+			FILE *file = fopen("d:\\debug_bsp.txt", "w");
+
+			if (file)
+			{
+				short plane_index;
+
+				fprintf(file, "%d\n", plane_count);
+				for (plane_index = 0; plane_index < plane_count; plane_index++)
+				{
+					fprintf(file, "%d\n", plane_designators[plane_index]);
+				}
+				fclose(file);
+			}
+		}
+	}
+
+	return;
+}
+
+static void render_debug_input(
+	void)
+{
+	if (debug_input)
+	{
+		short tab_stops[3];
+		char buffer[512];
+
+		tab_stops[0] = 200;
+		tab_stops[1] = 400;
+		tab_stops[2] = 550;
+		draw_string_set_tab_stops(
+			tab_stops,
+			NUMBEROF(tab_stops));
+		input_get_raw_data_string(
+			buffer,
+			sizeof(buffer) - 1);
+		interface_set_bitmap_text_draw_mode(
+			_interface_font_terminal,
+			NONE,
+			0,
+			0,
+			_interface_color_table_dialog,
+			0);
+		rasterizer_draw_string(
+			NULL,
+			NULL,
+			NULL,
+			0,
+			buffer);
+	}
+
+	return;
+}
+
+static void render_debug_structure_decals(
+	void)
+{
+	if (debug_permanent_decals)
+	{
+		struct structure_bsp *structure_bsp = global_structure_bsp_get();
+		long decal_index;
+
+		for (decal_index = 0; decal_index < structure_bsp->runtime_decals.count; decal_index++)
+		{
+			struct structure_runtime_decal *decal = TAG_BLOCK_GET_ELEMENT(
+				&structure_bsp->runtime_decals,
+				decal_index,
+				struct structure_runtime_decal);
+			long decal_definition_index = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->decal_palette,
+				decal->palette_index,
+				struct scenario_decal_palette_entry)->reference.index;
+			long leaf_index;
+			long cluster_index;
+			struct structure_cluster_runtime_decals *cluster;
+			struct collision_result collision;
+			real_vector3d vector;
+
+			decal_definition_get(decal_definition_index);
+			leaf_index = scenario_leaf_index_from_point(&decal->position);
+			cluster_index = leaf_index == NONE
+				? NONE
+				: TAG_BLOCK_GET_ELEMENT(
+					&global_structure_bsp_get()->leaves,
+					scenario_leaf_index_from_point(&decal->position) & LONG_MAX,
+					struct structure_leaf)->cluster_index;
+			cluster = TAG_BLOCK_GET_ELEMENT(
+				&structure_bsp->clusters,
+				cluster_index,
+				struct structure_cluster_runtime_decals);
+
+			{
+				real_euler_angles2d angles =
+				{
+					decal->yaw * (_pi / 127.0f),
+					decal->pitch * (_pi / 254.0f),
+				};
+
+				vector3d_from_euler_angles2d(&vector, &angles);
+
+				if (collision_test_vector(
+					FLAG(_collision_test_front_facing_surfaces_bit) |
+						FLAG(_collision_test_structure_bit) |
+						FLAG(_collision_test_media_bit),
+					&decal->position,
+					&vector,
+					NONE,
+					&collision))
+				{
+					if (cluster->first_decal_index != NONE &&
+						decal_index - cluster->first_decal_index < cluster->decal_count)
+					{
+						render_debug_sphere(
+							TRUE,
+							&collision.point,
+							0.1f,
+							global_real_argb_yellow);
+					}
+					else
+					{
+						render_debug_sphere(
+							TRUE,
+							&collision.point,
+							0.1f,
+							global_real_argb_orange);
+					}
+				}
+				else
+				{
+					render_debug_sphere(
+						TRUE,
+						&decal->position,
+						0.1f,
+						global_real_argb_red);
+				}
+
+				render_debug_string_at_point(
+					FALSE,
+					&decal->position,
+					tag_name_strip_path(tag_get_name(decal_definition_index)),
+					global_real_argb_green);
+			}
+		}
 	}
 
 	return;

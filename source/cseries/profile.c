@@ -419,12 +419,25 @@ void find_profile_section(
 	struct profile_section *section);
 static void profile_framedump_flush(
 	void);
-static void code_0007ee30(
+static void profile_sections_set_active(
 	const char *name,
 	boolean active);
 static int compare_profile_sections(
 	void const *section0,
 	void const *section1);
+static boolean string_starts_with(
+	char const *string,
+	char const *prefix);
+static void profile_timer_start(
+	struct profile_timer *timer);
+static void profile_timer_start_at(
+	struct profile_timer *timer,
+	__int64 start);
+static void profile_timer_end(
+	struct profile_timer *timer);
+static void profile_timer_end_at(
+	struct profile_timer *timer,
+	__int64 end);
 
 /* ---------- globals */
 
@@ -602,14 +615,10 @@ void profile_rasterizer_stalls(
 	long unused,
 	__int64 stall_timebase)
 {
-	real msec = (real)(stall_timebase*1000.0f/profile_globals.timebase_frequency);
-
-	profile_globals.current_frame.stall.start = 0;
-	profile_globals.current_frame.stall.end = stall_timebase;
+	profile_timer_start_at(&profile_globals.current_frame.stall, 0);
+	profile_timer_end_at(&profile_globals.current_frame.stall, stall_timebase);
 	profile_globals.current_frame.stall_count = stall_count;
 	profile_globals.current_frame.stall_index = stall_index;
-	profile_globals.current_frame.stall.total += msec;
-	profile_globals.current_frame.stall.frame_total += msec;
 	profile_globals.current_frame.stall_msec = (real)(stall_ticks*1000.0f/profile_globals.timebase_frequency);
 
 	return;
@@ -960,7 +969,7 @@ real profile_frame_get_value(
 void profile_sections_activate(
 	const char *name)
 {
-	code_0007ee30(name, TRUE);
+	profile_sections_set_active(name, TRUE);
 
 	return;
 }
@@ -968,7 +977,7 @@ void profile_sections_activate(
 void profile_sections_deactivate(
 	const char *name)
 {
-	code_0007ee30(name, FALSE);
+	profile_sections_set_active(name, FALSE);
 
 	return;
 }
@@ -1068,8 +1077,6 @@ void profile_initialize(
 void profile_frame_start(
 	void)
 {
-	__int64 timebase;
-
 	if (!profile_timebase_ticks)
 	{
 		profile_sections_update();
@@ -1080,8 +1087,7 @@ void profile_frame_start(
 	profile_globals.current_frame.frame_index = render.frame_index;
 	profile_globals.current_frame.vertical_blank_index = rasterizer_globals.vertical_blank_index;
 	profile_globals.current_frame.game_tick_count = 0;
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.frame.start = timebase;
+	profile_timer_start(&profile_globals.current_frame.frame);
 
 	return;
 }
@@ -1089,7 +1095,6 @@ void profile_frame_start(
 void profile_tick_start(
 	void)
 {
-	__int64 timebase;
 	struct profile_timer *timer;
 
 	if (profile_timebase_ticks)
@@ -1108,8 +1113,7 @@ void profile_tick_start(
 		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
 
 	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
-	QUERY_TIMEBASE(timebase);
-	timer->start = timebase;
+	profile_timer_start(timer);
 
 	return;
 }
@@ -1117,19 +1121,13 @@ void profile_tick_start(
 void profile_tick_end(
 	void)
 {
-	__int64 timebase;
 	struct profile_timer *timer;
-	real msec;
 
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 320,
 		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
 
 	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
-	QUERY_TIMEBASE(timebase);
-	timer->end = timebase;
-	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
-	timer->total += msec;
-	timer->frame_total += msec;
+	profile_timer_end(timer);
 
 	return;
 }
@@ -1137,7 +1135,6 @@ void profile_tick_end(
 void profile_render_window_start(
 	boolean player_window)
 {
-	__int64 timebase;
 	struct profile_timer *timer;
 
 	if (profile_globals.current_frame.window_count<MAXIMUM_WINDOWS)
@@ -1152,8 +1149,7 @@ void profile_render_window_start(
 		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
 
 	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
-	QUERY_TIMEBASE(timebase);
-	timer->start = timebase;
+	profile_timer_start(timer);
 
 	return;
 }
@@ -1161,19 +1157,13 @@ void profile_render_window_start(
 void profile_render_window_end(
 	void)
 {
-	__int64 timebase;
 	struct profile_timer *timer;
-	real msec;
 
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 362,
 		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
 
 	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
-	QUERY_TIMEBASE(timebase);
-	timer->end = timebase;
-	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
-	timer->total += msec;
-	timer->frame_total += msec;
+	profile_timer_end(timer);
 
 	return;
 }
@@ -1181,11 +1171,8 @@ void profile_render_window_end(
 void profile_render_start(
 	void)
 {
-	__int64 timebase;
-
 	profile_globals.current_frame.window_count = 0;
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.render.start = timebase;
+	profile_timer_start(&profile_globals.current_frame.render);
 
 	return;
 }
@@ -1193,15 +1180,7 @@ void profile_render_start(
 void profile_render_end(
 	void)
 {
-	__int64 timebase;
-	real msec;
-
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.render.end = timebase;
-	msec = (real)((timebase-profile_globals.current_frame.render.start)*1000.0f/
-		profile_globals.timebase_frequency);
-	profile_globals.current_frame.render.total += msec;
-	profile_globals.current_frame.render.frame_total += msec;
+	profile_timer_end(&profile_globals.current_frame.render);
 
 	return;
 }
@@ -1209,10 +1188,7 @@ void profile_render_end(
 void profile_texture_start(
 	void)
 {
-	__int64 timebase;
-
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.texture.start = timebase;
+	profile_timer_start(&profile_globals.current_frame.texture);
 
 	return;
 }
@@ -1220,15 +1196,7 @@ void profile_texture_start(
 void profile_texture_end(
 	void)
 {
-	__int64 timebase;
-	real msec;
-
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.texture.end = timebase;
-	msec = (real)((timebase-profile_globals.current_frame.texture.start)*1000.0f/
-		profile_globals.timebase_frequency);
-	profile_globals.current_frame.texture.total += msec;
-	profile_globals.current_frame.texture.frame_total += msec;
+	profile_timer_end(&profile_globals.current_frame.texture);
 
 	return;
 }
@@ -1236,10 +1204,7 @@ void profile_texture_end(
 void profile_idle_start(
 	void)
 {
-	__int64 timebase;
-
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.idle.start = timebase;
+	profile_timer_start(&profile_globals.current_frame.idle);
 
 	return;
 }
@@ -1247,15 +1212,7 @@ void profile_idle_start(
 void profile_idle_end(
 	void)
 {
-	__int64 timebase;
-	real msec;
-
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.idle.end = timebase;
-	msec = (real)((timebase-profile_globals.current_frame.idle.start)*1000.0f/
-		profile_globals.timebase_frequency);
-	profile_globals.current_frame.idle.total += msec;
-	profile_globals.current_frame.idle.frame_total += msec;
+	profile_timer_end(&profile_globals.current_frame.idle);
 
 	return;
 }
@@ -1490,18 +1447,11 @@ static void profile_frame_dump(
 void profile_frame_end(
 	void)
 {
-	__int64 timebase;
-	real msec;
 	short game_tick_index;
 	short window_index;
 	short frame_index;
 
-	QUERY_TIMEBASE(timebase);
-	profile_globals.current_frame.frame.end = timebase;
-	msec = (real)((timebase-profile_globals.current_frame.frame.start)*1000.0f/
-		profile_globals.timebase_frequency);
-	profile_globals.current_frame.frame.total += msec;
-	profile_globals.current_frame.frame.frame_total += msec;
+	profile_timer_end(&profile_globals.current_frame.frame);
 
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 448,
 		(profile_globals.current_frame.game_tick_count >= 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
@@ -1563,6 +1513,76 @@ void profile_frame_end(
 
 
 /* ---------- private code */
+
+static void profile_timer_start_at(
+	struct profile_timer *timer,
+	__int64 start)
+{
+	timer->start = start;
+
+	return;
+}
+
+static void profile_timer_end_at(
+	struct profile_timer *timer,
+	__int64 end)
+{
+	real msec;
+
+	timer->end = end;
+	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
+	timer->total += msec;
+	timer->frame_total += msec;
+
+	return;
+}
+
+static boolean string_starts_with(
+	char const *string,
+	char const *prefix)
+{
+	boolean result = TRUE;
+
+	while (*prefix)
+	{
+		if (*prefix != *string)
+		{
+			result = FALSE;
+			break;
+		}
+
+		prefix++;
+		string++;
+	}
+
+	return result;
+}
+
+static void profile_timer_start(
+	struct profile_timer *timer)
+{
+	__int64 timebase;
+
+	QUERY_TIMEBASE(timebase);
+	timer->start = timebase;
+
+	return;
+}
+
+static void profile_timer_end(
+	struct profile_timer *timer)
+{
+	__int64 timebase;
+	real msec;
+
+	QUERY_TIMEBASE(timebase);
+	timer->end = timebase;
+	msec = (real)((timer->end-timer->start)*1000.0f/profile_globals.timebase_frequency);
+	timer->total += msec;
+	timer->frame_total += msec;
+
+	return;
+}
 
 static int compare_profile_sections(
 	void const *section0,
@@ -1717,7 +1737,7 @@ static void profile_framedump_flush(
 	return;
 }
 
-static void code_0007ee30(
+static void profile_sections_set_active(
 	const char *name,
 	boolean active)
 {
@@ -1733,21 +1753,8 @@ static void code_0007ee30(
 		{
 			if (prefix)
 			{
-				const char *pattern = name+1;
-
-				if (*pattern)
-				{
-					const char *section_name = section->name;
-
-					do
-					{
-						if (*pattern!=*section_name)
-							goto next_section;
-						pattern++;
-						section_name++;
-					}
-					while (*pattern);
-				}
+				if (!string_starts_with(section->name, name+1))
+					goto next_section;
 			}
 			else if (!strstr(section->name, name))
 			{

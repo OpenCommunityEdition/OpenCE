@@ -53,6 +53,18 @@ struct surface3d
 
 /* ---------- prototypes/GEOMETRY.C */
 
+void build_torus(
+	real_matrix4x3 const *matrix,
+	short *vertex_count_reference,
+	short *triangle_strip_count_reference,
+	real_point3d *points,
+	real_point2d *texture_uvs,
+	short *triangle_strip_vertex_indices,
+	short ring_segment_count,
+	real ring_radius,
+	short cylinder_segment_count,
+	real cylinder_radius);
+
 struct geosphere *geosphere_new(
 	short segment_count);
 void geosphere_dispose(
@@ -109,12 +121,12 @@ short convex_polygon2d_clip_to_plane(
 	boolean *clipped,
 	real epsilon);
 short convex_polygon3d_clip_to_plane(
-	short vertex_count,
-	real_point3d const *vertices,
+	short count,
+	real_point3d const *points,
 	real_plane3d const *plane,
-	short maximum_vertex_count,
-	real_point3d *clipped_vertices,
-	short *vertex_indices,
+	short maximum_count,
+	real_point3d *result,
+	boolean *clipped,
 	real epsilon,
 	boolean keep_degenerate);
 short convex_hull2d_intersect(

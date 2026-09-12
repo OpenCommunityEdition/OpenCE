@@ -1,5 +1,22 @@
 # `input_xbox.obj` lifecycle `+0x230` evidence boundary, 2026-09-04
 
+## 2026-09-12 integration decision
+
+The restored initializer and wait-thread graph now names this private member
+`keyboard_queue_state`. That is a **campaign-inferred semantic name**, not a
+recovered Bungie/PDB identifier. The inference is limited to target-proven
+facts: it is a four-byte field in the keyboard lifecycle region immediately
+before `keyboard_handle`, January initializes it to zero between starting the
+input worker and configuring `XInputDebugInitKeyboardQueue`, and no recovered
+code gives it stronger semantics yet. Future evidence may refine the spelling
+without changing layout or bytes.
+
+The integration follows the house rule requiring a semantic conventional name
+rather than retaining an address-derived `unknown + 0x230` label. Exact credit
+is based only on the complete January code, size, relocations, and normalized
+bytes of `_input_keyboard_thread@4` and `_input_initialize`; it is not evidence
+that the provisional member spelling is original.
+
 ## Scope and disposition
 
 This read-only follow-up starts from published canonical commit

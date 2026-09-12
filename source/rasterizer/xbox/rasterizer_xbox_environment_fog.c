@@ -45,7 +45,7 @@ symbols in this file:
 00155860 0200:
 	_code_00155860 (0000)
 00155A60 01f0:
-	_code_00155a60 (0000)
+	_rasterizer_environment_fog_screen_wind_update (0000)
 00155C50 0490:
 	__rasterizer_environment_fog_begin (0000)
 001560E0 0f40:
@@ -198,6 +198,12 @@ enum
 
 /* ---------- structures */
 
+struct real_bounds
+{
+	real lower;
+	real upper;
+};
+
 struct rasterizer_environment_fog_debug_options
 {
 	byte reserved00[2];
@@ -225,6 +231,12 @@ struct fog_screen
 	byte reserved2C[8];
 	real map_scale;
 	struct tag_reference map;
+	real animation_period;
+	real animation_unused;
+	struct real_bounds wind_velocity;
+	struct real_bounds wind_period;
+	real wind_acceleration_weight;
+	real wind_perpendicular_weight;
 };
 
 struct pixel_shader_definition
@@ -282,6 +294,10 @@ struct rasterizer_environment_fog_screen_wind
 {
 	real_vector2d direction;
 	real magnitude;
+	real_vector2d target_direction;
+	real target_magnitude;
+	real change_time;
+	real change_period;
 };
 
 struct rasterizer_environment_fog_screen_window
@@ -290,7 +306,6 @@ struct rasterizer_environment_fog_screen_window
 	word pad002;
 	byte reserved004[0x28];
 	struct rasterizer_environment_fog_screen_wind wind;
-	byte reserved038[0x14];
 };
 
 struct rasterizer_environment_fog_screen_globals
@@ -685,6 +700,76 @@ void _rasterizer_environment_fog_screen_wind_get_vector(
 	wind_vector->i = wind->magnitude * wind->direction.i * dt;
 	wind_vector->j = wind->direction.j * wind->magnitude * dt;
 	wind_vector->k = 0.0f;
+
+	return;
+}
+
+static void rasterizer_environment_fog_screen_wind_update(
+	struct fog_screen const *screen,
+	struct rasterizer_environment_fog_screen_wind *wind)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+		163,
+		screen);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+		164,
+		wind);
+
+	if (screen->wind_velocity.upper > 0.0f)
+	{
+		real_vector2d *target_direction = &wind->target_direction;
+		real weight = 1.0f - screen->wind_acceleration_weight;
+		real acceleration_weight;
+
+		wind->direction.i *= weight;
+		wind->direction.j *= weight;
+		acceleration_weight = screen->wind_acceleration_weight;
+		wind->direction.i += target_direction->i * acceleration_weight;
+		wind->direction.j += target_direction->j * acceleration_weight;
+		if (normalize2d(&wind->direction) == 0.0f)
+		{
+			wind->direction.i = 1.0f;
+			wind->direction.j = 0.0f;
+		}
+		scalars_interpolate(
+			wind->magnitude,
+			wind->target_magnitude,
+			screen->wind_acceleration_weight,
+			&wind->magnitude);
+		if (global_frame_parameters.game_time_sec - wind->change_time >= wind->change_period)
+		{
+			real_vector2d perpendicular;
+			real random_fraction = real_local_random();
+			real weight;
+			real sign;
+			real scale;
+
+			weight = (real)pow(
+				random_fraction,
+				1.0f - screen->wind_perpendicular_weight);
+			sign = local_random_boolean() ? -1.0f : 1.0f;
+			perpendicular2d(&wind->direction, &perpendicular);
+			scale = sign * weight;
+			perpendicular.i *= scale;
+			perpendicular.j *= scale;
+			target_direction->i = wind->direction.i * (1.0f - weight) + perpendicular.i;
+			target_direction->j = wind->direction.j * (1.0f - weight) + perpendicular.j;
+			if (normalize2d(target_direction) == 0.0f)
+			{
+				target_direction->i = 1.0f;
+				target_direction->j = 0.0f;
+			}
+			wind->target_magnitude = real_local_random_range(
+				screen->wind_velocity.lower,
+				screen->wind_velocity.upper);
+			wind->change_time = global_frame_parameters.game_time_sec;
+			wind->change_period = real_local_random_range(
+				screen->wind_period.lower,
+				screen->wind_period.upper);
+		}
+	}
 
 	return;
 }

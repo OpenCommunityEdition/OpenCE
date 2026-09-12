@@ -102,6 +102,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #ifndef _X86_
 #define _X86_
 #endif
@@ -118,6 +119,7 @@ symbols in this file:
 #include "input.h"
 #include "input/input_abstraction.h"
 #include "interface/player_ui.h"
+#include "main/console.h"
 
 /* ---------- constants */
 
@@ -192,7 +194,8 @@ struct input_globals
 	HANDLE update_event_handle;
 	boolean update_event_pending;
 	boolean frame_active;
-	unsigned char reserved3[6];
+	unsigned char reserved3[2];
+	long keyboard_queue_state;
 	HANDLE keyboard_handle;
 	byte key_ticks[NUMBER_OF_KEYS];
 	byte key_latches[NUMBER_OF_KEYS];
@@ -227,6 +230,8 @@ typedef char verify_input_update_event_pending_offset[
 	offsetof(struct input_globals, update_event_pending) == 0x22C ? 1 : -1];
 typedef char verify_input_frame_active_offset[
 	offsetof(struct input_globals, frame_active) == 0x22D ? 1 : -1];
+typedef char verify_input_keyboard_queue_state_offset[
+	offsetof(struct input_globals, keyboard_queue_state) == 0x230 ? 1 : -1];
 typedef char verify_input_keyboard_handle_offset[
 	offsetof(struct input_globals, keyboard_handle) == 0x234 ? 1 : -1];
 typedef char verify_input_key_ticks_offset[
@@ -252,6 +257,10 @@ static void input_get_device_states(
 	void);
 static void input_update_keyboard_devices(
 	void);
+static void input_flush_rumble(
+	void);
+static DWORD WINAPI input_keyboard_thread(
+	void *context);
 
 /* ---------- globals */
 
@@ -1120,4 +1129,113 @@ static void input_update_keyboard_devices(
 	}
 
 	return;
+}
+
+static void input_flush_rumble(
+	void)
+{
+	boolean suppress_rumble =
+		input_globals.suppressed ||
+		console_is_active() ||
+		game_time_get_paused() ||
+		!game_in_progress();
+	XINPUT_FEEDBACK *gamepad_feedback = input_globals.gamepad_feedbacks;
+	HANDLE *gamepad_handle = input_globals.gamepad_handles;
+	struct vibrate_data *gamepad_rumbler_state = input_globals.gamepad_rumbler_states;
+	long gamepad_count = MAXIMUM_GAMEPADS;
+
+	while (gamepad_count)
+	{
+		if (*gamepad_handle != NULL)
+		{
+			if (gamepad_feedback->Header.dwStatus == ERROR_SUCCESS)
+			{
+				gamepad_feedback->Rumble.wLeftMotorSpeed = suppress_rumble
+					? 0
+					: gamepad_rumbler_state->left_frequency;
+				gamepad_feedback->Rumble.wRightMotorSpeed = suppress_rumble
+					? 0
+					: gamepad_rumbler_state->right_frequency;
+				XInputSetState(*gamepad_handle, gamepad_feedback);
+			}
+			else if (gamepad_feedback->Header.dwStatus != ERROR_IO_PENDING)
+			{
+				gamepad_feedback->Header.dwStatus = ERROR_SUCCESS;
+			}
+		}
+
+		gamepad_feedback++;
+		gamepad_handle++;
+		gamepad_rumbler_state++;
+		gamepad_count--;
+	}
+
+	return;
+}
+
+static DWORD WINAPI input_keyboard_thread(
+	void *context)
+{
+	for (;;)
+	{
+		WaitForSingleObject(input_globals.update_event_handle, INFINITE);
+		input_flush_rumble();
+	}
+
+	return ERROR_SUCCESS;
+}
+
+boolean input_initialize(
+	void)
+{
+	XDEVICE_PREALLOC_TYPE device_types[] =
+	{
+		{ XDEVICE_TYPE_GAMEPAD, MAXIMUM_GAMEPADS },
+		{ XDEVICE_TYPE_DEBUG_KEYBOARD, 1 },
+		{ XDEVICE_TYPE_MEMORY_UNIT, 8 }
+	};
+	XINPUT_DEBUG_KEYQUEUE_PARAMETERS keyboard_queue_parameters;
+	long result;
+
+	csmemset(
+		&input_globals.suppressed,
+		0,
+		sizeof(input_globals) - offsetof(struct input_globals, suppressed));
+	XInitDevices(NUMBEROF(device_types), device_types);
+
+	input_globals.update_event_pending = TRUE;
+	input_globals.update_event_handle = CreateEvent(NULL, FALSE, FALSE, NULL);
+	input_globals.update_thread_handle = CreateThread(
+		NULL,
+		0x4000,
+		input_keyboard_thread,
+		NULL,
+		CREATE_SUSPENDED,
+		NULL);
+	SetThreadPriority(input_globals.update_thread_handle, THREAD_PRIORITY_HIGHEST);
+	input_globals.update_thread_started = TRUE;
+	input_globals.keyboard_queue_state = 0;
+
+	keyboard_queue_parameters.dwFlags =
+		XINPUT_DEBUG_KEYQUEUE_FLAG_KEYDOWN |
+		XINPUT_DEBUG_KEYQUEUE_FLAG_KEYREPEAT |
+		XINPUT_DEBUG_KEYQUEUE_FLAG_KEYUP;
+	keyboard_queue_parameters.dwQueueSize = MAXIMUM_BUFFERED_KEYSTROKES;
+	keyboard_queue_parameters.dwRepeatDelay = 500;
+	keyboard_queue_parameters.dwRepeatInterval = 100;
+	result = (long)XInputDebugInitKeyboardQueue(&keyboard_queue_parameters);
+	if (result < ERROR_SUCCESS)
+	{
+		error(
+			_error_silent,
+			"XInputDebugInitKeyboardQueue failed (#%d) during input_initialize()",
+			result);
+	}
+
+	HATInit();
+	input_get_device_states();
+	input_update();
+	input_globals.update_thread_started = FALSE;
+
+	return TRUE;
 }

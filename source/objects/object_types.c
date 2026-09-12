@@ -196,10 +196,6 @@ void unit_handle_region_destroyed(
 void unit_postprocess_node_matrices(
 	long object_index,
 	struct real_matrix4x3 *node_matrices);
-void unit_notify_impulse_sound(
-	long object_index,
-	long sound_index,
-	long source_object_index);
 void unit_render_debug(
 	long object_index);
 

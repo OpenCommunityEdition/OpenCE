@@ -227,7 +227,9 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
 #include "math/integer_math.h"
+#include "memory/data.h"
 #include "memory/data_compress.h"
+#include "memory/texture_page.h"
 
 /* ---------- constants */
 
@@ -310,6 +312,23 @@ enum
 	_bitmap_group_extract_sprites_filthy_bug_fix_bit = 3,
 };
 
+enum
+{
+	_bitmap_group_sprite_budget_32,
+	_bitmap_group_sprite_budget_64,
+	_bitmap_group_sprite_budget_128,
+	_bitmap_group_sprite_budget_256,
+	_bitmap_group_sprite_budget_512,
+	_bitmap_group_sprite_budget_1024,
+};
+
+enum
+{
+	_bitmap_group_sprite_usage_blend_add_sub_max,
+	_bitmap_group_sprite_usage_multiply_min,
+	_bitmap_group_sprite_usage_double_multiply,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -339,6 +358,18 @@ struct bitmap_extract_entry
 	short page_index;
 	word unused;
 	long page_entry_index;
+};
+
+struct bitmap_extract_cube_map_face
+{
+	short source_y_block;
+	short source_x_block;
+	short source_y_edge;
+	short source_x_edge;
+	short source_x_column_delta;
+	short source_y_column_delta;
+	short source_x_row_delta;
+	short source_y_row_delta;
 };
 
 typedef char bitmap_extract_entry_size_assert[
@@ -372,8 +403,13 @@ static boolean extract_sequences(
 	void);
 static boolean extract_without_sequences(
 	void);
-boolean extract_plateless_cube_map(
+static boolean extract_plateless_cube_map(
 	struct bitmap_data *bitmap);
+static void extract_build_texture_pages_by_sequence(
+	struct texture_page **texture_pages,
+	short *texture_page_count,
+	short minimum_page_size,
+	short spacing);
 static short extract_add_bitmap(
 	struct bitmap_data *bitmap);
 static void extract_mipmaps_to_bitmap(
@@ -383,11 +419,11 @@ static boolean extract_3d_textures(
 	void);
 static boolean extract_cube_maps(
 	void);
-boolean extract_sprites(
+static boolean extract_sprites(
 	void);
 static boolean extract_bitmap(
 	rectangle2d const *bounds);
-boolean extract_sequence(
+static boolean extract_sequence(
 	short top,
 	short bottom);
 
@@ -718,6 +754,115 @@ static void extract_warn_about_horizontal_border(
 		}
 	}
 	return;
+}
+
+static boolean extract_plateless_cube_map(
+	struct bitmap_data *bitmap)
+{
+	boolean result = TRUE;
+	short face_size;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x2C2,
+		bitmap_verify(bitmap, TRUE));
+
+	if (!(bitmap->width % 4) &&
+		bitmap->height >= 3 * (bitmap->width / 4) &&
+		!(bitmap->width & (bitmap->width - 1)))
+	{
+		face_size = bitmap->width / 4;
+		if (extract_data.bitmap_count + 6 <= 0x400)
+		{
+			struct bitmap_extract_cube_map_face faces[6] =
+			{
+				{ 0, 1, 1, 0,  0, 1, -1,  0 },
+				{ 1, 1, 1, 1, -1, 0,  0, -1 },
+				{ 2, 1, 0, 1,  0, -1, 1,  0 },
+				{ 3, 1, 0, 0,  1, 0,  0,  1 },
+				{ 0, 0, 1, 0,  0, 1, -1,  0 },
+				{ 0, 2, 1, 0,  0, 1, -1,  0 },
+			};
+			short face_index;
+
+			for (face_index = 0; face_index < NUMBEROF(faces); face_index++)
+			{
+				struct bitmap_extract_cube_map_face *face = &faces[face_index];
+				struct bitmap_extract_entry *entry =
+					&extract_data.bitmaps[extract_data.bitmap_count++];
+
+				entry->bitmap = bitmap_2d_new(
+					(short)face_size,
+					(short)face_size,
+					0,
+					_bitmap_format_a8r8g8b8);
+				if (entry->bitmap)
+				{
+					short source_x =
+						face->source_x_block * face_size +
+						face->source_x_edge * (face_size - 1);
+					short source_y =
+						face->source_y_block * face_size +
+						face->source_y_edge * (face_size - 1);
+					short destination_y;
+
+					for (destination_y = 0; destination_y < face_size; destination_y++)
+					{
+						short row_source_x = source_x;
+						short row_source_y = source_y;
+						short destination_x;
+
+						for (destination_x = 0; destination_x < face_size; destination_x++)
+						{
+							*(pixel32 *)bitmap_2d_address(
+								entry->bitmap,
+								destination_x,
+								destination_y,
+								0) = *(pixel32 *)bitmap_2d_address(
+									bitmap,
+									(short)row_source_x,
+									(short)row_source_y,
+									0);
+							row_source_x += face->source_x_column_delta;
+							row_source_y += face->source_y_column_delta;
+						}
+
+						source_x += face->source_x_row_delta;
+						source_y += face->source_y_row_delta;
+					}
+
+					entry->sequence_index = extract_data.sequence_index;
+					entry->sprite_index = NONE;
+					entry->page_index = NONE;
+					entry->page_entry_index = NONE;
+				}
+				else
+				{
+					error(_error_silent, "### ERROR extract: failed to allocate temporary bitmap");
+					result = FALSE;
+				}
+			}
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"### ERROR extract: can't handle more than (#%d) temporary bitmaps",
+				0x400);
+			result = FALSE;
+		}
+	}
+	else
+	{
+		error(
+			_error_silent,
+			"### ERROR extract: plateless cube map had invalid dimensions #%dx#%d",
+			bitmap->width,
+			bitmap->height);
+		result = FALSE;
+	}
+
+	return result;
 }
 
 static boolean extract_find_bitmap_bounds(
@@ -1080,6 +1225,132 @@ static void extract_pixels_from_mipmap(
 			pixel_index);
 	}
 
+	return;
+}
+
+static void extract_build_texture_pages_by_sequence(
+	struct texture_page **texture_pages,
+	short *texture_page_count,
+	short minimum_page_size,
+	short spacing)
+{
+	short page_count = 0;
+	long spanned_page_count = 1;
+	short sequence_index;
+
+	for (sequence_index = 0;
+		sequence_index < extract_data.group->sequences.count;
+		sequence_index++)
+	{
+		short page_index = 0;
+		short first_bitmap_index = 0;
+		boolean page_complete;
+
+		do
+		{
+			struct texture_page *texture_page;
+			boolean new_page = FALSE;
+			short bitmap_index;
+
+			if (page_index < page_count)
+			{
+				texture_page = texture_pages[page_index];
+				if (texture_page)
+					texture_page_textures_begin(texture_page);
+			}
+			else if (page_count < 32)
+			{
+				texture_page = NULL;
+				new_page = TRUE;
+			}
+			else
+			{
+				break;
+			}
+
+			page_complete = TRUE;
+			for (bitmap_index = first_bitmap_index;
+				bitmap_index < extract_data.bitmap_count;
+				bitmap_index++)
+			{
+				struct bitmap_extract_entry *entry = &extract_data.bitmaps[bitmap_index];
+
+				if (entry->sequence_index == sequence_index)
+				{
+					long page_entry_index;
+
+					if (!texture_page)
+					{
+						short page_width = (short)MIN(
+							ceiling_power2(MAX(minimum_page_size, entry->bitmap->width)),
+							512);
+						short page_height = (short)MIN(
+							ceiling_power2(MAX(minimum_page_size, entry->bitmap->height)),
+							512);
+
+						texture_page = texture_page_new(NULL, page_width, page_height, spacing);
+						if (!texture_page)
+							break;
+
+						texture_page_textures_begin(texture_page);
+						texture_pages[page_count++] = texture_page;
+					}
+
+					page_entry_index = texture_page_texture_new(
+						texture_page,
+						entry->bitmap->width,
+						entry->bitmap->height,
+						TRUE);
+					if (page_entry_index != NONE)
+					{
+						entry->page_index = page_index;
+						entry->page_entry_index = page_entry_index;
+					}
+					else
+					{
+						if (new_page)
+						{
+							spanned_page_count++;
+							first_bitmap_index = bitmap_index;
+							texture_page_textures_end(texture_page);
+						}
+						else
+						{
+							texture_page_textures_cancel(texture_page);
+						}
+
+						page_complete = FALSE;
+						break;
+					}
+				}
+			}
+
+			if (texture_page && page_complete)
+				texture_page_textures_end(texture_page);
+			page_index++;
+		}
+		while (!page_complete);
+	}
+
+	for (sequence_index = 0; sequence_index < page_count; sequence_index++)
+	{
+		struct texture_page *texture_page = texture_pages[sequence_index];
+		short width;
+		short height;
+
+		do
+		{
+			width = texture_page->width / 2;
+			height = texture_page->height / 2;
+		}
+		while (width >= 32 &&
+			height >= 32 &&
+			texture_page_resize(texture_page, width, height));
+	}
+
+	fprintf(stdout, "sequence spanned %d texture pages\r\n", spanned_page_count);
+	fflush(stdout);
+	*texture_page_count = page_count;
 	return;
 }
 
@@ -2026,6 +2297,205 @@ static boolean extract_cube_maps(
 	return result;
 }
 
+static boolean extract_sprites(
+	void)
+{
+	short sprite_page_count = extract_data.group->sprite_budget_count;
+	short spacing = extract_data.group->mipmap_count == 1 ? 1 : 4;
+	long page_size = 32 << (sprite_page_count
+		? extract_data.group->sprite_budget_size
+		: _bitmap_group_sprite_budget_512);
+	long budget_pixel_count = sprite_page_count * page_size * page_size;
+	short maximum_bitmap_dimension = (short)(page_size - 2 * spacing);
+	pixel32 background_colors[3] =
+	{
+		0x00000000,
+		0xFFFFFFFF,
+		0x7F7F7F7F,
+	};
+	struct texture_page *texture_pages[32];
+	short texture_page_count;
+	long total_page_pixel_count = 0;
+	boolean result = TRUE;
+	short bitmap_index;
+
+	for (bitmap_index = 0; result && bitmap_index < extract_data.bitmap_count; bitmap_index++)
+	{
+		struct bitmap_data *bitmap = extract_data.bitmaps[bitmap_index].bitmap;
+
+		if (bitmap &&
+			(bitmap->width > maximum_bitmap_dimension ||
+			bitmap->height > maximum_bitmap_dimension))
+		{
+			error(
+				_error_immediate,
+				"### ERROR one or more sprites do not fit in the requested page size");
+			result = FALSE;
+		}
+	}
+
+	if (result)
+	{
+		if (TEST_FLAG(
+			extract_data.group->flags,
+			_bitmap_group_uniform_sprite_sequences_bit))
+		{
+			error(
+				_error_immediate,
+				"### ERROR hey - don't even try it! (uniform sprite sequences)\n"
+				"don't fucking swim in that septic tank with your mouth open like that");
+		}
+
+		extract_build_texture_pages_by_sequence(
+			texture_pages,
+			&texture_page_count,
+			(short)page_size,
+			spacing);
+		extract_data.group->sprite_spacing = spacing;
+	}
+
+	if (!result)
+		return result;
+
+	for (bitmap_index = 0; result && bitmap_index < texture_page_count; bitmap_index++)
+	{
+		struct texture_page *texture_page = texture_pages[bitmap_index];
+		struct bitmap_data *page_bitmap = bitmap_2d_new(
+			texture_page->width,
+			texture_page->height,
+			0,
+			_bitmap_format_a8r8g8b8);
+
+		if (page_bitmap && page_bitmap->base_address)
+		{
+			short entry_index;
+
+			bitmap_fill(
+				page_bitmap,
+				background_colors[extract_data.group->sprite_usage]);
+			for (entry_index = 0;
+				result && entry_index < extract_data.bitmap_count;
+				entry_index++)
+			{
+				struct bitmap_extract_entry *entry = &extract_data.bitmaps[entry_index];
+				struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+					&extract_data.group->sequences,
+					entry->sequence_index,
+					struct bitmap_group_sequence);
+				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+					&sequence->sprites,
+					entry->sprite_index,
+					struct bitmap_group_sprite);
+
+				if (entry->page_index == bitmap_index)
+				{
+					struct texture_page_texture *texture = texture_page_texture_get(
+						texture_page,
+						entry->page_entry_index);
+					short sprite_spacing = spacing;
+					point2d destination_point;
+
+					if (!TEST_FLAG(
+						extract_data.group->flags,
+						_bitmap_group_extract_sprites_filthy_bug_fix_bit) &&
+						texture_page->textures->actual_count == 1)
+					{
+						sprite_spacing = 0;
+					}
+
+					sprite->bitmap_index = bitmap_index;
+					sprite->registration_point.x =
+						(sprite_spacing + sprite->registration_point.x) / texture_page->width;
+					sprite->registration_point.y =
+						(sprite_spacing + sprite->registration_point.y) / texture_page->height;
+					sprite->bounds.x0 =
+						(real)(texture->x - sprite_spacing) / texture_page->width;
+					sprite->bounds.y0 =
+						(real)(texture->y - sprite_spacing) / texture_page->height;
+					sprite->bounds.x1 =
+						(real)(texture->x + texture->width + sprite_spacing) / texture_page->width;
+					sprite->bounds.y1 =
+						(real)(texture->y + texture->height + sprite_spacing) / texture_page->height;
+
+					if (sequence->first_bitmap_index == NONE)
+					{
+						sequence->first_bitmap_index = bitmap_index;
+						sequence->bitmap_count = 1;
+					}
+					else
+					{
+						sequence->bitmap_count = bitmap_index - sequence->first_bitmap_index;
+					}
+
+					destination_point.x = texture->x;
+					destination_point.y = texture->y;
+					bitmap_copy(
+						page_bitmap,
+						&destination_point,
+						NULL,
+						entry->bitmap,
+						NULL,
+						0xFFFFFFFF,
+						0);
+					bitmap_delete(entry->bitmap);
+				}
+			}
+
+			if (extract_add_bitmap(page_bitmap) != NONE)
+			{
+				total_page_pixel_count += texture_page->width * texture_page->height;
+				bitmap_delete(page_bitmap);
+			}
+		}
+		else
+		{
+			error(
+				_error_silent,
+				"### ERROR extract_sprite: failed to allocate texture page bitmap");
+			result = FALSE;
+		}
+
+		fprintf(
+			stdout,
+			"texture page created #%dx#%d (%3.2f%% used)\r\n",
+			texture_page->width,
+			texture_page->height,
+			texture_page_fraction_used(texture_page, TRUE) * 100.0f);
+		fflush(stdout);
+		texture_page_delete(texture_page);
+	}
+
+	if (result)
+	{
+		if ((real)budget_pixel_count <= 0.0f)
+		{
+			fprintf(stdout, "### WARNING no sprite budget set\r\n");
+			fflush(stdout);
+		}
+		else
+		{
+			real budget_fraction =
+				(real)total_page_pixel_count / (real)budget_pixel_count;
+
+			if (budget_fraction <= 1.0f)
+			{
+				fprintf(stdout, "sprite budget met (%3.0f%%)\r\n", budget_fraction * 100.0f);
+				fflush(stdout);
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"### ERROR sprite budget exceeded (%3.0f%%)",
+					budget_fraction * 100.0f);
+				return FALSE;
+			}
+		}
+	}
+
+	return result;
+}
+
 static boolean extract_without_sequences(
 	void)
 {
@@ -2087,6 +2557,129 @@ static boolean extract_without_sequences(
 				FALSE,
 				"### ERROR unsupported bitmap group type");
 			break;
+		}
+	}
+
+	return result;
+}
+
+static boolean extract_sequence(
+	short top,
+	short bottom)
+{
+	boolean result = TRUE;
+	short x = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x234,
+		top >= 0);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x235,
+		bottom > top);
+	match_assert(
+		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+		0x236,
+		bottom <= extract_data.plate->height);
+
+	while (result && x < extract_data.plate->width)
+	{
+		rectangle2d bounds;
+		short extraction_state = 0;
+
+		bounds.y0 = top;
+		bounds.x0 = SHORT_MAX;
+		bounds.y1 = bottom;
+		bounds.x1 = SHORT_MIN;
+		while (extraction_state != 2 && x < extract_data.plate->width)
+		{
+			boolean found_bitmap = FALSE;
+			short y;
+
+			for (y = top; y < bottom; y++)
+			{
+				pixel32 color = *(pixel32 *)bitmap_2d_address(
+					extract_data.plate,
+					x,
+					y,
+					0) & 0xFFFFFF;
+
+				if (color != extract_data.bottom_reference &&
+					color != extract_data.top_reference)
+				{
+					found_bitmap = TRUE;
+					if (extraction_state == 0)
+					{
+						extraction_state = 1;
+						bounds.x0 = x;
+					}
+
+					bounds.y0 = MIN(y, bounds.y0);
+					bounds.y1 = MAX(y, bounds.y1);
+					bounds.x1 = x;
+				}
+			}
+
+			if (extraction_state == 1 && !found_bitmap)
+				extraction_state = 2;
+			x++;
+		}
+
+		if (extraction_state != 0)
+		{
+			bounds.x1++;
+			bounds.y1++;
+			if (TEST_FLAG(
+				extract_data.group->flags,
+				_bitmap_group_extract_sprites_filthy_bug_fix_bit))
+			{
+				short trim_y;
+
+				for (trim_y = bounds.y0; trim_y < bounds.y1; trim_y++)
+				{
+					short trim_x;
+
+					for (trim_x = bounds.x0; trim_x < bounds.x1; trim_x++)
+					{
+						pixel32 color = *(pixel32 *)bitmap_2d_address(
+							extract_data.plate,
+							trim_x,
+							trim_y,
+							0) & 0xFFFFFF;
+
+						if (color != extract_data.top_reference)
+							break;
+					}
+
+					if (trim_x < bounds.x1)
+						break;
+				}
+				bounds.y0 = trim_y;
+
+				for (trim_y = bounds.y1 - 2; trim_y >= bounds.y0; trim_y--)
+				{
+					short trim_x;
+
+					for (trim_x = bounds.x0; trim_x < bounds.x1; trim_x++)
+					{
+						pixel32 color = *(pixel32 *)bitmap_2d_address(
+							extract_data.plate,
+							trim_x,
+							trim_y,
+							0) & 0xFFFFFF;
+
+						if (color != extract_data.top_reference)
+							break;
+					}
+
+					if (trim_x < bounds.x1)
+						break;
+				}
+				bounds.y1 = trim_y + 1;
+			}
+
+			result = extract_bitmap(&bounds);
 		}
 	}
 

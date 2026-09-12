@@ -436,3 +436,24 @@ All retained residual bodies are explicitly parked at zero exact credit. See
 and its companion fuzzy ledgers. The canonical treemap is refreshed for this
 boundary. The next required refresh threshold is **1,113,239 meaningful
 accepted exact code bytes**.
+
+## 2026-09-12 sixth 10K reconciliation packet
+
+Relative to published commit `a565219da1`, the canonical semantic ledger
+advances from 1,103,239 meaningful bytes / 6,828 accepted functions to
+**1,113,556 meaningful bytes / 6,888 accepted functions**: a net gain of
+**10,317 bytes / 60 functions**. The independent fail-closed target-section
+census records 60 strict gains / 10,383 meaningful / 10,880 padded bytes with
+zero regressions.
+
+One newly strict 493-byte Texture Cache function was already credited at the
+previous boundary and is not double-counted. `render_debug_decals` receives
+427 semantic-exact bytes only after code bytes, relocation shape, and resolved
+final addresses agree; its same-address symbolic alias remains fail-closed in
+the strict tier. All other retained residual bodies are recorded in the park
+manifest with zero exact credit. See [the sixth 10K ledger](object_matching_logs/lane_reconciliation_10k_batch_6_20260912.md).
+
+The full source build, stable regression sweep, 447-entry park validation,
+object-admission audit, and complete 1,144-test plus 26-subtest suite pass. The
+canonical treemap is refreshed for this boundary. The next required refresh
+threshold is **1,123,556 meaningful accepted exact code bytes**.

@@ -220,6 +220,7 @@ symbols in this file:
 #define plane3d_from_point_and_normal plane3d_from_point_and_normal_inline
 #define plane3d_negate plane3d_negate_inline
 #define plane3d_distance_to_point plane3d_distance_to_point_inline
+#define REAL_MATH_EXTERNAL_PROJECT_POINT3D
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
@@ -232,6 +233,7 @@ symbols in this file:
 #undef plane3d_from_point_and_normal
 #undef plane3d_negate
 #undef plane3d_distance_to_point
+#undef REAL_MATH_EXTERNAL_PROJECT_POINT3D
 
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -247,6 +249,9 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "effects/decal_definitions.h"
 #include "rasterizer/rasterizer_debug_options.h"
+#include "render/render.h"
+#include "render/render_debug.h"
+#include "saved games/game_state.h"
 #include "shaders/shader_definitions.h"
 
 /* ---------- constants */
@@ -439,11 +444,8 @@ static void decal_sprite_get_bounds(
 	real radius,
 	real_rectangle2d *sprite_bounds,
 	real_rectangle2d *extent);
-/* These three January-private callees are not yet reconstructed.  Keep their
-   typed declarations local to this translation unit; their external linkage
-   is only the compiler's unresolved-symbol representation until the static
-   definitions are restored. */
-void decal_projection_create(
+/* These January-private callees belong to this translation unit. */
+static void decal_projection_create(
 	real_matrix4x3 const *basis,
 	real_rectangle2d const *extent,
 	struct decal_projection *projection);
@@ -471,10 +473,12 @@ extern struct data_array *global_decal_data;
 
 boolean decals_enabled= TRUE;
 static boolean decal_locked_count_reported;
-static boolean decal_delete_locked_reported;
-static boolean decal_delete_permanent_reported;
 static struct decal_globals *decal_globals;
 static struct decal_geometry decal_geometry;
+static boolean decals_unlock_locked_count_reported;
+static boolean decals_unlock_permanent_count_reported;
+static boolean decal_delete_locked_reported;
+static boolean decal_delete_permanent_reported;
 
 struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] =
 {
@@ -485,6 +489,53 @@ struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] 
 };
 
 /* ---------- public code */
+
+void decals_initialize(
+	void)
+{
+	global_decal_data = game_state_data_new(
+		"decals",
+		MAXIMUM_DECALS_PER_MAP,
+		sizeof(struct decal_datum));
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 593, global_decal_data);
+	global_decal_data->identifier_zero_invalid = TRUE;
+
+	decal_globals = game_state_malloc(
+		"decal globals",
+		NULL,
+		sizeof(struct decal_globals));
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 596, decal_globals);
+
+	rasterizer_decals_initialize();
+
+	decal_geometry.decal_vertex_count = 0;
+	decal_geometry.decal_surface_count = 0;
+
+	return;
+}
+
+void decals_initialize_for_new_map(
+	void)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 610, global_decal_data);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 611, decal_globals);
+
+	csmemset(
+		decal_globals->first_decal_indices,
+		NONE,
+		sizeof(decal_globals->first_decal_indices));
+	decal_globals->first_disconnected_decal_index = NONE;
+	decal_globals->locked_count = 0;
+	decal_globals->permanent_count = 0;
+
+	data_make_valid(global_decal_data);
+	rasterizer_decals_initialize_for_new_map();
+
+	decal_geometry.decal_vertex_count = 0;
+	decal_geometry.decal_surface_count = 0;
+
+	return;
+}
 
 void decals_dispose_from_old_map(
 	void)
@@ -502,6 +553,67 @@ void decals_dispose(
 {
 	global_decal_data = NULL;
 	rasterizer_decals_dispose();
+
+	return;
+}
+
+void decals_unlock(
+	boolean permanent)
+{
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 801, global_decal_data);
+
+	if (global_decal_data->valid)
+	{
+		struct data_iterator iterator;
+		struct decal_datum *decal;
+
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 808, decal_globals);
+
+		data_iterator_new(&iterator, global_decal_data);
+		while ((decal = data_iterator_next(&iterator)) != NULL)
+		{
+			if (TEST_FLAG(decal->flags, _decal_locked_bit))
+			{
+				SET_FLAG(decal->flags, _decal_locked_bit, FALSE);
+				decal_globals->locked_count -= 1;
+			}
+
+			if (permanent && TEST_FLAG(decal->flags, _decal_permanent_bit))
+			{
+				SET_FLAG(decal->flags, _decal_permanent_bit, FALSE);
+				decal_globals->permanent_count -= 1;
+			}
+		}
+
+		if (decal_globals->locked_count != 0)
+		{
+			if (!decals_unlock_locked_count_reported)
+			{
+				error(
+					_error_silent,
+					"### ERROR decals: locked count is invalid (#%d) -- tell Bernie!!",
+					decal_globals->locked_count);
+				decals_unlock_locked_count_reported = TRUE;
+			}
+			decal_globals->locked_count = 0;
+		}
+
+		if (permanent && decal_globals->permanent_count != 0)
+		{
+			if (!decals_unlock_permanent_count_reported)
+			{
+				error(
+					_error_silent,
+					"### ERROR decals: permanent count is invalid (#%d) -- tell Bernie!!",
+					decal_globals->permanent_count);
+				decals_unlock_permanent_count_reported = TRUE;
+			}
+			decal_globals->permanent_count = 0;
+		}
+	}
+
+	decal_geometry.decal_vertex_count = 0;
+	decal_geometry.decal_surface_count = 0;
 
 	return;
 }
@@ -527,6 +639,117 @@ void decal_new_from_media_collision(
 	short forced_sequence_index,
 	struct decal_editor_geometry *editor_geometry)
 {
+	return;
+}
+
+void render_debug_decals(
+	void)
+{
+	if (debug_decals)
+	{
+		short decal_surface_vertex_base = 0;
+		short decal_surface_index;
+
+		for (decal_surface_index = 0;
+			decal_surface_index<decal_geometry.decal_surface_count;
+			decal_surface_index++)
+		{
+			short decal_surface_vertex_count =
+				decal_geometry.decal_surface_vertex_counts[decal_surface_index];
+			struct decal_vertex *previous_decal_vertex =
+				&decal_geometry.decal_vertices[
+					decal_surface_vertex_base + decal_surface_vertex_count - 1];
+			short decal_surface_vertex_index;
+
+			for (decal_surface_vertex_index = 0;
+				decal_surface_vertex_index<
+					decal_geometry.decal_surface_vertex_counts[decal_surface_index];
+				decal_surface_vertex_index++)
+			{
+				struct decal_vertex *decal_vertex =
+					&decal_geometry.decal_vertices[
+						decal_surface_vertex_base + decal_surface_vertex_index];
+
+				render_debug_line(
+					TRUE,
+					&previous_decal_vertex->position,
+					&decal_vertex->position,
+					global_real_argb_yellow);
+				render_debug_point(
+					TRUE,
+					&decal_vertex->position,
+					0.0625f,
+					decal_vertex->clipped
+						? global_real_argb_red
+						: global_real_argb_white);
+
+				previous_decal_vertex = decal_vertex;
+			}
+
+			{
+				short other_decal_surface_index;
+
+				for (other_decal_surface_index = 0;
+					other_decal_surface_index<decal_geometry.decal_surface_count;
+					other_decal_surface_index++)
+				{
+					if (other_decal_surface_index!=decal_surface_index)
+					{
+						long other_surface_index =
+							decal_geometry.decal_surface_indices[other_decal_surface_index];
+						long surface_index =
+							decal_geometry.decal_surface_indices[decal_surface_index];
+
+						if (surface_index==other_surface_index)
+						{
+							error(
+								_error_silent,
+								"### ERROR decals: duplicate surface indices in queue -- tell Bernie!!");
+						}
+					}
+				}
+			}
+
+			decal_surface_vertex_base += decal_surface_vertex_count;
+		}
+
+		{
+			short rendered_cluster_index;
+
+			for (rendered_cluster_index = 0;
+				rendered_cluster_index<render.rendered_cluster_count;
+				rendered_cluster_index++)
+			{
+				short cluster_index =
+					rendered_cluster_get(rendered_cluster_index)->cluster_index;
+				short layer;
+
+				for (layer = 0; layer<NUMBER_OF_DECAL_LAYERS; layer++)
+				{
+					long decal_index = decal_get_first_decal_index(cluster_index, layer);
+
+					while (decal_index!=NONE)
+					{
+						struct decal_datum *decal = DECAL_GET(decal_index);
+						char string[64];
+
+						sprintf(
+							string,
+							"%d",
+							decal->quad_count * NUMBER_OF_VERTICES_PER_QUADRALATERAL);
+						render_debug_string_at_point(
+							FALSE,
+							&decal->position,
+							string,
+							global_real_argb_red);
+
+						decal_index = decal->next_decal_index;
+					}
+				}
+			}
+		}
+	}
+
 	return;
 }
 
@@ -707,6 +930,61 @@ real plane3d_distance_to_point(
 		- plane->d;
 }
 
+pixel32 real_a_rgb_color_to_pixel32(
+	real alpha,
+	real_rgb_color const *color)
+{
+	real scale = 255.0f;
+	pixel32 result;
+
+	match_assert(
+		"..\\bitmaps\\bitmaps_inlines.h",
+		243,
+		alpha>=0.0f && alpha<=1.0f);
+	match_vassert(
+		"..\\bitmaps\\bitmaps_inlines.h",
+		244,
+		valid_real_rgb_color(color),
+		csprintf(
+			temporary,
+			"%s: assert_valid_real_rgb_color(%f, %f, %f)",
+			"color",
+			color->red,
+			color->green,
+			color->blue));
+
+	__asm
+	{
+		mov		edx, color
+		fld		alpha
+		fld		dword ptr [edx]
+		fld		dword ptr [edx+4]
+		fld		dword ptr [edx+8]
+		fld		scale
+		fmul	st(4), st
+		fmul	st(3), st
+		fmul	st(2), st
+		fmulp	st(1), st
+		fistp	result
+		and		result, 0FFh
+		mov		edx, result
+		fistp	result
+		and		result, 0FFh
+		shl		result, 8
+		or		edx, result
+		fistp	result
+		and		result, 0FFh
+		shl		result, 16
+		or		edx, result
+		fistp	result
+		shl		result, 24
+		or		edx, result
+		mov		result, edx
+	}
+
+	return result;
+}
+
 void decals_update(
 	void)
 {
@@ -837,6 +1115,102 @@ void decal_delete(
 	}
 
 	datum_delete(global_decal_data, decal_index);
+
+	return;
+}
+
+static void decal_projection_create(
+	real_matrix4x3 const *basis,
+	real_rectangle2d const *extent,
+	struct decal_projection *projection)
+{
+	real_point3d point;
+
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 0x410, basis);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 0x411, projection);
+
+	projection->basis = *basis;
+	projection->extent = *extent;
+	plane3d_from_point_and_normal(
+		&projection->plane,
+		&basis->position,
+		&basis->up);
+	projection->projection = projection_from_vector3d(&projection->plane.n);
+	projection->sign = projection_sign_from_vector3d(
+		&projection->plane.n,
+		projection->projection);
+
+	point.x = extent->x0 * basis->forward.i
+		+ extent->y0 * basis->left.i
+		+ basis->position.x;
+	point.y = extent->y0 * basis->left.j
+		+ extent->x0 * basis->forward.j
+		+ basis->position.y;
+	point.z = extent->y0 * basis->left.k
+		+ extent->x0 * basis->forward.k
+		+ basis->position.z;
+	project_point3d(
+		&point,
+		projection->projection,
+		projection->sign,
+		&projection->decal_points2d[0]);
+
+	point.x = extent->x1 * basis->forward.i
+		+ extent->y0 * basis->left.i
+		+ basis->position.x;
+	point.y = extent->y0 * basis->left.j
+		+ extent->x1 * basis->forward.j
+		+ basis->position.y;
+	point.z = extent->y0 * basis->left.k
+		+ extent->x1 * basis->forward.k
+		+ basis->position.z;
+	project_point3d(
+		&point,
+		projection->projection,
+		projection->sign,
+		&projection->decal_points2d[1]);
+
+	point.x = extent->x1 * basis->forward.i
+		+ extent->y1 * basis->left.i
+		+ basis->position.x;
+	point.y = extent->y1 * basis->left.j
+		+ extent->x1 * basis->forward.j
+		+ basis->position.y;
+	point.z = extent->x1 * basis->forward.k
+		+ extent->y1 * basis->left.k
+		+ basis->position.z;
+	project_point3d(
+		&point,
+		projection->projection,
+		projection->sign,
+		&projection->decal_points2d[2]);
+
+	point.x = extent->y1 * basis->left.i
+		+ extent->x0 * basis->forward.i
+		+ basis->position.x;
+	point.y = extent->y1 * basis->left.j
+		+ extent->x0 * basis->forward.j
+		+ basis->position.y;
+	point.z = extent->y1 * basis->left.k
+		+ extent->x0 * basis->forward.k
+		+ basis->position.z;
+	project_point3d(
+		&point,
+		projection->projection,
+		projection->sign,
+		&projection->decal_points2d[3]);
+
+	vector_from_points2d(
+		&projection->decal_points2d[0],
+		&projection->decal_points2d[1],
+		&projection->texture_u_axis);
+	vector_from_points2d(
+		&projection->decal_points2d[0],
+		&projection->decal_points2d[3],
+		&projection->texture_v_axis);
+	projection->texture_scale = 1.0f / cross_product2d(
+		&projection->texture_u_axis,
+		&projection->texture_v_axis);
 
 	return;
 }

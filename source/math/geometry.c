@@ -318,6 +318,113 @@ real vector_intersect_plane3d(
 		-(vector->i*plane->n.i + vector->j*plane->n.j + vector->k*plane->n.k);
 }
 
+void build_torus(
+	real_matrix4x3 const *matrix,
+	short *vertex_count_reference,
+	short *triangle_strip_count_reference,
+	real_point3d *points,
+	real_point2d *texture_uvs,
+	short *triangle_strip_vertex_indices,
+	short ring_segment_count,
+	real ring_radius,
+	short cylinder_segment_count,
+	real cylinder_radius)
+{
+	long vertex_count = 0;
+	long triangle_strip_count = 0;
+	short ring_index;
+
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 346, ring_segment_count>2);
+	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 347, cylinder_segment_count>2);
+
+	for (ring_index = 0; ring_index <= ring_segment_count; ring_index++)
+	{
+		real ring_fraction = (real)ring_index / (real)ring_segment_count;
+		real ring_angle = ring_fraction * 2.f*_pi;
+		real ring_cosine = cosine(ring_angle);
+		real ring_sine = sine(ring_angle);
+		real ring_cosine_radius = ring_cosine*ring_radius;
+		real ring_sine_radius = ring_sine*ring_radius;
+		real_vector3d radial;
+		real_vector3d axis;
+		real cylinder_cosine_radius;
+		real cylinder_sine_radius;
+		short cylinder_index;
+
+		set_real_vector3d(&radial, ring_cosine_radius, ring_sine_radius, 0.f);
+		cross_product3d(&radial, global_up3d, &axis);
+		normalize3d(&axis);
+
+		cylinder_cosine_radius = ring_cosine*cylinder_radius;
+		cylinder_sine_radius = ring_sine*cylinder_radius;
+
+		for (cylinder_index = 0; cylinder_index <= cylinder_segment_count; cylinder_index++)
+		{
+			texture_uvs->y = ring_fraction*2.f;
+
+			if (ring_index > 0)
+			{
+				if (cylinder_index == 0)
+				{
+					*triangle_strip_vertex_indices++ = 2*(cylinder_segment_count + 1);
+					triangle_strip_count++;
+				}
+
+				*triangle_strip_vertex_indices++ = (short)vertex_count;
+				*triangle_strip_vertex_indices++ = (short)(vertex_count - cylinder_segment_count - 1);
+			}
+
+			if (ring_index == ring_segment_count)
+			{
+				long wrapped_index = (cylinder_segment_count + 1)*ring_segment_count;
+
+				*points = points[-wrapped_index];
+				texture_uvs->x = texture_uvs[-wrapped_index].x;
+			}
+			else
+			{
+				texture_uvs->x = ((real)cylinder_index / (real)cylinder_segment_count)*2.f;
+
+				if (cylinder_index == cylinder_segment_count)
+				{
+					*points = points[-cylinder_segment_count];
+				}
+				else
+				{
+					real cylinder_angle = ((real)cylinder_index / (real)cylinder_segment_count)*2.f*_pi;
+					real_vector3d rotated_point;
+
+					set_real_vector3d(
+						&rotated_point,
+						cylinder_cosine_radius,
+						cylinder_sine_radius,
+						0.f);
+					rotate_vector_about_axis(
+						&rotated_point,
+						&axis,
+						sine(cylinder_angle),
+						cosine(cylinder_angle));
+					set_real_point3d(
+						points,
+						rotated_point.i + ring_cosine_radius,
+						rotated_point.j + ring_sine_radius,
+						rotated_point.k);
+					matrix4x3_transform_point(matrix, points, points);
+				}
+			}
+
+			points++;
+			texture_uvs++;
+			vertex_count++;
+		}
+	}
+
+	*vertex_count_reference = (short)vertex_count;
+	*triangle_strip_count_reference = (short)triangle_strip_count;
+
+	return;
+}
+
 short convex_hull2d(
 	short vertex_count,
 	real_point2d const *points,
@@ -595,6 +702,21 @@ real convex_hull2d_area(
 	return (real)fabs(area);
 }
 
+real convex_hull2d_perimeter(
+	short count,
+	real_point2d const *points)
+{
+	real perimeter = distance2d(points + count - 1, points);
+	short index;
+
+	for (index = 1; index < count; index++)
+	{
+		perimeter += distance2d(points + index - 1, points + index);
+	}
+
+	return perimeter;
+}
+
 boolean convex_hull2d_test_vector(
 	short count,
 	real_point2d const *points,
@@ -666,6 +788,150 @@ boolean convex_hull2d_test_vector(
 	return TRUE;
 }
 
+short convex_polygon2d_clip_to_plane(
+	short count,
+	real_point2d const *points,
+	real_plane2d const *plane,
+	short maximum_count,
+	real_point2d *result,
+	long *clip_flags,
+	boolean *clipped,
+	real epsilon)
+{
+	real_point2d local_points[CLIP_BUFFER_SIZE];
+	boolean any_in_front = FALSE;
+	boolean any_behind = FALSE;
+	long result_clip_flags = 0;
+	short result_count = 0;
+	real_point2d const *previous_point;
+	boolean previous_in_front;
+	short point_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\geometry.c",
+		1350,
+		count>=NUMBER_OF_VERTICES_PER_TRIANGLE);
+
+	if (clipped)
+	{
+		*clipped = FALSE;
+	}
+
+	if (points == result)
+	{
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1357, count<=CLIP_BUFFER_SIZE);
+		csmemcpy(local_points, points, sizeof(real_point2d)*count);
+		points = local_points;
+	}
+
+	previous_point = points + count - 1;
+	previous_in_front = plane2d_distance_to_point(plane, previous_point) >= 0.f;
+
+	for (point_index = 0; point_index < count; point_index++)
+	{
+		real_point2d const *point = points + point_index;
+		real distance = plane2d_distance_to_point(plane, point);
+		boolean in_front = distance >= 0.f;
+
+		if (distance > epsilon)
+		{
+			any_in_front = TRUE;
+		}
+		else if (distance < -epsilon)
+		{
+			any_behind = TRUE;
+		}
+
+		if (in_front != previous_in_front)
+		{
+			real_vector2d vector;
+			real scale;
+
+			if (result_count == maximum_count)
+			{
+				result_count = NONE;
+				break;
+			}
+
+			if (clipped)
+			{
+				*clipped = TRUE;
+			}
+
+			vector_from_points2d(point, previous_point, &vector);
+			scale = PIN(vector_intersect_plane2d(point, &vector, plane), 0.f, 1.f);
+			point_from_line2d(point, &vector, scale, result + result_count);
+			SET_FLAG(result_clip_flags, result_count, TRUE);
+			result_count++;
+
+			if (result_count != 1 &&
+				((fabs(result[result_count - 1].x - result[0].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[0].y) < epsilon) ||
+				(fabs(result[result_count - 1].x - result[result_count - 2].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[result_count - 2].y) < epsilon)))
+			{
+				result_count--;
+			}
+		}
+
+		if (in_front)
+		{
+			if (result_count == maximum_count)
+			{
+				result_count = NONE;
+				break;
+			}
+
+			result[result_count] = *point;
+			SET_FLAG(result_clip_flags, result_count, clip_flags && TEST_FLAG(*clip_flags, point_index));
+			result_count++;
+
+			if (result_count != 1 &&
+				((fabs(result[result_count - 1].x - result[0].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[0].y) < epsilon) ||
+				(fabs(result[result_count - 1].x - result[result_count - 2].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[result_count - 2].y) < epsilon)))
+			{
+				result_count--;
+			}
+		}
+
+		previous_point = point;
+		previous_in_front = in_front;
+	}
+
+	if (result_count != NONE)
+	{
+		if (result_count < 3)
+		{
+			result_count = 0;
+		}
+
+		if (!any_in_front)
+		{
+			result_count = 0;
+		}
+		else if (!any_behind)
+		{
+			match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1441, count>=0 && count<=maximum_count);
+			csmemcpy(result, points, sizeof(real_point2d)*count);
+			result_count = count;
+		}
+	}
+	else
+	{
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1448, count>=0 && count<=maximum_count);
+		csmemcpy(result, points, sizeof(real_point2d)*count);
+	}
+
+	if (clip_flags)
+	{
+		*clip_flags = result_clip_flags;
+	}
+
+	return result_count;
+}
+
 boolean convex_polygon2d_verify(
 	short count,
 	real *vertices)
@@ -686,6 +952,152 @@ boolean convex_polygon2d_verify(
 	}
 
 	return TRUE;
+}
+
+short convex_polygon3d_clip_to_plane(
+	short count,
+	real_point3d const *points,
+	real_plane3d const *plane,
+	short maximum_count,
+	real_point3d *result,
+	boolean *clipped,
+	real epsilon,
+	boolean keep_degenerate)
+{
+	real_point3d local_points[CLIP_BUFFER_SIZE];
+	boolean any_in_front = FALSE;
+	boolean any_behind = FALSE;
+	short result_count = 0;
+	real_point3d const *previous_point;
+	boolean previous_in_front;
+	short point_index;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\math\\geometry.c",
+		1493,
+		count>=NUMBER_OF_VERTICES_PER_TRIANGLE);
+
+	if (clipped)
+	{
+		*clipped = FALSE;
+	}
+
+	if (points == result)
+	{
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1500, count<=CLIP_BUFFER_SIZE);
+		csmemcpy(local_points, points, sizeof(real_point3d)*count);
+		points = local_points;
+	}
+
+	previous_point = points + count - 1;
+	previous_in_front = plane3d_distance_to_point(plane, previous_point) >= 0.f;
+
+	for (point_index = 0; point_index < count; point_index++)
+	{
+		real_point3d const *point = points + point_index;
+		real distance = plane3d_distance_to_point(plane, point);
+		boolean in_front = distance >= 0.f;
+
+		if (distance > epsilon)
+		{
+			any_in_front = TRUE;
+		}
+		else if (distance < -epsilon)
+		{
+			any_behind = TRUE;
+		}
+
+		if (in_front != previous_in_front)
+		{
+			real_vector3d vector;
+			real scale;
+
+			if (result_count == maximum_count)
+			{
+				result_count = NONE;
+				break;
+			}
+
+			if (clipped)
+			{
+				*clipped = TRUE;
+			}
+
+			vector_from_points3d(point, previous_point, &vector);
+			scale = PIN(vector_intersect_plane3d(point, &vector, plane), 0.f, 1.f);
+			result[result_count].x = vector.i*scale + point->x;
+			result[result_count].y = vector.j*scale + point->y;
+			result[result_count].z = vector.k*scale + point->z;
+			result_count++;
+
+			if (result_count != 1 &&
+				((fabs(result[result_count - 1].x - result[0].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[0].y) < epsilon &&
+					fabs(result[result_count - 1].z - result[0].z) < epsilon) ||
+				(fabs(result[result_count - 1].x - result[result_count - 2].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[result_count - 2].y) < epsilon &&
+					fabs(result[result_count - 1].z - result[result_count - 2].z) < epsilon)))
+			{
+				result_count--;
+			}
+		}
+
+		if (in_front)
+		{
+			if (result_count >= maximum_count)
+			{
+				result_count = NONE;
+				break;
+			}
+
+			result[result_count] = *point;
+			result_count++;
+
+			if (result_count != 1 &&
+				((fabs(result[result_count - 1].x - result[0].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[0].y) < epsilon &&
+					fabs(result[result_count - 1].z - result[0].z) < epsilon) ||
+				(fabs(result[result_count - 1].x - result[result_count - 2].x) < epsilon &&
+					fabs(result[result_count - 1].y - result[result_count - 2].y) < epsilon &&
+					fabs(result[result_count - 1].z - result[result_count - 2].z) < epsilon)))
+			{
+				result_count--;
+			}
+		}
+
+		previous_point = point;
+		previous_in_front = in_front;
+	}
+
+	if (result_count == NONE)
+	{
+		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1591, count>=0 && count<=maximum_count);
+		csmemcpy(result, points, sizeof(real_point3d)*count);
+	}
+	else
+	{
+		if (result_count < 3)
+		{
+			result_count = 0;
+		}
+
+		if (!any_in_front)
+		{
+			if (any_behind || !keep_degenerate)
+			{
+				return 0;
+			}
+		}
+
+		if (!any_behind)
+		{
+			match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1584, count>=0 && count<=maximum_count);
+			csmemcpy(result, points, sizeof(real_point3d)*count);
+			result_count = count;
+		}
+	}
+
+	return result_count;
 }
 
 boolean convex_polygon3d_verify(

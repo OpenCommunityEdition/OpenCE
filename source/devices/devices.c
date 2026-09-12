@@ -188,7 +188,7 @@ void device_group_set_actual_value(
 	real actual_value);
 static short device_group_new(
 	real initial_value,
-	word flags);
+	unsigned long flags);
 static void create_initial_device_groups(
 	void);
 static void device_group_delete(
@@ -1021,7 +1021,7 @@ boolean device_frontfacing(
 
 static short device_group_new(
 	real initial_value,
-	word flags)
+	unsigned long flags)
 {
 	short group_index = datum_new(device_groups_data);
 

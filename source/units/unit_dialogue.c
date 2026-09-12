@@ -81,9 +81,14 @@ symbols in this file:
 
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
+#include "ai/ai_runtime.h"
+#include "ai/actors.h"
 #include "dialogue_definitions.h"
 #include "game/game.h"
+#include "game/game_globals.h"
 #include "main/console.h"
+#include "objects/damage.h"
+#include "objects/damage_effect_definitions.h"
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_groups.h"
@@ -97,6 +102,43 @@ enum unit_play_speech_type
 	_unit_play_speech_queue,
 	_unit_play_speech_immediate,
 	_unit_play_speech_immediate_dequeue,
+};
+
+enum unit_dialogue_vocalization_type
+{
+	_vocalization_pain_body = 6,
+	_vocalization_pain_body_major = 7,
+	_vocalization_pain_shield = 8,
+	_vocalization_pain_falling = 9,
+	_vocalization_scream_fear = 10,
+	_vocalization_scream_pain = 11,
+	_vocalization_maimed_limb = 12,
+	_vocalization_maimed_head = 13,
+	_vocalization_death_quiet = 14,
+	_vocalization_death_violent = 15,
+	_vocalization_death_falling = 16,
+	_vocalization_death_agonizing = 17,
+	_vocalization_death_instant = 18,
+	_vocalization_death_flying = 19,
+	_vocalization_hurt_enemy_grenade = 39,
+	_vocalization_resurrect = 183,
+};
+
+enum unit_dialogue_damage_category
+{
+	_unit_dialogue_damage_category_none = 0,
+	_unit_dialogue_damage_category_falling = 1,
+	_unit_dialogue_damage_category_flame = 7,
+};
+
+enum unit_dialogue_actor_combat_status
+{
+	_unit_dialogue_actor_combat_status_definite = 3,
+};
+
+enum unit_dialogue_ai_unit_effect
+{
+	_unit_dialogue_ai_unit_effect_death_scream = 2,
 };
 
 /* ---------- macros */
@@ -420,6 +462,82 @@ short unit_get_speech_priority_by_name(
 	return result;
 }
 
+char const *unit_describe_speech(
+	long unit_index,
+	boolean abbreviated,
+	long buffer_size,
+	char *buffer)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	char *sound_name;
+	char *separator;
+	char *scan;
+
+	if (unit->unit.speech.current.priority == _unit_speech_none)
+	{
+		_snprintf(buffer, (short)buffer_size, "<none>");
+		return buffer;
+	}
+
+	sound_name = "<none>";
+	if (unit->unit.speech.current.sound_definition_index != NONE)
+	{
+		sound_name = tag_get_name(
+			unit->unit.speech.current.sound_definition_index);
+	}
+
+	if (abbreviated)
+	{
+		scan = sound_name;
+		while (TRUE)
+		{
+			if (!scan)
+				break;
+
+			scan = strchr(scan, '\\');
+			if (!scan)
+				break;
+
+			scan++;
+			sound_name = scan;
+		}
+	}
+	else
+	{
+		separator = strrchr(sound_name, '\\');
+		if (separator)
+			sound_name = separator + 1;
+	}
+
+	if (unit->unit.speech.current.vocalization_type == NONE)
+	{
+		_snprintf(buffer, (short)buffer_size, "%s", sound_name);
+	}
+	else if (abbreviated)
+	{
+		_snprintf(
+			buffer,
+			(short)buffer_size,
+			"%s %s",
+			dialogue_get_vocalization_name(
+				unit->unit.speech.current.vocalization_type,
+				FALSE),
+			sound_name);
+	}
+	else
+	{
+		_snprintf(
+			buffer,
+			(short)buffer_size,
+			"%s",
+			dialogue_get_vocalization_name(
+				unit->unit.speech.current.vocalization_type,
+				FALSE));
+	}
+
+	return buffer;
+}
+
 static void unit_lose_speech(
 	long unit_index,
 	short play_type,
@@ -547,6 +665,290 @@ void unit_speak(
 	}
 
 	return;
+}
+
+void unit_notify_impulse_sound(
+	long unit_index,
+	long sound_definition_index,
+	long impulse_sound_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_speech_item speech_item;
+	long play_type = sound_definition_index;
+	short vocalization_type = NONE;
+
+	play_type = unit_test_speech(
+		unit_index,
+		_unit_speech_scripted,
+		FALSE,
+		FALSE,
+		NULL,
+		&vocalization_type,
+		&play_type);
+
+	if ((short)play_type <= _unit_play_speech_immediate)
+		play_type = _unit_play_speech_immediate;
+
+	csmemset(&speech_item, 0, sizeof(speech_item));
+	speech_item.priority = _unit_speech_scripted;
+	speech_item.vocalization_type = NONE;
+	speech_item.sound_definition_index = sound_definition_index;
+	speech_item.pause_time = 24;
+	ai_communication_packet_new(&speech_item.ai);
+	unit_speak(unit_index, (short)play_type, &speech_item);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		406,
+		unit->unit.speech.current.sound_definition_index == sound_definition_index);
+
+	unit->unit.speech.impulse_sound_index = impulse_sound_index;
+	unit->unit.speech.played = TRUE;
+	unit->unit.speech.pre_delay_timer = 0;
+	ai_communication_started(
+		unit_index,
+		_unit_speech_scripted,
+		NONE,
+		&unit->unit.speech.current.ai);
+
+	return;
+}
+
+boolean unit_make_damage_sound(
+	long unit_index,
+	struct damage_data *damage_data,
+	boolean died,
+	boolean died_instantly,
+	real body_damage,
+	real shield_damage)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	boolean spoke = FALSE;
+
+	(void)shield_damage;
+
+	if (unit->unit.dialogue_index == NONE)
+		return spoke;
+
+	{
+	boolean took_body_damage = unit->object.recent_body_damage > 0.f;
+	boolean took_major_body_damage = unit->object.recent_body_damage >= 0.6f;
+	short vocalization_type = NONE;
+	short damage_category = _unit_dialogue_damage_category_none;
+	short unit_effect_type = NONE;
+	short unit_effect_volume = 0;
+	boolean involuntary_vocalization = FALSE;
+
+	if (damage_data && damage_data->definition_index != NONE)
+	{
+		damage_category = damage_effect_definition_get(
+			damage_data->definition_index)->damage.category;
+	}
+
+	if (died)
+	{
+		long actor_index = unit->unit.swarm_actor_index;
+		boolean instantaneous = FALSE;
+		boolean severe;
+
+		if (actor_index == NONE)
+			actor_index = unit->unit.actor_index;
+
+		if (damage_data->definition_index != NONE)
+		{
+			instantaneous = damage_effect_definition_get(
+				damage_data->definition_index)->damage.instantaneous_acceleration >= 2.f;
+		}
+
+		if (actor_index != NONE)
+		{
+			severe = actor_get(actor_index)->state.combat_status >=
+				_unit_dialogue_actor_combat_status_definite;
+		}
+		else
+		{
+			severe = unit->object.recent_body_damage > body_damage + 0.2f;
+		}
+
+		if (damage_category == _unit_dialogue_damage_category_falling)
+			vocalization_type = _vocalization_death_falling;
+		else if (damage_category == _unit_dialogue_damage_category_flame)
+			vocalization_type = _vocalization_death_agonizing;
+		else if (instantaneous)
+			vocalization_type = _vocalization_death_flying;
+		else if (severe)
+		{
+			vocalization_type = died_instantly ?
+				_vocalization_death_instant :
+				_vocalization_death_violent;
+		}
+		else
+		{
+			vocalization_type = _vocalization_death_quiet;
+		}
+
+		involuntary_vocalization = TRUE;
+		if (vocalization_type != _vocalization_death_quiet)
+		{
+			unit_effect_type = _unit_dialogue_ai_unit_effect_death_scream;
+			unit_effect_volume = vocalization_type == _vocalization_death_instant ? 4 : 1;
+		}
+	}
+	else if (unit->unit.speech.damage_major_timer == 0)
+	{
+		if (damage_category == _unit_dialogue_damage_category_falling)
+		{
+			involuntary_vocalization = TRUE;
+			vocalization_type = _vocalization_pain_falling;
+		}
+		else if (took_major_body_damage)
+		{
+			involuntary_vocalization = TRUE;
+			vocalization_type = _vocalization_pain_body_major;
+		}
+		else if (unit->unit.speech.damage_minor_timer == 0 &&
+			unit->unit.speech.damage_minor_sounds < 3 &&
+			(unit->unit.speech.current.priority == _unit_speech_none ||
+				real_seed_random(get_global_random_seed_address()) < 0.4f))
+		{
+			vocalization_type = took_body_damage ?
+				_vocalization_pain_body :
+				_vocalization_pain_shield;
+		}
+	}
+
+	if (vocalization_type != NONE)
+	{
+		long sound_definition_index = NONE;
+		short priority = died ?
+			_unit_speech_death :
+			(involuntary_vocalization ? _unit_speech_involuntary : _unit_speech_pain);
+		short play_type = unit_test_speech(
+			unit_index,
+			priority,
+			TRUE,
+			FALSE,
+			NULL,
+			&vocalization_type,
+			&sound_definition_index);
+
+		if (!ai_debug.disable_wounded_sounds &&
+			play_type > _unit_play_speech_none)
+		{
+			struct unit_speech_item speech_item;
+
+			csmemset(&speech_item, 0, sizeof(speech_item));
+			speech_item.priority = priority;
+			speech_item.vocalization_type = vocalization_type;
+			speech_item.sound_definition_index = sound_definition_index;
+			speech_item.pause_time = 7;
+			ai_communication_packet_new(&speech_item.ai);
+			unit_speak(unit_index, play_type, &speech_item);
+			spoke = TRUE;
+
+			if (took_major_body_damage)
+			{
+				unit->unit.speech.damage_major_timer = 60;
+			}
+			else
+			{
+				unit->unit.speech.damage_minor_sounds++;
+				unit->unit.speech.damage_minor_timer = 30;
+				unit->unit.speech.damage_minor_decay_timer = 22;
+			}
+		}
+	}
+
+	if (unit_effect_type != NONE)
+	{
+		ai_handle_unit_effect(
+			unit_index,
+			unit_effect_type,
+			unit_effect_volume);
+	}
+	}
+
+	return spoke;
+}
+
+boolean unit_scream(
+	long unit_index,
+	short scream_type)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short vocalization_type;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+		599,
+		(scream_type >= 0) && (scream_type < NUMBER_OF_UNIT_SCREAM_TYPES));
+
+	switch (scream_type)
+	{
+	case _unit_scream_falling:
+		vocalization_type = _vocalization_scream_fear;
+		break;
+	case _unit_scream_grenade_attached_to_us:
+		if (real_seed_random(get_global_random_seed_address()) < 0.5f)
+			vocalization_type = _vocalization_hurt_enemy_grenade;
+		else
+			vocalization_type = _vocalization_scream_pain;
+		break;
+	case _unit_scream_burning_to_death:
+		vocalization_type = _vocalization_scream_pain;
+		break;
+	case _unit_scream_destroyed_limb:
+		vocalization_type = _vocalization_maimed_limb;
+		break;
+	case _unit_scream_destroyed_head:
+		vocalization_type = _vocalization_maimed_head;
+		break;
+	case _unit_scream_resurrection:
+		vocalization_type = _vocalization_resurrect;
+		break;
+	default:
+		match_assert(
+			"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
+			635,
+			!"unreachable");
+		break;
+	}
+
+	if (unit->unit.dialogue_index != NONE)
+	{
+		struct dialogue_definition *dialogue_definition =
+			dialogue_definition_get(unit->unit.dialogue_index);
+		long sound_definition_index =
+			dialogue_definition->vocalizations[vocalization_type].index;
+
+		if (sound_definition_index != NONE)
+		{
+			short play_type = unit_test_speech(
+				unit_index,
+				_unit_speech_scream,
+				TRUE,
+				FALSE,
+				NULL,
+				&vocalization_type,
+				&sound_definition_index);
+
+			if (play_type > _unit_play_speech_none)
+			{
+				struct unit_speech_item speech_item;
+
+				csmemset(&speech_item, 0, sizeof(speech_item));
+				speech_item.priority = _unit_speech_scream;
+				speech_item.vocalization_type = vocalization_type;
+				speech_item.sound_definition_index = sound_definition_index;
+				speech_item.pause_time = 7;
+				ai_communication_packet_new(&speech_item.ai);
+				unit_speak(unit_index, play_type, &speech_item);
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
 }
 
 void unit_dialogue_update(

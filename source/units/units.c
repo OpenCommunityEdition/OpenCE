@@ -1051,13 +1051,6 @@ void aiming_screen_apply(
 	real yaw,
 	real pitch,
 	struct real_orientation *node_orientations);
-boolean unit_make_damage_sound(
-	long unit_index,
-	struct damage_data *damage_data,
-	boolean died,
-	boolean died_instantly,
-	real body_damage,
-	real shield_damage);
 void biped_exit_seat_end(
 	long biped_index,
 	long parent_unit_index);

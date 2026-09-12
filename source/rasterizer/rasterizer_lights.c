@@ -80,6 +80,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "errors.h"
@@ -98,6 +99,7 @@ symbols in this file:
 #include "rasterizer_debug_options.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 /* ---------- constants */
 
@@ -133,6 +135,20 @@ enum
 	_lens_flare_corona_rotation_function_eye_to_light_in_light_space,
 	_lens_flare_corona_rotation_function_eye_to_light_in_eye_space,
 	NUMBER_OF_LENS_FLARE_CORONA_ROTATION_FUNCTIONS
+};
+
+enum
+{
+	_lens_flare_occlusion_offset_direction_toward_viewer = 0,
+	_lens_flare_occlusion_offset_direction_marker_forward,
+	_lens_flare_occlusion_offset_direction_none,
+	NUMBER_OF_LENS_FLARE_OCCLUSION_OFFSET_DIRECTIONS
+};
+
+enum
+{
+	_widget_type_internal_occlusion_test = 6,
+	_widget_zbuffer_enable_bit = 0
 };
 
 enum
@@ -782,6 +798,81 @@ void rasterizer_lens_flare_submit_for_cluster(
 			rasterizer_lens_flare_submit(&parameters);
 		}
 	}
+
+	return;
+}
+
+void rasterizer_lens_flares_submit_occlusion_tests(
+	void)
+{
+	rasterizer_profile_begin(_rasterizer_profile_lens_flare_occlusion_submit);
+
+	if (rasterizer_debug_options.lens_flares && !screenshot_in_progress() &&
+		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary &&
+		local_lens_flare_count > 0)
+	{
+		short lens_flare_index;
+
+		rasterizer_widget_begin(
+			_widget_type_internal_occlusion_test,
+			FLAG(_widget_zbuffer_enable_bit));
+
+		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+		{
+			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+				lens_flare_submit_parameter_get(lens_flare_index);
+			struct lens_flare_definition *definition = lens_flare_parameters->definition;
+			real_vector3d uncompressed_direction;
+			real_vector3d direction = *uncompress_int32_to_real_vector3d(
+				&uncompressed_direction,
+				lens_flare_parameters->compressed_direction);
+
+			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
+				global_window_parameters.window_index)
+			{
+				real occlusion_radius = definition->occlusion_radius;
+				real_point3d occlusion_point;
+
+				switch (definition->occlusion_offset_direction)
+				{
+				case _lens_flare_occlusion_offset_direction_toward_viewer:
+					point_from_line3d(
+						&lens_flare_parameters->position,
+						&global_window_parameters.camera_forward,
+						-definition->occlusion_radius,
+						&occlusion_point);
+					break;
+
+				case _lens_flare_occlusion_offset_direction_marker_forward:
+					point_from_line3d(
+						&lens_flare_parameters->position,
+						&direction,
+						definition->occlusion_radius * 1.41421356f,
+						&occlusion_point);
+					break;
+
+				case _lens_flare_occlusion_offset_direction_none:
+					occlusion_point = lens_flare_parameters->position;
+					break;
+
+				default:
+#line 482 "c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c"
+					vassert(FALSE, "### ERROR unsupported lens flare occlusion offset direction");
+					break;
+				}
+
+				lens_flare_parameters->internal__occlusion_pixels =
+					rasterizer_widget_submit_occlusion_test(
+						&occlusion_point,
+						occlusion_radius,
+						lens_flare_index);
+			}
+		}
+
+		rasterizer_widget_end();
+	}
+
+	rasterizer_profile_end(_rasterizer_profile_lens_flare_occlusion_submit);
 
 	return;
 }

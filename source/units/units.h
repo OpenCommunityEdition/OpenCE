@@ -776,9 +776,6 @@ boolean unit_enter_seat(
 	long unit_index,
 	long target_unit_index,
 	short seat_index);
-void unit_control(
-	long unit_index,
-	struct unit_control_data const *control_data);
 boolean unit_has_weapon(
 	long unit_index,
 	long weapon_index);
@@ -867,7 +864,20 @@ void unit_speak(
 	struct unit_speech_item const *speech_item);
 short unit_get_speech_priority_by_name(
 	char const *name);
-boolean unit_scream(long unit_index, short scream_type);
+void unit_notify_impulse_sound(
+	long unit_index,
+	long sound_definition_index,
+	long impulse_sound_index);
+boolean unit_make_damage_sound(
+	long unit_index,
+	struct damage_data *damage_data,
+	boolean died,
+	boolean died_instantly,
+	real body_damage,
+	real shield_damage);
+boolean unit_scream(
+	long unit_index,
+	short scream_type);
 void unit_dialogue_update(
 	long unit_index);
 

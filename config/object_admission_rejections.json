@@ -82,6 +82,22 @@
       "reopen": "Remove only after source-authentic header/declaration topology preserves all 189 exact target functions and the two January external calls while preventing units.obj from emitting _point_from_line3d. Linker discard alone does not waive the explicit no-emission house rule; do not expand the two external calls or use forced inline/noinline, pragmas, assembly, or byte-shaping."
     },
     {
+      "unit": "source/effects/decals",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_vector_from_points2d",
+      "reason": "The exact typed decal_projection_create body naturally inlines vector_from_points2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Action Obey copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+      "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+      "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
+    },
+    {
+      "unit": "source/effects/decals",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_cross_product2d",
+      "reason": "The exact typed decal_projection_create body naturally inlines cross_product2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Actor Combat copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+      "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+      "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
+    },
+    {
       "unit": "source/physics/collision_features",
       "class": "candidate-only-comdat-owner",
       "symbol": "_projection_from_vector3d",

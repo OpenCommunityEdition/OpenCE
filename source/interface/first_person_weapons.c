@@ -96,6 +96,12 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_SIGNED_ANGULAR_DIFFERENCE
+#define REAL_MATH_EXTERNAL_SQUARE_ROOT
+#define REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
+#define REAL_MATH_EXTERNAL_MAGNITUDE3D
+#define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
+#define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
 #include "interface/first_person_weapons.h"
 
 #include "cache/predicted_resources.h"
@@ -170,6 +176,18 @@ enum
 {
 	_render_model_effect_type_none = 0,
 	_render_model_effect_type_active_camouflage,
+};
+
+enum
+{
+	animation_update_kind_render_only = 0,
+};
+
+enum animation_update_result
+{
+	_animation_no_key_frame = 0,
+	_animation_key_frame,
+	_animation_will_restart_on_next_frame,
 };
 
 /* ---------- macros */
@@ -336,6 +354,13 @@ static void first_person_weapon_set_state(
 	short new_state,
 	boolean reset_sounds);
 static void first_person_weapon_switch_weapons(
+	short local_player_index);
+static void first_person_weapon_new_unit(
+	short local_player_index,
+	long unit_index);
+static void first_person_weapon_next_state(
+	short local_player_index);
+static void first_person_weapon_update(
 	short local_player_index);
 static boolean model_build_remapping_table_for_animation_graph(
 	long model_index,
@@ -760,6 +785,35 @@ struct real_matrix4x3 *first_person_weapon_get_node_matrix(
 		node_index>=0 && node_index<animation_graph->nodes.count);
 
 	return &first_person_weapon->node_matrices[node_index];
+}
+
+void first_person_weapons_update(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index=0; local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		long player_index= local_player_get_player_index(local_player_index);
+
+		if (player_index!=NONE)
+		{
+			struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+			long unit_index= player_get(player_index)->unit_index;
+
+			if (first_person_weapon->unit_index!=unit_index)
+			{
+				first_person_weapon_new_unit(local_player_index, unit_index);
+			}
+			if (first_person_weapon->weapon_index==NONE)
+			{
+				first_person_weapon_switch_weapons(local_player_index);
+			}
+			first_person_weapon_update(local_player_index);
+		}
+	}
+
+	return;
 }
 
 /* ---------- private code */
@@ -1478,6 +1532,399 @@ static void first_person_weapon_switch_weapons(
 		}
 	}
 	first_person_weapon_predict(local_player_index);
+
+	return;
+}
+
+static void first_person_weapon_new_unit(
+	short local_player_index,
+	long unit_index)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+
+	first_person_weapon->rendered= FALSE;
+	first_person_weapon->unit_index= unit_index;
+	first_person_weapon_switch_weapons(local_player_index);
+
+	return;
+}
+
+static void first_person_weapon_next_state(
+	short local_player_index)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+	short new_state= NONE;
+
+	switch (first_person_weapon->state)
+	{
+		case _first_person_weapon_state_idle:
+		case _first_person_weapon_state_posing:
+		case _first_person_weapon_state_primary_fire:
+		case _first_person_weapon_state_secondary_fire:
+		case _first_person_weapon_state_primary_misfire:
+		case _first_person_weapon_state_secondary_misfire:
+		case _first_person_weapon_state_melee:
+		case _first_person_weapon_state_light_off:
+		case _first_person_weapon_state_light_on:
+		case _first_person_weapon_state_shotgun_exit_reload_empty:
+		case _first_person_weapon_state_shotgun_exit_reload_full:
+		case _first_person_weapon_state_ready:
+		case _first_person_weapon_state_throw_grenade:
+		case _first_person_weapon_state_overheated_exit:
+			new_state= _first_person_weapon_state_idle;
+			break;
+
+		case _first_person_weapon_state_overheating:
+		case _first_person_weapon_state_overheating_again:
+		case _first_person_weapon_state_throw_grenade_overheated:
+		case _first_person_weapon_state_overheating_super_recoil:
+			new_state= _first_person_weapon_state_overheated;
+			break;
+
+		case _first_person_weapon_state_put_away:
+			first_person_weapon->state_animation.frame_index--;
+			break;
+
+		case _first_person_weapon_state_shotgun_enter_reload:
+		{
+			struct weapon_datum *weapon= weapon_get(first_person_weapon->weapon_index);
+			struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+
+			if (weapon_definition->weapon.weapon_type==_weapon_type_shotgun &&
+				first_person_weapon->shotgun_reload_type==_shotgun_reload_type_first_and_last_round)
+			{
+				new_state= first_person_weapon->shotgun_empty ?
+					_first_person_weapon_state_shotgun_exit_reload_empty :
+					_first_person_weapon_state_shotgun_exit_reload_full;
+			}
+			else
+			{
+				new_state= _first_person_weapon_state_idle;
+			}
+			break;
+		}
+
+		case _first_person_weapon_state_reload_while_empty:
+		case _first_person_weapon_state_reload_while_full:
+		{
+			struct weapon_datum *weapon= weapon_get(first_person_weapon->weapon_index);
+			struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+
+			if (weapon_definition->weapon.weapon_type!=_weapon_type_shotgun ||
+				!first_person_weapon->shotgun_reload_type ||
+				first_person_weapon->shotgun_reload_type==NONE)
+			{
+				new_state= _first_person_weapon_state_idle;
+			}
+			else
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\first_person_weapons.c",
+					799,
+					first_person_weapon->shotgun_reload_type == _shotgun_reload_type_first_and_last_round ||
+						first_person_weapon->shotgun_reload_type == _shotgun_reload_type_last_round);
+				new_state= first_person_weapon->shotgun_empty ?
+					_first_person_weapon_state_shotgun_exit_reload_empty :
+					_first_person_weapon_state_shotgun_exit_reload_full;
+			}
+			break;
+		}
+	}
+
+	if (new_state!=NONE)
+	{
+		first_person_weapon_set_state(local_player_index, new_state, FALSE);
+	}
+
+	return;
+}
+
+static void first_person_weapon_update(
+	short local_player_index)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+
+	if (first_person_weapon->weapon_index!=NONE &&
+		!weapon_try_and_get(first_person_weapon->weapon_index))
+	{
+		error(
+			_error_log,
+			"local player %d, weapon (0x%x), deleted unexpectedly",
+			local_player_index,
+			first_person_weapon->weapon_index);
+		first_person_weapon->weapon_index= NONE;
+	}
+
+	if (first_person_weapon->unit_index!=NONE && first_person_weapon->weapon_index!=NONE)
+	{
+		struct unit_datum *unit= unit_get(first_person_weapon->unit_index);
+		struct weapon_datum *weapon= weapon_get(first_person_weapon->weapon_index);
+		struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+		struct animation_graph *animation_graph;
+		long triggered_sound_index;
+		short animation_update_result;
+		boolean moving;
+
+		model_definition_get(weapon_definition->weapon.interface_definition.first_person_model.index);
+		animation_graph= animation_graph_definition_get(
+			weapon_definition->weapon.interface_definition.first_person_animations.index);
+
+		if (first_person_weapon->state==_first_person_weapon_state_overheated ||
+			first_person_weapon->state==_first_person_weapon_state_overheating)
+		{
+			if (TEST_FLAG(weapon->weapon.flags, _weapon_overheated_exit_bit))
+			{
+				first_person_weapon_set_state(
+					local_player_index,
+					_first_person_weapon_state_overheated_exit,
+					TRUE);
+			}
+			if (!TEST_FLAG(weapon->weapon.flags, _weapon_overheated_bit))
+			{
+				first_person_weapon_set_state(
+					local_player_index,
+					_first_person_weapon_state_idle,
+					TRUE);
+			}
+		}
+
+		animation_update_result= animation_update_internal(
+			animation_update_kind_render_only,
+			weapon_definition->weapon.interface_definition.first_person_animations.index,
+			&first_person_weapon->state_animation,
+			&triggered_sound_index);
+		if (animation_update_result==_animation_key_frame ||
+			animation_update_result==_animation_will_restart_on_next_frame)
+		{
+			first_person_weapon_next_state(local_player_index);
+		}
+
+		if (triggered_sound_index!=NONE &&
+			director_get_perspective(local_player_index)==_director_perspective_first_person)
+		{
+			first_person_weapon->current_sound_index= object_impulse_sound_new(
+				first_person_weapon->weapon_index,
+				triggered_sound_index,
+				NONE,
+				global_origin3d,
+				global_forward3d,
+				1.0f);
+			first_person_weapon->current_sound_state= first_person_weapon->state;
+		}
+
+		moving= magnitude3d(&unit->unit.throttle)>0.1f;
+		if (unit_flying_through_air(first_person_weapon->unit_index))
+		{
+			moving= FALSE;
+		}
+
+		if (first_person_weapon->moving_animation.index!=NONE)
+		{
+			animation_update_internal(
+				animation_update_kind_render_only,
+				weapon_definition->weapon.interface_definition.first_person_animations.index,
+				&first_person_weapon->moving_animation,
+				NULL);
+			if (!moving)
+			{
+				if (first_person_weapon->state==_first_person_weapon_state_idle)
+				{
+					first_person_weapon_start_interpolation(local_player_index, 6);
+				}
+				first_person_weapon->moving_animation.index= NONE;
+			}
+		}
+		else if (moving)
+		{
+			struct animation_graph_first_person_weapon_animations *first_person_weapon_animations=
+				!animation_graph->first_person_weapon_animations.count ?
+					NULL :
+					TAG_BLOCK_GET_ELEMENT(
+						&animation_graph->first_person_weapon_animations,
+						0,
+						struct animation_graph_first_person_weapon_animations);
+
+			first_person_weapon->moving_animation.frame_index= 0;
+			first_person_weapon->moving_animation.index=
+				first_person_weapon_animations &&
+					first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
+					animation_graph_animation_index_get(
+						&first_person_weapon_animations->animations)
+							[_first_person_weapon_animation_moving].animation_index :
+					(short)NONE;
+		}
+
+		if (first_person_weapon->overcharged_jitter_animation.index==NONE)
+		{
+			if (first_person_weapon->state==_first_person_weapon_state_charged)
+			{
+				struct animation_graph_first_person_weapon_animations *first_person_weapon_animations=
+					!animation_graph->first_person_weapon_animations.count ?
+						NULL :
+						TAG_BLOCK_GET_ELEMENT(
+							&animation_graph->first_person_weapon_animations,
+							0,
+							struct animation_graph_first_person_weapon_animations);
+
+				first_person_weapon->overcharged_jitter_animation.frame_index= 0.0f;
+				first_person_weapon->overcharged_jitter_animation.index=
+					first_person_weapon_animations &&
+						first_person_weapon_animations->animations.count>
+						_first_person_weapon_animation_overcharged_jitter ?
+						animation_graph_animation_index_get(
+							&first_person_weapon_animations->animations)
+								[_first_person_weapon_animation_overcharged_jitter].animation_index :
+						(short)NONE;
+			}
+		}
+		else if (first_person_weapon->state==_first_person_weapon_state_charged)
+		{
+			struct animation *animation= TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->animations,
+				first_person_weapon->overcharged_jitter_animation.index,
+				struct animation);
+
+			first_person_weapon->overcharged_jitter_animation.frame_index= (real)fmod(
+				(weapon->weapon.overcharged+1.0f)*2.0f+
+					first_person_weapon->overcharged_jitter_animation.frame_index,
+				(real)animation->frame_count);
+		}
+		else
+		{
+			first_person_weapon->overcharged_jitter_animation.index= NONE;
+		}
+
+		if (first_person_weapon->rendered)
+		{
+			accelerate_to_position(
+				&first_person_weapon->position.i,
+				&first_person_weapon->position_velocity.i,
+				unit->unit.throttle.i,
+				0.08f,
+				0.5f,
+				-1.0f,
+				1.0f,
+				FALSE);
+			accelerate_to_position(
+				&first_person_weapon->position.j,
+				&first_person_weapon->position_velocity.j,
+				unit->unit.throttle.j,
+				0.08f,
+				0.5f,
+				-1.0f,
+				1.0f,
+				FALSE);
+
+			{
+				real turning_i= signed_angular_difference(
+					first_person_weapon->last_render_facing.yaw,
+					first_person_weapon->render_facing.yaw)*30.0f;
+				real turning_j= signed_angular_difference(
+					first_person_weapon->last_render_facing.pitch,
+					first_person_weapon->render_facing.pitch)*-30.0f;
+
+				turning_i= PIN(turning_i, -1.0f, 1.0f);
+				turning_j= PIN(turning_j, -1.0f, 1.0f);
+
+				accelerate_to_position(
+					&first_person_weapon->turning.i,
+					&first_person_weapon->turning_velocity.i,
+					turning_i,
+					0.03f,
+					0.2f,
+					-1.0f,
+					1.0f,
+					FALSE);
+				accelerate_to_position(
+					&first_person_weapon->turning.j,
+					&first_person_weapon->turning_velocity.j,
+					turning_j,
+					0.03f,
+					0.2f,
+					-1.0f,
+					1.0f,
+					FALSE);
+			}
+		}
+
+		accelerate_to_position(
+			&first_person_weapon->firing_push_back,
+			&first_person_weapon->firing_push_back_velocity,
+			0.0f,
+			0.01f,
+			0.2f,
+			0.0f,
+			1.0f,
+			FALSE);
+		if (first_person_weapon->firing_push_back==1.0f)
+		{
+			first_person_weapon->firing_push_back_velocity= 0.0f;
+		}
+
+		if (first_person_weapon->interpolation_frame_count>0)
+		{
+			first_person_weapon->interpolation_frame_index++;
+			if (first_person_weapon->interpolation_frame_index>=
+				first_person_weapon->interpolation_frame_count)
+			{
+				first_person_weapon->interpolation_frame_count= 0;
+			}
+		}
+
+		if (player_control_get_autoaim_level(local_player_index)!=0.0f ||
+			player_control_get_zoom_level(local_player_index)!=NONE ||
+			first_person_weapon->firing_push_back!=0.0f ||
+			first_person_weapon->position.i!=0.0f ||
+			first_person_weapon->position.j!=0.0f ||
+			first_person_weapon->turning.i!=0.0f ||
+			first_person_weapon->turning.j!=0.0f)
+		{
+			first_person_weapon->ticks_idle= 0;
+			if (first_person_weapon->state==_first_person_weapon_state_posing)
+			{
+				first_person_weapon_set_state(
+					local_player_index,
+					_first_person_weapon_state_idle,
+					TRUE);
+			}
+		}
+		else if (first_person_weapon->state==_first_person_weapon_state_idle)
+		{
+			struct game_globals_player_information *player_information= TAG_BLOCK_GET_ELEMENT(
+				&scenario_get_game_globals()->player_information,
+				0,
+				struct game_globals_player_information);
+
+			if (!first_person_weapon->ticks_until_pose)
+			{
+				first_person_weapon->ticks_until_pose= (short)(real_local_random_range(
+					player_information->first_person_idle_time_lower_bound,
+					player_information->first_person_idle_time_upper_bound)*TICKS_PER_SECOND);
+			}
+			first_person_weapon->ticks_idle++;
+			if (first_person_weapon->ticks_idle>first_person_weapon->ticks_until_pose)
+			{
+				first_person_weapon->ticks_until_pose= 0;
+				if (real_local_random()>=player_information->first_person_idle_skip_fraction)
+				{
+					first_person_weapon_set_state(
+						local_player_index,
+						_first_person_weapon_state_posing,
+						TRUE);
+				}
+			}
+		}
+		else
+		{
+			first_person_weapon->ticks_idle= 0;
+		}
+	}
+
+	first_person_weapon->ticks_until_predict--;
+	if (first_person_weapon->ticks_until_predict<=0)
+	{
+		first_person_weapon_predict(local_player_index);
+	}
 
 	return;
 }

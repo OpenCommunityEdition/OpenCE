@@ -42,6 +42,11 @@ void editor_camera_set_focus(
 void editor_camera_set_position(
 	real_point3d const *point,
 	real_euler_angles2d const *angles);
+void editor_camera_move_to_point(
+	real_point3d const *point);
+void editor_camera_set_position_and_roll(
+	real_point3d const *point,
+	real_euler_angles3d const *angles);
 void editor_camera_set_unit_focus(
 	long unit_index);
 void editor_camera_bump_speed(
@@ -62,6 +67,8 @@ short editor_camera_get_mode(
 
 boolean editor_camera_get_scripted(
 	void);
+void editor_camera_set_scripted(
+	boolean scripted);
 
 real editor_camera_get_field_of_view(
 	void);

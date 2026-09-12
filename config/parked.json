@@ -462,11 +462,11 @@
       "unit": "source/math/geometry",
       "function": "_get_edge_vertex",
       "class": "unclassified",
-      "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The 416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence. The 2026-09-09 Leaf Map integration moved two genuine Geometry declarations into their correct owner header without editing this body. That changed only the already-fuzzy translation-unit allocation context; the refreshed form still receives zero exact credit.",
+      "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The 416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence. The 2026-09-12 complete geosphere private-call graph and correctly owned Geometry declarations change only this already-fuzzy translation-unit allocation context. The refreshed 400-byte form remains natural and receives zero exact credit.",
       "measurements": {
         "target": { "size": 416, "relocation_count": 17, "normalized_sha256": "ebafcbd056870e28f2d96ad7e08a64d9a2e1b2513e911e075aed0fca4b9dc880" },
-        "base": { "size": 400, "relocation_count": 17, "normalized_sha256": "cbd59745d903fd9daba7435a854ac62755bc9349bfa1f91197aa7ce1364580ea" },
-        "objdiff_percent": 61.557144
+        "base": { "size": 400, "relocation_count": 17, "normalized_sha256": "240b22a49f13a88b486b99416a7f162513a3c76a9e4de22ee5445d83f3cc7ded" },
+        "objdiff_percent": 61.442856
       }
     },
     {
@@ -1051,25 +1051,6 @@
           "normalized_sha256": "3e938f14594007d55c8c4582e070f1912ce6788c9ebbb76d7eae75d5bd2923dc"
         },
         "objdiff_percent": 93.70744
-      }
-    },
-    {
-      "unit": "source/devices/devices",
-      "function": "_device_add_scenario_information",
-      "class": "unclassified",
-      "evidence": "Authentic typed scenario-device group assignment; target and candidate are 288 bytes with all 12 ordered relocations identical. Only the equivalent nine-byte changes-once/runtime flag lowering differs at +0x7C. Retain natural FLAG/TEST_FLAG source rather than an unusual shifted mask for codegen. See docs/object_matching_logs/devices_obj_group_creation_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 288,
-          "relocation_count": 12,
-          "normalized_sha256": "6a508ab57f807278d3115da228ff0f772290ec852b455d8ef8595112af1ce6da"
-        },
-        "base": {
-          "size": 288,
-          "relocation_count": 12,
-          "normalized_sha256": "44aeccc35c9004fb6a37926da5f38083cc0b7c6bfdee96d06e7edca02f5c06b8"
-        },
-        "objdiff_percent": 97.56626
       }
     },
     {
@@ -1678,24 +1659,13 @@
     },
     {
       "unit": "source/objects/object_lights",
-      "function": "_light_mark",
-      "class": "unclassified",
-      "evidence": "The retained private helper is ordinary, coherent marker-state C and is emitted through the real lights_prepare_for_object_dynamic -> find_point_lights_for_object_in_cluster call topology; no anchor, duplicate helper, or standalone byte carrier remains. January and the candidate have the same 96-byte envelope and all eight relocation identities, but VC7 selects a different natural assertion/marker control-flow schedule. Source respellings that merely manufacture the target branch layout are rejected under the anti-fake-match rule. Reopen only for authoritative January source or independent same-compiler source/topology evidence that naturally explains the schedule; do not use volatile access, fake dependencies, assembly, or optimizer steering.",
-      "measurements": {
-        "target": { "size": 96, "relocation_count": 8, "normalized_sha256": "1175088cd02bd3341a0ff200c3356917ecd5b27958606b0c9d68ef92c07a5300" },
-        "base": { "size": 96, "relocation_count": 8, "normalized_sha256": "780f93f2adfaad0f187e7271a5e1516d6416d6881e7a7476969cf21eec2c887f" },
-        "objdiff_percent": 84.84849
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
       "function": "_light_unmarked",
       "class": "unclassified",
-      "evidence": "The retained private helper is the direct semantic predicate `lights_globals.marker != light->marker`, naturally called by find_point_lights_for_object_in_cluster. A previously discovered if/return/return spelling reaches the January 96-byte stream only by artificial source topology and is explicitly rejected; the honest one-expression function is 80 bytes with the same eight relocation identities. Reopen only for authoritative January source or independent evidence for a natural historical control-flow spelling. Do not admit the known byte-oriented respelling, volatile state, dead branches, assembly, or a fake caller.",
+      "evidence": "The retained private helper is the direct semantic predicate `lights_globals.marker != light->marker`, naturally called by the reconstructed find_point_lights_for_object_in_cluster graph. Restoring that genuine same-TU graph naturally moves the one-expression helper to the January 96-byte envelope with the same eight relocation identities, but its normalized stream remains different. The previously discovered if/return/return spelling reaches the January stream only by artificial source topology and remains explicitly rejected. Reopen only for authoritative January source or independent evidence for a natural historical control-flow spelling. Do not admit the known byte-oriented respelling, volatile state, dead branches, assembly, or a fake caller.",
       "measurements": {
         "target": { "size": 96, "relocation_count": 8, "normalized_sha256": "6aa93207648f0793874a395bb091edda96bd71c50fd33a1eb3ef9d34ce6ff498" },
-        "base": { "size": 80, "relocation_count": 8, "normalized_sha256": "9ea9773df405cf2faefd56cf8476c76d416f5c00bbc2df13ea5f149b7b2c087f" },
-        "objdiff_percent": 77.40741
+        "base": { "size": 96, "relocation_count": 8, "normalized_sha256": "721187363fa3f19cc22344982ff520d8431a5982c19d84e4234e0c8f16c16f3c" },
+        "objdiff_percent": 92.22222
       }
     },
     {
@@ -4429,25 +4399,6 @@
     },
     {
       "unit": "source/rasterizer/xbox/rasterizer_xbox",
-      "function": "_SetupSmartStates",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete January smart-state reset from the target instruction and relocation topology and the stock XDK 3911 state-shadow declarations. The retained routine copies all D3DRS_MAX render states, walks all D3DTSS_MAX texture states for the four Xbox stages, and clears the four texture bindings. Target and candidate both occupy 128 padded bytes. The only structural gap is that January emits the initial 0x90-dword copy as an inline rep movsd with fourteen total relocations, while the ordinary csmemcpy spelling has fifteen because cseries.h deliberately routes memcpy to the project function. An exact spelling requires a one-use representation cast to an invented aggregate type for two XDK arrays, which is rejected under the anti-fake-match rule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, or nonsensical control flow is retained. Reopen for an authoritative owner type or January source evidence for the aggregate assignment.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 14,
-          "normalized_sha256": "cfe9f19764073025697fc58befd435e453f1af4aba3fff8b58d89737ad8ef4ba"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 15,
-          "normalized_sha256": "5af5c50b6097a2d81f5aaa9f10d49fd60ccd6c6178cdac368f6e5ea4152ed33d"
-        },
-        "objdiff_percent": 75.89286
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox",
       "function": "__rasterizer_window_begin",
       "class": "instruction-scheduling",
       "evidence": "Fuzzy-parked after reconstructing the full typed January window-begin lifecycle from the target disassembly, assertion strings, ordered subsystem calls, named fog/window structures, and XDK state setter. Target and candidate both occupy 416 padded bytes with all 39 relocations and objdiff reports 99.03226 percent similarity. The sole residual is a dependency-independent transposition: January loads parameters->window_index before storing suppress_window_begin_end, while VC7 schedules the byte store first. Expression-assignment and explicit if/else spellings reproduce the same fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained.",
@@ -6467,17 +6418,6 @@
       }
     },
     {
-      "unit": "source/effects/decals",
-      "function": "_decals_delete_permanent_from_cluster",
-      "class": "tu-context-optimization",
-      "evidence": "Best complete typed decal-deletion reconstruction retained after the model APIs were removed from the broad rasterizer header and placed in rasterizer_models.h, their genuine subsystem owner. January and the candidate are both 400 padded bytes with all 29 relocation identities; objdiff reports 99.81035 percent similarity. The only normalized code difference is the order of two adjacent independent stack reloads at the outer-loop latch. Restoring the former strict hash would require unrelated or duplicate model declarations in rasterizer.h, so the previous exact credit is deliberately retired. The body uses the established DECAL_GET accessor, named flags, semantic globals, ordinary C control flow, and no compiler steering, fake dependency, raw offset, undefined behavior, or nonsensical logic. Zero exact credit. See docs/object_matching_logs/decals_obj_typed_rasterizer_header_reconciliation_20260909.md.",
-      "measurements": {
-        "target": { "size": 400, "relocation_count": 29, "normalized_sha256": "b3eeb427eeef1e02f793286b1011a5b89822e041f0b442759259255e1117220a" },
-        "base": { "size": 400, "relocation_count": 29, "normalized_sha256": "6fb830e33513eb040f0ff7cb46cc9167d30a96893dedb145370b416426025ffd" },
-        "objdiff_percent": 99.81035
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
       "function": "_rasterizer_model_draw_environment_shader",
       "class": "instruction-scheduling",
@@ -6743,6 +6683,39 @@
           "normalized_sha256": "ec5db927f53566b43b74f00b87411dd57031310473bf0d21a2cfbf1a0c40a7ad"
         },
         "objdiff_percent": 96.05747
+      }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_texture_cache_build_hardware_format",
+      "class": "unclassified",
+      "evidence": "Complete typed hardware-format construction retained from the published 2026-09-09 Xbox texture-cache reconstruction. January and the candidate share the 336-byte extent and all 17 relocation identities but have different normalized streams; ordinary objdiff acceptance elsewhere does not make this function strict. It remains a zero-credit fuzzy research body in this manifest, with no representation trick or compiler steering admitted. See docs/object_matching_logs/lane_reconciliation_10k_batch_5_20260909.md.",
+      "measurements": {
+        "target": { "size": 336, "relocation_count": 17, "normalized_sha256": "0cd7b038ddc0b8773d695bcb2ec539680f553390c06a200afa39ee617c44b6d3" },
+        "base": { "size": 336, "relocation_count": 17, "normalized_sha256": "e4f39cc0bc638dd2aecf3d46fd6af9973f664f0ba864bd06caff08558515ccde" },
+        "objdiff_percent": 96.293106
+      }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_render_inverse_transform_screen_point",
+      "class": "register-allocation",
+      "evidence": "Complete HCEA-authenticated typed inverse screen transform retained with the Xbox texture-cache debug caller. Target and candidate share the 256-byte extent and all 22 relocations; the residual is the equivalent ECX/EDX allocation of the two output pointers after ordinary declaration and parameter-order probes converged. No volatile/register forcing or fake dependency is retained, and this body receives zero credit. The analogous sound-cache boundary is documented in docs/object_matching_logs/xbox_sound_cache_obj_complete_fuzzy_closeout_20260901.md.",
+      "measurements": {
+        "target": { "size": 256, "relocation_count": 22, "normalized_sha256": "c39690660070bc740fc89bc34ed735ce9c30406d8f26cfe5f853c9d2e5261bee" },
+        "base": { "size": 256, "relocation_count": 22, "normalized_sha256": "d434a17b8d90be4fa31d5651b27f45be31c5a6c6e5d0c21b366fc2d174e23acc" },
+        "objdiff_percent": 99.347824
+      }
+    },
+    {
+      "unit": "source/cache/xbox_texture_cache",
+      "function": "_texture_cache_start_loading_bitmap",
+      "class": "unclassified",
+      "evidence": "Complete typed asynchronous bitmap-load start path retained from the published 2026-09-09 Xbox texture-cache reconstruction. January and the candidate share the 224-byte extent and all 16 relocation identities but remain different normalized streams. No fake ownership, volatile carrier, or compiler steering is admitted; the fail-closed class claims no unsupported mechanism and the body receives zero credit. See docs/object_matching_logs/lane_reconciliation_10k_batch_5_20260909.md.",
+      "measurements": {
+        "target": { "size": 224, "relocation_count": 16, "normalized_sha256": "2bf7d1281710a4abd400acfd47119798635ceafae0e1dde6b31dfc8ea7798999" },
+        "base": { "size": 224, "relocation_count": 16, "normalized_sha256": "19a25b22d733ecdf32d1281283f5b2a1ada07436d22ce2f9d848f114896a675e" },
+        "objdiff_percent": 96.47059
       }
     },
     {
@@ -7218,6 +7191,325 @@
           "normalized_sha256": "7a670604363eebcb3d91e0a6a9a2ba90aa5983e1c5e9e062407b4f78f7ff07bf"
         },
         "objdiff_percent": 38.43919
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_build_texture_pages_by_sequence",
+      "class": "unclassified",
+      "evidence": "Complete typed texture-page packing reconstruction retained from the 2026-09-12 private packet. January control flow and relocations plus the independent Pastudan/HCEA maps support the behavior, but the current natural candidate is 672 versus 608 padded bytes and remains non-exact. The fail-closed class makes no unsupported codegen diagnosis; this body receives zero exact-function and zero exact-byte credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 608, "relocation_count": 22, "normalized_sha256": "70092abc226e6d9400baed2f856500896bf821f08e7ee9c8b9a7691013a4ce44" },
+        "base": { "size": 672, "relocation_count": 22, "normalized_sha256": "a0a34a2062ebb22b2028e75043ece7a57531deacba0a47049070e3b0100ddc86" },
+        "objdiff_percent": 60.788944
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_plateless_cube_map",
+      "class": "unclassified",
+      "evidence": "Complete typed six-face cube-map reconstruction retained from the 2026-09-12 private packet. January and the current candidate have the same 832-byte extent and 19 relocations, while their normalized streams remain different. No cast pressure, artificial branch, or compiler steering is admitted; the fail-closed class claims no mechanism and the body receives zero credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 832, "relocation_count": 19, "normalized_sha256": "f55f10e75310fe5c98c6bff63288c76c13e64850a4ec6ffaa7ed03244d64c2e2" },
+        "base": { "size": 832, "relocation_count": 19, "normalized_sha256": "a5286bb8ce75c089b2a60e4f1594da25f2df04742ba7fdfc8478539f9a978e54" },
+        "objdiff_percent": 79.492065
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_sequence",
+      "class": "unclassified",
+      "evidence": "Complete typed bitmap-run and border-trimming reconstruction retained from the 2026-09-12 private packet. The source deliberately omits an apparently behaviorally redundant January branch rather than reproducing it only for bytes; the current candidate therefore remains an honest residual and receives zero credit. The fail-closed class asserts no single compiler mechanism. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 720, "relocation_count": 28, "normalized_sha256": "5f106d5c4f2bb3024df015b0b10b2236b3ffc3818cff7588e4fd3a7c7a810e56" },
+        "base": { "size": 656, "relocation_count": 27, "normalized_sha256": "662a00511374710cd51cc4b0c7cec0d0d9d2b7248b8ab34656e5c162a725f548" },
+        "objdiff_percent": 71.78667
+      }
+    },
+    {
+      "unit": "source/bitmaps/bitmap_extract",
+      "function": "_extract_sprites",
+      "class": "unclassified",
+      "evidence": "Complete typed sprite-budget, page-packing, metadata, and reporting reconstruction retained from the 2026-09-12 private packet. January and the current candidate have the same 1104-byte extent and 49 relocations but different normalized streams. No synthetic source pressure is retained; the fail-closed class makes no stronger diagnosis and the body receives zero credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 1104, "relocation_count": 49, "normalized_sha256": "b853b0998fdec2cdf39cce422d5baa701b09b807da62f236f7c409764437ee0b" },
+        "base": { "size": 1104, "relocation_count": 49, "normalized_sha256": "1abf491af39a8d3889045734745eb8b7a431bfa326ac3f2736aac3b236450e3e" },
+        "objdiff_percent": 85.248604
+      }
+    },
+    {
+      "unit": "source/camera/editor_flying_camera",
+      "function": "_editor_camera_set_position_and_roll",
+      "class": "unclassified",
+      "evidence": "Complete January/HCEA-authenticated editor-camera reconstruction retained from the 2026-09-12 packet. It uses correctly typed Euler storage and copying instead of representation-pointer punning; that house-rule-compliant shape remains 464 versus 432 padded bytes and receives zero credit. The fail-closed class makes no unsupported compiler diagnosis. See docs/object_matching_logs/editor_flying_camera_obj_unwritten_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 30, "normalized_sha256": "a209aa201db09ef8600e6aa329e259b552acb2fe89532ea3bc18f4c007912b82" },
+        "base": { "size": 464, "relocation_count": 30, "normalized_sha256": "67b4c733c5db98d9e9c7ca7b21869fa63800ef10c912d24d1adbfc1e101b115a" },
+        "objdiff_percent": 80.0604
+      }
+    },
+    {
+      "unit": "source/camera/editor_flying_camera",
+      "function": "_editor_camera_update",
+      "class": "unclassified",
+      "evidence": "Complete scripted/free-flight editor-camera state machine retained from the 2026-09-12 packet with named flags and natural control flow. It shares January's 304-byte extent but has one extra relocation and a different normalized stream; no source-shape pressure is admitted and it receives zero credit. See docs/object_matching_logs/editor_flying_camera_obj_unwritten_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 304, "relocation_count": 26, "normalized_sha256": "3f3b95ee1bff1748d5b911a1ba0f7c307742058e9bc8b8c7e67649cc3288ed7e" },
+        "base": { "size": 304, "relocation_count": 27, "normalized_sha256": "32fc230529e51df0ddd6f8a4a35a74b31ca746efeedbc7a654cfdb6d57b8347c" },
+        "objdiff_percent": 92.08696
+      }
+    },
+    {
+      "unit": "source/camera/editor_flying_camera",
+      "function": "_editor_camera_set_scripted",
+      "class": "unclassified",
+      "evidence": "Complete scripted-mode transition reconstruction retained from the 2026-09-12 packet. It copies the focused-unit vector into a real point rather than representation-punning its pointer; the natural type-safe form remains 464 versus 432 padded bytes and receives zero credit. The fail-closed class claims no stronger mechanism. See docs/object_matching_logs/editor_flying_camera_obj_unwritten_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 40, "normalized_sha256": "925a9c065ee97f4b157c20efb60ed226b0852123c626eb2e78b6cbbca0a124df" },
+        "base": { "size": 464, "relocation_count": 43, "normalized_sha256": "8eb8e394df47250950f18742f107706f614e8594d8e3830d9b390a0072b302d4" },
+        "objdiff_percent": 88.7874
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_update_accelerations",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. It is complete natural source, remains non-exact at the current production compile, and receives zero credit; no register tuning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 464, "relocation_count": 13, "normalized_sha256": "928529875fdad2ff46972e74d088bff5f94d15be907617e9e513ec8a41b315a7" },
+        "base": { "size": 528, "relocation_count": 13, "normalized_sha256": "c3229a797b41078842c37b3777cbdb8e3d45b25dce7f77d260c7c40a529aac84" },
+        "objdiff_percent": 50.05298
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_update_velocities",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer velocity-integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. It is complete natural source, remains non-exact at the current production compile, and receives zero credit; no register tuning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 512, "relocation_count": 14, "normalized_sha256": "9af560df9a899bb1ac53b0ed6c773d014e9a4ead892db1b76b5da195a96e1ac1" },
+        "base": { "size": 544, "relocation_count": 14, "normalized_sha256": "d486a70d554e015b79b1315a7707624a4503fc2481e6e3d0fc50d413f36f38ef" },
+        "objdiff_percent": 13.716867
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_collision_test_with_t",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer collision helper retained from the authenticated penetration packet and the 2026-09-12 replacement packet. January's real penetration caller invokes this helper directly; the complete natural body remains non-exact and receives zero credit. No fake caller, register forcing, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 224, "relocation_count": 15, "normalized_sha256": "6c92e9642a9735f928a35438ce063b0218de0f14eeeca1703776bf35f5b0d6f1" },
+        "base": { "size": 208, "relocation_count": 15, "normalized_sha256": "cdfc7f2239730b884060df50b8b395766abe4c1cc68d1a424cb47c6dc48e2696" },
+        "objdiff_percent": 81.87692
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_update_command",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer command-update body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural control flow remains non-exact at the current production compile and receives zero credit; no byte forcing or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 1040, "relocation_count": 33, "normalized_sha256": "78930fa0b90a5020a8f21975451e43b2a2b07df1cc96ded8fd5fff0365db8656" },
+        "base": { "size": 1056, "relocation_count": 35, "normalized_sha256": "92596f927e1b02d02469750d87793e5bb23eb948f674c41e27f81add1ede7cc4" },
+        "objdiff_percent": 88.56902
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_update_polynomial",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer polynomial-update body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete endpoint/interpolation logic remains non-exact at the current production compile and receives zero credit; no codegen steering or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 1440, "relocation_count": 48, "normalized_sha256": "23fa700f3f11e331415fc0f5c190e02781ec07f6ff3790eb824d0634e32ef9e4" },
+        "base": { "size": 1488, "relocation_count": 46, "normalized_sha256": "62378d20b35384cebac90c2f18a0d2341cbc8c3350b5e65cebe30d2e1c24c58d" },
+        "objdiff_percent": 75.87404
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_update_positions",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer position-integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural source remains non-exact at the current production compile and receives zero credit; no representation punning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 1568, "relocation_count": 40, "normalized_sha256": "8dce5e181abf19a30fc9a87e483c1e0a16050eeb48c03c48c2b6209e7fd59deb" },
+        "base": { "size": 1280, "relocation_count": 28, "normalized_sha256": "53f9635a438d2ebd8fa36e24a991df1c3adb5023eafbc440c0e060a00d1a7fe0" },
+        "objdiff_percent": 45.926723
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_check_penetration",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer penetration refinement retained from the independently reviewed 2026-09-05 packet and reconciled in the 2026-09-12 replacement packet. It preserves the real collision-test-with-t call graph but remains non-exact and receives zero credit; no fake differential call or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 752, "relocation_count": 11, "normalized_sha256": "ef9a396b122f6b5f45532ca7361227e1cbeaa47273bb9802a67187a32e09b140" },
+        "base": { "size": 688, "relocation_count": 10, "normalized_sha256": "1062b1380ec193b28d059a3861e36941619b4f9ce06eb1ab157226731495b09a" },
+        "objdiff_percent": 54.21348
+      }
+    },
+    {
+      "unit": "source/camera/observer",
+      "function": "_observer_postcheck",
+      "class": "unclassified",
+      "evidence": "Behavior-reviewed Observer postcheck body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. Its complete natural camera/collision logic remains non-exact at the current production compile and receives zero credit; no compiler steering or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 2112, "relocation_count": 104, "normalized_sha256": "04956fe0b7c20823ab4605b5f92b0a76797b937bee96c30a8db360c5d990cbbb" },
+        "base": { "size": 1968, "relocation_count": 107, "normalized_sha256": "49f65a0234d12825cb1452d46b1a6972f61ff9084504ac9558af1ca1f7c9e127" },
+        "objdiff_percent": 90.80541
+      }
+    },
+    {
+      "unit": "source/input/input_xbox",
+      "function": "_input_flush_rumble",
+      "class": "unclassified",
+      "evidence": "Complete private rumble-state update retained with the genuine input worker/initializer call graph. January proves the four feedback updates and suppression conditions; the current natural body remains 160 versus 176 padded bytes with one fewer relocation, so it receives zero credit. The inferred keyboard lifecycle field is explicitly not treated as original-name evidence. See docs/object_matching_logs/input_xbox_obj_lifecycle_unknown_230_blocker_20260904.md.",
+      "measurements": {
+        "target": { "size": 176, "relocation_count": 8, "normalized_sha256": "f473cb2d504d90b7ac4014fa2d05f189e9ef27ace087fd7fb23d69a6c9c19949" },
+        "base": { "size": 160, "relocation_count": 7, "normalized_sha256": "f9b857cc2a18599535d68140b11d5bf9c0b479a253f27a37146f7cceacdfea73" },
+        "objdiff_percent": 84.2
+      }
+    },
+    {
+      "unit": "source/interface/first_person_weapons",
+      "function": "_first_person_weapon_update",
+      "class": "unclassified",
+      "evidence": "Complete HCEA-corroborated first-person weapon state machine retained from the 2026-09-12 update cluster. It has the real callers, typed accessors, and four-player January loop, but the current production inline schedule remains non-exact and emits one extra relocation; no forced-inline or source-pressure device is admitted. This body and its non-owned helper schedule receive zero credit. See docs/object_matching_logs/first_person_weapons_obj_update_cluster_reconciliation_20260912.md.",
+      "measurements": {
+        "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
+        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "a112cf32c0e3baf805bd69c440b5beadbe51394f6a7f3161f61d4c470ea88292" },
+        "objdiff_percent": 93.48387
+      }
+    },
+    {
+      "unit": "source/objects/object_lights",
+      "function": "_lights_preprocess_scene",
+      "class": "register-allocation",
+      "evidence": "Complete HCEA-guided, January-corrected scene-light preprocessing graph retained from the 2026-09-12 packet. Target and candidate have identical 2400-byte extents, 165 relocations, call order, and behavior; the measured residual is systematic local allocation/instruction scheduling, including a 0x3E0 candidate frame versus January's 0x3DC. Artificial locals and register steering are rejected, and the body receives zero credit. See docs/object_matching_logs/object_lights_obj_preprocess_scene_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 2400, "relocation_count": 165, "normalized_sha256": "726548627571357009de646c259615ae7b6df8ca5abe3e1d13018ee126e28b52" },
+        "base": { "size": 2400, "relocation_count": 165, "normalized_sha256": "32951ca676c566965d56b67a33c516271944eb950d93c6e02e67304edf985368" },
+        "objdiff_percent": 95.15638
+      }
+    },
+    {
+      "unit": "source/rasterizer/rasterizer_lights",
+      "function": "_rasterizer_lens_flares_submit_occlusion_tests",
+      "class": "unclassified",
+      "evidence": "Complete natural lens-flare occlusion submission reconstructed from the January instruction/relocation topology and the Opus rasterizer donor packet. Target and candidate both occupy 400 bytes with all 22 relocation identities, but their normalized streams remain different. No control-flow fabrication or compiler steering is admitted; the fail-closed class claims no unsupported mechanism and the body receives zero credit. Donor provenance: commit 74e015673.",
+      "measurements": {
+        "target": { "size": 400, "relocation_count": 22, "normalized_sha256": "1c79f999dc13e23a8c403b87948660413ea7a09a495a32d890c3abc3a5086612" },
+        "base": { "size": 400, "relocation_count": 22, "normalized_sha256": "687bd511d2c7222074da7c9352197282f1337358ff1c8a506e4e98f6355cb948" },
+        "objdiff_percent": 96.3871
+      }
+    },
+    {
+      "unit": "source/render/render_debug",
+      "function": "_render_debug_player",
+      "class": "register-allocation",
+      "evidence": "Complete typed debug-player renderer retained from the 2026-09-12 packet. Target and candidate share the 272-byte extent, all 16 relocations, calls, branches, and behavior; the normalized difference is the formatting-buffer stack slot, with January reserving 0x404 bytes and the natural candidate 0x400. Artificially enlarging the buffer or adding a dead local is rejected, and the body receives zero credit. See docs/object_matching_logs/render_debug_unwritten_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "a45fe6649ea60e23685d2c15640529bc16e9720ff02715c1809b04bd0301f8d0" },
+        "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "2cb093e3d436cd9fc015b77afe56b67514e29035a6b9069dd45508a2d2756a56" },
+        "objdiff_percent": 99.960526
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_build_torus",
+      "class": "unclassified",
+      "evidence": "Complete typed torus-builder reconstruction retained from the reconciled Fable geometry packet. January controls the ABI and relocation topology; the house-rule repair now uses a correctly typed real_vector3d local instead of a point-to-vector pointer cast. The natural implementation remains 752 versus 768 padded bytes with all 18 relocations and receives zero credit. The fail-closed class makes no unsupported codegen diagnosis; no register forcing, punning, or synthetic branch is admitted. Donor provenance: commit f9dd42218.",
+      "measurements": {
+        "target": { "size": 768, "relocation_count": 18, "normalized_sha256": "6460f3c33d8f750aa8651ce8c7a26cb9670b258dfe080d9f13af8baff1c48022" },
+        "base": { "size": 752, "relocation_count": 18, "normalized_sha256": "204b063ec59c73dbdc75a7bb5361a86776ba7942fd0a4a5e6aa008e36dfea2e2" },
+        "objdiff_percent": 73.81274
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_convex_hull2d_perimeter",
+      "class": "unclassified",
+      "evidence": "Complete natural convex-hull perimeter reconstruction retained from the reconciled Fable geometry packet. Target and candidate share a 96-byte extent with no relocations but have different normalized streams; earlier exact-looking expression/helper variants had unresolved provenance and are not used as credit. The retained ordinary project-type body receives zero credit. See docs/object_matching_logs/geometry_obj_fable_clean_pair_independent_intake_20260906.md.",
+      "measurements": {
+        "target": { "size": 96, "relocation_count": 0, "normalized_sha256": "71292feb41a8e5d57e328751240458cb0b9678237d26b7f8be4ba7abab7f4b0e" },
+        "base": { "size": 96, "relocation_count": 0, "normalized_sha256": "22c6d46416fece30ca43252116be4b7f30369b3c2df152ea46ef045b031d073d" },
+        "objdiff_percent": 91.5
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_convex_polygon2d_clip_to_plane",
+      "class": "unclassified",
+      "evidence": "Complete typed 2D convex-polygon plane clipping reconstruction retained from the reconciled Fable geometry packet with its declarations in the Geometry owner header. Target and candidate share the 1008-byte extent and all 26 relocations but remain normalized-code residuals. No artificial expression ordering or helper ownership is admitted; zero exact-function and byte credit. Donor provenance: commit f9dd42218.",
+      "measurements": {
+        "target": { "size": 1008, "relocation_count": 26, "normalized_sha256": "cae8638e13aaeefab4fd338969dad10f37b372f0d6c1ed8bf603b461b1c8e291" },
+        "base": { "size": 1008, "relocation_count": 26, "normalized_sha256": "70b1b254018a4bebfb89bd0ce810eba6ddfcdaf482bee55f4840e15de7672df8" },
+        "objdiff_percent": 86.58671
+      }
+    },
+    {
+      "unit": "source/math/geometry",
+      "function": "_convex_polygon3d_clip_to_plane",
+      "class": "unclassified",
+      "evidence": "Complete typed 3D convex-polygon plane clipping reconstruction retained from the reconciled Fable geometry packet with its declarations in the Geometry owner header. Target and candidate share the 1120-byte extent and all 26 relocations but remain normalized-code residuals. No representation punning, artificial branch shape, or helper-ownership trick is admitted; zero credit. Donor provenance: commit f9dd42218.",
+      "measurements": {
+        "target": { "size": 1120, "relocation_count": 26, "normalized_sha256": "0d106198b6d9ccb8c0d74d8af566876f04b2610ae714fb5cabb28254b33e0d20" },
+        "base": { "size": 1120, "relocation_count": 26, "normalized_sha256": "9c1611d216717b6d0ba6792f37f6dde55d3fbbffac81c875f48a0e934072f6a3" },
+        "objdiff_percent": 80.76382
+      }
+    },
+    {
+      "unit": "source/render/render_cameras",
+      "function": "_render_camera_view_to_screen",
+      "class": "unclassified",
+      "evidence": "Complete typed view-to-screen projection retained from the reconciled Fable render-camera packet and independently bounded by the existing camera reconstruction ledgers. Target and candidate share the 480-byte extent and all 30 relocations, but the normalized streams remain different. No Boolean respelling or compiler steering is admitted; this fuzzy research baseline receives zero credit. Donor provenance: commit f9dd42218.",
+      "measurements": {
+        "target": { "size": 480, "relocation_count": 30, "normalized_sha256": "517a6258ff52de38f56f76280f92a6aa61ebfe1c2802a22576f798d499f3eb32" },
+        "base": { "size": 480, "relocation_count": 30, "normalized_sha256": "871744565d00924c7995954af46afccb56f0c92ce1fb26a3a93f1a4f714864fe" },
+        "objdiff_percent": 98.36552
+      }
+    },
+    {
+      "unit": "source/render/render_cameras",
+      "function": "_render_frustum_sphere_visible",
+      "class": "unclassified",
+      "evidence": "Complete typed frustum-sphere visibility reconstruction retained from the reconciled Fable packet. January, HCEA, and preserved PC history authenticate the bounds and six-plane behavior; target and candidate share 432 bytes and six relocations, while the final classification/control-flow lowering remains different. Comparison/return-shape tuning is rejected and the body receives zero credit. See docs/object_matching_logs/render_cameras_obj_jonas_sphere_visibility_boundary_20260829.md.",
+      "measurements": {
+        "target": { "size": 432, "relocation_count": 6, "normalized_sha256": "2bdb31a0158b5a23314020bcccb8931e8bcc74c2b357d56305c687c16b91f949" },
+        "base": { "size": 432, "relocation_count": 6, "normalized_sha256": "8bded9be55c3f53ba980619ea443350230675ee9dd6337b7ec675c14950d905e" },
+        "objdiff_percent": 89.36364
+      }
+    },
+    {
+      "unit": "source/units/unit_dialogue",
+      "function": "_unit_describe_speech",
+      "class": "unclassified",
+      "evidence": "Complete January-authoritative, HCEA-cross-checked speech-description reconstruction retained from the 2026-09-12 packet. Target and candidate share the 272-byte extent and all 15 relocation identities but remain normalized-code residuals. The natural typed body receives zero credit and no register or branch-layout steering is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 272, "relocation_count": 15, "normalized_sha256": "7d9ee7e3b923460ae26a00c0612904b3106b6ed95c8c0491504d017841c1dc9c" },
+        "base": { "size": 272, "relocation_count": 15, "normalized_sha256": "2b01a81debf36cda38bd965419e48997b2a2bbeac2dd4041f6752591f481edaf" },
+        "objdiff_percent": 97.22727
+      }
+    },
+    {
+      "unit": "source/units/unit_dialogue",
+      "function": "_unit_notify_impulse_sound",
+      "class": "unclassified",
+      "evidence": "Complete January-authoritative, HCEA-cross-checked impulse-speech arbitration reconstruction retained from the 2026-09-12 packet. Target and candidate share the 240-byte extent and all 10 relocation identities but remain different in scheduling/register/branch shape. The natural typed body receives zero credit and no codegen pressure is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 240, "relocation_count": 10, "normalized_sha256": "ff46a3c5213b3d65bc19da918a094f3aba00c56dbc017a97f1e646a06df18c81" },
+        "base": { "size": 240, "relocation_count": 10, "normalized_sha256": "3582e4a63aa482d79f813af47a217c92370b47c7f9fa3221eef7f9fb1d97c7d7" },
+        "objdiff_percent": 84.39474
+      }
+    },
+    {
+      "unit": "source/units/unit_dialogue",
+      "function": "_unit_make_damage_sound",
+      "class": "unclassified",
+      "evidence": "Complete January-authoritative, HCEA-cross-checked damage/death vocalization reconstruction retained from the 2026-09-12 packet. Target and candidate share the 784-byte extent and all 18 relocation identities, including January-only wounded-sound suppression, but remain normalized-code residuals. The natural typed body receives zero credit and no codegen pressure is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 784, "relocation_count": 18, "normalized_sha256": "87952366bca787dc5174221b78335b6a9e91770433b8d76266bdb21d1bf65975" },
+        "base": { "size": 784, "relocation_count": 18, "normalized_sha256": "a72cd2b9285abc4fe3ed3a8f4de6c0606fe474c9e01a1049e16b3285f1497f01" },
+        "objdiff_percent": 81.60833
       }
     }
   ]

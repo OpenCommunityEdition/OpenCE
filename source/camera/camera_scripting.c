@@ -137,13 +137,6 @@ void scripted_camera_set(
 	short camera_point_index,
 	word transition_time,
 	long relative_object_index);
-void scripted_camera_set_camera_point_relative(
-	real_point3d const *position,
-	real_vector3d const *forward,
-	real_vector3d const *up,
-	real field_of_view,
-	word transition_time,
-	long relative_object_index);
 void observer_update(
 	real dt);
 void first_person_camera_fake(

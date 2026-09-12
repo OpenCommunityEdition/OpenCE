@@ -748,12 +748,18 @@ __inline real tangent(
 	return tan(angle);
 }
 
+#ifdef REAL_MATH_EXTERNAL_ARCTANGENT
+real arctangent(
+	real y,
+	real x);
+#else
 __inline real arctangent(
 	real y,
 	real x)
 {
 	return atan2(y, x);
 }
+#endif
 
 __inline real arccosine(
 	real x)
@@ -767,6 +773,11 @@ __inline real arcsine(
 	return asin(x);
 }
 
+#ifdef REAL_MATH_EXTERNAL_SIGNED_ANGULAR_DIFFERENCE
+real signed_angular_difference(
+	real angle1,
+	real angle2);
+#else
 __inline real signed_angular_difference(
 	real angle1,
 	real angle2)
@@ -785,12 +796,18 @@ __inline real signed_angular_difference(
 
 	return result;
 }
+#endif
 
+#ifdef REAL_MATH_EXTERNAL_SQUARE_ROOT
+real square_root(
+	real x);
+#else
 __inline real square_root(
 	real x)
 {
 	return sqrt(x);
 }
+#endif
 
 __inline real reciprocal_square_root(
 	real x)
@@ -972,6 +989,13 @@ __inline boolean projection_sign_from_vector3d(
 	return n->n[projection] > 0.f;
 }
 
+#ifdef REAL_MATH_EXTERNAL_PROJECT_POINT3D
+real_point2d *project_point3d(
+	real_point3d const *p3d,
+	short projection,
+	boolean sign,
+	real_point2d *p2d);
+#else
 __inline real_point2d *project_point3d(
 	real_point3d const *p3d, 
 	short projection, 
@@ -987,6 +1011,7 @@ __inline real_point2d *project_point3d(
 		p3d->n[global_projection3d_mappings[projection][sign][1]]);
 	return p2d;
 }
+#endif
 
 __inline real_point3d *project_point2d(
 	real_point2d const *p2d,
@@ -1084,17 +1109,27 @@ __inline real_vector3d *scale_vector3d(
 	return result;
 }
 
+#ifdef REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
+real magnitude_squared3d(
+	real_vector3d const *v);
+#else
 __inline real magnitude_squared3d(
 	real_vector3d const *v)
 {
 	return v->i*v->i + v->j*v->j + v->k*v->k;
 }
+#endif
 
+#ifdef REAL_MATH_EXTERNAL_MAGNITUDE3D
+real magnitude3d(
+	real_vector3d const *v);
+#else
 __inline real magnitude3d(
 	real_vector3d const *v)
 {
 	return square_root(magnitude_squared3d(v));
 }
+#endif
 
 #ifdef REAL_MATH_EXTERNAL_NORMALIZE3D
 real normalize3d(
@@ -1156,12 +1191,18 @@ __inline real_point3d *midpoint3d(
 	result->z = (p0->z + p1->z) * 0.5f;
 }
 
+#ifdef REAL_MATH_EXTERNAL_DOT_PRODUCT3D
+real dot_product3d(
+	real_vector3d const *a,
+	real_vector3d const *b);
+#else
 __inline real dot_product3d(
 	real_vector3d const *a,
 	real_vector3d const *b)
 {
 	return a->i*b->i + a->j*b->j + a->k*b->k;
 }
+#endif
 
 __inline real_vector3d *cross_product3d(
 	real_vector3d const *a,
@@ -1312,12 +1353,18 @@ __inline real_plane3d *plane3d_negate(
 	return plane;
 }
 
+#ifdef REAL_MATH_EXTERNAL_PLANE3D_DISTANCE_TO_POINT
+real plane3d_distance_to_point(
+	real_plane3d const *plane,
+	real_point3d const *point);
+#else
 __inline real plane3d_distance_to_point(
 	real_plane3d const *plane,
 	real_point3d const *point)
 {
 	return (dot_product3d((real_vector3d *)point, &plane->n) - plane->d);
 }
+#endif
 
 __inline real vector_intersect_plane3d(
 	real_point3d const *point,
@@ -1434,18 +1481,29 @@ __inline short local_random_range(
 	return seed_random_range(get_global_local_random_seed_address(), lower_bound, upper_bound);
 }
 
+#ifdef REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
+real real_local_random(
+	void);
+#else
 __inline real real_local_random(
 	void)
 {
 	return real_seed_random(get_global_local_random_seed_address());
 }
+#endif
 
+#ifdef REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
+real real_local_random_range(
+	real lower_bound,
+	real upper_bound);
+#else
 __inline real real_local_random_range(
 	real lower_bound,
 	real upper_bound)
 {
 	return real_seed_random_range(get_global_local_random_seed_address(), lower_bound, upper_bound);
 }
+#endif
 
 __inline real_vector3d *local_random_direction3d(
 	real_vector3d *direction)

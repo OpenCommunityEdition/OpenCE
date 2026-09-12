@@ -43,6 +43,8 @@ void decal_new_from_media_collision(
 	boolean permanent,
 	short forced_sequence_index,
 	struct decal_editor_geometry *editor_geometry);
+void render_debug_decals(
+	void);
 void decal_new_from_collision(
 	long decal_definition_index,
 	struct collision_result const *collision,

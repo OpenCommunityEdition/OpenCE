@@ -2195,7 +2195,7 @@ static void game_options_menu_update_text_desc(
 	struct widget_instance *extended_description;
 	struct widget_instance *spinner_list;
 	struct ui_widget_definition *definition;
-	long description_index = 0;
+	long description_index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -2203,11 +2203,11 @@ static void game_options_menu_update_text_desc(
 		widget->type == _ui_widget_type_column_list,
 		"expected column list for multiplayer game options list");
 
-	extended_description = widget->parameters.list.extended_description;
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x8F8,
-		extended_description && extended_description->type == _ui_widget_type_text_box,
+		widget->parameters.list.extended_description &&
+			widget->parameters.list.extended_description->type == _ui_widget_type_text_box,
 		"expected a text box for multiplayer game options list extended description");
 
 	definition = ui_widget_definition_get(widget->definition_tag_index);
@@ -2217,8 +2217,10 @@ static void game_options_menu_update_text_desc(
 		definition->child_count > 0,
 		"expected some list items for multiplayer game settings list");
 
+	extended_description = widget->parameters.list.extended_description;
 	if (widget->focused_child)
 	{
+		description_index = 0;
 		column = widget->child;
 		while (column)
 		{
@@ -2254,7 +2256,7 @@ static void game_options_menu_update_pic_desc(
 	struct widget_instance *extended_description;
 	struct widget_instance *spinner_list;
 	struct ui_widget_definition *definition;
-	long description_index = 0;
+	long description_index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -2262,11 +2264,11 @@ static void game_options_menu_update_pic_desc(
 		widget->type == _ui_widget_type_column_list,
 		"expected column list for game options list");
 
-	extended_description = widget->parameters.list.extended_description;
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 		0x983,
-		extended_description && extended_description->type == _ui_widget_type_bitmap,
+		widget->parameters.list.extended_description &&
+			widget->parameters.list.extended_description->type == _ui_widget_type_bitmap,
 		"expected a picture (container) for game options list extended description");
 
 	definition = ui_widget_definition_get(widget->definition_tag_index);
@@ -2276,8 +2278,10 @@ static void game_options_menu_update_pic_desc(
 		definition->child_count > 0,
 		"expected some list items for game settings list");
 
+	extended_description = widget->parameters.list.extended_description;
 	if (widget->focused_child)
 	{
+		description_index = 0;
 		column = widget->child;
 		while (column)
 		{

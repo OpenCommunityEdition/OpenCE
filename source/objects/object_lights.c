@@ -153,6 +153,8 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "interface/first_person_weapons.h"
+#include "math/periodic_functions.h"
 #include "memory/data.h"
 #include "objects/light_definitions.h"
 #include "objects/object_lights.h"
@@ -164,6 +166,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_environment.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_geometry_environment.h"
+#include "rasterizer/rasterizer_lights.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "shaders/shader_definitions.h"
@@ -173,7 +176,9 @@ symbols in this file:
 #include "structures/structure_render_lights.h"
 #include "structures/structures.h"
 #include "structures/structure_vector_tests.h"
+#include "structures/structure_visibility.h"
 #include "tag_files/tag_groups.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -183,6 +188,8 @@ enum
 	_light_definition_no_specular_bit,
 	_light_definition_dont_light_own_object_bit,
 	_light_definition_supersize_in_first_person_bit,
+	_light_definition_is_first_person_flashlight_bit,
+	_light_definition_dont_fade_active_camouflage_bit,
 };
 
 enum
@@ -196,6 +203,7 @@ enum
 enum
 {
 	MAXIMUM_CLUSTERS_PER_LIGHT = 512,
+	LENS_FLARE_FIRST_PERSON_MARKER_FLAG = FLAG(7),
 };
 
 enum
@@ -290,8 +298,17 @@ struct light_definition
 	real runtime_cosine_cutoff_angle;
 	real specular_radius_multiplier;
 	real runtime_sine_cutoff_angle;
-	byte reserved2C[0x80];
+	byte reserved2C[0x8];
+	unsigned long color_interpolation_flags;
+	real_argb_color color_lower_bound;
+	real_argb_color color_upper_bound;
+	byte reserved58[0x54];
 	struct tag_reference lens_flare;
+	byte reservedBC[0x38];
+	real transition_duration;
+	word reservedF8;
+	short falloff_function;
+	byte reservedFC[0x8];
 };
 
 struct light_datum
@@ -302,7 +319,7 @@ struct light_datum
 	long rasterizer_light_index;
 	long marker;
 	long cluster_reference;
-	real_rgb_color current_color;
+	real_rgb_color color;
 	byte reserved20[0xC];
 	long object_index;
 	real_point3d position;
@@ -339,6 +356,16 @@ struct rasterizer_lens_flare_submit_parameters
 	long internal_occlusion_pixels;
 };
 
+struct rasterizer_light_submit_parameters
+{
+	struct light_definition *definition;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	real_rgb_color color;
+	real radius;
+};
+
 struct lights_globals
 {
 	boolean marker_initialized;
@@ -360,15 +387,34 @@ typedef char verify_light_datum_cluster_reference_offset[
 	offsetof(struct light_datum, cluster_reference) == 0x10 ? 1 : -1];
 typedef char verify_light_definition_lens_flare_offset[
 	offsetof(struct light_definition, lens_flare) == 0xAC ? 1 : -1];
+typedef char verify_light_definition_color_offset[
+	offsetof(struct light_definition, color_interpolation_flags) == 0x34 ? 1 : -1];
+typedef char verify_light_definition_transition_duration_offset[
+	offsetof(struct light_definition, transition_duration) == 0xF4 ? 1 : -1];
+typedef char verify_light_definition_falloff_function_offset[
+	offsetof(struct light_definition, falloff_function) == 0xFA ? 1 : -1];
 typedef char verify_light_datum_size[
 	sizeof(struct light_datum) == 0x7C ? 1 : -1];
+typedef char verify_rasterizer_light_submit_parameters_size[
+	sizeof(struct rasterizer_light_submit_parameters) == 0x38 ? 1 : -1];
 typedef char verify_lights_globals_size[
 	sizeof(struct lights_globals) == 0x350 ? 1 : -1];
 
 /* ---------- prototypes */
 
+static void light_marker_begin(
+	void);
+static void light_marker_end(
+	void);
 static boolean light_unmarked(
 	long light_index);
+static boolean light_mark(
+	long light_index);
+long cluster_get_first_light(
+	long *reference_index,
+	short cluster_index);
+long cluster_get_next_light(
+	long *reference_index);
 static void find_point_lights_for_object_in_cluster(
 	long object_index,
 	short cluster_index,
@@ -443,6 +489,8 @@ static real_vector3d const lightmap_sample_raycast_sideways[NUMBER_OF_LIGHTMAP_S
 	{ 0.0f, 10.0f, 0.0f },
 };
 
+static struct profile_section lights_section = { "lights", NONE, TRUE };
+
 real object_light_ambient_base = 0.03f;
 real object_light_ambient_scale = 0.4f;
 real object_light_secondary_scale = 1.0f;
@@ -453,6 +501,7 @@ extern boolean debug_object_lights;
 extern struct data_array *light_data;
 extern struct cluster_partition light_cluster_partition;
 extern struct lights_game_globals *lights_game_globals;
+extern short debug_rasterizer_light_count;
 static struct lights_globals lights_globals;
 
 /* ---------- public code */
@@ -745,6 +794,354 @@ long light_new_unattached(
 	return light_index;
 }
 
+void lights_preprocess_scene(
+	void)
+{
+	long current_time = game_time_get();
+	long light_index;
+	short rendered_cluster_index;
+	short scene_light_index;
+	short queued_lens_flare_index;
+
+	profile_enter(lights_section);
+	debug_rasterizer_light_count = 0;
+	for (light_index = data_next_index(light_data, NONE);
+		light_index != NONE;
+		light_index = data_next_index(light_data, light_index))
+	{
+		struct light_datum *light = light_get(light_index);
+		long transition_start_time = light->parent_light_index;
+
+		SET_FLAG(
+			light->flags,
+			_point_light_attached_to_first_person_weapon_bit,
+			FALSE);
+		light->rasterizer_light_index = NONE;
+		if (transition_start_time != NONE)
+		{
+			struct light_definition *definition = light_definition_get(
+				light->definition_index);
+			real elapsed = (real)(current_time - transition_start_time);
+
+			if (elapsed > definition->transition_duration)
+			{
+				cluster_partition_disconnect(
+					&light_cluster_partition,
+					light_index,
+					&light_get(light_index)->cluster_reference);
+				datum_delete(light_data, light_index);
+			}
+			else if (object_try_and_get(light->object_index))
+			{
+				light_disconnect_from_map(light_index);
+				light_reconnect_to_map(light_index);
+			}
+		}
+	}
+
+	light_marker_begin();
+	lights_globals.scene_point_light_count = structure_visibility_find_objects(
+		lights_globals.scene_point_lights,
+		MAXIMUM_RENDERED_LIGHTS,
+		cluster_get_first_light,
+		cluster_get_next_light,
+		light_get_bounding_sphere,
+		light_unmarked,
+		light_mark);
+	light_marker_end();
+	rasterizer_lights_begin();
+	for (rendered_cluster_index = 0;
+		rendered_cluster_index < render.rendered_cluster_count;
+		rendered_cluster_index++)
+	{
+		rasterizer_lens_flare_submit_for_cluster(
+			rendered_cluster_get(rendered_cluster_index)->cluster_index);
+	}
+
+	for (scene_light_index = 0;
+		scene_light_index < lights_globals.scene_point_light_count;
+		scene_light_index++)
+	{
+		long scene_light_handle = lights_globals.scene_point_lights[scene_light_index];
+		struct light_datum *light = light_get(scene_light_handle);
+		struct light_definition *definition = light_definition_get(
+			light->definition_index);
+		struct object_datum *object;
+		real intensity;
+		real inverse_intensity;
+		real lens_flare_scale = 1.0f;
+
+		render_debug_light(scene_light_handle);
+		object = light->object_index != NONE
+			? object_try_and_get(light->object_index)
+			: NULL;
+		if (light->parent_light_index == NONE)
+		{
+			real_rgb_color const *color;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\objects\\object_lights.c",
+				0x1AC,
+				object);
+			object_get_function_value(
+				light->object_index,
+				light->function_index,
+				&intensity);
+			color = light->color_function_index == NONE
+				? global_real_rgb_white
+				: &object->object.outgoing_change_colors[light->color_function_index];
+			rgb_colors_interpolate_and_scale(
+				&light->color,
+				definition->color_interpolation_flags,
+				&definition->color_lower_bound,
+				&definition->color_upper_bound,
+				color,
+				intensity);
+		}
+		else
+		{
+			intensity = (1.0f - transition_function_evaluate(
+				definition->falloff_function,
+				(real)(current_time - light->parent_light_index)
+					/ definition->transition_duration))
+				* light->intensity_scale;
+			rgb_colors_interpolate(
+				&light->color,
+				definition->color_interpolation_flags,
+				&definition->color_lower_bound.rgb,
+				&definition->color_upper_bound.rgb,
+				intensity);
+		}
+
+		inverse_intensity = 1.0f - intensity;
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_lights.c",
+			0x1BB,
+			light->color.red >=0.0f && light->color.red <=1.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_lights.c",
+			0x1BC,
+			light->color.green>=0.0f && light->color.green<=1.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\objects\\object_lights.c",
+			0x1BD,
+			light->color.blue >=0.0f && light->color.blue <=1.0f);
+
+		if (object)
+		{
+			long ultimate_parent_index = object_get_ultimate_parent(
+				light->object_index);
+			struct object_datum *ultimate_parent = object_get(
+				ultimate_parent_index);
+
+			if (TEST_FLAG(_object_mask_unit, ultimate_parent->object.type))
+			{
+				struct unit_datum *parent_unit = unit_get(ultimate_parent_index);
+				real active_camouflage = parent_unit->unit.active_camouflage;
+
+				if (active_camouflage > 0.0f
+					&& !TEST_FLAG(
+						light_definition_get(light->definition_index)->flags,
+						_light_definition_dont_fade_active_camouflage_bit))
+				{
+					lens_flare_scale = 1.0f - active_camouflage;
+					light->color.red *= lens_flare_scale;
+					light->color.green *= lens_flare_scale;
+					light->color.blue *= lens_flare_scale;
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1D1,
+						light->color.red >=0.0f && light->color.red <=1.0f);
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1D2,
+						light->color.green>=0.0f && light->color.green<=1.0f);
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1D3,
+						light->color.blue >=0.0f && light->color.blue <=1.0f);
+				}
+			}
+		}
+
+		if (light->color.red != 0.0f
+			|| light->color.green != 0.0f
+			|| light->color.blue != 0.0f)
+		{
+			if (TEST_FLAG(light->flags, _point_light_dynamic_bit))
+			{
+				light->radius = (definition->radius_modifier_lower_bound * inverse_intensity
+					+ definition->radius_modifier_upper_bound * intensity)
+					* definition->radius;
+				if (light->radius != 0.0f)
+				{
+					struct rasterizer_light_submit_parameters light_parameters;
+
+					light_parameters.definition = light_definition_get(
+						light->definition_index);
+					light_parameters.position = light->position;
+					light_parameters.forward = light->forward;
+					light_parameters.up = light->up;
+					light_parameters.color = light->color;
+					light_parameters.radius = light->radius;
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1EE,
+						light->color.red >=0.0f && light->color.red <=1.0f);
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1EF,
+						light->color.green>=0.0f && light->color.green<=1.0f);
+					match_assert(
+						"c:\\halo\\SOURCE\\objects\\object_lights.c",
+						0x1F0,
+						light->color.blue >=0.0f && light->color.blue <=1.0f);
+
+					if (light->parent_light_index == NONE)
+					{
+						boolean adjusted = FALSE;
+
+						if (TEST_FLAG(
+							definition->flags,
+							_light_definition_is_first_person_flashlight_bit))
+						{
+							first_person_weapon_center_flashlight(
+								light->object_index,
+								&light_parameters.position,
+								&light_parameters.forward,
+								&light_parameters.up);
+							adjusted = TRUE;
+						}
+						else if (object->object.type == _object_type_weapon
+							&& object->object.parent_object_index != NONE)
+						{
+							adjusted = first_person_weapon_adjust_light(
+								light->object_index,
+								object_get_attachment_marker_name(
+									light->object_index,
+									light->attachment_marker_index),
+								&light_parameters.position,
+								&light_parameters.forward,
+								&light_parameters.up);
+						}
+						if (adjusted)
+						{
+							SET_FLAG(
+								light->flags,
+								_point_light_attached_to_first_person_weapon_bit,
+								TRUE);
+						}
+					}
+
+					light->rasterizer_light_index = rasterizer_light_submit(
+						&light_parameters);
+					debug_rasterizer_light_count = light->rasterizer_light_index + 1;
+				}
+			}
+			else
+			{
+				light->radius = definition->radius;
+			}
+
+			if (definition->lens_flare.index != NONE)
+			{
+				struct rasterizer_lens_flare_submit_parameters lens_flare_parameters;
+
+				lens_flare_parameters.definition = lens_flare_definition_get(
+					definition->lens_flare.index);
+				lens_flare_parameters.compressed_light_color =
+					real_a_rgb_color_to_pixel32(lens_flare_scale, &light->color);
+				lens_flare_parameters.compressed_light_scale =
+					compress_real_to_int8(intensity);
+				lens_flare_parameters.compressed_window_index = (byte)render.window_index;
+				lens_flare_parameters.light_index =
+					(short)DATUM_INDEX_TO_ABSOLUTE_INDEX(scene_light_handle);
+				lens_flare_parameters.light_identifier =
+					(short)DATUM_INDEX_TO_IDENTIFIER(scene_light_handle);
+				match_assert(
+					"c:\\halo\\SOURCE\\objects\\object_lights.c",
+					0x21C,
+					lens_flare_parameters.light_identifier!=0);
+				if (lens_flare_parameters.light_identifier == NONE)
+				{
+					lens_flare_parameters.light_identifier = 0;
+				}
+
+				if (light->parent_light_index == NONE)
+				{
+					char const *marker_name = object_get_attachment_marker_name(
+						light->object_index,
+						light->attachment_marker_index);
+					struct object_marker markers[MAXIMUM_LENS_FLARES_PER_LIGHT];
+					short marker_count = 0;
+					short marker_index;
+
+					if (object->object.type == _object_type_weapon
+						&& object->object.parent_object_index != NONE)
+					{
+						marker_count = first_person_weapon_get_marker_by_name_render(
+							light->object_index,
+							marker_name,
+							markers,
+							MAXIMUM_LENS_FLARES_PER_LIGHT);
+						if (marker_count > 0)
+						{
+							lens_flare_parameters.compressed_window_index |=
+								LENS_FLARE_FIRST_PERSON_MARKER_FLAG;
+						}
+					}
+					if (!marker_count)
+					{
+						marker_count = object_get_marker_by_name(
+							light->object_index,
+							marker_name,
+							markers,
+							MAXIMUM_LENS_FLARES_PER_LIGHT);
+					}
+
+					for (marker_index = 0;
+						marker_index < marker_count;
+						marker_index++)
+					{
+						lens_flare_parameters.position = markers[marker_index].matrix.position;
+						lens_flare_parameters.compressed_direction =
+							compress_real_vector3d_to_int32_clamp(
+								&markers[marker_index].matrix.left);
+						lens_flare_parameters.compressed_up =
+							compress_real_vector3d_to_int32_clamp(
+								&markers[marker_index].matrix.up);
+						lens_flare_parameters.lens_flare_index = marker_index;
+						rasterizer_lens_flare_submit(&lens_flare_parameters);
+					}
+				}
+				else
+				{
+					lens_flare_parameters.position = light->position;
+					lens_flare_parameters.compressed_direction =
+						compress_real_vector3d_to_int32_clamp(&light->forward);
+					lens_flare_parameters.compressed_up =
+						compress_real_vector3d_to_int32_clamp(&light->up);
+					lens_flare_parameters.lens_flare_index = 0;
+					rasterizer_lens_flare_submit(&lens_flare_parameters);
+				}
+			}
+		}
+	}
+
+	for (queued_lens_flare_index = 0;
+		queued_lens_flare_index < lights_globals.queued_lens_flare_count;
+		queued_lens_flare_index++)
+	{
+		rasterizer_lens_flare_submit(
+			&lights_globals.queued_lens_flares[queued_lens_flare_index]);
+	}
+	lights_globals.queued_lens_flare_count = 0;
+	rasterizer_lights_end();
+	profile_exit(lights_section);
+
+	return;
+}
+
 void light_delete(
 	long light_index)
 {
@@ -775,7 +1172,7 @@ real object_get_self_illumination(
 				&& object->object.attachment_indices[attachment_index] != NONE)
 			{
 				struct light_datum *light = light_get(object->object.attachment_indices[attachment_index]);
-				illumination += real_rgb_color_brightness(&light->current_color);
+				illumination += real_rgb_color_brightness(&light->color);
 			}
 			attachment_index++;
 		}
@@ -1438,7 +1835,7 @@ static void find_point_lights_for_object_in_cluster(
 				if (distance < radius + light->radius)
 				{
 					real attenuation = light_attenuation(light->radius, distance);
-					real intensity = real_rgb_color_brightness(&light->current_color) * attenuation;
+					real intensity = real_rgb_color_brightness(&light->color) * attenuation;
 					short index;
 
 					if (*light_count < maximum_light_count)
@@ -1563,9 +1960,9 @@ void lights_illumination_at_point(
 
 			if (TEST_FLAG(light->flags, _point_light_dynamic_bit))
 			{
-				color->red += light->current_color.red * light_attenuations[light_index];
-				color->green += light->current_color.green * light_attenuations[light_index];
-				color->blue += light->current_color.blue * light_attenuations[light_index];
+				color->red += light->color.red * light_attenuations[light_index];
+				color->green += light->color.green * light_attenuations[light_index];
+				color->blue += light->color.blue * light_attenuations[light_index];
 			}
 		}
 	}

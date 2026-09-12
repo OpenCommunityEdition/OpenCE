@@ -9,13 +9,13 @@ symbols in this file:
 00144910 0020:
 	_IDirect3D8_CreateDevice@28 (0000)
 00144930 0010:
-	_code_00144930 (0000)
+	_D3DDevice_BeginScene@0 (0000)
 00144940 0010:
-	_code_00144940 (0000)
+	_D3DDevice_EndScene@0 (0000)
 00144950 0010:
-	_code_00144950 (0000)
+	_D3DDevice_GetRenderState (0000)
 00144960 0020:
-	_code_00144960 (0000)
+	_D3DDevice_GetTextureStageState (0000)
 00144980 01b0:
 	_D3DDevice_SetRenderState (0000)
 00144B30 0050:
@@ -43,9 +43,9 @@ symbols in this file:
 00144D80 0010:
 	_code_00144d80 (0000)
 00144D90 0010:
-	_code_00144d90 (0000)
+	_IDirect3DDevice8_BeginScene@4 (0000)
 00144DA0 0010:
-	_code_00144da0 (0000)
+	_IDirect3DDevice8_EndScene@4 (0000)
 00144DB0 0020:
 	_IDirect3DDevice8_Clear@28 (0000)
 00144DD0 0010:
@@ -55,13 +55,13 @@ symbols in this file:
 00144E80 0220:
 	_IDirect3DDevice8_SetRenderState@12 (0000)
 001450A0 0010:
-	_code_001450a0 (0000)
+	_IDirect3DDevice8_GetRenderState@12 (0000)
 001450B0 0010:
 	_code_001450b0 (0000)
 001450C0 0010:
 	_code_001450c0 (0000)
 001450D0 0020:
-	_code_001450d0 (0000)
+	_IDirect3DDevice8_GetTextureStageState@16 (0000)
 001450F0 0060:
 	_IDirect3DDevice8_SetTextureStageState@16 (0000)
 00145150 0010:
@@ -75,9 +75,9 @@ symbols in this file:
 00145190 0010:
 	_code_00145190 (0000)
 001451A0 0010:
-	_code_001451a0 (0000)
+	_IDirect3DDevice8_SetPixelShaderProgram@8 (0000)
 001451B0 0010:
-	_code_001451b0 (0000)
+	_IDirect3DDevice8_SetVerticalBlankCallback@8 (0000)
 001451C0 0010:
 	_IDirect3DDevice8_SetVertexData2s@16 (0000)
 001451D0 0010:
@@ -95,7 +95,7 @@ symbols in this file:
 00145250 0040:
 	__rasterizer_window_get_fog (0000)
 00145290 0010:
-	_code_00145290 (0000)
+	_D3DTexture_UnlockRect@8 (0000)
 001452A0 0030:
 	__rasterizer_windows_end (0000)
 001452D0 00d0:
@@ -105,9 +105,9 @@ symbols in this file:
 001453B0 0020:
 	_code_001453b0 (0000)
 001453D0 0010:
-	_code_001453d0 (0000)
+	_IDirect3DTexture8_UnlockRect@8 (0000)
 001453E0 0010:
-	_code_001453e0 (0000)
+	_D3DVolumeTexture_UnlockBox@8 (0000)
 001453F0 0070:
 	__rasterizer_dispose (0000)
 00145460 0010:
@@ -115,13 +115,13 @@ symbols in this file:
 00145470 0020:
 	_code_00145470 (0000)
 00145490 0010:
-	_code_00145490 (0000)
+	_IDirect3DVolumeTexture8_UnlockBox@8 (0000)
 001454A0 00a0:
 	_rasterizer_set_texture_bitmap_data (0000)
 00145540 00b0:
 	_rasterizer_set_texture_direct (0000)
 001455F0 0010:
-	_code_001455f0 (0000)
+	_D3DCubeTexture_UnlockRect@12 (0000)
 00145600 00d0:
 	_rasterizer_set_texture_direct_non_blocking (0000)
 001456D0 01f0:
@@ -129,17 +129,17 @@ symbols in this file:
 001458C0 0020:
 	_code_001458c0 (0000)
 001458E0 0010:
-	_code_001458e0 (0000)
+	_IDirect3DCubeTexture8_UnlockRect@12 (0000)
 001458F0 01b0:
 	_rasterizer_set_texture_non_blocking (0000)
 00145AA0 01c0:
 	_rasterizer_get_target (0000)
 00145C60 0010:
-	_code_00145c60 (0000)
+	_D3DPalette_Unlock@4 (0000)
 00145C70 0010:
 	_code_00145c70 (0000)
 00145C80 0010:
-	_code_00145c80 (0000)
+	_IDirect3DPalette8_Unlock@4 (0000)
 00145C90 00d0:
 	_rasterizer_set_vertex_shader (0000)
 00145D60 0200:
@@ -147,7 +147,7 @@ symbols in this file:
 00145F60 0140:
 	_rasterizer_set_model_skinning (0000)
 001460A0 0010:
-	_code_001460a0 (0000)
+	_D3DSurface_UnlockRect@4 (0000)
 001460B0 0010:
 	_IDirect3DSurface8_Release@4 (0000)
 001460C0 0180:
@@ -157,7 +157,7 @@ symbols in this file:
 00146250 0020:
 	_IDirect3DSurface8_LockRect@16 (0000)
 00146270 0010:
-	_code_00146270 (0000)
+	_IDirect3DSurface8_UnlockRect@4 (0000)
 00146280 0090:
 	_rasterizer_set_model_lighting_distant_light (0000)
 00146310 0170:
@@ -785,7 +785,7 @@ struct rasterizer_model_skinning_parameters
 
 /* ---------- prototypes */
 
-static void SetupSmartStates(
+void SetupSmartStates(
 	void);
 
 /* ---------- globals */
@@ -956,7 +956,9 @@ void rasterizer_spin_end(
 void _rasterizer_set_vblank_callback(
 	void (*callback)(unsigned long))
 {
-	D3DDevice_SetVerticalBlankCallback(callback);
+	IDirect3DDevice8_SetVerticalBlankCallback(
+		global_d3d_device,
+		callback);
 	return;
 }
 
@@ -967,6 +969,7 @@ void _rasterizer_windows_begin(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		1331,
 		global_d3d_device);
+	IDirect3DDevice8_BeginScene(global_d3d_device);
 	return;
 }
 
@@ -1113,6 +1116,7 @@ void _rasterizer_windows_end(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		1629,
 		global_d3d_device);
+	IDirect3DDevice8_EndScene(global_d3d_device);
 	return;
 }
 
@@ -1189,7 +1193,8 @@ void rasterizer_set_pixel_shader(
 	}
 	else
 	{
-		D3DDevice_SetPixelShaderProgram(
+		IDirect3DDevice8_SetPixelShaderProgram(
+			global_d3d_device,
 			(D3DPIXELSHADERDEF *)pixel_shader);
 		if (rasterizer_debug_options.stats == 2)
 			rasterizer_frame_statistics.pixel_shader_pushbuffer_bytes += 228;
@@ -2503,6 +2508,7 @@ void _rasterizer_present(
 							(byte *)d3d_locked_rect.pBits + y * d3d_locked_rect.Pitch,
 							d3d_locked_rect.Pitch);
 					}
+					IDirect3DSurface8_UnlockRect(d3d_backbuffer);
 					success = TRUE;
 				}
 				else
@@ -3430,23 +3436,42 @@ boolean _rasterizer_initialize(
 }
 
 /* ---------- private code */
-static void SetupSmartStates(
+void SetupSmartStates(
 	void)
 {
+	long stage_index;
 	long state_index;
 
-	csmemcpy(renderstate_table, D3D__RenderState, sizeof(renderstate_table));
+	for (state_index = 0; state_index < D3DRS_MAX; state_index++)
+		IDirect3DDevice8_GetRenderState(
+			global_d3d_device,
+			state_index,
+			&renderstate_table[state_index]);
 	for (state_index = 0; state_index < D3DTSS_MAX; state_index++)
 	{
-		texturestagestate_table[0][state_index] = D3D__TextureState[0][state_index];
-		texturestagestate_table[1][state_index] = D3D__TextureState[1][state_index];
-		texturestagestate_table[2][state_index] = D3D__TextureState[2][state_index];
-		texturestagestate_table[3][state_index] = D3D__TextureState[3][state_index];
+		IDirect3DDevice8_GetTextureStageState(
+			global_d3d_device,
+			0,
+			state_index,
+			&texturestagestate_table[0][state_index]);
+		IDirect3DDevice8_GetTextureStageState(
+			global_d3d_device,
+			1,
+			state_index,
+			&texturestagestate_table[1][state_index]);
+		IDirect3DDevice8_GetTextureStageState(
+			global_d3d_device,
+			2,
+			state_index,
+			&texturestagestate_table[2][state_index]);
+		IDirect3DDevice8_GetTextureStageState(
+			global_d3d_device,
+			3,
+			state_index,
+			&texturestagestate_table[3][state_index]);
 	}
-	texture_table[0] = NULL;
-	texture_table[1] = NULL;
-	texture_table[2] = NULL;
-	texture_table[3] = NULL;
+	for (stage_index = 0; stage_index < D3DTSS_MAXSTAGES; stage_index++)
+		texture_table[stage_index] = NULL;
 	return;
 }
 
@@ -3585,6 +3610,9 @@ void rasterizer_filthy_bitmap_default_initialize(
 			0);
 		for (pixel_index = 0, pixel_count = DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE; pixel_count; pixel_index++, pixel_count--)
 			((word *)d3d_locked_rect.pBits)[pixel_index] = pixels[pixel_index & 1];
+		IDirect3DTexture8_UnlockRect(
+			default_2d_hardware_format,
+			0);
 		IDirect3DVolumeTexture8_LockBox(
 			default_3d_hardware_format,
 			0,
@@ -3593,6 +3621,9 @@ void rasterizer_filthy_bitmap_default_initialize(
 			0);
 		for (pixel_index = 0, pixel_count = DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE; pixel_count; pixel_index++, pixel_count--)
 			((word *)d3d_locked_box.pBits)[pixel_index] = pixels[pixel_index & 1];
+		IDirect3DVolumeTexture8_UnlockBox(
+			default_3d_hardware_format,
+			0);
 		success = TRUE;
 		for (face_index = 0, face_count = NUMBER_OF_CUBE_MAP_FACES; face_count; face_index++, face_count--)
 		{

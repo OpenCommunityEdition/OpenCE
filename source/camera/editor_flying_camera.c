@@ -89,6 +89,7 @@ symbols in this file:
 
 #include "editor_flying_camera.h"
 #include "flying_camera.h"
+#include "camera_scripting.h"
 #include "game/player_control.h"
 #include "main/console.h"
 #include "observer.h"
@@ -326,6 +327,25 @@ void editor_camera_set_focus(
 	return;
 }
 
+void editor_camera_move_to_point(
+	real_point3d const *point)
+{
+	struct flying_camera *camera;
+	real_vector3d forward;
+
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 139, point);
+
+	vector3d_from_euler_angles2d(
+		&forward,
+		&editor_camera_globals.camera->facing);
+	camera = editor_camera_globals.camera;
+	camera->position.x = point->x - forward.i * 2.5f;
+	camera->position.y = point->y - forward.j * 2.5f;
+	camera->position.z = point->z - forward.k * 2.5f;
+
+	return;
+}
+
 void editor_camera_set_position(
 	real_point3d const *point,
 	real_euler_angles2d const *angles)
@@ -347,6 +367,71 @@ void editor_camera_set_position(
 		camera->facing.yaw = angles->yaw;
 		camera->facing.pitch = angles->pitch;
 	}
+
+	return;
+}
+
+void editor_camera_set_position_and_roll(
+	real_point3d const *point,
+	real_euler_angles3d const *angles)
+{
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 169, point);
+	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 170, angles);
+
+	if (editor_camera_globals.camera)
+	{
+		real_matrix4x3 rotation;
+		real_vector3d facing;
+		real_euler_angles2d up_angles;
+		real_vector3d up;
+		real_vector3d roll_reference;
+
+		editor_camera_globals.camera->position = *point;
+		matrix4x3_rotation_from_angles(
+			&rotation,
+			angles->yaw,
+			angles->pitch,
+			angles->roll);
+		euler_angles2d_from_vector3d(
+			&editor_camera_globals.camera->facing,
+			&rotation.forward);
+		vector3d_from_euler_angles2d(
+			&facing,
+			&editor_camera_globals.camera->facing);
+
+		up_angles = editor_camera_globals.camera->facing;
+		up_angles.pitch += _pi / 2.f;
+		vector3d_from_euler_angles2d(
+			&up,
+			&up_angles);
+		normalize3d(&facing);
+		normalize3d(&up);
+		cross_product3d(
+			&up,
+			&rotation.up,
+			&roll_reference);
+		normalize3d(&roll_reference);
+		editor_camera_globals.camera->roll = angle_between_vectors3d(&up, &rotation.up) *
+			dot_product3d(&roll_reference, &facing);
+
+		if (unit_focus != NONE)
+		{
+			editor_camera_globals.unit_offset.i = point->x;
+			editor_camera_globals.unit_offset.j = point->y;
+			editor_camera_globals.unit_offset.k = point->z;
+		}
+	}
+	else
+	{
+		real_euler_angles2d focus_angles;
+
+		focus_angles.yaw = angles->yaw;
+		focus_angles.pitch = angles->pitch;
+		editor_camera_set_focus(point, &focus_angles);
+		editor_camera_globals.initialized = TRUE;
+	}
+
+	editor_camera_globals.reset_all = TRUE;
 
 	return;
 }
@@ -463,6 +548,138 @@ void editor_camera_set_mode(
 
 	editor_camera_globals.mode = mode;
 	console_printf(FALSE, mode_names[mode]);
+
+	return;
+}
+
+void editor_camera_update(
+	struct flying_camera *camera,
+	struct flying_camera_action const *controls,
+	struct camera_command *result)
+{
+	match_dassert(
+		"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+		340,
+		update_funcs[editor_camera_globals.mode],
+		"update_funcs[camera_mode]");
+
+	if (editor_camera_globals.scripted)
+	{
+		if (!controls->active)
+		{
+			scripted_camera_update(NULL, controls, result);
+			return;
+		}
+
+		editor_camera_globals.camera->position = editor_custom_render->camera.position;
+		euler_angles2d_from_vector3d(
+			&editor_camera_globals.camera->facing,
+			&editor_custom_render->camera.forward);
+		editor_camera_set_unit_focus(unit_focus);
+		if (editor_camera_globals.mode)
+		{
+			match_dassert(
+				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+				356,
+				translate_funcs[editor_camera_globals.mode][_translate_from],
+				"translate_funcs[camera_mode][_translate_from]");
+			translate_funcs[editor_camera_globals.mode][_translate_to](
+				editor_camera_globals.camera);
+		}
+	}
+
+	update_funcs[editor_camera_globals.mode](camera, controls, result);
+	if (editor_camera_globals.scripted)
+	{
+		long flags = result->flags;
+
+		SET_FLAG(flags, _observer_command_valid_bit, TRUE);
+		SET_FLAG(flags, _observer_command_force_time_bit, TRUE);
+		result->timer = 0.f;
+		result->flags = flags;
+	}
+
+	return;
+}
+
+void editor_camera_set_scripted(
+	boolean scripted)
+{
+	if (scripted)
+	{
+		real_euler_angles2d angles;
+
+		if (editor_camera_globals.mode)
+		{
+			match_dassert(
+				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+				387,
+				translate_funcs[editor_camera_globals.mode][_translate_from],
+				"translate_funcs[camera_mode][_translate_from]");
+			translate_funcs[editor_camera_globals.mode][_translate_from](
+				editor_camera_globals.camera);
+		}
+
+		euler_angles2d_from_vector3d(
+			&angles,
+			&editor_custom_render->camera.forward);
+		editor_camera_set_position(
+			&editor_custom_render->camera.position,
+			&angles);
+
+		if (unit_focus != NONE)
+		{
+			real_point3d relative_position;
+
+			set_real_point3d(
+				&relative_position,
+				editor_camera_globals.unit_offset.i,
+				editor_camera_globals.unit_offset.j,
+				editor_camera_globals.unit_offset.k);
+			scripted_camera_set_camera_point_relative(
+				&relative_position,
+				&editor_custom_render->camera.forward,
+				&editor_custom_render->camera.up,
+				DEGREES_TO_RADIANS(70.f),
+				0,
+				unit_focus);
+		}
+		else
+		{
+			scripted_camera_set_camera_point_relative(
+				&editor_custom_render->camera.position,
+				&editor_custom_render->camera.forward,
+				&editor_custom_render->camera.up,
+				DEGREES_TO_RADIANS(70.f),
+				0,
+				NONE);
+		}
+	}
+	else
+	{
+		editor_camera_globals.camera->position = editor_custom_render->camera.position;
+		euler_angles2d_from_vector3d(
+			&editor_camera_globals.camera->facing,
+			&editor_custom_render->camera.forward);
+		editor_camera_set_unit_focus(unit_focus);
+		if (editor_camera_globals.mode)
+		{
+			match_dassert(
+				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+				414,
+				translate_funcs[editor_camera_globals.mode][_translate_from],
+				"translate_funcs[camera_mode][_translate_from]");
+			translate_funcs[editor_camera_globals.mode][_translate_to](
+				editor_camera_globals.camera);
+		}
+	}
+
+	editor_camera_globals.last_scripted = editor_camera_globals.scripted;
+	editor_camera_globals.scripted = scripted;
+	console_printf(
+		FALSE,
+		"%s scripted camera mode",
+		scripted_names[scripted]);
 
 	return;
 }

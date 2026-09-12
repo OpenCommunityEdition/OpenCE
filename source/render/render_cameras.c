@@ -311,4 +311,134 @@ void render_camera_screen_to_world(
 	return;
 }
 
+boolean render_camera_view_to_screen(
+	struct render_camera const *camera,
+	struct render_frustum const *frustum,
+	real_point3d const *view_point,
+	real_point2d *screen_point)
+{
+	boolean result = FALSE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		978,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		979,
+		frustum);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		980,
+		view_point);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		981,
+		screen_point);
+
+	if (view_point->z < 0.0f)
+	{
+		real inverse_depth = -1.0f / view_point->z;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			988,
+			frustum->projection_valid);
+
+		screen_point->x =
+			(frustum->projection_matrix[0][0] * view_point->x +
+			frustum->projection_matrix[2][0] * view_point->z) * inverse_depth;
+		screen_point->y =
+			-(frustum->projection_matrix[1][1] * view_point->y +
+			frustum->projection_matrix[2][1] * view_point->z) * inverse_depth;
+		if (screen_point->x >= -1.0f && screen_point->x <= 1.0f &&
+			screen_point->y >= -1.0f && screen_point->y <= 1.0f)
+		{
+			real viewport_height = (real)(
+				camera->viewport_bounds.y1 - camera->viewport_bounds.y0);
+			long viewport_x0 = camera->viewport_bounds.x0;
+			real viewport_width = (real)(
+				camera->viewport_bounds.x1 - viewport_x0);
+
+			result = TRUE;
+			screen_point->x =
+				(real)viewport_width * ((screen_point->x + 1.0f) * 0.5f) +
+				(real)viewport_x0;
+			{
+				long viewport_y0 = camera->viewport_bounds.y0;
+
+				screen_point->y =
+					((screen_point->y + 1.0f) * 0.5f) *
+					(real)viewport_height +
+					(real)viewport_y0;
+			}
+		}
+	}
+
+	return result;
+}
+
+short render_frustum_sphere_visible(
+	struct render_frustum const *frustum,
+	real_point3d const *point,
+	real radius)
+{
+	real distance0;
+	real distance1;
+	real distance2;
+	real distance3;
+	real distance5;
+	real negative_radius;
+
+	if (frustum->world_bounds.x1 < point->x - radius ||
+		frustum->world_bounds.y1 < point->y - radius ||
+		frustum->world_bounds.z1 < point->z - radius ||
+		frustum->world_bounds.x0 > point->x + radius ||
+		frustum->world_bounds.y0 > point->y + radius ||
+		frustum->world_bounds.z0 > point->z + radius)
+	{
+		return 0;
+	}
+
+	distance0 = plane3d_distance_to_point(&frustum->world_planes[0], point);
+	if (distance0 > radius)
+		return 0;
+	distance1 = plane3d_distance_to_point(&frustum->world_planes[1], point);
+	if (distance1 > radius)
+		return 0;
+	distance2 = plane3d_distance_to_point(&frustum->world_planes[2], point);
+	if (distance2 > radius)
+		return 0;
+	distance3 = plane3d_distance_to_point(&frustum->world_planes[3], point);
+	if (distance3 > radius)
+		return 0;
+	if (plane3d_distance_to_point(&frustum->world_planes[4], point) > radius)
+		return 0;
+	distance5 = plane3d_distance_to_point(&frustum->world_planes[5], point);
+	if (distance5 > radius)
+	{
+		return 0;
+	}
+	else
+	{
+		short result;
+
+		negative_radius = -radius;
+		if (distance0 < negative_radius &&
+			distance1 < negative_radius &&
+			distance2 < negative_radius &&
+			distance3 < negative_radius &&
+			distance5 < negative_radius)
+		{
+			result = 2;
+		}
+		else
+		{
+			result = 1;
+		}
+
+		return result;
+	}
+}
+
 /* ---------- private code */

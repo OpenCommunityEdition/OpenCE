@@ -16,6 +16,8 @@ header included in hcex build.
 
 /* ---------- prototypes/RENDER_DEBUG.C */
 
+void render_debug(
+	void);
 void render_debug_string(boolean immediate, const char *string);
 
 void render_debug_string_at_point(
@@ -83,6 +85,10 @@ void render_debug_pill(
 	real_point3d const *base,
 	real_vector3d const *height,
 	real width,
+	real_argb_color const *color);
+void render_debug_box(
+	boolean immediate,
+	real_rectangle3d const *bounds,
 	real_argb_color const *color);
 void render_debug_box_outline(
 	boolean immediate,
