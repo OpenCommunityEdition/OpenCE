@@ -107,19 +107,23 @@ enum
 
 /* ---------- structures */
 
-struct playlist_profile_data_prefix
+#pragma pack(push, 1)
+struct playlist_profile_data
 {
 	struct game_variant *(*default_variant_building_functions[
 		NUMBER_OF_DEFAULT_PLAYLIST_PROFILES])(
 		struct game_variant *variant);
 	boolean first_time;
 };
+#pragma pack(pop)
 
 typedef char verify_playlist_profile_building_functions_size[
-	sizeof(((struct playlist_profile_data_prefix *)0)->
+	sizeof(((struct playlist_profile_data *)0)->
 		default_variant_building_functions) == 0x68 ? 1 : -1];
 typedef char verify_playlist_profile_first_time_offset[
-	offsetof(struct playlist_profile_data_prefix, first_time) == 0x68 ? 1 : -1];
+	offsetof(struct playlist_profile_data, first_time) == 0x68 ? 1 : -1];
+typedef char verify_playlist_profile_data_size[
+	sizeof(struct playlist_profile_data) == 0x69 ? 1 : -1];
 
 struct playlist_profile_write_request
 {
@@ -170,7 +174,38 @@ static void playlist_profile_write(
 /* ---------- globals */
 
 struct playlist_profile_runtime_globals_prefix playlist_profile_globals = { 0 };
-extern struct playlist_profile_data_prefix playlist_profile_default_data;
+struct playlist_profile_data playlist_profile_default_data =
+{
+	{
+		build_game_variant_slayer,
+		build_game_variant_slayer_pro,
+		build_game_variant_elimination,
+		build_game_variant_phantoms,
+		build_game_variant_endurance,
+		build_game_variant_rockets,
+		build_game_variant_snipers,
+		build_game_variant_oddball,
+		build_game_variant_reverse_tag,
+		build_game_variant_accumulation,
+		build_game_variant_juggernaut,
+		build_game_variant_stalker,
+		build_game_variant_king,
+		build_game_variant_king_pro,
+		build_game_variant_crazy_king,
+		build_game_variant_race,
+		build_game_variant_rally,
+		build_game_variant_ctf,
+		build_game_variant_invasion,
+		build_game_variant_iron_ctf,
+		build_game_variant_ctf_pro,
+		build_game_variant_team_race,
+		build_game_variant_team_rally,
+		build_game_variant_team_oddball,
+		build_game_variant_team_king,
+		build_game_variant_team_slayer,
+	},
+	TRUE
+};
 
 /* ---------- public code */
 

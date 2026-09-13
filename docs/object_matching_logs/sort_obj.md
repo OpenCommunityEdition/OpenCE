@@ -110,7 +110,11 @@ boundaries.  Current January gates also keep `profile_enter_private` and
 not be "repaired" by changing either proven interface.
 
 Two user-supplied analyses of Xbox debug build 2276 provide independent
-cross-build corroboration.  Its 16-bit selection sort tests `AL` immediately
+cross-build corroboration: `profile_sort_decompilations.md` (SHA-256
+`28cfc10694a9b6437d91f32c9dad3e7d4a3389c533c26643f9e48cc6560ce732`)
+and `profile_sort_corruption_analysis.md` (SHA-256
+`ada613e65c8992fed8b165d5529e2c65076c51511d7da2a3358f831c1add9a51`).
+Its 16-bit selection sort tests `AL` immediately
 after the indirect comparator call at `0x91d22`; its 32-bit selection sort does
 the same at `0x91d7c`; and both quicksort comparator sites test `AL` at
 `0x91f86` and `0x91fa3`.  The reported structure-surface comparator also

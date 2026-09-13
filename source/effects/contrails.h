@@ -67,7 +67,13 @@ real contrail_scale_value(
 	real value,
 	real scale,
 	unsigned long flags,
-	char flag_bit);
+	short flag_bit);
+real contrail_scale_random_value(
+	real value,
+	real lower_bound,
+	real upper_bound,
+	unsigned long flags,
+	short flag_bit);
 void contrails_initialize(
 	void);
 void contrails_initialize_for_new_map(

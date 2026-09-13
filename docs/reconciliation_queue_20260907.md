@@ -501,3 +501,31 @@ object-admission audit, Units 189/189 gate, fake-source review, and complete
 1,147-test plus 26-subtest suite pass.  The canonical treemap is refreshed for
 this boundary.  The next required refresh threshold is **1,144,830 meaningful
 accepted exact code bytes**.
+
+## 2026-09-13 Claude reconciliation completion and small closeouts
+
+The Claude donor census is complete: no high-confidence unaudited payload
+remains.  The fully dispositioned donor-only union is **71 functions / 29,958
+meaningful bytes**: 38 / 17,047 are canonical zero-credit parks, while 33 /
+12,911 are documented rejects, ownership blocks, or stale aliases.  These are
+not unclaimed exact bytes.
+
+Post-publication closeouts keep Actor Perception's two coherent fuzzy bodies,
+Contrails' two residuals (17/19 exact; 1,047 meaningful residual bytes), and
+Stack Memory Pool's two residuals (31/33 exact; 821 meaningful residual bytes)
+at zero credit.  The Weapons owner packet was fully rolled back after genuine
+headers regressed unrelated runtime owners and artificial microheaders were
+rejected.  Playlist Profile is now 14/14 exact and newly `Matching`; the
+profile-sort attachment hashes are pinned in `sort_obj.md`.
+
+Final global verification passes configure/Ninja and reports **6,960 accepted
+functions / 1,134,830 meaningful exact bytes**, **393/833 Matching files**, a
+stable strict **6,925 before / 6,925 after** snapshot with zero gains or
+regressions, zero admission candidates or contradictions with seven existing
+rejections, **1,151 passed / 5 skipped / 26 subtests**, and zero fake-source
+findings across five changed source/header files.  See
+[the completion ledger](object_matching_logs/claude_reconciliation_completion_and_small_closeouts_20260913.md).
+Published base `f472b6fcb` remains the exact-code accounting milestone because
+this closeout has zero exact delta.  The commit containing the completion ledger
+publishes the retained source and accounting packet.  The next exact threshold
+remains **1,144,830 meaningful accepted exact bytes**.

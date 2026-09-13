@@ -136,12 +136,6 @@ enum
 
 static void contrail_next_frame(
 	struct contrail_datum *contrail);
-real contrail_scale_random_value(
-	real value,
-	real lower_bound,
-	real upper_bound,
-	unsigned long flags,
-	char flag_bit);
 static short contrail_compute_new_point_count(
 	long contrail_index,
 	real dt);
@@ -163,7 +157,7 @@ real contrail_scale_value(
 	real value,
 	real scale,
 	unsigned long flags,
-	char flag_bit)
+	short flag_bit)
 {
 	real result = scale;
 
@@ -178,7 +172,7 @@ real contrail_scale_random_value(
 	real lower_bound,
 	real upper_bound,
 	unsigned long flags,
-	char flag_bit)
+	short flag_bit)
 {
 	real result = lower_bound;
 	real range;

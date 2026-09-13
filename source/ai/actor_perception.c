@@ -247,12 +247,16 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+
 #include "cseries.h"
 
 #include "actions.h"
 #include "actor_definitions.h"
+#include "actor_types.h"
 #include "actors.h"
 #include "ai.h"
+#include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
 #include "encounters.h"
@@ -270,6 +274,8 @@ symbols in this file:
 #include "units/vehicles.h"
 #include "units/biped_definitions.h"
 
+#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+
 /* ---------- constants */
 
 enum
@@ -280,8 +286,19 @@ enum
 enum
 {
 	_actor_combat_status_none = 0,
+	_actor_combat_status_definite = 3,
 	_actor_combat_status_certain = 4,
 	_actor_combat_status_visible = 7,
+};
+
+enum
+{
+	_defensive_crouch_none = 0,
+	_defensive_crouch_danger,
+	_defensive_crouch_shield_low,
+	_defensive_crouch_hide_behind_shield,
+	_defensive_crouch_any_target,
+	_defensive_crouch_flood_shamble,
 };
 
 /* ---------- macros */
@@ -617,12 +634,6 @@ struct actor_target_weight_weapon_definition_view
 	real minimum_target_range;
 };
 
-struct actor_emotion_priority_counts_view
-{
-	byte __unknown000[0x1EE];
-	char priority_counts[12];
-};
-
 struct actor_perception_projectile_datum_view
 {
 	byte __unknown000[0x1DC];
@@ -655,91 +666,6 @@ struct actor_perception_responsible_unit_view
 {
 	byte __unknown000[0x68];
 	short team;
-};
-
-struct actor_situation_counts
-{
-	char enemy_count;
-	char enemy_very_close_count;
-	char enemy_priority_counts[10];
-	char fighting_enemy_count;
-	char priority_two_count;
-	char priority_three_count;
-	char priority_four_count;
-	char priority_five_count;
-	char priority_six_count;
-	char priority_seven_count;
-	char priority_eight_count;
-	char close_friend_count;
-	char close_active_friend_count;
-	char close_active_dangerous_friend_count;
-	char close_friend_type_counts[16];
-	char close_active_friend_type_counts[16];
-	char visible_friend_count;
-	char visible_active_friend_count;
-	char visible_friend_type_counts[16];
-	char visible_active_friend_type_counts[16];
-	char audible_friend_count;
-	char audible_active_friend_count;
-	char audible_friend_type_counts[16];
-	char audible_active_friend_type_counts[16];
-};
-
-struct actor_situation_actor_view
-{
-	byte __unknown000[4];
-	short type;
-	byte __unknown006[0x66];
-	short combat_status;
-	byte __unknown06E[0x17E];
-	struct actor_situation_counts counts;
-	byte __unknown267[1];
-	short target_type;
-	byte __unknown26A[2];
-	long target_last_visible_time;
-	long target_prop_index;
-	byte __unknown274[0x104];
-	boolean berserk;
-};
-
-struct actor_situation_prop_view
-{
-	byte __unknown000[0x18];
-	long unit_index;
-	byte __unknown01C[8];
-	short state;
-	byte __unknown026[0xC];
-	short combat_status;
-	byte __unknown034[4];
-	short perception;
-	byte __unknown03A[0x16];
-	real target_weight;
-	byte __unknown054[0xC];
-	boolean enemy;
-	byte __unknown061[0x13];
-	boolean recent_damage;
-	byte __unknown075[0x27];
-	short combat_status_detail;
-	byte __unknown09E[0x7E];
-	real distance;
-	byte __unknown120[2];
-	char visibility;
-	byte __unknown123[4];
-	boolean dead;
-	byte __unknown128[5];
-	boolean active;
-	byte __unknown12E[1];
-	boolean friend_attack_result;
-	byte __unknown130[5];
-	boolean dangerous_vehicle_driver;
-};
-
-struct actor_situation_unit_view
-{
-	byte __unknown000[0x1A4];
-	long actor_index;
-	byte __unknown1A8[0x20];
-	long player_index;
 };
 
 struct actor_orphan_prop_view
@@ -927,8 +853,6 @@ typedef char actor_emotion_actor_control_moving_offset_assert[
 	offsetof(struct actor_datum, control.moving) == 0x504 ? 1 : -1];
 typedef char actor_emotion_actor_control_vector_offset_assert[
 	offsetof(struct actor_datum, control.moving_towards_vector) == 0x518 ? 1 : -1];
-typedef char actor_emotion_priority_counts_offset_assert[
-	offsetof(struct actor_emotion_priority_counts_view, priority_counts) == 0x1EE ? 1 : -1];
 typedef char actor_emotion_definition_crouch_type_offset_assert[
 	offsetof(struct actor_definition, defensive.defensive_crouch_type) == 0x2F8 ? 1 : -1];
 typedef char actor_emotion_definition_attacking_threshold_offset_assert[
@@ -985,22 +909,6 @@ typedef char actor_visibility_debug_info_size_assert[
 	sizeof(struct actor_debug_info) == 0x657C ? 1 : -1];
 typedef char actor_visibility_debug_info_last_time_offset_assert[
 	offsetof(struct actor_debug_info, vision_last_time) == 0x656C ? 1 : -1];
-typedef char actor_situation_counts_size_assert[
-	sizeof(struct actor_situation_counts) == 0x7B ? 1 : -1];
-typedef char actor_situation_actor_view_counts_offset_assert[
-	offsetof(struct actor_situation_actor_view, counts) == 0x1EC ? 1 : -1];
-typedef char actor_situation_actor_view_target_prop_index_offset_assert[
-	offsetof(struct actor_situation_actor_view, target_prop_index) == 0x270 ? 1 : -1];
-typedef char actor_situation_actor_view_berserk_offset_assert[
-	offsetof(struct actor_situation_actor_view, berserk) == 0x378 ? 1 : -1];
-typedef char actor_situation_prop_view_target_weight_offset_assert[
-	offsetof(struct actor_situation_prop_view, target_weight) == 0x50 ? 1 : -1];
-typedef char actor_situation_prop_view_distance_offset_assert[
-	offsetof(struct actor_situation_prop_view, distance) == 0x11C ? 1 : -1];
-typedef char actor_situation_unit_view_actor_index_offset_assert[
-	offsetof(struct actor_situation_unit_view, actor_index) == 0x1A4 ? 1 : -1];
-typedef char actor_situation_unit_view_player_index_offset_assert[
-	offsetof(struct actor_situation_unit_view, player_index) == 0x1C8 ? 1 : -1];
 typedef char actor_orphan_prop_view_related_prop_index_offset_assert[
 	offsetof(struct actor_orphan_prop_view, related_prop_index) == 0xC ? 1 : -1];
 typedef char actor_orphan_prop_view_orphan_inspection_ticks_offset_assert[
@@ -1683,6 +1591,266 @@ combat_status_timers_updated:
 	return;
 }
 
+void actor_situation_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+	struct
+	{
+		long prop_index;
+		real target_weight;
+	} best = { NONE, 0.0f };
+	struct
+	{
+		boolean close;
+		boolean visible;
+		boolean charging;
+		boolean area;
+	} flags;
+
+	flags.charging =
+		actor->emotions.berserk ||
+		actor->state.action == _actor_action_charge;
+
+	memset(&actor->situation, 0, sizeof(actor->situation));
+	prop_iterator_new(&iterator, actor_index);
+	prop = prop_iterator_next(&iterator);
+	while (prop != NULL)
+	{
+		if (prop->state >= _prop_state_becoming_unacknowledged &&
+			prop->state <= _prop_state_acknowledged &&
+			!prop->dead)
+		{
+			if (prop->enemy)
+			{
+				boolean active =
+					prop->visibility >= _actor_perception_full;
+				short priority = 0;
+
+				actor->situation.known_enemies++;
+				if (active)
+				{
+					if (prop->unreachable_ticks == 0)
+						actor->situation.visible_reachable_enemies++;
+					actor->situation.cumulative_threats[1]++;
+					priority = 1;
+
+enemy_priority_tests:
+					if (prop->currently_damaging_me && priority <= 8)
+					{
+						actor->situation.cumulative_threats[8]++;
+						priority = 8;
+					}
+
+					if (prop->shooting && priority <= 4)
+					{
+						actor->situation.cumulative_threats[4]++;
+						priority = 4;
+					}
+
+					if (prop->quantized_facing < 3)
+					{
+						if (active)
+						{
+							actor->situation.cumulative_threats[2]++;
+							if (priority <= 2)
+								priority = 2;
+
+							if (!flags.charging &&
+								prop->distance < 2.0f &&
+								priority <= 7)
+							{
+								actor->situation.cumulative_threats[7]++;
+								priority = 7;
+							}
+						}
+
+						if (prop->quantized_facing < 2)
+						{
+							if (prop->shooting &&
+								priority <= 5)
+							{
+								actor->situation.cumulative_threats[5]++;
+								priority = 5;
+							}
+
+							if (prop->quantized_facing < 1)
+							{
+								if (active && priority <= 3)
+								{
+									actor->situation.cumulative_threats[3]++;
+									priority = 3;
+								}
+
+								if (prop->shooting &&
+									priority <= 6)
+								{
+									actor->situation.cumulative_threats[6]++;
+									priority = 6;
+								}
+							}
+						}
+					}
+				}
+				else if (prop->shooting &&
+					prop->line_of_sight == _ai_line_of_sight_clear)
+				{
+					goto enemy_priority_tests;
+				}
+
+				actor->situation.specific_threats[priority]++;
+			}
+			else
+			{
+				struct unit_datum *unit = unit_get(prop->unit_index);
+				struct actor_datum *friend_actor = NULL;
+				short actor_type;
+
+				if (unit->unit.actor_index != NONE)
+				{
+					friend_actor = actor_get(unit->unit.actor_index);
+				}
+
+				if (unit->unit.player_index != NONE)
+					actor_type = _actor_player;
+				else if (friend_actor != NULL)
+					actor_type = friend_actor->meta.type;
+				else
+					actor_type = _actor_none;
+
+				flags.area = FALSE;
+				flags.visible = FALSE;
+				flags.close = FALSE;
+
+				match_assert(
+					"c:\\halo\\SOURCE\\ai\\actor_perception.c",
+					4572,
+					(actor_type >= 0) &&
+					(actor_type < NUMBER_OF_ACTOR_TYPES));
+
+				if (prop->distance < 8.0f)
+				{
+					flags.area = TRUE;
+				}
+				else if (prop->fighting &&
+					friend_actor != NULL &&
+					actor->target.target_prop_index != NONE &&
+					friend_actor->target.target_prop_index != NONE)
+				{
+					struct prop_datum *target_prop =
+						prop_get(actor->target.target_prop_index);
+					struct prop_datum *friend_target_prop =
+						prop_get(friend_actor->target.target_prop_index);
+
+					if (target_prop->unit_index ==
+						friend_target_prop->unit_index)
+					{
+						flags.area = TRUE;
+					}
+				}
+
+				if (prop->line_of_sight == _ai_line_of_sight_clear ||
+					prop->line_of_sight == _ai_line_of_sight_occluded)
+				{
+					flags.visible = TRUE;
+					flags.close = prop->distance < 3.0f;
+				}
+
+				if (flags.area)
+				{
+					actor->situation.area_friends++;
+					if (prop->fighting)
+					{
+						actor->situation.area_fighting_friends++;
+						if (prop->dangerous_vehicle_driver)
+						{
+							actor->situation.area_fire_support_friends++;
+						}
+					}
+					actor->situation.area_friends_by_type[actor_type]++;
+					if (prop->fighting)
+					{
+						actor->situation.
+							area_fighting_friends_by_type[actor_type]++;
+					}
+				}
+
+				if (flags.visible)
+				{
+					actor->situation.visible_friends++;
+					if (prop->fighting)
+						actor->situation.visible_fighting_friends++;
+					actor->situation.visible_friends_by_type[actor_type]++;
+					if (prop->fighting)
+					{
+						actor->situation.
+							visible_fighting_friends_by_type[actor_type]++;
+					}
+				}
+
+				if (flags.close)
+				{
+					actor->situation.close_friends++;
+					if (prop->fighting)
+						actor->situation.close_fighting_friends++;
+					actor->situation.close_friends_by_type[actor_type]++;
+					if (prop->fighting)
+					{
+						actor->situation.
+							close_fighting_friends_by_type[actor_type]++;
+					}
+				}
+			}
+		}
+
+		if (best.target_weight < prop->target_weight)
+		{
+			best.target_weight = prop->target_weight;
+			best.prop_index = iterator.index;
+		}
+
+		prop = prop_iterator_next(&iterator);
+	}
+
+	if (best.prop_index != actor->target.target_prop_index)
+	{
+		long old_target_prop_index = actor->target.target_prop_index;
+
+		actor->target.target_type = 0;
+		actor->target.target_prop_index = best.prop_index;
+		actor->target.target_last_visible_time = NONE;
+
+		if (old_target_prop_index != NONE)
+		{
+			struct prop_datum *old_target_prop =
+				prop_get(old_target_prop_index);
+
+			old_target_prop->target_weight =
+				actor_compute_prop_target_weight(
+					actor_index,
+					old_target_prop_index);
+		}
+
+		if (best.prop_index != NONE)
+		{
+			struct prop_datum *new_target_prop =
+				prop_get(best.prop_index);
+
+			new_target_prop->target_weight =
+				actor_compute_prop_target_weight(
+					actor_index,
+					actor->target.target_prop_index);
+		}
+	}
+
+	actor_situation_update_target_status(actor_index);
+	actor_situation_combat_status_update(actor_index);
+
+	return;
+}
+
 boolean actor_perception_friend_prop_is_attacking(
 	long actor_index,
 	long friend_prop_index,
@@ -2048,58 +2216,28 @@ range_weight_done:
 
 
 
-struct actor_emotion_priority_prop_view
-{
-	byte __unknown000[0x24];
-	short state;
-	byte __unknown026[0xC];
-	short combat_status;
-	byte __unknown034[0x40];
-	boolean recent_damage;
-	byte __unknown075[0x2F];
-	boolean unopposable;
-	byte __unknown0A5[0x7D];
-	char visibility;
-	byte __unknown123[0xC];
-	boolean friend_attacking;
-};
-
-typedef char actor_emotion_priority_prop_state_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, state) == 0x24 ? 1 : -1];
-typedef char actor_emotion_priority_prop_combat_status_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, combat_status) == 0x32 ? 1 : -1];
-typedef char actor_emotion_priority_prop_recent_damage_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, recent_damage) == 0x74 ? 1 : -1];
-typedef char actor_emotion_priority_prop_unopposable_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, unopposable) == 0xA4 ? 1 : -1];
-typedef char actor_emotion_priority_prop_visibility_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, visibility) == 0x122 ? 1 : -1];
-typedef char actor_emotion_priority_prop_friend_attacking_offset_assert[
-	offsetof(struct actor_emotion_priority_prop_view, friend_attacking) == 0x12F ? 1 : -1];
-
 static long actor_emotion_assess_unopposable_danger(
 	long prop_index)
 {
-	struct actor_emotion_priority_prop_view *prop;
+	struct prop_datum *prop;
 	long priority;
 
-	prop =
-		(struct actor_emotion_priority_prop_view *)prop_get(prop_index);
+	prop = prop_get(prop_index);
 	priority = 0;
 
 	if (prop->state >= _prop_state_becoming_unacknowledged &&
 		prop->state <= _prop_state_acknowledged &&
-		prop->unopposable)
+		prop->unopposable_enemy)
 	{
-		if (prop->recent_damage)
+		if (prop->currently_damaging_me)
 		{
 			priority = 4;
 		}
-		else if (prop->friend_attacking)
+		else if (prop->shooting)
 		{
-			priority = (prop->visibility <= 1) + 2;
+			priority = (prop->quantized_facing <= 1) + 2;
 		}
-		else if (prop->combat_status >= 2)
+		else if (prop->visibility >= _actor_perception_full)
 		{
 			priority = 1;
 		}
@@ -3177,6 +3315,375 @@ void actor_perception_abandoned_search(
 			actor_situation_combat_status_update(actor_index);
 		}
 	}
+
+	return;
+}
+
+void actor_emotion_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	short priority;
+
+	if (actor->emotions.berserk &&
+		(actor->state.combat_status == _actor_combat_status_none ||
+			actor->state.mode < _actor_mode_combat ||
+			(actor->input.shield_vitality == 1.0f &&
+				actor->state.combat_status <
+					_actor_combat_status_definite)))
+	{
+		actor_berserk(actor_index, FALSE);
+	}
+
+	if (actor->emotions.currently_defending !=
+		actor->external_orders.defending)
+	{
+		boolean defending = actor->external_orders.defending;
+
+		actor->emotions.currently_defending = defending;
+		if (actor->meta.unit_index != NONE)
+		{
+			ai_communication_event(
+				(defending != FALSE) + _ai_communication_advance,
+				actor->meta.unit_index,
+				NONE,
+				NONE,
+				NONE,
+				NONE,
+				NULL);
+		}
+	}
+
+	actor->emotions.forced_to_charge =
+		actor->emotions.berserk ||
+		TEST_FLAG(
+			definition->flags,
+			_actor_definition_always_charge_bit);
+	if (actor->input.vehicle_index != NONE)
+	{
+		actor->emotions.forced_to_charge = FALSE;
+	}
+	else if (TEST_FLAG(
+			definition->flags,
+			_actor_definition_charge_in_attacking_mode_bit) &&
+		!actor->emotions.currently_defending)
+	{
+		actor->emotions.forced_to_charge = TRUE;
+	}
+
+	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES - 1;
+		priority > 0 &&
+			actor->situation.specific_threats[priority] <= 0;
+		priority--)
+	{
+	}
+
+	if (priority >= _actor_threat_damaging_me)
+		actor->emotions.instantaneous_danger = 2.0f;
+	else if (priority >= _actor_threat_extremely_close_to_me)
+		actor->emotions.instantaneous_danger = 1.8f;
+	else if (priority >= _actor_threat_shooting_at_me)
+		actor->emotions.instantaneous_danger = 1.6f;
+	else if (priority >= _actor_threat_shooting_near_me)
+		actor->emotions.instantaneous_danger = 1.2f;
+	else if (priority >= _actor_threat_visible_aiming_at_me)
+		actor->emotions.instantaneous_danger = 0.7f;
+	else
+		actor->emotions.instantaneous_danger = 0.0f;
+
+	{
+		real interpolation =
+			1.0f -
+			(real)exp(-0.046209812164306640625);
+
+		actor->emotions.perceived_danger =
+			(actor->emotions.instantaneous_danger -
+				actor->emotions.perceived_danger) *
+				interpolation +
+			actor->emotions.perceived_danger;
+	}
+
+	if (actor->external_orders.stand_down)
+	{
+		actor->emotions.original_body_vitality =
+			actor->input.body_vitality;
+	}
+
+	if (definition->flags &
+		(FLAG(_actor_definition_crouch_in_line_of_fire_bit) |
+			FLAG(_actor_definition_avoid_friend_line_of_fire_bit)))
+	{
+		if (actor->input.vehicle_index == NONE &&
+			actor->state.combat_status >=
+				_actor_combat_status_definite)
+		{
+			boolean has_target_vector;
+			real_vector3d attack_vector;
+			struct prop_iterator iterator;
+			struct prop_datum *prop;
+
+			actor->emotions.crouch_blocking_line_of_fire = FALSE;
+			actor->emotions.crouch_blocking_player_line_of_fire =
+				FALSE;
+			actor->emotions.crouch_friends_in_line_of_fire = FALSE;
+			actor->emotions.moving_into_player_line_of_fire = FALSE;
+			has_target_vector =
+				actor->target.target_type > 8;
+
+			if (has_target_vector)
+			{
+				struct prop_datum *target_prop =
+					prop_get(actor->target.target_prop_index);
+
+				attack_vector = target_prop->actor_to_prop;
+			}
+
+			prop_iterator_new(&iterator, actor_index);
+			prop = prop_iterator_next(&iterator);
+			while (prop != NULL)
+			{
+				if (prop->state >=
+						_prop_state_becoming_unacknowledged &&
+					prop->state <= _prop_state_acknowledged &&
+					!prop->enemy &&
+					!prop->dead &&
+					!prop->swarm &&
+					(prop->player ||
+						prop->vehicle_index == NONE))
+				{
+					real_vector3d friend_attack_vector;
+
+					if (actor_perception_friend_prop_is_attacking(
+						actor_index,
+						iterator.index,
+						&friend_attack_vector))
+					{
+						real_vector3d vector_to_line_of_fire;
+						short blockage =
+							actor_perception_aiming_vector_test_blockage(
+								&prop->body_position,
+								&friend_attack_vector,
+								&actor->input.position.body_position,
+								&vector_to_line_of_fire);
+
+						if (blockage >= 1)
+						{
+							actor->emotions.
+								crouch_blocking_line_of_fire = TRUE;
+							if (prop->player)
+							{
+								actor->emotions.
+									crouch_blocking_player_line_of_fire =
+										TRUE;
+							}
+						}
+
+						if (TEST_FLAG(
+								definition->flags,
+								_actor_definition_avoid_friend_line_of_fire_bit) &&
+							prop->player &&
+							prop->shooting &&
+							magnitude_squared3d(&vector_to_line_of_fire) < 1.0f &&
+							(actor->control.moving ||
+								actor->emotions.
+									moving_into_fire_timer > 0))
+						{
+							real_vector3d movement_direction =
+								actor->control.moving_towards_vector;
+
+							if (normalize3d(&movement_direction) > 0.0f)
+							{
+								real_point3d future_point;
+								short secondary_blockage;
+								real dot;
+								real threshold;
+
+								point_from_line3d(
+									&actor->input.position.body_position,
+									&movement_direction,
+									0.4f,
+									&future_point);
+								secondary_blockage =
+									actor_perception_aiming_vector_test_blockage(
+									&prop->body_position,
+									&friend_attack_vector,
+									&future_point,
+										NULL);
+								if (secondary_blockage <= blockage)
+									secondary_blockage = blockage;
+								if (secondary_blockage >= 1)
+								{
+									dot =
+									dot_product3d(
+										&movement_direction,
+										&vector_to_line_of_fire);
+								threshold =
+									magnitude_squared3d(&vector_to_line_of_fire) < 0.25f ?
+											0.0f :
+											0.8660253882408142f;
+									if (dot > threshold)
+									{
+										actor->emotions.
+											moving_into_player_line_of_fire =
+												TRUE;
+									}
+								}
+							}
+						}
+					}
+
+					if (has_target_vector &&
+						actor_perception_aiming_vector_test_blockage(
+							&actor->input.position.body_position,
+							&attack_vector,
+							&prop->body_position,
+							NULL) >= 2)
+					{
+						actor->emotions.
+							crouch_friends_in_line_of_fire = TRUE;
+					}
+				}
+
+				prop = prop_iterator_next(&iterator);
+			}
+		}
+		else
+		{
+			actor->emotions.crouch_blocking_line_of_fire = FALSE;
+			actor->emotions.crouch_blocking_player_line_of_fire =
+				FALSE;
+			actor->emotions.crouch_friends_in_line_of_fire = FALSE;
+			actor->emotions.moving_into_player_line_of_fire = FALSE;
+		}
+	}
+
+	if (actor->emotions.moving_into_player_line_of_fire)
+	{
+		actor_discard_firing_position(
+			actor_index,
+			actor->firing_positions.current_position_index,
+			TRUE);
+		actor->emotions.moving_into_fire_timer = 22;
+	}
+	else if (actor->emotions.moving_into_fire_timer > 0)
+	{
+		actor->emotions.moving_into_fire_timer--;
+	}
+
+	if (actor->emotions.defensive_crouch_timer > 0)
+	{
+		actor->emotions.defensive_crouch_timer--;
+	}
+	else
+	{
+		real threshold;
+		boolean crouch;
+
+		if (!actor->emotions.currently_defending ||
+			actor->emotions.berserk)
+		{
+			threshold =
+				definition->defensive.
+					defensive_threshold_attacking;
+		}
+		else
+		{
+			threshold =
+				definition->defensive.
+					defensive_threshold_defending;
+		}
+
+		switch (definition->defensive.defensive_crouch_type)
+		{
+		case _defensive_crouch_danger:
+			crouch =
+				actor->emotions.perceived_danger > threshold;
+			break;
+
+		case _defensive_crouch_shield_low:
+			crouch =
+				actor->input.shield_vitality < threshold;
+			break;
+
+		case _defensive_crouch_hide_behind_shield:
+			crouch =
+				actor->input.shield_vitality > threshold &&
+				actor->situation.cumulative_threats[
+					_actor_threat_visible_facing_me] > 0;
+			break;
+
+		case _defensive_crouch_any_target:
+			crouch = actor->state.combat_status > 0;
+			break;
+
+		case _defensive_crouch_flood_shamble:
+			crouch = actor_type_flood_desire_shamble(actor_index);
+			break;
+
+		default:
+			crouch = FALSE;
+			break;
+		}
+
+		if (TEST_FLAG(
+			definition->flags,
+			_actor_definition_crouch_in_line_of_fire_bit))
+		{
+			if (actor->emotions.crouch_blocking_player_line_of_fire)
+				crouch = TRUE;
+			else if (actor->emotions.crouch_friends_in_line_of_fire)
+				crouch = FALSE;
+			else if (actor->emotions.crouch_blocking_line_of_fire)
+				crouch = TRUE;
+		}
+
+		if (actor->emotions.defensive_crouch)
+		{
+			if (!crouch)
+			{
+				actor->emotions.defensive_crouch = FALSE;
+				if (definition->defensive.
+						defensive_crouch_min_stand_time > 0.0f)
+				{
+					actor->emotions.defensive_crouch_timer =
+						(short)(definition->defensive.
+							defensive_crouch_min_stand_time *
+							30.0f);
+				}
+				else
+				{
+					actor->emotions.defensive_crouch_timer = 45;
+				}
+			}
+		}
+
+		if (crouch)
+		{
+			if (!actor->emotions.defensive_crouch)
+			{
+				actor->emotions.defensive_crouch = TRUE;
+				if (definition->defensive.
+						defensive_crouch_min_crouch_time > 0.0f)
+				{
+					actor->emotions.defensive_crouch_timer =
+						(short)(definition->defensive.
+							defensive_crouch_min_crouch_time *
+							30.0f);
+				}
+				else
+				{
+					actor->emotions.defensive_crouch_timer = 45;
+				}
+			}
+		}
+	}
+
+	if (actor->emotions.evasion_delay_timer > 0)
+		actor->emotions.evasion_delay_timer--;
+
+	actor_emotion_unopposable_retreat(actor_index);
 
 	return;
 }
@@ -4322,8 +4829,8 @@ boolean actor_perception_create_orphan_from_friend(
 	{
 		if (source_actor_index == NONE ||
 			(friend_prop_index != NONE &&
-				((struct actor_situation_prop_view *)
-					prop_get(friend_prop_index))->combat_status >= 2))
+				prop_get(friend_prop_index)->visibility >=
+						_actor_perception_full))
 		{
 			current_prop->definitely_located = TRUE;
 			current_prop->ticks_since_definitely_located = 0;
