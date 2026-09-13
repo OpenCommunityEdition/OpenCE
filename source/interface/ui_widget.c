@@ -1377,6 +1377,10 @@ static void widget_instance_go_back_to_previous(
 	struct widget_instance *widget);
 static __inline struct widget_instance *widget_instance_find_by_tag_index(
 	long tag_index);
+static void widget_instance_reload_recursive(
+	struct widget_instance *widget);
+static void ui_widget_reload_by_tag(
+	long tag_index);
 static void event_handler_dispatch(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -3184,11 +3188,19 @@ static void event_handler_dispatch(
 				success = FALSE;
 			}
 		}
+		if (TEST_FLAG(handler->flags, _event_handler_reload_self_bit) &&
+			!widget_deleted)
+		{
+			widget_instance_reload_recursive(widget);
+		}
 		if (TEST_FLAG(handler->flags, _event_handler_reload_widget_bit) &&
 			!widget_deleted)
 		{
-			/* January reports the missing tag but never reloads anything */
-			if (handler->widget_tag.index == NONE)
+			if (handler->widget_tag.index != NONE)
+			{
+				ui_widget_reload_by_tag(handler->widget_tag.index);
+			}
+			else
 			{
 				error(
 					_error_silent,
@@ -3566,8 +3578,8 @@ static void widget_instance_initialize(
 		widget->type = _ui_widget_type_text_box;
 	}
 	widget->definition_tag_index = tag_index;
-	widget->local_player_index = local_player_index;
 	widget->name = definition->name;
+	widget->local_player_index = local_player_index;
 	widget->type = definition->type;
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
@@ -3647,8 +3659,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 	short focused_child_index)
 {
 	struct ui_widget_definition *definition;
-	struct widget_instance *widget;
-	short controller_index = local_player_index;
+	struct widget_instance *widget = NULL;
 	short widget_stack = (local_player_index == NONE) ? 0 : local_player_index;
 
 	match_assert(
@@ -3664,84 +3675,83 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 		379,
 		(widget_stack>=0) && (widget_stack<MAXIMUM_GAMEPADS));
 	if (tag_index == NONE)
-	{
 		tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, name);
-		if (tag_index == NONE)
-		{
-			error(_error_silent, "ui_widget_definition tag '%s'/%d not loaded", name, NONE);
-
-			return NULL;
-		}
-	}
-	definition = ui_widget_definition_get(tag_index);
-	widget = pool_new_pointer(
-		widget_memory_pool,
-		sizeof(struct widget_instance),
-		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
-		395);
-	if (widget)
+	if (tag_index != NONE)
 	{
-		if (!parent)
+		definition = ui_widget_definition_get(tag_index);
+		widget = pool_new_pointer(
+			widget_memory_pool,
+			sizeof(struct widget_instance),
+			"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+			395);
+		if (widget)
 		{
-			short previous_local_player_index;
+			if (!parent)
+			{
+				short previous_local_player_index;
 
-			if (widget_globals.active_widgets[widget_stack])
-			{
-				previous_local_player_index =
-					widget_globals.active_widgets[widget_stack]->local_player_index;
-				ui_widget_delete(widget_globals.active_widgets[widget_stack]);
-			}
-			else
-			{
-				previous_local_player_index = NONE;
-			}
-			widget_globals.active_widgets[widget_stack] = widget;
-			if (invoking_widget_tag != NONE &&
-				!TEST_FLAG(
-					ui_widget_definition_get(invoking_widget_tag)->flags,
-					_widget_dont_push_history_data_bit))
-			{
-				struct widget_stack_data data;
+				if (widget_globals.active_widgets[widget_stack])
+				{
+					previous_local_player_index =
+						widget_globals.active_widgets[widget_stack]->local_player_index;
+					ui_widget_delete(widget_globals.active_widgets[widget_stack]);
+				}
+				else
+				{
+					previous_local_player_index = NONE;
+				}
+				widget_globals.active_widgets[widget_stack] = widget;
+				if (invoking_widget_tag != NONE &&
+					!TEST_FLAG(
+						ui_widget_definition_get(invoking_widget_tag)->flags,
+						_widget_dont_push_history_data_bit))
+				{
+					struct widget_stack_data data;
 
-				data.previous_widget_tag = invoking_widget_tag;
-				data.focused_child_parent_widget_tag = focused_child_parent_widget_tag;
-				data.focused_child_index = focused_child_index;
-				data.local_player_index = previous_local_player_index;
-				push_widget(&widget_globals.widget_stack[widget_stack], &data);
+					data.previous_widget_tag = invoking_widget_tag;
+					data.focused_child_parent_widget_tag = focused_child_parent_widget_tag;
+					data.focused_child_index = focused_child_index;
+					data.local_player_index = previous_local_player_index;
+					push_widget(&widget_globals.widget_stack[widget_stack], &data);
+				}
 			}
+			if (local_player_index == NONE)
+			{
+				switch (definition->controller_index)
+				{
+				case _widget_controller0:
+					local_player_index = 0;
+					break;
+				case _widget_controller1:
+					local_player_index = 1;
+					break;
+				case _widget_controller2:
+					local_player_index = 2;
+					break;
+				case _widget_controller3:
+					local_player_index = 3;
+					break;
+				case _widget_controller_any:
+					local_player_index = NONE;
+					break;
+				}
+			}
+			widget_instance_initialize(
+				widget,
+				parent,
+				definition,
+				tag_index,
+				local_player_index,
+				widget_stack);
 		}
-		if (local_player_index == NONE)
+		else
 		{
-			switch (definition->controller_index)
-			{
-			case _widget_controller0:
-				controller_index = 0;
-				break;
-			case _widget_controller1:
-				controller_index = 1;
-				break;
-			case _widget_controller2:
-				controller_index = 2;
-				break;
-			case _widget_controller3:
-				controller_index = 3;
-				break;
-			case _widget_controller_any:
-				controller_index = NONE;
-				break;
-			}
+			error(_error_silent, "failed to create new widget; out of memory!");
 		}
-		widget_instance_initialize(
-			widget,
-			parent,
-			definition,
-			tag_index,
-			controller_index,
-			widget_stack);
 	}
 	else
 	{
-		error(_error_silent, "failed to create new widget; out of memory!");
+		error(_error_silent, "ui_widget_definition tag '%s'/%d not loaded", name, NONE);
 	}
 
 	return widget;
@@ -4643,14 +4653,16 @@ void main_screen_shell_load(
 }
 
 static void widget_instance_reload_recursive(
-	void)
+	struct widget_instance *widget)
 {
+	/* widget reloading is compiled out of this build */
 	return;
 }
 
 static void ui_widget_reload_by_tag(
-	void)
+	long tag_index)
 {
+	/* widget reloading is compiled out of this build */
 	return;
 }
 
