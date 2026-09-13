@@ -1090,41 +1090,32 @@ static struct sound_listener *listener_get(
 static short sound_definition_promote(
 	long definition_index)
 {
+	short result = _sound_promotion_dont;
 	struct sound_definition *definition = sound_definition_get(definition_index);
-	short promotion_count = definition->promotion_count;
-	long longest_permutation_length;
-	long promotion_limit;
-	long promotion_counter;
 
-	if (!promotion_count)
+	if (definition->promotion_count)
 	{
-		return _sound_promotion_dont;
-	}
+		definition->promotion_counter += definition->promotion_time - sound_manager_globals.render_time;
+		definition->promotion_counter = MAX(0, definition->promotion_counter);
+		definition->promotion_time = sound_manager_globals.render_time;
+		definition->promotion_counter += definition->longest_permutation_length;
 
-	longest_permutation_length = definition->longest_permutation_length;
-	promotion_limit = longest_permutation_length * promotion_count;
-	promotion_counter = definition->promotion_time - sound_manager_globals.render_time +
-		definition->promotion_counter;
-	definition->promotion_counter = promotion_counter;
-
-	promotion_counter = MAX(promotion_counter, 0);
-	definition->promotion_counter = promotion_counter;
-	definition->promotion_time = sound_manager_globals.render_time;
-	definition->promotion_counter = longest_permutation_length + promotion_counter;
-
-	if (longest_permutation_length + promotion_counter > promotion_limit)
-	{
-		if (definition->promotion_sound.index == NONE)
+		if (definition->promotion_counter > definition->promotion_count * definition->longest_permutation_length)
 		{
-			definition->promotion_counter = promotion_counter;
-			return _sound_promotion_dont_play;
+			if (definition->promotion_sound.index != NONE)
+			{
+				definition->promotion_counter = 0;
+				result = _sound_promotion_do;
+			}
+			else
+			{
+				definition->promotion_counter -= definition->longest_permutation_length;
+				result = _sound_promotion_dont_play;
+			}
 		}
-
-		definition->promotion_counter = 0;
-		return _sound_promotion_do;
 	}
 
-	return _sound_promotion_dont;
+	return result;
 }
 
 static real sound_manager_master_gain(
@@ -3189,23 +3180,22 @@ static short source_audible(
 	real maximum_distance)
 {
 	short nearest_listener_index = NONE;
-	short listener_index;
 
 	if (source->spatialization_mode == _sound_spatialization_mode_none)
 	{
-		return 0;
+		nearest_listener_index = 0;
 	}
-
-	if (source->spatialization_mode == _sound_spatialization_mode_relative)
+	else if (source->spatialization_mode == _sound_spatialization_mode_relative)
 	{
 		if (source_distance_squared(NONE, source) < maximum_distance)
 		{
-			return 0;
+			nearest_listener_index = 0;
 		}
 	}
 	else
 	{
 		real nearest_distance_squared = REAL_MAX;
+		short listener_index;
 
 		for (
 			listener_index = 0;
@@ -3237,7 +3227,7 @@ static short source_audible(
 		if (nearest_distance_squared > maximum_distance * maximum_distance ||
 			source->occlusion == 1.f)
 		{
-			return NONE;
+			nearest_listener_index = NONE;
 		}
 	}
 
