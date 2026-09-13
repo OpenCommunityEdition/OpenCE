@@ -408,6 +408,10 @@ enum
 	NUMBER_OF_UNIQUE_LEADER_TYPES,
 };
 
+// encounter_update_follow: follow-target units and firing position letter groups (a..z)
+#define MAXIMUM_FOLLOW_TARGET_UNITS 8
+#define NUMBER_OF_FIRING_POSITION_GROUP_INDICES 26
+
 enum
 {
 	_ai_reference_squad_bit = 15,
@@ -537,7 +541,7 @@ static short encounter_post_combat_select_random_behavior(
 	struct post_combat_possibility *selected_possibility);
 static void encounter_post_combat(
 	long encounter_index);
-void encounter_update_follow(
+static void encounter_update_follow(
 	long encounter_index);
 static void encounter_control_actors(
 	long encounter_index);
@@ -1839,22 +1843,25 @@ boolean encounter_spawn_actor(
 	long encounter_index,
 	short squad_index)
 {
-	if (ai_globals->ai_initialized_for_map && encounter_place_actor(encounter_index, squad_index, 0, TRUE))
+	if (ai_globals->ai_initialized_for_map)
 	{
-		struct encounter_datum *encounter = encounter_get(encounter_index);
-		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
-		struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
-		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&encounter_definition->squads, squad_index, struct squad_definition);
+		if (encounter_place_actor(encounter_index, squad_index, 0, TRUE))
+		{
+			struct encounter_datum *encounter = encounter_get(encounter_index);
+			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
+			struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads, squad_index, struct squad_definition);
 
-		encounter->current_count++;
-		squad->current_count++;
-		if (squad_definition->respawn_total_count > 0)
-			squad->respawn_actors_left--;
+			encounter->current_count++;
+			squad->current_count++;
+			if (squad_definition->respawn_total_count > 0)
+				squad->respawn_actors_left--;
 
-		encounter->respawn_delay_ticks = real_random_range(encounter_definition->respawn_time_lower_bound, encounter_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
-		squad->respawn_delay_ticks = real_random_range(squad_definition->respawn_time_lower_bound, squad_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
+			encounter->respawn_delay_ticks = real_random_range(encounter_definition->respawn_time_lower_bound, encounter_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
+			squad->respawn_delay_ticks = real_random_range(squad_definition->respawn_time_lower_bound, squad_definition->respawn_time_upper_bound) * TICKS_PER_SECOND;
+		}
 	}
 
 	/* Original January and HCEA behavior: the successful placement is not reported to the caller;
@@ -2664,11 +2671,9 @@ static short encounter_post_combat_select_random_behavior(
 		behavior_index < NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES;
 		behavior_index++)
 	{
-		struct post_combat_possibility *possibility = &possibilities[behavior_index][0];
-
-		if (possibility->weight > 0.0f && possibility->actor_index != NONE)
+		if (possibilities[behavior_index][0].weight > 0.0f && possibilities[behavior_index][0].actor_index != NONE)
 		{
-			total_weight += possibility->weight;
+			total_weight += possibilities[behavior_index][0].weight;
 			selected_behavior_index = behavior_index;
 			possibility_count++;
 		}
@@ -2683,11 +2688,9 @@ static short encounter_post_combat_select_random_behavior(
 			behavior_index < NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES;
 			behavior_index++)
 		{
-			struct post_combat_possibility *possibility = &possibilities[behavior_index][0];
-
-			if (possibility->weight > 0.0f && possibility->actor_index != NONE)
+			if (possibilities[behavior_index][0].weight > 0.0f && possibilities[behavior_index][0].actor_index != NONE)
 			{
-				current_weight += possibility->weight;
+				current_weight += possibilities[behavior_index][0].weight;
 				if (current_weight > selected_weight)
 				{
 					selected_behavior_index = behavior_index;
@@ -3386,6 +3389,318 @@ static void encounter_update_platoons(
 							encounter_definition->name,
 							platoon_definition->name,
 							defending ? "defending" : "attacking");
+					}
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+// encounter_datum.follow_target_type (TU-local until encounters.h names them)
+enum
+{
+	_follow_target_none = 0,
+	_follow_target_players,
+	_follow_target_unit,
+	_follow_target_ai,
+	NUMBER_OF_FOLLOW_TARGET_TYPES,
+};
+
+static void encounter_update_follow(
+	long encounter_index)
+{
+	struct encounter_datum *encounter = encounter_get(encounter_index);
+	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters,
+		DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+		struct encounter_definition);
+	long target_unit_indices[MAXIMUM_FOLLOW_TARGET_UNITS];
+	long follow_unit_index = NONE;
+	short target_count = 0;
+	real_point3d follow_position;
+
+	switch (encounter->follow_target_type)
+	{
+	case _follow_target_players:
+		{
+			struct data_iterator iterator;
+			struct player_datum *player;
+
+			data_iterator_new(&iterator, player_data);
+			while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+			{
+				if (player->unit_index != NONE && target_count < MAXIMUM_FOLLOW_TARGET_UNITS)
+					target_unit_indices[target_count++] = player->unit_index;
+			}
+		}
+		break;
+
+	case _follow_target_unit:
+		if (object_try_and_get_and_verify_type(encounter->follow_target_unit_index, _object_mask_unit))
+		{
+			target_unit_indices[0] = encounter->follow_target_unit_index;
+			target_count = 1;
+		}
+		else
+		{
+			encounter->follow_target_unit_index = NONE;
+		}
+		break;
+
+	case _follow_target_ai:
+		if (encounter->follow_target_ai_index != NONE)
+		{
+			struct ai_script_actor_reference_iterator iterator;
+			struct actor_datum *actor;
+
+			ai_index_actor_iterator_new(encounter->follow_target_ai_index, &iterator);
+			while ((actor = ai_index_actor_iterator_next(&iterator)) != NULL &&
+				target_count < MAXIMUM_FOLLOW_TARGET_UNITS)
+			{
+				target_unit_indices[target_count++] = actor->meta.unit_index;
+			}
+		}
+		break;
+	}
+
+	if (target_count > 0)
+	{
+		unsigned long present_squads[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_SQUADS_PER_ENCOUNTER)];
+		unsigned long migrating_squads[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_SQUADS_PER_ENCOUNTER)];
+		unsigned long living_squads[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_SQUADS_PER_ENCOUNTER)];
+		unsigned long squad_firing_position_groups[MAXIMUM_SQUADS_PER_ENCOUNTER];
+		unsigned long firing_position_groups = 0;
+		short living_count = 0;
+		short squad_index;
+
+		csmemset(present_squads, 0, sizeof(present_squads));
+		csmemset(migrating_squads, 0, sizeof(migrating_squads));
+		csmemset(living_squads, 0, sizeof(living_squads));
+
+		for (squad_index = 0; squad_index < encounter->squad_count; squad_index++)
+		{
+			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads,
+				squad_index,
+				struct squad_definition);
+
+			if (TEST_FLAG(squad_definition->flags, _squad_automatic_migration_bit))
+			{
+				struct squad_datum *squad = encounter_get_squad(encounter, squad_index);
+
+				BIT_VECTOR_SET_FLAG(present_squads, squad_index, TRUE);
+				living_count += squad->current_count;
+				if (squad->automatic_migration_target)
+				{
+					short platoon_index;
+					unsigned long groups = 0;
+					boolean defending = FALSE;
+					short group_index;
+
+					BIT_VECTOR_SET_FLAG(migrating_squads, squad_index, TRUE);
+					platoon_index = squad_definition->platoon_index;
+					if (VALID_INDEX(platoon_index, encounter_definition->platoons.count))
+					{
+						defending = encounter_get_platoon(encounter, platoon_index)->defending;
+					}
+					else if (platoon_index != NONE)
+					{
+						error(
+							_error_silent,
+							"WARNING: squad %s/%s has an invalid platoon - %d is outside range of [0, %d)",
+							encounter_definition->name,
+							squad_definition->name,
+							platoon_index,
+							encounter_definition->platoons.count);
+					}
+
+					if (defending)
+					{
+						for (group_index = _firing_position_group_defending;
+							group_index <= _firing_position_group_defending_guard;
+							group_index++)
+						{
+							groups |= squad_definition->firing_position_groups[group_index];
+						}
+					}
+					else
+					{
+						for (group_index = _firing_position_group_attacking;
+							group_index <= _firing_position_group_attacking_guard;
+							group_index++)
+						{
+							groups |= squad_definition->firing_position_groups[group_index];
+						}
+					}
+
+					firing_position_groups |= groups;
+					squad_firing_position_groups[squad_index] = groups;
+					if (squad->current_count > 0)
+						BIT_VECTOR_SET_FLAG(living_squads, squad_index, TRUE);
+				}
+			}
+		}
+
+		if (living_count > 0 && firing_position_groups > 0)
+		{
+			if (target_count == 1)
+			{
+				follow_unit_index = target_unit_indices[0];
+				object_get_origin(follow_unit_index, &follow_position);
+			}
+			else
+			{
+				real target_distances_squared[MAXIMUM_FOLLOW_TARGET_UNITS];
+				real_point3d target_positions[MAXIMUM_FOLLOW_TARGET_UNITS];
+				struct encounter_actor_iterator iterator;
+				struct actor_datum *actor;
+				short target_index;
+
+				for (target_index = 0; target_index < target_count; target_index++)
+				{
+					target_distances_squared[target_index] = REAL_MAX;
+					object_get_origin(target_unit_indices[target_index], &target_positions[target_index]);
+				}
+
+				encounter_actor_iterator_new(&iterator, encounter_index);
+				while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+				{
+					if (BIT_VECTOR_TEST_FLAG(present_squads, actor->meta.squad_index))
+					{
+						for (target_index = 0; target_index < target_count; target_index++)
+						{
+							real distance_squared = distance_squared3d(
+								&actor->input.position.body_position,
+								&target_positions[target_index]);
+
+							target_distances_squared[target_index] = MIN(target_distances_squared[target_index], distance_squared);
+						}
+					}
+				}
+
+				for (target_index = 0; target_index < target_count; target_index++)
+				{
+					if (target_distances_squared[target_index] < REAL_MAX)
+					{
+						follow_unit_index = target_unit_indices[target_index];
+						follow_position = target_positions[target_index];
+					}
+				}
+			}
+
+			if (follow_unit_index != NONE)
+			{
+				real group_distances_squared[NUMBER_OF_FIRING_POSITION_GROUP_INDICES];
+				real best_distance_squared;
+				real current_distance_squared;
+				short best_squad_index = NONE;
+				short current_squad_index;
+				short candidate_squad_index;
+				short firing_position_index;
+				short group_index;
+
+				for (group_index = 0; group_index < NUMBER_OF_FIRING_POSITION_GROUP_INDICES; group_index++)
+					group_distances_squared[group_index] = REAL_MAX;
+
+				for (firing_position_index = 0;
+					firing_position_index < encounter_definition->firing_positions.count;
+					firing_position_index++)
+				{
+					struct firing_position_definition *firing_position = TAG_BLOCK_GET_ELEMENT(
+						&encounter_definition->firing_positions,
+						firing_position_index,
+						struct firing_position_definition);
+
+					if (TEST_FLAG(firing_position_groups, firing_position->group_index))
+					{
+						real distance_squared = distance_squared3d(&firing_position->position, &follow_position);
+
+						group_distances_squared[firing_position->group_index] = MIN(
+							group_distances_squared[firing_position->group_index],
+							distance_squared);
+					}
+				}
+
+				best_distance_squared = REAL_MAX;
+				current_distance_squared = REAL_MIN;
+				current_squad_index = NONE;
+				for (candidate_squad_index = 0; candidate_squad_index < encounter->squad_count; candidate_squad_index++)
+				{
+					if (BIT_VECTOR_TEST_FLAG(migrating_squads, candidate_squad_index))
+					{
+						real squad_distance_squared = REAL_MAX;
+
+						for (group_index = 0; group_index < NUMBER_OF_FIRING_POSITION_GROUP_INDICES; group_index++)
+						{
+							if (TEST_FLAG(squad_firing_position_groups[candidate_squad_index], group_index))
+								squad_distance_squared = MIN(squad_distance_squared, group_distances_squared[group_index]);
+						}
+
+						if (squad_distance_squared < best_distance_squared)
+						{
+							best_distance_squared = squad_distance_squared;
+							best_squad_index = candidate_squad_index;
+						}
+						if (BIT_VECTOR_TEST_FLAG(living_squads, candidate_squad_index) &&
+							squad_distance_squared > current_distance_squared)
+						{
+							current_distance_squared = squad_distance_squared;
+							current_squad_index = candidate_squad_index;
+						}
+					}
+				}
+
+				if (best_squad_index != NONE)
+				{
+					boolean migrate = TRUE;
+
+					if (current_squad_index != NONE)
+					{
+						real best_distance = square_root(best_distance_squared);
+						real current_distance = square_root(current_distance_squared);
+						real tolerance = encounter->follow_target_distance > 0.0f ? encounter->follow_target_distance : 2.0f;
+
+						migrate = best_distance < current_distance - tolerance;
+						if (ai_debug.print_automatic_migration)
+						{
+							struct squad_definition *current_squad_definition = TAG_BLOCK_GET_ELEMENT(
+								&encounter_definition->squads,
+								current_squad_index,
+								struct squad_definition);
+							struct squad_definition *best_squad_definition = TAG_BLOCK_GET_ELEMENT(
+								&encounter_definition->squads,
+								best_squad_index,
+								struct squad_definition);
+
+							console_printf(
+								FALSE,
+								"%s: current %s/%.1f best %s/%.1f tol %.1f -> %s",
+								encounter_definition->name,
+								!current_squad_definition ? "<none>" : current_squad_definition->name,
+								current_distance_squared == REAL_MIN ? -1000.0f : current_distance,
+								!best_squad_definition ? "<none>" : best_squad_definition->name,
+								best_distance_squared == REAL_MAX ? 1000.0f : best_distance,
+								tolerance,
+								migrate ? "migrate" : "stay");
+						}
+					}
+
+					if (migrate)
+					{
+						struct encounter_actor_iterator iterator;
+						struct actor_datum *actor;
+
+						encounter_actor_iterator_new(&iterator, encounter_index);
+						while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+						{
+							if (BIT_VECTOR_TEST_FLAG(present_squads, actor->meta.squad_index) &&
+								actor->meta.squad_index != best_squad_index)
+							{
+								actor_change_encounter(iterator.index, encounter_index, best_squad_index);
+							}
+						}
 					}
 				}
 			}
