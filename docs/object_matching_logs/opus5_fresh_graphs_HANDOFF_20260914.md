@@ -60,7 +60,7 @@ comparator result, owner census, point guard, review verdict and commit.
 
 ## Changed files (base..tip)
 
-- **Source (11):** action_alert.c, action_charge.c, action_fight.c, action_obey.c,
+- **Source (12):** action_alert.c, action_charge.c, action_fight.c, action_obey.c,
   actor_moving.c, ai_script.c, encounters.c, aim_assist.c, game_engine.c,
   hud_draw.c, virtual_keyboard.c, render_sprite.c.
 - **Headers (3):** `source/ai/actor_perception.h`, `source/math/real_math.h`,
@@ -182,7 +182,7 @@ Owner-actionable proposals with unlock values:
   base) owns interface, projectiles, rasterizer_xbox_active_camouflage,
   stack_walk_windows and actor_combat. Its no-overlap list names every file this lane
   changed, and this lane's planned actor_combat wave was cancelled to avoid overlap.
-- **Before integration:** re-check canonical for new commits touching the 11 source
+- **Before integration:** re-check canonical for new commits touching the 12 source
   files, 3 headers and 2 configs above.
 
 Scratch evidence stays untracked under this worktree's `scratch/`: snapshots,
