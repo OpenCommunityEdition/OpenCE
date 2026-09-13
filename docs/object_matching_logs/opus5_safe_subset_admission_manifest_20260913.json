@@ -1,0 +1,150 @@
+{
+  "campaign": "opus5-safe-subset-publication-20260913",
+  "canonical_base": "73e97eca51425495acb9dbfa3349370c7962c022",
+  "donor_branch": "opus/50k-house-clean-20260913",
+  "donor_tip": "d63223a4547bfa71c60fa37c30cfd73d8199e802",
+  "integration_parent": "98e10ed97c26806772e20be65cfe268a69d023aa",
+  "totals": {
+    "baseline_meaningful_code_bytes": 1134830,
+    "final_meaningful_code_bytes": 1140161,
+    "meaningful_code_bytes_gained": 5331,
+    "baseline_accepted_functions": 6960,
+    "final_accepted_functions": 6972,
+    "accepted_functions_gained": 12,
+    "strict_padded_bytes_gained": 5408,
+    "strict_regressions": 0
+  },
+  "changed_source_sha256": {
+    "source/ai/path.c": "0bb0e69f762844f15ebdd4acaa34ddfa343ced93fb57061985415201b19343f3",
+    "source/effects/particle_systems.c": "4ad25437e1c5e9d417c4776db7c9d57e10f28c99fb5f8d0fbb4dad75140a40ea",
+    "source/game/players.c": "bd63aa27e077c3f61f94c1eaaa96770c4e708ae17a2e7bd55a80759657411cd9",
+    "source/interface/ui_widget.c": "0247f2d8eda3ac33b71ba08d48f961aaf3377acb9ed17c63b9f8758615af1ad0",
+    "source/sound/sound_manager.c": "aa818505a213a605bff3d20e680ecb6a5b8d6b4e57d887302cebff17600cf050"
+  },
+  "admitted": [
+    {
+      "unit": "source/ai/path",
+      "function": "_path_state_build_path",
+      "meaningful_bytes": 1184,
+      "padded_bytes": 1184,
+      "relocations": 37,
+      "normalized_sha256": "e43c741f08a41afd3471c90d2593f5c8985c2b6f2a8c6d8f784bd9da2fa2b59c"
+    },
+    {
+      "unit": "source/effects/particle_systems",
+      "function": "_particle_system_new_attached",
+      "meaningful_bytes": 402,
+      "padded_bytes": 416,
+      "relocations": 18,
+      "normalized_sha256": "c81dea561857e1b35f653e31fc792a0b43fd9b22862daa9de4d4a764a367252e"
+    },
+    {
+      "unit": "source/effects/particle_systems",
+      "function": "_particle_system_next_particle_state_index",
+      "meaningful_bytes": 143,
+      "padded_bytes": 144,
+      "relocations": 0,
+      "normalized_sha256": "02ca0e6ac1fbf6c2fc075bcc1537ae74e946419206fc1b023e08d76dd8fc5380"
+    },
+    {
+      "unit": "source/effects/particle_systems",
+      "function": "_particle_system_next_type_state_index",
+      "meaningful_bytes": 171,
+      "padded_bytes": 176,
+      "relocations": 0,
+      "normalized_sha256": "c62b4e3b13dc131de15e2ca4a42d86cbaa550b85d3357119b181c588c4a4918f"
+    },
+    {
+      "unit": "source/effects/particle_systems",
+      "function": "_randomize_particle_variables",
+      "meaningful_bytes": 243,
+      "padded_bytes": 256,
+      "relocations": 11,
+      "normalized_sha256": "a02cdf74e4fe600a241eeb44d1c375e1f73129b2d68f522139f9ab55b46e9acd"
+    },
+    {
+      "unit": "source/game/players",
+      "function": "_players_update_before_game",
+      "meaningful_bytes": 1754,
+      "padded_bytes": 1760,
+      "relocations": 101,
+      "normalized_sha256": "8c92baaaebf7177d7bc54239c21b0923703a50f3ede19dca3a81a457f2860947"
+    },
+    {
+      "unit": "source/interface/ui_widget",
+      "function": "_ui_widget_load_by_name_or_tag",
+      "meaningful_bytes": 544,
+      "padded_bytes": 544,
+      "relocations": 35,
+      "normalized_sha256": "0015243618efc67b28a889f58ff29d30c7ff38b9dc8e4a62b6f2d51fab5016b1"
+    },
+    {
+      "unit": "source/interface/ui_widget",
+      "function": "_ui_widget_reload_by_tag",
+      "meaningful_bytes": 1,
+      "padded_bytes": 16,
+      "relocations": 0,
+      "normalized_sha256": "499f1f307c1cb989f968a6b7fcaec591e1828877223d0b0e7e8e8b76cde8c9ca"
+    },
+    {
+      "unit": "source/interface/ui_widget",
+      "function": "_widget_instance_initialize",
+      "meaningful_bytes": 493,
+      "padded_bytes": 496,
+      "relocations": 18,
+      "normalized_sha256": "2c4ba33b887ec7cae674a4d5352bfc6e4c71d6623cc920d8ac73d4c5cf09efb9"
+    },
+    {
+      "unit": "source/interface/ui_widget",
+      "function": "_widget_instance_reload_recursive",
+      "meaningful_bytes": 1,
+      "padded_bytes": 16,
+      "relocations": 0,
+      "normalized_sha256": "499f1f307c1cb989f968a6b7fcaec591e1828877223d0b0e7e8e8b76cde8c9ca"
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_sound_definition_promote",
+      "meaningful_bytes": 158,
+      "padded_bytes": 160,
+      "relocations": 3,
+      "normalized_sha256": "07c62c74ca8bb2f9a6143b282a7155f86b8da0db339f095c5adc5189380675fc"
+    },
+    {
+      "unit": "source/sound/sound_manager",
+      "function": "_source_audible",
+      "meaningful_bytes": 237,
+      "padded_bytes": 240,
+      "relocations": 8,
+      "normalized_sha256": "1da6136d5e94da865edc62a472dbe1e5a9dd149abc0abfec9f3942034d095c94"
+    }
+  ],
+  "excluded": [
+    {
+      "packet": "hud_weapon",
+      "meaningful_bytes": 494,
+      "exact_credit": 0,
+      "reason": "The exact caller depends on a large fuzzy crosshairs reconstruction that still needs an independent authenticity ruling and enum cleanup."
+    },
+    {
+      "function": "_player_examine_nearby_objects",
+      "exact_credit": 0,
+      "reason": "The provisional closure depended on a rejected private ABI change and was reverted before admission."
+    },
+    {
+      "commit": "d63223a4547bfa71c60fa37c30cfd73d8199e802",
+      "exact_credit": 0,
+      "reason": "Evidence-only ledgers for unchanged objects."
+    }
+  ],
+  "verification": {
+    "full_ninja_build": "pass",
+    "stable_diff": "12 gained, 5408 padded bytes, 0 regressions",
+    "parked_functions": "465 active, 0 stale, 0 invalid",
+    "object_admission": "0 candidates, 0 contradicted, 7 unchanged pre-existing rejections",
+    "fake_match_scan": "0 findings in the five changed source files",
+    "pytest": "1151 passed, 5 skipped, 26 subtests passed",
+    "point_from_line3d_guard": "passed for every changed translation unit",
+    "git_diff_check": "pass"
+  }
+}

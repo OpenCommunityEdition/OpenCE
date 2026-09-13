@@ -4655,14 +4655,12 @@ void main_screen_shell_load(
 static void widget_instance_reload_recursive(
 	struct widget_instance *widget)
 {
-	/* widget reloading is compiled out of this build */
 	return;
 }
 
 static void ui_widget_reload_by_tag(
 	long tag_index)
 {
-	/* widget reloading is compiled out of this build */
 	return;
 }
 
