@@ -1071,17 +1071,17 @@ void ai_index_actor_iterator_new(
 			iterator->encounter_index = NONE;
 			break;
 		}
+
+		if (iterator->encounter_index != NONE)
+		{
+			encounter_actor_iterator_new(
+				(struct encounter_actor_iterator *)&iterator->actor_encounter_index,
+				iterator->encounter_index);
+		}
 	}
 	else
 	{
 		iterator->encounter_index = NONE;
-	}
-
-	if (iterator->encounter_index != NONE)
-	{
-		encounter_actor_iterator_new(
-			(struct encounter_actor_iterator *)&iterator->actor_encounter_index,
-			iterator->encounter_index);
 	}
 
 	return;
@@ -2140,17 +2140,17 @@ static short ai_scripting_migrate_find_target_squad(
 {
 	struct scenario *scenario = global_scenario_get();
 	struct encounter_definition *target_encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&scenario->ai_encounters,
+		&global_scenario_get()->ai_encounters,
 		DATUM_INDEX_TO_ABSOLUTE_INDEX(target_ai_reference),
 		struct encounter_definition);
 	struct ai_script_squad_iterator iterator;
 	struct squad_datum *squad;
-	short matching_squad_index = NONE;
-	short matching_variant_index = NONE;
-	short matching_actor_index = NONE;
-	short matching_type_index = NONE;
 	short first_squad_index = NONE;
-	short result;
+	short matching_type_index = NONE;
+	short matching_actor_index = NONE;
+	short matching_variant_index = NONE;
+	short matching_squad_index = NONE;
+	short found_squad_index = NONE;
 
 	ai_index_squad_iterator_new(target_ai_reference, &iterator);
 	for (squad = ai_index_squad_iterator_next(&iterator);
@@ -2161,8 +2161,8 @@ static short ai_scripting_migrate_find_target_squad(
 			&target_encounter_definition->squads,
 			iterator.squad_index,
 			struct squad_definition);
-		struct actor_definition *actor_definition = NULL;
 		struct actor_variant_definition *actor_variant_definition = NULL;
+		struct actor_definition *actor_definition = NULL;
 		short actor_palette_index = squad_definition->actor_palette_index;
 
 		if (VALID_INDEX(actor_palette_index, scenario->ai_actor_palette.count))
@@ -2219,7 +2219,7 @@ static short ai_scripting_migrate_find_target_squad(
 
 	if (matching_squad_index != NONE)
 	{
-		result = matching_squad_index;
+		found_squad_index = matching_squad_index;
 		if (ai_debug.print_migration)
 		{
 			error(_error_silent, "  %s unchanged", debug_description);
@@ -2227,39 +2227,42 @@ static short ai_scripting_migrate_find_target_squad(
 	}
 	else if (matching_variant_index != NONE)
 	{
-		struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&target_encounter_definition->squads,
-			matching_variant_index,
-			struct squad_definition);
-
-		result = matching_variant_index;
+		found_squad_index = matching_variant_index;
 		if (ai_debug.print_migration)
 		{
+			struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&target_encounter_definition->squads,
+				found_squad_index,
+				struct squad_definition);
 			char const *source_variant_name = "<error>";
 
-			if (source_encounter_index != NONE && source_squad_index != NONE)
+			if (source_encounter_index != NONE)
 			{
 				struct encounter_definition *source_encounter_definition = TAG_BLOCK_GET_ELEMENT(
-					&scenario->ai_encounters,
+					&global_scenario_get()->ai_encounters,
 					DATUM_INDEX_TO_ABSOLUTE_INDEX(source_encounter_index),
 					struct encounter_definition);
-				struct squad_definition *source_squad_definition = TAG_BLOCK_GET_ELEMENT(
-					&source_encounter_definition->squads,
-					source_squad_index,
-					struct squad_definition);
 
-				if (VALID_INDEX(
-					source_squad_definition->actor_palette_index,
-					scenario->ai_actor_palette.count))
+				if (source_squad_index != NONE)
 				{
-					struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
-						&scenario->ai_actor_palette,
-						source_squad_definition->actor_palette_index,
-						struct tag_reference);
+					struct squad_definition *source_squad_definition = TAG_BLOCK_GET_ELEMENT(
+						&source_encounter_definition->squads,
+						source_squad_index,
+						struct squad_definition);
 
-					if (actor_palette_entry->index != NONE)
+					if (VALID_INDEX(
+						source_squad_definition->actor_palette_index,
+						scenario->ai_actor_palette.count))
 					{
-						source_variant_name = tag_get_name(actor_palette_entry->index);
+						struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
+							&scenario->ai_actor_palette,
+							source_squad_definition->actor_palette_index,
+							struct tag_reference);
+
+						if (actor_palette_entry->index != NONE)
+						{
+							source_variant_name = tag_get_name(actor_palette_entry->index);
+						}
 					}
 				}
 			}
@@ -2274,14 +2277,13 @@ static short ai_scripting_migrate_find_target_squad(
 	}
 	else if (matching_actor_index != NONE)
 	{
-		struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&target_encounter_definition->squads,
-			matching_actor_index,
-			struct squad_definition);
-
-		result = matching_actor_index;
+		found_squad_index = matching_actor_index;
 		if (ai_debug.print_migration)
 		{
+			struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&target_encounter_definition->squads,
+				found_squad_index,
+				struct squad_definition);
 			char const *actor_name = "<error>";
 
 			if (source_variant_definition)
@@ -2302,14 +2304,14 @@ static short ai_scripting_migrate_find_target_squad(
 	}
 	else if (matching_type_index != NONE)
 	{
-		struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&target_encounter_definition->squads,
-			matching_type_index,
-			struct squad_definition);
-
-		result = matching_type_index;
+		found_squad_index = matching_type_index;
 		if (ai_debug.print_migration)
 		{
+			struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&target_encounter_definition->squads,
+				found_squad_index,
+				struct squad_definition);
+
 			error(
 				_error_silent,
 				"  %s -> %s (same-type %s)",
@@ -2320,52 +2322,44 @@ static short ai_scripting_migrate_find_target_squad(
 	}
 	else if (first_squad_index != NONE)
 	{
-		struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&target_encounter_definition->squads,
-			first_squad_index,
-			struct squad_definition);
-
-		result = first_squad_index;
+		found_squad_index = first_squad_index;
 		if (ai_debug.print_migration)
 		{
 			error(
 				_error_silent,
 				"  %s -> %s (no matching types found)",
 				debug_description,
-				target_squad_definition->name);
+				TAG_BLOCK_GET_ELEMENT(
+					&target_encounter_definition->squads,
+					found_squad_index,
+					struct squad_definition)->name);
 		}
 	}
 	else if (target_encounter_definition->squads.count > 0)
 	{
-		struct squad_definition *target_squad_definition = TAG_BLOCK_GET_ELEMENT(
-			&target_encounter_definition->squads,
-			0,
-			struct squad_definition);
-
-		result = 0;
+		found_squad_index = 0;
 		if (ai_debug.print_migration)
 		{
 			error(
 				_error_silent,
 				"  %s -> %s (no matching squads found, going to squad 0)",
 				debug_description,
-				target_squad_definition->name);
+				TAG_BLOCK_GET_ELEMENT(
+					&target_encounter_definition->squads,
+					found_squad_index,
+					struct squad_definition)->name);
 		}
 	}
-	else
-	{
-		result = NONE;
-	}
 
-	if (result != NONE)
+	if (found_squad_index != NONE)
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\ai\\ai_script.c",
 			1532,
-			VALID_INDEX(result, target_encounter_definition->squads.count));
+			(found_squad_index >= 0) && (found_squad_index < target_encounter_definition->squads.count));
 	}
 
-	return result;
+	return found_squad_index;
 }
 
 static void ai_scripting_migrate_internal(
@@ -2374,217 +2368,220 @@ static void ai_scripting_migrate_internal(
 	boolean generate_stimulus,
 	boolean advancing_stimulus)
 {
-	long source_encounter_index;
-	long target_encounter_index;
-	struct scenario *scenario;
-	struct encounter_datum *source_encounter;
-	struct encounter_datum *target_encounter;
-	struct encounter_definition *source_encounter_definition;
-	struct encounter_definition *target_encounter_definition;
-	short target_squad_indices[MAXIMUM_SQUADS_PER_ENCOUNTER];
-	boolean same_encounter;
-	struct ai_script_squad_iterator squad_iterator;
-	struct squad_datum *squad;
-	struct encounter_actor_iterator encounter_actor_iterator;
-	struct actor_datum *actor;
-
-	if (source_ai_reference == NONE || target_ai_reference == NONE)
+	if (source_ai_reference != NONE && target_ai_reference != NONE)
 	{
-		return;
-	}
+		long source_encounter_index = source_ai_reference & UNSIGNED_SHORT_MAX;
+		long target_encounter_index = target_ai_reference & UNSIGNED_SHORT_MAX;
 
-	source_encounter_index = source_ai_reference & UNSIGNED_SHORT_MAX;
-	target_encounter_index = target_ai_reference & UNSIGNED_SHORT_MAX;
-	scenario = global_scenario_get();
-	source_encounter = encounter_get(source_encounter_index);
-	target_encounter = encounter_get(target_encounter_index);
-	source_encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&scenario->ai_encounters,
-		source_encounter_index,
-		struct encounter_definition);
-	target_encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&scenario->ai_encounters,
-		target_encounter_index,
-		struct encounter_definition);
-	same_encounter = source_encounter_index == target_encounter_index;
-	csmemset(target_squad_indices, NONE, sizeof(target_squad_indices));
-
-	ai_index_squad_iterator_new(source_ai_reference, &squad_iterator);
-	for (squad = ai_index_squad_iterator_next(&squad_iterator);
-		squad;
-		squad = ai_index_squad_iterator_next(&squad_iterator))
-	{
-		short source_squad_index = squad_iterator.squad_index;
-
-		match_assert(
-			"c:\\halo\\SOURCE\\ai\\ai_script.c",
-			1571,
-			VALID_INDEX(source_squad_index, MAXIMUM_SQUADS_PER_ENCOUNTER));
-		if (squad->current_count > 0 || source_encounter->is_prevehicle_encounter)
+		if (source_encounter_index != NONE && target_encounter_index != NONE)
 		{
-			struct squad_definition *source_squad_definition = TAG_BLOCK_GET_ELEMENT(
-				&source_encounter_definition->squads,
-				source_squad_index,
-				struct squad_definition);
-			struct actor_definition *source_actor_definition = NULL;
-			struct actor_variant_definition *source_variant_definition = NULL;
+			struct scenario *scenario = global_scenario_get();
+			struct encounter_datum *source_encounter = encounter_get(source_encounter_index);
+			struct encounter_datum *target_encounter = encounter_get(target_encounter_index);
+			struct encounter_definition *source_encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(source_encounter_index),
+				struct encounter_definition);
+			struct encounter_definition *target_encounter_definition = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(target_encounter_index),
+				struct encounter_definition);
+			boolean same_encounter = source_encounter_index == target_encounter_index;
+			short target_squad_indices[MAXIMUM_SQUADS_PER_ENCOUNTER];
 
-			if (VALID_INDEX(
-				source_squad_definition->actor_palette_index,
-				scenario->ai_actor_palette.count))
+			csmemset(target_squad_indices, NONE, sizeof(target_squad_indices));
+
 			{
-				struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
-					&scenario->ai_actor_palette,
-					source_squad_definition->actor_palette_index,
-					struct tag_reference);
+				struct ai_script_squad_iterator source_iterator;
+				struct squad_datum *squad;
 
-				if (actor_palette_entry->index != NONE &&
-					tag_get_group_tag(actor_palette_entry->index) == ACTOR_VARIANT_DEFINITION_TAG)
+				ai_index_squad_iterator_new(source_ai_reference, &source_iterator);
+				for (squad = ai_index_squad_iterator_next(&source_iterator);
+					squad;
+					squad = ai_index_squad_iterator_next(&source_iterator))
 				{
-					source_variant_definition = actor_variant_definition_get(
-						actor_palette_entry->index);
-					if (source_variant_definition->actor_reference.index != NONE)
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai_script.c",
+						1571,
+						(source_iterator.squad_index >= 0) && (source_iterator.squad_index < MAXIMUM_SQUADS_PER_ENCOUNTER));
+					if (squad->current_count > 0 || source_encounter->is_prevehicle_encounter)
 					{
-						source_actor_definition = actor_definition_get(
-							source_variant_definition->actor_reference.index);
+						struct squad_definition *source_squad_definition = TAG_BLOCK_GET_ELEMENT(
+							&source_encounter_definition->squads,
+							source_iterator.squad_index,
+							struct squad_definition);
+						struct actor_definition *source_actor_definition = NULL;
+						struct actor_variant_definition *source_variant_definition = NULL;
+
+						if (VALID_INDEX(
+							source_squad_definition->actor_palette_index,
+							scenario->ai_actor_palette.count))
+						{
+							struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
+								&scenario->ai_actor_palette,
+								source_squad_definition->actor_palette_index,
+								struct tag_reference);
+
+							if (actor_palette_entry->index != NONE &&
+								tag_get_group_tag(actor_palette_entry->index) == ACTOR_VARIANT_DEFINITION_TAG)
+							{
+								source_variant_definition = actor_variant_definition_get(
+									actor_palette_entry->index);
+								if (source_variant_definition->actor_reference.index != NONE)
+								{
+									source_actor_definition = actor_definition_get(
+										source_variant_definition->actor_reference.index);
+								}
+							}
+						}
+
+						sprintf(temporary, "squad %s", source_squad_definition->name);
+						target_squad_indices[source_iterator.squad_index] = ai_scripting_migrate_find_target_squad(
+							source_encounter_index,
+							source_iterator.squad_index,
+							source_actor_definition,
+							source_variant_definition,
+							same_encounter,
+							target_ai_reference,
+							temporary);
 					}
 				}
 			}
 
-			sprintf(temporary, "squad %s", source_squad_definition->name);
-			target_squad_indices[source_squad_index] = ai_scripting_migrate_find_target_squad(
-				source_encounter_index,
-				source_squad_index,
-				source_actor_definition,
-				source_variant_definition,
-				same_encounter,
-				target_ai_reference,
-				temporary);
-		}
-	}
-
-	encounter_actor_iterator_new(&encounter_actor_iterator, source_encounter_index);
-	for (actor = encounter_actor_iterator_next(&encounter_actor_iterator);
-		actor;
-		actor = encounter_actor_iterator_next(&encounter_actor_iterator))
-	{
-		short source_squad_index = actor->meta.squad_index;
-		short target_squad_index;
-
-		match_assert(
-			"c:\\halo\\SOURCE\\ai\\ai_script.c",
-			1617,
-			VALID_INDEX(source_squad_index, MAXIMUM_SQUADS_PER_ENCOUNTER));
-		target_squad_index = target_squad_indices[source_squad_index];
-		if (target_squad_index != NONE &&
-			(!same_encounter || target_squad_index != source_squad_index))
-		{
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\ai_script.c",
-				1629,
-				VALID_INDEX(target_squad_index, target_encounter_definition->squads.count));
-			actor_change_encounter(
-				encounter_actor_iterator.index,
-				target_encounter_index,
-				target_squad_index);
-			if (generate_stimulus)
 			{
-				actor_stimulus_maneuvering(
-					encounter_actor_iterator.index,
-					advancing_stimulus,
-					FALSE);
-			}
-		}
-	}
+				struct encounter_actor_iterator iterator;
+				struct actor_datum *actor;
 
-	if (source_encounter->is_prevehicle_encounter)
-	{
-		struct actor_iterator actor_iterator;
-
-		actor_iterator_new(&actor_iterator, FALSE);
-		for (actor = actor_iterator_next(&actor_iterator);
-			actor;
-			actor = actor_iterator_next(&actor_iterator))
-		{
-			if ((actor->meta.prevehicle_encounter_index & UNSIGNED_SHORT_MAX) ==
-				source_encounter_index)
-			{
-				short source_squad_index = actor->meta.prevehicle_squad_index;
-				short target_squad_index;
-
-				match_assert(
-					"c:\\halo\\SOURCE\\ai\\ai_script.c",
-					1655,
-					VALID_INDEX(source_squad_index, MAXIMUM_SQUADS_PER_ENCOUNTER));
-				target_squad_index = target_squad_indices[source_squad_index];
-				if (target_squad_index != NONE &&
-					(!same_encounter || target_squad_index != source_squad_index))
+				encounter_actor_iterator_new(&iterator, source_encounter_index);
+				for (actor = encounter_actor_iterator_next(&iterator);
+					actor;
+					actor = encounter_actor_iterator_next(&iterator))
 				{
+					short current_squad_index = actor->meta.squad_index;
+
 					match_assert(
 						"c:\\halo\\SOURCE\\ai\\ai_script.c",
-						1667,
-						VALID_INDEX(target_squad_index, target_encounter_definition->squads.count));
-					actor->meta.prevehicle_encounter_index = target_encounter_index;
-					actor->meta.prevehicle_squad_index = target_squad_index;
+						1617,
+						(current_squad_index >= 0) && (current_squad_index < MAXIMUM_SQUADS_PER_ENCOUNTER));
+					if (target_squad_indices[current_squad_index] != NONE &&
+						(!same_encounter || target_squad_indices[current_squad_index] != current_squad_index))
+					{
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\ai_script.c",
+							1629,
+							(target_squad_indices[current_squad_index] >= 0) && (target_squad_indices[current_squad_index] < target_encounter_definition->squads.count));
+						actor_change_encounter(
+							iterator.index,
+							target_encounter_index,
+							target_squad_indices[current_squad_index]);
+						if (generate_stimulus)
+						{
+							actor_stimulus_maneuvering(
+								iterator.index,
+								advancing_stimulus,
+								FALSE);
+						}
+					}
 				}
 			}
-		}
 
-		if (!same_encounter)
-		{
-			if (((unsigned long)source_ai_reference >> 30) == _ai_reference_type_encounter)
+			if (source_encounter->is_prevehicle_encounter)
 			{
-				source_encounter->is_prevehicle_encounter = FALSE;
-			}
-			target_encounter->is_prevehicle_encounter = TRUE;
-		}
-	}
+				struct actor_iterator iterator;
+				struct actor_datum *actor;
 
-	encounter_actor_iterator_new(&encounter_actor_iterator, NONE);
-	for (actor = encounter_actor_iterator_next(&encounter_actor_iterator);
-		actor;
-		actor = encounter_actor_iterator_next(&encounter_actor_iterator))
-	{
-		if ((actor->meta.disconnected_encounter_index & UNSIGNED_SHORT_MAX) ==
-			source_encounter_index)
-		{
-			short source_squad_index = actor->meta.disconnected_squad_index;
-			short target_squad_index;
-
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\ai_script.c",
-				1700,
-				VALID_INDEX(source_squad_index, MAXIMUM_SQUADS_PER_ENCOUNTER));
-			target_squad_index = target_squad_indices[source_squad_index];
-			if (target_squad_index != NONE &&
-				(!same_encounter || target_squad_index != source_squad_index))
-			{
-				match_assert(
-					"c:\\halo\\SOURCE\\ai\\ai_script.c",
-					1712,
-					VALID_INDEX(target_squad_index, target_encounter_definition->squads.count));
-				actor->meta.disconnected_encounter_index = target_encounter_index;
-				actor->meta.disconnected_squad_index = target_squad_index;
-				if (!same_encounter &&
-					target_encounter_definition->runtime_structure_bsp_reference_index ==
-						global_structure_bsp_index_get())
+				actor_iterator_new(&iterator, FALSE);
+				for (actor = actor_iterator_next(&iterator);
+					actor;
+					actor = actor_iterator_next(&iterator))
 				{
-					encounterless_detach_actor(encounter_actor_iterator.index);
-					encounter_attach_actor(
-						encounter_actor_iterator.index,
-						actor->meta.disconnected_encounter_index,
-						actor->meta.disconnected_squad_index,
-						TRUE);
+					if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.prevehicle_encounter_index) ==
+						DATUM_INDEX_TO_ABSOLUTE_INDEX(source_encounter_index))
+					{
+						short current_squad_index = actor->meta.prevehicle_squad_index;
+
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\ai_script.c",
+							1655,
+							(current_squad_index >= 0) && (current_squad_index < MAXIMUM_SQUADS_PER_ENCOUNTER));
+						if (target_squad_indices[current_squad_index] != NONE &&
+							(!same_encounter || target_squad_indices[current_squad_index] != current_squad_index))
+						{
+							match_assert(
+								"c:\\halo\\SOURCE\\ai\\ai_script.c",
+								1667,
+								(target_squad_indices[current_squad_index] >= 0) && (target_squad_indices[current_squad_index] < target_encounter_definition->squads.count));
+							actor->meta.prevehicle_encounter_index = target_encounter_index;
+							actor->meta.prevehicle_squad_index = target_squad_indices[current_squad_index];
+						}
+					}
+				}
+
+				if (!same_encounter)
+				{
+					/* BUG (original): January tests the reference type of the already-masked encounter
+					 * index (test edi,0xC0000000), so the source flag is also cleared for platoon and squad
+					 * migrations (the later HCEA build clears it unconditionally). A corrected build would
+					 * presumably test the type of source_ai_reference instead.
+					 */
+					if (((unsigned long)source_encounter_index >> 30) == _ai_reference_type_encounter)
+					{
+						source_encounter->is_prevehicle_encounter = FALSE;
+					}
+					target_encounter->is_prevehicle_encounter = TRUE;
 				}
 			}
+
+			{
+				struct encounter_actor_iterator iterator;
+				struct actor_datum *actor;
+
+				encounter_actor_iterator_new(&iterator, NONE);
+				for (actor = encounter_actor_iterator_next(&iterator);
+					actor;
+					actor = encounter_actor_iterator_next(&iterator))
+				{
+					if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.disconnected_encounter_index) ==
+						DATUM_INDEX_TO_ABSOLUTE_INDEX(source_encounter_index))
+					{
+						short current_squad_index = actor->meta.disconnected_squad_index;
+
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\ai_script.c",
+							1700,
+							(current_squad_index >= 0) && (current_squad_index < MAXIMUM_SQUADS_PER_ENCOUNTER));
+						if (target_squad_indices[current_squad_index] != NONE &&
+							(!same_encounter || target_squad_indices[current_squad_index] != current_squad_index))
+						{
+							match_assert(
+								"c:\\halo\\SOURCE\\ai\\ai_script.c",
+								1712,
+								(target_squad_indices[current_squad_index] >= 0) && (target_squad_indices[current_squad_index] < target_encounter_definition->squads.count));
+							actor->meta.disconnected_encounter_index = target_encounter_index;
+							actor->meta.disconnected_squad_index = target_squad_indices[current_squad_index];
+							if (!same_encounter &&
+								target_encounter_definition->runtime_structure_bsp_reference_index ==
+									global_structure_bsp_index_get())
+							{
+								encounterless_detach_actor(iterator.index);
+								encounter_attach_actor(
+									iterator.index,
+									actor->meta.disconnected_encounter_index,
+									actor->meta.disconnected_squad_index,
+									TRUE);
+							}
+						}
+					}
+				}
+			}
+
+			if (source_encounter->team_index != target_encounter->team_index)
+			{
+				ai_update_team_status();
+			}
+			encounters_update_dirty_status();
 		}
 	}
-
-	if (source_encounter->team_index != target_encounter->team_index)
-	{
-		ai_update_team_status();
-	}
-	encounters_update_dirty_status();
 
 	return;
 }
@@ -2632,41 +2629,36 @@ static void ai_scripting_migrate_by_unit_internal(
 	boolean advancing_stimulus)
 {
 	struct unit_datum *unit = unit_get(unit_index);
-	long actor_index = unit->unit.actor_index;
-	long target_encounter_index;
-	struct actor_datum *actor;
-	boolean same_encounter;
-	short target_squad_index;
+	long actor_index = unit->unit.actor_index != NONE ?
+		unit->unit.actor_index :
+		unit->unit.swarm_actor_index;
 
-	if (actor_index == NONE)
+	if (actor_index != NONE && target_ai_reference != NONE)
 	{
-		actor_index = unit->unit.swarm_actor_index;
-	}
-	if (actor_index == NONE || target_ai_reference == NONE)
-	{
-		return;
-	}
+		struct actor_datum *actor = actor_get(actor_index);
+		struct actor_definition *actor_definition = actor_definition_get(actor->meta.definition_index);
+		struct actor_variant_definition *actor_variant_definition =
+			actor_variant_definition_get(actor->meta.variant_definition_index);
+		long target_encounter_index = target_ai_reference & UNSIGNED_SHORT_MAX;
+		boolean same_encounter = DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index) ==
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(target_encounter_index);
+		short target_squad_index = ai_scripting_migrate_find_target_squad(
+			actor->meta.encounter_index,
+			actor->meta.squad_index,
+			actor_definition,
+			actor_variant_definition,
+			same_encounter,
+			target_ai_reference,
+			"unit");
 
-	target_encounter_index = target_ai_reference & UNSIGNED_SHORT_MAX;
-	actor = actor_get(actor_index);
-	same_encounter =
-		(actor->meta.encounter_index & UNSIGNED_SHORT_MAX) == target_encounter_index;
-	target_squad_index = ai_scripting_migrate_find_target_squad(
-		actor->meta.encounter_index,
-		actor->meta.squad_index,
-		actor_definition_get(actor->meta.definition_index),
-		actor_variant_definition_get(actor->meta.variant_definition_index),
-		same_encounter,
-		target_ai_reference,
-		"unit");
-
-	if (target_squad_index != NONE &&
-		(!same_encounter || target_squad_index != actor->meta.squad_index))
-	{
-		actor_change_encounter(actor_index, target_encounter_index, target_squad_index);
-		if (generate_stimulus)
+		if (target_squad_index != NONE &&
+			(!same_encounter || target_squad_index != actor->meta.squad_index))
 		{
-			actor_stimulus_maneuvering(actor_index, advancing_stimulus, FALSE);
+			actor_change_encounter(actor_index, target_encounter_index, target_squad_index);
+			if (generate_stimulus)
+			{
+				actor_stimulus_maneuvering(actor_index, advancing_stimulus, FALSE);
+			}
 		}
 	}
 
@@ -3147,23 +3139,26 @@ void ai_scripting_vehicle_encounter(
 				case _ai_reference_type_platoon:
 				{
 					short platoon_index = (ai_reference >> 16) & UNSIGNED_CHAR_MAX;
-					short search_index;
 
-					for (search_index = 0;
-						search_index < encounter_definition->squads.count;
-						search_index++)
+					for (squad_index = 0;
+						squad_index < encounter_definition->squads.count;
+						squad_index++)
 					{
-						if (TAG_BLOCK_GET_ELEMENT(
+						struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 							&encounter_definition->squads,
-							search_index,
-							struct squad_definition)->platoon_index == platoon_index)
+							squad_index,
+							struct squad_definition);
+
+						if (squad_definition->platoon_index == platoon_index)
 						{
 							break;
 						}
 					}
 
-					squad_index = search_index < encounter_definition->squads.count ?
-						search_index : 0;
+					if (squad_index >= encounter_definition->squads.count)
+					{
+						squad_index = 0;
+					}
 					break;
 				}
 				case _ai_reference_type_squad:
@@ -4404,19 +4399,31 @@ static short ai_scripting_command_list_status_internal(
 		&global_scenario_get()->ai_command_lists,
 		command_list_index,
 		struct ai_command_list_definition);
+	struct ai_command_definition *command = NULL;
+	short status;
 
-	if (simple_control->current_command_index < command_list->commands.count &&
-		TAG_BLOCK_GET_ELEMENT(
+	if (simple_control->current_command_index < command_list->commands.count)
+	{
+		command = TAG_BLOCK_GET_ELEMENT(
 			&command_list->commands,
 			simple_control->current_command_index,
-			struct ai_command_definition))
-	{
-		return TEST_FLAG(
-			simple_control->metadata_flags,
-			_obey_metadata_waiting_for_advance_notification_bit) ? 2 : 3;
+			struct ai_command_definition);
 	}
 
-	return 1;
+	if (!command)
+	{
+		status = 1;
+	}
+	else if (TEST_FLAG(simple_control->metadata_flags, _obey_metadata_waiting_for_advance_notification_bit))
+	{
+		status = 2;
+	}
+	else
+	{
+		status = 3;
+	}
+
+	return status;
 }
 
 short ai_scripting_command_list_status(
@@ -4490,14 +4497,14 @@ short ai_scripting_command_list_status(
 				}
 			}
 
-			if (!status && actor && actor->state.last_command_list_time != NONE)
+			if (!status &&
+				actor &&
+				actor->state.last_command_list_time != NONE &&
+				actor->state.last_command_list_time + 150 >= game_time)
 			{
-				status = actor->state.last_command_list_time + 150 >= game_time;
+				status = 1;
 			}
-			if (status > result)
-			{
-				result = status;
-			}
+			result = MAX(result, status);
 		}
 
 		unit_index = object_list_get_next(object_list_index, &reference_index);
