@@ -92,6 +92,13 @@ void rasterizer_environment_fog_screen_window_begin(
 	void);
 void rasterizer_environment_fog_screen_window_end(
 	void);
+void _rasterizer_environment_fog_screen_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_environment_fog_screen_end(
 	void);
 boolean rasterizer_environment_fog_screen_model_begin(

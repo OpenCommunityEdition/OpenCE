@@ -123,6 +123,9 @@ void ai_scripting_maneuver(
 void ai_scripting_maneuver_enable(
 	long ai_reference,
 	boolean enable);
+void ai_scripting_migrate_by_unit(
+	long object_list_index,
+	long target_ai_reference);
 void ai_scripting_berserk(
 	long ai_reference,
 	boolean berserk);
@@ -155,6 +158,9 @@ void ai_scripting_follow_distance(
 void ai_scripting_follow_target_unit(
 	long ai_reference,
 	long unit_index);
+void ai_scripting_follow_target_ai(
+	long ai_reference,
+	long target_ai_reference);
 void ai_scripting_force_active(
 	long ai_reference,
 	boolean force);
@@ -172,6 +178,9 @@ void ai_scripting_vehicle_encounter(
 void ai_scripting_allegiance(
 	short team_index0,
 	short team_index1);
+boolean ai_scripting_allegiance_broken(
+	short team1_index,
+	short team2_index);
 void ai_scripting_renew(
 	long ai_reference);
 void ai_scripting_braindead_by_unit(

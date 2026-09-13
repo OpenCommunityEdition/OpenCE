@@ -731,7 +731,7 @@ boolean rasterizer_transparent_geometry_initialize_aux_buffer(
 			"IDirect3DDevice8_CreateVertexBuffer(global_d3d_device, RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)), RASTERIZER_STATIC_BUFFER_USAGE, 0, RASTERIZER_STATIC_BUFFER_POOL, &rasterizer_xbox_transparent_geometry_texcoord_stream)");
 	}
 
-	rasterizer_globals.current_lock_operation = 2;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_vertexbuffer_new;
 	if (IDirect3DVertexBuffer8_Lock(
 		rasterizer_xbox_transparent_geometry_globals.texcoord_stream,
 		0,
@@ -748,7 +748,7 @@ boolean rasterizer_transparent_geometry_initialize_aux_buffer(
 			0,
 			"IDirect3DVertexBuffer8_Lock(rasterizer_xbox_transparent_geometry_texcoord_stream, 0, RASTERIZER_TRANSPARENT_GEOMETRY_TEXCOORD_STREAM_SIZE*(2*sizeof(byte)), (unsigned char**)&vertices, 0)");
 	}
-	rasterizer_globals.current_lock_operation = 0;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	if (success && vertices)
 	{

@@ -478,3 +478,26 @@ The full source build, stable regression sweep, 459-entry park validation,
 object-admission audit, and complete 1,144-test plus 26-subtest suite pass.
 The canonical treemap is refreshed for this boundary. The next required
 refresh threshold is **1,133,718 meaningful accepted exact code bytes**.
+
+## 2026-09-13 eighth 10K reconciliation packet
+
+Relative to published commit `eb61c0f746`, the canonical semantic ledger
+advances from 1,123,718 meaningful bytes / 6,918 accepted functions to
+**1,134,830 meaningful bytes / 6,960 accepted functions**: a net gain of
+**11,112 bytes / 42 functions**.  The independent fail-closed target-section
+census records 41 strict gains / 9,890 meaningful / 10,192 padded bytes with
+zero regressions.
+
+The remaining 1,222 bytes are the naturally closed 3-wide player-profile UI
+function, admitted only after normalized code and all relocation positions and
+types agree and its two same-address COFF-label differences are audited.
+Conversely, the 224-byte obstacle-path renderer is explicitly debited by the
+new pinned semantic-credit veto because its coherent BSS owners differ from
+the split artifact; it remains useful zero-credit source.  See
+[the eighth 10K ledger](object_matching_logs/lane_reconciliation_10k_batch_8_20260913.md).
+
+The full source build, zero-regression stable sweep, 465-entry park audit,
+object-admission audit, Units 189/189 gate, fake-source review, and complete
+1,147-test plus 26-subtest suite pass.  The canonical treemap is refreshed for
+this boundary.  The next required refresh threshold is **1,144,830 meaningful
+accepted exact code bytes**.

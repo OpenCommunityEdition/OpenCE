@@ -61,6 +61,12 @@ void physics_compute_new(
 	struct mass_point_datum *mass_points,
 	real_vector3d *total_force,
 	real_vector3d *total_torque);
+void physics_update(
+	long object_index,
+	struct powered_mass_point_datum *powered_mass_points,
+	struct mass_point_datum *mass_points,
+	real_vector3d const *magic_force,
+	real_vector3d const *magic_torque);
 
 void render_debug_physics(struct physics_instance *instance);
 

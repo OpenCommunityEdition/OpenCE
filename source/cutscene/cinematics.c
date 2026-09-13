@@ -572,7 +572,7 @@ void draw_quad(
 
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	return;
 }

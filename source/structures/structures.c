@@ -60,6 +60,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "math/geometry.h"
 #include "physics/collision_bsp_definitions.h"
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
@@ -328,6 +329,151 @@ boolean structure_cluster_mark(
 	return TRUE;
 }
 
+boolean sphere_intersects_cluster_portal(
+	struct structure_bsp *structure,
+	short portal_index,
+	real_point3d const *position,
+	real radius)
+{
+	struct structure_cluster_portal *portal = TAG_BLOCK_GET_ELEMENT(
+		&structure->cluster_portals,
+		portal_index,
+		struct structure_cluster_portal);
+	real_plane3d *collision_plane = TAG_BLOCK_GET_ELEMENT(
+		&TAG_BLOCK_GET_ELEMENT(
+			&structure->collision_bsp,
+			0,
+			struct collision_bsp)->bsp3d.planes,
+		portal->plane_index,
+		real_plane3d);
+	real plane_distance = plane3d_distance_to_point(collision_plane, position);
+	real_point2d projected_vertices[MAXIMUM_VERTICES_PER_CLUSTER_PORTAL];
+	real_point3d projected_position;
+	real_point2d projected_position2d;
+	real_vector3d const *plane_normal;
+	short projection;
+	boolean projection_sign;
+	short vertex_index;
+
+	if (!(fabs(plane_distance) < radius))
+	{
+		return FALSE;
+	}
+
+	if (!(distance_squared3d(position, &portal->centroid) <
+		(portal->bounding_radius + radius) * (portal->bounding_radius + radius)))
+	{
+		return FALSE;
+	}
+
+	plane_normal = &TAG_BLOCK_GET_ELEMENT(
+		&global_bsp3d_get()->planes,
+		portal->plane_index,
+		real_plane3d)->n;
+	projection = projection_from_vector3d(plane_normal);
+	projection_sign = projection_sign_from_vector3d(plane_normal, projection);
+	projected_position.x = plane_normal->i * -plane_distance + position->x;
+	projected_position.y = plane_normal->j * -plane_distance + position->y;
+	projected_position.z = plane_normal->k * -plane_distance + position->z;
+	project_point3d(
+		&projected_position,
+		projection,
+		projection_sign,
+		&projected_position2d);
+
+	for (vertex_index = 0;
+		vertex_index < portal->vertices.count;
+		vertex_index++)
+	{
+		project_point3d(
+			TAG_BLOCK_GET_ELEMENT(
+				&portal->vertices,
+				vertex_index,
+				real_point3d),
+			projection,
+			projection_sign,
+			&projected_vertices[vertex_index]);
+	}
+
+	if (!convex_hull2d_test_circle(
+		(short)portal->vertices.count,
+		projected_vertices,
+		&projected_position2d,
+		square_root(radius * radius - plane_distance * plane_distance)))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static short structure_clusters_in_sphere_recursive(
+	short cluster_index,
+	real_point3d const *position,
+	real radius,
+	short maximum_count,
+	short *intersected_indices)
+{
+	struct structure_bsp *structure = global_structure_bsp_get();
+	struct structure_cluster_graph *cluster = TAG_BLOCK_GET_ELEMENT(
+		&structure->clusters,
+		cluster_index,
+		struct structure_cluster_graph);
+	short cluster_count;
+	short portal_list_index;
+
+	if (maximum_count-- > 0)
+	{
+		*intersected_indices++ = cluster_index;
+	}
+
+	structure_cluster_mark(cluster_index);
+	cluster_count = 1;
+
+	for (portal_list_index = 0;
+		portal_list_index < cluster->portal_indices.count;
+		portal_list_index++)
+	{
+		short portal_index = *TAG_BLOCK_GET_ELEMENT(
+			&cluster->portal_indices,
+			portal_list_index,
+			short);
+		struct structure_cluster_portal *portal = TAG_BLOCK_GET_ELEMENT(
+			&structure->cluster_portals,
+			portal_index,
+			struct structure_cluster_portal);
+		short adjacent_cluster_index =
+			portal->cluster_indices[0] == cluster_index
+				? portal->cluster_indices[1]
+				: portal->cluster_indices[0];
+
+		if (structure_cluster_unmarked(adjacent_cluster_index) &&
+			sphere_intersects_cluster_portal(
+				structure,
+				portal_index,
+				position,
+				radius))
+		{
+			short added_count = structure_clusters_in_sphere_recursive(
+				adjacent_cluster_index,
+				position,
+				radius,
+				maximum_count,
+				intersected_indices);
+
+			cluster_count += added_count;
+			maximum_count -= added_count;
+			/* BUG (original): January and HCEA advance by every visited cluster,
+			 * even after the output capacity is exhausted, which can form an
+			 * out-of-bounds pointer. A corrected build should advance only by
+			 * the number actually written, clamped to the remaining capacity. */
+			intersected_indices += added_count;
+		}
+	}
+
+	return cluster_count;
+}
+
 boolean structure_render_surface_from_point_and_leaf(
 	real_point3d const *point,
 	long leaf_index,
@@ -500,6 +646,55 @@ void render_debug_fog_planes(
 	}
 
 	return;
+}
+
+short structure_clusters_in_sphere(
+	short cluster_index,
+	real_point3d const *position,
+	real radius,
+	short maximum_count,
+	short *intersected_indices)
+{
+	short cluster_count = 0;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x86,
+		position);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x87,
+		radius>=0.f);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x88,
+		maximum_count>0);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x89,
+		intersected_indices);
+
+	if (cluster_index != NONE)
+	{
+		if (radius > 0.0f)
+		{
+			structure_cluster_marker_begin();
+			cluster_count = structure_clusters_in_sphere_recursive(
+				cluster_index,
+				position,
+				radius,
+				maximum_count,
+				intersected_indices);
+			structure_cluster_marker_end();
+		}
+		else if (maximum_count > 0)
+		{
+			intersected_indices[0] = cluster_index;
+			cluster_count = 1;
+		}
+	}
+
+	return cluster_count;
 }
 
 short structure_clusters_in_cone(

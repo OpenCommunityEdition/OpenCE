@@ -21,9 +21,9 @@ symbols in this file:
 000CE880 0080:
 	_profile_graph_toggle (0000)
 000CE900 0110:
-	_code_000ce900 (0000)
+	_render_debug_profile_stall_tick (0000)
 000CEA10 08e0:
-	_code_000cea10 (0000)
+	_render_debug_profile (0000)
 000CF2F0 00e0:
 	_interface_splitscreen_render (0000)
 000CF3D0 0060:
@@ -301,7 +301,7 @@ typedef char interface_hud_globals_default_weapon_hud_index_offset_assert[
 
 void interface_splitscreen_render(
 	void);
-void code_000cea10(
+void render_debug_profile(
 	void);
 /* ---------- globals */
 
@@ -475,7 +475,7 @@ void interface_draw_fullscreen_overlays(
 	hud_render_timer();
 	terminal_draw();
 	main_framerate_render();
-	code_000cea10();
+	render_debug_profile();
 
 	return;
 }

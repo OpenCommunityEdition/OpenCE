@@ -55,4 +55,21 @@ long generic_exception_filter(
 	unsigned long exception_code,
 	PEXCEPTION_POINTERS exception_information);
 
+/* ---------- prototypes/STACK_WALK_WINDOWS.C */
+
+long stack_walk_global_function_offset(
+	void);
+void stack_walk_disregard_symbol_names(
+	boolean disregard);
+void stack_walk_initialize(
+	void);
+void stack_walk_dispose(
+	void);
+void stack_walk(
+	short levels_to_ignore);
+void stack_walk_with_context(
+	FILE *error_stream,
+	short levels_to_ignore,
+	CONTEXT *context_pointer);
+
 #endif // __CSERIES_WINDOWS_H

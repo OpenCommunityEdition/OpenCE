@@ -18,7 +18,8 @@ enum
 	_transport_endpoint_listening_bit,
 	_transport_endpoint_readable_bit,
 	_transport_endpoint_in_set_bit,
-	_transport_endpoint_nonblocking_bit
+	_transport_endpoint_nonblocking_bit,
+	_transport_endpoint_client_bit
 };
 
 /* ---------- structures */
@@ -34,6 +35,8 @@ struct transport_endpoint
 struct transport_endpoint_set;
 struct transport_address;
 struct connect_process_input;
+
+typedef struct connect_process_input *transport_connect_process_ref;
 
 /* ---------- prototypes/TRANSPORT_ENDPOINT_WINSOCK.C, TRANSPORT_ENDPOINT_SET_WINSOCK.C */
 
@@ -75,9 +78,9 @@ short connect_endpoint(
 short connect_endpoint_async(
 	struct transport_endpoint *endpoint,
 	struct transport_address const *address,
-	void *process_reference);
+	transport_connect_process_ref *process_reference);
 void cancel_connect_process(
-	struct connect_process_input *input);
+	transport_connect_process_ref input);
 short set_endpoint_blocking(
 	struct transport_endpoint *endpoint,
 	boolean blocking);

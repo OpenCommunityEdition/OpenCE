@@ -80,11 +80,6 @@ enum
 
 enum
 {
-	_rasterizer_lock_debug_geometry = 13
-};
-
-enum
-{
 	RASTERIZER_DEBUG_LINE_ZBIAS = 16
 };
 
@@ -384,7 +379,7 @@ void rasterizer_debug_draw(
 			sizeof(struct rasterizer_debug_primitive),
 			rasterizer_debug_compare_primitives);
 
-		rasterizer_globals.current_lock_operation = _rasterizer_lock_debug_geometry;
+		rasterizer_globals.current_lock_operation = _rasterizer_lock_debug;
 
 		if (debug_data.opaque_triangle_count>0)
 		{
@@ -536,7 +531,7 @@ void rasterizer_debug_draw(
 			}
 		}
 
-		rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+		rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 	}
 
 	return;

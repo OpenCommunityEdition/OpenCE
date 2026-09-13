@@ -699,7 +699,7 @@ void rasterizer_bitmap_changed(
 		0x70,
 		bitmap);
 
-	rasterizer_globals.current_lock_operation = 1;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_texture_changed;
 	switch (bitmap->type)
 	{
 	case _bitmap_type_2d:
@@ -722,7 +722,7 @@ void rasterizer_bitmap_changed(
 			"### ERROR unsupported bitmap type");
 		break;
 	}
-	rasterizer_globals.current_lock_operation = 0;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	return;
 }

@@ -97,6 +97,7 @@ symbols in this file:
 #include "rasterizer_geometry.h"
 #include "rasterizer_geometry_compression.h"
 #include "rasterizer_debug_options.h"
+#include "objects/widgets/widget_types.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
@@ -147,8 +148,7 @@ enum
 
 enum
 {
-	_widget_type_internal_occlusion_test = 6,
-	_widget_zbuffer_enable_bit = 0
+	_widget_type_internal_occlusion_test = 6
 };
 
 enum
@@ -815,7 +815,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 
 		rasterizer_widget_begin(
 			_widget_type_internal_occlusion_test,
-			FLAG(_widget_zbuffer_enable_bit));
+			FLAG(_rasterizer_widget_z_enable_bit));
 
 		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
 		{

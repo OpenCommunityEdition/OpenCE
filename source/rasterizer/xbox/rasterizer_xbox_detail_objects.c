@@ -75,6 +75,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
+#include "rasterizer/rasterizer.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
@@ -105,13 +106,6 @@ struct detail_objects_debug_options
 	boolean detail_objects;
 	byte reserved25[0x2B];
 	float detail_objects_offset_multiplier;
-};
-
-struct detail_objects_rasterizer_globals
-{
-	boolean initialized;
-	byte reserved01;
-	short current_lock_operation;
 };
 
 struct detail_object
@@ -297,7 +291,6 @@ void rasterizer_set_vertex_shader_permutation(
 
 extern D3DDevice *global_d3d_device;
 extern struct detail_objects_debug_options rasterizer_debug_options;
-extern struct detail_objects_rasterizer_globals rasterizer_globals;
 extern struct pixel_shader_definition pixel_shader;
 D3DVertexBuffer *bss_0045e904 = NULL;
 
@@ -535,14 +528,14 @@ void _rasterizer_detail_objects_rebuild_vertices(
 		0xD9,
 		global_d3d_device);
 
-	rasterizer_globals.current_lock_operation = 3;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_detail_objects;
 	IDirect3DVertexBuffer8_Lock(
 		local_d3d_vertex_buffer,
 		0,
 		DETAIL_OBJECT_VERTEX_BUFFER_SIZE,
 		&locked_vertices,
 		0);
-	rasterizer_globals.current_lock_operation = 0;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 	if (!locked_vertices)
 	{
 		return;

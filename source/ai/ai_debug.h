@@ -602,6 +602,13 @@ void ai_debug_lineofsight(
 	real_point3d const *end,
 	short end_key);
 
+void ai_debug_idle_look_clear(
+	long unit_index);
+
+void ai_debug_idle_look_addprop(
+	long prop_index,
+	real weight);
+
 void ai_debug_speak(
 	char const *vocalization_type_name);
 

@@ -601,6 +601,22 @@ struct bitmap_data *bitmap_cube_map_new(
 	return bitmap;
 }
 
+void bitmap_rebuild(
+	struct bitmap_data *bitmap)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x163, bitmap);
+
+	if (!bitmap->hardware_format)
+	{
+		rasterizer_bitmap_new(bitmap);
+	}
+	rasterizer_bitmap_changed(bitmap);
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x171, bitmap_verify(bitmap, FALSE));
+
+	return;
+}
+
 void bitmap_changed(
 	struct bitmap_data *bitmap)
 {

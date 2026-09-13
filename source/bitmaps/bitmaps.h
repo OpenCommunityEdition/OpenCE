@@ -22,6 +22,8 @@ struct bitmap_data;
 
 /* ---------- prototypes/BITMAPS.C */
 
+void bitmap_rebuild(
+	struct bitmap_data *bitmap);
 void bitmap_delete(
 	struct bitmap_data *bitmap);
 

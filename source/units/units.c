@@ -651,6 +651,7 @@ symbols in this file:
 #include "dialogue_definitions.h"
 #include "unit_definitions.h"
 
+#include "ai/actor_looking.h"
 #include "ai/actors.h"
 #include "ai/ai_debug.h"
 #include "ai/ai_runtime.h"
@@ -971,8 +972,6 @@ boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
-boolean valid_real_normal2d(
-	real_vector2d const *normal);
 void biped_stop_melee_attack(
 	long unit_index);
 void first_person_weapon_message_from_unit(

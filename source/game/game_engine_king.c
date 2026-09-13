@@ -139,7 +139,6 @@ enum
 	_string_ally_name_is_on_the_hill_score_seconds,
 	_string_enemy_name_is_on_the_hill_score_seconds,
 	_string_time,
-	_rasterizer_lock_dynamic_quad = 9,
 };
 
 /* ---------- macros */
@@ -709,7 +708,7 @@ void render_dynamic_quad(
 	long triangle_buffer_index;
 	long vertex_buffer_index;
 
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_dynamic_quad;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_koth;
 	triangle_buffer_index = rasterizer_dynamic_triangles_new(2);
 	vertex_buffer_index = rasterizer_dynamic_vertices_new(_rasterizer_vertex_type_model_compressed, 4);
 	if (triangle_buffer_index != NONE && vertex_buffer_index != NONE)
@@ -806,7 +805,7 @@ void render_dynamic_quad(
 		rasterizer_dynamic_triangles_delete(triangle_buffer_index);
 		rasterizer_dynamic_vertices_delete(vertex_buffer_index);
 	}
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	return;
 }

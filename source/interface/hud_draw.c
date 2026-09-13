@@ -89,12 +89,18 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "effects/particles.h"
 #include "game/game.h"
+#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
+#include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
+#include "units/unit_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -120,9 +126,66 @@ enum hud_weapon_overlay_flags
 	_hud_overlay_runtime_invalid_bit,
 };
 
+enum hud_multitexture_overlay_effector_type
+{
+	_hud_multitexture_overlay_effector_type_tint = 0,
+	_hud_multitexture_overlay_effector_type_horizontal_offset,
+	_hud_multitexture_overlay_effector_type_vertical_offset,
+	_hud_multitexture_overlay_effector_type_alpha,
+
+	NUMBER_OF_HUD_MULTITEXTURE_OVERLAY_EFFECTOR_TYPES
+};
+
+enum hud_multitexture_overlay_effector_destination
+{
+	_hud_multitexture_overlay_effector_destination_geometry_offset = 0,
+	_hud_multitexture_overlay_effector_destination_primary_map,
+	_hud_multitexture_overlay_effector_destination_secondary_map,
+	_hud_multitexture_overlay_effector_destination_tertiary_map,
+
+	NUMBER_OF_HUD_MULTITEXTURE_OVERLAY_EFFECTOR_DESTINATIONS
+};
+
+enum hud_multitexture_overlay_effector_source
+{
+	_hud_multitexture_overlay_effector_source_player_pitch = 0,
+	_hud_multitexture_overlay_effector_source_player_pitch_tangent,
+	_hud_multitexture_overlay_effector_source_player_yaw,
+	_hud_multitexture_overlay_effector_source_weapon_ammo_loaded,
+	_hud_multitexture_overlay_effector_source_weapon_ammo_total,
+	_hud_multitexture_overlay_effector_source_weapon_heat,
+	_hud_multitexture_overlay_effector_source_explicit,
+	_hud_multitexture_overlay_effector_source_zoom_level,
+
+	NUMBER_OF_HUD_MULTITEXTURE_OVERLAY_EFFECTOR_SOURCES
+};
+
+enum hud_multitexture_overlay_blend_function
+{
+	_hud_multitexture_overlay_blend_function_add = 0,
+	_hud_multitexture_overlay_blend_function_subtract,
+	_hud_multitexture_overlay_blend_function_multiply,
+	_hud_multitexture_overlay_blend_function_multiply2x,
+	_hud_multitexture_overlay_blend_function_dot,
+
+	NUMBER_OF_HUD_MULTITEXTURE_OVERLAY_BLEND_FUNCTIONS
+};
+
+enum bitmap_group_type
+{
+	_bitmap_group_type_interface_bitmaps = 4,
+};
+
 enum
 {
-	_shader_framebuffer_blend_function_alpha_multiply_add = 7,
+	_shader_framebuffer_blend_function_alpha_blend = 0,
+	_shader_framebuffer_blend_function_multiply,
+	_shader_framebuffer_blend_function_double_multiply,
+	_shader_framebuffer_blend_function_add,
+	_shader_framebuffer_blend_function_subtract,
+	_shader_framebuffer_blend_function_component_min,
+	_shader_framebuffer_blend_function_component_max,
+	_shader_framebuffer_blend_function_alpha_multiply_add,
 };
 
 /* ---------- macros */
@@ -157,6 +220,72 @@ struct weapon_hud_overlay_definition
 	struct tag_block items;
 };
 
+struct weapon_interface_magazine_state
+{
+	boolean reloading;
+	boolean can_fire;
+	short rounds_loaded;
+	short rounds_loaded_maximum;
+	short rounds_remaining;
+	short rounds_remaining_maximum;
+};
+
+struct weapon_interface_state
+{
+	real heat;
+	real age;
+	boolean overheated;
+	byte pad09;
+	short magazine_count;
+	struct weapon_interface_magazine_state magazines[2];
+};
+
+struct multitexture_overlay_hud_element_effector_definition
+{
+	long unused0[16];
+	short destination_type;
+	short destination;
+	short source;
+	word pad46;
+	real in_bounds[2];
+	real out_bounds[2];
+	long unused58[16];
+	real_rgb_color tint_color_lower_bounds;
+	real_rgb_color tint_color_upper_bounds;
+	short periodic_function;
+	word padB2;
+	real periodic_function_period;
+	real periodic_function_phase;
+	long unusedBC[8];
+};
+
+struct multitexture_overlay_hud_element_definition
+{
+	word flags;
+	short type;
+	short framebuffer_blend_function;
+	word pad06;
+	long unused08[8];
+	word map_flags[3];
+	short map_blending_function[2];
+	short pad32;
+	real_vector2d map_scale[3];
+	real_vector2d map_offset[3];
+	struct tag_reference map[3];
+	short map_clamp[3];
+	short pad9A;
+	long unused9C[46];
+	struct tag_block functions;
+	long unused160[32];
+};
+
+typedef char weapon_interface_state_size_assert[
+	sizeof(struct weapon_interface_state) == 0x20 ? 1 : -1];
+typedef char multitexture_overlay_hud_element_effector_definition_size_assert[
+	sizeof(struct multitexture_overlay_hud_element_effector_definition) == 0xDC ? 1 : -1];
+typedef char multitexture_overlay_hud_element_definition_size_assert[
+	sizeof(struct multitexture_overlay_hud_element_definition) == 0x1E0 ? 1 : -1];
+
 /* ---------- prototypes */
 
 static real_rectangle2d const *get_sprite_clip_rect(
@@ -190,6 +319,18 @@ static void hud_draw_bitmap_with_meter(
 	boolean in_multiplayer,
 	boolean is_interface_bitmap,
 	boolean is_crosshair_bitmap);
+static boolean hud_draw_multitexture_overlay_get_current_weapon_definition(
+	struct player_datum const *player,
+	struct weapon_interface_state *weapon_state);
+static void hud_draw_multitexture_overlay(
+	struct multitexture_overlay_hud_element_definition const *overlay,
+	short local_player_index,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real_rectangle2d const *bounds,
+	real_vector2d const *xy_scale,
+	real theta,
+	pixel32 color);
 
 /* ---------- globals */
 
@@ -278,6 +419,427 @@ void hud_retrieve_bitmap_and_bounding_rect(
 		*clip = NULL;
 
 	hud_draw_stack_buffer_check(228);
+
+	return;
+}
+
+static boolean hud_draw_multitexture_overlay_get_current_weapon_definition(
+	struct player_datum const *player,
+	struct weapon_interface_state *weapon_state)
+{
+	boolean result = FALSE;
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	long weapon_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	weapon_index = unit_inventory_get_weapon(
+		player->unit_index,
+		unit_get(player->unit_index)->unit.current_weapon_index);
+	if (weapon_index == NONE)
+	{
+		struct unit_datum *unit = unit_get(player->unit_index);
+
+		if (unit->object.parent_object_index != NONE &&
+			unit->unit.parent_seat_index != NONE)
+		{
+			struct unit_definition *parent_definition = unit_definition_get(
+				unit_get(unit->object.parent_object_index)->definition_index);
+			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+				&parent_definition->unit.seats,
+				unit->unit.parent_seat_index,
+				struct unit_seat);
+
+			if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+			{
+				weapon_index = unit_inventory_get_weapon(
+					unit->object.parent_object_index,
+					unit_get(
+						unit->object.parent_object_index)->unit.current_weapon_index);
+			}
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+		1021,
+		player->local_player_index==render.local_player_index);
+
+	if (weapon_index != NONE)
+	{
+		struct weapon_definition *weapon_definition = weapon_definition_get(
+			weapon_get(weapon_index)->definition_index);
+
+		weapon_build_weapon_interface_state(weapon_index, weapon_state);
+		result = TRUE;
+	}
+
+	hud_draw_stack_buffer_check(1032);
+
+	return result;
+}
+
+static void hud_draw_multitexture_overlay(
+	struct multitexture_overlay_hud_element_definition const *overlay,
+	short local_player_index,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real_rectangle2d const *bounds,
+	real_vector2d const *xy_scale,
+	real theta,
+	pixel32 color)
+{
+	static real animation_phase;
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	struct weapon_interface_state weapon_state;
+	struct dynamic_screen_vertex vertices[4];
+	struct rasterizer_dynamic_screen_geometry_parameters parameters;
+	real_point2d texture_offset[3];
+	real_rgb_color texture_tint[3];
+	real texture_fade[3];
+	real_vector2d geometry_offset;
+	real sin_theta;
+	real cos_theta;
+	short vertex_index;
+	short map_index;
+	short function_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	sin_theta = (real)sin(theta);
+	texture_offset[0].x = overlay->map_offset[0].i;
+	texture_offset[0].y = overlay->map_offset[0].j;
+	texture_offset[1].x = overlay->map_offset[1].i;
+	texture_offset[1].y = overlay->map_offset[1].j;
+	texture_offset[2].x = overlay->map_offset[2].i;
+	texture_offset[2].y = overlay->map_offset[2].j;
+	texture_tint[0].red = 0.0f;
+	texture_tint[0].green = 0.0f;
+	texture_tint[0].blue = 0.0f;
+	texture_tint[1].red = 0.0f;
+	texture_tint[1].green = 0.0f;
+	texture_tint[1].blue = 0.0f;
+	texture_tint[2].red = 0.0f;
+	texture_tint[2].green = 0.0f;
+	texture_tint[2].blue = 0.0f;
+	texture_fade[0] = 1.0f;
+	texture_fade[1] = 1.0f;
+	texture_fade[2] = 1.0f;
+	geometry_offset.i = 0.0f;
+	geometry_offset.j = 0.0f;
+	cos_theta = (real)cos(theta);
+
+	hud_draw_multitexture_overlay_get_current_weapon_definition(
+		player_get(local_player_get_player_index(local_player_index)),
+		&weapon_state);
+
+	for (vertex_index = 0; vertex_index < 4; vertex_index++)
+	{
+		long use_x1 = (vertex_index + 1) & 2;
+		real texture_x = use_x1 ? clip->x1 : clip->x0;
+		real texture_y = vertex_index > 1 ? clip->y1 : clip->y0;
+		real bound_x = use_x1 ? bounds->x1 : bounds->x0;
+		real bound_y = vertex_index > 1 ? bounds->y1 : bounds->y0;
+
+		vertices[vertex_index].position.x = (real)(point->x + fast_ftol(
+			(bound_x*cos_theta-bound_y*sin_theta)*xy_scale->i));
+		vertices[vertex_index].position.y = (real)(point->y + fast_ftol(
+			(bound_y*cos_theta+bound_x*sin_theta)*xy_scale->j));
+		vertices[vertex_index].texture_coordinates.x = texture_x;
+		vertices[vertex_index].texture_coordinates.y = texture_y;
+		vertices[vertex_index].color = color;
+	}
+
+	csmemset(&parameters, 0, sizeof(parameters));
+	parameters.map_texture_scale[0].j = 1.0f;
+	parameters.map_texture_scale[0].i = 1.0f;
+	parameters.meter_parameters = NULL;
+	parameters.map_scale[0].j = 1.0f;
+	parameters.map_scale[0].i = 1.0f;
+	parameters.point_sampled = local_player_count() == 1;
+	parameters.map[0] = bitmap_group_get_bitmap_from_sequence(
+		overlay->map[0].index,
+		0,
+		0);
+	parameters.map[1] = bitmap_group_get_bitmap_from_sequence(
+		overlay->map[1].index,
+		0,
+		0);
+	parameters.map[2] = bitmap_group_get_bitmap_from_sequence(
+		overlay->map[2].index,
+		0,
+		0);
+
+	for (map_index = 0; map_index < 3; map_index++)
+	{
+		struct bitmap_data *bitmap = parameters.map[map_index];
+
+		if (bitmap)
+		{
+			real scale_x = overlay->map_scale[map_index].i == 0.0f ?
+				1.0f : 1.0f/overlay->map_scale[map_index].i;
+			real scale_y = overlay->map_scale[map_index].j == 0.0f ?
+				1.0f : 1.0f/overlay->map_scale[map_index].j;
+
+			if (((bitmap->width-1)&bitmap->width) != 0 ||
+				((bitmap->height-1)&bitmap->height) != 0)
+			{
+				parameters.map_texture_scale[map_index].i =
+					1.0f/(real)bitmap->width;
+				parameters.map_texture_scale[map_index].j =
+					1.0f/(real)bitmap->height;
+			}
+			else
+			{
+				parameters.map_texture_scale[map_index].i = 1.0f;
+				parameters.map_texture_scale[map_index].j = 1.0f;
+			}
+
+			parameters.map_offset[map_index] = &texture_offset[map_index];
+			parameters.map_scale[map_index].i = scale_x;
+			parameters.map_scale[map_index].j = scale_y;
+			parameters.map_wrapped[map_index] = (boolean)overlay->map_clamp[map_index];
+		}
+
+		if (map_index < 2)
+		{
+			short *out_modes[2] =
+			{
+				&parameters.map0_to_1_blend_function,
+				&parameters.map1_to_2_blend_function
+			};
+
+			switch (overlay->map_blending_function[map_index])
+			{
+			case _hud_multitexture_overlay_blend_function_add:
+				*out_modes[map_index] =
+					_shader_framebuffer_blend_function_alpha_blend;
+				break;
+
+			case _hud_multitexture_overlay_blend_function_subtract:
+				*out_modes[map_index] =
+					_shader_framebuffer_blend_function_double_multiply;
+				break;
+
+			case _hud_multitexture_overlay_blend_function_multiply:
+				*out_modes[map_index] =
+					_shader_framebuffer_blend_function_multiply;
+				break;
+
+			case _hud_multitexture_overlay_blend_function_multiply2x:
+				*out_modes[map_index] =
+					_shader_framebuffer_blend_function_add;
+				break;
+
+			case _hud_multitexture_overlay_blend_function_dot:
+				*out_modes[map_index] =
+					_shader_framebuffer_blend_function_subtract;
+				break;
+			}
+		}
+		else
+		{
+			parameters.framebuffer_blend_function =
+				overlay->framebuffer_blend_function;
+		}
+	}
+
+	for (function_index = 0;
+		function_index < overlay->functions.count;
+		function_index++)
+	{
+		struct multitexture_overlay_hud_element_effector_definition *effector =
+			TAG_BLOCK_GET_ELEMENT(
+				&overlay->functions,
+				function_index,
+				struct multitexture_overlay_hud_element_effector_definition);
+		real source_value;
+		real dest_value;
+		real_rgb_color dest_color;
+
+		animation_phase += 0.05f;
+
+		switch (effector->source)
+		{
+		case _hud_multitexture_overlay_effector_source_player_pitch:
+			{
+				long unit_index = local_player_get_player_index(local_player_index);
+				real_vector3d direction;
+				real_euler_angles2d angles;
+
+				if (unit_index == NONE)
+					unit_index = 0;
+				else
+					unit_index = player_get(
+						local_player_get_player_index(local_player_index))->unit_index;
+
+				unit_get_aiming_vector(unit_index, &direction);
+				euler_angles2d_from_vector3d(&angles, &direction);
+				source_value = angles.pitch;
+			}
+			break;
+
+		case _hud_multitexture_overlay_effector_source_player_pitch_tangent:
+		case _hud_multitexture_overlay_effector_source_player_yaw:
+			source_value = 0.0f;
+			break;
+
+		case _hud_multitexture_overlay_effector_source_weapon_ammo_loaded:
+			source_value = (real)weapon_state.magazines[0].rounds_loaded;
+			break;
+
+		case _hud_multitexture_overlay_effector_source_weapon_ammo_total:
+			source_value = (real)weapon_state.magazines[0].rounds_remaining;
+			break;
+
+		case _hud_multitexture_overlay_effector_source_weapon_heat:
+			source_value = weapon_state.heat;
+			break;
+
+		case _hud_multitexture_overlay_effector_source_explicit:
+			source_value = effector->in_bounds[0];
+			break;
+
+		case _hud_multitexture_overlay_effector_source_zoom_level:
+			source_value = (real)player_control_get_zoom_level(local_player_index);
+			break;
+		}
+
+		if (effector->in_bounds[1] == effector->in_bounds[0] ||
+			effector->out_bounds[1] == effector->out_bounds[0])
+		{
+			dest_value = effector->out_bounds[0];
+			dest_color = effector->tint_color_lower_bounds;
+		}
+		else
+		{
+			real fraction = PIN(
+				(source_value-effector->in_bounds[0])/
+					(effector->in_bounds[1]-effector->in_bounds[0]),
+				0.0f,
+				1.0f);
+
+			scalars_interpolate(
+				effector->out_bounds[0],
+				effector->out_bounds[1],
+				fraction,
+				&dest_value);
+			rgb_colors_interpolate(
+				&dest_color,
+				0,
+				&effector->tint_color_lower_bounds,
+				&effector->tint_color_upper_bounds,
+				fraction);
+		}
+
+		switch (effector->destination)
+		{
+		case _hud_multitexture_overlay_effector_destination_geometry_offset:
+			geometry_offset.i =
+				effector->destination_type ==
+					_hud_multitexture_overlay_effector_type_horizontal_offset ?
+				dest_value : 0.0f;
+			geometry_offset.j =
+				effector->destination_type ==
+					_hud_multitexture_overlay_effector_type_vertical_offset ?
+				dest_value : 0.0f;
+			parameters.offset = &geometry_offset;
+			break;
+
+		case _hud_multitexture_overlay_effector_destination_primary_map:
+			if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_tint)
+			{
+				texture_tint[0] = dest_color;
+				parameters.map_tint[0] = &texture_tint[0];
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_horizontal_offset)
+			{
+				texture_offset[0].x += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_vertical_offset)
+			{
+				texture_offset[0].y += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_alpha)
+			{
+				texture_fade[0] = dest_value;
+				parameters.map_fade[0] = &texture_fade[0];
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+					1287,
+					dest_value>=0.0f && dest_value<=1.0f);
+			}
+			break;
+
+		case _hud_multitexture_overlay_effector_destination_secondary_map:
+			if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_tint)
+			{
+				texture_tint[1] = dest_color;
+				parameters.map_tint[1] = &texture_tint[1];
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_horizontal_offset)
+			{
+				texture_offset[1].x += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_vertical_offset)
+			{
+				texture_offset[1].y += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_alpha)
+			{
+				texture_fade[1] = dest_value;
+				parameters.map_fade[1] = &texture_fade[1];
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+					1310,
+					dest_value>=0.0f && dest_value<=1.0f);
+			}
+			break;
+
+		case _hud_multitexture_overlay_effector_destination_tertiary_map:
+			if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_tint)
+			{
+				texture_tint[2] = dest_color;
+				parameters.map_tint[2] = &texture_tint[2];
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_horizontal_offset)
+			{
+				texture_offset[2].x += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_vertical_offset)
+			{
+				texture_offset[2].y += dest_value;
+			}
+			else if (effector->destination_type ==
+				_hud_multitexture_overlay_effector_type_alpha)
+			{
+				texture_fade[2] = dest_value;
+				parameters.map_fade[2] = &texture_fade[2];
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+					1333,
+					dest_value>=0.0f && dest_value<=1.0f);
+			}
+			break;
+		}
+	}
+
+	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+
+	hud_draw_stack_buffer_check(1372);
 
 	return;
 }
@@ -642,6 +1204,125 @@ void hud_draw_bitmap(
 		in_multiplayer,
 		is_interface_bitmap,
 		is_crosshair_bitmap);
+
+	return;
+}
+
+void hud_draw_static_element(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct static_hud_element_definition const *static_element,
+	short draw_flags,
+	long flash_reference_time)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	struct bitmap_group *bitmap_group;
+	struct bitmap_data *bitmap;
+	short overlay_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	bitmap_group = bitmap_group_get(
+		verify_tag_reference(&static_element->interface_bitmap));
+	bitmap = bitmap_group_get_bitmap_from_sequence(
+		static_element->interface_bitmap.index,
+		static_element->sequence_index,
+		0);
+	if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+	{
+		real_rectangle2d const *clip = get_sprite_clip_rect(
+			verify_tag_reference(&static_element->interface_bitmap),
+			static_element->sequence_index,
+			0);
+		pixel32 color;
+		boolean is_interface_bitmap;
+
+		if (TEST_FLAG(draw_flags, _hud_draw_disabled_bit))
+			color = static_element->colors.disabled_color;
+		else if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+			color = get_flash_color(
+				&static_element->colors,
+				flash_reference_time);
+		else
+			color = static_element->colors.color;
+
+		is_interface_bitmap =
+			bitmap_group->type == _bitmap_group_type_interface_bitmaps;
+
+		hud_draw_bitmap_with_meter(
+			NULL,
+			bitmap,
+			absolute_placement,
+			&static_element->placement,
+			clip,
+			1.0f,
+			0.0f,
+			color,
+			TEST_FLAG(draw_flags, _hud_draw_in_multiplayer_bit),
+			is_interface_bitmap,
+			FALSE);
+
+		for (overlay_index = 0;
+			overlay_index < static_element->multitexture_overlays.count;
+			overlay_index++)
+		{
+			struct multitexture_overlay_hud_element_definition const *overlay =
+				TAG_BLOCK_GET_ELEMENT(
+					&static_element->multitexture_overlays,
+					overlay_index,
+					struct multitexture_overlay_hud_element_definition);
+			real_rectangle2d default_clip;
+			real_vector2d xy_scale;
+			point2d point;
+			real_rectangle2d bounds;
+
+			default_clip.x0 = 0.0f;
+			default_clip.x1 = 1.0f;
+			default_clip.y0 = 0.0f;
+			default_clip.y1 = 1.0f;
+
+			if (is_interface_bitmap)
+			{
+				default_clip.x1 = (real)bitmap->width;
+				default_clip.y1 = (real)bitmap->height;
+			}
+
+			if (!clip)
+				clip = &default_clip;
+
+			xy_scale = static_element->placement.scale;
+
+			hud_calculate_point(
+				render.local_player_index,
+				absolute_placement,
+				&static_element->placement,
+				NULL,
+				TEST_FLAG(draw_flags, _hud_draw_in_multiplayer_bit) &&
+					!TEST_FLAG(
+						static_element->placement.multiplayer_scaling_flags,
+						_hud_dont_scale_offset_bit),
+				0.0f,
+				&point);
+			hud_calculate_bitmap_bounds(
+				bitmap,
+				absolute_placement->corner,
+				clip,
+				&bounds,
+				is_interface_bitmap);
+			hud_draw_multitexture_overlay(
+				overlay,
+				local_player_index,
+				&point,
+				clip,
+				&bounds,
+				&xy_scale,
+				0.0f,
+				color);
+		}
+	}
+
+	hud_draw_stack_buffer_check(685);
 
 	return;
 }

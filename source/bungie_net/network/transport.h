@@ -72,6 +72,8 @@ struct transport_address
 
 short transport_initialize(
 	void);
+short transport_dispose(
+	void);
 struct transport_address *create_transport_address(
 	struct transport_address_data const *address,
 	word address_length,

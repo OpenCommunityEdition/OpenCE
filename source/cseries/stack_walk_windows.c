@@ -7,7 +7,7 @@ symbols in this file:
 000806C0 0010:
 	_stack_walk_disregard_symbol_names (0000)
 000806D0 0030:
-	_code_000806d0 (0000)
+	_symbol_sort_proc (0000)
 00080700 0080:
 	_free_symbol_table (0000)
 00080780 00b0:
@@ -15,15 +15,15 @@ symbols in this file:
 00080830 0060:
 	_base_address_from_symbol_name (0000)
 00080890 0020:
-	_code_00080890 (0000)
+	_is_valid_ebp (0000)
 000808B0 0040:
-	_code_000808b0 (0000)
+	_walk_up (0000)
 000808F0 0020:
-	_code_000808f0 (0000)
+	_initialize_stack_walk (0000)
 00080910 00d0:
-	_code_00080910 (0000)
+	_walk_stack_context (0000)
 000809E0 00d0:
-	_code_000809e0 (0000)
+	_walk_stack (0000)
 00080AB0 0020:
 	_stack_walk_dispose (0000)
 00080AD0 02b0:
@@ -101,12 +101,16 @@ symbols in this file:
 002DCD40 0014:
 	_stack_walk_globals (0000)
 00431C98 4008:
-	_bss_00431c98 (0000)
+	_walk_up_current_frame (0000)
+	_old_ebp (0004)
+	?symbol_buffer@?1??symbol_name_from_address@@9@9 (0008)
 */
 
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries_windows.h"
+#include "errors.h"
 
 /* ---------- constants */
 
@@ -138,10 +142,26 @@ struct _stack_walk_globals
 
 /* ---------- prototypes */
 
-void stack_walk_with_context(
-	boolean disregard_symbol_names,
-	short levels_to_ignore,
-	void *context);
+static boolean is_valid_ebp(
+	void);
+
+static unsigned long walk_up(
+	void);
+
+static void initialize_stack_walk(
+	CONTEXT *context);
+
+static void walk_stack_context(
+	unsigned long *routine_addresses,
+	unsigned long number_of_levels,
+	unsigned long ignore_levels,
+	unsigned long *levels_dumped);
+
+static void walk_stack(
+	unsigned long *routine_addresses,
+	unsigned long number_of_levels,
+	unsigned long ignore_levels,
+	unsigned long *levels_dumped);
 
 void load_symbol_table(
 	char const *map_path,
@@ -155,6 +175,9 @@ struct _stack_walk_globals stack_walk_globals =
 	NONE,
 	FALSE
 };
+
+static unsigned long walk_up_current_frame;
+static unsigned long *old_ebp;
 
 /* ---------- public code */
 
@@ -172,11 +195,11 @@ void stack_walk_disregard_symbol_names(
 }
 
 void stack_walk(
-	long levels_to_ignore)
+	short levels_to_ignore)
 {
 	stack_walk_with_context(
-		FALSE,
-		(short)(levels_to_ignore + 1),
+		NULL,
+		levels_to_ignore + 1,
 		NULL);
 
 	return;
@@ -201,6 +224,49 @@ void free_symbol_table(
 	symbol_table->string_storage = NULL;
 	symbol_table->symbols = NULL;
 	return;
+}
+
+char *symbol_name_from_address(
+	unsigned long fake_address,
+	struct debug_symbol_table *symbol_table)
+{
+	static char symbol_buffer[0x4000];
+	unsigned long address = stack_walk_globals.fixup + fake_address;
+	long number_of_symbols;
+
+	csstrcpy(symbol_buffer, "<unknown>");
+	number_of_symbols = symbol_table->number_of_symbols;
+	if (number_of_symbols > 0)
+	{
+		struct debug_symbol *symbols = symbol_table->symbols;
+
+		if (address >= symbols[0].rva_base && address < symbols[number_of_symbols - 1].rva_base + 0xFFFF)
+		{
+			long symbol_index = 1;
+
+			if (number_of_symbols > 1)
+			{
+				while (symbols[symbol_index - 1].rva_base > address || address >= symbols[symbol_index].rva_base)
+				{
+					symbol_index++;
+					if (symbol_index >= number_of_symbols)
+					{
+						return symbol_buffer;
+					}
+				}
+
+				_snprintf(
+					symbol_buffer,
+					0x3FFF,
+					"%s + %04lX : %s",
+					symbol_table->string_storage + symbols[symbol_index - 1].name_string_offset,
+					address - symbols[symbol_index - 1].rva_base,
+					symbol_table->string_storage + symbols[symbol_index - 1].library_object_string_offset);
+			}
+		}
+	}
+
+	return symbol_buffer;
 }
 
 long base_address_from_symbol_name(
@@ -233,6 +299,115 @@ void stack_walk_dispose(
 	return;
 }
 
+void stack_walk_with_context(
+	FILE *error_stream,
+	short levels_to_ignore,
+	CONTEXT *context_pointer)
+{
+	unsigned long routine_addresses[64] = { 0 };
+	unsigned long levels_dumped;
+	long frame_number;
+
+	if (context_pointer)
+	{
+		initialize_stack_walk(context_pointer);
+		walk_stack_context(
+			routine_addresses,
+			NUMBEROF(routine_addresses),
+			levels_to_ignore,
+			&levels_dumped);
+	}
+	else
+	{
+		walk_stack(
+			routine_addresses,
+			NUMBEROF(routine_addresses),
+			levels_to_ignore,
+			&levels_dumped);
+	}
+
+	if (!error_stream)
+	{
+		error(_error_silent, "Printing stuff for Mat's edification");
+
+		for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
+		{
+			unsigned long routine_address = routine_addresses[frame_number];
+			char const *symbol_name;
+
+			routine_address += *(long *)(routine_address - sizeof(long));
+			if (stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names)
+			{
+				symbol_name = symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table);
+			}
+			else
+			{
+				symbol_name = "?????";
+			}
+
+			error(_error_silent, "%08lX %s", routine_address, symbol_name);
+		}
+	}
+
+	if (context_pointer)
+	{
+		unsigned long instruction = *(unsigned long *)context_pointer->Eip;
+		char const *symbol_name;
+
+		error(_error_silent, "EAX: 0x%08lX", context_pointer->Eax);
+		error(_error_silent, "EBX: 0x%08lX", context_pointer->Ebx);
+		error(_error_silent, "ECX: 0x%08lX", context_pointer->Ecx);
+		error(_error_silent, "EDX: 0x%08lX", context_pointer->Edx);
+		error(_error_silent, "EDI: 0x%08lX", context_pointer->Edi);
+		error(_error_silent, "ESI: 0x%08lX", context_pointer->Esi);
+		error(_error_silent, "EBP: 0x%08lX", context_pointer->Ebp);
+		error(_error_silent, "ESP: 0x%08lX", context_pointer->Esp);
+
+		if (stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names)
+		{
+			symbol_name = symbol_name_from_address(context_pointer->Eip, &stack_walk_globals.symbol_table);
+		}
+		else
+		{
+			symbol_name = "?????";
+		}
+
+		error(
+			_error_silent,
+			"EIP: 0x%08lX, %02lX %02lX %02lX %02lX %s",
+			context_pointer->Eip,
+			instruction & 0xFF,
+			(instruction >> 8) & 0xFF,
+			(instruction >> 16) & 0xFF,
+			instruction >> 24,
+			symbol_name);
+	}
+
+	for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
+	{
+		unsigned long routine_address = routine_addresses[frame_number];
+
+		if (error_stream)
+		{
+			char const *symbol_name = stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
+				? symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table)
+				: "?????";
+
+			fprintf(error_stream, "%08lX %s\n", routine_address, symbol_name);
+		}
+		else
+		{
+			char const *symbol_name = stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
+				? symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table)
+				: "?????";
+
+			error(_error_silent, "%08lX %s", routine_address, symbol_name);
+		}
+	}
+
+	return;
+}
+
 void stack_walk_initialize(
 	void)
 {
@@ -250,3 +425,113 @@ void stack_walk_initialize(
 }
 
 /* ---------- private code */
+
+static boolean is_valid_ebp(
+	void)
+{
+	if ((walk_up_current_frame & (sizeof(unsigned long) - 1)) != 0 || walk_up_current_frame < (unsigned long)old_ebp)
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static unsigned long walk_up(
+	void)
+{
+	unsigned long routine_address = 0;
+
+	if (walk_up_current_frame)
+	{
+		unsigned long *frame = (unsigned long *)walk_up_current_frame;
+
+		routine_address = frame[1];
+		walk_up_current_frame = frame[0];
+		if (!is_valid_ebp())
+		{
+			walk_up_current_frame = 0;
+		}
+
+		old_ebp = (unsigned long *)walk_up_current_frame;
+	}
+
+	return routine_address;
+}
+
+static void initialize_stack_walk(
+	CONTEXT *context)
+{
+	old_ebp = (unsigned long *)context->Esp;
+	walk_up_current_frame = context->Ebp;
+	return;
+}
+
+static void walk_stack_context(
+	unsigned long *routine_addresses,
+	unsigned long number_of_levels,
+	unsigned long ignore_levels,
+	unsigned long *levels_dumped)
+{
+	unsigned long level;
+
+	if (!is_valid_ebp())
+	{
+		walk_up_current_frame = 0;
+	}
+
+	for (level = 1; level < ignore_levels; level++)
+	{
+		walk_up();
+	}
+
+	for (level = 0; level < number_of_levels; level++)
+	{
+		unsigned long routine_address = walk_up();
+
+		routine_addresses[level] = routine_address;
+		if (!routine_address)
+		{
+			break;
+		}
+	}
+
+	*levels_dumped = level;
+	return;
+}
+
+static void walk_stack(
+	unsigned long *routine_addresses,
+	unsigned long number_of_levels,
+	unsigned long ignore_levels,
+	unsigned long *levels_dumped)
+{
+	unsigned long level;
+
+	__asm mov walk_up_current_frame, ebp
+	__asm mov old_ebp, esp
+
+	if (!is_valid_ebp())
+	{
+		walk_up_current_frame = 0;
+	}
+
+	for (level = 1; level < ignore_levels; level++)
+	{
+		walk_up();
+	}
+
+	for (level = 0; level < number_of_levels; level++)
+	{
+		unsigned long routine_address = walk_up();
+
+		routine_addresses[level] = routine_address;
+		if (!routine_address)
+		{
+			break;
+		}
+	}
+
+	*levels_dumped = level;
+	return;
+}

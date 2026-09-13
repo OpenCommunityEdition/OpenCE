@@ -587,13 +587,6 @@ void _rasterizer_environment_fog_screen_wind_get_vector(
 	real_vector3d *wind_vector);
 void _rasterizer_environment_fog_screen_begin(
 	boolean render_fog);
-void _rasterizer_environment_fog_screen_draw(
-	struct shader const *shader,
-	short bitmap_index,
-	long dynamic_triangle_buffer_index,
-	long first_triangle_index,
-	long triangle_count,
-	struct vertex_buffer const *vertex_buffer);
 void _rasterizer_screen_flash(
 	void);
 /* ---------- globals */

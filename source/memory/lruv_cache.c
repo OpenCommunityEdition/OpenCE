@@ -704,8 +704,6 @@ long lruv_block_new(
 						cache->last_block_index==NONE);
 					new_block->previous_block_index = NONE;
 					cache->last_block_index = new_block_index;
-					new_block->next_block_index = cache->first_block_index;
-					cache->first_block_index = new_block_index;
 				}
 				else
 				{
@@ -716,8 +714,6 @@ long lruv_block_new(
 						next_block->previous_block_index==NONE);
 					new_block->previous_block_index = NONE;
 					next_block->previous_block_index = new_block_index;
-					new_block->next_block_index = cache->first_block_index;
-					cache->first_block_index = new_block_index;
 				}
 			}
 			else
@@ -734,6 +730,15 @@ long lruv_block_new(
 					new_block->previous_block_index = next_block->previous_block_index;
 					next_block->previous_block_index = new_block_index;
 				}
+			}
+
+			if (best_hole.block_index == NONE)
+			{
+				new_block->next_block_index = cache->first_block_index;
+				cache->first_block_index = new_block_index;
+			}
+			else
+			{
 				block = datum_get(cache->blocks, best_hole.block_index);
 				new_block->next_block_index = block->next_block_index;
 				block->next_block_index = new_block_index;

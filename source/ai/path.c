@@ -155,9 +155,11 @@ symbols in this file:
 /* ---------- headers */
 
 #include "ai/path.h"
+#include "ai/ai_debug.h"
 #include "ai/ai_profile.h"
 #include "ai/path_structure_bsp.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
@@ -809,6 +811,230 @@ boolean path_state_approach_point(
 	}
 
 	return result;
+}
+
+boolean path_state_build_path(
+	struct path_state *state,
+	struct path_result *path)
+{
+	short node_index;
+	struct path_node *node;
+	short raw_step_count;
+	short smoothed_step_count;
+	short avoided_step_count;
+	boolean steps_finish_path;
+	struct path_step raw_steps[64];
+	struct path_step smoothed_steps[4];
+	struct path_step avoided_steps[4];
+	short child_node_index;
+	struct path_node *child_node;
+
+	if (state->debug)
+	{
+		state->debug->path_build_result = _path_build_result_none;
+	}
+
+	path->valid = FALSE;
+	if (state->destination_valid)
+	{
+		node_index = path_node_from_hash_table(
+			state,
+			state->destination.surface_index);
+
+		if (node_index != NONE)
+		{
+			node = path_get_node(state, node_index);
+			path->endpoint = state->destination;
+			path->endpoint.target_radius = 0.0f;
+		}
+		else
+		{
+			if (state->closest_distance < state->destination.target_radius)
+			{
+				node_index = state->closest_node_index;
+				node = path_get_node(state, node_index);
+				path->endpoint.point = state->closest_point;
+				path->endpoint.surface_index = node->surface_index;
+				path->endpoint.target_radius = state->closest_distance;
+			}
+		}
+
+		if (node_index != NONE)
+		{
+			long depth_plus_one = node->depth + 1;
+			boolean path_build_success;
+
+			smoothed_step_count = 0;
+			avoided_step_count = 0;
+			steps_finish_path = TRUE;
+			child_node_index = NONE;
+			child_node = NULL;
+			raw_step_count = MIN(depth_plus_one, 64);
+
+			do
+			{
+				node = path_get_node(state, node_index);
+
+				if (node->depth >= 64)
+				{
+					steps_finish_path = FALSE;
+				}
+				else
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\path.c",
+						0x1E8,
+						(node->depth >= 0) && (node->depth < raw_step_count));
+
+					raw_steps[node->depth].surface_index = node->surface_index;
+					if (child_node_index == NONE)
+					{
+						raw_steps[node->depth].point = path->endpoint.point;
+					}
+					else
+					{
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\path.c",
+							0x1F0,
+							node->depth == child_node->depth - 1);
+						raw_steps[node->depth].point = child_node->entry_point;
+					}
+				}
+				child_node_index = node_index;
+				child_node = node;
+				node_index = node->parent_node_index;
+			} while (node_index != NONE);
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x1FB,
+				child_node_index != NONE);
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\path.c",
+				0x1FC,
+				child_node->depth == 0);
+
+			if (game_connection() == _game_connection_local &&
+				ai_debug.path_disable_smoothing)
+			{
+				smoothed_step_count = MIN(raw_step_count, 4);
+				csmemcpy(
+					smoothed_steps,
+					raw_steps,
+					smoothed_step_count * sizeof(struct path_step));
+			}
+			else
+			{
+				path_smooth(
+					state,
+					raw_step_count,
+					raw_steps,
+					&smoothed_step_count,
+					smoothed_steps,
+					&steps_finish_path);
+			}
+
+			if (game_connection() == _game_connection_local &&
+				ai_debug.path_disable_obstacle_avoidance)
+			{
+				avoided_step_count = MIN(smoothed_step_count, 4);
+				csmemcpy(
+					avoided_steps,
+					smoothed_steps,
+					avoided_step_count * sizeof(struct path_step));
+				path_build_success = TRUE;
+			}
+			else
+			{
+				path_build_success = path_avoid_obstacles(
+					state,
+					smoothed_step_count,
+					smoothed_steps,
+					&avoided_step_count,
+					avoided_steps,
+					&steps_finish_path);
+			}
+
+			if (path_build_success)
+			{
+				path->step_count = (char)avoided_step_count;
+				path->steps_finish_path = steps_finish_path;
+				path->valid = TRUE;
+				path->step_index = 0;
+				csmemcpy(
+					path->steps,
+					avoided_steps,
+					avoided_step_count * sizeof(struct path_step));
+
+				if (path->steps_finish_path)
+				{
+					path->endpoint.point =
+						path->steps[path->step_count - 1].point;
+					path->endpoint.surface_index =
+						path->steps[path->step_count - 1].surface_index;
+					path->endpoint.target_radius = distance3d(
+						&path->endpoint.point,
+						&state->destination.point);
+				}
+
+				if (state->debug)
+				{
+					state->debug->path_build_result = _path_build_result_success;
+				}
+			}
+			else if (state->debug)
+			{
+				state->debug->path_build_result =
+					_path_build_result_obstacle_avoidance_failed;
+			}
+
+			if (state->debug)
+			{
+				state->debug->raw_step_count = raw_step_count;
+				csmemcpy(
+					state->debug->raw_steps,
+					raw_steps,
+					raw_step_count * sizeof(struct path_step));
+				state->debug->smoothed_step_count = smoothed_step_count;
+				csmemcpy(
+					state->debug->smoothed_steps,
+					smoothed_steps,
+					smoothed_step_count * sizeof(struct path_step));
+				state->debug->avoided_step_count = avoided_step_count;
+				csmemcpy(
+					state->debug->avoided_steps,
+					avoided_steps,
+					avoided_step_count * sizeof(struct path_step));
+			}
+		}
+		else if (state->debug)
+		{
+			state->debug->path_build_result =
+				(state->closest_node_index != NONE) +
+				_path_build_result_cached_node_missing;
+		}
+	}
+	else if (state->debug)
+	{
+		state->debug->path_build_result = _path_build_result_no_destination;
+	}
+
+	if (state->debug)
+	{
+		*(struct path_result *)state->debug->__unknown140A0 = *path;
+
+		if (state->debug->path_build_result != _path_build_result_success)
+		{
+			state->debug->failure = TRUE;
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\path.c",
+			0x265,
+			state->debug->path_build_result != _path_build_result_none);
+	}
+
+	return path->valid;
 }
 
 static boolean path_state_begin(

@@ -123,6 +123,7 @@ symbols in this file:
 enum
 {
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+	_cluster_sound_distance_unreachable_bit = 7,
 	CLUSTER_SOUND_DISTANCE_VALUE_MASK = 0x7F,
 	_game_looping_sound_unattached_bit = 0,
 	_game_looping_sound_unattached_stop_bit = 1,
@@ -1030,7 +1031,7 @@ static void compute_combined_pas(
 					real distance = (structure_bsp_get_cluster_encoded_sound_distance(
 							structure_bsp,
 							cluster_index,
-							camera->location.cluster_index) & CLUSTER_SOUND_DISTANCE_VALUE_MASK)
+							camera->location.cluster_index) & ~FLAG(_cluster_sound_distance_unreachable_bit))
 						* (MAXIMUM_CLUSTER_SOUND_DISTANCE / CLUSTER_SOUND_DISTANCE_VALUE_MASK);
 
 					if (distance < MAXIMUM_CLUSTER_SOUND_DISTANCE)

@@ -94,6 +94,49 @@ Natural/target normalized hashes:
   `0297644a3e1501a48dd9d7bbf24744b366d2892607ee9d29d26307e7be593a6a`;
   target `5adde524c709325b4dd89a59ab62baa7a6f10654ae64b1773bdb05409086f3af`.
 
+### Occlusion-submit reconstruction retained (2026-09-13)
+
+The formerly unwritten `_rasterizer_widget_submit_occlusion_test` is now a
+complete, coherent fuzzy reconstruction with **zero exact credit**.  The
+source was recovered from historical campaign commit
+`bb0d690a39` and checked against both January disassembly and the later HCEA
+occlusion-query implementation.  The later build uses a different D3D query
+API and coverage policy, so it corroborates only the projection, rectangle,
+visibility-query, and return-value roles—not January code bytes.
+
+The retained January-shaped source:
+
+- returns one when lens-flare occlusion is disabled and zero when projection
+  fails;
+- clamps both projected axes to at least one pixel;
+- floors four signed-16-bit screen bounds after applying the existing `PIN`
+  macro;
+- computes the rectangle pixel count and rejects negative results;
+- surrounds the four-vertex triangle fan with the Xbox visibility-test calls;
+  and
+- reports a failed end-visibility call through the real rasterizer/error
+  interfaces.
+
+Target and candidate are both **640 padded bytes with 36 ordered relocation
+destinations**.  Their normalized hashes are respectively
+`7176593c07173a51237a815767ea3ad66b0835ae76f6b0516aabfa87db940a64`
+and
+`950b2dc0afdecac058ed173099b3fd2849abc8adfdb1815c34307eb83397abc7`.
+The normalized raw-byte comparison has 165 differing bytes; the target has
+221 decoded instructions and the candidate 222.  They agree through the four
+clamp/floor sequences.  The remaining boundary is register lifetime and call
+cleanup: January keeps `pixel_count` in `EDI`, saves `ESI` only around the draw
+path, and cleans the two diagnostic calls separately, while VC7 gives the
+ordinary source a stack home and a different nonvolatile-register assignment.
+
+Moving the HRESULT into the draw block and changing the natural declaration
+order emitted the same candidate bytes.  No volatile/register forcing,
+barrier, inline assembly, fake dependency, duplicate call, or manual cleanup
+was attempted or retained.  The public prototype stays in its actual
+`rasterizer_widgets.h` owner, the implementation uses project `real` types and
+an SDK `HRESULT`, and the focused object gate remains 22 exact / 3 honest
+residual / zero unwritten with no emitted `_point_from_line3d`.
+
 ### Bounded actual-byte runtime corroboration
 
 An independently authored differential executes January and the natural

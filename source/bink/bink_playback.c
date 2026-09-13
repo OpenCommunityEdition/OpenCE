@@ -151,9 +151,6 @@ enum
 
 	BINK_FRAME_BUFFER_ALIGNMENT= 128,
 
-	/* rasterizer lock operation owned by bink playback (rasterizer.h enum rasterizer_lock_operation) */
-	_rasterizer_lock_bink= 6,
-
 	/* Bink SDK surface types, BinkOpen and BinkCopyToBuffer flags (bink.h) */
 	BINKSURFACE32= 3,
 	BINKIOSIZE= 0x01000000,
@@ -980,7 +977,7 @@ static void bink_decompress_video_frame(
 	BinkCopyToBuffer(bink_globals.bink, locked_rect.pBits, locked_rect.Pitch, bink_globals.bink->Height,
 		0, 0, bink_globals.surface_type|BINKCOPYALL);
 	IDirect3DTexture8_UnlockRect(bink_globals.texture, 0);
-	rasterizer_globals.current_lock_operation= _rasterizer_lock_unlocked;
+	rasterizer_globals.current_lock_operation= _rasterizer_lock_none;
 
 	return;
 }

@@ -58,6 +58,12 @@ void structures_dispose_from_old_map(
 	void);
 void structures_dispose(
 	void);
+void structure_cluster_marker_begin(
+	void);
+boolean structure_cluster_mark(
+	short cluster_index);
+void structure_cluster_marker_end(
+	void);
 short structure_clusters_in_cone(
 	short position_cluster_index,
 	real_point3d const *position,
@@ -67,7 +73,12 @@ short structure_clusters_in_cone(
 	real cosine,
 	short maximum_cluster_count,
 	short *cluster_indices);
-short structure_clusters_in_sphere(short cluster_index, real_point3d const *position, real radius, short maximum_count, short *intersected_indices);
+short structure_clusters_in_sphere(
+	short cluster_index,
+	real_point3d const *position,
+	real radius,
+	short maximum_count,
+	short *intersected_indices);
 
 /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
 

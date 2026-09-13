@@ -12,6 +12,7 @@ header included in hcex build.
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
@@ -82,6 +83,13 @@ enum particle_system_type_create
 	NUMBER_OF_PARTICLE_SYSTEM_TYPE_CREATION_PHYSICS,
 };
 
+enum particle_system_type_complex_sprite_render_mode
+{
+	_particle_system_type_complex_sprite_render_mode_simple,
+	_particle_system_type_complex_sprite_render_mode_rotational,
+	NUMBER_OF_PARTICLE_SYSTEM_TYPE_COMPLEX_SPRITE_RENDER_MODES,
+};
+
 /* ---------- macros */
 
 #define particle_system_definition_get(index) ((struct particle_system_definition *)tag_get(PARTICLE_SYSTEM_DEFINITION_TAG, (index)))
@@ -150,7 +158,9 @@ struct particle_system_type_particle_state
 	real_argb_color color_upper_bound;
 	struct particle_system_type_particle_state_interpolated_variables variables;
 	struct tag_reference point_physics;
-	byte reserved94[0xE4];
+	byte reserved94[0x24];
+	struct shader_effect_definition shader;
+	byte reserved16C[0xC];
 };
 
 struct old_particle_system_type
@@ -231,6 +241,8 @@ typedef char particle_system_type_particle_state_variables_offset_assert[
 	offsetof(struct particle_system_type_particle_state, variables) == 0x80 ? 1 : -1];
 typedef char particle_system_type_particle_state_point_physics_offset_assert[
 	offsetof(struct particle_system_type_particle_state, point_physics) == 0x84 ? 1 : -1];
+typedef char particle_system_type_particle_state_shader_offset_assert[
+	offsetof(struct particle_system_type_particle_state, shader) == 0xB8 ? 1 : -1];
 typedef char particle_system_type_state_size_assert[
 	sizeof(struct particle_system_type_state) == 0xC0 ? 1 : -1];
 typedef char particle_system_type_state_duration_lower_bound_offset_assert[

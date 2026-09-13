@@ -141,6 +141,14 @@ boolean collision_test_vector(
 	real_vector3d const *vector,
 	long ignore_object_index,
 	struct collision_result *collision);
+boolean collision_fix_pill(
+	unsigned long flags,
+	real_point3d const *old_position,
+	real distance,
+	real height,
+	real width,
+	long ignore_object_index,
+	real_point3d *new_position);
 short collision_move_pill(
 	unsigned long flags,
 	real_point3d const *position,

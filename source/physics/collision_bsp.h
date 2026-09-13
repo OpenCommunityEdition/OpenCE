@@ -164,6 +164,12 @@ boolean collision_bsp_test_vector(
 	real maximum_t,
 	struct collision_bsp_test_vector_result *result);
 
+void render_debug_collision_surface(
+	struct collision_bsp *bsp,
+	long surface_index,
+	real_matrix4x3 const *matrix,
+	real_argb_color const *color);
+
 short collision_surface_polygon(
 	struct collision_bsp const *bsp,
 	long surface_index,

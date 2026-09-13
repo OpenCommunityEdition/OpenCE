@@ -8,6 +8,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include <stdio.h>
 #include "cseries/cseries_windows.h"
 
 /* ---------- constants */

@@ -179,6 +179,8 @@ boolean hs_wake_by_name(
 	char const *name);
 void render_debug_scripting(
 	void);
+void render_debug_trigger_volumes(
+	void);
 void hs_evaluate_wake(
 	short function_index,
 	long thread_index,
@@ -240,6 +242,7 @@ extern tag hs_tag_reference_type_group_tags[];
 extern struct hs_enum_definition hs_enum_table[NUMBER_OF_HS_TYPES];
 extern char const *hs_type_names[NUMBER_OF_HS_TYPES];
 extern char const *hs_script_type_names[];
+extern boolean debug_trigger_volumes;
 
 /* ---------- public code */
 

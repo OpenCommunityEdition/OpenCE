@@ -1098,6 +1098,12 @@ __inline real_vector3d *vector_from_points3d(
 	return result;
 }
 
+#ifdef REAL_MATH_EXTERNAL_SCALE_VECTOR3D
+real_vector3d *scale_vector3d(
+	real_vector3d const *a,
+	real c,
+	real_vector3d *result);
+#else
 __inline real_vector3d *scale_vector3d(
 	real_vector3d const *a,
 	real c,
@@ -1108,6 +1114,7 @@ __inline real_vector3d *scale_vector3d(
 	result->k = c*a->k;
 	return result;
 }
+#endif
 
 #ifdef REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
 real magnitude_squared3d(

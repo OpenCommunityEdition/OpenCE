@@ -197,11 +197,6 @@ enum
 
 enum
 {
-	_rasterizer_lock_decal_update = 5
-};
-
-enum
-{
 	MAXIMUM_DECALS_PER_MAP = 2048,
 	DECAL_VERTEX_CACHE_PAGE_SIZE_BITS = 6,
 	DECAL_VERTEX_CACHE_PAGE_COUNT = 2560,
@@ -368,14 +363,14 @@ void *_rasterizer_decal_vertices_lock(
 	vertex_data_offset = (unsigned long)lruv_block_get_address(
 		local_vertex_cache,
 		cache_index);
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_decal_update;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_decal_vertices;
 	IDirect3DVertexBuffer8_Lock(
 		local_d3d_vertex_buffer,
 		vertex_data_offset,
 		cache_size,
 		&vertex_data,
 		D3DLOCK_READONLY);
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	return vertex_data;
 }

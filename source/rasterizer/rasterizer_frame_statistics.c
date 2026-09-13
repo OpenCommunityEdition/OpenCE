@@ -138,42 +138,95 @@ symbols in this file:
 #include "cseries/sort.h"
 #include "cseries/cseries_windows.h"
 #include "errors.h"
+#include "game/players.h"
+#include "interface/interface.h"
+#include "main/main_runtime.h"
+#include "math/integer_math.h"
 #include "rasterizer.h"
+#include "rasterizer_debug_options.h"
 #include "rasterizer_frame_statistics.h"
 #include "rasterizer_geometry.h"
+#include "rasterizer/xbox/rasterizer_xbox.h"
+#include "text/draw_string.h"
 
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_FPS_SAMPLE_COUNT = 60,
+	MAXIMUM_PROFILE_ACCUMULATION_COUNT = 16,
+	NUMBER_OF_STATISTICS_TAB_STOPS = 6,
+	NUMBER_OF_MEMORY_USAGE_REPORTS = 16,
+	STATISTICS_TEXT_BUFFER_SIZE = 12288
+};
+
+enum
+{
+	_rasterizer_statistics_mode_none = 0,
+	_rasterizer_statistics_mode_objects,
+	_rasterizer_statistics_mode_geometry,
+	_rasterizer_statistics_mode_profile,
+	_rasterizer_statistics_mode_memory
+};
 
 /* ---------- macros */
 
 /* ---------- structures */
 
-struct rasterizer_frame_statistics_private_globals_prefix
+struct rasterizer_memory_usage_report
 {
-	byte reserved000[0x740];
+	char const *name;
+	long allocation;
+	long shared;
+};
+
+struct rasterizer_frame_statistics_private_globals_definition
+{
+	real profile_times[NUMBER_OF_RASTERIZER_PROFILES][MAXIMUM_PROFILE_ACCUMULATION_COUNT];
 	word *temp_buffer;
 	byte reserved744[4];
 	unsigned __int64 fps_accumulation_time;
 	unsigned __int64 fps_accumulation_frame_index;
-};
-
-struct rasterizer_frame_statistics_debug_options_prefix
-{
-	boolean fps_accumulation;
+	FILE *profile_log_file;
+	byte reserved75C[4];
+	unsigned long fps_sample_times[MAXIMUM_FPS_SAMPLE_COUNT];
+	short fps_sample_count;
+	short pad852;
+	short profile_accumulation_index;
+	real profile_accumulated_time;
+	long profile_accumulated_pushbuffer_size;
 };
 
 typedef char verify_rasterizer_frame_statistics_temp_buffer_offset[
 	offsetof(
-		struct rasterizer_frame_statistics_private_globals_prefix,
+		struct rasterizer_frame_statistics_private_globals_definition,
 		temp_buffer) == 0x740 ? 1 : -1];
 typedef char verify_rasterizer_frame_statistics_accumulation_time_offset[
 	offsetof(
-		struct rasterizer_frame_statistics_private_globals_prefix,
+		struct rasterizer_frame_statistics_private_globals_definition,
 		fps_accumulation_time) == 0x748 ? 1 : -1];
 typedef char verify_rasterizer_frame_statistics_accumulation_frame_index_offset[
 	offsetof(
-		struct rasterizer_frame_statistics_private_globals_prefix,
+		struct rasterizer_frame_statistics_private_globals_definition,
 		fps_accumulation_frame_index) == 0x750 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_profile_log_file_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_definition,
+		profile_log_file) == 0x758 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_fps_sample_times_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_definition,
+		fps_sample_times) == 0x760 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_fps_sample_count_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_definition,
+		fps_sample_count) == 0x850 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_profile_accumulation_offset[
+	offsetof(
+		struct rasterizer_frame_statistics_private_globals_definition,
+		profile_accumulation_index) == 0x854 ? 1 : -1];
+typedef char verify_rasterizer_frame_statistics_private_globals_size[
+	sizeof(struct rasterizer_frame_statistics_private_globals_definition) == 0x860 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -183,10 +236,13 @@ static boolean eat_my_shorts(
 
 /* ---------- globals */
 
-extern struct rasterizer_frame_statistics_private_globals_prefix rasterizer_frame_statistics_private_globals;
-extern struct rasterizer_frame_statistics_debug_options_prefix rasterizer_debug_options;
+extern struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals;
+
+char const *profile_log_path = "d:\\r-prof.txt";
 
 #define rasterizer_frame_statistics_temp_buffer rasterizer_frame_statistics_private_globals.temp_buffer
+#define rasterizer_fps_sample_times rasterizer_frame_statistics_private_globals.fps_sample_times
+#define rasterizer_fps_sample_count rasterizer_frame_statistics_private_globals.fps_sample_count
 
 /* ---------- public code */
 
@@ -215,6 +271,60 @@ void rasterizer_frame_statistics_begin(
 	void)
 {
 	memset(&rasterizer_frame_statistics, 0, sizeof(rasterizer_frame_statistics));
+
+	return;
+}
+
+void rasterizer_frame_statistics_get_fps(
+	struct rasterizer_frame_statistics_globals *frame_statistics)
+{
+	if (rasterizer_debug_options.stats && frame_statistics)
+	{
+		unsigned long current_time = system_milliseconds();
+		short sample_count = rasterizer_fps_sample_count;
+
+		if (sample_count)
+		{
+			unsigned long minimum_frame_time = current_time - rasterizer_fps_sample_times[0];
+			unsigned long maximum_frame_time = current_time - rasterizer_fps_sample_times[0];
+			unsigned long window_time;
+			short index;
+
+			for (index = rasterizer_fps_sample_count - 1; index > 0; index--)
+			{
+				if (index > 1)
+				{
+					unsigned long frame_time =
+						rasterizer_fps_sample_times[index - 1] - rasterizer_fps_sample_times[index];
+
+					minimum_frame_time = MIN(frame_time, minimum_frame_time);
+					maximum_frame_time = MAX(frame_time, maximum_frame_time);
+				}
+				rasterizer_fps_sample_times[index] = rasterizer_fps_sample_times[index - 1];
+			}
+
+			window_time = current_time - rasterizer_fps_sample_times[0];
+			frame_statistics->fps_sample_count = sample_count;
+			frame_statistics->frames_per_second = 1000.0f / (real)MAX(window_time, 1);
+
+			window_time = current_time - rasterizer_fps_sample_times[sample_count - 1];
+			frame_statistics->average_frames_per_second =
+				(real)sample_count * 1000.0f / (real)MAX(window_time, 1);
+
+			frame_statistics->maximum_frames_per_second =
+				1000.0f / (real)MAX(minimum_frame_time, 1);
+			frame_statistics->minimum_frames_per_second =
+				1000.0f / (real)MAX(maximum_frame_time, 1);
+		}
+
+		rasterizer_fps_sample_times[0] = current_time;
+		rasterizer_fps_sample_count =
+			(short)MIN(sample_count + 1, MAXIMUM_FPS_SAMPLE_COUNT);
+	}
+	else
+	{
+		rasterizer_fps_sample_count = 0;
+	}
 
 	return;
 }
@@ -320,6 +430,499 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 	}
 
 	return vertex_count;
+}
+
+void rasterizer_frame_statistics_draw(
+	void)
+{
+	if (rasterizer_debug_options.stats)
+	{
+		char string[STATISTICS_TEXT_BUFFER_SIZE];
+		point2d cursor = { 0, 0 };
+		short left = rasterizer_globals.reserved04.frame_bounds.x0;
+		short tab_stops[NUMBER_OF_STATISTICS_TAB_STOPS] = { 100, 200, 300, 400, 500, 600 };
+		real_argb_color data_color = { 1.0f, 0.66f, 1.0f, 0.66f };
+		real_argb_color header_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		real_argb_color default_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		long environment_vertices =
+			rasterizer_frame_statistics.lightmap_dynamic_vertex_count +
+			rasterizer_frame_statistics.shadow_vertex_count +
+			rasterizer_frame_statistics.environment_dynamic_vertex_count +
+			rasterizer_frame_statistics.diffuse_texture_dynamic_vertex_count +
+			rasterizer_frame_statistics.specular_light_dynamic_vertex_count +
+			rasterizer_frame_statistics.specular_lightmap_dynamic_vertex_count +
+			rasterizer_frame_statistics.reflection_mask_dynamic_vertex_count +
+			rasterizer_frame_statistics.reflection_dynamic_vertex_count +
+			rasterizer_frame_statistics.transparent_geometry_dynamic_vertex_count +
+			rasterizer_frame_statistics.environment_fog_dynamic_vertex_count;
+		long environment_triangles =
+			rasterizer_frame_statistics.lightmap_dynamic_triangle_count +
+			rasterizer_frame_statistics.shadow_triangle_count +
+			rasterizer_frame_statistics.environment_dynamic_triangle_count +
+			rasterizer_frame_statistics.diffuse_texture_dynamic_triangle_count +
+			rasterizer_frame_statistics.specular_light_dynamic_triangle_count +
+			rasterizer_frame_statistics.specular_lightmap_dynamic_triangle_count +
+			rasterizer_frame_statistics.reflection_mask_dynamic_triangle_count +
+			rasterizer_frame_statistics.reflection_dynamic_triangle_count +
+			rasterizer_frame_statistics.transparent_geometry_dynamic_triangle_count +
+			rasterizer_frame_statistics.environment_fog_dynamic_triangle_count;
+		long environment_primitives =
+			rasterizer_frame_statistics.lightmap_dynamic_draw_count +
+			rasterizer_frame_statistics.shadow_draw_count +
+			rasterizer_frame_statistics.environment_dynamic_draw_count +
+			rasterizer_frame_statistics.diffuse_texture_dynamic_draw_count +
+			rasterizer_frame_statistics.specular_light_dynamic_draw_count +
+			rasterizer_frame_statistics.specular_lightmap_dynamic_draw_count +
+			rasterizer_frame_statistics.reflection_mask_dynamic_draw_count +
+			rasterizer_frame_statistics.reflection_dynamic_draw_count +
+			rasterizer_frame_statistics.transparent_geometry_dynamic_draw_count +
+			rasterizer_frame_statistics.environment_fog_dynamic_draw_count;
+		long model_vertices =
+			rasterizer_frame_statistics.model_vertex_count +
+			rasterizer_frame_statistics.transparent_model_vertex_count;
+		long model_triangles =
+			rasterizer_frame_statistics.model_triangle_count +
+			rasterizer_frame_statistics.transparent_model_triangle_count;
+		long model_primitives =
+			rasterizer_frame_statistics.model_draw_count +
+			rasterizer_frame_statistics.transparent_model_submit_count;
+		long total_vertices =
+			environment_vertices + model_vertices +
+			rasterizer_frame_statistics.model_shadow_vertex_count;
+		long total_triangles =
+			environment_triangles + model_triangles +
+			rasterizer_frame_statistics.model_shadow_triangle_count;
+		long total_primitives =
+			environment_primitives + model_primitives +
+			rasterizer_frame_statistics.model_shadow_draw_count;
+		rectangle2d bounds;
+		short index;
+
+		for (index = 0; index < NUMBER_OF_STATISTICS_TAB_STOPS; index++)
+		{
+			tab_stops[index] += left;
+		}
+
+		bounds = rasterizer_globals.reserved04.frame_bounds;
+		offset_rectangle2d(&bounds, 0, 32);
+		interface_set_bitmap_text_draw_mode(_interface_font_terminal, NONE, 0, 0, 5, 0);
+
+		sprintf(string, "|n|tframerate|taverage (of %d)|tmin|tmax",
+			rasterizer_frame_statistics.fps_sample_count);
+		tab_stops[0] = left;
+		draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+		draw_string_set_color(&header_color);
+		rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+		bounds.y0 = cursor.y - 1;
+
+		if (rasterizer_debug_options.fps_accumulation)
+		{
+			__int64 accumulated_frames =
+				rasterizer_globals.fps_accumulation_frame_index -
+				rasterizer_frame_statistics_private_globals.fps_accumulation_frame_index;
+			__int64 accumulated_time =
+				system_milliseconds() -
+				rasterizer_frame_statistics_private_globals.fps_accumulation_time;
+
+			sprintf(string, "|t%.0f|t%.0f/%.0f|t%.0f|t%.0f|n",
+				rasterizer_frame_statistics.frames_per_second,
+				rasterizer_frame_statistics.average_frames_per_second,
+				accumulated_frames * 1000.0f / accumulated_time,
+				rasterizer_frame_statistics.minimum_frames_per_second,
+				rasterizer_frame_statistics.maximum_frames_per_second);
+		}
+		else
+		{
+			sprintf(string, "|t%.0f|t%.0f|t%.0f|t%.0f|n",
+				rasterizer_frame_statistics.frames_per_second,
+				rasterizer_frame_statistics.average_frames_per_second,
+				rasterizer_frame_statistics.minimum_frames_per_second,
+				rasterizer_frame_statistics.maximum_frames_per_second);
+		}
+
+		tab_stops[0] = left;
+		draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+		draw_string_set_color(&data_color);
+		rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+		bounds.y0 = cursor.y - 1;
+
+		if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_objects)
+		{
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			draw_string_set_color(&data_color);
+
+			sprintf(string, "|tfogged|t%d|n|tnormal|t%d|n|tfast|t%d|n|tscenery|t%d|n",
+				rasterizer_frame_statistics.fogged_object_count,
+				rasterizer_frame_statistics.normal_object_count,
+				rasterizer_frame_statistics.fast_object_count,
+				rasterizer_frame_statistics.scenery_object_count);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tskinning|t%d|n|tlighting|t%d|n|tvertex shaders|t%d|n",
+				rasterizer_frame_statistics.model_skinning_constant_bytes,
+				rasterizer_frame_statistics.model_lighting_constant_bytes,
+				rasterizer_frame_statistics.model_vertex_shader_work_accumulated);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tlocal_player_count|t%d|n|tmain_get_window_count|t%d|n",
+				local_player_count(),
+				main_get_window_count());
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+		}
+		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_geometry)
+		{
+			sprintf(string, "|t|tvertices|ttriangles|tprimitives");
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			draw_string_set_color(&header_color);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|ttotal|t%d|t%d|t%d|n",
+				total_vertices,
+				total_triangles,
+				total_primitives);
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			draw_string_set_color(&data_color);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tenvironment|t%d|t%d|t%d",
+				environment_vertices,
+				environment_triangles,
+				environment_primitives);
+			tab_stops[0] = left + 25;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tlightmaps|t%d|t%d|t%d|n|tshadows (%d)|t%d|t%d|t%d|n|tlights|t%d|t%d|t%d|n|ttextures|t%d|t%d|t%d|n|tlights specular|t%d|t%d|t%d|n|tlightmaps specular|t%d|t%d|t%d|n|tlightmaps ref.mask|t%d|t%d|t%d|n|treflections|t%d|t%d|t%d|n|ttransparent|t%d|t%d/%d|t%d|n|tfog|t%d|t%d|t%d|n",
+				rasterizer_frame_statistics.lightmap_dynamic_vertex_count,
+				rasterizer_frame_statistics.lightmap_dynamic_triangle_count,
+				rasterizer_frame_statistics.lightmap_dynamic_draw_count,
+				rasterizer_frame_statistics.shadow_count,
+				rasterizer_frame_statistics.shadow_vertex_count,
+				rasterizer_frame_statistics.shadow_triangle_count,
+				rasterizer_frame_statistics.shadow_draw_count,
+				rasterizer_frame_statistics.environment_dynamic_vertex_count,
+				rasterizer_frame_statistics.environment_dynamic_triangle_count,
+				rasterizer_frame_statistics.environment_dynamic_draw_count,
+				rasterizer_frame_statistics.diffuse_texture_dynamic_vertex_count,
+				rasterizer_frame_statistics.diffuse_texture_dynamic_triangle_count,
+				rasterizer_frame_statistics.diffuse_texture_dynamic_draw_count,
+				rasterizer_frame_statistics.specular_light_dynamic_vertex_count,
+				rasterizer_frame_statistics.specular_light_dynamic_triangle_count,
+				rasterizer_frame_statistics.specular_light_dynamic_draw_count,
+				rasterizer_frame_statistics.specular_lightmap_dynamic_vertex_count,
+				rasterizer_frame_statistics.specular_lightmap_dynamic_triangle_count,
+				rasterizer_frame_statistics.specular_lightmap_dynamic_draw_count,
+				rasterizer_frame_statistics.reflection_mask_dynamic_vertex_count,
+				rasterizer_frame_statistics.reflection_mask_dynamic_triangle_count,
+				rasterizer_frame_statistics.reflection_mask_dynamic_draw_count,
+				rasterizer_frame_statistics.reflection_dynamic_vertex_count,
+				rasterizer_frame_statistics.reflection_dynamic_triangle_count,
+				rasterizer_frame_statistics.reflection_dynamic_draw_count,
+				rasterizer_frame_statistics.transparent_geometry_dynamic_vertex_count,
+				rasterizer_frame_statistics.transparent_geometry_dynamic_triangle_count,
+				rasterizer_frame_statistics.transparent_geometry_largest_dynamic_triangle_count,
+				rasterizer_frame_statistics.transparent_geometry_dynamic_draw_count,
+				rasterizer_frame_statistics.environment_fog_dynamic_vertex_count,
+				rasterizer_frame_statistics.environment_fog_dynamic_triangle_count,
+				rasterizer_frame_statistics.environment_fog_dynamic_draw_count);
+			tab_stops[0] = left + 50;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tmodel shadows (%d)|t%d|t%d|t%d",
+				rasterizer_frame_statistics.model_shadow_count,
+				rasterizer_frame_statistics.model_shadow_vertex_count,
+				rasterizer_frame_statistics.model_shadow_triangle_count,
+				rasterizer_frame_statistics.model_shadow_draw_count);
+			tab_stops[0] = left + 25;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tmodels (%d)|t%d|t%d|t%d",
+				rasterizer_frame_statistics.model_count,
+				model_vertices,
+				model_triangles,
+				model_primitives);
+			tab_stops[0] = left + 25;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tsolid|t%d|t%d|t%d|n|ttransparent|t%d|t%d/%d|t%d|n",
+				rasterizer_frame_statistics.model_vertex_count,
+				rasterizer_frame_statistics.model_triangle_count,
+				rasterizer_frame_statistics.model_draw_count,
+				rasterizer_frame_statistics.transparent_model_vertex_count,
+				rasterizer_frame_statistics.transparent_model_triangle_count,
+				rasterizer_frame_statistics.transparent_model_maximum_triangle_count,
+				rasterizer_frame_statistics.transparent_model_submit_count);
+			tab_stops[0] = left + 50;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tdecals|t%d|t%d|t%d|n",
+				rasterizer_frame_statistics.decal_vertex_count,
+				rasterizer_frame_statistics.decal_triangle_count,
+				rasterizer_frame_statistics.decal_draw_count);
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tdynamic geometry|t%d/%d|t%d/%d|n",
+				rasterizer_frame_statistics.dynamic_vertex_count,
+				rasterizer_frame_statistics.dynamic_vertex_buffer_count,
+				rasterizer_frame_statistics.dynamic_triangle_count,
+				rasterizer_frame_statistics.dynamic_triangle_buffer_count);
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|t%d dynamic lights|n|t%d lens flares|n",
+				rasterizer_frame_statistics.dynamic_light_count,
+				rasterizer_frame_statistics.lens_flare_count);
+			tab_stops[0] = left;
+			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+		}
+		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_profile)
+		{
+			short profile;
+
+			tab_stops[0] = left;
+			tab_stops[1] = left + 200;
+			tab_stops[2] = left + 300;
+			tab_stops[3] = 600;
+
+			sprintf(string, "|tGPU profile|ttime (msecs)|tdata (bytes)");
+			draw_string_set_tab_stops(tab_stops, 4);
+			draw_string_set_color(&header_color);
+			cursor.y -= 30;
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+			draw_string_set_color(&data_color);
+
+			for (profile = 0; profile < NUMBER_OF_RASTERIZER_PROFILES; profile++)
+			{
+				real profile_time = rasterizer_profile_query(profile);
+
+				if (profile_time >= 0.0f)
+				{
+					sprintf(string, "|t%s|t%.2f|t%d",
+						rasterizer_profile_get_string(profile),
+						profile_time * 1000.0f,
+						rasterizer_profile_query_pushbuffer(profile));
+				}
+				else
+				{
+					sprintf(string, "|t%s|t----|t0",
+						rasterizer_profile_get_string(profile));
+				}
+
+				rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+				bounds.y0 = cursor.y - 1;
+			}
+
+			sprintf(string, "|ttotal|t%.2f|t%d|n",
+				rasterizer_profile_query(NUMBER_OF_RASTERIZER_PROFILES) * 1000.0f,
+				rasterizer_profile_query_pushbuffer(NUMBER_OF_RASTERIZER_PROFILES));
+			draw_string_set_color(global_real_argb_yellow);
+			bounds.y0 += 4;
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+		}
+		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_memory)
+		{
+			long total_allocation = 0;
+			long total_unique_allocation = 0;
+			MEMORYSTATUS memory_status;
+			struct rasterizer_memory_usage_report memory_usage[NUMBER_OF_MEMORY_USAGE_REPORTS] =
+			{
+				{ "memory pool", 0x18000, 0 },
+				{ "dynamic vertices (unlit)", 0x30000, 0 },
+				/* BUG (original): January stores 0x48 here; a plausible corrected
+				 * allocation would be 0x48000, but the target value is preserved. */
+				{ "dynamic vertices (lit*)", 0x48, 0x4b000 },
+				{ "dynamic vertices (screen)", 0x50000, 0 },
+				{ "dynamic vertices (model)", 0x10000, 0 },
+				{ "dynamic vertices (detail objects)", 0x20000, 0 },
+				{ "dynamic triangles", 0x30000, 0 },
+				{ "transparent geometry groups", 0xf000, 0 },
+				{ "bump map palette", 0x400, 0 },
+				{ "mirror buffers (includes z-buffer*)", 0x96000, 0x4b000 },
+				{ "shadow buffers", 0x10000, 0 },
+				{ "sun glow buffers*", 0x8000, 0x8000 },
+				{ "water buffers", 0x10000, 0 },
+				{ "motion sensor buffers*", 0x14000, 0x14000 },
+				{ "debug geometry*", 0x1b0000, 0x1b0000 },
+				{ "vertex shaders|t~35k last i checked", 0x8c00, 0x3000 }
+			};
+			short report_index;
+
+			tab_stops[0] = left;
+			tab_stops[1] = left + 300;
+			tab_stops[2] = 600;
+			sprintf(string, "|tallocation|tmemory usage (bytes)");
+			draw_string_set_tab_stops(tab_stops, 3);
+			draw_string_set_color(&header_color);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+			draw_string_set_color(&data_color);
+
+			for (report_index = 0; report_index < NUMBER_OF_MEMORY_USAGE_REPORTS; report_index++)
+			{
+				sprintf(string, "|t%s|t%d",
+					memory_usage[report_index].name,
+					memory_usage[report_index].allocation);
+				rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+				bounds.y0 = cursor.y - 1;
+				total_allocation += memory_usage[report_index].allocation;
+				total_unique_allocation +=
+					memory_usage[report_index].allocation - memory_usage[report_index].shared;
+			}
+
+			sprintf(string, "|n|ttotal|t%d (%d)", total_allocation, total_unique_allocation);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			GlobalMemoryStatus(&memory_status);
+			draw_string_set_color(&header_color);
+
+			sprintf(string, "|n|tsystem total|t%dKb", memory_status.dwTotalPhys >> 10);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			sprintf(string, "|tsystem available|t%dKb", memory_status.dwAvailPhys >> 10);
+			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
+			bounds.y0 = cursor.y - 1;
+
+			draw_string_set_color(&data_color);
+		}
+
+		draw_string_set_tab_stops(NULL, 0);
+		draw_string_set_color(&default_color);
+	}
+
+	if (rasterizer_debug_options.profile_log)
+	{
+		if (!rasterizer_frame_statistics_private_globals.profile_log_file)
+		{
+			rasterizer_frame_statistics_private_globals.profile_log_file =
+				fopen(profile_log_path, "w");
+
+			if (!rasterizer_frame_statistics_private_globals.profile_log_file)
+			{
+				error(
+					_error_silent,
+					"### ERROR failed to open rasterizer profile log (%s)",
+					profile_log_path);
+				rasterizer_debug_options.profile_log = FALSE;
+			}
+
+			rasterizer_frame_statistics_private_globals.profile_accumulated_time = 0.0f;
+			rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size = 0;
+		}
+
+		if (rasterizer_frame_statistics_private_globals.profile_log_file)
+		{
+			short profile;
+
+			for (profile = 0; profile < NUMBER_OF_RASTERIZER_PROFILES; profile++)
+			{
+				rasterizer_frame_statistics_private_globals.profile_times[profile][
+					rasterizer_frame_statistics_private_globals.profile_accumulation_index] =
+					rasterizer_profile_query(profile) * 1000.0f;
+			}
+
+			rasterizer_frame_statistics_private_globals.profile_accumulated_time +=
+				rasterizer_profile_query(NUMBER_OF_RASTERIZER_PROFILES) * 1000.0f;
+			rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size +=
+				rasterizer_profile_query_pushbuffer(NUMBER_OF_RASTERIZER_PROFILES);
+
+			if (++rasterizer_frame_statistics_private_globals.profile_accumulation_index ==
+				MAXIMUM_PROFILE_ACCUMULATION_COUNT)
+			{
+				short accumulation;
+
+				fprintf(rasterizer_frame_statistics_private_globals.profile_log_file, "\n");
+
+				for (profile = 0; profile < NUMBER_OF_RASTERIZER_PROFILES; profile++)
+				{
+					short length;
+
+					fprintf(
+						rasterizer_frame_statistics_private_globals.profile_log_file,
+						"%s",
+						rasterizer_profile_get_string(profile));
+
+					for (length = (short)csstrlen(rasterizer_profile_get_string(profile));
+						length < 32;
+						length++)
+					{
+						fprintf(rasterizer_frame_statistics_private_globals.profile_log_file, ".");
+					}
+
+					for (accumulation = 0;
+						accumulation < MAXIMUM_PROFILE_ACCUMULATION_COUNT;
+						accumulation++)
+					{
+						if (rasterizer_frame_statistics_private_globals.profile_times[profile][accumulation] >= 0.0f)
+						{
+							fprintf(
+								rasterizer_frame_statistics_private_globals.profile_log_file,
+								"%6.2f",
+								rasterizer_frame_statistics_private_globals.profile_times[profile][accumulation]);
+						}
+						else
+						{
+							fprintf(
+								rasterizer_frame_statistics_private_globals.profile_log_file,
+								"  ----");
+						}
+					}
+
+					fprintf(rasterizer_frame_statistics_private_globals.profile_log_file, "\n");
+				}
+
+				fprintf(
+					rasterizer_frame_statistics_private_globals.profile_log_file,
+					"average total frame time= %.2f msecs\n",
+					rasterizer_frame_statistics_private_globals.profile_accumulated_time /
+						MAXIMUM_PROFILE_ACCUMULATION_COUNT);
+				fprintf(
+					rasterizer_frame_statistics_private_globals.profile_log_file,
+					"average total pushbuffer= %d bytes\n",
+					(rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size +
+						MAXIMUM_PROFILE_ACCUMULATION_COUNT / 2) / MAXIMUM_PROFILE_ACCUMULATION_COUNT);
+				fflush(rasterizer_frame_statistics_private_globals.profile_log_file);
+
+				rasterizer_frame_statistics_private_globals.profile_accumulation_index = 0;
+				rasterizer_frame_statistics_private_globals.profile_accumulated_time = 0.0f;
+				rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size = 0;
+			}
+		}
+	}
+	else if (rasterizer_frame_statistics_private_globals.profile_log_file)
+	{
+		fclose(rasterizer_frame_statistics_private_globals.profile_log_file);
+		rasterizer_frame_statistics_private_globals.profile_log_file = NULL;
+	}
+
+	return;
 }
 
 void rasterizer_frame_statistics_end(

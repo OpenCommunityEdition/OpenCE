@@ -102,13 +102,6 @@ struct system_memory_information
 	unsigned long total_physical_memory;
 };
 
-/* ---------- prototypes */
-
-void stack_walk_with_context(
-	boolean disregard_symbol_names,
-	const char *name,
-	CONTEXT *context);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -327,7 +320,7 @@ long generic_exception_filter(
 {
 	const char *exception_name = code_0007cb70(exception_code);
 
-	stack_walk_with_context(FALSE, NULL, exception_information->ContextRecord);
+	stack_walk_with_context(NULL, 0, exception_information->ContextRecord);
 	if (exception_name)
 	{
 		error(_error_silent, "%s", exception_name);

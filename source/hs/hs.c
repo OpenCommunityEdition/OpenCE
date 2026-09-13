@@ -3826,9 +3826,6 @@ boolean ai_scripting_is_attacking(
 	long encounter_index);
 boolean ai_scripting_conversation(
 	word conversation_index);
-boolean ai_scripting_allegiance_broken(
-	short team0,
-	word team1);
 boolean scripted_player_control_set_camera_control(
 	boolean enabled);
 boolean scripted_show_hud(
@@ -4159,12 +4156,6 @@ void ai_scripting_migrate_and_speak(
 	long source_ai_index,
 	long destination_ai_index,
 	long dialogue_index);
-void ai_scripting_migrate_by_unit(
-	long unit_index,
-	long destination_ai_index);
-void ai_scripting_allegiance(
-	short team_a,
-	unsigned short team_b);
 void ai_scripting_allegiance_remove(
 	short team_a,
 	unsigned short team_b);

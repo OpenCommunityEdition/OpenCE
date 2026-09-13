@@ -253,6 +253,7 @@ symbols in this file:
 
 #include "actor_looking.h"
 #include "actors.h"
+#include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_scenario_definitions.h"
 #include "cseries/errors.h"
@@ -269,6 +270,13 @@ symbols in this file:
 enum
 {
 	OBEY_MAXIMUM_LOOP_COUNT = 10,
+	_action_obey_actor_mode_combat = 3,
+	_action_obey_idle_look_none = 0,
+	_action_obey_idle_look_noncombat = 1,
+	_action_obey_idle_look_combat = 4,
+	_action_obey_primary_priority_exact_facing = 4,
+	_action_obey_primary_priority_locked_aiming = 7,
+	_action_obey_combat_status_clear_los = 5,
 };
 
 /* ---------- macros */
@@ -283,6 +291,12 @@ typedef void (*action_obey_individual_iterator_proc)(
 	struct obey_individual_complex_control *complex_control,
 	void *user_data);
 
+struct vehicle_possibility
+{
+	real distance_squared;
+	long vehicle_index;
+};
+
 typedef char action_obey_simple_control_size_assert[
 	sizeof(struct obey_individual_simple_control) == 0x24 ? 1 : -1];
 typedef char action_obey_complex_control_size_assert[
@@ -294,6 +308,9 @@ typedef char action_obey_state_offset_assert[
 
 /* ---------- prototypes */
 
+static int vehicle_possibility_qsort(
+	void const *a,
+	void const *b);
 static void action_obey_command_end(
 	long actor_index,
 	long unit_index,
@@ -541,6 +558,187 @@ void action_obey_update(
 	return;
 }
 
+void action_obey_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct obey_state_data *state_data = &actor->state.action_data.obey;
+
+	match_assert("c:\\halo\\SOURCE\\ai\\action_obey.c", 1777, !actor->meta.swarm);
+
+	if (state_data->complex_control.shoot_at_target)
+	{
+		actor->orders.look.primary_priority = _action_obey_primary_priority_locked_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_target;
+		actor->orders.look.idle_look_type = _action_obey_idle_look_combat;
+		actor->orders.combat.shoot_at_target = TRUE;
+		actor->orders.combat.override_firing_restrictions = TRUE;
+		actor->orders.combat.use_manual_target_point = TRUE;
+		actor->orders.combat.target_point = state_data->complex_control.shoot_target;
+		actor->orders.combat.override_burst_duration = state_data->complex_control.shoot_burst_length;
+		goto flush_order_effects;
+	}
+
+	if (state_data->complex_control.destination_facing &&
+		actor_path_at_destination(actor_index))
+	{
+		boolean flying = actor->state.flying;
+
+		actor->orders.look.primary_priority = _action_obey_primary_priority_exact_facing;
+		actor->orders.look.primary_direction.type = _direction_specification_point;
+		actor->orders.look.primary_direction.point = state_data->complex_control.destination_facing_point;
+
+		if (!flying)
+		{
+			actor->orders.look.primary_direction.point.z = actor->input.position.head_position.z;
+		}
+
+		actor->orders.look.idle_look_type = actor->state.mode >= _action_obey_actor_mode_combat ?
+			_action_obey_idle_look_combat : _action_obey_idle_look_noncombat;
+		goto flush_order_effects;
+	}
+
+	if (state_data->complex_control.override_movement_type == _actor_movement_type_panic ||
+		state_data->complex_control.override_movement_type == _actor_movement_type_asleep)
+	{
+		actor->orders.look.primary_priority = _action_obey_primary_priority_locked_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_movement;
+		actor->orders.look.idle_look_type = _action_obey_idle_look_none;
+		goto flush_order_effects;
+	}
+
+	if (actor->state.combat_status >= _action_obey_combat_status_clear_los &&
+		TEST_FLAG(state_data->simple_control.metadata_flags, _obey_metadata_targeting_bit))
+	{
+		actor->orders.look.primary_priority = _action_obey_primary_priority_locked_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_target;
+		actor->orders.look.idle_look_type = _action_obey_idle_look_combat;
+		actor->orders.combat.shoot_at_target = TRUE;
+		goto flush_order_effects;
+	}
+
+	actor->orders.look.primary_priority = _primary_priority_none;
+	if (state_data->allow_looking)
+	{
+		actor->orders.look.idle_look_type = actor->state.mode >= _action_obey_actor_mode_combat ?
+			_action_obey_idle_look_combat : _action_obey_idle_look_noncombat;
+	}
+	else
+	{
+		actor->orders.look.idle_look_type = _action_obey_idle_look_none;
+	}
+
+flush_order_effects:
+	if (state_data->complex_control.grenade_throw_depress_trigger)
+	{
+		actor->orders.combat.throw_grenade = TRUE;
+		state_data->complex_control.grenade_throw_depress_trigger = FALSE;
+	}
+
+	actor->orders.move.stationary_crouch = state_data->complex_control.override_crouch;
+	actor->orders.move.moving_crouch = state_data->complex_control.override_crouch;
+	actor->orders.move.override_movement_type = state_data->complex_control.override_movement_type;
+
+	if (state_data->complex_control.play_action && !actor_move_animation_busy(actor_index))
+	{
+		short animation_impulse = state_data->complex_control.action_animation_impulse;
+
+		if (animation_impulse != NONE)
+		{
+			real_vector2d alignment_vector;
+
+			alignment_vector.i = actor->control.desired_facing_vector.i;
+			alignment_vector.j = actor->control.desired_facing_vector.j;
+			normalize2d(&alignment_vector);
+			actor_move_animation_impulse(actor_index, animation_impulse, &alignment_vector);
+		}
+
+		if (state_data->complex_control.action_communication_type != NONE)
+		{
+			ai_communication_event(
+				state_data->complex_control.action_communication_type,
+				actor->meta.unit_index,
+				NONE,
+				NONE,
+				NONE,
+				NONE,
+				NULL);
+		}
+
+		state_data->complex_control.play_action = FALSE;
+	}
+
+	if (TEST_FLAG(state_data->simple_control.simple_control_flags, _obey_simple_directmovement_bit))
+	{
+		actor->orders.move.override_movement_direction = TRUE;
+		actor->orders.move.override_movement_direction_vector = state_data->simple_control.directmovement.vector;
+		actor->orders.move.override_movement_facing = state_data->simple_control.directmovement.facing;
+	}
+
+	if (TEST_FLAG(state_data->simple_control.simple_control_flags, _obey_simple_jump_bit))
+	{
+		boolean aim_set = FALSE;
+
+		if (TEST_FLAG(state_data->simple_control.simple_control_flags, _obey_simple_jump_jumped_bit))
+		{
+			aim_set = state_data->simple_control.jump.delay_ticks > 0;
+		}
+		else if (state_data->simple_control.jump.delay_ticks ||
+			actor->input.in_midair ||
+			unit_is_busy(actor->meta.unit_index))
+		{
+			aim_set = TRUE;
+		}
+		else
+		{
+			real_vector2d facing;
+			real_vector2d alignment_vector;
+
+			facing.i = actor->input.facing_vector.i;
+			facing.j = actor->input.facing_vector.j;
+			if (normalize2d(&facing) == 0.f)
+			{
+				alignment_vector = *global_forward2d;
+			}
+			else
+			{
+				alignment_vector = facing;
+			}
+
+			actor->orders.move.jump = TRUE;
+			actor->orders.move.jump_leap =
+				state_data->simple_control.jump.target_vertical_vel <
+				state_data->simple_control.jump.target_horizontal_vel * 0.7f;
+			actor->orders.move.jump_targeted = TEST_FLAG(
+				state_data->simple_control.simple_control_flags,
+				_obey_simple_jump_targeted_bit);
+			actor->orders.move.jump_alignment_vector = alignment_vector;
+			actor->orders.move.jump_target_horizontal_vel = state_data->simple_control.jump.target_horizontal_vel;
+			actor->orders.move.jump_target_vertical_vel = state_data->simple_control.jump.target_vertical_vel;
+			SET_FLAG(
+				state_data->simple_control.simple_control_flags,
+				_obey_simple_jump_jumped_bit,
+				TRUE);
+
+			if (!TEST_FLAG(
+				state_data->simple_control.simple_control_flags,
+				_obey_simple_jump_targeted_bit))
+			{
+				state_data->simple_control.jump.delay_ticks = 15;
+			}
+		}
+
+		if (aim_set)
+		{
+			actor->orders.move.override_movement_direction = TRUE;
+			actor->orders.move.override_movement_direction_vector = actor->input.facing_vector;
+			actor->orders.move.override_movement_facing = 0;
+		}
+	}
+
+	return;
+}
+
 short random_range(
 	short lower_bound,
 	short upper_bound)
@@ -564,6 +762,21 @@ real_vector2d *vector_from_points2d(
 
 
 /* ---------- private code */
+
+static int vehicle_possibility_qsort(
+	void const *a,
+	void const *b)
+{
+	struct vehicle_possibility const *possibility_a = a;
+	struct vehicle_possibility const *possibility_b = b;
+
+	if (possibility_a->distance_squared >= possibility_b->distance_squared)
+	{
+		return possibility_a->distance_squared > possibility_b->distance_squared;
+	}
+
+	return -1;
+}
 
 static void action_obey_command_end(
 	long actor_index,

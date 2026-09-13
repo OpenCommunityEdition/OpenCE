@@ -144,8 +144,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/profile.h"
+#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "vehicles.h"
 #include "math/real_math.h"
+#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "effects/material_effects.h"
@@ -236,36 +238,7 @@ struct game_globals_falling_damage
 	real runtime_maximum_damage_velocity;
 };
 
-struct _vehicle_datum
-{
-	word flags;
-	short unknown426;
-	byte unknown428;
-	byte unknown429;
-	byte unknown42a;
-	byte unknown42b;
-	real unknown42c;
-	real unknown430;
-	real unknown434;
-	real unknown438;
-	real unknown43c;
-	real unknown440;
-	real unknown444;
-	real unknown448;
-	byte unknown44c[8];
-	real_point3d hover_position;
-	real_quaternion unknown460;
-	real_point2d unknown470;
-	long unknown478;
-};
-
-struct vehicle_runtime_datum
-{
-	long definition_index;
-	struct _object_datum object;
-	struct _unit_datum unit;
-	struct _vehicle_datum vehicle;
-};
+#include "vehicle_datum.h"
 
 struct physics_mass_point_definition
 {
@@ -298,40 +271,9 @@ struct vehicle_suspension
 	byte unknownc[8];
 };
 
-struct vehicle_mass_point_state
-{
-	unsigned long flags;
-	real_point3d position;
-	byte unused10[0x44];
-	real_vector3d velocity;
-	real_vector3d normal;
-	byte unused6c[4];
-	short material_index;
-	short pad72;
-	real unknown74;
-	byte unused78[0xb8];
-};
+#include "physics/mass_point_datum.h"
 
-struct vehicle_powered_mass_point_state
-{
-	real unknown0;
-	real unknown4;
-	real unknown8;
-	real unknownc;
-	byte unused10[0x8];
-	real unknown18;
-	union
-	{
-		struct
-		{
-			real_vector2d unknown1c;
-			real_vector2d unknown24;
-		};
-		real_quaternion unknown1c_quaternion;
-		real unknown1c_values[4];
-	};
-	byte unused2c[0x34];
-};
+#include "physics/powered_mass_point_datum.h"
 
 struct scenario_object_permutation;
 struct scenario_unit;
@@ -351,12 +293,6 @@ void aiming_screen_apply(
 	real yaw,
 	real pitch,
 	struct real_orientation *node_orientations);
-void physics_update(
-	long object_index,
-	struct vehicle_powered_mass_point_state *powered_mass_points,
-	struct vehicle_mass_point_state *mass_points,
-	real_vector3d const *unknown3,
-	real_vector3d const *unknown4);
 short unit_update_animation(
 	long unit_index,
 	void *update_data);
@@ -421,7 +357,7 @@ void vehicle_delete(
 boolean vehicle_causes_collision_damage(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 
@@ -448,7 +384,7 @@ void vehicle_hover(
 {
 	if (vehicle_index!=NONE)
 	{
-		struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+		struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 
 		if (hover)
 		{
@@ -467,7 +403,7 @@ void vehicle_hover(
 boolean vehicle_is_flipped(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 
 	return vehicle->object.up.k<0.2f;
 }
@@ -475,26 +411,26 @@ boolean vehicle_is_flipped(
 void vehicle_reset(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 
 	vehicle->vehicle.flags = 0;
-	vehicle->vehicle.unknown426 = 0;
-	vehicle->vehicle.unknown428 = 0;
-	vehicle->vehicle.unknown429 = 0;
-	vehicle->vehicle.unknown42a = 0;
-	vehicle->vehicle.unknown42b = 0;
-	vehicle->vehicle.unknown42c = 0;
-	vehicle->vehicle.unknown430 = 0;
-	vehicle->vehicle.unknown434 = 0;
-	vehicle->vehicle.unknown438 = 0;
-	vehicle->vehicle.unknown43c = 0;
-	vehicle->vehicle.unknown440 = 0;
-	vehicle->vehicle.unknown448 = 0;
-	vehicle->vehicle.unknown444 = 0;
-	csmemset(vehicle->vehicle.unknown44c, 0, sizeof(vehicle->vehicle.unknown44c));
-	set_real_quaternion(&vehicle->vehicle.unknown460, 0.0f, 0.0f, 0.0f, 0.0f);
-	set_real_point2d(&vehicle->vehicle.unknown470, 0.0f, 0.0f);
-	vehicle->vehicle.unknown478 = 0;
+	vehicle->vehicle.stop_time = 0;
+	vehicle->vehicle.airborne_ticks = 0;
+	vehicle->vehicle.upending_type = 0;
+	vehicle->vehicle.upending_ticks = 0;
+	vehicle->vehicle.on_ground_ticks = 0;
+	vehicle->vehicle.speed = 0;
+	vehicle->vehicle.slide = 0;
+	vehicle->vehicle.turn = 0;
+	vehicle->vehicle.wheel = 0;
+	vehicle->vehicle.left_tread = 0;
+	vehicle->vehicle.right_tread = 0;
+	vehicle->vehicle.thrust = 0;
+	vehicle->vehicle.hover = 0;
+	csmemset(vehicle->vehicle.suspension, 0, sizeof(vehicle->vehicle.suspension));
+	set_real_quaternion(&vehicle->vehicle.collision_accumulator_head, 0.0f, 0.0f, 0.0f, 0.0f);
+	set_real_point2d(&vehicle->vehicle.collision_accumulator_tail, 0.0f, 0.0f);
+	vehicle->vehicle.stuck_mass_point_flags = 0;
 
 	return;
 }
@@ -502,7 +438,7 @@ void vehicle_reset(
 boolean vehicle_new(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct unit_definition *definition = vehicle_definition_get(vehicle->definition_index);
 
 	vehicle_reset(vehicle_index);
@@ -522,7 +458,7 @@ void vehicle_accelerate(
 	long vehicle_index,
 	real_vector3d const *acceleration)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct unit_definition *definition = vehicle_definition_get(vehicle->definition_index);
 
 	if (definition->object.physics.index!=NONE)
@@ -554,7 +490,7 @@ void vehicle_accelerate(
 void vehicle_render_debug(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct unit_definition *definition = vehicle_definition_get(vehicle->definition_index);
 
 	if (definition->object.physics.index!=NONE)
@@ -578,10 +514,10 @@ boolean vehicle_stuck(
 	long vehicle_index,
 	real_vector3d *direction)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	boolean stuck = FALSE;
 
-	if (vehicle->vehicle.unknown478)
+	if (vehicle->vehicle.stuck_mass_point_flags)
 	{
 		struct physics_instance instance;
 
@@ -595,7 +531,7 @@ boolean vehicle_stuck(
 				mass_point_index<instance.physics->mass_points.count;
 				mass_point_index++)
 			{
-				if (TEST_FLAG(vehicle->vehicle.unknown478, mass_point_index))
+				if (TEST_FLAG(vehicle->vehicle.stuck_mass_point_flags, mass_point_index))
 				{
 					struct physics_mass_point_definition *mass_point = TAG_BLOCK_GET_ELEMENT(
 						&instance.physics->mass_points, mass_point_index,
@@ -678,7 +614,7 @@ enum
 void vehicle_export_function_values(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	real forward_speed = (real)fabs(definition->unknown2f8);
@@ -707,46 +643,46 @@ void vehicle_export_function_values(
 				case _vehicle_function_speed_absolute_b:
 				case _vehicle_function_speed_absolute_c:
 				case _vehicle_function_speed_absolute_d:
-					result = (real)fabs(vehicle->vehicle.unknown42c)/maximum_speed;
+					result = (real)fabs(vehicle->vehicle.speed)/maximum_speed;
 					break;
 
 				case _vehicle_function_speed_forward:
-					result = (vehicle->vehicle.unknown42c<0.0f ? 0.0f :
-						vehicle->vehicle.unknown42c)/forward_speed;
+					result = (vehicle->vehicle.speed<0.0f ? 0.0f :
+						vehicle->vehicle.speed)/forward_speed;
 					break;
 
 				case _vehicle_function_speed_reverse:
-					result = (real)fabs(vehicle->vehicle.unknown42c>0.0f ? 0.0f :
-						vehicle->vehicle.unknown42c)/reverse_speed;
+					result = (real)fabs(vehicle->vehicle.speed>0.0f ? 0.0f :
+						vehicle->vehicle.speed)/reverse_speed;
 					break;
 
 				case _vehicle_function_slide_absolute:
-					result = (real)fabs(vehicle->vehicle.unknown430)/maximum_slide;
+					result = (real)fabs(vehicle->vehicle.slide)/maximum_slide;
 					break;
 
 				case _vehicle_function_slide_left:
-					result = (real)fabs(vehicle->vehicle.unknown430)/left_slide;
+					result = (real)fabs(vehicle->vehicle.slide)/left_slide;
 					break;
 
 				case _vehicle_function_slide_right:
-					result = (real)fabs(vehicle->vehicle.unknown430)/right_slide;
+					result = (real)fabs(vehicle->vehicle.slide)/right_slide;
 					break;
 
 				case _vehicle_function_speed_or_slide:
-					result = MAX(fabs(vehicle->vehicle.unknown42c)/maximum_speed,
-						fabs(vehicle->vehicle.unknown430)/maximum_slide);
+					result = MAX(fabs(vehicle->vehicle.speed)/maximum_speed,
+						fabs(vehicle->vehicle.slide)/maximum_slide);
 					break;
 
 				case _vehicle_function_turn_absolute:
-					result = (real)fabs(vehicle->vehicle.unknown434)/maximum_turn;
+					result = (real)fabs(vehicle->vehicle.turn)/maximum_turn;
 					break;
 
 				case _vehicle_function_turn_left:
-					result = (real)fabs(vehicle->vehicle.unknown434)/left_turn;
+					result = (real)fabs(vehicle->vehicle.turn)/left_turn;
 					break;
 
 				case _vehicle_function_turn_right:
-					result = (real)fabs(vehicle->vehicle.unknown434)/right_turn;
+					result = (real)fabs(vehicle->vehicle.turn)/right_turn;
 					break;
 
 				case _vehicle_function_flag2:
@@ -788,28 +724,28 @@ void vehicle_export_function_values(
 					break;
 
 				case _vehicle_function_left_tread_position:
-					result = vehicle->vehicle.unknown43c/definition->wheel_circumference;
+					result = vehicle->vehicle.left_tread/definition->wheel_circumference;
 					break;
 
 				case _vehicle_function_right_tread_position:
-					result = vehicle->vehicle.unknown440/definition->wheel_circumference;
+					result = vehicle->vehicle.right_tread/definition->wheel_circumference;
 					break;
 
 				case _vehicle_function_speed_minus_turn:
-					result = (real)fabs(vehicle->vehicle.unknown42c-
-						vehicle->vehicle.unknown434)/maximum_speed;
+					result = (real)fabs(vehicle->vehicle.speed-
+						vehicle->vehicle.turn)/maximum_speed;
 					break;
 
 				case _vehicle_function_speed_plus_turn:
-					result = (real)fabs(vehicle->vehicle.unknown434+
-						vehicle->vehicle.unknown42c)/maximum_speed;
+					result = (real)fabs(vehicle->vehicle.turn+
+						vehicle->vehicle.speed)/maximum_speed;
 					break;
 
 				case _vehicle_function_wheel_position_a:
 				case _vehicle_function_wheel_position_b:
 				case _vehicle_function_wheel_position_c:
 				case _vehicle_function_wheel_position_d:
-					result = vehicle->vehicle.unknown438/definition->wheel_circumference;
+					result = vehicle->vehicle.wheel/definition->wheel_circumference;
 					break;
 
 				case _vehicle_function_sideslip:
@@ -826,11 +762,11 @@ void vehicle_export_function_values(
 				}
 
 				case _vehicle_function_unknown448:
-					result = vehicle->vehicle.unknown448;
+					result = vehicle->vehicle.thrust;
 					break;
 
 				case _vehicle_function_unknown444:
-					result = vehicle->vehicle.unknown444;
+					result = vehicle->vehicle.hover;
 					break;
 
 				case _vehicle_function_speed_blend:
@@ -840,8 +776,8 @@ void vehicle_export_function_values(
 					real blend;
 
 					dot_speed = (real)fabs(dot_product3d(&vehicle->object.translational_velocity, &vehicle->object.forward))/maximum_speed;
-					forward_value = (real)fabs(vehicle->vehicle.unknown42c)/forward_speed;
-					blend = PIN(((real)vehicle->vehicle.unknown428*0.2f+1.0f)*0.5f, 0.0f, 1.0f);
+					forward_value = (real)fabs(vehicle->vehicle.speed)/forward_speed;
+					blend = PIN(((real)vehicle->vehicle.airborne_ticks*0.2f+1.0f)*0.5f, 0.0f, 1.0f);
 					result = dot_speed*(1.0f-blend)+forward_value*blend;
 					break;
 				}
@@ -849,7 +785,7 @@ void vehicle_export_function_values(
 				case _vehicle_function_boost:
 					result = magnitude3d(&vehicle->object.translational_velocity)/
 						definition->unknown2f8;
-					result = (result*vehicle->vehicle.unknown448-0.05f)*
+					result = (result*vehicle->vehicle.thrust-0.05f)*
 						(1.0f/(0.9f-0.05f));
 					break;
 			}
@@ -928,7 +864,7 @@ long vehicle_find_pathfinding_surface_index(
 	long vehicle_index,
 	real_point3d *position)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	long surface_index = NONE;
@@ -957,9 +893,15 @@ long vehicle_find_pathfinding_surface_index(
 
 			if (collision_bsp_test_vector(1, bsp, 0, NULL, &origin, &vector, FLT_MAX, &result))
 			{
+				real t = result.t;
+
 				surface_index = result.surface_index;
 
-				point_from_line3d(&origin, &vector, result.t, position);
+				/* Preserve the January inline schedule without owning
+				 * point_from_line3d in this translation unit. */
+				position->x = vector.i*t + origin.x;
+				position->y = vector.j*t + origin.y;
+				position->z = vector.k*t + origin.z;
 			}
 			break;
 		}
@@ -970,34 +912,34 @@ long vehicle_find_pathfinding_surface_index(
 
 static void compute_airborne_ticks(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points,
+	struct mass_point_datum *mass_points,
 	void *state)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct physics_definition *physics = physics_definition_get(
 		vehicle_definition_get(vehicle->definition_index)->object.physics.index);
 	short mass_point_index;
 
-	if (vehicle->vehicle.unknown428<0xff)
-		vehicle->vehicle.unknown428++;
+	if (vehicle->vehicle.airborne_ticks<0xff)
+		vehicle->vehicle.airborne_ticks++;
 
 	for (mass_point_index = 0; mass_point_index<physics->mass_points.count; mass_point_index++)
 	{
-		struct vehicle_mass_point_state *mass_point = &mass_points[mass_point_index];
+		struct mass_point_datum *mass_point = &mass_points[mass_point_index];
 
 		if (TEST_FLAG(mass_point->flags, 1))
 		{
-			vehicle->vehicle.unknown428 = 0;
-			if (vehicle->vehicle.unknown42b<0xff)
-				vehicle->vehicle.unknown42b++;
+			vehicle->vehicle.airborne_ticks = 0;
+			if (vehicle->vehicle.on_ground_ticks<0xff)
+				vehicle->vehicle.on_ground_ticks++;
 			return;
 		}
 
 		if (TEST_FLAG(mass_point->flags, 4))
-			vehicle->vehicle.unknown428 = 0;
+			vehicle->vehicle.airborne_ticks = 0;
 	}
 
-	vehicle->vehicle.unknown42b = 0;
+	vehicle->vehicle.on_ground_ticks = 0;
 
 	return;
 }
@@ -1011,10 +953,10 @@ static real_vector3d *compute_acceleration(
 
 static void update_alien_fighter_physics_new(
 	long vehicle_index,
-	struct vehicle_powered_mass_point_state *state,
-	struct vehicle_mass_point_state *mass_points)
+	struct powered_mass_point_datum *state,
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -1030,12 +972,12 @@ static void update_alien_fighter_physics_new(
 		real_vector3d torque;
 		real throttle, average, spin, maximum;
 
-		scale_vector3d(&vehicle->object.forward, vehicle->vehicle.unknown42c, &torque);
+		scale_vector3d(&vehicle->object.forward, vehicle->vehicle.speed, &torque);
 
-		if (vehicle->vehicle.unknown42c>0.0f)
-			throttle = vehicle->vehicle.unknown42c/definition->unknown2f8;
+		if (vehicle->vehicle.speed>0.0f)
+			throttle = vehicle->vehicle.speed/definition->unknown2f8;
 		else
-			throttle = -(vehicle->vehicle.unknown42c/definition->unknown2fc);
+			throttle = -(vehicle->vehicle.speed/definition->unknown2fc);
 
 		compute_acceleration(&torque, &vehicle->object.translational_velocity, &axis,
 			throttle*definition->unknown300, throttle*definition->unknown304);
@@ -1089,26 +1031,26 @@ static void update_alien_fighter_physics_new(
 
 		spin = magnitude3d(&vehicle->object.angular_velocity)/definition->unknown314;
 
-		if (spin>vehicle->vehicle.unknown448)
+		if (spin>vehicle->vehicle.thrust)
 		{
-			maximum = PIN((1.0f-vehicle->vehicle.unknown448)*
-				(1.0f-vehicle->vehicle.unknown448)*0.2f, 0.01f, 0.05f);
+			maximum = PIN((1.0f-vehicle->vehicle.thrust)*
+				(1.0f-vehicle->vehicle.thrust)*0.2f, 0.01f, 0.05f);
 
-			vehicle->vehicle.unknown448 += MIN(spin-vehicle->vehicle.unknown448, maximum);
+			vehicle->vehicle.thrust += MIN(spin-vehicle->vehicle.thrust, maximum);
 		}
 		else
 		{
-			maximum = -MAX(vehicle->vehicle.unknown448*vehicle->vehicle.unknown448*0.05f,
+			maximum = -MAX(vehicle->vehicle.thrust*vehicle->vehicle.thrust*0.05f,
 				0.005f);
 
-			vehicle->vehicle.unknown448 += MAX(spin-vehicle->vehicle.unknown448, maximum);
+			vehicle->vehicle.thrust += MAX(spin-vehicle->vehicle.thrust, maximum);
 		}
 
-		state[0].unknown18 = vehicle->unit.seat_power[0];
-		state[0].unknown1c_quaternion = *global_identity_quaternion;
+		state[0].antigrav_fraction = vehicle->unit.seat_power[0];
+		state[0].rotation = *global_identity_quaternion;
 
-		state[1].unknown18 = vehicle->unit.seat_power[0];
-		state[1].unknown1c_quaternion = *global_identity_quaternion;
+		state[1].antigrav_fraction = vehicle->unit.seat_power[0];
+		state[1].rotation = *global_identity_quaternion;
 
 		physics_update(vehicle_index, state, mass_points, &force, &torque);
 	}
@@ -1122,10 +1064,10 @@ static void update_alien_fighter_physics_new(
 
 static void update_alien_fighter_physics_old(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points,
-	struct vehicle_powered_mass_point_state *state)
+	struct mass_point_datum *mass_points,
+	struct powered_mass_point_datum *state)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -1150,7 +1092,7 @@ static void update_alien_fighter_physics_old(
 
 		speed = dot_product3d(&vehicle->object.forward,
 			&vehicle->object.translational_velocity);
-		thrust = (vehicle->vehicle.unknown42c-speed)*physics->mass*0.05f;
+		thrust = (vehicle->vehicle.speed-speed)*physics->mass*0.05f;
 		lift = ((real)fabs(speed/definition->unknown2f8)*physics->mass)*global_gravity*1.05f;
 
 		force.i = lift*vehicle->object.up.i+thrust*vehicle->object.forward.i;
@@ -1191,17 +1133,17 @@ static void update_alien_fighter_physics_old(
 		torque.j = (scaled.j-vehicle->object.angular_velocity.j)*scale;
 		torque.k = (scaled.k-vehicle->object.angular_velocity.k)*scale;
 
-		state[0].unknown18 = vehicle->unit.seat_power[0];
-		state[0].unknown1c_quaternion.w = 1.0f;
-		state[0].unknown1c_quaternion.v.i = 0.0f;
-		state[0].unknown1c_quaternion.v.j = 0.0f;
-		state[0].unknown1c_quaternion.v.k = 0.0f;
+		state[0].antigrav_fraction = vehicle->unit.seat_power[0];
+		state[0].rotation.w = 1.0f;
+		state[0].rotation.v.i = 0.0f;
+		state[0].rotation.v.j = 0.0f;
+		state[0].rotation.v.k = 0.0f;
 
-		state[1].unknown18 = vehicle->unit.seat_power[0];
-		state[1].unknown1c_quaternion.w = 1.0f;
-		state[1].unknown1c_quaternion.v.i = 0.0f;
-		state[1].unknown1c_quaternion.v.j = 0.0f;
-		state[1].unknown1c_quaternion.v.k = 0.0f;
+		state[1].antigrav_fraction = vehicle->unit.seat_power[0];
+		state[1].rotation.w = 1.0f;
+		state[1].rotation.v.i = 0.0f;
+		state[1].rotation.v.j = 0.0f;
+		state[1].rotation.v.k = 0.0f;
 
 		scale_vector3d(&force, vehicle->unit.seat_power[0], &force);
 		scale_vector3d(&torque, vehicle->unit.seat_power[0], &torque);
@@ -1219,7 +1161,7 @@ static void update_alien_fighter_physics_old(
 static void slowly_stop_vehicle(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	real_point3d *object_position = &vehicle->object.position;
 	real_vector3d *velocity = &vehicle->object.translational_velocity;
 	real_vector3d *angular_velocity = &vehicle->object.angular_velocity;
@@ -1228,7 +1170,7 @@ static void slowly_stop_vehicle(
 	real_vector3d forward, up;
 	real magnitude;
 
-	vehicle->vehicle.unknown426--;
+	vehicle->vehicle.stop_time--;
 
 	velocity->i *= 0.835f;
 	velocity->j *= 0.835f;
@@ -1259,7 +1201,7 @@ static void slowly_stop_vehicle(
 		}
 	}
 
-	if (!vehicle->vehicle.unknown426)
+	if (!vehicle->vehicle.stop_time)
 	{
 		*velocity = *global_zero_vector3d;
 		*angular_velocity = *global_zero_vector3d;
@@ -1296,7 +1238,7 @@ static real_vector3d *compute_acceleration(
 static void create_ghost_effect(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 
@@ -1367,7 +1309,7 @@ static void create_ghost_effect(
 static void create_pelican_effect(
 	long vehicle_index)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 
@@ -1397,8 +1339,8 @@ static void create_pelican_effect(
 				&marker->matrix.forward, 0.0f, _pi/12, &direction);
 
 			length = (marker_index<marker_count
-				? vehicle->vehicle.unknown444
-				: vehicle->vehicle.unknown448)*6.0f+2.0f;
+				? vehicle->vehicle.hover
+				: vehicle->vehicle.thrust)*6.0f+2.0f;
 
 			vector.i = direction.i*length;
 			vector.j = direction.j*length;
@@ -1443,7 +1385,7 @@ void vehicle_preprocess_node_orientations(
 	long vehicle_index,
 	struct real_orientation *node_orientations)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct animation_graph *graph;
@@ -1470,7 +1412,7 @@ void vehicle_preprocess_node_orientations(
 	{
 		aiming_screen_apply(TAG_BLOCK_GET_ELEMENT(&graph->animations,
 			((short *)animation->animations.address)[0], struct animation),
-			animation, vehicle->vehicle.unknown434, 0.0f, node_orientations);
+			animation, vehicle->vehicle.turn, 0.0f, node_orientations);
 	}
 
 	if (animation->animations.count>1
@@ -1492,10 +1434,10 @@ void vehicle_preprocess_node_orientations(
 		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
 			((short *)animation->animations.address)[2], struct animation);
 
-		if (vehicle->vehicle.unknown42c<0.0f)
-			value = 0.5f-vehicle->vehicle.unknown42c/definition->unknown2fc*0.5f;
+		if (vehicle->vehicle.speed<0.0f)
+			value = 0.5f-vehicle->vehicle.speed/definition->unknown2fc*0.5f;
 		else
-			value = (vehicle->vehicle.unknown42c/definition->unknown2f8+1.0f)*0.5f;
+			value = (vehicle->vehicle.speed/definition->unknown2f8+1.0f)*0.5f;
 
 		overlay_animation_apply_continuous(overlay, value*(overlay->frame_count-1),
 			node_orientations);
@@ -1529,7 +1471,7 @@ void vehicle_preprocess_node_orientations(
 			((short *)animation->animations.address)[5], struct animation);
 
 		if (definition->wheel_circumference>0.0f)
-			value = vehicle->vehicle.unknown438/definition->wheel_circumference;
+			value = vehicle->vehicle.wheel/definition->wheel_circumference;
 		else
 			value = 0.0f;
 
@@ -1549,10 +1491,10 @@ void vehicle_preprocess_node_orientations(
 			overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
 				suspension->animation_index, struct animation);
 
-			if (vehicle->vehicle.unknown44c[suspension_index]==0xff)
+			if (vehicle->vehicle.suspension[suspension_index]==0xff)
 				value = 1.0f;
 			else
-				value = vehicle->vehicle.unknown44c[suspension_index]*(1.0f/255);
+				value = vehicle->vehicle.suspension[suspension_index]*(1.0f/255);
 
 			overlay_animation_apply_continuous(overlay, value*(overlay->frame_count-1),
 				node_orientations);
@@ -1564,10 +1506,10 @@ void vehicle_preprocess_node_orientations(
 
 static void update_human_plane_physics(
 	long vehicle_index,
-	struct vehicle_powered_mass_point_state *state,
-	struct vehicle_mass_point_state *mass_points)
+	struct powered_mass_point_datum *state,
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -1592,13 +1534,13 @@ static void update_human_plane_physics(
 	if (TEST_FLAG(vehicle->vehicle.flags, 1))
 	{
 		csmemset(mass_points, 0,
-			physics->mass_points.count*sizeof(struct vehicle_mass_point_state));
+			physics->mass_points.count*sizeof(struct mass_point_datum));
 		create_pelican_effect(vehicle_index);
 
 		return;
 	}
 
-	throttle = PIN(vehicle->vehicle.unknown42c, 0.0f, definition->unknown2f8)/
+	throttle = PIN(vehicle->vehicle.speed, 0.0f, definition->unknown2f8)/
 		definition->unknown2f8;
 
 	if (TEST_FLAG(vehicle->vehicle.flags, 2))
@@ -1608,12 +1550,12 @@ static void update_human_plane_physics(
 	else
 		factor = 0.75f;
 
-	vehicle->vehicle.unknown444 += PIN(factor*(1.0f-throttle*throttle)*
-		vehicle->unit.seat_power[0]-vehicle->vehicle.unknown444, -0.05f, 0.05f);
+	vehicle->vehicle.hover += PIN(factor*(1.0f-throttle*throttle)*
+		vehicle->unit.seat_power[0]-vehicle->vehicle.hover, -0.05f, 0.05f);
 
 	facing = vehicle->unit.desired_facing_vector;
 
-	vehicle->vehicle.unknown448 = throttle*throttle*vehicle->unit.seat_power[0];
+	vehicle->vehicle.thrust = throttle*throttle*vehicle->unit.seat_power[0];
 
 	ground.i = -(facing.k*facing.i);
 	ground.j = -(facing.k*facing.j);
@@ -1628,9 +1570,9 @@ static void update_human_plane_physics(
 
 	dot = dot_product3d(&vehicle->object.translational_velocity, &vehicle->object.forward);
 
-	drive = (vehicle->vehicle.unknown42c-dot)*vehicle->vehicle.unknown448*physics->mass*0.05f;
+	drive = (vehicle->vehicle.speed-dot)*vehicle->vehicle.thrust*physics->mass*0.05f;
 	lift = ((real)fabs(dot/definition->unknown2f8)*1.05f+
-		vehicle->vehicle.unknown444*1.3f)*global_gravity*physics->mass;
+		vehicle->vehicle.hover*1.3f)*global_gravity*physics->mass;
 
 	force.i = lift*vehicle->object.up.i+drive*vehicle->object.forward.i;
 	force.j = lift*vehicle->object.up.j+drive*vehicle->object.forward.j;
@@ -1681,7 +1623,7 @@ static boolean update_suspension(
 	long vehicle_index)
 {
 	boolean result = FALSE;
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 
@@ -1737,10 +1679,10 @@ static boolean update_suspension(
 						mass_point = TAG_BLOCK_GET_ELEMENT(&physics->mass_points,
 							suspension->mass_point_index, struct physics_mass_point_definition);
 
-						if (vehicle->vehicle.unknown44c[suspension_index]==0xff)
+						if (vehicle->vehicle.suspension[suspension_index]==0xff)
 							current = 1.0f;
 						else
-							current = vehicle->vehicle.unknown44c[suspension_index]*(1.0f/255);
+							current = vehicle->vehicle.suspension[suspension_index]*(1.0f/255);
 
 						matrix4x3_transform_point(&matrix, &mass_point->position, &point);
 						matrix4x3_transform_normal(&matrix, &mass_point->normal, &normal);
@@ -1767,7 +1709,7 @@ static boolean update_suspension(
 						if (shift-current>maximum_shift)
 							maximum_shift = shift-current;
 
-						vehicle->vehicle.unknown44c[suspension_index] =
+						vehicle->vehicle.suspension[suspension_index] =
 							quantize_real_to_byte_lower_bound(0.0f, 1.0f, (shift+current)*0.5f);
 					}
 				}
@@ -1790,9 +1732,9 @@ static boolean update_suspension(
 static void create_crashing_effects(
 	long vehicle_index,
 	real_vector3d const *previous_velocity,
-	struct vehicle_mass_point_state *mass_points)
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -1856,7 +1798,7 @@ static void create_crashing_effects(
 
 static void update_turret_physics(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points)
+	struct mass_point_datum *mass_points)
 {
 	physics_update(vehicle_index, NULL, mass_points, NULL, NULL);
 
@@ -1865,10 +1807,10 @@ static void update_turret_physics(
 
 static void create_slipping_effects(
 	long vehicle_index,
-	struct vehicle_powered_mass_point_state *state,
-	struct vehicle_mass_point_state *mass_points)
+	struct powered_mass_point_datum *state,
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -1880,37 +1822,37 @@ static void create_slipping_effects(
 
 		for (mass_point_index = 0; mass_point_index<physics->mass_points.count; mass_point_index++)
 		{
-			struct vehicle_mass_point_state *mass_point = &mass_points[mass_point_index];
+			struct mass_point_datum *mass_point = &mass_points[mass_point_index];
 			struct physics_mass_point_definition *mass_point_definition = TAG_BLOCK_GET_ELEMENT(
 				&physics->mass_points, mass_point_index, struct physics_mass_point_definition);
 
 			if (TEST_FLAG(mass_point->flags, 1))
 			{
-				real speed = magnitude3d(&mass_point->velocity);
+				real speed = magnitude3d(&mass_point->velocity_relative_to_ground);
 
 				if (speed>0.03f)
 				{
 					real scale = (speed-0.03f)*4.5454545f;
-					real depth = mass_point->unknown74-mass_point_definition->unknown68+0.003f;
+					real depth = mass_point->ground_depth-mass_point_definition->unknown68+0.003f;
 					real_point3d position;
 					real_vector3d normal;
 					real inverse;
 
-					position.x = depth*mass_point->normal.i+mass_point->position.x;
-					position.y = depth*mass_point->normal.j+mass_point->position.y;
-					position.z = depth*mass_point->normal.k+mass_point->position.z;
+					position.x = depth*mass_point->ground_plane.n.i+mass_point->position.x;
+					position.y = depth*mass_point->ground_plane.n.j+mass_point->position.y;
+					position.z = depth*mass_point->ground_plane.n.k+mass_point->position.z;
 
 					inverse = 0.8660254f/speed;
 
-					scale_vector3d(&mass_point->velocity, inverse, &normal);
+					scale_vector3d(&mass_point->velocity_relative_to_ground, inverse, &normal);
 
-					normal.i += mass_point->normal.i*0.5f;
-					normal.j += mass_point->normal.j*0.5f;
-					normal.k += mass_point->normal.k*0.5f;
+					normal.i += mass_point->ground_plane.n.i*0.5f;
+					normal.j += mass_point->ground_plane.n.j*0.5f;
+					normal.k += mass_point->ground_plane.n.k*0.5f;
 
 					material_effect_new(definition->material_effects.index,
 						TEST_FLAG(mass_point_definition->flags, 0) ? 10 : 9,
-						mass_point->material_index, &position, &normal,
+						mass_point->ground_material_type, &position, &normal,
 						&vehicle->object.location, PIN(scale, 0.0f, 1.0f));
 				}
 			}
@@ -1922,36 +1864,36 @@ static void create_slipping_effects(
 
 static void update_human_tank_physics(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points,
-	struct vehicle_powered_mass_point_state *state)
+	struct mass_point_datum *mass_points,
+	struct powered_mass_point_datum *state)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
 		definition->unit.object.physics.index);
-	real left = vehicle->vehicle.unknown42c-vehicle->vehicle.unknown434;
-	real right = vehicle->vehicle.unknown434+vehicle->vehicle.unknown42c;
+	real left = vehicle->vehicle.speed-vehicle->vehicle.turn;
+	real right = vehicle->vehicle.turn+vehicle->vehicle.speed;
 
-	vehicle->vehicle.unknown43c = left+vehicle->vehicle.unknown43c;
-	vehicle->vehicle.unknown43c = (real)fmod(vehicle->vehicle.unknown43c, definition->wheel_circumference);
-	if (vehicle->vehicle.unknown43c<0.0f)
-		vehicle->vehicle.unknown43c += definition->wheel_circumference;
+	vehicle->vehicle.left_tread = left+vehicle->vehicle.left_tread;
+	vehicle->vehicle.left_tread = (real)fmod(vehicle->vehicle.left_tread, definition->wheel_circumference);
+	if (vehicle->vehicle.left_tread<0.0f)
+		vehicle->vehicle.left_tread += definition->wheel_circumference;
 
-	vehicle->vehicle.unknown440 = right+vehicle->vehicle.unknown440;
-	vehicle->vehicle.unknown440 = (real)fmod(vehicle->vehicle.unknown440, definition->wheel_circumference);
-	if (vehicle->vehicle.unknown440<0.0f)
-		vehicle->vehicle.unknown440 += definition->wheel_circumference;
+	vehicle->vehicle.right_tread = right+vehicle->vehicle.right_tread;
+	vehicle->vehicle.right_tread = (real)fmod(vehicle->vehicle.right_tread, definition->wheel_circumference);
+	if (vehicle->vehicle.right_tread<0.0f)
+		vehicle->vehicle.right_tread += definition->wheel_circumference;
 
 	if (physics->powered_mass_points.count==2)
 	{
-		state[0].unknown0 = left;
-		set_real_vector2d(&state[0].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[0].unknown24, 0.0f, 1.0f);
+		state[0].ground_friction_velocity = left;
+		set_real_vector2d(&state[0].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[0].rotation_pairs[1], 0.0f, 1.0f);
 
-		state[1].unknown0 = right;
-		set_real_vector2d(&state[1].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[1].unknown24, 0.0f, 1.0f);
+		state[1].ground_friction_velocity = right;
+		set_real_vector2d(&state[1].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[1].rotation_pairs[1], 0.0f, 1.0f);
 
 		physics_update(vehicle_index, state, mass_points, NULL, NULL);
 	}
@@ -1989,9 +1931,9 @@ static real vehicle_update_upending_velocity(
 }
 
 static real vehicle_update_minimum_upending_velocity(
-	struct vehicle_runtime_datum *vehicle)
+	struct vehicle_datum *vehicle)
 {
-	vehicle->vehicle.unknown42a++;
+	vehicle->vehicle.upending_ticks++;
 	return -0.01f;
 }
 
@@ -2027,10 +1969,10 @@ static real vehicle_triple_product3d_target(
 }
 static void update_human_boat_physics(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points,
-	struct vehicle_powered_mass_point_state *state)
+	struct mass_point_datum *mass_points,
+	struct powered_mass_point_datum *state)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -2053,13 +1995,13 @@ static void update_human_boat_physics(
 		real const *forward;
 
 		speed = (real)fabs(magnitude3d(&vehicle->object.translational_velocity)*2.5f);
-		maximum_angle = vehicle->vehicle.unknown434*0.5f;
+		maximum_angle = vehicle->vehicle.turn*0.5f;
 		angle = 1.0f-CEILING(speed, 1.0f);
 
-		state[0].unknown4 = vehicle->vehicle.unknown42c;
-		state[0].unknownc = 0.003f;
+		state[0].water_friction_velocity = vehicle->vehicle.speed;
+		state[0].water_lift_ratio = 0.003f;
 		angle *= maximum_angle;
-		rotation = state[0].unknown1c_values;
+		rotation = state[0].rotation_values;
 		rotation[0] = 0.0f;
 		rotation[2] = sine(angle);
 		rotation[1] = 0.0f;
@@ -2070,13 +2012,13 @@ static void update_human_boat_physics(
 
 		forward = vehicle->object.forward.n;
 
-		state[1].unknownc = 0.003f;
-		set_real_vector2d(&state[1].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[1].unknown24, 0.0f, 1.0f);
+		state[1].water_lift_ratio = 0.003f;
+		set_real_vector2d(&state[1].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[1].rotation_pairs[1], 0.0f, 1.0f);
 
-		state[2].unknownc = 0.005f;
-		set_real_vector2d(&state[2].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[2].unknown24, 0.0f, 1.0f);
+		state[2].water_lift_ratio = 0.005f;
+		set_real_vector2d(&state[2].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[2].rotation_pairs[1], 0.0f, 1.0f);
 
 		negative_k = -vehicle->object.forward.k;
 
@@ -2127,33 +2069,33 @@ static void update_human_boat_physics(
 
 static void update_human_jeep_physics(
 	long vehicle_index,
-	struct vehicle_mass_point_state *mass_points,
-	struct vehicle_powered_mass_point_state *state)
+	struct mass_point_datum *mass_points,
+	struct powered_mass_point_datum *state)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
 		definition->unit.object.physics.index);
 
-	vehicle->vehicle.unknown438 = vehicle->vehicle.unknown42c+vehicle->vehicle.unknown438;
-	vehicle->vehicle.unknown438 = (real)fmod(vehicle->vehicle.unknown438, definition->wheel_circumference);
-	if (vehicle->vehicle.unknown438<0.0f)
-		vehicle->vehicle.unknown438 += definition->wheel_circumference;
+	vehicle->vehicle.wheel = vehicle->vehicle.speed+vehicle->vehicle.wheel;
+	vehicle->vehicle.wheel = (real)fmod(vehicle->vehicle.wheel, definition->wheel_circumference);
+	if (vehicle->vehicle.wheel<0.0f)
+		vehicle->vehicle.wheel += definition->wheel_circumference;
 
 	if (physics->powered_mass_points.count==2)
 	{
-		real angle = vehicle->vehicle.unknown434*0.5f;
+		real angle = vehicle->vehicle.turn*0.5f;
 		real cs = cosine(angle);
 		real sn = sine(angle);
 
-		state[0].unknown0 = vehicle->vehicle.unknown42c;
-		set_real_vector2d(&state[0].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[0].unknown24, sn, cs);
+		state[0].ground_friction_velocity = vehicle->vehicle.speed;
+		set_real_vector2d(&state[0].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[0].rotation_pairs[1], sn, cs);
 
-		state[1].unknown0 = vehicle->vehicle.unknown42c;
-		set_real_vector2d(&state[1].unknown1c, 0.0f, 0.0f);
-		set_real_vector2d(&state[1].unknown24, -sn, cs);
+		state[1].ground_friction_velocity = vehicle->vehicle.speed;
+		set_real_vector2d(&state[1].rotation_pairs[0], 0.0f, 0.0f);
+		set_real_vector2d(&state[1].rotation_pairs[1], -sn, cs);
 
 		physics_update(vehicle_index, state, mass_points, NULL, NULL);
 	}
@@ -2168,10 +2110,10 @@ static void update_human_jeep_physics(
 static void update_alien_scout_physics(
 	long vehicle_index,
 	real steering,
-	struct vehicle_powered_mass_point_state *state,
-	struct vehicle_mass_point_state *mass_points)
+	struct powered_mass_point_datum *state,
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct vehicle_definition *definition = vehicle_specific_definition_get(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
@@ -2195,11 +2137,11 @@ static void update_alien_scout_physics(
 		mass_point_index<physics->powered_mass_points.count;
 		mass_point_index++)
 	{
-		state[mass_point_index].unknown18 = antigrav;
-		state[mass_point_index].unknown1c_quaternion.v.i = 0.0f;
-		state[mass_point_index].unknown1c_quaternion.v.j = 0.0f;
-		state[mass_point_index].unknown1c_quaternion.v.k = 0.0f;
-		state[mass_point_index].unknown1c_quaternion.w = 1.0f;
+		state[mass_point_index].antigrav_fraction = antigrav;
+		state[mass_point_index].rotation.v.i = 0.0f;
+		state[mass_point_index].rotation.v.j = 0.0f;
+		state[mass_point_index].rotation.v.k = 0.0f;
+		state[mass_point_index].rotation.w = 1.0f;
 	}
 
 	if (water_depth<0.5f && vehicle->object.up.k>-0.2f)
@@ -2213,7 +2155,7 @@ static void update_alien_scout_physics(
 		matrix4x3_inverse_transform_vector(&matrix,
 			&vehicle->object.translational_velocity, &local_velocity);
 
-		if (vehicle->vehicle.unknown444>0.0f)
+		if (vehicle->vehicle.hover>0.0f)
 		{
 			real maximum_speed = definition->unknown2f8;
 			real maximum_acceleration;
@@ -2232,22 +2174,22 @@ static void update_alien_scout_physics(
 			acceleration.j = target_velocity.j-local_velocity.j;
 			acceleration.k = 0.0f;
 
-			if (vehicle->vehicle.unknown42b>0 && fabs(steering)>0.785398185f)
+			if (vehicle->vehicle.on_ground_ticks>0 && fabs(steering)>0.785398185f)
 			{
-				real reduction = MIN(vehicle->vehicle.unknown42b*0.05f, 0.98f);
+				real reduction = MIN(vehicle->vehicle.on_ground_ticks*0.05f, 0.98f);
 				maximum_acceleration *= 1.0f-reduction;
 			}
 
 			limit3d(&acceleration, maximum_acceleration);
 			matrix4x3_transform_vector(&matrix, &acceleration, &acceleration);
 
-			scale = physics->mass*vehicle->vehicle.unknown444;
+			scale = physics->mass*vehicle->vehicle.hover;
 			magic_force.i += acceleration.i*scale;
 			magic_force.j += acceleration.j*scale;
 			magic_force.k += acceleration.k*scale;
 		}
 
-		if (vehicle->vehicle.unknown444>0.0f)
+		if (vehicle->vehicle.hover>0.0f)
 		{
 			real current = dot_product3d(object_up,
 				object_angular_velocity);
@@ -2261,14 +2203,14 @@ static void update_alien_scout_physics(
 
 			error = PIN(desired-current, -0.0034906587f, 0.0034906587f);
 			torque = error*physics->zz_moment;
-			torque *= vehicle->vehicle.unknown444;
+			torque *= vehicle->vehicle.hover;
 
 			magic_torque.i += object_up->i*torque;
 			magic_torque.j += object_up->j*torque;
 			magic_torque.k += object_up->k*torque;
 		}
 
-		if (vehicle->vehicle.unknown444<1.0f)
+		if (vehicle->vehicle.hover<1.0f)
 		{
 			real_vector3d left;
 			real_vector2d forward2d;
@@ -2341,7 +2283,7 @@ static void update_alien_scout_physics(
 				real_vector3d torque = *global_zero_vector3d;
 				real left_scale = physics->yy_moment*torque_a;
 				real forward_scale = -(physics->xx_moment*torque_b);
-				real scale = 1.0f-vehicle->vehicle.unknown444;
+				real scale = 1.0f-vehicle->vehicle.hover;
 
 				torque.i += left.i*left_scale;
 				torque.j += left.j*left_scale;
@@ -2368,28 +2310,28 @@ static void update_alien_scout_physics(
 
 			if (speed>0.0f)
 			{
-				real torque = physics->yy_moment*speed*vehicle->vehicle.unknown444*-0.005817764f;
+				real torque = physics->yy_moment*speed*vehicle->vehicle.hover*-0.005817764f;
 				real lift;
 
 				magic_torque.i += left.i*torque;
 				magic_torque.j += left.j*torque;
 				magic_torque.k += left.k*torque;
 
-				lift = physics->mass*speed*vehicle->vehicle.unknown444*0.004f;
+				lift = physics->mass*speed*vehicle->vehicle.hover*0.004f;
 				magic_force.i += global_up3d->i*lift;
 				magic_force.j += global_up3d->j*lift;
 				magic_force.k += global_up3d->k*lift;
 			}
 
-			if (vehicle->vehicle.unknown428>0)
+			if (vehicle->vehicle.airborne_ticks>0)
 			{
 				real_vector3d axis;
 
 				cross_product3d(&left, global_up3d, &axis);
 				if (normalize3d(&axis)>0.0f)
 				{
-					real fade = PIN(1.0f-vehicle->vehicle.unknown428*(1.0f/30), 0.0f, 1.0f);
-					real axis_scale = (1.0f-vehicle->vehicle.unknown444)*
+					real fade = PIN(1.0f-vehicle->vehicle.airborne_ticks*(1.0f/30), 0.0f, 1.0f);
+					real axis_scale = (1.0f-vehicle->vehicle.hover)*
 						physics->mass*fade*0.002f;
 					real up_scale;
 
@@ -2397,7 +2339,7 @@ static void update_alien_scout_physics(
 					magic_force.j += axis.j*axis_scale;
 					magic_force.k += axis.k*axis_scale;
 
-					up_scale = (1.0f-vehicle->vehicle.unknown444)*
+					up_scale = (1.0f-vehicle->vehicle.hover)*
 						physics->mass*fade*0.001f;
 					magic_force.i += global_up3d->i*up_scale;
 					magic_force.j += global_up3d->j*up_scale;
@@ -2442,12 +2384,12 @@ static void update_alien_scout_physics(
 			ratio = (real)(short)grounded_count/(real)(short)powered_count;
 
 		target = PIN(ratio*maximum, 0.0f, 1.0f);
-		if (target-vehicle->vehicle.unknown444>0.1f)
-			target = vehicle->vehicle.unknown444+0.1f;
-		else if (target-vehicle->vehicle.unknown444<-0.1f)
-			target = vehicle->vehicle.unknown444-0.1f;
+		if (target-vehicle->vehicle.hover>0.1f)
+			target = vehicle->vehicle.hover+0.1f;
+		else if (target-vehicle->vehicle.hover<-0.1f)
+			target = vehicle->vehicle.hover-0.1f;
 
-		vehicle->vehicle.unknown444 = target;
+		vehicle->vehicle.hover = target;
 	}
 
 	create_ghost_effect(vehicle_index);
@@ -2457,10 +2399,10 @@ static void update_alien_scout_physics(
 
 static void update_alien_fighter_physics(
 	long vehicle_index,
-	struct vehicle_powered_mass_point_state *state,
-	struct vehicle_mass_point_state *mass_points)
+	struct powered_mass_point_datum *state,
+	struct mass_point_datum *mass_points)
 {
-	struct vehicle_runtime_datum *vehicle = vehicle_runtime_get(vehicle_index);
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
 	struct unit_definition *definition = vehicle_definition_get(vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(definition->object.physics.index);
 
@@ -2482,14 +2424,14 @@ file-static call topology intact while closing it. */
 boolean vehicle_update(
 	long vehicle_index)
 {
-	struct vehicle_mass_point_state mass_points[32];
-	struct vehicle_powered_mass_point_state powered_mass_points[32];
-	struct vehicle_runtime_datum *vehicle;
+	struct mass_point_datum mass_points[32];
+	struct powered_mass_point_datum powered_mass_points[32];
+	struct vehicle_datum *vehicle;
 	real steering_angle;
 	real torque;
 	struct vehicle_definition *definition;
 
-	vehicle = vehicle_runtime_get(vehicle_index);
+	vehicle = vehicle_datum_get(vehicle_index);
 	definition = vehicle_specific_definition_get(vehicle->definition_index);
 
 	profile_enter(vehicle_update_section);
@@ -2514,8 +2456,8 @@ boolean vehicle_update(
 	SET_FLAG(vehicle->vehicle.flags, 3,
 		TEST_FLAG(vehicle->unit.control_flags, _unit_control_jump_bit) ||
 		(TEST_FLAG(definition->flags, 4) &&
-			((vehicle->unit.throttle.i>0.0f && vehicle->vehicle.unknown42c<0.0f) ||
-			(vehicle->unit.throttle.i<0.0f && vehicle->vehicle.unknown42c>0.0f))));
+			((vehicle->unit.throttle.i>0.0f && vehicle->vehicle.speed<0.0f) ||
+			(vehicle->unit.throttle.i<0.0f && vehicle->vehicle.speed>0.0f))));
 
 	{
 		real_vector3d const *forward = &vehicle->object.forward;
@@ -2537,11 +2479,11 @@ boolean vehicle_update(
 		word vehicle_flags = vehicle->vehicle.flags;
 
 		if (TEST_FLAG(vehicle_flags, 4) &&
-			vehicle->vehicle.unknown429 &&
-			vehicle->vehicle.unknown42a<30 &&
+			vehicle->vehicle.upending_type &&
+			vehicle->vehicle.upending_ticks<30 &&
 			vehicle->object.up.k<=0.9f)
 		{
-			byte righting_axis = vehicle->vehicle.unknown429;
+			byte righting_axis = vehicle->vehicle.upending_type;
 			real_vector3d torque_axis;
 			real roll;
 
@@ -2566,8 +2508,11 @@ boolean vehicle_update(
 				real_vector3d cross;
 
 				cross_product3d(&vehicle->object.forward, &vehicle->object.up, &cross);
-				point_from_line3d((real_point3d *)&torque_axis, &cross,
-					-vehicle->object.forward.k, (real_point3d *)&torque_axis);
+				point_from_line3d(
+					(real_point3d *)&torque_axis,
+					&cross,
+					-vehicle->object.forward.k,
+					(real_point3d *)&torque_axis);
 			}
 
 			scale_vector3d(&torque_axis, torque, &vehicle->object.angular_velocity);
@@ -2583,7 +2528,7 @@ boolean vehicle_update(
 							-0.01f>vehicle->object.translational_velocity.k
 							? vehicle_update_upending_velocity(
 								&vehicle->object.translational_velocity.k,
-								&vehicle->vehicle.unknown42a)
+								&vehicle->vehicle.upending_ticks)
 							: vehicle_update_minimum_upending_velocity(
 								vehicle);
 						goto seek_speed;
@@ -2600,12 +2545,12 @@ boolean vehicle_update(
 				}
 			}
 
-			vehicle->vehicle.unknown42a++;
+			vehicle->vehicle.upending_ticks++;
 		}
 		else
 		{
-			vehicle->vehicle.unknown42a = 0;
-			vehicle->vehicle.unknown429 = 0;
+			vehicle->vehicle.upending_ticks = 0;
+			vehicle->vehicle.upending_type = 0;
 			vehicle->vehicle.flags &= ~FLAG(4);
 		}
 	}
@@ -2618,21 +2563,21 @@ seek_speed:
 		if (TEST_FLAG(vehicle->vehicle.flags, 3))
 		{
 			physics_variable_speed_update_seek(
-				&vehicle->vehicle.unknown42c, speed_parameters, 0.0f, 1.0f);
+				&vehicle->vehicle.speed, speed_parameters, 0.0f, 1.0f);
 		}
 		else
 		{
 			physics_variable_speed_update_seek(
-				&vehicle->vehicle.unknown42c, speed_parameters, vehicle->unit.throttle.i, 1.0f);
+				&vehicle->vehicle.speed, speed_parameters, vehicle->unit.throttle.i, 1.0f);
 			physics_variable_speed_update_seek(
-				&vehicle->vehicle.unknown430,
+				&vehicle->vehicle.slide,
 				(struct physics_variable_speed_parameters *)&definition->unknown330,
 				vehicle->unit.throttle.j, 1.0f);
 		}
 
 		if (definition->vehicle_type)
 		{
-			real desired_position = vehicle->vehicle.unknown42c<0.0f
+			real desired_position = vehicle->vehicle.speed<0.0f
 				? -steering_angle
 				: steering_angle;
 
@@ -2642,7 +2587,7 @@ seek_speed:
 				desired_position = DEGREES_TO_RADIANS(definition->unknown308);
 
 			physics_variable_position_update_seek(
-				&vehicle->vehicle.unknown434,
+				&vehicle->vehicle.turn,
 				&definition->unknown308,
 				FALSE,
 				desired_position,
@@ -2650,10 +2595,10 @@ seek_speed:
 		}
 		else
 		{
-			if (vehicle->vehicle.unknown42c==0.0f)
+			if (vehicle->vehicle.speed==0.0f)
 			{
 				physics_variable_speed_update_seek(
-					&vehicle->vehicle.unknown434, speed_parameters, 0.0f, 1.0f);
+					&vehicle->vehicle.turn, speed_parameters, 0.0f, 1.0f);
 			}
 			else
 			{
@@ -2662,7 +2607,7 @@ seek_speed:
 				normalized = PIN(normalized, -1.0f, 1.0f);
 
 				physics_variable_speed_update_seek(
-					&vehicle->vehicle.unknown434,
+					&vehicle->vehicle.turn,
 					speed_parameters,
 					normalized*definition->unknown2f8,
 					2.0f);
@@ -2674,11 +2619,11 @@ seek_speed:
 	{
 		unsigned long flags = definition->flags;
 
-		if ((TEST_FLAG(flags, 0) && vehicle->vehicle.unknown42c!=0.0f) ||
-			(TEST_FLAG(flags, 1) && vehicle->vehicle.unknown434!=0.0f) ||
+		if ((TEST_FLAG(flags, 0) && vehicle->vehicle.speed!=0.0f) ||
+			(TEST_FLAG(flags, 1) && vehicle->vehicle.turn!=0.0f) ||
 			(TEST_FLAG(flags, 2) && vehicle->unit.seat_power[0]!=0.0f) ||
 			(TEST_FLAG(flags, 3) && vehicle->unit.seat_power[1]!=0.0f) ||
-			(TEST_FLAG(flags, 5) && vehicle->vehicle.unknown430!=0.0f))
+			(TEST_FLAG(flags, 5) && vehicle->vehicle.slide!=0.0f))
 		{
 			vehicle->object.flags &= ~FLAG(_object_at_rest_bit);
 		}
@@ -2725,7 +2670,7 @@ seek_speed:
 		compute_airborne_ticks(vehicle_index, mass_points, powered_mass_points);
 
 		if (TEST_FLAG(vehicle->object.flags, _object_at_rest_bit))
-			vehicle->vehicle.unknown426 = 15;
+			vehicle->vehicle.stop_time = 15;
 
 		if (!TEST_FLAG(vehicle->object.flags, _object_no_collisions_bit) &&
 			TEST_FLAG(FLAG(_vehicle_type_human_plane) | FLAG(_vehicle_type_alien_fighter),
@@ -2751,7 +2696,7 @@ seek_speed:
 			}
 		}
 	}
-	else if (vehicle->vehicle.unknown426>0)
+	else if (vehicle->vehicle.stop_time>0)
 	{
 		slowly_stop_vehicle(vehicle_index);
 		update_suspension(vehicle_index);
@@ -2794,7 +2739,7 @@ animate:
 	}
 
 	{
-		boolean blur = fabs(vehicle->vehicle.unknown42c)>=definition->unknown318;
+		boolean blur = fabs(vehicle->vehicle.speed)>=definition->unknown318;
 
 		if (blur!=TEST_FLAG(vehicle->vehicle.flags, 0))
 		{

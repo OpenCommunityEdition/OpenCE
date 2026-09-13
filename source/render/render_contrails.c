@@ -48,12 +48,6 @@ enum
 
 enum
 {
-	_rasterizer_lock_none = 0,
-	_rasterizer_lock_contrail = 15,
-};
-
-enum
-{
 	_contrail_point_transitioning_bit = 1,
 };
 

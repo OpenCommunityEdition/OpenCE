@@ -23,7 +23,7 @@ symbols in this file:
 0015FC80 0010:
 	_code_0015fc80 (0000)
 0015FC90 0850:
-	_code_0015fc90 (0000)
+	_rasterizer_screen_effect_set_texture_transforms (0000)
 001604E0 0f30:
 	__rasterizer_screen_effect (0000)
 00161410 0540:
@@ -244,7 +244,7 @@ static real_vector2d vector2d_reciprocal(
 	return reciprocal;
 }
 
-static void rasterizer_screen_effect_set_vertex_shader_constants(
+static void rasterizer_screen_effect_set_texture_transforms(
 	struct rasterizer_cinematic_screen_effect_parameters const *parameters,
 	short pass,
 	short pass_count)
@@ -730,7 +730,7 @@ void _rasterizer_screen_effect(
 				D3DRS_ZBIAS,
 				0);
 
-			rasterizer_screen_effect_set_vertex_shader_constants(parameters, pass, pass_count);
+			rasterizer_screen_effect_set_texture_transforms(parameters, pass, pass_count);
 
 			if (destination_target != NONE)
 				rasterizer_set_target(destination_target, FALSE, FALSE, FALSE, FALSE);

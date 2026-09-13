@@ -8,7 +8,19 @@
 unsigned long const rasterizer_frame_statistics_layout[] =
 {
 	sizeof(struct rasterizer_frame_statistics_globals),
-	FRAME_STATISTICS_FIELD(reserved000),
+	FRAME_STATISTICS_FIELD(frames_per_second),
+	FRAME_STATISTICS_FIELD(fps_sample_count),
+	FRAME_STATISTICS_FIELD(pad006),
+	FRAME_STATISTICS_FIELD(average_frames_per_second),
+	FRAME_STATISTICS_FIELD(minimum_frames_per_second),
+	FRAME_STATISTICS_FIELD(maximum_frames_per_second),
+	FRAME_STATISTICS_FIELD(fogged_object_count),
+	FRAME_STATISTICS_FIELD(normal_object_count),
+	FRAME_STATISTICS_FIELD(fast_object_count),
+	FRAME_STATISTICS_FIELD(scenery_object_count),
+	FRAME_STATISTICS_FIELD(lightmap_dynamic_vertex_count),
+	FRAME_STATISTICS_FIELD(lightmap_dynamic_triangle_count),
+	FRAME_STATISTICS_FIELD(lightmap_dynamic_draw_count),
 	FRAME_STATISTICS_FIELD(shadow_count),
 	FRAME_STATISTICS_FIELD(shadow_vertex_count),
 	FRAME_STATISTICS_FIELD(shadow_triangle_count),
@@ -43,9 +55,21 @@ unsigned long const rasterizer_frame_statistics_layout[] =
 	FRAME_STATISTICS_FIELD(environment_fog_dynamic_vertex_count),
 	FRAME_STATISTICS_FIELD(environment_fog_dynamic_triangle_count),
 	FRAME_STATISTICS_FIELD(environment_fog_dynamic_draw_count),
-	FRAME_STATISTICS_FIELD(reserved0B8),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_dynamic_vertex_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_dynamic_triangle_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_dynamic_draw_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_model_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_static_vertex_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_static_triangle_count),
+	FRAME_STATISTICS_FIELD(environment_fog_screen_static_draw_count),
 	FRAME_STATISTICS_FIELD(model_count),
-	FRAME_STATISTICS_FIELD(reserved0D8),
+	FRAME_STATISTICS_FIELD(model_vertex_count),
+	FRAME_STATISTICS_FIELD(model_triangle_count),
+	FRAME_STATISTICS_FIELD(model_draw_count),
+	FRAME_STATISTICS_FIELD(transparent_model_vertex_count),
+	FRAME_STATISTICS_FIELD(transparent_model_triangle_count),
+	FRAME_STATISTICS_FIELD(transparent_model_maximum_triangle_count),
+	FRAME_STATISTICS_FIELD(transparent_model_submit_count),
 	FRAME_STATISTICS_FIELD(model_shadow_count),
 	FRAME_STATISTICS_FIELD(model_shadow_vertex_count),
 	FRAME_STATISTICS_FIELD(model_shadow_triangle_count),
@@ -69,7 +93,8 @@ unsigned long const rasterizer_frame_statistics_layout[] =
 	FRAME_STATISTICS_FIELD(pixel_shader_pushbuffer_bytes),
 	FRAME_STATISTICS_FIELD(model_skinning_constant_bytes),
 	FRAME_STATISTICS_FIELD(model_lighting_constant_bytes),
-	FRAME_STATISTICS_FIELD(reserved168),
+	FRAME_STATISTICS_FIELD(model_vertex_shader_work_accumulated),
+	FRAME_STATISTICS_FIELD(reserved16C),
 };
 
 static void frame_statistics_expect_signed(
@@ -94,6 +119,13 @@ static void frame_statistics_expect_unsigned(
 void rasterizer_frame_statistics_type_contract(
 	struct rasterizer_frame_statistics_globals *statistics)
 {
+	EXPECT_SIGNED(fogged_object_count);
+	EXPECT_SIGNED(normal_object_count);
+	EXPECT_SIGNED(fast_object_count);
+	EXPECT_SIGNED(scenery_object_count);
+	EXPECT_UNSIGNED(lightmap_dynamic_vertex_count);
+	EXPECT_UNSIGNED(lightmap_dynamic_triangle_count);
+	EXPECT_UNSIGNED(lightmap_dynamic_draw_count);
 	EXPECT_UNSIGNED(shadow_count);
 	EXPECT_UNSIGNED(shadow_vertex_count);
 	EXPECT_UNSIGNED(shadow_triangle_count);
@@ -128,7 +160,21 @@ void rasterizer_frame_statistics_type_contract(
 	EXPECT_UNSIGNED(environment_fog_dynamic_vertex_count);
 	EXPECT_UNSIGNED(environment_fog_dynamic_triangle_count);
 	EXPECT_UNSIGNED(environment_fog_dynamic_draw_count);
+	EXPECT_UNSIGNED(environment_fog_screen_dynamic_vertex_count);
+	EXPECT_UNSIGNED(environment_fog_screen_dynamic_triangle_count);
+	EXPECT_UNSIGNED(environment_fog_screen_dynamic_draw_count);
+	EXPECT_UNSIGNED(environment_fog_screen_model_count);
+	EXPECT_UNSIGNED(environment_fog_screen_static_vertex_count);
+	EXPECT_UNSIGNED(environment_fog_screen_static_triangle_count);
+	EXPECT_UNSIGNED(environment_fog_screen_static_draw_count);
 	EXPECT_UNSIGNED(model_count);
+	EXPECT_UNSIGNED(model_vertex_count);
+	EXPECT_UNSIGNED(model_triangle_count);
+	EXPECT_UNSIGNED(model_draw_count);
+	EXPECT_SIGNED(transparent_model_vertex_count);
+	EXPECT_SIGNED(transparent_model_triangle_count);
+	EXPECT_SIGNED(transparent_model_maximum_triangle_count);
+	EXPECT_SIGNED(transparent_model_submit_count);
 	EXPECT_UNSIGNED(model_shadow_count);
 	EXPECT_UNSIGNED(model_shadow_vertex_count);
 	EXPECT_UNSIGNED(model_shadow_triangle_count);
@@ -150,6 +196,7 @@ void rasterizer_frame_statistics_type_contract(
 	EXPECT_SIGNED(pixel_shader_pushbuffer_bytes);
 	EXPECT_UNSIGNED(model_skinning_constant_bytes);
 	EXPECT_UNSIGNED(model_lighting_constant_bytes);
+	EXPECT_UNSIGNED(model_vertex_shader_work_accumulated);
 	return;
 }
 #pragma warning(pop)

@@ -78,13 +78,6 @@ struct error_suppression_globals
 	long error_count;
 };
 
-/* ---------- prototypes */
-
-void stack_walk_initialize(
-	void);
-void stack_walk_dispose(
-	void);
-
 /* ---------- globals */
 
 boolean data_002dcd2c = TRUE;

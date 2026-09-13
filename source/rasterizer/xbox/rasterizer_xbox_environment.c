@@ -138,6 +138,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+#define REAL_MATH_EXTERNAL_SCALE_VECTOR3D
 #include "cseries.h"
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
@@ -147,6 +149,8 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "math/periodic_functions.h"
 #include "math/real_math.h"
+#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+#undef REAL_MATH_EXTERNAL_SCALE_VECTOR3D
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_environment.h"
 #include "rasterizer/common/rasterizer_common.h"
@@ -159,6 +163,7 @@ symbols in this file:
 
 #include <xtl.h>
 
+#include "interface/progress_bar_internal.h"
 #include "rasterizer_xbox.h"
 #include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_internal.h"
@@ -197,6 +202,17 @@ enum
 enum
 {
 	_shader_environment_reflection_dynamic_mirror_bit = 0,
+};
+
+enum
+{
+	_rasterizer_environment_vector_mode_test_pattern = 50,
+	NUMBER_OF_RASTERIZER_ENVIRONMENT_VECTOR_MODES,
+};
+
+enum
+{
+	_shader_environment_self_illumination_unfiltered_bit = 0,
 };
 
 enum
@@ -294,10 +310,15 @@ struct rasterizer_environment_debug_options
 	boolean draw_environment_transparent_geometry;
 	byte reserved1C[0x10];
 	real lightmap_ambient;
-	byte reserved30[0x5];
+	byte reserved30[0x2];
+	short vector_drawing_mode;
+	boolean lightmap_bump_enabled;
 	boolean lightmap_filtering;
-	byte reserved36[0x7];
+	byte reserved36[0x6];
+	boolean alpha_testing_enabled;
 	boolean environment_specular_mask_enabled;
+	byte reserved3E[0x2E];
+	real vector_scale;
 };
 
 struct transparent_geometry_group
@@ -451,6 +472,42 @@ struct shader_environment_diffuse_properties
 	byte reservedD4[0x40];
 };
 
+struct shader_environment_self_illumination_properties
+{
+	word flags;
+	short pad02;
+	byte reserved04[0x18];
+	real_rgb_color primary_on_color;
+	real_rgb_color primary_off_color;
+	short primary_animation_function;
+	short pad36;
+	real primary_animation_period;
+	real primary_animation_phase;
+	byte reserved40[0x18];
+	real_rgb_color secondary_on_color;
+	real_rgb_color secondary_off_color;
+	short secondary_animation_function;
+	short pad72;
+	real secondary_animation_period;
+	real secondary_animation_phase;
+	byte reserved7C[0x18];
+	real_rgb_color plasma_on_color;
+	real_rgb_color plasma_off_color;
+	short plasma_animation_function;
+	short padAE;
+	real plasma_animation_period;
+	real plasma_animation_phase;
+	byte reservedB8[0x18];
+	real map_scale;
+	struct tag_reference map;
+};
+
+struct rasterizer_environment_vector_mode
+{
+	short vertex_shader_permutation_index;
+	long final_combiner_input;
+};
+
 struct shader_environment_reflection_properties
 {
 	word flags;
@@ -487,7 +544,8 @@ struct shader_environment_properties
 	struct tag_reference lens_flare;
 	long unused[11];
 	struct shader_environment_diffuse_properties diffuse;
-	byte reserved158[0xFC];
+	struct shader_environment_self_illumination_properties self_illumination;
+	byte reserved23C[0x18];
 	struct shader_environment_specular_properties specular;
 	struct shader_environment_reflection_properties reflection;
 };
@@ -519,6 +577,530 @@ extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern short specular_light_vertex_shader_permutation_index;
 
 /* ---------- public code */
+
+void _rasterizer_environment_lightmap_draw(
+	struct shader const *shader,
+	short bitmap_index,
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+		135,
+		global_d3d_device);
+
+	if (rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_vectors)
+	{
+		if (vertex_buffer->type == _rasterizer_vertex_type_environment_compressed)
+		{
+			struct rasterizer_environment_vector_mode vector_modes[NUMBER_OF_RASTERIZER_ENVIRONMENT_VECTOR_MODES] =
+			{
+				{ 0, 8 },
+				{ 0, 9 },
+				{ 0, 10 },
+				{ 0, 11 },
+				{ 1, 8 },
+				{ 1, 9 },
+				{ 1, 10 },
+				{ 1, 20 },
+				{ 1, 11 },
+				{ NONE, NONE },
+				{ 0, 4 },
+				{ 0, 5 },
+				{ 1, 4 },
+				{ 1, 5 },
+				{ 2, 4 },
+				{ 2, 5 },
+				{ 3, 4 },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ 5, 5 },
+				{ 2, 20 },
+				{ 2, 21 },
+				{ 2, 19 },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ 2, 8 },
+				{ 2, 9 },
+				{ 2, 10 },
+				{ 2, 11 },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ 3, 5 },
+				{ 4, 4 },
+				{ 4, 5 },
+				{ 5, 4 },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ NONE, NONE },
+				{ 3, 12 },
+			};
+			real_vector4d texture_transform_constants[3];
+			short vector_index;
+			short vector_bitmap_index;
+			boolean vector_test_pattern;
+
+			vector_index = (short)(rasterizer_debug_options.vector_drawing_mode % 1000);
+			vector_bitmap_index = (short)(rasterizer_debug_options.vector_drawing_mode / 1000);
+			if (vector_index >= 0 &&
+				vector_index < NUMBER_OF_RASTERIZER_ENVIRONMENT_VECTOR_MODES &&
+				vector_modes[vector_index].vertex_shader_permutation_index != NONE)
+			{
+				vector_test_pattern =
+					(vector_index == _rasterizer_environment_vector_mode_test_pattern);
+				if (vector_test_pattern &&
+					global_rasterizer_data->test[3].index != NONE)
+				{
+					rasterizer_set_texture_direct(0, global_rasterizer_data->test[3].index, 0);
+					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+				}
+				else
+				{
+					rasterizer_set_texture_direct(
+						0,
+						global_rasterizer_data->vector_normalization.index,
+						vector_bitmap_index);
+					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+				}
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+				rasterizer_set_texture_direct(
+					1,
+					global_rasterizer_data->vector_normalization.index,
+					vector_bitmap_index);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+				rasterizer_set_texture_direct(
+					2,
+					global_rasterizer_data->vector_normalization.index,
+					vector_bitmap_index);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+				rasterizer_set_texture_direct(
+					3,
+					global_rasterizer_data->vector_normalization.index,
+					vector_bitmap_index);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_ADDRESSW, D3DTADDRESS_CLAMP);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_CCW);
+				IDirect3DDevice8_SetRenderState(
+					global_d3d_device,
+					D3DRS_COLORWRITEENABLE,
+					D3DCOLORWRITEENABLE_RED |
+					D3DCOLORWRITEENABLE_GREEN |
+					D3DCOLORWRITEENABLE_BLUE);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, FALSE);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHATESTENABLE, FALSE);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZENABLE, TRUE);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZWRITEENABLE, TRUE);
+				IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
+
+				rasterizer_set_vertex_shader_permutation(
+					37,
+					vertex_buffer->type,
+					vector_modes[vector_index].vertex_shader_permutation_index);
+
+				csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+				pixel_shader.texture_modes = 0x00018C60 | (vector_test_pattern ? 1 : 3);
+				if (vector_test_pattern)
+				{
+					texture_transform_constants[0].i = rasterizer_debug_options.vector_scale;
+					texture_transform_constants[0].j = 1.0f;
+					texture_transform_constants[0].k = 1.0f;
+					texture_transform_constants[0].l = 1.0f;
+					texture_transform_constants[1].i = 1.0f;
+					texture_transform_constants[1].j = 0.0f;
+					texture_transform_constants[1].k = 0.0f;
+					texture_transform_constants[1].l = 0.0f;
+					texture_transform_constants[2].i = 0.0f;
+					texture_transform_constants[2].j = 1.0f;
+					texture_transform_constants[2].k = 0.0f;
+					texture_transform_constants[2].l = 0.0f;
+					IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
+
+					pixel_shader.combiner_count = 3;
+					pixel_shader.constant_0[0] = 0x00FF0000;
+					pixel_shader.constant_1[0] = 0x000000FF;
+					pixel_shader.rgb_inputs[0] = 0x4849484A;
+					pixel_shader.rgb_outputs[0] = 0x000030CD;
+					pixel_shader.rgb_inputs[1] = 0x0C0C0D0D;
+					pixel_shader.rgb_outputs[1] = 0x000000CD;
+					pixel_shader.rgb_inputs[2] = 0x0C010D02;
+					pixel_shader.rgb_outputs[2] = 0x00000C00;
+					pixel_shader.final_combiner_inputs_abcd =
+						vector_modes[vector_index].final_combiner_input | 0x18200000;
+				}
+				else
+				{
+					pixel_shader.combiner_count = 1;
+					pixel_shader.final_combiner_inputs_abcd =
+						vector_modes[vector_index].final_combiner_input;
+				}
+				rasterizer_set_pixel_shader(&pixel_shader);
+
+				rasterizer_draw_dynamic_triangles_static_vertices2(
+					dynamic_triangle_buffer_index,
+					first_triangle_index,
+					triangle_count,
+					vertex_buffer,
+					vertex_buffer + !rasterizer_environment_globals.lightmap_missing);
+			}
+		}
+	}
+	else if ((rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_bump_color ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_bump_edge ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask_times_bump_color ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_specular_mask_times_bump_edge ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_diffuse_texture_times_bump_color ||
+		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_diffuse_texture_times_bump_edge) &&
+		rasterizer_debug_options.draw_environment_lightmaps)
+	{
+		struct shader_environment_definition *shader_environment;
+		struct shader_environment_self_illumination_properties const *illumination;
+		real_rgb_color primary_color;
+		real_rgb_color secondary_color;
+		real_rgb_color plasma_on_color;
+		real_rgb_color plasma_off_color;
+		real primary_value;
+		real secondary_value;
+		real plasma_value;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			347,
+			shader);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+			348,
+			vertex_buffer);
+		shader_environment = (struct shader_environment_definition *)
+			shader_get_and_verify_type((struct shader *)shader, _shader_type_environment);
+		rasterizer_set_vertex_shader_permutation(
+			16,
+			vertex_buffer->type,
+			shader_get_vertex_shader_permutation(shader));
+
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ALPHATESTENABLE,
+			TEST_FLAG(
+				shader_environment->environment.flags,
+				_shader_environment_alpha_tested_bit) &&
+				rasterizer_debug_options.alpha_testing_enabled);
+		rasterizer_set_texture(
+			0,
+			0,
+			3,
+			TEST_FLAG(
+				shader_environment->environment.flags,
+				_shader_environment_bump_map_is_specular_mask_bit)
+				? NONE
+				: shader_environment->environment.diffuse.bump_map.index,
+			bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+		illumination = &shader_environment->environment.self_illumination;
+		rasterizer_set_texture(1, 0, 0, illumination->map.index, bitmap_index);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+		if (TEST_FLAG(
+			illumination->flags,
+			_shader_environment_self_illumination_unfiltered_bit))
+		{
+			SetTextureStageStateSmart(1, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+			SetTextureStageStateSmart(1, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			SetTextureStageStateSmart(1, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+		}
+		else
+		{
+			SetTextureStageStateSmart(1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+			SetTextureStageStateSmart(1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+			SetTextureStageStateSmart(1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+		}
+
+		{
+			real_vector4d texture_transform_constants[3];
+
+			texture_transform_constants[0].i = shader_environment->environment.diffuse.runtime_bump_map_scale.i;
+			texture_transform_constants[0].j = shader_environment->environment.diffuse.runtime_bump_map_scale.j;
+			texture_transform_constants[0].k = illumination->map_scale;
+			texture_transform_constants[0].l = 1.0f;
+			texture_transform_constants[1].i = 1.0f;
+			texture_transform_constants[1].j = 0.0f;
+			texture_transform_constants[1].k = 0.0f;
+			texture_transform_constants[1].l = 0.0f;
+			texture_transform_constants[2].i = 0.0f;
+			texture_transform_constants[2].j = 1.0f;
+			texture_transform_constants[2].k = 0.0f;
+			texture_transform_constants[2].l = 0.0f;
+			shader_environment_texture_animation_evaluate(
+				shader,
+				global_frame_parameters.game_time_sec,
+				&texture_transform_constants[1].l,
+				&texture_transform_constants[2].l);
+			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -84, texture_transform_constants, 3);
+		}
+
+		if (illumination->map.index == NONE)
+		{
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.combiner_count = 2;
+			pixel_shader.texture_modes =
+				rasterizer_environment_globals.lightmap_missing
+					? 0x00018001
+					: 0x00018401;
+			pixel_shader.rgb_inputs[0] =
+				rasterizer_debug_options.lightmap_bump_enabled
+					? 0x484B0A01
+					: 0x20200000;
+			pixel_shader.rgb_outputs[0] = 0x0000208C;
+			pixel_shader.alpha_inputs[1] = 0x34201408;
+			pixel_shader.alpha_outputs[1] = 0x00000C00;
+			pixel_shader.final_combiner_inputs_abcd = 0x0A0F000C;
+			pixel_shader.final_combiner_inputs_efg = 0x1C011800;
+		}
+		else
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				448,
+				illumination->primary_animation_period!=0.0f);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				449,
+				illumination->secondary_animation_period!=0.0f);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+				450,
+				illumination->plasma_animation_period!=0.0f);
+
+			primary_value =
+				periodic_function_evaluate(
+					illumination->primary_animation_function,
+					(global_frame_parameters.game_time_sec + illumination->primary_animation_phase) /
+						illumination->primary_animation_period);
+			secondary_value =
+				periodic_function_evaluate(
+					illumination->secondary_animation_function,
+					(global_frame_parameters.game_time_sec + illumination->secondary_animation_phase) /
+						illumination->secondary_animation_period);
+			plasma_value =
+				periodic_function_evaluate(
+					illumination->plasma_animation_function,
+					(global_frame_parameters.game_time_sec + illumination->plasma_animation_phase) /
+						illumination->plasma_animation_period);
+
+			scale_vector3d(
+				(real_vector3d const *)&illumination->primary_off_color,
+				1.0f - primary_value,
+				(real_vector3d *)&primary_color);
+			scale_vector3d(
+				(real_vector3d const *)&illumination->secondary_off_color,
+				1.0f - secondary_value,
+				(real_vector3d *)&secondary_color);
+			point_from_line3d(
+				(real_point3d const *)&primary_color,
+				(real_vector3d const *)&illumination->primary_on_color,
+				primary_value,
+				(real_point3d *)&primary_color);
+			point_from_line3d(
+				(real_point3d const *)&secondary_color,
+				(real_vector3d const *)&illumination->secondary_on_color,
+				secondary_value,
+				(real_point3d *)&secondary_color);
+			scale_vector3d(
+				(real_vector3d const *)&illumination->plasma_on_color,
+				1.0f,
+				(real_vector3d *)&plasma_on_color);
+			scale_vector3d(
+				(real_vector3d const *)&illumination->plasma_off_color,
+				1.0f,
+				(real_vector3d *)&plasma_off_color);
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes =
+				rasterizer_environment_globals.lightmap_missing
+					? 0x00018021
+					: 0x00018421;
+			pixel_shader.combiner_count = 0x00011106;
+			pixel_shader.constant_0[0] = real_alpha_to_pixel32(plasma_value);
+			pixel_shader.alpha_inputs[0] = 0x1120B920;
+			pixel_shader.alpha_outputs[0] = 0x00000C00;
+			pixel_shader.rgb_inputs[0] = 0x1920B120;
+			pixel_shader.rgb_outputs[0] = 0x00000C00;
+			pixel_shader.alpha_inputs[1] = 0xDCDCCCCC;
+			pixel_shader.alpha_outputs[1] = 0x00024C00;
+			pixel_shader.rgb_inputs[1] =
+				rasterizer_debug_options.lightmap_bump_enabled
+					? 0x484B0A01
+					: 0x20200000;
+			pixel_shader.rgb_outputs[1] = 0x00002080;
+			pixel_shader.constant_0[2] = 0x00FF0000;
+			pixel_shader.constant_1[2] = 0x0000FF00;
+			pixel_shader.alpha_inputs[2] = 0x1C1C0920;
+			pixel_shader.alpha_outputs[2] = 0x000000C9;
+			pixel_shader.rgb_inputs[2] = 0x09010902;
+			pixel_shader.rgb_outputs[2] = 0x000030CD;
+			pixel_shader.constant_0[3] = real_rgb_color_to_pixel32(&primary_color);
+			pixel_shader.constant_1[3] = real_rgb_color_to_pixel32(&secondary_color);
+			pixel_shader.alpha_inputs[3] = 0x00005C5C;
+			pixel_shader.alpha_outputs[3] = 0x00004C00;
+			pixel_shader.rgb_inputs[3] = 0x0C010D02;
+			pixel_shader.rgb_outputs[3] = 0x00000D00;
+			pixel_shader.constant_0[4] = real_rgb_color_to_pixel32(&plasma_on_color);
+			pixel_shader.constant_1[4] = real_rgb_color_to_pixel32(&plasma_off_color);
+			pixel_shader.alpha_inputs[4] = 0x34201408;
+			pixel_shader.alpha_outputs[4] = 0x00000C00;
+			pixel_shader.rgb_inputs[4] = 0x011C0220;
+			pixel_shader.rgb_outputs[4] = 0x00000C00;
+			pixel_shader.rgb_inputs[5] = 0x0C190D20;
+			pixel_shader.rgb_outputs[5] = 0x00000C00;
+			pixel_shader.final_combiner_inputs_abcd = 0x0A0F000C;
+			pixel_shader.final_combiner_inputs_efg = 0x1C011800;
+		}
+		pixel_shader.final_combiner_constant_0 =
+			real_rgb_color_to_pixel32(&shader_environment->environment.diffuse.material_color);
+
+		if (rasterizer_globals.lightmap_mode == _rasterizer_lightmap_mode_no_lightmap)
+		{
+			real_vector4d lightmap_mode_constants[4];
+
+			lightmap_mode_constants[0].i = 0.5f;
+			lightmap_mode_constants[0].j = 0.6f;
+			lightmap_mode_constants[0].k = 0.6f;
+			lightmap_mode_constants[0].l = 1.0f;
+			lightmap_mode_constants[1].i = 0.0f;
+			lightmap_mode_constants[1].j = 0.0f;
+			lightmap_mode_constants[1].k = 1.0f;
+			lightmap_mode_constants[1].l = 0.1f;
+			lightmap_mode_constants[2].i = 0.9f;
+			lightmap_mode_constants[2].j = 0.9f;
+			lightmap_mode_constants[2].k = 0.8f;
+			lightmap_mode_constants[2].l = 0.0f;
+			lightmap_mode_constants[3].i = 0.1f;
+			lightmap_mode_constants[3].j = 0.1f;
+			lightmap_mode_constants[3].k = 0.3f;
+			lightmap_mode_constants[3].l = 0.0f;
+			IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -81, lightmap_mode_constants, 4);
+			pixel_shader.final_combiner_inputs_abcd = 0x2004000C;
+		}
+		else if (rasterizer_globals.lightmap_mode == _rasterizer_lightmap_mode_fullbright ||
+			rasterizer_globals.lightmap_mode == _rasterizer_lightmap_mode_lightmap_bitmap)
+		{
+			pixel_shader.final_combiner_constant_1 =
+				real_rgb_color_to_pixel32(&rasterizer_environment_globals.local_lightmap_ambient_color);
+			pixel_shader.final_combiner_inputs_abcd = 0x2002000C;
+		}
+
+		switch (rasterizer_debug_options.drawing_mode)
+		{
+			case _rasterizer_drawing_mode_normal:
+				break;
+
+			case _rasterizer_drawing_mode_bump_color:
+			case _rasterizer_drawing_mode_specular_mask_times_bump_color:
+			case _rasterizer_drawing_mode_diffuse_texture_times_bump_color:
+				pixel_shader.combiner_count = 1;
+				pixel_shader.alpha_inputs[0] = 0;
+				pixel_shader.alpha_outputs[0] = 0;
+				pixel_shader.rgb_inputs[0] = 0;
+				pixel_shader.rgb_outputs[0] = 0;
+				pixel_shader.final_combiner_inputs_abcd = 0x00000008;
+				break;
+
+			case _rasterizer_drawing_mode_specular_mask:
+				pixel_shader.combiner_count = 1;
+				pixel_shader.alpha_inputs[0] = 0;
+				pixel_shader.alpha_outputs[0] = 0;
+				pixel_shader.rgb_inputs[0] = 0;
+				pixel_shader.rgb_outputs[0] = 0;
+				pixel_shader.final_combiner_inputs_abcd = 0x00000020;
+				break;
+
+			case _rasterizer_drawing_mode_bump_edge:
+			case _rasterizer_drawing_mode_specular_mask_times_bump_edge:
+			case _rasterizer_drawing_mode_diffuse_texture_times_bump_edge:
+				pixel_shader.combiner_count = 1;
+				pixel_shader.alpha_inputs[0] = 0x48402020;
+				pixel_shader.alpha_outputs[0] = 0x00020D00;
+				pixel_shader.rgb_inputs[0] = 0;
+				pixel_shader.rgb_outputs[0] = 0;
+				pixel_shader.final_combiner_inputs_abcd = 0x0000001D;
+				break;
+
+			default:
+				match_vassert(
+					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
+					575,
+					FALSE,
+					"### ERROR unsupported drawing mode in environment lightmap pass");
+				break;
+		}
+		rasterizer_set_pixel_shader(&pixel_shader);
+
+		rasterizer_draw_dynamic_triangles_static_vertices2(
+			dynamic_triangle_buffer_index,
+			first_triangle_index,
+			triangle_count,
+			vertex_buffer,
+			vertex_buffer + !rasterizer_environment_globals.lightmap_missing);
+		if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
+		{
+			rasterizer_frame_statistics.lightmap_dynamic_draw_count++;
+			rasterizer_frame_statistics.lightmap_dynamic_triangle_count += triangle_count;
+			rasterizer_frame_statistics.lightmap_dynamic_vertex_count +=
+				rasterizer_frame_statistics_count_dynamic_vertices(
+					dynamic_triangle_buffer_index,
+					first_triangle_index,
+					triangle_count);
+		}
+	}
+	return;
+}
 
 void _rasterizer_environment_lightmap_end(
 	void)

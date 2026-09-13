@@ -85,3 +85,29 @@ punning, fake dependency, or raw-address access.
 No configure, Ninja build, push, or exact-progress/treemap update was
 performed. This document intentionally records the best credible fuzzy source
 without awarding matching credit.
+
+## 2026-09-13 integrated-context supersession
+
+The batch-8 full build supersedes the fuzzy classification of
+`_player_profile_3wide_list_update`.  The function source was not steered or
+rewritten after the review above; in the reconciled translation-unit context it
+naturally compiles to January's complete 1,232-byte normalized code section
+with all 71 relocation offsets and types.  It therefore contributes 1,222
+meaningful exact bytes and one accepted function.
+
+The hardened semantic comparator remains fail-closed on two relocation-label
+representations, not on executable bytes.  At section offset 779 January's
+split names the address immediately following the three-entry
+`cached_player_profile` array as
+`local_player_index_for_draw_string_and_hack_in_icons`; the rebuilt object
+expresses the same address as `cached_player_profile + 0x9C`.  Each cache entry
+is 52 bytes, so three entries occupy exactly `0x9C`.  At offset 939 the same
+wide-string literal is represented as an undefined symbol in the split and a
+defined `.rdata` symbol in the rebuilt object.  These are genuine same-address
+COFF ownership/representation differences; no alias facade, fake global,
+source-pressure dependency, or target-byte exception is present.
+
+The integrated target and candidate normalized SHA-256 are both
+`00c90368ad7f0a0ea918ef5d4425050b17bfd917eced2a27dbac0dab47d6a9a9`.
+The function is admitted through the existing relocation-shape semantic gate,
+while the other fuzzy functions documented above remain uncredited.

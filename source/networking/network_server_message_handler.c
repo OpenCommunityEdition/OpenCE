@@ -562,6 +562,23 @@ static boolean network_game_server_handle_message_client_switch_to_pregame(
 
 /* ---------- globals */
 
+/* ---------- private code */
+
+static boolean network_game_server_write(
+	struct network_connection *connection,
+	void *message,
+	word buffer_size,
+	struct transport_address *destination_address,
+	boolean reliable)
+{
+	return network_connection_write(
+		connection,
+		message,
+		buffer_size,
+		destination_address,
+		reliable);
+}
+
 /* ---------- public code */
 
 boolean network_game_server_send_message_to_machine(
@@ -577,7 +594,7 @@ boolean network_game_server_send_message_to_machine(
 	{
 		word message_size = GET_MESSAGE_SIZE(message->header);
 
-		result = network_connection_write(
+		result = network_game_server_write(
 			connection,
 			message,
 			message_size,
@@ -621,7 +638,7 @@ boolean network_game_server_send_message_to_all_machines(
 					message_length<=sizeof(message_buffer));
 
 				csmemcpy(message_buffer, message, message_length);
-				if (!network_connection_write(
+				if (!network_game_server_write(
 					connection,
 					message_buffer,
 					message_length,
@@ -1220,7 +1237,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 				struct network_connection *connection =
 					network_game_server_get_connection(server);
 
-				result = network_connection_write(
+				result = network_game_server_write(
 					connection,
 					reply,
 					message_size,
@@ -1271,7 +1288,7 @@ static boolean network_game_server_handle_message_client_ping(
 		address.address.long_words[0] = source_address->address.long_words[0];
 		address.port = client_message->port;
 		connection = network_game_server_get_connection(server);
-		result = network_connection_write(
+		result = network_game_server_write(
 			connection,
 			reply,
 			message_size,
@@ -1382,7 +1399,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 							struct network_connection *connection =
 								network_game_server_get_client_connection(server_client_machine);
 
-							network_connection_write(
+							network_game_server_write(
 								connection,
 								reply,
 								message_size,
@@ -1424,7 +1441,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 								struct network_connection *connection =
 									network_game_server_get_client_connection(server_client_machine);
 
-								result = network_connection_write(
+								result = network_game_server_write(
 									connection,
 									reply,
 									message_size,
@@ -1477,7 +1494,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 								struct network_connection *connection =
 									network_game_server_get_client_connection(server_client_machine);
 
-								if (!network_connection_write(
+								if (!network_game_server_write(
 									connection,
 									reply,
 									message_size,
@@ -1513,7 +1530,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 						struct network_connection *connection =
 							network_game_server_get_client_connection(server_client_machine);
 
-						if (!network_connection_write(
+						if (!network_game_server_write(
 							connection,
 							reply,
 							message_size,
@@ -1552,7 +1569,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 					struct network_connection *connection =
 						network_game_server_get_client_connection(server_client_machine);
 
-					if (!network_connection_write(
+					if (!network_game_server_write(
 						connection,
 						reply,
 						message_size,

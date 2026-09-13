@@ -366,6 +366,7 @@ enum
 
 struct unit_control_data;
 struct scenario_unit_datum;
+struct location;
 
 struct unit_animation
 {
@@ -708,6 +709,18 @@ boolean unit_melee_attack_begin(
 	long unit_index,
 	boolean continuous,
 	real_vector2d const *alignment_vector);
+boolean unit_leap_begin(
+	long unit_index,
+	real_vector2d const *alignment_vector);
+void unit_impact_melee_damage(
+	long unit_index,
+	long target_object_index,
+	short node_index,
+	short region_index,
+	short material_index,
+	real_point3d const *position,
+	real_vector3d const *object_normal,
+	struct location const *location);
 void scripting_magic_melee_attack(
 	void);
 boolean unit_try_and_exit_seat(

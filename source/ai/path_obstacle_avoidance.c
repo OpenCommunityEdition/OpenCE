@@ -1089,3 +1089,51 @@ boolean path_avoid_obstacles(
 
 	return result;
 }
+
+void render_debug_obstacle_path(
+	void)
+{
+	if (debug_obstacle_path)
+	{
+		if (!console_is_active())
+		{
+			if (input_key_is_down(_key_r))
+			{
+				debug_obstacle_path_on_failure = TRUE;
+				debug_obstacle_path = FALSE;
+			}
+
+			if (input_key_is_down(_key_g))
+			{
+				debug_obstacle_path_on_failure = FALSE;
+				debug_obstacle_path = FALSE;
+			}
+
+			if (input_key_is_down(_key_n))
+			{
+				path_new(
+					&debug_path,
+					&debug_obstacles,
+					global_structure_bsp_get(),
+					debug_ignore_broken_surfaces,
+					debug_obstacle_path_radius,
+					(real_point2d const *)&debug_obstacle_path_start_point,
+					debug_obstacle_path_start_surface_index,
+					(real_point2d const *)&debug_obstacle_path_goal_point,
+					debug_obstacle_path_goal_surface_index,
+					debug_obstacle_path_finishing,
+					FALSE);
+			}
+
+			if (input_key_is_down(_key_i))
+			{
+				path_iterate(&debug_path);
+			}
+		}
+
+		render_debug_obstacles(&debug_obstacles, debug_obstacle_path_radius);
+		render_debug_path(&debug_path);
+	}
+
+	return;
+}

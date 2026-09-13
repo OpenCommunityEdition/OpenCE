@@ -90,6 +90,38 @@ Five corrections were needed; each was read directly off the disassembly.
   (`sub esp,0xf4` = 4 + 120 + 120) and the `[ebp+eax*4-0x7c]` / `[ebp+eax*4-0xf4]`
   addressing.
 
+### Comparator ABI boundary (2026-09-12)
+
+A runtime finding from Stian Eklund's non-byte-matching NTSC decomp identified
+renderer corruption when its `profile_sort32_compare_proc` was declared as
+returning `int` rather than a byte-sized Boolean.  That finding is consistent
+with the January evidence here: the custom `qsort_2byte` and `qsort_4byte`
+callbacks return the project `boolean` type (`typedef byte boolean`), and all
+four functions in this object are strict exact with that ABI.  Do not widen
+either custom-sort callback to `int`; a callee that only defines `AL` cannot be
+safely consumed as though it defined all of `EAX`.
+
+This rule does **not** apply to `compare_profile_sections` in `profile.c`.
+That function is passed to the C runtime `qsort`, whose comparator contract is
+`int (*)(const void *, const void *)`, and it correctly remains `int`.  The
+custom value-comparator ABI and the CRT pointer-comparator ABI are separate
+boundaries.  Current January gates also keep `profile_enter_private` and
+`profile_exit_private` strict exact, so downstream renderer differences must
+not be "repaired" by changing either proven interface.
+
+Two user-supplied analyses of Xbox debug build 2276 provide independent
+cross-build corroboration.  Its 16-bit selection sort tests `AL` immediately
+after the indirect comparator call at `0x91d22`; its 32-bit selection sort does
+the same at `0x91d7c`; and both quicksort comparator sites test `AL` at
+`0x91f86` and `0x91fa3`.  The reported structure-surface comparator also
+defines only the byte result.  Declaring that callback as returning `int`
+therefore makes a rebuilt caller test stale upper `EAX` bits, which can retain
+the timestamp written by nearby profiling code and corrupt the surface order.
+This explains the observed renderer symptom, but it does not move January's
+custom sorts out of their target-proven `sort.obj` owner or change the CRT
+comparator above.  Treat the 2276 addresses and source ownership as cross-build
+evidence; the January split object and exact gates remain authoritative.
+
 ## 4. Current-integration revalidation (2026-08-13)
 
 The completed source was recovered from Claude's local `claude/libcmt-stream`

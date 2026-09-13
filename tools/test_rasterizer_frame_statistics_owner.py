@@ -24,7 +24,19 @@ SYMBOL = "_rasterizer_frame_statistics"
 # These offsets are fixed from the pre-migration writers and January's 0x170-byte
 # linker-common owner.  They deliberately are not derived from the live header.
 FIELDS = (
-	("reserved000", 0x000, 0x30, None),
+	("frames_per_second", 0x000, 4, None),
+	("fps_sample_count", 0x004, 2, None),
+	("pad006", 0x006, 2, None),
+	("average_frames_per_second", 0x008, 4, None),
+	("minimum_frames_per_second", 0x00C, 4, None),
+	("maximum_frames_per_second", 0x010, 4, None),
+	("fogged_object_count", 0x014, 4, "signed"),
+	("normal_object_count", 0x018, 4, "signed"),
+	("fast_object_count", 0x01C, 4, "signed"),
+	("scenery_object_count", 0x020, 4, "signed"),
+	("lightmap_dynamic_vertex_count", 0x024, 4, "unsigned"),
+	("lightmap_dynamic_triangle_count", 0x028, 4, "unsigned"),
+	("lightmap_dynamic_draw_count", 0x02C, 4, "unsigned"),
 	("shadow_count", 0x030, 4, "unsigned"),
 	("shadow_vertex_count", 0x034, 4, "unsigned"),
 	("shadow_triangle_count", 0x038, 4, "unsigned"),
@@ -59,9 +71,21 @@ FIELDS = (
 	("environment_fog_dynamic_vertex_count", 0x0AC, 4, "unsigned"),
 	("environment_fog_dynamic_triangle_count", 0x0B0, 4, "unsigned"),
 	("environment_fog_dynamic_draw_count", 0x0B4, 4, "unsigned"),
-	("reserved0B8", 0x0B8, 0x1C, None),
+	("environment_fog_screen_dynamic_vertex_count", 0x0B8, 4, "unsigned"),
+	("environment_fog_screen_dynamic_triangle_count", 0x0BC, 4, "unsigned"),
+	("environment_fog_screen_dynamic_draw_count", 0x0C0, 4, "unsigned"),
+	("environment_fog_screen_model_count", 0x0C4, 4, "unsigned"),
+	("environment_fog_screen_static_vertex_count", 0x0C8, 4, "unsigned"),
+	("environment_fog_screen_static_triangle_count", 0x0CC, 4, "unsigned"),
+	("environment_fog_screen_static_draw_count", 0x0D0, 4, "unsigned"),
 	("model_count", 0x0D4, 4, "unsigned"),
-	("reserved0D8", 0x0D8, 0x1C, None),
+	("model_vertex_count", 0x0D8, 4, "unsigned"),
+	("model_triangle_count", 0x0DC, 4, "unsigned"),
+	("model_draw_count", 0x0E0, 4, "unsigned"),
+	("transparent_model_vertex_count", 0x0E4, 4, "signed"),
+	("transparent_model_triangle_count", 0x0E8, 4, "signed"),
+	("transparent_model_maximum_triangle_count", 0x0EC, 4, "signed"),
+	("transparent_model_submit_count", 0x0F0, 4, "signed"),
 	("model_shadow_count", 0x0F4, 4, "unsigned"),
 	("model_shadow_vertex_count", 0x0F8, 4, "unsigned"),
 	("model_shadow_triangle_count", 0x0FC, 4, "unsigned"),
@@ -85,7 +109,8 @@ FIELDS = (
 	("pixel_shader_pushbuffer_bytes", 0x15C, 4, "signed"),
 	("model_skinning_constant_bytes", 0x160, 4, "unsigned"),
 	("model_lighting_constant_bytes", 0x164, 4, "unsigned"),
-	("reserved168", 0x168, 8, None),
+	("model_vertex_shader_work_accumulated", 0x168, 4, "unsigned"),
+	("reserved16C", 0x16C, 4, None),
 )
 
 IMPORTERS = frozenset({
@@ -335,10 +360,13 @@ def test_compiled_models_arithmetic_is_modulo_2_to_32(compiled_fixture):
 def test_offset_negative_control_detects_shifted_writer(tmp_path):
 	if not COMPILER.is_file():
 		pytest.skip("the locally supplied VC7/XDK compiler is unavailable")
-	override = write_override(tmp_path, "byte reserved000[0x30];", "byte reserved000[0x2C];")
+	override = write_override(
+		tmp_path,
+		"unsigned long model_vertex_count;\n\tunsigned long model_triangle_count;",
+		"unsigned long model_triangle_count;\n\tunsigned long model_vertex_count;")
 	output = tmp_path / "shifted.obj"
 	compile_fixture(output, override)
-	with pytest.raises(FrameStatisticsLayoutMismatch, match="structure size|reserved000"):
+	with pytest.raises(FrameStatisticsLayoutMismatch, match="model_vertex_count"):
 		require_layout(cc.load(output))
 
 

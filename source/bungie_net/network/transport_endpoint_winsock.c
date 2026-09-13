@@ -3,11 +3,11 @@ TRANSPORT_ENDPOINT_WINSOCK.C
 
 symbols in this file:
 00071300 0060:
-	_code_00071300 (0000)
+	_connection_thread_list_add (0000)
 00071360 0040:
-	_code_00071360 (0000)
+	_connection_thread_list_mark_for_disposal (0000)
 000713A0 0040:
-	_code_000713a0 (0000)
+	_connection_thread_list_maintenance (0000)
 000713E0 0080:
 	_create_transport_endpoint (0000)
 00071460 0060:
@@ -33,7 +33,7 @@ symbols in this file:
 00071980 0620:
 	_winsock_error_to_string (0000)
 00071FA0 0130:
-	_code_00071fa0 (0000)
+	_create_endpoint_socket (0000)
 000720D0 0170:
 	_get_endpoint_address (0000)
 00072240 0110:
@@ -45,7 +45,7 @@ symbols in this file:
 00072670 0080:
 	_disconnect_endpoint (0000)
 000726F0 0130:
-	_code_000726f0 (0000)
+	_connect_endpoint_process@4 (0000)
 00072820 0150:
 	_connect_endpoint_async (0000)
 00072970 00a0:
@@ -277,6 +277,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 
 #include "bungie_net/common/thread.h"
@@ -312,7 +313,7 @@ struct endpoint_thread_reference
 struct connect_process_input
 {
 	struct transport_endpoint *ep;
-	long unknown4[6];
+	struct transport_address address;
 	struct thread_reference *thread;
 	struct mutex_reference *mutex;
 	boolean cancelled;
@@ -333,8 +334,14 @@ static SOCKET create_endpoint_socket(
 	int address_family,
 	int socket_type,
 	int protocol);
+static boolean connection_thread_list_add(
+	struct thread_reference *thread);
+static void connection_thread_list_mark_for_disposal(
+	struct thread_reference *thread);
+static unsigned long __stdcall connect_endpoint_process(
+	void *input_pointer);
 
-void code_000713a0(
+void connection_thread_list_maintenance(
 	void);
 
 /* ---------- globals */
@@ -343,7 +350,52 @@ struct transport_endpoint_winsock_globals transport_endpoint_globals = {0};
 
 /* ---------- public code */
 
-void code_000713a0(
+static boolean connection_thread_list_add(
+	struct thread_reference *thread)
+{
+	long endpoint_thread_index = 0;
+
+	while (transport_endpoint_globals.endpoint_threads[endpoint_thread_index].thread &&
+		endpoint_thread_index < MAXIMUM_ENDPOINT_THREADS)
+	{
+		endpoint_thread_index++;
+	}
+
+	if (endpoint_thread_index < MAXIMUM_ENDPOINT_THREADS)
+	{
+		transport_endpoint_globals.endpoint_threads[endpoint_thread_index].thread = thread;
+		transport_endpoint_globals.endpoint_threads[endpoint_thread_index].dispose = FALSE;
+	}
+	else
+	{
+		endpoint_thread_index = NONE;
+	}
+
+	return endpoint_thread_index != NONE;
+}
+
+static void connection_thread_list_mark_for_disposal(
+	struct thread_reference *thread)
+{
+	long endpoint_thread_index;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x4F, thread);
+
+	for (endpoint_thread_index = 0;
+		endpoint_thread_index < MAXIMUM_ENDPOINT_THREADS;
+		endpoint_thread_index++)
+	{
+		if (transport_endpoint_globals.endpoint_threads[endpoint_thread_index].thread == thread)
+		{
+			transport_endpoint_globals.endpoint_threads[endpoint_thread_index].dispose = TRUE;
+			break;
+		}
+	}
+
+	return;
+}
+
+void connection_thread_list_maintenance(
 	void)
 {
 	long endpoint_thread_index = 0;
@@ -373,7 +425,7 @@ struct transport_endpoint *create_transport_endpoint(
 	struct transport_endpoint *ep = NULL;
 
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xCE, transport_initialized);
-	code_000713a0();
+	connection_thread_list_maintenance();
 
 	if (type == _transport_type_udp || type == _transport_type_tcp)
 	{
@@ -1009,6 +1061,302 @@ short get_endpoint_address(
 	return (short)error;
 }
 
+short set_endpoint_blocking(
+	struct transport_endpoint *ep,
+	boolean blocking)
+{
+	short error = _transport_error_none;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x139, ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x13A, transport_initialized);
+
+	if (!endpoint_blocking(ep))
+	{
+		if (blocking)
+		{
+			u_long nonblocking = FALSE;
+
+			if (ioctlsocket(ep->socket, FIONBIO, &nonblocking) != 0)
+			{
+				winsock_error_to_string(WSAGetLastError());
+				error = _transport_error_options_failed;
+			}
+			else
+			{
+				SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
+			}
+		}
+	}
+	else if (!blocking)
+	{
+		u_long nonblocking = TRUE;
+
+		if (ioctlsocket(ep->socket, FIONBIO, &nonblocking) != 0)
+		{
+			winsock_error_to_string(WSAGetLastError());
+			error = _transport_error_options_failed;
+		}
+		else
+		{
+			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, TRUE);
+		}
+	}
+
+	ep->error = error;
+	return error;
+}
+
+short bind_endpoint(
+	struct transport_endpoint *ep,
+	struct transport_address *address)
+{
+	short error = _transport_error_none;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x16C, ep && address);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x16D, transport_initialized);
+
+	if (ep->socket == INVALID_SOCKET)
+	{
+		int socket_type;
+
+		if (ep->type == _transport_type_tcp)
+		{
+			socket_type = SOCK_STREAM;
+		}
+		else if (ep->type == _transport_type_udp)
+		{
+			socket_type = SOCK_DGRAM;
+		}
+		else
+		{
+			error = _transport_error_bad_endpoint;
+		}
+
+		if (error == _transport_error_none)
+		{
+			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
+			if (ep->socket == INVALID_SOCKET)
+			{
+				error = _transport_error_unknown;
+			}
+		}
+	}
+
+	if (ep->socket != INVALID_SOCKET && error == _transport_error_none)
+	{
+		struct sockaddr_in socket_address;
+
+		socket_address.sin_addr.s_addr = SWAP4(address->address.long_words[0]);
+		socket_address.sin_port = (word)SWAP2(address->port);
+		socket_address.sin_family = AF_INET;
+
+		if (bind(ep->socket, (struct sockaddr *)&socket_address, sizeof(socket_address)) != 0)
+		{
+			winsock_error_to_string(WSAGetLastError());
+			error = _transport_error_bind_endpoint;
+		}
+	}
+	else
+	{
+		error = _transport_error_unknown;
+	}
+
+	ep->error = error;
+	return error;
+}
+
+short connect_endpoint(
+	struct transport_endpoint *ep,
+	struct transport_address const *address)
+{
+	short result = _transport_error_none;
+	int socket_type;
+	boolean blocking;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x1B5, ep && address);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x1B6, transport_initialized);
+
+	if (ep->type == _transport_type_udp)
+	{
+		socket_type = SOCK_DGRAM;
+	}
+	else if (ep->type == _transport_type_tcp)
+	{
+		socket_type = SOCK_STREAM;
+	}
+	else
+	{
+		result = _transport_error_bad_endpoint;
+	}
+
+	if (result == _transport_error_none)
+	{
+		struct sockaddr_in socket_address;
+		long error;
+
+		if (ep->socket == INVALID_SOCKET)
+		{
+			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
+		}
+
+		socket_address.sin_addr.s_addr = SWAP4(address->address.long_words[0]);
+		socket_address.sin_port = (word)SWAP2(address->port);
+		socket_address.sin_family = AF_INET;
+		blocking = (boolean)endpoint_blocking(ep);
+		set_endpoint_blocking(ep, FALSE);
+		error = connect(ep->socket, (struct sockaddr *)&socket_address, sizeof(socket_address));
+
+		if (error == SOCKET_ERROR)
+		{
+			error = WSAGetLastError();
+			if (error == WSAEWOULDBLOCK)
+			{
+				unsigned long timeout = system_milliseconds() + 10 * MILLISECONDS_PER_SECOND;
+				struct timeval timeval;
+				fd_set writeable;
+
+				timeval.tv_sec = 1;
+				timeval.tv_usec = 0;
+				writeable.fd_count = 1;
+				writeable.fd_array[0] = ep->socket;
+
+				do
+				{
+					if (select(1, NULL, &writeable, NULL, &timeval) == 1)
+					{
+						error = 0;
+					}
+					else
+					{
+						error = WSAGetLastError();
+					}
+
+					if (system_milliseconds() > timeout)
+					{
+						closesocket(ep->socket);
+						error = WSAEINPROGRESS;
+						break;
+					}
+				}
+				while (error == WSAEINPROGRESS);
+			}
+		}
+
+		if (error != 0)
+		{
+			winsock_error_to_string(error);
+			result = _transport_error_connect_failed;
+		}
+		else
+		{
+			set_endpoint_blocking(ep, blocking);
+			SET_FLAG(ep->flags, _transport_endpoint_connected_bit, TRUE);
+			SET_FLAG(ep->flags, _transport_endpoint_client_bit, TRUE);
+		}
+	}
+
+	ep->error = result;
+	return result;
+}
+
+static unsigned long __stdcall connect_endpoint_process(
+	void *input_pointer)
+{
+	struct connect_process_input *input = input_pointer;
+	struct thread_reference *thread = NULL;
+	struct mutex_reference *mutex = NULL;
+	short error;
+
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x239, input);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x23A, input->ep);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x23B, input->thread);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x23C, transport_initialized);
+
+	error = connect_endpoint(input->ep, &input->address);
+	if (take_mutex(input->mutex, 1000))
+	{
+		if (input->cancelled)
+		{
+			disconnect_endpoint(input->ep);
+		}
+
+		thread = input->thread;
+		mutex = input->mutex;
+	}
+	else
+	{
+		error = _transport_error_unknown;
+	}
+
+	input->ep->error = error;
+	if (mutex)
+	{
+		match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x252, input);
+		release_mutex(mutex);
+		dispose_mutex(mutex);
+	}
+
+	if (thread)
+	{
+		connection_thread_list_mark_for_disposal(thread);
+	}
+
+	return error;
+}
+
+short connect_endpoint_async(
+	struct transport_endpoint *ep,
+	struct transport_address const *address,
+	transport_connect_process_ref *process_reference)
+{
+	struct connect_process_input *input;
+
+	connection_thread_list_maintenance();
+	match_assert(
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x268,
+		ep && address && process_reference);
+	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x269, transport_initialized);
+
+	input = debug_malloc(
+		sizeof(*input),
+		TRUE,
+		TRANSPORT_ENDPOINT_WINSOCK_FILE,
+		0x26B);
+	if (input)
+	{
+		input->address = *address;
+		input->ep = ep;
+		input->cancelled = FALSE;
+
+		if (create_mutex(&input->mutex) &&
+			create_thread(2, connect_endpoint_process, input, &input->thread))
+		{
+			if (connection_thread_list_add(input->thread))
+			{
+				short result = _transport_result_connect_in_progress;
+
+				*process_reference = input;
+				ep->error = result;
+				return result;
+			}
+
+			dispose_thread(input->thread);
+			dispose_mutex(input->mutex);
+			input->thread = NULL;
+			ep->error = _transport_error_unknown;
+			return _transport_error_unknown;
+		}
+
+		match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x282, input);
+		ep->error = _transport_error_connect_failed;
+		return _transport_error_connect_failed;
+	}
+
+	ep->error = _transport_error_out_of_memory;
+	return _transport_error_out_of_memory;
+}
+
 void disconnect_endpoint(
 	struct transport_endpoint *ep)
 {
@@ -1028,14 +1376,14 @@ void disconnect_endpoint(
 }
 
 void cancel_connect_process(
-	struct connect_process_input *input)
+	transport_connect_process_ref input)
 {
 	match_assert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
 		0x298,
 		input && input->ep && input->thread);
 
-	code_000713a0();
+	connection_thread_list_maintenance();
 	if (take_mutex(input->mutex, 1000))
 	{
 		disconnect_endpoint(input->ep);
@@ -1287,7 +1635,7 @@ void delete_transport_endpoint(
 
 	disconnect_endpoint(ep);
 	match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0xE8, ep);
-	code_000713a0();
+	connection_thread_list_maintenance();
 	return;
 }
 

@@ -102,11 +102,6 @@ enum
 
 enum
 {
-	_rasterizer_lock_sprite = 16,
-};
-
-enum
-{
 	_shader_effect_uses_nonlinear_tint_bit = 1,
 };
 
@@ -814,7 +809,7 @@ static short build_sprite_get_group(
 				}
 				group->vertices = NULL;
 			}
-			rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+			rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 		}
 		else
 		{

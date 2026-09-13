@@ -1039,7 +1039,7 @@ extern byte debug_sound_environment[];
 extern byte debug_sprites[];
 extern byte debug_structure[];
 extern byte debug_texture_cache[];
-extern byte debug_trigger_volumes[];
+extern boolean debug_trigger_volumes;
 extern byte debug_unit_all_animations[];
 extern byte debug_unit_animations[];
 extern byte debug_unit_illumination[];
@@ -1301,7 +1301,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "render_shadows", _hs_type_boolean, 0, render_shadows },
 	{ "debug_damage", _hs_type_boolean, 0, debug_damage },
 	{ "debug_scripting", _hs_type_boolean, 0, debug_scripting },
-	{ "debug_trigger_volumes", _hs_type_boolean, 0, debug_trigger_volumes },
+	{ "debug_trigger_volumes", _hs_type_boolean, 0, &debug_trigger_volumes },
 	{ "debug_point_physics", _hs_type_boolean, 0, debug_point_physics },
 	{ "debug_physics_disable_penetration_freeze", _hs_type_boolean, 0, debug_physics_disable_penetration_freeze },
 	{ "debug_motion_sensor_draw_all_units", _hs_type_boolean, 0, debug_motion_sensor_draw_all_units },

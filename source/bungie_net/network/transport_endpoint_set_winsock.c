@@ -361,6 +361,25 @@ short transport_server_terminate(
 	return _transport_error_none;
 }
 
+short transport_dispose(
+	void)
+{
+	short result = _transport_error_none;
+
+	if (transport_initialized)
+	{
+		WSACleanup();
+		XNetCleanup();
+		transport_initialized = FALSE;
+	}
+	else
+	{
+		result = _transport_error_not_initialized;
+	}
+
+	return result;
+}
+
 boolean transport_network_available(
 	void)
 {

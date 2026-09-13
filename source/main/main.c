@@ -391,6 +391,12 @@ enum
 	_bitmap_format_x8r8g8b8 = 10,
 };
 
+enum
+{
+	_text_justification_left = 0,
+	_text_justification_right,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -545,6 +551,15 @@ struct _main_globals
 	byte reserved61C[4];
 };
 
+struct main_hud_globals_definition
+{
+	byte reserved00[0x54];
+	long font_tag_index;
+};
+
+typedef char main_hud_globals_font_tag_index_offset_assert[
+	offsetof(struct main_hud_globals_definition, font_tag_index) == 0x54 ? 1 : -1];
+
 typedef char main_globals_size_assert[
 	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
 typedef char main_globals_frame_start_milliseconds_offset_assert[
@@ -675,6 +690,8 @@ extern struct bitmap_data *bitmap_2d_new(
 extern char const *tiff_export(
 	struct file_reference *file,
 	struct bitmap_data *bitmap);
+
+extern struct main_hud_globals_definition *hud_globals;
 
 /* ---------- globals */
 
@@ -2624,6 +2641,120 @@ static void screenshot_render(
 	}
 
 	global_screenshot_count.count = 0;
+	return;
+}
+
+void main_framerate_render(
+	void)
+{
+	if (display_framerate)
+	{
+		long font_tag_index;
+
+		font_tag_index = hud_globals->font_tag_index;
+		if (font_tag_index != NONE)
+		{
+			real frame_seconds;
+			real frame_rate_real;
+			long frame_rate;
+			rectangle2d bounds;
+			char frame_rate_string[4];
+
+			bounds = render.camera.window_bounds;
+			frame_seconds = MAX(main_globals.seconds_elapsed, 0.01f);
+			frame_rate_real = 1.0f / frame_seconds;
+			frame_rate = fast_ftol(frame_rate_real);
+			if (main_globals.vblank_interval_held)
+				frame_rate = 60 / main_globals.vblank_interval_current;
+
+			_snprintf(
+				frame_rate_string,
+				NUMBEROF(frame_rate_string) - 1,
+				"%d",
+				(short)frame_rate);
+			frame_rate_string[NUMBEROF(frame_rate_string) - 1] = 0;
+			bounds.x0 = (short)(bounds.x1 - 50);
+			bounds.y0 = (short)(bounds.y1 - 50);
+			draw_string_set_format(NONE, _text_justification_left, 0);
+			draw_string_set_color(
+				(short)frame_rate >= 30 ? global_real_argb_green : global_real_argb_red);
+			draw_string_set_font(font_tag_index);
+			rasterizer_draw_string(&bounds, NULL, NULL, 0, frame_rate_string);
+		}
+	}
+
+	if (display_vblank_deltas)
+	{
+		long font_tag_index;
+
+		font_tag_index = hud_globals->font_tag_index;
+		if (font_tag_index != NONE)
+		{
+			short index;
+			rectangle2d bounds;
+			char delta_string[4];
+
+			bounds = render.camera.window_bounds;
+			bounds.x0 = (short)(bounds.x1 - 50);
+			bounds.y0 = (short)(bounds.y1 - 50);
+			index = (short)((main_globals.vblank_flip_delta_index + 14) % 15);
+			while (index != main_globals.vblank_flip_delta_index)
+			{
+				bounds.y0 -= 20;
+				bounds.y1 -= 20;
+				_snprintf(
+					delta_string,
+					NUMBEROF(delta_string) - 1,
+					"%d",
+					main_globals.vblank_flip_deltas[index]);
+				delta_string[NUMBEROF(delta_string) - 1] = 0;
+				draw_string_set_format(NONE, _text_justification_right, 0);
+				draw_string_set_font(font_tag_index);
+				draw_string_set_color(
+					main_globals.vblank_flip_deltas[index] == 2
+						? global_real_argb_white
+						: global_real_argb_red);
+				rasterizer_draw_string(&bounds, NULL, NULL, 0, delta_string);
+				index = (short)((index + 14) % 15);
+			}
+		}
+	}
+
+	if (display_precache_progress && cache_files_precache_in_progress())
+	{
+		long font_tag_index;
+
+		font_tag_index = hud_globals->font_tag_index;
+		if (font_tag_index != NONE)
+		{
+			real progress;
+			long progress_percent;
+			rectangle2d bounds;
+			char progress_string[4];
+
+			if (cache_files_precache_map_status(&progress) == 0)
+			{
+				real progress_percent_real;
+
+				bounds = render.camera.window_bounds;
+				progress_percent_real = progress * 100.0f;
+				progress_percent = fast_ftol(progress_percent_real);
+				_snprintf(
+					progress_string,
+					NUMBEROF(progress_string) - 1,
+					"%d",
+					(short)progress_percent);
+				progress_string[NUMBEROF(progress_string) - 1] = 0;
+				bounds.x0 = (short)(bounds.x1 - 50);
+				bounds.y0 = (short)(bounds.y1 - 100);
+				draw_string_set_format(NONE, _text_justification_left, 0);
+				draw_string_set_color(global_real_argb_purple);
+				draw_string_set_font(font_tag_index);
+				rasterizer_draw_string(&bounds, NULL, NULL, 0, progress_string);
+			}
+		}
+	}
+
 	return;
 }
 

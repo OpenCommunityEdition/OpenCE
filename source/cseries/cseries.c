@@ -136,6 +136,7 @@ symbols in this file:
 #include <wchar.h>
 
 #include "cseries.h"
+#include "cseries_windows.h"
 #include "profile.h"
 #include "errors.h"
 #include "real_math.h"
@@ -154,15 +155,10 @@ enum
 
 /* ---------- macros */
 
-#define cseries_match_assert(file, line, expr) if (!(expr)) { stack_walk(FALSE); error(_error_silent, "EXCEPTION %s in %s,#%d: %s", "halt", MATCH_FILE(file), MATCH_LINE(line), STRINGIFY(expr)); system_exit(-1); }
+#define cseries_match_assert(file, line, expr) if (!(expr)) { stack_walk(0); error(_error_silent, "EXCEPTION %s in %s,#%d: %s", "halt", MATCH_FILE(file), MATCH_LINE(line), STRINGIFY(expr)); system_exit(-1); }
 #define cseries_assert(expr) cseries_match_assert(__FILE__, __LINE__, expr)
 
 /* ---------- structures */
-
-/* ---------- prototypes */
-
-extern void stack_walk(
-	long levels_to_ignore);
 
 /* ---------- globals */
 
@@ -361,7 +357,7 @@ void display_assert(
 {
 	if (fatal)
 	{
-		stack_walk(FALSE);
+		stack_walk(0);
 	}
 	
 	error(_error_silent, "EXCEPTION %s in %s,#%d: %s", fatal ? "halt" : "warn", file, line, information ? information : "<no reason given>");

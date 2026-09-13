@@ -50,6 +50,9 @@ void vehicles_dispose(
 	void);
 boolean vehicle_moving_near_any_player(
 	void);
+boolean vehicle_stuck(
+	long vehicle_index,
+	real_vector3d *direction);
 void vehicle_delete(
 	long vehicle_index);
 long vehicle_find_pathfinding_surface_index(

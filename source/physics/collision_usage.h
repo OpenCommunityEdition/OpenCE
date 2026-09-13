@@ -77,6 +77,8 @@ void collision_log_usage(
 void collision_log_display(
 	char *buffer);
 void collision_log_begin_period(short);
+void collision_log_continue_period(
+	short time_period);
 void collision_log_end_period(void);
 
 /* ---------- globals */

@@ -154,12 +154,15 @@ symbols in this file:
 #include "cseries.h"
 
 #include "actor_definitions.h"
+#include "actor_perception.h"
 #include "actors.h"
 #include "ai.h"
 #include "ai_scenario_definitions.h"
 #include "encounters.h"
+#include "props.h"
 #include "game/game.h"
 #include "items/weapon_definitions.h"
+#include "physics/collision_bsp_definitions.h"
 #include "units/vehicles.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -172,6 +175,22 @@ enum
 	_firing_position_attack_vector_friend_player,
 	_firing_position_attack_vector_dangerous_enemy,
 	NUMBER_OF_FIRING_POSITION_ATTACK_VECTOR_TYPES,
+};
+
+enum
+{
+	_actor_definition_flags2_avoid_all_enemy_attack_vectors_bit = 0,
+	_actor_definition_flags2_pathfinding_ignores_danger_bit = 4,
+};
+
+enum
+{
+	_actor_combat_status_definite = 3,
+};
+
+enum
+{
+	MAXIMUM_NUMBER_OF_FIRING_POSITIONS_PER_ENCOUNTER = 512,
 };
 
 /* debug evaluation categories reported through firing_position_store_evaluation_debug;
@@ -361,6 +380,14 @@ static boolean firing_positions_get_post_evaluation_bound(
 static boolean firing_position_compare(
 	long index1,
 	long index2);
+static void firing_position_compute_line_of_sight(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *firing_position);
+static boolean firing_position_forced_evaluation(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *firing_position);
 
 /* ---------- globals */
 
@@ -927,7 +954,6 @@ static boolean firing_position_compare(
 {
 	struct firing_position *firing_position1= &global_temporary_sort_firing_position_array[index1];
 	struct firing_position *firing_position2= &global_temporary_sort_firing_position_array[index2];
-	long result;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
@@ -944,26 +970,15 @@ static boolean firing_position_compare(
 
 	if (firing_position1->valid!=firing_position2->valid)
 	{
-		result= firing_position1->valid ? -1 : 1;
-	}
-	else if (firing_position1->rejected!=firing_position2->rejected)
-	{
-		result= firing_position1->rejected ? 1 : -1;
-	}
-	else if (firing_position1->evaluation>firing_position2->evaluation)
-	{
-		result= -1;
-	}
-	else if (firing_position1->evaluation<firing_position2->evaluation)
-	{
-		result= 1;
-	}
-	else
-	{
-		result= 0;
+		return !firing_position1->valid;
 	}
 
-	return result>0;
+	if (firing_position1->rejected!=firing_position2->rejected)
+	{
+		return firing_position1->rejected;
+	}
+
+	return firing_position1->evaluation<firing_position2->evaluation;
 }
 
 /* ---------- public code */
@@ -1454,6 +1469,1012 @@ static void pre_evaluator_panic(
 	}
 
 	return;
+}
+
+static void firing_position_compute_line_of_sight(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *firing_position)
+{
+	struct actor_datum *actor= actor_get(actor_index);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+		828,
+		evaluation_context->has_target);
+
+	if (evaluation_context->evaluation_mode==_firing_point_evaluation_mode_pursue)
+	{
+		if (firing_position->path_distance_from_actor<6.0f)
+		{
+			real_point3d estimated_position;
+
+			unit_estimate_position(
+				actor->meta.unit_index,
+				_unit_estimate_head_standing,
+				&firing_position->definition->position,
+				NULL,
+				NULL,
+				&estimated_position);
+			firing_position->line_of_sight= ai_test_line_of_sight(
+				&actor->input.position.head_position,
+				actor->input.position.body_location.cluster_index,
+				&estimated_position,
+				firing_position->definition->cluster_index,
+				_ai_line_of_sight_normal,
+				FALSE,
+				NONE,
+				actor->input.vehicle_index!=NONE);
+		}
+		else
+		{
+			firing_position->line_of_sight= _ai_line_of_sight_obstructed;
+		}
+	}
+	else
+	{
+		long line_of_sight_mode= _ai_line_of_sight_normal;
+		long estimate_mode;
+		real_vector3d *desired_facing;
+		real_vector3d *desired_gun_offset;
+		real_vector3d facing;
+		real_vector2d horizontal_facing;
+		real_point3d estimated_position;
+
+		if (evaluation_context->evaluation_mode==_firing_point_evaluation_mode_panic ||
+			evaluation_context->evaluation_mode==_firing_point_evaluation_mode_cover)
+		{
+			estimate_mode= _unit_estimate_head_crouching;
+			desired_facing= NULL;
+			desired_gun_offset= NULL;
+		}
+		else if (evaluation_context->has_gun_offset_stand)
+		{
+			estimate_mode= _unit_estimate_gun_position;
+			desired_gun_offset= &evaluation_context->gun_offset_stand;
+			vector_from_points3d(
+				&firing_position->definition->position,
+				&evaluation_context->target_head_position,
+				&facing);
+			horizontal_facing.i= facing.i;
+			horizontal_facing.j= facing.j;
+			if (normalize2d(&horizontal_facing)>0.0f)
+			{
+				facing.i= horizontal_facing.i;
+				facing.j= horizontal_facing.j;
+				facing.k= 0.0f;
+				desired_facing= &facing;
+			}
+			else
+			{
+				desired_facing= &actor->input.facing_vector;
+			}
+		}
+		else
+		{
+			estimate_mode= _unit_estimate_head_standing;
+			desired_facing= NULL;
+			desired_gun_offset= NULL;
+		}
+
+		unit_estimate_position(
+			actor->meta.unit_index,
+			estimate_mode,
+			&firing_position->definition->position,
+			desired_facing,
+			desired_gun_offset,
+			&estimated_position);
+		{
+			long evaluation_mode= evaluation_context->evaluation_mode;
+
+			if (evaluation_mode>_firing_point_evaluation_mode_fight &&
+				evaluation_mode<=_firing_point_evaluation_mode_uncover)
+			{
+				line_of_sight_mode= _ai_line_of_sight_expand_source;
+			}
+		}
+		firing_position->line_of_sight= ai_test_line_of_sight(
+			&estimated_position,
+			firing_position->definition->cluster_index,
+			&evaluation_context->target_line_of_sight_position,
+			evaluation_context->target_cluster_index,
+			line_of_sight_mode,
+			TRUE,
+			evaluation_context->target_vehicle_index,
+			actor->input.vehicle_index!=NONE);
+	}
+
+	return;
+}
+
+static boolean firing_position_forced_evaluation(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *firing_position)
+{
+	firing_position->valid= TRUE;
+	firing_position->evaluation= 0.0f;
+	firing_position->pre_evaluation= 0.0f;
+	firing_position->rejected= FALSE;
+	firing_position_pre_evaluate(actor_index, evaluation_context, 1, firing_position);
+
+	if (firing_position->valid)
+	{
+		evaluation_context->debug_valid_count++;
+	}
+	if (!firing_position->rejected)
+	{
+		evaluation_context->debug_nonrejected_count++;
+	}
+	if (firing_position->valid)
+	{
+		if (evaluation_context->has_target)
+		{
+			firing_position_compute_line_of_sight(
+				actor_index,
+				evaluation_context,
+				firing_position);
+		}
+
+		firing_position->pre_evaluation= firing_position->evaluation;
+		firing_position->valid= firing_position_post_evaluate(
+			actor_index,
+			evaluation_context,
+			firing_position);
+		evaluation_context->debug_post_evaluated_count++;
+	}
+
+	return firing_position->valid;
+}
+
+boolean actor_nearby_firing_positions(
+	long actor_index,
+	real_point3d const *test_point,
+	long test_surface_index,
+	short group_selection_mode)
+{
+	struct actor_datum *actor= actor_get(actor_index);
+	struct actor_definition *definition= actor_definition_get(actor->meta.definition_index);
+
+	if (!actor->state.flying && test_surface_index!=NONE)
+	{
+		struct collision_bsp *collision_bsp= global_collision_bsp_get();
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+			1434,
+			(test_surface_index >= 0) && (test_surface_index < collision_bsp->surfaces.count));
+	}
+
+	if ((actor->state.flying || test_surface_index!=NONE) && actor->meta.encounter_index!=NONE)
+	{
+		struct encounter_definition *encounter= TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+		long firing_position_groups= actor_get_firing_position_group(
+			actor_index,
+			_firing_point_evaluation_mode_fight,
+			group_selection_mode);
+		struct path_state state;
+		short firing_position_index;
+
+		if (!actor->state.flying)
+		{
+			struct path_input input;
+
+			path_input_new(
+				&input,
+				definition->moving.pathfinding_radius,
+				TRUE,
+				NONE);
+			path_input_set_start(&input, test_point, test_surface_index);
+			path_input_set_search_bounds(&input, 4.0f);
+			path_state_new(&input, &state, NULL);
+			path_state_find(&state);
+		}
+
+		for (firing_position_index= 0;
+			firing_position_index<encounter->firing_positions.count;
+			firing_position_index++)
+		{
+			struct firing_position_definition *firing_position= TAG_BLOCK_GET_ELEMENT(
+				&encounter->firing_positions,
+				firing_position_index,
+				struct firing_position_definition);
+
+			if (TEST_FLAG(firing_position_groups, firing_position->group_index) &&
+				distance_squared3d(test_point, &firing_position->position)<16.0f)
+			{
+				if (actor->state.flying)
+				{
+					if (path_3d_available(
+						global_structure_bsp_get(),
+						test_point,
+						0.0f,
+						&firing_position->position,
+						NULL,
+						NULL))
+					{
+						return TRUE;
+					}
+				}
+				else
+				{
+					real distance;
+
+					path_state_estimated_distance(
+						&state,
+						&firing_position->position,
+						firing_position->surface_index,
+						&distance,
+						NULL,
+						NULL);
+					if (distance<4.0f)
+					{
+						return TRUE;
+					}
+				}
+			}
+		}
+	}
+
+	return FALSE;
+}
+
+short actor_select_firing_position(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *best_firing_position,
+	long *current_owner,
+	struct path_state *area_path_state,
+	boolean *area_path_state_valid)
+{
+	struct actor_datum *actor= actor_get(actor_index);
+	struct encounter_definition *encounter;
+	struct actor_definition *definition;
+	struct actor_variant_definition *variant_definition;
+	struct firing_position firing_positions[MAXIMUM_NUMBER_OF_FIRING_POSITIONS_PER_ENCOUNTER];
+	long sorted_indices[MAXIMUM_NUMBER_OF_FIRING_POSITIONS_PER_ENCOUNTER];
+	long owner_actor_indices[MAXIMUM_NUMBER_OF_FIRING_POSITIONS_PER_ENCOUNTER];
+	short firing_position_count= 0;
+	short best_index= NONE;
+	real best_evaluation= 0.0f;
+	boolean any_in_range= FALSE;
+	long encounter_index= actor->meta.encounter_index;
+
+	if (encounter_index==NONE)
+	{
+		return NONE;
+	}
+
+	encounter= TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->ai_encounters,
+		DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+		struct encounter_definition);
+	definition= actor_definition_get(actor->meta.definition_index);
+	variant_definition= actor_variant_definition_get(actor->meta.variant_definition_index);
+	encounter_build_firing_position_owner_actor_indices(encounter_index, owner_actor_indices);
+	if (actor->firing_positions.current_position_index!=NONE)
+	{
+		owner_actor_indices[actor->firing_positions.current_position_index]= NONE;
+	}
+
+	evaluation_context->maximum_allowable_range=
+		actor->input.vehicle_driver_type==_actor_vehicle_driver_none ? 15.0f : 80.0f;
+	if (evaluation_context->maximum_search_range==0.0f)
+	{
+		evaluation_context->maximum_search_range= evaluation_context->maximum_allowable_range;
+	}
+	evaluation_context->has_target= FALSE;
+	evaluation_context->target_has_hint_vector= FALSE;
+	evaluation_context->find_path_distance_to_target=
+		evaluation_context->evaluation_mode==_firing_point_evaluation_mode_pursue;
+
+	if (evaluation_context->specific_target_enable)
+	{
+		evaluation_context->target_point= evaluation_context->specific_target_point;
+		evaluation_context->target_pathfinding_point= evaluation_context->specific_target_point;
+		evaluation_context->target_pathfinding_surface_index=
+			evaluation_context->specific_target_surface_index;
+		evaluation_context->target_cluster_index= evaluation_context->specific_target_cluster_index;
+		evaluation_context->target_danger_radius= 0.0f;
+		evaluation_context->target_prop_index= NONE;
+		evaluation_context->target_vehicle_index= NONE;
+		evaluation_context->target_current_distance= distance3d(
+			&evaluation_context->target_point,
+			&actor->input.position.body_position);
+		unit_estimate_position(
+			actor->meta.unit_index,
+			_unit_estimate_head_standing,
+			&evaluation_context->target_point,
+			NULL,
+			NULL,
+			&evaluation_context->target_head_position);
+		evaluation_context->target_line_of_sight_position=
+			evaluation_context->target_head_position;
+		evaluation_context->has_target= TRUE;
+	}
+	else
+	{
+		long target_prop_index= NONE;
+
+		if (actor->state.action==_actor_action_flee)
+		{
+			target_prop_index= actor->state.action_data.flee.flee_prop_index;
+		}
+		if (target_prop_index==NONE)
+		{
+			target_prop_index= actor->target.target_prop_index;
+		}
+		if (target_prop_index!=NONE)
+		{
+			struct prop_datum *prop= prop_get(target_prop_index);
+
+			if (evaluation_context->evaluation_mode==_firing_point_evaluation_mode_pursue &&
+				prop->state>=_prop_state_becoming_unacknowledged &&
+				prop->state<=_prop_state_acknowledged)
+			{
+				actor_perception_find_prop_pathfinding_location(actor_index, target_prop_index);
+			}
+
+			evaluation_context->target_point= prop->body_position;
+			evaluation_context->target_pathfinding_point= prop->pathfinding_point;
+			evaluation_context->target_pathfinding_surface_index= prop->pathfinding_surface_index;
+			evaluation_context->target_cluster_index= prop->body_location.cluster_index;
+			evaluation_context->target_prop_index= target_prop_index;
+			evaluation_context->target_current_distance= prop->distance;
+			evaluation_context->target_head_position= prop->head_position;
+			evaluation_context->target_vehicle_index= prop->vehicle_index;
+			evaluation_context->target_danger_radius= prop->suicide_radius;
+			if (evaluation_context->use_last_visible_target_position &&
+				prop->last_visible_time!=NONE)
+			{
+				evaluation_context->target_line_of_sight_position=
+					prop->last_visible_head_position;
+			}
+			else
+			{
+				evaluation_context->target_line_of_sight_position= prop->head_position;
+			}
+			if (prop->state>=_prop_state_uninspected_orphan &&
+				prop->state<=_prop_state_inspected_orphan)
+			{
+				evaluation_context->target_has_hint_vector= TRUE;
+				evaluation_context->target_hint_vector= prop->orphan_hint_vector;
+			}
+			evaluation_context->target_line_of_sight_optional=
+				evaluation_context->evaluation_mode==_firing_point_evaluation_mode_guard ||
+				evaluation_context->evaluation_mode==_firing_point_evaluation_mode_avoid;
+			evaluation_context->has_target= TRUE;
+		}
+	}
+
+	if (magnitude_squared3d(&variant_definition->ranged_combat.gun_offset_stand)>0.0001f)
+	{
+		evaluation_context->has_gun_offset_stand= TRUE;
+		evaluation_context->gun_offset_stand=
+			variant_definition->ranged_combat.gun_offset_stand;
+	}
+	else if (magnitude_squared3d(&definition->perception.gun_offset_stand)>0.0001f)
+	{
+		evaluation_context->has_gun_offset_stand= TRUE;
+		evaluation_context->gun_offset_stand= definition->perception.gun_offset_stand;
+	}
+	else
+	{
+		evaluation_context->has_gun_offset_stand= FALSE;
+	}
+	if (magnitude_squared3d(&variant_definition->ranged_combat.gun_offset_crouch)>0.0001f)
+	{
+		evaluation_context->has_gun_offset_crouch= TRUE;
+		evaluation_context->gun_offset_crouch=
+			variant_definition->ranged_combat.gun_offset_crouch;
+	}
+	else if (magnitude_squared3d(&definition->perception.gun_offset_crouch)>0.0001f)
+	{
+		evaluation_context->has_gun_offset_crouch= TRUE;
+		evaluation_context->gun_offset_crouch= definition->perception.gun_offset_crouch;
+	}
+	else
+	{
+		evaluation_context->has_gun_offset_crouch= FALSE;
+	}
+
+	if (actor->danger_zone.danger_type>_actor_danger_zone_none &&
+		actor->danger_zone.noticed_danger &&
+		actor->danger_zone.current_distance_from_actor<
+			actor->danger_zone.bounding_sphere_radius+3.0f)
+	{
+		evaluation_context->find_path_direction_from_actor= TRUE;
+	}
+	evaluation_context->flying= actor->state.flying;
+	if (actor->input.vehicle_driver_type==_actor_vehicle_driver_directional_flying)
+	{
+		evaluation_context->directional_driving= TRUE;
+		evaluation_context->directional_driving_cannot_stop= TRUE;
+	}
+
+	evaluation_context->avoid_point_count= 0;
+	if (actor->firing_positions.last_discarded_firing_position_valid)
+	{
+		struct firing_position_avoid_point *avoid_point=
+			&evaluation_context->avoid_points[evaluation_context->avoid_point_count++];
+
+		avoid_point->point= actor->firing_positions.last_discarded_firing_position;
+		avoid_point->radius= definition->firing_position.old_avoidance_radius;
+	}
+	if (definition->firing_position.friend_avoidance_radius>0.0f &&
+		(evaluation_context->evaluation_mode==_firing_point_evaluation_mode_fight ||
+			evaluation_context->evaluation_mode==_firing_point_evaluation_mode_uncover ||
+			evaluation_context->evaluation_mode==_firing_point_evaluation_mode_avoid))
+	{
+		struct prop_iterator iterator;
+		struct prop_datum *prop;
+
+		prop_iterator_new(&iterator, actor_index);
+		while (evaluation_context->avoid_point_count<MAXIMUM_NUMBER_OF_FIRING_POSITION_AVOID_POINTS &&
+			(prop= prop_iterator_next(&iterator))!=NULL)
+		{
+			if (prop->state>=_prop_state_becoming_unacknowledged &&
+				prop->state<=_prop_state_acknowledged &&
+				!prop->enemy && !prop->dead && !prop->player)
+			{
+				struct firing_position_avoid_point *avoid_point=
+					&evaluation_context->avoid_points[evaluation_context->avoid_point_count++];
+
+				avoid_point->point= prop->body_position;
+				avoid_point->radius= definition->firing_position.friend_avoidance_radius;
+			}
+		}
+	}
+
+	evaluation_context->attack_vector_count= 0;
+	evaluation_context->friend_attack_vector_count= 0;
+	evaluation_context->dangerous_enemy_attack_vector_count= 0;
+	{
+		boolean build_attack_vectors= FALSE;
+		short evaluation_mode= evaluation_context->evaluation_mode;
+
+		if (TEST_FLAG(definition->flags, _actor_definition_avoid_friend_line_of_fire_bit) &&
+			actor->state.combat_status>=_actor_combat_status_definite)
+		{
+			build_attack_vectors= actor->situation.known_enemies>0;
+		}
+		if (TEST_FLAG(
+			definition->flags2,
+			_actor_definition_flags2_avoid_all_enemy_attack_vectors_bit) &&
+			actor->state.combat_status>=_actor_combat_status_definite)
+		{
+			build_attack_vectors= TRUE;
+		}
+		if (evaluation_mode!=_firing_point_evaluation_mode_fight &&
+			evaluation_mode!=_firing_point_evaluation_mode_cover &&
+			evaluation_mode!=_firing_point_evaluation_mode_uncover &&
+			evaluation_mode!=_firing_point_evaluation_mode_avoid)
+		{
+			build_attack_vectors= FALSE;
+		}
+
+		if (build_attack_vectors)
+		{
+			struct prop_iterator iterator;
+			struct prop_datum *prop;
+
+			prop_iterator_new(&iterator, actor_index);
+			while (evaluation_context->attack_vector_count<
+				MAXIMUM_NUMBER_OF_FIRING_POSITION_ATTACK_VECTORS &&
+				(prop= prop_iterator_next(&iterator))!=NULL)
+			{
+				if (prop->state>=_prop_state_becoming_unacknowledged &&
+					prop->state<=_prop_state_acknowledged && !prop->dead)
+				{
+					if (!prop->enemy && (prop->player || prop->vehicle_index==NONE))
+					{
+						real_vector3d attack_vector;
+
+						if (actor_perception_friend_prop_is_attacking(
+							actor_index,
+							iterator.index,
+							&attack_vector))
+						{
+							struct firing_position_attack_vector *entry=
+								&evaluation_context->attack_vectors[
+									evaluation_context->attack_vector_count++];
+
+							entry->type= prop->player
+								? _firing_position_attack_vector_friend_player
+								: _firing_position_attack_vector_friend;
+							entry->point= prop->body_position;
+							entry->vector= attack_vector;
+							evaluation_context->friend_attack_vector_count++;
+						}
+					}
+					if (prop->enemy &&
+						(TEST_FLAG(
+							definition->flags2,
+							_actor_definition_flags2_avoid_all_enemy_attack_vectors_bit) ||
+							(prop->unopposable_enemy && (prop->player || prop->shooting))))
+					{
+						struct firing_position_attack_vector *entry=
+							&evaluation_context->attack_vectors[
+								evaluation_context->attack_vector_count++];
+						long unit_index= prop->vehicle_index!=NONE
+							? prop->vehicle_index
+							: prop->unit_index;
+
+						entry->type= _firing_position_attack_vector_dangerous_enemy;
+						entry->point= prop->body_position;
+						unit_get_aiming_vector(unit_index, &entry->vector);
+						evaluation_context->dangerous_enemy_attack_vector_count++;
+					}
+				}
+			}
+		}
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+		2067,
+		area_path_state_valid);
+	*area_path_state_valid= FALSE;
+	{
+		short index;
+
+		for (index= 0; index<encounter->firing_positions.count; index++)
+		{
+			struct firing_position_definition *firing_position_definition=
+				TAG_BLOCK_GET_ELEMENT(
+					&encounter->firing_positions,
+					index,
+					struct firing_position_definition);
+
+			if (TEST_FLAG(
+					evaluation_context->allowed_position_mask,
+					firing_position_definition->group_index) &&
+				(evaluation_context->flying || firing_position_definition->surface_index!=NONE) &&
+				(evaluation_context->evaluation_mode!=_firing_point_evaluation_mode_pursue ||
+					actor_nearby_firing_positions(
+						actor_index,
+						&firing_position_definition->position,
+						firing_position_definition->surface_index,
+						_firing_position_group_when_searching)))
+			{
+				long owner_actor_index= owner_actor_indices[index];
+				boolean accept= owner_actor_index==NONE;
+
+				if (!accept)
+				{
+					struct actor_datum *owner_actor;
+					real owner_distance;
+
+					if (evaluation_context->evaluation_mode==_firing_point_evaluation_mode_guard &&
+						evaluation_context->avoid_point_count<
+							MAXIMUM_NUMBER_OF_FIRING_POSITION_AVOID_POINTS)
+					{
+						struct firing_position_avoid_point *avoid_point=
+							&evaluation_context->avoid_points[
+								evaluation_context->avoid_point_count++];
+
+						avoid_point->point= firing_position_definition->position;
+						avoid_point->radius= 4.0f;
+					}
+					owner_actor= actor_get(owner_actor_index);
+					owner_distance= distance3d(
+						&firing_position_definition->position,
+						&owner_actor->input.position.body_position);
+					if (owner_distance>=1.0f)
+					{
+						real actor_distance= distance3d(
+							&firing_position_definition->position,
+							&actor->input.position.body_position);
+
+						accept= owner_distance>=actor_distance*2.0f;
+					}
+				}
+
+				if (accept &&
+					firing_position_count<MAXIMUM_NUMBER_OF_FIRING_POSITIONS_PER_ENCOUNTER)
+				{
+					struct firing_position *firing_position=
+						&firing_positions[firing_position_count++];
+
+					firing_position->definition= firing_position_definition;
+					firing_position->original_index= index;
+					firing_position->line_of_sight= _ai_line_of_sight_clear;
+					firing_position->path_distance_from_actor= REAL_MAX;
+					firing_position->path_direction_from_actor= *global_zero_vector3d;
+					firing_position->path_distance_to_target= REAL_MAX;
+					firing_position->path_closest_approach_to_target= REAL_MAX;
+					firing_position->path_direction_from_target= *global_zero_vector3d;
+					firing_position->linear_distance_squared_to_target= 0.0f;
+					firing_position->pre_evaluation= 0.0f;
+					firing_position->evaluation= 0.0f;
+					firing_position->valid= TRUE;
+					firing_position->rejected= FALSE;
+				}
+			}
+		}
+	}
+
+	if (firing_position_count<=0)
+	{
+		actor_clear_discarded_firing_positions(actor_index, FALSE);
+		return NONE;
+	}
+
+	if (evaluation_context->has_target && evaluation_context->find_path_distance_to_target)
+	{
+		if (evaluation_context->flying)
+		{
+			short index;
+
+			for (index= 0; index<firing_position_count; index++)
+			{
+				struct firing_position *firing_position= &firing_positions[index];
+				real_vector3d target_vector;
+
+				vector_from_points3d(
+					&evaluation_context->target_point,
+					&firing_position->definition->position,
+					&target_vector);
+				if (magnitude_squared3d(&target_vector)<400.0f &&
+					path_3d_available(
+						global_structure_bsp_get(),
+						&evaluation_context->target_point,
+						0.0f,
+						&firing_position->definition->position,
+						NULL,
+						NULL))
+				{
+					firing_position->path_distance_to_target= normalize3d(&target_vector);
+					if (evaluation_context->find_path_direction_from_target)
+					{
+						firing_position->path_direction_from_target= target_vector;
+					}
+				}
+			}
+		}
+		else if (evaluation_context->target_pathfinding_surface_index!=NONE)
+		{
+			struct path_input input;
+			struct path_state state;
+			short index;
+
+			path_input_new(
+				&input,
+				definition->moving.pathfinding_radius,
+				FALSE,
+				actor->emotions.ignorant_of_broken_surfaces);
+			path_input_set_start(
+				&input,
+				&evaluation_context->target_pathfinding_point,
+				evaluation_context->target_pathfinding_surface_index);
+			path_input_set_search_bounds(&input, 20.0f);
+			path_state_new(&input, &state, NULL);
+			path_state_find(&state);
+			for (index= 0; index<firing_position_count; index++)
+			{
+				struct firing_position *firing_position= &firing_positions[index];
+				real_vector3d *direction= evaluation_context->find_path_direction_from_target
+					? &firing_position->path_direction_from_target
+					: NULL;
+
+				path_state_estimated_distance(
+					&state,
+					&firing_position->definition->position,
+					firing_position->definition->surface_index,
+					&firing_position->path_distance_to_target,
+					NULL,
+					direction);
+			}
+		}
+	}
+
+	if (!evaluation_context->flying)
+	{
+		struct path_input input;
+
+		actor_path_input_new(actor_index, &input);
+		path_input_set_search_bounds(&input, evaluation_context->maximum_search_range);
+		if (evaluation_context->attractor_enable && evaluation_context->has_target)
+		{
+			path_input_set_attractor(
+				&input,
+				&evaluation_context->target_point,
+				evaluation_context->attractor_radius,
+				NONE,
+				evaluation_context->attractor_weight);
+		}
+		else if (actor->danger_zone.danger_type>_actor_danger_zone_none &&
+			!TEST_FLAG(
+				definition->flags2,
+				_actor_definition_flags2_pathfinding_ignores_danger_bit))
+		{
+			path_input_set_attractor(
+				&input,
+				&actor->danger_zone.position,
+				actor->danger_zone.danger_radius,
+				NONE,
+				10.0f);
+		}
+		path_state_new(&input, area_path_state, NULL);
+		if (path_state_find(area_path_state))
+		{
+			*area_path_state_valid= TRUE;
+		}
+	}
+
+	{
+		short index;
+
+		for (index= 0; index<firing_position_count; index++)
+		{
+			struct firing_position *firing_position= &firing_positions[index];
+			real_vector3d from_actor;
+			real maximum_search_range_squared=
+				evaluation_context->maximum_search_range*evaluation_context->maximum_search_range;
+
+			if (evaluation_context->has_target)
+			{
+				firing_position->linear_distance_squared_to_target= distance_squared3d(
+					&evaluation_context->target_point,
+					&firing_position->definition->position);
+			}
+			vector_from_points3d(
+				&actor->input.position.body_position,
+				&firing_position->definition->position,
+				&from_actor);
+			if (magnitude_squared3d(&from_actor)<maximum_search_range_squared)
+			{
+				if (evaluation_context->flying)
+				{
+					firing_position->path_closest_approach_to_target= square_root(
+						point_to_line_distance_squared3d(
+							&evaluation_context->target_point,
+							&actor->input.position.body_position,
+							&from_actor));
+					firing_position->path_distance_from_actor= normalize3d(&from_actor);
+					if (evaluation_context->find_path_direction_from_actor)
+					{
+						firing_position->path_direction_from_actor= from_actor;
+					}
+				}
+				else
+				{
+					real_vector3d *direction= evaluation_context->find_path_direction_from_actor
+						? &firing_position->path_direction_from_actor
+						: NULL;
+
+					path_state_estimated_distance(
+						area_path_state,
+						&firing_position->definition->position,
+						firing_position->definition->surface_index,
+						&firing_position->path_distance_from_actor,
+						&firing_position->path_closest_approach_to_target,
+						direction);
+				}
+			}
+			if (firing_position->path_distance_from_actor>=
+				evaluation_context->maximum_search_range)
+			{
+				firing_position->valid= FALSE;
+			}
+			else
+			{
+				any_in_range= TRUE;
+			}
+		}
+	}
+
+	if (evaluation_context->allow_outside_range && !any_in_range)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+			2210,
+			firing_position_count > 0);
+		best_index= seed_random_range(
+			get_global_random_seed_address(),
+			0,
+			firing_position_count);
+		*area_path_state_valid= FALSE;
+		actor_clear_discarded_firing_positions(actor_index, FALSE);
+		if (!firing_position_forced_evaluation(
+			actor_index,
+			evaluation_context,
+			&firing_positions[best_index]))
+		{
+			best_index= NONE;
+		}
+	}
+	else
+	{
+		short index;
+
+		firing_position_pre_evaluate(
+			actor_index,
+			evaluation_context,
+			firing_position_count,
+			firing_positions);
+		for (index= 0; index<firing_position_count; index++)
+		{
+			sorted_indices[index]= index;
+		}
+		global_temporary_sort_firing_position_count= firing_position_count;
+		global_temporary_sort_firing_position_array= firing_positions;
+		qsort_4byte(sorted_indices, firing_position_count, firing_position_compare);
+		evaluation_context->post_evaluation_bound= 0.0f;
+		evaluation_context->post_evaluation_bounded=
+			firing_positions_get_post_evaluation_bound(actor_index, evaluation_context);
+
+		for (index= 0; index<firing_position_count; index++)
+		{
+			short sorted_index= (short)sorted_indices[index];
+			struct firing_position *firing_position= &firing_positions[sorted_index];
+
+			if (!firing_position->valid ||
+				(evaluation_context->post_evaluation_bounded &&
+					firing_position->evaluation+evaluation_context->post_evaluation_bound<=
+						best_evaluation))
+			{
+				break;
+			}
+			if (evaluation_context->has_target)
+			{
+				firing_position_compute_line_of_sight(
+					actor_index,
+					evaluation_context,
+					firing_position);
+			}
+			firing_position->pre_evaluation= firing_position->evaluation;
+			if (firing_position_post_evaluate(
+				actor_index,
+				evaluation_context,
+				firing_position) &&
+				firing_position->evaluation>best_evaluation)
+			{
+				best_index= sorted_index;
+				best_evaluation= firing_position->evaluation;
+			}
+		}
+	}
+
+	if (best_index==NONE)
+	{
+		return NONE;
+	}
+	if (best_firing_position)
+	{
+		*best_firing_position= firing_positions[best_index];
+	}
+	if (current_owner)
+	{
+		*current_owner= owner_actor_indices[firing_positions[best_index].original_index];
+	}
+
+	return firing_positions[best_index].original_index;
+}
+
+short actor_active_select_firing_position(
+	long actor_index,
+	struct firing_position_evaluation_context *evaluation_context,
+	struct firing_position *best_firing_position,
+	long *current_owner,
+	struct path_state *area_path_state,
+	boolean *area_path_state_valid)
+{
+	struct actor_datum *actor= actor_get(actor_index);
+	unsigned long currently_allowed_groups;
+	unsigned long groups_when_not_searching;
+	unsigned long total_groups;
+	long result;
+
+	if (actor->meta.encounter_index==NONE)
+	{
+		return NONE;
+	}
+
+	currently_allowed_groups= actor_get_firing_position_group(
+		actor_index,
+		evaluation_context->evaluation_mode,
+		_firing_position_group_normal);
+	groups_when_not_searching= actor_get_firing_position_group(
+		actor_index,
+		evaluation_context->evaluation_mode,
+		_firing_position_group_when_not_searching);
+	total_groups= actor_get_firing_position_group(
+		actor_index,
+		evaluation_context->evaluation_mode,
+		_firing_position_group_when_searching);
+	total_groups|= groups_when_not_searching;
+
+	if (total_groups<=currently_allowed_groups)
+	{
+		evaluation_context->allowed_position_mask= currently_allowed_groups;
+	}
+	else
+	{
+		evaluation_context->preferred_groups= currently_allowed_groups;
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
+			2311,
+			(total_groups & currently_allowed_groups) == currently_allowed_groups);
+		evaluation_context->allowed_position_mask= total_groups;
+		evaluation_context->preferred_weight= 8.0f;
+	}
+
+	evaluation_context->allow_outside_range=
+		actor->firing_positions.current_position_index==NONE ||
+		!actor->firing_positions.current_position_found_outside_range;
+	evaluation_context->allow_rejected_positions= TRUE;
+	result= actor_select_firing_position(
+		actor_index,
+		evaluation_context,
+		best_firing_position,
+		current_owner,
+		area_path_state,
+		area_path_state_valid);
+
+	if ((short)result!=NONE)
+	{
+		if (!TEST_FLAG(
+			currently_allowed_groups,
+			best_firing_position->definition->group_index))
+		{
+			actor->state.searching= !actor->state.searching;
+		}
+
+		return (short)result;
+	}
+	{
+		short firing_position_index= actor->firing_positions.current_position_index;
+
+		if (firing_position_index!=NONE &&
+			actor->firing_positions.current_position_found_outside_range)
+		{
+			struct encounter_definition *encounter= TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+				struct encounter_definition);
+			struct firing_position_definition *definition= TAG_BLOCK_GET_ELEMENT(
+				&encounter->firing_positions,
+				firing_position_index,
+				struct firing_position_definition);
+
+			best_firing_position->definition= definition;
+			best_firing_position->original_index= firing_position_index;
+			best_firing_position->line_of_sight= _ai_line_of_sight_clear;
+			best_firing_position->path_distance_from_actor= REAL_MAX;
+			best_firing_position->path_distance_to_target= REAL_MAX;
+			best_firing_position->path_closest_approach_to_target= REAL_MAX;
+			best_firing_position->path_direction_from_target= *global_zero_vector3d;
+			best_firing_position->path_direction_from_actor= *global_zero_vector3d;
+			if (evaluation_context->has_target)
+			{
+				best_firing_position->linear_distance_squared_to_target= distance_squared3d(
+					&evaluation_context->target_point,
+					&definition->position);
+			}
+			else
+			{
+				best_firing_position->linear_distance_squared_to_target= 0.0f;
+			}
+
+			if (!firing_position_forced_evaluation(
+				actor_index,
+				evaluation_context,
+				best_firing_position))
+			{
+				firing_position_index= NONE;
+				actor->firing_positions.current_position_index= NONE;
+			}
+			*current_owner= NONE;
+			*area_path_state_valid= FALSE;
+			return firing_position_index;
+		}
+	}
+
+	return (short)result;
 }
 
 short actor_change_firing_position(

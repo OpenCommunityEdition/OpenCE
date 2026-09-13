@@ -90,13 +90,20 @@ struct render_fog
 
 /* ---------- prototypes/RENDER_CAMERAS.C */
 
-void render_camera_build_frustum(const struct render_camera *camera, const real_rectangle2d *frustum_bounds, struct render_frustum *frustum, boolean build_projection);
+void render_camera_build_frustum(
+	const struct render_camera *camera,
+	const real_rectangle2d *frustum_bounds,
+	struct render_frustum *frustum,
+	boolean build_projection);
 real render_camera_get_adjusted_field_of_view_tangent(
 	real field_of_view);
 void render_camera_hack_frustum_z(
 	struct render_frustum *frustum,
 	real z_near,
 	real z_far);
+void render_camera_debug_frustum(
+	struct render_camera const *camera,
+	struct render_frustum const *frustum);
 
 /* ---------- globals */
 

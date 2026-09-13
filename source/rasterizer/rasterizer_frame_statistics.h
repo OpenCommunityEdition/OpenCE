@@ -9,12 +9,25 @@ Narrow cross-translation-unit interface owned by RASTERIZER_FRAME_STATISTICS.C.
 #pragma once
 
 #include "cseries.h"
+#include <stddef.h>
 
 /* January's 0x170-byte linker-common record. Only counters already used by
  * reconstructed writers are named here; unreviewed interiors stay reserved. */
 struct rasterizer_frame_statistics_globals
 {
-	byte reserved000[0x30];
+	real frames_per_second;
+	short fps_sample_count;
+	short pad006;
+	real average_frames_per_second;
+	real minimum_frames_per_second;
+	real maximum_frames_per_second;
+	long fogged_object_count;
+	long normal_object_count;
+	long fast_object_count;
+	long scenery_object_count;
+	unsigned long lightmap_dynamic_vertex_count;
+	unsigned long lightmap_dynamic_triangle_count;
+	unsigned long lightmap_dynamic_draw_count;
 	unsigned long shadow_count;
 	unsigned long shadow_vertex_count;
 	unsigned long shadow_triangle_count;
@@ -49,9 +62,21 @@ struct rasterizer_frame_statistics_globals
 	unsigned long environment_fog_dynamic_vertex_count;
 	unsigned long environment_fog_dynamic_triangle_count;
 	unsigned long environment_fog_dynamic_draw_count;
-	byte reserved0B8[0x1C];
+	unsigned long environment_fog_screen_dynamic_vertex_count;
+	unsigned long environment_fog_screen_dynamic_triangle_count;
+	unsigned long environment_fog_screen_dynamic_draw_count;
+	unsigned long environment_fog_screen_model_count;
+	unsigned long environment_fog_screen_static_vertex_count;
+	unsigned long environment_fog_screen_static_triangle_count;
+	unsigned long environment_fog_screen_static_draw_count;
 	unsigned long model_count;
-	byte reserved0D8[0x1C];
+	unsigned long model_vertex_count;
+	unsigned long model_triangle_count;
+	unsigned long model_draw_count;
+	long transparent_model_vertex_count;
+	long transparent_model_triangle_count;
+	long transparent_model_maximum_triangle_count;
+	long transparent_model_submit_count;
 	unsigned long model_shadow_count;
 	unsigned long model_shadow_vertex_count;
 	unsigned long model_shadow_triangle_count;
@@ -75,8 +100,40 @@ struct rasterizer_frame_statistics_globals
 	long pixel_shader_pushbuffer_bytes;
 	unsigned long model_skinning_constant_bytes;
 	unsigned long model_lighting_constant_bytes;
-	byte reserved168[8];
+	unsigned long model_vertex_shader_work_accumulated;
+	byte reserved16C[4];
 };
+
+typedef char rasterizer_frame_statistics_globals_size_assert[
+	sizeof(struct rasterizer_frame_statistics_globals) == 0x170 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_vertex_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_vertex_count) == 0xB8 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_triangle_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_triangle_count) == 0xBC ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_draw_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_draw_count) == 0xC0 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_model_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_model_count) == 0xC4 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_vertex_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_vertex_count) == 0xC8 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_triangle_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_triangle_count) == 0xCC ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_draw_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_draw_count) == 0xD0 ? 1 : -1];
 
 extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 

@@ -183,6 +183,8 @@ void particle_systems_reconnect_to_structure_bsp(
 	void);
 void particle_systems_update(
 	real delta_time);
+void particle_systems_render(
+	void);
 long particle_system_new_attached(
 	long definition_index,
 	long object_index,

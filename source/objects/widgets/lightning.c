@@ -71,12 +71,6 @@ enum
 	_lightning_marker_not_connected_to_next_marker_bit = 0,
 };
 
-enum
-{
-	_rasterizer_lock_none = 0,
-	_rasterizer_lock_lightning = 12,
-};
-
 /* ---------- macros */
 
 #define lightning_definition_get(definition_index) \

@@ -331,9 +331,9 @@ void path_state_destination(
 	real target_radius);
 boolean path_state_find(
 	struct path_state *state);
-void path_state_build_path(
+boolean path_state_build_path(
 	struct path_state *state,
-	boolean *complete);
+	struct path_result *path);
 void path_smooth(
 	struct path_state *state,
 	short raw_step_count,

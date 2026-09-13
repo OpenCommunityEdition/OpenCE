@@ -506,7 +506,7 @@ void structure_bsp_header_deregister_vertex_buffers(
 {
 	short index;
 
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_structure_bsp_vertex_buffers;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_bsp_switch;
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
@@ -522,7 +522,7 @@ void structure_bsp_header_deregister_vertex_buffers(
 		IDirect3DVertexBuffer8_BlockUntilNotBusy(vertex_buffer);
 	}
 
-	rasterizer_globals.current_lock_operation = _rasterizer_lock_unlocked;
+	rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 
 	return;
 }

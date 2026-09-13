@@ -33,5 +33,9 @@ void actor_situation_combat_status_update(
 boolean actor_situation_try_new_target(
 	long actor_index,
 	long prop_index);
+boolean actor_perception_friend_prop_is_attacking(
+	long actor_index,
+	long friend_prop_index,
+	real_vector3d *attack_vector);
 
 #endif // __ACTOR_PERCEPTION_H

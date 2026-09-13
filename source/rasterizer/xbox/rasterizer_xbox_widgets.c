@@ -913,6 +913,111 @@ void _rasterizer_widget_draw_sprite3d(
 	return;
 }
 
+long _rasterizer_widget_submit_occlusion_test(
+	real_point3d const *point,
+	real radius,
+	long index)
+{
+	real_point3d projected_center;
+	real_vector2d projected_axes;
+	short x0;
+	short y0;
+	short x1;
+	short y1;
+	long pixel_count;
+	HRESULT result;
+
+	if (rasterizer_debug_options.lens_flare_occlusion_enabled)
+	{
+		if (rasterizer_widget_project_billboard(
+			point,
+			radius,
+			&projected_center,
+			&projected_axes))
+		{
+			projected_axes.i = MAX(1.0f, projected_axes.i);
+			projected_axes.j = MAX(1.0f, projected_axes.j);
+
+			x0 = (short)fast_ftol((real)floor(PIN(
+				projected_center.x - projected_axes.i,
+				-32767.0f,
+				32767.0f)));
+			y0 = (short)fast_ftol((real)floor(PIN(
+				projected_center.y - projected_axes.j,
+				-32767.0f,
+				32767.0f)));
+			x1 = (short)fast_ftol((real)floor(PIN(
+				projected_center.x + projected_axes.i,
+				-32767.0f,
+				32767.0f)));
+			y1 = (short)fast_ftol((real)floor(PIN(
+				projected_center.y + projected_axes.j,
+				-32767.0f,
+				32767.0f)));
+
+			pixel_count = (x1 - x0) * (y1 - y0);
+			if (pixel_count < 0)
+				return 0;
+
+			if (pixel_count > 0)
+			{
+				IDirect3DDevice8_BeginVisibilityTest(global_d3d_device);
+				IDirect3DDevice8_Begin(
+					global_d3d_device,
+					D3DPT_TRIANGLEFAN);
+				IDirect3DDevice8_SetVertexData4f(
+					global_d3d_device,
+					0,
+					(real)x0,
+					(real)y0,
+					projected_center.z,
+					1.0f);
+				IDirect3DDevice8_SetVertexData4f(
+					global_d3d_device,
+					0,
+					(real)x1,
+					(real)y0,
+					projected_center.z,
+					1.0f);
+				IDirect3DDevice8_SetVertexData4f(
+					global_d3d_device,
+					0,
+					(real)x1,
+					(real)y1,
+					projected_center.z,
+					1.0f);
+				IDirect3DDevice8_SetVertexData4f(
+					global_d3d_device,
+					0,
+					(real)x0,
+					(real)y1,
+					projected_center.z,
+					1.0f);
+				IDirect3DDevice8_End(global_d3d_device);
+
+				result = IDirect3DDevice8_EndVisibilityTest(
+					global_d3d_device,
+					index);
+				if (result < 0)
+				{
+					rasterizer_error(
+						result,
+						"IDirect3DDevice8_EndVisibilityTest(global_d3d_device, index)");
+					error(
+						_error_silent,
+						"### ERROR rasterizer_widget_submit_occlusion_test failed");
+				}
+			}
+
+			return pixel_count;
+		}
+
+		return 0;
+	}
+
+	return 1;
+}
+
 /* ---------- private code */
 
 static boolean rasterizer_widget_project_billboard(

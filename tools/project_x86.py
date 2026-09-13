@@ -221,6 +221,9 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     
     report_path = sln.build_dir / "report.json"
     semantic_report_path = sln.build_dir / "semantic_report.json"
+    semantic_credit_rejections_path = (
+        sln.config_dir / "semantic_credit_rejections.json"
+    )
     build_tools_path = sln.build_dir / "tools"
     download_tool = sln.tools_dir / "download_tool.py"
     n.rule(
@@ -407,6 +410,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             python_lib,
             report_path,
             semantic_report_path,
+            semantic_credit_rejections_path,
             sln.config_dir / "semantic_matches.json",
             sln.config_dir / "semantic_data_matches.json",
             sln.config_dir / "symbols.json",
@@ -447,6 +451,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
         implicit=[
             report_path,
             "objdiff.json",
+            semantic_credit_rejections_path,
             sln.tools_dir / "audit_semantic_matches.py",
             sln.tools_dir / "coff_compare.py",
         ],
