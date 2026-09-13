@@ -318,8 +318,8 @@ static void particle_system_next_type_state_index(
 	struct particle_system_type const *type_definition)
 {
 	boolean states_moving_forward = type->states_moving_forward;
-	short state_index = type->state_index;
 	short step = states_moving_forward ? 1 : -1;
+	short state_index = type->state_index;
 	short next_state_index = state_index + step;
 
 	type->transition_state_index = next_state_index;
@@ -340,19 +340,8 @@ static void particle_system_next_type_state_index(
 			flags,
 			_particle_system_type_type_states_loop_forward_backward_bit))
 		{
-			long bounced_state_index = state_index - step;
+			type->transition_state_index = PIN(state_index - step, 0, state_count - 1);
 
-			if (bounced_state_index >= 0)
-			{
-				if (bounced_state_index > state_count - 1)
-					bounced_state_index = state_count - 1;
-			}
-			else
-			{
-				bounced_state_index = 0;
-			}
-
-			type->transition_state_index = bounced_state_index;
 			type->states_moving_forward = !states_moving_forward;
 		}
 		else
@@ -369,8 +358,8 @@ static void particle_system_next_particle_state_index(
 	struct particle_system_type const *type_definition)
 {
 	boolean states_moving_forward = particle->states_moving_forward;
-	short state_index = particle->state_index;
 	short step = states_moving_forward ? 1 : -1;
+	short state_index = particle->state_index;
 	short next_state_index = state_index + step;
 
 	particle->transition_state_index = next_state_index;
@@ -387,19 +376,8 @@ static void particle_system_next_particle_state_index(
 				flags,
 				_particle_system_type_particle_states_loop_forward_backward_bit))
 			{
-				long bounced_state_index = state_index - step;
+				particle->transition_state_index = PIN(state_index - step, 0, state_count - 1);
 
-				if (bounced_state_index >= 0)
-				{
-					if (bounced_state_index > state_count - 1)
-						bounced_state_index = state_count - 1;
-				}
-				else
-				{
-					bounced_state_index = 0;
-				}
-
-				particle->transition_state_index = bounced_state_index;
 				particle->states_moving_forward = !states_moving_forward;
 			}
 			else
@@ -486,7 +464,10 @@ long particle_system_new_attached(
 		object_get_marker_by_name(object_index, attachment->marker_name, &marker, 1);
 		system->position = marker.matrix.position;
 		object_get_velocities(object_index, &system->velocity, NULL);
-		scale_vector3d(&system->velocity, TICKS_PER_SECOND, &system->velocity);
+		system->velocity.i *= TICKS_PER_SECOND;
+		system->velocity.j *= TICKS_PER_SECOND;
+		system->velocity.k *= TICKS_PER_SECOND;
+
 		system->lighting = *global_real_rgb_white;
 		SET_FLAG(
 			system->flags,
@@ -496,8 +477,9 @@ long particle_system_new_attached(
 		if (!particle_system_initialize(system_index))
 		{
 			datum_delete(particle_systems, system_index);
-			return NONE;
+			system_index = NONE;
 		}
+
 	}
 
 	return system_index;
@@ -993,45 +975,28 @@ static void randomize_particle_variables(
 		&type_definition->particle_states,
 		state_index,
 		struct particle_system_type_particle_state);
-	real range[3];
+	real color_fraction = real_local_random_range(0.0f, 1.0f);
 
-	range[2] = real_seed_random_range(
-		get_global_local_random_seed_address(),
-		0.0f,
-		1.0f);
-
-	range[1] = state_definition->animation_rate_upper_bound;
-	range[0] = state_definition->animation_rate_lower_bound;
-	variables->animation_rate = real_seed_random_range(
-		get_global_local_random_seed_address(),
-		range[0],
-		range[1]);
-	range[1] = state_definition->rotation_rate_upper_bound;
-	range[0] = state_definition->rotation_rate_lower_bound;
-	variables->rotation_rate = real_seed_random_range(
-		get_global_local_random_seed_address(),
-		range[0],
-		range[1]);
-	range[1] = state_definition->scale_upper_bound;
-	range[0] = state_definition->scale_lower_bound;
-	variables->scale = real_seed_random_range(
-		get_global_local_random_seed_address(),
-		range[0],
-		range[1]);
-	range[1] = state_definition->color_upper_bound.alpha;
-	range[0] = state_definition->color_lower_bound.alpha;
-	variables->color.alpha = real_seed_random_range(
-		get_global_local_random_seed_address(),
-		range[0],
-		range[1]);
+	variables->animation_rate = real_local_random_range(
+		state_definition->animation_rate_lower_bound,
+		state_definition->animation_rate_upper_bound);
+	variables->rotation_rate = real_local_random_range(
+		state_definition->rotation_rate_lower_bound,
+		state_definition->rotation_rate_upper_bound);
+	variables->scale = real_local_random_range(
+		state_definition->scale_lower_bound,
+		state_definition->scale_upper_bound);
+	variables->color.alpha = real_local_random_range(
+		state_definition->color_lower_bound.alpha,
+		state_definition->color_upper_bound.alpha);
 	variables->color.red =
-		(state_definition->color_upper_bound.red - state_definition->color_lower_bound.red)*range[2] +
+		(state_definition->color_upper_bound.red - state_definition->color_lower_bound.red)*color_fraction +
 		state_definition->color_lower_bound.red;
 	variables->color.green =
-		(state_definition->color_upper_bound.green - state_definition->color_lower_bound.green)*range[2] +
+		(state_definition->color_upper_bound.green - state_definition->color_lower_bound.green)*color_fraction +
 		state_definition->color_lower_bound.green;
 	variables->color.blue =
-		(state_definition->color_upper_bound.blue - state_definition->color_lower_bound.blue)*range[2] +
+		(state_definition->color_upper_bound.blue - state_definition->color_lower_bound.blue)*color_fraction +
 		state_definition->color_lower_bound.blue;
 
 	return;
