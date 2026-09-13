@@ -3366,7 +3366,6 @@ void players_update_before_game(
 	struct unit_datum *unit;
 	struct player_action *action;
 	struct unit_control_data control_data;
-	struct unit_control_data *control_data_pointer;
 	long weapon_index;
 	short action_index;
 
@@ -3381,7 +3380,7 @@ void players_update_before_game(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\players.c",
 				0x256,
-				action_index >= 0 && action_index < NETWORK_GAME_MAXIMUM_PLAYER_COUNT);
+				action_index>=0 && action_index<NETWORK_GAME_MAXIMUM_PLAYER_COUNT);
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\players.c",
 				0x25B,
@@ -3407,19 +3406,19 @@ void players_update_before_game(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\players.c",
 				0x260,
-				action->desired_weapon_index == NONE ||
-				(action->desired_weapon_index >= 0 &&
-				action->desired_weapon_index <= MAXIMUM_WEAPONS_PER_UNIT));
+				(NONE == action->desired_weapon_index) ||
+				((action->desired_weapon_index >= 0) &&
+				(action->desired_weapon_index <= MAXIMUM_WEAPONS_PER_UNIT)));
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\players.c",
 				0x261,
-				action->desired_grenade_index == NONE ||
-				(action->desired_grenade_index >= 0 &&
-				action->desired_grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES));
+				(NONE == action->desired_grenade_index) ||
+				((action->desired_grenade_index >= 0) &&
+				(action->desired_grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES)));
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\players.c",
 				0x262,
-				action->desired_zoom_level == NONE || action->desired_zoom_level >= 0);
+				(NONE == action->desired_zoom_level) || ((action->desired_zoom_level >= 0)));
 
 			if (player->unit_index == NONE && !game_in_editor())
 			{
@@ -3478,7 +3477,7 @@ void players_update_before_game(
 
 					weapon_index = unit_inventory_get_weapon(
 						player->unit_index,
-						unit->unit.current_weapon_index);
+						unit_get(player->unit_index)->unit.current_weapon_index);
 					if (weapon_index != NONE && weapon_must_be_readied(weapon_index))
 					{
 						if (TEST_FLAG(action->control_flags, _unit_control_weapon_primary_trigger_bit) ||
@@ -3509,20 +3508,20 @@ void players_update_before_game(
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",
 						0x2E3,
-						control_data.weapon_index == NONE ||
-						(control_data.weapon_index >= 0 &&
-						control_data.weapon_index <= MAXIMUM_WEAPONS_PER_UNIT));
+						(NONE == control_data.weapon_index) ||
+						((control_data.weapon_index >= 0) &&
+						(control_data.weapon_index <= MAXIMUM_WEAPONS_PER_UNIT)));
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",
 						0x2E4,
-						control_data.grenade_index == NONE ||
-						(control_data.grenade_index >= 0 &&
-						control_data.grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES));
+						(NONE == control_data.grenade_index) ||
+						((control_data.grenade_index >= 0) &&
+						(control_data.grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES)));
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",
 						0x2E5,
-						control_data.zoom_level == NONE || control_data.zoom_level >= 0);
-					control_data_pointer = &control_data;
+						(NONE == control_data.zoom_level) || ((control_data.zoom_level >= 0)));
+					unit_control(player->unit_index, &control_data);
 				}
 				else if (unit->unit.swarm_actor_index == NONE &&
 					unit->unit.actor_index == NONE)
@@ -3540,15 +3539,8 @@ void players_update_before_game(
 					inhibited_control_data.aiming_vector = unit->unit.desired_aiming_vector;
 					inhibited_control_data.primary_trigger = 0.f;
 					inhibited_control_data.looking_vector = unit->unit.desired_looking_vector;
-					control_data_pointer = &inhibited_control_data;
+					unit_control(player->unit_index, &inhibited_control_data);
 				}
-				else
-				{
-					control_data_pointer = NULL;
-				}
-
-				if (control_data_pointer)
-					unit_control(player->unit_index, control_data_pointer);
 			}
 		}
 
