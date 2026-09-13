@@ -953,6 +953,12 @@ boolean path_state_build_path(
 					&avoided_step_count,
 					avoided_steps,
 					&steps_finish_path);
+
+				if (state->debug && !path_build_success)
+				{
+					state->debug->path_build_result =
+						_path_build_result_obstacle_avoidance_failed;
+				}
 			}
 
 			if (path_build_success)
@@ -981,11 +987,6 @@ boolean path_state_build_path(
 				{
 					state->debug->path_build_result = _path_build_result_success;
 				}
-			}
-			else if (state->debug)
-			{
-				state->debug->path_build_result =
-					_path_build_result_obstacle_avoidance_failed;
 			}
 
 			if (state->debug)
