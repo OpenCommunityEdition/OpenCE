@@ -51,9 +51,17 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmaps_inlines.h"
+#include "game/game_globals.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_active_camouflage.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
+#include "rasterizer/rasterizer_models.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
+#include "rasterizer/common/rasterizer_common.h"
+#include "shaders/shader_definitions.h"
+#include "shaders/shaders.h"
 
 #include <xtl.h>
 
@@ -64,10 +72,71 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* no shared header publishes the geometry-flag, shader-type, model-flag or model-effect
+enumerations yet; compatible TU-local copies live in rasterizer_xbox_models.c,
+rasterizer_xbox_transparent_geometry.c, rasterizer_transparent_geometry.c and models.c */
+
 enum
 {
 	_rasterizer_target_render_primary = 0,
 	_rasterizer_target_render_secondary
+};
+
+enum
+{
+	_rasterizer_geometry_no_sort_bit = 0,
+	_rasterizer_geometry_no_queue_bit,
+	_rasterizer_geometry_no_fog_bit,
+	_rasterizer_geometry_no_zbuffer_bit,
+	_rasterizer_geometry_sky_bit,
+	_rasterizer_geometry_viewspace_bit,
+	_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit,
+	_rasterizer_geometry_first_person_bit,
+	_rasterizer_geometry_parts_define_local_nodes_bit
+};
+
+enum
+{
+	_shader_type_screen = 0,
+	_shader_type_effect,
+	_shader_type_decal,
+	_shader_type_environment,
+	_shader_type_model,
+	_shader_type_transparent_generic,
+	_shader_type_transparent_chicago,
+	_shader_type_transparent_water,
+	_shader_type_transparent_glass,
+	_shader_type_transparent_meter,
+	_shader_type_transparent_plasma
+};
+
+enum
+{
+	_shader_model_detail_after_reflection_bit = 0,
+	_shader_model_two_sided_bit,
+	_shader_model_not_alpha_tested_bit,
+	_shader_model_alpha_blended_decal_bit,
+	_shader_model_true_atmospheric_fog_bit,
+	_shader_model_nocull_two_sided_bit
+};
+
+enum
+{
+	_render_model_effect_type_none = 0,
+	_render_model_effect_type_active_camouflage,
+	_render_model_effect_type_modifier
+};
+
+enum
+{
+	_active_camouflage_tint_edge_density_bit = 0
+};
+
+/* descriptive names: January's vertex shader name table has not been recovered */
+enum
+{
+	_rasterizer_vertex_shader_active_camouflage_model = 13,
+	_rasterizer_vertex_shader_active_camouflage = 64
 };
 
 enum
@@ -86,6 +155,98 @@ enum
 
 /* ---------- structures */
 
+/* no shared header declares these yet; compatible TU-local copies also live in
+rasterizer_xbox_models.c, rasterizer_xbox_transparent_geometry.c,
+rasterizer_xbox_environment.c, rasterizer_xbox_environment_fog.c,
+rasterizer_xbox_dynavobgeom.c, rasterizer_xbox_water.c, rasterizer_xbox_widgets.c,
+rasterizer_xbox_shadows.c, rasterizer_transparent_geometry.c, models.c and shaders.c */
+
+struct shader_model_properties
+{
+	word flags;
+	short type;
+	byte reserved04[0xC];
+	real translucency;
+	byte reserved14[0x10];
+	short change_color_source;
+	byte reserved26[0x1E];
+	word self_illumination_flags;
+	short pad46;
+	short self_illumination_color_source;
+	short self_illumination_animation_function;
+	real self_illumination_animation_period;
+	real_rgb_color self_illumination_animation_color_lower_bound;
+	real_rgb_color self_illumination_animation_color_upper_bound;
+	byte reserved68[0xC];
+	real map_u_scale;
+	real map_v_scale;
+	struct tag_reference base_map;
+	byte reserved8C[8];
+	struct tag_reference multipurpose_map;
+	byte reservedA4[8];
+	short detail_function;
+	short detail_mask;
+	real detail_map_scale;
+	struct tag_reference detail_map;
+	real detail_map_v_scale;
+	byte reservedC8[0xC];
+	struct shader_texture_animation texture_animation;
+	byte reserved10C[8];
+	real reflection_falloff_distance;
+	real reflection_cutoff_distance;
+	real perpendicular_brightness;
+	real_rgb_color perpendicular_tint_color;
+	real parallel_brightness;
+	real_rgb_color parallel_tint_color;
+	struct tag_reference reflection_cube_map;
+};
+
+struct shader_model_definition
+{
+	struct shader shader;
+	struct shader_model_properties model;
+};
+
+struct transparent_geometry_group
+{
+	unsigned long geometry_flags;
+	long object_index;
+	long source_object_index;
+	struct shader *shader;
+	short shader_permutation_index;
+	word pad12;
+	struct render_model_effect effect;
+	real_vector2d model_base_map_scale;
+	long dynamic_triangle_buffer_index;
+	struct triangle_buffer const *triangle_buffer;
+	long first_triangle_index;
+	long triangle_count;
+	long dynamic_vertex_buffer_index;
+	struct vertex_buffer const *vertex_buffer;
+	struct bitmap_data const *lightmap;
+	real_matrix4x3 const *node_matrices;
+	short node_matrix_count;
+	word pad66;
+	struct render_lighting const *lighting;
+	struct render_animation const *animation;
+	real z_sort;
+	real_point3d centroid;
+	real_plane3d plane;
+	long sorted_index;
+	short previous_group_presorted_index;
+	short next_group_presorted_index;
+	long active_camouflage_transparent_source_object_index;
+	boolean sort_last;
+	boolean cortana_hack;
+	byte pad9E[2];
+};
+
+typedef char verify_shader_model_texture_animation_offset[
+	offsetof(struct shader_model_definition, model.texture_animation) == 0xFC ? 1 : -1];
+typedef char verify_transparent_geometry_group_size[
+	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
+typedef char verify_transparent_geometry_group_animation_offset[
+	offsetof(struct transparent_geometry_group, animation) == 0x6C ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -309,6 +470,443 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 			local_active_camouflage_visibility_flag = FALSE;
 		}
 		local_active_camouflage_debug_cached_flag = TRUE;
+	}
+
+	return;
+}
+
+void rasterizer_active_camouflage_draw(
+	struct transparent_geometry_group *group)
+{
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		152,
+		group);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		153,
+		group->shader);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		154,
+		group->effect.type==_render_model_effect_type_active_camouflage);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		155,
+		group->effect.intensity>0.0f);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		156,
+		group->effect.intensity<=1.0f);
+	match_assert(
+		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+		157,
+		global_d3d_device);
+
+	if (rasterizer_debug_options.active_camouflage &&
+		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
+	{
+		struct shader_model_definition *model;
+		real_vector4d vertex_constants[3];
+		real_rgb_color tint_color;
+		real detail_map_v_scale;
+		real distance_falloff;
+		real refraction_amount;
+		real normal;
+
+		model = (struct shader_model_definition *)shader_get_and_verify_type(
+			group->shader,
+			_shader_type_model);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+			164,
+			local_active_camouflage_debug_cached_flag);
+		match_assert(
+			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_active_camouflage.c",
+			165,
+			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit));
+
+		if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit))
+		{
+			rasterizer_set_frustum_z(
+				rasterizer_globals.first_person_weapon_near_clip_distance,
+				rasterizer_globals.first_person_weapon_far_clip_distance);
+		}
+
+		if (group->effect.intensity==1.0f)
+		{
+			/* fully cloaked: lay down depth only, alpha tested against the base map */
+			rasterizer_set_texture(
+				0,
+				0,
+				1,
+				model->model.base_map.index,
+				group->shader_permutation_index);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_ADDRESSU,
+				D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_ADDRESSV,
+				D3DTADDRESS_WRAP);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MAGFILTER,
+				D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MINFILTER,
+				D3DTEXF_LINEAR);
+			IDirect3DDevice8_SetTextureStageState(
+				global_d3d_device,
+				0,
+				D3DTSS_MIPFILTER,
+				D3DTEXF_LINEAR);
+
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_CULLMODE,
+				TEST_FLAG(model->model.flags, _shader_model_two_sided_bit) ?
+					D3DCULL_NONE : D3DCULL_CCW);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_COLORWRITEENABLE,
+				0);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHABLENDENABLE,
+				FALSE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHATESTENABLE,
+				TRUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ALPHAREF,
+				127);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZENABLE,
+				TRUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZWRITEENABLE,
+				TRUE);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZFUNC,
+				D3DCMP_LESSEQUAL);
+			IDirect3DDevice8_SetRenderState(
+				global_d3d_device,
+				D3DRS_ZBIAS,
+				0);
+
+			rasterizer_set_vertex_shader_permutation(
+				_rasterizer_vertex_shader_active_camouflage_model,
+				rasterizer_transparent_geometry_get_primary_vertex_type(group),
+				0);
+
+			detail_map_v_scale = model->model.detail_map_v_scale*model->model.detail_map_scale;
+			vertex_constants[0].i = model->model.detail_map_scale;
+			vertex_constants[0].j = detail_map_v_scale;
+			vertex_constants[0].k = 1.0f;
+			vertex_constants[0].l = 1.0f;
+			vertex_constants[1].i = 1.0f;
+			vertex_constants[1].j = 0.0f;
+			vertex_constants[1].k = 0.0f;
+			vertex_constants[1].l = 0.0f;
+			vertex_constants[2].i = 0.0f;
+			vertex_constants[2].j = 1.0f;
+			vertex_constants[2].k = 0.0f;
+			vertex_constants[2].l = 0.0f;
+			shader_texture_animation_evaluate(
+				&model->model.texture_animation,
+				group->animation,
+				model->model.map_u_scale*group->model_base_map_scale.i,
+				model->model.map_v_scale*group->model_base_map_scale.j,
+				0.0f,
+				0.0f,
+				0.0f,
+				global_frame_parameters.game_time_sec,
+				&vertex_constants[1],
+				&vertex_constants[2]);
+			IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-84,
+				vertex_constants,
+				NUMBEROF(vertex_constants));
+
+			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+			pixel_shader.texture_modes = PS_TEXTUREMODES(
+				PS_TEXTUREMODES_PROJECT2D,
+				PS_TEXTUREMODES_NONE,
+				PS_TEXTUREMODES_NONE,
+				PS_TEXTUREMODES_NONE);
+			pixel_shader.combiner_count = PS_COMBINERCOUNT(1, 0);
+			pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+				0);
+			rasterizer_set_pixel_shader(&pixel_shader);
+
+			rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+		}
+		else
+		{
+			/* partially cloaked: draw the model normally underneath the distortion */
+			struct rasterizer_model_begin_parameters parameters;
+
+			parameters.geometry_flags = group->geometry_flags&FLAG(_rasterizer_geometry_first_person_bit);
+			parameters.skinning.node_matrices = group->node_matrices;
+			parameters.skinning.node_matrix_count = group->node_matrix_count;
+			parameters.centroid = group->centroid;
+			csmemset(&parameters.effect, 0, sizeof(parameters.effect));
+			parameters.base_map_scale = group->model_base_map_scale;
+			if (group->lighting)
+			{
+				csmemcpy(&parameters.lighting, group->lighting, sizeof(parameters.lighting));
+			}
+			else
+			{
+				csmemset(&parameters.lighting, 0, sizeof(parameters.lighting));
+			}
+			if (group->animation)
+			{
+				parameters.animation = *group->animation;
+			}
+			else
+			{
+				csmemset(&parameters.animation, 0, sizeof(parameters.animation));
+			}
+
+			rasterizer_profile_enable(FALSE);
+			rasterizer_models_begin(FALSE);
+			rasterizer_model_begin(&parameters, TRUE);
+			rasterizer_model_draw(
+				group->shader,
+				group->shader_permutation_index,
+				group->triangle_buffer,
+				group->dynamic_triangle_buffer_index,
+				group->triangle_count,
+				group->vertex_buffer,
+				group->dynamic_vertex_buffer_index);
+			rasterizer_model_end();
+			rasterizer_models_end();
+			rasterizer_profile_enable(TRUE);
+		}
+
+		rasterizer_set_texture_direct(
+			0,
+			global_rasterizer_data->active_camouflage_distortion.index,
+			0);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_ADDRESSU,
+			D3DTADDRESS_CLAMP);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_ADDRESSV,
+			D3DTADDRESS_CLAMP);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_ADDRESSV,
+			D3DTADDRESS_CLAMP);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_MAGFILTER,
+			D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_MINFILTER,
+			D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			0,
+			D3DTSS_MIPFILTER,
+			D3DTEXF_LINEAR);
+
+		rasterizer_set_target_as_texture(
+			2,
+			_rasterizer_target_render_secondary,
+			0);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			2,
+			D3DTSS_ADDRESSU,
+			D3DTADDRESS_CLAMP);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			2,
+			D3DTSS_ADDRESSV,
+			D3DTADDRESS_CLAMP);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			2,
+			D3DTSS_MAGFILTER,
+			D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			2,
+			D3DTSS_MINFILTER,
+			D3DTEXF_LINEAR);
+		IDirect3DDevice8_SetTextureStageState(
+			global_d3d_device,
+			2,
+			D3DTSS_MIPFILTER,
+			D3DTEXF_POINT);
+
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_CULLMODE,
+			TEST_FLAG(model->model.flags, _shader_model_two_sided_bit) ?
+				D3DCULL_NONE : D3DCULL_CCW);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			D3DCOLORWRITEENABLE_RED |
+			D3DCOLORWRITEENABLE_GREEN |
+			D3DCOLORWRITEENABLE_BLUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ALPHATESTENABLE,
+			FALSE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZENABLE,
+			TRUE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZWRITEENABLE,
+			FALSE);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZFUNC,
+			D3DCMP_EQUAL);
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_ZBIAS,
+			0);
+
+		if (group->effect.intensity<1.0f)
+		{
+			SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, TRUE);
+			SetRenderStateSmart(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+			SetRenderStateSmart(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+			SetRenderStateSmart(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+		}
+		else
+		{
+			SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, FALSE);
+		}
+
+		rasterizer_set_vertex_shader_permutation(
+			_rasterizer_vertex_shader_active_camouflage,
+			rasterizer_transparent_geometry_get_primary_vertex_type(group),
+			0);
+
+		/* blend the normal and hyper-stealth parameters by the effect parameter */
+		normal = 1.0f - group->effect.parameter;
+		distance_falloff = normal*global_rasterizer_data->active_camouflage_distance_falloff;
+		distance_falloff += global_rasterizer_data->active_camouflage_hyper_stealth_distance_falloff*group->effect.parameter;
+		tint_color.red = normal*global_rasterizer_data->active_camouflage_tint_color.red;
+		tint_color.red += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.red*group->effect.parameter;
+		tint_color.green = normal*global_rasterizer_data->active_camouflage_tint_color.green;
+		tint_color.green += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.green*group->effect.parameter;
+		tint_color.blue = normal*global_rasterizer_data->active_camouflage_tint_color.blue;
+		tint_color.blue += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.blue*group->effect.parameter;
+		refraction_amount = normal*global_rasterizer_data->active_camouflage_refraction_amount;
+		refraction_amount += global_rasterizer_data->active_camouflage_hyper_stealth_refraction_amount*group->effect.parameter;
+
+		vertex_constants[0].i = refraction_amount*group->effect.intensity;
+		vertex_constants[0].j = distance_falloff;
+		vertex_constants[0].k = (real)ACTIVE_CAMOUFLAGE_SCREEN_WIDTH;
+		vertex_constants[0].l = (real)ACTIVE_CAMOUFLAGE_SCREEN_HEIGHT;
+		vertex_constants[1].i = 0.0f;
+		vertex_constants[1].j = 0.0f;
+		vertex_constants[1].k = 0.0f;
+		vertex_constants[1].l = 0.0f;
+		vertex_constants[2].i = tint_color.red;
+		vertex_constants[2].j = tint_color.green;
+		vertex_constants[2].k = tint_color.blue;
+		vertex_constants[2].l = 0.0f;
+		IDirect3DDevice8_SetVertexShaderConstant(
+			global_d3d_device,
+			-84,
+			vertex_constants,
+			NUMBEROF(vertex_constants));
+
+		csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+		pixel_shader.texture_modes = PS_TEXTUREMODES(
+			PS_TEXTUREMODES_CUBEMAP,
+			PS_TEXTUREMODES_DOTPRODUCT,
+			PS_TEXTUREMODES_DOT_ST,
+			PS_TEXTUREMODES_NONE);
+		pixel_shader.input_texture = PS_INPUTTEXTURE(0, 0, 0, 0);
+		pixel_shader.dot_mapping = PS_DOTMAPPING(
+			0,
+			PS_DOTMAPPING_MINUS1_TO_1_D3D,
+			PS_DOTMAPPING_MINUS1_TO_1_D3D,
+			PS_DOTMAPPING_ZERO_TO_ONE);
+		pixel_shader.combiner_count = PS_COMBINERCOUNT(2, 0);
+		pixel_shader.rgb_inputs[0] = TEST_FLAG(
+			global_rasterizer_data->active_camouflage_flags,
+			_active_camouflage_tint_edge_density_bit) ?
+			PS_COMBINERINPUTS(
+				PS_REGISTER_T0 | PS_CHANNEL_ALPHA | PS_INPUTMAPPING_UNSIGNED_INVERT,
+				PS_REGISTER_ONE,
+				PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+				PS_REGISTER_V0) :
+			PS_COMBINERINPUTS(
+				PS_REGISTER_V0,
+				PS_REGISTER_ONE,
+				PS_REGISTER_ZERO,
+				PS_REGISTER_ZERO);
+		pixel_shader.rgb_outputs[0] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			0);
+		pixel_shader.rgb_inputs[1] = PS_COMBINERINPUTS(
+			PS_REGISTER_V0 | PS_CHANNEL_ALPHA | PS_INPUTMAPPING_UNSIGNED_INVERT,
+			PS_REGISTER_ONE,
+			PS_REGISTER_V0 | PS_CHANNEL_ALPHA,
+			PS_REGISTER_R0);
+		pixel_shader.rgb_outputs[1] = PS_COMBINEROUTPUTS(
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_DISCARD,
+			PS_REGISTER_R0,
+			0);
+		pixel_shader.final_combiner_constant_0 = real_alpha_to_pixel32(group->effect.intensity);
+		pixel_shader.final_combiner_inputs_abcd = PS_COMBINERINPUTS(
+			PS_REGISTER_T2,
+			PS_REGISTER_R0,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO);
+		pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+			PS_REGISTER_ZERO,
+			PS_REGISTER_ZERO,
+			PS_REGISTER_C0 | PS_CHANNEL_ALPHA,
+			0);
+		rasterizer_set_pixel_shader(&pixel_shader);
+
+		rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+
+		if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit))
+		{
+			rasterizer_set_frustum_z(0.0f, 0.0f);
+		}
 	}
 
 	return;
