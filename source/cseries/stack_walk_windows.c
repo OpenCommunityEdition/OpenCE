@@ -112,7 +112,20 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "errors.h"
 
+#include <ctype.h>
+
+/* January calls the CRT isspace function rather than the multibyte ctype macro. */
+#undef isspace
+
 /* ---------- constants */
+
+enum
+{
+	MAXIMUM_DEBUG_SYMBOL_NAME_LENGTH = 256,
+	MAXIMUM_LIBRARY_OBJECT_FILE_NAME_LENGTH = 256,
+	DEBUG_SYMBOL_ALLOCATION_COUNT = 4096,
+	DEBUG_SYMBOL_STRING_STORAGE_ALLOCATION_SIZE = 0x4000
+};
 
 /* ---------- macros */
 
@@ -163,10 +176,9 @@ static void walk_stack(
 	unsigned long ignore_levels,
 	unsigned long *levels_dumped);
 
-void load_symbol_table(
-	char const *map_path,
-	struct debug_symbol_table *symbol_table,
-	char const *timestamp);
+static int symbol_sort_proc(
+	const void *elem1,
+	const void *elem2);
 
 /* ---------- globals */
 
@@ -408,6 +420,297 @@ void stack_walk_with_context(
 	return;
 }
 
+int load_symbol_table(
+	char *filename,
+	struct debug_symbol_table *symbol_table,
+	char *timestamp_str)
+{
+	FILE *map_file;
+	unsigned long string_storage_size;
+	unsigned long string_storage_used;
+	unsigned long symbols_size;
+	long previous_library_object_offset;
+	unsigned long symbol_address;
+	unsigned long rva_base;
+	char *segment;
+	char *token;
+	char *end_str;
+	char symbol_name[MAXIMUM_DEBUG_SYMBOL_NAME_LENGTH];
+	char library_object_file_name[MAXIMUM_LIBRARY_OBJECT_FILE_NAME_LENGTH];
+	char last_object_file_name[MAXIMUM_LIBRARY_OBJECT_FILE_NAME_LENGTH];
+
+	match_assert("c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 256, symbol_table);
+	csmemset(symbol_table, 0, sizeof(*symbol_table));
+
+	map_file = fopen(filename, "r");
+	if (!map_file)
+	{
+		error(_error_silent, "Couldn't read map file '%s'", filename);
+		goto finished;
+	}
+
+	{
+		char line[DEBUG_SYMBOL_STRING_STORAGE_ALLOCATION_SIZE] = "";
+
+		if (!fgets(line, sizeof(line), map_file))
+		{
+			goto close_map_file;
+		}
+
+		while (TRUE)
+		{
+			if (!fgets(line, sizeof(line), map_file))
+			{
+				error(_error_silent, "map file appears corrupt");
+				goto close_map_file;
+			}
+
+			if (strstr(line, "Lib:Object"))
+			{
+				break;
+			}
+
+			if (strstr(line, "Timestamp"))
+			{
+				/* BUG (preserved for exact matching): January performs the
+				 * timestamp search but ignores whether it succeeds.  A corrected
+				 * build should reject a map whose timestamp does not match. */
+				strstr(line, timestamp_str);
+			}
+		}
+
+		string_storage_size = 0;
+		string_storage_used = 0;
+		symbols_size = 0;
+		previous_library_object_offset = NONE;
+		strcpy(last_object_file_name, "nothing");
+
+		if (!fgets(line, sizeof(line), map_file))
+		{
+			goto close_map_file;
+		}
+
+		while (TRUE)
+		{
+			end_str = NULL;
+			segment = strtok(line, ":");
+			if (!segment || *segment!=' ')
+			{
+				goto read_next_line;
+			}
+
+			token = strtok(NULL, " \t\n\r");
+			if (!token)
+			{
+				goto corrupt_map_file;
+			}
+			symbol_address = strtoul(token, &end_str, 16);
+
+			token = strtok(NULL, " \t\n\r");
+			if (!token)
+			{
+				if (!strstr(line, "entry point at"))
+				{
+					goto corrupt_map_file;
+				}
+
+				/* BUG (preserved for exact matching): January consumes each of
+				 * these continuation lines without checking whether fgets failed.
+				 * A corrected build should reject EOF before reading line[0] or
+				 * tokenizing the buffer. */
+				fgets(line, sizeof(line), map_file);
+				if (!isspace(line[0]))
+				{
+					goto corrupt_map_file;
+				}
+
+				fgets(line, sizeof(line), map_file);
+				if (!strstr(line, "Static symbols"))
+				{
+					goto corrupt_map_file;
+				}
+
+				fgets(line, sizeof(line), map_file);
+				if (!isspace(line[0]))
+				{
+					goto corrupt_map_file;
+				}
+
+				fgets(line, sizeof(line), map_file);
+				segment = strtok(line, ":");
+				if (!segment || *segment!=' ')
+				{
+					goto corrupt_map_file;
+				}
+
+				token = strtok(NULL, " \t\n\r");
+				if (!token)
+				{
+					goto corrupt_map_file;
+				}
+				symbol_address = strtoul(token, &end_str, 16);
+				token = strtok(NULL, " \t\n\r");
+			}
+
+			/* BUG (preserved for exact matching): January leaves symbol_name
+			 * unchanged if the continuation entry omits its name token, then
+			 * continues parsing.  A corrected build should reject that entry. */
+			if (token)
+			{
+				strncpy(symbol_name, token, sizeof(symbol_name)-1);
+				symbol_name[sizeof(symbol_name)-1] = 0;
+			}
+
+			token = strtok(NULL, " \t\n\r");
+			if (!token)
+			{
+				goto corrupt_map_file;
+			}
+			rva_base = strtoul(token, &end_str, 16);
+
+			if (strcmp(symbol_name, "_load_symbol_table")==0)
+			{
+				stack_walk_globals.fixup = rva_base - (unsigned long)load_symbol_table;
+			}
+
+			/* BUG (preserved for exact matching): January checks only whether
+			 * strtoul assigned an end pointer, then advances five bytes without
+			 * validating the conversion or remaining field width.  A corrected
+			 * build should validate both before advancing. */
+			if (!end_str)
+			{
+				goto corrupt_map_file;
+			}
+			end_str += 5;
+
+			token = strtok(end_str, " \t\n\r");
+			if (!token)
+			{
+				goto corrupt_map_file;
+			}
+			strncpy(library_object_file_name, token, sizeof(library_object_file_name)-1);
+			library_object_file_name[sizeof(library_object_file_name)-1] = 0;
+
+			if ((unsigned long)symbol_table->number_of_symbols >= symbols_size)
+			{
+				struct debug_symbol *new_symbols;
+
+				symbols_size += DEBUG_SYMBOL_ALLOCATION_COUNT;
+				new_symbols = match_realloc(
+					"c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+					454,
+					symbol_table->symbols,
+					symbols_size * sizeof(*symbol_table->symbols));
+				if (!new_symbols)
+				{
+					goto allocation_failed;
+				}
+				symbol_table->symbols = new_symbols;
+			}
+
+			if (string_storage_used + strlen(symbol_name) + 1 + strlen(library_object_file_name) + 1 >= string_storage_size)
+			{
+				char *new_string_storage;
+
+				string_storage_size += DEBUG_SYMBOL_STRING_STORAGE_ALLOCATION_SIZE;
+				new_string_storage = match_realloc(
+					"c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+					471,
+					symbol_table->string_storage,
+					string_storage_size);
+				if (!new_string_storage)
+				{
+					goto allocation_failed;
+				}
+				symbol_table->string_storage = new_string_storage;
+
+				match_assert(
+					"c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+					482,
+					string_storage_used + strlen(symbol_name) + 1 + strlen(library_object_file_name) + 1 < string_storage_size);
+			}
+
+			{
+				struct debug_symbol *new_symbol = &symbol_table->symbols[symbol_table->number_of_symbols++];
+
+				new_symbol->address = symbol_address;
+				new_symbol->rva_base = rva_base;
+
+				match_assert(
+					"c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+					489,
+					string_storage_used + strlen(symbol_name) + 1 < string_storage_size);
+				strcpy(symbol_table->string_storage + string_storage_used, symbol_name);
+				new_symbol->name_string_offset = string_storage_used;
+				string_storage_used += strlen(symbol_name) + 1;
+
+				if (strcmp(last_object_file_name, library_object_file_name)==0)
+				{
+					new_symbol->library_object_string_offset = previous_library_object_offset;
+				}
+				else
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+						501,
+						string_storage_used + strlen(library_object_file_name) + 1 < string_storage_size);
+					strcpy(symbol_table->string_storage + string_storage_used, library_object_file_name);
+					new_symbol->library_object_string_offset = string_storage_used;
+					string_storage_used += strlen(library_object_file_name) + 1;
+					previous_library_object_offset = new_symbol->library_object_string_offset;
+					strcpy(last_object_file_name, library_object_file_name);
+				}
+			}
+
+read_next_line:
+			if (!fgets(line, sizeof(line), map_file))
+			{
+				break;
+			}
+		}
+
+		goto close_map_file;
+
+allocation_failed:
+		token = "could not allocate enough memory for map file";
+		goto report_map_file_error;
+
+corrupt_map_file:
+		token = "map file appears corrupt";
+
+report_map_file_error:
+		error(_error_silent, token);
+		free_symbol_table(symbol_table);
+
+close_map_file:
+		fclose(map_file);
+	}
+
+finished:
+	if (symbol_table->number_of_symbols > 0)
+	{
+		qsort(
+			symbol_table->symbols,
+			symbol_table->number_of_symbols,
+			sizeof(*symbol_table->symbols),
+			symbol_sort_proc);
+
+		if (symbol_table->symbols[symbol_table->number_of_symbols-1].rva_base==0)
+		{
+			/* BUG (preserved for exact matching): January assumes at least one
+			 * nonzero RVA while trimming sentinels.  A corrected build should
+			 * stop before number_of_symbols reaches zero. */
+			do
+			{
+				symbol_table->number_of_symbols--;
+			}
+			while (symbol_table->symbols[symbol_table->number_of_symbols-1].rva_base==0);
+		}
+	}
+
+	return symbol_table->number_of_symbols > 0;
+}
+
 void stack_walk_initialize(
 	void)
 {
@@ -425,6 +728,29 @@ void stack_walk_initialize(
 }
 
 /* ---------- private code */
+
+static int symbol_sort_proc(
+	const void *elem1,
+	const void *elem2)
+{
+	const struct debug_symbol *symbol1 = elem1;
+	const struct debug_symbol *symbol2 = elem2;
+
+	/* BUG (preserved for exact matching): January returns 1 when both RVAs
+	 * are zero, violating comparator antisymmetry.  A corrected build should
+	 * return 0 for two equal zero-RVA sentinel records. */
+	if (symbol1->rva_base==0 || symbol1->rva_base > symbol2->rva_base)
+	{
+		return 1;
+	}
+
+	if (symbol2->rva_base==0 || symbol1->rva_base < symbol2->rva_base)
+	{
+		return NONE;
+	}
+
+	return 0;
+}
 
 static boolean is_valid_ebp(
 	void)
