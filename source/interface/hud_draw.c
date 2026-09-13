@@ -86,6 +86,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_utilities.h"
 #include "cache/texture_cache.h"
 #include "effects/particles.h"
 #include "game/game.h"
@@ -93,6 +94,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
+#include "interface/interface.h"
 #include "interface/unit_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
@@ -113,6 +115,44 @@ enum
 enum
 {
 	_hud_dont_scale_offset_bit = 0,
+};
+
+/* hud number and meter definitions (no shared header declares these yet;
+   number_hud_element_definition, hud_number_definition and
+   rasterizer_meter_parameters have identical TU-local copies in hud_messaging.c,
+   hud_nav_points.c, hud_weapon.c and rasterizer_xbox_dynavobgeom.c) */
+enum
+{
+	hud_number_group_tag = 'hud#',
+};
+
+enum hud_number_show_flags
+{
+	_hud_number_show_all_leading_zeros_bit = 0,
+	_hud_number_show_only_when_zoomed_bit,
+	_hud_number_show_trailing_m_bit,
+
+	NUMBER_OF_HUD_NUMBER_SHOW_FLAGS
+};
+
+enum hud_number
+{
+	_hud_number_decimal_index = 10,
+	_hud_number_colon_index,
+	_hud_number_negative_sign_index,
+	_hud_number_meters_index,
+	_hud_number_kilometers_index
+};
+
+enum hud_meter_flags
+{
+	_hud_meter_switch_color_on_state_change_bit = 0,
+	_hud_meter_interpolates_between_min_max_bit,
+	_hud_meter_interpolate_in_hsv_space_bit,
+	_hud_meter_interpolate_along_farthest_hue_path_bit,
+	_hud_meter_invert_interpolation_value_bit,
+
+	NUMBER_OF_HUD_METER_FLAGS
 };
 
 enum hud_flash_flags
@@ -197,10 +237,50 @@ enum
 	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, corrupt_index==NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
 }
 
+#define hud_number_definition_get(index) \
+	((struct hud_number_definition *)tag_get(hud_number_group_tag, (index)))
+
 #define _hud_anchor_right_bit 0
 #define _hud_anchor_bottom_bit 1
 
 /* ---------- structures */
+
+struct number_hud_element_definition
+{
+	struct hud_placement_definition placement;
+	struct hud_color_definition colors;
+	char digits;
+	byte number_flags;
+	char fractional_digits;
+	byte pad;
+	long unused[3];
+};
+
+struct hud_number_definition
+{
+	struct tag_reference number_bitmap;
+	char character_width;
+	char screen_width;
+	char x_offset;
+	char y_offset;
+	char decimal_point_width;
+	char colon_width;
+	short pad;
+	long unused[19];
+};
+
+struct rasterizer_meter_parameters
+{
+	pixel32 gradient_min_color;
+	pixel32 gradient_max_color;
+	pixel32 background_color;
+	pixel32 flash_color;
+	boolean flash_color_is_negative;
+	boolean tint_mode_2;
+	byte pad12[2];
+	pixel32 tint_color;
+	real gradient;
+};
 
 struct weapon_hud_overlay_item
 {
@@ -279,6 +359,12 @@ struct multitexture_overlay_hud_element_definition
 	long unused160[32];
 };
 
+typedef char number_hud_element_definition_size_assert[
+	sizeof(struct number_hud_element_definition) == 0x54 ? 1 : -1];
+typedef char hud_number_definition_size_assert[
+	sizeof(struct hud_number_definition) == 0x64 ? 1 : -1];
+typedef char rasterizer_meter_parameters_size_assert[
+	sizeof(struct rasterizer_meter_parameters) == 0x1C ? 1 : -1];
 typedef char weapon_interface_state_size_assert[
 	sizeof(struct weapon_interface_state) == 0x20 ? 1 : -1];
 typedef char multitexture_overlay_hud_element_effector_definition_size_assert[
@@ -1613,6 +1699,418 @@ void hud_draw_bitmap_direct(
 		color);
 
 	hud_draw_stack_buffer_check(856);
+
+	return;
+}
+
+void hud_draw_meter(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct meter_hud_element_definition const *meter,
+	byte min_value,
+	byte max_value,
+	short draw_flags,
+	real reference_time,
+	real reference_value)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	struct bitmap_group *bitmap_group;
+	struct bitmap_data *bitmap;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	bitmap_group = bitmap_group_get(
+		verify_tag_reference(&meter->meter_bitmap));
+	bitmap = bitmap_group_get_bitmap_from_sequence(
+		meter->meter_bitmap.index,
+		meter->sequence_index,
+		0);
+	if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+	{
+		real_rectangle2d const *clip = get_sprite_clip_rect(
+			verify_tag_reference(&meter->meter_bitmap),
+			meter->sequence_index,
+			0);
+		boolean is_interface_bitmap =
+			bitmap_group->type == _bitmap_group_type_interface_bitmaps;
+		short min_alpha = MAX(meter->minimum_value,
+			PIN(fast_ftol_C(meter->alpha_multiplier*min_value + meter->alpha_bias), 0, UNSIGNED_CHAR_MAX));
+		short max_alpha = MAX(meter->minimum_value,
+			PIN(fast_ftol_C(meter->alpha_multiplier*max_value + meter->alpha_bias), 0, UNSIGNED_CHAR_MAX));
+		struct rasterizer_meter_parameters meter_parameters;
+
+		if (TEST_FLAG(draw_flags, _hud_draw_disabled_bit))
+		{
+			meter_parameters.gradient_min_color = 0;
+			meter_parameters.flash_color = 0;
+			meter_parameters.gradient_max_color = 0;
+		}
+		else if (!TEST_FLAG(meter->meter_flags, _hud_meter_switch_color_on_state_change_bit))
+		{
+			real fade = reference_time<0.0f ? 0.0f : PIN(1.0f-reference_time, 0.0f, 1.0f);
+			real_rgb_color flash_color;
+
+			pixel32_to_real_rgb_color(meter->flash_color, &flash_color);
+			flash_color.red *= fade;
+			flash_color.green *= fade;
+			flash_color.blue *= fade;
+
+			meter_parameters.gradient_min_color = (meter->min_color&0xFFFFFF) | (min_alpha<<24);
+			meter_parameters.gradient_max_color = meter->max_color&0xFFFFFF;
+			meter_parameters.flash_color = (real_rgb_color_to_pixel32(&flash_color)&0xFFFFFF) | (max_alpha<<24);
+		}
+		else if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+		{
+			if (TEST_FLAG(meter->meter_flags, _hud_meter_interpolates_between_min_max_bit))
+			{
+				real_rgb_color min_color;
+				real_rgb_color max_color;
+				real_rgb_color color;
+				real interpolation_value;
+
+				pixel32_to_real_rgb_color(meter->min_color, &min_color);
+				pixel32_to_real_rgb_color(meter->max_color, &max_color);
+				if (TEST_FLAG(meter->meter_flags, _hud_meter_invert_interpolation_value_bit))
+					interpolation_value = 1.0f-reference_value;
+				else
+					interpolation_value = reference_value;
+				rgb_colors_interpolate(&color, 0, &min_color, &max_color, interpolation_value);
+
+				meter_parameters.gradient_min_color = real_rgb_color_to_pixel32(&color) | (min_alpha<<24);
+				meter_parameters.gradient_max_color = real_rgb_color_to_pixel32(&color);
+				meter_parameters.flash_color = min_alpha<<24;
+			}
+			else
+			{
+				meter_parameters.gradient_min_color = (meter->max_color&0xFFFFFF) | (min_alpha<<24);
+				meter_parameters.flash_color = min_alpha<<24;
+				meter_parameters.gradient_max_color = meter->max_color&0xFFFFFF;
+			}
+		}
+		else
+		{
+			meter_parameters.gradient_min_color = (min_alpha<<24) | (meter->min_color&0xFFFFFF);
+			meter_parameters.flash_color = min_alpha<<24;
+			meter_parameters.gradient_max_color = meter->min_color&0xFFFFFF;
+		}
+
+		meter_parameters.background_color =
+			((UNSIGNED_CHAR_MAX - (meter->empty_color>>24))<<24) | (meter->empty_color&0xFFFFFF);
+		meter_parameters.tint_color = real_alpha_intensity_to_pixel32(
+			meter->fade,
+			1.0f-meter->opacity);
+		meter_parameters.gradient = 1.0f;
+		meter_parameters.flash_color_is_negative = FALSE;
+		meter_parameters.tint_mode_2 = TRUE;
+
+		hud_draw_bitmap_with_meter(
+			&meter_parameters,
+			bitmap,
+			absolute_placement,
+			&meter->placement,
+			clip,
+			1.0f,
+			0.0f,
+			0xFFFFFFFF,
+			TEST_FLAG(draw_flags, _hud_draw_in_multiplayer_bit),
+			is_interface_bitmap,
+			FALSE);
+	}
+
+	hud_draw_stack_buffer_check(428);
+
+	return;
+}
+
+void hud_draw_numbers(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct number_hud_element_definition const *numbers,
+	short value,
+	short decimal_value,
+	short draw_flags,
+	long flash_reference_time,
+	real override_scale)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	long hud_number_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	hud_number_index = interface_get_tag_index(_interface_hud_digits);
+	if (hud_number_index != NONE)
+	{
+		struct hud_number_definition const *hud_number =
+			hud_number_definition_get(hud_number_index);
+		struct bitmap_group const *bitmap_group =
+			bitmap_group_get(hud_number->number_bitmap.index);
+		struct bitmap_data *source_bitmap = bitmap_group_get_bitmap_from_sequence(
+			hud_number->number_bitmap.index,
+			0,
+			0);
+		boolean kilometers = value > 999;
+
+		if (_texture_cache_bitmap_get_hardware_format(source_bitmap, FALSE, TRUE))
+		{
+			boolean negative = value < 0;
+			real digit_count = (real)(numbers->digits +
+				(numbers->fractional_digits && decimal_value != NONE ?
+					MIN(numbers->fractional_digits, 4) + 1 : 0));
+			real decimal_point_width = (real)(numbers->fractional_digits ?
+				hud_number->decimal_point_width : 0);
+			real scale;
+			point2d origin;
+			point2d cursor;
+			short digit_index;
+
+			if (override_scale > 0.0f)
+			{
+				scale = override_scale;
+			}
+			else
+			{
+				scale = hud_globals_get_scale(
+					TEST_FLAG(draw_flags, _hud_draw_in_multiplayer_bit));
+			}
+
+			if (TEST_FLAG(numbers->number_flags, _hud_number_show_trailing_m_bit))
+			{
+				digit_count += 1.0f;
+				if (kilometers)
+				{
+					decimal_value = value*10;
+					value /= 1000;
+				}
+			}
+			value = abs(value);
+
+			hud_calculate_point(
+				local_player_index,
+				absolute_placement,
+				&numbers->placement,
+				NULL,
+				TEST_FLAG(draw_flags, _hud_draw_in_multiplayer_bit),
+				0.0f,
+				&origin);
+
+			switch (absolute_placement->corner)
+			{
+			case _hud_anchor_top_left:
+			case _hud_anchor_bottom_left:
+				cursor.x = (short)(((digit_count-2.0f)*hud_number->screen_width +
+					decimal_point_width)*scale + origin.x);
+				break;
+
+			case _hud_anchor_center:
+				cursor.x = (short)(((digit_count-1.0f)*hud_number->screen_width +
+					decimal_point_width)*scale*0.5f + origin.x);
+				break;
+
+			default:
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+					493,
+					!"unreachable");
+			case _hud_anchor_top_right:
+			case _hud_anchor_bottom_right:
+				cursor.x = origin.x;
+				break;
+			}
+
+			if (source_bitmap)
+			{
+				pixel32 color;
+
+				if (TEST_FLAG(draw_flags, _hud_draw_disabled_bit))
+					color = numbers->colors.disabled_color;
+				else if (TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+					color = get_flash_color(&numbers->colors, flash_reference_time);
+				else
+					color = numbers->colors.color;
+
+				if (TEST_FLAG(numbers->number_flags, _hud_number_show_trailing_m_bit))
+				{
+					struct bitmap_data const *number_bitmap;
+					real_rectangle2d const *clip;
+					point2d point;
+
+					point.x = cursor.x;
+					point.y = origin.y;
+					number_bitmap = NULL;
+					clip = NULL;
+					hud_retrieve_bitmap_and_bounding_rect(
+						hud_number->number_bitmap.index,
+						0,
+						kilometers ? _hud_number_kilometers_index : _hud_number_meters_index,
+						&number_bitmap,
+						&clip);
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+						515,
+						source_bitmap==number_bitmap);
+					hud_draw_bitmap_direct(
+						number_bitmap,
+						absolute_placement->corner,
+						&point,
+						clip,
+						scale,
+						0.0f,
+						color,
+						bitmap_group->type == _bitmap_group_type_interface_bitmaps);
+					cursor.x = (short)(cursor.x - hud_number->screen_width*scale);
+				}
+
+				if (numbers->fractional_digits && decimal_value >= 0)
+				{
+					short fractional_digits = MIN(numbers->fractional_digits, 4);
+
+					for (digit_index = fractional_digits; digit_index < 4; digit_index++)
+					{
+						decimal_value /= 10;
+					}
+
+					for (digit_index = 0; digit_index < fractional_digits; digit_index++)
+					{
+						struct bitmap_data const *number_bitmap;
+						real_rectangle2d const *clip;
+						point2d point;
+
+						point.x = cursor.x;
+						point.y = origin.y;
+						number_bitmap = NULL;
+						clip = NULL;
+						hud_retrieve_bitmap_and_bounding_rect(
+							hud_number->number_bitmap.index,
+							0,
+							decimal_value % 10,
+							&number_bitmap,
+							&clip);
+						match_assert(
+							"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+							539,
+							source_bitmap==number_bitmap);
+						hud_draw_bitmap_direct(
+							number_bitmap,
+							absolute_placement->corner,
+							&point,
+							clip,
+							scale,
+							0.0f,
+							color,
+							bitmap_group->type == _bitmap_group_type_interface_bitmaps);
+						cursor.x = (short)(cursor.x - hud_number->screen_width*scale);
+						decimal_value /= 10;
+					}
+
+					cursor.x = (short)(cursor.x + hud_number->screen_width*scale);
+					cursor.x = (short)(cursor.x - hud_number->decimal_point_width*scale);
+
+					{
+						struct bitmap_data const *number_bitmap;
+						real_rectangle2d const *clip;
+						point2d point;
+
+						point.x = cursor.x;
+						point.y = origin.y;
+						number_bitmap = NULL;
+						clip = NULL;
+						hud_retrieve_bitmap_and_bounding_rect(
+							hud_number->number_bitmap.index,
+							0,
+							_hud_number_decimal_index,
+							&number_bitmap,
+							&clip);
+						match_assert(
+							"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+							556,
+							source_bitmap==number_bitmap);
+						hud_draw_bitmap_direct(
+							number_bitmap,
+							absolute_placement->corner,
+							&point,
+							clip,
+							scale,
+							0.0f,
+							color,
+							bitmap_group->type == _bitmap_group_type_interface_bitmaps);
+						cursor.x = (short)(cursor.x - hud_number->screen_width*scale);
+					}
+				}
+
+				for (digit_index = 0; digit_index < numbers->digits; digit_index++)
+				{
+					short digit = value % 10;
+					struct bitmap_data const *number_bitmap;
+					real_rectangle2d const *clip;
+					point2d point;
+
+					if (!value && !TEST_FLAG(numbers->number_flags, _hud_number_show_all_leading_zeros_bit))
+						break;
+
+					point.x = cursor.x;
+					point.y = origin.y;
+					number_bitmap = NULL;
+					clip = NULL;
+					hud_retrieve_bitmap_and_bounding_rect(
+						hud_number->number_bitmap.index,
+						0,
+						digit,
+						&number_bitmap,
+						&clip);
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+						575,
+						source_bitmap==number_bitmap);
+					hud_draw_bitmap_direct(
+						number_bitmap,
+						absolute_placement->corner,
+						&point,
+						clip,
+						scale,
+						0.0f,
+						color,
+						bitmap_group->type == _bitmap_group_type_interface_bitmaps);
+					cursor.x = (short)(cursor.x - hud_number->screen_width*scale);
+					value /= 10;
+				}
+
+				if (negative)
+				{
+					struct bitmap_data const *number_bitmap;
+					real_rectangle2d const *clip;
+					point2d point;
+
+					point.x = cursor.x;
+					point.y = origin.y;
+					number_bitmap = NULL;
+					clip = NULL;
+					hud_retrieve_bitmap_and_bounding_rect(
+						hud_number->number_bitmap.index,
+						0,
+						_hud_number_negative_sign_index,
+						&number_bitmap,
+						&clip);
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+						595,
+						source_bitmap==number_bitmap);
+					hud_draw_bitmap_direct(
+						number_bitmap,
+						absolute_placement->corner,
+						&point,
+						clip,
+						scale,
+						0.0f,
+						color,
+						bitmap_group->type == _bitmap_group_type_interface_bitmaps);
+				}
+			}
+		}
+	}
+
+	hud_draw_stack_buffer_check(602);
 
 	return;
 }
