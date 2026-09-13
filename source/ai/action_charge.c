@@ -96,14 +96,20 @@ symbols in this file:
 #include "actions.h"
 
 #include "actor_definitions.h"
+#include "actor_perception.h"
 #include "actors.h"
+#include "ai.h"
+#include "ai_communication.h"
 #include "props.h"
 #include "game/game.h"
+#include "items/projectiles.h"
+#include "items/weapon_definitions.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
 #include "units/units.h"
+#include "ai_debug.h"
 #undef scale_vector2d
 #undef magnitude2d
 #undef normalize2d
@@ -126,6 +132,8 @@ enum
 	_action_charge_primary_priority_locked_aiming = 7,
 	_actor_special_fire_situation_strafing = 3,
 	_action_charge_combat_status_clear_line_of_sight = 5,
+	_action_charge_prop_facing_central = 2,
+	_action_charge_prop_closing_speed_slow = 1,
 };
 
 /* ---------- macros */
@@ -454,6 +462,519 @@ real real_random(
 {
 	return real_seed_random(
 		get_global_random_seed_address());
+}
+
+boolean action_charge_perform(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition =
+		actor_definition_get(actor->meta.definition_index);
+	struct actor_variant_definition *variant_definition =
+		actor_variant_definition_get(actor->meta.variant_definition_index);
+	struct actor_variant_definition *firing_variant_definition =
+		actor_combat_get_firing_variant_definition(actor_index);
+	struct charge_state_data *state_data = &actor->state.action_data.charge;
+	struct prop_datum *prop = NULL;
+	boolean result = FALSE;
+
+	if (actor->target.target_prop_index != NONE)
+	{
+		prop = prop_get(actor->target.target_prop_index);
+
+		if (actor->input.delayed_attached_projectile_index != NONE)
+		{
+			state_data->advancing = TRUE;
+		}
+		else if (state_data->goal == _charge_goal_vehicle_ramming ||
+			state_data->goal == _charge_goal_vehicle_strafing)
+		{
+			state_data->advancing = TRUE;
+		}
+		else if (state_data->goal != _charge_goal_melee &&
+			state_data->goal != _charge_goal_melee_leaping)
+		{
+			boolean stalking =
+				TEST_FLAG(definition->flags, _actor_definition_stalking_behavior_bit) &&
+				actor->state.combat_status >= _action_charge_combat_status_clear_line_of_sight &&
+				!actor->emotions.berserk;
+
+			state_data->goal = stalking ? _charge_goal_stalking : _charge_goal_close_range;
+			if (state_data->goal == _charge_goal_stalking)
+			{
+				state_data->stalking_currently_exposed =
+					(prop->line_of_sight == _ai_line_of_sight_clear || prop->line_of_sight == _ai_line_of_sight_occluded) &&
+					prop->quantized_facing <= _action_charge_prop_facing_central;
+				if (state_data->stalking_currently_exposed &&
+					TEST_FLAG(definition->flags, _actor_definition_stalking_freeze_when_exposed_bit))
+				{
+					state_data->advancing = FALSE;
+				}
+				else
+				{
+					state_data->advancing = TRUE;
+				}
+				if (state_data->stalking_currently_exposed)
+				{
+					state_data->stalking_discovery_timer++;
+				}
+
+				state_data->stalking_catch_target = FALSE;
+				if (!state_data->stalking_currently_exposed && prop->quantized_closing_speed <= _action_charge_prop_closing_speed_slow)
+				{
+					state_data->stalking_catch_target = TRUE;
+				}
+				else if (definition->defensive.stalking_max_distance > 0.f &&
+					prop->distance >= definition->defensive.stalking_max_distance)
+				{
+					state_data->stalking_catch_target = TRUE;
+				}
+			}
+			else if (actor_has_ranged_weapon(actor_index) && !actor->input.underwater)
+			{
+				real minimum_range;
+				real maximum_range;
+				struct weapon_definition *weapon;
+
+				if (actor->emotions.berserk)
+				{
+					minimum_range = firing_variant_definition->ranged_combat.berserk_firing_range_lower_bound;
+					maximum_range = firing_variant_definition->ranged_combat.berserk_firing_range_upper_bound;
+				}
+				else
+				{
+					minimum_range = firing_variant_definition->ranged_combat.combat_range_lower_bound;
+					maximum_range = firing_variant_definition->ranged_combat.combat_range_upper_bound;
+				}
+
+				weapon = actor_get_weapon_definition(actor_index);
+				if (weapon && weapon->weapon.ai_minimum_target_range > 0.f)
+				{
+					minimum_range = MAX(minimum_range, weapon->weapon.ai_minimum_target_range);
+				}
+
+				if (state_data->advancing)
+				{
+					if (prop->distance < minimum_range)
+					{
+						state_data->advancing = FALSE;
+					}
+				}
+				else
+				{
+					if (prop->distance > maximum_range)
+					{
+						state_data->advancing = TRUE;
+					}
+				}
+
+				if (prop->distance > 0.7f &&
+					prop->line_of_sight != _ai_line_of_sight_clear &&
+					prop->line_of_sight != _ai_line_of_sight_occluded)
+				{
+					state_data->advancing = TRUE;
+				}
+			}
+			else
+			{
+				state_data->advancing = TRUE;
+			}
+		}
+		else
+		{
+			real abort_range = REAL_MAX;
+			boolean check_range = TRUE;
+			boolean berserk_ranges = actor->emotions.berserk;
+
+			if (!actor_has_ranged_weapon(actor_index))
+			{
+				berserk_ranges = TRUE;
+			}
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\action_charge.c",
+				288,
+				!actor->meta.swarm);
+
+			if (state_data->launched_melee_attack ||
+				state_data->launched_leap ||
+				state_data->leap_pending)
+			{
+				check_range = FALSE;
+			}
+			else if (actor->emotions.berserk || !actor_has_ranged_weapon(actor_index))
+			{
+				abort_range = berserk_ranges ?
+					variant_definition->ranged_combat.berserk_melee_abort_range :
+					variant_definition->ranged_combat.melee_abort_range;
+			}
+
+			if (actor->external_orders.disable_charging)
+			{
+				real maximum_abort_range = MAX(0.f, definition->berserk.melee_attack_range) + 0.8f;
+
+				abort_range = MIN(abort_range, maximum_abort_range);
+			}
+
+			if (check_range && prop->distance > abort_range)
+			{
+				state_data->aborted_melee_attack = TRUE;
+			}
+			else
+			{
+				actor->emotions.last_melee_attack_time = game_time_get();
+				state_data->advancing = TRUE;
+
+				if (check_range)
+				{
+					if (state_data->goal == _charge_goal_melee)
+					{
+						if (definition->berserk.melee_leap_range_upper_bound == 0.f ||
+							definition->berserk.melee_leap_chance == 0.f)
+						{
+							state_data->leap_possible_if_at_range = FALSE;
+						}
+						else if (prop->flying || prop->unreachable_ticks > 0)
+						{
+							state_data->leap_possible_if_at_range = TRUE;
+						}
+
+						if (state_data->leap_possible_if_at_range &&
+							(prop->unreachable_ticks > 0 ||
+							prop->distance > definition->berserk.melee_leap_range_lower_bound * 1.5f))
+						{
+							state_data->goal = _charge_goal_melee_leaping;
+						}
+					}
+					else if (prop->distance < definition->berserk.melee_leap_range_lower_bound)
+					{
+						state_data->goal = _charge_goal_melee;
+						state_data->leap_possible_if_at_range = TRUE;
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		state_data->advancing = FALSE;
+	}
+
+	if (state_data->launched_melee_attack)
+	{
+		long unit_index = actor->meta.unit_index;
+
+		state_data->finished_melee_attack = unit_index == NONE || !unit_is_busy(unit_index);
+	}
+	else if (!state_data->leap_pending &&
+		(state_data->goal == _charge_goal_melee || state_data->goal == _charge_goal_melee_leaping) &&
+		prop)
+	{
+		boolean melee = FALSE;
+		struct actor_debug_info *debug_info =
+			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
+		real_vector3d direction;
+		real distance;
+
+		debug_info->last_melee_time = game_time_get();
+		point_from_line3d(&actor->input.position.body_position, global_up3d, 0.05f, &debug_info->field_108);
+		debug_info->field_114 = actor->input.facing_vector;
+		point_from_line3d(&prop->body_position, global_up3d, 0.05f, &debug_info->field_120);
+
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\action_charge.c",
+			487,
+			!actor->meta.swarm);
+
+		if (prop->distance < 0.8f)
+		{
+			debug_info->field_139 = TRUE;
+			direction = prop->actor_to_prop;
+			melee = TRUE;
+		}
+		else
+		{
+			struct unit_datum *unit = unit_get(actor->meta.unit_index);
+			real lead_fraction;
+			real speed;
+			real_point3d target_point;
+
+			debug_info->field_139 = FALSE;
+			lead_fraction = 0.f;
+			speed = magnitude3d(&prop->velocity);
+			if (speed > 0.f)
+			{
+				lead_fraction = (dot_product3d(&prop->velocity, &prop->actor_to_prop) / speed + 1.f) * 0.5f;
+			}
+
+			point_from_line3d(
+				&prop->body_position,
+				&prop->velocity,
+				lead_fraction * state_data->melee_ticks_until_dangerous,
+				&target_point);
+			vector_from_points3d(&actor->input.position.body_position, &target_point, &direction);
+			point_from_line3d(&target_point, global_up3d, 0.05f, &debug_info->field_13C);
+
+			if (dot_product3d(&direction, &prop->actor_to_prop) < 0.f)
+			{
+				distance = 0.f;
+				direction = prop->actor_to_prop;
+			}
+			else
+			{
+				distance = normalize3d(&direction);
+				if (distance == 0.f)
+				{
+					direction = prop->actor_to_prop;
+				}
+			}
+
+			if (state_data->goal == _charge_goal_melee_leaping && !state_data->launched_leap)
+			{
+				debug_info->field_148 = definition->berserk.melee_leap_range_lower_bound;
+				debug_info->field_14C = definition->berserk.melee_leap_range_upper_bound;
+
+				if (distance < definition->berserk.melee_leap_range_lower_bound &&
+					prop->unreachable_ticks == 0 &&
+					!prop->flying)
+				{
+					state_data->aborted_melee_attack = TRUE;
+					actor->emotions.last_melee_attack_time = NONE;
+				}
+				else
+				{
+					if (distance < definition->berserk.melee_leap_range_upper_bound)
+					{
+						real target_velocity_minimum = definition->berserk.melee_leap_velocity * 0.3f;
+						real_vector3d aim_vector;
+						real horizontal_velocity;
+						real vertical_velocity;
+
+						if (projectile_aim_ballistic(
+							definition->berserk.melee_leap_velocity,
+							1.f,
+							&actor->input.position.body_position,
+							&prop->body_position,
+							&target_velocity_minimum,
+							&definition->berserk.melee_leap_ballistic,
+							NULL,
+							FALSE,
+							&aim_vector,
+							NULL,
+							NULL,
+							NULL,
+							&vertical_velocity,
+							&horizontal_velocity))
+						{
+							if (normalize2d((real_vector2d *)&aim_vector) == 0.f)
+							{
+								aim_vector = actor->input.facing_vector;
+								if (normalize2d((real_vector2d *)&aim_vector) == 0.f)
+								{
+									aim_vector = *global_forward3d;
+								}
+							}
+
+							state_data->leap_pending = TRUE;
+							state_data->leap_alignment_vector.i = aim_vector.i;
+							state_data->leap_alignment_vector.j = aim_vector.j;
+							state_data->leap_horizontal_velocity = horizontal_velocity;
+							state_data->leap_vertical_velocity = vertical_velocity;
+						}
+					}
+				}
+			}
+			else if (state_data->melee_suicide)
+			{
+				debug_info->field_148 = 0.f;
+				debug_info->field_14C = definition->berserk.melee_attack_range;
+
+				if (distance < definition->berserk.melee_attack_range)
+				{
+					melee = TRUE;
+				}
+				else if (distance < definition->berserk.suicide_sensing_distance)
+				{
+					real_vector3d relative_velocity;
+
+					subtract_vectors3d(&prop->velocity, &unit->object.translational_velocity, &relative_velocity);
+					if (dot_product3d(&relative_velocity, &direction) > 0.023333333f)
+					{
+						melee = TRUE;
+					}
+				}
+			}
+			else
+			{
+				if (state_data->goal == _charge_goal_melee_leaping && state_data->launched_leap)
+				{
+					distance -= dot_product3d(&direction, &unit->object.translational_velocity) *
+						state_data->melee_ticks_until_dangerous;
+				}
+
+				debug_info->field_148 = state_data->melee_danger_range;
+				debug_info->field_14C = state_data->melee_danger_range + definition->berserk.melee_attack_range;
+				if (distance < state_data->melee_danger_range + definition->berserk.melee_attack_range)
+				{
+					melee = TRUE;
+				}
+			}
+		}
+
+		if (state_data->leap_pending || (melee && !state_data->melee_suicide))
+		{
+			real_vector2d facing_direction;
+
+			facing_direction.i = direction.i;
+			facing_direction.j = direction.j;
+			if (normalize2d(&facing_direction) > 0.f)
+			{
+				real minimum_alignment = state_data->launched_leap ? 0.f : 0.8660254f;
+
+				if (dot_product2d(&facing_direction, (real_vector2d *)&actor->input.facing_vector) < minimum_alignment)
+				{
+					melee = FALSE;
+					state_data->leap_pending = FALSE;
+					state_data->alignment_incorrect = TRUE;
+				}
+			}
+		}
+
+		debug_info->field_12C = direction;
+		debug_info->field_138 = melee;
+
+		if (melee)
+		{
+			real_vector2d melee_direction;
+
+			melee_direction.i = direction.i;
+			melee_direction.j = direction.j;
+			if (normalize2d(&melee_direction) == 0.f)
+			{
+				melee_direction.i = actor->input.facing_vector.i;
+				melee_direction.j = actor->input.facing_vector.j;
+			}
+
+			if (unit_melee_attack_begin(actor->meta.unit_index, FALSE, &melee_direction))
+			{
+				ai_communication_event(
+					_ai_communication_melee,
+					actor->meta.unit_index,
+					prop->unit_index,
+					_comm_hostility_enemy,
+					NONE,
+					NONE,
+					NULL);
+				state_data->launched_melee_attack = TRUE;
+			}
+		}
+	}
+
+	{
+		long time = game_time_get();
+		real target_range;
+
+		if ((state_data->goal == _charge_goal_melee || state_data->goal == _charge_goal_melee_leaping) &&
+			!state_data->launched_melee_attack &&
+			!state_data->leap_pending)
+		{
+			if (state_data->launched_leap)
+			{
+				if (state_data->leap_failure_timer > 15)
+				{
+					state_data->aborted_melee_attack = TRUE;
+				}
+			}
+			else if (definition->berserk.melee_attack_charge_timer > 0.f &&
+				time >= state_data->charge_start_time + definition->berserk.melee_attack_charge_timer * TICKS_PER_SECOND)
+			{
+				state_data->aborted_melee_attack = TRUE;
+			}
+		}
+
+		if (state_data->goal == _charge_goal_vehicle_strafing ||
+			state_data->goal == _charge_goal_vehicle_ramming)
+		{
+			actor->emotions.last_vehicle_charge_time = time;
+		}
+
+		target_range = action_charge_find_target_range(actor_index, state_data->goal, state_data);
+		state_data->acceptable_target_range = target_range;
+
+		if (!actor->meta.swarm && actor->meta.timeslice)
+		{
+			boolean moving = FALSE;
+
+			state_data->unable_to_advance = FALSE;
+			if (!state_data->launched_melee_attack &&
+				!state_data->launched_leap &&
+				!state_data->leap_pending &&
+				state_data->advancing)
+			{
+				real minimum_move_range = state_data->goal == _charge_goal_melee_leaping ? 4.f : 1.5f;
+				real move_range = MAX(minimum_move_range, target_range);
+
+				if (actor_move_to_prop(actor_index, actor->target.target_prop_index, move_range))
+				{
+					actor_move_keep_moving_past_destination(actor_index);
+					moving = TRUE;
+				}
+				else
+				{
+					state_data->unable_to_advance = TRUE;
+					state_data->advancing = FALSE;
+				}
+			}
+
+			if (!moving)
+			{
+				actor_move_halt(actor_index);
+			}
+
+			if (actor->target.target_type >= _actor_target_acknowledged_enemy)
+			{
+				struct prop_datum *target_prop = prop_get(actor->target.target_prop_index);
+				boolean unreachable = FALSE;
+				boolean out_of_range = FALSE;
+
+				if (target_prop->distance > state_data->acceptable_target_range)
+				{
+					out_of_range = TRUE;
+				}
+
+				if ((state_data->goal == _charge_goal_melee || state_data->goal == _charge_goal_melee_leaping) &&
+					(state_data->launched_leap || state_data->leap_pending || state_data->launched_melee_attack))
+				{
+					out_of_range = FALSE;
+				}
+
+				if (out_of_range &&
+					(state_data->unable_to_advance ||
+					!actor_path_has_path(actor_index) ||
+					actor->control.path.path.endpoint.target_radius > state_data->acceptable_target_range))
+				{
+					unreachable = TRUE;
+				}
+
+				actor_perception_unreachable(actor_index, actor->target.target_prop_index, unreachable);
+			}
+		}
+	}
+
+	if (state_data->goal == _charge_goal_melee ||
+		state_data->goal == _charge_goal_melee_leaping)
+	{
+		result = state_data->aborted_melee_attack ||
+			state_data->finished_melee_attack ||
+			state_data->unable_to_advance;
+	}
+	else if (state_data->goal == _charge_goal_vehicle_strafing ||
+		state_data->goal == _charge_goal_vehicle_ramming)
+	{
+		result = state_data->unable_to_advance;
+	}
+
+	return result;
 }
 
 static boolean action_charge_valid_melee_destination(
