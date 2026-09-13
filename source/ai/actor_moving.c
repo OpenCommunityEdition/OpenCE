@@ -1282,12 +1282,10 @@ boolean actor_move_try_evasion_vector(
 			real_point3d actor_midpoint;
 			real_vector3d collision_vector;
 
-			actor_midpoint.x =
-				(actor->input.position.head_position.x + actor->input.position.body_position.x) * 0.5f;
-			actor_midpoint.y =
-				(actor->input.position.head_position.y + actor->input.position.body_position.y) * 0.5f;
-			actor_midpoint.z =
-				(actor->input.position.body_position.z + actor->input.position.head_position.z) * 0.5f;
+			midpoint3d(
+				&actor->input.position.head_position,
+				&actor->input.position.body_position,
+				&actor_midpoint);
 			collision_vector.i = evade_distance * evasion_vector->i;
 			collision_vector.j = evade_distance * evasion_vector->j;
 			collision_vector.k = 0.0f;
