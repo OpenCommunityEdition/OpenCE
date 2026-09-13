@@ -2717,108 +2717,106 @@ static void encounter_post_combat(
 {
 	struct encounter_datum *encounter = encounter_get(encounter_index);
 	short primary_postcombat_behaviors[NUMBER_OF_POST_COMBAT_POSSIBILITIES];
-	short postcombat_behavior = NONE;
-	long secondary_reply_actor_index = NONE;
-	long secondary_reply_target_prop_index = NONE;
 	struct post_combat_possibility primary_possibilities[NUMBER_OF_POST_COMBAT_POSSIBILITIES];
-	struct post_combat_possibility possibilities[NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES][NUMBER_OF_POST_COMBAT_POSSIBILITIES] =
-	{
-		{ { NONE, 0.0f, NONE, NONE }, { NONE, 0.0f, NONE, NONE } },
-		{ { NONE, 0.0f, NONE, NONE }, { NONE, 0.0f, NONE, NONE } },
-		{ { NONE, 0.0f, NONE, NONE }, { NONE, 0.0f, NONE, NONE } },
-		{ { NONE, 0.0f, NONE, NONE }, { NONE, 0.0f, NONE, NONE } },
-	};
+	struct post_combat_possibility possibilities[NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES][NUMBER_OF_POST_COMBAT_POSSIBILITIES];
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
-	long behavior_actor_index = NONE;
-	boolean found_possibility = FALSE;
+	short postcombat_behavior;
+	long behavior_actor_index;
+	long secondary_reply_actor_index;
+	long secondary_reply_target_prop_index;
+	boolean found_possibility;
+	short behavior_index;
+	short possibility_index;
 	short primary_behavior_index;
 
 	csmemset(primary_postcombat_behaviors, NONE, sizeof(primary_postcombat_behaviors));
+	postcombat_behavior = NONE;
+	behavior_actor_index = NONE;
+	secondary_reply_actor_index = NONE;
+	for (behavior_index = 0; behavior_index < NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES; behavior_index++)
+	{
+		for (possibility_index = 0; possibility_index < NUMBER_OF_POST_COMBAT_POSSIBILITIES; possibility_index++)
+			possibilities[behavior_index][possibility_index] = global_empty_possibility;
+	}
+	found_possibility = FALSE;
 
 	encounter_actor_iterator_new(&iterator, encounter_index);
 	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
 	{
 		struct actor_definition *actor_definition = actor_definition_get(actor->meta.definition_index);
-		long unit_index = actor->meta.unit_index;
+		boolean found_enemy = FALSE;
 
-		if (unit_index != NONE)
+		if (actor->meta.unit_index != NONE)
 		{
+			real player_rating = ai_communication_get_player_rating(actor->meta.unit_index, TRUE, NULL, NULL);
 			struct prop_iterator prop_iterator;
 			struct prop_datum *prop;
-			real player_rating = ai_communication_get_player_rating(unit_index, TRUE, NULL, NULL);
-			boolean found_enemy = FALSE;
 
 			prop_iterator_new(&prop_iterator, iterator.index);
 			while ((prop = prop_iterator_next(&prop_iterator)) != NULL)
 			{
-				short behavior_index;
-				real maximum_distance;
-				real extra_weight;
-				real distance_factor;
-				real rating;
-				real age;
-				real weight;
-
-				if (!prop->dead)
-					continue;
-
-				if (prop->enemy)
+				if (prop->dead)
 				{
-					if (TEST_FLAG(actor_definition->flags2, _actor_definition_no_corpse_shooting_bit) ||
-						prop->dead_ticks >= 210)
+					real maximum_distance;
+					real extra_weight;
+
+					if (prop->enemy)
 					{
-						behavior_index = 1;
-						maximum_distance = 5.0f;
-						extra_weight = 0.0f;
+						if (TEST_FLAG(actor_definition->flags2, _actor_definition_no_corpse_shooting_bit) ||
+							prop->dead_ticks >= 210)
+						{
+							behavior_index = 1;
+							maximum_distance = 5.0f;
+							extra_weight = 0.0f;
+						}
+						else
+						{
+							behavior_index = 0;
+							maximum_distance = 10.0f;
+							extra_weight = 0.7f;
+						}
 					}
 					else
 					{
-						behavior_index = 0;
-						maximum_distance = 10.0f;
-						extra_weight = 0.7f;
+						behavior_index = 2;
+						maximum_distance = 9.0f;
+						extra_weight = 0.4f;
 					}
-				}
-				else
-				{
-					behavior_index = 2;
-					maximum_distance = 9.0f;
-					extra_weight = 0.4f;
-				}
 
-				if (prop->distance >= maximum_distance)
-					continue;
+					if (prop->distance < maximum_distance)
+					{
+						real distance_factor = MIN(2.0f, maximum_distance / prop->distance);
+						real rating = MAX(player_rating, 1.5f);
+						real age = MIN(1.0f, (real)prop->dead_ticks * 0.0041666669f);
+						real weight = (2.0f - age) * rating * distance_factor + extra_weight;
 
-				distance_factor = MIN(maximum_distance / prop->distance, 2.0f);
-				rating = MAX(player_rating, 1.5f);
-				age = MIN((real)prop->dead_ticks * 0.0041666669f, 1.0f);
-				weight = (2.0f - age) * rating * distance_factor + extra_weight;
-				if (prop->player)
-					weight += 2.0f;
+						if (prop->player)
+							weight += 2.0f;
+						if (prop->enemy)
+							found_enemy = TRUE;
 
-				if (prop->enemy)
-					found_enemy = TRUE;
-
-				if (encounter_post_combat_add_possibility(
-					&possibilities[behavior_index][0],
-					iterator.index,
-					weight,
-					prop_iterator.index,
-					prop->unit_index))
-				{
-					found_possibility = TRUE;
+						if (encounter_post_combat_add_possibility(
+							&possibilities[behavior_index][0],
+							iterator.index,
+							weight,
+							prop_iterator.index,
+							prop->unit_index))
+						{
+							found_possibility = TRUE;
+						}
+					}
 				}
 			}
 
 			if (found_enemy)
 			{
-				struct unit_datum *unit = unit_get(unit_index);
-				real weight = (real)unit->unit.killing_spree_count * 0.7f + player_rating;
+				struct unit_datum *unit = unit_get(actor->meta.unit_index);
 
 				if (encounter_post_combat_add_possibility(
 					&possibilities[3][0],
 					iterator.index,
-					weight,
+					(real)unit->unit.killing_spree_count * 0.7f + player_rating,
 					NONE,
 					NONE))
 				{
@@ -2830,35 +2828,33 @@ static void encounter_post_combat(
 
 	if (found_possibility)
 	{
-		boolean possibility_remaining = FALSE;
-
 		primary_postcombat_behaviors[0] = encounter_post_combat_select_random_behavior(
 			possibilities,
 			&primary_possibilities[0]);
 
 		if (encounter->team_index != _game_team_human || encounter->enemies_defeated >= 8)
 		{
-			for (primary_behavior_index = 0;
-				primary_behavior_index < NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES;
-				primary_behavior_index++)
+			found_possibility = FALSE;
+			for (behavior_index = 0; behavior_index < NUMBER_OF_POST_COMBAT_BEHAVIOR_TYPES; behavior_index++)
 			{
-				if (primary_behavior_index == primary_postcombat_behaviors[0])
+				if (behavior_index == primary_postcombat_behaviors[0])
 				{
-					possibilities[primary_behavior_index][0] = global_empty_possibility;
-					possibilities[primary_behavior_index][1] = global_empty_possibility;
+					for (possibility_index = 0; possibility_index < NUMBER_OF_POST_COMBAT_POSSIBILITIES; possibility_index++)
+						possibilities[behavior_index][possibility_index] = global_empty_possibility;
 				}
-				else if (possibilities[primary_behavior_index][0].actor_index == primary_possibilities[0].actor_index ||
-					possibilities[primary_behavior_index][0].unit_index == primary_possibilities[0].unit_index)
+				else if (possibilities[behavior_index][0].actor_index == primary_possibilities[0].actor_index ||
+					possibilities[behavior_index][0].unit_index == primary_possibilities[0].unit_index)
 				{
-					possibilities[primary_behavior_index][0] = possibilities[primary_behavior_index][1];
-					possibilities[primary_behavior_index][1] = global_empty_possibility;
+					for (possibility_index = 0; possibility_index < NUMBER_OF_POST_COMBAT_POSSIBILITIES - 1; possibility_index++)
+						possibilities[behavior_index][possibility_index] = possibilities[behavior_index][possibility_index + 1];
+					possibilities[behavior_index][NUMBER_OF_POST_COMBAT_POSSIBILITIES - 1] = global_empty_possibility;
 				}
 
-				if (possibilities[primary_behavior_index][0].actor_index != NONE)
-					possibility_remaining = TRUE;
+				if (possibilities[behavior_index][0].actor_index != NONE)
+					found_possibility = TRUE;
 			}
 
-			if (possibility_remaining)
+			if (found_possibility)
 			{
 				primary_postcombat_behaviors[1] = encounter_post_combat_select_random_behavior(
 					possibilities,
@@ -2870,6 +2866,7 @@ static void encounter_post_combat(
 	if (encounter->team_index != _game_team_human || encounter->enemies_defeated >= 4)
 	{
 		struct encounter_actor_iterator reply_iterator;
+		long best_actor_index = NONE;
 		real best_actor_rating = 0.0f;
 
 		encounter_actor_iterator_new(&reply_iterator, encounter_index);
@@ -2883,65 +2880,64 @@ static void encounter_post_combat(
 					rating > 2.0f &&
 					rating > best_actor_rating)
 				{
-					behavior_actor_index = reply_iterator.index;
+					best_actor_index = reply_iterator.index;
 					best_actor_rating = rating;
 				}
 			}
 		}
 
-		if (behavior_actor_index != NONE)
+		behavior_actor_index = best_actor_index;
+		if (best_actor_index != NONE)
 		{
-			struct actor_datum *behavior_actor = actor_get(behavior_actor_index);
-			real health = behavior_actor->input.body_vitality;
+			struct actor_datum *behavior_actor = actor_get(best_actor_index);
+			boolean find_secondary_reply = FALSE;
 
-			if (health >= 0.5f || behavior_actor->emotions.original_body_vitality - health <= 0.3f)
+			if (behavior_actor->input.body_vitality < 0.5f &&
+				behavior_actor->emotions.original_body_vitality - behavior_actor->input.body_vitality > 0.3f)
 			{
-				short living_count = encounter->current_count;
-
-				if (living_count == 1 && encounter->prebattle_living_count > 1)
-				{
-					postcombat_behavior = _actor_postcombat_speak_alone;
-				}
-				else
-				{
-					if (living_count >= 2)
-					{
-						short threshold = MIN(living_count, 2);
-
-						if (encounter->prebattle_living_count >= threshold + living_count)
-						{
-							postcombat_behavior = _actor_postcombat_speak_massacre;
-							goto apply_postcombat_behaviors;
-						}
-
-						if (living_count >= encounter->prebattle_living_count - 1)
-						{
-							postcombat_behavior = _actor_postcombat_speak_triumph;
-							goto apply_postcombat_behaviors;
-						}
-					}
-
-					if (health > 0.8f)
-						postcombat_behavior = _actor_postcombat_speak_unscathed;
-				}
+				postcombat_behavior = _actor_postcombat_speak_wounded;
+				find_secondary_reply = TRUE;
 			}
 			else
 			{
-				struct encounter_actor_iterator search_iterator;
-				real best_distance_squared = REAL_MAX;
+				if (encounter->current_count == 1 && encounter->prebattle_living_count > 1)
+				{
+					postcombat_behavior = _actor_postcombat_speak_alone;
+				}
+				else if (encounter->current_count >= 2 &&
+					encounter->prebattle_living_count >= encounter->current_count + MIN(encounter->current_count, 2))
+				{
+					postcombat_behavior = _actor_postcombat_speak_massacre;
+				}
+				else if (encounter->current_count >= 2 &&
+					encounter->current_count >= encounter->prebattle_living_count - 1)
+				{
+					postcombat_behavior = _actor_postcombat_speak_triumph;
+				}
+				else if (behavior_actor->input.body_vitality > 0.8f)
+				{
+					postcombat_behavior = _actor_postcombat_speak_unscathed;
+				}
+			}
 
-				postcombat_behavior = _actor_postcombat_speak_wounded;
+			if (find_secondary_reply)
+			{
+				struct encounter_actor_iterator search_iterator;
+				long closest_actor_index = NONE;
+				long closest_prop_index = NONE;
+				real closest_distance_squared = REAL_MAX;
+
 				encounter_actor_iterator_new(&search_iterator, encounter_index);
 				while ((actor = encounter_actor_iterator_next(&search_iterator)) != NULL)
 				{
-					if (actor->meta.unit_index != NONE && search_iterator.index != behavior_actor_index)
+					if (actor->meta.unit_index != NONE && search_iterator.index != best_actor_index)
 					{
 						real distance_squared = distance_squared3d(
-							&actor->input.position.head_position,
-							&behavior_actor->input.position.head_position);
+							&behavior_actor->input.position.head_position,
+							&actor->input.position.head_position);
 
-						if (best_distance_squared == REAL_MAX ||
-							distance_squared < best_distance_squared * best_distance_squared)
+						if (closest_distance_squared == REAL_MAX ||
+							distance_squared < closest_distance_squared * closest_distance_squared)
 						{
 							long active_prop_index = prop_get_active_by_unit_index(
 								search_iterator.index,
@@ -2949,21 +2945,24 @@ static void encounter_post_combat(
 
 							if (active_prop_index != NONE)
 							{
-								best_distance_squared = distance_squared;
-								secondary_reply_actor_index = search_iterator.index;
-								secondary_reply_target_prop_index = active_prop_index;
+								closest_distance_squared = distance_squared;
+								closest_actor_index = search_iterator.index;
+								closest_prop_index = active_prop_index;
 							}
 						}
 					}
+				}
+
+				if (closest_actor_index != NONE)
+				{
+					secondary_reply_actor_index = closest_actor_index;
+					secondary_reply_target_prop_index = closest_prop_index;
 				}
 			}
 		}
 	}
 
-apply_postcombat_behaviors:
-	for (primary_behavior_index = 0;
-		primary_behavior_index < NUMBER_OF_POST_COMBAT_POSSIBILITIES;
-		primary_behavior_index++)
+	for (primary_behavior_index = 0; primary_behavior_index < NUMBER_OF_POST_COMBAT_POSSIBILITIES; primary_behavior_index++)
 	{
 		if (primary_postcombat_behaviors[primary_behavior_index] != NONE &&
 			primary_possibilities[primary_behavior_index].actor_index != NONE)
