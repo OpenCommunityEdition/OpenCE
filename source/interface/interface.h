@@ -51,6 +51,8 @@ real_argb_color *interface_get_real_argb_color(
 	short interface_color_table_index,
 	short color_index,
 	real_argb_color *color);
+long interface_get_weapon_hud_index(
+	real *flashlight_power);
 void interface_set_bitmap_text_draw_mode(
 	short interface_font_index,
 	short style,

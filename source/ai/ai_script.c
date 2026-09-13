@@ -465,8 +465,10 @@ symbols in this file:
 #include "hs/hs.h"
 #include "hs/object_lists.h"
 #include "memory/data.h"
+#include "objects/objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicle_scripting.h"
 
@@ -645,6 +647,9 @@ typedef char ai_script_vehicle_candidate_state_offset_assert[
 
 static long ai_scripting_assess_status(
 	long actor_index);
+static void ai_scripting_teleport_starting_location_private(
+	long ai_reference,
+	boolean only_if_unsupported);
 static void ai_scripting_kill_internal(
 	long ai_reference,
 	boolean silent);
@@ -3393,6 +3398,102 @@ void ai_scripting_prefer_target(
 
 		unit_index = object_list_get_next(object_list_index, &reference_index);
 	}
+
+	return;
+}
+
+static void ai_scripting_teleport_starting_location_private(
+	long ai_reference,
+	boolean only_if_unsupported)
+{
+	struct ai_script_actor_reference_iterator iterator;
+	struct actor_datum *actor;
+
+	ai_index_actor_iterator_new(ai_reference, &iterator);
+	for (actor = ai_index_actor_iterator_next(&iterator);
+		actor;
+		actor = ai_index_actor_iterator_next(&iterator))
+	{
+		if (actor->meta.unit_index == NONE)
+			continue;
+		if (only_if_unsupported &&
+			(actor->input.vehicle_index != NONE ||
+			biped_approximate_surface_index(actor->meta.unit_index, NULL) != NONE))
+		{
+			continue;
+		}
+		if (actor->meta.encounter_index == NONE)
+			continue;
+
+		{
+			struct encounter_definition *encounter = TAG_BLOCK_GET_ELEMENT(
+				&global_scenario_get()->ai_encounters,
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+				struct encounter_definition);
+			struct squad_definition *squad = TAG_BLOCK_GET_ELEMENT(
+				&encounter->squads,
+				actor->meta.squad_index,
+				struct squad_definition);
+			short starting_location_index = encounter_get_actor_starting_location(
+				actor->meta.encounter_index,
+				actor->meta.squad_index,
+				TRUE);
+
+			if (starting_location_index != NONE)
+			{
+				struct actor_starting_location const *starting_location = TAG_BLOCK_GET_ELEMENT(
+					&squad->starting_locations,
+					starting_location_index,
+					struct actor_starting_location);
+				real_vector3d forward;
+
+				vector3d_from_angle(&forward, starting_location->facing);
+				object_set_position(actor->meta.unit_index, &starting_location->position, &forward, NULL);
+				object_reset(actor->meta.unit_index);
+				actor_move_halt(iterator.actor_index);
+			}
+		}
+	}
+
+	return;
+}
+
+void ai_scripting_teleport_starting_location_if_unsupported(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_teleport_starting_location_if_unsupported %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	ai_scripting_teleport_starting_location_private(ai_reference, TRUE);
+
+	return;
+}
+
+void ai_scripting_teleport_starting_location(
+	long ai_reference)
+{
+	if (ai_debug.print_scripting)
+	{
+		char ai_name[256];
+
+		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
+		error(
+			_error_silent,
+			"%s: ai_teleport_starting_location %s",
+			hs_runtime_get_executing_thread_name(),
+			ai_name);
+	}
+
+	ai_scripting_teleport_starting_location_private(ai_reference, FALSE);
 
 	return;
 }

@@ -2787,6 +2787,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/ai_profile.h"
+#include "ai/ai_script.h"
 #include "cutscene/recorded_animation_definitions.h"
 #include "cutscene/recorded_animations.h"
 #include "devices/devices.h"
@@ -4189,10 +4190,6 @@ void ai_scripting_ignore(
 void ai_scripting_prefer_target(
 	long ai_index,
 	boolean prefer);
-void ai_scripting_teleport_starting_location(
-	long ai_index);
-void ai_scripting_teleport_starting_location_if_unsupported(
-	long ai_index);
 void ai_scripting_renew(
 	long ai_index);
 void ai_scripting_try_to_fight_nothing(

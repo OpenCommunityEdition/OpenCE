@@ -659,8 +659,6 @@ void action_wait_update(
 void action_wait_control(
 	long actor_index);
 
-void action_vehicle_begin(
-	long actor_index);
 boolean action_vehicle_perform(
 	long actor_index);
 void action_vehicle_update(

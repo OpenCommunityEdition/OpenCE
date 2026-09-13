@@ -909,6 +909,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_endpoint_winsock.h"
 #include "interface/player_ui.h"
 #include "saved games/player_profile.h"
 #include "interface/ui_widget_definitions.h"

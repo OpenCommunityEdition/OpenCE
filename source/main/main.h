@@ -12,10 +12,20 @@ MAIN.H
 
 /* ---------- structures */
 
+struct observer_result;
+struct render_window;
+
 /* ---------- prototypes/MAIN.C */
 
 float main_get_seconds_elapsed(
 	void);
+
+void set_window_camera_values(
+	struct render_window *window,
+	struct observer_result const *observer);
+
+void main_game_render(
+	double time_delta_since_tick_sec);
 
 void game_connection_set(
 	short connection);

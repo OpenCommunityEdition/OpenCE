@@ -35,6 +35,7 @@ struct animation;
 struct object_placement_data;
 struct real_orientation;
 struct scenario_object_datum;
+struct unit_animation_update_data;
 
 struct _biped_datum
 {
@@ -153,6 +154,8 @@ void biped_build_flying_axes(
 void biped_exit_seat_end(
 	long biped_index,
 	long seat_object_index);
+void biped_falling_danger(
+	long biped_index);
 void biped_render_debug(
 	long biped_index);
 short biped_approximate_surface_index(
@@ -165,9 +168,15 @@ boolean biped_new(
 	long biped_index);
 boolean biped_update(
 	long biped_index);
+void biped_update_airborne(
+	long biped_index,
+	struct unit_animation_update_data *animation);
 void biped_preprocess_node_orientations(
 	long biped_index,
 	struct real_orientation *node_orientations);
+void biped_update_moving(
+	long biped_index,
+	struct unit_animation_update_data *animation);
 
 /* ---------- globals */
 

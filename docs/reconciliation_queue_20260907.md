@@ -457,3 +457,24 @@ The full source build, stable regression sweep, 447-entry park validation,
 object-admission audit, and complete 1,144-test plus 26-subtest suite pass. The
 canonical treemap is refreshed for this boundary. The next required refresh
 threshold is **1,123,556 meaningful accepted exact code bytes**.
+
+## 2026-09-12 seventh 10K reconciliation packet
+
+Relative to published commit `d6250fa794`, the canonical semantic ledger
+advances from 1,113,556 meaningful bytes / 6,888 accepted functions to
+**1,123,718 meaningful bytes / 6,918 accepted functions**: a net gain of
+**10,162 bytes / 30 functions**. The independent fail-closed target-section
+census records 29 strict gains / 9,470 meaningful / 9,664 padded bytes with
+zero regressions.
+
+`decal_insert` contributes the remaining 692 meaningful / 704 padded semantic
+exact bytes only after its code, instruction stream, relocation shape, and
+resolved final addresses agree. The strict symbolic comparator remains
+fail-closed for its distinct same-address BSS representation; no alias facade
+or fuzzy source receives credit. All other retained residuals are parked at
+zero exact credit. See [the seventh 10K ledger](object_matching_logs/lane_reconciliation_10k_batch_7_20260912.md).
+
+The full source build, stable regression sweep, 459-entry park validation,
+object-admission audit, and complete 1,144-test plus 26-subtest suite pass.
+The canonical treemap is refreshed for this boundary. The next required
+refresh threshold is **1,133,718 meaningful accepted exact code bytes**.

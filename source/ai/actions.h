@@ -610,6 +610,8 @@ void actor_conversation_control(
 
 /* ---------- prototypes/ACTION_VEHICLE.C */
 
+void action_vehicle_begin(
+	long actor_index);
 void action_vehicle_control(
 	long actor_index);
 

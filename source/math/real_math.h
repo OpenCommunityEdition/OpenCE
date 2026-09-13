@@ -1446,12 +1446,18 @@ __inline real real_random(
 	return real_seed_random(get_global_random_seed_address());
 }
 
+#ifdef REAL_MATH_EXTERNAL_REAL_RANDOM_RANGE
+real real_random_range(
+	real lower_bound,
+	real upper_bound);
+#else
 __inline real real_random_range(
 	real lower_bound,
 	real upper_bound)
 {
 	return real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
 }
+#endif
 
 __inline real_vector3d *random_direction3d(
 	real_vector3d *direction)

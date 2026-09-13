@@ -75,6 +75,15 @@ enum
 	_ai_information_flee = 4,
 };
 
+enum
+{
+	/* Later-build symbols authenticate these meanings; January uses this TU's 3/6/7 layout. */
+	_action_flee_primary_priority_facing = 3,
+	_action_flee_primary_priority_locked_facing = 6,
+	_action_flee_primary_priority_locked_aiming = 7,
+	_action_flee_idle_look_type = 4,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -431,6 +440,71 @@ void action_flee_update(
 	if (state_data->panic_type > _actor_panic_none)
 	{
 		actor->emotions.flee_with_friends_disable_time = game_time_get() + 25*TICKS_PER_SECOND;
+	}
+
+	return;
+}
+
+void action_flee_control(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct flee_state_data *state_data = &actor->state.action_data.flee;
+
+	if (state_data->panic_type > _actor_panic_none)
+	{
+		actor->orders.look.primary_priority = _action_flee_primary_priority_locked_facing;
+		actor->orders.look.primary_direction.type = _direction_specification_movement;
+		actor->orders.combat.abort_burst = TRUE;
+	}
+	else if (actor->target.target_prop_index != NONE &&
+		prop_get(actor->target.target_prop_index)->visibility > 0)
+	{
+		actor->orders.look.primary_priority = _action_flee_primary_priority_locked_aiming;
+		actor->orders.look.primary_direction.type = _direction_specification_target;
+		actor->orders.combat.shoot_at_target = TRUE;
+	}
+	else if (state_data->flee_prop_index != NONE)
+	{
+		actor->orders.look.primary_priority = _action_flee_primary_priority_facing;
+		actor->orders.look.primary_direction.type = _direction_specification_prop;
+		actor->orders.look.primary_direction.prop_index = state_data->flee_prop_index;
+	}
+	else
+	{
+		actor->orders.look.primary_priority = _primary_priority_none;
+	}
+	actor->orders.look.idle_look_type = _action_flee_idle_look_type;
+
+	actor->orders.move.panicked = state_data->panic_type > _actor_panic_none;
+	actor->orders.move.flaming = action_flee_blind_panic(state_data->panic_type);
+	actor->orders.move.stationary_crouch = TRUE;
+	actor->orders.move.moving_crouch = FALSE;
+	actor->orders.move.dive_into_cover = TRUE;
+	actor->orders.move.emerge_from_cover = FALSE;
+
+	if (state_data->flee_firing_position_index == NONE)
+	{
+		actor_move_halt(actor_index);
+	}
+	else if (actor->meta.timeslice)
+	{
+		if (actor_move_to_firing_position(actor_index, state_data->flee_firing_position_index, NULL))
+		{
+			actor->firing_positions.current_position_index = state_data->flee_firing_position_index;
+			actor->firing_positions.current_position_found_outside_range = state_data->flee_firing_position_found_randomly;
+		}
+		else
+		{
+			if (actor->firing_positions.current_position_index != NONE)
+			{
+				actor_discard_firing_position(actor_index, actor->firing_positions.current_position_index, FALSE);
+				actor_move_halt(actor_index);
+				actor->firing_positions.current_position_index = NONE;
+			}
+			state_data->flee_firing_position_index = NONE;
+			state_data->find_new_flee_position = TRUE;
+		}
 	}
 
 	return;

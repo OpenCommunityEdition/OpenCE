@@ -103,6 +103,10 @@ void ai_place(
 	void);
 void ai_update(
 	void);
+void ai_disconnect_from_structure_bsp(
+	void);
+void ai_reconnect_to_structure_bsp(
+	void);
 void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
 void ai_update_team_status(

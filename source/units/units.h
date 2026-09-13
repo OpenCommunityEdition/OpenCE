@@ -840,6 +840,15 @@ boolean unit_drop_current_weapon(long unit_index, boolean immediate);
 
 boolean unit_throw_grenade_begin(long unit_index, real_vector2d const *alignment_vector);
 
+void unit_damage_aftermath(
+	long unit_index,
+	struct damage_data *damage_data,
+	unsigned long damage_flags,
+	real shield_damage,
+	real body_damage,
+	real body_damage_multiplier,
+	short body_part);
+
 void unit_place(
 	long unit_index,
 	struct scenario_unit_datum const *scenario_unit);

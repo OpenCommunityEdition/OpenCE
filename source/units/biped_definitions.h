@@ -96,7 +96,7 @@ struct _biped_definition
 	real collision_height_standing;
 	real collision_height_crouching;
 	real collision_radius;
-	real collision_unused[12];
+	real collision_unused[10];
 	real autoaim_width;
 	real unused[27];
 	real runtime_cosine_stationary_turning_threshold;

@@ -84,7 +84,11 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "math/real_math.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "cache/texture_cache.h"
+#include "effects/particles.h"
+#include "game/game.h"
 #include "game/players.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
@@ -105,6 +109,17 @@ enum
 	_hud_dont_scale_offset_bit = 0,
 };
 
+enum hud_flash_flags
+{
+	_hud_flash_reverse_colors_bit = 0,
+};
+
+enum hud_weapon_overlay_flags
+{
+	_hud_overlay_flashes_bit = 0,
+	_hud_overlay_runtime_invalid_bit,
+};
+
 enum
 {
 	_shader_framebuffer_blend_function_alpha_multiply_add = 7,
@@ -119,7 +134,28 @@ enum
 	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, corrupt_index==NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
 }
 
+#define _hud_anchor_right_bit 0
+#define _hud_anchor_bottom_bit 1
+
 /* ---------- structures */
+
+struct weapon_hud_overlay_item
+{
+	struct hud_placement_definition placement;
+	struct hud_color_definition colors;
+	short frame_rate;
+	short pad;
+	short sequence_index;
+	short type;
+	long flags;
+	long unused[14];
+};
+
+struct weapon_hud_overlay_definition
+{
+	struct tag_reference bitmap;
+	struct tag_block items;
+};
 
 /* ---------- prototypes */
 
@@ -269,10 +305,317 @@ pixel32 real_alpha_intensity_to_pixel32(
 	return real_argb_color_to_pixel32(&color);
 }
 
+void hud_calculate_point(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct hud_placement_definition const *placement,
+	struct bitmap_data const *bitmap_data,
+	boolean in_multiplayer,
+	real override_scale,
+	point2d *result)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real_point2d point;
+	real scale;
+	short corner;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	if (in_multiplayer && override_scale != 0.0f)
+	{
+		scale = override_scale;
+	}
+	else
+	{
+		scale = hud_globals_get_scale(in_multiplayer);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+		125,
+		render.local_player_index==local_player_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+		126,
+		absolute_placement);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+		127,
+		placement);
+
+	corner = absolute_placement->corner;
+	if (corner < _hud_anchor_center)
+	{
+		point.x = placement->offset.x *
+			(TEST_FLAG(corner, _hud_anchor_right_bit) ? -1 : 1) * scale +
+			render.camera.window_bounds.v[
+				((corner & FLAG(_hud_anchor_right_bit)) << 1) |
+					FLAG(_hud_anchor_right_bit)] -
+			render.camera.viewport_bounds.x0;
+		point.y = placement->offset.y *
+			(TEST_FLAG(corner, _hud_anchor_bottom_bit) ? -1 : 1) * scale +
+			render.camera.window_bounds.v[corner & FLAG(_hud_anchor_bottom_bit)] -
+			render.camera.viewport_bounds.y0;
+	}
+	else
+	{
+		point2d window_center;
+
+		window_center.x = (short)(
+			(render.camera.window_bounds.x1 + render.camera.window_bounds.x0) / 2);
+		window_center.y = (short)(
+			(render.camera.window_bounds.y1 + render.camera.window_bounds.y0) / 2);
+
+		point.x = window_center.x - render.camera.viewport_bounds.x0 +
+			placement->offset.x * scale;
+		point.y = window_center.y - render.camera.viewport_bounds.y0 +
+			placement->offset.y * scale;
+	}
+
+	if (bitmap_data)
+	{
+		switch (corner)
+		{
+		case _hud_anchor_top_left:
+			point.x += bitmap_data->registration_point_x * scale;
+			point.y += bitmap_data->registration_point_y * scale;
+			break;
+
+		case _hud_anchor_top_right:
+			point.x += (bitmap_data->registration_point_x - bitmap_data->width) * scale;
+			point.y += bitmap_data->registration_point_y * scale;
+			break;
+
+		case _hud_anchor_bottom_left:
+			point.x += bitmap_data->registration_point_x * scale;
+			point.y += (bitmap_data->registration_point_y - bitmap_data->height) * scale;
+			break;
+
+		case _hud_anchor_bottom_right:
+			point.x += (bitmap_data->registration_point_x - bitmap_data->width) * scale;
+			point.y += (bitmap_data->registration_point_y - bitmap_data->height) * scale;
+			break;
+
+		case _hud_anchor_center:
+			point.x += (bitmap_data->registration_point_x + bitmap_data->width / 2) * scale;
+			point.y += (bitmap_data->registration_point_y + bitmap_data->width / 2) * scale;
+			break;
+
+		default:
+			match_assert(
+				"c:\\halo\\SOURCE\\interface\\hud_draw.c",
+				174,
+				!"unreachable");
+			break;
+		}
+	}
+
+	result->x = (short)fast_ftol(point.x);
+	result->y = (short)fast_ftol(point.y);
+
+	hud_draw_stack_buffer_check(181);
+
+	return;
+}
+
 long get_flash_duration(
 	struct hud_color_definition const *hud_color)
 {
 	return fast_ftol(hud_color->flash_period * 30.0f);
+}
+
+pixel32 get_flash_color(
+	struct hud_color_definition const *hud_color,
+	long reference_value)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real_argb_color result;
+	real_argb_color base_color;
+	real_argb_color flash_color;
+	real flash_phase;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	flash_phase = (real)fmod(
+		(game_time_get() - reference_value) * (1.0f / TICKS_PER_SECOND),
+		hud_color->flash_period);
+	pixel32_to_real_argb_color(hud_color->color, &base_color);
+	pixel32_to_real_argb_color(hud_color->flash_color, &flash_color);
+
+	if (flash_phase < hud_color->number_of_flashes *
+		(hud_color->flash_delay + hud_color->flash_length))
+	{
+		flash_phase = (real)fmod(
+			flash_phase,
+			hud_color->flash_delay + hud_color->flash_length);
+
+		if (!reference_value)
+		{
+			if (TEST_FLAG(
+				hud_color->flash_flags,
+				_hud_flash_reverse_colors_bit))
+			{
+				result = base_color;
+			}
+			else
+			{
+				result = flash_color;
+			}
+		}
+		else if (flash_phase < hud_color->flash_length)
+		{
+			real fraction = square_root(
+				PIN(
+					(real)(1.0 -
+						(cos(flash_phase / hud_color->flash_length * 6.283f) + 1.0) * 0.5),
+					0.0f,
+					1.0f));
+
+			if (TEST_FLAG(
+				hud_color->flash_flags,
+				_hud_flash_reverse_colors_bit))
+			{
+				vectors_interpolate(
+					(real_vector3d const *)&flash_color.rgb,
+					(real_vector3d const *)&base_color.rgb,
+					fraction,
+					(real_vector3d *)&result.rgb);
+				scalars_interpolate(
+					flash_color.alpha,
+					base_color.alpha,
+					fraction,
+					&result.alpha);
+			}
+			else
+			{
+				vectors_interpolate(
+					(real_vector3d const *)&base_color.rgb,
+					(real_vector3d const *)&flash_color.rgb,
+					fraction,
+					(real_vector3d *)&result.rgb);
+				scalars_interpolate(
+					base_color.alpha,
+					flash_color.alpha,
+					fraction,
+					&result.alpha);
+			}
+		}
+		else
+		{
+			if (TEST_FLAG(
+				hud_color->flash_flags,
+				_hud_flash_reverse_colors_bit))
+			{
+				result = flash_color;
+			}
+			else
+			{
+				result = base_color;
+			}
+		}
+	}
+	else
+	{
+		result = base_color;
+	}
+
+	hud_draw_stack_buffer_check(311);
+
+	return real_argb_color_to_pixel32(&result);
+}
+
+void hud_draw_weapon_overlays(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct weapon_hud_overlay_definition const *overlays,
+	long type_flags,
+	long reference_time,
+	short draw_flags,
+	boolean in_multiplayer)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	long item_index;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	for (item_index = 0; item_index < overlays->items.count; item_index++)
+	{
+		struct weapon_hud_overlay_item const *item = TAG_BLOCK_GET_ELEMENT(
+			&overlays->items,
+			item_index,
+			struct weapon_hud_overlay_item);
+
+		if (!TEST_FLAG(item->flags, _hud_overlay_runtime_invalid_bit) &&
+			(item->type & type_flags))
+		{
+			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+				&bitmap_group_get(overlays->bitmap.index)->sequences,
+				item->sequence_index,
+				struct bitmap_group_sequence);
+			pixel32 color;
+			short frame_index;
+
+			if (TEST_FLAG(item->flags, _hud_overlay_flashes_bit) &&
+				TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
+			{
+				color = get_flash_color(&item->colors, reference_time);
+			}
+			else
+			{
+				color = item->colors.color;
+			}
+
+			if (TEST_FLAG(item->flags, _hud_overlay_flashes_bit) &&
+				TEST_FLAG(draw_flags, _hud_draw_flashing_bit) &&
+				item->frame_rate > 0)
+			{
+				frame_index = (short)(((game_time_get() - reference_time) /
+					item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
+			}
+			else
+			{
+				frame_index = 0;
+			}
+
+			{
+				struct bitmap_data const *bitmap = NULL;
+				real_rectangle2d const *clip = NULL;
+
+				hud_retrieve_bitmap_and_bounding_rect(
+					overlays->bitmap.index,
+					item->sequence_index,
+					frame_index,
+					&bitmap,
+					&clip);
+
+				if (bitmap && _texture_cache_bitmap_get_hardware_format(
+					(struct bitmap_data *)bitmap,
+					FALSE,
+					TRUE))
+				{
+					hud_draw_bitmap_with_meter(
+						NULL,
+						bitmap,
+						absolute_placement,
+						&item->placement,
+						clip,
+						1.0f,
+						0.0f,
+						color,
+						in_multiplayer,
+						FALSE,
+						FALSE);
+				}
+			}
+		}
+	}
+
+	hud_draw_stack_buffer_check(748);
+
+	return;
 }
 
 void hud_draw_bitmap(
@@ -380,7 +723,6 @@ static void hud_draw_bitmap_with_meter(
 	real_vector2d xy_scale;
 	point2d point;
 	real_rectangle2d bounds;
-	boolean use_multiplayer_scaling;
 
 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
 
@@ -402,17 +744,15 @@ static void hud_draw_bitmap_with_meter(
 
 	xy_scale.i = placement->scale.i*scale;
 	xy_scale.j = placement->scale.j*scale;
-	use_multiplayer_scaling =
-		in_multiplayer && !TEST_FLAG(
-			placement->multiplayer_scaling_flags,
-			_hud_dont_scale_offset_bit);
 
 	hud_calculate_point(
 		render.local_player_index,
 		absolute_placement,
 		placement,
 		NULL,
-		use_multiplayer_scaling,
+		in_multiplayer && !TEST_FLAG(
+			placement->multiplayer_scaling_flags,
+			_hud_dont_scale_offset_bit),
 		0.0f,
 		&point);
 	hud_calculate_bitmap_bounds(
@@ -534,6 +874,64 @@ static void hud_calculate_bitmap_bounds(
 	}
 
 	hud_draw_stack_buffer_check(907);
+
+	return;
+}
+
+void hud_draw_bitmap_direct(
+	struct bitmap_data const *bitmap,
+	short placement,
+	point2d const *point,
+	real_rectangle2d const *clip,
+	real scale,
+	real theta,
+	pixel32 color,
+	boolean is_interface_bitmap)
+{
+	long return_eip = get_return_eip();
+	long stack_buffer[STACK_BUFFER_LENGTH];
+	real_rectangle2d default_clip;
+	real_vector2d xy_scale;
+	real_rectangle2d bounds;
+
+	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+
+	default_clip.x0 = 0.0f;
+	default_clip.x1 = 1.0f;
+	default_clip.y0 = 0.0f;
+	default_clip.y1 = 1.0f;
+
+	if (is_interface_bitmap)
+	{
+		default_clip.x1 = (real)bitmap->width;
+		default_clip.y1 = (real)bitmap->height;
+	}
+
+	if (!clip)
+	{
+		clip = &default_clip;
+	}
+
+	xy_scale.i = scale;
+	xy_scale.j = scale;
+
+	hud_calculate_bitmap_bounds(
+		bitmap,
+		placement,
+		clip,
+		&bounds,
+		is_interface_bitmap);
+	hud_draw_bitmap_internal(
+		NULL,
+		bitmap,
+		point,
+		clip,
+		&bounds,
+		&xy_scale,
+		theta,
+		color);
+
+	hud_draw_stack_buffer_check(856);
 
 	return;
 }

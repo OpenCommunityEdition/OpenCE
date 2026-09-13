@@ -100,5 +100,6 @@ struct rasterizer_debug_options_definition
 };
 
 extern struct rasterizer_debug_options_definition rasterizer_debug_options;
+extern boolean debug_render_freeze;
 
 #endif /* __RASTERIZER_DEBUG_OPTIONS_H */

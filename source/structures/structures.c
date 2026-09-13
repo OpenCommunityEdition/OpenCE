@@ -61,6 +61,8 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_debug.h"
 #include "rasterizer/rasterizer_geometry_environment.h"
@@ -69,6 +71,7 @@ symbols in this file:
 #include "scenario/fog_definitions.h"
 #include "scenario/sky_definitions.h"
 #include "structure_bsp_definitions.h"
+#include "structure_vector_tests.h"
 #include "structures.h"
 
 /* ---------- constants */
@@ -79,6 +82,7 @@ enum
 	_render_planar_fog_mode_normal = 1,
 	_render_planar_fog_mode_fully_fogged,
 	_render_fog_runtime_screen_use_sky_interpolator_bit = 0,
+	_collision_surface_two_sided_bit = 0,
 };
 
 /* ---------- macros */
@@ -221,11 +225,9 @@ typedef char verify_structure_runtime_globals_size[
 
 /* ---------- globals */
 
-struct structure_runtime_globals bss_004c1100;
+static struct structure_runtime_globals structure_globals;
 
 extern boolean debug_fog_planes;
-
-#define structure_globals bss_004c1100
 
 /* ---------- public code */
 
@@ -572,6 +574,105 @@ short structure_clusters_in_cone(
 	structure_cluster_marker_end();
 
 	return cluster_count;
+}
+
+boolean structure_test_vector(
+	real_point3d const *p,
+	real_vector3d const *v,
+	real_point3d *collision_point,
+	short *lightmap_index,
+	short *material_index,
+	long *surface_index,
+	real *s,
+	real *t)
+{
+	boolean found = FALSE;
+	boolean done;
+	struct collision_result collision;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x188,
+		p);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x189,
+		v);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x18A,
+		material_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x18B,
+		surface_index);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x18C,
+		s);
+	match_assert(
+		"c:\\halo\\SOURCE\\structures\\structures.c",
+		0x18D,
+		t);
+
+	*collision_point = *p;
+	do
+	{
+		done = TRUE;
+		match_assert(
+			"c:\\halo\\SOURCE\\structures\\structures.c",
+			0x196,
+			global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+		global_current_collision_users[global_current_collision_user_depth++] =
+			_collision_user_structure_lighting;
+
+		if (collision_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_structure_bit),
+			collision_point,
+			v,
+			NONE,
+			&collision))
+		{
+			struct structure_bsp *structure = global_structure_bsp_get();
+
+			*collision_point = collision.point;
+			if (structure_render_surface_from_point_and_leaf(
+				collision_point,
+				collision.location.leaf_index,
+				collision.plane_designator & LONG_MAX,
+				lightmap_index,
+				material_index,
+				surface_index,
+				s,
+				t) &&
+				TAG_BLOCK_GET_ELEMENT(
+					&structure->lightmaps,
+					*lightmap_index,
+					struct structure_lightmap)->bitmap_index != NONE)
+			{
+				found = TRUE;
+			}
+			else if (TEST_FLAG(
+				collision.flags,
+				_collision_surface_two_sided_bit))
+			{
+				done = FALSE;
+				collision_point->x += v->i * (1.0f / 4096.0f);
+				collision_point->y += v->j * (1.0f / 4096.0f);
+				collision_point->z += v->k * (1.0f / 4096.0f);
+			}
+		}
+
+		match_assert(
+			"c:\\halo\\SOURCE\\structures\\structures.c",
+			0x1AA,
+			global_current_collision_user_depth > 1);
+		--global_current_collision_user_depth;
+	}
+	while (!done);
+
+	return found;
 }
 
 long structure_get_planar_fog_definition_index(

@@ -55,6 +55,9 @@ void vehicle_delete(
 long vehicle_find_pathfinding_surface_index(
 	long vehicle_index,
 	real_point3d *position);
+void vehicle_accelerate(
+	long vehicle_index,
+	real_vector3d const *acceleration);
 
 /* ---------- globals */
 

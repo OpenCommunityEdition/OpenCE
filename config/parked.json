@@ -2,6 +2,253 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/ai/ai",
+      "function": "_ai_disconnect_from_structure_bsp",
+      "class": "unclassified",
+      "evidence": "Best complete house-rule-reviewed January control-flow reconstruction retained from the Claude large-AI packet. It owns its public prototype in ai.h, scenario.c now includes that owner, and the body uses typed actor/prop/swarm accessors and named constants without compiler steering. Target and candidate have the same 1,280-byte padded envelope and all 62 relocation identities; remaining differences are distributed register/schedule choices. This is a zero-credit fuzzy park. Reopen only with authoritative January source/symbol context or a natural same-compiler donor that explains the residual. See docs/object_matching_logs/ai_obj_482743d8a_reconciliation_audit_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 1280,
+          "relocation_count": 62,
+          "normalized_sha256": "50551a92f7dfebd3f86a133f6737f4184152acadbde7c7958b057bb73e9276a9"
+        },
+        "base": {
+          "size": 1280,
+          "relocation_count": 62,
+          "normalized_sha256": "19404fc01508e0ef27258ed54581626941ad7aab6d4372dc8a692870c739208b"
+        },
+        "objdiff_percent": 95.6066
+      }
+    },
+    {
+      "unit": "source/ai/path_structure_bsp",
+      "function": "_structure_test_line2d",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete ordinary-C reconstruction from the dedicated path-structure BSP audit. It preserves the January recursive fallback and target-proven boundary behavior, uses the owning header and named path/collision flag bits, and contains no volatile, barrier, pragma, assembly, or fake dependency. Candidate and target both occupy 1,104 padded bytes with all 29 relocation identities; the remaining difference is the documented legal-C schedule fixed point. This is a zero-credit fuzzy park. Reopen only with authoritative January source or a natural same-compiler donor. See docs/object_matching_logs/path_structure_bsp_obj.md.",
+      "measurements": {
+        "target": {
+          "size": 1104,
+          "relocation_count": 29,
+          "normalized_sha256": "664912aede956fbb3bc49b4517a90d315d445777054a1823c0eafadd2a1f2bc0"
+        },
+        "base": {
+          "size": 1104,
+          "relocation_count": 29,
+          "normalized_sha256": "55ccd1c4c2cab82eb867a354392b848b9a1851bc29a4c0dab3f4e64aadaece83"
+        },
+        "objdiff_percent": 95.24156
+      }
+    },
+    {
+      "unit": "source/interface/hud_draw",
+      "function": "_get_flash_color",
+      "class": "unclassified",
+      "evidence": "Best complete house-rule-reviewed HUD flash reconstruction. It uses named flash flags, project real/color types, natural fmod/cos/square-root interpolation, and no source-pressure steering. Candidate and target both occupy 608 padded bytes with all 32 relocation identities and score 99.944725% objdiff. The genuine call also causes the January-inline square_root body to appear as a target-absent candidate section; that helper receives no exact credit and keeps the whole object from object-exact status. Reopen with authoritative January inline provenance or a natural same-compiler donor explaining the residual/helper schedule.",
+      "measurements": {
+        "target": {
+          "size": 608,
+          "relocation_count": 32,
+          "normalized_sha256": "0717c2b85934e185e6cfb38a82a90f3160bc2e1b3372c2eb80d27af1f4f1818b"
+        },
+        "base": {
+          "size": 608,
+          "relocation_count": 32,
+          "normalized_sha256": "35adc125fc6d7a1f0bc5a94ba0ee65fc6cad065651ef7c216c9a747a6732452b"
+        },
+        "objdiff_percent": 99.944725
+      }
+    },
+    {
+      "unit": "source/interface/hud_draw",
+      "function": "_hud_draw_bitmap_direct",
+      "class": "unclassified",
+      "evidence": "Best complete readable bitmap-direct reconstruction retained at zero exact credit. It follows the owning HUD interface, uses project geometry/bitmap types and the shared draw path, and has no artificial compiler controls. The candidate has all 15 target relocation identities but is 336 versus 320 padded bytes; the remaining difference is not assigned a stronger cause without evidence. Reopen only with authoritative January source or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 320,
+          "relocation_count": 15,
+          "normalized_sha256": "6ec7215284a2c2248b4524f4229982fa6855489a4033c233b7c9ba5505a9a8c8"
+        },
+        "base": {
+          "size": 336,
+          "relocation_count": 15,
+          "normalized_sha256": "e13047e3464fe9dc0fc3e4382ddacf2415f83322c0edc8c06750a348eb0597a9"
+        },
+        "objdiff_percent": 93.88
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_main_game_render",
+      "class": "unclassified",
+      "evidence": "Best complete natural render-dispatch reconstruction retained after removing the inadmissible _ReadWriteBarrier experiment. It is readable ordinary C with authentic subsystem calls and no barrier, volatile, pragma, assembly, or fake dependency. The candidate is 464 versus 448 target padded bytes with 29 versus 28 relocations and scores 94.666664% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor explaining the extra call/relocation and schedule. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 28,
+          "normalized_sha256": "049052197c4b50b38b734ed982558cd27d4c999e6ee05897e02c99804c696a2b"
+        },
+        "base": {
+          "size": 464,
+          "relocation_count": 29,
+          "normalized_sha256": "311d0f3787d9da53e6141d95ea4a0f60d8c0efd8bc82b65d8ee1b16b7f5a1952"
+        },
+        "objdiff_percent": 94.666664
+      }
+    },
+    {
+      "unit": "source/main/main",
+      "function": "_set_window_camera_values",
+      "class": "unclassified",
+      "evidence": "Best complete ordinary-C window/camera state reconstruction. It uses named engine globals and project types, keeps its prototype with the Main owner, and contains no compiler-steering constructs. Candidate and target retain all 19 relocation identities but differ by one 16-byte padded slot (416 candidate versus 432 target), scoring 88.32374% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
+      "measurements": {
+        "target": {
+          "size": 432,
+          "relocation_count": 19,
+          "normalized_sha256": "b6b77e1325d664686277c8ab3678b163f92e428ce003a51526ef628c20a2e771"
+        },
+        "base": {
+          "size": 416,
+          "relocation_count": 19,
+          "normalized_sha256": "9b3998256a96c5a2a09fe7c4c99b586627059b2c97d1628cfcf088ccb7b33eff"
+        },
+        "objdiff_percent": 88.32374
+      }
+    },
+    {
+      "unit": "source/render/render_cameras",
+      "function": "_render_frustum_cube_view_fraction",
+      "class": "unclassified",
+      "evidence": "Best complete ordinary-C frustum projection reconstruction. It uses the render-camera owner header, named project math types/constants, and direct geometric operations without compiler steering. Candidate and target share the 1,200-byte padded envelope and all 78 relocation identities, scoring 96.128494% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor that explains the residual schedule.",
+      "measurements": {
+        "target": {
+          "size": 1200,
+          "relocation_count": 78,
+          "normalized_sha256": "bcc496e4a2fc55aa9fc78d14a886b2c29828c43c27a40aea5949da21f19543be"
+        },
+        "base": {
+          "size": 1200,
+          "relocation_count": 78,
+          "normalized_sha256": "b3c2fd0e3984e2cdf2beeb4c3c3886e228cb40e87a0bd85f9b0e24736b2789d7"
+        },
+        "objdiff_percent": 96.128494
+      }
+    },
+    {
+      "unit": "source/render/render_cameras",
+      "function": "_render_camera_build_frustum_bounds",
+      "class": "unclassified",
+      "evidence": "Best complete ordinary-C full frustum-bounds reconstruction. It uses the render-camera owner header and named project math types, with no source-pressure steering. Candidate and target share the 288-byte padded envelope and all nine relocation identities, scoring 99.41237% objdiff; the residual is an unresolved natural instruction-schedule difference. The clipped-frustum companion is strict exact at 352 padded bytes and is therefore not parked. The same TU's exact front-facing reconstruction naturally emits cross/vector helper sections absent from the target object; those helpers receive no credit and the whole object remains rejected for object-exact accounting. Reopen only with authoritative January inline provenance or a natural same-compiler donor.",
+      "measurements": {
+        "target": {
+          "size": 288,
+          "relocation_count": 9,
+          "normalized_sha256": "99e8fde76b974d967c9e83ee16177ec0eae87683db8631e38c5517d886c246e2"
+        },
+        "base": {
+          "size": 288,
+          "relocation_count": 9,
+          "normalized_sha256": "752b1da78d5e94de589db2db1e9ae2e40b6d624200f87339d87b300130137349"
+        },
+        "objdiff_percent": 99.41237
+      }
+    },
+    {
+      "unit": "source/interface/interface",
+      "function": "_interface_get_weapon_hud_index",
+      "class": "unclassified",
+      "evidence": "Best complete typed ordinary-C weapon-HUD resolver reconstructed from the HCEA semantic donor and January disassembly/relocation authority. It owns its public prototype in interface.h, uses player_get, unit_get, weapon_get and typed definition accessors, preserves the complete gunner-seat/default-HUD/flashlight behavior, and contains no representation punning, assembly or source-pressure steering. Target and candidate share the 448-byte padded envelope and all 20 relocation identities, scoring 94.96429% objdiff. January performs the final real out-parameter copies through integer registers while natural VC7 C uses x87 loads/stores; reproducing that choice through a wrong ABI, memcpy facade, volatile access or inline assembly is rejected. This is zero-credit fuzzy source. Reopen only with authoritative January source or independently attested source that naturally selects the integer copy. See docs/object_matching_logs/interface_obj_weapon_hud_best_fuzzy_20260912.md.",
+      "measurements": {
+        "target": {
+          "size": 448,
+          "relocation_count": 20,
+          "normalized_sha256": "0673f867b219cdbd399685310736ae3de8263479cb2104edd5c56f48930c6549"
+        },
+        "base": {
+          "size": 448,
+          "relocation_count": 20,
+          "normalized_sha256": "57151d28c46aeee1fc2bb715ebde2fbc994b52447a4ba273d624aa56e7749e72"
+        },
+        "objdiff_percent": 94.96429
+      }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_check_discard",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete typed ordinary-C discard check retained from January control flow, relocation topology, diagnostic strings and HCEA semantic corroboration. Target and candidate share the 176-byte padded envelope and all 10 relocation identities; the remaining normalized-code difference is the formatted diagnostic argument evaluation order. No barrier, volatile/register forcing, pragma, assembly, fake dependency or nonsensical branch is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor explaining that evaluation order. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
+      "measurements": {
+        "target": {
+          "size": 176,
+          "relocation_count": 10,
+          "normalized_sha256": "5f7c9efc91592d80df55608dcd341f924ee6367af8b3e572a43212cfc6633250"
+        },
+        "base": {
+          "size": 176,
+          "relocation_count": 10,
+          "normalized_sha256": "096f8aa672e716e4677d36521767e8dd355325c553bb753fed2d1341e9200103"
+        },
+        "objdiff_percent": 65.9434
+      }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_fix_position",
+      "class": "instruction-scheduling",
+      "evidence": "Best complete typed ordinary-C position correction retained from January disassembly/relocations and HCEA semantic corroboration. Target and candidate share the 1,232-byte padded envelope and all 47 relocation identities; the remaining difference is a narrow-load/sign-extension schedule. The discarded pill-base result remains a genuine real_point3d and is not representation-punned to steer code generation. No barrier, volatile/register forcing, pragma, assembly, fake dependency or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor explaining the remaining schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
+      "measurements": {
+        "target": {
+          "size": 1232,
+          "relocation_count": 47,
+          "normalized_sha256": "8932705148ab7aa1b778d8854ae1ae69e3eee275111372c0df4594eeab02ab33"
+        },
+        "base": {
+          "size": 1232,
+          "relocation_count": 47,
+          "normalized_sha256": "efc83d31ae1a834a59c4d9e8e134c4acebdfb7b753ca5b30ec61f7ff4eac3b1b"
+        },
+        "objdiff_percent": 95.90932
+      }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_update_turning",
+      "class": "unclassified",
+      "evidence": "Best complete typed ordinary-C turning update reconstructed from January target authority and donor-corroborated gameplay semantics. Target and candidate share the 1,712-byte padded envelope and all 49 relocation identities, scoring 95.2675% objdiff. The retained natural two-dimensional math path emits documented helper COMDAT debt, which receives no credit; no fake dependency, forced inline, barrier, volatile/register steering, pragma, assembly or nonsensical logic is present. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the normalized-code residual. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
+      "measurements": {
+        "target": {
+          "size": 1712,
+          "relocation_count": 49,
+          "normalized_sha256": "9e0e4d2d24a79a17e7407f07fe39e397f22ac43bf1553349b39ccf70675f8102"
+        },
+        "base": {
+          "size": 1712,
+          "relocation_count": 49,
+          "normalized_sha256": "5ab254c5d0965680ebcc89ce3847468061469f642646d6332e7e6140159a9c48"
+        },
+        "objdiff_percent": 95.2675
+      }
+    },
+    {
+      "unit": "source/units/bipeds",
+      "function": "_biped_update",
+      "class": "unclassified",
+      "evidence": "Best complete typed natural-C Biped update body retained from January control-flow/relocation authority and HCEA semantic corroboration. January occupies 1,120 padded bytes with 61 relocations; the candidate occupies 1,104 padded bytes with the same 61 relocation identities and scores 93.09064% objdiff. The broad residual is not assigned a speculative compiler mechanism. No fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical branch is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
+      "measurements": {
+        "target": {
+          "size": 1120,
+          "relocation_count": 61,
+          "normalized_sha256": "fe3b81e079c33a132e6aa3403c6148ecbba692047ca2368e46dabe1884348f7e"
+        },
+        "base": {
+          "size": 1104,
+          "relocation_count": 61,
+          "normalized_sha256": "95e78b0eb93d7d95433b3f66c4cda1e70557d9b7f6b50a9efa48dc69e56e27fd"
+        },
+        "objdiff_percent": 93.09064
+      }
+    },
+    {
       "unit": "source/models/model_animations",
       "function": "_animation_get_keyframe_rotation",
       "class": "unclassified",
@@ -1492,44 +1739,6 @@
     },
     {
       "unit": "source/bungie_net/common/key_agreement",
-      "function": "_key_agreement_get_packet_type",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after a bounded ordinary-C type and expression audit. The retained private helper has the exact four relocation identities and the authentic January assertion/file strings; it reads the key-agreement packet type from the final encoded message byte after requiring `_message_type_packet`. The compiler strength-reduces `GET_MESSAGE_TYPE` to `and al, 0x0C; cmp al, 0x0C`, while January emits `shr al, 2; and al, 3; cmp al, 3`, leaving a 64-byte candidate against the 80-byte target. `key_agreement_get_packet_type` is a descriptive inferred private name: Stian/Pastudan's research-only `key_agreement_peek_packet_type` refers instead to the separate public `_is_message_encryption_key_message` predicate and was deliberately not misapplied here. No volatile/register forcing, barrier, pragma, assembly, or artificial dependency was admitted.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 4,
-          "normalized_sha256": "17992eecb37a652d03f0088ce5123c158674116e7b2c88fe56083c3627f03278"
-        },
-        "base": {
-          "size": 64,
-          "relocation_count": 4,
-          "normalized_sha256": "c85c2f19f63571e94b0334e0868eb18f2f2ec585b54cdf229b114e38c0c79eb3"
-        },
-        "objdiff_percent": 95.75
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/key_agreement",
-      "function": "_initiate_key_exchange",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked with the simplest coherent Diffie-Hellman initiation flow: generate parameters and public key, build into the same-TU 0x200-byte buffer, byte-swap the header, write the complete message, and return the write result. Target and retained source have equal 128-byte padded size and the same six relocation identities. January preserves a preinitialized byte-sized TRUE result and a larger local frame; retaining `boolean result = TRUE; return result;` solely to influence code generation lacked independent source provenance and was rejected under the source-credibility rule. Direct `return TRUE`/`FALSE` is retained even though it scores lower. No exact candidate was found or rejected, and no compiler-steering construct is present.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 6,
-          "normalized_sha256": "dd522968df4407b121545dc0bc712ea05f9e82a71fb21fcb1c46474c55defb9d"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 6,
-          "normalized_sha256": "193bbbb3b54c0db91978f2077f02bde2b3be2f86ebdb0cdef3489da18be109fc"
-        },
-        "objdiff_percent": 69.57895
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/key_agreement",
       "function": "_complete_key_exchange",
       "class": "instruction-scheduling",
       "evidence": "Fuzzy-parked as an explicitly labeled January-disassembly reconstruction, not recovered named source. The retained typed C has the exact 416-byte padded envelope, 17 relocation identities, message-type gate, packet-tail dispatch, packet-group decode calls, type-zero secret generation ranges [0xFF, prime limb - 2], finalize reply through the same-TU 0x200-byte buffer, and type-one/private-key completion semantics proved by January control flow and canonical public-key/data-packet APIs. The long/short union overlays are the canonical interface bridge already used by `network_messages.c`: January initializes full-word stack slots while packet-group APIs consume `short *`. Bounded local-scope/type/order variants only moved independent calls and stores; the retained form is the simplest semantically coherent equal-envelope source. Pastudan's opaque `FUN_00080620` body was never copied. No exact candidate was found or rejected, and no volatile, barrier, pragma, assembly, pointer-address trick, or forced lifetime is present.",
@@ -1542,9 +1751,9 @@
         "base": {
           "size": 416,
           "relocation_count": 17,
-          "normalized_sha256": "b1abf287400c1b3843364d05327512ff963fce5fb159f46f73100852027a411a"
+          "normalized_sha256": "fb0142cb223b631a4753a951718e0cfb7b4946eeafe6bdc99913cb95431a9d97"
         },
-        "objdiff_percent": 84.85987
+        "objdiff_percent": 97.42038
       }
     },
     {
@@ -2710,7 +2919,7 @@
       "unit": "source/units/bipeds",
       "function": "_biped_find_nearby_support_surface",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed support-surface search from January disassembly and relocation topology, the later HCEA semantic implementation, and the earlier e02971dfd campaign reconstruction. The same-build Halo CE symbol atlas independently recovers the private name biped_find_nearby_support_surface. The retained ordinary C obtains the biped physics pill, brackets the collision query with the semantic collision-user stack, tests the structure BSP with the breakable-surface flags, corrects back-facing planes through named fields and LONG_MAX, selects the closest support plane, and updates the biped's support surface, ground plane, and up vector. Target and candidate have the same 544-byte padded envelope, all 23 relocation identities, and 175 decoded instructions; the report records 99.976746 percent similarity. Their sole machine-code difference is the order of the first two independent x87 multiply/add terms inside the inlined plane3d_distance_to_point expression. The source-authentic project helper is retained rather than expanding and reordering its dot-product terms solely to steer code generation. The fail-closed classifier returns UNKNOWN. No forced inline/noinline, barrier, volatile access, pragma, assembly, fake dependency, raw offset, undefined behavior, manual bitwise plane mask, or nonsensical branch is retained. Reopen only for authoritative January source/local records, a proven January inline-schedule correction, or a natural compatible-compiler donor that explains the x87 evaluation order.",
+      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed support-surface search from January disassembly and relocation topology, the later HCEA semantic implementation, and the earlier e02971dfd campaign reconstruction. The same-build Halo CE symbol atlas independently recovers the private name biped_find_nearby_support_surface. The retained ordinary C obtains the biped physics pill, brackets the collision query with the semantic collision-user stack, tests the structure BSP with the breakable-surface flags, corrects back-facing planes through named fields and LONG_MAX, selects the closest support plane, and updates the biped's support surface, ground plane, and up vector. Target and candidate have the same 544-byte padded envelope, all 23 relocation identities, and 175 decoded instructions; the current report records 99.98837 percent similarity. Their sole machine-code difference is the order of the first two independent x87 multiply/add terms inside the inlined plane3d_distance_to_point expression. The source-authentic project helper is retained rather than expanding and reordering its dot-product terms solely to steer code generation. No forced inline/noinline, barrier, volatile access, pragma, assembly, fake dependency, raw offset, undefined behavior, manual bitwise plane mask, or nonsensical branch is retained. This is zero-credit fuzzy source. Reopen only for authoritative January source/local records, a proven January inline-schedule correction, or a natural compatible-compiler donor that explains the x87 evaluation order. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
       "measurements": {
         "target": {
           "size": 544,
@@ -2720,9 +2929,9 @@
         "base": {
           "size": 544,
           "relocation_count": 23,
-          "normalized_sha256": "7264f6ba522f1b4dab0f59e9a1e725bfed9363c869e1727e0b69f94b1e1212b0"
+          "normalized_sha256": "a0ef780b38e8c2aa3674296ff845cfc30ae8c759adfd18d2ed816b4bc3536c02"
         },
-        "objdiff_percent": 99.976746
+        "objdiff_percent": 99.98837
       }
     },
     {
@@ -3195,9 +3404,9 @@
         "base": {
           "size": 672,
           "relocation_count": 43,
-          "normalized_sha256": "7db4861a5adf519e0457a0ffe785ff4d47e878fda47cc0a06206a529776ac91c"
+          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
         },
-        "objdiff_percent": 97.76382
+        "objdiff_percent": 97.67839
       }
     },
     {
@@ -5066,7 +5275,7 @@
       "unit": "source/objects/damage",
       "function": "_object_cause_damage",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete master object-damage dispatcher in ordinary typed C and naturally activating its private player-owner helper as a strict exact same-TU function. January COFF remains the sole byte, ABI, control-flow, constant, and relocation authority; independent HCEA source and Stian's PC lift corroborate the parent walk, damage randomization and modifiers, vehicle-child recursion, player feedback, collision material selection, shield/body dispatch, material-effect reporting, aftermath, and deletion behavior. This refreshed context writes object_damage_body as a credible typed fuzzy body and adds the independently authenticated same-TU private helpers damage_effect_new_at_location and object_destroy_region as strict exact functions. Those legitimate additions change this candidate's normalized hash but not its envelope or similarity: the target occupies 1984 padded / 1971 meaningful bytes; the candidate occupies 1952 padded / 1950 meaningful bytes; both carry the same 75 ordered relocation identities; objdiff remains 88.5429 percent. object_damage_shield and object_damage_aftermath remain unwritten and preserve a material private-call-boundary context gap. Reopen when those authentic callee bodies are reconstructed together, or when authoritative January source/local records explain the remaining register allocation, stack frame, and x87 schedule. No raw offset, false type, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline/noinline, undefined behavior, nonsensical branch, or fake context is retained.",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete master object-damage dispatcher in ordinary typed C. January COFF remains the sole byte, ABI, control-flow, constant and relocation authority; independent HCEA source and Stian's PC lift corroborate the parent walk, damage randomization and modifiers, vehicle-child recursion, player feedback, collision material selection, shield/body dispatch, material-effect reporting, aftermath and deletion behavior. The current same-TU context includes strict-exact object_damage_shield, object_damage_aftermath, damage_effect_new_at_location and object_destroy_region bodies, plus the separately parked typed object_damage_body residual. The target occupies 1,984 padded / 1,971 meaningful bytes; the candidate occupies 1,968 padded bytes, carries the same 75 relocation identities and scores 95.71607% objdiff. The remaining broad register, frame and x87 schedule differences have no proved source-level mechanism. No raw offset, false type, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline/noinline, undefined behavior, nonsensical branch or fake context is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor explaining the residual.",
       "measurements": {
         "target": {
           "size": 1984,
@@ -5074,11 +5283,11 @@
           "normalized_sha256": "68f55b08e71a95b90b258c6d1a1d50f7a637eca0af4fd3ea7388c0f7884015c0"
         },
         "base": {
-          "size": 1952,
+          "size": 1968,
           "relocation_count": 75,
-          "normalized_sha256": "cfd8204015222ec9bd4dc25d3d1d245a4bcb17b29f273c39fb79dca037f9aa3b"
+          "normalized_sha256": "899b76c53282a5218dee64258c603b9fbaf8b11a078e3c0ab97d2638d9f713cd"
         },
-        "objdiff_percent": 88.5429
+        "objdiff_percent": 95.71607
       }
     },
     {
@@ -6069,22 +6278,22 @@
       "unit": "source/units/bipeds",
       "function": "_biped_get_sight_position",
       "class": "unclassified",
-      "evidence": "Best complete typed sight-position reconstruction retained using biped/tag access macros, project real types, named estimate modes, and existing vector helpers. January is 416 padded bytes and canonical is 400; both have 19 relocations. The residual has no proved compiler mechanism and receives zero exact credit. The unrooted private biped update cluster is separately excluded from production credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
+      "evidence": "Best complete typed sight-position reconstruction retained using biped/tag access macros, project real types, named estimate modes, and existing vector helpers. Target and candidate now share the 416-byte padded envelope and all 19 relocation identities, scoring 97.74286% objdiff; the remaining difference is an x87/local-spill choice with no proved source-level compiler mechanism. No fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the spill schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
       "measurements": {
         "target": { "size": 416, "relocation_count": 19, "normalized_sha256": "59e27e5e5b6f7a7ca3ec56c3ff8f347e70de4848ad52d8c8dfe257e7ef3dffc8" },
-        "base": { "size": 400, "relocation_count": 19, "normalized_sha256": "be9c30a4eee928c3876b49286bdf08856672e9b91fbf5c3d88def1451d3093dc" },
-        "objdiff_percent": 92.6
+        "base": { "size": 416, "relocation_count": 19, "normalized_sha256": "46b593827ea2de5386183bd8c60fdaab2c986990dbde4e7ec9e6fa33edc9e951" },
+        "objdiff_percent": 97.74286
       }
     },
     {
       "unit": "source/units/bipeds",
       "function": "_biped_get_autoaim_pill",
       "class": "instruction-scheduling",
-      "evidence": "Best complete typed autoaim-pill reconstruction retained at 336 padded bytes and nine relocations on both sides. It uses biped definition accessors, named flags, project real types, and genuine vector helpers; the remaining normalized-code difference is scheduling. No raw casts, fake dependency, or forced helper emission is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
+      "evidence": "Best complete typed autoaim-pill reconstruction retained at 336 padded bytes and all nine relocation identities on both sides. It uses biped definition accessors, named flags, project real types and genuine vector helpers; the remaining spherical-branch difference is a pointer/value register schedule, with 98.08264% objdiff. No raw casts, fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the register schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
       "measurements": {
         "target": { "size": 336, "relocation_count": 9, "normalized_sha256": "c232d22b9b72f5355e3496cafe1fbfb7985a69515dfa2d0df1f2f9052a116600" },
-        "base": { "size": 336, "relocation_count": 9, "normalized_sha256": "4568d5e227f2d6b948161aacf012add8dc170a551e3ef166146af82a6b90a7e7" },
-        "objdiff_percent": 98.04132
+        "base": { "size": 336, "relocation_count": 9, "normalized_sha256": "6b5e592092e374eea419480375447ba0dc54ddf8f01b5c37f07a5a18b9eb99f2" },
+        "objdiff_percent": 98.08264
       }
     },
     {
@@ -6443,11 +6652,11 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
       "function": "__rasterizer_model_draw",
       "class": "tu-context-optimization",
-      "evidence": "Best complete typed model draw reconstruction retained from the Opus rasterizer lane after house-rule reconciliation. January and the candidate are both 5,168 padded bytes; January has 350 relocations and the candidate has 348 at 95.331955 percent similarity. The established REAL_MATH_EXTERNAL_POINT_FROM_LINE3D include schedule remains in force and this TU emits no point_from_line3d COMDAT. The shader-plasma access now uses its authentic enclosing definition instead of a raw byte offset, texture-animation outputs use true real_vector4d storage, self-illumination colors are interpolated component by component without incompatible point/vector/color casts, and the atmosphere-dominant test uses the named flag. These defined semantic choices account for part of the measured residual and are retained rather than restoring the closer prohibited representation-cast form. The correctly owned environment-fog backend declaration changes only compiler scheduling in this already-fuzzy owner and adds no exact credit. Semantic model-effect enums and render_lighting fields replace misleading donor placeholders. No forced inline, fake dependency, raw offset, representation pun, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
+      "evidence": "Best complete typed model draw reconstruction retained from the Opus rasterizer lane after house-rule reconciliation. January and the candidate are both 5,168 padded bytes; January has 350 relocations and the candidate has 348 at 95.32371 percent similarity. The established REAL_MATH_EXTERNAL_POINT_FROM_LINE3D include schedule remains in force and this TU emits no point_from_line3d COMDAT. The shader-plasma access now uses its authentic enclosing definition instead of a raw byte offset, texture-animation outputs use true real_vector4d storage, self-illumination colors are interpolated component by component without incompatible point/vector/color casts, and the atmosphere-dominant test uses the named flag. These defined semantic choices account for part of the measured residual and are retained rather than restoring the closer prohibited representation-cast form. The correctly owned environment-fog backend declaration changes only compiler scheduling in this already-fuzzy owner and adds no exact credit. Semantic model-effect enums and render_lighting fields replace misleading donor placeholders. No forced inline, fake dependency, raw offset, representation pun, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md.",
       "measurements": {
         "target": { "size": 5168, "relocation_count": 350, "normalized_sha256": "99d8b95f1ce011781cedc3a123887065a0f8af4a54c842194fcd90c22fa2cc4e" },
-        "base": { "size": 5168, "relocation_count": 348, "normalized_sha256": "112b4321bee9992ef063e93af69c91faba64a7ecf830fa5b7ff4e657832c26ee" },
-        "objdiff_percent": 95.331955
+        "base": { "size": 5168, "relocation_count": 348, "normalized_sha256": "23ca80471861b904938ae52617a1931ea48279e746341e540d1874a7701dbd35" },
+        "objdiff_percent": 95.32371
       }
     },
     {
@@ -6912,7 +7121,7 @@
       "unit": "source/interface/hud_draw",
       "function": "_hud_draw_bitmap_with_meter",
       "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January directly proves the apparently nonsensical animation operation: fld [definition+4] followed by a relocation-backed fmul of __real@00000000. Independent HCEA and Halo CE PC reconstructions preserve the same literal-zero multiply, while Marathon has no corresponding planar-fog animation implementation and January's stripped structures.obj PDB module contains no local-variable records from which an original phase name could be recovered. The source therefore labels this target-proven disabled feature as an original bug instead of inventing a time-varying expression. Current canonical target/base COFF measurements remain non-identical; the candidate is 32 padded bytes short and lacks one January tag-block lookup. Objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January directly proves the apparently nonsensical animation operation: fld [definition+4] followed by a relocation-backed fmul of __real@00000000. Independent HCEA and Halo CE PC reconstructions preserve the same literal-zero multiply, while Marathon has no corresponding planar-fog animation implementation and January's stripped structures.obj PDB module contains no local-variable records from which an original phase name could be recovered. The source therefore labels this target-proven disabled feature as an original bug instead of inventing a time-varying expression. Current canonical target/base COFF measurements remain non-identical; the candidate is 16 padded bytes longer with the same relocation count, and the residual remains an instruction-selection/scheduling difference. Objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
       "measurements": {
         "target": {
           "size": 384,
@@ -6922,9 +7131,9 @@
         "base": {
           "size": 400,
           "relocation_count": 17,
-          "normalized_sha256": "3cc01a61674255de737e68476c3052952b668dafb47a0c135c1ecc92a4c54c8b"
+          "normalized_sha256": "db685d4d000e7a31c14cacedc43115c1c7a8f8643a25880ef470cc16433dd942"
         },
-        "objdiff_percent": 92.69841
+        "objdiff_percent": 93.35714
       }
     },
     {
@@ -7510,6 +7719,17 @@
         "target": { "size": 784, "relocation_count": 18, "normalized_sha256": "87952366bca787dc5174221b78335b6a9e91770433b8d76266bdb21d1bf65975" },
         "base": { "size": 784, "relocation_count": 18, "normalized_sha256": "a72cd2b9285abc4fe3ed3a8f4de6c0606fe474c9e01a1049e16b3285f1497f01" },
         "objdiff_percent": 81.60833
+      }
+    },
+    {
+      "unit": "source/ai/ai_script",
+      "function": "_ai_scripting_teleport_starting_location_private",
+      "class": "instruction-scheduling",
+      "evidence": "Complete typed HCEA-backed teleport helper retained under its authenticated semantic private name. Target and candidate both occupy 288 padded bytes and have the same 13 relocation destinations; the remaining one-byte schedule displacement begins after the January biped_approximate_surface_index call. Widening that shared function's return type can close this helper but perturbs accepted consumers, so that ABI change is rejected. This natural body receives zero credit. See docs/object_matching_logs/ai_flee_teleport_model_node_packet_20260912.md.",
+      "measurements": {
+        "target": { "size": 288, "relocation_count": 13, "normalized_sha256": "755b7a6e2990f977b15fb61eb09a0106990c68fcd7d69128922e69cc12e52c5e" },
+        "base": { "size": 288, "relocation_count": 13, "normalized_sha256": "9c0415c2243227d13b1b96ca944e476f75acf40417113dab2fc3edcaa501b22e" },
+        "objdiff_percent": 99.9375
       }
     }
   ]

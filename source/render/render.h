@@ -94,6 +94,13 @@ void render_initialize_for_new_map(void);
 void render_dispose_from_old_map(void);
 void render_dispose(void);
 
+void render_frame(
+	struct render_window *windoze,
+	short window_count,
+	point2d const *screenshot_page_index,
+	point2d const *screenshot_index,
+	struct bitmap_data *screenshot_bitmap,
+	real time_delta_since_tick_sec);
 void render_frame_pregame(
 	struct render_window const *window,
 	struct bitmap_data *bitmap);

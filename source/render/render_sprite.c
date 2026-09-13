@@ -82,6 +82,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
+#include "render/render_cameras_internal.h"
 #include "render/render_debug.h"
 #include "render/render_sprite.h"
 #include "tag_files/tag_files.h"
@@ -159,14 +160,6 @@ void *_texture_cache_bitmap_get_hardware_format(
 	struct bitmap_data *bitmap,
 	boolean block,
 	boolean load);
-real render_frustum_cube_view_fraction(
-	struct render_frustum const *frustum,
-	real_rectangle3d const *bounds);
-void render_camera_screen_to_view(
-	struct render_camera const *camera,
-	struct render_frustum const *frustum,
-	real_point2d const *screen_point,
-	real_vector3d *view_vector);
 
 static void build_sprite_transform_origin_and_direction(
 	struct build_sprite_data const *data,

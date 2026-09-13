@@ -239,6 +239,23 @@ struct compressed_animation_header
 	unsigned long rotation_node_headers[1];
 };
 
+/* Recovered animation-graph block layouts kept TU-private to preserve VC7 header scheduling. */
+struct animation_graph_node
+{
+	char name[TAG_STRING_LENGTH+1];
+	short next_sibling_node_index;
+	short first_child_node_index;
+	short parent_node_index;
+	word pad;
+	unsigned long flags;
+	real_vector3d base_vector;
+	real range;
+	long pad1;
+};
+
+typedef char verify_animation_graph_node_size[
+	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
+
 typedef char verify_compressed_animation_header_rotation_node_headers_offset[
 	offsetof(struct compressed_animation_header, rotation_node_headers) == 0x2C ? 1 : -1];
 
@@ -391,6 +408,71 @@ void animation_set_frame_size(
 	}
 
 	animation->frame_size = frame_size;
+
+	return;
+}
+
+void animation_graph_node_matrices_from_orientations(
+	long animation_graph_index,
+	real_matrix4x3 *node_matrices,
+	struct real_orientation const *node_orientations,
+	real_point3d const *origin,
+	real_vector3d const *forward,
+	real_vector3d const *up)
+{
+	struct animation_graph const *animation_graph = animation_graph_definition_get(
+		animation_graph_index);
+	real_matrix4x3 root_matrix;
+	short node_indices[MAXIMUM_NODES_PER_MODEL];
+	short read_index;
+	short write_index;
+
+	matrix4x3_from_point_and_vectors(&root_matrix, origin, forward, up);
+
+	if (animation_graph->nodes.count > 0)
+	{
+		read_index = 0;
+		write_index = 1;
+		node_indices[0] = 0;
+
+		do
+		{
+			short node_index = node_indices[read_index++];
+			struct animation_graph_node *node = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->nodes,
+				node_index,
+				struct animation_graph_node);
+			real_matrix4x3 const *parent_matrix;
+			real_matrix4x3 local_matrix;
+
+			if (!node_index)
+				parent_matrix = &root_matrix;
+			else
+				parent_matrix = &node_matrices[node->parent_node_index];
+
+			matrix4x3_from_orientation(&local_matrix, &node_orientations[node_index]);
+			matrix4x3_multiply(parent_matrix, &local_matrix, &node_matrices[node_index]);
+
+			if (node->next_sibling_node_index != NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\models\\model_animations.c",
+					1250,
+					write_index<MAXIMUM_NODES_PER_MODEL);
+				node_indices[write_index++] = node->next_sibling_node_index;
+			}
+
+			if (node->first_child_node_index != NONE)
+			{
+				match_assert(
+					"c:\\halo\\SOURCE\\models\\model_animations.c",
+					1256,
+					write_index<MAXIMUM_NODES_PER_MODEL);
+				node_indices[write_index++] = node->first_child_node_index;
+			}
+		}
+		while (read_index != write_index);
+	}
 
 	return;
 }

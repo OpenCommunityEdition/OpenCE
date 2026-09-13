@@ -226,6 +226,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
+#include "game/players.h"
 
 #include "memory/data.h"
 #include "objects/damage.h"
@@ -262,6 +263,26 @@ enum
 	MINIMUM_ACTOR_KILLING_SPREE = 3,
 	MINIMUM_PLAYER_KILLING_SPREE = 5,
 	AI_DESCRIPTION_BUFFER_SIZE = 512,
+	AI_BSP_TRANSITION_DESCRIPTION_SIZE = 256,
+	MAXIMUM_NUMBER_OF_UNITS_PER_SWARM = MAXIMUM_UNIT_INDICES_PER_SWARM,
+};
+
+/* The shared scenario-AI header does not yet own this source-attested enum. */
+enum actor_default_state
+{
+	actor_default_state_none = 0,
+	actor_default_state_asleep,
+	actor_default_state_alert,
+	actor_default_state_moving_repeat_position,
+	actor_default_state_moving_loop,
+	actor_default_state_moving_loop_back_and_forth,
+	actor_default_state_moving_loop_randomly,
+	actor_default_state_moving_randomly,
+	actor_default_state_guarding,
+	actor_default_state_guarding_at_guard_point,
+	actor_default_state_searching,
+	actor_default_state_fleeing,
+	number_of_actor_default_states,
 };
 
 enum
@@ -1550,6 +1571,254 @@ void ai_flush_spatial_effects(
 		ai_globals->spatial_effects,
 		0,
 		sizeof(ai_globals->spatial_effects));
+
+	return;
+}
+
+void ai_disconnect_from_structure_bsp(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+	short encounter_index;
+
+	for (encounter_index = 0;
+		encounter_index < scenario->ai_encounters.count;
+		encounter_index++)
+	{
+		struct encounter_datum *encounter = encounter_get(encounter_index);
+
+		if (encounter->active && encounter->current_count > 0)
+		{
+			struct encounter_actor_iterator iterator;
+			struct actor_datum *actor;
+
+			encounter_actor_iterator_new(&iterator, encounter_index);
+			actor = encounter_actor_iterator_next(&iterator);
+
+			while (actor)
+			{
+				char actor_description[AI_BSP_TRANSITION_DESCRIPTION_SIZE];
+				boolean disconnect = FALSE;
+
+				ai_debug_describe_actor(
+					iterator.index,
+					NONE,
+					TRUE,
+					actor_description,
+					sizeof(actor_description));
+
+				if (actor->target.target_prop_index == NONE ||
+					actor->target.target_type < _actor_target_uninspected_orphan)
+				{
+					if (!game_team_is_enemy(actor->meta.team_index, _game_team_player))
+					{
+						struct prop_iterator prop_iterator;
+						struct prop_datum *prop;
+
+						prop_iterator_new(&prop_iterator, iterator.index);
+						prop = prop_iterator_next(&prop_iterator);
+
+						while (prop)
+						{
+							if (prop->player &&
+								(prop->visibility >= 2 || prop->distance < 3.0f))
+							{
+								disconnect = TRUE;
+							}
+
+							prop = prop_iterator_next(&prop_iterator);
+						}
+					}
+				}
+				else
+				{
+					struct prop_datum *target_prop = prop_get(actor->target.target_prop_index);
+
+					if (target_prop->state >= _prop_state_uninspected_orphan &&
+						target_prop->state <= _prop_state_inspected_orphan)
+					{
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\ai.c",
+							0x8B9,
+							target_prop->parent_prop_index != NONE);
+						target_prop = prop_get(target_prop->parent_prop_index);
+					}
+
+					if (target_prop->player &&
+						actor->state.uncertain_combat_timer != NONE &&
+						actor->state.uncertain_combat_timer < 90 &&
+						target_prop->distance < 10.0f)
+					{
+						disconnect = TRUE;
+					}
+				}
+
+				if (disconnect && actor->meta.swarm)
+				{
+					if (actor->meta.swarm_cache_index == NONE)
+					{
+						disconnect = FALSE;
+					}
+					else
+					{
+						struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+						unsigned long const *combined_pvs = players_get_combined_pvs();
+						long components_outside_pvs[MAXIMUM_NUMBER_OF_UNITS_PER_SWARM];
+						short components_outside_pvs_count = 0;
+						short component_index;
+
+						for (component_index = 0;
+							component_index < swarm->unit_count;
+							component_index++)
+						{
+							long unit_index = swarm->unit_indices[component_index];
+							long ultimate_parent_index = object_get_ultimate_parent(unit_index);
+							short cluster_index = object_get(ultimate_parent_index)->object.location.cluster_index;
+
+							if (cluster_index == NONE ||
+								!BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index))
+							{
+								match_assert(
+									"c:\\halo\\SOURCE\\ai\\ai.c",
+									0x8EB,
+									components_outside_pvs_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
+								components_outside_pvs[components_outside_pvs_count++] = unit_index;
+							}
+						}
+
+						if (components_outside_pvs_count == 0)
+						{
+							if (ai_debug.print_bsp_transition)
+							{
+								error(
+									_error_silent,
+									"%s: all swarm inside PVS, transition unchanged",
+									actor_description);
+							}
+						}
+						else
+						{
+							short unit_count = swarm->unit_count;
+
+							if (components_outside_pvs_count == unit_count)
+							{
+								if (ai_debug.print_bsp_transition)
+								{
+									error(
+										_error_silent,
+										"%s: no units inside PVS, do not transition",
+										actor_description);
+								}
+
+								disconnect = FALSE;
+							}
+							else
+							{
+								short components_reattached_count = 0;
+								short outside_component_index;
+
+								for (outside_component_index = 0;
+									outside_component_index < components_outside_pvs_count;
+									outside_component_index++)
+								{
+									long unit_index = components_outside_pvs[outside_component_index];
+
+									actor_swarm_detach_from_unit(iterator.index, unit_index);
+									if (actor_create_for_unit(
+										TRUE,
+										unit_index,
+										actor->meta.variant_definition_index,
+										actor->meta.encounter_index,
+										actor->meta.squad_index,
+										FALSE,
+										iterator.index,
+										FALSE,
+										actor_default_state_alert,
+										actor_default_state_none,
+										NONE,
+										0) == NONE)
+									{
+										object_delete(unit_index);
+									}
+									else
+									{
+										components_reattached_count++;
+									}
+								}
+
+								if (ai_debug.print_bsp_transition)
+								{
+									error(
+										_error_silent,
+										"%s: %d of %d units outside PVS, reattached %d%s",
+										actor_description,
+										components_outside_pvs_count,
+										unit_count,
+										components_reattached_count,
+										components_reattached_count < components_outside_pvs_count
+											? " (deleted some)"
+											: "");
+								}
+							}
+						}
+					}
+				}
+
+				if (disconnect)
+				{
+					if (ai_debug.print_bsp_transition)
+					{
+						error(
+							_error_silent,
+							"%s: disconnect and transition to new bsp",
+							actor_description);
+					}
+
+					actor->meta.disconnected_encounter_index = encounter_index;
+					actor->meta.disconnected_squad_index = actor->meta.squad_index;
+					actor_flush_position_indices(iterator.index);
+					encounter_detach_actor(iterator.index, FALSE);
+					encounterless_attach_actor(iterator.index);
+				}
+
+				actor = encounter_actor_iterator_next(&iterator);
+			}
+		}
+
+		encounter_force_deactivate(encounter_index);
+	}
+
+	{
+		long actor_index = ai_globals->first_encounterless_actor_index;
+
+		while (actor_index != NONE)
+		{
+			struct actor_datum *actor = actor_get(actor_index);
+			long next_actor_index = actor->meta.next_actor_index;
+			struct prop_iterator prop_iterator;
+			struct prop_datum *prop;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\ai.c",
+				0x94A,
+				actor->meta.encounterless);
+			actor_flush_structure_indices(actor_index);
+
+			prop_iterator_new(&prop_iterator, actor_index);
+			prop = prop_iterator_next(&prop_iterator);
+
+			while (prop)
+			{
+				prop->body_location.cluster_index = NONE;
+				prop->body_location.leaf_index = NONE;
+				prop->pathfinding_surface_index = NONE;
+
+				prop = prop_iterator_next(&prop_iterator);
+			}
+
+			actor_index = next_actor_index;
+		}
+	}
 
 	return;
 }

@@ -107,6 +107,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
+#include "memory/byte_swapping.h"
 
 /* ---------- constants */
 
@@ -710,6 +711,27 @@ boolean transport_is_nonce(
 		0xB0,
 		bytes == sizeof(global_nonce));
 	return transport_nonce_is_equal(src, global_nonce);
+}
+
+void transport_client_start(
+	XNADDR const *xnaddr,
+	XNKEY const *key,
+	XNKID const *key_id,
+	word port,
+	struct transport_address *address)
+{
+	IN_ADDR in_addr;
+
+	transport_client_stop();
+	transport_push_key(key, key_id);
+	XNetXnAddrToInAddr(xnaddr, key_id, &in_addr);
+	address->address.long_words[0] = SWAP4(in_addr.s_addr);
+	address->address_length = IPV4_ADDRESS_LENGTH;
+	address->port = port;
+	address->address_type = 0;
+	global_client_active = TRUE;
+
+	return;
 }
 
 /* ---------- private code */

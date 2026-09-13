@@ -207,6 +207,7 @@ boolean initiate_key_exchange(
 	struct public_key *prime,
 	struct public_key *secret)
 {
+	boolean success = TRUE;
 	struct public_key generator;
 	word *message;
 	short message_size;
@@ -220,14 +221,18 @@ boolean initiate_key_exchange(
 		key_agreement_message_buffer,
 		sizeof(key_agreement_message_buffer));
 	if (!message)
-		return FALSE;
+	{
+		success = FALSE;
+	}
+	else
+	{
+		message_size = GET_MESSAGE_SIZE(*message);
+		byte_swap_message_header(message, _byte_order_network);
+		if (write_endpoint(endpoint, message, message_size) != message_size)
+			success = FALSE;
+	}
 
-	message_size = GET_MESSAGE_SIZE(*message);
-	byte_swap_message_header(message, _byte_order_network);
-	if (write_endpoint(endpoint, message, message_size) != message_size)
-		return FALSE;
-
-	return TRUE;
+	return success;
 }
 
 boolean complete_key_exchange(
@@ -244,68 +249,69 @@ boolean complete_key_exchange(
 	union key_agreement_packet_value packet_type;
 	union key_agreement_packet_value packet_version;
 	word *message;
-	word message_size;
-	enum message_type message_type;
+	short message_size;
+	byte message_type;
 
 	packet_version.value = KEY_AGREEMENT_PACKET_VERSION;
 	match_assert(KEY_AGREEMENT_FILE, 0x105, msgptr && prime && secret && private_key);
 
 	message_size = GET_MESSAGE_SIZE(*msgptr);
+	encoded_packet_size.value = (word)message_size - sizeof(word);
 	message_type = GET_MESSAGE_TYPE(*msgptr);
-	encoded_packet_size.value = message_size - sizeof(word);
-	if (message_type != _message_type_packet)
-		return FALSE;
-	packet_type.encoded = key_agreement_get_packet_type(msgptr);
-
-	switch ((enum key_agreement_packet_type)packet_type.encoded)
+	if (message_type == _message_type_packet)
 	{
-	case _key_agreement_packet_type_initiate:
+		packet_type.value = key_agreement_get_packet_type(msgptr);
+
+		switch ((enum key_agreement_packet_type)packet_type.encoded)
 		{
-			if (!key_agreement_decode_packet(
-				&initiate_packet,
-				msgptr + 1,
-				&encoded_packet_size.encoded,
-				&packet_type.encoded,
-				&packet_version.encoded,
-				0))
+		case _key_agreement_packet_type_initiate:
 			{
-				return FALSE;
+				if (!key_agreement_decode_packet(
+					&initiate_packet,
+					msgptr + 1,
+					&encoded_packet_size.encoded,
+					&packet_type.encoded,
+					&packet_version.encoded,
+					0))
+				{
+					return FALSE;
+				}
+
+				secret->dwords[0] = randomrange(0xFF, initiate_packet.prime.dwords[0] - 2);
+				secret->dwords[1] = randomrange(0xFF, initiate_packet.prime.dwords[1] - 2);
+				generate_public_key(&initiate_packet.prime, secret, &initiate_packet.generator, &key);
+				message = build_finalize_key_agreement_message(
+					&key,
+					key_agreement_message_buffer,
+					sizeof(key_agreement_message_buffer));
+				if (!message)
+					return FALSE;
+
+				message_size = GET_MESSAGE_SIZE(*message);
+				byte_swap_message_header(message, _byte_order_network);
+				if (write_endpoint(endpoint, message, message_size) != message_size)
+					return FALSE;
+
+				generate_private_key(&initiate_packet.key, &initiate_packet.prime, secret, private_key);
+				return TRUE;
 			}
 
-			secret->dwords[0] = randomrange(0xFF, initiate_packet.prime.dwords[0] - 2);
-			secret->dwords[1] = randomrange(0xFF, initiate_packet.prime.dwords[1] - 2);
-			generate_public_key(&initiate_packet.prime, secret, &initiate_packet.generator, &key);
-			message = build_finalize_key_agreement_message(
-				&key,
-				key_agreement_message_buffer,
-				sizeof(key_agreement_message_buffer));
-			if (!message)
-				return FALSE;
-
-			message_size = GET_MESSAGE_SIZE(*message);
-			byte_swap_message_header(message, _byte_order_network);
-			if (write_endpoint(endpoint, message, message_size) != message_size)
-				return FALSE;
-
-			generate_private_key(&initiate_packet.key, &initiate_packet.prime, secret, private_key);
-			return TRUE;
-		}
-
-	case _key_agreement_packet_type_finalize:
-		{
-			if (!key_agreement_decode_packet(
-				&finalize_packet,
-				msgptr + 1,
-				&encoded_packet_size.encoded,
-				&packet_type.encoded,
-				&packet_version.encoded,
-				0))
+		case _key_agreement_packet_type_finalize:
 			{
-				return FALSE;
-			}
+				if (!key_agreement_decode_packet(
+					&finalize_packet,
+					msgptr + 1,
+					&encoded_packet_size.encoded,
+					&packet_type.encoded,
+					&packet_version.encoded,
+					0))
+				{
+					return FALSE;
+				}
 
-			generate_private_key(&finalize_packet.key, prime, secret, private_key);
-			return TRUE;
+				generate_private_key(&finalize_packet.key, prime, secret, private_key);
+				return TRUE;
+			}
 		}
 	}
 
@@ -325,7 +331,7 @@ void initialize_key_agreement_packets(
 static char key_agreement_get_packet_type(
 	word const *msgptr)
 {
-	enum message_type message_type;
+	byte message_type;
 	word message_size = GET_MESSAGE_SIZE(*msgptr);
 
 	match_assert(

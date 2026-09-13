@@ -359,6 +359,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "cache/cache_files.h"
 #include "cache/predicted_resources.h"
+#include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps_internal.h"
 #include "interface/hud.h"
 #include "interface/interface.h"
@@ -368,6 +369,7 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_debug.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include "bink/bink_playback.h"
 #include "main/d3d_intimacy.h"
 #include "networking/network_game_globals.h"
@@ -383,6 +385,11 @@ symbols in this file:
 #include "tag_files/files.h"
 
 /* ---------- constants */
+
+enum
+{
+	_bitmap_format_x8r8g8b8 = 10,
+};
 
 /* ---------- macros */
 
@@ -651,8 +658,6 @@ extern void main_initialize_time(void);
 extern void main_skip_private(void);
 extern void main_update_time(
 	void);
-extern void main_game_render(
-	double time_delta_since_tick_sec);
 static void main_frame_rate_debug(
 	void);
 
@@ -1104,6 +1109,69 @@ static void screenshot_record(
 
 	if (error_message)
 		error(_error_silent, error_message);
+	return;
+}
+
+void set_window_camera_values(
+	struct render_window *window,
+	struct observer_result const *observer)
+{
+	struct render_camera *camera = &window->rasterizer_camera;
+
+	if (observer)
+	{
+		camera->position = observer->position;
+		camera->forward = observer->forward;
+		camera->up = observer->up;
+		camera->vertical_field_of_view =
+			2.0f * arctangent(
+				0.75f * render_camera_get_adjusted_field_of_view_tangent(
+					observer->field_of_view),
+				1.0f);
+
+		if (window->local_player_index != NONE &&
+			!console_is_active() &&
+			!game_time_get_paused() &&
+			director_get_perspective(window->local_player_index) !=
+				_director_perspective_neutral)
+		{
+			real_matrix4x3 effect_matrix;
+			real_matrix4x3 view_matrix;
+
+			player_effect_get_camera_effect_matrix(
+				window->local_player_index,
+				&effect_matrix);
+			matrix4x3_from_point_and_vectors(
+				&view_matrix,
+				&observer->position,
+				&observer->forward,
+				&observer->up);
+			matrix4x3_multiply(&view_matrix, &effect_matrix, &view_matrix);
+			matrix4x3_to_point_and_vectors(
+				&view_matrix,
+				&camera->position,
+				&camera->forward,
+				&camera->up);
+		}
+	}
+	else
+	{
+		camera->position = *global_origin3d;
+		camera->forward = *global_forward3d;
+		camera->up = *global_up3d;
+		camera->vertical_field_of_view =
+			2.0f * arctangent(
+				0.75f * render_camera_get_adjusted_field_of_view_tangent(
+					DEGREES_TO_RADIANS(80.0f)),
+				1.0f);
+	}
+
+	camera->mirrored = FALSE;
+	camera->z_near = rasterizer_globals.near_clip_distance;
+	camera->z_far = rasterizer_globals.far_clip_distance;
+	if (!debug_render_freeze)
+		window->render_camera = *camera;
+
 	return;
 }
 
@@ -2475,6 +2543,90 @@ static void main_reset_map_private(
 	return;
 }
 
+static void screenshot_render(
+	struct render_window *windows)
+{
+	char path[512];
+	struct file_reference reference;
+	point2d screenshot_page_index;
+	point2d screenshot_index;
+	struct bitmap_data *bitmap;
+	long screenshot_width;
+	long screenshot_height;
+
+	global_screenshot_size = PIN(global_screenshot_size, 1, 3);
+	screenshot_width =
+		rasterizer_globals.reserved04.screen_bounds.x1 -
+		rasterizer_globals.reserved04.screen_bounds.x0;
+	screenshot_height =
+		rasterizer_globals.reserved04.screen_bounds.y1 -
+		rasterizer_globals.reserved04.screen_bounds.y0;
+	bitmap = bitmap_2d_new(
+		global_screenshot_size * screenshot_width,
+		global_screenshot_size * screenshot_height,
+		0,
+		_bitmap_format_x8r8g8b8);
+
+	if (bitmap && bitmap->base_address)
+	{
+		console_printf(TRUE, "");
+		console_close();
+
+		for (screenshot_page_index.y = 0;
+			screenshot_page_index.y < global_screenshot_count.count;
+			screenshot_page_index.y++)
+		{
+			for (screenshot_page_index.x = 0;
+				screenshot_page_index.x < global_screenshot_count.count;
+				screenshot_page_index.x++)
+			{
+				for (screenshot_index.y = 0;
+					screenshot_index.y < global_screenshot_size;
+					screenshot_index.y++)
+				{
+					for (screenshot_index.x = 0;
+						screenshot_index.x < global_screenshot_size;
+						screenshot_index.x++)
+					{
+						if (global_screenshot_count.count > 1 ||
+							global_screenshot_size > 1)
+						{
+							render_frame(
+								windows,
+								1,
+								&screenshot_page_index,
+								&screenshot_index,
+								bitmap,
+								0.0f);
+							render_frame_present(&screenshot_index, bitmap);
+						}
+						else
+						{
+							render_frame(windows, 1, NULL, NULL, bitmap, 0.0f);
+							render_frame_present(NULL, bitmap);
+						}
+					}
+				}
+
+				sprintf(
+					path,
+					"%dscreenshot%d%d.tif",
+					main_globals.screenshot_identifier,
+					screenshot_page_index.y,
+					screenshot_page_index.x);
+				file_reference_create_from_path(&reference, path, FALSE);
+				screenshot_record(bitmap, &reference);
+			}
+		}
+
+		main_globals.screenshot_identifier++;
+		bitmap_delete(bitmap);
+	}
+
+	global_screenshot_count.count = 0;
+	return;
+}
+
 void halt_and_catch_fire(
 	void)
 {
@@ -2606,6 +2758,103 @@ void main_loop_of_death(
 		input_frame_end();
 	}
 
+	return;
+}
+
+void main_game_render(
+	double time_delta_since_tick_sec)
+{
+	boolean force_single_screen;
+	long window_index;
+	struct render_window *window;
+	struct observer_result const *observer;
+	long player_window_count;
+	long window_count;
+	long last_local_player_index;
+
+	lock_global_random_seed();
+	collision_log_continue_period(TRUE);
+	sound_render();
+	force_single_screen = game_engine_force_single_screen();
+	last_local_player_index = NONE;
+
+	if (local_player_count() < 1)
+		window_count = 1;
+	else if (local_player_count() > MAXIMUM_LOCAL_PLAYERS)
+		window_count = MAXIMUM_LOCAL_PLAYERS;
+	else
+		window_count = local_player_count();
+	player_window_count = window_count;
+	if (force_single_screen || cinematic_in_progress())
+	{
+		window_count = 1;
+		player_window_count = 1;
+	}
+
+	for (window_index = 0; window_index < player_window_count; window_index++)
+	{
+		window = &global_screenshot_count.windows[window_index];
+		observer = NULL;
+
+		compute_window_bounds(
+			window_index,
+			player_window_count,
+			&window->rasterizer_camera.viewport_bounds,
+			&window->rasterizer_camera.window_bounds);
+		if (force_single_screen || window_index >= window_count)
+		{
+			window->local_player_index = NONE;
+		}
+		else
+		{
+			if (rasterizer_debug_options.force_all_player_views_to_default_player &&
+				(short)last_local_player_index != NONE)
+			{
+				goto assign_player_camera;
+			}
+			if (main_globals.connection == _game_connection_film_playback)
+			{
+				last_local_player_index = 0;
+				goto assign_player_camera;
+			}
+			last_local_player_index = local_player_get_next(last_local_player_index);
+
+		assign_player_camera:
+			window->local_player_index = (short)last_local_player_index;
+			observer = observer_get_camera(last_local_player_index);
+		}
+
+		set_window_camera_values(window, observer);
+		window->console_window = FALSE;
+	}
+
+	window = &global_screenshot_count.windows[player_window_count];
+	compute_window_bounds(
+		0,
+		1,
+		&window->rasterizer_camera.viewport_bounds,
+		&window->rasterizer_camera.window_bounds);
+	window->local_player_index = NONE;
+	window->console_window = TRUE;
+	set_window_camera_values(window, NULL);
+
+	if (global_screenshot_count.count <= 0)
+	{
+		render_frame(
+			global_screenshot_count.windows,
+			player_window_count + 1,
+			NULL,
+			NULL,
+			main_globals.movie,
+			(real)time_delta_since_tick_sec);
+	}
+	else
+	{
+		screenshot_render(global_screenshot_count.windows);
+	}
+
+	collision_log_end_period();
+	unlock_global_random_seed();
 	return;
 }
 

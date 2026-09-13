@@ -72,6 +72,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/color_table_group.h"
+#include "camera/director.h"
 #include "cutscene/cinematics.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
@@ -85,11 +86,15 @@ symbols in this file:
 #include "main/main.h"
 #include "main/main_runtime.h"
 #include "math/real_math.h"
+#include "items/weapon_definitions.h"
+#include "items/weapons.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
 #include "text/draw_string.h"
+#include "units/unit_definitions.h"
+#include "units/units.h"
 
 /* ---------- constants */
 
@@ -271,15 +276,37 @@ struct profile_value
 typedef char profile_value_size_assert[
 	sizeof(struct profile_value) == 0x20C ? 1 : -1];
 
+struct interface_hud_scripted_globals
+{
+	boolean show_hud;
+	boolean show_hud_help_text;
+	byte unused[2];
+};
+
+struct interface_hud_defaults_definition
+{
+	struct tag_reference default_weapon_hud;
+};
+
+struct interface_hud_globals_definition
+{
+	byte unused[0x2C0];
+	struct interface_hud_defaults_definition defaults;
+};
+
+typedef char interface_hud_globals_default_weapon_hud_index_offset_assert[
+	offsetof(struct interface_hud_globals_definition, defaults.default_weapon_hud.index) == 0x2CC ? 1 : -1];
+
 /* ---------- prototypes */
 
 void interface_splitscreen_render(
 	void);
 void code_000cea10(
 	void);
-long interface_get_weapon_hud_index(
-	real *flashlight_power);
 /* ---------- globals */
+
+extern struct interface_hud_globals_definition *hud_globals;
+extern struct interface_hud_scripted_globals *hud_scripted_globals;
 
 static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
 static struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
@@ -499,6 +526,77 @@ void interface_draw_bitmap(
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 
 	return;
+}
+
+long interface_get_weapon_hud_index(
+	real *flashlight_power)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	long weapon_hud_index = NONE;
+	real flashlight = 0.0f;
+
+	if (player_index != NONE)
+	{
+		struct player_datum *player = player_get(player_index);
+		director_perspective perspective = director_get_perspective(render.local_player_index);
+
+		if (hud_scripted_globals &&
+			hud_scripted_globals->show_hud &&
+			perspective != _director_perspective_neutral &&
+			perspective != _director_perspective_scripted &&
+			player->unit_index != NONE)
+		{
+			long weapon_index = unit_inventory_get_weapon(
+				player->unit_index,
+				unit_get(player->unit_index)->unit.current_weapon_index);
+
+			if (weapon_index == NONE)
+			{
+				struct unit_datum *unit = unit_get(player->unit_index);
+
+				if (unit->object.parent_object_index != NONE &&
+					unit->unit.parent_seat_index != NONE)
+				{
+					struct unit_datum *parent = unit_get(unit->object.parent_object_index);
+					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+						&unit_definition_get(parent->definition_index)->unit.seats,
+						unit->unit.parent_seat_index,
+						struct unit_seat);
+
+					if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+					{
+						weapon_index = unit_inventory_get_weapon(
+							unit->object.parent_object_index,
+							unit_get(unit->object.parent_object_index)->unit.current_weapon_index);
+					}
+				}
+			}
+			else
+			{
+				flashlight = unit_get(player->unit_index)->unit.integrated_night_vision_power;
+			}
+
+			if (weapon_index != NONE)
+			{
+				long hud_index = weapon_definition_get(
+					weapon_get(weapon_index)->definition_index)->
+					weapon.interface_definition.hud_interface.index;
+
+				if (hud_index != NONE)
+				{
+					weapon_hud_index = hud_index;
+				}
+				else if (!unit_get_weapon_count(player->unit_index))
+				{
+					weapon_hud_index = hud_globals->defaults.default_weapon_hud.index;
+				}
+			}
+		}
+	}
+
+	*flashlight_power = flashlight;
+
+	return weapon_hud_index;
 }
 
 void interface_draw_bitmap_modulated(

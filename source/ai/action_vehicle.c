@@ -156,6 +156,19 @@ real_vector2d *negate_vector2d(
 	return result;
 }
 
+void action_vehicle_begin(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct vehicle_state_data *state_data = &actor->state.action_data.vehicle;
+
+	state_data->stuck_detection_counter = 0;
+	state_data->stuck_detection_time = game_time_get();
+	state_data->stuck_detection_point = actor->input.position.body_position;
+
+	return;
+}
+
 void action_vehicle_update(
 	long actor_index)
 {

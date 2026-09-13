@@ -460,7 +460,7 @@ void decal_clip_to_surface(
 	short *surface_queue_write_index,
 	long *deviant_surface_list,
 	short *deviant_surface_count);
-long decal_insert(
+static long decal_insert(
 	long cache_index,
 	short cluster_index,
 	short layer,
@@ -473,6 +473,7 @@ extern struct data_array *global_decal_data;
 
 boolean decals_enabled= TRUE;
 static boolean decal_locked_count_reported;
+static boolean decal_insert_locked_count_reported;
 static struct decal_globals *decal_globals;
 static struct decal_geometry decal_geometry;
 static boolean decals_unlock_locked_count_reported;
@@ -2256,7 +2257,115 @@ static void decal_reinsert(
 	return;
 }
 
+static long decal_insert(
+	long cache_index,
+	short cluster_index,
+	short layer,
+	long next_decal_index,
+	boolean permanent)
+{
+	struct data_iterator iterator;
+	long decal_index = datum_new_at_index(global_decal_data, cache_index);
 
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 479,
+		cluster_index >= 0 && cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE);
+	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 480,
+		layer >= 0 && layer < NUMBER_OF_DECAL_LAYERS);
+
+	if (decal_index != NONE)
+	{
+		struct decal_datum *new_decal = DECAL_GET(decal_index);
+
+		if (permanent)
+		{
+			new_decal->flags = FLAG(_decal_permanent_bit);
+			decal_globals->permanent_count++;
+		}
+		else if (100 * seed_random(get_global_local_random_seed_address()) < 655350)
+		{
+			new_decal->flags = FLAG(_decal_locked_bit);
+			decal_globals->locked_count++;
+
+			if (decal_globals->locked_count > 512)
+			{
+				short restart_count = 0;
+
+				data_iterator_new(&iterator, global_decal_data);
+				while (decal_globals->locked_count > 256)
+				{
+					struct decal_datum *decal = data_iterator_next(&iterator);
+
+					if (decal)
+					{
+						if (TEST_FLAG(decal->flags, _decal_locked_bit) &&
+							(100 * seed_random(get_global_local_random_seed_address()) < 2686935 ||
+							decal->cluster_index == NONE))
+						{
+							SET_FLAG(decal->flags, _decal_locked_bit, FALSE);
+							decal_globals->locked_count--;
+						}
+					}
+					else
+					{
+						data_iterator_new(&iterator, global_decal_data);
+						if (++restart_count >= 100)
+						{
+							error(
+								_error_silent,
+								"### ERROR decals: failed to unlock decals during insert -- tell Bernie!!");
+							return NONE;
+						}
+					}
+				}
+
+				if (decal_globals->locked_count < 0 && !decal_insert_locked_count_reported)
+				{
+					error(
+						_error_silent,
+						"### ERROR decals: locked count is invalid (#%d) -- tell Bernie!!",
+						decal_globals->locked_count);
+					decal_insert_locked_count_reported = TRUE;
+				}
+			}
+		}
+		else
+		{
+			new_decal->flags = 0;
+		}
+		if (next_decal_index != NONE)
+		{
+			struct decal_datum *next_decal = DECAL_GET(next_decal_index);
+
+			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 556,
+				next_decal->cluster_index == cluster_index);
+
+			if (next_decal->previous_decal_index != NONE)
+			{
+				DECAL_GET(next_decal->previous_decal_index)->next_decal_index = decal_index;
+			}
+			else
+			{
+				decal_set_first_decal_index(cluster_index, layer, decal_index);
+			}
+
+			next_decal->previous_decal_index = decal_index;
+			new_decal->previous_decal_index = decal_index;
+			new_decal->next_decal_index = next_decal_index;
+			new_decal->cluster_index = cluster_index;
+			new_decal->layer = layer;
+		}
+		else
+		{
+			decal_reinsert(decal_index, cluster_index, layer);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to insert decal");
+	}
+
+	return decal_index;
+}
 
 static void decal_set_first_decal_index(
 	short cluster_index,

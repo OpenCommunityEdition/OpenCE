@@ -20,6 +20,7 @@ symbols in this file:
 #include "real_math.h"
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
+#include "game/game_statistics_internal.h"
 #include "game/players.h"
 #include "memory/data.h"
 #include "units/units.h"

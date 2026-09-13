@@ -220,6 +220,10 @@ void ai_scripting_ignore(
 void ai_scripting_prefer_target(
 	long object_list_index,
 	boolean prefer);
+void ai_scripting_teleport_starting_location(
+	long ai_reference);
+void ai_scripting_teleport_starting_location_if_unsupported(
+	long ai_reference);
 void ai_scripting_command_list_advance(
 	long ai_reference);
 void ai_scripting_erase(

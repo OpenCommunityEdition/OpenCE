@@ -141,6 +141,11 @@ enum render_frustum_point_flag_bits
 	_render_frustum_point_flags_right_bit,
 	_render_frustum_point_flags_top_bit,
 	_render_frustum_point_flags_bottom_bit,
+	_render_frustum_point_flags_near_bit,
+	_render_frustum_point_flags_far_bit,
+	NUMBER_OF_RENDER_FRUSTUM_POINT_FLAGS,
+
+	RENDER_FRUSTUM_POINT_FLAGS_PLANE_MASK = FLAG(NUMBER_OF_RENDER_FRUSTUM_POINT_FLAGS) - 1,
 };
 
 /* ---------- macros */
@@ -148,6 +153,8 @@ enum render_frustum_point_flag_bits
 /* ---------- structures */
 
 /* ---------- globals */
+
+boolean debug_no_frustum_clip;
 
 /* ---------- public code */
 
@@ -253,6 +260,133 @@ real render_frustum_sphere_diameter_in_pixels(
 	return (frustum->projection_world_to_screen.j / clamped_depth) * radius * 2.0f;
 }
 
+real render_frustum_cube_view_fraction(
+	struct render_frustum const *frustum,
+	real_rectangle3d const *bounds)
+{
+	real fraction;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		876,
+		frustum);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		877,
+		bounds);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		878,
+		bounds->x0<=bounds->x1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		879,
+		bounds->y0<=bounds->y1);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		880,
+		bounds->z0<=bounds->z1);
+
+	if (bounds->z0 >= 0.0f)
+	{
+		fraction = 0.0f;
+	}
+	else if (bounds->z1 >= 0.0f)
+	{
+		fraction = 1.0f;
+	}
+	else
+	{
+		real inverse_z0 = 1.0f / bounds->z0;
+		real projection_x = frustum->projection_matrix[0][0];
+		real projection_offset_x = frustum->projection_matrix[2][0];
+		real projection_y = frustum->projection_matrix[1][1];
+		real projection_offset_y = frustum->projection_matrix[2][1];
+		real inverse_z1 = 1.0f / bounds->z1;
+		real positive_inverse_z0;
+		real positive_inverse_z1;
+		real left;
+		real bottom;
+		real right;
+		real top;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			900,
+			frustum->projection_valid);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			903,
+			frustum->projection_matrix[1][0]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			904,
+			frustum->projection_matrix[3][0]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			905,
+			frustum->projection_matrix[0][1]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			906,
+			frustum->projection_matrix[3][1]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			907,
+			frustum->projection_matrix[0][3]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			908,
+			frustum->projection_matrix[1][3]==0.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			909,
+			frustum->projection_matrix[2][3]==-1.0f);
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_cameras.c",
+			910,
+			frustum->projection_matrix[3][3]==0.0f);
+
+		positive_inverse_z0 = -inverse_z0;
+		positive_inverse_z1 = -inverse_z1;
+		left = MAX(
+			MIN(
+				(bounds->z0 * projection_offset_x + bounds->x0 * projection_x) *
+					positive_inverse_z0,
+				(bounds->z1 * projection_offset_x + bounds->x0 * projection_x) *
+					positive_inverse_z1),
+			-1.0f);
+		bottom = MAX(
+			MIN(
+				(bounds->z0 * projection_offset_y + bounds->y0 * projection_y) *
+					positive_inverse_z0,
+				(bounds->z1 * projection_offset_y + bounds->y0 * projection_y) *
+					positive_inverse_z1),
+			-1.0f);
+		right = MIN(
+			MAX(
+				(bounds->z0 * projection_offset_x + bounds->x1 * projection_x) *
+					positive_inverse_z0,
+				(bounds->z1 * projection_offset_x + bounds->x1 * projection_x) *
+					positive_inverse_z1),
+			1.0f);
+		top = MIN(
+			MAX(
+				(bounds->z0 * projection_offset_y + bounds->y1 * projection_y) *
+					positive_inverse_z0,
+				(bounds->z1 * projection_offset_y + bounds->y1 * projection_y) *
+					positive_inverse_z1),
+			1.0f);
+		fraction = (right - left) * (top - bottom) * 0.25f;
+		if (!(fraction > 0.0f))
+		{
+			fraction = 0.0f;
+		}
+	}
+
+	return fraction;
+}
+
 word render_frustum_build_point_flags(
 	const struct render_frustum *frustum,
 	const real_point3d *point)
@@ -268,6 +402,80 @@ word render_frustum_build_point_flags(
 		FLAG(_render_frustum_point_flags_top_bit) : 0;
 
 	return flags;
+}
+
+boolean render_frustum_triangle_visible(
+	struct render_frustum const *frustum,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2)
+{
+	word flags = RENDER_FRUSTUM_POINT_FLAGS_PLANE_MASK;
+	word point_flags;
+
+	point_flags = render_frustum_build_point_flags(frustum, point0);
+	if (!point_flags)
+		return TRUE;
+	flags &= point_flags;
+	point_flags = render_frustum_build_point_flags(frustum, point1);
+	if (!point_flags)
+		return TRUE;
+	flags &= point_flags;
+	point_flags = render_frustum_build_point_flags(frustum, point2);
+	if (!point_flags)
+		return TRUE;
+	flags &= point_flags;
+
+	return flags == 0;
+}
+
+boolean render_camera_triangle_frontfacing(
+	struct render_camera const *camera,
+	real_point3d const *point0,
+	real_point3d const *point1,
+	real_point3d const *point2)
+{
+	real_vector3d camera_to_point;
+	real_vector3d edge0;
+	real_vector3d edge1;
+	real_vector3d normal;
+
+	vector_from_points3d(&camera->position, point0, &camera_to_point);
+	vector_from_points3d(point0, point1, &edge0);
+	vector_from_points3d(point1, point2, &edge1);
+	cross_product3d(&edge0, &edge1, &normal);
+
+	return dot_product3d(&normal, &camera_to_point) > -_real_epsilon;
+}
+
+void render_frustum_get_projection_bounds(
+	struct render_frustum const *frustum,
+	real_rectangle2d *bounds)
+{
+	real x;
+	real y;
+	real inverse_x_scale;
+	real inverse_y_scale;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		935,
+		frustum && frustum->projection_valid);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		936,
+		bounds);
+
+	x = -frustum->projection_matrix[2][0];
+	y = -frustum->projection_matrix[2][1];
+	inverse_x_scale = -1.0f / frustum->projection_matrix[0][0];
+	inverse_y_scale = -1.0f / frustum->projection_matrix[1][1];
+
+	bounds->x0 = (x - 1.0f) * inverse_x_scale;
+	bounds->x1 = (x + 1.0f) * inverse_x_scale;
+	bounds->y0 = (y - 1.0f) * inverse_y_scale;
+	bounds->y1 = (y + 1.0f) * inverse_y_scale;
+	return;
 }
 
 void render_camera_screen_to_world(
@@ -309,6 +517,107 @@ void render_camera_screen_to_world(
 	matrix4x3_transform_vector(&frustum->view_to_world, &view_vector, world_vector);
 
 	return;
+}
+
+void render_camera_build_frustum_bounds(
+	struct render_camera const *camera,
+	real_rectangle2d *frustum_bounds)
+{
+	real aspect_ratio;
+	real inverse_window_height;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		305,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		306,
+		frustum_bounds);
+
+	aspect_ratio = (real)(camera->viewport_bounds.y1 - camera->viewport_bounds.y0) /
+		(camera->viewport_bounds.x1 - camera->viewport_bounds.x0);
+	inverse_window_height = 1.0f /
+		(camera->window_bounds.y1 - camera->window_bounds.y0);
+
+	frustum_bounds->x0 =
+		(2 * camera->viewport_bounds.x0 -
+		camera->window_bounds.x0 - camera->window_bounds.x1) *
+		inverse_window_height;
+	frustum_bounds->x1 =
+		(2 * camera->viewport_bounds.x1 -
+		camera->window_bounds.x0 - camera->window_bounds.x1) *
+		inverse_window_height;
+	frustum_bounds->y0 =
+		(2 * camera->viewport_bounds.y0 -
+		camera->window_bounds.y0 - camera->window_bounds.y1) *
+		inverse_window_height;
+	frustum_bounds->y1 =
+		(2 * camera->viewport_bounds.y1 -
+		camera->window_bounds.y0 - camera->window_bounds.y1) *
+		inverse_window_height;
+
+	frustum_bounds->x0 *= aspect_ratio;
+	frustum_bounds->x1 *= aspect_ratio;
+
+	{
+		real temporary_y0 = frustum_bounds->y0;
+
+		frustum_bounds->y0 = -frustum_bounds->y1;
+		frustum_bounds->y1 = -temporary_y0;
+	}
+	return;
+}
+
+boolean render_camera_build_clipped_frustum_bounds(
+	struct render_camera const *camera,
+	real_rectangle2d const *clip,
+	real_rectangle2d *frustum_bounds)
+{
+	boolean use_full_bounds = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		342,
+		camera);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		343,
+		clip);
+	match_assert(
+		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+		344,
+		frustum_bounds);
+
+	if (!debug_no_frustum_clip &&
+		clip->x0 < clip->x1 &&
+		clip->y0 < clip->y1)
+	{
+		long viewport_height = camera->viewport_bounds.y1 - camera->viewport_bounds.y0;
+		long viewport_width = camera->viewport_bounds.x1 - camera->viewport_bounds.x0;
+		real aspect_ratio = (real)viewport_height / (real)viewport_width;
+		real inverse_tangent = 1.0f /
+			tangent(camera->vertical_field_of_view * 0.5f);
+		real horizontal_scale = inverse_tangent * aspect_ratio;
+
+		frustum_bounds->x0 = clip->x0 * horizontal_scale;
+		frustum_bounds->x1 = clip->x1 * horizontal_scale;
+		frustum_bounds->y0 = inverse_tangent * clip->y0;
+		frustum_bounds->y1 = clip->y1 * inverse_tangent;
+		use_full_bounds =
+			frustum_bounds->x0 >= frustum_bounds->x1 ||
+			frustum_bounds->y0 >= frustum_bounds->y1;
+	}
+
+	if (use_full_bounds)
+	{
+		frustum_bounds->y1 = 1.0f;
+		frustum_bounds->x1 = 1.0f;
+		frustum_bounds->y0 = -1.0f;
+		frustum_bounds->x0 = -1.0f;
+	}
+
+	return !use_full_bounds;
 }
 
 boolean render_camera_view_to_screen(

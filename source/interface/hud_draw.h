@@ -27,6 +27,7 @@ struct hud_placement_definition;
 struct meter_hud_element_definition;
 struct number_hud_element_definition;
 struct static_hud_element_definition;
+struct weapon_hud_overlay_definition;
 
 long get_return_eip(
 	void);
@@ -60,6 +61,14 @@ long get_flash_duration(
 pixel32 get_flash_color(
 	struct hud_color_definition const *hud_color,
 	long reference_value);
+void hud_draw_weapon_overlays(
+	short local_player_index,
+	struct hud_absolute_placement_definition const *absolute_placement,
+	struct weapon_hud_overlay_definition const *overlays,
+	long type_flags,
+	long reference_time,
+	short draw_flags,
+	boolean in_multiplayer);
 void hud_draw_bitmap(
 	struct bitmap_data const *bitmap,
 	struct hud_absolute_placement_definition const *absolute_placement,

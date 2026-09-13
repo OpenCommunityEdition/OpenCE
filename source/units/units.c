@@ -6736,8 +6736,8 @@ void unit_damage_aftermath(
 	unsigned long damage_flags,
 	real shield_damage,
 	real body_damage,
-	long unused,
-	long animation_index)
+	real body_damage_multiplier,
+	short body_part)
 {
 	struct unit_datum *unit;
 	struct unit_definition *unit_definition;
@@ -6757,7 +6757,7 @@ void unit_damage_aftermath(
 		_object_being_damaged_body_depleted_bit);
 	feigned = FALSE;
 
-	(void)unused;
+	(void)body_damage_multiplier;
 
 	if (debug_damage_taken && unit->unit.player_index != NONE)
 	{
@@ -6929,7 +6929,7 @@ void unit_damage_aftermath(
 			resists_pings,
 			animation_flag,
 			angle,
-			(short)animation_index,
+			body_part,
 			direction_valid ? &damage_direction : NULL);
 	}
 

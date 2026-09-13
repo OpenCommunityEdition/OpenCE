@@ -164,6 +164,7 @@ symbols in this file:
 #include "cseries.h"
 #include "scenario.h"
 
+#include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
@@ -220,8 +221,6 @@ void objects_reconnect_to_structure_bsp(
 	void);
 void lights_reconnect_to_structure_bsp(
 	void);
-void ai_reconnect_to_structure_bsp(
-	void);
 void particles_reconnect_to_structure_bsp(
 	void);
 void contrails_reconnect_to_structure_bsp(
@@ -242,8 +241,6 @@ void object_types_disconnect_from_structure_bsp(
 void objects_disconnect_from_structure_bsp(
 	void);
 void lights_disconnect_from_structure_bsp(
-	void);
-void ai_disconnect_from_structure_bsp(
 	void);
 void particles_disconnect_from_structure_bsp(
 	void);

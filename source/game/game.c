@@ -637,7 +637,7 @@ boolean game_safe_to_save(
 	{
 		if (debug_game_save)
 			console_warning("not safe to save: vehicle_moving_near_any_player");
-		return FALSE;
+		safe = FALSE;
 	}
 
 	return safe;
