@@ -1677,16 +1677,9 @@ static long select_players_to_display(
 	long maximum_count)
 {
 	struct postgame_statistic_entry entries[MULTIPLAYER_MAXIMUM_PLAYERS];
-	struct postgame_statistic_entry local_entries[MAXIMUM_LOCAL_PLAYERS];
 	long player_count;
-	long local_player_count;
-	long remaining_count;
-	long entry_index;
-	long insertion_index;
-	struct postgame_statistic_entry *source;
-	struct postgame_statistic_entry *destination;
-	struct player_datum *player;
 	boolean debug;
+	long entry_index;
 
 	player_count = populate_statistic_buffer(entries, statistic, 0);
 	debug = rasterizer_debug_options.postgame_player_list_debug == 'E';
@@ -1699,89 +1692,54 @@ static long select_players_to_display(
 			maximum_count);
 	}
 
-	if (player_count > 0)
+	for (entry_index = 0; entry_index < player_count; entry_index++)
 	{
-		source = entries;
-		remaining_count = player_count;
-		do
-		{
-			player_get(source->values[0]);
-			source++;
-			remaining_count--;
-		}
-		while (remaining_count != 0);
+		player_get(entries[entry_index].values[0]);
 	}
 
-	if (maximum_count < player_count)
+	if (player_count > maximum_count)
 	{
-		local_player_count = 0;
+		struct postgame_statistic_entry local_entries[MAXIMUM_LOCAL_PLAYERS];
+		long local_player_count = 0;
+		long local_index;
 
-		if (maximum_count < player_count)
+		for (entry_index = maximum_count; entry_index < player_count; entry_index++)
 		{
-			source = &entries[maximum_count];
-			destination = local_entries;
-			remaining_count = player_count - maximum_count;
-			do
-			{
-				player = player_get(source->values[0]);
-				if (player && player->local_player_index != NONE)
-				{
-					if (debug)
-					{
-						terminal_printf(
-							global_real_argb_white,
-							"found local player");
-					}
+			struct player_datum *player = player_get(entries[entry_index].values[0]);
 
-					*destination = *source;
-					local_player_count++;
-					destination++;
+			if (player && player->local_player_index != NONE)
+			{
+				if (debug)
+				{
+					terminal_printf(
+						global_real_argb_white,
+						"found local player");
 				}
-				source++;
-				remaining_count--;
+
+				local_entries[local_player_count] = entries[entry_index];
+				local_player_count++;
 			}
-			while (remaining_count != 0);
 		}
 
-		if (local_player_count > 0)
+		for (local_index = 0; local_index < local_player_count; local_index++)
 		{
-			insertion_index = maximum_count - 1;
-			destination = local_entries;
-			remaining_count = local_player_count;
-			do
+			long insertion_index;
+
+			for (insertion_index = maximum_count - 1; insertion_index >= 0; insertion_index--)
 			{
-				if (insertion_index >= 0)
+				struct player_datum *player = player_get(entries[insertion_index].values[0]);
+
+				if (player->local_player_index == NONE)
 				{
-					entry_index = insertion_index;
-					source = &entries[insertion_index];
-					do
-					{
-						player = player_get(source->values[0]);
-						if (player->local_player_index == NONE)
-							goto found_insertion;
-
-						entry_index--;
-						source--;
-					}
-					while (entry_index >= 0);
+					csmemmove(
+						&entries[insertion_index],
+						&entries[insertion_index + 1],
+						maximum_count * sizeof(struct postgame_statistic_entry) -
+							(insertion_index + 1) * sizeof(struct postgame_statistic_entry));
+					entries[maximum_count - 1] = local_entries[local_index];
+					break;
 				}
-				goto next_local_player;
-
-			found_insertion:
-				csmemmove(
-					&entries[entry_index],
-					&entries[entry_index + 1],
-					maximum_count *
-							sizeof(struct postgame_statistic_entry) -
-						entry_index * sizeof(struct postgame_statistic_entry) -
-						sizeof(struct postgame_statistic_entry));
-				entries[maximum_count - 1] = *destination;
-
-			next_local_player:
-				destination++;
-				remaining_count--;
 			}
-			while (remaining_count != 0);
 		}
 	}
 
