@@ -1165,11 +1165,13 @@ __inline boolean limit3d(
 	real length)
 {
 	real dot = vector->i*vector->i + vector->j*vector->j + vector->k*vector->k;
-	if (dot <= length*length)
-		return FALSE;
+	if (dot > length*length)
+	{
+		scale_vector3d(vector, length*reciprocal_square_root(dot), vector);
+		return TRUE;
+	}
 
-	scale_vector3d(vector, length / square_root(dot), vector);
-	return TRUE;
+	return FALSE;
 }
 
 __inline real distance_squared3d(
@@ -1196,6 +1198,7 @@ __inline real_point3d *midpoint3d(
 	result->x = (p0->x + p1->x) * 0.5f;
 	result->y = (p0->y + p1->y) * 0.5f;
 	result->z = (p0->z + p1->z) * 0.5f;
+	return result;
 }
 
 #ifdef REAL_MATH_EXTERNAL_DOT_PRODUCT3D
