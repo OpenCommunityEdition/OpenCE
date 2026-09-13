@@ -24,6 +24,7 @@ symbols in this file:
 #include "actions.h"
 
 #include "actor_definitions.h"
+#include "actor_perception.h"
 #include "actors.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"
@@ -46,11 +47,6 @@ struct fight_vehicle_definition
 };
 
 /* ---------- prototypes */
-
-void actor_perception_unreachable(
-	long actor_index,
-	long prop_index,
-	boolean unreachable);
 
 /* ---------- globals */
 
