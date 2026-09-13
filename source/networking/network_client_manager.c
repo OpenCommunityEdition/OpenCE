@@ -3,7 +3,7 @@ NETWORK_CLIENT_MANAGER.C
 
 symbols in this file:
 001141C0 0040:
-	_code_001141c0 (0000)
+	_check_networking_and_generate_error (0000)
 00114200 0060:
 	_network_game_client_dispose (0000)
 00114260 0020:
@@ -71,13 +71,13 @@ symbols in this file:
 00115500 0030:
 	_network_game_client_advertised_game_is_valid (0000)
 00115530 02d0:
-	_code_00115530 (0000)
+	_add_advertised_game (0000)
 00115800 0050:
-	_code_00115800 (0000)
+	_network_game_client_set_error (0000)
 00115850 00c0:
-	_code_00115850 (0000)
+	_network_game_client_update_precache_status (0000)
 00115910 0080:
-	_code_00115910 (0000)
+	_network_game_client_process_incoming_messages (0000)
 00115990 0260:
 	_network_game_client_leave_game (0000)
 00115BF0 01f0:
@@ -91,15 +91,15 @@ symbols in this file:
 00116010 00e0:
 	_network_game_client_reset (0000)
 001160F0 02c0:
-	_code_001160f0 (0000)
+	_network_game_client_idle_searching (0000)
 001163B0 0180:
-	_code_001163b0 (0000)
+	_network_game_client_idle_joining (0000)
 00116530 00d0:
-	_code_00116530 (0000)
+	_network_game_client_idle_pregame (0000)
 00116600 0190:
-	_code_00116600 (0000)
+	_network_game_client_idle_ingame (0000)
 00116790 00a0:
-	_code_00116790 (0000)
+	_network_game_client_idle_postgame (0000)
 00116830 0090:
 	_network_game_client_create (0000)
 001168C0 0130:
@@ -785,17 +785,17 @@ typedef char network_game_client_connection_silent_offset_assert[
 
 /* ---------- prototypes */
 
-static boolean network_game_client_network_available(
+static boolean check_networking_and_generate_error(
 	void);
 static void network_game_client_set_error(
 	struct network_game_client *client,
 	word error);
-static boolean network_game_client_add_advertised_game(
+static boolean add_advertised_game(
 	struct network_advertised_game *available_games,
 	struct message_server_game_advertise *advertisement);
 static boolean network_game_client_process_incoming_messages(
 	struct network_game_client *client);
-static void network_game_client_precache_map(
+static void network_game_client_update_precache_status(
 	struct network_game_client *client);
 static boolean network_game_client_idle_searching(
 	struct network_game_client *client);
@@ -810,12 +810,13 @@ static boolean network_game_client_idle_postgame(
 
 /* ---------- globals */
 
+struct network_game_client network_game_client_dont_use_directly;
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
 /* ---------- public code */
 
-static boolean network_game_client_network_available(
+static boolean check_networking_and_generate_error(
 	void)
 {
 	boolean connected = TRUE;
@@ -1282,7 +1283,7 @@ void network_game_client_new_advertised_game(
 		0x2FC,
 		client && message_packet);
 
-	network_game_client_add_advertised_game(client->available_games, message_packet);
+	add_advertised_game(client->available_games, message_packet);
 
 	return;
 }
@@ -2185,7 +2186,7 @@ boolean network_game_client_request_start_time_change(
 
 void network_game_client_reset(
 	struct network_game_client *client,
-	boolean leave_connection_open)
+	boolean teardown_connection)
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
@@ -2197,7 +2198,7 @@ void network_game_client_reset(
 	client->machine_index = NONE;
 	client->state = _network_game_client_state_searching;
 
-	if (leave_connection_open && client->connection &&
+	if (teardown_connection && client->connection &&
 		(boolean)network_connection_connected(client->connection))
 	{
 		client->join_in_progress = TRUE;
@@ -2321,7 +2322,7 @@ void network_game_client_rejected_by_game(
 
 /* ---------- private code */
 
-static boolean network_game_client_add_advertised_game(
+static boolean add_advertised_game(
 	struct network_advertised_game *available_games,
 	struct message_server_game_advertise *advertisement)
 {
@@ -2487,7 +2488,7 @@ static boolean network_game_client_process_incoming_messages(
 	return success;
 }
 
-static void network_game_client_precache_map(
+static void network_game_client_update_precache_status(
 	struct network_game_client *client)
 {
 	long now = system_milliseconds();
@@ -2538,7 +2539,7 @@ static boolean network_game_client_idle_searching(
 
 	network_connection_keep_alive(client->connection);
 
-	success = network_game_client_network_available();
+	success = check_networking_and_generate_error();
 
 	if (success == TRUE)
 	{
@@ -2664,7 +2665,7 @@ static boolean network_game_client_idle_searching(
 static boolean network_game_client_idle_joining(
 	struct network_game_client *client)
 {
-	boolean success = network_game_client_network_available();
+	boolean success = check_networking_and_generate_error();
 
 	if (success == TRUE)
 	{
@@ -2744,14 +2745,14 @@ static boolean network_game_client_idle_joining(
 static boolean network_game_client_idle_pregame(
 	struct network_game_client *client)
 {
-	boolean success = network_game_client_network_available();
+	boolean success = check_networking_and_generate_error();
 
 	if (success)
 	{
 		if (network_connection_active(client->connection) &&
 			(boolean)network_connection_connected(client->connection))
 		{
-			network_game_client_precache_map(client);
+			network_game_client_update_precache_status(client);
 
 			if (!(success = network_connection_idle(client->connection, 15000, NULL)))
 			{
@@ -2857,7 +2858,7 @@ static boolean network_game_client_idle_ingame(
 static boolean network_game_client_idle_postgame(
 	struct network_game_client *client)
 {
-	boolean success = network_game_client_network_available();
+	boolean success = check_networking_and_generate_error();
 
 	if (success)
 	{

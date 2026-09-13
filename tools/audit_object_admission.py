@@ -21,6 +21,7 @@ if __package__ in (None, ""):
 
 from tools.object_admission_policy import load_rejection_index
 from tools.semantic_progress import (
+    apply_semantic_accepted_ledger,
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
@@ -116,6 +117,7 @@ def audit(
         semantic_matches_path,
         config_path,
     )
+    apply_semantic_accepted_ledger(strict_report, semantic_report_path)
     apply_semantic_data_matches(
         strict_report,
         project_root,

@@ -8,6 +8,7 @@ from pathlib import Path
 from tools.coff_compare import build_coff, make_section_raw
 from tools.semantic_progress import (
     SemanticProgressError,
+    apply_semantic_accepted_ledger,
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
@@ -152,6 +153,96 @@ class SemanticProgressTests(unittest.TestCase):
         self.assertEqual(notes, [])
         self.assertEqual(report["measures"]["matched_code"], 20)
         self.assertEqual(report["measures"]["matched_functions"], 2)
+
+    def test_generated_semantic_ledger_credits_false_negative_once(self):
+        semantic_report = self.root / "semantic_report.json"
+        semantic_report.write_text(json.dumps({
+            "summary": {"accepted_exact": 1},
+            "ordinary_rejected": [],
+            "accepted_ledger": [{
+                "unit": "unit",
+                "function": "_fn",
+                "code_bytes": 16,
+                "padded_bytes": 16,
+                "proof_sources": ["semantic-coff"],
+            }],
+        }), encoding="utf-8")
+
+        notes = apply_semantic_accepted_ledger(self.report, semantic_report)
+
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(self.report["units"][0]["measures"]["matched_code"], 16)
+        self.assertEqual(
+            self.report["units"][0]["functions"][0]["fuzzy_match_percent"],
+            100.0,
+        )
+        self.assertEqual(
+            apply_semantic_accepted_ledger(self.report, semantic_report), [])
+
+    def test_generated_semantic_ledger_does_not_recredit_manifest_match(self):
+        self._apply()
+        before = copy.deepcopy(self.report)
+        semantic_report = self.root / "semantic_report.json"
+        semantic_report.write_text(json.dumps({
+            "summary": {"accepted_exact": 1},
+            "ordinary_rejected": [],
+            "accepted_ledger": [{
+                "unit": "unit",
+                "function": "_fn",
+                "code_bytes": 16,
+                "padded_bytes": 16,
+                "proof_sources": ["semantic-coff"],
+            }],
+        }), encoding="utf-8")
+
+        self.assertEqual(
+            apply_semantic_accepted_ledger(self.report, semantic_report), [])
+        self.assertEqual(self.report, before)
+
+    def test_generated_semantic_ledger_rejects_duplicates_and_veto_overlap(self):
+        entry = {
+            "unit": "unit",
+            "function": "_fn",
+            "code_bytes": 16,
+            "padded_bytes": 16,
+            "proof_sources": ["semantic-coff"],
+        }
+        semantic_report = self.root / "semantic_report.json"
+        semantic_report.write_text(json.dumps({
+            "summary": {"accepted_exact": 2},
+            "ordinary_rejected": [],
+            "accepted_ledger": [entry, entry],
+        }), encoding="utf-8")
+        with self.assertRaisesRegex(
+                SemanticProgressError, "duplicate semantic accepted"):
+            apply_semantic_accepted_ledger(self.report, semantic_report)
+
+        semantic_report.write_text(json.dumps({
+            "summary": {"accepted_exact": 1},
+            "ordinary_rejected": [{"unit": "unit", "function": "_fn"}],
+            "accepted_ledger": [entry],
+        }), encoding="utf-8")
+        with self.assertRaisesRegex(
+                SemanticProgressError, "overlaps rejection"):
+            apply_semantic_accepted_ledger(self.report, semantic_report)
+
+    def test_generated_semantic_ledger_requires_matching_report_size(self):
+        semantic_report = self.root / "semantic_report.json"
+        semantic_report.write_text(json.dumps({
+            "summary": {"accepted_exact": 1},
+            "ordinary_rejected": [],
+            "accepted_ledger": [{
+                "unit": "unit",
+                "function": "_fn",
+                "code_bytes": 12,
+                "padded_bytes": 16,
+                "proof_sources": ["semantic-coff"],
+            }],
+        }), encoding="utf-8")
+
+        with self.assertRaisesRegex(
+                SemanticProgressError, "accepted size differs"):
+            apply_semantic_accepted_ledger(self.report, semantic_report)
 
     def test_changed_object_refuses_credit(self):
         self.base_path.write_bytes(self._object(b"\xcc" * 16))

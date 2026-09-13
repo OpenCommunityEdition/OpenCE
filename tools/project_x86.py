@@ -27,6 +27,7 @@ from . import ninja_syntax
 from .ninja_syntax import serialize_path
 from .semantic_progress import (
     SemanticProgressError,
+    apply_semantic_accepted_ledger,
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
@@ -641,6 +642,10 @@ def calculate_progress(sln: SolutionConfig) -> None:
             sln.config_dir / "semantic_matches.json",
             Path("objdiff.json"),
         )
+        semantic_accepted = apply_semantic_accepted_ledger(
+            report_data,
+            sln.build_dir / "semantic_report.json",
+        )
         semantic_data_matches = apply_semantic_data_matches(
             report_data,
             Path.cwd(),
@@ -683,6 +688,8 @@ def calculate_progress(sln: SolutionConfig) -> None:
         progress_print(f"  Rejected objdiff false positive: {semantic_rejection}")
     for semantic_match in semantic_matches:
         progress_print(f"  Verified objdiff exception: {semantic_match}")
+    for semantic_match in semantic_accepted:
+        progress_print(f"  Verified semantic COFF result: {semantic_match}")
     for semantic_data_match in semantic_data_matches:
         progress_print(
             f"  Verified objdiff data exception: {semantic_data_match}")

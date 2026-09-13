@@ -123,7 +123,7 @@ boolean network_game_client_switch_to_pregame(
 	struct network_game_client *client);
 void network_game_client_reset(
 	struct network_game_client *client,
-	boolean leave_connection_open);
+	boolean teardown_connection);
 struct network_game_client *network_game_client_create(
 	void);
 struct network_connection *network_game_client_get_connection(

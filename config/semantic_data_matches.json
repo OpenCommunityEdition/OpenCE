@@ -412,5 +412,36 @@
       "relocation_count": 25,
       "normalized_sha256": "97a4c632a978acafd20933da4504d8ec3fdf3c5afd2f78934bced57dc8f746f4"
     }
+  },
+  {
+    "unit": "source/networking/network_server_manager",
+    "group": "bss-local-static-alias",
+    "reason": "The complete January and rebuilt BSS sections contain the same external in-use byte at offset 0 and the same TU-private four-byte team flip-flop at offset 4. The supplied Bungie source independently authenticates function-local static storage; csplit gives that private owner its recovered source name while VC7 emits the compiler-decorated block-static name. Logical bytes, section size and flags, owner offset/type/storage, and every code relocation are exact. See docs/object_matching_logs/network_server_manager_obj_bss_owner_completion_20260913.md.",
+    "members": [
+      {
+        "symbol": "_network_game_server_next_team_index",
+        "base_symbol": "?network_game_server_next_team_index@?1??network_game_server_add_player_to_game@@9@9",
+        "measurements": {
+          "target": {
+            "section": ".bss",
+            "size": 8,
+            "padded_size": 8,
+            "flags": 3224371328,
+            "relocation_count": 0,
+            "normalized_sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc",
+            "owner": { "value": 4, "type": 0, "storage": 3 }
+          },
+          "base": {
+            "section": ".bss",
+            "size": 8,
+            "padded_size": 8,
+            "flags": 3224371328,
+            "relocation_count": 0,
+            "normalized_sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc",
+            "owner": { "value": 4, "type": 0, "storage": 3 }
+          }
+        }
+      }
+    ]
   }
 ]

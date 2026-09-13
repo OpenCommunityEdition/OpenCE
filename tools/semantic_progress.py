@@ -2,8 +2,11 @@
 
 Entries in config/semantic_matches.json are never trusted on their own. Each
 entry is re-verified against the current target and rebuilt COFF objects before
-its function is credited. This keeps the ordinary objdiff report authoritative
-except where a stricter semantic relocation comparison proves exact equality.
+its function is credited. The sibling semantic report may then supply further
+accepted functions, but only through its fail-closed COFF ledger and only after
+the report identity, proof source, size, uniqueness and rejection set agree.
+This keeps the ordinary objdiff report authoritative except where a stricter
+semantic relocation comparison proves exact equality.
 """
 
 import json
@@ -453,6 +456,7 @@ def apply_semantic_matches(
         code_bytes = int(function["size"])
         _credit(report["measures"], code_bytes)
         _credit(report_unit["measures"], code_bytes)
+        function["fuzzy_match_percent"] = 100.0
 
         progress_categories = report_unit.get("metadata", {}).get("progress_categories", [])
         if isinstance(progress_categories, str):
@@ -465,6 +469,130 @@ def apply_semantic_matches(
         credited.append(
             f"{unit_name}:{function_name} (+{code_bytes} code bytes, +1 function)"
         )
+
+    return credited
+
+
+def apply_semantic_accepted_ledger(
+    report: Dict[str, Any],
+    semantic_report_path: Path,
+) -> List[str]:
+    """Credit additional functions proven by the generated COFF audit.
+
+    ``audit_semantic_matches.py`` produces ``accepted_ledger`` from the live
+    target and rebuilt objects.  This consumer deliberately admits only entries
+    carrying the ``semantic-coff`` proof source.  Ordinary objdiff entries are
+    already counted, compiler-local continuation labels are not promoted here,
+    and any duplicate, missing, size-mismatched or rejected identity fails
+    closed.  Explicit ``semantic_matches.json`` entries should be applied first;
+    they mark their report function exact and are therefore not double-counted.
+    """
+    if not semantic_report_path.is_file():
+        return []
+
+    semantic_report = json.loads(
+        semantic_report_path.read_text(encoding="utf-8"))
+    entries = semantic_report.get("accepted_ledger")
+    if not isinstance(entries, list):
+        raise SemanticProgressError(
+            "semantic report accepted_ledger must be a list")
+
+    expected_count = semantic_report.get("summary", {}).get("accepted_exact")
+    if expected_count is not None and int(expected_count) != len(entries):
+        raise SemanticProgressError(
+            "semantic report accepted ledger count does not match summary")
+
+    rejected_keys = set()
+    for entry in semantic_report.get("ordinary_rejected", []):
+        if not isinstance(entry, dict):
+            raise SemanticProgressError(
+                "semantic report ordinary_rejected entry must be an object")
+        unit_name = entry.get("unit")
+        function_name = entry.get("function")
+        if isinstance(unit_name, str) and isinstance(function_name, str):
+            rejected_keys.add((unit_name, function_name))
+
+    report_units = {unit["name"]: unit for unit in report.get("units", [])}
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    seen = set()
+    credited = []
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SemanticProgressError(
+                "semantic report accepted ledger entry must be an object")
+        unit_name = entry.get("unit")
+        function_name = entry.get("function")
+        if not isinstance(unit_name, str) or not isinstance(function_name, str):
+            raise SemanticProgressError(
+                "semantic report accepted ledger entry lacks an identity")
+        key = (unit_name, function_name)
+        if key in seen:
+            raise SemanticProgressError(
+                f"duplicate semantic accepted ledger entry: "
+                f"{unit_name}:{function_name}")
+        seen.add(key)
+        if key in rejected_keys:
+            raise SemanticProgressError(
+                f"semantic accepted ledger overlaps rejection: "
+                f"{unit_name}:{function_name}")
+
+        proof_sources = entry.get("proof_sources")
+        if not isinstance(proof_sources, list):
+            raise SemanticProgressError(
+                f"semantic accepted ledger lacks proof sources: "
+                f"{unit_name}:{function_name}")
+        if "semantic-coff" not in proof_sources:
+            continue
+        if function_name.startswith("$"):
+            raise SemanticProgressError(
+                f"semantic COFF ledger may not promote a local continuation: "
+                f"{unit_name}:{function_name}")
+
+        report_unit = report_units.get(unit_name)
+        if report_unit is None:
+            raise SemanticProgressError(
+                f"semantic accepted ledger unit not found: {unit_name}")
+        functions = [
+            function for function in report_unit.get("functions", [])
+            if function.get("name") == function_name
+        ]
+        if len(functions) != 1:
+            raise SemanticProgressError(
+                f"expected one report function {unit_name}:{function_name}, "
+                f"found {len(functions)}")
+        function = functions[0]
+        try:
+            code_bytes = int(entry["code_bytes"])
+            report_bytes = int(function["size"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise SemanticProgressError(
+                f"invalid semantic accepted size for "
+                f"{unit_name}:{function_name}") from error
+        if code_bytes <= 0 or report_bytes != code_bytes:
+            raise SemanticProgressError(
+                f"semantic accepted size differs for "
+                f"{unit_name}:{function_name}: {code_bytes}/{report_bytes}")
+        if float(function.get("fuzzy_match_percent", 0.0)) == 100.0:
+            continue
+
+        _credit(report["measures"], code_bytes)
+        _credit(report_unit["measures"], code_bytes)
+        function["fuzzy_match_percent"] = 100.0
+
+        progress_categories = report_unit.get(
+            "metadata", {}).get("progress_categories", [])
+        if isinstance(progress_categories, str):
+            progress_categories = [progress_categories]
+        for category_id in progress_categories:
+            if category_id not in categories:
+                raise SemanticProgressError(
+                    f"semantic accepted category not found: {category_id}")
+            _credit(categories[category_id]["measures"], code_bytes)
+
+        credited.append(
+            f"{unit_name}:{function_name} "
+            f"(+{code_bytes} code bytes, +1 function)")
 
     return credited
 
