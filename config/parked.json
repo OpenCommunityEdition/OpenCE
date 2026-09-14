@@ -2996,44 +2996,6 @@
       }
     },
     {
-      "unit": "source/units/unit_dialogue",
-      "function": "_unit_dialogue_determine_variant",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed January behavior from target disassembly and the independent HaloCEA applied-type lift: collect at most sixteen dialogue variants below 100, report the authenticated silent overflow error, select sequentially through the PDB-authenticated sequential_counter global, and store the selected variant only when the unit has no variant. Target and candidate both occupy 176 padded bytes with all seven relocation identities, and objdiff reports 88.95522 percent. The residual is confined to VC7's final independent load/increment/store register schedule; bounded natural local and direct-assignment spellings did not close it. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 7,
-          "normalized_sha256": "5331055b840b29dd2d20476dd69850abee818a531a6da9e8373d5f98e8b90ef1"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 7,
-          "normalized_sha256": "b54dcf839bc4a04064e8b70f84bcf63f2da833933260f74fee0df91102b2ee88"
-        },
-        "objdiff_percent": 88.95522
-      }
-    },
-    {
-      "unit": "source/units/unit_dialogue",
-      "function": "_unit_dialogue_update",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked with the complete typed dialogue lifecycle recovered from January target disassembly and the independent HaloCEA Xbox lift. The retained function performs setup, damage-speech timer decay, head-marker sound placement, AI communication start/notify/finish transitions, delay expiration, speech completion, and queued-speech dequeue using the authenticated enum constant. It preserves January's independently corroborated double decrement of damage_minor_timer rather than silently repairing the original behavior. Target and candidate both occupy 768 padded bytes with all fifteen relocation identities; objdiff reports 98.4058 percent. Remaining differences are local branch and instruction scheduling, not missing behavior. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented control flow is retained.",
-      "measurements": {
-        "target": {
-          "size": 768,
-          "relocation_count": 15,
-          "normalized_sha256": "0bc104489dda51afb9471523058e2f12e6b20bd55ce54ddf6b49eab0b441ba8f"
-        },
-        "base": {
-          "size": 768,
-          "relocation_count": 15,
-          "normalized_sha256": "def7aab44a446dd38126ecfa09ffe755328450d1b55e840b75a6114e46ef1266"
-        },
-        "objdiff_percent": 98.4058
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
       "function": "__rasterizer_environment_shadow_begin",
       "class": "instruction-scheduling",
@@ -5011,17 +4973,6 @@
         "target": { "size": 272, "relocation_count": 15, "normalized_sha256": "7d9ee7e3b923460ae26a00c0612904b3106b6ed95c8c0491504d017841c1dc9c" },
         "base": { "size": 272, "relocation_count": 15, "normalized_sha256": "2b01a81debf36cda38bd965419e48997b2a2bbeac2dd4041f6752591f481edaf" },
         "objdiff_percent": 97.22727
-      }
-    },
-    {
-      "unit": "source/units/unit_dialogue",
-      "function": "_unit_notify_impulse_sound",
-      "class": "unclassified",
-      "evidence": "Complete January-authoritative, HCEA-cross-checked impulse-speech arbitration reconstruction retained from the 2026-09-12 packet. Target and candidate share the 240-byte extent and all 10 relocation identities but remain different in scheduling/register/branch shape. The natural typed body receives zero credit and no codegen pressure is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 240, "relocation_count": 10, "normalized_sha256": "ff46a3c5213b3d65bc19da918a094f3aba00c56dbc017a97f1e646a06df18c81" },
-        "base": { "size": 240, "relocation_count": 10, "normalized_sha256": "3582e4a63aa482d79f813af47a217c92370b47c7f9fa3221eef7f9fb1d97c7d7" },
-        "objdiff_percent": 84.39474
       }
     },
     {

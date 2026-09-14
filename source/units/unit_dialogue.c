@@ -219,7 +219,7 @@ real const global_speech_queue_times[NUMBER_OF_UNIT_SPEECH_PRIORITIES] =
 	3.0f,
 };
 
-long sequential_counter;
+static long sequential_counter;
 
 /* ---------- public code */
 
@@ -674,20 +674,18 @@ void unit_notify_impulse_sound(
 {
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_speech_item speech_item;
-	long play_type = sound_definition_index;
 	short vocalization_type = NONE;
-
-	play_type = unit_test_speech(
+	long test_sound_definition_index = sound_definition_index;
+	short play_type = unit_test_speech(
 		unit_index,
 		_unit_speech_scripted,
 		FALSE,
 		FALSE,
 		NULL,
 		&vocalization_type,
-		&play_type);
+		&test_sound_definition_index);
 
-	if ((short)play_type <= _unit_play_speech_immediate)
-		play_type = _unit_play_speech_immediate;
+	play_type = MAX(play_type, _unit_play_speech_immediate);
 
 	csmemset(&speech_item, 0, sizeof(speech_item));
 	speech_item.priority = _unit_speech_scripted;
@@ -695,7 +693,7 @@ void unit_notify_impulse_sound(
 	speech_item.sound_definition_index = sound_definition_index;
 	speech_item.pause_time = 24;
 	ai_communication_packet_new(&speech_item.ai);
-	unit_speak(unit_index, (short)play_type, &speech_item);
+	unit_speak(unit_index, play_type, &speech_item);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
@@ -955,7 +953,6 @@ void unit_dialogue_update(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
-	struct unit_speech *speech = &unit->unit.speech;
 
 	if (TEST_FLAG(unit->unit.flags, _unit_must_set_up_dialogue_bit))
 	{
@@ -963,29 +960,35 @@ void unit_dialogue_update(
 		SET_FLAG(unit->unit.flags, _unit_must_set_up_dialogue_bit, FALSE);
 	}
 
-	if (speech->damage_minor_decay_timer > 0 && --speech->damage_minor_decay_timer == 0)
+	if (unit->unit.speech.damage_minor_decay_timer > 0 && --unit->unit.speech.damage_minor_decay_timer == 0)
 	{
-		if (speech->damage_minor_sounds > 0)
+		if (unit->unit.speech.damage_minor_sounds > 0)
 		{
-			speech->damage_minor_sounds--;
-			speech->damage_minor_decay_timer = 22;
+			unit->unit.speech.damage_minor_sounds--;
+			unit->unit.speech.damage_minor_decay_timer = 22;
 		}
 	}
 
-	if (speech->damage_minor_timer > 0)
-		speech->damage_minor_timer--;
-	if (speech->damage_minor_timer > 0)
-		speech->damage_minor_timer--;
+	if (unit->unit.speech.damage_minor_timer > 0)
+		unit->unit.speech.damage_minor_timer--;
+	/* BUG (preserved for exact matching): January decrements damage_minor_timer
+	 * (+0x39C) a second time here and never touches damage_major_timer (+0x39E,
+	 * the field unit_make_damage_sound tests against zero and sets to 60), so a
+	 * unit's major pain vocalization is suppressed for good once one has played.
+	 * A corrected build should decrement damage_major_timer in this statement.
+	 */
+	if (unit->unit.speech.damage_minor_timer > 0)
+		unit->unit.speech.damage_minor_timer--;
 
-	if (speech->current.priority > _unit_speech_none)
+	if (unit->unit.speech.current.priority > _unit_speech_none)
 	{
-		if (speech->pre_delay_timer > 0)
+		if (unit->unit.speech.pre_delay_timer > 0)
 		{
-			speech->pre_delay_timer--;
+			unit->unit.speech.pre_delay_timer--;
 		}
 		else
 		{
-			if (!speech->played)
+			if (!unit->unit.speech.played)
 			{
 				struct object_marker marker;
 				real_point3d position;
@@ -1005,11 +1008,11 @@ void unit_dialogue_update(
 					forward = *global_forward3d;
 				}
 
-				if (speech->current.sound_definition_index != NONE)
+				if (unit->unit.speech.current.sound_definition_index != NONE)
 				{
-					speech->impulse_sound_index = object_impulse_sound_new(
+					unit->unit.speech.impulse_sound_index = object_impulse_sound_new(
 						unit_index,
-						speech->current.sound_definition_index,
+						unit->unit.speech.current.sound_definition_index,
 						node_index,
 						&position,
 						&forward,
@@ -1018,67 +1021,67 @@ void unit_dialogue_update(
 
 				ai_communication_started(
 					unit_index,
-					speech->current.priority,
-					speech->current.vocalization_type,
-					&speech->current.ai);
-				speech->played = TRUE;
+					unit->unit.speech.current.priority,
+					unit->unit.speech.current.vocalization_type,
+					&unit->unit.speech.current.ai);
+				unit->unit.speech.played = TRUE;
 			}
 
-			if (speech->ai_delay_timer > 0)
-				speech->ai_delay_timer--;
+			if (unit->unit.speech.ai_delay_timer > 0)
+				unit->unit.speech.ai_delay_timer--;
 
-			if (speech->sound_timer > 0)
+			if (unit->unit.speech.sound_timer > 0)
 			{
 				match_assert(
 					"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
 					757,
-					speech->current.priority > _unit_speech_none);
-				if (--speech->sound_timer == 0)
-					speech->impulse_sound_index = NONE;
+					unit->unit.speech.current.priority > _unit_speech_none);
+				if (--unit->unit.speech.sound_timer == 0)
+					unit->unit.speech.impulse_sound_index = NONE;
 			}
 			else
 			{
-				if (!speech->finished)
+				if (!unit->unit.speech.finished)
 				{
 					ai_communication_finished(
 						unit_index,
-						speech->current.priority,
-						speech->current.vocalization_type,
+						unit->unit.speech.current.priority,
+						unit->unit.speech.current.vocalization_type,
 						FALSE,
 						NONE,
-						&speech->current.ai);
-					speech->finished = TRUE;
+						&unit->unit.speech.current.ai);
+					unit->unit.speech.finished = TRUE;
 				}
 
-				if (speech->post_delay_timer > 0)
-					speech->post_delay_timer--;
-				if (speech->post_delay_timer == 0)
-					speech->ai_delay_timer = 0;
+				if (unit->unit.speech.post_delay_timer > 0)
+					unit->unit.speech.post_delay_timer--;
+				if (unit->unit.speech.post_delay_timer == 0)
+					unit->unit.speech.ai_delay_timer = 0;
 			}
 		}
 	}
 
-	if (speech->ai_delay_timer == 0 && !speech->notified_ai)
+	if (unit->unit.speech.ai_delay_timer == 0 && !unit->unit.speech.notified_ai)
 	{
 		ai_communication_notify(
 			unit_index,
-			speech->current.priority,
-			speech->current.vocalization_type,
-			&speech->current.ai);
-		speech->notified_ai = TRUE;
+			unit->unit.speech.current.priority,
+			unit->unit.speech.current.vocalization_type,
+			&unit->unit.speech.current.ai);
+		unit->unit.speech.notified_ai = TRUE;
 	}
 
-	if (speech->current.priority > _unit_speech_none &&
-		speech->sound_timer == 0 &&
-		speech->post_delay_timer == 0)
+	if (unit->unit.speech.current.priority > _unit_speech_none &&
+		unit->unit.speech.sound_timer == 0 &&
+		unit->unit.speech.post_delay_timer == 0)
 	{
-		speech->current.priority = _unit_speech_none;
+		unit->unit.speech.current.priority = _unit_speech_none;
 	}
 
-	if (speech->current.priority == _unit_speech_none &&
-		speech->queued.priority > _unit_speech_none)
+	if (unit->unit.speech.current.priority == _unit_speech_none &&
+		unit->unit.speech.queued.priority > _unit_speech_none)
 	{
-		unit_speak(unit_index, _unit_play_speech_immediate_dequeue, &speech->queued);
+		unit_speak(unit_index, _unit_play_speech_immediate_dequeue, &unit->unit.speech.queued);
 	}
 
 	return;
