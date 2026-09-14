@@ -57,6 +57,13 @@ enum sound_channel_state
 
 #define cache_base_address unknown1
 
+/* deferred DirectSound parameters are only resubmitted when they change by more than epsilon */
+#define realcmp_epsilon(a, b, epsilon) (fabs((a)-(b))<(epsilon))
+
+/* our world is right-handed with +z up, DirectSound is left-handed with +y up */
+#define DSOUND_POINT3D(p) ((p).x), ((p).z), ((p).y)
+#define DSOUND_VECTOR3D(v) ((v).i), ((v).k), ((v).j)
+
 /* ---------- structures */
 
 struct sound_virtual_channel
@@ -689,16 +696,14 @@ void dsound_flush(
 void dsound_set_listener_properties(
 	struct platform_sound_listener_properties const *properties)
 {
-	if (!(0.05f>fabs(properties->position.x-dsound_globals.listener_position.x)) ||
-		!(0.05f>fabs(properties->position.y-dsound_globals.listener_position.y)) ||
-		!(0.05f>fabs(properties->position.z-dsound_globals.listener_position.z)) ||
+	if (!realcmp_epsilon(properties->position.x, dsound_globals.listener_position.x, 0.05f) ||
+		!realcmp_epsilon(properties->position.y, dsound_globals.listener_position.y, 0.05f) ||
+		!realcmp_epsilon(properties->position.z, dsound_globals.listener_position.z, 0.05f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSound_SetPosition(
 			dsound_globals.direct_sound,
-			properties->position.x,
-			properties->position.z,
-			properties->position.y,
+			DSOUND_POINT3D(properties->position),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -709,22 +714,18 @@ void dsound_set_listener_properties(
 		dsound_globals.listener_position= properties->position;
 	}
 
-	if (!(0.05f>fabs(properties->forward.i-dsound_globals.listener_forward.i)) ||
-		!(0.05f>fabs(properties->forward.j-dsound_globals.listener_forward.j)) ||
-		!(0.05f>fabs(properties->forward.k-dsound_globals.listener_forward.k)) ||
-		!(0.05f>fabs(properties->up.i-dsound_globals.listener_up.i)) ||
-		!(0.05f>fabs(properties->up.j-dsound_globals.listener_up.j)) ||
-		!(0.05f>fabs(properties->up.k-dsound_globals.listener_up.k)) ||
+	if (!realcmp_epsilon(properties->forward.i, dsound_globals.listener_forward.i, 0.05f) ||
+		!realcmp_epsilon(properties->forward.j, dsound_globals.listener_forward.j, 0.05f) ||
+		!realcmp_epsilon(properties->forward.k, dsound_globals.listener_forward.k, 0.05f) ||
+		!realcmp_epsilon(properties->up.i, dsound_globals.listener_up.i, 0.05f) ||
+		!realcmp_epsilon(properties->up.j, dsound_globals.listener_up.j, 0.05f) ||
+		!realcmp_epsilon(properties->up.k, dsound_globals.listener_up.k, 0.05f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSound_SetOrientation(
 			dsound_globals.direct_sound,
-			properties->forward.i,
-			properties->forward.k,
-			properties->forward.j,
-			properties->up.i,
-			properties->up.k,
-			properties->up.j,
+			DSOUND_VECTOR3D(properties->forward),
+			DSOUND_VECTOR3D(properties->up),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -736,16 +737,14 @@ void dsound_set_listener_properties(
 		dsound_globals.listener_up= properties->up;
 	}
 
-	if (!(0.01f>fabs(properties->velocity.i-dsound_globals.listener_velocity.i)) ||
-		!(0.01f>fabs(properties->velocity.j-dsound_globals.listener_velocity.j)) ||
-		!(0.01f>fabs(properties->velocity.k-dsound_globals.listener_velocity.k)) ||
+	if (!realcmp_epsilon(properties->velocity.i, dsound_globals.listener_velocity.i, 0.01f) ||
+		!realcmp_epsilon(properties->velocity.j, dsound_globals.listener_velocity.j, 0.01f) ||
+		!realcmp_epsilon(properties->velocity.k, dsound_globals.listener_velocity.k, 0.01f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSound_SetVelocity(
 			dsound_globals.direct_sound,
-			properties->velocity.i,
-			properties->velocity.k,
-			properties->velocity.j,
+			DSOUND_VECTOR3D(properties->velocity),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -1337,16 +1336,14 @@ static void channel_set_location(
 		}
 	}
 
-	if (!(0.05f>fabs(location->position.x-channel->position.x)) ||
-		!(0.05f>fabs(location->position.y-channel->position.y)) ||
-		!(0.05f>fabs(location->position.z-channel->position.z)) ||
+	if (!realcmp_epsilon(location->position.x, channel->position.x, 0.05f) ||
+		!realcmp_epsilon(location->position.y, channel->position.y, 0.05f) ||
+		!realcmp_epsilon(location->position.z, channel->position.z, 0.05f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSoundStream_SetPosition(
 			channel->stream,
-			location->position.x,
-			location->position.z,
-			location->position.y,
+			DSOUND_POINT3D(location->position),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -1357,9 +1354,9 @@ static void channel_set_location(
 		channel->position= location->position;
 	}
 
-	if (!(0.05f>fabs(location->forward.i-channel->forward.i)) ||
-		!(0.05f>fabs(location->forward.j-channel->forward.j)) ||
-		!(0.05f>fabs(location->forward.k-channel->forward.k)) ||
+	if (!realcmp_epsilon(location->forward.i, channel->forward.i, 0.05f) ||
+		!realcmp_epsilon(location->forward.j, channel->forward.j, 0.05f) ||
+		!realcmp_epsilon(location->forward.k, channel->forward.k, 0.05f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result;
@@ -1371,9 +1368,7 @@ static void channel_set_location(
 
 		result= IDirectSoundStream_SetConeOrientation(
 			channel->stream,
-			location->forward.i,
-			location->forward.k,
-			location->forward.j,
+			DSOUND_VECTOR3D(location->forward),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -1384,16 +1379,14 @@ static void channel_set_location(
 		channel->forward= location->forward;
 	}
 
-	if (!(0.01f>fabs(location->translational_velocity.i-channel->translational_velocity.i)) ||
-		!(0.01f>fabs(location->translational_velocity.j-channel->translational_velocity.j)) ||
-		!(0.01f>fabs(location->translational_velocity.k-channel->translational_velocity.k)) ||
+	if (!realcmp_epsilon(location->translational_velocity.i, channel->translational_velocity.i, 0.01f) ||
+		!realcmp_epsilon(location->translational_velocity.j, channel->translational_velocity.j, 0.01f) ||
+		!realcmp_epsilon(location->translational_velocity.k, channel->translational_velocity.k, 0.01f) ||
 		!dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSoundStream_SetVelocity(
 			channel->stream,
-			location->translational_velocity.i,
-			location->translational_velocity.k,
-			location->translational_velocity.j,
+			DSOUND_VECTOR3D(location->translational_velocity),
 			DS3D_DEFERRED);
 
 		if (result<0)
@@ -1404,15 +1397,15 @@ static void channel_set_location(
 		channel->translational_velocity= location->translational_velocity;
 	}
 
-	if (!(0.001f>fabs(occlusion-channel->occlusion)) ||
-		!(0.001f>fabs(obstruction-channel->obstruction)) ||
+	if (!realcmp_epsilon(occlusion, channel->occlusion, 0.001f) ||
+		!realcmp_epsilon(obstruction, channel->obstruction, 0.001f) ||
 		channel->attenuate_direct_path!=attenuate_direct_path ||
 		spatialization_changed ||
 		!dsound_globals.initialized)
 	{
-		channel->attenuate_direct_path= attenuate_direct_path;
 		channel->occlusion= occlusion;
 		channel->obstruction= obstruction;
+		channel->attenuate_direct_path= attenuate_direct_path;
 
 		channel_set_i3dl2_source(channel_index);
 	}
@@ -1441,7 +1434,7 @@ static void channel_set_properties(
 		982,
 		channel->stream);
 
-	if (!(0.001f>fabs(gain-channel->gain)) || !dsound_globals.initialized)
+	if (!realcmp_epsilon(gain, channel->gain, 0.001f) || !dsound_globals.initialized)
 	{
 		HRESULT result= IDirectSoundStream_SetVolume(
 			channel->stream,
@@ -1457,7 +1450,7 @@ static void channel_set_properties(
 
 	if (!gain_only)
 	{
-		if (!(0.001f>fabs(properties->pitch-channel->pitch)) || !dsound_globals.initialized)
+		if (!realcmp_epsilon(properties->pitch, channel->pitch, 0.001f) || !dsound_globals.initialized)
 		{
 			unsigned long samples_per_second= sound_samples_per_second(
 				TEST_FLAG(channel->type_flags, _sound_channel_44k_bit));
@@ -1475,7 +1468,7 @@ static void channel_set_properties(
 
 		if (TEST_FLAG(channel->type_flags, _sound_channel_3d_bit))
 		{
-			if (!(0.05f>fabs(properties->maximum_distance-channel->maximum_distance)) ||
+			if (!realcmp_epsilon(properties->maximum_distance, channel->maximum_distance, 0.05f) ||
 				!dsound_globals.initialized)
 			{
 				HRESULT result= IDirectSoundStream_SetMaxDistance(
@@ -1491,7 +1484,7 @@ static void channel_set_properties(
 				channel->maximum_distance= properties->maximum_distance;
 			}
 
-			if (!(0.05f>fabs(properties->minimum_distance-channel->minimum_distance)) ||
+			if (!realcmp_epsilon(properties->minimum_distance, channel->minimum_distance, 0.05f) ||
 				!dsound_globals.initialized)
 			{
 				HRESULT result= IDirectSoundStream_SetMinDistance(
@@ -1507,8 +1500,8 @@ static void channel_set_properties(
 				channel->minimum_distance= properties->minimum_distance;
 			}
 
-			if (!(0.034906585f>fabs(properties->cone_inside_angle-channel->cone_inside_angle)) ||
-				!(0.034906585f>fabs(properties->cone_outside_angle-channel->cone_outside_angle)) ||
+			if (!realcmp_epsilon(properties->cone_inside_angle, channel->cone_inside_angle, 0.034906585f) ||
+				!realcmp_epsilon(properties->cone_outside_angle, channel->cone_outside_angle, 0.034906585f) ||
 				!dsound_globals.initialized)
 			{
 				HRESULT result= IDirectSoundStream_SetConeAngles(
@@ -1526,7 +1519,7 @@ static void channel_set_properties(
 				channel->cone_outside_angle= properties->cone_outside_angle;
 			}
 
-			if (!(0.001f>fabs(properties->cone_outside_gain-channel->cone_outside_gain)) ||
+			if (!realcmp_epsilon(properties->cone_outside_gain, channel->cone_outside_gain, 0.001f) ||
 				!dsound_globals.initialized)
 			{
 				HRESULT result= IDirectSoundStream_SetConeOutsideVolume(
@@ -1542,7 +1535,7 @@ static void channel_set_properties(
 				channel->cone_outside_gain= properties->cone_outside_gain;
 			}
 
-			if (!(0.001f>fabs(properties->reverb_attenuation-channel->reverb_attenuation)) ||
+			if (!realcmp_epsilon(properties->reverb_attenuation, channel->reverb_attenuation, 0.001f) ||
 				!dsound_globals.initialized)
 			{
 				channel->reverb_attenuation= properties->reverb_attenuation;
