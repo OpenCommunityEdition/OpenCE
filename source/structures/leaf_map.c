@@ -1070,30 +1070,27 @@ static void leaf_map_build_portals_from_leaf(
 
 	for (child_index = 0; child_index < 2; child_index++)
 	{
-		boolean descend_from_this_node = ancestor_node_index == NONE && child_index != 0 && first_traversal_node < 0;
+		boolean descend_from_this_node = ancestor_node_index == NONE && child_index != 0 && (first_traversal_node & LONG_MIN) != 0;
 		long child_node_index;
 
-		if (ancestor_node_index == NONE)
+		if (ancestor_node_index == NONE && child_index == 0 && !(first_traversal_node & LONG_MIN))
 		{
-			if (child_index == 0 && first_traversal_node >= 0)
+			continue;
+		}
+
+		if (descend_from_this_node)
+		{
+			short face_index = map_leaf_find_face_on_node(
+				leaf_map,
+				TAG_BLOCK_GET_ELEMENT(&leaf_map->leaves, index_from_node(leaf_index), struct map_leaf),
+				node_index);
+
+			if (face_index == NONE)
 			{
 				continue;
 			}
-
-			if (descend_from_this_node)
-			{
-				struct map_leaf *leaf = TAG_BLOCK_GET_ELEMENT(
-					&leaf_map->leaves,
-					index_from_node(leaf_index),
-					struct map_leaf);
-
-				if (map_leaf_find_face_on_node(leaf_map, leaf, node_index) == NONE)
-				{
-					continue;
-				}
-			}
 		}
-		else if (plane_on_stack && side == child_index)
+		else if (ancestor_node_index != NONE && plane_on_stack && side == child_index)
 		{
 			continue;
 		}

@@ -4118,12 +4118,12 @@
     {
       "unit": "source/structures/leaf_map",
       "function": "_leaf_map_build_portals_from_leaf",
-      "class": "unclassified",
-      "evidence": "Best complete ordinary-C recursive portal traversal retained from the interrupted Opus Leaf Map graph. Same-build symbols authenticate the private name; January's branch, relocation and assertion topology plus the independent HCEA lift support the behavior. Natural signed designator comparisons are retained without source-pressure rewrites. Target is 480 padded bytes and canonical is 432, both with 17 relocations; objdiff reports 63.948864 percent. No precise natural source-level mechanism is proved. Zero exact credit. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
+      "class": "csplit-relocation-alias",
+      "evidence": "Best complete ordinary-C recursive portal traversal retained from the interrupted Opus Leaf Map graph. Same-build symbols authenticate the private name; January's branch, relocation and assertion topology plus the independent HCEA lift support the behavior. Natural signed designator comparisons are retained without source-pressure rewrites. Target is 480 padded bytes and canonical is 432, both with 17 relocations; objdiff reports 63.948864 percent. No precise natural source-level mechanism is proved. Zero exact credit. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1 Batch B, adversarially verified) the body became resolved-address identical to January (480/17): the inline frequency law explains the 48-byte inlined map_leaf_find_face_on_node, the HCEA-corroborated flattened gate topology and the jns-proven LONG_MIN designator tests are reproduced. The single remaining difference is a csplit relocation alias at +0x6a (_faked_xbox_command_line+4 in the split vs _leaf_map_globals-4 in the candidate, both image address 4982956), so the class is csplit-relocation-alias. See docs/object_matching_logs/leaf_map_obj_opus5_150k_w1_20260914.md.",
       "measurements": {
         "target": { "size": 480, "relocation_count": 17, "normalized_sha256": "d50628a74d0b5faa208698ae864a472891a40d442d219bd01dd148adb640fe81" },
-        "base": { "size": 432, "relocation_count": 17, "normalized_sha256": "8e4bf5849992759b74e770a10ea4e2173b3a3626c137a8f20dc3514267fd54a7" },
-        "objdiff_percent": 63.948864
+        "base": { "size": 480, "relocation_count": 17, "normalized_sha256": "d50628a74d0b5faa208698ae864a472891a40d442d219bd01dd148adb640fe81" },
+        "objdiff_percent": 100.0
       }
     },
     {
