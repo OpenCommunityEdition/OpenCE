@@ -656,11 +656,11 @@ boolean actor_aim_jump(
 				leap = TRUE;
 			}
 
-			jump_velocity->i = actor->control.jump_alignment_vector.i *
-				actor->control.jump_target_horizontal_vel;
-			jump_velocity->j = actor->control.jump_alignment_vector.j *
-				actor->control.jump_target_horizontal_vel;
-			jump_velocity->k = actor->control.jump_target_vertical_vel;
+			set_real_vector3d(
+				jump_velocity,
+				actor->control.jump_alignment_vector.i * actor->control.jump_target_horizontal_vel,
+				actor->control.jump_alignment_vector.j * actor->control.jump_target_horizontal_vel,
+				actor->control.jump_target_vertical_vel);
 			magnitude = magnitude3d(jump_velocity);
 
 			if (!leap && magnitude > jump_magnitude)
@@ -2451,21 +2451,27 @@ static void actor_move_calculate_movement(
 			break;
 
 		case _actor_facing_backward:
-			facing_vector.i = -movement_vector.i;
-			facing_vector.j = -movement_vector.j;
-			facing_vector.k = movement_vector.k;
+			set_real_vector3d(
+				&facing_vector,
+				-movement_vector.i,
+				-movement_vector.j,
+				movement_vector.k);
 			break;
 
 		case _actor_facing_left:
-			facing_vector.i = -movement_vector.j;
-			facing_vector.j = movement_vector.i;
-			facing_vector.k = movement_vector.k;
+			set_real_vector3d(
+				&facing_vector,
+				-movement_vector.j,
+				movement_vector.i,
+				movement_vector.k);
 			break;
 
 		case _actor_facing_right:
-			facing_vector.i = movement_vector.j;
-			facing_vector.j = -movement_vector.i;
-			facing_vector.k = movement_vector.k;
+			set_real_vector3d(
+				&facing_vector,
+				movement_vector.j,
+				-movement_vector.i,
+				movement_vector.k);
 			break;
 
 		default:
@@ -2492,7 +2498,7 @@ static void actor_move_calculate_movement(
 		{
 			real_vector3d movement_vector = *desired_movement_vector;
 			real_vector3d actor_facing_vector;
-			real_vector3d const *free_facing_vector = &facing_vector;
+			real_vector3d const *free_facing_vector;
 
 			face_actor_facing = FALSE;
 
@@ -2525,6 +2531,10 @@ static void actor_move_calculate_movement(
 				if (normalize3d(&actor_facing_vector) == 0.f)
 					actor_facing_vector = facing_vector;
 				free_facing_vector = &actor_facing_vector;
+			}
+			else
+			{
+				free_facing_vector = &facing_vector;
 			}
 			actor_move_calculate_free(move_in_3d, &movement_vector, free_facing_vector, &free_throttle);
 			facing_direction = _actor_facing_free;
@@ -2565,8 +2575,11 @@ static void actor_move_calculate_movement(
 	{
 		if (!actor->state.flying)
 		{
+			long pathfinding_surface_index;
+
 			actor_find_pathfinding_location(actor_index);
-			if (actor->input.pathfinding_surface_index != NONE)
+			pathfinding_surface_index = actor->input.pathfinding_surface_index;
+			if (pathfinding_surface_index != NONE)
 			{
 				real_vector3d movement_direction;
 				boolean test_movement_direction = TRUE;
@@ -2574,23 +2587,35 @@ static void actor_move_calculate_movement(
 				switch (facing_direction)
 				{
 				case _actor_facing_forward:
-					movement_direction.i = actor->input.facing_vector.i;
-					movement_direction.j = actor->input.facing_vector.j;
+					set_real_vector3d(
+						&movement_direction,
+						actor->input.facing_vector.i,
+						actor->input.facing_vector.j,
+						actor->input.facing_vector.k);
 					break;
 
 				case _actor_facing_backward:
-					movement_direction.i = -actor->input.facing_vector.i;
-					movement_direction.j = -actor->input.facing_vector.j;
+					set_real_vector3d(
+						&movement_direction,
+						-actor->input.facing_vector.i,
+						-actor->input.facing_vector.j,
+						actor->input.facing_vector.k);
 					break;
 
 				case _actor_facing_left:
-					movement_direction.i = actor->input.facing_vector.j;
-					movement_direction.j = -actor->input.facing_vector.i;
+					set_real_vector3d(
+						&movement_direction,
+						actor->input.facing_vector.j,
+						-actor->input.facing_vector.i,
+						actor->input.facing_vector.k);
 					break;
 
 				case _actor_facing_right:
-					movement_direction.i = -actor->input.facing_vector.j;
-					movement_direction.j = actor->input.facing_vector.i;
+					set_real_vector3d(
+						&movement_direction,
+						-actor->input.facing_vector.j,
+						actor->input.facing_vector.i,
+						actor->input.facing_vector.k);
 					break;
 
 				default:
@@ -2600,7 +2625,6 @@ static void actor_move_calculate_movement(
 
 				if (test_movement_direction)
 				{
-					movement_direction.k = actor->input.facing_vector.k;
 					if (normalize2d((real_vector2d *)&movement_direction) > 0.f)
 					{
 						struct path_collision_result collision;
@@ -2616,7 +2640,7 @@ static void actor_move_calculate_movement(
 							global_structure_bsp_get(),
 							actor->emotions.ignorant_of_broken_surfaces,
 							(real_point2d const *)&actor->input.position.body_position,
-							actor->input.pathfinding_surface_index,
+							pathfinding_surface_index,
 							(real_point2d const *)&test_point,
 							NONE,
 							&collision))
@@ -2655,15 +2679,15 @@ static void actor_move_calculate_movement(
 				maximum_throttle,
 				(movement_distance - maximum_stopping_distance) /
 					(current_stopping_distance - maximum_stopping_distance));
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\actor_moving.c",
-				1634,
-				(maximum_throttle >= 0.0f) && (maximum_throttle <= 1.0f));
 		}
 		else
 		{
 			maximum_throttle = 0.f;
 		}
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_moving.c",
+			1634,
+			(maximum_throttle >= 0.0f) && (maximum_throttle <= 1.0f));
 	}
 
 	throttle = *global_zero_vector3d;
@@ -2745,7 +2769,7 @@ static void actor_move_calculate_movement(
 			if (rotation_emergency_amount > 1.0f)
 				maximum_steering_angle = MIN(rotation_emergency_amount, 1.5f)*steering_maximum_angle;
 			minimum_steering_angle = MIN(angle*3.0f, minimum_steering_angle);
-			steering_angle = PIN(angle, minimum_steering_angle, maximum_steering_angle);
+			steering_angle = PIN(steering_angle, minimum_steering_angle, maximum_steering_angle);
 		}
 
 		if (steering_angle > actor->control.face_exactly_oversteer_angle)
