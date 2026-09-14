@@ -21,44 +21,6 @@
       }
     },
     {
-      "unit": "source/interface/hud_draw",
-      "function": "_get_flash_color",
-      "class": "unclassified",
-      "evidence": "Best complete house-rule-reviewed HUD flash reconstruction. It uses named flash flags, project real/color types, natural fmod/cos/square-root interpolation, and no source-pressure steering. Candidate and target both occupy 608 padded bytes with all 32 relocation identities and score 99.944725% objdiff. The genuine call also causes the January-inline square_root body to appear as a target-absent candidate section; that helper receives no exact credit and keeps the whole object from object-exact status. Reopen with authoritative January inline provenance or a natural same-compiler donor explaining the residual/helper schedule.",
-      "measurements": {
-        "target": {
-          "size": 608,
-          "relocation_count": 32,
-          "normalized_sha256": "0717c2b85934e185e6cfb38a82a90f3160bc2e1b3372c2eb80d27af1f4f1818b"
-        },
-        "base": {
-          "size": 608,
-          "relocation_count": 32,
-          "normalized_sha256": "35adc125fc6d7a1f0bc5a94ba0ee65fc6cad065651ef7c216c9a747a6732452b"
-        },
-        "objdiff_percent": 99.944725
-      }
-    },
-    {
-      "unit": "source/interface/hud_draw",
-      "function": "_hud_draw_bitmap_direct",
-      "class": "unclassified",
-      "evidence": "Best complete readable bitmap-direct reconstruction retained at zero exact credit. It follows the owning HUD interface, uses project geometry/bitmap types and the shared draw path, and has no artificial compiler controls. The candidate has all 15 target relocation identities but is 336 versus 320 padded bytes; the remaining difference is not assigned a stronger cause without evidence. Reopen only with authoritative January source or a natural same-compiler donor.",
-      "measurements": {
-        "target": {
-          "size": 320,
-          "relocation_count": 15,
-          "normalized_sha256": "6ec7215284a2c2248b4524f4229982fa6855489a4033c233b7c9ba5505a9a8c8"
-        },
-        "base": {
-          "size": 336,
-          "relocation_count": 15,
-          "normalized_sha256": "e13047e3464fe9dc0fc3e4382ddacf2415f83322c0edc8c06750a348eb0597a9"
-        },
-        "objdiff_percent": 93.88
-      }
-    },
-    {
       "unit": "source/main/main",
       "function": "_main_game_render",
       "class": "unclassified",
@@ -5511,44 +5473,6 @@
           "normalized_sha256": "5a3d5f2d21a3a7416760c0efdbd4489c670ae641042e6c564dd9b34ee4a6432f"
         },
         "objdiff_percent": 91.88461
-      }
-    },
-    {
-      "unit": "source/interface/hud_draw",
-      "function": "_hud_draw_bitmap_internal",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January target CFG directly loads the fog definition animation distance and multiplies it by the literal zero before building the renderer offset vector; independent Halo CE PC and HCEA reconstructions preserve the same disabled operation, while the stripped January PDB exposes no local phase name. The source labels this target-proven behavior under the original-bug policy instead of inventing an animation expression. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 16,
-          "normalized_sha256": "afc1044b43f5f168eed9a6f96553231667e861929533abbac26a2b229df5b972"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 16,
-          "normalized_sha256": "fcfc4a4eebd7b00d6325212d2d737886467259b5e79b8bfada2142ea5908445d"
-        },
-        "objdiff_percent": 86.4012
-      }
-    },
-    {
-      "unit": "source/interface/hud_draw",
-      "function": "_hud_draw_bitmap_with_meter",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. January directly proves the apparently nonsensical animation operation: fld [definition+4] followed by a relocation-backed fmul of __real@00000000. Independent HCEA and Halo CE PC reconstructions preserve the same literal-zero multiply, while Marathon has no corresponding planar-fog animation implementation and January's stripped structures.obj PDB module contains no local-variable records from which an original phase name could be recovered. The source therefore labels this target-proven disabled feature as an original bug instead of inventing a time-varying expression. Current canonical target/base COFF measurements remain non-identical; the candidate is 16 padded bytes longer with the same relocation count, and the residual remains an instruction-selection/scheduling difference. Objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 384,
-          "relocation_count": 17,
-          "normalized_sha256": "e44c9d5bbd7d5279cc45630280f6b347dfc572ab2e635e4a5a84ad940d3ac4e8"
-        },
-        "base": {
-          "size": 400,
-          "relocation_count": 17,
-          "normalized_sha256": "db685d4d000e7a31c14cacedc43115c1c7a8f8643a25880ef470cc16433dd942"
-        },
-        "objdiff_percent": 93.35714
       }
     },
     {

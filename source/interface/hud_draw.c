@@ -1110,6 +1110,8 @@ pixel32 get_flash_color(
 		}
 		else if (flash_phase < hud_color->flash_length)
 		{
+			/* the color is blended as a vector of its first three components
+			 * followed by a scalar for the fourth (n[3]) */
 			real fraction = square_root(
 				PIN(
 					(real)(1.0 -
@@ -1122,28 +1124,28 @@ pixel32 get_flash_color(
 				_hud_flash_reverse_colors_bit))
 			{
 				vectors_interpolate(
-					(real_vector3d const *)&flash_color.rgb,
-					(real_vector3d const *)&base_color.rgb,
+					(real_vector3d const *)&flash_color,
+					(real_vector3d const *)&base_color,
 					fraction,
-					(real_vector3d *)&result.rgb);
+					(real_vector3d *)&result);
 				scalars_interpolate(
-					flash_color.alpha,
-					base_color.alpha,
+					flash_color.n[3],
+					base_color.n[3],
 					fraction,
-					&result.alpha);
+					&result.n[3]);
 			}
 			else
 			{
 				vectors_interpolate(
-					(real_vector3d const *)&base_color.rgb,
-					(real_vector3d const *)&flash_color.rgb,
+					(real_vector3d const *)&base_color,
+					(real_vector3d const *)&flash_color,
 					fraction,
-					(real_vector3d *)&result.rgb);
+					(real_vector3d *)&result);
 				scalars_interpolate(
-					base_color.alpha,
-					flash_color.alpha,
+					base_color.n[3],
+					flash_color.n[3],
 					fraction,
-					&result.alpha);
+					&result.n[3]);
 			}
 		}
 		else
@@ -1434,11 +1436,10 @@ static void hud_draw_bitmap_internal(
 
 	for (vertex_index = 0; vertex_index < 4; vertex_index++)
 	{
-		long use_x1 = (vertex_index+1)&2;
-		real texture_x = use_x1 ? clip->x1 : clip->x0;
-		real texture_y = vertex_index>1 ? clip->y1 : clip->y0;
-		real bound_x = use_x1 ? bounds->x1 : bounds->x0;
-		real bound_y = vertex_index>1 ? bounds->y1 : bounds->y0;
+		real texture_x = ((vertex_index + 1) & 2) ? clip->x1 : clip->x0;
+		real texture_y = vertex_index > 1 ? clip->y1 : clip->y0;
+		real bound_x = ((vertex_index + 1) & 2) ? bounds->x1 : bounds->x0;
+		real bound_y = vertex_index > 1 ? bounds->y1 : bounds->y0;
 
 		vertices[vertex_index].position.x = (real)(point->x + fast_ftol(
 			(bound_x*cos_theta-bound_y*sin_theta)*xy_scale->i));
@@ -1456,9 +1457,9 @@ static void hud_draw_bitmap_internal(
 	parameters.map_scale[0].i = 1.0f;
 	parameters.meter_parameters = meter_parameters;
 	parameters.point_sampled = meter_parameters && local_player_count()==1;
-	parameters.map[0] = (struct bitmap_data *)bitmap;
 	parameters.framebuffer_blend_function =
 		_shader_framebuffer_blend_function_alpha_multiply_add;
+	parameters.map[0] = (struct bitmap_data *)bitmap;
 
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 
