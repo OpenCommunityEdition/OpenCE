@@ -2242,27 +2242,9 @@ void game_engine_post_rasterize_post_game(
 long find_closest_player_index(
 	long player_index)
 {
-	struct player_datum *player;
-	long best_object_index;
-	long object_index;
-	long candidate_object_index;
-	struct unit_datum *candidate;
-	long candidate_player_index;
-	real x;
-	real y;
-	real z;
-	long object_indices[32];
-	real_point3d target_position;
-	real_vector3d target_direction;
-	real_vector3d facing_direction;
-	real target_distance;
-	real_point3d camera_position;
-	long object_count;
-	real target_angle;
-	real distance_squared;
+	struct player_datum *player = player_get(player_index);
+	long best_object_index = NONE;
 
-	player = player_get(player_index);
-	best_object_index = NONE;
 	if (player->local_player_index != NONE &&
 		player_control_get_autoaim_level(player->local_player_index) > 0.0f)
 	{
@@ -2272,6 +2254,12 @@ long find_closest_player_index(
 
 	if (best_object_index == NONE)
 	{
+		long object_indices[32];
+		real_point3d camera_position;
+		real_vector3d facing_direction;
+		long object_count;
+		long object_index;
+
 		unit_get_camera_position(player->unit_index, &camera_position);
 		player_control_get_facing_direction(
 			player->local_player_index,
@@ -2284,22 +2272,23 @@ long find_closest_player_index(
 			NUMBEROF(object_indices),
 			object_indices);
 
-		object_index = 0;
-		for (; object_index < object_count; object_index++)
+		for (object_index = 0; object_index < object_count; object_index++)
 		{
-			candidate_object_index = object_indices[object_index];
-			candidate = unit_get(candidate_object_index);
-			x = candidate->object.position.x - camera_position.x;
-			y = candidate->object.position.y - camera_position.y;
-			z = candidate->object.position.z - camera_position.z;
-			distance_squared = y * y + (x * x + z * z);
+			long candidate_object_index = object_indices[object_index];
+			struct unit_datum *candidate = unit_get(candidate_object_index);
+			real x = candidate->object.position.x - camera_position.x;
+			real y = candidate->object.position.y - camera_position.y;
+			real z = candidate->object.position.z - camera_position.z;
+			real distance_squared = y * y + (x * x + z * z);
+			real_point3d target_position;
+			real_vector3d target_direction;
+			real target_distance;
+			real target_angle;
 
 			if ((candidate->unit.active_camouflage < 1.0f ||
-				(candidate_player_index =
-					player_index_from_unit_index(candidate_object_index),
-					player->unknown7c == candidate_player_index)) &&
+				player->unknown7c == player_index_from_unit_index(candidate_object_index)) &&
 				autoaim_compute_target(
-					candidate_object_index,
+					object_indices[object_index],
 					&camera_position,
 					&facing_direction,
 					player->unit_index,
@@ -2314,14 +2303,10 @@ long find_closest_player_index(
 				best_object_index = object_indices[object_index];
 			}
 		}
+	}
 
-		if (best_object_index != NONE)
-			return player_index_from_unit_index(best_object_index);
-	}
-	else
-	{
-		return player_index_from_unit_index(best_object_index);
-	}
+	if (best_object_index != NONE)
+		best_object_index = player_index_from_unit_index(best_object_index);
 
 	return best_object_index;
 }
@@ -2546,11 +2531,12 @@ static void multiplayer_message(
 	long parameter1,
 	long parameter2)
 {
-	wchar_t message[1024];
 	struct player_datum *player = player_get(player_index);
 
 	if (player->local_player_index != NONE)
 	{
+		wchar_t message[1024];
+
 		if (multiplayer_message_internal(
 			player_index,
 			parameter1,
@@ -7879,11 +7865,7 @@ struct game_engine_place game_engine_get_place(
 	enum get_score_type score_type)
 {
 	struct player_datum *player;
-	struct data_iterator iterator;
-	struct player_datum *other_player;
-	long score;
 	long group_count;
-	unsigned long team_mask;
 	boolean tied;
 	boolean all_tied;
 	struct game_engine_place result;
@@ -7896,8 +7878,11 @@ struct game_engine_place game_engine_get_place(
 
 	if (game_engine->get_player_score)
 	{
-		team_mask = 0;
-		score = game_engine->get_player_score(player_index, score_type);
+		struct data_iterator iterator;
+		struct player_datum *other_player;
+		unsigned long team_mask = 0;
+		long score = game_engine->get_player_score(player_index, score_type);
+
 		data_iterator_new(&iterator, player_data);
 		other_player = (struct player_datum *)data_iterator_next(&iterator);
 		while (other_player)
@@ -7912,36 +7897,31 @@ struct game_engine_place game_engine_get_place(
 			else
 				different_player = iterator.datum_index != player_index;
 
-			if (different_player)
+			if (different_player &&
+				score_type == _get_score_team)
 			{
-				if (score_type == _get_score_team)
-				{
-					unsigned long team_bit =
-						FLAG(other_player->team_index);
-
-					if (team_mask & team_bit)
-						goto next_player;
-
-					team_mask |= team_bit;
-				}
-
-				{
-					long other_score = game_engine->get_player_score(
-						iterator.datum_index,
-						score_type);
-
-					group_count++;
-					if (other_score != score)
-						all_tied = FALSE;
-
-					if (other_score > score)
-						result.place++;
-					else if (other_score == score)
-						tied = TRUE;
-				}
+				if (TEST_FLAG(team_mask, other_player->team_index))
+					different_player = FALSE;
+				else
+					SET_FLAG(team_mask, other_player->team_index, TRUE);
 			}
 
-next_player:
+			if (different_player)
+			{
+				long other_score = game_engine->get_player_score(
+					iterator.datum_index,
+					score_type);
+
+				group_count++;
+				if (other_score != score)
+					all_tied = FALSE;
+
+				if (other_score > score)
+					result.place++;
+				else if (other_score == score)
+					tied = TRUE;
+			}
+
 			other_player =
 				(struct player_datum *)data_iterator_next(&iterator);
 		}
@@ -7953,6 +7933,7 @@ next_player:
 			"(!all_tied || (tied)) || (1 == group_count)");
 	}
 
+	all_tied &= tied;
 	result.flags = score_type != _get_score_team
 		? 0
 		: FLAG(_place_team);
@@ -7960,7 +7941,7 @@ next_player:
 	SET_FLAG(
 		result.flags,
 		_place_all_tied,
-		all_tied & tied);
+		all_tied);
 	SET_FLAG(
 		result.flags,
 		_place_two_groups,
