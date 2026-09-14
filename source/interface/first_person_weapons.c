@@ -109,6 +109,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "effects/effects.h"
+#include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/player_control.h"
 #include "game/players.h"
@@ -625,10 +626,10 @@ void first_person_weapon_render_update(
 		if (first_person_weapon->unit_index!=NONE &&
 			first_person_weapon->weapon_index!=NONE)
 		{
-			first_person_weapon_set_visibility(
-				render.local_player_index,
-				director_get_perspective(render.local_player_index)==_director_perspective_first_person &&
-					player_control_get_zoom_level(render.local_player_index)==NONE);
+			boolean visible= director_get_perspective(render.local_player_index)==_director_perspective_first_person &&
+				player_control_get_zoom_level(render.local_player_index)==NONE;
+
+			first_person_weapon_set_visibility(render.local_player_index, visible);
 			if (first_person_weapon->visible)
 			{
 				first_person_weapon_build_node_matrices(render.local_player_index);
@@ -1353,56 +1354,62 @@ void first_person_weapon_message(
 			{
 				struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
 
-				if (weapon_definition->weapon.weapon_type==_weapon_type_shotgun &&
-					(message_type==_first_person_weapon_message_reload_while_empty ||
-					message_type==_first_person_weapon_message_reload_while_full))
+				switch (weapon_definition->weapon.weapon_type)
 				{
-					struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(
-						&weapon_definition->weapon.magazines,
-						0,
-						struct weapon_magazine_definition);
-					short rounds_loaded= weapon->weapon.magazines[0].rounds_loaded;
-					short rounds_total= weapon->weapon.magazines[0].rounds_total;
-
-					if (first_person_weapon->state==_first_person_weapon_state_shotgun_enter_reload ||
-						first_person_weapon->state==_first_person_weapon_state_overheated_exit ||
-						first_person_weapon->state==_first_person_weapon_state_shotgun_exit_reload_empty ||
-						first_person_weapon->state==_first_person_weapon_state_shotgun_exit_reload_full ||
-						first_person_weapon->state==_first_person_weapon_state_reload_while_empty ||
-						first_person_weapon->state==_first_person_weapon_state_reload_while_full ||
-						weapon->weapon.magazines[0].state)
-					{
-						if (MIN(magazine_definition->rounds_loaded_maximum-rounds_loaded, rounds_total)==1)
+					case _weapon_type_shotgun:
+						if (message_type==_first_person_weapon_message_reload_while_empty ||
+							message_type==_first_person_weapon_message_reload_while_full)
 						{
-							first_person_weapon->shotgun_reload_type= _shotgun_reload_type_last_round;
-						}
-						else
-						{
-							first_person_weapon->shotgun_reload_type= NONE;
-						}
-					}
-					else
-					{
-						short shells_to_reload= (short)MIN(
-							magazine_definition->rounds_loaded_maximum-rounds_loaded,
-							rounds_total);
+							struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(
+								&weapon_definition->weapon.magazines,
+								0,
+								struct weapon_magazine_definition);
+							short rounds_loaded= weapon->weapon.magazines[0].rounds_loaded;
+							short rounds_total= weapon->weapon.magazines[0].rounds_total;
 
-						first_person_weapon->shotgun_shells_to_reload= shells_to_reload;
-						first_person_weapon->shotgun_empty= rounds_loaded==0;
-						first_person_weapon->shotgun_reload_type= (shells_to_reload!=1) ?
-							_shotgun_reload_type_first_round :
-							_shotgun_reload_type_first_and_last_round;
-					}
+							if (first_person_weapon->state==_first_person_weapon_state_shotgun_enter_reload ||
+								first_person_weapon->state==_first_person_weapon_state_overheated_exit ||
+								first_person_weapon->state==_first_person_weapon_state_shotgun_exit_reload_empty ||
+								first_person_weapon->state==_first_person_weapon_state_shotgun_exit_reload_full ||
+								first_person_weapon->state==_first_person_weapon_state_reload_while_empty ||
+								first_person_weapon->state==_first_person_weapon_state_reload_while_full ||
+								weapon->weapon.magazines[0].state)
+							{
+								if (MIN(magazine_definition->rounds_loaded_maximum-rounds_loaded, rounds_total)==1)
+								{
+									first_person_weapon->shotgun_reload_type= _shotgun_reload_type_last_round;
+								}
+								else
+								{
+									first_person_weapon->shotgun_reload_type= NONE;
+								}
+							}
+							else
+							{
+								short shells_to_reload= (short)MIN(
+									magazine_definition->rounds_loaded_maximum-rounds_loaded,
+									rounds_total);
 
-					if (first_person_weapon->shotgun_reload_type==NONE)
-					{
-						state= _first_person_weapon_state_reload_while_empty;
-					}
-					else if (first_person_weapon->shotgun_reload_type==_shotgun_reload_type_first_round ||
-						first_person_weapon->shotgun_reload_type==_shotgun_reload_type_first_and_last_round)
-					{
-						state= _first_person_weapon_state_shotgun_enter_reload;
-					}
+								first_person_weapon->shotgun_shells_to_reload= shells_to_reload;
+								first_person_weapon->shotgun_empty= rounds_loaded==0;
+								first_person_weapon->shotgun_reload_type= (shells_to_reload!=1) ?
+									_shotgun_reload_type_first_round :
+									_shotgun_reload_type_first_and_last_round;
+							}
+
+							switch (first_person_weapon->shotgun_reload_type)
+							{
+								case _shotgun_reload_type_first_round:
+								case _shotgun_reload_type_first_and_last_round:
+									state= _first_person_weapon_state_shotgun_enter_reload;
+									break;
+
+								case NONE:
+									state= _first_person_weapon_state_reload_while_empty;
+									break;
+							}
+						}
+						break;
 				}
 			}
 		}
@@ -1415,9 +1422,11 @@ void first_person_weapon_message(
 		{
 			first_person_weapon_set_state(local_player_index, state, TRUE);
 		}
-		if (message_type==_first_person_weapon_message_ready)
+		switch (message_type)
 		{
-			first_person_weapon->interpolation_frame_count= 0;
+			case _first_person_weapon_message_ready:
+				first_person_weapon->interpolation_frame_count= 0;
+				break;
 		}
 	}
 
