@@ -484,12 +484,14 @@ static void path_heap_bubble_down(
 
 	while (TRUE)
 	{
-		short child_heap_location = (short)(heap_location << 1);
-		short child_number = 0;
+		short child_heap_location;
+		short child_number;
 
 		new_node_index = node_index;
 		new_heap_location = heap_location;
 		new_cost = node_cost;
+		child_number = 0;
+		child_heap_location = (short)(heap_location << 1);
 
 		while (child_number < 2 && child_heap_location < state->heap_count)
 		{
@@ -784,7 +786,8 @@ boolean path_state_approach_point(
 				break;
 			}
 
-			node = path_get_node(state, node->parent_node_index);
+			node_index = node->parent_node_index;
+			node = path_get_node(state, node_index);
 		}
 
 		match_assert(
@@ -1183,7 +1186,6 @@ static short build_path_edges_for_surface(
 		struct collision_bsp);
 	short edge_count = 0;
 	struct collision_surface const *surface;
-	long first_edge_index;
 	long edge_index;
 
 	match_assert(
@@ -1194,8 +1196,7 @@ static short build_path_edges_for_surface(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
-	first_edge_index = surface->first_edge_index;
-	edge_index = first_edge_index;
+	edge_index = surface->first_edge_index;
 
 	do
 	{
@@ -1203,13 +1204,13 @@ static short build_path_edges_for_surface(
 			&bsp->edges,
 			edge_index,
 			struct collision_edge);
+		boolean right_surface = surface_index == collision_edge->surface_indices[1];
 		struct path_edge *edge = &edges[edge_count++];
-		boolean right_surface = collision_edge->surface_indices[1] == surface_index;
 		struct collision_vertex const *start_vertex;
 		struct collision_vertex const *end_vertex;
 
 		edge->adjacent_surface_index =
-			collision_edge->surface_indices[right_surface ? 0 : 1];
+			collision_edge->surface_indices[!right_surface];
 		if (edge->adjacent_surface_index != NONE)
 		{
 			match_assert(
@@ -1239,9 +1240,9 @@ static short build_path_edges_for_surface(
 			break;
 		}
 
-		edge_index = collision_edge->edge_indices[right_surface ? 1 : 0];
+		edge_index = collision_edge->edge_indices[right_surface];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != surface->first_edge_index);
 
 	return edge_count;
 }
@@ -1281,8 +1282,8 @@ real path_attractor_weight(
 {
 	real_point3d closest_point;
 	real distance_squared;
-	real distance = REAL_MAX;
 	real weight = 0.0f;
+	real distance = REAL_MAX;
 
 	closest_point_to_attractor(
 		point,
