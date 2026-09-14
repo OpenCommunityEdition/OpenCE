@@ -868,8 +868,8 @@ extern D3DCAPS8 global_d3d_caps;
  * is the only symbol csplit knows there, so the split still anchors their
  * relocations on `_global_d3d_device + 8` / `+ 12` (image 0x0045E8D8 and
  * 0x0045E8DC).  symbols.json names for those two addresses close the gap. */
-boolean suppress_window_begin_end;
-short previous_window_index;
+static boolean suppress_window_begin_end;
+static short previous_window_index;
 
 struct rasterizer_hardware_state_cache rasterizer_state_cache =
 {
