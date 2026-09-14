@@ -190,11 +190,6 @@ struct rasterizer_frame_statistics_private_globals_definition
 	FILE *profile_log_file;
 	byte reserved75C[4];
 	unsigned long fps_sample_times[MAXIMUM_FPS_SAMPLE_COUNT];
-	short fps_sample_count;
-	short pad852;
-	short profile_accumulation_index;
-	real profile_accumulated_time;
-	long profile_accumulated_pushbuffer_size;
 };
 
 typedef char verify_rasterizer_frame_statistics_temp_buffer_offset[
@@ -217,16 +212,8 @@ typedef char verify_rasterizer_frame_statistics_fps_sample_times_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_private_globals_definition,
 		fps_sample_times) == 0x760 ? 1 : -1];
-typedef char verify_rasterizer_frame_statistics_fps_sample_count_offset[
-	offsetof(
-		struct rasterizer_frame_statistics_private_globals_definition,
-		fps_sample_count) == 0x850 ? 1 : -1];
-typedef char verify_rasterizer_frame_statistics_profile_accumulation_offset[
-	offsetof(
-		struct rasterizer_frame_statistics_private_globals_definition,
-		profile_accumulation_index) == 0x854 ? 1 : -1];
 typedef char verify_rasterizer_frame_statistics_private_globals_size[
-	sizeof(struct rasterizer_frame_statistics_private_globals_definition) == 0x860 ? 1 : -1];
+	sizeof(struct rasterizer_frame_statistics_private_globals_definition) == 0x850 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -238,11 +225,18 @@ static boolean eat_my_shorts(
 
 extern struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals;
 
+/* the FPS sample count and the profile-log accumulators are separate file-scope statics, not
+   members of the private record: get_fps reloads fps_sample_count from memory after the
+   sample-shift loop, which VC7 only does when the loop's array stores cannot alias it */
+static short fps_sample_count;
+static short profile_accumulation_index;
+static real profile_accumulated_time;
+static long profile_accumulated_pushbuffer_size;
+
 char const *profile_log_path = "d:\\r-prof.txt";
 
 #define rasterizer_frame_statistics_temp_buffer rasterizer_frame_statistics_private_globals.temp_buffer
 #define rasterizer_fps_sample_times rasterizer_frame_statistics_private_globals.fps_sample_times
-#define rasterizer_fps_sample_count rasterizer_frame_statistics_private_globals.fps_sample_count
 
 /* ---------- public code */
 
@@ -281,7 +275,7 @@ void rasterizer_frame_statistics_get_fps(
 	if (rasterizer_debug_options.stats && frame_statistics)
 	{
 		unsigned long current_time = system_milliseconds();
-		short sample_count = rasterizer_fps_sample_count;
+		short sample_count = fps_sample_count;
 
 		if (sample_count)
 		{
@@ -290,7 +284,7 @@ void rasterizer_frame_statistics_get_fps(
 			unsigned long window_time;
 			short index;
 
-			for (index = rasterizer_fps_sample_count - 1; index > 0; index--)
+			for (index = fps_sample_count - 1; index > 0; index--)
 			{
 				if (index > 1)
 				{
@@ -304,8 +298,8 @@ void rasterizer_frame_statistics_get_fps(
 			}
 
 			window_time = current_time - rasterizer_fps_sample_times[0];
-			frame_statistics->fps_sample_count = sample_count;
 			frame_statistics->frames_per_second = 1000.0f / (real)MAX(window_time, 1);
+			frame_statistics->fps_sample_count = sample_count;
 
 			window_time = current_time - rasterizer_fps_sample_times[sample_count - 1];
 			frame_statistics->average_frames_per_second =
@@ -318,12 +312,12 @@ void rasterizer_frame_statistics_get_fps(
 		}
 
 		rasterizer_fps_sample_times[0] = current_time;
-		rasterizer_fps_sample_count =
+		fps_sample_count =
 			(short)MIN(sample_count + 1, MAXIMUM_FPS_SAMPLE_COUNT);
 	}
 	else
 	{
-		rasterizer_fps_sample_count = 0;
+		fps_sample_count = 0;
 	}
 
 	return;
@@ -833,8 +827,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_debug_options.profile_log = FALSE;
 			}
 
-			rasterizer_frame_statistics_private_globals.profile_accumulated_time = 0.0f;
-			rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size = 0;
+			profile_accumulated_time = 0.0f;
+			profile_accumulated_pushbuffer_size = 0;
 		}
 
 		if (rasterizer_frame_statistics_private_globals.profile_log_file)
@@ -844,16 +838,16 @@ void rasterizer_frame_statistics_draw(
 			for (profile = 0; profile < NUMBER_OF_RASTERIZER_PROFILES; profile++)
 			{
 				rasterizer_frame_statistics_private_globals.profile_times[profile][
-					rasterizer_frame_statistics_private_globals.profile_accumulation_index] =
+					profile_accumulation_index] =
 					rasterizer_profile_query(profile) * 1000.0f;
 			}
 
-			rasterizer_frame_statistics_private_globals.profile_accumulated_time +=
+			profile_accumulated_time +=
 				rasterizer_profile_query(NUMBER_OF_RASTERIZER_PROFILES) * 1000.0f;
-			rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size +=
+			profile_accumulated_pushbuffer_size +=
 				rasterizer_profile_query_pushbuffer(NUMBER_OF_RASTERIZER_PROFILES);
 
-			if (++rasterizer_frame_statistics_private_globals.profile_accumulation_index ==
+			if (++profile_accumulation_index ==
 				MAXIMUM_PROFILE_ACCUMULATION_COUNT)
 			{
 				short accumulation;
@@ -901,18 +895,18 @@ void rasterizer_frame_statistics_draw(
 				fprintf(
 					rasterizer_frame_statistics_private_globals.profile_log_file,
 					"average total frame time= %.2f msecs\n",
-					rasterizer_frame_statistics_private_globals.profile_accumulated_time /
+					profile_accumulated_time /
 						MAXIMUM_PROFILE_ACCUMULATION_COUNT);
 				fprintf(
 					rasterizer_frame_statistics_private_globals.profile_log_file,
 					"average total pushbuffer= %d bytes\n",
-					(rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size +
+					(profile_accumulated_pushbuffer_size +
 						MAXIMUM_PROFILE_ACCUMULATION_COUNT / 2) / MAXIMUM_PROFILE_ACCUMULATION_COUNT);
 				fflush(rasterizer_frame_statistics_private_globals.profile_log_file);
 
-				rasterizer_frame_statistics_private_globals.profile_accumulation_index = 0;
-				rasterizer_frame_statistics_private_globals.profile_accumulated_time = 0.0f;
-				rasterizer_frame_statistics_private_globals.profile_accumulated_pushbuffer_size = 0;
+				profile_accumulation_index = 0;
+				profile_accumulated_time = 0.0f;
+				profile_accumulated_pushbuffer_size = 0;
 			}
 		}
 	}
