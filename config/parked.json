@@ -5110,63 +5110,6 @@
     },
     {
       "unit": "source/ai/actor_firing_position",
-      "function": "_post_evaluator_hide",
-      "class": "unclassified",
-      "evidence": "Best currently integrated Fable reconstruction of the complete hide/cover line-of-sight post evaluator, using the genuine evaluation context, named line-of-sight enum and shared rejection/debug helpers. Target and candidate are both 224 bytes with 11 relocations, but control-flow scheduling remains non-exact. No source-shape tuning or inappropriate exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 11,
-          "normalized_sha256": "66434779de62f535539bcfe2fa4c163a9b2ead54c7c979c8ee45c17420d1a027"
-        },
-        "base": {
-          "size": 224,
-          "relocation_count": 11,
-          "normalized_sha256": "2e587cb1a2579a7eed9ec60904d589517ddb0ef4d79b22f3804b228ace218614"
-        },
-        "objdiff_percent": 82.5
-      }
-    },
-    {
-      "unit": "source/ai/actor_firing_position",
-      "function": "_post_evaluator_uncover",
-      "class": "unclassified",
-      "evidence": "Best currently integrated Fable reconstruction of the uncover line-of-sight post evaluator, retaining the real target-distance rejection rule and named line-of-sight enum through genuine shared owners. Target and candidate are both 192 bytes with four relocations; remaining branch scheduling is fuzzy and uncredited. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
-      "measurements": {
-        "target": {
-          "size": 192,
-          "relocation_count": 4,
-          "normalized_sha256": "45c381842b37aba13ac53fdd0a37338c3219f4ad6bfd5fd9e54e893796a40beb"
-        },
-        "base": {
-          "size": 192,
-          "relocation_count": 4,
-          "normalized_sha256": "f3d29c892ec86f96936dae4c7acff6444ec421e13216d339b69a017e863ecbcc"
-        },
-        "objdiff_percent": 86.5625
-      }
-    },
-    {
-      "unit": "source/ai/actor_firing_position",
-      "function": "_post_evaluator_attack",
-      "class": "unclassified",
-      "evidence": "Best currently integrated Fable reconstruction of the attack line-of-sight post evaluator. It retains the complete optional/non-optional target scoring and rejection behavior with genuine types and enums. The candidate is 208 versus 224 target bytes with the same three relocations; remaining source scheduling is non-exact and receives zero exact credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 3,
-          "normalized_sha256": "46496861931cc3563c1a0d319a03bb82e475885a1295221b4b2c72c2c0797bd6"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 3,
-          "normalized_sha256": "f063ea5068c49a4946bc5474e2b4da7652d5b1bf3a4a4fbc7f60a10c42a4a36b"
-        },
-        "objdiff_percent": 90.36232
-      }
-    },
-    {
-      "unit": "source/ai/actor_firing_position",
       "function": "_pre_evaluator_global",
       "class": "unclassified",
       "evidence": "First natural complete January-layout reconstruction of the global firing-position pre-evaluator, using HCEA only as an algorithm/name map and January diagnostics, scores, vehicle mask and 0x670 context as target evidence. Target and candidate are both 1616 bytes with 53 relocations; remaining instruction selection is fuzzy. No forced inline, point_from_line3d, raw-offset facade or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",

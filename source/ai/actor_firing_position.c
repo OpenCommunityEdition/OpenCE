@@ -717,7 +717,6 @@ static long post_evaluator_hide(
 		if (!firing_position)
 		{
 			evaluation_context->post_evaluation_bound+= 12.0f;
-			return TRUE;
 		}
 		else
 		{
@@ -760,12 +759,12 @@ static long post_evaluator_hide(
 		}
 	}
 
-	if (firing_position)
+	if (!firing_position)
 	{
-		return firing_position->valid;
+		return TRUE;
 	}
 
-	return TRUE;
+	return firing_position->valid;
 }
 
 static long post_evaluator_uncover(
@@ -778,7 +777,6 @@ static long post_evaluator_uncover(
 		if (!firing_position)
 		{
 			evaluation_context->post_evaluation_bound+= 20.0f;
-			return TRUE;
 		}
 		else
 		{
@@ -813,12 +811,12 @@ static long post_evaluator_uncover(
 		}
 	}
 
-	if (firing_position)
+	if (!firing_position)
 	{
-		return firing_position->valid;
+		return TRUE;
 	}
 
-	return TRUE;
+	return firing_position->valid;
 }
 
 static long post_evaluator_attack(
@@ -831,7 +829,6 @@ static long post_evaluator_attack(
 		if (!firing_position)
 		{
 			evaluation_context->post_evaluation_bound+= evaluation_context->target_line_of_sight_optional ? 6.0f : 15.0f;
-			return TRUE;
 		}
 		else
 		{
@@ -868,12 +865,12 @@ static long post_evaluator_attack(
 		}
 	}
 
-	if (firing_position)
+	if (!firing_position)
 	{
-		return firing_position->valid;
+		return TRUE;
 	}
 
-	return TRUE;
+	return firing_position->valid;
 }
 
 static void firing_position_pre_evaluate(
