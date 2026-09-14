@@ -1517,7 +1517,9 @@ __inline real real_local_random_range(
 	real lower_bound,
 	real upper_bound)
 {
-	return real_seed_random_range(get_global_local_random_seed_address(), lower_bound, upper_bound);
+	real result= real_seed_random_range(get_global_local_random_seed_address(), lower_bound, upper_bound);
+
+	return result;
 }
 #endif
 
