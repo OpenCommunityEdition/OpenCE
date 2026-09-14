@@ -162,7 +162,7 @@ real contrail_scale_value(
 	real result = scale;
 
 	if (TEST_FLAG(flags, flag_bit))
-		result = value * scale;
+		result *= value;
 
 	return result;
 }
@@ -174,18 +174,18 @@ real contrail_scale_random_value(
 	unsigned long flags,
 	short flag_bit)
 {
-	real result = lower_bound;
-	real range;
+	real minimum = contrail_scale_value(
+		value,
+		lower_bound,
+		flags,
+		flag_bit);
+	real range = contrail_scale_value(
+		value,
+		upper_bound - lower_bound,
+		flags,
+		flag_bit + 1);
 
-	if (TEST_FLAG(flags, flag_bit))
-		result = value * lower_bound;
-
-	range = upper_bound - lower_bound;
-
-	if (TEST_FLAG(flags, flag_bit + 1))
-		range = range * value;
-
-	return real_local_random_range(0.0f, range) + result;
+	return real_local_random_range(0.0f, range) + minimum;
 }
 
 void contrails_initialize(
