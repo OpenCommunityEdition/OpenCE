@@ -570,25 +570,6 @@
       }
     },
     {
-      "unit": "source/ai/encounters",
-      "function": "_encounter_new",
-      "class": "unclassified",
-      "evidence": "Complete natural January constructor retained with its genuine public map-initialization caller and private starting-location reset. The owner schema exposes PDB/January-authenticated platoon flags; typed tag/encounter accessors, named cseries flags, original assertions, full salted encounter handles, short counters and the two authentic 999 defaults are preserved. Target and candidate are both 656 padded bytes with 31 relocations; ordinary objdiff is 98.40206 percent. The natural zero-total respawn selection uses a direct short assignment rather than January's EAX selection, shortening that block by three bytes and shifting later branches/relocations. January's external 30.0f constant reference is satisfied by the already-existing genuine candidate literal owner, not a fabricated alias. Integrated real-code execution passes 49/49 cases including field state, external call order, assertions and valid-tag starting-location counts0..32. All43 inherited exact owners and every pre-existing runtime owner are preserved; only compiler-local labels change. No tuning, fake caller, forced inline, custom ABI, raw-offset production access, new math helper or point_from_line3d definition is introduced. See docs/object_matching_logs/encounters_obj_initialize_cluster_natural_20260905.md and its independent runtime review. Park the honest residual; do not search expression/declaration variants.",
-      "measurements": {
-        "target": {
-          "size": 656,
-          "relocation_count": 31,
-          "normalized_sha256": "3984b20f66ae9674d23c3fa400197b1e9a332f054b37bd572ed3bc3ce2c1d288"
-        },
-        "base": {
-          "size": 656,
-          "relocation_count": 31,
-          "normalized_sha256": "f95c0e4d0db253d37bd67b09c89feb5e8019a8a5e5ebe3f2918ec44fdb852719"
-        },
-        "objdiff_percent": 98.40206
-      }
-    },
-    {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_initialize",
       "class": "unclassified",
@@ -5187,17 +5168,6 @@
         "target": { "size": 1200, "relocation_count": 46, "normalized_sha256": "acd4a94a5e81ffd2c2568f2ab2ce7a9f919bf85b70314864ea017ff060a171b4" },
         "base": { "size": 1232, "relocation_count": 46, "normalized_sha256": "3c5635f77de7879f0621e26ecadbb4c5385dfbd7ff086c2fdf1ae9f67b3c2cf7" },
         "objdiff_percent": 92.32905
-      }
-    },
-    {
-      "unit": "source/ai/encounters",
-      "function": "_encounter_control_actors",
-      "class": "register-allocation",
-      "evidence": "Complete source-plausible actor-control loop retained at the exact 448-byte padded envelope with all 16 relocation identities. The normalized digest still differs through register and independent stack-load scheduling. One bounded reconciliation pass found no missing logic; further perturbation would be compiler steering, so this small residual is deliberately parked. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source/local records or a natural same-compiler allocation donor.",
-      "measurements": {
-        "target": { "size": 448, "relocation_count": 16, "normalized_sha256": "75f6b08c5eadabec3c27ae977933a927518dd5554523f02534ea147f44454848" },
-        "base": { "size": 448, "relocation_count": 16, "normalized_sha256": "cbe14c9c90ff20b56cfb8afe7e13dafef768ad05165536e8460be98f147668fc" },
-        "objdiff_percent": 92.19149
       }
     },
     {

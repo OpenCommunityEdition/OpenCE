@@ -2504,16 +2504,9 @@ static void encounter_new(
 			if (squad_definition->respawn_max_actors > 0 ||
 				squad_definition->respawn_min_actors > 0)
 			{
-				short respawn_actors_left =
+				squad->respawn_actors_left = squad_definition->respawn_total_count == 0 ?
+					SQUAD_UNLIMITED_RESPAWN_ACTOR_COUNT :
 					squad_definition->respawn_total_count;
-
-				if (respawn_actors_left == 0)
-				{
-					respawn_actors_left =
-						SQUAD_UNLIMITED_RESPAWN_ACTOR_COUNT;
-				}
-
-				squad->respawn_actors_left = respawn_actors_left;
 			}
 		}
 
@@ -3008,6 +3001,7 @@ static boolean encounter_place_actor(
 	short initial_variant,
 	boolean spawning)
 {
+	boolean placed = FALSE;
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
@@ -3019,11 +3013,12 @@ static boolean encounter_place_actor(
 		struct actor_starting_location *starting_location = TAG_BLOCK_GET_ELEMENT(
 			&squad_definition->starting_locations, starting_location_index, struct actor_starting_location);
 		short actor_palette_index = squad_definition->actor_palette_index;
+		struct scenario *scenario = global_scenario_get();
 
 		if (starting_location->actor_variant_index != NONE)
 			actor_palette_index = starting_location->actor_variant_index;
 
-		if (actor_palette_index >= 0 && actor_palette_index < global_scenario_get()->ai_actor_palette.count)
+		if (VALID_INDEX(actor_palette_index, scenario->ai_actor_palette.count))
 		{
 			struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
 				&global_scenario_get()->ai_actor_palette, actor_palette_index, struct tag_reference);
@@ -3043,7 +3038,7 @@ static boolean encounter_place_actor(
 						upgrade_major = ai_consider_major_upgrade(encounter_index, squad_index, chance);
 				}
 
-				return actor_place(actor_palette_entry->index, encounter_index, squad_index, starting_location, upgrade_major, initial_variant) != NONE;
+				placed = actor_place(actor_palette_entry->index, encounter_index, squad_index, starting_location, upgrade_major, initial_variant) != NONE;
 			}
 		}
 		else
@@ -3052,7 +3047,7 @@ static boolean encounter_place_actor(
 		}
 	}
 
-	return FALSE;
+	return placed;
 }
 
 static void encounter_update_timers(
@@ -3714,9 +3709,7 @@ static void encounter_control_actors(
 {
 	struct encounter_datum *encounter = encounter_get(encounter_index);
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-		&global_scenario_get()->ai_encounters,
-		DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
-		struct encounter_definition);
+		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
 
@@ -3734,45 +3727,36 @@ static void encounter_control_actors(
 			actor->external_orders.postcombat_prop_index = NONE;
 		}
 
+		if (actor->meta.platoon_index != NONE)
 		{
-			short platoon_index = actor->meta.platoon_index;
+			struct platoon_datum *platoon = encounter_get_platoon(encounter, actor->meta.platoon_index);
 
-			if (platoon_index != NONE)
+			defending = platoon->defending;
+			maneuvering = platoon->maneuvering && !platoon->maneuver_disable;
+		}
+		actor->external_orders.defending = defending;
+
+		if (maneuvering)
+		{
+			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->squads, actor->meta.squad_index, struct squad_definition);
+			struct platoon_definition *platoon_definition = TAG_BLOCK_GET_ELEMENT(
+				&encounter_definition->platoons, actor->meta.platoon_index, struct platoon_definition);
+			short squad_index = squad_definition->maneuver_squad_index;
+
+			if (squad_index >= 0 && squad_index < encounter_definition->squads.count)
 			{
-				struct platoon_datum *platoon = encounter_get_platoon(encounter, platoon_index);
-
-				maneuvering = platoon->maneuvering && !platoon->maneuver_disable;
-				defending = platoon->defending;
-			}
-			actor->external_orders.defending = defending;
-
-			if (maneuvering)
-			{
-				short squad_index;
-				struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
-					&encounter_definition->squads,
-					actor->meta.squad_index,
-					struct squad_definition);
-				struct platoon_definition *platoon_definition = TAG_BLOCK_GET_ELEMENT(
-					&encounter_definition->platoons,
-					platoon_index,
-					struct platoon_definition);
-
-				squad_index = squad_definition->maneuver_squad_index;
-
-				if (squad_index >= 0 && squad_index < encounter_definition->squads.count)
-				{
-					actor_change_encounter(iterator.index, encounter_index, squad_index);
-					actor_stimulus_maneuvering(
-						iterator.index,
-						TEST_FLAG(platoon_definition->flags, _platoon_advancing_maneuver_bit),
-						TEST_FLAG(platoon_definition->flags, _platoon_flee_upon_maneuver_bit));
-				}
+				actor_change_encounter(iterator.index, encounter_index, squad_index);
+				actor_stimulus_maneuvering(
+					iterator.index,
+					TEST_FLAG(platoon_definition->flags, _platoon_advancing_maneuver_bit),
+					TEST_FLAG(platoon_definition->flags, _platoon_flee_upon_maneuver_bit));
 			}
 		}
 	}
 
 	encounters_update_dirty_status();
+
 	return;
 }
 
