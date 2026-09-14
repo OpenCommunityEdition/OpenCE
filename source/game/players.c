@@ -2936,10 +2936,9 @@ static void player_examine_nearby_item(
 		weapon_trigger_active =
 			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit) ||
 			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit);
-		unit = unit_get(player->unit_index);
 		current_weapon_index = unit_inventory_get_weapon(
 			player->unit_index,
-			unit->unit.current_weapon_index);
+			unit_get(player->unit_index)->unit.current_weapon_index);
 		weapon_count = unit_get_weapon_count(player->unit_index);
 		current_weapon_does_not_count = FALSE;
 		if (weapon_count >= 2 &&
