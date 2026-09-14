@@ -233,7 +233,7 @@ wchar_t const *default_string = L"";
 
 /* ---------- public code */
 
-static long weapon_state_is_depleted(
+static boolean weapon_state_is_depleted(
 	struct weapon_interface_state const *state)
 {
 	return (state->magazines[0].rounds_loaded_maximum &&
@@ -359,7 +359,6 @@ static void hud_show_action_response(
 {
 	struct player_datum *player = player_get(player_index);
 	short respawn_failure = players_get_respawn_failure();
-	long action_object_index;
 	short item_name_index;
 
 	if (respawn_failure != _player_respawn_failure_none &&
@@ -371,25 +370,25 @@ static void hud_show_action_response(
 			hud_set_state_message(
 				render.local_player_index,
 				_hud_message_respawn_failed_combat);
-			break;
+			return;
 
 		case _player_respawn_failure_enemies:
 			hud_set_state_message(
 				render.local_player_index,
 				_hud_message_respawn_failed_unsafe);
-			break;
+			return;
 
 		case _player_respawn_failure_moving:
 			hud_set_state_message(
 				render.local_player_index,
 				_hud_message_respawn_failed_moving);
-			break;
+			return;
 
 		case _player_respawn_failure_vehicle:
 			hud_set_state_message(
 				render.local_player_index,
 				_hud_message_respawn_failed_vehicle);
-			break;
+			return;
 
 		default:
 			match_assert(
@@ -402,15 +401,14 @@ static void hud_show_action_response(
 		return;
 	}
 
-	action_object_index = player->action_object_index;
-	if (action_object_index == NONE)
+	if (player->action_object_index == NONE)
 	{
 		item_name_index = NONE;
 	}
 	else
 	{
 		item_name_index = object_definition_get(
-			object_get(action_object_index)->definition_index)->object.icon_text_index;
+			object_get(player->action_object_index)->definition_index)->object.icon_text_index;
 	}
 
 	switch (player->action_result)
@@ -423,6 +421,23 @@ static void hud_show_action_response(
 		hud_set_state_message_text(
 			render.local_player_index,
 			0,
+			item_name_index,
+			FALSE);
+		return;
+
+	case _player_action_result_swap_for_powerup:
+		hud_set_state_message(
+			render.local_player_index,
+			_hud_message_swap_powerup);
+		hud_set_state_message_text(
+			render.local_player_index,
+			0,
+			(short)get_object_icon_text_index(
+				unit_get_current_equipment(player->unit_index)),
+			FALSE);
+		hud_set_state_message_text(
+			render.local_player_index,
+			1,
 			item_name_index,
 			FALSE);
 		return;
@@ -442,26 +457,39 @@ static void hud_show_action_response(
 		return;
 	}
 
-	case _player_action_result_swap_for_powerup:
-		hud_set_state_message(
-			render.local_player_index,
-			_hud_message_swap_powerup);
-		hud_set_state_message_text(
-			render.local_player_index,
-			0,
-			(short)get_object_icon_text_index(
-				unit_get_current_equipment(player->unit_index)),
-			FALSE);
-		hud_set_state_message_text(
-			render.local_player_index,
-			1,
-			item_name_index,
-			FALSE);
+	case _player_action_result_touch_device:
+	{
+		struct control_datum *control = control_get(player->action_object_index);
+
+		if (control->control.custom_name_index != NONE)
+		{
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_custom_device);
+			hud_set_state_message_text(
+				render.local_player_index,
+				0,
+				control->control.custom_name_index,
+				TRUE);
+		}
+		else
+		{
+			hud_set_state_message(
+				render.local_player_index,
+				_hud_message_touch_device);
+			hud_set_state_message_text(
+				render.local_player_index,
+				0,
+				item_name_index,
+				FALSE);
+		}
+
 		return;
+	}
 
 	case _player_action_result_swap_for_weapon:
 	{
-		struct weapon_datum *weapon = weapon_try_and_get(action_object_index);
+		struct weapon_datum *weapon = weapon_try_and_get(player->action_object_index);
 
 		if (weapon != NULL)
 		{
@@ -502,7 +530,7 @@ static void hud_show_action_response(
 
 	case _player_action_result_add_weapon_to_inventory:
 	{
-		struct weapon_datum *weapon = weapon_try_and_get(action_object_index);
+		struct weapon_datum *weapon = weapon_try_and_get(player->action_object_index);
 
 		if (weapon != NULL)
 		{
@@ -552,7 +580,7 @@ static void hud_show_action_response(
 			0,
 			TAG_BLOCK_GET_ELEMENT(
 				&unit_definition_get(
-					unit_get(action_object_index)->definition_index)->unit.seats,
+					unit_get(player->action_object_index)->definition_index)->unit.seats,
 				player->action_seat_index,
 				struct unit_seat)->icon_text_index,
 			FALSE);
@@ -564,36 +592,6 @@ static void hud_show_action_response(
 		return;
 	}
 
-	case _player_action_result_touch_device:
-	{
-		struct control_datum *control = control_get(action_object_index);
-
-		if (control->control.custom_name_index == NONE)
-		{
-			hud_set_state_message(
-				render.local_player_index,
-				_hud_message_touch_device);
-			hud_set_state_message_text(
-				render.local_player_index,
-				0,
-				item_name_index,
-				FALSE);
-		}
-		else
-		{
-			hud_set_state_message(
-				render.local_player_index,
-				_hud_message_custom_device);
-			hud_set_state_message_text(
-				render.local_player_index,
-				0,
-				control->control.custom_name_index,
-				TRUE);
-		}
-
-		return;
-	}
-
 	case _player_action_result_flip_vehicle:
 		hud_set_state_message(
 			render.local_player_index,
@@ -601,7 +599,7 @@ static void hud_show_action_response(
 		hud_set_state_message_text(
 			render.local_player_index,
 			0,
-			(short)get_object_icon_text_index(action_object_index),
+			(short)get_object_icon_text_index(player->action_object_index),
 			FALSE);
 		return;
 
@@ -626,11 +624,10 @@ static void hud_show_action_response(
 		}
 
 		{
-			long unit_index = player->unit_index;
 			long weapon_index = unit_inventory_get_weapon(
-				unit_index,
-				unit_get(unit_index)->unit.current_weapon_index);
-			struct unit_datum *unit = unit_get(unit_index);
+				player->unit_index,
+				unit_get(player->unit_index)->unit.current_weapon_index);
+			struct unit_datum *unit = unit_get(player->unit_index);
 			boolean allow_swap_prompt = TRUE;
 
 			if (unit->object.parent_object_index != NONE &&
@@ -655,17 +652,17 @@ static void hud_show_action_response(
 				if (weapon_state_is_depleted(&weapon_state))
 				{
 					short weapon_slot = unit->unit.current_weapon_index;
-					short weapon_count = unit_get_weapon_count(unit_index);
+					short weapon_count = unit_get_weapon_count(player->unit_index);
 					long candidate_weapon_index;
 
 					do
 					{
 						weapon_slot = unit_inventory_next_weapon(
-							unit_index,
+							player->unit_index,
 							weapon_slot,
 							1);
 						candidate_weapon_index = unit_inventory_get_weapon(
-							unit_index,
+							player->unit_index,
 							weapon_slot);
 						weapon_build_weapon_interface_state(
 							candidate_weapon_index,
@@ -1159,26 +1156,28 @@ void hud_draw_screen(
 			motion_sensor_tick();
 		}
 
-		if (hud_scripted_globals->show_hud &&
-			perspective != _director_perspective_neutral &&
-			perspective != _director_perspective_scripted &&
-			player->unit_index != NONE)
+		if (hud_scripted_globals->show_hud)
 		{
-			hud_render_weapon_interface(player);
-			hud_show_action_response(player_index);
-			hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
-			hud_render_unit_interface(player);
-			hud_render_nav_points(render.local_player_index);
-			hud_render_damage_indicators(render.local_player_index);
+			if (perspective != _director_perspective_neutral &&
+				perspective != _director_perspective_scripted &&
+				player->unit_index != NONE)
+			{
+				hud_render_weapon_interface(player);
+				hud_show_action_response(player_index);
+				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+				hud_render_unit_interface(player);
+				hud_render_nav_points(render.local_player_index);
+				hud_render_damage_indicators(render.local_player_index);
+			}
+			else
+			{
+				hud_show_action_response(player_index);
+				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+			}
 		}
 		else
 		{
-			if (hud_scripted_globals->show_hud)
-			{
-				hud_show_action_response(player_index);
-			}
-
-			hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+			hud_play_unit_sounds(player, FALSE);
 		}
 
 		hud_messaging_update(render.local_player_index);
