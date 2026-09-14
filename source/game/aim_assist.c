@@ -490,11 +490,13 @@ static short find_aim_assist_targets(
 			NUMBEROF(cluster_indices), cluster_indices);
 		short object_count= objects_in_clusters_by_indices(FLAG(0), cluster_count, cluster_indices,
 			NUMBEROF(object_indices), object_indices); // collideable objects only
-		short object_index;
+		short object_number;
 
-		for (object_index= 0; object_index<object_count; ++object_index)
+		for (object_number= 0; object_number<object_count; ++object_number)
 		{
-			target_count+= find_aim_assist_targets_recursive(parameters, object_indices[object_index], position, direction,
+			long object_index= object_indices[object_number];
+
+			target_count+= find_aim_assist_targets_recursive(parameters, object_index, position, direction,
 				distance, angle_sine, angle_cosine, ignore_object_index, ignore_team_index,
 				maximum_target_count - target_count, &targets[target_count]);
 			if (target_count>=maximum_target_count)
