@@ -895,21 +895,18 @@ void action_obey_describe_command(
 
 			if (command->animation_reference_index == NONE)
 			{
-				_snprintf(string, string_size, "animate %s", "NONE");
+				animation_name = "NONE";
 			}
-			else
+			else if (command->animation_reference_index >= 0 &&
+				command->animation_reference_index < scenario->ai_animation_references.count)
 			{
-				if (command->animation_reference_index >= 0 &&
-					command->animation_reference_index < scenario->ai_animation_references.count)
-				{
-					animation_name = TAG_BLOCK_GET_ELEMENT(
-						&scenario->ai_animation_references,
-						command->animation_reference_index,
-						struct ai_animation_reference_definition)->animation_name;
-				}
-
-				_snprintf(string, string_size, "animate %s", animation_name);
+				animation_name = TAG_BLOCK_GET_ELEMENT(
+					&scenario->ai_animation_references,
+					command->animation_reference_index,
+					struct ai_animation_reference_definition)->animation_name;
 			}
+
+			_snprintf(string, string_size, "animate %s", animation_name);
 		}
 		break;
 
@@ -919,21 +916,18 @@ void action_obey_describe_command(
 
 			if (command->recording_reference_index == NONE)
 			{
-				_snprintf(string, string_size, "play recording %s", "NONE");
+				recording_name = "NONE";
 			}
-			else
+			else if (command->recording_reference_index >= 0 &&
+				command->recording_reference_index < scenario->ai_recording_references.count)
 			{
-				if (command->recording_reference_index >= 0 &&
-					command->recording_reference_index < scenario->ai_recording_references.count)
-				{
-					recording_name = TAG_BLOCK_GET_ELEMENT(
-						&scenario->ai_recording_references,
-						command->recording_reference_index,
-						struct ai_recording_reference_definition)->recording_name;
-				}
-
-				_snprintf(string, string_size, "play recording %s", recording_name);
+				recording_name = TAG_BLOCK_GET_ELEMENT(
+					&scenario->ai_recording_references,
+					command->recording_reference_index,
+					struct ai_recording_reference_definition)->recording_name;
 			}
+
+			_snprintf(string, string_size, "play recording %s", recording_name);
 		}
 		break;
 
