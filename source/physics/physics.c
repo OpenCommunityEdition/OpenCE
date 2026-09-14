@@ -101,6 +101,7 @@ symbols in this file:
 #include "collision_models.h"
 #include "collisions.h"
 #include "effects/material_effect_definitions.h"
+#include "game/game.h"
 #include "game/game_globals.h"
 #include "objects/damage.h"
 #include "objects/object_definitions.h"
@@ -112,6 +113,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/bipeds.h"
+#include "units/unit_definitions.h"
 #include "units/vehicles.h"
 
 /* ---------- constants */
@@ -180,6 +182,31 @@ struct powered_mass_point_definition
 
 #include "units/vehicle_datum.h"
 
+/* TU-local copy: no shared header declares the game globals falling-damage
+ * block yet; identical complete copies live in objects/damage.c and
+ * units/bipeds.c. */
+struct game_globals_falling_damage
+{
+	long unused0[2];
+	real falling_distance_lower_bound;
+	real falling_distance_upper_bound;
+	struct tag_reference falling_damage;
+	long terminal_velocity_unused[2];
+	real maximum_distance;
+	struct tag_reference maximum_distance_damage;
+	struct tag_reference vehicle_hit_environment_damage_effect;
+	struct tag_reference vehicle_killed_unit_damage_effect;
+	struct tag_reference vehicle_collision_damage;
+	struct tag_reference flaming_death_damage;
+	long unused7c[4];
+	real runtime_maximum_falling_velocity;
+	real runtime_minimum_damage_velocity;
+	real runtime_maximum_damage_velocity;
+};
+
+typedef char game_globals_falling_damage_size_assert[
+	sizeof(struct game_globals_falling_damage) == 0x98 ? 1 : -1];
+
 typedef char powered_mass_point_definition_size_assert[
 	sizeof(struct powered_mass_point_definition) == 0x80 ? 1 : -1];
 typedef char powered_mass_point_datum_size_assert[
@@ -203,7 +230,7 @@ static void friction_evaluate(
 	struct friction_datum *friction,
 	real_vector3d const *forward,
 	real_vector3d const *up);
-boolean physics_compute_biped_collision(
+static boolean physics_compute_biped_collision(
 	struct collision_model_instance *instance,
 	long biped_index);
 static boolean physics_compute_vehicle_collision(
@@ -898,6 +925,145 @@ void physics_compute_new(
 	}
 
 	return;
+}
+
+static boolean physics_compute_biped_collision(
+	struct collision_model_instance *instance,
+	long biped_index)
+{
+	static real scales[] = { 0.5f, 0.25f, 1.0f };
+	boolean collision = FALSE;
+	real_point3d base;
+	real height;
+	real width;
+
+	biped_get_physics_pill(biped_index, &base, &height, &width);
+
+	if (collision_model_test_point(instance, &base))
+	{
+		collision = TRUE;
+	}
+	else
+	{
+		struct collision_feature_list features;
+		struct collision_plane collision_plane;
+		real_point3d center;
+		real radius;
+		real feature_width;
+
+		collision_features_new(&features);
+		set_real_point3d(&center, base.x, base.y, base.z + height*0.5f);
+		radius = height*0.5f + width;
+		feature_width = MAX(width - 0.015625f, 0.015625f);
+		collision_model_get_features_in_sphere(
+			instance,
+			&center,
+			radius,
+			height,
+			feature_width,
+			&features);
+		if (collision_features_test_point(&features, &base, &collision_plane))
+			collision = TRUE;
+	}
+
+	if (collision)
+	{
+		struct unit_datum *vehicle = vehicle_get(instance->object_index);
+		struct biped_datum *biped = biped_get(biped_index);
+		real vehicle_speed = magnitude3d(&vehicle->object.translational_velocity);
+		real_vector3d acceleration;
+		real_point3d new_position;
+		boolean cause_damage = TRUE;
+
+		vector_from_points3d(
+			&vehicle->object.bounding_sphere_center,
+			&biped->object.bounding_sphere_center,
+			&acceleration);
+		normalize3d(&acceleration);
+		acceleration.k += 0.8f;
+		normalize3d(&acceleration);
+		scale_vector3d(&acceleration, MAX(vehicle_speed, 0.1f), &acceleration);
+		add_vectors3d(&acceleration, &vehicle->object.translational_velocity, &acceleration);
+		scale_vector3d(&acceleration, 0.5f, &acceleration);
+		biped_accelerate(biped_index, &acceleration);
+
+		base.x += acceleration.i*2.0f;
+		base.y += acceleration.j*2.0f;
+		base.z += acceleration.k*2.0f;
+
+		if (collision_fix_pill(
+				_collision_test_for_bipeds_living_flags,
+				&base,
+				width*2.0f,
+				height,
+				width,
+				biped_index,
+				&new_position))
+		{
+			new_position.z -= width;
+			object_translate(biped_index, &new_position, NULL);
+
+			cause_damage =
+				(instance->object_index != biped->unit.last_vehicle_index ||
+					game_time_get() > biped->unit.game_time_at_last_vehicle_exit + 90) &&
+				(vehicle_speed > 0.06666667f ||
+					distance_squared3d(
+						(real_point3d const *)&vehicle->object.translational_velocity,
+						(real_point3d const *)&biped->object.translational_velocity) > 0.0011111111f);
+		}
+
+		if (cause_damage)
+		{
+			struct game_globals_falling_damage *falling_damage = TAG_BLOCK_GET_ELEMENT(
+				&scenario_get_game_globals()->falling_damage,
+				0,
+				struct game_globals_falling_damage);
+
+			if (falling_damage->vehicle_collision_damage.index != NONE)
+			{
+				long responsible_object_index = instance->object_index;
+				struct object_datum *responsible_object = (struct object_datum *)vehicle;
+				struct damage_data damage;
+
+				if (vehicle->unit.driver_object_index != NONE)
+				{
+					responsible_object_index = vehicle->unit.driver_object_index;
+					responsible_object = object_get(responsible_object_index);
+				}
+
+				damage_data_new(&damage, falling_damage->vehicle_collision_damage.index);
+				damage.scale = 1.0f;
+				SET_FLAG(damage.flags, _damage_area_of_effect_bit, TRUE);
+				damage.owner_player_index = responsible_object->object.owner_player_index;
+				damage.owner_object_index = responsible_object->object.owner_object_index != NONE ?
+					responsible_object->object.owner_object_index : responsible_object_index;
+				damage.owner_team_index = responsible_object->object.owner_team_index;
+				damage.origin = biped->object.bounding_sphere_center;
+				damage.epicenter = vehicle->object.bounding_sphere_center;
+				damage.direction = acceleration;
+				normalize3d(&damage.direction);
+				object_cause_damage(&damage, biped_index, NONE, NONE, NONE, NULL);
+			}
+
+			if (falling_damage->vehicle_killed_unit_damage_effect.index != NONE)
+			{
+				struct unit_definition *unit_definition = unit_definition_get(biped->definition_index);
+				struct damage_data damage;
+
+				damage_data_new(&damage, falling_damage->vehicle_killed_unit_damage_effect.index);
+				match_assert(
+					"c:\\halo\\SOURCE\\physics\\physics.c",
+					830,
+					unit_definition->unit.blip_type>=0 && unit_definition->unit.blip_type<NUMBEROF(scales));
+				damage.scale = scales[unit_definition->unit.blip_type];
+				damage.origin = biped->object.bounding_sphere_center;
+				scale_vector3d(&acceleration, -1.0f, &damage.direction);
+				object_cause_damage(&damage, instance->object_index, NONE, NONE, NONE, NULL);
+			}
+		}
+	}
+
+	return collision;
 }
 
 static boolean physics_compute_vehicle_collision(
