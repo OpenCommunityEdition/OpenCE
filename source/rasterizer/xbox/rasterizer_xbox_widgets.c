@@ -414,10 +414,14 @@ void _rasterizer_widget_begin(
 				global_window_parameters.viewport_bounds.x0;
 			viewport_height = global_window_parameters.viewport_bounds.y1 -
 				global_window_parameters.viewport_bounds.y0;
+			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
 			vertex_constants[0][1] = 0.0f;
 			vertex_constants[0][2] = 0.0f;
+			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
 			vertex_constants[1][0] = 0.0f;
+			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
 			vertex_constants[1][2] = 0.0f;
+			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
 			vertex_constants[2][0] = 0.0f;
 			vertex_constants[2][1] = 0.0f;
 			vertex_constants[2][2] = 1.0f;
@@ -430,10 +434,6 @@ void _rasterizer_widget_begin(
 			vertex_constants[4][1] = 0.0f;
 			vertex_constants[4][2] = 0.0f;
 			vertex_constants[4][3] = 1.0f;
-			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
-			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
-			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
-			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
 			IDirect3DDevice8_SetVertexShaderConstant(
 				global_d3d_device,
 				-68,
@@ -505,10 +505,14 @@ void _rasterizer_widget_begin(
 				global_window_parameters.viewport_bounds.x0;
 			viewport_height = global_window_parameters.viewport_bounds.y1 -
 				global_window_parameters.viewport_bounds.y0;
+			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
 			vertex_constants[0][1] = 0.0f;
 			vertex_constants[0][2] = 0.0f;
+			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
 			vertex_constants[1][0] = 0.0f;
+			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
 			vertex_constants[1][2] = 0.0f;
+			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
 			vertex_constants[2][0] = 0.0f;
 			vertex_constants[2][1] = 0.0f;
 			vertex_constants[2][2] = 1.0f;
@@ -521,10 +525,6 @@ void _rasterizer_widget_begin(
 			vertex_constants[4][1] = 0.0f;
 			vertex_constants[4][2] = 0.0f;
 			vertex_constants[4][3] = 1.0f;
-			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
-			vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
-			vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
-			vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
 			IDirect3DDevice8_SetVertexShaderConstant(
 				global_d3d_device,
 				-68,
@@ -926,6 +926,7 @@ long _rasterizer_widget_submit_occlusion_test(
 	short y1;
 	long pixel_count;
 	HRESULT result;
+	boolean success = TRUE;
 
 	if (rasterizer_debug_options.lens_flare_occlusion_enabled)
 	{
@@ -955,10 +956,7 @@ long _rasterizer_widget_submit_occlusion_test(
 				-32767.0f,
 				32767.0f)));
 
-			pixel_count = (x1 - x0) * (y1 - y0);
-			if (pixel_count < 0)
-				return 0;
-
+			pixel_count = MAX(0, (x1 - x0) * (y1 - y0));
 			if (pixel_count > 0)
 			{
 				IDirect3DDevice8_BeginVisibilityTest(global_d3d_device);
@@ -1000,22 +998,29 @@ long _rasterizer_widget_submit_occlusion_test(
 					index);
 				if (result < 0)
 				{
+					success = FALSE;
 					rasterizer_error(
 						result,
 						"IDirect3DDevice8_EndVisibilityTest(global_d3d_device, index)");
-					error(
-						_error_silent,
-						"### ERROR rasterizer_widget_submit_occlusion_test failed");
 				}
 			}
-
-			return pixel_count;
 		}
-
-		return 0;
+		else
+		{
+			pixel_count = 0;
+		}
+	}
+	else
+	{
+		pixel_count = 1;
 	}
 
-	return 1;
+	if (!success)
+		error(
+			_error_silent,
+			"### ERROR rasterizer_widget_submit_occlusion_test failed");
+
+	return pixel_count;
 }
 
 /* ---------- private code */
