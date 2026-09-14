@@ -3533,26 +3533,32 @@ static boolean ui_widget_load_children_recursive(
 	}
 	if (!TEST_FLAG(definition->flags, _widget_dont_focus_a_specific_child_bit))
 	{
-		struct widget_instance *child;
+		boolean focus_a_child = FALSE;
 
 		if (widget->type == _ui_widget_type_spinner_list ||
 			widget->type == _ui_widget_type_column_list)
 		{
 			widget->parameters.list.selected_index = 0;
 			widget->parameters.list.last_list_tab_direction = 0;
+			focus_a_child = TRUE;
 		}
-		else if (!TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit))
+		else if (TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit))
 		{
-			return result;
+			focus_a_child = TRUE;
 		}
-		for (child = widget->child; child; child = child->next)
+		if (focus_a_child)
 		{
-			if (widget->type == _ui_widget_type_spinner_list ||
-				widget->type == _ui_widget_type_column_list ||
-				widget_instance_can_handle_events(child))
+			struct widget_instance *child;
+
+			for (child = widget->child; child; child = child->next)
 			{
-				widget->focused_child = child;
-				break;
+				if (widget->type == _ui_widget_type_spinner_list ||
+					widget->type == _ui_widget_type_column_list ||
+					widget_instance_can_handle_events(child))
+				{
+					widget->focused_child = child;
+					break;
+				}
 			}
 		}
 	}
