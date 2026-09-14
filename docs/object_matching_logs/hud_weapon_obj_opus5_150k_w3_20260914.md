@@ -230,7 +230,7 @@ then need re-measuring in that context.
 
   ```c
   boolean weapon_prevents_grenade_throwing(
-  	long weapon_index);
+    long weapon_index);
   ```
 
 - **Position.** This follows the definition order in `weapons.c`.
