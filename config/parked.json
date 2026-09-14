@@ -4433,11 +4433,11 @@
       "unit": "source/bitmaps/bitmap_extract",
       "function": "_extract_build_texture_pages_by_sequence",
       "class": "unclassified",
-      "evidence": "Complete typed texture-page packing reconstruction retained from the 2026-09-12 private packet. January control flow and relocations plus the independent Pastudan/HCEA maps support the behavior, but the current natural candidate is 672 versus 608 padded bytes and remains non-exact. The fail-closed class makes no unsupported codegen diagnosis; this body receives zero exact-function and zero exact-byte credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
+      "evidence": "Complete typed texture-page packing reconstruction retained from the 2026-09-12 private packet. January control flow and relocations plus the independent Pastudan/HCEA maps support the behavior, but the current natural candidate is 672 versus 608 padded bytes and remains non-exact. The fail-closed class makes no unsupported codegen diagnosis; this body receives zero exact-function and zero exact-byte credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): A8 callee-ABI cascade coupled to the _extract_sprites reopen. The body is strictly closer: base 672/22 a0a34a20 goes to target size 608 with 22 relocations, and alndiff blocks drop from 49 to 21, leaving one floated new-page arm and alignment filler. Control: without it _extract_sprites is not exact. The function stays parked.",
       "measurements": {
         "target": { "size": 608, "relocation_count": 22, "normalized_sha256": "70092abc226e6d9400baed2f856500896bf821f08e7ee9c8b9a7691013a4ce44" },
-        "base": { "size": 672, "relocation_count": 22, "normalized_sha256": "a0a34a2062ebb22b2028e75043ece7a57531deacba0a47049070e3b0100ddc86" },
-        "objdiff_percent": 60.788944
+        "base": { "size": 608, "relocation_count": 22, "normalized_sha256": "da8246c856fc6d86814908319b6600b6ff89bd4564dcff9222904c77bb51f359" },
+        "objdiff_percent": 91.909546
       }
     },
     {
@@ -4449,17 +4449,6 @@
         "target": { "size": 720, "relocation_count": 28, "normalized_sha256": "5f106d5c4f2bb3024df015b0b10b2236b3ffc3818cff7588e4fd3a7c7a810e56" },
         "base": { "size": 656, "relocation_count": 27, "normalized_sha256": "662a00511374710cd51cc4b0c7cec0d0d9d2b7248b8ab34656e5c162a725f548" },
         "objdiff_percent": 71.78667
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_sprites",
-      "class": "unclassified",
-      "evidence": "Complete typed sprite-budget, page-packing, metadata, and reporting reconstruction retained from the 2026-09-12 private packet. January and the current candidate have the same 1104-byte extent and 49 relocations but different normalized streams. No synthetic source pressure is retained; the fail-closed class makes no stronger diagnosis and the body receives zero credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 1104, "relocation_count": 49, "normalized_sha256": "b853b0998fdec2cdf39cce422d5baa701b09b807da62f236f7c409764437ee0b" },
-        "base": { "size": 1104, "relocation_count": 49, "normalized_sha256": "1abf491af39a8d3889045734745eb8b7a431bfa326ac3f2736aac3b236450e3e" },
-        "objdiff_percent": 85.248604
       }
     },
     {

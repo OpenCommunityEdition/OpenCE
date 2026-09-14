@@ -1239,26 +1239,27 @@ static void extract_build_texture_pages_by_sequence(
 	short spacing)
 {
 	short page_count = 0;
-	long spanned_page_count = 1;
+	short spanned_page_count = 1;
 	short sequence_index;
 
 	for (sequence_index = 0;
 		sequence_index < extract_data.group->sequences.count;
 		sequence_index++)
 	{
-		short page_index = 0;
 		short first_bitmap_index = 0;
+		short page_index = 0;
 		boolean page_complete;
 
 		do
 		{
 			struct texture_page *texture_page;
-			boolean new_page = FALSE;
+			boolean new_page;
 			short bitmap_index;
 
 			if (page_index < page_count)
 			{
 				texture_page = texture_pages[page_index];
+				new_page = FALSE;
 				if (texture_page)
 					texture_page_textures_begin(texture_page);
 			}
@@ -1285,13 +1286,11 @@ static void extract_build_texture_pages_by_sequence(
 
 					if (!texture_page)
 					{
-						short page_width = (short)MIN(
-							ceiling_power2(MAX(minimum_page_size, entry->bitmap->width)),
-							512);
-						short page_height = (short)MIN(
-							ceiling_power2(MAX(minimum_page_size, entry->bitmap->height)),
-							512);
+						short page_width = MAX(minimum_page_size, entry->bitmap->width);
+						short page_height = MAX(minimum_page_size, entry->bitmap->height);
 
+						page_width = (short)MIN(512, ceiling_power2(page_width));
+						page_height = (short)MIN(512, ceiling_power2(page_height));
 						texture_page = texture_page_new(NULL, page_width, page_height, spacing);
 						if (!texture_page)
 							break;
@@ -1344,8 +1343,8 @@ static void extract_build_texture_pages_by_sequence(
 
 		do
 		{
-			width = texture_page->width / 2;
-			height = texture_page->height / 2;
+			width = texture_page->width >> 1;
+			height = texture_page->height >> 1;
 		}
 		while (width >= 32 &&
 			height >= 32 &&
@@ -2299,32 +2298,33 @@ static boolean extract_cube_maps(
 static boolean extract_sprites(
 	void)
 {
+	boolean result = TRUE;
+	long total_page_pixel_count = 0;
 	short sprite_page_count = extract_data.group->sprite_budget_count;
 	short spacing = extract_data.group->mipmap_count == 1 ? 1 : 4;
 	long page_size = 32 << (sprite_page_count
 		? extract_data.group->sprite_budget_size
 		: _bitmap_group_sprite_budget_512);
 	long budget_pixel_count = sprite_page_count * page_size * page_size;
-	short maximum_bitmap_dimension = (short)(page_size - 2 * spacing);
 	pixel32 background_colors[3] =
 	{
 		0x00000000,
 		0xFFFFFFFF,
 		0x7F7F7F7F,
 	};
+	short maximum_bitmap_dimension = (short)(page_size - 2 * spacing);
 	struct texture_page *texture_pages[32];
 	short texture_page_count;
-	long total_page_pixel_count = 0;
-	boolean result = TRUE;
 	short bitmap_index;
+	short page_index;
 
 	for (bitmap_index = 0; result && bitmap_index < extract_data.bitmap_count; bitmap_index++)
 	{
-		struct bitmap_data *bitmap = extract_data.bitmaps[bitmap_index].bitmap;
+		struct bitmap_extract_entry *entry = &extract_data.bitmaps[bitmap_index];
 
-		if (bitmap &&
-			(bitmap->width > maximum_bitmap_dimension ||
-			bitmap->height > maximum_bitmap_dimension))
+		if (entry->bitmap &&
+			(entry->bitmap->width > maximum_bitmap_dimension ||
+			entry->bitmap->height > maximum_bitmap_dimension))
 		{
 			error(
 				_error_immediate,
@@ -2353,12 +2353,9 @@ static boolean extract_sprites(
 		extract_data.group->sprite_spacing = spacing;
 	}
 
-	if (!result)
-		return result;
-
-	for (bitmap_index = 0; result && bitmap_index < texture_page_count; bitmap_index++)
+	for (page_index = 0; result && page_index < texture_page_count; page_index++)
 	{
-		struct texture_page *texture_page = texture_pages[bitmap_index];
+		struct texture_page *texture_page = texture_pages[page_index];
 		struct bitmap_data *page_bitmap = bitmap_2d_new(
 			texture_page->width,
 			texture_page->height,
@@ -2386,7 +2383,7 @@ static boolean extract_sprites(
 					entry->sprite_index,
 					struct bitmap_group_sprite);
 
-				if (entry->page_index == bitmap_index)
+				if (entry->page_index == page_index)
 				{
 					struct texture_page_texture *texture = texture_page_texture_get(
 						texture_page,
@@ -2402,7 +2399,7 @@ static boolean extract_sprites(
 						sprite_spacing = 0;
 					}
 
-					sprite->bitmap_index = bitmap_index;
+					sprite->bitmap_index = page_index;
 					sprite->registration_point.x =
 						(sprite_spacing + sprite->registration_point.x) / texture_page->width;
 					sprite->registration_point.y =
@@ -2418,12 +2415,12 @@ static boolean extract_sprites(
 
 					if (sequence->first_bitmap_index == NONE)
 					{
-						sequence->first_bitmap_index = bitmap_index;
+						sequence->first_bitmap_index = page_index;
 						sequence->bitmap_count = 1;
 					}
 					else
 					{
-						sequence->bitmap_count = bitmap_index - sequence->first_bitmap_index;
+						sequence->bitmap_count = page_index - sequence->first_bitmap_index;
 					}
 
 					destination_point.x = texture->x;
@@ -2466,7 +2463,7 @@ static boolean extract_sprites(
 
 	if (result)
 	{
-		if ((real)budget_pixel_count <= 0.0f)
+		if ((real)budget_pixel_count == 0.0f)
 		{
 			fprintf(stdout, "### WARNING no sprite budget set\r\n");
 			fflush(stdout);
@@ -2487,7 +2484,7 @@ static boolean extract_sprites(
 					_error_silent,
 					"### ERROR sprite budget exceeded (%3.0f%%)",
 					budget_fraction * 100.0f);
-				return FALSE;
+				result = FALSE;
 			}
 		}
 	}
