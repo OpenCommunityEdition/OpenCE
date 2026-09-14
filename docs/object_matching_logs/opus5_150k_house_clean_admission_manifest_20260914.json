@@ -1,21 +1,21 @@
 {
  "summary": {
-  "label": "final (after truncated wave w3a)",
+  "label": "final (after truncated waves w3a and w3b)",
   "base_commit": "12f7375d4b845725c5ae3fda7ad715998ee54975",
-  "head_commit": "fe586a59b3ac7cf263c21a0e640755c3b9f5212f",
-  "accepted_functions": 7290,
-  "accepted_meaningful": 1331815,
-  "accepted_gain_functions": 141,
-  "accepted_gain_meaningful": 86845,
-  "strict_new_functions": 138,
-  "strict_new_meaningful": 84893,
-  "strict_new_padded": 85872,
-  "nonstrict_new_accepted_functions": 3,
-  "nonstrict_new_accepted_meaningful": 1952,
+  "head_commit": "fe0ec76e8026746f3dde34b8a99a5ffae26f6908",
+  "accepted_functions": 7297,
+  "accepted_meaningful": 1336250,
+  "accepted_gain_functions": 148,
+  "accepted_gain_meaningful": 91280,
+  "strict_new_functions": 144,
+  "strict_new_meaningful": 89085,
+  "strict_new_padded": 90112,
+  "nonstrict_new_accepted_functions": 4,
+  "nonstrict_new_accepted_meaningful": 2195,
   "strict_gains_not_in_accepted_ledger": 0,
   "regressions": [],
   "target_meaningful": 1394970,
-  "strict_remaining_to_150k": 65107
+  "strict_remaining_to_150k": 60915
  },
  "strict_functions": [
   {
@@ -31,6 +31,22 @@
    "section": "section:5",
    "padded_bytes": 352,
    "previous_name": "_action_flee_current_position_exposed",
+   "commits": [
+    "110eecc5c action_flee: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/action_flee",
+   "function": "_action_flee_perform",
+   "meaningful_bytes": 857,
+   "relocations": 30,
+   "normalized_sha256": "d62f05304574f88eefd7c025a452910d821e3986442777adcb223dc0d2085dc2",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 864,
+   "previous_name": "_action_flee_perform",
    "commits": [
     "110eecc5c action_flee: 2 function(s) strict exact"
    ]
@@ -582,6 +598,7 @@
    "padded_bytes": 576,
    "previous_name": "_extract_get_bitmap_format",
    "commits": [
+    "57fc56c46 bitmap_extract: 1 function(s) strict exact",
     "1f2c40aef bitmap_extract: 2 function(s) strict exact"
    ]
   },
@@ -599,6 +616,25 @@
    "padded_bytes": 832,
    "previous_name": "_extract_plateless_cube_map",
    "commits": [
+    "57fc56c46 bitmap_extract: 1 function(s) strict exact",
+    "1f2c40aef bitmap_extract: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "function": "_extract_sprites",
+   "meaningful_bytes": 1089,
+   "relocations": 49,
+   "normalized_sha256": "b853b0998fdec2cdf39cce422d5baa701b09b807da62f236f7c409764437ee0b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 1104,
+   "previous_name": "_extract_sprites",
+   "commits": [
+    "57fc56c46 bitmap_extract: 1 function(s) strict exact",
     "1f2c40aef bitmap_extract: 2 function(s) strict exact"
    ]
   },
@@ -956,6 +992,40 @@
    "previous_name": "_particle_system_new_particles",
    "commits": [
     "789e992a6 particle_systems: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/particles",
+   "function": "_particle_next_frame",
+   "meaningful_bytes": 204,
+   "relocations": 8,
+   "normalized_sha256": "5b20757045cb3e9b1402dc94c9f4b8c115fb6c394bd0fec214a3b5e8795c46a0",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 208,
+   "previous_name": "_particle_next_frame",
+   "commits": [
+    "6555f3d0e particles: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/particles",
+   "function": "_particle_update_physics",
+   "meaningful_bytes": 913,
+   "relocations": 35,
+   "normalized_sha256": "2713b2fb111b6b63fc47b59818f03d7d9f75e1c0b21e28a6af37765ea07bf3b7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 928,
+   "previous_name": "_particle_update_physics",
+   "commits": [
+    "6555f3d0e particles: 2 function(s) strict exact"
    ]
   },
   {
@@ -1754,6 +1824,23 @@
    "commits": []
   },
   {
+   "unit": "source/objects/widgets/lightning",
+   "function": "_lightning_offset_marker_position",
+   "meaningful_bytes": 237,
+   "relocations": 22,
+   "normalized_sha256": "2fe97798519acba821968a88f76c5a3ac64a62c86a9919327b6ed89c8599f17d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:8",
+   "padded_bytes": 240,
+   "previous_name": "_lightning_offset_marker_position",
+   "commits": [
+    "2716e6119 lightning: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/physics/collision_usage",
    "function": "_collision_log_render",
    "meaningful_bytes": 1582,
@@ -1767,6 +1854,7 @@
    "padded_bytes": 1584,
    "previous_name": "_collision_log_render",
    "commits": [
+    "8468de1ba collision_usage: retain verified credible source at zero credit",
     "3e223c3ab collision_usage: 1 function(s) strict exact"
    ]
   },
@@ -1857,6 +1945,24 @@
   },
   {
    "unit": "source/rasterizer/rasterizer_text",
+   "function": "_cache_hardware_format_character",
+   "meaningful_bytes": 892,
+   "relocations": 74,
+   "normalized_sha256": "c8c82d6f962bf513cdbd0ef515ff326824996e3fe443930afeb2d5b23043529f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 896,
+   "previous_name": "_cache_hardware_format_character",
+   "commits": [
+    "75e3c4b95 rasterizer_text: 1 function(s) strict exact",
+    "029e2cf76 rasterizer_text: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_text",
    "function": "_rasterizer_draw_character",
    "meaningful_bytes": 228,
    "relocations": 3,
@@ -1869,6 +1975,7 @@
    "padded_bytes": 240,
    "previous_name": "_rasterizer_draw_character",
    "commits": [
+    "75e3c4b95 rasterizer_text: 1 function(s) strict exact",
     "029e2cf76 rasterizer_text: 3 function(s) strict exact"
    ]
   },
@@ -1886,6 +1993,7 @@
    "padded_bytes": 368,
    "previous_name": "_rasterizer_draw_character_with_dropshadow",
    "commits": [
+    "75e3c4b95 rasterizer_text: 1 function(s) strict exact",
     "029e2cf76 rasterizer_text: 3 function(s) strict exact"
    ]
   },
@@ -1903,6 +2011,7 @@
    "padded_bytes": 144,
    "previous_name": "_rasterizer_text_cache_initialize",
    "commits": [
+    "75e3c4b95 rasterizer_text: 1 function(s) strict exact",
     "029e2cf76 rasterizer_text: 3 function(s) strict exact"
    ]
   },
@@ -2384,6 +2493,17 @@
    "unit": "source/interface/ui_widget_game_data_input_functions",
    "function": "_splitscreen_pregame_status_screen_update",
    "meaningful_bytes": 1208,
+   "relocations": null,
+   "normalized_sha256": null,
+   "proof_sources": [
+    "objdiff",
+    "objdiff-coff-shape"
+   ]
+  },
+  {
+   "unit": "source/physics/collision_usage",
+   "function": "_collision_log_get_current_user",
+   "meaningful_bytes": 243,
    "relocations": null,
    "normalized_sha256": null,
    "proof_sources": [
