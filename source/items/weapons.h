@@ -277,6 +277,21 @@ boolean weapon_can_be_fired(long weapon_index);
 
 short weapon_get_first_person_animation_time(long weapon_index, short mode, short animation_type, short shotgun_reload_type);
 
+boolean weapon_aim(
+	long weapon_index,
+	short trigger_index,
+	real_point3d const *origin,
+	real_point3d const *target_point,
+	boolean lob,
+	real_vector3d *result_aim_vector,
+	real *result_ticks,
+	real *result_distance,
+	boolean *result_linear);
+real weapon_estimate_time_to_target(
+	long weapon_index,
+	short trigger_index,
+	real distance);
+
 /* ---------- globals */
 
 /* ---------- public code */
