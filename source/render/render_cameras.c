@@ -396,8 +396,6 @@ real render_frustum_cube_view_fraction(
 		real projection_y = frustum->projection_matrix[1][1];
 		real projection_offset_y = frustum->projection_matrix[2][1];
 		real inverse_z1 = 1.0f / bounds->z1;
-		real positive_inverse_z0;
-		real positive_inverse_z1;
 		real left;
 		real bottom;
 		real right;
@@ -440,35 +438,33 @@ real render_frustum_cube_view_fraction(
 			910,
 			frustum->projection_matrix[3][3]==0.0f);
 
-		positive_inverse_z0 = -inverse_z0;
-		positive_inverse_z1 = -inverse_z1;
 		left = MAX(
 			MIN(
 				(bounds->z0 * projection_offset_x + bounds->x0 * projection_x) *
-					positive_inverse_z0,
+					(-inverse_z0),
 				(bounds->z1 * projection_offset_x + bounds->x0 * projection_x) *
-					positive_inverse_z1),
+					(-inverse_z1)),
 			-1.0f);
 		bottom = MAX(
 			MIN(
 				(bounds->z0 * projection_offset_y + bounds->y0 * projection_y) *
-					positive_inverse_z0,
+					(-inverse_z0),
 				(bounds->z1 * projection_offset_y + bounds->y0 * projection_y) *
-					positive_inverse_z1),
+					(-inverse_z1)),
 			-1.0f);
 		right = MIN(
 			MAX(
 				(bounds->z0 * projection_offset_x + bounds->x1 * projection_x) *
-					positive_inverse_z0,
+					(-inverse_z0),
 				(bounds->z1 * projection_offset_x + bounds->x1 * projection_x) *
-					positive_inverse_z1),
+					(-inverse_z1)),
 			1.0f);
 		top = MIN(
 			MAX(
 				(bounds->z0 * projection_offset_y + bounds->y1 * projection_y) *
-					positive_inverse_z0,
+					(-inverse_z0),
 				(bounds->z1 * projection_offset_y + bounds->y1 * projection_y) *
-					positive_inverse_z1),
+					(-inverse_z1)),
 			1.0f);
 		fraction = (right - left) * (top - bottom) * 0.25f;
 		if (!(fraction > 0.0f))

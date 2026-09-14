@@ -117,25 +117,6 @@
     },
     {
       "unit": "source/render/render_cameras",
-      "function": "_render_frustum_cube_view_fraction",
-      "class": "unclassified",
-      "evidence": "Best complete ordinary-C frustum projection reconstruction. It uses the render-camera owner header, named project math types/constants, and direct geometric operations without compiler steering. Candidate and target share the 1,200-byte padded envelope and all 78 relocation identities, scoring 96.128494% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor that explains the residual schedule.",
-      "measurements": {
-        "target": {
-          "size": 1200,
-          "relocation_count": 78,
-          "normalized_sha256": "bcc496e4a2fc55aa9fc78d14a886b2c29828c43c27a40aea5949da21f19543be"
-        },
-        "base": {
-          "size": 1200,
-          "relocation_count": 78,
-          "normalized_sha256": "b3c2fd0e3984e2cdf2beeb4c3c3886e228cb40e87a0bd85f9b0e24736b2789d7"
-        },
-        "objdiff_percent": 96.128494
-      }
-    },
-    {
-      "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum_bounds",
       "class": "unclassified",
       "evidence": "Best complete ordinary-C full frustum-bounds reconstruction. It uses the render-camera owner header and named project math types, with no source-pressure steering. Candidate and target share the 288-byte padded envelope and all nine relocation identities, scoring 99.41237% objdiff; the residual is an unresolved natural instruction-schedule difference. The clipped-frustum companion is strict exact at 352 padded bytes and is therefore not parked. The same TU's exact front-facing reconstruction naturally emits cross/vector helper sections absent from the target object; those helpers receive no credit and the whole object remains rejected for object-exact accounting. Reopen only with authoritative January inline provenance or a natural same-compiler donor.",
