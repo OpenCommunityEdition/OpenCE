@@ -547,21 +547,21 @@ void profile_dump(
 				do
 				{
 					total_calls += sections[section_index]->total_call_count;
-					total_time += (real)(sections[section_index]->total_elapsed_timebase/
-						(double)profile_globals.timebase_frequency);
+					total_time += sections[section_index]->total_elapsed_timebase/
+						(double)profile_globals.timebase_frequency;
 					average_calls += (real)sections[section_index]->total_call_count/
 						sections[section_index]->sample_count;
-					average_msec += (real)((sections[section_index]->sample_count==0 ?
+					average_msec += (sections[section_index]->sample_count==0 ?
 						0.0 :
 						(double)sections[section_index]->total_elapsed_timebase/
 							sections[section_index]->sample_count)*1000.0/
-						profile_globals.timebase_frequency);
+						profile_globals.timebase_frequency;
 					peak_calls += sections[section_index]->peak_call_count;
-					peak_msec += (real)(sections[section_index]->peak_elapsed_timebase*1000.0/
-						profile_globals.timebase_frequency);
+					peak_msec += sections[section_index]->peak_elapsed_timebase*1000.0/
+						profile_globals.timebase_frequency;
 					frame_calls += sections[section_index]->frame_call_count;
-					frame_msec += (real)(sections[section_index]->frame_elapsed_timebase*1000.0/
-						profile_globals.timebase_frequency);
+					frame_msec += sections[section_index]->frame_elapsed_timebase*1000.0/
+						profile_globals.timebase_frequency;
 
 					section_index++;
 				}
