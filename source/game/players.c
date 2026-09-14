@@ -1426,7 +1426,7 @@ static void players_compute_combined_pvs(
 	struct structure_bsp *structure_bsp;
 	struct structure_leaf *leaf;
 	long leaf_index;
-	long activating_cluster_index;
+	short activating_cluster_index;
 	long root_object_index;
 	short cluster_index;
 
@@ -1466,14 +1466,14 @@ static void players_compute_combined_pvs(
 			}
 		}
 
-		if ((short)activating_cluster_index != NONE)
+		if (activating_cluster_index != NONE)
 		{
 			bit_vector_or(
 				(short)structure_bsp->clusters.count,
 				combined_pvs,
 				structure_bsp_get_cluster_pvs(
 					structure_bsp,
-					(short)activating_cluster_index),
+					activating_cluster_index),
 				combined_pvs);
 		}
 	}
@@ -2178,7 +2178,6 @@ static void player_teleport_on_bsp_switch(
 	struct player_datum *player;
 	struct biped_datum *biped;
 	struct biped_datum *source_biped;
-	struct scenario_bsp_switch_trigger_volume *bsp_switch;
 	long unit_index;
 	boolean outside_switch_trigger;
 	boolean teleport_succeeded;
@@ -2192,15 +2191,15 @@ static void player_teleport_on_bsp_switch(
 		position);
 	if (biped)
 	{
-		if (players_globals->pending_teleport_starting_location_index != NONE)
+		if (players_globals->pending_teleport_starting_location_index != NONE &&
+			!scenario_trigger_volume_test_object(
+				TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->bsp_switch_trigger_volumes,
+					players_globals->pending_teleport_starting_location_index,
+					struct scenario_bsp_switch_trigger_volume)->trigger_volume_index,
+				unit_index))
 		{
-			bsp_switch = TAG_BLOCK_GET_ELEMENT(
-				&global_scenario_get()->bsp_switch_trigger_volumes,
-				players_globals->pending_teleport_starting_location_index,
-				struct scenario_bsp_switch_trigger_volume);
-			outside_switch_trigger = !scenario_trigger_volume_test_object(
-				bsp_switch->trigger_volume_index,
-				unit_index);
+			outside_switch_trigger = TRUE;
 		}
 		else
 		{
@@ -2247,20 +2246,14 @@ void players_reconnect_to_structure_bsp(
 	struct scenario *scenario;
 	struct scenario_bsp_switch_trigger_volume *bsp_switch;
 	struct scenario_cutscene_flag *cutscene_flag;
-	struct structure_leaf *leaf;
-	real_point3d biped_base;
 	real_point3d teleport_position;
-	real biped_height;
 	long source_unit_index;
-	real adjustment_or_width;
 	boolean teleport_position_valid;
 	boolean found_player;
 	short local_player_index;
 	short cutscene_flag_index;
 	long player_index;
 	long player_unit_index;
-	long cluster_index;
-	long (*local_player_index_getter)(short local_player_index);
 
 	if (players_globals->pending_teleport_starting_location_index != NONE &&
 		players_globals->local_player_count > 1)
@@ -2276,27 +2269,26 @@ void players_reconnect_to_structure_bsp(
 		cutscene_flag_index = bsp_switch->cutscene_flag_index;
 		if (cutscene_flag_index != NONE)
 		{
-			adjustment_or_width = 0.f;
+			real adjustment = 0.f;
+
 			cutscene_flag = TAG_BLOCK_GET_ELEMENT(
 				&scenario->cutscene_flags,
 				cutscene_flag_index,
 				struct scenario_cutscene_flag);
 			teleport_position = cutscene_flag->position;
-		collision_test:
-			if (collision_test_point(
-				FLAG(_collision_test_front_facing_surfaces_bit) |
-					FLAG(_collision_test_ignore_invisible_surfaces_bit) |
-					FLAG(_collision_test_structure_bit) |
-					FLAG(_collision_test_objects_scenery_bit),
-				&teleport_position,
-				NONE))
+			while (adjustment < 0.3f &&
+				collision_test_point(
+					FLAG(_collision_test_front_facing_surfaces_bit) |
+						FLAG(_collision_test_ignore_invisible_surfaces_bit) |
+						FLAG(_collision_test_structure_bit) |
+						FLAG(_collision_test_objects_scenery_bit),
+					&teleport_position,
+					NONE))
 			{
 				teleport_position.z += 0.05f;
-				adjustment_or_width += 0.05f;
-				if (adjustment_or_width < 0.3f)
-					goto collision_test;
+				adjustment += 0.05f;
 			}
-			teleport_position_valid = adjustment_or_width < 0.3f;
+			teleport_position_valid = adjustment < 0.3f;
 		}
 
 		data_iterator_new(&iterator, player_data);
@@ -2310,28 +2302,35 @@ void players_reconnect_to_structure_bsp(
 					players_globals->pending_teleport_starting_location_index,
 					player_unit_index))
 				{
+					real_point3d biped_base;
+					real biped_height;
+					real biped_width;
+					long cluster_index;
+
 					biped_get_physics_pill(
 						player->unit_index,
 						&biped_base,
 						&biped_height,
-						&adjustment_or_width);
-					if (scenario_leaf_index_from_point(&biped_base) != NONE)
-					{
-						leaf = TAG_BLOCK_GET_ELEMENT(
+						&biped_width);
+					cluster_index = scenario_leaf_index_from_point(&biped_base) == NONE ?
+						NONE :
+						TAG_BLOCK_GET_ELEMENT(
 							&global_structure_bsp_get()->leaves,
 							scenario_leaf_index_from_point(&biped_base) & LONG_MAX,
-							struct structure_leaf);
-						cluster_index = leaf->cluster_index;
-						if (cluster_index != NONE)
+							struct structure_leaf)->cluster_index;
+					if (cluster_index != NONE)
+					{
+						if (!teleport_position_valid)
 						{
-							if (!teleport_position_valid)
-								teleport_position = biped_base;
-							else
-								teleport_position.z =
-									adjustment_or_width + teleport_position.z;
-							source_unit_index = player->unit_index;
-							found_player = TRUE;
+							teleport_position = biped_base;
 						}
+						else
+						{
+							teleport_position.z += biped_width;
+						}
+
+						source_unit_index = player->unit_index;
+						found_player = TRUE;
 					}
 				}
 			}
@@ -2344,11 +2343,10 @@ void players_reconnect_to_structure_bsp(
 			"no players in the bsp");
 		if (found_player)
 		{
-			local_player_index_getter = local_player_get_player_index;
 			local_player_index = local_player_get_next(NONE);
 			while (local_player_index != NONE)
 			{
-				player_index = local_player_index_getter(local_player_index);
+				player_index = local_player_get_player_index(local_player_index);
 				player = player_get(player_index);
 				if (player->unit_index != NONE &&
 					player->unit_index != source_unit_index)
@@ -2379,23 +2377,28 @@ boolean unit_should_autopick_weapon(
 	struct weapon_datum *weapon;
 	struct weapon_definition *weapon_definition;
 	long weapon_count;
+	boolean result;
 
 	weapon = weapon_try_and_get(weapon_index);
 	weapon_definition = weapon_definition_get(weapon->definition_index);
 	weapon_count = unit_get_weapon_count(unit_index);
 
-	if (!(unit_approve_weapon_pickup(unit_index, weapon_index) &&
-		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) &&
-		weapon_count != 0 &&
-		(game_engine_running() ||
-			!unit_approve_weapon_pickup(unit_index, weapon_index) ||
-			weapon_count >= 2) &&
-		!game_engine_force_autopickup(unit_index, weapon_index))
+	if ((unit_approve_weapon_pickup(unit_index, weapon_index) &&
+		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) ||
+		weapon_count == 0 ||
+		(!game_engine_running() &&
+			unit_approve_weapon_pickup(unit_index, weapon_index) &&
+			weapon_count < 2) ||
+		game_engine_force_autopickup(unit_index, weapon_index))
 	{
-		return FALSE;
+		result = TRUE;
+	}
+	else
+	{
+		result = FALSE;
 	}
 
-	return TRUE;
+	return result;
 }
 
 static long players_compute_local_player_count(
