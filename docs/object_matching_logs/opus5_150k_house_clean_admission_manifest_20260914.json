@@ -1,21 +1,21 @@
 {
  "summary": {
-  "label": "checkpoint-w2A",
+  "label": "final",
   "base_commit": "12f7375d4b845725c5ae3fda7ad715998ee54975",
-  "head_commit": "d0c2aed7b0bead84df7ab113eb331fac355f7b72",
-  "accepted_functions": 7259,
-  "accepted_meaningful": 1308903,
-  "accepted_gain_functions": 110,
-  "accepted_gain_meaningful": 63933,
-  "strict_new_functions": 108,
-  "strict_new_meaningful": 62457,
-  "strict_new_padded": 63264,
-  "nonstrict_new_accepted_functions": 2,
-  "nonstrict_new_accepted_meaningful": 1476,
+  "head_commit": "ff1acbf89b59b7ede6fd77b574e26574df8ef461",
+  "accepted_functions": 7283,
+  "accepted_meaningful": 1326319,
+  "accepted_gain_functions": 134,
+  "accepted_gain_meaningful": 81349,
+  "strict_new_functions": 131,
+  "strict_new_meaningful": 79397,
+  "strict_new_padded": 80336,
+  "nonstrict_new_accepted_functions": 3,
+  "nonstrict_new_accepted_meaningful": 1952,
   "strict_gains_not_in_accepted_ledger": 0,
   "regressions": [],
   "target_meaningful": 1394970,
-  "strict_remaining_to_150k": 87543
+  "strict_remaining_to_150k": 70603
  },
  "strict_functions": [
   {
@@ -84,6 +84,22 @@
    "previous_name": "_action_vehicle_setup_specific",
    "commits": [
     "cbc9fbf5a action_vehicle: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_actor_combat_update",
+   "meaningful_bytes": 4672,
+   "relocations": 146,
+   "normalized_sha256": "e37ad38594fffad1ddc0589ce5997423a028066ef06aa85ae811d9f3b3731150",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:34",
+   "padded_bytes": 4672,
+   "previous_name": "_actor_combat_update",
+   "commits": [
+    "3611d423d actor_combat: 1 function(s) strict exact"
    ]
   },
   {
@@ -239,6 +255,40 @@
    ]
   },
   {
+   "unit": "source/ai/ai_script",
+   "function": "_ai_scripting_set_current_state",
+   "meaningful_bytes": 160,
+   "relocations": 10,
+   "normalized_sha256": "0b89d73cba5002aed9389f654733e85ce001302868370ec9063b75f660df5278",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:81",
+   "padded_bytes": 160,
+   "previous_name": "_ai_scripting_set_current_state",
+   "commits": [
+    "ffd0e1d4b ai_script: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "function": "_ai_scripting_teleport_starting_location_private",
+   "meaningful_bytes": 285,
+   "relocations": 13,
+   "normalized_sha256": "755b7a6e2990f977b15fb61eb09a0106990c68fcd7d69128922e69cc12e52c5e",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:62",
+   "padded_bytes": 288,
+   "previous_name": "_ai_scripting_teleport_starting_location_private",
+   "commits": [
+    "ffd0e1d4b ai_script: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/ai/encounters",
    "function": "_encounter_control_actors",
    "meaningful_bytes": 436,
@@ -290,6 +340,41 @@
    ]
   },
   {
+   "unit": "source/ai/path",
+   "function": "_path_heap_verify",
+   "meaningful_bytes": 3,
+   "relocations": 0,
+   "normalized_sha256": "1191f37eec740e495eda01ae2ac0969bf44c3c661ce4ae90583b5fdc05c0f707",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 16,
+   "previous_name": "_code_0004c7b0",
+   "commits": [
+    "8015c9112 path: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path_obstacle_avoidance",
+   "function": "_path_add_steps",
+   "meaningful_bytes": 816,
+   "relocations": 30,
+   "normalized_sha256": "9e03f302b0caf5a5e6b53433fdded66b356d7b50378c2bb652e4647761ae3f3f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "padded_bytes": 816,
+   "previous_name": "_path_add_steps",
+   "commits": [
+    "2ac274833 path.h: obstacle_from_disc returns short (path_obstacle_avoidance: 1 function strict exact)",
+    "1886d3944 path_obstacle_avoidance: 2 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/ai/path_obstacle_avoidance",
    "function": "_path_new",
    "meaningful_bytes": 476,
@@ -303,6 +388,7 @@
    "padded_bytes": 480,
    "previous_name": "_path_new",
    "commits": [
+    "2ac274833 path.h: obstacle_from_disc returns short (path_obstacle_avoidance: 1 function strict exact)",
     "1886d3944 path_obstacle_avoidance: 2 function(s) strict exact"
    ]
   },
@@ -320,6 +406,7 @@
    "padded_bytes": 608,
    "previous_name": "_render_debug_path",
    "commits": [
+    "2ac274833 path.h: obstacle_from_disc returns short (path_obstacle_avoidance: 1 function strict exact)",
     "1886d3944 path_obstacle_avoidance: 2 function(s) strict exact"
    ]
   },
@@ -678,6 +765,23 @@
    ]
   },
   {
+   "unit": "source/cutscene/recorded_animations",
+   "function": "_recorded_animation_play_internal",
+   "meaningful_bytes": 630,
+   "relocations": 38,
+   "normalized_sha256": "df113ef0763a2a945aaf24c999e7976d55b0f998719fff88ba52585d73eb1a7c",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 640,
+   "previous_name": "_recorded_animation_play_internal",
+   "commits": [
+    "0af86e9e8 recorded_animations: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/effects/contrails",
    "function": "_contrail_scale_random_value",
    "meaningful_bytes": 102,
@@ -745,6 +849,40 @@
    ]
   },
   {
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_new_particles",
+   "meaningful_bytes": 843,
+   "relocations": 35,
+   "normalized_sha256": "42b053f34b78452c8c6fa4b8b0c6aabbbcf6750abce7856556240f3637e01e27",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 848,
+   "previous_name": "_particle_system_new_particles",
+   "commits": [
+    "789e992a6 particle_systems: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/weather_particle_systems",
+   "function": "_weather_particle_system_new_particle",
+   "meaningful_bytes": 704,
+   "relocations": 41,
+   "normalized_sha256": "7f9d6a12746c868b4a9882f29df1c2ba594137146ba65394a2082d7af1fe32c8",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:11",
+   "padded_bytes": 704,
+   "previous_name": "_weather_particle_system_new_particle",
+   "commits": [
+    "7fe3891c3 weather_particle_systems: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/game/aim_assist",
    "function": "_find_aim_assist_targets",
    "meaningful_bytes": 294,
@@ -759,6 +897,40 @@
    "previous_name": "_find_aim_assist_targets",
    "commits": [
     "b0cb3bd3b aim_assist: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_allegiance",
+   "function": "_game_allegiance_broken",
+   "meaningful_bytes": 402,
+   "relocations": 2,
+   "normalized_sha256": "3eba7c13f76df6f625c5abf7165fe4e320ba92642bad6390de317f45dfcd0f9e",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:11",
+   "padded_bytes": 416,
+   "previous_name": "_game_allegiance_broken",
+   "commits": [
+    "596e7f2fb game_allegiance: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_allegiance",
+   "function": "_game_allegiance_create",
+   "meaningful_bytes": 217,
+   "relocations": 5,
+   "normalized_sha256": "47961c6c1d4c59a901156d907b22388d0b0a39a06f367b8403cd9e97ada8ed1f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 224,
+   "previous_name": "_game_allegiance_create",
+   "commits": [
+    "596e7f2fb game_allegiance: 2 function(s) strict exact"
    ]
   },
   {
@@ -861,6 +1033,74 @@
    "previous_name": "_game_statistics_record_kill",
    "commits": [
     "f764cdf19 game_statistics: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/player_control",
+   "function": "_get_local_player_input_blob",
+   "meaningful_bytes": 3444,
+   "relocations": 130,
+   "normalized_sha256": "4b4ad9ae985a33b5447df49d1037b7ec716d220c7a6a1544720c49a2b52c1b9a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:41",
+   "padded_bytes": 3456,
+   "previous_name": "_get_local_player_input_blob",
+   "commits": [
+    "57121f73f player_control: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/player_control",
+   "function": "_player_control_initialize_for_new_map",
+   "meaningful_bytes": 138,
+   "relocations": 10,
+   "normalized_sha256": "adb32edd759e2bbcf07d7c5b87f8a11099d2f03e8e93e465605bcbc3512994e7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:46",
+   "padded_bytes": 144,
+   "previous_name": "_player_control_initialize_for_new_map",
+   "commits": [
+    "57121f73f player_control: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/player_queues_new",
+   "function": "_update_client_get_maximum_possible_server_time",
+   "meaningful_bytes": 74,
+   "relocations": 3,
+   "normalized_sha256": "30ffd0838c5ff2ede2048d24ee662704576c5f1a3dcd0b28b547ebc8ba71dd96",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 80,
+   "previous_name": "_update_client_get_maximum_possible_server_time",
+   "commits": [
+    "4a846e714 player_queues_new: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/player_queues_new",
+   "function": "_update_queues_reset_and_fill_with_lies",
+   "meaningful_bytes": 260,
+   "relocations": 24,
+   "normalized_sha256": "786c6c80f9616932ef40b3146089fa32653cdaecada706c74ae2dae993d4ba70",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 272,
+   "previous_name": "_update_queues_reset_and_fill_with_lies",
+   "commits": [
+    "4a846e714 player_queues_new: 2 function(s) strict exact"
    ]
   },
   {
@@ -1299,7 +1539,59 @@
    "padded_bytes": 32,
    "previous_name": "_animation_update",
    "commits": [
+    "71e4a5a77 weapons: retain verified credible source at zero credit",
     "b929ac233 weapons: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "function": "_build_torus",
+   "meaningful_bytes": 753,
+   "relocations": 18,
+   "normalized_sha256": "6460f3c33d8f750aa8651ce8c7a26cb9670b258dfe080d9f13af8baff1c48022",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:7",
+   "padded_bytes": 768,
+   "previous_name": "_build_torus",
+   "commits": [
+    "6493ad3b5 geometry: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "function": "_convex_hull3d_begin",
+   "meaningful_bytes": 1485,
+   "relocations": 28,
+   "normalized_sha256": "d3e0ba2e2077ce1e167e22398d1ce4b18329c8a3301ef606b46f56456ee282bc",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 1488,
+   "previous_name": "_convex_hull3d_begin",
+   "commits": [
+    "6493ad3b5 geometry: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "function": "_geosphere_new",
+   "meaningful_bytes": 494,
+   "relocations": 25,
+   "normalized_sha256": "89b49ad03b434d6258ac264dc7b71bb625984c51016d55a82ad146c86d474911",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:30",
+   "padded_bytes": 496,
+   "previous_name": "_geosphere_new",
+   "commits": [
+    "6493ad3b5 geometry: 3 function(s) strict exact"
    ]
   },
   {
@@ -1337,6 +1629,21 @@
    ]
   },
   {
+   "unit": "source/objects/widgets/glow",
+   "function": "_glow_trailing_particle_new",
+   "meaningful_bytes": 608,
+   "relocations": 26,
+   "normalized_sha256": "dfe35f0bc1c0576d568472c8be04583e4651a2fe14810520891f9608bf86ccd2",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:23",
+   "padded_bytes": 608,
+   "previous_name": "_glow_trailing_particle_new",
+   "commits": []
+  },
+  {
    "unit": "source/physics/collision_usage",
    "function": "_collision_log_render",
    "meaningful_bytes": 1582,
@@ -1351,6 +1658,74 @@
    "previous_name": "_collision_log_render",
    "commits": [
     "3e223c3ab collision_usage: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_cinematics",
+   "function": "_rasterizer_screen_effect_set_convolution",
+   "meaningful_bytes": 98,
+   "relocations": 4,
+   "normalized_sha256": "7beef58f5328b7768b506801a5528055389723414ad6c8ea1e4eead421e8aa48",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:9",
+   "padded_bytes": 112,
+   "previous_name": "_rasterizer_screen_effect_set_convolution",
+   "commits": [
+    "a25da8b81 rasterizer_cinematics: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_cinematics",
+   "function": "_rasterizer_screen_effect_set_filter",
+   "meaningful_bytes": 109,
+   "relocations": 4,
+   "normalized_sha256": "de4709a02eba43f11818fd1edf0124d200de56a81157be6670dfa8fff0834794",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 112,
+   "previous_name": "_rasterizer_screen_effect_set_filter",
+   "commits": [
+    "a25da8b81 rasterizer_cinematics: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_cinematics",
+   "function": "_rasterizer_screen_effect_set_video",
+   "meaningful_bytes": 288,
+   "relocations": 20,
+   "normalized_sha256": "eb1b757f0f5e5dbfb23a66ea08ec4cd3b8eeb4ce6385ea9c8a0f3e4e5916c46a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 288,
+   "previous_name": "_rasterizer_screen_effect_set_video",
+   "commits": [
+    "a25da8b81 rasterizer_cinematics: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_cinematics",
+   "function": "_rasterizer_screen_effects_initialize_for_new_map",
+   "meaningful_bytes": 45,
+   "relocations": 3,
+   "normalized_sha256": "e53fee00ab5bd5eb887f92dd8dbe300dae55ac8ca59c1a5c9c1ab26e62441804",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 48,
+   "previous_name": "_rasterizer_screen_effects_initialize_for_new_map",
+   "commits": [
+    "a25da8b81 rasterizer_cinematics: 4 function(s) strict exact"
    ]
   },
   {
@@ -1419,6 +1794,23 @@
    "previous_name": "_rasterizer_text_cache_initialize",
    "commits": [
     "029e2cf76 rasterizer_text: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox",
+   "function": "__rasterizer_window_begin",
+   "meaningful_bytes": 412,
+   "relocations": 39,
+   "normalized_sha256": "fecabaa8a9edb25e6db2dc22654b55310d362082bac2a8c2254eba73f2b41223",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:94",
+   "padded_bytes": 416,
+   "previous_name": "__rasterizer_window_begin",
+   "commits": [
+    "858bde2b5 rasterizer_xbox: 1 function(s) strict exact"
    ]
   },
   {
@@ -1791,6 +2183,7 @@
    "padded_bytes": 1232,
    "previous_name": "_biped_fix_position",
    "commits": [
+    "276b0368f bipeds.h: biped_approximate_surface_index returns long (ai_script: 1 function strict exact)",
     "4f66b6d8b bipeds: 1 function(s) strict exact"
    ]
   },
@@ -1862,6 +2255,17 @@
    "unit": "source/interface/ui_widget_game_data_input_functions",
    "function": "_splitscreen_pregame_status_screen_update",
    "meaningful_bytes": 1208,
+   "relocations": null,
+   "normalized_sha256": null,
+   "proof_sources": [
+    "objdiff",
+    "objdiff-coff-shape"
+   ]
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_leaf_map_build_portals_from_leaf",
+   "meaningful_bytes": 476,
    "relocations": null,
    "normalized_sha256": null,
    "proof_sources": [
