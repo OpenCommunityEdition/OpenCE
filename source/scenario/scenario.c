@@ -629,7 +629,7 @@ short scenario_get_fog_region_index(
 					&structure_bsp->fog_planes,
 					fog_reference & SHORT_MAX,
 					struct structure_fog_plane);
-				fog_index = scenario_fog_region_get_fog_index(fog_plane->fog_palette_index);
+				fog_index = scenario_fog_region_get_fog_index(fog_plane->region_index);
 				plane_distance = 0.0f;
 				if (fog_index != NONE)
 				{
@@ -639,7 +639,7 @@ short scenario_get_fog_region_index(
 				}
 
 				if (!position || plane3d_distance_to_point(&fog_plane->plane, position) + plane_distance < 0.0f)
-					result = fog_plane->fog_palette_index;
+					result = fog_plane->region_index;
 			}
 			else
 			{
@@ -726,7 +726,7 @@ real scenario_location_water_depth(
 					&structure_bsp->fog_planes,
 					fog_reference & SHORT_MAX,
 					struct structure_fog_plane);
-				fog_palette_index = fog_plane->fog_palette_index;
+				fog_palette_index = fog_plane->region_index;
 				plane = &fog_plane->plane;
 			}
 			else

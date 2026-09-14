@@ -151,8 +151,8 @@ struct structure_fog_region
 
 struct structure_fog_plane
 {
-	short fog_palette_index;
-	word pad;
+	short region_index;
+	short runtime_material_type;
 	real_plane3d plane;
 	byte unused14[0xC];
 };
