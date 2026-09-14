@@ -22473,7 +22473,7 @@
 { "file_offset": 4414624, "flags": 0, "name": "_cinematic_globals" },
 { "file_offset": 4414628, "flags": 0, "name": "_animation_threads", "static": true },
 { "file_offset": 4414632, "flags": 0, "name": "_debug_recording" },
-{ "file_offset": 4414636, "flags": 0, "name": "_animation_threads_debug" },
+{ "file_offset": 4414636, "flags": 0, "name": "_animation_threads_debug", "static": true },
 { "file_offset": 4414640, "flags": 0, "name": "_bss_00435cb0" },
 { "file_offset": 4414816, "flags": 0, "name": "_debug_decals" },
 { "file_offset": 4414832, "flags": 0, "name": "_decal_globals", "static": true },

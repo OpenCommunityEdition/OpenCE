@@ -921,25 +921,6 @@
       }
     },
     {
-      "unit": "source/cutscene/recorded_animations",
-      "function": "_recorded_animation_play_internal",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after a fresh canonical-commit audit found no missing behavior and the fail-closed classifier returned UNKNOWN. The retained ordinary-C implementation is complete, typed, link-correct, 0x280 padded bytes on both sides, and preserves the same ordered 38 relocation types/destinations; objdiff reports 98.57143 percent. The six-event aligned walk reduces to a four-instruction scheduling tie after tag_data_get_pointer: January loads animation_threads_debug before storing the returned event stream and masks the thread index before materializing &thread->event_stream, while VC7 emits those two independent pairs in the opposite order; the animation_threads_debug relocation consequently moves from +0x12c to +0x12f. A census of all 1,746 registered worktrees found 14 physical source hashes, and all reachable history reduced to 11 committed blobs. The only exact families make animation_threads_debug or all three BSS globals file-local; those forms have false BSS ownership/offsets and cannot provide the external _debug_recording symbol used by hs_globals_external. The 47 Claude/Opus worktrees and the Opus canonical-reconciliation ledger add no admissible family: they explicitly classify the Opus exact result as false storage ownership. The later HaloCEA reconstruction corroborates the current gameplay path but has neither January local-lifetime evidence nor the debug bookkeeping, and Marathon's recording/replay code supports ordinary file-scope state and direct control flow only. Temporary-local and statement-order probes already either enlarge the residual or perturb allocation across the function. No source, header, enum, prototype, tag/object access, or behavior gap remains; no assembly, volatile/register forcing, barrier, pragma, raw offset, representation pun, fake dependency, undefined behavior, forced inline, or nonsensical control flow is accepted. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the independent scheduling order while preserving real BSS linkage and ownership.",
-      "measurements": {
-        "target": {
-          "size": 640,
-          "relocation_count": 38,
-          "normalized_sha256": "df113ef0763a2a945aaf24c999e7976d55b0f998719fff88ba52585d73eb1a7c"
-        },
-        "base": {
-          "size": 640,
-          "relocation_count": 38,
-          "normalized_sha256": "21d8285c6b390376e50a99d6b6de987fbbaf585cafe83d99973a40c5072c0be7"
-        },
-        "objdiff_percent": 98.57143
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/shader_transparent_chicago_preprocessor",
       "function": "_shader_transparent_chicago_create",
       "class": "register-allocation",

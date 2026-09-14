@@ -179,7 +179,7 @@ static boolean recorded_animation_play_internal(
 
 static struct data_array *animation_threads;
 boolean debug_recording = FALSE;
-struct animation_thread_debug *animation_threads_debug = NULL;
+static struct animation_thread_debug *animation_threads_debug = NULL;
 
 struct animation_playback current_playback =
 {
