@@ -1426,47 +1426,43 @@ static long looping_sound_new(
 				looping_sound_get(looping_sound_index);
 			struct looping_sound_definition *definition =
 				looping_sound_definition_get(definition_index);
-			short detail_index = 0;
+			short detail_index;
 
 			looping_sound->definition_index = definition_index;
 			looping_sound->loop_identifier = identifier;
 			looping_sound->component_sound_count = 0;
 			looping_sound->ordered_sounds_finished = FALSE;
 
-			if (definition->details.count > 0)
+			for (detail_index = 0;
+				detail_index < definition->details.count;
+				detail_index++)
 			{
-				do
-				{
-					struct looping_sound_detail *detail = TAG_BLOCK_GET_ELEMENT(
-						&definition->details,
-						detail_index,
-						struct looping_sound_detail);
-					real scale;
-					real upper_scale;
-					real lower_scale;
-					real period_upper_bound;
-					real period_lower_bound;
-					real period;
+				struct looping_sound_detail *detail = TAG_BLOCK_GET_ELEMENT(
+					&definition->details,
+					detail_index,
+					struct looping_sound_detail);
+				real scale;
+				real upper_scale;
+				real lower_scale;
+				real period_upper_bound;
+				real period_lower_bound;
+				real period;
 
-					sound_definition_get(detail->sound.index);
-					scale = source->scale;
-					upper_scale =
-						definition->scale_upper_bound.detail_period;
-					lower_scale =
-						definition->scale_lower_bound.detail_period;
-					period_upper_bound = detail->period_bounds.upper;
-					period_lower_bound = detail->period_bounds.lower;
-					period = real_seed_random_range(
-						get_global_local_random_seed_address(),
-						period_lower_bound,
-						period_upper_bound);
-					looping_sound->detail_play_times[detail_index] = (long)(
-						((upper_scale - lower_scale) * scale + lower_scale) *
-						period * 1000.f + sound_manager_globals.render_time);
-
-					detail_index++;
-				}
-				while (detail_index < definition->details.count);
+				sound_definition_get(detail->sound.index);
+				scale = source->scale;
+				upper_scale =
+					definition->scale_upper_bound.detail_period;
+				lower_scale =
+					definition->scale_lower_bound.detail_period;
+				period_upper_bound = detail->period_bounds.upper;
+				period_lower_bound = detail->period_bounds.lower;
+				period = real_seed_random_range(
+					get_global_local_random_seed_address(),
+					period_lower_bound,
+					period_upper_bound);
+				looping_sound->detail_play_times[detail_index] = (long)(
+					((upper_scale - lower_scale) * scale + lower_scale) *
+					period * 1000.f + sound_manager_globals.render_time);
 			}
 		}
 	}
@@ -1615,17 +1611,22 @@ static real limit_pitch(
 	real old_pitch,
 	real maximum_bend)
 {
+	real pitch;
+
 	if (maximum_bend == 0.f || desired_pitch == old_pitch)
 	{
-		return desired_pitch;
+		pitch = desired_pitch;
 	}
-
-	if (desired_pitch > old_pitch)
+	else if (desired_pitch > old_pitch)
 	{
-		return MIN(desired_pitch, old_pitch * maximum_bend);
+		pitch = MIN(desired_pitch, old_pitch * maximum_bend);
+	}
+	else
+	{
+		pitch = MAX(desired_pitch, old_pitch / maximum_bend);
 	}
 
-	return MAX(desired_pitch, old_pitch / maximum_bend);
+	return pitch;
 }
 
 static void render_debug_sound(
