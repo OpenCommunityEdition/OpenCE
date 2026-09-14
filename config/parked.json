@@ -5793,25 +5793,6 @@
     },
     {
       "unit": "source/ai/ai_communication",
-      "function": "_ai_conversation_find_participant",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 2048,
-          "relocation_count": 85,
-          "normalized_sha256": "344df5e9415b7b470e528153f3097ef3ff894d72ef2253625e61af4c1ecafdeb"
-        },
-        "base": {
-          "size": 2032,
-          "relocation_count": 85,
-          "normalized_sha256": "faae33e2ab872f9c1cfb5038a17b6f5fc8819eedef3921f3a033f9959743a37b"
-        },
-        "objdiff_percent": 48.317684
-      }
-    },
-    {
-      "unit": "source/ai/ai_communication",
       "function": "_ai_conversation_begin",
       "class": "unclassified",
       "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",

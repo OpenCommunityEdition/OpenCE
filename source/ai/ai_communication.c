@@ -3379,8 +3379,8 @@ static boolean ai_conversation_find_participant(
 			&conversation_definition->participants,
 			participant_index,
 			struct scenario_conversation_participant_view);
-	long selected_actor_index = NONE;
 	short selected_variant_index = NONE;
+	long selected_actor_index = NONE;
 	real best_player_distance = REAL_MAX;
 	boolean better_player_rating_found = FALSE;
 	boolean participant_found = FALSE;
@@ -3401,13 +3401,14 @@ static boolean ai_conversation_find_participant(
 		struct ai_script_actor_reference_iterator ai_actor_iterator;
 		real_point3d nearby_unit_positions[MAXIMUM_PARTICIPANTS_PER_CONVERSATION];
 		short rejection_counts[7];
-		long candidate_object_index = NONE;
-		long possible_actor_count = 0;
-		short nearby_unit_count = 0;
 		boolean player_selection = FALSE;
 		boolean use_specific_object = FALSE;
 		boolean use_ai_iterator = FALSE;
+		boolean first_participant;
+		long candidate_object_index = NONE;
 		real best_rating = 0.0f;
+		short possible_actor_count = 0;
+		short nearby_unit_count;
 		short slot_index;
 
 		csmemset(rejection_counts, 0, sizeof(rejection_counts));
@@ -3417,6 +3418,7 @@ static boolean ai_conversation_find_participant(
 			player_selection = TRUE;
 		}
 
+		nearby_unit_count = 0;
 		for (slot_index = 0;
 			slot_index < conversation_definition->participants.count;
 			slot_index = (short)(slot_index + 1))
@@ -3437,6 +3439,7 @@ static boolean ai_conversation_find_participant(
 			}
 		}
 
+		first_participant = nearby_unit_count == 0;
 		if (participant->preexisting_object_name_index != NONE)
 		{
 			candidate_object_index = object_index_from_name_index(
@@ -3457,19 +3460,23 @@ static boolean ai_conversation_find_participant(
 
 		while (TRUE)
 		{
-			struct actor_datum *candidate_actor = NULL;
-			struct unit_datum *player_target_unit = NULL;
-			long candidate_actor_index = NONE;
-			long player_target_unit_index = NONE;
-			real candidate_player_distance = REAL_MAX;
 			real candidate_rating = 0.0f;
-			short actor_variant_index = NONE;
+			real candidate_player_distance = REAL_MAX;
+			struct unit_datum *player_target_unit = NULL;
+			real player_rating;
+			boolean selection_valid = TRUE;
+			struct actor_datum *candidate_actor;
+			long candidate_actor_index;
+			long player_target_unit_index;
+			short actor_variant_index;
 
 			if (use_specific_object)
 			{
 				struct unit_datum *candidate_unit = unit_try_and_get(
 					candidate_object_index);
 
+				candidate_actor_index = NONE;
+				candidate_actor = NULL;
 				if (candidate_unit && candidate_unit->unit.actor_index != NONE)
 				{
 					candidate_actor_index = candidate_unit->unit.actor_index;
@@ -3493,7 +3500,7 @@ static boolean ai_conversation_find_participant(
 				break;
 			}
 
-			possible_actor_count++;
+			possible_actor_count = (short)(possible_actor_count + 1);
 			if (candidate_actor->meta.unit_index == NONE)
 			{
 				rejection_counts[0]++;
@@ -3509,7 +3516,7 @@ static boolean ai_conversation_find_participant(
 				slot_index < conversation_definition->participants.count;
 				slot_index = (short)(slot_index + 1))
 			{
-				if (conversation->actor_indices[slot_index] == candidate_actor_index)
+				if (candidate_actor_index == conversation->actor_indices[slot_index])
 				{
 					break;
 				}
@@ -3520,9 +3527,9 @@ static boolean ai_conversation_find_participant(
 				continue;
 			}
 
-			candidate_rating = ai_communication_get_player_rating(
+			player_rating = ai_communication_get_player_rating(
 				candidate_actor->meta.unit_index,
-				nearby_unit_count == 0,
+				first_participant,
 				&player_target_unit_index,
 				&candidate_player_distance);
 			if (player_target_unit_index == NONE)
@@ -3536,6 +3543,7 @@ static boolean ai_conversation_find_participant(
 			}
 			else
 			{
+				candidate_rating = player_rating;
 				player_target_unit = unit_get(player_target_unit_index);
 			}
 
@@ -3548,8 +3556,7 @@ static boolean ai_conversation_find_participant(
 						candidate_actor->meta.team_index,
 						player_target_unit->object.owner_team_index))
 				{
-					rejection_counts[4]++;
-					continue;
+					selection_valid = FALSE;
 				}
 				break;
 
@@ -3559,10 +3566,9 @@ static boolean ai_conversation_find_participant(
 					candidate_actor->input.vehicle_index !=
 						player_target_unit->object.parent_object_index)
 				{
-					rejection_counts[4]++;
-					continue;
+					selection_valid = FALSE;
 				}
-				if (candidate_actor->input.vehicle_gunner)
+				else if (candidate_actor->input.vehicle_gunner)
 				{
 					candidate_rating += 1.0f;
 				}
@@ -3571,8 +3577,7 @@ static boolean ai_conversation_find_participant(
 			case _ai_conversation_selection_not_in_vehicle:
 				if (candidate_actor->input.vehicle_index != NONE)
 				{
-					rejection_counts[4]++;
-					continue;
+					selection_valid = FALSE;
 				}
 				break;
 
@@ -3590,9 +3595,15 @@ static boolean ai_conversation_find_participant(
 				break;
 			}
 
-			if (nearby_unit_count == 0 &&
+			if (!selection_valid)
+			{
+				rejection_counts[4]++;
+				continue;
+			}
+
+			if (first_participant &&
 				!player_selection &&
-				candidate_rating < 2.0f &&
+				player_rating < 2.0f &&
 				conversation_definition->run_to_player_distance == 0.0f)
 			{
 				rejection_counts[5]++;
@@ -3609,10 +3620,10 @@ static boolean ai_conversation_find_participant(
 					slot_index = (short)(slot_index + 1))
 				{
 					real distance_squared = distance_squared3d(
-						&nearby_unit_positions[slot_index],
-						&candidate_actor->input.position.body_position);
+						&candidate_actor->input.position.body_position,
+						&nearby_unit_positions[slot_index]);
 
-					if (distance_squared < nearest_distance_squared)
+					if (nearest_distance_squared > distance_squared)
 					{
 						nearest_distance_squared = distance_squared;
 					}
@@ -3681,38 +3692,40 @@ static boolean ai_conversation_find_participant(
 					actor_variant_index = found_variant_index;
 					candidate_rating += 0.7f;
 				}
-				else if (change_variant_indices_count == 1)
+				else if (change_variant_indices_count > 0)
 				{
-					actor_variant_index = change_variant_indices[0];
-				}
-				else if (change_variant_indices_count > 1)
-				{
-					actor_variant_index = change_variant_indices[
-						seed_random_range(
-							get_global_random_seed_address(),
-							0,
-							change_variant_indices_count)];
+					if (change_variant_indices_count == 1)
+					{
+						actor_variant_index = change_variant_indices[0];
+					}
+					else
+					{
+						actor_variant_index = change_variant_indices[
+							seed_random_range(
+								get_global_random_seed_address(),
+								0,
+								change_variant_indices_count)];
+					}
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+						0x13C7,
+						(actor_variant_index >= 0) &&
+						(actor_variant_index <
+							MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT));
 				}
 				else
 				{
 					rejection_counts[6]++;
 					continue;
 				}
-
-				match_assert(
-					"c:\\halo\\SOURCE\\ai\\ai_communication.c",
-					0x13C7,
-					(actor_variant_index >= 0) &&
-					(actor_variant_index <
-						MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT));
 			}
 
 			if (candidate_rating > best_rating)
 			{
 				selected_actor_index = candidate_actor_index;
-				selected_variant_index = actor_variant_index;
-				best_player_distance = candidate_player_distance;
 				best_rating = candidate_rating;
+				best_player_distance = candidate_player_distance;
+				selected_variant_index = actor_variant_index;
 				participant_found = TRUE;
 			}
 		}
@@ -3761,7 +3774,7 @@ static boolean ai_conversation_find_participant(
 
 			if (possible_actor_count > 0)
 			{
-				char reason_string[1024];
+				char reason_string[512];
 				char const *reason_names[7] =
 				{
 					"swarm",
