@@ -1,0 +1,2721 @@
+{
+ "summary": {
+  "label": "final",
+  "base_commit": "c3e257e9ab9a5d7e1c9b39862f87ac2abde4359c",
+  "head_commit": "32009865ace8b813d89f2449a8cd2526b965012b",
+  "accepted_functions": 7149,
+  "accepted_meaningful": 1244970,
+  "gain_functions_vs_base": 177,
+  "gain_meaningful_vs_base": 104809,
+  "strict_gained_functions": 182,
+  "strict_gained_padded": 107712,
+  "strict_gained_meaningful": 106222,
+  "regressions": [],
+  "target_meaningful": 1240161,
+  "remaining_to_target": -4809
+ },
+ "functions": [
+  {
+   "unit": "source/ai/action_obey",
+   "section": "section:1",
+   "function": "_vehicle_possibility_qsort",
+   "previous_name": "_code_00004f70",
+   "padded_bytes": 64,
+   "meaningful_bytes": 49,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "9580bb9e63af0101831656bfb5817f5dbe8c0aaaaab3ddb630f610240875f12f",
+   "commits": [
+    "0fc3f380b action_obey: close describe_command with January's shared snprintf tail",
+    "c078622f2 Reconstruct the action_obey command graph"
+   ]
+  },
+  {
+   "unit": "source/ai/action_obey",
+   "section": "section:15",
+   "function": "_action_obey_describe_command",
+   "previous_name": "_action_obey_describe_command",
+   "padded_bytes": 1936,
+   "meaningful_bytes": 1928,
+   "accepted": true,
+   "relocations": 153,
+   "normalized_sha256": "d14c27f63086d980aa736f06329782e8d22f5f4c208e24734884ff9e68f33587",
+   "commits": [
+    "0fc3f380b action_obey: close describe_command with January's shared snprintf tail",
+    "c078622f2 Reconstruct the action_obey command graph"
+   ]
+  },
+  {
+   "unit": "source/ai/action_obey",
+   "section": "section:22",
+   "function": "_action_obey_command_perform",
+   "previous_name": "_code_000071a0",
+   "padded_bytes": 1408,
+   "meaningful_bytes": 1404,
+   "accepted": true,
+   "relocations": 51,
+   "normalized_sha256": "afc109dc8ddf7e3f4ee6ed60f606b1e597702f063a81488fb2f8fd24f3713b07",
+   "commits": [
+    "0fc3f380b action_obey: close describe_command with January's shared snprintf tail",
+    "c078622f2 Reconstruct the action_obey command graph"
+   ]
+  },
+  {
+   "unit": "source/ai/action_obey",
+   "section": "section:23",
+   "function": "_action_obey_individual_perform",
+   "previous_name": "_code_00007720",
+   "padded_bytes": 288,
+   "meaningful_bytes": 275,
+   "accepted": true,
+   "relocations": 11,
+   "normalized_sha256": "e97937e99b4828d95711e2a5a7787cc2d5c383659589eb4ccb56abbd3d13f79f",
+   "commits": [
+    "0fc3f380b action_obey: close describe_command with January's shared snprintf tail",
+    "c078622f2 Reconstruct the action_obey command graph"
+   ]
+  },
+  {
+   "unit": "source/ai/action_obey",
+   "section": "section:26",
+   "function": "_action_obey_perform",
+   "previous_name": "_action_obey_perform",
+   "padded_bytes": 192,
+   "meaningful_bytes": 189,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "13870134b899d0149ad38c24f5cbe32d704f2d5567b2b696ae195d6fafe72bac",
+   "commits": [
+    "0fc3f380b action_obey: close describe_command with January's shared snprintf tail",
+    "c078622f2 Reconstruct the action_obey command graph"
+   ]
+  },
+  {
+   "unit": "source/ai/actions",
+   "section": "section:48",
+   "function": "_actor_action_handle_lost_contact",
+   "previous_name": "_actor_action_handle_lost_contact",
+   "padded_bytes": 1872,
+   "meaningful_bytes": 1858,
+   "accepted": true,
+   "relocations": 55,
+   "normalized_sha256": "1b2dca7a160e365844a4f791b96e850838684053047eede1d2efc59a260c9834",
+   "commits": [
+    "be74e58fb actions: reopen handle_danger_avoidance and handle_lost_contact exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actions",
+   "section": "section:63",
+   "function": "_actor_action_handle_danger_avoidance",
+   "previous_name": "_actor_action_handle_danger_avoidance",
+   "padded_bytes": 1520,
+   "meaningful_bytes": 1509,
+   "accepted": true,
+   "relocations": 34,
+   "normalized_sha256": "50e4161c4fc3e7ba8a3a310dc7254db5ccb8c9731b76038f7a53114d511a8807",
+   "commits": [
+    "be74e58fb actions: reopen handle_danger_avoidance and handle_lost_contact exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:1",
+   "function": "_actor_combat_enable_special_fire_situation",
+   "previous_name": "_code_0000f590",
+   "padded_bytes": 144,
+   "meaningful_bytes": 139,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "5a477b5450f82b338fd3b3a450335d8b1748f4fb77d0b493fc6e1d286d96ab85",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:11",
+   "function": "_fast_ftol",
+   "previous_name": "_fast_ftol",
+   "padded_bytes": 32,
+   "meaningful_bytes": 17,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "8d76b4470cb80ce310b0c4d5255470b182cfa0a78d93b9df3cdcb6f56678f248",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:17",
+   "function": "_random_boolean",
+   "previous_name": "_random_boolean",
+   "padded_bytes": 32,
+   "meaningful_bytes": 26,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "3bd7359afa67fecf48892651f71ca0202b6f62c8e2c5bc6a85641440bba3df2a",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:20",
+   "function": "_actor_start_pause",
+   "previous_name": "_code_0000fba0",
+   "padded_bytes": 176,
+   "meaningful_bytes": 173,
+   "accepted": true,
+   "relocations": 11,
+   "normalized_sha256": "eeb7cce55b1efa7ca48d2bbd01dd777f2ecde01486eee923b18d3a5f33cbfe37",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:21",
+   "function": "_actor_start_first_burst_delay",
+   "previous_name": "_code_0000fc50",
+   "padded_bytes": 208,
+   "meaningful_bytes": 205,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "5de9a157692b5702b040c8181fc20d720c686c2f5ae2f4e33a6eaa8f178e74bc",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:29",
+   "function": "_actor_combat_allow_special_fire_situation",
+   "previous_name": "_code_00010620",
+   "padded_bytes": 176,
+   "meaningful_bytes": 173,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "1bddf744667a501a171e819c5bc5c9f644167929d5f626a7f934bed8a706a3eb",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "section": "section:9",
+   "function": "_actor_combat_get_firing_parameters",
+   "previous_name": "_code_0000f880",
+   "padded_bytes": 160,
+   "meaningful_bytes": 151,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "7866fc29f8cfd7c3598e016fafeca60eec3301c5dee7bfbe75caff0a25f606a7",
+   "commits": [
+    "ffc0dec8f actor_combat: land seven private combat owners exact; fuzzy update and start_burst"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:13",
+   "function": "_firing_position_compare",
+   "previous_name": "_firing_position_compare",
+   "padded_bytes": 272,
+   "meaningful_bytes": 264,
+   "accepted": true,
+   "relocations": 15,
+   "normalized_sha256": "814f436eb77899afb14393539ae7f8f9677a20d07b200760619a56d1f8ec089b",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:21",
+   "function": "_firing_position_compute_line_of_sight",
+   "previous_name": "_firing_position_compute_line_of_sight",
+   "padded_bytes": 464,
+   "meaningful_bytes": 455,
+   "accepted": true,
+   "relocations": 13,
+   "normalized_sha256": "1e3e9a13eb49f869ed0d425687aeb596418695af02db5d5e2880251f0a66e8d6",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:24",
+   "function": "_actor_select_firing_position",
+   "previous_name": "_actor_select_firing_position",
+   "padded_bytes": 5248,
+   "meaningful_bytes": 5248,
+   "accepted": true,
+   "relocations": 120,
+   "normalized_sha256": "e5ccfff162a8ee262e30bf71d2c6ca153609975ddf51ac7d4afad449289a12b7",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:25",
+   "function": "_actor_active_select_firing_position",
+   "previous_name": "_actor_active_select_firing_position",
+   "padded_bytes": 576,
+   "meaningful_bytes": 569,
+   "accepted": true,
+   "relocations": 19,
+   "normalized_sha256": "d068e3ef512a549da87311bc78b458801a14858a28b24927fc1d7662a56f7ce2",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:7",
+   "function": "_post_evaluator_hide",
+   "previous_name": "_post_evaluator_hide",
+   "padded_bytes": 224,
+   "meaningful_bytes": 224,
+   "accepted": true,
+   "relocations": 11,
+   "normalized_sha256": "66434779de62f535539bcfe2fa4c163a9b2ead54c7c979c8ee45c17420d1a027",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:8",
+   "function": "_post_evaluator_uncover",
+   "previous_name": "_post_evaluator_uncover",
+   "padded_bytes": 192,
+   "meaningful_bytes": 187,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "45c381842b37aba13ac53fdd0a37338c3219f4ad6bfd5fd9e54e893796a40beb",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "section": "section:9",
+   "function": "_post_evaluator_attack",
+   "previous_name": "_post_evaluator_attack",
+   "padded_bytes": 224,
+   "meaningful_bytes": 216,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "46496861931cc3563c1a0d319a03bb82e475885a1295221b4b2c72c2c0797bd6",
+   "commits": [
+    "afc739fc3 actor_firing_position: reopen post_evaluator uncover, hide and attack exact",
+    "ff71ecfc2 actor_firing_position: copy evaluation context and firing positions into ai_debug; select_firing_position exact",
+    "c5d7751bd Type ai_debug firing-position records with their actors.h owners",
+    "1cc269896 actor_firing_position: close compare, line-of-sight and active select; complete select body fuzzy"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:13",
+   "function": "_actor_look_idle_new_major_direction",
+   "previous_name": "_actor_look_idle_new_major_direction",
+   "padded_bytes": 528,
+   "meaningful_bytes": 523,
+   "accepted": true,
+   "relocations": 10,
+   "normalized_sha256": "9bcc1b4ef525f6ffc03224c78c9aaa5551a7f494abf93bd97c4bff5ea55726a8",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:14",
+   "function": "_actor_look_idle_new_minor_direction",
+   "previous_name": "_actor_look_idle_new_minor_direction",
+   "padded_bytes": 368,
+   "meaningful_bytes": 362,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "ce75f37a16f0471b17fccd15f662514677e21608e523066a08692bcc80bcf171",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:16",
+   "function": "_actor_look_affect_movement",
+   "previous_name": "_actor_look_affect_movement",
+   "padded_bytes": 128,
+   "meaningful_bytes": 122,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "5d7d253b925542d2e1c1c21c83c6a2f2049df1a6fe051b6f713b377c47f85dde",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:3",
+   "function": "_actor_look_get_looking_definition",
+   "previous_name": "_actor_look_get_looking_definition",
+   "padded_bytes": 80,
+   "meaningful_bytes": 71,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "23ebbd15aff7b53bce8636fee459d661aa5573ed8f3696b5a180be51a79a1cf7",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:4",
+   "function": "_actor_look_secondary",
+   "previous_name": "_actor_look_secondary",
+   "padded_bytes": 880,
+   "meaningful_bytes": 869,
+   "accepted": true,
+   "relocations": 44,
+   "normalized_sha256": "c9a67fd41565580adf039d8e3726702075c0be2cf511c7684fff72ef7b9c3549",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:7",
+   "function": "_actor_looking_test_validity",
+   "previous_name": "_actor_looking_test_validity",
+   "padded_bytes": 176,
+   "meaningful_bytes": 161,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "af81bf40127acb1872a57261d925ef478d9a368accdc7da8117cfc4e12f32310",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "section": "section:9",
+   "function": "_actor_look_idle_timer",
+   "previous_name": "_actor_look_idle_timer",
+   "padded_bytes": 352,
+   "meaningful_bytes": 351,
+   "accepted": true,
+   "relocations": 22,
+   "normalized_sha256": "b6d1ccbb00c3af6e3f3366d8823be49de93671c960a098ff033b6440b217e067",
+   "commits": [
+    "d6cbc58ea actor_looking: reopen actor_look_affect_movement exact",
+    "ff1054197 actor_looking: write the look update graph; secondary, idle direction/timer helpers and test_validity exact",
+    "9f3ea79c8 Declare actor look-graph callees in actors.h and complete the primary look priority enum"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "section": "section:19",
+   "function": "_actor_move_vector_avoidance_find_direction",
+   "previous_name": "_code_00019920",
+   "padded_bytes": 240,
+   "meaningful_bytes": 230,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "92f92b7c10eb4d14778790e4d2f58555a52a76f4391a4a881143e7f1b4fe50d1",
+   "commits": [
+    "a19059979 actor_moving: index avoidance directions in place; vector_avoidance_find_direction exact",
+    "15b3b7717 actor_moving: restore January per-site normalize3d inlining; close calculate_controlled_by_aiming",
+    "423067414 Match midpoint3d through actor_move_try_evasion_vector",
+    "262759b8a Reconstruct actor movement and avoidance graph; match calculate_free"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "section": "section:24",
+   "function": "_actor_move_calculate_controlled_by_aiming",
+   "previous_name": "_code_00019e40",
+   "padded_bytes": 640,
+   "meaningful_bytes": 626,
+   "accepted": true,
+   "relocations": 16,
+   "normalized_sha256": "1832fd5e56f794b979ea690d76085d59ee5854874d3ce2a30c25faa253a10d5b",
+   "commits": [
+    "a19059979 actor_moving: index avoidance directions in place; vector_avoidance_find_direction exact",
+    "15b3b7717 actor_moving: restore January per-site normalize3d inlining; close calculate_controlled_by_aiming",
+    "423067414 Match midpoint3d through actor_move_try_evasion_vector",
+    "262759b8a Reconstruct actor movement and avoidance graph; match calculate_free"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "section": "section:25",
+   "function": "_actor_move_calculate_free",
+   "previous_name": "_code_0001a0c0",
+   "padded_bytes": 720,
+   "meaningful_bytes": 717,
+   "accepted": true,
+   "relocations": 53,
+   "normalized_sha256": "32046024d371d89263583dd6cfd04a7c06c1210286448fe0517e6a95be6f3948",
+   "commits": [
+    "a19059979 actor_moving: index avoidance directions in place; vector_avoidance_find_direction exact",
+    "15b3b7717 actor_moving: restore January per-site normalize3d inlining; close calculate_controlled_by_aiming",
+    "423067414 Match midpoint3d through actor_move_try_evasion_vector",
+    "262759b8a Reconstruct actor movement and avoidance graph; match calculate_free"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "section": "section:9",
+   "function": "_midpoint3d",
+   "previous_name": "_midpoint3d",
+   "padded_bytes": 64,
+   "meaningful_bytes": 56,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "712499e7f9fc6e985d3e3ddfe0b03e70d4a8e59c6eba96567b5cc281a52bc963",
+   "commits": [
+    "a19059979 actor_moving: index avoidance directions in place; vector_avoidance_find_direction exact",
+    "15b3b7717 actor_moving: restore January per-site normalize3d inlining; close calculate_controlled_by_aiming",
+    "423067414 Match midpoint3d through actor_move_try_evasion_vector",
+    "262759b8a Reconstruct actor movement and avoidance graph; match calculate_free"
+   ]
+  },
+  {
+   "unit": "source/ai/actors",
+   "section": "section:16",
+   "function": "_actor_attacking_target",
+   "previous_name": "_actor_attacking_target",
+   "padded_bytes": 176,
+   "meaningful_bytes": 175,
+   "accepted": true,
+   "relocations": 7,
+   "normalized_sha256": "fe4a0a53ab6cdd1b74f6b1bd2a80cf30a3adee989c61f234b8b5bb54435c5b4f",
+   "commits": [
+    "5a84a96dd actors: reopen actor_swarm_attach_unit exact",
+    "ddf4ba163 actors: single-exit attack-vector result; actor_attacking_target exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actors",
+   "section": "section:65",
+   "function": "_actor_swarm_attach_unit",
+   "previous_name": "_actor_swarm_attach_unit",
+   "padded_bytes": 656,
+   "meaningful_bytes": 651,
+   "accepted": true,
+   "relocations": 43,
+   "normalized_sha256": "d3153578bbc9c66ae43435a4b417c54675d0925fdffaa3501f03c90011b171e9",
+   "commits": [
+    "5a84a96dd actors: reopen actor_swarm_attach_unit exact",
+    "ddf4ba163 actors: single-exit attack-vector result; actor_attacking_target exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai",
+   "section": "section:31",
+   "function": "_ai_disconnect_from_structure_bsp",
+   "previous_name": "_ai_disconnect_from_structure_bsp",
+   "padded_bytes": 1280,
+   "meaningful_bytes": 1268,
+   "accepted": true,
+   "relocations": 62,
+   "normalized_sha256": "50551a92f7dfebd3f86a133f6737f4184152acadbde7c7958b057bb73e9276a9",
+   "commits": [
+    "c4c75f530 ai: reopen ai_disconnect_from_structure_bsp exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_communication",
+   "section": "section:37",
+   "function": "_ai_conversation_find_participant",
+   "previous_name": "_ai_conversation_find_participant",
+   "padded_bytes": 2048,
+   "meaningful_bytes": 2048,
+   "accepted": true,
+   "relocations": 85,
+   "normalized_sha256": "344df5e9415b7b470e528153f3097ef3ff894d72ef2253625e61af4c1ecafdeb",
+   "commits": [
+    "e7c706a81 ai_communication: reopen ai_conversation_find_participant exact",
+    "78d88f330 ai_communication: complete ai_communication_event from January disassembly (fuzzy)"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:12",
+   "function": "_ai_index_actor_iterator_new",
+   "previous_name": "_ai_index_actor_iterator_new",
+   "padded_bytes": 208,
+   "meaningful_bytes": 204,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "c21d192405b121c20d6a9078b72c5a07a0a31d816f3e8452aad90b8842edbf4a",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:46",
+   "function": "_ai_scripting_migrate_find_target_squad",
+   "previous_name": "_ai_scripting_migrate_find_target_squad",
+   "padded_bytes": 1072,
+   "meaningful_bytes": 1067,
+   "accepted": true,
+   "relocations": 48,
+   "normalized_sha256": "fb21929e521bfee961efff47faaa26d83a744dbe48e9796003c354dee5cacec5",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:47",
+   "function": "_ai_scripting_migrate_internal",
+   "previous_name": "_ai_scripting_migrate_internal",
+   "padded_bytes": 1360,
+   "meaningful_bytes": 1352,
+   "accepted": true,
+   "relocations": 67,
+   "normalized_sha256": "b775cd218af477e5cb4bf52916e486b5882e868b2a76411ae4a40b591810c994",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:48",
+   "function": "_ai_scripting_migrate",
+   "previous_name": "_ai_scripting_migrate",
+   "padded_bytes": 160,
+   "meaningful_bytes": 145,
+   "accepted": true,
+   "relocations": 10,
+   "normalized_sha256": "3c116181c54e651734246a78dddb60fa8de8d77856e5363876b6481c1950812b",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:49",
+   "function": "_ai_scripting_migrate_by_unit_internal",
+   "previous_name": "_ai_scripting_migrate_by_unit_internal",
+   "padded_bytes": 240,
+   "meaningful_bytes": 232,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "e46a4572f6fab0f0fd043d6611ba71c9bd727108b92344146e2570c6e5fe248a",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:73",
+   "function": "_ai_scripting_command_list_status_internal",
+   "previous_name": "_ai_scripting_command_list_status_internal",
+   "padded_bytes": 80,
+   "meaningful_bytes": 78,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "42d4335fb62e9924ca8017bce7adece84d6c994c36c061c7d59485715af27d62",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:74",
+   "function": "_ai_scripting_command_list_status",
+   "previous_name": "_ai_scripting_command_list_status",
+   "padded_bytes": 592,
+   "meaningful_bytes": 590,
+   "accepted": true,
+   "relocations": 24,
+   "normalized_sha256": "859cf195324941c42cd56099ab461cc0241a256f1fe2cc3d5ff343bed3024657",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "section": "section:86",
+   "function": "_ai_scripting_vehicle_encounter",
+   "previous_name": "_ai_scripting_vehicle_encounter",
+   "padded_bytes": 496,
+   "meaningful_bytes": 491,
+   "accepted": true,
+   "relocations": 19,
+   "normalized_sha256": "6a91443a942be67795a268ddd0f348ac29bed44758fc43b6a3107f5139af7c06",
+   "commits": [
+    "a76d937e7 Match ai_script migrate, command-list status and vehicle encounter paths"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "section": "section:47",
+   "function": "_encounter_post_combat_select_random_behavior",
+   "previous_name": "_encounter_post_combat_select_random_behavior",
+   "padded_bytes": 272,
+   "meaningful_bytes": 259,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "63a81fd9169ba095b9516829ae8928ea00b1bde66744b444351820db77d7038d",
+   "commits": [
+    "6a65c04c1 Match encounter_post_combat",
+    "0569dd175 Match encounter follow update, spawn and random post-combat behavior"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "section": "section:48",
+   "function": "_encounter_post_combat",
+   "previous_name": "_encounter_post_combat",
+   "padded_bytes": 1984,
+   "meaningful_bytes": 1971,
+   "accepted": true,
+   "relocations": 76,
+   "normalized_sha256": "20f53f910c78d8ce03302d46fe6d06029dea9d1c76a9f7adcb1cd3e9c1e3565c",
+   "commits": [
+    "6a65c04c1 Match encounter_post_combat",
+    "0569dd175 Match encounter follow update, spawn and random post-combat behavior"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "section": "section:50",
+   "function": "_encounter_spawn_actor",
+   "previous_name": "_encounter_spawn_actor",
+   "padded_bytes": 288,
+   "meaningful_bytes": 274,
+   "accepted": true,
+   "relocations": 16,
+   "normalized_sha256": "8bf571479c96dd304231b793c49fff35ec1011b8bf6db0431fe79f2bfa100c2a",
+   "commits": [
+    "6a65c04c1 Match encounter_post_combat",
+    "0569dd175 Match encounter follow update, spawn and random post-combat behavior"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "section": "section:54",
+   "function": "_encounter_update_follow",
+   "previous_name": "_encounter_update_follow",
+   "padded_bytes": 1920,
+   "meaningful_bytes": 1909,
+   "accepted": true,
+   "relocations": 52,
+   "normalized_sha256": "039ff256fc8f30f9af8d58a981534a30320812a26b96f5845e80b7240346a792",
+   "commits": [
+    "6a65c04c1 Match encounter_post_combat",
+    "0569dd175 Match encounter follow update, spawn and random post-combat behavior"
+   ]
+  },
+  {
+   "unit": "source/ai/path",
+   "section": "section:15",
+   "function": "_path_heap_bubble_down",
+   "previous_name": "_path_heap_bubble_down",
+   "padded_bytes": 560,
+   "meaningful_bytes": 546,
+   "accepted": true,
+   "relocations": 24,
+   "normalized_sha256": "7a171cedd6dae59cca1f1aece48a3a3811d22ad2c92f739e2e8c587739f60ef2",
+   "commits": [
+    "d2d8b580b path: reopen heap_bubble_down, attractor_weight, state_approach_point and build_path_edges_for_surface exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path",
+   "section": "section:23",
+   "function": "_path_state_approach_point",
+   "previous_name": "_path_state_approach_point",
+   "padded_bytes": 304,
+   "meaningful_bytes": 294,
+   "accepted": true,
+   "relocations": 13,
+   "normalized_sha256": "d5abe183e0dbbae53e3f46f674b31ee96aef3f8f9f0905473cdc288ba1b45d20",
+   "commits": [
+    "d2d8b580b path: reopen heap_bubble_down, attractor_weight, state_approach_point and build_path_edges_for_surface exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path",
+   "section": "section:27",
+   "function": "_build_path_edges_for_surface",
+   "previous_name": "_build_path_edges_for_surface",
+   "padded_bytes": 384,
+   "meaningful_bytes": 372,
+   "accepted": true,
+   "relocations": 13,
+   "normalized_sha256": "3f8e92ea9ce08fb346676f4f52ff44f33f1ab0fe433d2e2deee46da398f85031",
+   "commits": [
+    "d2d8b580b path: reopen heap_bubble_down, attractor_weight, state_approach_point and build_path_edges_for_surface exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path",
+   "section": "section:29",
+   "function": "_path_attractor_weight",
+   "previous_name": "_path_attractor_weight",
+   "padded_bytes": 192,
+   "meaningful_bytes": 185,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "9785d44ef2192e89a1a00c1612a3502d902db25b8dcb9e49a878f641dc42d65e",
+   "commits": [
+    "d2d8b580b path: reopen heap_bubble_down, attractor_weight, state_approach_point and build_path_edges_for_surface exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:10",
+   "function": "_extract_build_debug_plate",
+   "previous_name": "_extract_build_debug_plate",
+   "padded_bytes": 1408,
+   "meaningful_bytes": 1398,
+   "accepted": true,
+   "relocations": 52,
+   "normalized_sha256": "c7ced6d2891f524edfb3b911a2ea180a2c9bcc1f4fcf8b4faf41504084881e88",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:11",
+   "function": "_extract_mipmaps_to_bitmap",
+   "previous_name": "_extract_mipmaps_to_bitmap",
+   "padded_bytes": 976,
+   "meaningful_bytes": 968,
+   "accepted": true,
+   "relocations": 68,
+   "normalized_sha256": "690b82e1ac6db7cfa5bd6982d84a602fbf94afb65110a170b5410a29f3a3f898",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:12",
+   "function": "_extract_add_bitmap",
+   "previous_name": "_extract_add_bitmap",
+   "padded_bytes": 688,
+   "meaningful_bytes": 676,
+   "accepted": true,
+   "relocations": 55,
+   "normalized_sha256": "c8118b1518729467fb711b03b848810d1fb022378efdcb1993864c51a80834c8",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:13",
+   "function": "_extract_3d_textures",
+   "previous_name": "_extract_3d_textures",
+   "padded_bytes": 464,
+   "meaningful_bytes": 457,
+   "accepted": true,
+   "relocations": 22,
+   "normalized_sha256": "db5cb3236cbae82c1dbb9a526754dc136bf8741c9f1608c2b80c43982b33edfd",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:14",
+   "function": "_extract_cube_maps",
+   "previous_name": "_extract_cube_maps",
+   "padded_bytes": 544,
+   "meaningful_bytes": 541,
+   "accepted": true,
+   "relocations": 37,
+   "normalized_sha256": "17babd5be00b7725547b4bcc9bdffb5a7582a30f4e11a9b5a85a509f75bb9480",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:16",
+   "function": "_extract_bitmap",
+   "previous_name": "_extract_bitmap",
+   "padded_bytes": 1168,
+   "meaningful_bytes": 1154,
+   "accepted": true,
+   "relocations": 66,
+   "normalized_sha256": "051e1fae474dc6acd83587572aebfa8a0a9b8ab20dfafed770583e6ad046469c",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:20",
+   "function": "_bitmaps_extract",
+   "previous_name": "_bitmaps_extract",
+   "padded_bytes": 736,
+   "meaningful_bytes": 729,
+   "accepted": true,
+   "relocations": 68,
+   "normalized_sha256": "537d98f8a8adf6da9a4651ec215d5cf13225263ecefe5cb3562c8e932eb718ed",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:3",
+   "function": "_extract_warn_about_horizontal_border",
+   "previous_name": "_extract_warn_about_horizontal_border",
+   "padded_bytes": 128,
+   "meaningful_bytes": 114,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "12713fbd52519b45853b962d44c886bc14bc020e2b80b044cfe0bc174fdeb8db",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:7",
+   "function": "_extract_pixels_to_mipmap",
+   "previous_name": "_extract_pixels_to_mipmap",
+   "padded_bytes": 944,
+   "meaningful_bytes": 934,
+   "accepted": true,
+   "relocations": 58,
+   "normalized_sha256": "819f2ecf803274443d1a5ff05ee462142fb6d2094d681b43557f14e845c1d262",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "section": "section:8",
+   "function": "_extract_pixels_from_mipmap",
+   "previous_name": "_extract_pixels_from_mipmap",
+   "padded_bytes": 528,
+   "meaningful_bytes": 518,
+   "accepted": true,
+   "relocations": 35,
+   "normalized_sha256": "89a0f49d2b11682782c4b618179ed6ef841e7fda585ad1ab6554f0229f36d4eb",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7de493604 bitmap_extract: reopen extract_bitmap, bitmaps_extract, cube_maps, 3d_textures and border warning exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:10",
+   "function": "_observer_update_velocities",
+   "previous_name": "_observer_update_velocities",
+   "padded_bytes": 512,
+   "meaningful_bytes": 502,
+   "accepted": true,
+   "relocations": 14,
+   "normalized_sha256": "9af560df9a899bb1ac53b0ed6c773d014e9a4ead892db1b76b5da195a96e1ac1",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:14",
+   "function": "_observer_collision_test_with_t",
+   "previous_name": "_observer_collision_test_with_t",
+   "padded_bytes": 224,
+   "meaningful_bytes": 214,
+   "accepted": true,
+   "relocations": 15,
+   "normalized_sha256": "6c92e9642a9735f928a35438ce063b0218de0f14eeeca1703776bf35f5b0d6f1",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:15",
+   "function": "_observer_collision_test_differential",
+   "previous_name": "_observer_collision_test_differential",
+   "padded_bytes": 64,
+   "meaningful_bytes": 64,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "be7d04ae1073eabaa6e032ca73341d02198b5fae51050aae5276effbb23ba794",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:18",
+   "function": "_observer_update_polynomial",
+   "previous_name": "_observer_update_polynomial",
+   "padded_bytes": 1440,
+   "meaningful_bytes": 1426,
+   "accepted": true,
+   "relocations": 48,
+   "normalized_sha256": "23fa700f3f11e331415fc0f5c190e02781ec07f6ff3790eb824d0634e32ef9e4",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:21",
+   "function": "_observer_check_penetration",
+   "previous_name": "_observer_check_penetration",
+   "padded_bytes": 752,
+   "meaningful_bytes": 739,
+   "accepted": true,
+   "relocations": 11,
+   "normalized_sha256": "ef9a396b122f6b5f45532ca7361227e1cbeaa47273bb9802a67187a32e09b140",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:23",
+   "function": "_observer_postcheck",
+   "previous_name": "_observer_postcheck",
+   "padded_bytes": 2112,
+   "meaningful_bytes": 2107,
+   "accepted": true,
+   "relocations": 104,
+   "normalized_sha256": "04956fe0b7c20823ab4605b5f92b0a76797b937bee96c30a8db360c5d990cbbb",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/camera/observer",
+   "section": "section:9",
+   "function": "_observer_update_accelerations",
+   "previous_name": "_observer_update_accelerations",
+   "padded_bytes": 464,
+   "meaningful_bytes": 464,
+   "accepted": true,
+   "relocations": 13,
+   "normalized_sha256": "928529875fdad2ff46972e74d088bff5f94d15be907617e9e513ec8a41b315a7",
+   "commits": [
+    "32009865a observer: name observer tuning tables; write collision_test_differential and reopen six observer functions exact"
+   ]
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "section": "section:3",
+   "function": "_symbol_sort_proc",
+   "previous_name": "_symbol_sort_proc",
+   "padded_bytes": 48,
+   "meaningful_bytes": 47,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "444999547dd1ee50dcb9bc22d0d3abf3f065cc99c0eb763c77cd3c7ed6955f32",
+   "commits": [
+    "3be9c1703 Restore symbol_sort_proc through the genuine map-file loader"
+   ]
+  },
+  {
+   "unit": "source/effects/decals",
+   "section": "section:21",
+   "function": "_bsp3d_get_plane_from_designator",
+   "previous_name": "_bsp3d_get_plane_from_designator",
+   "padded_bytes": 112,
+   "meaningful_bytes": 101,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "9715a442e80abf39d135d2d21272aba32ea1ada03e0505843c0a67cf39703300",
+   "commits": [
+    "828625092 Match decal_insert and motion_sensor assert/literal text to January .rdata"
+   ]
+  },
+  {
+   "unit": "source/effects/decals",
+   "section": "section:24",
+   "function": "_decal_insert",
+   "previous_name": "_decal_insert",
+   "padded_bytes": 704,
+   "meaningful_bytes": 692,
+   "accepted": true,
+   "relocations": 44,
+   "normalized_sha256": "3defca9d1e5f1f220feb75ebd0170b7aac87716be3ea7d170fabf2d2f3d80be9",
+   "commits": [
+    "828625092 Match decal_insert and motion_sensor assert/literal text to January .rdata"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "section": "section:10",
+   "function": "_effect_scale",
+   "previous_name": "_effect_scale",
+   "padded_bytes": 48,
+   "meaningful_bytes": 39,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "fa6e87903a77e69479c8093e30c27f512a543da7c828aa0888a7feb02efcca1d",
+   "commits": [
+    "2e81aa959 effects: reopen corpse test, effect scale, disposition filter, generate_parts and effect_update exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "section": "section:15",
+   "function": "_effect_part_allowed_by_disposition",
+   "previous_name": "_effect_part_allowed_by_disposition",
+   "padded_bytes": 32,
+   "meaningful_bytes": 28,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "e878f1da4c5677d4e788b43988e2655d11524f10570cd45b8d60ffaf745e54df",
+   "commits": [
+    "2e81aa959 effects: reopen corpse test, effect scale, disposition filter, generate_parts and effect_update exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "section": "section:34",
+   "function": "_effect_generate_parts",
+   "previous_name": "_effect_generate_parts",
+   "padded_bytes": 592,
+   "meaningful_bytes": 587,
+   "accepted": true,
+   "relocations": 15,
+   "normalized_sha256": "57b1eb3518c25cd821a330e2cb80201e5196bcd98d140bce265503797999db71",
+   "commits": [
+    "2e81aa959 effects: reopen corpse test, effect scale, disposition filter, generate_parts and effect_update exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "section": "section:36",
+   "function": "_effect_update",
+   "previous_name": "_effect_update",
+   "padded_bytes": 1328,
+   "meaningful_bytes": 1324,
+   "accepted": true,
+   "relocations": 48,
+   "normalized_sha256": "0e9307dd99a9d220aebf4f39b9c10df08687d3796376148bce23387fe54c6fd3",
+   "commits": [
+    "2e81aa959 effects: reopen corpse test, effect scale, disposition filter, generate_parts and effect_update exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "section": "section:5",
+   "function": "_effects_object_is_corpse",
+   "previous_name": "_effects_object_is_corpse",
+   "padded_bytes": 80,
+   "meaningful_bytes": 72,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "258911960813c6bc362d9c018f048c2a6aac9ed52fb28febb5bca828cddd2e4c",
+   "commits": [
+    "2e81aa959 effects: reopen corpse test, effect scale, disposition filter, generate_parts and effect_update exact"
+   ]
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "section": "section:5",
+   "function": "_reciprocal_square_root",
+   "previous_name": "_reciprocal_square_root",
+   "padded_bytes": 16,
+   "meaningful_bytes": 16,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "6675eafcdc04bcb2a3a70b55f061d18302beb6e07425aed3f4d15d23eb038ad6",
+   "commits": [
+    "8650b238b Match object_compute_autoaim_target"
+   ]
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "section": "section:6",
+   "function": "_limit3d",
+   "previous_name": "_limit3d",
+   "padded_bytes": 96,
+   "meaningful_bytes": 88,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "4ba268790768577ef786d5f1c5b25a180d6468be03fcc0571e294eadd7f48e21",
+   "commits": [
+    "8650b238b Match object_compute_autoaim_target"
+   ]
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "section": "section:9",
+   "function": "_object_compute_autoaim_target",
+   "previous_name": "_object_compute_autoaim_target",
+   "padded_bytes": 416,
+   "meaningful_bytes": 413,
+   "accepted": true,
+   "relocations": 7,
+   "normalized_sha256": "f1d2a44acd553fddc7be312e1b2a935d37f1ab43ab20960f6f682ae413ca5e04",
+   "commits": [
+    "8650b238b Match object_compute_autoaim_target"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "section": "section:131",
+   "function": "_select_players_to_display",
+   "previous_name": "_select_players_to_display",
+   "padded_bytes": 496,
+   "meaningful_bytes": 494,
+   "accepted": true,
+   "relocations": 16,
+   "normalized_sha256": "f30da54283e6b5a0916af55a3d766d330cef653ffda3ce918e16482c41583a04",
+   "commits": [
+    "5266233aa game_engine: reopen verify_current_map via find_netgame_flag",
+    "b510b1d58 Match select_players_to_display"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "section": "section:169",
+   "function": "_game_engine_verify_current_map",
+   "previous_name": "_game_engine_verify_current_map",
+   "padded_bytes": 640,
+   "meaningful_bytes": 638,
+   "accepted": true,
+   "relocations": 52,
+   "normalized_sha256": "b3bce6413d9406f83ea59885922cd47be96d95e3fad738820f5802d54dbde7f8",
+   "commits": [
+    "5266233aa game_engine: reopen verify_current_map via find_netgame_flag",
+    "b510b1d58 Match select_players_to_display"
+   ]
+  },
+  {
+   "unit": "source/game/player_control",
+   "section": "section:47",
+   "function": "_handle_one_player_input",
+   "previous_name": "_handle_one_player_input",
+   "padded_bytes": 1568,
+   "meaningful_bytes": 1562,
+   "accepted": true,
+   "relocations": 95,
+   "normalized_sha256": "490eb357b2d76f34ef5d2e72a92c21a3e625e230e3c4a0a586f9502f0d4cc845",
+   "commits": [
+    "b165cbf8b player_control: reopen handle_one_player_input exact"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "section": "section:68",
+   "function": "_player_examine_nearby_item",
+   "previous_name": "_player_examine_nearby_item",
+   "padded_bytes": 800,
+   "meaningful_bytes": 793,
+   "accepted": true,
+   "relocations": 33,
+   "normalized_sha256": "f1f67bf1b9c419dff4931c270876453b35a10e20fdd292bea1bb77673fb8876c",
+   "commits": [
+    "8f41149c5 Make the local-player triggered switch nibble signed; players_update_after_game exact",
+    "b66439f1e players: re-fetch unit accessor closes examine_nearby_item"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "section": "section:70",
+   "function": "_players_update_after_game",
+   "previous_name": "_players_update_after_game",
+   "padded_bytes": 816,
+   "meaningful_bytes": 810,
+   "accepted": true,
+   "relocations": 52,
+   "normalized_sha256": "af64f40efdb1be0cd2754ada85b34acecdd4480a39c73b5a9ef2938c2c1d315b",
+   "commits": [
+    "8f41149c5 Make the local-player triggered switch nibble signed; players_update_after_game exact",
+    "b66439f1e players: re-fetch unit accessor closes examine_nearby_item"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "section": "section:16",
+   "function": "_hud_draw_multitexture_overlay",
+   "previous_name": "_code_000c1b40",
+   "padded_bytes": 2272,
+   "meaningful_bytes": 2264,
+   "accepted": true,
+   "relocations": 74,
+   "normalized_sha256": "874edd237080cff091a18ce6d1263e3b621965d4e838114c4722a66fa6ca3a27",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7dd88aa05 hud_draw: close static_element and current_weapon_definition; overlay exact pending theta rename",
+    "0501bd06e Match hud_draw_meter and hud_draw_numbers"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "section": "section:19",
+   "function": "_hud_draw_meter",
+   "previous_name": "_hud_draw_meter",
+   "padded_bytes": 1312,
+   "meaningful_bytes": 1298,
+   "accepted": true,
+   "relocations": 46,
+   "normalized_sha256": "6f675c6830c15c1749e2761336c671e59b916767beec8e2255b30ffb9b23a068",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7dd88aa05 hud_draw: close static_element and current_weapon_definition; overlay exact pending theta rename",
+    "0501bd06e Match hud_draw_meter and hud_draw_numbers"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "section": "section:20",
+   "function": "_hud_draw_numbers",
+   "previous_name": "_hud_draw_numbers",
+   "padded_bytes": 1856,
+   "meaningful_bytes": 1845,
+   "accepted": true,
+   "relocations": 73,
+   "normalized_sha256": "42711a6117260029774b358280a9689c4e2e691960dd75c4641e28e086f7af07",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7dd88aa05 hud_draw: close static_element and current_weapon_definition; overlay exact pending theta rename",
+    "0501bd06e Match hud_draw_meter and hud_draw_numbers"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "section": "section:22",
+   "function": "_hud_draw_static_element",
+   "previous_name": "_hud_draw_static_element",
+   "padded_bytes": 640,
+   "meaningful_bytes": 627,
+   "accepted": true,
+   "relocations": 26,
+   "normalized_sha256": "e4f4da2a62de9eee5c9af11dd2d753cd21442c04101f8f8fde6dc7a3b62761a2",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7dd88aa05 hud_draw: close static_element and current_weapon_definition; overlay exact pending theta rename",
+    "0501bd06e Match hud_draw_meter and hud_draw_numbers"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "section": "section:7",
+   "function": "_hud_draw_multitexture_overlay_get_current_weapon_definition",
+   "previous_name": "_code_000c0e10",
+   "padded_bytes": 480,
+   "meaningful_bytes": 468,
+   "accepted": true,
+   "relocations": 29,
+   "normalized_sha256": "9484b60b15a401288d05834e36d2fc704b290019438e209fee422622c0fd9813",
+   "commits": [
+    "94f7bbb80 Restore bitmap_data/bitmap_group owner types and bitmap helper prototypes; reopen five bitmap_extract parks exact",
+    "7dd88aa05 hud_draw: close static_element and current_weapon_definition; overlay exact pending theta rename",
+    "0501bd06e Match hud_draw_meter and hud_draw_numbers"
+   ]
+  },
+  {
+   "unit": "source/interface/motion_sensor",
+   "section": "section:19",
+   "function": "_motion_sensor_tick",
+   "previous_name": "_motion_sensor_tick",
+   "padded_bytes": 112,
+   "meaningful_bytes": 99,
+   "accepted": true,
+   "relocations": 12,
+   "normalized_sha256": "895a3fb08305ef485996f1577c5b94e52ee44f5951dae2d1546fac8be26c24ee",
+   "commits": [
+    "828625092 Match decal_insert and motion_sensor assert/literal text to January .rdata"
+   ]
+  },
+  {
+   "unit": "source/interface/motion_sensor",
+   "section": "section:6",
+   "function": "_get_motion_sensor_data",
+   "previous_name": "_get_motion_sensor_data",
+   "padded_bytes": 64,
+   "meaningful_bytes": 61,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "e768bb9a6ef81b2c857a039a6678073540dee667d6a9f66d6aaf0f7da149f791",
+   "commits": [
+    "828625092 Match decal_insert and motion_sensor assert/literal text to January .rdata"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "section": "section:74",
+   "function": "_ui_widget_load_children_recursive",
+   "previous_name": "_ui_widget_load_children_recursive",
+   "padded_bytes": 672,
+   "meaningful_bytes": 672,
+   "accepted": true,
+   "relocations": 23,
+   "normalized_sha256": "fb981d3a0eec90224ecfda88ee8f041cab2723c12494212843bb76c71fc7c2a4",
+   "commits": [
+    "ad4ffda4f ui_widget: single-exit focus flag closes load_children_recursive"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "section": "section:14",
+   "function": "_projectile_set_action",
+   "previous_name": "_code_000e7630",
+   "padded_bytes": 32,
+   "meaningful_bytes": 28,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "f1f3a50d14c173918869c007d4ce3889de8718702ba454c87d05411e2a2302a8",
+   "commits": [
+    "7b6bbfbb7 Reconstruct the projectile update, collision and detonation graph"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "section": "section:15",
+   "function": "_projectile_effect_new",
+   "previous_name": "_code_000e7650",
+   "padded_bytes": 96,
+   "meaningful_bytes": 92,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "3733234e28ec6fa968e582d3d69a647fa4aca4c013055429a2af8d12ddd1f1f7",
+   "commits": [
+    "7b6bbfbb7 Reconstruct the projectile update, collision and detonation graph"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "section": "section:26",
+   "function": "_projectile_detonate",
+   "previous_name": "_code_000e8110",
+   "padded_bytes": 1040,
+   "meaningful_bytes": 1031,
+   "accepted": true,
+   "relocations": 37,
+   "normalized_sha256": "315992f201ed6fa3c9907396f9f2d4a62bda8864341367b3986fa9941dcade8d",
+   "commits": [
+    "7b6bbfbb7 Reconstruct the projectile update, collision and detonation graph"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:29",
+   "function": "_weapon_get_projectile_owner_object_index",
+   "previous_name": "_weapon_get_projectile_owner_object_index",
+   "padded_bytes": 80,
+   "meaningful_bytes": 71,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "2f6270b7cee462062ea1d9f8c869976d579334062d9225751774d1c7d7a3294d",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:31",
+   "function": "_weapon_trigger_can_fire_again",
+   "previous_name": "_weapon_trigger_can_fire_again",
+   "padded_bytes": 240,
+   "meaningful_bytes": 234,
+   "accepted": true,
+   "relocations": 10,
+   "normalized_sha256": "0662dc3df62118d22a36fb751419b4935734ebdb2518191e851eed3cf1d35b8e",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:32",
+   "function": "_weapon_magazine_idle",
+   "previous_name": "_weapon_magazine_idle",
+   "padded_bytes": 80,
+   "meaningful_bytes": 70,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "e4cfe18dd3c6cf9b1f30431ba5343928812e9587991d438c70f54ffc69cdf097",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:34",
+   "function": "_weapon_effect_looping_new",
+   "previous_name": "_weapon_effect_looping_new",
+   "padded_bytes": 112,
+   "meaningful_bytes": 104,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "5791796b165ae569fa219a8cab732e3ed850525396de3c208061216837eafcaa",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:35",
+   "function": "_weapon_detonate",
+   "previous_name": "_weapon_detonate",
+   "padded_bytes": 64,
+   "meaningful_bytes": 49,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "551beff927f543d76d38ee33f52c7e6e124c6a145b3fb57a74d21e1a6f1b1e13",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:36",
+   "function": "_weapon_trigger_change_state",
+   "previous_name": "_weapon_trigger_change_state",
+   "padded_bytes": 144,
+   "meaningful_bytes": 132,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "2cadbbd0c5b5293d7a621efbdeff307d28d83d61f218c4af7d8d506c497ef126",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:37",
+   "function": "_weapon_trigger_start_ejection_port",
+   "previous_name": "_weapon_trigger_start_ejection_port",
+   "padded_bytes": 128,
+   "meaningful_bytes": 125,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "2358cb7ccbc8527ab42cc691e90b0bbf4c83a05b22963f441d17a5d0cee108e5",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:38",
+   "function": "_weapon_state_key_frame",
+   "previous_name": "_weapon_state_key_frame",
+   "padded_bytes": 80,
+   "meaningful_bytes": 74,
+   "accepted": true,
+   "relocations": 4,
+   "normalized_sha256": "0805cb1e08aa948ad902b1bcd48cf0b47eb03d0e6bbe0bd9750e912939787fdb",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:39",
+   "function": "_weapon_magazine_state_interruptable",
+   "previous_name": "_weapon_magazine_state_interruptable",
+   "padded_bytes": 32,
+   "meaningful_bytes": 18,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "2a80e3df7559bb369ca4bb0a00de4136951baecc12ade62856d3aca159106b2c",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:44",
+   "function": "_random",
+   "previous_name": "_random",
+   "padded_bytes": 16,
+   "meaningful_bytes": 15,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "a8ad3cb30f329f39f3193d4112f79d5983d27e7d41b1c99b5e0b4cd98e555bd0",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:58",
+   "function": "_weapon_magazine_start_chamber",
+   "previous_name": "_weapon_magazine_start_chamber",
+   "padded_bytes": 192,
+   "meaningful_bytes": 187,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "fa0e3fc241297fe86cbdc8ddfa854c1e7299d59be1a28b4e49bb535956160911",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:59",
+   "function": "_weapon_magazine_finish_chamber",
+   "previous_name": "_weapon_magazine_finish_chamber",
+   "padded_bytes": 128,
+   "meaningful_bytes": 122,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "8e0ecd772615b9bb394af3485212ae4d3e37da58853f7c198a918123ec5594b7",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:60",
+   "function": "_weapon_trigger_fully_charged",
+   "previous_name": "_weapon_trigger_fully_charged",
+   "padded_bytes": 192,
+   "meaningful_bytes": 189,
+   "accepted": true,
+   "relocations": 13,
+   "normalized_sha256": "4d2d15f30d2933e46b595466fcf208b45a9f770b5d2b09e9f28f577c066d951b",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:61",
+   "function": "_weapon_trigger_idle",
+   "previous_name": "_weapon_trigger_idle",
+   "padded_bytes": 144,
+   "meaningful_bytes": 137,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "b775e1630036a6b21364ddfc7276baf97d3a6ec00f058d2b9101befc454644cc",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:62",
+   "function": "_weapon_trigger_locked",
+   "previous_name": "_weapon_trigger_locked",
+   "padded_bytes": 96,
+   "meaningful_bytes": 84,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "33124f08c4a78cc8f0f27eba6f9f0bb702a587bb31c0a98d42ea24145b66593a",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:63",
+   "function": "_weapon_trigger_recover",
+   "previous_name": "_weapon_trigger_recover",
+   "padded_bytes": 96,
+   "meaningful_bytes": 83,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "6b8024e24cc139e578f0d13e4aa9978dab13ccf28e946c341c45babc4505ce62",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:65",
+   "function": "_projectile_distribute",
+   "previous_name": "_code_000ec8c0",
+   "padded_bytes": 160,
+   "meaningful_bytes": 149,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "019c79633f244cd154a8e9c8428f36f28fdeebf593e6fc8238bdea343e963dc8",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:70",
+   "function": "_weapon_aim",
+   "previous_name": "_weapon_aim",
+   "padded_bytes": 272,
+   "meaningful_bytes": 257,
+   "accepted": true,
+   "relocations": 14,
+   "normalized_sha256": "ee62f54c1d38995c3fe15714bbfaef7837269622f9576f6277dfa382f9b3be01",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:72",
+   "function": "_weapon_trigger_finish_tracking",
+   "previous_name": "_weapon_trigger_finish_tracking",
+   "padded_bytes": 80,
+   "meaningful_bytes": 79,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "1242dd37c6f60fec0216cc71de3e37a058f43ec1a5a5381d2429d8639badbe95",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:74",
+   "function": "_weapon_trigger_fire",
+   "previous_name": "_code_000ed4a0",
+   "padded_bytes": 1984,
+   "meaningful_bytes": 1970,
+   "accepted": true,
+   "relocations": 62,
+   "normalized_sha256": "0a873f5653980679bea8698d96c3c0fce9dbd9816dc5ce26f30faa760aff6974",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:75",
+   "function": "_weapon_trigger_begin_firing",
+   "previous_name": "_code_000edc60",
+   "padded_bytes": 624,
+   "meaningful_bytes": 620,
+   "accepted": true,
+   "relocations": 29,
+   "normalized_sha256": "2c3dc129a50ff7c4f2c0ea40a77721cb20fe554ff40ec328582039c878a316d7",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:76",
+   "function": "_weapon_trigger_overload",
+   "previous_name": "_weapon_trigger_overload",
+   "padded_bytes": 208,
+   "meaningful_bytes": 193,
+   "accepted": true,
+   "relocations": 12,
+   "normalized_sha256": "8a9d97ddab8ed0c418072af7c41a2a2aab4a27a2e4441f1820183cbb1352b2dc",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:77",
+   "function": "_weapon_trigger_release_charge",
+   "previous_name": "_weapon_trigger_release_charge",
+   "padded_bytes": 256,
+   "meaningful_bytes": 245,
+   "accepted": true,
+   "relocations": 14,
+   "normalized_sha256": "8e9be99ec1c5e30e411544b1ba8fa36d3246a2d1a65cc25dd5fe1d204a1ee011",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "section": "section:78",
+   "function": "_weapon_trigger_overcharged",
+   "previous_name": "_weapon_trigger_overcharged",
+   "padded_bytes": 128,
+   "meaningful_bytes": 127,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "9bbe1dfb1dbca7046a8f68f604e64669b9bb94d7cf10e61816ee4f1eaefeaf9d",
+   "commits": [
+    "4060ae876 weapons: guard the overheat divide first; weapon_trigger_fire exact",
+    "f94f6d7db weapons: restore the trigger/magazine state graph; 22 functions exact, trigger fire graph fuzzy",
+    "f193dbbc8 weapons: write weapon_aim exact"
+   ]
+  },
+  {
+   "unit": "source/main/main",
+   "section": "section:42",
+   "function": "_main_get_solo_level_from_name",
+   "previous_name": "_main_get_solo_level_from_name",
+   "padded_bytes": 368,
+   "meaningful_bytes": 354,
+   "accepted": true,
+   "relocations": 22,
+   "normalized_sha256": "68e7372c529d46cf6292e2698cf022704ed3085cbabae5fd7bedc48598bf81a9",
+   "commits": [
+    "336ea9d31 main: reopen solo level lookup, connection setup, map rename and window bounds/camera helpers exact"
+   ]
+  },
+  {
+   "unit": "source/main/main",
+   "section": "section:47",
+   "function": "_compute_window_bounds",
+   "previous_name": "_compute_window_bounds",
+   "padded_bytes": 496,
+   "meaningful_bytes": 481,
+   "accepted": true,
+   "relocations": 25,
+   "normalized_sha256": "9e74a78d008dcdaa4ecd0e8290296cab0e4bc43a5ea1222200a9867d80677e76",
+   "commits": [
+    "336ea9d31 main: reopen solo level lookup, connection setup, map rename and window bounds/camera helpers exact"
+   ]
+  },
+  {
+   "unit": "source/main/main",
+   "section": "section:50",
+   "function": "_main_change_map_name",
+   "previous_name": "_main_change_map_name",
+   "padded_bytes": 384,
+   "meaningful_bytes": 372,
+   "accepted": true,
+   "relocations": 35,
+   "normalized_sha256": "d4399d9558fa56ca1b98419bb62a950b8018cfa101637b50b9d5312af4cd8c3e",
+   "commits": [
+    "336ea9d31 main: reopen solo level lookup, connection setup, map rename and window bounds/camera helpers exact"
+   ]
+  },
+  {
+   "unit": "source/main/main",
+   "section": "section:86",
+   "function": "_set_window_camera_values",
+   "previous_name": "_set_window_camera_values",
+   "padded_bytes": 432,
+   "meaningful_bytes": 418,
+   "accepted": true,
+   "relocations": 19,
+   "normalized_sha256": "b6b77e1325d664686277c8ab3678b163f92e428ce003a51526ef628c20a2e771",
+   "commits": [
+    "336ea9d31 main: reopen solo level lookup, connection setup, map rename and window bounds/camera helpers exact"
+   ]
+  },
+  {
+   "unit": "source/main/main",
+   "section": "section:88",
+   "function": "_main_setup_connection",
+   "previous_name": "_main_setup_connection",
+   "padded_bytes": 192,
+   "meaningful_bytes": 182,
+   "accepted": true,
+   "relocations": 17,
+   "normalized_sha256": "c5411956292ae880665d080ef10f13e76665ff55bb11fdb8983c5209a4260c72",
+   "commits": [
+    "336ea9d31 main: reopen solo level lookup, connection setup, map rename and window bounds/camera helpers exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "section": "section:28",
+   "function": "_get_face_vertex",
+   "previous_name": "_get_face_vertex",
+   "padded_bytes": 400,
+   "meaningful_bytes": 385,
+   "accepted": true,
+   "relocations": 18,
+   "normalized_sha256": "6b9b37ec87ba359ac32e9e5bc04938b01a69de5b6783ee0b7d766818299f1b87",
+   "commits": [
+    "293c23fb0 geometry: reopen calculate_vertex, get_face_vertex and subdivide_triangle exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "section": "section:29",
+   "function": "_subdivide_triangle",
+   "previous_name": "_subdivide_triangle",
+   "padded_bytes": 944,
+   "meaningful_bytes": 939,
+   "accepted": true,
+   "relocations": 52,
+   "normalized_sha256": "f2e96f710a5b63988446081b1b3fff165fb4db2779f4b38606e273508fcad334",
+   "commits": [
+    "293c23fb0 geometry: reopen calculate_vertex, get_face_vertex and subdivide_triangle exact"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "section": "section:6",
+   "function": "_calculate_vertex",
+   "previous_name": "_calculate_vertex",
+   "padded_bytes": 336,
+   "meaningful_bytes": 321,
+   "accepted": true,
+   "relocations": 18,
+   "normalized_sha256": "5bc4eb4df60182b53941a5231a7f0f984ca4d4eb37fe4dafb09662a2cf8916af",
+   "commits": [
+    "293c23fb0 geometry: reopen calculate_vertex, get_face_vertex and subdivide_triangle exact"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:20",
+   "function": "_animation_get_keyframe_rotation",
+   "previous_name": "_animation_get_keyframe_rotation",
+   "padded_bytes": 784,
+   "meaningful_bytes": 779,
+   "accepted": true,
+   "relocations": 43,
+   "normalized_sha256": "a533276c9248c7483d0976ab483c322c903192ed9133423cd0f59912a9c87684",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:21",
+   "function": "_animation_get_keyframe_translation",
+   "previous_name": "_animation_get_keyframe_translation",
+   "padded_bytes": 768,
+   "meaningful_bytes": 759,
+   "accepted": true,
+   "relocations": 37,
+   "normalized_sha256": "2a4ed003246c413640a5b1cb1f2ddc8b0211fac68a0306389a6f2e5b007ae812",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:22",
+   "function": "_animation_get_keyframe_scale",
+   "previous_name": "_animation_get_keyframe_scale",
+   "padded_bytes": 752,
+   "meaningful_bytes": 742,
+   "accepted": true,
+   "relocations": 37,
+   "normalized_sha256": "842fdd10dc6dcd11802d323642403bf8b9282606e0a7a71d5d54db0da6492f13",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:23",
+   "function": "_animation_update_internal",
+   "previous_name": "_animation_update_internal",
+   "padded_bytes": 304,
+   "meaningful_bytes": 300,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "41e02539e6d1719390762396d13e94628f330b1a7e5600a82c1475bf0b2d1429",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:28",
+   "function": "_overlay_animation_apply_continuous",
+   "previous_name": "_overlay_animation_apply_continuous",
+   "padded_bytes": 960,
+   "meaningful_bytes": 953,
+   "accepted": true,
+   "relocations": 34,
+   "normalized_sha256": "5ffa1215f54cc536965c23570748b1fbd028622f034111b95af4d49a3e9d508a",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/models/model_animations",
+   "section": "section:29",
+   "function": "_overlay_animation_apply_continuous_scaled",
+   "previous_name": "_overlay_animation_apply_continuous_scaled",
+   "padded_bytes": 1024,
+   "meaningful_bytes": 1012,
+   "accepted": true,
+   "relocations": 37,
+   "normalized_sha256": "345a817b00662af38c623b59e4d4bab23b460f41eb8576160e4b4b84b22afb9d",
+   "commits": [
+    "071c5c045 model_animations: reopen keyframe getters and overlay continuous appliers exact",
+    "5a9586851 Widen animation_update_internal render/game-state parameter to long",
+    "8c1cd4f91 model_animations: write animation_update_internal (fuzzy pending parameter width)"
+   ]
+  },
+  {
+   "unit": "source/objects/damage",
+   "section": "section:31",
+   "function": "_object_cause_damage",
+   "previous_name": "_object_cause_damage",
+   "padded_bytes": 1984,
+   "meaningful_bytes": 1971,
+   "accepted": true,
+   "relocations": 75,
+   "normalized_sha256": "68f55b08e71a95b90b258c6d1a1d50f7a637eca0af4fd3ea7388c0f7884015c0",
+   "commits": [
+    "da12da12c damage: reopen object_cause_damage exact"
+   ]
+  },
+  {
+   "unit": "source/objects/object_lights",
+   "section": "section:24",
+   "function": "_light_unmarked",
+   "previous_name": "_light_unmarked",
+   "padded_bytes": 96,
+   "meaningful_bytes": 81,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "6aa93207648f0793874a395bb091edda96bd71c50fd33a1eb3ef9d34ce6ff498",
+   "commits": [
+    "76efed8c6 object_lights: name the lights profile section; reopen five lighting functions exact"
+   ]
+  },
+  {
+   "unit": "source/objects/object_lights",
+   "section": "section:29",
+   "function": "_find_point_lights_for_object_in_cluster",
+   "previous_name": "_find_point_lights_for_object_in_cluster",
+   "padded_bytes": 560,
+   "meaningful_bytes": 551,
+   "accepted": true,
+   "relocations": 31,
+   "normalized_sha256": "39d22fa1133941bdd6a0b52cfe5ff4e0df3e109e21e6318f46774740811f96be",
+   "commits": [
+    "76efed8c6 object_lights: name the lights profile section; reopen five lighting functions exact"
+   ]
+  },
+  {
+   "unit": "source/objects/object_lights",
+   "section": "section:30",
+   "function": "_build_distant_lights",
+   "previous_name": "_build_distant_lights",
+   "padded_bytes": 1024,
+   "meaningful_bytes": 1010,
+   "accepted": true,
+   "relocations": 78,
+   "normalized_sha256": "9040b294b2196ad5856ae91dc985071fc099c4df2afc3095ea8b2c49bf62529c",
+   "commits": [
+    "76efed8c6 object_lights: name the lights profile section; reopen five lighting functions exact"
+   ]
+  },
+  {
+   "unit": "source/objects/object_lights",
+   "section": "section:42",
+   "function": "_lights_preprocess_scene",
+   "previous_name": "_lights_preprocess_scene",
+   "padded_bytes": 2400,
+   "meaningful_bytes": 2388,
+   "accepted": true,
+   "relocations": 165,
+   "normalized_sha256": "726548627571357009de646c259615ae7b6df8ca5abe3e1d13018ee126e28b52",
+   "commits": [
+    "76efed8c6 object_lights: name the lights profile section; reopen five lighting functions exact"
+   ]
+  },
+  {
+   "unit": "source/objects/object_lights",
+   "section": "section:43",
+   "function": "_lights_prepare_for_object_static",
+   "previous_name": "_lights_prepare_for_object_static",
+   "padded_bytes": 832,
+   "meaningful_bytes": 827,
+   "accepted": true,
+   "relocations": 17,
+   "normalized_sha256": "99209b5ebb1bce3e750c483032987911774acc613c74965847b808a3d7fc5068",
+   "commits": [
+    "76efed8c6 object_lights: name the lights profile section; reopen five lighting functions exact"
+   ]
+  },
+  {
+   "unit": "source/physics/collision_bsp",
+   "section": "section:19",
+   "function": "_bsp2d_test_sphere_recursive",
+   "previous_name": "_bsp2d_test_sphere_recursive",
+   "padded_bytes": 160,
+   "meaningful_bytes": 145,
+   "accepted": true,
+   "relocations": 3,
+   "normalized_sha256": "3d3e2ebc2475a44e6fc46a61a195af74e7bfe2b9123b724beb96f1fb3dc9c8f1",
+   "commits": [
+    "f861776bf collision_bsp: reopen bsp2d sphere and pill recursions exact; refresh three bsp3d parks"
+   ]
+  },
+  {
+   "unit": "source/physics/collision_bsp",
+   "section": "section:28",
+   "function": "_bsp2d_test_pill_recursive",
+   "previous_name": "_bsp2d_test_pill_recursive",
+   "padded_bytes": 272,
+   "meaningful_bytes": 267,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "40f743a1aebcedeaaf128f692bf200d33fb5694033dc89fe37eff3b6b8ba9a9d",
+   "commits": [
+    "f861776bf collision_bsp: reopen bsp2d sphere and pill recursions exact; refresh three bsp3d parks"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:11",
+   "function": "_collision_get_features_in_sphere",
+   "previous_name": "_collision_get_features_in_sphere",
+   "padded_bytes": 512,
+   "meaningful_bytes": 507,
+   "accepted": true,
+   "relocations": 25,
+   "normalized_sha256": "fa6cdc09bc777620dc3a318d6abe8a0608cb98a41ac541f69d7679dadd76886c",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:12",
+   "function": "_clip_position_to_plane",
+   "previous_name": "_clip_position_to_plane",
+   "padded_bytes": 64,
+   "meaningful_bytes": 54,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "f6d48903a603b24e9f80f15aac580247c041a101662fb28375457842878b509e",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:13",
+   "function": "_clip_velocity_to_plane",
+   "previous_name": "_clip_velocity_to_plane",
+   "padded_bytes": 64,
+   "meaningful_bytes": 51,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "7a9093c05a8f086a66de64fb9dad13a6d8af8cb872881a5189dfc15acf695e88",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:14",
+   "function": "_clip_position_to_line",
+   "previous_name": "_clip_position_to_line",
+   "padded_bytes": 128,
+   "meaningful_bytes": 117,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "e695c2d7259cc381d8329e1ddf48ca26f4f3a5ee83b7d02b7a17bedfb2bfa7d1",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:15",
+   "function": "_clip_velocity_to_line",
+   "previous_name": "_clip_velocity_to_line",
+   "padded_bytes": 80,
+   "meaningful_bytes": 73,
+   "accepted": true,
+   "relocations": 0,
+   "normalized_sha256": "13f921296a759e06e825acb74f5e83815ce77425c301204fdf0d5d7af77e0112",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:16",
+   "function": "_collision_fix_pill_nudge_collision",
+   "previous_name": "_collision_fix_pill_nudge_collision",
+   "padded_bytes": 160,
+   "meaningful_bytes": 147,
+   "accepted": true,
+   "relocations": 5,
+   "normalized_sha256": "c3b6224c13285c476856d2198196edaa5965963b67f40ec22d35b4dabc0a64f3",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:17",
+   "function": "_collision_fix_pill",
+   "previous_name": "_collision_fix_pill",
+   "padded_bytes": 672,
+   "meaningful_bytes": 657,
+   "accepted": true,
+   "relocations": 28,
+   "normalized_sha256": "9fe807e097dac0179d2f8aeb86c81f0f1e3789ed857540a2104f7460a3497e45",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/collisions",
+   "section": "section:6",
+   "function": "_collision_test_vector",
+   "previous_name": "_collision_test_vector",
+   "padded_bytes": 1744,
+   "meaningful_bytes": 1730,
+   "accepted": true,
+   "relocations": 58,
+   "normalized_sha256": "553db5826860eb285d218e569f9add49e3b9070d221a8cc878f14d8fa90b72c9",
+   "commits": [
+    "a4a7fe8cf collisions: write collision_test_vector and collision_move_point with clip helpers; test_vector and clip helpers exact",
+    "516c6b58a collisions: close fix_pill, nudge_collision and features_in_sphere"
+   ]
+  },
+  {
+   "unit": "source/physics/physics",
+   "section": "section:11",
+   "function": "_physics_compute_biped_collision",
+   "previous_name": "_physics_compute_biped_collision",
+   "padded_bytes": 1136,
+   "meaningful_bytes": 1133,
+   "accepted": true,
+   "relocations": 43,
+   "normalized_sha256": "6f544fa6bbdc541c61d6a4bd405617be7831134c24a525f80a04993f1bb6cf91",
+   "commits": [
+    "4dd357580 physics: write physics_update_new; update_new and rotate_vectors3d_by_angular_velocity exact",
+    "70ad17afb physics: write physics_compute_biped_collision exact"
+   ]
+  },
+  {
+   "unit": "source/physics/physics",
+   "section": "section:14",
+   "function": "_rotate_vectors3d_by_angular_velocity",
+   "previous_name": "_rotate_vectors3d_by_angular_velocity",
+   "padded_bytes": 432,
+   "meaningful_bytes": 417,
+   "accepted": true,
+   "relocations": 24,
+   "normalized_sha256": "00064ac648e168b3a7e6fd9ae2204d39cdb17daebb9ee7ad13011021d1f42d61",
+   "commits": [
+    "4dd357580 physics: write physics_update_new; update_new and rotate_vectors3d_by_angular_velocity exact",
+    "70ad17afb physics: write physics_compute_biped_collision exact"
+   ]
+  },
+  {
+   "unit": "source/physics/physics",
+   "section": "section:15",
+   "function": "_physics_update_new",
+   "previous_name": "_physics_update_new",
+   "padded_bytes": 1984,
+   "meaningful_bytes": 1976,
+   "accepted": true,
+   "relocations": 66,
+   "normalized_sha256": "8cc42cd03258ede247eca9dbe551ae2981bfb1f8573502d9932d747c6445b049",
+   "commits": [
+    "4dd357580 physics: write physics_update_new; update_new and rotate_vectors3d_by_angular_velocity exact",
+    "70ad17afb physics: write physics_compute_biped_collision exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_frame_statistics",
+   "section": "section:3",
+   "function": "_rasterizer_frame_statistics_get_fps",
+   "previous_name": "_rasterizer_frame_statistics_get_fps",
+   "padded_bytes": 384,
+   "meaningful_bytes": 375,
+   "accepted": true,
+   "relocations": 21,
+   "normalized_sha256": "c6275f2bf09ccb0363daeeff9afcab28656ef7f51f2a73b4f0780f5fdb095a92",
+   "commits": [
+    "47fecc821 Separate frame-statistics FPS count and profile accumulators into file statics"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+   "section": "section:1",
+   "function": "_real_alpha_to_pixel32",
+   "previous_name": "_real_alpha_to_pixel32",
+   "padded_bytes": 112,
+   "meaningful_bytes": 99,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "28913a006347a05e936678a44d230c0137795a8e427083b4ff0f1367ecd73596",
+   "commits": [
+    "1086dd183 Reconstruct rasterizer_active_camouflage_draw; emit real_alpha_to_pixel32"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
+   "section": "section:4",
+   "function": "_IDirect3DDevice8_SetTexture@12",
+   "previous_name": "_IDirect3DDevice8_SetTexture@12",
+   "padded_bytes": 16,
+   "meaningful_bytes": 12,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "52e1fc33ef345b2e01eb4dfeb90dbea92beabe621157eda9ca9fe0c3ab98b107",
+   "commits": [
+    "81dc83608 rasterizer_xbox_environment: device SetTexture call closes the D3D inline wrapper"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
+   "section": "section:11",
+   "function": "_rasterizer_screen_effect_set_texture_transforms",
+   "previous_name": "_rasterizer_screen_effect_set_texture_transforms",
+   "padded_bytes": 2128,
+   "meaningful_bytes": 2115,
+   "accepted": true,
+   "relocations": 86,
+   "normalized_sha256": "c24f18204f9cfada68827ba33625f7acfdfe406577c1bf000c51c65c70adbf00",
+   "commits": [
+    "a389e0035 screen_effect: pass texture-transform parameters in January's private EAX ABI; set_texture_transforms exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_cameras",
+   "section": "section:6",
+   "function": "_render_frustum_cube_view_fraction",
+   "previous_name": "_render_frustum_cube_view_fraction",
+   "padded_bytes": 1200,
+   "meaningful_bytes": 1186,
+   "accepted": true,
+   "relocations": 78,
+   "normalized_sha256": "bcc496e4a2fc55aa9fc78d14a886b2c29828c43c27a40aea5949da21f19543be",
+   "commits": [
+    "b9cef202b render_cameras: reopen render_frustum_cube_view_fraction exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_objects",
+   "section": "section:9",
+   "function": "_render_object_list",
+   "previous_name": "_render_object_list",
+   "padded_bytes": 1152,
+   "meaningful_bytes": 1152,
+   "accepted": true,
+   "relocations": 55,
+   "normalized_sha256": "a0050f4a7fa31cbe909653574cb3decfd34b5fd7b6fc1f188e3d512a08f58028",
+   "commits": [
+    "5dcb9e15f render_objects: close render_object_list"
+   ]
+  },
+  {
+   "unit": "source/render/render_sprite",
+   "section": "section:4",
+   "function": "_build_sprite_get_group",
+   "previous_name": "_build_sprite_get_group",
+   "padded_bytes": 384,
+   "meaningful_bytes": 381,
+   "accepted": true,
+   "relocations": 20,
+   "normalized_sha256": "f2e9787070fc78bf43c1c343885bd3862c9ec91ddaabe67b82ec322326e2b780",
+   "commits": [
+    "65277e66c Match build_sprite_get_group"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_dsound_xbox",
+   "section": "section:28",
+   "function": "_dsound_set_listener_properties",
+   "previous_name": "_dsound_set_listener_properties",
+   "padded_bytes": 816,
+   "meaningful_bytes": 816,
+   "accepted": true,
+   "relocations": 63,
+   "normalized_sha256": "2c07c059201ef12a4a0cfdc2618702f1b5a2a2db5ea19a2b264e8c4240977651",
+   "commits": [
+    "2885ba82c sound_dsound_xbox: coordinate-conversion and epsilon macros stage DirectSound float arguments; listener and channel location exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_dsound_xbox",
+   "section": "section:34",
+   "function": "_channel_set_location",
+   "previous_name": "_channel_set_location",
+   "padded_bytes": 752,
+   "meaningful_bytes": 738,
+   "accepted": true,
+   "relocations": 43,
+   "normalized_sha256": "b509812c4154174516b49ac7f97f83cb21ba50de63e055f3789460e2a622a192",
+   "commits": [
+    "2885ba82c sound_dsound_xbox: coordinate-conversion and epsilon macros stage DirectSound float arguments; listener and channel location exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "section": "section:21",
+   "function": "_sound_travel_milliseconds",
+   "previous_name": "_sound_travel_milliseconds",
+   "padded_bytes": 32,
+   "meaningful_bytes": 18,
+   "accepted": true,
+   "relocations": 2,
+   "normalized_sha256": "21286aa41918f996fc727f6c67add1d90c97582776293d89fda6dc88c6ef16ce",
+   "commits": [
+    "24bf3dfc6 sound_manager: reopen limit_pitch and looping_sound_new exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "section": "section:33",
+   "function": "_limit_pitch",
+   "previous_name": "_limit_pitch",
+   "padded_bytes": 96,
+   "meaningful_bytes": 92,
+   "accepted": true,
+   "relocations": 1,
+   "normalized_sha256": "fa465e8daf708a83bb16686d2c254a68937b1ad2c600be40817358dbdd31c6f3",
+   "commits": [
+    "24bf3dfc6 sound_manager: reopen limit_pitch and looping_sound_new exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "section": "section:45",
+   "function": "_looping_sound_new",
+   "previous_name": "_looping_sound_new",
+   "padded_bytes": 304,
+   "meaningful_bytes": 292,
+   "accepted": true,
+   "relocations": 14,
+   "normalized_sha256": "c611da5fed821bf1db78b52fd3fbbe3fa7f3829024d30a558b3f3f3d124fa4cc",
+   "commits": [
+    "24bf3dfc6 sound_manager: reopen limit_pitch and looping_sound_new exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "section": "section:52",
+   "function": "_refresh_sounds",
+   "previous_name": "_refresh_sounds",
+   "padded_bytes": 544,
+   "meaningful_bytes": 543,
+   "accepted": true,
+   "relocations": 32,
+   "normalized_sha256": "7334c26ecc09a454bf4c12bfe7132cd6c59a1a74a69755eaf18390928fbcaab8",
+   "commits": [
+    "24bf3dfc6 sound_manager: reopen limit_pitch and looping_sound_new exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:11",
+   "function": "_structure_visibility_build_surfaces_traverse_clusters",
+   "previous_name": "_structure_visibility_build_surfaces_traverse_clusters",
+   "padded_bytes": 352,
+   "meaningful_bytes": 340,
+   "accepted": true,
+   "relocations": 7,
+   "normalized_sha256": "cb3e624783365b287cb7bfae736a0f2a0571c7855a0f99fc706349e98c54ed35",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:16",
+   "function": "_structure_visibility_find_mirror",
+   "previous_name": "_structure_visibility_find_mirror",
+   "padded_bytes": 704,
+   "meaningful_bytes": 700,
+   "accepted": true,
+   "relocations": 18,
+   "normalized_sha256": "a73ca94621d5523246b92ee34dcf234be6e2f91541132472ba99facd1d8afbad",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:17",
+   "function": "_structure_visibility_build_surfaces_traverse_node",
+   "previous_name": "_structure_visibility_build_surfaces_traverse_node",
+   "padded_bytes": 608,
+   "meaningful_bytes": 603,
+   "accepted": true,
+   "relocations": 26,
+   "normalized_sha256": "4724859cbb5d84ee92fc37ec79de6188c26811c92a47e3d92bbac615fad48925",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:18",
+   "function": "_structure_visibility_traverse_cluster",
+   "previous_name": "_structure_visibility_traverse_cluster",
+   "padded_bytes": 912,
+   "meaningful_bytes": 903,
+   "accepted": true,
+   "relocations": 53,
+   "normalized_sha256": "c1053f49f6c23c306099d9cd9d3e63e55b53de53558e4bb4f9b79c89814e6c6d",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:19",
+   "function": "_structure_visibility_build_surfaces",
+   "previous_name": "_structure_visibility_build_surfaces",
+   "padded_bytes": 480,
+   "meaningful_bytes": 476,
+   "accepted": true,
+   "relocations": 18,
+   "normalized_sha256": "be4b07f707ac21bc863b60cb158f25d47e81dfae8c7f660d21c247eb42b8004f",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:21",
+   "function": "_structure_visibility_compute",
+   "previous_name": "_structure_visibility_compute",
+   "padded_bytes": 576,
+   "meaningful_bytes": 566,
+   "accepted": true,
+   "relocations": 48,
+   "normalized_sha256": "0c3960161dffa598a275c6fcb9a7c9635008250354665a1aef8f16e8e48e6ca3",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:3",
+   "function": "_structure_visibility_traverse_subclusters",
+   "previous_name": "_structure_visibility_traverse_subclusters",
+   "padded_bytes": 416,
+   "meaningful_bytes": 407,
+   "accepted": true,
+   "relocations": 24,
+   "normalized_sha256": "2d0107d50065a36b23c64015836d3765e3ee36a5878a238b689f3c7d2a8e6ca3",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "section": "section:6",
+   "function": "_planes_intersect_rectangle",
+   "previous_name": "_planes_intersect_rectangle",
+   "padded_bytes": 384,
+   "meaningful_bytes": 378,
+   "accepted": true,
+   "relocations": 8,
+   "normalized_sha256": "31b090b9939bf64edf6131c83ca8454f4baf80674c81d7a75982c5d4524b6c90",
+   "commits": [
+    "706a02a5a structure_visibility: reopen eight visibility traversal and surface-build functions exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:17",
+   "function": "_styled_font_get",
+   "previous_name": "_styled_font_get",
+   "padded_bytes": 112,
+   "meaningful_bytes": 99,
+   "accepted": true,
+   "relocations": 6,
+   "normalized_sha256": "85f0a63276b854d6854915b2099aacdcd0ba5741d1366b55f4e7cf2c2fa9fc81",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:21",
+   "function": "_draw_string_partial",
+   "previous_name": "_draw_string_partial",
+   "padded_bytes": 528,
+   "meaningful_bytes": 523,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "e55f2a4aa9ebcd849324eb7c083e8a2f03fee150ddddf12284fa28d2c5e11c5a",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:22",
+   "function": "_draw_unicode_string_partial",
+   "previous_name": "_draw_unicode_string_partial",
+   "padded_bytes": 528,
+   "meaningful_bytes": 522,
+   "accepted": true,
+   "relocations": 9,
+   "normalized_sha256": "a5bfb710d5d9d7d0231206c83cfd1f931e2aab1bd0188203fde7c9c0e0ecce07",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:23",
+   "function": "_draw_string",
+   "previous_name": "_draw_string",
+   "padded_bytes": 912,
+   "meaningful_bytes": 909,
+   "accepted": true,
+   "relocations": 46,
+   "normalized_sha256": "8a16ea28aab4bb4839d80221e1c7b793a2180e9a3ec7c50a0b6d2c6a008c48d3",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:24",
+   "function": "_draw_unicode_string",
+   "previous_name": "_draw_unicode_string",
+   "padded_bytes": 912,
+   "meaningful_bytes": 912,
+   "accepted": true,
+   "relocations": 46,
+   "normalized_sha256": "a9959a0469b03fcbff5ec70bf6749e20a761755c4e6e192fec80f5dca8e28e70",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "section": "section:6",
+   "function": "_text_pick_draw_character",
+   "previous_name": "_text_pick_draw_character",
+   "padded_bytes": 224,
+   "meaningful_bytes": 214,
+   "accepted": true,
+   "relocations": 11,
+   "normalized_sha256": "a0b5c3c509e22da9390fc71d49e8296440382e1d4b706b5762c320a7a779a7c8",
+   "commits": [
+    "e34edcd08 draw_string: reopen styled_font_get, pick_draw_character and the draw_string/unicode string family exact"
+   ]
+  },
+  {
+   "unit": "source/units/bipeds",
+   "section": "section:19",
+   "function": "_biped_start_landing",
+   "previous_name": "_biped_start_landing",
+   "padded_bytes": 272,
+   "meaningful_bytes": 257,
+   "accepted": true,
+   "relocations": 12,
+   "normalized_sha256": "1eb5725913aec18c56ba675ab7dbd21adf3efd050eae3517c0b4f817f66b8d1e",
+   "commits": [
+    "d154664b2 bipeds: close start_landing and update_jumping; January-derived update_physics fuzzy"
+   ]
+  },
+  {
+   "unit": "source/units/bipeds",
+   "section": "section:41",
+   "function": "_biped_update_jumping",
+   "previous_name": "_biped_update_jumping",
+   "padded_bytes": 512,
+   "meaningful_bytes": 509,
+   "accepted": true,
+   "relocations": 21,
+   "normalized_sha256": "90bd42606540ced2adaebd965345003779b69f9e7f7f6332422adc3073a32681",
+   "commits": [
+    "d154664b2 bipeds: close start_landing and update_jumping; January-derived update_physics fuzzy"
+   ]
+  }
+ ]
+}

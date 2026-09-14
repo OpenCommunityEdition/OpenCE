@@ -1,16 +1,16 @@
-# Opus5 100K consolidated lane: checkpoint-60k
+# Opus5 100K consolidated lane: final
 
 | total | value |
 | --- | ---: |
-| `head_commit` | 94f7bbb80cf05ae68bb9a6ab3965927f38c4f0f8 |
-| `accepted_functions` | 7092 |
-| `accepted_meaningful` | 1206879 |
-| `gain_functions_vs_base` | 120 |
-| `gain_meaningful_vs_base` | 66718 |
-| `strict_gained_functions` | 125 |
-| `strict_gained_padded` | 69136 |
-| `strict_gained_meaningful` | 68131 |
-| `remaining_to_target` | 33282 |
+| `head_commit` | 32009865ace8b813d89f2449a8cd2526b965012b |
+| `accepted_functions` | 7149 |
+| `accepted_meaningful` | 1244970 |
+| `gain_functions_vs_base` | 177 |
+| `gain_meaningful_vs_base` | 104809 |
+| `strict_gained_functions` | 182 |
+| `strict_gained_padded` | 107712 |
+| `strict_gained_meaningful` | 106222 |
+| `remaining_to_target` | -4809 |
 
 Regressions vs base snapshot: 0
 
@@ -32,11 +32,21 @@ Regressions vs base snapshot: 0
 | ai/actor_firing_position | _actor_active_select_firing_position | 576 | 569 |
 | ai/actor_firing_position | _firing_position_compute_line_of_sight | 464 | 455 |
 | ai/actor_firing_position | _firing_position_compare | 272 | 264 |
+| ai/actor_firing_position | _post_evaluator_hide | 224 | 224 |
+| ai/actor_firing_position | _post_evaluator_attack | 224 | 216 |
+| ai/actor_firing_position | _post_evaluator_uncover | 192 | 187 |
 | interface/hud_draw | _hud_draw_multitexture_overlay | 2272 | 2264 |
 | interface/hud_draw | _hud_draw_numbers | 1856 | 1845 |
 | interface/hud_draw | _hud_draw_meter | 1312 | 1298 |
 | interface/hud_draw | _hud_draw_static_element | 640 | 627 |
 | interface/hud_draw | _hud_draw_multitexture_overlay_get_current_weapon_definition | 480 | 468 |
+| camera/observer | _observer_postcheck | 2112 | 2107 |
+| camera/observer | _observer_update_polynomial | 1440 | 1426 |
+| camera/observer | _observer_check_penetration | 752 | 739 |
+| camera/observer | _observer_update_velocities | 512 | 502 |
+| camera/observer | _observer_update_accelerations | 464 | 464 |
+| camera/observer | _observer_collision_test_with_t | 224 | 214 |
+| camera/observer | _observer_collision_test_differential | 64 | 64 |
 | items/weapons | _weapon_trigger_fire | 1984 | 1970 |
 | items/weapons | _weapon_trigger_begin_firing | 624 | 620 |
 | items/weapons | _weapon_aim | 272 | 257 |
@@ -61,6 +71,11 @@ Regressions vs base snapshot: 0
 | items/weapons | _weapon_detonate | 64 | 49 |
 | items/weapons | _weapon_magazine_state_interruptable | 32 | 18 |
 | items/weapons | _random | 16 | 15 |
+| objects/object_lights | _lights_preprocess_scene | 2400 | 2388 |
+| objects/object_lights | _build_distant_lights | 1024 | 1010 |
+| objects/object_lights | _lights_prepare_for_object_static | 832 | 827 |
+| objects/object_lights | _find_point_lights_for_object_in_cluster | 560 | 551 |
+| objects/object_lights | _light_unmarked | 96 | 81 |
 | models/model_animations | _overlay_animation_apply_continuous_scaled | 1024 | 1012 |
 | models/model_animations | _overlay_animation_apply_continuous | 960 | 953 |
 | models/model_animations | _animation_get_keyframe_rotation | 784 | 779 |
@@ -71,6 +86,14 @@ Regressions vs base snapshot: 0
 | ai/encounters | _encounter_update_follow | 1920 | 1909 |
 | ai/encounters | _encounter_spawn_actor | 288 | 274 |
 | ai/encounters | _encounter_post_combat_select_random_behavior | 272 | 259 |
+| structures/structure_visibility | _structure_visibility_traverse_cluster | 912 | 903 |
+| structures/structure_visibility | _structure_visibility_find_mirror | 704 | 700 |
+| structures/structure_visibility | _structure_visibility_build_surfaces_traverse_node | 608 | 603 |
+| structures/structure_visibility | _structure_visibility_compute | 576 | 566 |
+| structures/structure_visibility | _structure_visibility_build_surfaces | 480 | 476 |
+| structures/structure_visibility | _structure_visibility_traverse_subclusters | 416 | 407 |
+| structures/structure_visibility | _planes_intersect_rectangle | 384 | 378 |
+| structures/structure_visibility | _structure_visibility_build_surfaces_traverse_clusters | 352 | 340 |
 | ai/ai_script | _ai_scripting_migrate_internal | 1360 | 1352 |
 | ai/ai_script | _ai_scripting_migrate_find_target_squad | 1072 | 1067 |
 | ai/ai_script | _ai_scripting_command_list_status | 592 | 590 |
@@ -95,6 +118,14 @@ Regressions vs base snapshot: 0
 | physics/collisions | _clip_velocity_to_line | 80 | 73 |
 | physics/collisions | _clip_position_to_plane | 64 | 54 |
 | physics/collisions | _clip_velocity_to_plane | 64 | 51 |
+| ai/actions | _actor_action_handle_lost_contact | 1872 | 1858 |
+| ai/actions | _actor_action_handle_danger_avoidance | 1520 | 1509 |
+| text/draw_string | _draw_string | 912 | 909 |
+| text/draw_string | _draw_unicode_string | 912 | 912 |
+| text/draw_string | _draw_string_partial | 528 | 523 |
+| text/draw_string | _draw_unicode_string_partial | 528 | 522 |
+| text/draw_string | _text_pick_draw_character | 224 | 214 |
+| text/draw_string | _styled_font_get | 112 | 99 |
 | ai/actor_looking | _actor_look_secondary | 880 | 869 |
 | ai/actor_looking | _actor_look_idle_new_major_direction | 528 | 523 |
 | ai/actor_looking | _actor_look_idle_new_minor_direction | 368 | 362 |
@@ -103,14 +134,36 @@ Regressions vs base snapshot: 0
 | ai/actor_looking | _actor_look_affect_movement | 128 | 122 |
 | ai/actor_looking | _actor_look_get_looking_definition | 80 | 71 |
 | rasterizer/xbox/rasterizer_xbox_screen_effect | _rasterizer_screen_effect_set_texture_transforms | 2128 | 2115 |
+| effects/effects | _effect_update | 1328 | 1324 |
+| effects/effects | _effect_generate_parts | 592 | 587 |
+| effects/effects | _effects_object_is_corpse | 80 | 72 |
+| effects/effects | _effect_scale | 48 | 39 |
+| effects/effects | _effect_part_allowed_by_disposition | 32 | 28 |
+| ai/ai_communication | _ai_conversation_find_participant | 2048 | 2048 |
+| objects/damage | _object_cause_damage | 1984 | 1971 |
+| main/main | _compute_window_bounds | 496 | 481 |
+| main/main | _set_window_camera_values | 432 | 418 |
+| main/main | _main_change_map_name | 384 | 372 |
+| main/main | _main_get_solo_level_from_name | 368 | 354 |
+| main/main | _main_setup_connection | 192 | 182 |
+| math/geometry | _subdivide_triangle | 944 | 939 |
+| math/geometry | _get_face_vertex | 400 | 385 |
+| math/geometry | _calculate_vertex | 336 | 321 |
 | ai/actor_moving | _actor_move_calculate_free | 720 | 717 |
 | ai/actor_moving | _actor_move_calculate_controlled_by_aiming | 640 | 626 |
 | ai/actor_moving | _actor_move_vector_avoidance_find_direction | 240 | 230 |
 | ai/actor_moving | _midpoint3d | 64 | 56 |
 | game/players | _players_update_after_game | 816 | 810 |
 | game/players | _player_examine_nearby_item | 800 | 793 |
+| game/player_control | _handle_one_player_input | 1568 | 1562 |
 | sound/sound_dsound_xbox | _dsound_set_listener_properties | 816 | 816 |
 | sound/sound_dsound_xbox | _channel_set_location | 752 | 738 |
+| ai/path | _path_heap_bubble_down | 560 | 546 |
+| ai/path | _build_path_edges_for_surface | 384 | 372 |
+| ai/path | _path_state_approach_point | 304 | 294 |
+| ai/path | _path_attractor_weight | 192 | 185 |
+| ai/ai | _ai_disconnect_from_structure_bsp | 1280 | 1268 |
+| render/render_cameras | _render_frustum_cube_view_fraction | 1200 | 1186 |
 | items/projectiles | _projectile_detonate | 1040 | 1031 |
 | items/projectiles | _projectile_effect_new | 96 | 92 |
 | items/projectiles | _projectile_set_action | 32 | 28 |
@@ -128,6 +181,8 @@ Regressions vs base snapshot: 0
 | ai/actor_combat | _actor_combat_enable_special_fire_situation | 144 | 139 |
 | ai/actor_combat | _fast_ftol | 32 | 17 |
 | ai/actor_combat | _random_boolean | 32 | 26 |
+| ai/actors | _actor_swarm_attach_unit | 656 | 651 |
+| ai/actors | _actor_attacking_target | 176 | 175 |
 | effects/decals | _decal_insert | 704 | 692 |
 | effects/decals | _bsp3d_get_plane_from_designator | 112 | 101 |
 | units/bipeds | _biped_update_jumping | 512 | 509 |
@@ -136,6 +191,8 @@ Regressions vs base snapshot: 0
 | game/aim_assist | _object_compute_autoaim_target | 416 | 413 |
 | game/aim_assist | _limit3d | 96 | 88 |
 | game/aim_assist | _reciprocal_square_root | 16 | 16 |
+| physics/collision_bsp | _bsp2d_test_pill_recursive | 272 | 267 |
+| physics/collision_bsp | _bsp2d_test_sphere_recursive | 160 | 145 |
 | rasterizer/rasterizer_frame_statistics | _rasterizer_frame_statistics_get_fps | 384 | 375 |
 | render/render_sprite | _build_sprite_get_group | 384 | 381 |
 | interface/motion_sensor | _motion_sensor_tick | 112 | 99 |
@@ -143,11 +200,3 @@ Regressions vs base snapshot: 0
 | rasterizer/xbox/rasterizer_xbox_active_camouflage | _real_alpha_to_pixel32 | 112 | 99 |
 | cseries/stack_walk_windows | _symbol_sort_proc | 48 | 47 |
 | rasterizer/xbox/rasterizer_xbox_environment | _IDirect3DDevice8_SetTexture@12 | 16 | 12 |
-
-## Checkpoint verification (+60K, at the bitmap packet)
-
-- Full build: pass.
-- Stable diff from base snapshot: 0 regressions.
-- Parks: 446 active / 0 stale / 0 invalid. 19 parks were reopened with adversarial verification, and 3 were re-measured with appended evidence (speech timers, screen_effect, bitmap_group_add_bitmap).
-- Admission audit, pytest and fake-scan: unchanged from checkpoint 1 at every packet.
-- Treemap input: `scratch/report-ck60k.json`.
