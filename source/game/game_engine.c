@@ -6904,17 +6904,12 @@ static void netgame_flag_verify_team_exists(
 	short flag_index,
 	char const *error_message)
 {
-	long found_flag_index = NONE;
-
-	find_netgame_flags(
+	if (find_netgame_flag(
 		NULL,
 		0.f,
 		0.f,
 		flag_type,
-		flag_index,
-		1,
-		&found_flag_index);
-	if (found_flag_index == NONE)
+		flag_index) == NONE)
 	{
 		error(
 			_error_silent,
