@@ -1,23 +1,57 @@
 {
  "summary": {
-  "label": "checkpoint-w1",
+  "label": "checkpoint-w2A",
   "base_commit": "12f7375d4b845725c5ae3fda7ad715998ee54975",
-  "head_commit": "8e9a6de05d55c3aac3aab52f651f9a10dcedf317",
-  "accepted_functions": 7205,
-  "accepted_meaningful": 1275467,
-  "accepted_gain_functions": 56,
-  "accepted_gain_meaningful": 30497,
-  "strict_new_functions": 54,
-  "strict_new_meaningful": 29021,
-  "strict_new_padded": 29440,
+  "head_commit": "d0c2aed7b0bead84df7ab113eb331fac355f7b72",
+  "accepted_functions": 7259,
+  "accepted_meaningful": 1308903,
+  "accepted_gain_functions": 110,
+  "accepted_gain_meaningful": 63933,
+  "strict_new_functions": 108,
+  "strict_new_meaningful": 62457,
+  "strict_new_padded": 63264,
   "nonstrict_new_accepted_functions": 2,
   "nonstrict_new_accepted_meaningful": 1476,
   "strict_gains_not_in_accepted_ledger": 0,
   "regressions": [],
   "target_meaningful": 1394970,
-  "strict_remaining_to_150k": 120979
+  "strict_remaining_to_150k": 87543
  },
  "strict_functions": [
+  {
+   "unit": "source/ai/action_flee",
+   "function": "_action_flee_current_position_exposed",
+   "meaningful_bytes": 347,
+   "relocations": 13,
+   "normalized_sha256": "498dc2c046073108d309d0057bb5fc0405a8112c5532e90ef7ec5e79f21d7708",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:5",
+   "padded_bytes": 352,
+   "previous_name": "_action_flee_current_position_exposed",
+   "commits": [
+    "110eecc5c action_flee: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/action_flee",
+   "function": "_action_flee_setup",
+   "meaningful_bytes": 265,
+   "relocations": 12,
+   "normalized_sha256": "1a415a0adece0dd541b62c1c9ada51604d58751e66d769d88619d76db5471d79",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:8",
+   "padded_bytes": 272,
+   "previous_name": "_action_flee_setup",
+   "commits": [
+    "110eecc5c action_flee: 2 function(s) strict exact"
+   ]
+  },
   {
    "unit": "source/ai/action_vehicle",
    "function": "_action_vehicle_perform",
@@ -50,6 +84,57 @@
    "previous_name": "_action_vehicle_setup_specific",
    "commits": [
     "cbc9fbf5a action_vehicle: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "function": "_post_evaluator_global",
+   "meaningful_bytes": 214,
+   "relocations": 8,
+   "normalized_sha256": "e07f193d22593c7a8b5891a3bd0e570baf0a411c087993859cdda8c7de69831b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:5",
+   "padded_bytes": 224,
+   "previous_name": "_post_evaluator_global",
+   "commits": [
+    "5f057533a actor_firing_position: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "function": "_pre_evaluator_combatmove",
+   "meaningful_bytes": 567,
+   "relocations": 21,
+   "normalized_sha256": "dec21af4f9dee8911db9c77008eca40cb30fade0f2974d2c1c42ae9856976f7f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 576,
+   "previous_name": "_pre_evaluator_combatmove",
+   "commits": [
+    "5f057533a actor_firing_position: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_firing_position",
+   "function": "_pre_evaluator_global",
+   "meaningful_bytes": 1603,
+   "relocations": 53,
+   "normalized_sha256": "d83fd2341499b72125066d2b82c940567be7758ff5667186d64ad59a5113196e",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 1616,
+   "previous_name": "_pre_evaluator_global",
+   "commits": [
+    "5f057533a actor_firing_position: 3 function(s) strict exact"
    ]
   },
   {
@@ -239,6 +324,23 @@
    ]
   },
   {
+   "unit": "source/ai/path_obstacles",
+   "function": "_obstacles_disc_neighborhood",
+   "meaningful_bytes": 551,
+   "relocations": 21,
+   "normalized_sha256": "daa57d89708f1bf205442613b8d59462c3e83133254dd9d23c4a8486a75581f1",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 560,
+   "previous_name": "_obstacles_disc_neighborhood",
+   "commits": [
+    "c9ed39313 path_obstacles: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/ai/props",
    "function": "_prop_get_base_by_unit_index",
    "meaningful_bytes": 395,
@@ -253,6 +355,39 @@
    "previous_name": "_prop_get_base_by_unit_index",
    "commits": [
     "bacc15195 props: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_playback_idle",
+   "meaningful_bytes": 160,
+   "relocations": 14,
+   "normalized_sha256": "8a3e23da9d6e73e456d5ac27d74066ff6d80583545aba88bf10f7a10b71c4de2",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 160,
+   "previous_name": "_bink_playback_idle",
+   "commits": [
+    "7a4dfd799 bink_playback: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_drawing",
+   "function": "_bitmap_copy",
+   "meaningful_bytes": 2784,
+   "relocations": 69,
+   "normalized_sha256": "d8154826cc75922608a282d952b0f3c6e517e4074599f218e01160c4f18033b6",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 2784,
+   "previous_name": "_bitmap_copy",
+   "commits": [
+    "525f4029f bitmap_drawing: 1 function(s) strict exact"
    ]
   },
   {
@@ -340,6 +475,39 @@
    ]
   },
   {
+   "unit": "source/bitmaps/bitmaps",
+   "function": "_bitmap_format_to_a8r8g8b8",
+   "meaningful_bytes": 544,
+   "relocations": 22,
+   "normalized_sha256": "393db9b9a129a1c388c69259dd20b6dc91bbf6e5943ebc5d398375e9da4ef806",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 544,
+   "previous_name": "_bitmap_format_to_a8r8g8b8",
+   "commits": [
+    "f1afc7c88 bitmaps: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmaps",
+   "function": "_palette_find_closest_match",
+   "meaningful_bytes": 245,
+   "relocations": 4,
+   "normalized_sha256": "bff02f627a7490e89413a9c25091762766ee6c4d5a197b895d3f9b7675573b9e",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 256,
+   "previous_name": "_palette_find_closest_match",
+   "commits": [
+    "f1afc7c88 bitmaps: 2 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/cache/cache_files_decompress_windows",
    "function": "_acquire_read_request",
    "meaningful_bytes": 104,
@@ -391,6 +559,91 @@
    ]
   },
   {
+   "unit": "source/cache/xbox_sound_cache",
+   "function": "__sound_cache_sound_request",
+   "meaningful_bytes": 348,
+   "relocations": 25,
+   "normalized_sha256": "92c886403f8cde61d3d896b9ed86e8834df085c15e28f3db224e2e28628e968a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 352,
+   "previous_name": "__sound_cache_sound_request",
+   "commits": [
+    "232f3b979 xbox_sound_cache: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/xbox_texture_cache",
+   "function": "_texture_cache_build_hardware_format",
+   "meaningful_bytes": 330,
+   "relocations": 17,
+   "normalized_sha256": "0cd7b038ddc0b8773d695bcb2ec539680f553390c06a200afa39ee617c44b6d3",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:19",
+   "padded_bytes": 336,
+   "previous_name": "_texture_cache_build_hardware_format",
+   "commits": [
+    "4dc236312 xbox_texture_cache: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/xbox_texture_cache",
+   "function": "_texture_cache_locked_block_proc",
+   "meaningful_bytes": 51,
+   "relocations": 3,
+   "normalized_sha256": "9f883aeaa9d5a930f38b79b2960d634b647d971b5fcd92675174941d340b1f1d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "padded_bytes": 64,
+   "previous_name": "_texture_cache_locked_block_proc",
+   "commits": [
+    "4dc236312 xbox_texture_cache: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/xbox_texture_cache",
+   "function": "_texture_cache_start_loading_bitmap",
+   "meaningful_bytes": 224,
+   "relocations": 16,
+   "normalized_sha256": "2bf7d1281710a4abd400acfd47119798635ceafae0e1dde6b31dfc8ea7798999",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:23",
+   "padded_bytes": 224,
+   "previous_name": "_texture_cache_start_loading_bitmap",
+   "commits": [
+    "4dc236312 xbox_texture_cache: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/camera/director",
+   "function": "_director_update_controls",
+   "meaningful_bytes": 949,
+   "relocations": 45,
+   "normalized_sha256": "7b4bef8961ac5919acc38751bc1ef3ecc03b5779ab4601e5fa5e9cbd4e296584",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:24",
+   "padded_bytes": 960,
+   "previous_name": "_director_update_controls",
+   "commits": [
+    "d83babe7b director: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/camera/editor_flying_camera",
    "function": "_editor_camera_orbiting_update",
    "meaningful_bytes": 1117,
@@ -405,6 +658,23 @@
    "previous_name": "_editor_camera_orbiting_update",
    "commits": [
     "1a8ceaf44 editor_flying_camera: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cseries/profile",
+   "function": "_profile_dump",
+   "meaningful_bytes": 864,
+   "relocations": 44,
+   "normalized_sha256": "1b5a353ac0e64397890fa73f4fd0970229b5a2d22c2af46c3b4e4a8fb5f056e6",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 864,
+   "previous_name": "_profile_dump",
+   "commits": [
+    "543a5ca66 profile: 1 function(s) strict exact"
    ]
   },
   {
@@ -439,6 +709,39 @@
    "previous_name": "_decal_update",
    "commits": [
     "8e5976ae9 decals: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "function": "_effect_evaluate_function_integral",
+   "meaningful_bytes": 176,
+   "relocations": 17,
+   "normalized_sha256": "d68c4243e967a0ca2728e4396cd92595dfbfdb5253489e32bbfb08c9b9d3ed29",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "padded_bytes": 176,
+   "previous_name": "_effect_evaluate_function_integral",
+   "commits": [
+    "36021342d effects: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/effects",
+   "function": "_effect_get_node_matrix",
+   "meaningful_bytes": 68,
+   "relocations": 3,
+   "normalized_sha256": "0d95929225eaea99b2246cf8cfcbd8207e89afd5eed6b827464b612b9d9daf1f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:19",
+   "padded_bytes": 80,
+   "previous_name": "_effect_get_node_matrix",
+   "commits": [
+    "36021342d effects: 2 function(s) strict exact"
    ]
   },
   {
@@ -507,6 +810,57 @@
    "previous_name": "_multiplayer_message",
    "commits": [
     "4916e70a0 game_engine: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine_king",
+   "function": "_find_hill",
+   "meaningful_bytes": 847,
+   "relocations": 35,
+   "normalized_sha256": "a05fb3507d2417e3408ce6b7c3b810e537c4b60803458e52ca97a42bde4c1bf4",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 848,
+   "previous_name": "_find_hill",
+   "commits": [
+    "78819760c game_engine_king: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine_king",
+   "function": "_king_engine_post_rasterize",
+   "meaningful_bytes": 916,
+   "relocations": 23,
+   "normalized_sha256": "a08e67ac8eb6f17666d65a2fcc7add06e4cf523448a667875e0f5beffcfc1b71",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:28",
+   "padded_bytes": 928,
+   "previous_name": "_king_engine_post_rasterize",
+   "commits": [
+    "78819760c game_engine_king: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_statistics",
+   "function": "_game_statistics_record_kill",
+   "meaningful_bytes": 661,
+   "relocations": 22,
+   "normalized_sha256": "faed51b584f65f1a0f97f4416a0f599800dceeb2352a80dcf565d92d37724a69",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 672,
+   "previous_name": "_game_statistics_record_kill",
+   "commits": [
+    "f764cdf19 game_statistics: 1 function(s) strict exact"
    ]
   },
   {
@@ -591,6 +945,140 @@
    "previous_name": "_hs_evaluate_inequality",
    "commits": [
     "0e52be360 hs_runtime: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/input/input_abstraction",
+   "function": "_input_abstraction_update",
+   "meaningful_bytes": 2384,
+   "relocations": 103,
+   "normalized_sha256": "7630e7c9cb2c1abfcce11af3bdf04a7e26ae5bf9a96b1286576b9444cd3c9cbe",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 2384,
+   "previous_name": "_input_abstraction_update",
+   "commits": [
+    "6afca0e7b input_abstraction: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/input/input_xbox",
+   "function": "_input_flush_rumble",
+   "meaningful_bytes": 173,
+   "relocations": 8,
+   "normalized_sha256": "f473cb2d504d90b7ac4014fa2d05f189e9ef27ace087fd7fb23d69a6c9c19949",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "padded_bytes": 176,
+   "previous_name": "_input_flush_rumble",
+   "commits": [
+    "e123a1d82 input_xbox: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/input/input_xbox",
+   "function": "_input_get_raw_data_string",
+   "meaningful_bytes": 237,
+   "relocations": 14,
+   "normalized_sha256": "3a95b06caa2d47b995d9c24ba0a7450d1ccbc091e6a4dc288cc6a986d8f76c5a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "padded_bytes": 240,
+   "previous_name": "_input_get_raw_data_string",
+   "commits": [
+    "e123a1d82 input_xbox: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/first_person_weapons",
+   "function": "_first_person_weapon_message",
+   "meaningful_bytes": 544,
+   "relocations": 20,
+   "normalized_sha256": "cd9c8aedea8b749e4062c3d33d11467628ea4338df7558fa7fa17223441d5338",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:29",
+   "padded_bytes": 544,
+   "previous_name": "_first_person_weapon_message",
+   "commits": [
+    "6ddd4c8a9 first_person_weapons: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/first_person_weapons",
+   "function": "_first_person_weapon_render_update",
+   "meaningful_bytes": 173,
+   "relocations": 14,
+   "normalized_sha256": "1eae8155ba3c823b726bfb78add927d2367ab4c1fa1ddc568c2c1f48be4c63e3",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:24",
+   "padded_bytes": 176,
+   "previous_name": "_first_person_weapon_render_update",
+   "commits": [
+    "6ddd4c8a9 first_person_weapons: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/first_person_weapons",
+   "function": "_first_person_weapon_set_visibility",
+   "meaningful_bytes": 146,
+   "relocations": 12,
+   "normalized_sha256": "d4692680178268eae30468170feb07dbfc0f220c1252109a17b4bbcf89630473",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 160,
+   "previous_name": "_first_person_weapon_set_visibility",
+   "commits": [
+    "6ddd4c8a9 first_person_weapons: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/first_person_weapons",
+   "function": "_first_person_weapon_switch_weapons",
+   "meaningful_bytes": 604,
+   "relocations": 26,
+   "normalized_sha256": "7d83d24b330d5e74a0a680e21d4e2d42a659c01cd00ffbca6cbd64b821aba62b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:27",
+   "padded_bytes": 608,
+   "previous_name": "_first_person_weapon_switch_weapons",
+   "commits": [
+    "6ddd4c8a9 first_person_weapons: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud",
+   "function": "_hud_draw_screen",
+   "meaningful_bytes": 306,
+   "relocations": 33,
+   "normalized_sha256": "4c1bd54b1e9c6c99e27b86fe5281fca35482e7f2b16be9a9d808a4110b77dffb",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "padded_bytes": 320,
+   "previous_name": "_hud_draw_screen",
+   "commits": [
+    "6c3fef1a2 hud: 1 function(s) strict exact"
    ]
   },
   {
@@ -815,6 +1303,74 @@
    ]
   },
   {
+   "unit": "source/networking/network_server_message_handler",
+   "function": "_network_game_server_handle_datagram",
+   "meaningful_bytes": 778,
+   "relocations": 47,
+   "normalized_sha256": "f32e88d94387bb9f05b146c7f2410d457f7c64e104167a6c4c42c665bebaae54",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 784,
+   "previous_name": "_network_game_server_handle_datagram",
+   "commits": [
+    "94654d61f network_server_message_handler: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_server_message_handler",
+   "function": "_network_game_server_handle_message_client_ping",
+   "meaningful_bytes": 189,
+   "relocations": 11,
+   "normalized_sha256": "96c721475f9cc12f4132e7b05d91aa3d576f804e99d6ffc134e39df030820831",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 192,
+   "previous_name": "_network_game_server_handle_message_client_ping",
+   "commits": [
+    "94654d61f network_server_message_handler: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/physics/collision_usage",
+   "function": "_collision_log_render",
+   "meaningful_bytes": 1582,
+   "relocations": 79,
+   "normalized_sha256": "dc4c9ded347bbcf3f6a5577d375e9611458a2c6b06039e89a01b7b47ceb1a213",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:9",
+   "padded_bytes": 1584,
+   "previous_name": "_collision_log_render",
+   "commits": [
+    "3e223c3ab collision_usage: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_swizzle",
+   "function": "_rasterizer_xbox_bitmap_swizzle",
+   "meaningful_bytes": 791,
+   "relocations": 47,
+   "normalized_sha256": "4e705de69eb0ee60da8a23b66cf9de1258831b8d1ac4493078af7e0479b0168f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 800,
+   "previous_name": "_rasterizer_xbox_bitmap_swizzle",
+   "commits": [
+    "6dfae7d1b rasterizer_swizzle: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/rasterizer/rasterizer_text",
    "function": "_rasterizer_draw_character",
    "meaningful_bytes": 228,
@@ -866,6 +1422,39 @@
    ]
   },
   {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
+   "function": "__rasterizer_decals_draw",
+   "meaningful_bytes": 840,
+   "relocations": 77,
+   "normalized_sha256": "99a8c7dd1568c82d25de2211ce0c77f6b595223e55cead8d10d22b2906bfc9e6",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:29",
+   "padded_bytes": 848,
+   "previous_name": "__rasterizer_decals_draw",
+   "commits": [
+    "667f9327c rasterizer_xbox_decals: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
+   "function": "__rasterizer_decals_initialize",
+   "meaningful_bytes": 268,
+   "relocations": 31,
+   "normalized_sha256": "87bdf054c7cc834eb2ed4baa6be508efc6476dca660b1c3d50a89e8cb5940b1a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:24",
+   "padded_bytes": 272,
+   "previous_name": "__rasterizer_decals_initialize",
+   "commits": [
+    "667f9327c rasterizer_xbox_decals: 2 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
    "function": "__rasterizer_environment_diffuse_light_begin",
    "meaningful_bytes": 914,
@@ -880,6 +1469,159 @@
    "previous_name": "__rasterizer_environment_diffuse_light_begin",
    "commits": [
     "ccc0f26ea rasterizer_xbox_environment: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+   "function": "__rasterizer_environment_shadow_draw",
+   "meaningful_bytes": 1458,
+   "relocations": 146,
+   "normalized_sha256": "ddc0ede010a6293c32aa9a30e712b9cde81eaf12e9e5b8124119d13ff9cc16cb",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 1472,
+   "previous_name": "__rasterizer_environment_shadow_draw",
+   "commits": [
+    "8016eb502 rasterizer_xbox_shadows: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
+   "function": "_rasterizer_water_draw",
+   "meaningful_bytes": 2240,
+   "relocations": 171,
+   "normalized_sha256": "bc1ccd223540f3d77f9b8d9c55c4e2bc88cf1e6471309c6e6c7f69ae02c61a13",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 2240,
+   "previous_name": "_rasterizer_water_draw",
+   "commits": [
+    "23e55289f rasterizer_xbox_water: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
+   "function": "__rasterizer_widget_begin",
+   "meaningful_bytes": 1139,
+   "relocations": 87,
+   "normalized_sha256": "9d7646e555d1b71d16837b27172594fe50ecac76ace106f31a70d56380f80ecb",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:19",
+   "padded_bytes": 1152,
+   "previous_name": "__rasterizer_widget_begin",
+   "commits": [
+    "b0d1f3218 rasterizer_xbox_widgets: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
+   "function": "__rasterizer_widget_submit_occlusion_test",
+   "meaningful_bytes": 626,
+   "relocations": 36,
+   "normalized_sha256": "7176593c07173a51237a815767ea3ad66b0835ae76f6b0516aabfa87db940a64",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:25",
+   "padded_bytes": 640,
+   "previous_name": "__rasterizer_widget_submit_occlusion_test",
+   "commits": [
+    "b0d1f3218 rasterizer_xbox_widgets: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_debug",
+   "function": "_build_circle_points",
+   "meaningful_bytes": 102,
+   "relocations": 2,
+   "normalized_sha256": "8ff853ea832e60346320c53fb99586743adf932aa308fedb2f26a9cc07ede693",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:5",
+   "padded_bytes": 112,
+   "previous_name": "_build_circle_points",
+   "commits": [
+    "be0fb070d render_debug: 5 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_debug",
+   "function": "_build_pill_points",
+   "meaningful_bytes": 437,
+   "relocations": 8,
+   "normalized_sha256": "64cab2d3fdbb39cee3d4b2c1fb369089ee9ed5d5a6ee7e3e917b9dd53f8a8fa0",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:7",
+   "padded_bytes": 448,
+   "previous_name": "_build_pill_points",
+   "commits": [
+    "be0fb070d render_debug: 5 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_debug",
+   "function": "_render_debug_circle",
+   "meaningful_bytes": 293,
+   "relocations": 15,
+   "normalized_sha256": "3b88079749360d3c2786ba4fc155c8d6fed92652a053172c4369655d387cd813",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:31",
+   "padded_bytes": 304,
+   "previous_name": "_render_debug_circle",
+   "commits": [
+    "be0fb070d render_debug: 5 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_debug",
+   "function": "_render_debug_point",
+   "meaningful_bytes": 278,
+   "relocations": 11,
+   "normalized_sha256": "d266ea4ebca719170c806b7e4a1658585a5d9c500cc09c21edeed62d346983f7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:9",
+   "padded_bytes": 288,
+   "previous_name": "_render_debug_point",
+   "commits": [
+    "be0fb070d render_debug: 5 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_debug",
+   "function": "_render_debug_sphere",
+   "meaningful_bytes": 389,
+   "relocations": 15,
+   "normalized_sha256": "d2729ec1a7534b06a9a99b6796649887e742dc688acbff1f8723ded1ff27f98d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 400,
+   "previous_name": "_render_debug_sphere",
+   "commits": [
+    "be0fb070d render_debug: 5 function(s) strict exact"
    ]
   },
   {
@@ -931,6 +1673,176 @@
    "previous_name": "_sound_new_impulse",
    "commits": [
     "85984a463 sound_manager: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_detail_objects",
+   "function": "_render_debug_detail_objects",
+   "meaningful_bytes": 740,
+   "relocations": 33,
+   "normalized_sha256": "3e4c30c13847d08060c08d64bd9114a3c6592eb827ba69d422c93f046d70a6a7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 752,
+   "previous_name": "_render_debug_detail_objects",
+   "commits": [
+    "767272749 structure_detail_objects: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structures",
+   "function": "_structure_clusters_in_cone",
+   "meaningful_bytes": 476,
+   "relocations": 26,
+   "normalized_sha256": "7dace3a28da0af6b4ba088102aea9d2cac40a2f8c43ae0a86d7ee0d4fe8b0735",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 480,
+   "previous_name": "_structure_clusters_in_cone",
+   "commits": [
+    "6cbfc5af5 structures: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structures",
+   "function": "_structure_render_surface_from_point_and_leaf",
+   "meaningful_bytes": 422,
+   "relocations": 13,
+   "normalized_sha256": "0554dba934d6bb4545ff3a40d968b5ba8480c15e9820af556c9911ab4e3d0c7d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:9",
+   "padded_bytes": 432,
+   "previous_name": "_structure_render_surface_from_point_and_leaf",
+   "commits": [
+    "6cbfc5af5 structures: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/tag_files/files_windows",
+   "function": "_file_open",
+   "meaningful_bytes": 391,
+   "relocations": 23,
+   "normalized_sha256": "b91ff127948eb458e70ae51cf1efc5158a353749d27b2e29a03ad3abcb7b930b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 400,
+   "previous_name": "_file_open",
+   "commits": [
+    "8687fae3b files_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/tag_files/files_windows",
+   "function": "_file_read",
+   "meaningful_bytes": 168,
+   "relocations": 13,
+   "normalized_sha256": "8442e02641914ce558f9947431dc6e60171d38dd9ba1c9882defba9f2e39773a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 176,
+   "previous_name": "_file_read",
+   "commits": [
+    "8687fae3b files_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/tag_files/files_windows",
+   "function": "_file_write",
+   "meaningful_bytes": 161,
+   "relocations": 12,
+   "normalized_sha256": "f1fb6f5c8738ecea224c025c70e077c7175200d705df410ce5773d166733e101",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "padded_bytes": 176,
+   "previous_name": "_file_write",
+   "commits": [
+    "8687fae3b files_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/bipeds",
+   "function": "_biped_fix_position",
+   "meaningful_bytes": 1224,
+   "relocations": 47,
+   "normalized_sha256": "8932705148ab7aa1b778d8854ae1ae69e3eee275111372c0df4594eeab02ab33",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:25",
+   "padded_bytes": 1232,
+   "previous_name": "_biped_fix_position",
+   "commits": [
+    "4f66b6d8b bipeds: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/unit_dialogue",
+   "function": "_unit_dialogue_determine_variant",
+   "meaningful_bytes": 174,
+   "relocations": 7,
+   "normalized_sha256": "5331055b840b29dd2d20476dd69850abee818a531a6da9e8373d5f98e8b90ef1",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 176,
+   "previous_name": "_unit_dialogue_determine_variant",
+   "commits": [
+    "1e936afab unit_dialogue: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/unit_dialogue",
+   "function": "_unit_dialogue_update",
+   "meaningful_bytes": 759,
+   "relocations": 15,
+   "normalized_sha256": "0bc104489dda51afb9471523058e2f12e6b20bd55ce54ddf6b49eab0b441ba8f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 768,
+   "previous_name": "_unit_dialogue_update",
+   "commits": [
+    "1e936afab unit_dialogue: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/unit_dialogue",
+   "function": "_unit_notify_impulse_sound",
+   "meaningful_bytes": 230,
+   "relocations": 10,
+   "normalized_sha256": "ff46a3c5213b3d65bc19da918a094f3aba00c56dbc017a97f1e646a06df18c81",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:9",
+   "padded_bytes": 240,
+   "previous_name": "_unit_notify_impulse_sound",
+   "commits": [
+    "1e936afab unit_dialogue: 3 function(s) strict exact"
    ]
   }
  ],
