@@ -3296,63 +3296,6 @@
       }
     },
     {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_bitmaps_extract",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete public bitmap extraction entry point in ordinary typed C from January's instruction, relocation, assertion, and cleanup topology, cross-checked against independent later Halo sources. The retained body validates the group, allocates and decompresses the imported plate, dispatches sequence and group-type extraction, reports January's target-proven double error on allocation failure, and releases temporary state. The 720-byte candidate versus 736-byte target and 66 versus 68 relocations reflect cold cleanup layout and still-unwritten private callees; bounded natural control-flow variants did not expose a semantic defect. No register forcing, volatile carrier, pragma, assembly, fake dependency, invented branch, or undefined behavior is retained. Reopen for authoritative January source/local records or when the remaining private extraction callees are reconstructed naturally.",
-      "measurements": {
-        "target": {
-          "size": 736,
-          "relocation_count": 68,
-          "normalized_sha256": "537d98f8a8adf6da9a4651ec215d5cf13225263ecefe5cb3562c8e932eb718ed"
-        },
-        "base": {
-          "size": 720,
-          "relocation_count": 66,
-          "normalized_sha256": "51cadcd34bfde4712f54de3e6857f3ca096f6b623352a90454c4ae53c260e337"
-        },
-        "objdiff_percent": 76.950676
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_warn_about_horizontal_border",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after recovering the target-proven horizontal-border warning loop in natural typed C. Target and candidate share the 128-byte envelope and all nine relocation identities; objdiff reports 99.48718 percent similarity. Four normalized bytes differ only because VC7 selects different temporary registers for two vararg integer extensions. Natural declaration and expression shapes did not reveal missing behavior. No register hint, volatile access, barrier, pragma, inline assembly, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the temporary-register choice.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 9,
-          "normalized_sha256": "12713fbd52519b45853b962d44c886bc14bc020e2b80b044cfe0bc174fdeb8db"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 9,
-          "normalized_sha256": "17f7087e59c4a476db19d9896873393f95f891dd2997971eb2d4946439c3f6bc"
-        },
-        "objdiff_percent": 99.48718
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_bitmap",
-      "class": "private-register-convention",
-      "evidence": "Fuzzy-parked after reconstructing the complete private bitmap extractor from January's control-flow, relocations, assertions, marker rules, and independent later-source semantics. The retained typed body covers bounds, registration points, marker filtering, alpha and DXT1 color-key warnings, interface-format validation, pending entries, sprites, plateless cubes, and direct bitmaps. Candidate and target have all 66 relocations; the candidate is 1,152 padded bytes versus 1,168. The remaining gap is C2 register/cold-block allocation and the unresolved private extract_add_bitmap call: January uses a TU-private EAX convention that cannot arise from an undefined ordinary declaration. No calling-convention lie, register forcing, volatile carrier, pragma, fake wrapper, assembly, or undefined behavior is retained. Reopen when extract_add_bitmap is naturally reconstructed in this TU or authoritative January source/local records appear.",
-      "measurements": {
-        "target": {
-          "size": 1168,
-          "relocation_count": 66,
-          "normalized_sha256": "051e1fae474dc6acd83587572aebfa8a0a9b8ab20dfafed770583e6ad046469c"
-        },
-        "base": {
-          "size": 1152,
-          "relocation_count": 66,
-          "normalized_sha256": "720d8e364ef806437370817882806154fc1209410c0f44b69e1b99872d02ba22"
-        },
-        "objdiff_percent": 81.149734
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
       "function": "__rasterizer_environment_diffuse_light_begin",
       "class": "register-allocation",
@@ -6815,25 +6758,6 @@
     },
     {
       "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_3d_textures",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 22,
-          "normalized_sha256": "db5cb3236cbae82c1dbb9a526754dc136bf8741c9f1608c2b80c43982b33edfd"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 22,
-          "normalized_sha256": "1faf0f6890cea8e63d3aaae5f77752d39cae58d8a7044d41f80647c05c62cf97"
-        },
-        "objdiff_percent": 88.46575
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
       "function": "_extract_add_bitmap",
       "class": "unclassified",
       "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
@@ -6868,25 +6792,6 @@
           "normalized_sha256": "3be6b5185897bf993a4952e6e70142bd0e5248b55118cc2d922e23c4f8c32339"
         },
         "objdiff_percent": 46.90763
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_cube_maps",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 37,
-          "normalized_sha256": "17babd5be00b7725547b4bcc9bdffb5a7582a30f4e11a9b5a85a509f75bb9480"
-        },
-        "base": {
-          "size": 512,
-          "relocation_count": 33,
-          "normalized_sha256": "7055481eb0e36f29f1329e678c2a3d4058a4d8b76e8b21f9077a78fd092af58a"
-        },
-        "objdiff_percent": 52.68485
       }
     },
     {

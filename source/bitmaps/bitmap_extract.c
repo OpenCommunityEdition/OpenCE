@@ -442,7 +442,7 @@ boolean bitmaps_extract(
 {
 	unsigned long decompressed_plate_size;
 	boolean should_extract_sequences;
-	boolean result;
+	boolean result = TRUE;
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c", 0xB4, group);
 	match_assert(
@@ -466,10 +466,18 @@ boolean bitmaps_extract(
 	if (!extract_data.bitmaps)
 	{
 		error(_error_silent, "### ERROR extract: failed to allocate bitmap array");
+		result = FALSE;
 	}
-	else if (tag_block_resize(&group->bitmap_data, 0) &&
-		tag_block_resize(&group->sequences, 0) &&
-		tag_data_resize(&group->pixel_data, 0))
+
+	if (!result ||
+		!tag_block_resize(&group->bitmap_data, 0) ||
+		!tag_block_resize(&group->sequences, 0) ||
+		!tag_data_resize(&group->pixel_data, 0))
+	{
+		error(_error_silent, "### ERROR extract: failed to resize bitmap group tags to zero");
+		result = FALSE;
+	}
+	else
 	{
 		extract_data.sequence = NULL;
 		extract_data.sequence_index = NONE;
@@ -479,12 +487,7 @@ boolean bitmaps_extract(
 			group->import_height,
 			0,
 			_bitmap_format_a8r8g8b8);
-		if (!extract_data.plate)
-		{
-			error(_error_silent, "### ERROR extract: failed to allocate color plate");
-			result = FALSE;
-		}
-		else
+		if (extract_data.plate)
 		{
 			decompressed_plate_size = data_decompressed_size(
 				group->import_bitmap.address,
@@ -492,7 +495,7 @@ boolean bitmaps_extract(
 			match_assert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 				0x104,
-				decompressed_plate_size == sizeof(pixel32) * group->import_width * group->import_height);
+				decompressed_plate_size==sizeof(pixel32)*group->import_width*group->import_height);
 			if (data_decompress(
 				group->import_bitmap.address,
 				group->import_bitmap.size,
@@ -509,30 +512,6 @@ boolean bitmaps_extract(
 					result = extract_without_sequences();
 
 				bitmap_delete(extract_data.plate);
-				if (result)
-				{
-					switch (extract_data.group->type)
-					{
-					case _bitmap_group_type_2d_textures:
-					case _bitmap_group_type_interface_bitmaps:
-						break;
-					case _bitmap_group_type_3d_textures:
-						result = extract_3d_textures();
-						break;
-					case _bitmap_group_type_cube_maps:
-						result = extract_cube_maps();
-						break;
-					case _bitmap_group_type_sprites:
-						result = extract_sprites();
-						break;
-					default:
-						match_vassert(
-							"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
-							0x137,
-							FALSE,
-							"### ERROR unsupported bitmap group type");
-					}
-				}
 			}
 			else
 			{
@@ -540,13 +519,38 @@ boolean bitmaps_extract(
 				result = FALSE;
 			}
 		}
-		goto cleanup;
+		else
+		{
+			error(_error_silent, "### ERROR extract: failed to allocate color plate");
+			result = FALSE;
+		}
 	}
 
-	error(_error_silent, "### ERROR extract: failed to resize bitmap group tags to zero");
-	result = FALSE;
+	if (result)
+	{
+		switch (extract_data.group->type)
+		{
+		case _bitmap_group_type_2d_textures:
+		case _bitmap_group_type_interface_bitmaps:
+			break;
+		case _bitmap_group_type_3d_textures:
+			result = extract_3d_textures();
+			break;
+		case _bitmap_group_type_cube_maps:
+			result = extract_cube_maps();
+			break;
+		case _bitmap_group_type_sprites:
+			result = extract_sprites();
+			break;
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
+				0x137,
+				FALSE,
+				"### ERROR unsupported bitmap group type");
+		}
+	}
 
-cleanup:
 	if (extract_data.bitmaps)
 	{
 		match_free(
@@ -740,12 +744,8 @@ static void extract_warn_about_horizontal_border(
 
 		for (x = 0; x < extract_data.plate->width; x++)
 		{
-			pixel32 color = *(pixel32 *)bitmap_2d_address(
-				extract_data.plate,
-				x,
-				bottom,
-				0) & 0xFFFFFF;
-			if (color != extract_data.bottom_reference)
+			if ((*(pixel32 *)bitmap_2d_address(extract_data.plate, x, bottom, 0) & 0xFFFFFF) !=
+				extract_data.bottom_reference)
 			{
 				fprintf(stdout, "### WARNING horizontal border broken at (#%d,#%d)\r\n", x, bottom);
 				fflush(stdout);
@@ -1860,12 +1860,11 @@ static boolean extract_bitmap(
 	rectangle2d const *bounds)
 {
 	boolean result = TRUE;
-	boolean warned_about_zero_alpha = FALSE;
 	boolean warned_about_dxt1_alpha = FALSE;
+	boolean warned_about_zero_alpha = FALSE;
 	rectangle2d adjusted_bounds;
 	struct bitmap_data *bitmap;
 	short source_y;
-	short destination_y;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
@@ -1898,12 +1897,9 @@ static boolean extract_bitmap(
 					(bounds->y0 + bounds->y1) / 2 - adjusted_bounds.y0;
 			}
 
-			for (
-				source_y = adjusted_bounds.y0, destination_y = 0;
-				source_y < adjusted_bounds.y1;
-				source_y++, destination_y++)
+			for (source_y = adjusted_bounds.y0; source_y < adjusted_bounds.y1; source_y++)
 			{
-				pixel32 *destination = bitmap_2d_address(bitmap, 0, destination_y, 0);
+				pixel32 *destination = bitmap_2d_address(bitmap, 0, source_y - adjusted_bounds.y0, 0);
 				short source_x;
 
 				for (source_x = adjusted_bounds.x0; source_x < adjusted_bounds.x1; source_x++)
@@ -1941,9 +1937,7 @@ static boolean extract_bitmap(
 					if (extract_data.group->format ==
 						_bitmap_group_format_compressed_color_key_transparency)
 					{
-						unsigned long alpha = color >> 24;
-
-						if (alpha != 0 && alpha != 255 && !warned_about_dxt1_alpha)
+						if ((color >> 24) != 0 && (color >> 24) != 0xFF && !warned_about_dxt1_alpha)
 						{
 							fprintf(
 								stdout,
@@ -1952,7 +1946,7 @@ static boolean extract_bitmap(
 							warned_about_dxt1_alpha = TRUE;
 						}
 
-						if (!alpha &&
+						if (!(color >> 24) &&
 							((color & 0xFFFFFF) == extract_data.adjusted_bounds_reference ||
 							!extract_data.extract_sequences))
 						{
@@ -1977,7 +1971,7 @@ static boolean extract_bitmap(
 							"### ERROR interface/linear bitmap cannot be DXT-compressed");
 					}
 
-					*destination++ = color;
+					destination[source_x - adjusted_bounds.x0] = color;
 				}
 			}
 
@@ -1998,10 +1992,8 @@ static boolean extract_bitmap(
 				}
 
 				bitmap_delete(bitmap);
-				return result;
 			}
-
-			if (!extract_data.extract_sequences)
+			else if (!extract_data.extract_sequences)
 			{
 				if (extract_data.group->type == _bitmap_group_type_cube_maps)
 				{
@@ -2016,10 +2008,8 @@ static boolean extract_bitmap(
 				}
 
 				bitmap_delete(bitmap);
-				return result;
 			}
-
-			if (extract_data.bitmap_count < 0x400)
+			else if (extract_data.bitmap_count < 0x400)
 			{
 				struct bitmap_extract_entry *entry =
 					&extract_data.bitmaps[extract_data.bitmap_count++];
@@ -2034,48 +2024,52 @@ static boolean extract_bitmap(
 				{
 					short sprite_index =
 						(short)tag_block_add_element(&extract_data.sequence->sprites);
-					struct bitmap_group_sprite *sprite;
 
-					if (sprite_index == NONE)
+					if (sprite_index != NONE)
 					{
-						error(_error_silent, "### ERROR extract: failed to add sprite to sequence");
-						return FALSE;
-					}
+						struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
+							&extract_data.sequence->sprites,
+							sprite_index,
+							struct bitmap_group_sprite);
 
-					sprite = TAG_BLOCK_GET_ELEMENT(
-						&extract_data.sequence->sprites,
-						sprite_index,
-						struct bitmap_group_sprite);
-					sprite->bitmap_index = NONE;
-					if (TEST_FLAG(
-						extract_data.group->flags,
-						_bitmap_group_extract_sprites_filthy_bug_fix_bit))
-					{
-						sprite->registration_point.x =
-							(real)bitmap->registration_point_x * 0.5f;
-						sprite->registration_point.y =
-							(real)bitmap->registration_point_y * 0.5f;
+						sprite->bitmap_index = NONE;
+						if (TEST_FLAG(
+							extract_data.group->flags,
+							_bitmap_group_extract_sprites_filthy_bug_fix_bit))
+						{
+							sprite->registration_point.x =
+								(real)bitmap->registration_point_x * 0.5f;
+							sprite->registration_point.y =
+								(real)bitmap->registration_point_y * 0.5f;
+						}
+						else
+						{
+							sprite->registration_point.x = (real)bitmap->registration_point_x;
+							sprite->registration_point.y = (real)bitmap->registration_point_y;
+						}
+						entry->sprite_index = sprite_index;
 					}
 					else
 					{
-						sprite->registration_point.x = (real)bitmap->registration_point_x;
-						sprite->registration_point.y = (real)bitmap->registration_point_y;
+						error(_error_silent, "### ERROR extract: failed to add sprite to sequence");
+						result = FALSE;
 					}
-					entry->sprite_index = sprite_index;
 				}
-
-				return result;
 			}
-
-			error(
-				_error_silent,
-				"### ERROR extract: can't handle more than (#%d) temporary bitmaps",
-				0x400);
-			return FALSE;
+			else
+			{
+				error(
+					_error_silent,
+					"### ERROR extract: can't handle more than (#%d) temporary bitmaps",
+					0x400);
+				result = FALSE;
+			}
 		}
-
-		error(_error_silent, "### ERROR extract: failed to allocate temporary bitmap");
-		result = FALSE;
+		else
+		{
+			error(_error_silent, "### ERROR extract: failed to allocate temporary bitmap");
+			result = FALSE;
+		}
 	}
 	else
 	{
@@ -2090,7 +2084,7 @@ static boolean extract_3d_textures(
 	void)
 {
 	boolean result = TRUE;
-	long first_bitmap_index = 0;
+	short first_bitmap_index = 0;
 
 	while (result && first_bitmap_index < extract_data.bitmap_count)
 	{
@@ -2098,8 +2092,8 @@ static boolean extract_3d_textures(
 		short sequence_index = first_entry->sequence_index;
 		short width = first_entry->bitmap->width;
 		short height = first_entry->bitmap->height;
-		boolean incompatible_dimensions = FALSE;
 		short bitmap_count = 0;
+		boolean incompatible_dimensions = FALSE;
 
 		// BUG (preserved): January does not bound the final run before reading its next sequence index.
 		while (!incompatible_dimensions &&
@@ -2132,6 +2126,7 @@ static boolean extract_3d_textures(
 			if (bitmap && bitmap->base_address)
 			{
 				short slice_index;
+				short bitmap_index;
 
 				for (slice_index = 0; slice_index < bitmap_count; slice_index++)
 				{
@@ -2143,26 +2138,22 @@ static boolean extract_3d_textures(
 				}
 
 				extract_data.sequence_index = sequence_index;
+				bitmap_index = extract_add_bitmap(bitmap);
+				if (bitmap_index != NONE)
 				{
-				short bitmap_index = extract_add_bitmap(bitmap);
+					struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+						&extract_data.group->sequences,
+						sequence_index,
+						struct bitmap_group_sequence);
 
-					if (bitmap_index != NONE)
+					if (sequence->first_bitmap_index == NONE)
 					{
-						struct bitmap_group_sequence *sequence =
-							TAG_BLOCK_GET_ELEMENT(
-								&extract_data.group->sequences,
-								sequence_index,
-								struct bitmap_group_sequence);
-
-						if (sequence->first_bitmap_index == NONE)
-						{
-							sequence->first_bitmap_index = bitmap_index;
-							sequence->bitmap_count = 1;
-						}
-						else
-						{
-							sequence->bitmap_count++;
-						}
+						sequence->first_bitmap_index = bitmap_index;
+						sequence->bitmap_count = 1;
+					}
+					else
+					{
+						sequence->bitmap_count++;
 					}
 				}
 			}
@@ -2188,9 +2179,9 @@ static boolean extract_cube_maps(
 	struct bitmap_data *temporary_bitmap = NULL;
 	short face_index = 0;
 	short sequence_index;
-	long bitmap_index = 0;
+	short bitmap_index;
 
-	while (result && bitmap_index < extract_data.bitmap_count)
+	for (bitmap_index = 0; result && bitmap_index < extract_data.bitmap_count; bitmap_index++)
 	{
 		struct bitmap_extract_entry *entry = &extract_data.bitmaps[bitmap_index];
 		boolean skip_cube_map = FALSE;
@@ -2220,68 +2211,71 @@ static boolean extract_cube_maps(
 
 		if (temporary_bitmap && temporary_bitmap->base_address)
 		{
-			if (entry->sequence_index != sequence_index)
+			if (entry->sequence_index == sequence_index)
+			{
+				if (entry->bitmap->width == temporary_bitmap->width &&
+					entry->bitmap->height == temporary_bitmap->height)
+				{
+					bitmap_cube_map_face_insert(
+						entry->bitmap,
+						temporary_bitmap,
+						0,
+						face_index);
+					face_index++;
+				}
+				else
+				{
+					fprintf(stdout, "skipping cube map with incompatible-size faces\r\n");
+					fflush(stdout);
+					skip_cube_map = TRUE;
+				}
+			}
+			else
 			{
 				fprintf(stdout, "skipping cube map which spanned sequence\r\n");
 				fflush(stdout);
 				skip_cube_map = TRUE;
 			}
-			else if (entry->bitmap->width != temporary_bitmap->width ||
-				entry->bitmap->height != temporary_bitmap->height)
-			{
-				fprintf(stdout, "skipping cube map with incompatible-size faces\r\n");
-				fflush(stdout);
-				skip_cube_map = TRUE;
-			}
-			else
-			{
-				bitmap_cube_map_face_insert(
-					entry->bitmap,
-					temporary_bitmap,
-					0,
-					face_index);
-			}
 
-			face_index++;
 			if (skip_cube_map)
 			{
+				/* BUG (original): January frees the partial cube map without clearing temporary_bitmap,
+				so the !temporary_bitmap assert fires at the next face-0 entry. */
 				bitmap_delete(temporary_bitmap);
-				temporary_bitmap = NULL;
-				face_index = 0;
-			}
-
-			if (result && face_index == 6)
-			{
-				short group_bitmap_index = extract_add_bitmap(temporary_bitmap);
-
-				if (group_bitmap_index != NONE)
-				{
-					struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
-						&extract_data.group->sequences,
-						sequence_index,
-						struct bitmap_group_sequence);
-
-					if (sequence->first_bitmap_index == NONE)
-					{
-						sequence->first_bitmap_index = group_bitmap_index;
-						sequence->bitmap_count = 0;
-					}
-					sequence->bitmap_count++;
-				}
-
-				bitmap_delete(temporary_bitmap);
-				temporary_bitmap = NULL;
 				face_index = 0;
 			}
 		}
 		else if (!skip_cube_map)
 		{
-			error(_error_silent, "### ERROR extract: failed to create temporary cube map");
+			error(_error_silent, "### ERROR extract: failed to create temporary bitmap");
 			result = FALSE;
 		}
 
+		if (result && face_index == 6)
+		{
+			short group_bitmap_index = extract_add_bitmap(temporary_bitmap);
+
+			if (group_bitmap_index != NONE)
+			{
+				struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+					&extract_data.group->sequences,
+					sequence_index,
+					struct bitmap_group_sequence);
+
+				if (sequence->first_bitmap_index == NONE)
+				{
+					sequence->first_bitmap_index = group_bitmap_index;
+					sequence->bitmap_count = 0;
+				}
+				sequence->bitmap_count++;
+			}
+
+			bitmap_delete(temporary_bitmap);
+			temporary_bitmap = NULL;
+			face_index = 0;
+		}
+
 		bitmap_delete(entry->bitmap);
-		bitmap_index++;
 	}
 
 	if (temporary_bitmap)
