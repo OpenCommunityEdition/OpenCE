@@ -877,25 +877,6 @@
       }
     },
     {
-      "unit": "source/ai/actor_perception",
-      "function": "_actor_perception_desire_prop",
-      "class": "register-allocation",
-      "evidence": "Deliberate source-authenticity correction withdraws the inherited 549-meaningful-byte exact claim. January consumes a plain actor-index argument before reusing its parameter-home top byte for a boolean; that compiler allocation is not an authentic public union API. The corrected source takes a long handle and an initialized separate boolean, uses the existing genuine actor/encounter/unit datums instead of incompatible shadow views, and obtains actor_action_class from actions.h. The 13-parameter declaration belongs to actors.h and agrees with Props; DIA corroborates short desired_target_state and the plain long handle. Props-state enum domain is corroborated by orphan-transition callers, not guessed from the formal name. January and candidate both560 padded/16 relocations, candidate normalized607cc3f2;97.791664 percent objdiff. The natural local occupies ebp-1 rather than the dead argument byte ebp+0x17, shifting frame/instruction/relocation addresses while preserving destinations and logic. All32 other inherited strict functions and both inherited residuals are unchanged. This park gives zero exact credit, and no whole-object approval; existing extra helper owners remain disclosed. Reopen only for authentic source/compiler-context evidence, never a carrier union, declaration permutation, false layout or optimizer control. See docs/object_matching_logs/actor_perception_obj_props_api_typed_followup_20260904.md and docs/object_matching_logs/props_actor_perception_grenade_canonical_integration_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 560,
-          "relocation_count": 16,
-          "normalized_sha256": "f9729e40ecdc2cbd04fcb50024e74431499a7f69d9d071ca13b8cf6eea3def13"
-        },
-        "base": {
-          "size": 560,
-          "relocation_count": 16,
-          "normalized_sha256": "607cc3f2234cd8cdf3e3e0c0c6d3c52de8748c67c11ee3e1a32865c98e6bfa85"
-        },
-        "objdiff_percent": 97.791664
-      }
-    },
-    {
       "unit": "source/sound/game_sound",
       "function": "_update_potentially_audible_looping_sound",
       "class": "unclassified",

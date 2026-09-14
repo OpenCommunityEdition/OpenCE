@@ -250,6 +250,7 @@ symbols in this file:
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 #include "cseries.h"
+#include "cseries/errors.h"
 
 #include "actions.h"
 #include "actor_definitions.h"
@@ -262,6 +263,7 @@ symbols in this file:
 #include "encounters.h"
 #include "game/game.h"
 #include "items/projectile_definitions.h"
+#include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "math/integer_math.h"
 #include "props.h"
@@ -280,7 +282,54 @@ symbols in this file:
 
 enum
 {
+	_actor_mode_asleep = 1,
 	_actor_mode_combat = 3,
+};
+
+/*
+ * TU-local copy: no shared header owns the actor knowledge domain. January's
+ * actor_perception_update prints the names "noncombat", "guard", "searching"
+ * and "definite" and asserts NUMBER_OF_ACTOR_KNOWLEDGE_TYPES.
+ */
+enum
+{
+	_actor_knowledge_noncombat = 0,
+	_actor_knowledge_guard,
+	_actor_knowledge_searching,
+	_actor_knowledge_definite,
+	NUMBER_OF_ACTOR_KNOWLEDGE_TYPES,
+};
+
+/*
+ * January's acknowledgement speed classes, indexed from
+ * global_acknowledgement_speeds; actor_perception_update prints their names.
+ */
+enum
+{
+	_awareness_speed_never = 0,
+	_awareness_speed_noncombat,
+	_awareness_speed_guard,
+	_awareness_speed_combat,
+	_awareness_speed_instant,
+};
+
+/* TU-local copy: also in actors.c, action_obey.c and actor_combat.c. */
+enum
+{
+	_actor_fire_target_none = 0,
+	_actor_fire_target_prop,
+};
+
+/*
+ * TU-local copy of the ai_information_data union selector (ai.h owns the
+ * union); ai_communication.c carries a partial copy.
+ */
+enum
+{
+	_ai_information_none = 0,
+	_ai_information_allegiance,
+	_ai_information_combat_stimulus,
+	_ai_information_target_knowledge,
 };
 
 enum
@@ -1124,13 +1173,15 @@ boolean actor_perception_desire_prop(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_datum *related_actor;
-	boolean desire = dead;
-	boolean too_far = FALSE;
+	boolean desire;
+	boolean too_far;
 
 	if (prop_actor_index == NONE)
 		related_actor = NULL;
 	else
 		related_actor = actor_get(prop_actor_index);
+
+	too_far = FALSE;
 
 	if ((!enemy || dead) &&
 		desired_target_state >= _prop_state_uninspected_orphan &&
@@ -4267,6 +4318,299 @@ static boolean actor_perception_assess_vehicle_danger(
 	return result;
 }
 
+static void actor_perception_refresh_danger_zone(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct object_datum *object;
+	struct actor_position_data position;
+	boolean perceived;
+	boolean attached_to_us;
+
+	if (actor->danger_zone.danger_type <= _actor_danger_zone_none)
+	{
+		return;
+	}
+
+	object = object_try_and_get(actor->danger_zone.object_index);
+	if (object == NULL)
+	{
+		actor->danger_zone.danger_type = _actor_danger_zone_none;
+		return;
+	}
+
+#line 3227 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+	assert((actor->danger_zone.danger_type == _actor_danger_zone_projectile) || (actor->danger_zone.danger_type == _actor_danger_zone_vehicle) || (actor->danger_zone.danger_type == _actor_danger_zone_suicide));
+#line 4986 "source\\ai\\actor_perception.c"
+
+	object_get_origin(
+		actor->danger_zone.object_index,
+		&actor->danger_zone.position);
+	actor_perception_find_sense_position(
+		actor_index,
+		&actor->danger_zone.position,
+		NONE,
+		&position);
+
+	actor->danger_zone.velocity = object->object.translational_velocity;
+	actor->danger_zone.current_distance_from_actor =
+		distance3d(
+			&position.body_position,
+			&actor->danger_zone.position);
+	midpoint3d(
+		point_from_line3d(
+			&actor->danger_zone.position,
+			&actor->danger_zone.velocity,
+			45.0f,
+			&actor->danger_zone.predict_danger_position),
+		&actor->danger_zone.position,
+		&actor->danger_zone.bounding_sphere_center);
+	actor->danger_zone.bounding_sphere_radius =
+		distance3d(
+			&actor->danger_zone.bounding_sphere_center,
+			&actor->danger_zone.position) +
+		actor->danger_zone.danger_radius;
+
+	perceived = FALSE;
+	attached_to_us = FALSE;
+
+	switch (actor->danger_zone.danger_type)
+	{
+	case _actor_danger_zone_vehicle:
+		{
+			struct unit_definition *vehicle_definition =
+				vehicle_definition_get(object->definition_index);
+
+			if (magnitude_squared3d(&object->object.translational_velocity) <
+					0.000044444444065040908f ||
+				actor->danger_zone.current_distance_from_actor >
+					vehicle_definition->object.bounding_radius + 10.0f)
+			{
+				actor->danger_zone.danger_type = _actor_danger_zone_none;
+				break;
+			}
+
+			perceived = actor->danger_zone.currently_perceived;
+			if (!perceived)
+			{
+				struct unit_datum *vehicle = (struct unit_datum *)object;
+				long prop_index;
+
+				if (vehicle->unit.driver_object_index != NONE &&
+					(prop_index = prop_get_active_by_unit_index(
+						actor_index,
+						vehicle->unit.driver_object_index)) != NONE)
+				{
+					perceived =
+						prop_get(prop_index)->perception >= _actor_perception_full;
+				}
+				else
+				{
+					struct encounter_datum *encounter =
+						actor->meta.encounter_index == NONE ?
+							NULL :
+							encounter_get(actor->meta.encounter_index);
+					boolean blind = FALSE;
+					struct location const *location;
+					short line_of_sight;
+
+					if (actor->state.mode == _actor_mode_asleep ||
+						(encounter != NULL && encounter->blind))
+					{
+						blind = TRUE;
+					}
+
+					if (object->object.parent_object_index == NONE)
+					{
+						location = &object->object.location;
+					}
+					else
+					{
+						long ultimate_parent_index =
+							object_get_ultimate_parent(
+								actor->danger_zone.object_index);
+
+						location = &object_get(ultimate_parent_index)->object.location;
+					}
+
+					line_of_sight =
+						ai_test_line_of_sight(
+							&position.head_position,
+							position.body_location.cluster_index,
+							&actor->danger_zone.position,
+							location->cluster_index,
+							0,
+							FALSE,
+							actor->danger_zone.object_index,
+							actor->input.vehicle_index != NONE);
+
+					if (!blind &&
+						actor_visibility_at_point(
+							actor_index,
+							&position,
+							&actor->danger_zone.position,
+							0,
+							line_of_sight,
+							TRUE,
+							FALSE,
+							actor_get_perception_knowledge(
+								actor_index,
+								NONE)) >= _actor_perception_full)
+					{
+						perceived = TRUE;
+					}
+					else if (actor_audibility_at_point(
+							actor_index,
+							&position,
+							&actor->danger_zone.position,
+							location,
+							vehicle_definition->unit.constant_sound,
+							1.0f,
+							line_of_sight) >= _actor_perception_full)
+					{
+						perceived = TRUE;
+					}
+				}
+			}
+			break;
+		}
+
+	case _actor_danger_zone_projectile:
+		{
+			struct projectile_datum *projectile =
+				(struct projectile_datum *)object;
+
+			if (actor->meta.unit_index != NONE &&
+				object->object.parent_object_index == actor->meta.unit_index)
+			{
+				attached_to_us = TRUE;
+			}
+
+#line 3257 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+			assert(object->object.type == _object_type_projectile);
+#line 5133 "source\\ai\\actor_perception.c"
+
+			if (projectile->projectile.detonation_timer > 0.0f &&
+				projectile->projectile.detonation_timer_delta > 0.0f)
+			{
+				actor->danger_zone.projectile.time_until_explosion =
+					(short)fast_ftol(
+						(1.0f - projectile->projectile.detonation_timer) /
+						projectile->projectile.detonation_timer_delta);
+			}
+			else
+			{
+				actor->danger_zone.projectile.time_until_explosion = NONE;
+			}
+
+			perceived =
+				actor->danger_zone.currently_perceived ||
+				attached_to_us;
+			if (!perceived)
+			{
+				struct encounter_datum *encounter =
+					actor->meta.encounter_index == NONE ?
+						NULL :
+						encounter_get(actor->meta.encounter_index);
+
+				if (actor->state.mode != _actor_mode_asleep &&
+					(encounter == NULL || !encounter->blind) &&
+					actor->danger_zone.current_distance_from_actor <
+						projectile_definition_get(object->definition_index)
+							->projectile.ai_perception_radius)
+				{
+					short cluster_index = object->object.location.cluster_index;
+					short line_of_sight;
+
+					if (object->object.parent_object_index != NONE)
+					{
+						cluster_index =
+							object_get(
+								object_get_ultimate_parent(
+									actor->danger_zone.object_index))
+								->object.location.cluster_index;
+					}
+
+					line_of_sight =
+						ai_test_line_of_sight(
+							&position.head_position,
+							position.body_location.cluster_index,
+							&actor->danger_zone.position,
+							cluster_index,
+							0,
+							FALSE,
+							actor->danger_zone.object_index,
+							actor->input.vehicle_index != NONE);
+
+					if (actor_visibility_at_point(
+							actor_index,
+							&position,
+							&actor->danger_zone.position,
+							0,
+							line_of_sight,
+							TRUE,
+							FALSE,
+							actor_get_perception_knowledge(
+								actor_index,
+								NONE)) >= _actor_perception_full)
+					{
+						perceived = TRUE;
+					}
+				}
+			}
+			break;
+		}
+
+	case _actor_danger_zone_suicide:
+		{
+			short animation_state;
+			short frames_remaining;
+
+			perceived = actor->danger_zone.currently_perceived;
+			if (!perceived)
+			{
+				long prop_index =
+					prop_get_active_by_unit_index(
+						actor_index,
+						actor->danger_zone.object_index);
+
+				if (prop_index != NONE)
+				{
+					perceived =
+						prop_get(prop_index)->perception >= _actor_perception_full;
+				}
+			}
+
+			frames_remaining =
+				unit_get_animation_frames_remaining(
+					actor->danger_zone.object_index,
+					&animation_state);
+			actor->danger_zone.suicide.time_until_death =
+				animation_state == _unit_state_dying ?
+					frames_remaining :
+					NONE;
+			break;
+		}
+	}
+
+	if (perceived && !actor->danger_zone.currently_perceived)
+	{
+		struct direction_specification direction;
+
+		direction.type = _direction_specification_danger;
+		actor_look_secondary(
+			actor_index,
+			_secondary_look_dangerous_object,
+			_secondary_look_priority_default,
+			&direction);
+	}
+
+	actor->danger_zone.currently_perceived = perceived;
+	actor->danger_zone.attached_to_us = attached_to_us;
+
+	return;
+}
+
 
 /*
  * January caller skeleton used while reconstructing the full status refresh.
@@ -4852,6 +5196,344 @@ done:
 	return result;
 }
 
+
+void actor_perception_refresh(
+	long actor_index)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	struct actor_datum *actor = actor_get(actor_index);
+	unsigned long *pvs = NULL;
+	unsigned long swarm_pvs[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_CLUSTERS_PER_STRUCTURE)];
+	struct actor_perception_refresh_list enemies;
+	struct actor_perception_refresh_list friends;
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+	struct actor_position_data position;
+
+	enemies.entry_count = 0;
+	enemies.accepted_count = 0;
+	friends.entry_count = 0;
+	friends.accepted_count = 0;
+
+	if (actor->meta.swarm)
+	{
+		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+		boolean swarm_pvs_valid = FALSE;
+		short unit_index;
+
+		csmemset(swarm_pvs, 0, sizeof(swarm_pvs));
+		for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+		{
+			struct unit_datum *unit = unit_get(swarm->unit_indices[unit_index]);
+			short cluster_index = unit->object.location.cluster_index;
+
+			if (cluster_index != NONE)
+			{
+				unsigned long *cluster_pvs =
+					structure_bsp_get_cluster_pvs(structure_bsp, cluster_index);
+
+				bit_vector_or(
+					(short)structure_bsp->clusters.count,
+					cluster_pvs,
+					swarm_pvs,
+					swarm_pvs);
+				swarm_pvs_valid = TRUE;
+			}
+		}
+
+		if (swarm_pvs_valid)
+		{
+			pvs = swarm_pvs;
+		}
+	}
+	else
+	{
+		short cluster_index = actor->input.position.body_location.cluster_index;
+
+		if (cluster_index != NONE)
+		{
+			pvs = structure_bsp_get_cluster_pvs(structure_bsp, cluster_index);
+		}
+	}
+
+	object_marker_begin();
+
+	prop_iterator_new(&iterator, actor_index);
+	while ((prop = prop_iterator_next(&iterator)) != NULL)
+	{
+		if (prop->state < _prop_state_uninspected_orphan ||
+			prop->state > _prop_state_inspected_orphan)
+		{
+			real distance_squared = prop->distance * prop->distance;
+			boolean optional;
+			boolean desired =
+				actor_perception_desire_prop(
+					actor_index,
+					NONE,
+					prop->unit_index,
+					prop->actor_index,
+					prop->in_use,
+					prop->player,
+					prop->enemy,
+					prop->dead,
+					prop->dead_ticks,
+					prop->suicide_radius,
+					distance_squared,
+					prop->required_ticks,
+					&optional);
+
+			if (desired && pvs != NULL)
+			{
+				struct object_cluster_iterator cluster_iterator;
+				short cluster_index;
+
+				desired = FALSE;
+				for (cluster_index = object_get_first_cluster(&cluster_iterator, prop->unit_index);
+					cluster_index != NONE;
+					cluster_index = object_get_next_cluster(&cluster_iterator, prop->unit_index))
+				{
+					if (BIT_VECTOR_TEST_FLAG(pvs, cluster_index))
+					{
+						desired = TRUE;
+						break;
+					}
+				}
+			}
+
+			if (prop->swarm && prop->actor_index != NONE)
+			{
+				struct actor_datum *swarm_actor = actor_get(prop->actor_index);
+
+				if (swarm_actor->meta.swarm_cache_index != NONE)
+				{
+					struct swarm_datum *swarm = swarm_get(swarm_actor->meta.swarm_cache_index);
+					short unit_index;
+
+					for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
+					{
+						object_mark_function(swarm->unit_indices[unit_index]);
+					}
+				}
+				else
+				{
+					/* BUG (preserved for exact matching): January walks the perceiving actor's
+					 * swarm unit list (actor+0x24 through the actor_get(actor_index) pointer),
+					 * not the uncached swarm actor's list. A corrected build should start from
+					 * swarm_actor->meta.swarm_unit_index. */
+					long unit_index = actor->meta.swarm_unit_index;
+
+					while (unit_index != NONE)
+					{
+						struct unit_datum *unit = unit_get(unit_index);
+
+						object_mark_function(unit_index);
+						unit_index = unit->unit.swarm_next_unit_index;
+					}
+				}
+			}
+
+			object_mark_function(prop->unit_index);
+
+			if (desired)
+			{
+				struct actor_perception_refresh_list *list =
+					prop->enemy ? &enemies : &friends;
+
+				if (optional)
+				{
+#line 2669 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+					assert(!prop->dead);
+#line 5988 "source\\ai\\actor_perception.c"
+
+					if (list->entry_count < 128)
+					{
+						list->entries[list->entry_count].unit_index = prop->unit_index;
+						list->entries[list->entry_count].prop_index = iterator.index;
+						list->entries[list->entry_count].priority = distance_squared * 0.69444442f;
+						list->entry_count++;
+					}
+					else if (last_refresh_overflow_warning_time == NONE ||
+						game_time_get() > last_refresh_overflow_warning_time + 150)
+					{
+						error(
+							_error_silent,
+							"actor_perception_refresh overflowed max %s (%d), discarding",
+							prop->enemy ? "enemies" : "friends",
+							128);
+						last_refresh_overflow_warning_time = game_time_get();
+					}
+				}
+				else if (!prop->dead)
+				{
+					list->accepted_count++;
+				}
+			}
+			else
+			{
+				if ((prop->state < _prop_state_uninspected_orphan ||
+						prop->state > _prop_state_inspected_orphan) &&
+					prop->orphan_prop_index != NONE)
+				{
+					actor_switch_props(actor_index, prop->orphan_prop_index, NONE);
+					prop_delete(actor_index, prop->orphan_prop_index);
+				}
+
+				actor_switch_props(actor_index, iterator.index, NONE);
+				prop_delete(actor_index, iterator.index);
+			}
+		}
+	}
+
+	if (pvs != NULL)
+	{
+		short cluster_index;
+
+		for (cluster_index = 0; cluster_index < structure_bsp->clusters.count; cluster_index++)
+		{
+			if (BIT_VECTOR_TEST_FLAG(pvs, cluster_index))
+			{
+				long reference_index;
+				long object_index;
+
+				for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
+					object_index != NONE;
+					object_index = cluster_get_next_collideable_object(&reference_index))
+				{
+					actor_perception_refresh_test_object(actor_index, object_index, &enemies, &friends);
+				}
+
+				for (object_index = cluster_get_first_noncollideable_object(&reference_index, cluster_index);
+					object_index != NONE;
+					object_index = cluster_get_next_noncollideable_object(&reference_index))
+				{
+					actor_perception_refresh_test_object(actor_index, object_index, &enemies, &friends);
+				}
+			}
+		}
+	}
+
+	if (enemies.entry_count > 0)
+	{
+		short entry_index = 0;
+
+		if (enemies.accepted_count < 4)
+		{
+			qsort(
+				enemies.entries,
+				enemies.entry_count,
+				sizeof(struct actor_perception_refresh_entry),
+				actor_perception_qsort_compare_optional_props);
+			for (; entry_index < enemies.entry_count; entry_index++)
+			{
+				if (enemies.entries[entry_index].prop_index == NONE)
+				{
+					long prop_index =
+						prop_new_unacknowledged(
+							actor_index,
+							enemies.entries[entry_index].unit_index,
+							TRUE);
+
+					if (prop_index == NONE)
+					{
+						continue;
+					}
+
+					prop_position_refresh(actor_index, prop_index, &position, FALSE, FALSE);
+				}
+
+				/* BUG (preserved for exact matching): January leaves the loop before
+				 * advancing past the entry that reached the limit, so the discard loop
+				 * below also deletes that entry when it was an existing prop. */
+				if (++enemies.accepted_count >= 4)
+				{
+					break;
+				}
+			}
+		}
+
+		for (; entry_index < enemies.entry_count; entry_index++)
+		{
+			if (enemies.entries[entry_index].prop_index != NONE)
+			{
+				struct prop_datum *discarded_prop = prop_get(enemies.entries[entry_index].prop_index);
+
+				if ((discarded_prop->state < _prop_state_uninspected_orphan ||
+						discarded_prop->state > _prop_state_inspected_orphan) &&
+					discarded_prop->orphan_prop_index != NONE)
+				{
+					actor_switch_props(actor_index, discarded_prop->orphan_prop_index, NONE);
+					prop_delete(actor_index, discarded_prop->orphan_prop_index);
+				}
+
+				actor_switch_props(actor_index, enemies.entries[entry_index].prop_index, NONE);
+				prop_delete(actor_index, enemies.entries[entry_index].prop_index);
+			}
+		}
+	}
+
+	if (friends.entry_count > 0)
+	{
+		short entry_index = 0;
+		short prop_count = enemies.accepted_count + friends.accepted_count;
+		short maximum_prop_count = MAX(enemies.accepted_count + 2, 4);
+
+		if (prop_count < maximum_prop_count)
+		{
+			qsort(
+				friends.entries,
+				friends.entry_count,
+				sizeof(struct actor_perception_refresh_entry),
+				actor_perception_qsort_compare_optional_props);
+			for (; entry_index < friends.entry_count; entry_index++)
+			{
+				if (friends.entries[entry_index].prop_index == NONE)
+				{
+					long prop_index =
+						prop_new_unacknowledged(
+							actor_index,
+							friends.entries[entry_index].unit_index,
+							FALSE);
+
+					if (prop_index == NONE)
+					{
+						continue;
+					}
+
+					prop_position_refresh(actor_index, prop_index, &position, FALSE, FALSE);
+				}
+
+				friends.accepted_count++;
+				if (++prop_count >= maximum_prop_count)
+				{
+					break;
+				}
+			}
+		}
+
+		for (; entry_index < friends.entry_count; entry_index++)
+		{
+			if (friends.entries[entry_index].prop_index != NONE)
+			{
+				struct prop_datum *discarded_prop = prop_get(friends.entries[entry_index].prop_index);
+
+				if ((discarded_prop->state < _prop_state_uninspected_orphan ||
+						discarded_prop->state > _prop_state_inspected_orphan) &&
+					discarded_prop->orphan_prop_index != NONE)
+				{
+					actor_switch_props(actor_index, discarded_prop->orphan_prop_index, NONE);
+					prop_delete(actor_index, discarded_prop->orphan_prop_index);
+				}
+
+				actor_switch_props(actor_index, friends.entries[entry_index].prop_index, NONE);
+				prop_delete(actor_index, friends.entries[entry_index].prop_index);
+			}
+		}
+	}
+
+	object_marker_end();
+
+	return;
+}
 boolean actor_emotion_flee_with_friends(
 	long actor_index,
 	real *desire_to_flee)
@@ -5014,4 +5696,864 @@ static boolean actor_perception_assess_suicide_danger(
 	}
 
 	return result;
+}
+
+void actor_perception_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	short highest_prop_timer = 1;
+	boolean prop_serviced = FALSE;
+	long nearest_orphan_index = NONE;
+	real nearest_orphan_distance = REAL_MAX;
+	long interesting_orphan_index;
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+	struct actor_position_data position;
+
+	if (!actor->meta.dormant)
+	{
+		if (actor->meta.timeslice)
+		{
+			actor_perception_refresh(actor_index);
+		}
+
+		actor_perception_refresh_danger_zone(actor_index);
+
+		if (actor->danger_zone.danger_type > _actor_danger_zone_none)
+		{
+			boolean acknowledge_danger = FALSE;
+
+			if (actor->danger_zone.attached_to_us ||
+				actor->danger_zone.hostility != 0)
+			{
+				actor->danger_zone.noticed_danger = TRUE;
+				acknowledge_danger = actor->danger_zone.acknowledgement_timer > 0;
+				actor->danger_zone.acknowledgement_timer = 0;
+			}
+			else if (actor->danger_zone.acknowledgement_timer > 0 &&
+				actor->danger_zone.currently_perceived)
+			{
+				if (actor->state.uncertain_combat_timer == NONE ||
+					actor->state.uncertain_combat_timer >= 60)
+				{
+					acknowledge_danger = --actor->danger_zone.acknowledgement_timer == 0;
+				}
+				else
+				{
+					actor->danger_zone.acknowledgement_timer = 0;
+					acknowledge_danger = TRUE;
+				}
+			}
+
+			if (acknowledge_danger)
+			{
+				real notice_chance;
+
+				switch (actor->danger_zone.danger_type)
+				{
+				case _actor_danger_zone_vehicle:
+					notice_chance = definition->perception.notice_vehicle_chance;
+					goto test_notice_chance;
+
+				case _actor_danger_zone_projectile:
+					notice_chance = definition->perception.notice_projectile_chance;
+				test_notice_chance:
+					if (notice_chance > 0.0f &&
+						real_seed_random(get_global_random_seed_address()) < notice_chance)
+					{
+						actor->danger_zone.noticed_danger = TRUE;
+					}
+					break;
+
+				case _actor_danger_zone_suicide:
+					actor->danger_zone.noticed_danger = TRUE;
+					break;
+				}
+
+				if (actor->danger_zone.noticed_danger)
+				{
+					if (actor->danger_zone.attached_to_us)
+					{
+						actor->danger_zone.allow_dive_evasion = FALSE;
+					}
+					else if (actor->danger_zone.hostility != 0 ||
+						actor->danger_zone.danger_type == _actor_danger_zone_vehicle ||
+						actor->danger_zone.danger_type == _actor_danger_zone_suicide)
+					{
+						actor->danger_zone.allow_dive_evasion = TRUE;
+					}
+					else
+					{
+						actor->danger_zone.allow_dive_evasion =
+							real_seed_random(get_global_random_seed_address()) <
+								definition->moving.grenade_dive_chance;
+					}
+
+					actor_stimulus_noticed_danger_zone(
+						actor_index,
+						actor->danger_zone.danger_type,
+						actor->danger_zone.hostility,
+						actor->danger_zone.object_index,
+						&actor->danger_zone.position);
+				}
+			}
+
+			if (actor->danger_zone.acknowledgement_timer == 0)
+			{
+				if (actor->control.secondary_look_type == _secondary_look_dangerous_object)
+				{
+					actor->control.secondary_look_priority =
+						MIN(actor->control.secondary_look_priority, _secondary_look_priority_turn_and_aim);
+				}
+
+				if (actor->danger_zone.attached_to_us)
+				{
+					actor->danger_zone.noticed_danger = TRUE;
+					actor->danger_zone.allow_dive_evasion = FALSE;
+				}
+			}
+		}
+	}
+
+	prop_iterator_new(&iterator, actor_index);
+	while ((prop = prop_iterator_next(&iterator)) != NULL)
+	{
+		short new_state = NONE;
+		boolean orphan_expired = FALSE;
+		boolean refresh_position = FALSE;
+		boolean refresh_status = FALSE;
+		boolean became_acknowledged = FALSE;
+		boolean expected_acknowledgement = FALSE;
+
+		if (prop->unit_effect_decay_ticks > 0 &&
+			--prop->unit_effect_decay_ticks == 0)
+		{
+			prop->unit_effect = NONE;
+		}
+
+		if (prop->ticks_since_damage != NONE &&
+			++prop->ticks_since_damage >= 45)
+		{
+			prop->currently_damaging_me = FALSE;
+		}
+
+		if (prop->ticks_since_definitely_located != NONE &&
+			++prop->ticks_since_definitely_located >= 60)
+		{
+			prop->definitely_located = FALSE;
+			prop->definite_knowledge_source_actor = NONE;
+		}
+
+		if (prop->dead)
+		{
+			prop->dead_ticks++;
+		}
+		else
+		{
+			prop->dead_ticks = 0;
+		}
+
+		if (prop->ticks_until_orphan > 0)
+		{
+			prop->ticks_until_orphan--;
+		}
+
+		if (prop->required_ticks > 0 &&
+			!prop->delay_requirement_decision)
+		{
+			prop->required_ticks--;
+		}
+
+		if (prop->unreachable_ticks > 0 &&
+			prop->unreachable_ticks < SHORT_MAX)
+		{
+			prop->unreachable_ticks++;
+		}
+
+		if (prop->unopposable_casualty_decay_timer > 0 &&
+			--prop->unopposable_casualty_decay_timer == 0)
+		{
+#line 316 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+			assert(prop->unopposable_casualties_inflicted > 0);
+#line 6522 "source\\ai\\actor_perception.c"
+
+			if (--prop->unopposable_casualties_inflicted > 0)
+			{
+				prop->unopposable_casualty_decay_timer = 750;
+			}
+		}
+
+		if (prop->visibility >= _actor_perception_full)
+		{
+			if (prop->visible_ticks < SHORT_MAX)
+			{
+				prop->visible_ticks++;
+			}
+		}
+		else
+		{
+			prop->visible_ticks = 0;
+		}
+
+		if (actor->meta.dormant)
+		{
+			prop->in_use = FALSE;
+			prop->timer = 0;
+		}
+		else
+		{
+			short prop_timer = ++prop->timer;
+
+			if (!prop->enemy)
+			{
+				prop_timer >>= 3;
+			}
+
+			if (prop->quantized_distance >= 3)
+			{
+				prop_timer >>= 1;
+			}
+
+			if (!prop_serviced &&
+				prop_timer >= actor->meta.highest_prop_timer)
+			{
+				refresh_status = TRUE;
+				refresh_position = TRUE;
+				prop_timer = 0;
+				prop->timer = 0;
+				prop_serviced = TRUE;
+			}
+
+			if (prop_timer > highest_prop_timer)
+			{
+				highest_prop_timer = prop_timer;
+			}
+
+			if (prop->state < _prop_state_unacknowledged ||
+				prop->state > _prop_state_becoming_acknowledged ||
+				prop->orphan_prop_index == NONE)
+			{
+				if (actor->meta.swarm)
+				{
+					prop->in_use = FALSE;
+				}
+				else
+				{
+					prop->in_use =
+						actor->target.target_prop_index == iterator.index ||
+						actor->meta.interesting_orphan_index == iterator.index ||
+						actor->emotions.unopposable_retreat_prop_index == iterator.index ||
+						actor->external_orders.pursuit_group_prop_index == iterator.index ||
+						(actor->control.secondary_look_type != _secondary_look_none &&
+							actor->control.secondary_look_direction.type == _direction_specification_prop &&
+							actor->control.secondary_look_direction.prop_index == iterator.index) ||
+						(actor->control.idle_major_active &&
+							actor->control.idle_major_direction.type == _direction_specification_prop &&
+							actor->control.idle_major_direction.prop_index == iterator.index) ||
+						(actor->control.idle_minor_active &&
+							actor->control.idle_minor_direction.type == _direction_specification_prop &&
+							actor->control.idle_minor_direction.prop_index == iterator.index);
+
+					if (prop->state >= _prop_state_uninspected_orphan &&
+						prop->state <= _prop_state_inspected_orphan)
+					{
+						struct prop_datum *parent_prop = prop_get(prop->orphan_prop_index);
+
+#line 402 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+						assert(parent_prop->orphan_prop_index == iterator.index);
+#line 6608 "source\\ai\\actor_perception.c"
+
+						parent_prop->in_use = prop->in_use;
+					}
+				}
+			}
+
+			if (prop->in_use &&
+				(prop->state < _prop_state_unacknowledged ||
+					prop->state > _prop_state_becoming_acknowledged))
+			{
+				refresh_position = TRUE;
+			}
+
+#line 416 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+			assert(!refresh_status || refresh_position);
+#line 6624 "source\\ai\\actor_perception.c"
+
+			if (refresh_position)
+			{
+				prop_position_refresh(
+					actor_index,
+					iterator.index,
+					&position,
+					FALSE,
+					refresh_status);
+			}
+
+			if (refresh_status)
+			{
+				prop_status_refresh(actor_index, iterator.index, &position);
+			}
+		}
+
+		switch (prop->state)
+		{
+		case _prop_state_unacknowledged:
+			if (prop->perception <= _actor_perception_none)
+			{
+				break;
+			}
+
+			new_state = _prop_state_becoming_acknowledged;
+			prop->awareness = 0.0f;
+			if (prop->player &&
+				ai_debug.print_acknowledgement)
+			{
+				char buffer[256];
+
+				ai_debug_describe_actor(actor_index, actor->meta.unit_index, NONE, buffer, sizeof(buffer));
+				error(_error_silent, "%s: start to become aware", buffer);
+			}
+
+		case _prop_state_becoming_acknowledged:
+			{
+				struct actor_perception_debug_info_view *debug = actor_perception_debug_get(DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index));
+
+				if (prop->perception == _actor_perception_none)
+				{
+					prop->awareness = 0.0f;
+					new_state = _prop_state_unacknowledged;
+					if (prop->player)
+					{
+						debug->perception_awareness_speed = NONE;
+						if (ai_debug.print_acknowledgement)
+						{
+							char buffer[256];
+
+							ai_debug_describe_actor(actor_index, actor->meta.unit_index, NONE, buffer, sizeof(buffer));
+							error(_error_silent, "%s: stop becoming aware", buffer);
+						}
+					}
+				}
+				else
+				{
+					short knowledge_type = actor_get_perception_knowledge(actor_index, iterator.index);
+					short awareness_speed;
+					real awareness_delta;
+
+#line 489 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+					assert((knowledge_type >= 0) && (knowledge_type < NUMBER_OF_ACTOR_KNOWLEDGE_TYPES));
+					assert((prop->perception >= 0) && (prop->perception < NUMBER_OF_ACTOR_PERCEPTION_TYPES));
+#line 6690 "source\\ai\\actor_perception.c"
+
+					awareness_speed = global_acknowledgement_speeds[knowledge_type][prop->perception];
+					switch (awareness_speed)
+					{
+					case _awareness_speed_never:
+						awareness_delta = 0.0f;
+						break;
+
+					case _awareness_speed_noncombat:
+						awareness_delta = definition->perception.runtime_awareness_delta_non_combat;
+						break;
+
+					case _awareness_speed_guard:
+						awareness_delta = definition->perception.runtime_awareness_delta_guard;
+						break;
+
+					case _awareness_speed_combat:
+						awareness_delta = definition->perception.runtime_awareness_delta_combat;
+						break;
+
+					case _awareness_speed_instant:
+						awareness_delta = 1.0f;
+						break;
+
+					default:
+#line 516 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+						assert(!"unreachable");
+#line 6718 "source\\ai\\actor_perception.c"
+						break;
+					}
+
+					if (prop->player &&
+						debug->perception_awareness_speed != awareness_speed)
+					{
+						debug->perception_awareness_speed = awareness_speed;
+						if (ai_debug.print_acknowledgement)
+						{
+							char const *awareness_speed_names[] =
+							{
+								"never",
+								"noncombat",
+								"guard",
+								"combat",
+								"instant"
+							};
+							char const *knowledge_names[] =
+							{
+								"noncombat",
+								"guard",
+								"searching",
+								"definite"
+							};
+							char const *perception_names[] =
+							{
+								"none",
+								"partial",
+								"full",
+								"unmistakable"
+							};
+							char buffer[256];
+
+							ai_debug_describe_actor(actor_index, actor->meta.unit_index, NONE, buffer, sizeof(buffer));
+							error(
+								_error_silent,
+								"%s: knowledge %s percep %s -> awareness %s",
+								buffer,
+								knowledge_names[knowledge_type],
+								perception_names[prop->perception],
+								awareness_speed_names[awareness_speed]);
+
+							if (awareness_delta > 0.0f &&
+								awareness_delta < 1.0f)
+							{
+								error(
+									_error_silent,
+									"  awareness delta: %.2f (current awareness %.2f -> time %.2fsec)",
+									awareness_delta,
+									prop->awareness,
+									(1.0f - prop->awareness) / (awareness_delta * TICKS_PER_SECOND));
+							}
+						}
+					}
+
+					prop->awareness += awareness_delta;
+					if (prop->awareness >= 1.0f)
+					{
+						new_state = _prop_state_acknowledged;
+						if (prop->player)
+						{
+							debug->perception_awareness_speed = NONE;
+							if (ai_debug.print_acknowledgement)
+							{
+								char buffer[256];
+
+								ai_debug_describe_actor(actor_index, actor->meta.unit_index, NONE, buffer, sizeof(buffer));
+								error(_error_silent, "%s: become aware!", buffer);
+							}
+						}
+					}
+				}
+			}
+			break;
+
+		case _prop_state_becoming_unacknowledged:
+			if (prop->perception > _actor_perception_none)
+			{
+				new_state = _prop_state_acknowledged;
+			}
+			else
+			{
+				real delta_x;
+				real delta_y;
+
+				if (prop->ticks_until_orphan == 0 ||
+					actor_perception_distance_squared2d(
+						&prop->last_perceived_body_position,
+						&prop->body_position,
+						delta_x,
+						delta_y) > 1.0f)
+				{
+					long orphan_prop_index = NONE;
+
+					if (actor_perception_desire_prop(
+							actor_index,
+							_prop_state_uninspected_orphan,
+							prop->unit_index,
+							prop->actor_index,
+							prop->in_use,
+							prop->player,
+							prop->enemy,
+							prop->dead,
+							prop->dead_ticks,
+							prop->suicide_radius,
+							prop->distance * prop->distance,
+							prop->required_ticks,
+							NULL))
+					{
+						struct actor_position_data orphan_position;
+
+						prop_position_refresh(
+							actor_index,
+							iterator.index,
+							&orphan_position,
+							FALSE,
+							FALSE);
+						actor_perception_find_prop_pathfinding_location(actor_index, iterator.index);
+						orphan_prop_index = prop_orphan_transition(actor_index, iterator.index);
+					}
+
+					actor_switch_props(actor_index, iterator.index, orphan_prop_index);
+					new_state = _prop_state_unacknowledged;
+				}
+			}
+			break;
+
+		case _prop_state_acknowledged:
+			if (prop->perception == _actor_perception_none)
+			{
+				if (actor_perception_desire_prop(
+						actor_index,
+						_prop_state_uninspected_orphan,
+						prop->unit_index,
+						prop->actor_index,
+						prop->in_use,
+						prop->player,
+						prop->enemy,
+						prop->dead,
+						prop->dead_ticks,
+						prop->suicide_radius,
+						prop->distance * prop->distance,
+						prop->required_ticks,
+						NULL))
+				{
+					new_state = _prop_state_becoming_unacknowledged;
+				}
+				else
+				{
+					actor_switch_props(actor_index, iterator.index, NONE);
+					new_state = _prop_state_unacknowledged;
+				}
+			}
+			break;
+
+		case _prop_state_uninspected_orphan:
+		case _prop_state_inspected_orphan:
+			{
+				short lifespan_decay;
+
+				if (prop->state == _prop_state_uninspected_orphan)
+				{
+					short inspection_ticks =
+						actor->input.vehicle_gunner_bombardment ? 300 : 45;
+
+					if (prop->visibility >= _actor_perception_full ||
+						(actor->control.current_fire_target_type == _actor_fire_target_prop &&
+							actor->control.current_fire_target_prop_index == iterator.index &&
+							game_time_get() % 3 == 0))
+					{
+						if (++prop->orphan_inspection_ticks >= inspection_ticks)
+						{
+							new_state = _prop_state_inspected_orphan;
+						}
+					}
+				}
+
+				if (iterator.index == actor->emotions.unopposable_retreat_prop_index ||
+					(actor->state.action == _actor_action_flee &&
+						actor->state.action_data.flee.flee_prop_index == iterator.index))
+				{
+					lifespan_decay = 0;
+				}
+				else if (iterator.index == actor->target.target_prop_index)
+				{
+					lifespan_decay = prop->abandoned_search != FALSE;
+				}
+				else if (iterator.index == actor->meta.interesting_orphan_index)
+				{
+					lifespan_decay = actor->state.combat_status >= _actor_combat_status_certain ? 6 : 1;
+				}
+				else
+				{
+					lifespan_decay = 10;
+				}
+
+				prop->orphan_lifespan_ticks -= lifespan_decay;
+				if (prop->orphan_lifespan_ticks < 0)
+				{
+					orphan_expired = TRUE;
+				}
+			}
+			break;
+		}
+
+		if (new_state != NONE)
+		{
+#line 694 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+			assert(new_state!=prop->state);
+#line 6928 "source\\ai\\actor_perception.c"
+
+			switch (new_state)
+			{
+			case _prop_state_becoming_unacknowledged:
+				prop->ticks_until_orphan = prop->visibility >= _actor_perception_full ? 60 : 10;
+				break;
+
+			case _prop_state_acknowledged:
+				became_acknowledged =
+					actor_perception_become_acknowledged(
+						actor_index,
+						iterator.index,
+						&expected_acknowledgement);
+				iterator.next_index = prop->next_prop_index;
+				break;
+
+			case _prop_state_uninspected_orphan:
+				match_vassert("c:\\halo\\SOURCE\\ai\\actor_perception.c", 721, FALSE, NULL);
+
+			case _prop_state_unacknowledged:
+			case _prop_state_inspected_orphan:
+				prop->definitely_located = FALSE;
+				prop->definite_knowledge_source_actor = NONE;
+				break;
+
+			case _prop_state_becoming_acknowledged:
+				break;
+
+			default:
+				match_vassert("c:\\halo\\SOURCE\\ai\\actor_perception.c", 730, FALSE, NULL);
+				break;
+			}
+
+			prop->state = new_state;
+			prop->unopposable_enemy = actor_compute_prop_unopposable(actor_index, iterator.index);
+			prop->target_weight = actor_compute_prop_target_weight(actor_index, iterator.index);
+		}
+
+		if (orphan_expired)
+		{
+			struct prop_datum *parent_prop;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\ai\\actor_perception.c",
+				746,
+				prop->parent_prop_index != NONE,
+				"prop->parent_prop_index != NONE");
+
+			parent_prop = prop_get(prop->parent_prop_index);
+
+#line 751 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+			assert(parent_prop->orphan_prop_index == iterator.index);
+#line 6981 "source\\ai\\actor_perception.c"
+
+			parent_prop->orphan_prop_index = NONE;
+			actor_switch_props(actor_index, iterator.index, NONE);
+			prop_delete(actor_index, iterator.index);
+		}
+		else if (prop->refresh_stimuli &&
+			prop->state >= _prop_state_becoming_unacknowledged &&
+			prop->state <= _prop_state_acknowledged)
+		{
+			if (prop->just_killed)
+			{
+				actor_stimulus_prop_just_killed(actor_index, iterator.index);
+				prop->just_killed = FALSE;
+			}
+
+			if (prop->just_became_visible ||
+				(became_acknowledged && prop->visibility > _actor_perception_none))
+			{
+				boolean initial_sighting = became_acknowledged && !expected_acknowledgement;
+
+				actor_stimulus_prop_sighted(actor_index, iterator.index, initial_sighting);
+				prop->just_became_visible = FALSE;
+			}
+
+			if (!actor->emotions.sighted_friendly_player &&
+				!prop->enemy &&
+				prop->player &&
+				prop->visibility >= _actor_perception_full &&
+				prop->quantized_facing <= 2 &&
+				prop->distance < 7.0f)
+			{
+				actor->emotions.sighted_friendly_player = TRUE;
+				ai_communication_event(
+					_ai_communication_sighted_friend_player,
+					actor->meta.unit_index,
+					prop->unit_index,
+					_comm_hostility_friend,
+					NONE,
+					NONE,
+					NULL);
+				actor_stimulus_prop_sighted(actor_index, iterator.index, FALSE);
+			}
+
+			if (actor->meta.unit_index != NONE &&
+				!prop->dead &&
+				prop->ally &&
+				prop->ally_status_changed)
+			{
+				boolean enemy = game_team_is_enemy(actor->meta.team_index, prop->team_index);
+				boolean close =
+					prop->distance <
+						(enemy ? 15.0f : prop->quantized_facing <= 2 ? 10.0f : 3.0f);
+
+				if ((enemy && prop->currently_damaging_me) || close)
+				{
+					struct ai_information_data information;
+
+					information.allegiance.team1_index = actor->meta.team_index;
+					information.allegiance.team2_index = prop->team_index;
+					information.allegiance.broken = enemy;
+					ai_communication_event(
+						_ai_communication_allegiance_changed,
+						actor->meta.unit_index,
+						prop->unit_index,
+						enemy ? _comm_hostility_traitor : _comm_hostility_friend,
+						NONE,
+						_ai_information_allegiance,
+						&information);
+				}
+			}
+
+			if (actor->state.mode < _actor_mode_combat)
+			{
+				if (prop->dead && !prop->enemy)
+				{
+					actor_stimulus_enter_combat_found_body(actor_index, iterator.index);
+				}
+				else if (prop->enemy)
+				{
+					actor_stimulus_enter_combat_perceived_enemy(actor_index, iterator.index);
+				}
+			}
+
+			if (!prop->enemy &&
+				!prop->dead &&
+				!prop->player)
+			{
+				struct encounter_datum *encounter;
+
+				if ((actor->target.target_prop_index != NONE &&
+						(actor->target.since_any_target_visible_timer == NONE ||
+							actor->target.since_any_target_visible_timer >= 180)) ||
+					(actor->meta.encounter_index != NONE &&
+						((encounter = encounter_get(actor->meta.encounter_index))->enemy_visible_timer == NONE ||
+							(encounter->enemy_visible_timer >= 180 && encounter->enemy_alive))))
+				{
+					if (actor->meta.unit_index != NONE)
+					{
+						if (actor->state.mode < _actor_mode_combat)
+						{
+							if (prop->in_combat)
+							{
+								ai_communication_event(
+									_ai_communication_alert_noncombat,
+									prop->unit_index,
+									actor->meta.unit_index,
+									_comm_hostility_friend,
+									NONE,
+									_ai_information_combat_stimulus,
+									NULL);
+							}
+						}
+						else if (actor_in_combat(actor_index) &&
+							!actor_is_fighting(actor_index) &&
+							prop->noncombat &&
+							prop->visibility >= _actor_perception_full)
+						{
+							ai_communication_event(
+								_ai_communication_alert_noncombat,
+								actor->meta.unit_index,
+								prop->unit_index,
+								_comm_hostility_friend,
+								NONE,
+								_ai_information_combat_stimulus,
+								NULL);
+						}
+					}
+				}
+			}
+		}
+		else if (prop->state >= _prop_state_uninspected_orphan &&
+			prop->state <= _prop_state_inspected_orphan &&
+			prop->distance < nearest_orphan_distance)
+		{
+			nearest_orphan_index = iterator.index;
+			nearest_orphan_distance = prop->distance;
+		}
+
+		if (prop->dead)
+		{
+			if (prop->state >= _prop_state_becoming_unacknowledged && prop->state <= _prop_state_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_dead_props_acknowledged].accumulator++;
+			}
+			else if (prop->state >= _prop_state_uninspected_orphan && prop->state <= _prop_state_inspected_orphan)
+			{
+				ai_profile.meters[_ai_meter_dead_props_orphaned].accumulator++;
+			}
+			else if (prop->state >= _prop_state_unacknowledged && prop->state <= _prop_state_becoming_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_dead_props_unacknowledged].accumulator++;
+			}
+		}
+		else if (prop->enemy)
+		{
+			if (prop->state >= _prop_state_becoming_unacknowledged && prop->state <= _prop_state_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_enemy_props_acknowledged].accumulator++;
+			}
+			else if (prop->state >= _prop_state_uninspected_orphan && prop->state <= _prop_state_inspected_orphan)
+			{
+				ai_profile.meters[_ai_meter_enemy_props_orphaned].accumulator++;
+			}
+			else if (prop->state >= _prop_state_unacknowledged && prop->state <= _prop_state_becoming_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_enemy_props_unacknowledged].accumulator++;
+			}
+		}
+		else
+		{
+			if (prop->state >= _prop_state_becoming_unacknowledged && prop->state <= _prop_state_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_friendly_props_acknowledged].accumulator++;
+			}
+			else if (prop->state >= _prop_state_uninspected_orphan && prop->state <= _prop_state_inspected_orphan)
+			{
+				ai_profile.meters[_ai_meter_friendly_props_orphaned].accumulator++;
+			}
+			else if (prop->state >= _prop_state_unacknowledged && prop->state <= _prop_state_becoming_acknowledged)
+			{
+				ai_profile.meters[_ai_meter_friendly_props_unacknowledged].accumulator++;
+			}
+		}
+	}
+
+	interesting_orphan_index = nearest_orphan_index;
+	if (actor->target.target_prop_index != NONE)
+	{
+		struct prop_datum *target_prop = prop_get(actor->target.target_prop_index);
+
+		if (target_prop->state >= _prop_state_uninspected_orphan &&
+			target_prop->state <= _prop_state_inspected_orphan)
+		{
+			interesting_orphan_index = NONE;
+		}
+	}
+
+	if (actor->target.target_type >= _actor_target_definite_orphan)
+	{
+		actor->target.any_target_ever = TRUE;
+	}
+
+	if (actor->target.target_type >= _actor_target_visible_enemy)
+	{
+		actor->target.since_any_target_visible_timer = 0;
+	}
+	else if (actor->external_orders.stand_down)
+	{
+		actor->target.since_any_target_visible_timer = NONE;
+	}
+	else if (actor->target.since_any_target_visible_timer != NONE)
+	{
+		actor->target.since_any_target_visible_timer++;
+	}
+
+	actor->meta.highest_prop_timer = highest_prop_timer;
+	actor->meta.interesting_orphan_index = interesting_orphan_index;
+
+	return;
 }
