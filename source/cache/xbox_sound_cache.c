@@ -105,6 +105,8 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_files.h"
 
+#include <xtl.h>
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -553,71 +555,70 @@ boolean _sound_cache_sound_request(
 	boolean load,
 	boolean reference)
 {
-	struct xbox_cache_sound_datum *cache_sound;
 	boolean result = FALSE;
 
-	if (!load)
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
-			0xC2,
-			load || !block);
-		match_assert(
-			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
-			0xC4,
-			load || !reference);
-	}
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
+		0xC2,
+		load || !block);
+	match_assert(
+		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
+		0xC4,
+		load || !reference);
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
 		0xC6,
 		sound->cache_tag_index!=0);
 
 	if (sound->cache_block_index == NONE && load)
+	{
 		sound_cache_start_loading_sound(sound);
+	}
 
 	if (sound->cache_block_index != NONE)
 	{
 		lruv_block_touch(
 			xbox_sound_cache_globals.cache,
 			sound->cache_block_index);
-		for (;;)
+		do
 		{
-			cache_sound = datum_get(
+			struct xbox_cache_sound_datum *cache_sound = datum_get(
 				xbox_sound_cache_globals.cache_sounds,
 				sound->cache_block_index);
 			if (cache_sound->loaded)
-				break;
-
-			SwitchToThread();
-			if (!block)
-				return result;
-		}
-
-		if (!cache_sound->initialized)
-		{
-			cache_sound->initialized = TRUE;
-			cache_sound->software_reference_count = 0;
-			cache_sound->hardware_reference_count = 0;
-		}
-
-		if (reference)
-		{
-			if (debug_sound_reference_counts)
 			{
-				error(
-					_error_silent,
-					"--- request %d %s",
-					cache_sound->software_reference_count,
-					cache_sound->sound);
-			}
-			match_assert(
-				"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
-				0xEC,
-				cache_sound->software_reference_count<UNSIGNED_CHAR_MAX);
-			cache_sound->software_reference_count++;
-		}
+				if (!cache_sound->initialized)
+				{
+					cache_sound->initialized = TRUE;
+					cache_sound->software_reference_count = 0;
+					cache_sound->hardware_reference_count = 0;
+				}
 
-		return TRUE;
+				if (reference)
+				{
+					if (debug_sound_reference_counts)
+					{
+						error(
+							_error_silent,
+							"--- request %d %s",
+							cache_sound->software_reference_count,
+							cache_sound->sound);
+					}
+					match_assert(
+						"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
+						0xEC,
+						cache_sound->software_reference_count<UNSIGNED_CHAR_MAX);
+					cache_sound->software_reference_count++;
+				}
+
+				result = TRUE;
+			}
+			else
+			{
+				SwitchToThread();
+			}
+		}
+		while (!result && block);
 	}
 
 	return result;
