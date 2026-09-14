@@ -414,6 +414,13 @@ enum multiplayer_game_bitmap_frame
 
 /* ---------- macros */
 
+/* Same TU-local definition as network_client_manager.c, network_game_manager.c,
+   network_server_manager.c and network_server_message_handler.c; no shared header
+   owns it. January assertion strings in those objects preserve the macro name. */
+#define network_machine_is_valid(machine) \
+	((machine) && (machine)->machine_index >= 0 && \
+	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+
 /* ---------- structures */
 
 struct ui_widget_text_box_parameters
@@ -1367,7 +1374,7 @@ void network_pregame_status_screen_update(
 		{
 			struct network_machine *machine = &game->machines[machine_index];
 
-			if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+			if (network_machine_is_valid(machine) &&
 				machine->machine_index == local_machine_index)
 			{
 				struct network_machine *local_machine = network_game_client_get_machine(
@@ -1522,7 +1529,7 @@ void network_pregame_status_screen_update(
 			{
 				struct network_machine *machine = &game->machines[machine_index];
 
-				if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+				if (network_machine_is_valid(machine) &&
 					machine->machine_index != local_machine_index)
 				{
 					match_assert(
@@ -1765,7 +1772,7 @@ void splitscreen_pregame_status_screen_update(
 		{
 			struct network_machine *machine = &game->machines[machine_index];
 
-			if (VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+			if (network_machine_is_valid(machine) &&
 				machine->machine_index == local_machine_index)
 			{
 				struct network_machine *local_machine = network_game_client_get_machine(
@@ -2997,11 +3004,11 @@ void player_profile_update_cache_for_nwide_list(
 	long *profile_indices,
 	long profile_index_count)
 {
-	boolean still_wanted[3] = { FALSE, FALSE, FALSE };
+	boolean still_wanted[3] = { FALSE };
 	long cache_index;
 	long requested_index;
 
-	for (cache_index = 0; cache_index < NUMBEROF(cached_player_profile); cache_index++)
+	for (cache_index = 0; cache_index < (long)NUMBEROF(cached_player_profile); cache_index++)
 	{
 		if (cached_player_profile[cache_index].profile_index == NONE)
 			continue;
@@ -3018,35 +3025,34 @@ void player_profile_update_cache_for_nwide_list(
 
 	for (requested_index = 0; requested_index < profile_index_count; requested_index++)
 	{
-		long requested_profile_index = profile_indices[requested_index];
-
-		if (requested_profile_index == NONE)
+		if (profile_indices[requested_index] == NONE)
 			continue;
 
-		for (cache_index = 0; cache_index < NUMBEROF(cached_player_profile); cache_index++)
+		for (cache_index = 0; cache_index < (long)NUMBEROF(cached_player_profile); cache_index++)
 		{
-			if (cached_player_profile[cache_index].profile_index == requested_profile_index)
+			if (profile_indices[requested_index] == cached_player_profile[cache_index].profile_index)
 				break;
 		}
 
-		if (cache_index == NUMBEROF(cached_player_profile))
+		if (cache_index == (long)NUMBEROF(cached_player_profile))
 		{
-			for (cache_index = 0;
-				cache_index < NUMBEROF(still_wanted) && still_wanted[cache_index] == TRUE;
-				cache_index++)
+			for (cache_index = 0; cache_index < (long)NUMBEROF(still_wanted); cache_index++)
 			{
+				if (still_wanted[cache_index] != TRUE)
+					break;
+
+				match_vassert(
+					"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+					0xCA2,
+					cache_index < (long)NUMBEROF(cached_player_profile),
+					"not enough cache profiles");
 			}
 
-			match_assert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-				0xCA2,
-				cache_index < NUMBEROF(cached_player_profile));
-
 			if (player_profile_get(
-				requested_profile_index,
+				profile_indices[requested_index],
 				&cached_player_profile[cache_index].profile))
 			{
-				cached_player_profile[cache_index].profile_index = requested_profile_index;
+				cached_player_profile[cache_index].profile_index = profile_indices[requested_index];
 				still_wanted[cache_index] = TRUE;
 			}
 			else

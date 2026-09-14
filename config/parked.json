@@ -4700,25 +4700,6 @@
       }
     },
     {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_network_pregame_status_screen_update",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete typed UI/network pregame reconstruction retained with zero exact credit. Target and candidate are both 1,984 padded bytes with 81 semantic relocations; the controller-frame table has its proper semantic owner and all relocation identities agree. A prior exact candidate depended on two impossible `machine &&` tests immediately after taking an array-element address. Those nonsensical checks are deliberately rejected under house rule 21, leaving an honest code-hash residual. See docs/object_matching_logs/ui_server_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 1984,
-          "relocation_count": 81,
-          "normalized_sha256": "1a93e54737381c28f6977f4a053cc4f5753eb19083dcad0b38d295a0720730b2"
-        },
-        "base": {
-          "size": 1984,
-          "relocation_count": 81,
-          "normalized_sha256": "f139c00d124a264b1c87357b384023c3dd64dde724e1e3e7867ff64c1c0380ea"
-        },
-        "objdiff_percent": 96.35922
-      }
-    },
-    {
       "unit": "source/sound/sound_manager",
       "function": "_sound_refresh_looping",
       "class": "tu-context-optimization",
