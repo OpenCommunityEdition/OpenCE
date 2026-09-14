@@ -4097,26 +4097,28 @@ static boolean ai_conversation_begin(
 			conversation->header.scenario_conversation_index,
 			struct scenario_conversation_definition_view);
 	unsigned long better_player_rating_mask = 0;
-	real best_distance = REAL_MAX;
-	boolean found_specific_unit = FALSE;
 	boolean try_alternate = FALSE;
 	boolean found_alternate = FALSE;
+	boolean found_specific_unit = FALSE;
 	boolean can_begin = TRUE;
 	boolean keep_trying = FALSE;
-	short participant_index;
+	real best_distance = REAL_MAX;
+	boolean participant_not_ready;
+	boolean participant_missing;
+	short index;
 
 	conversation->participant_bitmask = 0;
 	csmemset(conversation->actor_indices, NONE, sizeof(conversation->actor_indices));
 	csmemset(conversation->dialogue_indices, NONE, sizeof(conversation->dialogue_indices));
 
-	for (participant_index = 0;
-		participant_index < definition->participants.count;
-		participant_index = (short)(participant_index + 1))
+	for (index = 0;
+		index < definition->participants.count;
+		index = (short)(index + 1))
 	{
 		struct scenario_conversation_participant_view *participant =
 			TAG_BLOCK_GET_ELEMENT(
 				&definition->participants,
-				participant_index,
+				index,
 				struct scenario_conversation_participant_view);
 
 		if (!TEST_FLAG(
@@ -4127,31 +4129,31 @@ static boolean ai_conversation_begin(
 
 			ai_conversation_find_participant(
 				conversation_index,
-				participant_index,
+				index,
 				&found_specific_unit,
 				&try_alternate,
 				&better_player_rating,
 				&best_distance);
 			SET_FLAG(
 				better_player_rating_mask,
-				participant_index,
+				index,
 				better_player_rating);
 		}
 	}
 
 	if (try_alternate)
 	{
-		for (participant_index = 0;
-			participant_index < definition->participants.count;
-			participant_index = (short)(participant_index + 1))
+		for (index = 0;
+			index < definition->participants.count;
+			index = (short)(index + 1))
 		{
 			struct scenario_conversation_participant_view *participant =
 				TAG_BLOCK_GET_ELEMENT(
 					&definition->participants,
-					participant_index,
+					index,
 					struct scenario_conversation_participant_view);
 
-			if (!TEST_FLAG(conversation->participant_bitmask, participant_index) &&
+			if (!TEST_FLAG(conversation->participant_bitmask, index) &&
 				TEST_FLAG(
 					participant->flags,
 					_ai_conversation_participant_is_alternate_bit))
@@ -4160,7 +4162,7 @@ static boolean ai_conversation_begin(
 
 				if (ai_conversation_find_participant(
 					conversation_index,
-					participant_index,
+					index,
 					&found_specific_unit,
 					NULL,
 					&better_player_rating,
@@ -4172,27 +4174,29 @@ static boolean ai_conversation_begin(
 				{
 					SET_FLAG(
 						better_player_rating_mask,
-						participant_index,
+						index,
 						better_player_rating);
 				}
 			}
 		}
 	}
 
-	for (participant_index = 0;
-		participant_index < definition->participants.count;
-		participant_index = (short)(participant_index + 1))
+	participant_not_ready = FALSE;
+	participant_missing = FALSE;
+	for (index = 0;
+		index < definition->participants.count;
+		index = (short)(index + 1))
 	{
 		struct scenario_conversation_participant_view *participant =
 			TAG_BLOCK_GET_ELEMENT(
 				&definition->participants,
-				participant_index,
+				index,
 				struct scenario_conversation_participant_view);
 
 		if (!TEST_FLAG(
 				participant->flags,
 				_ai_conversation_participant_optional_bit) &&
-			!TEST_FLAG(conversation->participant_bitmask, participant_index) &&
+			!TEST_FLAG(conversation->participant_bitmask, index) &&
 			(!TEST_FLAG(
 				participant->flags,
 				_ai_conversation_participant_has_alternate_bit) ||
@@ -4202,11 +4206,14 @@ static boolean ai_conversation_begin(
 				_ai_conversation_participant_is_alternate_bit) ||
 				try_alternate))
 		{
-			if (TEST_FLAG(better_player_rating_mask, participant_index))
+			if (TEST_FLAG(better_player_rating_mask, index))
 			{
-				keep_trying = TRUE;
+				participant_not_ready = TRUE;
 			}
-			can_begin = FALSE;
+			else
+			{
+				participant_missing = TRUE;
+			}
 
 			if (ai_print_conversations)
 			{
@@ -4223,17 +4230,37 @@ static boolean ai_conversation_begin(
 						struct scenario_object_name)->name;
 				}
 
-				console_printf(
-					FALSE,
-					TEST_FLAG(better_player_rating_mask, participant_index) ?
-						"%s: found participant %d/%s but not ready to talk yet" :
+				if (TEST_FLAG(better_player_rating_mask, index))
+				{
+					console_printf(
+						FALSE,
+						"%s: found participant %d/%s but not ready to talk yet",
+						definition->name,
+						index,
+						object_name);
+				}
+				else
+				{
+					console_printf(
+						FALSE,
 						"%s: could not find participant %d/%s",
-					definition->name,
-					participant_index,
-					object_name);
+						definition->name,
+						index,
+						object_name);
+				}
 			}
 			break;
 		}
+	}
+
+	if (participant_missing)
+	{
+		can_begin = FALSE;
+	}
+	else if (participant_not_ready)
+	{
+		keep_trying = TRUE;
+		can_begin = FALSE;
 	}
 
 	if (can_begin &&
@@ -4259,7 +4286,11 @@ static boolean ai_conversation_begin(
 	if (can_begin &&
 		TEST_FLAG(definition->flags, _ai_conversation_player_must_be_visible_bit))
 	{
-		if (found_specific_unit)
+		if (!found_specific_unit)
+		{
+			can_begin = FALSE;
+		}
+		else
 		{
 			struct data_iterator player_iterator;
 			struct player_datum *player;
@@ -4273,11 +4304,11 @@ static boolean ai_conversation_begin(
 				{
 					real nearest_prop_distance = REAL_MAX;
 
-					for (participant_index = 0;
-						participant_index < definition->participants.count;
-						participant_index = (short)(participant_index + 1))
+					for (index = 0;
+						index < definition->participants.count;
+						index = (short)(index + 1))
 					{
-						long actor_index = conversation->actor_indices[participant_index];
+						long actor_index = conversation->actor_indices[index];
 
 						if (actor_index != NONE)
 						{
@@ -4301,9 +4332,9 @@ static boolean ai_conversation_begin(
 
 					if (nearest_prop_distance < nearest_player_distance)
 					{
-						nearest_player_distance = nearest_prop_distance;
 						conversation->header.triggering_player_unit_index =
 							player->unit_index;
+						nearest_player_distance = nearest_prop_distance;
 					}
 				}
 			}
@@ -4326,10 +4357,6 @@ static boolean ai_conversation_begin(
 				}
 			}
 		}
-		else
-		{
-			can_begin = FALSE;
-		}
 	}
 
 	if (can_begin &&
@@ -4343,26 +4370,30 @@ static boolean ai_conversation_begin(
 		boolean player_can_see_participant = FALSE;
 
 		data_iterator_new(&player_iterator, player_data);
-		while (!player_can_see_participant &&
-			(player = (struct player_datum *)data_iterator_next(
-				&player_iterator)) != NULL)
+		while ((player = (struct player_datum *)data_iterator_next(
+				&player_iterator)) != NULL &&
+			!player_can_see_participant)
 		{
 			if (player->unit_index != NONE)
 			{
-				for (participant_index = 0;
-					participant_index < definition->participants.count;
-					participant_index = (short)(participant_index + 1))
+				for (index = 0;
+					index < definition->participants.count;
+					index = (short)(index + 1))
 				{
-					long actor_index = conversation->actor_indices[participant_index];
+					long actor_index = conversation->actor_indices[index];
 
-					if (actor_index != NONE &&
-						unit_can_see_point(
-							player->unit_index,
-							&actor_get(actor_index)->input.position.head_position,
-							0.52359879f))
+					if (actor_index != NONE)
 					{
-						player_can_see_participant = TRUE;
-						break;
+						struct actor_datum *actor = actor_get(actor_index);
+
+						if (unit_can_see_point(
+							player->unit_index,
+							&actor->input.position.head_position,
+							0.52359879f))
+						{
+							player_can_see_participant = TRUE;
+							break;
+						}
 					}
 				}
 			}
@@ -4389,23 +4420,19 @@ static boolean ai_conversation_begin(
 
 	if (can_begin)
 	{
-		short index;
-
 		for (index = 0;
 			index < definition->participants.count;
 			index = (short)(index + 1))
 		{
-			long actor_index = conversation->actor_indices[index];
-
 			if (TEST_FLAG(conversation->participant_bitmask, index) &&
-				actor_index != NONE)
+				conversation->actor_indices[index] != NONE)
 			{
 				struct scenario_conversation_participant_view *participant =
 					TAG_BLOCK_GET_ELEMENT(
 						&definition->participants,
 						index,
 						struct scenario_conversation_participant_view);
-				struct actor_datum *actor = actor_get(actor_index);
+				struct actor_datum *actor = actor_get(conversation->actor_indices[index]);
 				struct unit_datum *unit = unit_get(actor->meta.unit_index);
 				short attach_name_index = participant->new_attach_object_name_index;
 				short dialogue_variant;
@@ -4424,12 +4451,12 @@ static boolean ai_conversation_begin(
 					struct action_state_data action_data;
 
 					if (action_converse_setup(
-						actor_index,
+						conversation->actor_indices[index],
 						conversation_index,
 						&action_data.converse))
 					{
 						actor_action_change(
-							actor_index,
+							conversation->actor_indices[index],
 							_actor_action_converse,
 							&action_data);
 					}
