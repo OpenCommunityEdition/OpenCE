@@ -490,7 +490,7 @@ void obstacles_disc_neighborhood(
 	byte *disc_flags)
 {
 	short disc_stack[MAXIMUM_DISC_COUNT];
-	short stack_top;
+	short stack_top = 0;
 	unsigned long *disc_flag_words = (unsigned long *)disc_flags;
 
 	match_assert(
@@ -506,9 +506,8 @@ void obstacles_disc_neighborhood(
 			0x18C,
 			seed_disc_index>=0 && seed_disc_index<obstacles->disc_count);
 
-		disc_stack[0] = seed_disc_index;
-		stack_top = 1;
 		BIT_VECTOR_SET_FLAG(disc_flag_words, seed_disc_index, TRUE);
+		disc_stack[stack_top++] = seed_disc_index;
 
 		while (stack_top > 0)
 		{
@@ -523,8 +522,8 @@ void obstacles_disc_neighborhood(
 					struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
 
 					if (point_in_circle_inline(
-						&disc->center,
 						&current_disc->center,
+						&disc->center,
 						(disc->radius + radius) + (current_disc->radius + radius)))
 					{
 						BIT_VECTOR_SET_FLAG(disc_flag_words, disc_index, TRUE);

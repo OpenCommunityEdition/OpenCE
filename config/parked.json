@@ -5250,25 +5250,6 @@
       }
     },
     {
-      "unit": "source/ai/path_obstacles",
-      "function": "_obstacles_disc_neighborhood",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 560,
-          "relocation_count": 21,
-          "normalized_sha256": "daa57d89708f1bf205442613b8d59462c3e83133254dd9d23c4a8486a75581f1"
-        },
-        "base": {
-          "size": 560,
-          "relocation_count": 21,
-          "normalized_sha256": "ec5db927f53566b43b74f00b87411dd57031310473bf0d21a2cfbf1a0c40a7ad"
-        },
-        "objdiff_percent": 96.05747
-      }
-    },
-    {
       "unit": "source/cache/xbox_texture_cache",
       "function": "_texture_cache_build_hardware_format",
       "class": "unclassified",
