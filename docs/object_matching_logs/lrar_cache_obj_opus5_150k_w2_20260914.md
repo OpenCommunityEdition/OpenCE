@@ -18,7 +18,7 @@ The park is classed `tu-context-optimization`. The evidence below shows it is an
 - **What January does with the helper:** it calls `lrar_get_block` out of line at +0x83 and +0xCF, which are:
   - the last-block end, in the else arm;
   - the first eviction lookup.
-  
+
   At the post-increment lookup inside the eviction `while` it fully inlines the helper (verify_cache + index assert + verify_block).
 - **Why that means cold blocks:** January also inlines `lrar_get_block` partially at its non-loop sites (`lrar_block_address`, `lrar_deallocate`) and fully in `lrar_flush`'s loop. So January's two call sites are colder than an ordinary statement.
 - **Mechanism probe** (scratch only; NOT admissible): wrapping the retry `for (;;)` in a condition that VC7 folds late gives **12/12 strict exact**, with alndiff reporting no normalized instruction differences. The probe condition is `if (size >= 0)`, redundant with the dominating size check. File: `scratch/workers/player_profile_files_windows_etc/lr_p8.c`.

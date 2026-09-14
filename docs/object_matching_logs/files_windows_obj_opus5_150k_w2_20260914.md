@@ -49,7 +49,7 @@ Candidate: `scratch/workers/player_profile_files_windows_etc/fw_reopen.c`, SHA-2
 - *Measured levers:* two ordinary rules are needed together:
   - declaring `info` with its `file_reference_get_const_info` initializer, as the exact siblings `file_create`/`file_exists` do (house rule 17);
   - a single-exit boolean result.
-  
+
   Either lever alone stays residual (scratch `fw_v7.c` has only the single exit; `fw_v8.c` has only the initializer). The same family law closed `_file_open`, and behaviour is unchanged.
 
 ## `_file_get_size`: not landed

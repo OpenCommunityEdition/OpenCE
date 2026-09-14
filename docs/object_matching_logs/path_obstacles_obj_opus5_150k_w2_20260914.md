@@ -48,12 +48,12 @@ Diff against the real file (whitespace-exact in the candidate):
  ...
 -		disc_stack[0] = seed_disc_index;
 -		stack_top = 1;
- 		BIT_VECTOR_SET_FLAG(disc_flag_words, seed_disc_index, TRUE);
+        BIT_VECTOR_SET_FLAG(disc_flag_words, seed_disc_index, TRUE);
 +		disc_stack[stack_top++] = seed_disc_index;
  ...
- 					if (point_in_circle_inline(
+                    if (point_in_circle_inline(
 -						&disc->center,
- 						&current_disc->center,
+                        &current_disc->center,
 +						&disc->center,
 ```
 

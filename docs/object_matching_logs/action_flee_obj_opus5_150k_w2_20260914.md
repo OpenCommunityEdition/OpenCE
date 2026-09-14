@@ -102,7 +102,7 @@ Shapes: v6 (polarity, field, cause, arm order, swarm guard) gave 848. v6p (+ dia
 
    ```c
    boolean unit_is_speaking(
-   	long unit_index);
+    long unit_index);
    ```
 
    Evidence:
