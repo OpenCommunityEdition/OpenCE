@@ -210,6 +210,8 @@ symbols in this file:
 #include "projectile_definitions.h"
 #include "projectiles.h"
 
+#include "ai/actors.h"
+#include "ai/ai_runtime.h"
 #include "cache/cache_files.h"
 #include "cseries/profile.h"
 #include "effects/effect_definitions.h"
@@ -217,10 +219,14 @@ symbols in this file:
 #include "game/cheats.h"
 #include "game/game.h"
 #include "game/game_engine.h"
+#include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "models/model_animation_definitions.h"
+#include "objects/damage.h"
+#include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
+#include "units/unit_definitions.h"
 #include "units/units.h"
 
 /* ---------- constants */
@@ -239,6 +245,68 @@ enum weapon_trigger_flags
 enum
 {
 	MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON = 2,
+};
+
+/* TU-local copies: no shared header declares these tag/runtime enumerations yet.
+   Names follow the HCEA database enumerations; ai.c and actors.c carry their own
+   ai unit effect copies, and first_person_weapons.c an animation update result copy. */
+enum trigger_distribution_function
+{
+	_trigger_distribution_point = 0,
+	_trigger_distribution_horizontal_fan,
+	NUMBER_OF_TRIGGER_DISTRIBUTION_FUNCTIONS,
+};
+
+enum trigger_firing_effect_type
+{
+	_trigger_firing_effect = 0,
+	_trigger_overheated_effect,
+	_trigger_empty_effect,
+	NUMBER_OF_TRIGGER_FIRING_EFFECTS,
+};
+
+enum weapon_overcharged_action
+{
+	_trigger_overcharged_none = 0,
+	_trigger_overcharged_explodes,
+	_trigger_overcharged_fire,
+	NUMBER_OF_TRIGGER_OVERCHARGED_ACTIONS,
+};
+
+enum weapon_secondary_trigger_mode
+{
+	_weapon_secondary_trigger_normal = 0,
+	_weapon_secondary_trigger_slaved_to_primary,
+	_weapon_secondary_trigger_inhibits_primary,
+	_weapon_secondary_trigger_loads_alternate_ammunition,
+	_weapon_secondary_trigger_loads_multiple_primary_ammunition,
+	NUMBER_OF_WEAPON_SECONDARY_TRIGGER_MODES,
+};
+
+enum weapon_magazine_flags
+{
+	_weapon_magazine_wastes_rounds_when_reloaded_bit = 0,
+	_weapon_magazine_must_be_chambered_every_shot_bit,
+	NUMBER_OF_WEAPON_MAGAZINE_FLAGS,
+};
+
+enum animation_update_result
+{
+	_animation_running = 0,
+	_animation_key_frame,
+	_animation_will_restart_on_next_frame,
+	_animation_restarted,
+	_animation_looped,
+	NUMBER_OF_ANIMATION_UPDATE_RESULTS,
+};
+
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
 };
 
 /* ---------- macros */
@@ -275,6 +343,16 @@ struct animation_graph_first_person_weapon_animations
 {
 	long unused1[4];
 	struct tag_block animations;
+};
+
+/* TU-local: weapon_trigger_definition.firing_effects element; no shared header declares it yet. */
+struct trigger_firing_effect
+{
+	short shots_lower_bound;
+	short shots_upper_bound;
+	long unused[8];
+	struct tag_reference effects[NUMBER_OF_TRIGGER_FIRING_EFFECTS];
+	struct tag_reference damage_effects[NUMBER_OF_TRIGGER_FIRING_EFFECTS];
 };
 
 /* ---------- prototypes */
@@ -378,6 +456,33 @@ static void weapon_magazine_start_reload(
 static void weapon_state_next(
 	long weapon_index);
 
+static void projectile_distribute(
+	real_vector3d *forward,
+	real_vector3d *up,
+	short distribution_function,
+	real distribution_angle,
+	short projectile_index,
+	short projectile_count);
+static void trigger_create_projectiles(
+	long weapon_index,
+	short trigger_index);
+static void weapon_trigger_fire(
+	long weapon_index,
+	short trigger_index);
+static void weapon_trigger_begin_firing(
+	long weapon_index,
+	short trigger_index,
+	boolean force);
+static void weapon_trigger_overload(
+	long weapon_index,
+	long trigger_index);
+static void weapon_trigger_release_charge(
+	long weapon_index,
+	short trigger_index);
+static void weapon_trigger_overcharged(
+	long weapon_index,
+	short trigger_index);
+
 /* ---------- globals */
 
 struct weapons_globals
@@ -429,14 +534,6 @@ void weapon_ready(
 	first_person_weapon_message_from_weapon(weapon_index, _first_person_weapon_message_ready);
 	weapon_effect_new(weapon_index, weapon_definition->weapon.ready_effect.index, 0.f, 0.f);
 	weapon->weapon.state_timer = weapon_get_first_person_animation_time(weapon_index, 0, _first_person_weapon_animation_ready, NONE);
-
-	return;
-}
-
-void weapon_update(
-	long weapon_index)
-{
-	weapon_state_next(weapon_index);
 
 	return;
 }
@@ -1971,4 +2068,1119 @@ skip_animation:;
 	}
 
 	return busy;
+}
+
+static void projectile_distribute(
+	real_vector3d *forward,
+	real_vector3d *up,
+	short distribution_function,
+	real distribution_angle,
+	short projectile_index,
+	short projectile_count)
+{
+	real offset;
+	real angle;
+
+	if (projectile_count&1)
+	{
+		if (projectile_index==0)
+		{
+			offset= 0.0f;
+		}
+		else
+		{
+			short step= projectile_index-1;
+
+			if (step&1)
+			{
+				step>>= 1;
+			}
+			else
+			{
+				step= -(step>>1);
+			}
+			offset= step;
+		}
+	}
+	else
+	{
+		offset= (projectile_index>>1)-0.5f;
+		if (projectile_index&1)
+		{
+			offset= -offset;
+		}
+	}
+
+	angle= offset*distribution_angle;
+	switch (distribution_function)
+	{
+	case _trigger_distribution_horizontal_fan:
+		rotate_vector_about_axis(forward, up, sine(angle), cosine(angle));
+		break;
+	}
+
+	return;
+}
+
+static void trigger_create_projectiles(
+	long weapon_index,
+	short trigger_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+	long owner_object_index= weapon_get_owner_object_index(weapon_index);
+	char const *trigger_marker_names[MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON];
+	struct object_marker markers[MAXIMUM_MARKERS_PER_OBJECT];
+	short marker_count;
+	short marker_index;
+
+	trigger_marker_names[0]= "primary trigger";
+	trigger_marker_names[1]= "secondary trigger";
+
+	marker_count= object_get_marker_by_name(weapon_get_effect_object_index(weapon_index), trigger_marker_names[trigger_index], markers, MAXIMUM_MARKERS_PER_OBJECT);
+	if (!marker_count)
+	{
+		marker_count= 1;
+	}
+	if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_uses_weapon_origin_bit))
+	{
+		marker_count= 1;
+	}
+
+	for (marker_index= 0; marker_index<marker_count; marker_index++)
+	{
+		real_point3d origin= markers[marker_index].matrix.position;
+		real_vector3d forward= markers[marker_index].matrix.forward;
+		real velocity= 0.0f;
+		real error= 0.0f;
+		struct unit_datum *unit= unit_try_and_get(owner_object_index);
+		long target_object_index= NONE;
+		long projectile_definition_index;
+		short projectile_count;
+
+		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
+			unit &&
+			!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+		{
+			struct unit_definition *unit_definition= unit_definition_get(unit->definition_index);
+			long player_index= unit->unit.player_index;
+			long actor_index= unit->unit.actor_index;
+			boolean adjust_origin;
+			boolean use_aiming_vector= TRUE;
+
+			if (unit->unit.gunner_object_index!=NONE)
+			{
+				struct unit_datum *gunner= unit_get(unit->unit.gunner_object_index);
+
+				player_index= gunner->unit.player_index;
+				actor_index= gunner->unit.actor_index;
+			}
+
+			adjust_origin= TEST_FLAG(unit_definition->unit.flags, _unit_fires_from_camera_bit);
+			if (actor_index!=NONE && actor_firing_blindly(actor_index))
+			{
+				use_aiming_vector= FALSE;
+			}
+			if (unit->unit.gunner_object_index!=NONE)
+			{
+				use_aiming_vector= FALSE;
+			}
+
+			unit_adjust_projectile_ray(owner_object_index, &origin, &forward, &velocity, adjust_origin, use_aiming_vector);
+
+			if (player_index!=NONE)
+			{
+				real_vector3d right;
+				real_vector3d up;
+				real forward_offset;
+				real right_offset;
+				real up_offset;
+
+				cross_product3d(global_up3d, &forward, &right);
+				if (normalize3d(&right)==0.0f)
+				{
+					right= *global_left3d;
+				}
+				cross_product3d(&forward, &right, &up);
+				normalize3d(&up);
+
+				forward_offset= trigger_definition->first_person_weapon_offset.x;
+				right_offset= trigger_definition->first_person_weapon_offset.y;
+				up_offset= trigger_definition->first_person_weapon_offset.z;
+				origin.x+= forward.i*forward_offset;
+				origin.y+= forward.j*forward_offset;
+				origin.z+= forward.k*forward_offset;
+				origin.x+= right.i*right_offset;
+				origin.y+= right.j*right_offset;
+				origin.z+= right.k*right_offset;
+				origin.x+= up.i*up_offset;
+				origin.y+= up.j*up_offset;
+				origin.z+= up.k*up_offset;
+
+				target_object_index= player_aim_projectile(player_index, &origin, &forward);
+			}
+			else if (actor_index!=NONE)
+			{
+				target_object_index= actor_aim_projectile(actor_index, &origin, &forward, &error);
+			}
+		}
+
+		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_uses_weapon_origin_bit))
+		{
+			origin= markers[marker_index].matrix.position;
+		}
+
+		if (trigger_index==0 && weapon->weapon.alternate_shots_loaded>0)
+		{
+			struct weapon_trigger_definition *secondary_trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, 1, struct weapon_trigger_definition);
+			short alternate_shots_loaded= weapon->weapon.alternate_shots_loaded;
+
+			projectile_definition_index= secondary_trigger_definition->projectile.index;
+			if (weapon_definition->weapon.secondary_trigger_mode==_weapon_secondary_trigger_loads_multiple_primary_ammunition)
+			{
+				alternate_shots_loaded++;
+			}
+			projectile_count= trigger_definition->projectiles_per_shot*alternate_shots_loaded;
+			weapon->weapon.alternate_shots_loaded= 0;
+		}
+		else
+		{
+			projectile_definition_index= trigger_definition->projectile.index;
+			projectile_count= trigger_definition->projectiles_per_shot;
+		}
+
+		if (projectile_definition_index!=NONE)
+		{
+			long projectile_owner_object_index= weapon_get_projectile_owner_object_index(weapon_index);
+			real_vector3d first_projectile_forward;
+			short projectile_index;
+
+			for (projectile_index= 0; projectile_index<projectile_count; projectile_index++)
+			{
+				struct object_placement_data data;
+				boolean tracer= FALSE;
+				boolean inside_bsp;
+				long projectile_object_index;
+
+				object_placement_data_new(&data, trigger_definition->projectile.index, projectile_owner_object_index);
+				data.position= origin;
+				data.forward= forward;
+
+				if (trigger->rate_of_fire==0.0f || trigger->sequential_non_tracer_rounds++>=trigger_definition->rounds_between_tracers)
+				{
+					tracer= TRUE;
+					trigger->sequential_non_tracer_rounds= 0;
+				}
+
+				if (error==0.0f)
+				{
+					real fraction= TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit) ?
+						weapon->weapon.primary_trigger :
+						trigger->error;
+
+					error= (1.0f-fraction)*trigger_definition->projectile_error_angle_lower_bound + fraction*trigger_definition->projectile_error_angle_upper_bound;
+				}
+
+				if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_use_error_when_unzoomed_bit) ||
+					!TEST_FLAG(weapon->weapon.control_flags, _weapon_control_zoomed_bit))
+				{
+					random_vector_in_cone3d(&data.forward, trigger_definition->projectile_error_inner_cone_angle, error, &data.forward);
+				}
+
+				if (projectile_index==0)
+				{
+					first_projectile_forward= data.forward;
+				}
+				if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_have_identical_error_bit))
+				{
+					data.forward= first_projectile_forward;
+				}
+
+				normalize3d(perpendicular3d(&data.forward, &data.up));
+				projectile_distribute(&data.forward, &data.up, trigger_definition->projectile_distribution_function, trigger_definition->projectile_distribution_angle, projectile_index, projectile_count);
+				scale_vector3d(&data.forward, velocity, &data.translational_velocity);
+
+				if (unit && unit->unit.player_index!=NONE)
+				{
+					inside_bsp= TRUE;
+					SET_FLAG(data.flags, _new_object_never_automatically_delete_bit, TRUE);
+				}
+				else
+				{
+					inside_bsp= FALSE;
+				}
+
+				projectile_object_index= object_new(&data);
+				if (projectile_object_index!=NONE)
+				{
+					if (inside_bsp)
+					{
+						real_point3d camera_position;
+
+						unit_get_camera_position(owner_object_index, &camera_position);
+						object_force_inside_bsp(projectile_object_index, &camera_position);
+					}
+					if (target_object_index!=NONE)
+					{
+						projectile_set_target_object_index(projectile_object_index, target_object_index);
+					}
+					if (!tracer)
+					{
+						projectile_kill_tracer(projectile_object_index);
+					}
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+static void weapon_trigger_fire(
+	long weapon_index,
+	short trigger_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+	long owner_object_index= weapon_get_owner_object_index(weapon_index);
+	long damage_effect_index= NONE;
+	long effect_index= NONE;
+	real effect_error= 0.0f;
+	real effect_scale= 0.0f;
+	boolean fired= FALSE;
+	boolean misfired= FALSE;
+	boolean loads_alternate_ammunition= FALSE;
+
+	if (trigger_index==1 &&
+		(weapon_definition->weapon.secondary_trigger_mode==_weapon_secondary_trigger_loads_alternate_ammunition ||
+		weapon_definition->weapon.secondary_trigger_mode==_weapon_secondary_trigger_loads_multiple_primary_ammunition))
+	{
+		loads_alternate_ammunition= TRUE;
+	}
+
+	if (trigger_definition->magazine_index!=NONE)
+	{
+		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition);
+		struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+
+		if (!loads_alternate_ammunition || weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded)
+		{
+			if ((magazine->rounds_loaded>=trigger_definition->rounds_per_shot || TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) &&
+				!(TEST_FLAG(weapon_definition->weapon.flags, _weapon_cannot_fire_at_maximum_age_bit) && weapon->weapon.age>=1.0f) &&
+				(magazine->rounds_loaded>=trigger_definition->minimum_rounds_loaded_per_shot || !TEST_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit)))
+			{
+				if (!cheat.bottomless_clip && (magazine->rounds_loaded-= trigger_definition->rounds_per_shot)<=0)
+				{
+					magazine->rounds_loaded= 0;
+				}
+				else if (TEST_FLAG(magazine_definition->flags, _weapon_magazine_must_be_chambered_every_shot_bit))
+				{
+					magazine->state= _magazine_unchambered;
+					magazine->state_timer= 0;
+				}
+
+				fired= TRUE;
+			}
+		}
+	}
+	else
+	{
+		fired= TRUE;
+	}
+
+	if (cheat.bottomless_clip)
+	{
+		fired= TRUE;
+	}
+
+	if (trigger_definition->firing_effects.count>0)
+	{
+		struct trigger_firing_effect *firing_effect;
+		short effect_type;
+
+		if (trigger->firing_effect_shots_remaining<=0)
+		{
+			short starting_firing_effect_index= trigger->firing_effect_index;
+			short firing_effect_index;
+
+			if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_random_firing_effects_bit))
+			{
+				firing_effect_index= random()%trigger_definition->firing_effects.count;
+			}
+			else
+			{
+				firing_effect_index= starting_firing_effect_index;
+			}
+
+			do
+			{
+				struct trigger_firing_effect *next_firing_effect;
+
+				if (trigger->firing_effects_used_flags==FLAG(trigger_definition->firing_effects.count)-1)
+				{
+					trigger->firing_effects_used_flags= 0;
+				}
+
+				do
+				{
+					firing_effect_index++;
+					if (firing_effect_index>=trigger_definition->firing_effects.count)
+					{
+						firing_effect_index= 0;
+					}
+				}
+				while (TEST_FLAG(trigger->firing_effects_used_flags, firing_effect_index));
+
+				next_firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, firing_effect_index, struct trigger_firing_effect);
+				trigger->firing_effect_index= firing_effect_index;
+				SET_FLAG(trigger->firing_effects_used_flags, firing_effect_index, TRUE);
+				trigger->firing_effect_shots_remaining= random_range(next_firing_effect->shots_lower_bound, next_firing_effect->shots_upper_bound);
+			}
+			while (trigger->firing_effect_shots_remaining<=0 && firing_effect_index!=starting_firing_effect_index);
+		}
+
+		trigger->firing_effect_shots_remaining--;
+		firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, trigger->firing_effect_index, struct trigger_firing_effect);
+
+		if (weapon_definition->weapon.age_misfire_start>0.0f &&
+			weapon_definition->weapon.age_misfire_start<1.0f &&
+			weapon->weapon.age>weapon_definition->weapon.age_misfire_start)
+		{
+			real misfire_chance= ((weapon->weapon.age-weapon_definition->weapon.age_misfire_start)*weapon_definition->weapon.age_misfire_chance)/(1.0f-weapon_definition->weapon.age_misfire_start);
+
+			if (trigger->state==_trigger_spewing)
+			{
+				misfire_chance*= 2.0f;
+			}
+			if (real_random()<misfire_chance)
+			{
+				misfired= TRUE;
+			}
+		}
+
+		if (!fired)
+		{
+			effect_type= _trigger_empty_effect;
+			effect_scale= 1.0f;
+			effect_error= 0.0f;
+		}
+		else if (misfired)
+		{
+			effect_type= _trigger_overheated_effect;
+			effect_scale= trigger->rate_of_fire;
+			effect_error= 0.0f;
+		}
+		else
+		{
+			effect_type= _trigger_firing_effect;
+			effect_scale= trigger->rate_of_fire;
+			if (weapon_definition->weapon.heat_overheated_threshold!=0.0f)
+			{
+				effect_error= weapon->weapon.heat/weapon_definition->weapon.heat_overheated_threshold;
+			}
+			else
+			{
+				effect_error= 0.0f;
+			}
+		}
+
+		effect_index= firing_effect->effects[effect_type].index;
+		damage_effect_index= firing_effect->damage_effects[effect_type].index;
+	}
+
+	if (fired)
+	{
+		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && game_engine_running())
+		{
+			long player_index= player_index_from_unit_index(owner_object_index);
+
+			if (player_index!=NONE)
+			{
+				game_engine_weapon_fired(player_index);
+			}
+		}
+
+		weapon->weapon.game_time_last_fired= game_time_get();
+
+		first_person_weapon_message_from_weapon(weapon_index, misfired ?
+			(trigger_index ? _first_person_weapon_message_secondary_misfire : _first_person_weapon_message_primary_misfire) :
+			(trigger_index ? _first_person_weapon_message_secondary_fire : _first_person_weapon_message_primary_fire));
+		weapon_trigger_start_ejection_port(weapon_index, trigger_index, FALSE);
+
+		if (trigger_definition->illumination_recovery_time>0.0f)
+		{
+			trigger->illumination= 1.0f;
+		}
+
+		if (!cheat.bottomless_clip)
+		{
+			weapon->weapon.heat+= trigger_definition->heat_generated_per_round;
+		}
+
+		if (!TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && weapon->weapon.heat>weapon_definition->weapon.heat_overheated_threshold)
+		{
+			weapon->weapon.heat= weapon_definition->weapon.heat_overheated_threshold;
+		}
+		else if (weapon->weapon.heat>1.0f)
+		{
+			weapon->weapon.heat= 1.0f;
+		}
+
+		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !cheat.infinite_ammo)
+		{
+			weapon->weapon.age+= trigger_definition->age_generated_per_round;
+			if (weapon->weapon.age>1.0f)
+			{
+				weapon->weapon.age= 1.0f;
+			}
+		}
+
+		weapon_set_state(weapon_index, trigger_index ? _weapon_state_secondary_recoil : _weapon_state_primary_recoil, FALSE);
+
+		if (!misfired)
+		{
+			if (loads_alternate_ammunition)
+			{
+				weapon->weapon.alternate_shots_loaded++;
+			}
+			else
+			{
+				trigger_create_projectiles(weapon_index, trigger_index);
+				ai_handle_unit_effect(owner_object_index, _ai_unit_effect_shooting, trigger_definition->firing_noise);
+			}
+		}
+
+		if (owner_object_index!=NONE && damage_effect_index!=NONE)
+		{
+			struct unit_datum *unit= unit_get(owner_object_index);
+			struct damage_data damage;
+
+			damage_data_new(&damage, damage_effect_index);
+			SET_FLAG(damage.flags, _damage_from_weapon_bit, TRUE);
+			negate_vector3d(&unit->unit.aiming_vector, &damage.direction);
+			damage.epicenter= unit->object.bounding_sphere_center;
+			damage.origin= damage.epicenter;
+			object_cause_damage(&damage, owner_object_index, NONE, NONE, NONE, NULL);
+		}
+
+		if (weapon_definition->weapon.weapon_type==_weapon_type_plasma_pistol && trigger_index==1)
+		{
+			SET_FLAG(weapon->weapon.flags, _weapon_overheat_recoil_bit, TRUE);
+		}
+	}
+
+	if (weapon->weapon.heat>weapon_definition->weapon.heat_detonation_threshold && real_random()<weapon_definition->weapon.overheated_explosion_fraction)
+	{
+		weapon_detonate(weapon_index);
+	}
+
+	if (!fired)
+	{
+		weapon_trigger_change_state(weapon_index, trigger_index, _trigger_locked, NONE);
+	}
+	else if (trigger->state!=_trigger_spewing || misfired)
+	{
+		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_tracks_projectile_bit))
+		{
+			weapon_trigger_change_state(weapon_index, trigger_index, _trigger_tracking, NONE);
+		}
+		else
+		{
+			weapon_trigger_recover(weapon_index, trigger_index);
+		}
+	}
+
+	SET_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit, FALSE);
+	weapon_effect_new(weapon_index, effect_index, effect_scale, effect_error);
+
+	return;
+}
+
+static void weapon_trigger_begin_firing(
+	long weapon_index,
+	short trigger_index,
+	boolean force)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+	boolean can_fire= TRUE;
+
+	if (trigger_definition->magazine_index!=NONE)
+	{
+		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition);
+		struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+
+		if (magazine->state!=_magazine_idle)
+		{
+			can_fire= FALSE;
+		}
+	}
+
+	if (TEST_FLAG(weapon->weapon.flags, _weapon_overheated_bit))
+	{
+		can_fire= FALSE;
+	}
+
+	if (scenario_location_underwater(&weapon->object.location, &weapon->object.position, NULL))
+	{
+		can_fire= FALSE;
+	}
+
+	if (can_fire)
+	{
+		if (!force && trigger_definition->charging_time>0.0f)
+		{
+			if (TEST_FLAG(weapon_definition->weapon.flags, _weapon_cannot_fire_at_maximum_age_bit) && weapon->weapon.age>=1.0f)
+			{
+				weapon_trigger_fire(weapon_index, trigger_index);
+			}
+			else
+			{
+				if (weapon_definition->weapon.triggers.count>1)
+				{
+					trigger->charging_effect_index= weapon_effect_new(weapon_index, trigger_definition->charging_effect.index, 0.0f, 0.0f);
+				}
+				else if (trigger->rate_of_fire>0.0f)
+				{
+					SET_FLAG(trigger->flags, _weapon_trigger_fired_before_charging_bit, TRUE);
+					weapon_trigger_fire(weapon_index, trigger_index);
+				}
+				else
+				{
+					SET_FLAG(trigger->flags, _weapon_trigger_fired_before_charging_bit, FALSE);
+				}
+
+				weapon_trigger_change_state(weapon_index, trigger_index, _trigger_charging, (short)(trigger_definition->charging_time*TICKS_PER_SECOND));
+			}
+		}
+		else if (!force && trigger_definition->overloading_time>0.0f)
+		{
+			weapon_trigger_change_state(weapon_index, trigger_index, _trigger_overloading, (short)(trigger_definition->overloading_time*TICKS_PER_SECOND));
+		}
+		else
+		{
+			weapon_trigger_fire(weapon_index, trigger_index);
+		}
+	}
+
+	return;
+}
+
+static void weapon_trigger_overload(
+	long weapon_index,
+	long trigger_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+	if (trigger_index+1<weapon_definition->weapon.triggers.count)
+	{
+		weapon_trigger_fire(weapon_index, (short)(trigger_index+1));
+	}
+
+	weapon_trigger_change_state(weapon_index, (short)trigger_index, _trigger_overloading, (short)(trigger_definition->overloading_time*TICKS_PER_SECOND));
+
+	return;
+}
+
+static void weapon_trigger_release_charge(
+	long weapon_index,
+	short trigger_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+	if (trigger_definition->spew_time>0.0f)
+	{
+		weapon_trigger_change_state(weapon_index, trigger_index, _trigger_spewing, (short)(trigger_definition->spew_time*TICKS_PER_SECOND));
+	}
+	else
+	{
+		if (weapon_definition->weapon.triggers.count>1)
+		{
+			weapon_trigger_fire(weapon_index, 1);
+		}
+		weapon_trigger_recover(weapon_index, trigger_index);
+	}
+
+	trigger->rate_of_fire= 0.0f;
+
+	return;
+}
+
+static void weapon_trigger_overcharged(
+	long weapon_index,
+	short trigger_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+	switch (trigger_definition->overcharged_action)
+	{
+	case _trigger_overcharged_explodes:
+		weapon_detonate(weapon_index);
+		break;
+
+	case _trigger_overcharged_fire:
+		weapon_trigger_release_charge(weapon_index, trigger_index);
+		break;
+	}
+
+	return;
+}
+
+boolean weapon_update(
+	long weapon_index)
+{
+	struct weapon_datum *weapon= weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+	boolean triggers_down[MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON];
+	short magazine_index;
+	short trigger_index;
+
+	profile_enter(data_00307140.update_profile);
+
+	if (weapon->weapon.tracked_object_index!=NONE && !object_try_and_get_and_verify_type(weapon->weapon.tracked_object_index, _object_mask_all))
+	{
+		weapon->weapon.tracked_object_index= NONE;
+	}
+
+	if (weapon_definition->object.animation_graph.index!=NONE && weapon->object.animation.state.index!=NONE)
+	{
+		switch (animation_update_internal(TRUE, weapon_definition->object.animation_graph.index, &weapon->object.animation.state, NULL))
+		{
+		case _animation_key_frame:
+			weapon_state_key_frame(weapon_index);
+			break;
+
+		case _animation_will_restart_on_next_frame:
+			weapon_state_next(weapon_index);
+			break;
+		}
+	}
+
+	if (TEST_FLAG(weapon_definition->weapon.flags, _weapon_detonates_when_dropped_bit) && weapon->object.parent_object_index==NONE)
+	{
+		item_detonate(weapon_index);
+	}
+
+	if (weapon->weapon.integrated_light_power>0.0f)
+	{
+		struct unit_datum *unit;
+
+		if (!(weapon->object.parent_object_index!=NONE &&
+			(unit= unit_try_and_get(weapon->object.parent_object_index))!=NULL &&
+			unit->definition_index!=NONE &&
+			TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_integrated_light_controls_weapon_directly_bit)))
+		{
+			weapon->weapon.integrated_light_power-= (1.0f/24.0f);
+			if (weapon->weapon.integrated_light_power<0.0f)
+			{
+				weapon->weapon.integrated_light_power= 0.0f;
+			}
+		}
+	}
+
+	if (weapon->weapon.heat>0.0f)
+	{
+		if (weapon->weapon.heat>=weapon_definition->weapon.heat_overheated_threshold && !TEST_FLAG(weapon->weapon.flags, _weapon_overheated_bit))
+		{
+			SET_FLAG(weapon->weapon.flags, _weapon_overheated_bit, TRUE);
+			if (weapon_definition->weapon.weapon_type==_weapon_type_plasma_pistol && TEST_FLAG(weapon->weapon.flags, _weapon_overheat_recoil_bit))
+			{
+				SET_FLAG(weapon->weapon.flags, _weapon_overheat_recoil_bit, FALSE);
+				first_person_weapon_message_from_weapon(weapon_index, _first_person_weapon_message_overheating_super_recoil);
+			}
+			else
+			{
+				first_person_weapon_message_from_weapon(weapon_index, _first_person_weapon_message_overheating);
+			}
+			weapon->weapon.overheated_effect_index= weapon_effect_looping_new(weapon_index, weapon_definition->weapon.overheated_effect.index);
+		}
+
+		if (weapon->weapon.overcharged==0.0f)
+		{
+			real heat_loss= weapon_definition->weapon.heat_loss_per_second*(1.0f/TICKS_PER_SECOND);
+
+			if (weapon_definition->weapon.age_heat_recovery_penalty>0.0f)
+			{
+				heat_loss*= 1.0f-weapon->weapon.age*weapon_definition->weapon.age_heat_recovery_penalty;
+			}
+
+			weapon->weapon.heat-= heat_loss;
+			if (weapon->weapon.heat<0.0f)
+			{
+				weapon->weapon.heat= 0.0f;
+			}
+
+			if (TEST_FLAG(weapon->weapon.flags, _weapon_overheated_bit) &&
+				!TEST_FLAG(weapon->weapon.flags, _weapon_overheated_exit_bit) &&
+				(weapon->weapon.heat-weapon_definition->weapon.heat_recovery_threshold)/heat_loss<=1.0f)
+			{
+				SET_FLAG(weapon->weapon.flags, _weapon_overheated_exit_bit, TRUE);
+			}
+		}
+
+		if (TEST_FLAG(weapon->weapon.flags, _weapon_overheated_bit) && weapon->weapon.heat<weapon_definition->weapon.heat_recovery_threshold)
+		{
+			weapon->weapon.flags&= ~(FLAG(_weapon_overheated_bit)|FLAG(_weapon_overheated_exit_bit));
+			if (weapon->weapon.overheated_effect_index!=NONE)
+			{
+				effect_stop(weapon->weapon.overheated_effect_index, TRUE);
+			}
+		}
+	}
+
+	weapon->weapon.overcharged= 0.0f;
+	if (weapon->weapon.state_timer>0)
+	{
+		weapon->weapon.state_timer--;
+	}
+
+	if (!TEST_FLAG(weapon->weapon.control_flags, _weapon_control_user_busy_bit) && weapon->weapon.state_timer<=0)
+	{
+		triggers_down[0]= TEST_FLAG(weapon->weapon.control_flags, _weapon_control_primary_trigger_bit);
+		triggers_down[1]= TEST_FLAG(weapon_definition->weapon.flags, _weapon_secondary_trigger_overrides_grenades_bit) && TEST_FLAG(weapon->weapon.control_flags, _weapon_control_secondary_trigger_bit);
+	}
+	else
+	{
+		triggers_down[0]= FALSE;
+		triggers_down[1]= FALSE;
+	}
+
+	switch (weapon_definition->weapon.secondary_trigger_mode)
+	{
+	case _weapon_secondary_trigger_slaved_to_primary:
+		if (triggers_down[1] && weapon_definition->weapon.triggers.count>0 && weapon->weapon.triggers[0].rate_of_fire!=1.0f)
+		{
+			triggers_down[1]= FALSE;
+		}
+		break;
+
+	case _weapon_secondary_trigger_inhibits_primary:
+		if (triggers_down[1])
+		{
+			triggers_down[0]= FALSE;
+		}
+		break;
+	}
+
+	if (TEST_FLAG(weapon->weapon.control_flags, _weapon_control_reload_bit) && weapon_definition->weapon.magazines.count>0)
+	{
+		SET_FLAG(weapon->weapon.flags, _weapon_needs_to_reload_bit, TRUE);
+	}
+	if (TEST_FLAG(weapon->weapon.flags, _weapon_needs_to_reload_bit))
+	{
+		weapon_magazine_start_reload(weapon_index, 0, TRUE);
+	}
+
+	for (magazine_index= 0; magazine_index<weapon_definition->weapon.magazines.count; magazine_index++)
+	{
+		struct weapon_magazine *magazine= weapon_magazine_get(weapon, magazine_index);
+		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+		if (magazine_definition->rounds_recharged_per_second>0 && magazine->rounds_loaded<magazine_definition->rounds_loaded_maximum)
+		{
+			short rounds_recharged= magazine_definition->rounds_recharged_per_second;
+
+			magazine->rounds_loaded+= rounds_recharged/TICKS_PER_SECOND;
+			magazine->rounds_fractional_recharged+= rounds_recharged%TICKS_PER_SECOND;
+			if (magazine->rounds_fractional_recharged>=TICKS_PER_SECOND)
+			{
+				magazine->rounds_loaded++;
+				magazine->rounds_fractional_recharged-= TICKS_PER_SECOND;
+			}
+			if (magazine->rounds_loaded>magazine_definition->rounds_loaded_maximum)
+			{
+				magazine->rounds_loaded= magazine_definition->rounds_loaded_maximum;
+			}
+		}
+
+		if (magazine->state_timer)
+		{
+			magazine->state_timer--;
+		}
+
+		switch (magazine->state)
+		{
+		case _magazine_reloading:
+			if (magazine->state_timer-1<=0)
+			{
+				weapon_magazine_finish_reload(weapon_index, magazine_index);
+			}
+			break;
+
+		case _magazine_unchambered:
+			weapon_magazine_start_chamber(weapon_index, magazine_index);
+			break;
+
+		case _magazine_chambering:
+			if (!magazine->state_timer)
+			{
+				weapon_magazine_finish_chamber(weapon_index, magazine_index);
+			}
+			break;
+		}
+	}
+
+	for (trigger_index= 0; trigger_index<weapon_definition->weapon.triggers.count; trigger_index++)
+	{
+		struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
+		struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+		boolean trigger_down;
+
+		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit) && TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit))
+		{
+			triggers_down[trigger_index]= weapon->weapon.primary_trigger>0.05f;
+		}
+		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_sticks_when_dropped_bit) && weapon->object.parent_object_index==NONE)
+		{
+			triggers_down[trigger_index]= TRUE;
+		}
+
+		if (trigger->state_timer)
+		{
+			trigger->state_timer--;
+		}
+
+		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_toggles_bit))
+		{
+			if (!TEST_FLAG(trigger->flags, _weapon_trigger_was_down_bit) && triggers_down[trigger_index])
+			{
+				trigger->flags^= FLAG(_weapon_trigger_toggled_bit);
+			}
+			SET_FLAG(trigger->flags, _weapon_trigger_was_down_bit, triggers_down[trigger_index]);
+			triggers_down[trigger_index]= TEST_FLAG(trigger->flags, _weapon_trigger_toggled_bit);
+		}
+
+		trigger_down= triggers_down[trigger_index];
+		if (!trigger_down)
+		{
+			SET_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit, TRUE);
+		}
+
+		if (trigger->ejection_port_position>0.0f)
+		{
+			trigger->ejection_port_position-= trigger_definition->runtime_ejection_port_recovery_time;
+			if (trigger->ejection_port_position<=0.0f)
+			{
+				trigger->ejection_port_position= 0.0f;
+			}
+		}
+
+		if (trigger->illumination>0.0f)
+		{
+			trigger->illumination-= trigger_definition->runtime_illumination_recovery_time;
+			if (trigger->illumination<=0.0f)
+			{
+				trigger->illumination= 0.0f;
+			}
+		}
+
+		switch (trigger->state)
+		{
+		case _trigger_idle:
+			if (!TEST_FLAG(weapon->weapon.control_flags, _weapon_control_user_busy_bit) &&
+				weapon->object.parent_object_index!=NONE &&
+				trigger_definition->magazine_index!=NONE)
+			{
+				struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+
+				if ((magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) ||
+					magazine->rounds_loaded<trigger_definition->minimum_rounds_loaded_per_shot ||
+					magazine->rounds_loaded==0)
+				{
+					weapon_magazine_start_reload(weapon_index, trigger_definition->magazine_index, TRUE);
+				}
+			}
+
+			if (trigger_down && weapon_trigger_can_fire_again(weapon_index, trigger_index))
+			{
+				weapon_trigger_begin_firing(weapon_index, trigger_index, FALSE);
+			}
+			else if (trigger->idle_ticks<127)
+			{
+				trigger->idle_ticks++;
+			}
+			break;
+
+		case _trigger_spewing:
+			if (trigger->state_timer)
+			{
+				weapon_trigger_begin_firing(weapon_index, trigger_index, TRUE);
+			}
+			else
+			{
+				weapon_trigger_recover(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_overloading:
+			if (!trigger_down)
+			{
+				weapon_trigger_begin_firing(weapon_index, trigger_index, TRUE);
+			}
+			else if (!trigger->state_timer && weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded)
+			{
+				weapon_trigger_overload(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_charging:
+			if (trigger->state_timer)
+			{
+				if (!trigger_down)
+				{
+					if (trigger_index==0 && weapon_definition->weapon.triggers.count>1 && !TEST_FLAG(trigger->flags, _weapon_trigger_fired_before_charging_bit))
+					{
+						weapon_trigger_begin_firing(weapon_index, trigger_index, TRUE);
+					}
+					else
+					{
+						weapon_trigger_idle(weapon_index, trigger_index);
+					}
+
+					if (trigger->charging_effect_index!=NONE)
+					{
+						effect_stop(trigger->charging_effect_index, TRUE);
+						trigger->charging_effect_index= NONE;
+					}
+				}
+			}
+			else
+			{
+				weapon_trigger_fully_charged(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_charged:
+			if (trigger_down)
+			{
+				weapon->weapon.overcharged= 1.0f-(trigger->state_timer*(1.0f/TICKS_PER_SECOND))/trigger_definition->charged_time;
+				if (trigger->state_timer)
+				{
+					struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+
+					if (magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit))
+					{
+						weapon_trigger_release_charge(weapon_index, trigger_index);
+					}
+				}
+				else
+				{
+					weapon_trigger_overcharged(weapon_index, trigger_index);
+				}
+			}
+			else
+			{
+				weapon_trigger_release_charge(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_recovering:
+			if (!trigger->state_timer)
+			{
+				if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_latched_bit) &&
+					TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) &&
+					!TEST_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit))
+				{
+					weapon_trigger_locked(weapon_index, trigger_index);
+				}
+				else
+				{
+					weapon_trigger_idle(weapon_index, trigger_index);
+				}
+			}
+			break;
+
+		case _trigger_tracking:
+			if (!trigger_down || weapon->weapon.tracked_object_index==NONE)
+			{
+				weapon_trigger_finish_tracking(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_locked:
+			if (!trigger_down)
+			{
+				weapon_trigger_idle(weapon_index, trigger_index);
+			}
+			break;
+
+		case _trigger_uninitialized:
+			if (!trigger->state_timer)
+			{
+				weapon_trigger_idle(weapon_index, trigger_index);
+			}
+			break;
+
+		default:
+			match_vassert("c:\\halo\\SOURCE\\items\\weapons.c", 778, FALSE, NULL);
+			break;
+		}
+
+		if (trigger_down)
+		{
+			trigger->rate_of_fire+= trigger_definition->runtime_rate_of_fire_acceleration_time;
+			if (trigger->rate_of_fire>1.0f)
+			{
+				trigger->rate_of_fire= 1.0f;
+			}
+
+			if (trigger_definition->blurred_rate_of_fire!=0.0f &&
+				!TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) &&
+				trigger->rate_of_fire>trigger_definition->blurred_rate_of_fire)
+			{
+				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, TRUE);
+				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, TRUE);
+			}
+		}
+		else
+		{
+			trigger->rate_of_fire-= trigger_definition->runtime_rate_of_fire_deceleration_time;
+			if (trigger->rate_of_fire<0.0f)
+			{
+				trigger->rate_of_fire= 0.0f;
+			}
+
+			if (TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) && trigger->rate_of_fire<trigger_definition->blurred_rate_of_fire)
+			{
+				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, FALSE);
+				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, FALSE);
+			}
+		}
+
+		if (trigger->state==_trigger_spewing || trigger->state==_trigger_recovering || trigger_down)
+		{
+			trigger->error+= trigger_definition->runtime_error_acceleration_time;
+			if (trigger->error>1.0f)
+			{
+				trigger->error= 1.0f;
+			}
+		}
+		else
+		{
+			trigger->error-= trigger_definition->runtime_error_deceleration_time;
+			if (trigger->error<0.0f)
+			{
+				trigger->error= 0.0f;
+			}
+		}
+	}
+
+	profile_exit(data_00307140.update_profile);
+
+	return TRUE;
 }

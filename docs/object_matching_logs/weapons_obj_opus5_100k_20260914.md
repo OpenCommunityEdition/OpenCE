@@ -95,3 +95,14 @@ struct forward declaration — consistent with the declaration-count oracle.
   (`scratch/workers/weapons/candidate_full_proposalB_scratchprotos.c`).
 - weapon_place: a genuine scenario weapon record owner header.
 - animation_update: an authentic caller or return-type evidence (unchanged).
+
+## Header packet (orchestrator, checkpoint 3)
+
+Proposal A landed as a separate header commit:
+- `actor_firing_blindly` in actors.h
+- `player_aim_projectile` in aim_assist.h
+- `projectile_kill_tracer` in projectiles.h
+- `unit_adjust_projectile_ray` in units.h
+- the remaining weapon datum flag bits in weapon_datum_flags.h
+
+The first full build regressed `units::_unit_preprocess_node_orientations` (declaration-count oracle). Bisection showed that either the units.h or the aim_assist.h declaration alone is harmless, but both together are not. The same commit removes the verbatim duplicate `collision_surface_polygon` prototype at the end of `collision_bsp.h`, a genuine cleanup since the owner declaration stays in the COLLISION_BSP.C prototype block. Full build: +22 exact weapons functions (3,280 padded), 0 regressions, parks 465/0/0. Proposal B (`_point_from_line3d` emission) is declined under the lane rule, so `trigger_create_projectiles`, `weapon_trigger_fire` and `weapon_update` stay fuzzy at zero credit.
