@@ -140,6 +140,19 @@ enum hud_crosshair_flags
 	_hud_crosshair_runtime_invalid_bit,
 };
 
+/* TU-local copy: bitmap_group.h does not own the bitmap group type enum; the existing
+   copies are in bitmaps/bitmap_extract.c (complete), bitmaps/bitmap_group.c and
+   interface/hud_draw.c. */
+enum bitmap_group_type
+{
+	_bitmap_group_type_2d_textures = 0,
+	_bitmap_group_type_3d_textures,
+	_bitmap_group_type_cube_maps,
+	_bitmap_group_type_sprites,
+	_bitmap_group_type_interface_bitmaps,
+	NUMBER_OF_BITMAP_GROUP_TYPES
+};
+
 enum weapon_overlay_on_flags
 {
 	_weapon_overlay_on_flashing_bit = 0,
@@ -1009,354 +1022,314 @@ static void crosshairs_draw(
 {
 	long return_eip = get_return_eip();
 	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
-	long unit_index;
-	short local_player_index;
-	struct crosshair_hud_state *crosshair;
-	struct weapon_hud_interface_definition *definitions[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH];
-	long definition_indices[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH];
-	short map_type_flags;
-	short definition_count;
-	short definition_index;
 	boolean firing_active = FALSE;
 
 	csmemset(
 		stack_buffer,
 		0x62,
 		sizeof(stack_buffer));
-	if (!TEST_FLAG(weapon_hud_globals->script_flags, _hud_crosshair_show_bit) ||
-		hud_index == NONE)
+	if (TEST_FLAG(weapon_hud_globals->script_flags, _hud_crosshair_show_bit) &&
+		hud_index != NONE)
 	{
-		goto finished;
-	}
+		long unit_index = player->unit_index;
+		struct crosshair_hud_state *crosshair = get_crosshair_state(player->local_player_index);
+		struct weapon_hud_interface_definition *root_definition = weapon_hud_interface_definition_get(hud_index);
+		short map_type_flags = global_scenario_get()->type != _scenario_type_main_menu;
 
-	unit_index = player->unit_index;
-	local_player_index = player->local_player_index;
-	crosshair = get_crosshair_state(local_player_index);
-	definitions[0] = weapon_hud_interface_definition_get(hud_index);
-	map_type_flags = global_scenario_get()->type != _scenario_type_main_menu;
-	SET_FLAG(map_type_flags, 1, local_player_count() == 1);
-	SET_FLAG(map_type_flags, 2, local_player_count() > 1);
-	if (unit_index == NONE)
-		goto finished;
-
-	(void)unit_get(unit_index);
-	if (weapon_index != NONE)
-	{
-		struct weapon_datum *weapon = weapon_get(weapon_index);
-		(void)weapon_definition_get(weapon->definition_index);
-	}
-
-	csmemset(
-		&definitions[1],
-		0,
-		(MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH - 1) * sizeof(*definitions));
-	definition_indices[0] = hud_index;
-	csmemset(
-		&definition_indices[1],
-		0,
-		(MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH - 1) * sizeof(*definition_indices));
-	definition_count = 1;
-	do
-	{
-		long child_index = definitions[definition_count - 1]->parent_hud.index;
-
-		if (child_index == NONE)
-			break;
-		definition_indices[definition_count] = child_index;
-		definitions[definition_count] = weapon_hud_interface_definition_get(child_index);
-		definition_count++;
-	}
-	while (definition_count < MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH);
-
-	if (definition_count == MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH)
-	{
-		error(
-			_error_silent,
-			"too many levels in current weapon hud hierarchy");
-	}
-	if (definition_count <= 0)
-		goto finished;
-
-	for (definition_index = 0;
-		definition_index < definition_count;
-		definition_index++)
-	{
-		struct weapon_hud_interface_definition *definition = definitions[definition_index];
-		struct hud_absolute_placement_definition absolute_placement_template;
-		boolean in_multiplayer = local_player_count() > 1;
-		short crosshair_index;
-
-		absolute_placement_template.corner = _hud_anchor_center;
-		csmemset(
-			(byte *)&absolute_placement_template + sizeof(absolute_placement_template.corner),
-			0,
-			sizeof(absolute_placement_template) - sizeof(absolute_placement_template.corner));
-		for (crosshair_index = 0;
-			crosshair_index < definition->crosshairs.count;
-			crosshair_index++)
+		SET_FLAG(map_type_flags, 1, local_player_count() == 1);
+		SET_FLAG(map_type_flags, 2, local_player_count() > 1);
+		if (unit_index != NONE)
 		{
-			struct weapon_hud_crosshairs_element *crosshair_definition = TAG_BLOCK_GET_ELEMENT(
-				&definition->crosshairs,
-				crosshair_index,
-				struct weapon_hud_crosshairs_element);
-			short state_index = crosshair_definition->crosshair_type;
-			short item_index;
+			struct unit_datum *unit = unit_get(unit_index);
+			struct weapon_definition *weapon_definition = weapon_index == NONE ?
+				NULL :
+				weapon_definition_get(weapon_get(weapon_index)->definition_index);
+			struct weapon_hud_interface_definition *definitions[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { root_definition };
+			long definition_indices[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { hud_index };
+			unsigned long render_flags = crosshair->render_flags;
+			short definition_count = 1;
+			short definition_index;
 
-			if (!TEST_FLAG(crosshair->render_flags, state_index) ||
-				!TEST_FLAG(map_type_flags, crosshair_definition->use_on_map_type))
+			do
 			{
-				continue;
+				if (definitions[definition_count - 1]->parent_hud.index == NONE)
+					break;
+				definition_indices[definition_count] = definitions[definition_count - 1]->parent_hud.index;
+				definitions[definition_count] = weapon_hud_interface_definition_get(definition_indices[definition_count]);
+				definition_count++;
+			}
+			while (definition_count < MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH);
+
+			if (definition_count == MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH)
+			{
+				error(
+					_error_silent,
+					"too many levels in current weapon hud hierarchy");
 			}
 
-			for (item_index = 0;
-				item_index < crosshair_definition->crosshairs.items.count;
-				item_index++)
+			for (definition_index = 0;
+				definition_index < definition_count;
+				definition_index++)
 			{
-				struct weapon_hud_crosshair_item *item = TAG_BLOCK_GET_ELEMENT(
-					&crosshair_definition->crosshairs.items,
-					item_index,
-					struct weapon_hud_crosshair_item);
-				unsigned long item_flags = item->flags;
-				struct bitmap_group_sequence *sequence = NULL;
-				real scale;
-				short frame_index = 0;
-				pixel32 color;
+				struct weapon_hud_interface_definition *definition = definitions[definition_index];
+				struct hud_absolute_placement_definition absolute_placement = { _hud_anchor_center };
+				boolean in_multiplayer = local_player_count() > 1;
+				short crosshair_index;
 
-				if (TEST_FLAG(item_flags, _hud_crosshair_runtime_invalid_bit) ||
-					(TEST_FLAG(item_flags, _hud_crosshair_not_on_default_zoom_bit) &&
-						crosshair->states[_crosshair_state_zoom].value.reference_data <= 0) ||
-					(TEST_FLAG(item_flags, _hud_crosshair_only_on_default_zoom_bit) &&
-						crosshair->states[_crosshair_state_zoom].value.reference_data != 0))
+				for (crosshair_index = 0;
+					crosshair_index < definition->crosshairs.count;
+					crosshair_index++)
 				{
-					continue;
-				}
+					struct weapon_hud_crosshairs_element *element = TAG_BLOCK_GET_ELEMENT(
+						&definition->crosshairs,
+						crosshair_index,
+						struct weapon_hud_crosshairs_element);
+					short state_index = element->crosshair_type;
 
-				scale = in_multiplayer &&
-					!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
-					0.5f :
-					1.0f;
-				if (!TEST_FLAG(item_flags, _hud_crosshair_not_a_sprite_bit))
-				{
-					struct bitmap_group *bitmap_group;
-
-					verify_tag_reference(&crosshair_definition->crosshairs.bitmap);
-					bitmap_group = bitmap_group_get(crosshair_definition->crosshairs.bitmap.index);
-					sequence = TAG_BLOCK_GET_ELEMENT(
-						&bitmap_group->sequences,
-						item->sequence_index,
-						struct bitmap_group_sequence);
-				}
-
-				switch (state_index)
-				{
-				case _crosshair_state_aim:
-					if (TEST_FLAG(item_flags, _hud_crosshair_flashes_bit))
+					if (TEST_FLAG(render_flags, state_index) &&
+						TEST_FLAG(map_type_flags, element->use_on_map_type))
 					{
-						if (crosshair->states[state_index].value.reference_data > 0)
+						struct crosshair_state *state = &crosshair->states[state_index];
+						short item_index;
+
+						for (item_index = 0;
+							item_index < element->crosshairs.items.count;
+							item_index++)
 						{
-							color = get_flash_color(&item->colors, 0);
-							goto draw_crosshair;
-						}
-					}
-					else
-					{
-						frame_index = (short)crosshair->states[state_index].value.reference_data;
-					}
-					goto use_flat_color;
+							struct weapon_hud_crosshair_item *item = TAG_BLOCK_GET_ELEMENT(
+								&element->crosshairs.items,
+								item_index,
+								struct weapon_hud_crosshair_item);
 
-				case _crosshair_state_zoom:
-					if (TEST_FLAG(item_flags, _hud_crosshair_one_zoom_level_bit))
-					{
-						if (!crosshair->states[state_index].value.reference_data)
-							continue;
-						frame_index = 0;
-					}
-					else
-					{
-						frame_index = (short)(
-							crosshair->states[state_index].value.reference_data -
-							TEST_FLAG(item_flags, _hud_crosshair_not_on_default_zoom_bit));
-					}
-					if (TEST_FLAG(item_flags, _hud_crosshair_flashes_bit) &&
-						crosshair->states[_crosshair_state_aim].value.reference_data > 0)
-					{
-						color = get_flash_color(&item->colors, 0);
-						goto draw_crosshair;
-					}
-					goto use_flat_color;
-
-				case _crosshair_state_flash_fired_battery_depleted:
-					firing_active = weapon_state->age == 0.0f &&
-						TEST_FLAG(unit_get(unit_index)->unit.control_flags, _unit_control_weapon_primary_trigger_bit);
-					goto test_flash_duration;
-
-				case _crosshair_state_fired_with_no_ammo:
-					firing_active = !weapon_state->magazines[0].rounds_loaded &&
-						!weapon_state->magazines[0].rounds_remaining &&
-						TEST_FLAG(unit_get(unit_index)->unit.control_flags, _unit_control_weapon_primary_trigger_bit);
-					goto test_flash_duration;
-
-				case _crosshair_state_threw_with_no_grenade:
-				{
-					struct unit_datum *unit = unit_get(unit_index);
-					boolean no_grenades = TRUE;
-					short grenade_type;
-
-					for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
-					{
-						if (unit->unit.grenade_counts[grenade_type])
-							no_grenades = FALSE;
-					}
-					firing_active = no_grenades &&
-						!unit->unit.grenade_throw_state &&
-						TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit);
-					goto test_flash_duration;
-				}
-
-				case _crosshair_state_fired_secondary_with_no_ammo:
-				test_flash_duration:
-					if (!firing_active &&
-						game_time_get() - crosshair->states[state_index].value.reference_data >=
-							get_flash_duration(&item->colors))
-					{
-						crosshair->states[state_index].value.reference_data = NONE;
-					}
-					if (crosshair->states[state_index].value.reference_data == NONE)
-						continue;
-					/* fall through */
-
-				default:
-					if (item->frame_rate > 0)
-					{
-						frame_index = (short)(((game_time_get() -
-							crosshair->states[state_index].value.reference_data) /
-							item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
-					}
-					if (TEST_FLAG(item_flags, _hud_crosshair_flashes_bit) &&
-						crosshair->states[state_index].value.reference_data != NONE)
-					{
-						color = get_flash_color(
-							&item->colors,
-							crosshair->states[state_index].value.reference_data);
-						goto draw_crosshair;
-					}
-
-				use_flat_color:
-					color = item->colors.color;
-				draw_crosshair:
-				{
-					struct bitmap_group *bitmap_group;
-					struct bitmap_group_sprite *sprite = NULL;
-					short bitmap_index;
-					struct bitmap_data *bitmap;
-					boolean interface_bitmap;
-					struct hud_absolute_placement_definition absolute_placement = absolute_placement_template;
-					struct hud_placement_definition placement = item->placement;
-
-					match_vassert(
-						"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
-						0x4A5,
-						frame_index != NONE,
-						csprintf(
-							temporary,
-							"frame index NONE when drawing crosshair %d, element %d, for weapon interface '%s'",
-							crosshair_index,
-							item_index,
-							strip_path_name(tag_get_name(definition_indices[definition_index]))));
-					verify_tag_reference(&crosshair_definition->crosshairs.bitmap);
-					bitmap_group = bitmap_group_get(crosshair_definition->crosshairs.bitmap.index);
-					if (sequence)
-					{
-						sprite = TAG_BLOCK_GET_ELEMENT(
-							&sequence->sprites,
-							frame_index,
-							struct bitmap_group_sprite);
-						bitmap_index = sprite->bitmap_index;
-					}
-					else
-					{
-						bitmap_index = item->sequence_index;
-					}
-					bitmap = TAG_BLOCK_GET_ELEMENT(
-						&bitmap_group->bitmap_data,
-						bitmap_index,
-						struct bitmap_data);
-					if (!_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
-						continue;
-					interface_bitmap = bitmap_group->type == 4;
-
-					if (TEST_FLAG(item_flags, _hud_crosshair_hide_outside_area_bit))
-					{
-						real_rectangle2d clip;
-						real texel_scale_u = 1.0f;
-						real texel_scale_v = 1.0f;
-						real inverse_scale;
-						real expand_u;
-						real expand_v;
-
-						if (sprite)
-						{
-							clip = sprite->bounds;
-						}
-						else
-						{
-							clip.x0 = 0.0f;
-							clip.x1 = (real)(interface_bitmap ? bitmap->width : 1);
-							clip.y0 = 0.0f;
-							clip.y1 = (real)(interface_bitmap ? bitmap->height : 1);
-							if (!interface_bitmap)
+							if (!TEST_FLAG(item->flags, _hud_crosshair_runtime_invalid_bit) &&
+								(!TEST_FLAG(item->flags, _hud_crosshair_not_on_default_zoom_bit) ||
+									crosshair->states[_crosshair_state_zoom].value.reference_data > 0) &&
+								(!TEST_FLAG(item->flags, _hud_crosshair_only_on_default_zoom_bit) ||
+									crosshair->states[_crosshair_state_zoom].value.reference_data == 0))
 							{
-								texel_scale_u = (1.0f / bitmap->width) * 1.25f;
-								texel_scale_v = (1.0f / bitmap->height) * 1.25f;
+								real scale = local_player_count() > 1 &&
+									!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
+									0.5f :
+									1.0f;
+								struct bitmap_group_sequence *sequence = !TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit) ?
+									TAG_BLOCK_GET_ELEMENT(
+										&bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap))->sequences,
+										item->sequence_index,
+										struct bitmap_group_sequence) :
+									NULL;
+								short frame_index;
+								pixel32 color;
+
+								switch (state_index)
+								{
+								case _crosshair_state_aim:
+									if (TEST_FLAG(item->flags, _hud_crosshair_flashes_bit))
+									{
+										frame_index = 0;
+										if (state->value.reference_data > 0)
+										{
+											color = get_flash_color(&item->colors, 0);
+											goto draw_crosshair;
+										}
+									}
+									else
+									{
+										frame_index = (short)state->value.reference_data;
+									}
+									goto use_flat_color;
+
+								case _crosshair_state_zoom:
+									if (TEST_FLAG(item->flags, _hud_crosshair_one_zoom_level_bit))
+									{
+										if (!state->value.reference_data)
+											continue;
+										frame_index = 0;
+									}
+									else
+									{
+										frame_index = (short)state->value.reference_data -
+											TEST_FLAG(item->flags, _hud_crosshair_not_on_default_zoom_bit);
+									}
+									if (TEST_FLAG(item->flags, _hud_crosshair_flashes_bit) &&
+										crosshair->states[_crosshair_state_aim].value.reference_data > 0)
+									{
+										color = get_flash_color(&item->colors, 0);
+										goto draw_crosshair;
+									}
+									goto use_flat_color;
+
+								case _crosshair_state_fired_with_no_ammo:
+								case _crosshair_state_threw_with_no_grenade:
+								case _crosshair_state_fired_secondary_with_no_ammo:
+								case _crosshair_state_flash_fired_battery_depleted:
+									if (state_index == _crosshair_state_flash_fired_battery_depleted)
+									{
+										firing_active = weapon_state->age == 0.0f &&
+											TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit);
+									}
+									else if (state_index == _crosshair_state_fired_with_no_ammo)
+									{
+										firing_active = !weapon_state->magazines[0].rounds_loaded &&
+											!weapon_state->magazines[0].rounds_remaining &&
+											TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit);
+									}
+									else if (state_index == _crosshair_state_threw_with_no_grenade)
+									{
+										boolean no_grenades = TRUE;
+										short grenade_type;
+
+										for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
+										{
+											no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
+										}
+										firing_active = no_grenades &&
+											!unit->unit.grenade_throw_state &&
+											TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit);
+									}
+									if (!firing_active &&
+										game_time_get() - state->value.reference_data >= get_flash_duration(&item->colors))
+									{
+										state->value.reference_data = NONE;
+									}
+									if (state->value.reference_data == NONE)
+										continue;
+									/* fall through */
+
+								case _crosshair_state_charge:
+								case _crosshair_state_flash_ammo:
+								case _crosshair_state_flash_heat:
+								case _crosshair_state_flash_total_ammo:
+								case _crosshair_state_flash_total_battery:
+								case _crosshair_state_reload:
+								case _crosshair_state_flash_ammo_none_for_reload:
+								case _crosshair_state_flash_secondary_ammo:
+								case _crosshair_state_flash_secondary_total_ammo:
+								case _crosshair_state_secondary_reload:
+								case _crosshair_state_flash_secondary_ammo_none_for_reload:
+								case _crosshair_state_primary_trigger_ready:
+								case _crosshair_state_secondary_trigger_ready:
+									if (item->frame_rate > 0)
+									{
+										frame_index = (short)(((game_time_get() - state->value.reference_data) /
+											item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
+									}
+									else
+									{
+										frame_index = 0;
+									}
+									if (TEST_FLAG(item->flags, _hud_crosshair_flashes_bit) &&
+										state->value.reference_data != NONE)
+									{
+										color = get_flash_color(&item->colors, state->value.reference_data);
+										goto draw_crosshair;
+									}
+								use_flat_color:
+									color = item->colors.color;
+									break;
+
+								default:
+									match_vassert(
+										"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+										0x4A2,
+										FALSE,
+										NULL);
+									break;
+								}
+
+							draw_crosshair:
+								match_vassert(
+									"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+									0x4A5,
+									frame_index != NONE,
+									csprintf(
+										temporary,
+										"frame index NONE when drawing crosshair %d, element %d, for weapon interface '%s'",
+										crosshair_index,
+										item_index,
+										strip_path_name(tag_get_name(definition_indices[definition_index]))));
+								{
+									struct bitmap_group *bitmap_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
+									struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
+										&bitmap_group->bitmap_data,
+										sequence ?
+											TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
+											item->sequence_index,
+										struct bitmap_data);
+
+									if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+									{
+										if (TEST_FLAG(item->flags, _hud_crosshair_hide_outside_area_bit))
+										{
+											real texel_scale_u = 1.0f;
+											real texel_scale_v = 1.0f;
+											boolean interface_bitmap = bitmap_group->type == _bitmap_group_type_interface_bitmaps;
+											real_rectangle2d clip;
+											real inverse_scale;
+											real expand_u;
+											real expand_v;
+
+											if (sequence)
+											{
+												clip = TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bounds;
+											}
+											else
+											{
+												clip.x0 = 0.0f;
+												clip.x1 = (real)(interface_bitmap ? bitmap->width : 1);
+												clip.y0 = 0.0f;
+												clip.y1 = (real)(interface_bitmap ? bitmap->height : 1);
+												texel_scale_u = interface_bitmap ? 1.0 : (1.0f / bitmap->width) * 1.25;
+												texel_scale_v = interface_bitmap ? 1.0 : (1.0f / bitmap->height) * 1.25;
+											}
+
+											inverse_scale = 1.0f / scale;
+											expand_u = (bitmap->width - (render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0) * inverse_scale) *
+												texel_scale_u * -0.5f;
+											expand_v = (bitmap->height - (render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) * inverse_scale) *
+												texel_scale_v * -0.5f;
+											clip.x0 -= expand_u;
+											clip.x1 += expand_u;
+											clip.y0 -= expand_v;
+											clip.y1 += expand_v;
+											hud_draw_bitmap(
+												bitmap,
+												&absolute_placement,
+												&item->placement,
+												&clip,
+												scale,
+												0.0f,
+												color,
+												in_multiplayer,
+												interface_bitmap,
+												TRUE);
+										}
+										else
+										{
+											hud_draw_bitmap(
+												bitmap,
+												&absolute_placement,
+												&item->placement,
+												sequence ?
+													&TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bounds :
+													NULL,
+												scale,
+												0.0f,
+												color,
+												in_multiplayer,
+												bitmap_group->type == _bitmap_group_type_interface_bitmaps,
+												TRUE);
+										}
+									}
+								}
 							}
 						}
-
-						inverse_scale = 1.0f / scale;
-						expand_u = -0.5f * ((bitmap->width -
-							(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0) * inverse_scale) *
-							texel_scale_u);
-						expand_v = -0.5f * ((bitmap->height -
-							(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) * inverse_scale) *
-							texel_scale_v);
-						clip.x0 -= expand_u;
-						clip.x1 += expand_u;
-						clip.y0 -= expand_v;
-						clip.y1 += expand_v;
-						hud_draw_bitmap(
-							bitmap,
-							&absolute_placement,
-							&placement,
-							&clip,
-							scale,
-							0.0f,
-							color,
-							in_multiplayer,
-							interface_bitmap,
-							TRUE);
 					}
-					else
-					{
-						hud_draw_bitmap(
-							bitmap,
-							&absolute_placement,
-							&placement,
-							sprite ? &sprite->bounds : NULL,
-							scale,
-							0.0f,
-							color,
-							in_multiplayer,
-							interface_bitmap,
-							TRUE);
-					}
-					break;
-				}
 				}
 			}
 		}
 	}
 
-finished:
-	hud_weapon_stack_buffer_check(0x4AD);
+	hud_weapon_stack_buffer_check(0x4E2);
 	return;
 }
 
@@ -1988,7 +1961,6 @@ void hud_update_weapon(
 void hud_render_weapon_interface(
 	struct player_datum *player)
 {
-	struct weapon_interface_state weapon_state;
 	long weapon_index = unit_inventory_get_weapon(
 		player->unit_index,
 		unit_get(player->unit_index)->unit.current_weapon_index);
@@ -1997,11 +1969,10 @@ void hud_render_weapon_interface(
 	if (weapon_index == NONE)
 	{
 		struct unit_datum *unit = unit_get(player->unit_index);
-		long parent_object_index = unit->object.parent_object_index;
 
-		if (parent_object_index != NONE && unit->unit.parent_seat_index != NONE)
+		if (unit->object.parent_object_index != NONE && unit->unit.parent_seat_index != NONE)
 		{
-			struct unit_datum *parent = unit_get(parent_object_index);
+			struct unit_datum *parent = unit_get(unit->object.parent_object_index);
 			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
 				&unit_definition_get(parent->definition_index)->unit.seats,
 				unit->unit.parent_seat_index,
@@ -2010,8 +1981,8 @@ void hud_render_weapon_interface(
 			if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
 			{
 				weapon_index = unit_inventory_get_weapon(
-					parent_object_index,
-					unit_get(parent_object_index)->unit.current_weapon_index);
+					unit->object.parent_object_index,
+					unit_get(unit->object.parent_object_index)->unit.current_weapon_index);
 			}
 			else
 			{
@@ -2023,13 +1994,14 @@ void hud_render_weapon_interface(
 	match_assert(
 		"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 		0x1D8,
-		player->local_player_index == render.local_player_index);
+		player->local_player_index==render.local_player_index);
 
 	if (weapon_index != NONE)
 	{
 		struct weapon_datum *weapon = weapon_get(weapon_index);
 		struct weapon_definition *definition = weapon_definition_get(
 			weapon->definition_index);
+		struct weapon_interface_state weapon_state;
 		long hud_index;
 
 		weapon_build_weapon_interface_state(
@@ -2059,10 +2031,8 @@ void hud_render_weapon_interface(
 	}
 	else if (!seat_disallows_hud && !unit_get_weapon_count(player->unit_index))
 	{
-		csmemset(
-			&weapon_state,
-			0,
-			sizeof(weapon_state));
+		struct weapon_interface_state weapon_state = { 0 };
+
 		crosshairs_draw(
 			player,
 			NONE,
