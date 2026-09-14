@@ -152,6 +152,7 @@ symbols in this file:
 #include "models/model_animations.h"
 #include "models/models.h"
 #include "models/model_definitions.h"
+#include "objects/objects.h"
 
 /* ---------- constants */
 
@@ -167,6 +168,17 @@ enum
 {
 	animation_update_kind_render_only = 0,
 	animation_update_kind_affects_game_state,
+};
+
+/* No shared header declares the update results yet; first_person_weapons.c keeps a partial copy. */
+enum animation_update_result
+{
+	_animation_running = 0,
+	_animation_key_frame,
+	_animation_will_restart_on_next_frame,
+	_animation_restarted,
+	_animation_looped,
+	NUMBER_OF_ANIMATION_UPDATE_RESULTS,
 };
 
 enum
@@ -255,6 +267,16 @@ struct animation_graph_node
 
 typedef char verify_animation_graph_node_size[
 	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
+
+/* No shared header declares this block element yet; first_person_weapons.c keeps the same copy. */
+struct animation_graph_sound_reference
+{
+	struct tag_reference sound;
+	long unused;
+};
+
+typedef char verify_animation_graph_sound_reference_size[
+	sizeof(struct animation_graph_sound_reference) == 0x14 ? 1 : -1];
 
 typedef char verify_compressed_animation_header_rotation_node_headers_offset[
 	offsetof(struct compressed_animation_header, rotation_node_headers) == 0x2C ? 1 : -1];
@@ -410,6 +432,74 @@ void animation_set_frame_size(
 	animation->frame_size = frame_size;
 
 	return;
+}
+
+short animation_update_internal(
+	short render_or_affects_game_state,
+	long animation_graph_index,
+	struct animation_state *state,
+	long *sound_index)
+{
+	struct animation_graph const *animation_graph = animation_graph_definition_get(animation_graph_index);
+	struct animation const *animation;
+	short result = _animation_running;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\models\\model_animations.c",
+		147,
+		state);
+
+	animation = TAG_BLOCK_GET_ELEMENT(
+		&animation_graph->animations,
+		state->index,
+		struct animation);
+
+	if (sound_index)
+	{
+		if (animation->sound_index!=NONE && animation->private_sound_frame_index==state->frame_index)
+		{
+			struct animation_graph_sound_reference const *sound_reference = TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->sound_references,
+				animation->sound_index,
+				struct animation_graph_sound_reference);
+
+			*sound_index = sound_reference->sound.index;
+		}
+		else
+		{
+			*sound_index = NONE;
+		}
+	}
+
+	state->frame_index++;
+	if (state->frame_index>=animation->frame_count)
+	{
+		if (animation->private_loop_frame_index>0)
+		{
+			state->frame_index = MIN(animation->private_loop_frame_index, animation->frame_count-1);
+			result = _animation_looped;
+		}
+		else
+		{
+			state->index = animation_choose_random_permutation_internal(
+				render_or_affects_game_state,
+				animation_graph_index,
+				animation->runtime_parent_animation_index);
+			state->frame_index = 0;
+			result = _animation_restarted;
+		}
+	}
+	else if (state->frame_index+1==animation->frame_count && animation->private_loop_frame_index==0)
+	{
+		result = _animation_will_restart_on_next_frame;
+	}
+	else if (state->frame_index==animation->private_key_frame_index ||
+		state->frame_index==animation->private_second_key_frame_index)
+	{
+		result = _animation_key_frame;
+	}
+
+	return result;
 }
 
 void animation_graph_node_matrices_from_orientations(
