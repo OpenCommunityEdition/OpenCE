@@ -826,6 +826,7 @@ struct cache_copy_read_request *acquire_read_request(
 	struct simple_decompressor_definition *self,
 	short read_sequence_index)
 {
+	struct cache_copy_read_request *request = NULL;
 	short read_buffer_index;
 
 	for (read_buffer_index = 0; read_buffer_index < NUMBER_OF_READ_BUFFERS; read_buffer_index++)
@@ -833,18 +834,16 @@ struct cache_copy_read_request *acquire_read_request(
 		if (self->read_requests[read_buffer_index].read_sequence_index == read_sequence_index &&
 			BIT_VECTOR_TEST_FLAG(self->overlapped_completed_flags, _read_buffer_base + read_buffer_index))
 		{
-			struct cache_copy_read_request *request = &self->read_requests[read_buffer_index];
-
+			request = &self->read_requests[read_buffer_index];
 			XPhysicalProtect(
 				self->read_buffers[read_buffer_index],
 				FILE_BLOCK_SIZE,
 				PAGE_READONLY);
-
-			return request;
+			break;
 		}
 	}
 
-	return NULL;
+	return request;
 }
 
 static long cache_copy_read_buffer_size(
@@ -1049,8 +1048,7 @@ short cache_copy_get_status(
 		else
 		{
 			*progress = 0.0f;
-
-			return _cache_copy_in_progress;
+			status = _cache_copy_in_progress;
 		}
 	}
 	else
@@ -1464,19 +1462,23 @@ static void cache_copy_update_write_buffers(
 {
 	short write_buffer_index;
 
-	if (self->write_requests_pending > 0 &&
-		self->current_write_request &&
-		BIT_VECTOR_TEST_FLAG(self->overlapped_completed_flags, _write_buffer_base))
+	if (self->write_requests_pending > 0 && self->current_write_request)
 	{
-		self->write_requests[0].write_sequence_index = NONE;
-		BIT_VECTOR_SET_FLAG(self->overlapped_completed_flags, _write_buffer_base, FALSE);
-		self->write_requests_pending--;
-		self->current_write_request = NULL;
+		for (write_buffer_index = 0; write_buffer_index < NUMBER_OF_WRITE_BUFFERS; write_buffer_index++)
+		{
+			if (BIT_VECTOR_TEST_FLAG(self->overlapped_completed_flags, _write_buffer_base + write_buffer_index))
+			{
+				self->write_requests[write_buffer_index].write_sequence_index = NONE;
+				BIT_VECTOR_SET_FLAG(self->overlapped_completed_flags, _write_buffer_base + write_buffer_index, FALSE);
+				self->write_requests_pending--;
+				self->current_write_request = NULL;
 
-		match_assert(
-			"c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
-			1075,
-			self->write_requests_pending>=0);
+				match_assert(
+					"c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+					1075,
+					self->write_requests_pending>=0);
+			}
+		}
 	}
 
 	if (self->write_bytes_left &&
