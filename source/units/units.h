@@ -694,6 +694,8 @@ void unit_close(
 	long unit_index);
 void scripting_set_magic_base_seat(
 	char const *seat_name);
+void unit_start_running_blindly(
+	long unit_index);
 void unit_stop_running_blindly(
 	long unit_index);
 void unit_set_emotion(
@@ -897,6 +899,8 @@ void unit_notify_impulse_sound(
 	long unit_index,
 	long sound_definition_index,
 	long impulse_sound_index);
+boolean unit_is_speaking(
+	long unit_index);
 boolean unit_make_damage_sound(
 	long unit_index,
 	struct damage_data *damage_data,
