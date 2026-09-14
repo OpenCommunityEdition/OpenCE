@@ -1014,6 +1014,14 @@ short animation_choose_random_permutation(
 	return animation_choose_random_permutation_internal(TRUE, animation_graph_index, animation_index);
 }
 
+short animation_update(
+	long animation_graph_index,
+	struct animation_state *state,
+	long *sound_index)
+{
+	return animation_update_internal(TRUE, animation_graph_index, state, sound_index);
+}
+
 short animation_key_frame_index(
 	struct animation const *animation)
 {
