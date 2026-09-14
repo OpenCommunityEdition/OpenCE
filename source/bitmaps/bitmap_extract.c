@@ -364,10 +364,10 @@ struct bitmap_extract_entry
 
 struct bitmap_extract_cube_map_face
 {
-	short source_y_block;
 	short source_x_block;
-	short source_y_edge;
+	short source_y_block;
 	short source_x_edge;
+	short source_y_edge;
 	short source_x_column_delta;
 	short source_y_column_delta;
 	short source_x_row_delta;
@@ -789,29 +789,28 @@ static boolean extract_plateless_cube_map(
 
 			for (face_index = 0; face_index < NUMBEROF(faces); face_index++)
 			{
-				struct bitmap_extract_cube_map_face *face = &faces[face_index];
 				struct bitmap_extract_entry *entry =
 					&extract_data.bitmaps[extract_data.bitmap_count++];
 
 				entry->bitmap = bitmap_2d_new(
-					(short)face_size,
-					(short)face_size,
+					face_size,
+					face_size,
 					0,
 					_bitmap_format_a8r8g8b8);
 				if (entry->bitmap)
 				{
-					short source_x =
-						face->source_x_block * face_size +
-						face->source_x_edge * (face_size - 1);
-					short source_y =
-						face->source_y_block * face_size +
-						face->source_y_edge * (face_size - 1);
 					short destination_y;
 
 					for (destination_y = 0; destination_y < face_size; destination_y++)
 					{
-						short row_source_x = source_x;
-						short row_source_y = source_y;
+						short source_x =
+							faces[face_index].source_x_block * face_size +
+							faces[face_index].source_x_edge * (face_size - 1) +
+							destination_y * faces[face_index].source_x_row_delta;
+						short source_y =
+							faces[face_index].source_y_block * face_size +
+							faces[face_index].source_y_edge * (face_size - 1) +
+							destination_y * faces[face_index].source_y_row_delta;
 						short destination_x;
 
 						for (destination_x = 0; destination_x < face_size; destination_x++)
@@ -822,15 +821,12 @@ static boolean extract_plateless_cube_map(
 								destination_y,
 								0) = *(pixel32 *)bitmap_2d_address(
 									bitmap,
-									(short)row_source_x,
-									(short)row_source_y,
+									source_x,
+									source_y,
 									0);
-							row_source_x += face->source_x_column_delta;
-							row_source_y += face->source_y_column_delta;
+							source_x += faces[face_index].source_x_column_delta;
+							source_y += faces[face_index].source_y_column_delta;
 						}
-
-						source_x += face->source_x_row_delta;
-						source_y += face->source_y_row_delta;
 					}
 
 					entry->sequence_index = extract_data.sequence_index;
@@ -937,12 +933,12 @@ static short extract_get_bitmap_format(
 	struct bitmap_data *bitmap)
 {
 	short format = NONE;
+	short alpha_bits = 0;
+	short color_bits = 0;
 	boolean channels_differ = FALSE;
 	pixel32 *pixels;
 	pixel32 first_pixel;
 	long pixel_count;
-	short alpha_bits = 0;
-	short color_bits = 0;
 	long pixel_index;
 
 	match_assert(
@@ -956,28 +952,38 @@ static short extract_get_bitmap_format(
 	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
 	{
 		pixel32 pixel = pixels[pixel_index];
-		byte alpha = (byte)(pixel >> 24);
-		byte color = (byte)(pixel >> 16);
 
-		if (alpha != 0 && alpha != 255)
+		switch (pixel >> 24)
 		{
+		case 0:
+			if ((first_pixel & 0xFF000000) == 0xFF000000)
+				alpha_bits = MAX(alpha_bits, 1);
+			break;
+		case 0xFF:
+			if (!(first_pixel & 0xFF000000))
+				alpha_bits = MAX(alpha_bits, 1);
+			break;
+		default:
 			alpha_bits = 8;
-		}
-		else if ((pixel & 0xFF000000) != (first_pixel & 0xFF000000) && alpha_bits <= 1)
-		{
-			alpha_bits = 1;
+			break;
 		}
 
-		if (color != 0 && color != 255)
+		switch ((pixel >> 16) & 0xFF)
 		{
+		case 0:
+			if ((first_pixel & 0x00FF0000) == 0x00FF0000)
+				color_bits = MAX(color_bits, 1);
+			break;
+		case 0xFF:
+			if (!(first_pixel & 0x00FF0000))
+				color_bits = MAX(color_bits, 1);
+			break;
+		default:
 			color_bits = 8;
-		}
-		else if ((pixel & 0x00FF0000) != (first_pixel & 0x00FF0000) && color_bits <= 1)
-		{
-			color_bits = 1;
+			break;
 		}
 
-		if (alpha != color)
+		if ((pixel >> 24) != ((pixel >> 16) & 0xFF))
 			channels_differ = TRUE;
 	}
 
@@ -1040,7 +1046,7 @@ static short extract_get_bitmap_format(
 			extract_data.group->flags,
 			_bitmap_group_disable_vector_compression_bit))
 		{
-			return _bitmap_format_p8_bump;
+			format = _bitmap_format_p8_bump;
 		}
 	}
 

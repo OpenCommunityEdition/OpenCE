@@ -5740,25 +5740,6 @@
       }
     },
     {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_get_bitmap_format",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 576,
-          "relocation_count": 20,
-          "normalized_sha256": "de642601ab31964719ffd3853c0be2514d729c1b266f7e65dcab606b6312400e"
-        },
-        "base": {
-          "size": 496,
-          "relocation_count": 20,
-          "normalized_sha256": "66819a8ba442bcfc2e9b369e2b4480ca807f6b3db31648cbd0d253b08de35f96"
-        },
-        "objdiff_percent": 66.40804
-      }
-    },
-    {
       "unit": "source/cache/xbox_texture_cache",
       "function": "_texture_cache_debug_render",
       "class": "unclassified",
@@ -6090,17 +6071,6 @@
         "target": { "size": 608, "relocation_count": 22, "normalized_sha256": "70092abc226e6d9400baed2f856500896bf821f08e7ee9c8b9a7691013a4ce44" },
         "base": { "size": 672, "relocation_count": 22, "normalized_sha256": "a0a34a2062ebb22b2028e75043ece7a57531deacba0a47049070e3b0100ddc86" },
         "objdiff_percent": 60.788944
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_plateless_cube_map",
-      "class": "unclassified",
-      "evidence": "Complete typed six-face cube-map reconstruction retained from the 2026-09-12 private packet. January and the current candidate have the same 832-byte extent and 19 relocations, while their normalized streams remain different. No cast pressure, artificial branch, or compiler steering is admitted; the fail-closed class claims no mechanism and the body receives zero credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 832, "relocation_count": 19, "normalized_sha256": "f55f10e75310fe5c98c6bff63288c76c13e64850a4ec6ffaa7ed03244d64c2e2" },
-        "base": { "size": 832, "relocation_count": 19, "normalized_sha256": "a5286bb8ce75c089b2a60e4f1594da25f2df04742ba7fdfc8478539f9a978e54" },
-        "objdiff_percent": 79.492065
       }
     },
     {
