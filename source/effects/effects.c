@@ -2655,53 +2655,62 @@ static real_matrix4x3 *effect_get_node_matrix(
 	struct effect_datum const *effect,
 	short node_designator)
 {
-	if (node_designator != NONE)
-	{
-		if (TEST_FLAG(node_designator, _effect_location_first_person_bit))
-		{
-			return first_person_weapon_get_node_matrix(
-				effect->local_player_index,
-				(short)(node_designator &
-					(FLAG(_effect_location_first_person_bit) - 1)));
-		}
+	short node_index;
 
-		return object_get_node_matrix(
-			effect->object_index,
+	if (node_designator != NONE &&
+		TEST_FLAG(node_designator, _effect_location_first_person_bit))
+	{
+		return first_person_weapon_get_node_matrix(
+			effect->local_player_index,
 			(short)(node_designator &
 				(FLAG(_effect_location_first_person_bit) - 1)));
 	}
 
-	return object_get_node_matrix(effect->object_index, NONE);
+	if (node_designator == NONE)
+		node_index = NONE;
+	else
+		node_index = (short)(node_designator & (FLAG(_effect_location_first_person_bit) - 1));
+
+	return object_get_node_matrix(effect->object_index, node_index);
 }
 
 static real effect_evaluate_function_integral(
 	short function_index,
 	real fraction)
 {
+	real integral;
+
 	if (fraction == -1.0f)
 		return 0.0f;
 
 	switch (function_index)
 	{
 		case _effect_particle_distribution_function_start:
-			return 1.0f;
+			integral = 1.0f;
+			break;
 
 		case _effect_particle_distribution_function_end:
-			if (fraction >= 1.0f)
-				return 1.0f;
-			return 0.0f;
+			if (fraction < 1.0f)
+				integral = 0.0f;
+			else
+				integral = 1.0f;
+			break;
 
 		case _effect_particle_distribution_function_constant:
-			return fraction;
+			integral = fraction;
+			break;
 
 		case _effect_particle_distribution_function_buildup:
-			return fraction * fraction;
+			integral = fraction * fraction;
+			break;
 
 		case _effect_particle_distribution_function_falloff:
-			return (2.0f - fraction) * fraction;
+			integral = (2.0f - fraction) * fraction;
+			break;
 
 		case _effect_particle_distribution_function_quadratic:
-			return (3.0f - (fraction + fraction)) * fraction * fraction;
+			integral = (3.0f - (fraction + fraction)) * fraction * fraction;
+			break;
 
 		default:
 			match_vassert(
@@ -2709,10 +2718,11 @@ static real effect_evaluate_function_integral(
 				1886,
 				FALSE,
 				NULL);
+			integral = fraction;
 			break;
 	}
 
-	return fraction;
+	return integral;
 }
 
 static long effect_build_location(
