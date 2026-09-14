@@ -706,24 +706,12 @@ void render_debug_point(
 		real_point3d points[6];
 		short index;
 
-		points[0].x = point->x-size*0.5f;
-		points[0].y = point->y;
-		points[0].z = point->z;
-		points[1].x = point->x+size*0.5f;
-		points[1].y = point->y;
-		points[1].z = point->z;
-		points[2].x = point->x;
-		points[2].y = point->y-size*0.5f;
-		points[2].z = point->z;
-		points[3].x = point->x;
-		points[3].y = point->y+size*0.5f;
-		points[3].z = point->z;
-		points[4].x = point->x;
-		points[4].y = point->y;
-		points[4].z = point->z-size*0.5f;
-		points[5].x = point->x;
-		points[5].y = point->y;
-		points[5].z = point->z+size*0.5f;
+		set_real_point3d(&points[0], point->x-size*0.5f, point->y, point->z);
+		set_real_point3d(&points[1], point->x+size*0.5f, point->y, point->z);
+		set_real_point3d(&points[2], point->x, point->y-size*0.5f, point->z);
+		set_real_point3d(&points[3], point->x, point->y+size*0.5f, point->z);
+		set_real_point3d(&points[4], point->x, point->y, point->z-size*0.5f);
+		set_real_point3d(&points[5], point->x, point->y, point->z+size*0.5f);
 
 		for (index = 0; index<NUMBEROF(points)/2; index++)
 		{
@@ -925,30 +913,21 @@ void render_debug_sphere(
 
 			build_circle_points(radius, points);
 
-			for (index = 1; index<NUMBEROF(points); index++)
+			for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
 			{
-				point0.x = center->x + points[index-1].x;
-				point0.y = center->y + points[index-1].y;
-				point0.z = center->z;
-				point1.x = center->x + points[index].x;
-				point1.y = center->y + points[index].y;
-				point1.z = center->z;
+				real_point2d const *circle_point0 = &points[index];
+				real_point2d const *circle_point1 = &points[index+1];
+
+				set_real_point3d(&point0, center->x + circle_point0->x, center->y + circle_point0->y, center->z);
+				set_real_point3d(&point1, center->x + circle_point1->x, center->y + circle_point1->y, center->z);
 				rasterizer_debug_line(&point0, &point1, color);
 
-				point0.x = center->x + points[index-1].y;
-				point0.y = center->y;
-				point0.z = center->z + points[index-1].x;
-				point1.x = center->x + points[index].y;
-				point1.y = center->y;
-				point1.z = center->z + points[index].x;
+				set_real_point3d(&point0, center->x + circle_point0->y, center->y, center->z + circle_point0->x);
+				set_real_point3d(&point1, center->x + circle_point1->y, center->y, center->z + circle_point1->x);
 				rasterizer_debug_line(&point0, &point1, color);
 
-				point0.x = center->x;
-				point0.y = center->y + points[index-1].x;
-				point0.z = center->z + points[index-1].y;
-				point1.x = center->x;
-				point1.y = center->y + points[index].x;
-				point1.z = center->z + points[index].y;
+				set_real_point3d(&point0, center->x, center->y + circle_point0->x, center->z + circle_point0->y);
+				set_real_point3d(&point1, center->x, center->y + circle_point1->x, center->z + circle_point1->y);
 				rasterizer_debug_line(&point0, &point1, color);
 			}
 		}
@@ -1741,12 +1720,13 @@ void render_debug_circle(
 
 		build_circle_points(radius, points);
 
-		for (index = 1; index<NUMBEROF(points); index++)
+		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
 		{
-			point0.x = center->x + points[index-1].x;
-			point0.y = center->y + points[index-1].y;
-			point1.x = center->x + points[index].x;
-			point1.y = center->y + points[index].y;
+			real_point2d const *circle_point0 = &points[index];
+			real_point2d const *circle_point1 = &points[index+1];
+
+			set_real_point2d(&point0, center->x + circle_point0->x, center->y + circle_point0->y);
+			set_real_point2d(&point1, center->x + circle_point1->x, center->y + circle_point1->y);
 			render_debug_line2d(
 				TRUE,
 				plane,
@@ -2055,8 +2035,9 @@ static void build_circle_points(
 	real radius,
 	real_point2d *points)
 {
-	real sine_of_angle = sine(2*_pi/NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS);
-	real cosine_of_angle = cosine(2*_pi/NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS);
+	real angle = 2*_pi/NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS;
+	real sine_of_angle = sine(angle);
+	real cosine_of_angle = cosine(angle);
 	short index;
 
 	set_real_point2d(&points[0], radius, 0.f);
@@ -2114,11 +2095,13 @@ static void build_pill_points(
 	{
 		for (index = 0; index<NUMBEROF(points); index++)
 		{
-			top_points[index].x = points[index].x;
-			top_points[index].y = points[index].y;
+			real_point2d const *circle_point = &points[index];
+
+			top_points[index].x = circle_point->x;
+			top_points[index].y = circle_point->y;
 			top_points[index].z = height_magnitude;
-			bottom_points[index].x = points[index].x;
-			bottom_points[index].y = points[index].y;
+			bottom_points[index].x = circle_point->x;
+			bottom_points[index].y = circle_point->y;
 			bottom_points[index].z = 0.f;
 			matrix4x3_transform_point(&matrix, &top_points[index], &top_points[index]);
 			matrix4x3_transform_point(&matrix, &bottom_points[index], &bottom_points[index]);
@@ -2129,18 +2112,21 @@ static void build_pill_points(
 	{
 		for (index = 0; index<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2+1; index++)
 		{
+			real_point2d const *top_circle_point = &points[index];
+			real_point2d const *bottom_circle_point = &points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2];
+
 			top_yz_points[index].x = 0.f;
-			top_yz_points[index].y = points[index].x;
-			top_yz_points[index].z = height_magnitude + points[index].y;
+			top_yz_points[index].y = top_circle_point->x;
+			top_yz_points[index].z = height_magnitude + top_circle_point->y;
 			bottom_yz_points[index].x = 0.f;
-			bottom_yz_points[index].y = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].x;
-			bottom_yz_points[index].z = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].y;
-			top_xz_points[index].x = points[index].x;
+			bottom_yz_points[index].y = bottom_circle_point->x;
+			bottom_yz_points[index].z = bottom_circle_point->y;
+			top_xz_points[index].x = top_circle_point->x;
 			top_xz_points[index].y = 0.f;
-			top_xz_points[index].z = height_magnitude + points[index].y;
-			bottom_xz_points[index].x = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].x;
+			top_xz_points[index].z = height_magnitude + top_circle_point->y;
+			bottom_xz_points[index].x = bottom_circle_point->x;
 			bottom_xz_points[index].y = 0.f;
-			bottom_xz_points[index].z = points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2].y;
+			bottom_xz_points[index].z = bottom_circle_point->y;
 			matrix4x3_transform_point(&matrix, &top_yz_points[index], &top_yz_points[index]);
 			matrix4x3_transform_point(&matrix, &bottom_yz_points[index], &bottom_yz_points[index]);
 			matrix4x3_transform_point(&matrix, &top_xz_points[index], &top_xz_points[index]);
