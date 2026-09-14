@@ -20,7 +20,7 @@ enum
 	_player_powerup_full_spectrum_vision,
 	NUMBER_OF_PLAYER_POWERUPS,
 	MAXIMUM_LOCAL_PLAYERS = 4,
-	_local_player_triggered_switch_none = 0xF,
+	_local_player_triggered_switch_none = NONE,
 };
 
 enum player_action_result
@@ -136,7 +136,7 @@ struct players_globals
 		byte bsp_switch_state;
 		struct
 		{
-			byte local_player_triggered_switch : 4;
+			char local_player_triggered_switch : 4;
 			byte bsp_check_recursive_switch_ticks : 4;
 		};
 	};

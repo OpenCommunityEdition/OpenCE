@@ -3565,7 +3565,7 @@ void players_update_after_game(
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct object_datum *root_object;
-	struct tag_block *bsp_switch_trigger_volumes;
+	struct scenario *scenario;
 	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
 	long telefrag_ticks;
 	long root_object_index;
@@ -3636,13 +3636,13 @@ void players_update_after_game(
 			root_object = object_get(root_object_index);
 			if (!TEST_FLAG(root_object->object.flags, _object_outside_of_map_bit))
 			{
-				bsp_switch_trigger_volumes = &global_scenario_get()->bsp_switch_trigger_volumes;
+				scenario = global_scenario_get();
 				for (bsp_switch_trigger_volume_index = 0;
-					bsp_switch_trigger_volume_index < bsp_switch_trigger_volumes->count;
+					bsp_switch_trigger_volume_index < scenario->bsp_switch_trigger_volumes.count;
 					bsp_switch_trigger_volume_index++)
 				{
 					bsp_switch_trigger_volume = TAG_BLOCK_GET_ELEMENT(
-						bsp_switch_trigger_volumes,
+						&scenario->bsp_switch_trigger_volumes,
 						bsp_switch_trigger_volume_index,
 						struct scenario_bsp_switch_trigger_volume);
 					if (bsp_switch_trigger_volume->source_structure_bsp_index ==
@@ -3654,7 +3654,7 @@ void players_update_after_game(
 						if (players_globals->local_player_triggered_switch !=
 							_local_player_triggered_switch_none &&
 							players_globals->local_player_triggered_switch !=
-							(byte)player->local_player_index)
+							player->local_player_index)
 						{
 							error(
 								2,
@@ -3663,7 +3663,7 @@ void players_update_after_game(
 
 						players_globals->bsp_check_recursive_switch_ticks = 0;
 						players_globals->local_player_triggered_switch =
-							(byte)player->local_player_index;
+							player->local_player_index;
 						players_globals->pending_teleport_starting_location_index =
 							bsp_switch_trigger_volume_index;
 						main_switch_structure_bsp(

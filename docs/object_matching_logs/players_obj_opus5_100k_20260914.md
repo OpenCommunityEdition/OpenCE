@@ -174,3 +174,7 @@ rebuild and diff the whole board per function before admitting it.
 13 residual (4 parked, locked, unchanged), 1 target-only stub. Credit is claimed
 only for `_player_examine_nearby_item`. One header proposal would close
 `_players_update_after_game`.
+
+## Header packet (orchestrator, checkpoint 4)
+
+`players.h`: `local_player_triggered_switch` is a signed 4-bit field and `_local_player_triggered_switch_none` is `NONE`. January sign-extends the nibble, and the declaration count is unchanged. `players_update_after_game` now reads the scenario pointer once and compares the local player index without a byte cast. The header change and its only dependent source were measured together: full build +1 exact (816 padded), 74 includers, 0 regressions, parks clean.
