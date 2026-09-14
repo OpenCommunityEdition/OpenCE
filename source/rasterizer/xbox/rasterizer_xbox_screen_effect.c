@@ -249,32 +249,6 @@ static void rasterizer_screen_effect_set_texture_transforms(
 	short pass,
 	short pass_count)
 {
-	struct bitmap_data screen_bitmap =
-	{
-		BITMAP_GROUP_TAG,
-		global_window_parameters.camera.viewport_bounds.x1 - global_window_parameters.camera.viewport_bounds.x0,
-		global_window_parameters.camera.viewport_bounds.y1 - global_window_parameters.camera.viewport_bounds.y0,
-		1,
-		_bitmap_type_2d,
-		NONE,
-		FLAG(_bitmap_linear_bit)
-	};
-	real constants[8][4];
-	real_vector2d convolution_size;
-	real_vector2d screen_size;
-	real_vector2d scanline_size;
-	real_vector2d noise_size;
-	real_vector2d screen_scale;
-	real_vector2d unit_scale;
-	real_vector2d noise_scale;
-	real_vector2d scanline_scale;
-	real_vector2d convolution_scale;
-	struct bitmap_data const *scanline_bitmap;
-	struct bitmap_data const *noise_bitmap;
-	struct bitmap_data const *convolution_bitmap;
-	short x_offset;
-	short y_offset;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 		47,
@@ -284,198 +258,220 @@ static void rasterizer_screen_effect_set_texture_transforms(
 		48,
 		global_d3d_device);
 
-	unit_scale.i = 1.0f;
-	unit_scale.j = 1.0f;
-
-	if (parameters->convolution_mask &&
-		(pass > 0 ||
-		pass_count == 1 ||
-		parameters->convolution_type != _rasterizer_screen_effect_convolution_type_none))
-		convolution_bitmap = parameters->convolution_mask;
-	else
-		convolution_bitmap = &screen_bitmap;
-
-	if (parameters->video_on)
-		scanline_bitmap = parameters->video_scanline_map;
-	else
-		scanline_bitmap = &screen_bitmap;
-
-	if (parameters->video_on)
-		noise_bitmap = parameters->video_noise_map;
-	else
-		noise_bitmap = &screen_bitmap;
-
-	convolution_size.i = convolution_bitmap->width;
-	convolution_size.j = convolution_bitmap->height;
-	scanline_size.i = scanline_bitmap->width;
-	scanline_size.j = scanline_bitmap->height;
-	noise_size.i = noise_bitmap->width;
-	noise_size.j = noise_bitmap->height;
-	screen_size.i = screen_bitmap.width;
-	screen_size.j = screen_bitmap.height;
-
-	if (TEST_FLAG(convolution_bitmap->flags, _bitmap_linear_bit))
-		convolution_scale = unit_scale;
-	else
-		convolution_scale = vector2d_reciprocal(&convolution_size);
-
-	if (TEST_FLAG(scanline_bitmap->flags, _bitmap_linear_bit))
-		scanline_scale = unit_scale;
-	else
-		scanline_scale = vector2d_reciprocal(&scanline_size);
-
-	if (TEST_FLAG(noise_bitmap->flags, _bitmap_linear_bit))
-		noise_scale = unit_scale;
-	else
-		noise_scale = vector2d_reciprocal(&noise_size);
-
-	if (TEST_FLAG(screen_bitmap.flags, _bitmap_linear_bit))
-		screen_scale = unit_scale;
-	else
-		screen_scale = vector2d_reciprocal(&screen_size);
-
-	constants[0][0] = convolution_scale.i;
-	constants[0][1] = 0.0f;
-	constants[0][2] = 0.0f;
-	constants[0][3] = (convolution_size.i + 1.0f - screen_size.i) * convolution_scale.i * 0.5f;
-	constants[1][0] = 0.0f;
-	constants[1][1] = convolution_scale.j;
-	constants[1][2] = 0.0f;
-	constants[1][3] = (convolution_size.j + 1.0f - screen_size.j) * convolution_scale.j * 0.5f;
-	constants[2][0] = scanline_scale.i;
-	constants[2][1] = 0.0f;
-	constants[2][2] = 0.0f;
-	constants[2][3] = (scanline_size.i + 1.0f - screen_size.i) * scanline_scale.i * 0.5f;
-	constants[3][0] = 0.0f;
-	constants[3][1] = scanline_scale.j;
-	constants[3][2] = 0.0f;
-	constants[3][3] = (scanline_size.j + 1.0f - screen_size.j) * scanline_scale.j * 0.5f;
-	constants[4][0] = noise_scale.i;
-	constants[4][1] = 0.0f;
-	constants[4][2] = 0.0f;
-	constants[4][3] = (noise_size.i + 1.0f - screen_size.i) * noise_scale.i * 0.5f;
-	constants[5][0] = 0.0f;
-	constants[5][1] = noise_scale.j;
-	constants[5][2] = 0.0f;
-	constants[5][3] = (noise_size.j + 1.0f - screen_size.j) * noise_scale.j * 0.5f;
-	constants[6][0] = screen_scale.i;
-	constants[6][1] = 0.0f;
-	constants[6][2] = 0.0f;
-	constants[6][3] = (screen_size.i + 1.0f - screen_size.i) * screen_scale.i * 0.5f;
-	constants[7][0] = 0.0f;
-	constants[7][1] = screen_scale.j;
-	constants[7][2] = 0.0f;
-	constants[7][3] = (screen_size.j + 1.0f - screen_size.j) * screen_scale.j * 0.5f;
-
-	x_offset = (global_window_parameters.camera.viewport_bounds.x0 +
-		global_window_parameters.camera.viewport_bounds.x1) / 2 -
-		(global_window_parameters.camera.window_bounds.x0 +
-		global_window_parameters.camera.window_bounds.x1) / 2;
-	y_offset = (global_window_parameters.camera.viewport_bounds.y0 +
-		global_window_parameters.camera.viewport_bounds.y1) / 2 -
-		(global_window_parameters.camera.window_bounds.y0 +
-		global_window_parameters.camera.window_bounds.y1) / 2;
-
-	if (convolution_bitmap == &screen_bitmap)
 	{
-		constants[0][3] += global_window_parameters.camera.viewport_bounds.x0;
-		constants[1][3] += global_window_parameters.camera.viewport_bounds.y0;
+		struct bitmap_data viewport_map =
+		{
+			BITMAP_GROUP_TAG,
+			global_window_parameters.camera.viewport_bounds.x1 - global_window_parameters.camera.viewport_bounds.x0,
+			global_window_parameters.camera.viewport_bounds.y1 - global_window_parameters.camera.viewport_bounds.y0,
+			1,
+			_bitmap_type_2d,
+			NONE,
+			FLAG(_bitmap_linear_bit)
+		};
+		real constants[8][4];
+		real_vector2d convolution_size;
+		real_vector2d screen_size;
+		real_vector2d scanline_size;
+		real_vector2d noise_size;
+		real_vector2d screen_scale;
+		real_vector2d default_scale;
+		real_vector2d noise_scale;
+		real_vector2d scanline_scale;
+		real_vector2d convolution_scale;
+		struct bitmap_data const *scanline_bitmap;
+		struct bitmap_data const *noise_bitmap;
+		struct bitmap_data const *convolution_bitmap;
+		short x_offset;
+		short y_offset;
+
+		if (parameters->convolution_mask &&
+			(pass > 0 ||
+			pass_count == 1 ||
+			parameters->convolution_type != _rasterizer_screen_effect_convolution_type_none))
+			convolution_bitmap = parameters->convolution_mask;
+		else
+			convolution_bitmap = &viewport_map;
+
+		if (parameters->video_on)
+			scanline_bitmap = parameters->video_scanline_map;
+		else
+			scanline_bitmap = &viewport_map;
+
+		if (parameters->video_on)
+			noise_bitmap = parameters->video_noise_map;
+		else
+			noise_bitmap = &viewport_map;
+
+		convolution_size.i = convolution_bitmap->width;
+		convolution_size.j = convolution_bitmap->height;
+		scanline_size.i = scanline_bitmap->width;
+		scanline_size.j = scanline_bitmap->height;
+		noise_size.i = noise_bitmap->width;
+		noise_size.j = noise_bitmap->height;
+		screen_size.i = viewport_map.width;
+		screen_size.j = viewport_map.height;
+
+		default_scale.i = 1.0f;
+		default_scale.j = 1.0f;
+
+		convolution_scale = TEST_FLAG(convolution_bitmap->flags, _bitmap_linear_bit) ?
+			default_scale : vector2d_reciprocal(&convolution_size);
+
+		scanline_scale = TEST_FLAG(scanline_bitmap->flags, _bitmap_linear_bit) ?
+			default_scale : vector2d_reciprocal(&scanline_size);
+
+		noise_scale = TEST_FLAG(noise_bitmap->flags, _bitmap_linear_bit) ?
+			default_scale : vector2d_reciprocal(&noise_size);
+
+		screen_scale = TEST_FLAG(viewport_map.flags, _bitmap_linear_bit) ?
+			default_scale : vector2d_reciprocal(&screen_size);
+
+		constants[0][0] = convolution_scale.i;
+		constants[0][1] = 0.0f;
+		constants[0][2] = 0.0f;
+		constants[0][3] = (convolution_size.i + 1.0f - viewport_map.width) * convolution_scale.i * 0.5f;
+		constants[1][0] = 0.0f;
+		constants[1][1] = convolution_scale.j;
+		constants[1][2] = 0.0f;
+		constants[1][3] = (convolution_size.j + 1.0f - viewport_map.height) * convolution_scale.j * 0.5f;
+		constants[2][0] = scanline_scale.i;
+		constants[2][1] = 0.0f;
+		constants[2][2] = 0.0f;
+		constants[2][3] = (scanline_size.i + 1.0f - viewport_map.width) * scanline_scale.i * 0.5f;
+		constants[3][0] = 0.0f;
+		constants[3][1] = scanline_scale.j;
+		constants[3][2] = 0.0f;
+		constants[3][3] = (scanline_size.j + 1.0f - viewport_map.height) * scanline_scale.j * 0.5f;
+		constants[4][0] = noise_scale.i;
+		constants[4][1] = 0.0f;
+		constants[4][2] = 0.0f;
+		constants[4][3] = (noise_size.i + 1.0f - viewport_map.width) * noise_scale.i * 0.5f;
+		constants[5][0] = 0.0f;
+		constants[5][1] = noise_scale.j;
+		constants[5][2] = 0.0f;
+		constants[5][3] = (noise_size.j + 1.0f - viewport_map.height) * noise_scale.j * 0.5f;
+		constants[6][0] = screen_scale.i;
+		constants[6][1] = 0.0f;
+		constants[6][2] = 0.0f;
+		constants[6][3] = (screen_size.i + 1.0f - viewport_map.width) * screen_scale.i * 0.5f;
+		constants[7][0] = 0.0f;
+		constants[7][1] = screen_scale.j;
+		constants[7][2] = 0.0f;
+		constants[7][3] = (screen_size.j + 1.0f - viewport_map.height) * screen_scale.j * 0.5f;
+
+		x_offset = (global_window_parameters.camera.viewport_bounds.x0 +
+			global_window_parameters.camera.viewport_bounds.x1) / 2 -
+			(global_window_parameters.camera.window_bounds.x1 +
+			global_window_parameters.camera.window_bounds.x0) / 2;
+		y_offset = (global_window_parameters.camera.viewport_bounds.y0 +
+			global_window_parameters.camera.viewport_bounds.y1) / 2 -
+			(global_window_parameters.camera.window_bounds.y1 +
+			global_window_parameters.camera.window_bounds.y0) / 2;
+
+		if (convolution_bitmap == &viewport_map)
+		{
+			constants[0][3] += global_window_parameters.camera.viewport_bounds.x0;
+			constants[1][3] += global_window_parameters.camera.viewport_bounds.y0;
+		}
+		else if (convolution_bitmap == parameters->convolution_mask)
+		{
+			constants[0][3] += x_offset * convolution_scale.i;
+			constants[1][3] += y_offset * convolution_scale.j;
+		}
+
+		if (scanline_bitmap == &viewport_map)
+		{
+			constants[2][3] += global_window_parameters.camera.viewport_bounds.x0;
+			constants[3][3] += global_window_parameters.camera.viewport_bounds.y0;
+		}
+		else if (scanline_bitmap == parameters->convolution_mask)
+		{
+			constants[2][3] += x_offset * scanline_scale.i;
+			constants[3][3] += y_offset * scanline_scale.j;
+		}
+
+		if (parameters->convolution_type == _rasterizer_screen_effect_convolution_type_blur)
+		{
+			real convolution_radius = parameters->convolution_radius;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
+				176,
+				!parameters->video_on);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
+				177,
+				main_get_window_count()<=1);
+
+			constants[0][3] += parameters->convolution_mask ?
+				0.0f : convolution_scale.i * convolution_radius;
+			constants[1][3] += parameters->convolution_mask ?
+				0.0f : convolution_scale.j * convolution_radius;
+			constants[2][3] -= scanline_scale.i * convolution_radius;
+			constants[3][3] -= scanline_scale.j * convolution_radius;
+			constants[4][3] += noise_scale.i * convolution_radius;
+			constants[5][3] -= noise_scale.j * convolution_radius;
+			constants[6][3] -= screen_scale.i * convolution_radius;
+			constants[7][3] += screen_scale.j * convolution_radius;
+		}
+		else if (parameters->convolution_type == _rasterizer_screen_effect_convolution_type_warp)
+		{
+			real convolution_radius = parameters->convolution_radius;
+			real convolution_offset = parameters->convolution_mask ?
+				0.0f : -convolution_radius;
+			real scanline_offset = 0.0f;
+			real noise_offset = convolution_radius;
+			real screen_offset = parameters->convolution_mask ?
+				-convolution_radius : convolution_radius * 2.0f;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
+				198,
+				!parameters->video_on);
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
+				199,
+				main_get_window_count()<=1);
+
+			constants[0][0] = (1.0f - convolution_offset / convolution_size.i) * constants[0][0];
+			constants[1][1] = (1.0f - convolution_offset / convolution_size.j) * constants[1][1];
+			constants[2][0] = (1.0f - scanline_offset / scanline_size.i) * constants[2][0];
+			constants[3][1] = (1.0f - scanline_offset / scanline_size.j) * constants[3][1];
+			constants[4][0] = (1.0f - noise_offset / noise_size.i) * constants[4][0];
+			constants[5][1] = (1.0f - noise_offset / noise_size.j) * constants[5][1];
+			constants[6][0] = (1.0f - screen_offset / screen_size.i) * constants[6][0];
+			constants[7][1] = (1.0f - screen_offset / screen_size.j) * constants[7][1];
+			constants[0][3] += convolution_offset * 0.5f;
+			constants[1][3] += convolution_offset * 0.5f;
+			constants[2][3] += scanline_offset * 0.5f;
+			constants[3][3] += scanline_offset * 0.5f;
+			constants[4][3] += noise_offset * 0.5f;
+			constants[5][3] += noise_offset * 0.5f;
+			constants[6][3] += screen_offset * 0.5f;
+			constants[7][3] += screen_offset * 0.5f;
+		}
+		else if (pass == 1 && parameters->video_on)
+		{
+			real random_value;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
+				223,
+				main_get_window_count()<=1);
+
+			random_value = real_seed_random(get_global_local_random_seed_address());
+			constants[4][3] += noise_scale.i * random_value * noise_size.i;
+			random_value = real_seed_random(get_global_local_random_seed_address());
+			constants[5][3] += noise_scale.j * random_value * noise_size.j;
+		}
+
+		IDirect3DDevice8_SetVertexShaderConstant(
+			global_d3d_device,
+			-81,
+			constants,
+			8);
 	}
-	else if (convolution_bitmap == parameters->convolution_mask)
-	{
-		constants[0][3] += x_offset * convolution_scale.i;
-		constants[1][3] += y_offset * convolution_scale.j;
-	}
-
-	if (scanline_bitmap == &screen_bitmap)
-	{
-		constants[2][3] += global_window_parameters.camera.viewport_bounds.x0;
-		constants[3][3] += global_window_parameters.camera.viewport_bounds.y0;
-	}
-	else if (scanline_bitmap == parameters->convolution_mask)
-	{
-		constants[2][3] += x_offset * scanline_scale.i;
-		constants[3][3] += y_offset * scanline_scale.j;
-	}
-
-	if (parameters->convolution_type == _rasterizer_screen_effect_convolution_type_blur)
-	{
-		real convolution_radius = parameters->convolution_radius;
-
-		match_assert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
-			176,
-			!parameters->video_on);
-		match_assert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
-			177,
-			main_get_window_count()<=1);
-
-		constants[0][3] += parameters->convolution_mask ?
-			0.0f : convolution_scale.i * convolution_radius;
-		constants[1][3] += parameters->convolution_mask ?
-			0.0f : convolution_scale.j * convolution_radius;
-		constants[2][3] -= scanline_scale.i * convolution_radius;
-		constants[3][3] -= scanline_scale.j * convolution_radius;
-		constants[4][3] += noise_scale.i * convolution_radius;
-		constants[5][3] -= noise_scale.j * convolution_radius;
-		constants[6][3] -= screen_scale.i * convolution_radius;
-		constants[7][3] += screen_scale.j * convolution_radius;
-	}
-	else if (parameters->convolution_type == _rasterizer_screen_effect_convolution_type_warp)
-	{
-		real convolution_radius = parameters->convolution_radius;
-		real convolution_offset = parameters->convolution_mask ?
-			0.0f : -convolution_radius;
-		real scanline_offset = 0.0f;
-		real noise_offset = convolution_radius;
-		real screen_offset = parameters->convolution_mask ?
-			-convolution_radius : convolution_radius * 2.0f;
-
-		match_assert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
-			198,
-			!parameters->video_on);
-		match_assert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
-			199,
-			main_get_window_count()<=1);
-
-		constants[0][0] = (1.0f - convolution_offset / convolution_size.i) * constants[0][0];
-		constants[1][1] = (1.0f - convolution_offset / convolution_size.j) * constants[1][1];
-		constants[2][0] = (1.0f - scanline_offset / scanline_size.i) * constants[2][0];
-		constants[3][1] = (1.0f - scanline_offset / scanline_size.j) * constants[3][1];
-		constants[4][0] = (1.0f - noise_offset / noise_size.i) * constants[4][0];
-		constants[5][1] = (1.0f - noise_offset / noise_size.j) * constants[5][1];
-		constants[6][0] = (1.0f - screen_offset / screen_size.i) * constants[6][0];
-		constants[7][1] = (1.0f - screen_offset / screen_size.j) * constants[7][1];
-		constants[0][3] += convolution_offset * 0.5f;
-		constants[1][3] += convolution_offset * 0.5f;
-		constants[2][3] += scanline_offset * 0.5f;
-		constants[3][3] += scanline_offset * 0.5f;
-		constants[4][3] += noise_offset * 0.5f;
-		constants[5][3] += noise_offset * 0.5f;
-		constants[6][3] += screen_offset * 0.5f;
-		constants[7][3] += screen_offset * 0.5f;
-	}
-	else if (pass == 1 && parameters->video_on)
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
-			223,
-			main_get_window_count()<=1);
-
-		constants[4][3] += noise_scale.i *
-			real_seed_random(get_global_local_random_seed_address()) * noise_size.i;
-		constants[5][3] += noise_scale.j *
-			real_seed_random(get_global_local_random_seed_address()) * noise_size.j;
-	}
-
-	IDirect3DDevice8_SetVertexShaderConstant(
-		global_d3d_device,
-		-81,
-		constants,
-		8);
 
 	return;
 }
