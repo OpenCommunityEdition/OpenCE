@@ -172,6 +172,7 @@ static boolean local_player_is_piloting_aircraft(
 /* ---------- globals */
 
 struct input_abstraction_runtime_globals input_abstraction_globals = {0};
+static real const gamepad_axis_normalization_scale = 1.f / SHORT_MAX;
 static real const stick_direction_angles[] =
 {
 	STICK_DIAGONAL_ANGLE,
@@ -323,146 +324,231 @@ void input_abstraction_update(
 
 		if (gamepad)
 		{
-			struct game_input_preferences const *preferences =
-				&input_abstraction_globals.player_control_preferences[controller_index];
 			struct game_input_state *state = &input_abstraction_globals.input_states[controller_index];
 			real left_angle;
 			real right_angle;
-			real left_x;
-			real left_y;
-			real right_x;
-			real right_y;
-			real left_scale;
-			real right_scale;
+			real_point2d left_stick;
+			real_point2d right_stick;
 			long control_index;
 			boolean invert_look;
 
-			player_look_yaw_rate[controller_index] = preferences->yaw_rate;
-			player_look_pitch_rate[controller_index] = preferences->pitch_rate;
-			left_angle = (real)atan2(
-				(real)gamepad->sticks[_gamepad_stick_left].y,
-				(real)gamepad->sticks[_gamepad_stick_left].x);
-			left_scale = (real)(1.0 / MAX(fabs((real)sin(left_angle)), fabs((real)cos(left_angle))));
-			left_x = PIN((real)gamepad->sticks[_gamepad_stick_left].x * (1.f / SHORT_MAX) * left_scale, -1.f, 1.f);
-			left_y = PIN((real)gamepad->sticks[_gamepad_stick_left].y * (1.f / SHORT_MAX) * left_scale, -1.f, 1.f);
-			right_angle = (real)atan2(
-				(real)gamepad->sticks[_gamepad_stick_right].y,
-				(real)gamepad->sticks[_gamepad_stick_right].x);
-			right_scale = (real)(1.0 / MAX(fabs((real)sin(right_angle)), fabs((real)cos(right_angle))));
-			right_x = PIN((real)gamepad->sticks[_gamepad_stick_right].x * (1.f / SHORT_MAX) * right_scale, -1.f, 1.f);
-			right_y = PIN((real)gamepad->sticks[_gamepad_stick_right].y * (1.f / SHORT_MAX) * right_scale, -1.f, 1.f);
+			player_look_yaw_rate[controller_index] = input_abstraction_globals.player_control_preferences[controller_index].yaw_rate;
+			player_look_pitch_rate[controller_index] = input_abstraction_globals.player_control_preferences[controller_index].pitch_rate;
+			{
+				real scale;
+
+				left_angle = arctangent(gamepad->sticks[_gamepad_stick_left].y, gamepad->sticks[_gamepad_stick_left].x);
+				scale = 1.0 / MAX(fabs(sine(left_angle)), fabs(cosine(left_angle)));
+				left_stick.x = PIN(gamepad->sticks[_gamepad_stick_left].x * gamepad_axis_normalization_scale * scale, -1.f, 1.f);
+				left_stick.y = PIN(gamepad->sticks[_gamepad_stick_left].y * gamepad_axis_normalization_scale * scale, -1.f, 1.f);
+			}
+			{
+				real scale;
+
+				right_angle = arctangent(gamepad->sticks[_gamepad_stick_right].y, gamepad->sticks[_gamepad_stick_right].x);
+				scale = 1.0 / MAX(fabs(sine(right_angle)), fabs(cosine(right_angle)));
+				right_stick.x = PIN(gamepad->sticks[_gamepad_stick_right].x * gamepad_axis_normalization_scale * scale, -1.f, 1.f);
+				right_stick.y = PIN(gamepad->sticks[_gamepad_stick_right].y * gamepad_axis_normalization_scale * scale, -1.f, 1.f);
+			}
 			for (control_index = 0; control_index < NUMBER_OF_GAME_CONTROLS; control_index++)
 			{
 				state->buttons[control_index] =
-					gamepad->buttons[preferences->game_control_to_xbox_buttons[control_index]];
+					gamepad->buttons[input_abstraction_globals.player_control_preferences[controller_index].game_control_to_xbox_buttons[control_index]];
 			}
 
-			if (preferences->joystick_controls == _joystick_controls_legacy ||
-				preferences->joystick_controls == _joystick_controls_legacy_southpaw)
+			if (input_abstraction_globals.player_control_preferences[controller_index].joystick_controls == _joystick_controls_legacy ||
+				input_abstraction_globals.player_control_preferences[controller_index].joystick_controls == _joystick_controls_legacy_southpaw)
 			{
-				short left_quadrant = (left_x < 0.f ? 1 : 0) + (left_y < 0.f ? 2 : 0);
-				short right_quadrant = (right_x < 0.f ? 1 : 0) + (right_y < 0.f ? 2 : 0);
-				real left_magnitude = (real)sqrt(left_x * left_x + left_y * left_y);
-				real right_magnitude = (real)sqrt(right_x * right_x + right_y * right_y);
-				real left_diagonal_distance = (real)fabs(left_angle - stick_direction_angles[left_quadrant]);
-				real right_diagonal_distance;
+				short left_quadrant = (left_stick.x < 0.f ? 1 : 0) | (left_stick.y < 0.f ? 2 : 0);
+				short right_quadrant = (right_stick.x < 0.f ? 1 : 0) | (right_stick.y < 0.f ? 2 : 0);
+				real left_difference = left_angle - stick_direction_angles[left_quadrant];
+				real right_difference = right_angle - stick_direction_angles[right_quadrant];
+				real left_magnitude = square_root(left_stick.x * left_stick.x + left_stick.y * left_stick.y);
+				real right_magnitude = square_root(right_stick.x * right_stick.x + right_stick.y * right_stick.y);
 
-				if (left_diagonal_distance >= LEFT_STICK_DIAGONAL_SNAP_ANGLE)
+				if (fabs(left_difference) < LEFT_STICK_DIAGONAL_SNAP_ANGLE)
 				{
-					if (fabs(left_x) > fabs(left_y))
+					real absolute_angle = fabs(left_angle);
+
+					if (absolute_angle < STICK_DIAGONAL_ANGLE ||
+						absolute_angle > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
 					{
-						left_y = 0.f;
-						left_x = (left_x < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.x = (left_stick.x < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.y = (left_stick.y < 0.f ? -1 : 1) * left_magnitude *
+							(1.0 - fabs(left_difference) * STICK_DIAGONAL_BLEND_SCALE);
 					}
 					else
 					{
-						left_x = 0.f;
-						left_y = (left_y < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.y = (left_stick.y < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.x = (left_stick.x < 0.f ? -1 : 1) * left_magnitude *
+							(1.0 - fabs(left_difference) * STICK_DIAGONAL_BLEND_SCALE);
 					}
-				}
-				else if (fabs(left_angle) < STICK_DIAGONAL_ANGLE ||
-					fabs(left_angle) > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
-				{
-					left_x = (left_x < 0.f ? -1 : 1) * left_magnitude;
-					left_y = (left_y < 0.f ? -1 : 1) * left_magnitude *
-						(1.0 - left_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
 				}
 				else
 				{
-					left_y = (left_y < 0.f ? -1 : 1) * left_magnitude;
-					left_x = (left_x < 0.f ? -1 : 1) * left_magnitude *
-						(1.0 - left_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
-				}
-
-				right_diagonal_distance = (real)fabs(right_angle - stick_direction_angles[right_quadrant]);
-				if (right_diagonal_distance >= RIGHT_STICK_DIAGONAL_SNAP_ANGLE)
-				{
-					if (fabs(right_x) > fabs(right_y))
+					if (fabs(left_stick.x) > fabs(left_stick.y))
 					{
-						right_y = 0.f;
-						right_x = (right_x < 0.f ? -1 : 1) * right_magnitude;
+						left_stick.x = (left_stick.x < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.y = 0.f;
 					}
 					else
 					{
-						right_x = 0.f;
-						right_y = (right_y < 0.f ? -1 : 1) * right_magnitude;
+						left_stick.y = (left_stick.y < 0.f ? -1 : 1) * left_magnitude;
+						left_stick.x = 0.f;
 					}
 				}
-				else if (fabs(right_angle) < STICK_DIAGONAL_ANGLE ||
-					fabs(right_angle) > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
+
+				if (fabs(right_difference) < RIGHT_STICK_DIAGONAL_SNAP_ANGLE)
 				{
-					right_x = (right_x < 0.f ? -1 : 1) * right_magnitude;
-					right_y = (right_y < 0.f ? -1 : 1) * right_magnitude *
-						(1.0 - right_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+					real absolute_angle = fabs(right_angle);
+
+					if (absolute_angle < STICK_DIAGONAL_ANGLE ||
+						absolute_angle > STICK_SECOND_QUADRANT_DIAGONAL_ANGLE)
+					{
+						right_stick.x = (right_stick.x < 0.f ? -1 : 1) * right_magnitude;
+						right_stick.y = (right_stick.y < 0.f ? -1 : 1) * right_magnitude *
+							(1.0 - fabs(right_difference) * STICK_DIAGONAL_BLEND_SCALE);
+					}
+					else
+					{
+						right_stick.y = (right_stick.y < 0.f ? -1 : 1) * right_magnitude;
+						right_stick.x = (right_stick.x < 0.f ? -1 : 1) * right_magnitude *
+							(1.0 - fabs(right_difference) * STICK_DIAGONAL_BLEND_SCALE);
+					}
 				}
 				else
 				{
-					right_y = (right_y < 0.f ? -1 : 1) * right_magnitude;
-					right_x = (right_x < 0.f ? -1 : 1) * right_magnitude *
-						(1.0 - right_diagonal_distance * STICK_DIAGONAL_BLEND_SCALE);
+					if (fabs(right_stick.x) > fabs(right_stick.y))
+					{
+						right_stick.x = (right_stick.x < 0.f ? -1 : 1) * right_magnitude;
+						right_stick.y = 0.f;
+					}
+					else
+					{
+						right_stick.y = (right_stick.y < 0.f ? -1 : 1) * right_magnitude;
+						right_stick.x = 0.f;
+					}
 				}
 			}
 
-			invert_look = preferences->invert_look;
-			if (!invert_look && preferences->invert_look_aircraft_control)
+			invert_look = input_abstraction_globals.player_control_preferences[controller_index].invert_look;
+			if (!invert_look && input_abstraction_globals.player_control_preferences[controller_index].invert_look_aircraft_control)
 			{
 				invert_look = local_player_is_piloting_aircraft((short)controller_index);
 			}
-			switch (preferences->joystick_controls)
+			switch (input_abstraction_globals.player_control_preferences[controller_index].joystick_controls)
 			{
 				case _joystick_controls_default:
-					state->strafe = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
-					state->forward_movement = gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y;
-					state->yaw = -right_x;
-					state->pitch = (invert_look ? -1.f : 1.f) * right_y;
+					if (gamepad->buttons[_gamepad_binary_button_dpad_left])
+					{
+						state->strafe = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_right])
+					{
+						state->strafe = -1.f;
+					}
+					else
+					{
+						state->strafe = -left_stick.x;
+					}
+					if (gamepad->buttons[_gamepad_binary_button_dpad_up])
+					{
+						state->forward_movement = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_down])
+					{
+						state->forward_movement = -1.f;
+					}
+					else
+					{
+						state->forward_movement = left_stick.y;
+					}
+					state->yaw = -right_stick.x;
+					state->pitch = (invert_look ? -1.f : 1.f) * right_stick.y;
 					break;
 				case _joystick_controls_southpaw:
-					state->yaw = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
-					state->pitch = (invert_look ? -1.f : 1.f) *
-						(gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y);
-					state->forward_movement = right_y;
-					state->strafe = -right_x;
+					if (gamepad->buttons[_gamepad_binary_button_dpad_left])
+					{
+						state->yaw = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_right])
+					{
+						state->yaw = -1.f;
+					}
+					else
+					{
+						state->yaw = -left_stick.x;
+					}
+					if (gamepad->buttons[_gamepad_binary_button_dpad_up])
+					{
+						state->pitch = invert_look ? -1.f : 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_down])
+					{
+						state->pitch = invert_look ? 1.f : -1.f;
+					}
+					else
+					{
+						state->pitch = (invert_look ? -1.f : 1.f) * left_stick.y;
+					}
+					state->forward_movement = right_stick.y;
+					state->strafe = -right_stick.x;
 					break;
 				case _joystick_controls_legacy:
-					state->yaw = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
-					state->forward_movement = gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y;
-					state->strafe = -right_x;
-					state->pitch = (invert_look ? -1.f : 1.f) * right_y;
+					if (gamepad->buttons[_gamepad_binary_button_dpad_left])
+					{
+						state->yaw = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_right])
+					{
+						state->yaw = -1.f;
+					}
+					else
+					{
+						state->yaw = -left_stick.x;
+					}
+					if (gamepad->buttons[_gamepad_binary_button_dpad_up])
+					{
+						state->forward_movement = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_down])
+					{
+						state->forward_movement = -1.f;
+					}
+					else
+					{
+						state->forward_movement = left_stick.y;
+					}
+					state->strafe = -right_stick.x;
+					state->pitch = (invert_look ? -1.f : 1.f) * right_stick.y;
 					break;
 				case _joystick_controls_legacy_southpaw:
-					state->strafe = gamepad->buttons[_gamepad_binary_button_dpad_left] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_right] ? -1.f : -left_x;
-					state->pitch = (invert_look ? -1.f : 1.f) *
-						(gamepad->buttons[_gamepad_binary_button_dpad_up] ? 1.f :
-						gamepad->buttons[_gamepad_binary_button_dpad_down] ? -1.f : left_y);
-					state->forward_movement = right_y;
-					state->yaw = -right_x;
+					if (gamepad->buttons[_gamepad_binary_button_dpad_left])
+					{
+						state->strafe = 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_right])
+					{
+						state->strafe = -1.f;
+					}
+					else
+					{
+						state->strafe = -left_stick.x;
+					}
+					if (gamepad->buttons[_gamepad_binary_button_dpad_up])
+					{
+						state->pitch = invert_look ? -1.f : 1.f;
+					}
+					else if (gamepad->buttons[_gamepad_binary_button_dpad_down])
+					{
+						state->pitch = invert_look ? 1.f : -1.f;
+					}
+					else
+					{
+						state->pitch = (invert_look ? -1.f : 1.f) * left_stick.y;
+					}
+					state->forward_movement = right_stick.y;
+					state->yaw = -right_stick.x;
 					break;
 				default:
 					error(_error_silent, "unknown joystick preset");
@@ -482,43 +568,55 @@ void input_abstraction_update(
 				if (main_menu_is_active())
 				{
 					long available_controllers = 0;
-					long index;
+					long index = 0;
 
-					for (index = 0; index < MAXIMUM_GAMEPADS; index++)
+					do
 					{
 						if (input_abstraction_globals.controller_available[index])
 						{
 							available_controllers++;
 						}
+						index++;
 					}
+					while (index < MAXIMUM_GAMEPADS);
 					pause_game = FALSE;
 					error_code = _error_controller_unplugged;
 					if (available_controllers >= 2)
 					{
-						show_error =
-							player_ui_get_single_player_local_player_controller(0) == controller_index ||
-							player_ui_get_single_player_local_player_controller(1) == controller_index ||
-							player_ui_get_single_player_local_player_controller(2) == controller_index ||
-							player_ui_get_single_player_local_player_controller(3) == controller_index ||
-							player_ui_local_player_wants_to_play_multiplayer((short)controller_index);
+						if (player_ui_get_single_player_local_player_controller(0) != controller_index &&
+							player_ui_get_single_player_local_player_controller(1) != controller_index &&
+							player_ui_get_single_player_local_player_controller(2) != controller_index &&
+							player_ui_get_single_player_local_player_controller(3) != controller_index &&
+							!player_ui_local_player_wants_to_play_multiplayer((short)controller_index))
+						{
+							show_error = FALSE;
+						}
 					}
-					else if (player_ui_get_single_player_local_player_controller(0) != controller_index &&
-						player_ui_get_single_player_local_player_controller(1) != controller_index &&
-						player_ui_get_single_player_local_player_controller(2) != controller_index &&
-						player_ui_get_single_player_local_player_controller(3) != controller_index &&
-						!player_ui_local_player_wants_to_play_multiplayer((short)controller_index))
+					else
 					{
-						error_controller = NONE;
+						if (player_ui_get_single_player_local_player_controller(0) != controller_index &&
+							player_ui_get_single_player_local_player_controller(1) != controller_index &&
+							player_ui_get_single_player_local_player_controller(2) != controller_index &&
+							player_ui_get_single_player_local_player_controller(3) != controller_index &&
+							!player_ui_local_player_wants_to_play_multiplayer((short)controller_index))
+						{
+							error_controller = NONE;
+						}
 					}
+				}
+				else if (global_network_game_client_get())
+				{
+					pause_game = FALSE;
+					error_code = _error_controller_unplugged;
+					show_error = local_player_exists(controller_index);
 				}
 				else
 				{
-					pause_game = global_network_game_client_get() == NULL;
-					error_code = pause_game ? _error_controller_unplugged_start_to_continue :
-						_error_controller_unplugged;
-					show_error = local_player_exists((short)controller_index) == TRUE;
+					pause_game = TRUE;
+					error_code = _error_controller_unplugged_start_to_continue;
+					show_error = local_player_exists(controller_index);
 				}
-				if (show_error)
+				if (show_error == TRUE)
 				{
 					if (virtual_keyboard_active())
 					{
