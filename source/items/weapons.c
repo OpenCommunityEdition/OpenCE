@@ -523,6 +523,31 @@ void weapons_dispose(
 	return;
 }
 
+void weapon_place(
+	long weapon_index,
+	struct scenario_weapon_datum *scenario_weapon)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+
+	if (weapon_definition->weapon.magazines.count>0)
+	{
+		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, 0, struct weapon_magazine_definition);
+
+		weapon->weapon.magazines[0].rounds_total = MIN(scenario_weapon->rounds_total, magazine_definition->rounds_total_maximum);
+		weapon->weapon.magazines[0].rounds_loaded = MIN(scenario_weapon->rounds_loaded, magazine_definition->rounds_loaded_maximum);
+	}
+
+	SET_FLAG(weapon->object.flags, _object_at_rest_bit, TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit));
+	weapon->object.flags |= FLAG(_object_cannot_be_garbage_bit);
+	SET_FLAG(weapon->item.flags, _item_does_not_accelerate_bit, !TEST_FLAG(scenario_weapon->flags, _weapon_does_accelerate_bit));
+
+	if (!TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit))
+		weapon->object.position.z += 0.05f;
+
+	return;
+}
+
 void weapon_ready(
 	long weapon_index)
 {
