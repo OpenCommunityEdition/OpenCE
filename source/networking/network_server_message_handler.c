@@ -1265,7 +1265,6 @@ static boolean network_game_server_handle_message_client_ping(
 	struct message_client_ping *client_message)
 {
 	struct message_server_pong pong;
-	struct transport_address address;
 	struct network_message *reply;
 	boolean result = FALSE;
 
@@ -1281,17 +1280,14 @@ static boolean network_game_server_handle_message_client_ping(
 		sizeof(pong));
 	if (reply)
 	{
-		word message_size = GET_MESSAGE_SIZE(reply->header);
-		struct network_connection *connection;
-
+		struct transport_address address;
 		address.address_length = IPV4_ADDRESS_LENGTH;
 		address.address.long_words[0] = source_address->address.long_words[0];
 		address.port = client_message->port;
-		connection = network_game_server_get_connection(server);
 		result = network_game_server_write(
-			connection,
+			network_game_server_get_connection(server),
 			reply,
-			message_size,
+			GET_MESSAGE_SIZE(reply->header),
 			&address,
 			0);
 		if (!result)
