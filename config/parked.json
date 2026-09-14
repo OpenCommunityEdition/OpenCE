@@ -5087,28 +5087,6 @@
     },
     {
       "unit": "source/bitmaps/bitmaps",
-      "function": "_bitmap_format_to_a8r8g8b8",
-      "class": "unclassified",
-      "evidence": "Complete natural typed bitmap-format conversion retained from the 2026-09-09 reconciliation packet. The switch uses the project bitmap enums and pixel/color helpers, but the current candidate is 560 padded bytes and 21 relocations versus January's 544 bytes and 22 relocations. The remaining control-flow and instruction-selection differences are not treated as exact. No fake dependency, raw offset, compiler steering, assembly, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",
-      "measurements": {
-        "target": { "size": 544, "relocation_count": 22, "normalized_sha256": "393db9b9a129a1c388c69259dd20b6dc91bbf6e5943ebc5d398375e9da4ef806" },
-        "base": { "size": 560, "relocation_count": 21, "normalized_sha256": "2cca10a4cf9dcec80df84852ea289c0773ab8fecb23c6ad42d132d05ddad7da8" },
-        "objdiff_percent": 40.976078
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmaps",
-      "function": "_palette_find_closest_match",
-      "class": "unclassified",
-      "evidence": "Complete natural palette-search reconstruction retained from the 2026-09-09 bitmap packet. It uses typed pixel channels and the ordinary closest-distance loop; the current candidate is 272 padded bytes with four relocations versus January's 256 bytes and four relocations. The nonexact register and loop schedule receives no matching credit. No fake dependency, raw offset, compiler steering, assembly, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",
-      "measurements": {
-        "target": { "size": 256, "relocation_count": 4, "normalized_sha256": "bff02f627a7490e89413a9c25091762766ee6c4d5a197b895d3f9b7675573b9e" },
-        "base": { "size": 272, "relocation_count": 4, "normalized_sha256": "a710c01ba8e35d709c6d06b07008af5d0e3415d3c75b670b628242ad54d68a2c" },
-        "objdiff_percent": 78.02247
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmaps",
       "function": "_bitmap_2d_get_pixel",
       "class": "unclassified",
       "evidence": "Complete natural typed two-dimensional bitmap pixel reader retained from the 2026-09-09 bitmap packet. It follows the format-aware mipmap addressing and color conversion graph, but the current candidate is 1,200 padded bytes and 64 relocations versus January's 1,296 bytes and 67 relocations. The missing target schedule is not filled with guessed branches or byte-forcing source. Zero exact credit. See docs/object_matching_logs/bitmaps_obj_natural_reconstruction_packet_20260909.md.",

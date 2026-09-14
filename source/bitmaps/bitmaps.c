@@ -794,7 +794,10 @@ pixel32 bitmap_format_to_a8r8g8b8(
 	void const *mipmap_address,
 	long pixel_index)
 {
-	pixel32 result = 0;
+	/* January relies on the fatal assertion for unsupported formats, as
+	 * bitmap_mipmap_address does for unsupported types; there is no fallback
+	 * pixel if system_exit unexpectedly returns. */
+	pixel32 result;
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x22B, mipmap_address);
 
@@ -802,83 +805,71 @@ pixel32 bitmap_format_to_a8r8g8b8(
 	{
 	case _bitmap_format_r5g6b5:
 	{
-		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
-		pixel32 expanded = ((pixel & 0xFFFFF800) | 0xFFFF0000) << 3;
-		pixel32 low_bits = ((pixel >> 1) & 0xE) | (pixel & 0x600);
+		word pixel = ((word const *)mipmap_address)[pixel_index];
 
-		expanded |= pixel & 0x7E0;
-		expanded = (expanded << 2) | (pixel & 0xFFFFE01F);
-		result = (expanded << 3) | (low_bits >> 1);
+		result = 0xFF000000 |
+			(((((pixel >> 11) & 0x1F) << 3) | (((pixel >> 11) & 0x1F) >> 2)) << 16) |
+			(((((pixel >> 5) & 0x3F) << 2) | (((pixel >> 5) & 0x3F) >> 4)) << 8) |
+			(((pixel & 0x1F) << 3) | ((pixel & 0x1F) >> 2));
 		break;
 	}
 
 	case _bitmap_format_a1r5g5b5:
 	{
-		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
+		word pixel = ((word const *)mipmap_address)[pixel_index];
 
-		result = (pixel & 0x7C00) << 3;
-		result = (result | (pixel & 0x3E0)) << 2;
-		result = (result | (pixel & 0x7000)) << 1;
-		result |= pixel & 0x1F;
-		result = (result << 2) | (pixel & 0x380);
-		result = (result << 1) | ((pixel >> 2) & 7);
-		result |= -(long)(pixel >> 15) << 24;
+		result = (((pixel >> 15) * 0xFF) << 24) |
+			(((((pixel >> 10) & 0x1F) << 3) | (((pixel >> 10) & 0x1F) >> 2)) << 16) |
+			(((((pixel >> 5) & 0x1F) << 3) | (((pixel >> 5) & 0x1F) >> 2)) << 8) |
+			(((pixel & 0x1F) << 3) | ((pixel & 0x1F) >> 2));
 		break;
 	}
 
 	case _bitmap_format_a4r4g4b4:
 	{
-		pixel32 pixel = ((word const *)mipmap_address)[pixel_index];
-		pixel32 high_channels = pixel >> 8;
-		pixel32 alpha = high_channels & 0xF;
-		pixel32 red = (pixel >> 4) & 0xF;
-		pixel32 green = pixel & 0xF;
+		word pixel = ((word const *)mipmap_address)[pixel_index];
 
-		result = (((high_channels & 0xF0) << 12) | pixel) & 0xFFFFF000;
-		result |= (alpha << 4) | alpha;
-		result = ((result | red) << 4) | red;
-		result = ((result << 4) | green) << 4 | green;
+		result = (((((pixel >> 12) & 0xF) << 4) | ((pixel >> 12) & 0xF)) << 24) |
+			(((((pixel >> 8) & 0xF) << 4) | ((pixel >> 8) & 0xF)) << 16) |
+			(((((pixel >> 4) & 0xF) << 4) | ((pixel >> 4) & 0xF)) << 8) |
+			(((pixel & 0xF) << 4) | (pixel & 0xF));
 		break;
 	}
 
 	case _bitmap_format_x8r8g8b8:
+		result = ((pixel32 const *)mipmap_address)[pixel_index];
+		break;
+
 	case _bitmap_format_a8r8g8b8:
 		result = ((pixel32 const *)mipmap_address)[pixel_index];
 		break;
 
 	case _bitmap_format_a8:
-		result = (pixel32)((byte const *)mipmap_address)[pixel_index] << 24;
+		result = ((byte const *)mipmap_address)[pixel_index] << 24;
 		break;
 
 	case _bitmap_format_y8:
 	{
-		pixel32 intensity = ((byte const *)mipmap_address)[pixel_index];
+		byte intensity = ((byte const *)mipmap_address)[pixel_index];
 
-		result = intensity | 0xFFFFFF00;
-		result = (result << 8) | intensity;
-		result = (result << 8) | intensity;
+		result = 0xFF000000 | (intensity << 16) | (intensity << 8) | intensity;
 		break;
 	}
 
 	case _bitmap_format_ay8:
 	{
-		pixel32 intensity = ((byte const *)mipmap_address)[pixel_index];
+		byte intensity = ((byte const *)mipmap_address)[pixel_index];
 
-		result = intensity;
-		result = (result << 8) | intensity;
-		result = (result << 8) | intensity;
-		result = (result << 8) | intensity;
+		result = (intensity << 24) | (intensity << 16) | (intensity << 8) | intensity;
 		break;
 	}
 
 	case _bitmap_format_a8y8:
 	{
 		word pixel = ((word const *)mipmap_address)[pixel_index];
-		pixel32 intensity = (byte)pixel;
+		byte intensity = (byte)pixel;
 
-		result = ((pixel32)pixel & 0xFFFFFF00) | intensity;
-		result = (result << 8) | intensity;
-		result = (result << 8) | intensity;
+		result = ((pixel >> 8) << 24) | (intensity << 16) | (intensity << 8) | intensity;
 		break;
 	}
 
@@ -902,40 +893,41 @@ byte palette_find_closest_match(
 	pixel32 const *palette,
 	pixel32 color)
 {
-	long closest_match_index = NONE;
+	short closest_match_index = NONE;
 	long closest_distance = 0;
 	short palette_index;
 
 	if ((color & 0xFF000000) <= 0x80000000)
 	{
-		return 255;
+		closest_match_index = 255;
 	}
-
-	for (palette_index = 0; palette_index < NUMBER_OF_ENTRIES_IN_PALETTE; palette_index++)
+	else
 	{
-		pixel32 palette_color = palette[palette_index];
-		long red_delta;
-		long green_delta;
-		long blue_delta;
-		long distance;
-
-		if (palette_color == 0)
+		for (palette_index = 0; palette_index < NUMBER_OF_ENTRIES_IN_PALETTE; palette_index++)
 		{
-			break;
+			long red_delta;
+			long green_delta;
+			long blue_delta;
+			long distance;
+
+			if (palette[palette_index] == 0)
+			{
+				break;
+			}
+
+			red_delta = ABS((long)((palette[palette_index] >> 16) & 0xFF) - (long)((color >> 16) & 0xFF));
+			green_delta = ABS((long)((palette[palette_index] >> 8) & 0xFF) - (long)((color >> 8) & 0xFF));
+			blue_delta = ABS((long)(palette[palette_index] & 0xFF) - (long)(color & 0xFF));
+			distance = red_delta * red_delta + green_delta * green_delta + blue_delta * blue_delta;
+			if (palette_index == 0 || closest_distance > distance)
+			{
+				closest_distance = distance;
+				closest_match_index = palette_index;
+			}
 		}
 
-		red_delta = ABS((long)((palette_color >> 16) & 0xFF) - (long)((color >> 16) & 0xFF));
-		green_delta = ABS((long)((palette_color >> 8) & 0xFF) - (long)((color >> 8) & 0xFF));
-		blue_delta = ABS((long)(palette_color & 0xFF) - (long)(color & 0xFF));
-		distance = red_delta * red_delta + green_delta * green_delta + blue_delta * blue_delta;
-		if (palette_index == 0 || distance < closest_distance)
-		{
-			closest_distance = distance;
-			closest_match_index = palette_index;
-		}
+		match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x44D, closest_match_index!=NONE);
 	}
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x44D, closest_match_index!=NONE);
 
 	return (byte)closest_match_index;
 }
