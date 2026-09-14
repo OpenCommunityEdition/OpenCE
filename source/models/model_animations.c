@@ -1183,110 +1183,120 @@ void overlay_animation_apply_continuous(
 		{
 			struct real_orientation *orientation = &node_orientations[node_index];
 
-		if (!(node_index & (LONG_BITS - 1)))
-		{
-			short long_index = node_index >> LONG_BITS_BITS;
+			if (!(node_index & (LONG_BITS - 1)))
+			{
+				short long_index = node_index >> LONG_BITS_BITS;
 
-			translation_flags = animation->nodes_with_translation_flags[long_index];
-			rotation_flags = animation->nodes_with_rotation_flags[long_index];
-			scale_flags = animation->nodes_with_scale_flags[long_index];
+				translation_flags = animation->nodes_with_translation_flags[long_index];
+				rotation_flags = animation->nodes_with_rotation_flags[long_index];
+				scale_flags = animation->nodes_with_scale_flags[long_index];
+			}
+
+			if (TEST_FLAG(rotation_flags, 0))
+			{
+				real_quaternion rotation;
+
+				if (compressed)
+				{
+					animation_get_keyframe_rotation(
+						animation,
+						(real)frame_index,
+						(short)rotation_index++,
+						node_index,
+						&rotation);
+				}
+				else
+				{
+					real_quaternion this_rotation;
+					real_quaternion next_rotation;
+
+					quaternion_decompress_8byte(
+						(struct compressed_quaternion_8byte const *)data,
+						&this_rotation);
+					data += sizeof(struct compressed_quaternion_8byte);
+					quaternion_decompress_8byte(
+						(struct compressed_quaternion_8byte const *)next_data,
+						&next_rotation);
+					next_data += sizeof(struct compressed_quaternion_8byte);
+					quaternions_interpolate_and_normalize(
+						&this_rotation,
+						&next_rotation,
+						fraction,
+						&rotation);
+				}
+
+				quaternions_multiply(&rotation, &orientation->rotation, &orientation->rotation);
+			}
+			rotation_flags >>= 1;
+
+			if (TEST_FLAG(translation_flags, 0))
+			{
+				real_point3d translation;
+
+				if (compressed)
+				{
+					animation_get_keyframe_translation(
+						animation,
+						real_frame_index,
+						(short)translation_index++,
+						node_index,
+						&translation);
+				}
+				else
+				{
+					real_point3d const *this_translation;
+					real_point3d const *next_translation;
+
+					this_translation = (real_point3d const *)data;
+					data += sizeof(real_point3d);
+					next_translation = (real_point3d const *)next_data;
+					next_data += sizeof(real_point3d);
+					points_interpolate(
+						this_translation,
+						next_translation,
+						fraction,
+						&translation);
+				}
+
+				orientation->translation.x += translation.x;
+				orientation->translation.y += translation.y;
+				orientation->translation.z += translation.z;
+			}
+			translation_flags >>= 1;
+
+			if (TEST_FLAG(scale_flags, 0))
+			{
+				real scale;
+
+				if (compressed)
+				{
+					animation_get_keyframe_scale(
+						animation,
+						real_frame_index,
+						(short)scale_index++,
+						node_index,
+						&scale);
+				}
+				else
+				{
+					real this_scale;
+					real next_scale;
+
+					this_scale = *(real const *)data;
+					data += sizeof(real);
+					next_scale = *(real const *)next_data;
+					next_data += sizeof(real);
+					scalars_interpolate(
+						this_scale,
+						next_scale,
+						fraction,
+						&scale);
+				}
+
+				orientation->scale *= scale;
+			}
+			scale_flags >>= 1;
 		}
-
-		if (TEST_FLAG(rotation_flags, 0))
-		{
-			real_quaternion rotation;
-
-			if (compressed)
-			{
-				animation_get_keyframe_rotation(
-					animation,
-					(real)frame_index,
-					(short)rotation_index++,
-					node_index,
-					&rotation);
-			}
-			else
-			{
-				real_quaternion this_rotation;
-				real_quaternion next_rotation;
-
-				quaternion_decompress_8byte(
-					(struct compressed_quaternion_8byte const *)data,
-					&this_rotation);
-				data += sizeof(struct compressed_quaternion_8byte);
-				quaternion_decompress_8byte(
-					(struct compressed_quaternion_8byte const *)next_data,
-					&next_rotation);
-				next_data += sizeof(struct compressed_quaternion_8byte);
-				quaternions_interpolate_and_normalize(
-					&this_rotation,
-					&next_rotation,
-					fraction,
-					&rotation);
-			}
-
-			quaternions_multiply(&rotation, &orientation->rotation, &orientation->rotation);
-		}
-		rotation_flags >>= 1;
-
-		if (TEST_FLAG(translation_flags, 0))
-		{
-			real_point3d translation;
-
-			if (compressed)
-			{
-				animation_get_keyframe_translation(
-					animation,
-					real_frame_index,
-					(short)translation_index++,
-					node_index,
-					&translation);
-			}
-			else
-			{
-				points_interpolate(
-					(real_point3d const *)data,
-					(real_point3d const *)next_data,
-					fraction,
-					&translation);
-				data += sizeof(real_point3d);
-				next_data += sizeof(real_point3d);
-			}
-
-			orientation->translation.x += translation.x;
-			orientation->translation.y += translation.y;
-			orientation->translation.z += translation.z;
-		}
-		translation_flags >>= 1;
-
-		if (TEST_FLAG(scale_flags, 0))
-		{
-			real scale;
-
-			if (compressed)
-			{
-				animation_get_keyframe_scale(
-					animation,
-					real_frame_index,
-					(short)scale_index++,
-					node_index,
-					&scale);
-			}
-			else
-			{
-				scalars_interpolate(
-					*(real const *)data,
-					*(real const *)next_data,
-					fraction,
-					&scale);
-				data += sizeof(real);
-				next_data += sizeof(real);
-			}
-
-			orientation->scale *= scale;
-		}
-		scale_flags >>= 1;
-	}
 
 		match_assert(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -1492,13 +1502,18 @@ void overlay_animation_apply_continuous_scaled(
 				}
 				else
 				{
+					real_point3d const *this_translation;
+					real_point3d const *next_translation;
+
+					this_translation = (real_point3d const *)data;
+					data += sizeof(real_point3d);
+					next_translation = (real_point3d const *)next_data;
+					next_data += sizeof(real_point3d);
 					points_interpolate(
-						(real_point3d const *)data,
-						(real_point3d const *)next_data,
+						this_translation,
+						next_translation,
 						fraction,
 						&translation);
-					data += sizeof(real_point3d);
-					next_data += sizeof(real_point3d);
 				}
 
 				orientation->translation.x += translation.x*animation_scale;
@@ -1522,13 +1537,18 @@ void overlay_animation_apply_continuous_scaled(
 				}
 				else
 				{
+					real this_scale;
+					real next_scale;
+
+					this_scale = *(real const *)data;
+					data += sizeof(real);
+					next_scale = *(real const *)next_data;
+					next_data += sizeof(real);
 					scalars_interpolate(
-						*(real const *)data,
-						*(real const *)next_data,
+						this_scale,
+						next_scale,
 						fraction,
 						&scale);
-					data += sizeof(real);
-					next_data += sizeof(real);
 				}
 
 				orientation->scale *= scale*animation_scale+inverse_animation_scale;
@@ -1923,11 +1943,11 @@ static void animation_get_keyframe_rotation(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	unsigned long node_header = header->rotation_node_headers[adjusted_node_index];
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
 	struct compressed_quaternion_6byte const *default_rotations = (struct compressed_quaternion_6byte const *)(data+header->default_rotations_offset);
-	short const *keyframe_frame_indices;
+	unsigned long node_header = header->rotation_node_headers[adjusted_node_index];
+	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	word const *keyframe_frame_indices;
 	struct compressed_quaternion_6byte const *keyframe_rotations;
 	short frame_index;
 	struct compressed_quaternion_6byte const *this_keyframe;
@@ -1956,8 +1976,8 @@ static void animation_get_keyframe_rotation(
 		return;
 	}
 
-	keyframe_frame_indices = (short const *)(data+header->rotation_keyframe_frame_indices_offset)+first_keyframe_index;
 	keyframe_rotations = (struct compressed_quaternion_6byte const *)(data+header->rotation_keyframes_offset)+first_keyframe_index;
+	keyframe_frame_indices = (word const *)(data+header->rotation_keyframe_frame_indices_offset)+first_keyframe_index;
 	frame_index = (short)fast_ftol(floor(real_frame_index));
 
 	match_assert(
@@ -1971,17 +1991,17 @@ static void animation_get_keyframe_rotation(
 
 	if (frame_index<keyframe_frame_indices[0])
 	{
-		this_keyframe = &default_rotations[node_index];
 		this_keyframe_frame_index = 0;
-		next_keyframe = keyframe_rotations;
+		this_keyframe = &default_rotations[node_index];
 		next_keyframe_frame_index = keyframe_frame_indices[0];
+		next_keyframe = keyframe_rotations;
 	}
 	else if (frame_index==keyframe_frame_indices[keyframe_count-1])
 	{
-		this_keyframe = &keyframe_rotations[keyframe_count-1];
 		this_keyframe_frame_index = keyframe_frame_indices[keyframe_count-1];
-		next_keyframe = &default_rotations[node_index];
+		this_keyframe = &keyframe_rotations[keyframe_count-1];
 		next_keyframe_frame_index = this_keyframe_frame_index+1;
+		next_keyframe = &default_rotations[node_index];
 	}
 	else
 	{
@@ -1992,10 +2012,10 @@ static void animation_get_keyframe_rotation(
 			1472,
 			keyframe_index>=0 && keyframe_index<keyframe_count-1);
 
-		this_keyframe = &keyframe_rotations[keyframe_index];
 		this_keyframe_frame_index = keyframe_frame_indices[keyframe_index];
-		next_keyframe = &keyframe_rotations[keyframe_index+1];
+		this_keyframe = &keyframe_rotations[keyframe_index];
 		next_keyframe_frame_index = keyframe_frame_indices[keyframe_index+1];
+		next_keyframe = &keyframe_rotations[keyframe_index+1];
 	}
 
 	if (real_frame_index==(real)this_keyframe_frame_index)
@@ -2016,7 +2036,7 @@ static void animation_get_keyframe_rotation(
 		match_assert(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
 			1492,
-			real_frame_index<(real)next_keyframe_frame_index);
+			real_frame_index< (real)next_keyframe_frame_index);
 
 		quaternion_decompress_6byte(this_keyframe, &this_rotation);
 		quaternion_decompress_6byte(next_keyframe, &next_rotation);
@@ -2035,10 +2055,10 @@ static void animation_get_keyframe_translation(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	unsigned long node_header = ((unsigned long const *)(data+header->translation_node_headers_offset))[adjusted_node_index];
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
 	real_point3d const *default_translations = (real_point3d const *)(data+header->default_translations_offset);
+	unsigned long node_header = ((unsigned long const *)(data+header->translation_node_headers_offset))[adjusted_node_index];
+	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
 
 	match_assert(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -2059,8 +2079,8 @@ static void animation_get_keyframe_translation(
 	}
 	else
 	{
-		short const *keyframe_frame_indices = (short const *)(data+header->translation_keyframe_frame_indices_offset)+first_keyframe_index;
 		real_point3d const *keyframe_translations = (real_point3d const *)(data+header->translation_keyframes_offset)+first_keyframe_index;
+		word const *keyframe_frame_indices = (word const *)(data+header->translation_keyframe_frame_indices_offset)+first_keyframe_index;
 		short frame_index = (short)fast_ftol(floor(real_frame_index));
 		real_point3d const *this_keyframe;
 		real_point3d const *next_keyframe;
@@ -2078,17 +2098,17 @@ static void animation_get_keyframe_translation(
 
 		if (frame_index<keyframe_frame_indices[0])
 		{
-			this_keyframe = &default_translations[node_index];
 			this_keyframe_frame_index = 0;
-			next_keyframe = keyframe_translations;
+			this_keyframe = &default_translations[node_index];
 			next_keyframe_frame_index = keyframe_frame_indices[0];
+			next_keyframe = keyframe_translations;
 		}
 		else if (frame_index==keyframe_frame_indices[keyframe_count-1])
 		{
-			this_keyframe = &keyframe_translations[keyframe_count-1];
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_count-1];
-			next_keyframe = &default_translations[node_index];
+			this_keyframe = &keyframe_translations[keyframe_count-1];
 			next_keyframe_frame_index = this_keyframe_frame_index+1;
+			next_keyframe = &default_translations[node_index];
 		}
 		else
 		{
@@ -2099,10 +2119,10 @@ static void animation_get_keyframe_translation(
 				1566,
 				keyframe_index>=0 && keyframe_index<keyframe_count-1);
 
-			this_keyframe = &keyframe_translations[keyframe_index];
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_index];
-			next_keyframe = &keyframe_translations[keyframe_index+1];
+			this_keyframe = &keyframe_translations[keyframe_index];
 			next_keyframe_frame_index = keyframe_frame_indices[keyframe_index+1];
+			next_keyframe = &keyframe_translations[keyframe_index+1];
 		}
 
 		if (real_frame_index==(real)this_keyframe_frame_index)
@@ -2120,7 +2140,7 @@ static void animation_get_keyframe_translation(
 			match_assert(
 				"c:\\halo\\SOURCE\\models\\model_animations.c",
 				1584,
-				real_frame_index<(real)next_keyframe_frame_index);
+				real_frame_index< (real)next_keyframe_frame_index);
 
 			points_interpolate(this_keyframe, next_keyframe, fraction, translation);
 		}
@@ -2138,10 +2158,10 @@ static void animation_get_keyframe_scale(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	unsigned long node_header = ((unsigned long const *)(data+header->scale_node_headers_offset))[adjusted_node_index];
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
 	real const *default_scales = (real const *)(data+header->default_scales_offset);
+	unsigned long node_header = ((unsigned long const *)(data+header->scale_node_headers_offset))[adjusted_node_index];
+	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
 
 	match_assert(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -2162,8 +2182,8 @@ static void animation_get_keyframe_scale(
 	}
 	else
 	{
-		short const *keyframe_frame_indices = (short const *)(data+header->scale_keyframe_frame_indices_offset)+first_keyframe_index;
 		real const *keyframe_scales = (real const *)(data+header->scale_keyframes_offset)+first_keyframe_index;
+		word const *keyframe_frame_indices = (word const *)(data+header->scale_keyframe_frame_indices_offset)+first_keyframe_index;
 		short frame_index = (short)fast_ftol(floor(real_frame_index));
 		real this_keyframe_scale;
 		real next_keyframe_scale;
@@ -2181,17 +2201,17 @@ static void animation_get_keyframe_scale(
 
 		if (frame_index<keyframe_frame_indices[0])
 		{
-			this_keyframe_scale = default_scales[adjusted_node_index];
 			this_keyframe_frame_index = 0;
-			next_keyframe_scale = keyframe_scales[0];
+			this_keyframe_scale = default_scales[adjusted_node_index];
 			next_keyframe_frame_index = keyframe_frame_indices[0];
+			next_keyframe_scale = keyframe_scales[0];
 		}
 		else if (frame_index==keyframe_frame_indices[keyframe_count-1])
 		{
-			this_keyframe_scale = keyframe_scales[keyframe_count-1];
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_count-1];
-			next_keyframe_scale = default_scales[adjusted_node_index];
+			this_keyframe_scale = keyframe_scales[keyframe_count-1];
 			next_keyframe_frame_index = this_keyframe_frame_index+1;
+			next_keyframe_scale = default_scales[adjusted_node_index];
 		}
 		else
 		{
@@ -2202,10 +2222,10 @@ static void animation_get_keyframe_scale(
 				1655,
 				keyframe_index>=0 && keyframe_index<keyframe_count-1);
 
-			this_keyframe_scale = keyframe_scales[keyframe_index];
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_index];
-			next_keyframe_scale = keyframe_scales[keyframe_index+1];
+			this_keyframe_scale = keyframe_scales[keyframe_index];
 			next_keyframe_frame_index = keyframe_frame_indices[keyframe_index+1];
+			next_keyframe_scale = keyframe_scales[keyframe_index+1];
 		}
 
 		if (real_frame_index==(real)this_keyframe_frame_index)
@@ -2223,7 +2243,7 @@ static void animation_get_keyframe_scale(
 			match_assert(
 				"c:\\halo\\SOURCE\\models\\model_animations.c",
 				1673,
-				real_frame_index<(real)next_keyframe_frame_index);
+				real_frame_index< (real)next_keyframe_frame_index);
 
 			scalars_interpolate(this_keyframe_scale, next_keyframe_scale, fraction, scale);
 		}
