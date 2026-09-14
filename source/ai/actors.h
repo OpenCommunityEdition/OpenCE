@@ -1215,6 +1215,8 @@ void actor_combat_fire_wildly(
 void actor_combat_disable_bursts(
 	long actor_index,
 	long disable_timer);
+boolean actor_firing_blindly(
+	long actor_index);
 struct weapon_definition *actor_get_weapon_definition(
 	long actor_index);
 struct actor_variant_definition *actor_combat_get_firing_variant_definition(

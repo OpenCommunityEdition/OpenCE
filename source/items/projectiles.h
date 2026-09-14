@@ -67,6 +67,8 @@ void projectiles_dispose_from_old_map(
 	void);
 void projectiles_dispose(
 	void);
+void projectile_kill_tracer(
+	long projectile_index);
 void projectiles_delete_all(
 	void);
 void projectile_delete(

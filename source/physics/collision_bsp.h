@@ -170,11 +170,6 @@ void render_debug_collision_surface(
 	real_matrix4x3 const *matrix,
 	real_argb_color const *color);
 
-short collision_surface_polygon(
-	struct collision_bsp const *bsp,
-	long surface_index,
-	real_point3d *points);
-
 /* ---------- globals */
 
 /* ---------- public code */

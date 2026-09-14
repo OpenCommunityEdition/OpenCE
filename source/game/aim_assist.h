@@ -59,6 +59,10 @@ boolean aim_assist(
 	long ignore_object_index,
 	short ignore_team_index,
 	struct aim_assist_target *target);
+long player_aim_projectile(
+	long player_index,
+	real_point3d const *position,
+	real_vector3d *direction);
 long local_player_aim_assist(
 	short local_player_index,
 	real *autoaim_level,

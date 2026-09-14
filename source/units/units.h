@@ -727,6 +727,13 @@ boolean unit_try_and_exit_seat(
 	long unit_index);
 void unit_scripting_exit_vehicle(
 	long unit_index);
+void unit_adjust_projectile_ray(
+	long unit_index,
+	real_point3d *origin,
+	real_vector3d *direction,
+	real *velocity,
+	boolean adjust_origin,
+	boolean use_aiming_vector);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_weapon(
