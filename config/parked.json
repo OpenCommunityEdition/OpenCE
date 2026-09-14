@@ -458,25 +458,6 @@
       "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep both real default profiles and the typed checksummed file format. Initialize all serialized padding and close after every successful open, including seek failure; do not restore the donor's disclosure/leak paths. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
     },
     {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_2d_uncompress_from_mipmap",
-      "class": "instruction-scheduling",
-      "measurements": {
-        "target": {
-          "size": 880,
-          "relocation_count": 49,
-          "normalized_sha256": "4f4b53aed0db63a496b4c239249e9adaaa70adee056f6e6bc6118dc30dc2b4ab"
-        },
-        "base": {
-          "size": 880,
-          "relocation_count": 49,
-          "normalized_sha256": "0d0264895ee68a288dde6eb4dcbd425500971c01ba59158e1fe21ea4f05b456c"
-        },
-        "objdiff_percent": 99.922264
-      },
-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. This was previously exact (866 meaningful bytes), now explicitly debited. Proper S3TC header ownership changes only two independent ordinary stack loads at +0x33a/+0x33d: EDI from [EBP-0x24] and EBX from [EBP+0x10]. Both complete code sections are 880 bytes and all 49 ordered relocations are unchanged. No function-body or ABI change; no declaration-position search or fake source is used. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
-    },
-    {
       "unit": "source/interface/ui_widget_game_data_input_functions",
       "function": "_solo_level_select_list_update_displayed_items",
       "class": "instruction-scheduling",
@@ -1887,44 +1868,6 @@
     },
     {
       "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_2d_shrink",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and corroborating its 2D shrink topology and semantic private name against HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate have the same 656-byte padded envelope and all 18 relocation identities. The candidate is 244 instructions versus January's 245; the remaining gap begins in the nested sample loop, where VC7 chooses the opposite accumulator operand, address-call setup, and channel-sum register schedule before reconverging. The retained source uses bitmap_data fields, cseries types and macros, named enum constants, and ordinary loops; no volatile access, barrier, artificial alias, undefined behavior, manual offset logic, assembly, or nonsensical exact-only control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler declaration/lifetime donor.",
-      "measurements": {
-        "target": {
-          "size": 656,
-          "relocation_count": 18,
-          "normalized_sha256": "e032c32d2cf00f0b14b44627abd321b829450ea9d964b379b1ad51969755c87c"
-        },
-        "base": {
-          "size": 656,
-          "relocation_count": 18,
-          "normalized_sha256": "bf78c45c893b86a2ac84467a577030719437cc0f2c6018219368533a0fbbec59"
-        },
-        "objdiff_percent": 95.15126
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_3d_shrink",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and corroborating its 3D shrink topology and semantic private name against HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate share the 800-byte padded envelope and all 18 relocation identities. January emits 285 instructions while the retained source emits 290; VC7 assigns the scale, output dimensions, destination pointer, and nested voxel-loop indices to different callee-saved registers and stack slots, cascading through the averaging packet while preserving behavior and call topology. The 77.116196% residual is therefore recorded honestly rather than forced with source that exists only to steer the allocator. No volatile access, barrier, artificial alias, register hint, raw offset, assembly, undefined behavior, or fake control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler declaration/lifetime donor.",
-      "measurements": {
-        "target": {
-          "size": 800,
-          "relocation_count": 18,
-          "normalized_sha256": "5435cdf751f34b0fcdd56e703d1f8feb3d21dd3c4f95ac2a8bc65b06b9e9e8b4"
-        },
-        "base": {
-          "size": 800,
-          "relocation_count": 18,
-          "normalized_sha256": "c6a725afd52b660d466d6b1131ccca6d8335786d26aa8fae2fa0c56344f55fa1"
-        },
-        "objdiff_percent": 77.116196
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_utilities",
       "function": "_bitmap_2d_alpha_bleed",
       "class": "instruction-scheduling",
       "evidence": "Fuzzy-parked under the current house rule after selectively reconciling the coherent typed donor body and authenticating bitmap_2d_alpha_bleed from HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c. Target and candidate have the same 560-byte padded envelope, 196 aligned instructions, and all 24 relocation identities. The only normalized difference is the order of two independent stack reloads at +0x191/+0x194 after the neighborhood loop: January reloads ECX then EAX, while VC7 reloads EAX then ECX. The retained source uses the natural row/neighborhood loops and typed bitmap access. No volatile access, barrier, fake dependency, assembly, undefined behavior, manual byte forcing, or nonsensical source is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
@@ -2649,7 +2592,7 @@
       "unit": "source/bitmaps/bitmap_utilities",
       "function": "_bitmap_3d_smooth",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete 3D separable smoothing algorithm in ordinary typed C from January disassembly, relocation and diagnostic evidence, cross-checked against the later HaloCEA implementation. The retained body verifies the 3D bitmap and filter, preserves the target's oversized-filter warning and unused newline vararg, allocates the full pixel-data scratch buffer, performs toroidally wrapped X, Y, and Z convolution passes over every channel, copies the full scratch buffer back as January does, reports allocation failure, and frees at source line 0x33E. January is 1,824 padded bytes and the candidate is 1,792; both have 28 relocations and the refreshed report records 78.04 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/address scheduling, not missing logic. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, invented helper, or nonsensical branch is retained. The September 8 S3TC owner-header addition did not edit this body and changed only its already-fuzzy translation-unit schedule; it still receives zero exact credit. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete 3D separable smoothing algorithm in ordinary typed C from January disassembly, relocation and diagnostic evidence, cross-checked against the later HaloCEA implementation. The retained body verifies the 3D bitmap and filter, preserves the target's oversized-filter warning and unused newline vararg, allocates the full pixel-data scratch buffer, performs toroidally wrapped X, Y, and Z convolution passes over every channel, copies the full scratch buffer back as January does, reports allocation failure, and frees at source line 0x33E. January is 1,824 padded bytes and the candidate is 1,792; both have 28 relocations and the refreshed report records 78.04 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/address scheduling, not missing logic. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, invented helper, or nonsensical branch is retained. The September 8 S3TC owner-header addition did not edit this body and changed only its already-fuzzy translation-unit schedule; it still receives zero exact credit. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule. On September 14 (lane opus/150k-house-clean-20260914, wave w1, adversarially verified) the sibling bitmap_2d_shrink / bitmap_3d_shrink / bitmap_2d_uncompress_from_mipmap reopens restored January's definition order and helper ABIs; this unchanged parked body's schedule moves (same size and relocations), still fuzzy. See docs/object_matching_logs/bitmap_utilities_obj_opus5_150k_w1_20260914.md.",
       "measurements": {
         "target": {
           "size": 1824,
@@ -2659,9 +2602,9 @@
         "base": {
           "size": 1792,
           "relocation_count": 28,
-          "normalized_sha256": "dbdbd0bafa0bb62473ea8f137a0d3075e194123bf8705d26834b8f27fea5a5e0"
+          "normalized_sha256": "dc74abcc212d5c0ac407b7605d242aec8d0f66983aa263fcbd98ef35d7ef3490"
         },
-        "objdiff_percent": 78.04
+        "objdiff_percent": 78.03
       }
     },
     {

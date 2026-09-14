@@ -512,564 +512,6 @@ struct bitmap_data *bitmap_clone(
 	return cloned_bitmap;
 }
 
-void bitmap_fade(
-	struct bitmap_data *bitmap,
-	pixel32 fade_color,
-	real fade_amount)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1F5,
-		bitmap_verify(bitmap, TRUE));
-
-	if (fade_amount > 0.f)
-	{
-		long alpha = (long)floor(PIN(fade_amount, 0.f, 1.f) * 256.f + 0.5f);
-		long inverse_alpha = 256 - alpha;
-		long faded_alpha = ((fade_color >> 24) & 0xFF) * alpha;
-		long faded_red = ((fade_color >> 16) & 0xFF) * alpha;
-		long faded_green = ((fade_color >> 8) & 0xFF) * alpha;
-		long faded_blue = (fade_color & 0xFF) * alpha;
-		pixel32 *pixels = bitmap_mipmap_address(bitmap, 0);
-		long pixel_count = bitmap_get_pixel_count(bitmap);
-		long index;
-
-		for (index = 0; index < pixel_count; index++)
-		{
-			pixel32 pixel = pixels[index];
-
-			pixels[index] =
-				((((pixel >> 24) * inverse_alpha + faded_alpha + 0x7F) >> 8) << 24) |
-				(((((pixel >> 16) & 0xFF) * inverse_alpha + faded_red + 0x7F) >> 8) << 16) |
-				(((((pixel >> 8) & 0xFF) * inverse_alpha + faded_green + 0x7F) >> 8) << 8) |
-				((((pixel & 0xFF) * inverse_alpha + faded_blue + 0x7F) >> 8));
-		}
-	}
-
-	return;
-}
-
-real real_rgb_color_brightness(
-	union real_rgb_color const *color)
-{
-	return
-		color->red * 0.299f +
-		color->green * 0.587f +
-		color->blue * 0.114f;
-}
-
-union real_hsv_color *real_rgb_color_to_real_hsv_color(
-	union real_rgb_color const *rgb,
-	union real_hsv_color *hsv)
-{
-	real value;
-	real minimum;
-	real delta;
-	real saturation;
-
-	if (rgb->green > rgb->blue)
-		value = rgb->green;
-	else
-		value = rgb->blue;
-	if (rgb->red > value)
-		value = rgb->red;
-	else
-	{
-		if (rgb->green > rgb->blue)
-			value = rgb->green;
-		else
-			value = rgb->blue;
-	}
-
-	if (rgb->green > rgb->blue)
-		minimum = rgb->blue;
-	else
-		minimum = rgb->green;
-	if (rgb->red > minimum)
-	{
-		if (rgb->green > rgb->blue)
-			minimum = rgb->blue;
-		else
-			minimum = rgb->green;
-	}
-	else
-		minimum = rgb->red;
-
-	delta = value - minimum;
-
-	if (!hsv)
-	{
-		display_assert(
-			"hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x8B2,
-			TRUE);
-		system_exit(-1);
-	}
-	if ((void const *)rgb == (void const *)hsv)
-	{
-		display_assert(
-			"rgb!=(real_rgb_color *)hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x8B3,
-			TRUE);
-		system_exit(-1);
-	}
-
-	hsv->value = value;
-	if (value == 0.0f)
-		saturation = 0.0f;
-	else
-		saturation = delta / value;
-	hsv->saturation = saturation;
-
-	if (saturation == 0.0f)
-	{
-		hsv->hue = 0.0f;
-		return hsv;
-	}
-	if (rgb->red == value)
-		hsv->hue = (rgb->green - rgb->blue) / delta;
-	else if (rgb->green == value)
-		hsv->hue = (rgb->blue - rgb->red) / delta + 2.0f;
-	else
-		hsv->hue = (rgb->red - rgb->green) / delta + 4.0f;
-
-	hsv->hue *= 1.0f / 6.0f;
-	if (hsv->hue < 0.0f)
-		hsv->hue += 1.0f;
-	return hsv;
-}
-
-union real_rgb_color *real_hsv_color_to_real_rgb_color(
-	union real_hsv_color *hsv,
-	union real_rgb_color *rgb)
-{
-	union real_hsv_color *source = hsv;
-	real scaled_hue = source->hue * 6.0f;
-	real p;
-	real q;
-	real t;
-	long truncated_sector;
-	long sector;
-
-	if (!rgb)
-	{
-		display_assert(
-			"rgb",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x8DF,
-			TRUE);
-		system_exit(-1);
-	}
-	if ((void const *)rgb == (void const *)source)
-	{
-		display_assert(
-			"rgb!=(real_rgb_color *)hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x8E1,
-			TRUE);
-		system_exit(-1);
-	}
-
-	if (source->saturation == 0.0f)
-	{
-		rgb->red = rgb->green = rgb->blue = source->value;
-		return rgb;
-	}
-
-	truncated_sector = (long)scaled_hue;
-	sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
-	scaled_hue -= sector;
-	p = (1.0f - source->saturation) * source->value;
-	q = (1.0f - scaled_hue * source->saturation) * source->value;
-	t = (1.0f - (1.0f - scaled_hue) * source->saturation) * source->value;
-
-	switch (sector)
-	{
-	case 0:
-		rgb->red = source->value;
-		rgb->green = t;
-		rgb->blue = p;
-		return rgb;
-	case 1:
-		rgb->red = q;
-		rgb->green = source->value;
-		rgb->blue = p;
-		return rgb;
-	case 2:
-		rgb->red = p;
-		rgb->green = source->value;
-		rgb->blue = t;
-		return rgb;
-	case 3:
-		rgb->red = p;
-		rgb->green = q;
-		rgb->blue = source->value;
-		return rgb;
-	case 4:
-		rgb->red = t;
-		rgb->green = p;
-		rgb->blue = source->value;
-		return rgb;
-	case 5:
-		rgb->red = source->value;
-		rgb->green = p;
-		rgb->blue = q;
-		return rgb;
-	default:
-		return rgb;
-	}
-}
-
-struct hsv_color *rgb_color_to_hsv_color(
-	struct rgb_color const *rgb,
-	struct hsv_color *hsv)
-{
-	real red = (real)(long)rgb->red * (1.0f / 65535.0f);
-	real green = (real)(long)rgb->green * (1.0f / 65535.0f);
-	real blue = (real)(long)rgb->blue * (1.0f / 65535.0f);
-	real value;
-	real minimum;
-	real delta;
-	real hue;
-	real saturation;
-
-	if (green > blue)
-		value = green;
-	else
-		value = blue;
-	if (red > value)
-		value = red;
-	else
-	{
-		if (green > blue)
-			value = green;
-		else
-			value = blue;
-	}
-
-	if (green > blue)
-		minimum = blue;
-	else
-		minimum = green;
-	if (red > minimum)
-	{
-		if (green > blue)
-			minimum = blue;
-		else
-			minimum = green;
-	}
-	else
-		minimum = red;
-
-	delta = value - minimum;
-
-	if (!hsv)
-	{
-		display_assert(
-			"hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x852,
-			TRUE);
-		system_exit(-1);
-	}
-	if ((void const *)rgb == (void const *)hsv)
-	{
-		display_assert(
-			"rgb!=(rgb_color *)hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x853,
-			TRUE);
-		system_exit(-1);
-	}
-
-	if (value == 0.0f)
-		saturation = 0.0f;
-	else
-		saturation = delta / value;
-
-	if (saturation == 0.0f)
-		hue = 0.0f;
-	else
-	{
-		if (red == value)
-			hue = (green - blue) / delta;
-		else if (green == value)
-			hue = (blue - red) / delta + 2.0f;
-		else
-			hue = (red - green) / delta + 4.0f;
-
-		hue *= 1.0f / 6.0f;
-		if (hue < 0.0f)
-			hue += 1.0f;
-	}
-
-	hsv->hue = (word)(long)(hue * 65536.0f);
-	hsv->saturation = (word)(long)(saturation * 65535.0f);
-	hsv->value = (word)(long)(value * 65535.0f);
-	return hsv;
-}
-
-struct rgb_color *hsv_color_to_rgb_color(
-	struct hsv_color const *hsv,
-	struct rgb_color *rgb)
-{
-	real scaled_hue;
-	real saturation;
-	real value;
-	real fraction;
-	real p;
-	real q;
-	real t;
-	real red;
-	real green;
-	real blue;
-	long truncated_sector;
-	long sector;
-
-	scaled_hue = (real)(long)hsv->hue * (1.0f / 65536.0f);
-	scaled_hue *= 6.0f;
-	saturation = (real)(long)hsv->saturation * (1.0f / 65535.0f);
-	value = (real)(long)hsv->value * (1.0f / 65535.0f);
-
-	if (!rgb)
-	{
-		display_assert(
-			"rgb",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x886,
-			TRUE);
-		system_exit(-1);
-	}
-	if ((void const *)rgb == (void const *)hsv)
-	{
-		display_assert(
-			"rgb!=(rgb_color *)hsv",
-			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-			0x888,
-			TRUE);
-		system_exit(-1);
-	}
-
-	if (saturation == 0.0f)
-		red = green = blue = value;
-	else
-	{
-		truncated_sector = (long)scaled_hue;
-		sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
-		fraction = scaled_hue - (real)sector;
-		p = (1.0f - saturation) * value;
-		q = (1.0f - saturation * fraction) * value;
-		t = (1.0f - (1.0f - fraction) * saturation) * value;
-
-		switch (sector)
-		{
-		case 0:
-			red = value;
-			green = t;
-			blue = p;
-			break;
-		case 1:
-			red = q;
-			green = value;
-			blue = p;
-			break;
-		case 2:
-			red = p;
-			green = value;
-			blue = t;
-			break;
-		case 3:
-			red = p;
-			green = q;
-			blue = value;
-			break;
-		case 4:
-			red = t;
-			green = p;
-			blue = value;
-			break;
-		case 5:
-			red = value;
-			green = p;
-			blue = q;
-			break;
-		}
-	}
-
-	rgb->red = (word)(long)(red * 65535.0f);
-	rgb->green = (word)(long)(green * 65535.0f);
-	rgb->blue = (word)(long)(blue * 65535.0f);
-	return rgb;
-}
-
-union real_argb_color *argb_color_to_real_argb_color(
-	struct argb_color const *source,
-	union real_argb_color *result)
-{
-	result->alpha = (real)(long)source->alpha * oo_unsigned_short_max;
-	result->red = (real)(long)source->red * oo_unsigned_short_max;
-	result->green = (real)(long)source->green * oo_unsigned_short_max;
-	result->blue = (real)(long)source->blue * oo_unsigned_short_max;
-	return result;
-}
-
-union real_rgb_color *rgb_color_to_real_rgb_color(
-	struct rgb_color const *source,
-	union real_rgb_color *result)
-{
-	result->red = (real)(long)source->red * oo_unsigned_short_max;
-	result->green = (real)(long)source->green * oo_unsigned_short_max;
-	result->blue = (real)(long)source->blue * oo_unsigned_short_max;
-	return result;
-}
-
-union real_argb_color *pixel32_to_real_argb_color(
-	pixel32 color,
-	union real_argb_color *result)
-{
-	unsigned long alpha = color >> 24;
-	unsigned long red = (color >> 16) & 0xFF;
-	unsigned long green = (color >> 8) & 0xFF;
-	unsigned long blue = color & 0xFF;
-
-	result->alpha = alpha * (1.0f / 255.0f);
-	result->red = red * (1.0f / 255.0f);
-	result->green = green * (1.0f / 255.0f);
-	result->blue = blue * (1.0f / 255.0f);
-	return result;
-}
-
-union real_rgb_color *pixel32_to_real_rgb_color(
-	pixel32 color,
-	union real_rgb_color *result)
-{
-	unsigned long red = (color >> 16) & 0xFF;
-	unsigned long green = (color >> 8) & 0xFF;
-	unsigned long blue = color & 0xFF;
-
-	result->red = red * (1.0f / 255.0f);
-	result->green = green * (1.0f / 255.0f);
-	result->blue = blue * (1.0f / 255.0f);
-	return result;
-}
-
-boolean valid_real_rgb_color(
-	union real_rgb_color const *color)
-{
-	return
-		valid_real(color->red) &&
-		valid_real(color->green) &&
-		valid_real(color->blue) &&
-		color->red>=0.f && color->red<=1.f &&
-		color->green>=0.f && color->green<=1.f &&
-		color->blue>=0.f && color->blue<=1.f;
-}
-
-union real_rgb_color *rgb_colors_interpolate(
-	union real_rgb_color *rgb_result,
-	unsigned long flags,
-	union real_rgb_color const *rgb_lower_bound,
-	union real_rgb_color const *rgb_upper_bound,
-	real interpolation_factor)
-{
-	real inverse_interpolation_factor = 1.f - interpolation_factor;
-
-	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x939, rgb_lower_bound);
-	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x93A, rgb_upper_bound);
-
-	if (TEST_FLAG(flags, _rgb_color_interpolation_hsv_bit))
-	{
-		union real_hsv_color hsv_result;
-		union real_hsv_color hsv_lower_bound;
-		union real_hsv_color hsv_upper_bound;
-
-		real_rgb_color_to_real_hsv_color(rgb_lower_bound, &hsv_lower_bound);
-		real_rgb_color_to_real_hsv_color(rgb_upper_bound, &hsv_upper_bound);
-
-		if ((fabs(hsv_lower_bound.hue - hsv_upper_bound.hue) > 0.5) !=
-			TEST_FLAG(flags, _rgb_color_interpolation_hsv_reverse_bit))
-		{
-			if (hsv_lower_bound.hue < hsv_upper_bound.hue)
-				hsv_lower_bound.hue += 1.f;
-			else
-				hsv_upper_bound.hue += 1.f;
-		}
-
-		hsv_result.hue =
-			inverse_interpolation_factor * hsv_lower_bound.hue +
-			interpolation_factor * hsv_upper_bound.hue;
-		if (hsv_result.hue > 1.f)
-			hsv_result.hue -= 1.f;
-		hsv_result.saturation =
-			inverse_interpolation_factor * hsv_lower_bound.saturation +
-			interpolation_factor * hsv_upper_bound.saturation;
-		hsv_result.value =
-			inverse_interpolation_factor * hsv_lower_bound.value +
-			interpolation_factor * hsv_upper_bound.value;
-
-		real_hsv_color_to_real_rgb_color(&hsv_result, rgb_result);
-	}
-	else
-	{
-		rgb_result->red =
-			inverse_interpolation_factor * rgb_lower_bound->red +
-			interpolation_factor * rgb_upper_bound->red;
-		rgb_result->green =
-			inverse_interpolation_factor * rgb_lower_bound->green +
-			interpolation_factor * rgb_upper_bound->green;
-		rgb_result->blue =
-			inverse_interpolation_factor * rgb_lower_bound->blue +
-			interpolation_factor * rgb_upper_bound->blue;
-	}
-
-	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x95D, rgb_result);
-
-	return rgb_result;
-}
-
-union real_rgb_color *rgb_colors_interpolate_and_scale(
-	union real_rgb_color *rgb_result,
-	unsigned long flags,
-	union real_argb_color const *argb_lower_bound,
-	union real_argb_color const *argb_upper_bound,
-	union real_rgb_color const *rgb_scale,
-	real u)
-{
-	rgb_colors_interpolate(
-		rgb_result,
-		flags,
-		&argb_lower_bound->rgb,
-		&argb_upper_bound->rgb,
-		u);
-
-	if (rgb_scale)
-	{
-		match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x96E, rgb_scale);
-
-		if (argb_lower_bound->alpha>_real_epsilon ||
-			argb_upper_bound->alpha>_real_epsilon)
-		{
-			real alpha=
-				(1.f-u)*argb_lower_bound->alpha +
-				u*argb_upper_bound->alpha;
-
-			rgb_result->red= alpha*rgb_result->red + (1.f-alpha)*rgb_scale->red;
-			rgb_result->green= alpha*rgb_result->green + (1.f-alpha)*rgb_scale->green;
-			rgb_result->blue= alpha*rgb_result->blue + (1.f-alpha)*rgb_scale->blue;
-		}
-		else
-		{
-			rgb_result->red*= rgb_scale->red;
-			rgb_result->green*= rgb_scale->green;
-			rgb_result->blue*= rgb_scale->blue;
-		}
-	}
-
-	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x982, rgb_result);
-
-	return rgb_result;
-}
-
 struct bitmap_data *bitmap_shrink(
 	struct bitmap_data *source_bitmap,
 	short scale,
@@ -1119,6 +561,267 @@ struct bitmap_data *bitmap_shrink(
 	}
 
 	return destination_bitmap;
+}
+
+static struct bitmap_data *bitmap_2d_shrink(
+	struct bitmap_data *source_bitmap,
+	short scale,
+	short alpha_bias,
+	boolean ignore_transparent_pixels)
+{
+	struct bitmap_data *destination_bitmap;
+	short x_step, y_step;
+	short width, height;
+	short x, y;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x105, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x106, source_bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x107, scale>1);
+
+	x_step = MIN(scale, source_bitmap->width);
+	y_step = MIN(scale, source_bitmap->height);
+	width = source_bitmap->width / x_step;
+	height = source_bitmap->height / y_step;
+
+	destination_bitmap = bitmap_2d_new(width, height, 0, _bitmap_format_a8r8g8b8);
+	if (destination_bitmap && destination_bitmap->base_address)
+	{
+		for (y = 0; y < height; y++)
+		{
+			for (x = 0; x < width; x++)
+			{
+				long alpha = 0;
+				long red = 0;
+				long green = 0;
+				long blue = 0;
+				long count = 0;
+				short i, j;
+				pixel32 *destination_pixel = bitmap_2d_address(
+					destination_bitmap, x, y, 0);
+
+				for (j = 0; j < y_step; j++)
+				{
+					for (i = 0; i < x_step; i++)
+					{
+						pixel32 pixel = *(pixel32 *)bitmap_2d_address(
+							source_bitmap, x * x_step + i, y * y_step + j, 0);
+						long pixel_alpha = pixel >> 24;
+
+						if (pixel_alpha || !ignore_transparent_pixels)
+						{
+							alpha += pixel_alpha;
+							red += (pixel >> 16) & 0xFF;
+							green += (pixel >> 8) & 0xFF;
+							blue += pixel & 0xFF;
+							count++;
+						}
+					}
+				}
+
+				if (count)
+				{
+					*destination_pixel =
+						(PIN((alpha + count / 2) / count + alpha_bias, 0, 255) << 24) |
+						(((red + count / 2) / count) << 16) |
+						(((green + count / 2) / count) << 8) |
+						((blue + count / 2) / count);
+				}
+				else
+				{
+					*destination_pixel = 0;
+				}
+			}
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	return destination_bitmap;
+}
+
+static struct bitmap_data *bitmap_3d_shrink(
+	struct bitmap_data *source_bitmap,
+	short scale,
+	short alpha_bias,
+	boolean ignore_transparent_pixels)
+{
+	struct bitmap_data *destination_bitmap;
+	short x_step, y_step, z_step;
+	short width, height, depth;
+	short x, y, z;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15D, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15E, source_bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15F, scale>1);
+
+	x_step = MIN(scale, source_bitmap->width);
+	y_step = MIN(scale, source_bitmap->height);
+	z_step = MIN(scale, (short)source_bitmap->depth);
+	width = source_bitmap->width / x_step;
+	height = source_bitmap->height / y_step;
+	depth = (short)source_bitmap->depth / z_step;
+
+	destination_bitmap = bitmap_3d_new(width, height, depth, 0, _bitmap_format_a8r8g8b8);
+	if (destination_bitmap && destination_bitmap->base_address)
+	{
+		for (z = 0; z < depth; z++)
+		{
+			for (y = 0; y < height; y++)
+			{
+				for (x = 0; x < width; x++)
+				{
+					long alpha = 0;
+					long red = 0;
+					long green = 0;
+					long blue = 0;
+					long count = 0;
+					short i, j, k;
+					pixel32 *destination_pixel = bitmap_3d_address(
+						destination_bitmap, x, y, z, 0);
+
+					for (k = 0; k < z_step; k++)
+					{
+						for (j = 0; j < y_step; j++)
+						{
+							for (i = 0; i < x_step; i++)
+							{
+								pixel32 pixel = *(pixel32 *)bitmap_3d_address(
+									source_bitmap, x * x_step + i, y * y_step + j, z * z_step + k, 0);
+								long pixel_alpha = pixel >> 24;
+
+								if (pixel_alpha || !ignore_transparent_pixels)
+								{
+									alpha += pixel_alpha;
+									red += (pixel >> 16) & 0xFF;
+									green += (pixel >> 8) & 0xFF;
+									blue += pixel & 0xFF;
+									count++;
+								}
+							}
+						}
+					}
+
+					if (count)
+					{
+						*destination_pixel =
+							(PIN((alpha + count / 2) / count + alpha_bias, 0, 255) << 24) |
+							(((red + count / 2) / count) << 16) |
+							(((green + count / 2) / count) << 8) |
+							((blue + count / 2) / count);
+					}
+					else
+					{
+						*destination_pixel = 0;
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	return destination_bitmap;
+}
+
+static struct bitmap_data *bitmap_cm_shrink(
+	struct bitmap_data *source_bitmap,
+	short scale,
+	short alpha_bias,
+	boolean ignore_transparent_pixels)
+{
+	struct bitmap_data *destination_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BB, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BC, source_bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BD, scale>1);
+
+	destination_bitmap = bitmap_cube_map_new(
+		source_bitmap->width / MIN(scale, source_bitmap->width),
+		0,
+		_bitmap_format_a8r8g8b8);
+	if (destination_bitmap && destination_bitmap->base_address)
+	{
+		struct bitmap_data *face_bitmap = bitmap_2d_new(
+			source_bitmap->width,
+			source_bitmap->height,
+			0,
+			_bitmap_format_a8r8g8b8);
+
+		if (face_bitmap && face_bitmap->base_address)
+		{
+			short face_index;
+
+			for (face_index = 0; face_index < NUMBER_OF_FACES_PER_CUBE; face_index++)
+			{
+				struct bitmap_data *shrunk_bitmap;
+
+				bitmap_cube_map_face_extract(source_bitmap, 0, face_index, face_bitmap);
+				shrunk_bitmap = bitmap_2d_shrink(
+					face_bitmap,
+					scale,
+					alpha_bias,
+					ignore_transparent_pixels);
+				if (shrunk_bitmap && shrunk_bitmap->base_address)
+				{
+					bitmap_cube_map_face_insert(
+						shrunk_bitmap, destination_bitmap, 0, face_index);
+				}
+
+				bitmap_delete(shrunk_bitmap);
+			}
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+		}
+
+		bitmap_delete(face_bitmap);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	return destination_bitmap;
+}
+
+void bitmap_fade(
+	struct bitmap_data *bitmap,
+	pixel32 fade_color,
+	real fade_amount)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1F5,
+		bitmap_verify(bitmap, TRUE));
+
+	if (fade_amount > 0.f)
+	{
+		long alpha = (long)floor(PIN(fade_amount, 0.f, 1.f) * 256.f + 0.5f);
+		long inverse_alpha = 256 - alpha;
+		long faded_alpha = ((fade_color >> 24) & 0xFF) * alpha;
+		long faded_red = ((fade_color >> 16) & 0xFF) * alpha;
+		long faded_green = ((fade_color >> 8) & 0xFF) * alpha;
+		long faded_blue = (fade_color & 0xFF) * alpha;
+		pixel32 *pixels = bitmap_mipmap_address(bitmap, 0);
+		long pixel_count = bitmap_get_pixel_count(bitmap);
+		long index;
+
+		for (index = 0; index < pixel_count; index++)
+		{
+			pixel32 pixel = pixels[index];
+
+			pixels[index] =
+				((((pixel >> 24) * inverse_alpha + faded_alpha + 0x7F) >> 8) << 24) |
+				(((((pixel >> 16) & 0xFF) * inverse_alpha + faded_red + 0x7F) >> 8) << 16) |
+				(((((pixel >> 8) & 0xFF) * inverse_alpha + faded_green + 0x7F) >> 8) << 8) |
+				((((pixel & 0xFF) * inverse_alpha + faded_blue + 0x7F) >> 8));
+		}
+	}
+
+	return;
 }
 
 void bitmap_smooth(
@@ -1194,254 +897,6 @@ void bitmap_smooth(
 
 	return;
 }
-
-void bitmap_sharpen(
-	struct bitmap_data *bitmap,
-	real sharpen_amount)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x361,
-		bitmap_verify(bitmap, TRUE));
-
-	if (sharpen_amount > 0.f)
-	{
-		short sharpen_value = (short)(sharpen_amount * 100.f);
-		short falloff;
-		short value;
-
-		sharpen_value = PIN(sharpen_value, 0, 100);
-		falloff = MAX(1, 100 - sharpen_value);
-
-		for (value = 0; value < NUMBEROF(bitmap_sharpen_positive_table); value++)
-		{
-			bitmap_sharpen_positive_table[value] =
-				(short)(100 * value / falloff);
-			bitmap_sharpen_negative_table[value] =
-				(short)(value * sharpen_value / 8 / falloff);
-		}
-
-		switch (bitmap->type)
-		{
-		case _bitmap_type_2d:
-			bitmap_2d_sharpen(
-				bitmap,
-				sharpen_amount,
-				bitmap_sharpen_positive_table,
-				bitmap_sharpen_negative_table);
-			break;
-
-		case _bitmap_type_3d:
-			bitmap_3d_sharpen(
-				bitmap,
-				sharpen_amount,
-				bitmap_sharpen_positive_table,
-				bitmap_sharpen_negative_table);
-			break;
-
-		case _bitmap_type_cube_map:
-			bitmap_cm_sharpen(
-				bitmap,
-				sharpen_amount,
-				bitmap_sharpen_positive_table,
-				bitmap_sharpen_negative_table);
-			break;
-
-		default:
-			match_vassert(
-				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
-				0x37F,
-				FALSE,
-				"### ERROR unsupported bitmap type");
-			break;
-		}
-	}
-
-	return;
-}
-
-void bitmap_alpha_bleed(
-	struct bitmap_data *bitmap,
-	short passes)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x402, bitmap_verify(bitmap, TRUE));
-
-	if (passes > 0)
-	{
-		switch (bitmap->type)
-		{
-		case _bitmap_type_2d:
-			bitmap_2d_alpha_bleed(bitmap, passes);
-			break;
-
-		case _bitmap_type_3d:
-			bitmap_3d_alpha_bleed(bitmap, passes);
-			break;
-
-		case _bitmap_type_cube_map:
-			bitmap_cm_alpha_bleed(bitmap, passes);
-			break;
-
-		default:
-			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x410, FALSE, "### ERROR unsupported bitmap type");
-			break;
-		}
-	}
-
-	return;
-}
-
-void bitmap_height_map(
-	struct bitmap_data *bitmap,
-	real bump_height)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4AF, bitmap_verify(bitmap, TRUE));
-
-	if (bump_height > 0.f)
-	{
-		switch (bitmap->type)
-		{
-		case _bitmap_type_2d:
-			bitmap_2d_height_map(bitmap, bump_height);
-			break;
-
-		case _bitmap_type_3d:
-			bitmap_3d_height_map(bitmap, bump_height);
-			break;
-
-		case _bitmap_type_cube_map:
-			bitmap_cm_height_map(bitmap, bump_height);
-			break;
-
-		default:
-			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4BD, FALSE, "### ERROR unsupported bitmap type");
-			break;
-		}
-	}
-	else
-	{
-		fprintf(stdout, "### WARNING importing special-effect bump map with zero-height\r\n");
-		fflush(stdout);
-	}
-
-	return;
-}
-
-void bitmap_compress_to_mipmap(
-	struct bitmap_data *source_bitmap,
-	struct bitmap_data *destination_bitmap,
-	short destination_mipmap_index,
-	pixel32 const *transparent_color)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x619, bitmap_verify(source_bitmap, TRUE));
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61B, bitmap_verify(destination_bitmap, FALSE));
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61C, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61D, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61E, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61F, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x620, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
-
-	switch (source_bitmap->type)
-	{
-	case _bitmap_type_2d:
-		bitmap_2d_compress_to_mipmap(
-			source_bitmap,
-			destination_bitmap,
-			destination_mipmap_index,
-			transparent_color);
-		break;
-
-	case _bitmap_type_3d:
-		bitmap_3d_compress_to_mipmap(
-			source_bitmap,
-			destination_bitmap,
-			destination_mipmap_index,
-			transparent_color);
-		break;
-
-	case _bitmap_type_cube_map:
-		bitmap_cm_compress_to_mipmap(
-			source_bitmap,
-			destination_bitmap,
-			destination_mipmap_index,
-			transparent_color);
-		break;
-
-	default:
-		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x630, FALSE, "### ERROR unsupported bitmap type");
-		break;
-	}
-
-	return;
-}
-
-void bitmap_uncompress_from_mipmap(
-	struct bitmap_data *source_bitmap,
-	struct bitmap_data *destination_bitmap,
-	short source_mipmap_index)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x746, bitmap_verify(source_bitmap, FALSE));
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x747, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
-		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x748, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x749, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74A, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
-		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74B, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74D, bitmap_verify(destination_bitmap, TRUE));
-
-	switch (source_bitmap->type)
-	{
-	case _bitmap_type_2d:
-		bitmap_2d_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
-		break;
-
-	case _bitmap_type_3d:
-		bitmap_3d_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
-		break;
-
-	case _bitmap_type_cube_map:
-		bitmap_cm_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
-		break;
-
-	default:
-		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x75B, FALSE, "### ERROR unsupported bitmap type");
-		break;
-	}
-
-	return;
-}
-
-void bitmap_vector_map(
-	struct bitmap_data *bitmap)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x569, bitmap_verify(bitmap, TRUE));
-
-	switch (bitmap->type)
-	{
-		case _bitmap_type_2d:
-			bitmap_2d_vector_map(bitmap);
-			break;
-
-		case _bitmap_type_3d:
-			bitmap_3d_vector_map(bitmap);
-			break;
-
-		case _bitmap_type_cube_map:
-			bitmap_cm_vector_map(bitmap);
-			break;
-
-		default:
-			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x577, FALSE, "### ERROR unsupported bitmap type");
-			break;
-	}
-
-	return;
-}
-
-/* ---------- private code */
 
 static void bitmap_2d_smooth(
 	struct bitmap_data *bitmap,
@@ -1779,6 +1234,69 @@ static void bitmap_cm_smooth(
 	return;
 }
 
+void bitmap_sharpen(
+	struct bitmap_data *bitmap,
+	real sharpen_amount)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x361,
+		bitmap_verify(bitmap, TRUE));
+
+	if (sharpen_amount > 0.f)
+	{
+		short sharpen_value = (short)(sharpen_amount * 100.f);
+		short falloff;
+		short value;
+
+		sharpen_value = PIN(sharpen_value, 0, 100);
+		falloff = MAX(1, 100 - sharpen_value);
+
+		for (value = 0; value < NUMBEROF(bitmap_sharpen_positive_table); value++)
+		{
+			bitmap_sharpen_positive_table[value] =
+				(short)(100 * value / falloff);
+			bitmap_sharpen_negative_table[value] =
+				(short)(value * sharpen_value / 8 / falloff);
+		}
+
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			bitmap_2d_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_sharpen(
+				bitmap,
+				sharpen_amount,
+				bitmap_sharpen_positive_table,
+				bitmap_sharpen_negative_table);
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+				0x37F,
+				FALSE,
+				"### ERROR unsupported bitmap type");
+			break;
+		}
+	}
+
+	return;
+}
+
 static void bitmap_2d_sharpen(
 	struct bitmap_data *bitmap,
 	real sharpen_amount,
@@ -1920,6 +1438,706 @@ static void bitmap_cm_sharpen(
 	/* BUG (preserved for exact matching): see bitmap_cm_smooth. */
 	fprintf(stdout, "### WARNING tried to sharpen a cube map", "\r\n");
 	fflush(stdout);
+
+	return;
+}
+
+void bitmap_alpha_bleed(
+	struct bitmap_data *bitmap,
+	short passes)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x402, bitmap_verify(bitmap, TRUE));
+
+	if (passes > 0)
+	{
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			bitmap_2d_alpha_bleed(bitmap, passes);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_alpha_bleed(bitmap, passes);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_alpha_bleed(bitmap, passes);
+			break;
+
+		default:
+			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x410, FALSE, "### ERROR unsupported bitmap type");
+			break;
+		}
+	}
+
+	return;
+}
+
+static void bitmap_2d_alpha_bleed(
+	struct bitmap_data *bitmap,
+	short passes)
+{
+	long pixel_data_size;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41D, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41E, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41F, passes>0);
+
+	pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+	temporary_pixels = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x422, pixel_data_size);
+	if (temporary_pixels)
+	{
+		short pass;
+
+		for (pass = 0; pass < passes; pass++)
+		{
+			short x, y;
+
+			for (y = 0; y < bitmap->height; y++)
+			{
+				pixel32 *source_pixels = bitmap_2d_address(bitmap, 0, y, 0);
+				pixel32 *destination_pixels = temporary_pixels + y * bitmap->width;
+
+				for (x = 0; x < bitmap->width; x++)
+				{
+					pixel32 pixel = source_pixels[x];
+
+					if (!(pixel & 0xFF000000))
+					{
+						boolean found = FALSE;
+						short i, j;
+
+						for (j = -1; !found && j <= 1; j++)
+						{
+							for (i = -1; !found && i <= 1; i++)
+							{
+								short neighbor_x = x + i;
+								short neighbor_y = y + j;
+
+								if (neighbor_x >= 0 && neighbor_y >= 0 &&
+									neighbor_x < bitmap->width && neighbor_y < bitmap->height)
+								{
+									pixel32 neighbor = *(pixel32 *)bitmap_2d_address(
+										bitmap, neighbor_x, neighbor_y, 0);
+
+									if (neighbor)
+									{
+										pixel = neighbor & 0x00FFFFFF;
+										found = TRUE;
+									}
+								}
+							}
+						}
+					}
+
+					destination_pixels[x] = pixel;
+				}
+			}
+
+			csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
+		}
+
+		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x462, temporary_pixels);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary buffer");
+	}
+
+	return;
+}
+
+static void bitmap_3d_alpha_bleed(
+	struct bitmap_data *bitmap,
+	short passes)
+{
+	struct bitmap_data *slice_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x472, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x473, bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x474, passes>0);
+
+	slice_bitmap = bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (slice_bitmap && slice_bitmap->base_address)
+	{
+		short slice_index;
+
+		for (slice_index = 0; slice_index < (short)bitmap->depth; slice_index++)
+		{
+			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
+			bitmap_2d_alpha_bleed(slice_bitmap, passes);
+			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(slice_bitmap);
+
+	return;
+}
+
+static void bitmap_cm_alpha_bleed(
+	struct bitmap_data *bitmap,
+	short passes)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A1, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A2, bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A3, passes>0);
+
+	fprintf(stdout, "### WARNING tried to alpha-bleed a cube map (skipping)");
+	fflush(stdout);
+
+	return;
+}
+
+void bitmap_height_map(
+	struct bitmap_data *bitmap,
+	real bump_height)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4AF, bitmap_verify(bitmap, TRUE));
+
+	if (bump_height > 0.f)
+	{
+		switch (bitmap->type)
+		{
+		case _bitmap_type_2d:
+			bitmap_2d_height_map(bitmap, bump_height);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_height_map(bitmap, bump_height);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_height_map(bitmap, bump_height);
+			break;
+
+		default:
+			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4BD, FALSE, "### ERROR unsupported bitmap type");
+			break;
+		}
+	}
+	else
+	{
+		fprintf(stdout, "### WARNING importing special-effect bump map with zero-height\r\n");
+		fflush(stdout);
+	}
+
+	return;
+}
+
+static void bitmap_2d_height_map(
+	struct bitmap_data *bitmap,
+	real bump_height)
+{
+	long pixel_data_size;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4CF, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D0, bitmap->type==_bitmap_type_2d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D1, bump_height>0.0f);
+
+	pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+	temporary_pixels = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D4, pixel_data_size);
+	if (temporary_pixels)
+	{
+		real scale = bitmap->height * bump_height * (1.f / 255.f);
+		short x, y;
+
+		for (y = 0; y < bitmap->height; y++)
+		{
+			for (x = 0; x < bitmap->width; x++)
+			{
+				pixel32 pixel = *(pixel32 *)bitmap_2d_address(bitmap, x, y, 0);
+				pixel32 left_pixel = *(pixel32 *)bitmap_2d_address(bitmap,
+					x == 0 ? bitmap->width - 1 : x - 1, y, 0);
+				pixel32 right_pixel = *(pixel32 *)bitmap_2d_address(bitmap,
+					x == bitmap->width - 1 ? 0 : x + 1, y, 0);
+				pixel32 up_pixel = *(pixel32 *)bitmap_2d_address(bitmap, x,
+					y == 0 ? bitmap->height - 1 : y - 1, 0);
+				pixel32 down_pixel = *(pixel32 *)bitmap_2d_address(bitmap, x,
+					y == bitmap->height - 1 ? 0 : y + 1, 0);
+				real center_height = ((pixel >> 16) & 0xFF) * scale;
+				real left_height = ((left_pixel >> 16) & 0xFF) * scale;
+				real right_height = ((right_pixel >> 16) & 0xFF) * scale;
+				real up_height = ((up_pixel >> 16) & 0xFF) * scale;
+				real down_height = ((down_pixel >> 16) & 0xFF) * scale;
+				real_vector3d x_vector, y_vector, normal;
+
+				x_vector.j = 0.f;
+				if (center_height > left_height && center_height > right_height)
+				{
+					x_vector.i = 1.f;
+					x_vector.k = 0.f;
+				}
+				else if (left_height > right_height)
+				{
+					x_vector.i = -1.f;
+					x_vector.k = left_height - center_height;
+				}
+				else
+				{
+					x_vector.i = 1.f;
+					x_vector.k = right_height - center_height;
+				}
+
+				y_vector.i = 0.f;
+				if (center_height > up_height && center_height > down_height)
+				{
+					y_vector.j = 1.f;
+					y_vector.k = 0.f;
+				}
+				else if (up_height > down_height)
+				{
+					y_vector.j = -1.f;
+					y_vector.k = up_height - center_height;
+				}
+				else
+				{
+					y_vector.j = 1.f;
+					y_vector.k = down_height - center_height;
+				}
+
+				cross_product3d(&x_vector, &y_vector, &normal);
+				if (normal.k < 0.f)
+				{
+					normal.i = -normal.i;
+					normal.j = -normal.j;
+					normal.k = -normal.k;
+				}
+				normalize3d(&normal);
+
+				temporary_pixels[y * bitmap->width + x] =
+					(pixel & 0xFF000000) |
+					(fast_ftol((normal.i + 1.f) * 127.5f) << 16) |
+					(fast_ftol((normal.j + 1.f) * 127.5f) << 8) |
+					fast_ftol((normal.k + 1.f) * 127.5f);
+			}
+		}
+
+		csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
+		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x51D, temporary_pixels);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary buffer");
+	}
+
+	return;
+}
+
+static void bitmap_3d_height_map(
+	struct bitmap_data *bitmap,
+	real bump_height)
+{
+	struct bitmap_data *slice_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52D, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52E, bitmap->type==_bitmap_type_3d);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52F, bump_height>0.0f);
+
+	slice_bitmap = bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (slice_bitmap && slice_bitmap->base_address)
+	{
+		short slice_index;
+
+		for (slice_index = 0; slice_index < (short)bitmap->depth; slice_index++)
+		{
+			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
+			bitmap_2d_height_map(slice_bitmap, bump_height);
+			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(slice_bitmap);
+
+	return;
+}
+
+static void bitmap_cm_height_map(
+	struct bitmap_data *bitmap,
+	real bump_height)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55C, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55D, bitmap->type==_bitmap_type_cube_map);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55E, bump_height>0.0f);
+
+	fprintf(stdout, "### WARNING tried to use a cube map as a height map\r\n");
+	fflush(stdout);
+
+	return;
+}
+
+void bitmap_vector_map(
+	struct bitmap_data *bitmap)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x569, bitmap_verify(bitmap, TRUE));
+
+	switch (bitmap->type)
+	{
+		case _bitmap_type_2d:
+			bitmap_2d_vector_map(bitmap);
+			break;
+
+		case _bitmap_type_3d:
+			bitmap_3d_vector_map(bitmap);
+			break;
+
+		case _bitmap_type_cube_map:
+			bitmap_cm_vector_map(bitmap);
+			break;
+
+		default:
+			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x577, FALSE, "### ERROR unsupported bitmap type");
+			break;
+	}
+
+	return;
+}
+
+static void bitmap_2d_vector_map(
+	struct bitmap_data *bitmap)
+{
+	long pixel_data_size;
+	pixel32 *temporary_pixels;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x583, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x584, bitmap->type==_bitmap_type_2d);
+
+	pixel_data_size= bitmap_get_pixel_data_size(bitmap);
+	temporary_pixels= match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x587, pixel_data_size);
+	if (temporary_pixels)
+	{
+		short x, y;
+
+		for (y= 0; y<bitmap->height; y++)
+		{
+			for (x= 0; x<bitmap->width; x++)
+			{
+				pixel32 pixel= *(pixel32 *)bitmap_2d_address(bitmap, x, y, 0);
+				real_vector3d vector;
+
+				vector.i= ((pixel>>16)&0xFF)*(2.f/255.f) - 1.f;
+				vector.j= ((pixel>>8)&0xFF)*(2.f/255.f) - 1.f;
+				vector.k= (pixel&0xFF)*(2.f/255.f) - 1.f;
+				normalize3d(&vector);
+
+				temporary_pixels[y*bitmap->width + x]=
+					(pixel&0xFF000000) |
+					(fast_ftol((vector.i+1.f)*127.5f + 0.5f)<<16) |
+					(fast_ftol((vector.j+1.f)*127.5f + 0.5f)<<8) |
+					fast_ftol((vector.k+1.f)*127.5f + 0.5f);
+			}
+		}
+
+		csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
+		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5A8, temporary_pixels);
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary buffer");
+	}
+
+	return;
+}
+
+static void bitmap_3d_vector_map(
+	struct bitmap_data *bitmap)
+{
+	struct bitmap_data *slice_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B7, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B8, bitmap->type==_bitmap_type_3d);
+
+	slice_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (slice_bitmap && slice_bitmap->base_address)
+	{
+		short slice_index;
+
+		for (slice_index= 0; slice_index<(short)bitmap->depth; slice_index++)
+		{
+			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
+			bitmap_2d_vector_map(slice_bitmap);
+			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(slice_bitmap);
+
+	return;
+}
+
+static void bitmap_cm_vector_map(
+	struct bitmap_data *bitmap)
+{
+	struct bitmap_data *face_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E5, bitmap_verify(bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E6, bitmap->type==_bitmap_type_cube_map);
+
+	face_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
+	if (face_bitmap && face_bitmap->base_address)
+	{
+		short face_index;
+
+		for (face_index= 0; face_index<NUMBER_OF_FACES_PER_CUBE; face_index++)
+		{
+			bitmap_cube_map_face_extract(bitmap, 0, face_index, face_bitmap);
+			bitmap_2d_vector_map(face_bitmap);
+			bitmap_cube_map_face_insert(face_bitmap, bitmap, 0, face_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(face_bitmap);
+
+	return;
+}
+
+void bitmap_compress_to_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	pixel32 const *transparent_color)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x619, bitmap_verify(source_bitmap, TRUE));
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61B, bitmap_verify(destination_bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61C, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
+		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61D, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61E, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61F, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
+		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x620, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
+
+	switch (source_bitmap->type)
+	{
+	case _bitmap_type_2d:
+		bitmap_2d_compress_to_mipmap(
+			source_bitmap,
+			destination_bitmap,
+			destination_mipmap_index,
+			transparent_color);
+		break;
+
+	case _bitmap_type_3d:
+		bitmap_3d_compress_to_mipmap(
+			source_bitmap,
+			destination_bitmap,
+			destination_mipmap_index,
+			transparent_color);
+		break;
+
+	case _bitmap_type_cube_map:
+		bitmap_cm_compress_to_mipmap(
+			source_bitmap,
+			destination_bitmap,
+			destination_mipmap_index,
+			transparent_color);
+		break;
+
+	default:
+		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x630, FALSE, "### ERROR unsupported bitmap type");
+		break;
+	}
+
+	return;
+}
+
+static void bitmap_2d_compress_to_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	pixel32 const *transparent_color)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63C, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63D, source_bitmap->type==_bitmap_type_2d);
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63F, bitmap_verify(destination_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x640, destination_bitmap->type==_bitmap_type_2d);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x641, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
+		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x642, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x643, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x644, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
+		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x645, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
+
+	/* The Xbox tool build does not compress bitmaps at runtime. */
+	display_assert(NULL, "c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x69F, TRUE);
+	system_exit(-1);
+
+	return;
+}
+
+static void bitmap_3d_compress_to_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	pixel32 const *transparent_color)
+{
+	struct bitmap_data *source_slice_bitmap;
+	struct bitmap_data *destination_slice_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6AF, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B0, source_bitmap->type==_bitmap_type_3d);
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B2, bitmap_verify(destination_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B3, destination_bitmap->type==_bitmap_type_3d);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B4, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
+		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B5, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B6, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B7, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
+		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B8, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
+
+	source_slice_bitmap = bitmap_2d_new(
+		source_bitmap->width,
+		source_bitmap->height,
+		0,
+		source_bitmap->format);
+	destination_slice_bitmap = bitmap_2d_new(
+		source_bitmap->width,
+		source_bitmap->height,
+		0,
+		destination_bitmap->format);
+	if (source_slice_bitmap && source_slice_bitmap->base_address &&
+		destination_slice_bitmap && destination_slice_bitmap->base_address)
+	{
+		short slice_index;
+
+		for (slice_index = 0; slice_index < (short)source_bitmap->depth; slice_index++)
+		{
+			bitmap_3d_slice_extract(source_bitmap, 0, slice_index, source_slice_bitmap);
+			bitmap_2d_compress_to_mipmap(source_slice_bitmap, destination_slice_bitmap, 0, transparent_color);
+			bitmap_3d_slice_insert(
+				destination_slice_bitmap,
+				destination_bitmap,
+				destination_mipmap_index,
+				slice_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(source_slice_bitmap);
+	bitmap_delete(destination_slice_bitmap);
+
+	return;
+}
+
+static void bitmap_cm_compress_to_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short destination_mipmap_index,
+	pixel32 const *transparent_color)
+{
+	struct bitmap_data *source_face_bitmap;
+	struct bitmap_data *destination_face_bitmap;
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FA, bitmap_verify(source_bitmap, TRUE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FB, source_bitmap->type==_bitmap_type_cube_map);
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FD, bitmap_verify(destination_bitmap, FALSE));
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FE, destination_bitmap->type==_bitmap_type_cube_map);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FF, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
+		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x700, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x701, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x702, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
+		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x703, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
+
+	source_face_bitmap = bitmap_2d_new(
+		source_bitmap->width,
+		source_bitmap->height,
+		0,
+		source_bitmap->format);
+	destination_face_bitmap = bitmap_2d_new(
+		source_bitmap->width,
+		source_bitmap->height,
+		0,
+		destination_bitmap->format);
+	if (source_face_bitmap && source_face_bitmap->base_address &&
+		destination_face_bitmap && destination_face_bitmap->base_address)
+	{
+		short face_index;
+
+		for (face_index = 0; face_index < NUMBER_OF_FACES_PER_CUBE; face_index++)
+		{
+			bitmap_cube_map_face_extract(source_bitmap, 0, face_index, source_face_bitmap);
+			bitmap_2d_compress_to_mipmap(source_face_bitmap, destination_face_bitmap, 0, transparent_color);
+			bitmap_cube_map_face_insert(
+				destination_face_bitmap,
+				destination_bitmap,
+				destination_mipmap_index,
+				face_index);
+		}
+	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+	}
+
+	bitmap_delete(source_face_bitmap);
+	bitmap_delete(destination_face_bitmap);
+
+	return;
+}
+
+void bitmap_uncompress_from_mipmap(
+	struct bitmap_data *source_bitmap,
+	struct bitmap_data *destination_bitmap,
+	short source_mipmap_index)
+{
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x746, bitmap_verify(source_bitmap, FALSE));
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x747, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
+		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x748, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x749, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
+	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74A, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
+		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74B, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
+
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74D, bitmap_verify(destination_bitmap, TRUE));
+
+	switch (source_bitmap->type)
+	{
+	case _bitmap_type_2d:
+		bitmap_2d_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
+		break;
+
+	case _bitmap_type_3d:
+		bitmap_3d_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
+		break;
+
+	case _bitmap_type_cube_map:
+		bitmap_cm_uncompress_from_mipmap(source_bitmap, destination_bitmap, source_mipmap_index);
+		break;
+
+	default:
+		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x75B, FALSE, "### ERROR unsupported bitmap type");
+		break;
+	}
 
 	return;
 }
@@ -2118,747 +2336,525 @@ static void bitmap_cm_uncompress_from_mipmap(
 	return;
 }
 
-static void bitmap_2d_compress_to_mipmap(
-	struct bitmap_data *source_bitmap,
-	struct bitmap_data *destination_bitmap,
-	short destination_mipmap_index,
-	pixel32 const *transparent_color)
+real real_rgb_color_brightness(
+	union real_rgb_color const *color)
 {
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63C, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63D, source_bitmap->type==_bitmap_type_2d);
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63F, bitmap_verify(destination_bitmap, FALSE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x640, destination_bitmap->type==_bitmap_type_2d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x641, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x642, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x643, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x644, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x645, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
-
-	/* The Xbox tool build does not compress bitmaps at runtime. */
-	display_assert(NULL, "c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x69F, TRUE);
-	system_exit(-1);
-
-	return;
+	return
+		color->red * 0.299f +
+		color->green * 0.587f +
+		color->blue * 0.114f;
 }
 
-static void bitmap_3d_compress_to_mipmap(
-	struct bitmap_data *source_bitmap,
-	struct bitmap_data *destination_bitmap,
-	short destination_mipmap_index,
-	pixel32 const *transparent_color)
+struct hsv_color *rgb_color_to_hsv_color(
+	struct rgb_color const *rgb,
+	struct hsv_color *hsv)
 {
-	struct bitmap_data *source_slice_bitmap;
-	struct bitmap_data *destination_slice_bitmap;
+	real red = (real)(long)rgb->red * (1.0f / 65535.0f);
+	real green = (real)(long)rgb->green * (1.0f / 65535.0f);
+	real blue = (real)(long)rgb->blue * (1.0f / 65535.0f);
+	real value;
+	real minimum;
+	real delta;
+	real hue;
+	real saturation;
 
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6AF, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B0, source_bitmap->type==_bitmap_type_3d);
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B2, bitmap_verify(destination_bitmap, FALSE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B3, destination_bitmap->type==_bitmap_type_3d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B4, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B5, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B6, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B7, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B8, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
-
-	source_slice_bitmap = bitmap_2d_new(
-		source_bitmap->width,
-		source_bitmap->height,
-		0,
-		source_bitmap->format);
-	destination_slice_bitmap = bitmap_2d_new(
-		source_bitmap->width,
-		source_bitmap->height,
-		0,
-		destination_bitmap->format);
-	if (source_slice_bitmap && source_slice_bitmap->base_address &&
-		destination_slice_bitmap && destination_slice_bitmap->base_address)
+	if (green > blue)
+		value = green;
+	else
+		value = blue;
+	if (red > value)
+		value = red;
+	else
 	{
-		short slice_index;
+		if (green > blue)
+			value = green;
+		else
+			value = blue;
+	}
 
-		for (slice_index = 0; slice_index < (short)source_bitmap->depth; slice_index++)
+	if (green > blue)
+		minimum = blue;
+	else
+		minimum = green;
+	if (red > minimum)
+	{
+		if (green > blue)
+			minimum = blue;
+		else
+			minimum = green;
+	}
+	else
+		minimum = red;
+
+	delta = value - minimum;
+
+	if (!hsv)
+	{
+		display_assert(
+			"hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x852,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x853,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (value == 0.0f)
+		saturation = 0.0f;
+	else
+		saturation = delta / value;
+
+	if (saturation == 0.0f)
+		hue = 0.0f;
+	else
+	{
+		if (red == value)
+			hue = (green - blue) / delta;
+		else if (green == value)
+			hue = (blue - red) / delta + 2.0f;
+		else
+			hue = (red - green) / delta + 4.0f;
+
+		hue *= 1.0f / 6.0f;
+		if (hue < 0.0f)
+			hue += 1.0f;
+	}
+
+	hsv->hue = (word)(long)(hue * 65536.0f);
+	hsv->saturation = (word)(long)(saturation * 65535.0f);
+	hsv->value = (word)(long)(value * 65535.0f);
+	return hsv;
+}
+
+struct rgb_color *hsv_color_to_rgb_color(
+	struct hsv_color const *hsv,
+	struct rgb_color *rgb)
+{
+	real scaled_hue;
+	real saturation;
+	real value;
+	real fraction;
+	real p;
+	real q;
+	real t;
+	real red;
+	real green;
+	real blue;
+	long truncated_sector;
+	long sector;
+
+	scaled_hue = (real)(long)hsv->hue * (1.0f / 65536.0f);
+	scaled_hue *= 6.0f;
+	saturation = (real)(long)hsv->saturation * (1.0f / 65535.0f);
+	value = (real)(long)hsv->value * (1.0f / 65535.0f);
+
+	if (!rgb)
+	{
+		display_assert(
+			"rgb",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x886,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x888,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (saturation == 0.0f)
+		red = green = blue = value;
+	else
+	{
+		truncated_sector = (long)scaled_hue;
+		sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
+		fraction = scaled_hue - (real)sector;
+		p = (1.0f - saturation) * value;
+		q = (1.0f - saturation * fraction) * value;
+		t = (1.0f - (1.0f - fraction) * saturation) * value;
+
+		switch (sector)
 		{
-			bitmap_3d_slice_extract(source_bitmap, 0, slice_index, source_slice_bitmap);
-			bitmap_2d_compress_to_mipmap(source_slice_bitmap, destination_slice_bitmap, 0, transparent_color);
-			bitmap_3d_slice_insert(
-				destination_slice_bitmap,
-				destination_bitmap,
-				destination_mipmap_index,
-				slice_index);
+		case 0:
+			red = value;
+			green = t;
+			blue = p;
+			break;
+		case 1:
+			red = q;
+			green = value;
+			blue = p;
+			break;
+		case 2:
+			red = p;
+			green = value;
+			blue = t;
+			break;
+		case 3:
+			red = p;
+			green = q;
+			blue = value;
+			break;
+		case 4:
+			red = t;
+			green = p;
+			blue = value;
+			break;
+		case 5:
+			red = value;
+			green = p;
+			blue = q;
+			break;
 		}
+	}
+
+	rgb->red = (word)(long)(red * 65535.0f);
+	rgb->green = (word)(long)(green * 65535.0f);
+	rgb->blue = (word)(long)(blue * 65535.0f);
+	return rgb;
+}
+
+union real_hsv_color *real_rgb_color_to_real_hsv_color(
+	union real_rgb_color const *rgb,
+	union real_hsv_color *hsv)
+{
+	real value;
+	real minimum;
+	real delta;
+	real saturation;
+
+	if (rgb->green > rgb->blue)
+		value = rgb->green;
+	else
+		value = rgb->blue;
+	if (rgb->red > value)
+		value = rgb->red;
+	else
+	{
+		if (rgb->green > rgb->blue)
+			value = rgb->green;
+		else
+			value = rgb->blue;
+	}
+
+	if (rgb->green > rgb->blue)
+		minimum = rgb->blue;
+	else
+		minimum = rgb->green;
+	if (rgb->red > minimum)
+	{
+		if (rgb->green > rgb->blue)
+			minimum = rgb->blue;
+		else
+			minimum = rgb->green;
+	}
+	else
+		minimum = rgb->red;
+
+	delta = value - minimum;
+
+	if (!hsv)
+	{
+		display_assert(
+			"hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8B2,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)hsv)
+	{
+		display_assert(
+			"rgb!=(real_rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8B3,
+			TRUE);
+		system_exit(-1);
+	}
+
+	hsv->value = value;
+	if (value == 0.0f)
+		saturation = 0.0f;
+	else
+		saturation = delta / value;
+	hsv->saturation = saturation;
+
+	if (saturation == 0.0f)
+	{
+		hsv->hue = 0.0f;
+		return hsv;
+	}
+	if (rgb->red == value)
+		hsv->hue = (rgb->green - rgb->blue) / delta;
+	else if (rgb->green == value)
+		hsv->hue = (rgb->blue - rgb->red) / delta + 2.0f;
+	else
+		hsv->hue = (rgb->red - rgb->green) / delta + 4.0f;
+
+	hsv->hue *= 1.0f / 6.0f;
+	if (hsv->hue < 0.0f)
+		hsv->hue += 1.0f;
+	return hsv;
+}
+
+union real_rgb_color *real_hsv_color_to_real_rgb_color(
+	union real_hsv_color *hsv,
+	union real_rgb_color *rgb)
+{
+	union real_hsv_color *source = hsv;
+	real scaled_hue = source->hue * 6.0f;
+	real p;
+	real q;
+	real t;
+	long truncated_sector;
+	long sector;
+
+	if (!rgb)
+	{
+		display_assert(
+			"rgb",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8DF,
+			TRUE);
+		system_exit(-1);
+	}
+	if ((void const *)rgb == (void const *)source)
+	{
+		display_assert(
+			"rgb!=(real_rgb_color *)hsv",
+			"c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c",
+			0x8E1,
+			TRUE);
+		system_exit(-1);
+	}
+
+	if (source->saturation == 0.0f)
+	{
+		rgb->red = rgb->green = rgb->blue = source->value;
+		return rgb;
+	}
+
+	truncated_sector = (long)scaled_hue;
+	sector = (real)truncated_sector > scaled_hue ? truncated_sector - 1 : truncated_sector;
+	scaled_hue -= sector;
+	p = (1.0f - source->saturation) * source->value;
+	q = (1.0f - scaled_hue * source->saturation) * source->value;
+	t = (1.0f - (1.0f - scaled_hue) * source->saturation) * source->value;
+
+	switch (sector)
+	{
+	case 0:
+		rgb->red = source->value;
+		rgb->green = t;
+		rgb->blue = p;
+		return rgb;
+	case 1:
+		rgb->red = q;
+		rgb->green = source->value;
+		rgb->blue = p;
+		return rgb;
+	case 2:
+		rgb->red = p;
+		rgb->green = source->value;
+		rgb->blue = t;
+		return rgb;
+	case 3:
+		rgb->red = p;
+		rgb->green = q;
+		rgb->blue = source->value;
+		return rgb;
+	case 4:
+		rgb->red = t;
+		rgb->green = p;
+		rgb->blue = source->value;
+		return rgb;
+	case 5:
+		rgb->red = source->value;
+		rgb->green = p;
+		rgb->blue = q;
+		return rgb;
+	default:
+		return rgb;
+	}
+}
+
+union real_argb_color *argb_color_to_real_argb_color(
+	struct argb_color const *source,
+	union real_argb_color *result)
+{
+	result->alpha = (real)(long)source->alpha * oo_unsigned_short_max;
+	result->red = (real)(long)source->red * oo_unsigned_short_max;
+	result->green = (real)(long)source->green * oo_unsigned_short_max;
+	result->blue = (real)(long)source->blue * oo_unsigned_short_max;
+	return result;
+}
+
+union real_rgb_color *rgb_color_to_real_rgb_color(
+	struct rgb_color const *source,
+	union real_rgb_color *result)
+{
+	result->red = (real)(long)source->red * oo_unsigned_short_max;
+	result->green = (real)(long)source->green * oo_unsigned_short_max;
+	result->blue = (real)(long)source->blue * oo_unsigned_short_max;
+	return result;
+}
+
+union real_argb_color *pixel32_to_real_argb_color(
+	pixel32 color,
+	union real_argb_color *result)
+{
+	unsigned long alpha = color >> 24;
+	unsigned long red = (color >> 16) & 0xFF;
+	unsigned long green = (color >> 8) & 0xFF;
+	unsigned long blue = color & 0xFF;
+
+	result->alpha = alpha * (1.0f / 255.0f);
+	result->red = red * (1.0f / 255.0f);
+	result->green = green * (1.0f / 255.0f);
+	result->blue = blue * (1.0f / 255.0f);
+	return result;
+}
+
+union real_rgb_color *pixel32_to_real_rgb_color(
+	pixel32 color,
+	union real_rgb_color *result)
+{
+	unsigned long red = (color >> 16) & 0xFF;
+	unsigned long green = (color >> 8) & 0xFF;
+	unsigned long blue = color & 0xFF;
+
+	result->red = red * (1.0f / 255.0f);
+	result->green = green * (1.0f / 255.0f);
+	result->blue = blue * (1.0f / 255.0f);
+	return result;
+}
+
+boolean valid_real_rgb_color(
+	union real_rgb_color const *color)
+{
+	return
+		valid_real(color->red) &&
+		valid_real(color->green) &&
+		valid_real(color->blue) &&
+		color->red>=0.f && color->red<=1.f &&
+		color->green>=0.f && color->green<=1.f &&
+		color->blue>=0.f && color->blue<=1.f;
+}
+
+union real_rgb_color *rgb_colors_interpolate(
+	union real_rgb_color *rgb_result,
+	unsigned long flags,
+	union real_rgb_color const *rgb_lower_bound,
+	union real_rgb_color const *rgb_upper_bound,
+	real interpolation_factor)
+{
+	real inverse_interpolation_factor = 1.f - interpolation_factor;
+
+	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x939, rgb_lower_bound);
+	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x93A, rgb_upper_bound);
+
+	if (TEST_FLAG(flags, _rgb_color_interpolation_hsv_bit))
+	{
+		union real_hsv_color hsv_result;
+		union real_hsv_color hsv_lower_bound;
+		union real_hsv_color hsv_upper_bound;
+
+		real_rgb_color_to_real_hsv_color(rgb_lower_bound, &hsv_lower_bound);
+		real_rgb_color_to_real_hsv_color(rgb_upper_bound, &hsv_upper_bound);
+
+		if ((fabs(hsv_lower_bound.hue - hsv_upper_bound.hue) > 0.5) !=
+			TEST_FLAG(flags, _rgb_color_interpolation_hsv_reverse_bit))
+		{
+			if (hsv_lower_bound.hue < hsv_upper_bound.hue)
+				hsv_lower_bound.hue += 1.f;
+			else
+				hsv_upper_bound.hue += 1.f;
+		}
+
+		hsv_result.hue =
+			inverse_interpolation_factor * hsv_lower_bound.hue +
+			interpolation_factor * hsv_upper_bound.hue;
+		if (hsv_result.hue > 1.f)
+			hsv_result.hue -= 1.f;
+		hsv_result.saturation =
+			inverse_interpolation_factor * hsv_lower_bound.saturation +
+			interpolation_factor * hsv_upper_bound.saturation;
+		hsv_result.value =
+			inverse_interpolation_factor * hsv_lower_bound.value +
+			interpolation_factor * hsv_upper_bound.value;
+
+		real_hsv_color_to_real_rgb_color(&hsv_result, rgb_result);
 	}
 	else
 	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
+		rgb_result->red =
+			inverse_interpolation_factor * rgb_lower_bound->red +
+			interpolation_factor * rgb_upper_bound->red;
+		rgb_result->green =
+			inverse_interpolation_factor * rgb_lower_bound->green +
+			interpolation_factor * rgb_upper_bound->green;
+		rgb_result->blue =
+			inverse_interpolation_factor * rgb_lower_bound->blue +
+			interpolation_factor * rgb_upper_bound->blue;
 	}
 
-	bitmap_delete(source_slice_bitmap);
-	bitmap_delete(destination_slice_bitmap);
+	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x95D, rgb_result);
 
-	return;
+	return rgb_result;
 }
 
-static void bitmap_cm_compress_to_mipmap(
-	struct bitmap_data *source_bitmap,
-	struct bitmap_data *destination_bitmap,
-	short destination_mipmap_index,
-	pixel32 const *transparent_color)
+union real_rgb_color *rgb_colors_interpolate_and_scale(
+	union real_rgb_color *rgb_result,
+	unsigned long flags,
+	union real_argb_color const *argb_lower_bound,
+	union real_argb_color const *argb_upper_bound,
+	union real_rgb_color const *rgb_scale,
+	real u)
 {
-	struct bitmap_data *source_face_bitmap;
-	struct bitmap_data *destination_face_bitmap;
+	rgb_colors_interpolate(
+		rgb_result,
+		flags,
+		&argb_lower_bound->rgb,
+		&argb_upper_bound->rgb,
+		u);
 
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FA, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FB, source_bitmap->type==_bitmap_type_cube_map);
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FD, bitmap_verify(destination_bitmap, FALSE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FE, destination_bitmap->type==_bitmap_type_cube_map);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FF, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x700, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x701, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x702, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x703, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
-
-	source_face_bitmap = bitmap_2d_new(
-		source_bitmap->width,
-		source_bitmap->height,
-		0,
-		source_bitmap->format);
-	destination_face_bitmap = bitmap_2d_new(
-		source_bitmap->width,
-		source_bitmap->height,
-		0,
-		destination_bitmap->format);
-	if (source_face_bitmap && source_face_bitmap->base_address &&
-		destination_face_bitmap && destination_face_bitmap->base_address)
+	if (rgb_scale)
 	{
-		short face_index;
+		match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x96E, rgb_scale);
 
-		for (face_index = 0; face_index < NUMBER_OF_FACES_PER_CUBE; face_index++)
+		if (argb_lower_bound->alpha>_real_epsilon ||
+			argb_upper_bound->alpha>_real_epsilon)
 		{
-			bitmap_cube_map_face_extract(source_bitmap, 0, face_index, source_face_bitmap);
-			bitmap_2d_compress_to_mipmap(source_face_bitmap, destination_face_bitmap, 0, transparent_color);
-			bitmap_cube_map_face_insert(
-				destination_face_bitmap,
-				destination_bitmap,
-				destination_mipmap_index,
-				face_index);
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
+			real alpha=
+				(1.f-u)*argb_lower_bound->alpha +
+				u*argb_upper_bound->alpha;
 
-	bitmap_delete(source_face_bitmap);
-	bitmap_delete(destination_face_bitmap);
-
-	return;
-}
-
-static struct bitmap_data *bitmap_2d_shrink(
-	struct bitmap_data *source_bitmap,
-	short scale,
-	short alpha_bias,
-	boolean ignore_transparent_pixels)
-{
-	struct bitmap_data *destination_bitmap;
-	short x_step, y_step;
-	short width, height;
-	short x, y;
-	short source_x, source_y;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x105, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x106, source_bitmap->type==_bitmap_type_2d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x107, scale>1);
-
-	x_step = MIN(scale, source_bitmap->width);
-	y_step = MIN(scale, source_bitmap->height);
-	width = source_bitmap->width / x_step;
-	height = source_bitmap->height / y_step;
-
-	destination_bitmap = bitmap_2d_new(width, height, 0, _bitmap_format_a8r8g8b8);
-	if (destination_bitmap && destination_bitmap->base_address)
-	{
-		for (y = 0, source_y = 0; y < height; y++, source_y += y_step)
-		{
-			for (x = 0, source_x = 0; x < width; x++, source_x += x_step)
-			{
-				long alpha = 0;
-				long red = 0;
-				long green = 0;
-				long blue = 0;
-				long count = 0;
-				short i, j;
-				pixel32 *destination_pixel = bitmap_2d_address(
-					destination_bitmap, x, y, 0);
-
-				for (j = 0; j < y_step; j++)
-				{
-					for (i = 0; i < x_step; i++)
-					{
-						pixel32 pixel = *(pixel32 *)bitmap_2d_address(
-							source_bitmap, source_x + i, source_y + j, 0);
-						long pixel_alpha = pixel >> 24;
-
-						if (pixel_alpha || !ignore_transparent_pixels)
-						{
-							alpha += pixel_alpha;
-							red += (pixel >> 16) & 0xFF;
-							green += (pixel >> 8) & 0xFF;
-							blue += pixel & 0xFF;
-							count++;
-						}
-					}
-				}
-
-				if (count)
-				{
-					*destination_pixel =
-						(PIN((alpha + count / 2) / count + alpha_bias, 0, 255) << 24) |
-						(((red + count / 2) / count) << 16) |
-						(((green + count / 2) / count) << 8) |
-						((blue + count / 2) / count);
-				}
-				else
-				{
-					*destination_pixel = 0;
-				}
-			}
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	return destination_bitmap;
-}
-
-static struct bitmap_data *bitmap_3d_shrink(
-	struct bitmap_data *source_bitmap,
-	short scale,
-	short alpha_bias,
-	boolean ignore_transparent_pixels)
-{
-	struct bitmap_data *destination_bitmap;
-	short x_step, y_step, z_step;
-	short width, height, depth;
-	short x, y, z;
-	short source_x, source_y, source_z;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15D, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15E, source_bitmap->type==_bitmap_type_3d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x15F, scale>1);
-
-	x_step = MIN(scale, source_bitmap->width);
-	y_step = MIN(scale, source_bitmap->height);
-	z_step = MIN(scale, (short)source_bitmap->depth);
-	width = source_bitmap->width / x_step;
-	height = source_bitmap->height / y_step;
-	depth = (short)source_bitmap->depth / z_step;
-
-	destination_bitmap = bitmap_3d_new(width, height, depth, 0, _bitmap_format_a8r8g8b8);
-	if (destination_bitmap && destination_bitmap->base_address)
-	{
-		for (z = 0, source_z = 0; z < depth; z++, source_z += z_step)
-		{
-			for (y = 0, source_y = 0; y < height; y++, source_y += y_step)
-			{
-				for (x = 0, source_x = 0; x < width; x++, source_x += x_step)
-				{
-					long alpha = 0;
-					long red = 0;
-					long green = 0;
-					long blue = 0;
-					long count = 0;
-					short i, j, k;
-					pixel32 *destination_pixel = bitmap_3d_address(
-						destination_bitmap, x, y, z, 0);
-
-					for (k = 0; k < z_step; k++)
-					{
-						for (j = 0; j < y_step; j++)
-						{
-							for (i = 0; i < x_step; i++)
-							{
-								pixel32 pixel = *(pixel32 *)bitmap_3d_address(
-									source_bitmap, source_x + i, source_y + j, source_z + k, 0);
-								long pixel_alpha = pixel >> 24;
-
-								if (pixel_alpha || !ignore_transparent_pixels)
-								{
-									alpha += pixel_alpha;
-									red += (pixel >> 16) & 0xFF;
-									green += (pixel >> 8) & 0xFF;
-									blue += pixel & 0xFF;
-									count++;
-								}
-							}
-						}
-					}
-
-					if (count)
-					{
-						*destination_pixel =
-							(PIN((alpha + count / 2) / count + alpha_bias, 0, 255) << 24) |
-							(((red + count / 2) / count) << 16) |
-							(((green + count / 2) / count) << 8) |
-							((blue + count / 2) / count);
-					}
-					else
-					{
-						*destination_pixel = 0;
-					}
-				}
-			}
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	return destination_bitmap;
-}
-
-static struct bitmap_data *bitmap_cm_shrink(
-	struct bitmap_data *source_bitmap,
-	short scale,
-	short alpha_bias,
-	boolean ignore_transparent_pixels)
-{
-	struct bitmap_data *destination_bitmap;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BB, bitmap_verify(source_bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BC, source_bitmap->type==_bitmap_type_cube_map);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x1BD, scale>1);
-
-	destination_bitmap = bitmap_cube_map_new(
-		source_bitmap->width / MIN(scale, source_bitmap->width),
-		0,
-		_bitmap_format_a8r8g8b8);
-	if (destination_bitmap && destination_bitmap->base_address)
-	{
-		struct bitmap_data *face_bitmap = bitmap_2d_new(
-			source_bitmap->width,
-			source_bitmap->height,
-			0,
-			_bitmap_format_a8r8g8b8);
-
-		if (face_bitmap && face_bitmap->base_address)
-		{
-			short face_index;
-
-			for (face_index = 0; face_index < NUMBER_OF_FACES_PER_CUBE; face_index++)
-			{
-				struct bitmap_data *shrunk_bitmap;
-
-				bitmap_cube_map_face_extract(source_bitmap, 0, face_index, face_bitmap);
-				shrunk_bitmap = bitmap_2d_shrink(
-					face_bitmap,
-					scale,
-					alpha_bias,
-					ignore_transparent_pixels);
-				if (shrunk_bitmap && shrunk_bitmap->base_address)
-				{
-					bitmap_cube_map_face_insert(
-						shrunk_bitmap, destination_bitmap, 0, face_index);
-				}
-
-				bitmap_delete(shrunk_bitmap);
-			}
+			rgb_result->red= alpha*rgb_result->red + (1.f-alpha)*rgb_scale->red;
+			rgb_result->green= alpha*rgb_result->green + (1.f-alpha)*rgb_scale->green;
+			rgb_result->blue= alpha*rgb_result->blue + (1.f-alpha)*rgb_scale->blue;
 		}
 		else
 		{
-			error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-		}
-
-		bitmap_delete(face_bitmap);
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	return destination_bitmap;
-}
-
-static void bitmap_2d_alpha_bleed(
-	struct bitmap_data *bitmap,
-	short passes)
-{
-	long pixel_data_size;
-	pixel32 *temporary_pixels;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41D, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41E, bitmap->type==_bitmap_type_2d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x41F, passes>0);
-
-	pixel_data_size = bitmap_get_pixel_data_size(bitmap);
-	temporary_pixels = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x422, pixel_data_size);
-	if (temporary_pixels)
-	{
-		short pass;
-
-		for (pass = 0; pass < passes; pass++)
-		{
-			short x, y;
-
-			for (y = 0; y < bitmap->height; y++)
-			{
-				pixel32 *source_pixels = bitmap_2d_address(bitmap, 0, y, 0);
-				pixel32 *destination_pixels = temporary_pixels + y * bitmap->width;
-
-				for (x = 0; x < bitmap->width; x++)
-				{
-					pixel32 pixel = source_pixels[x];
-
-					if (!(pixel & 0xFF000000))
-					{
-						boolean found = FALSE;
-						short i, j;
-
-						for (j = -1; !found && j <= 1; j++)
-						{
-							for (i = -1; !found && i <= 1; i++)
-							{
-								short neighbor_x = x + i;
-								short neighbor_y = y + j;
-
-								if (neighbor_x >= 0 && neighbor_y >= 0 &&
-									neighbor_x < bitmap->width && neighbor_y < bitmap->height)
-								{
-									pixel32 neighbor = *(pixel32 *)bitmap_2d_address(
-										bitmap, neighbor_x, neighbor_y, 0);
-
-									if (neighbor)
-									{
-										pixel = neighbor & 0x00FFFFFF;
-										found = TRUE;
-									}
-								}
-							}
-						}
-					}
-
-					destination_pixels[x] = pixel;
-				}
-			}
-
-			csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
-		}
-
-		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x462, temporary_pixels);
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary buffer");
-	}
-
-	return;
-}
-
-static void bitmap_3d_alpha_bleed(
-	struct bitmap_data *bitmap,
-	short passes)
-{
-	struct bitmap_data *slice_bitmap;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x472, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x473, bitmap->type==_bitmap_type_3d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x474, passes>0);
-
-	slice_bitmap = bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
-	if (slice_bitmap && slice_bitmap->base_address)
-	{
-		short slice_index;
-
-		for (slice_index = 0; slice_index < (short)bitmap->depth; slice_index++)
-		{
-			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
-			bitmap_2d_alpha_bleed(slice_bitmap, passes);
-			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
+			rgb_result->red*= rgb_scale->red;
+			rgb_result->green*= rgb_scale->green;
+			rgb_result->blue*= rgb_scale->blue;
 		}
 	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
 
-	bitmap_delete(slice_bitmap);
+	match_assert_valid_real_rgb_color("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x982, rgb_result);
 
-	return;
-}
-
-static void bitmap_cm_alpha_bleed(
-	struct bitmap_data *bitmap,
-	short passes)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A1, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A2, bitmap->type==_bitmap_type_cube_map);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4A3, passes>0);
-
-	fprintf(stdout, "### WARNING tried to alpha-bleed a cube map (skipping)");
-	fflush(stdout);
-
-	return;
-}
-
-static void bitmap_cm_height_map(
-	struct bitmap_data *bitmap,
-	real bump_height)
-{
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55C, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55D, bitmap->type==_bitmap_type_cube_map);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x55E, bump_height>0.0f);
-
-	fprintf(stdout, "### WARNING tried to use a cube map as a height map\r\n");
-	fflush(stdout);
-
-	return;
-}
-
-static void bitmap_2d_height_map(
-	struct bitmap_data *bitmap,
-	real bump_height)
-{
-	long pixel_data_size;
-	pixel32 *temporary_pixels;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4CF, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D0, bitmap->type==_bitmap_type_2d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D1, bump_height>0.0f);
-
-	pixel_data_size = bitmap_get_pixel_data_size(bitmap);
-	temporary_pixels = match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x4D4, pixel_data_size);
-	if (temporary_pixels)
-	{
-		real scale = bitmap->height * bump_height * (1.f / 255.f);
-		short x, y;
-
-		for (y = 0; y < bitmap->height; y++)
-		{
-			for (x = 0; x < bitmap->width; x++)
-			{
-				pixel32 pixel = *(pixel32 *)bitmap_2d_address(bitmap, x, y, 0);
-				pixel32 left_pixel = *(pixel32 *)bitmap_2d_address(bitmap,
-					x == 0 ? bitmap->width - 1 : x - 1, y, 0);
-				pixel32 right_pixel = *(pixel32 *)bitmap_2d_address(bitmap,
-					x == bitmap->width - 1 ? 0 : x + 1, y, 0);
-				pixel32 up_pixel = *(pixel32 *)bitmap_2d_address(bitmap, x,
-					y == 0 ? bitmap->height - 1 : y - 1, 0);
-				pixel32 down_pixel = *(pixel32 *)bitmap_2d_address(bitmap, x,
-					y == bitmap->height - 1 ? 0 : y + 1, 0);
-				real center_height = ((pixel >> 16) & 0xFF) * scale;
-				real left_height = ((left_pixel >> 16) & 0xFF) * scale;
-				real right_height = ((right_pixel >> 16) & 0xFF) * scale;
-				real up_height = ((up_pixel >> 16) & 0xFF) * scale;
-				real down_height = ((down_pixel >> 16) & 0xFF) * scale;
-				real_vector3d x_vector, y_vector, normal;
-
-				x_vector.j = 0.f;
-				if (center_height > left_height && center_height > right_height)
-				{
-					x_vector.i = 1.f;
-					x_vector.k = 0.f;
-				}
-				else if (left_height > right_height)
-				{
-					x_vector.i = -1.f;
-					x_vector.k = left_height - center_height;
-				}
-				else
-				{
-					x_vector.i = 1.f;
-					x_vector.k = right_height - center_height;
-				}
-
-				y_vector.i = 0.f;
-				if (center_height > up_height && center_height > down_height)
-				{
-					y_vector.j = 1.f;
-					y_vector.k = 0.f;
-				}
-				else if (up_height > down_height)
-				{
-					y_vector.j = -1.f;
-					y_vector.k = up_height - center_height;
-				}
-				else
-				{
-					y_vector.j = 1.f;
-					y_vector.k = down_height - center_height;
-				}
-
-				cross_product3d(&x_vector, &y_vector, &normal);
-				if (normal.k < 0.f)
-				{
-					normal.i = -normal.i;
-					normal.j = -normal.j;
-					normal.k = -normal.k;
-				}
-				normalize3d(&normal);
-
-				temporary_pixels[y * bitmap->width + x] =
-					(pixel & 0xFF000000) |
-					(fast_ftol((normal.i + 1.f) * 127.5f) << 16) |
-					(fast_ftol((normal.j + 1.f) * 127.5f) << 8) |
-					fast_ftol((normal.k + 1.f) * 127.5f);
-			}
-		}
-
-		csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
-		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x51D, temporary_pixels);
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary buffer");
-	}
-
-	return;
-}
-
-static void bitmap_3d_height_map(
-	struct bitmap_data *bitmap,
-	real bump_height)
-{
-	struct bitmap_data *slice_bitmap;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52D, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52E, bitmap->type==_bitmap_type_3d);
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x52F, bump_height>0.0f);
-
-	slice_bitmap = bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
-	if (slice_bitmap && slice_bitmap->base_address)
-	{
-		short slice_index;
-
-		for (slice_index = 0; slice_index < (short)bitmap->depth; slice_index++)
-		{
-			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
-			bitmap_2d_height_map(slice_bitmap, bump_height);
-			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	bitmap_delete(slice_bitmap);
-
-	return;
-}
-
-static void bitmap_2d_vector_map(
-	struct bitmap_data *bitmap)
-{
-	long pixel_data_size;
-	pixel32 *temporary_pixels;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x583, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x584, bitmap->type==_bitmap_type_2d);
-
-	pixel_data_size= bitmap_get_pixel_data_size(bitmap);
-	temporary_pixels= match_malloc("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x587, pixel_data_size);
-	if (temporary_pixels)
-	{
-		short x, y;
-
-		for (y= 0; y<bitmap->height; y++)
-		{
-			for (x= 0; x<bitmap->width; x++)
-			{
-				pixel32 pixel= *(pixel32 *)bitmap_2d_address(bitmap, x, y, 0);
-				real_vector3d vector;
-
-				vector.i= ((pixel>>16)&0xFF)*(2.f/255.f) - 1.f;
-				vector.j= ((pixel>>8)&0xFF)*(2.f/255.f) - 1.f;
-				vector.k= (pixel&0xFF)*(2.f/255.f) - 1.f;
-				normalize3d(&vector);
-
-				temporary_pixels[y*bitmap->width + x]=
-					(pixel&0xFF000000) |
-					(fast_ftol((vector.i+1.f)*127.5f + 0.5f)<<16) |
-					(fast_ftol((vector.j+1.f)*127.5f + 0.5f)<<8) |
-					fast_ftol((vector.k+1.f)*127.5f + 0.5f);
-			}
-		}
-
-		csmemcpy(bitmap_mipmap_address(bitmap, 0), temporary_pixels, pixel_data_size);
-		match_free("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5A8, temporary_pixels);
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary buffer");
-	}
-
-	return;
-}
-
-static void bitmap_3d_vector_map(
-	struct bitmap_data *bitmap)
-{
-	struct bitmap_data *slice_bitmap;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B7, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5B8, bitmap->type==_bitmap_type_3d);
-
-	slice_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
-	if (slice_bitmap && slice_bitmap->base_address)
-	{
-		short slice_index;
-
-		for (slice_index= 0; slice_index<(short)bitmap->depth; slice_index++)
-		{
-			bitmap_3d_slice_extract(bitmap, 0, slice_index, slice_bitmap);
-			bitmap_2d_vector_map(slice_bitmap);
-			bitmap_3d_slice_insert(slice_bitmap, bitmap, 0, slice_index);
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	bitmap_delete(slice_bitmap);
-
-	return;
-}
-
-static void bitmap_cm_vector_map(
-	struct bitmap_data *bitmap)
-{
-	struct bitmap_data *face_bitmap;
-
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E5, bitmap_verify(bitmap, TRUE));
-	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x5E6, bitmap->type==_bitmap_type_cube_map);
-
-	face_bitmap= bitmap_2d_new(bitmap->width, bitmap->height, 0, bitmap->format);
-	if (face_bitmap && face_bitmap->base_address)
-	{
-		short face_index;
-
-		for (face_index= 0; face_index<NUMBER_OF_FACES_PER_CUBE; face_index++)
-		{
-			bitmap_cube_map_face_extract(bitmap, 0, face_index, face_bitmap);
-			bitmap_2d_vector_map(face_bitmap);
-			bitmap_cube_map_face_insert(face_bitmap, bitmap, 0, face_index);
-		}
-	}
-	else
-	{
-		error(_error_silent, "### ERROR failed to allocate temporary bitmap");
-	}
-
-	bitmap_delete(face_bitmap);
-
-	return;
+	return rgb_result;
 }
