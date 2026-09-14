@@ -1865,25 +1865,6 @@
     },
     {
       "unit": "source/objects/widgets/lightning",
-      "function": "_lightning_offset_marker_position",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete private marker-offset helper in ordinary typed C from January disassembly and assertion/relocation evidence, then corroborating its semantic name and algorithm against the later HCEA implementation and the independent Stian/Pastudan lifts. The helper is a same-TU static owner naturally emitted by the complete lightning_submit caller and receives position, matrix, and random_position_bounds in January's ESI/EBX/EDI private register convention. Target and candidate share the 240-byte padded envelope and all 22 relocation identities; the fail-closed classifier returns a PROVEN independent-instruction-scheduling STOP. After relocation normalization, the sole instruction difference is an adjacent transposition of the post-transform stack cleanup and first independent x87 addition. The retained source performs all three authenticated assertions, three local random draws, component remapping, in-place matrix transform, and position accumulation. No register hint, volatile access, barrier, pragma, assembly, fake dependency, undefined behavior, forced inline/noinline, or nonsensical control flow is present. Reopen only for authoritative January source/local records or a natural compatible-compiler context that explains that independent schedule.",
-      "measurements": {
-        "target": {
-          "size": 240,
-          "relocation_count": 22,
-          "normalized_sha256": "2fe97798519acba821968a88f76c5a3ac64a62c86a9919327b6ed89c8599f17d"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 22,
-          "normalized_sha256": "18303a5b66698933663dbbd26cebba03fb0487eb8154f80ec6a8bfadd6d7c7f3"
-        },
-        "objdiff_percent": 97.402596
-      }
-    },
-    {
-      "unit": "source/objects/widgets/lightning",
       "function": "_lightning_submit",
       "class": "unclassified",
       "evidence": "Fuzzy-parked under the current house rule after reconciling the strongest preserved Fable reconstruction with January control flow, frame, calls, relocation topology, and owned assertions. Its marker/subdivision/render semantics are independently corroborated by the later HCEA source, HCEA type records, and the Stian/Pastudan lifts. The retained function uses lightning_definition_get, lightning_get, bitmap_group_get, and TAG_BLOCK_GET_ELEMENT typed access; semantic enums and cseries flag/index macros; TU-private target-proven tag and vertex layouts; and the color-packing prototype declared in its hud_draw owner header. It reproduces January's 0x24144 stack frame and 0x24024-byte clear for 4,097 typed 0x24-byte points, resolves object markers, applies endpoint and midpoint jitter, preserves point-valid assertions, billboards the path into typed dynamic-unlit vertices, computes its bounds centroid, selects the semantic shader, submits, and releases the buffer. January and the retained VC7 candidate now share the 2,576-byte padded envelope, all 80 relocation identities, and 756 decoded instructions; objdiff reports 99.35952 percent. The raw Fable endpoint-axis aggregate cast left only one additional scheduling transposition but was rejected as representation punning; the retained component-wise copy is ordinary typed C and leaves a small register-allocation packet plus that independent x87-store transposition. The fail-closed classifier therefore remains UNKNOWN and grants no strict credit. No point_from_line3d helper/COMDAT, register hint, volatile access, barrier, pragma, assembly, fake dependency, raw address, undefined behavior, forced inline/noinline, manual color packing, or nonsensical exact-only branch is present. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining allocation and scheduling packet.",

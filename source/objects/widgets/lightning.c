@@ -243,9 +243,11 @@ static void lightning_offset_marker_position(
 	random_y = real_seed_random(get_global_local_random_seed_address());
 	random_x = real_seed_random(get_global_local_random_seed_address());
 
-	offset.i = (2.f*random_x - 1.f)*random_position_bounds->i;
-	offset.j = (2.f*random_y - 1.f)*random_position_bounds->j;
-	offset.k = (2.f*random_z - 1.f)*random_position_bounds->k;
+	set_real_vector3d(
+		&offset,
+		(2.f*random_x - 1.f)*random_position_bounds->i,
+		(2.f*random_y - 1.f)*random_position_bounds->j,
+		(2.f*random_z - 1.f)*random_position_bounds->k);
 	matrix4x3_transform_vector(matrix, &offset, &offset);
 
 	position->x += offset.i;
