@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/ai/ai",
-      "function": "_ai_disconnect_from_structure_bsp",
-      "class": "unclassified",
-      "evidence": "Best complete house-rule-reviewed January control-flow reconstruction retained from the Claude large-AI packet. It owns its public prototype in ai.h, scenario.c now includes that owner, and the body uses typed actor/prop/swarm accessors and named constants without compiler steering. Target and candidate have the same 1,280-byte padded envelope and all 62 relocation identities; remaining differences are distributed register/schedule choices. This is a zero-credit fuzzy park. Reopen only with authoritative January source/symbol context or a natural same-compiler donor that explains the residual. See docs/object_matching_logs/ai_obj_482743d8a_reconciliation_audit_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 1280,
-          "relocation_count": 62,
-          "normalized_sha256": "50551a92f7dfebd3f86a133f6737f4184152acadbde7c7958b057bb73e9276a9"
-        },
-        "base": {
-          "size": 1280,
-          "relocation_count": 62,
-          "normalized_sha256": "19404fc01508e0ef27258ed54581626941ad7aab6d4372dc8a692870c739208b"
-        },
-        "objdiff_percent": 95.6066
-      }
-    },
-    {
       "unit": "source/ai/path_structure_bsp",
       "function": "_structure_test_line2d",
       "class": "instruction-scheduling",

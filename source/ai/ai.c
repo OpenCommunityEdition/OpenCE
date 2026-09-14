@@ -1671,8 +1671,7 @@ void ai_disconnect_from_structure_bsp(
 							component_index < swarm->unit_count;
 							component_index++)
 						{
-							long unit_index = swarm->unit_indices[component_index];
-							long ultimate_parent_index = object_get_ultimate_parent(unit_index);
+							long ultimate_parent_index = object_get_ultimate_parent(swarm->unit_indices[component_index]);
 							short cluster_index = object_get(ultimate_parent_index)->object.location.cluster_index;
 
 							if (cluster_index == NONE ||
@@ -1682,7 +1681,7 @@ void ai_disconnect_from_structure_bsp(
 									"c:\\halo\\SOURCE\\ai\\ai.c",
 									0x8EB,
 									components_outside_pvs_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
-								components_outside_pvs[components_outside_pvs_count++] = unit_index;
+								components_outside_pvs[components_outside_pvs_count++] = swarm->unit_indices[component_index];
 							}
 						}
 
