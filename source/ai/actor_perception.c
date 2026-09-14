@@ -300,6 +300,36 @@ enum
 	NUMBER_OF_ACTOR_KNOWLEDGE_TYPES,
 };
 
+/* TU-local copy: complete copies also exist in actors.c, ai.c and ai_script.c. */
+enum
+{
+	_ai_unit_effect_bump = 0,
+	_ai_unit_effect_shooting,
+	_ai_unit_effect_death_scream,
+	_ai_unit_effect_magic_sight,
+	NUMBER_OF_AI_UNIT_EFFECTS,
+};
+
+/* TU-local copy of actor_external_orders.desired_target_type; also in ai_script.c. */
+enum
+{
+	_desired_target_none = 0,
+	_desired_target_ai,
+	_desired_target_player,
+};
+
+/*
+ * TU-local copy of the ai reference scope stored in the top two bits of an ai
+ * reference; also in ai_script.c (enum ai_reference_type) and actions.c.
+ */
+enum
+{
+	_ai_reference_type_encounter = 0,
+	_ai_reference_type_platoon,
+	_ai_reference_type_squad,
+	NUMBER_OF_AI_REFERENCE_TYPES,
+};
+
 /*
  * January's acknowledgement speed classes, indexed from
  * global_acknowledgement_speeds; actor_perception_update prints their names.
@@ -1118,12 +1148,10 @@ real actor_look_compute_prop_interest(
 	long actor_index,
 	long prop_index);
 
-static __inline boolean prop_acknowledged(
-	struct prop_datum const *prop)
-{
-	return prop->state >= _prop_state_becoming_unacknowledged &&
-		prop->state <= _prop_state_acknowledged;
-}
+/* TU-local copy: the same macro exists in actor_stimulus.c. */
+#define prop_acknowledged(prop) \
+	((prop)->state >= _prop_state_becoming_unacknowledged && \
+		(prop)->state <= _prop_state_acknowledged)
 
 static __inline void actor_perception_midpoint3d(
 	real_point3d const *p0,
@@ -1308,7 +1336,7 @@ void actor_perception_acknowledge(
 
 #line 1037 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 	assert(prop->owner_actor_index == actor_index);
-	assert(prop_acknowledged(prop));
+	vassert(prop_acknowledged(prop), "prop_acknowledged(prop)");
 #line 1039 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 	vassert(prop->orphan_prop_index == NONE, "prop->orphan_prop_index == NONE");
 #line 300 "source\\ai\\actor_perception.c"
@@ -1571,7 +1599,6 @@ void actor_situation_combat_status_update(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-	short combat_status;
 
 	if (actor->stimuli.suspicion_combat_status > _actor_combat_status_none)
 	{
@@ -1598,46 +1625,53 @@ void actor_situation_combat_status_update(
 	assert((actor->target.target_type >= 0) && (actor->target.target_type < NUMBER_OF_ACTOR_TARGET_TYPES));
 #line 540 "source\\ai\\actor_perception.c"
 
-	combat_status = MAX(
+	actor->state.combat_status = MAX(
 		actor->state.suspicion_combat_status,
 		MAX(
 			actor->state.artificial_combat_status,
 			global_combat_status_table[actor->target.target_type]));
-	actor->state.combat_status = combat_status;
 
-	if (combat_status > actor->state.suspicion_combat_status)
+	if (actor->state.combat_status > actor->state.suspicion_combat_status)
+	{
 		actor->state.suspicion_combat_status = _actor_combat_status_none;
+	}
 
 	if (actor->state.mode < _actor_mode_combat)
+	{
 		actor->state.combat_mode_timer = 0;
+	}
 	else
+	{
 		actor->state.combat_mode_timer++;
+	}
 
-	if (combat_status == _actor_combat_status_none)
+	if (actor->state.combat_status == _actor_combat_status_none)
 	{
 		actor->state.in_combat_timer = 0;
-		actor->state.certain_combat_timer = 0;
 	}
 	else
 	{
 		actor->state.in_combat_timer++;
-
-		if (combat_status >= _actor_combat_status_certain)
-		{
-			actor->state.certain_combat_timer++;
-			actor->state.uncertain_combat_timer = 0;
-			goto combat_status_timers_updated;
-		}
-
-		actor->state.certain_combat_timer = 0;
 	}
 
-	if (actor->state.uncertain_combat_timer != NONE)
-		actor->state.uncertain_combat_timer++;
+	if (actor->state.combat_status >= _actor_combat_status_certain)
+	{
+		actor->state.certain_combat_timer++;
+		actor->state.uncertain_combat_timer = 0;
+	}
+	else
+	{
+		actor->state.certain_combat_timer = 0;
+		if (actor->state.uncertain_combat_timer != NONE)
+		{
+			actor->state.uncertain_combat_timer++;
+		}
+	}
 
-combat_status_timers_updated:
-	if (combat_status >= _actor_combat_status_visible)
+	if (actor->state.combat_status >= _actor_combat_status_visible)
+	{
 		actor->state.had_visible_enemy = TRUE;
+	}
 
 	return;
 }
@@ -1648,20 +1682,9 @@ void actor_situation_update(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct prop_iterator iterator;
 	struct prop_datum *prop;
-	struct
-	{
-		long prop_index;
-		real target_weight;
-	} best = { NONE, 0.0f };
-	struct
-	{
-		boolean close;
-		boolean visible;
-		boolean charging;
-		boolean area;
-	} flags;
-
-	flags.charging =
+	long best_prop_index = NONE;
+	real best_target_weight = 0.0f;
+	boolean charging =
 		actor->emotions.berserk ||
 		actor->state.action == _actor_action_charge;
 
@@ -1670,85 +1693,80 @@ void actor_situation_update(
 	prop = prop_iterator_next(&iterator);
 	while (prop != NULL)
 	{
-		if (prop->state >= _prop_state_becoming_unacknowledged &&
-			prop->state <= _prop_state_acknowledged &&
+		if (prop_acknowledged(prop) &&
 			!prop->dead)
 		{
 			if (prop->enemy)
 			{
-				boolean active =
-					prop->visibility >= _actor_perception_full;
-				short priority = 0;
+				boolean visible = prop->visibility >= _actor_perception_full;
+				short priority = _actor_threat_none;
 
 				actor->situation.known_enemies++;
-				if (active)
+				if (visible)
 				{
 					if (prop->unreachable_ticks == 0)
+					{
 						actor->situation.visible_reachable_enemies++;
-					actor->situation.cumulative_threats[1]++;
-					priority = 1;
-
-enemy_priority_tests:
-					if (prop->currently_damaging_me && priority <= 8)
-					{
-						actor->situation.cumulative_threats[8]++;
-						priority = 8;
 					}
 
-					if (prop->shooting && priority <= 4)
-					{
-						actor->situation.cumulative_threats[4]++;
-						priority = 4;
-					}
-
-					if (prop->quantized_facing < 3)
-					{
-						if (active)
-						{
-							actor->situation.cumulative_threats[2]++;
-							if (priority <= 2)
-								priority = 2;
-
-							if (!flags.charging &&
-								prop->distance < 2.0f &&
-								priority <= 7)
-							{
-								actor->situation.cumulative_threats[7]++;
-								priority = 7;
-							}
-						}
-
-						if (prop->quantized_facing < 2)
-						{
-							if (prop->shooting &&
-								priority <= 5)
-							{
-								actor->situation.cumulative_threats[5]++;
-								priority = 5;
-							}
-
-							if (prop->quantized_facing < 1)
-							{
-								if (active && priority <= 3)
-								{
-									actor->situation.cumulative_threats[3]++;
-									priority = 3;
-								}
-
-								if (prop->shooting &&
-									priority <= 6)
-								{
-									actor->situation.cumulative_threats[6]++;
-									priority = 6;
-								}
-							}
-						}
-					}
+					actor->situation.cumulative_threats[_actor_threat_visible]++;
+					priority = _actor_threat_visible;
 				}
-				else if (prop->shooting &&
-					prop->line_of_sight == _ai_line_of_sight_clear)
+
+				if (visible ||
+					(prop->shooting && prop->line_of_sight == _ai_line_of_sight_clear))
 				{
-					goto enemy_priority_tests;
+					if (prop->currently_damaging_me)
+					{
+						actor->situation.cumulative_threats[_actor_threat_damaging_me]++;
+						priority = MAX(priority, _actor_threat_damaging_me);
+					}
+
+					if (prop->shooting)
+					{
+						actor->situation.cumulative_threats[_actor_threat_shooting]++;
+						priority = MAX(priority, _actor_threat_shooting);
+					}
+
+					if (prop->quantized_facing <= 2)
+					{
+						if (visible)
+						{
+							actor->situation.cumulative_threats[_actor_threat_visible_facing_me]++;
+							priority = MAX(priority, _actor_threat_visible_facing_me);
+
+							if (!charging &&
+								prop->distance < 2.0f)
+							{
+								actor->situation.cumulative_threats[_actor_threat_extremely_close_to_me]++;
+								priority = MAX(priority, _actor_threat_extremely_close_to_me);
+							}
+						}
+
+						if (prop->quantized_facing <= 1)
+						{
+							if (prop->shooting)
+							{
+								actor->situation.cumulative_threats[_actor_threat_shooting_near_me]++;
+								priority = MAX(priority, _actor_threat_shooting_near_me);
+							}
+
+							if (prop->quantized_facing <= 0)
+							{
+								if (visible)
+								{
+									actor->situation.cumulative_threats[_actor_threat_visible_aiming_at_me]++;
+									priority = MAX(priority, _actor_threat_visible_aiming_at_me);
+								}
+
+								if (prop->shooting)
+								{
+									actor->situation.cumulative_threats[_actor_threat_shooting_at_me]++;
+									priority = MAX(priority, _actor_threat_shooting_at_me);
+								}
+							}
+						}
+					}
 				}
 
 				actor->situation.specific_threats[priority]++;
@@ -1756,24 +1774,31 @@ enemy_priority_tests:
 			else
 			{
 				struct unit_datum *unit = unit_get(prop->unit_index);
-				struct actor_datum *friend_actor = NULL;
+				struct actor_datum *friend_actor =
+					unit->unit.actor_index == NONE ?
+						NULL :
+						actor_get(unit->unit.actor_index);
 				short actor_type;
-
-				if (unit->unit.actor_index != NONE)
-				{
-					friend_actor = actor_get(unit->unit.actor_index);
-				}
+				boolean area;
+				boolean visible;
+				boolean close;
 
 				if (unit->unit.player_index != NONE)
+				{
 					actor_type = _actor_player;
+				}
 				else if (friend_actor != NULL)
+				{
 					actor_type = friend_actor->meta.type;
+				}
 				else
+				{
 					actor_type = _actor_none;
+				}
 
-				flags.area = FALSE;
-				flags.visible = FALSE;
-				flags.close = FALSE;
+				area = FALSE;
+				visible = FALSE;
+				close = FALSE;
 
 				match_assert(
 					"c:\\halo\\SOURCE\\ai\\actor_perception.c",
@@ -1783,7 +1808,7 @@ enemy_priority_tests:
 
 				if (prop->distance < 8.0f)
 				{
-					flags.area = TRUE;
+					area = TRUE;
 				}
 				else if (prop->fighting &&
 					friend_actor != NULL &&
@@ -1795,82 +1820,82 @@ enemy_priority_tests:
 					struct prop_datum *friend_target_prop =
 						prop_get(friend_actor->target.target_prop_index);
 
-					if (target_prop->unit_index ==
-						friend_target_prop->unit_index)
+					if (target_prop->unit_index == friend_target_prop->unit_index)
 					{
-						flags.area = TRUE;
+						area = TRUE;
 					}
 				}
 
 				if (prop->line_of_sight == _ai_line_of_sight_clear ||
 					prop->line_of_sight == _ai_line_of_sight_occluded)
 				{
-					flags.visible = TRUE;
-					flags.close = prop->distance < 3.0f;
+					visible = TRUE;
+					close = prop->distance < 3.0f;
 				}
 
-				if (flags.area)
+				if (area)
 				{
 					actor->situation.area_friends++;
 					if (prop->fighting)
 					{
 						actor->situation.area_fighting_friends++;
-						if (prop->dangerous_vehicle_driver)
-						{
-							actor->situation.area_fire_support_friends++;
-						}
+					}
+					if (prop->fighting && prop->vehicle_gunner)
+					{
+						actor->situation.area_fire_support_friends++;
 					}
 					actor->situation.area_friends_by_type[actor_type]++;
 					if (prop->fighting)
 					{
-						actor->situation.
-							area_fighting_friends_by_type[actor_type]++;
+						actor->situation.area_fighting_friends_by_type[actor_type]++;
 					}
 				}
 
-				if (flags.visible)
+				if (visible)
 				{
 					actor->situation.visible_friends++;
 					if (prop->fighting)
+					{
 						actor->situation.visible_fighting_friends++;
+					}
 					actor->situation.visible_friends_by_type[actor_type]++;
 					if (prop->fighting)
 					{
-						actor->situation.
-							visible_fighting_friends_by_type[actor_type]++;
+						actor->situation.visible_fighting_friends_by_type[actor_type]++;
 					}
 				}
 
-				if (flags.close)
+				if (close)
 				{
 					actor->situation.close_friends++;
 					if (prop->fighting)
+					{
 						actor->situation.close_fighting_friends++;
+					}
 					actor->situation.close_friends_by_type[actor_type]++;
 					if (prop->fighting)
 					{
-						actor->situation.
-							close_fighting_friends_by_type[actor_type]++;
+						actor->situation.close_fighting_friends_by_type[actor_type]++;
 					}
 				}
 			}
 		}
 
-		if (best.target_weight < prop->target_weight)
+		if (prop->target_weight > best_target_weight)
 		{
-			best.target_weight = prop->target_weight;
-			best.prop_index = iterator.index;
+			best_prop_index = iterator.index;
+			best_target_weight = prop->target_weight;
 		}
 
 		prop = prop_iterator_next(&iterator);
 	}
 
-	if (best.prop_index != actor->target.target_prop_index)
+	if (best_prop_index != actor->target.target_prop_index)
 	{
 		long old_target_prop_index = actor->target.target_prop_index;
 
-		actor->target.target_type = 0;
-		actor->target.target_prop_index = best.prop_index;
+		actor->target.target_type = _actor_target_none;
+		actor->target.target_prop_index = best_prop_index;
 		actor->target.target_last_visible_time = NONE;
 
 		if (old_target_prop_index != NONE)
@@ -1884,10 +1909,10 @@ enemy_priority_tests:
 					old_target_prop_index);
 		}
 
-		if (best.prop_index != NONE)
+		if (best_prop_index != NONE)
 		{
 			struct prop_datum *new_target_prop =
-				prop_get(best.prop_index);
+				prop_get(best_prop_index);
 
 			new_target_prop->target_weight =
 				actor_compute_prop_target_weight(
@@ -3824,6 +3849,622 @@ boolean actor_perception_become_acknowledged(
 		*expected_acknowledgement_out = expected_acknowledgement;
 
 	return result;
+}
+
+void prop_status_refresh(
+	long actor_index,
+	long prop_index,
+	struct actor_position_data *position)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+
+	if (actor->meta.active)
+	{
+		struct actor_definition *definition =
+			actor_definition_get(actor->meta.definition_index);
+		struct encounter_datum *encounter =
+			actor->meta.encounter_index == NONE ?
+				NULL :
+				encounter_get(actor->meta.encounter_index);
+		struct prop_datum *prop = prop_get(prop_index);
+		struct unit_datum *unit = unit_get(prop->unit_index);
+		long game_time = game_time_get();
+		boolean blind =
+			(encounter != NULL && encounter->blind) ||
+			actor->state.mode == _actor_mode_asleep;
+		short previous_quantized_speed;
+		real_vector3d velocity;
+		real_vector3d relative_velocity;
+		real speed;
+		real closing_speed;
+		real facing;
+		real facing_distance;
+
+		prop->ignore = TEST_FLAG(unit->unit.flags, _unit_ignored_by_actors_bit);
+		if (prop->player &&
+			game_connection() == _game_connection_local &&
+			ai_debug.ignore_player)
+		{
+			prop->ignore = TRUE;
+		}
+
+		if (prop->enemy)
+		{
+			prop->preferred_target = TEST_FLAG(unit->unit.flags, _unit_preferred_target_bit);
+
+			switch (actor->external_orders.desired_target_type)
+			{
+			case _desired_target_ai:
+				if (prop->actor_index != NONE &&
+					actor->external_orders.desired_target_ai_index != NONE)
+				{
+					struct actor_datum *prop_actor = actor_get(prop->actor_index);
+
+					if (DATUM_INDEX_TO_ABSOLUTE_INDEX(prop_actor->meta.encounter_index) == DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->external_orders.desired_target_ai_index))
+					{
+						switch ((unsigned long)actor->external_orders.desired_target_ai_index >> 30)
+						{
+						case _ai_reference_type_encounter:
+							prop->preferred_target = TRUE;
+							break;
+
+						/* BUG (preserved for exact matching): January compares a platoon
+						 * reference with the actor's squad index (actor+0x3a) and a squad
+						 * reference with its platoon index (actor+0x3c), the reverse of
+						 * actor_action_handle_vehicle_entry. A corrected build should compare
+						 * platoon references with meta.platoon_index and squad references with
+						 * meta.squad_index. */
+						case _ai_reference_type_squad:
+							if ((short)(((unsigned long)actor->external_orders.desired_target_ai_index >> 16) & UNSIGNED_CHAR_MAX) ==
+								prop_actor->meta.platoon_index)
+							{
+								prop->preferred_target = TRUE;
+							}
+							break;
+
+						case _ai_reference_type_platoon:
+							if ((short)(((unsigned long)actor->external_orders.desired_target_ai_index >> 16) & UNSIGNED_CHAR_MAX) ==
+								prop_actor->meta.squad_index)
+							{
+								prop->preferred_target = TRUE;
+							}
+							break;
+						}
+					}
+				}
+				break;
+
+			case _desired_target_player:
+				if (prop->player)
+				{
+					prop->preferred_target = TRUE;
+				}
+				break;
+			}
+		}
+
+		previous_quantized_speed = prop->quantized_speed;
+		object_get_velocities(prop->unit_index, &velocity, NULL);
+
+		speed = magnitude3d(&velocity);
+		if (speed < 0.1f / TICKS_PER_SECOND)
+		{
+			prop->quantized_speed = 0;
+		}
+		else if (speed < 0.5f / TICKS_PER_SECOND)
+		{
+			prop->quantized_speed = 1;
+		}
+		else if (speed < 1.0f / TICKS_PER_SECOND)
+		{
+			prop->quantized_speed = 2;
+		}
+		else
+		{
+			prop->quantized_speed = 3;
+		}
+
+		closing_speed =
+			-dot_product3d(
+				subtract_vectors3d(&velocity, &position->velocity, &relative_velocity),
+				&prop->actor_to_prop);
+		if (closing_speed < -1.0f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 0;
+		}
+		else if (closing_speed < -0.5f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 1;
+		}
+		else if (closing_speed < -0.1f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 2;
+		}
+		else if (closing_speed < 0.1f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 3;
+		}
+		else if (closing_speed < 0.5f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 4;
+		}
+		else if (closing_speed < 1.0f / TICKS_PER_SECOND)
+		{
+			prop->quantized_closing_speed = 5;
+		}
+		else
+		{
+			prop->quantized_closing_speed = 6;
+		}
+
+		if (prop_acknowledged(prop) &&
+			previous_quantized_speed <= 1 &&
+			prop->quantized_speed > 1)
+		{
+			struct direction_specification direction;
+
+			direction.type = _direction_specification_prop;
+			direction.prop_index = prop_index;
+			actor_look_secondary(
+				actor_index,
+				_secondary_look_started_moving_prop,
+				_secondary_look_priority_default,
+				&direction);
+		}
+
+		if (prop->distance < 1.0f)
+		{
+			prop->quantized_distance = 0;
+		}
+		else if (prop->distance < 6.0f)
+		{
+			prop->quantized_distance = 1;
+		}
+		else if (prop->distance < 10.0f)
+		{
+			prop->quantized_distance = 2;
+		}
+		else if (prop->distance < 30.0f)
+		{
+			prop->quantized_distance = 3;
+		}
+		else
+		{
+			prop->quantized_distance = 4;
+		}
+
+		unit_get_aiming_vector(prop->unit_index, &velocity);
+		facing = -dot_product3d(&velocity, &prop->actor_to_prop);
+		if (facing <= 0.0f)
+		{
+			facing_distance = REAL_MAX;
+		}
+		else if (facing >= 1.0f)
+		{
+			facing_distance = 0.0f;
+		}
+		else
+		{
+			facing_distance = square_root(1.0f - facing * facing) * prop->distance;
+		}
+
+		if (facing > 0.99250001f || facing_distance < 0.5f)
+		{
+			prop->quantized_facing = 0;
+		}
+		else if (facing > 0.90630001f || facing_distance < 1.5f)
+		{
+			prop->quantized_facing = 1;
+		}
+		else if (facing > 0.5f)
+		{
+			prop->quantized_facing = 2;
+		}
+		else if (facing > 0.0f)
+		{
+			prop->quantized_facing = 3;
+		}
+		else
+		{
+			prop->quantized_facing = 4;
+		}
+
+		prop->shooting = prop->unit_effect == _ai_unit_effect_shooting;
+
+		if (prop->state >= _prop_state_uninspected_orphan &&
+			prop->state <= _prop_state_inspected_orphan)
+		{
+			prop->line_of_sight =
+				ai_test_line_of_sight(
+					&position->head_position,
+					position->body_location.cluster_index,
+					&prop->head_position,
+					prop->body_location.cluster_index,
+					prop->player && prop->enemy ? _ai_line_of_sight_expand_target : _ai_line_of_sight_normal,
+					FALSE,
+					prop->vehicle_index,
+					actor->input.vehicle_index != NONE);
+
+			if (prop->ignore || blind)
+			{
+				prop->perception = _actor_perception_none;
+				prop->ineffability = _actor_perception_none;
+				prop->audibility = _actor_perception_none;
+				prop->visibility = _actor_perception_none;
+			}
+			else
+			{
+				prop->visibility =
+					actor_visibility_at_point(
+						actor_index,
+						position,
+						&prop->head_position,
+						prop->lighting,
+						prop->line_of_sight,
+						TRUE,
+						FALSE,
+						_actor_knowledge_searching);
+				prop->audibility = _actor_perception_none;
+				prop->ineffability = _actor_perception_none;
+				prop->perception = prop->visibility;
+			}
+		}
+		else
+		{
+			boolean noticed = FALSE;
+			boolean dead;
+			boolean really_dead;
+			long unit_actor_index;
+			boolean swarm;
+			boolean noncombat;
+			boolean in_combat;
+			boolean fighting;
+
+			prop->line_of_sight =
+				ai_test_line_of_sight(
+					&position->head_position,
+					position->body_location.cluster_index,
+					&prop->head_position,
+					prop->body_location.cluster_index,
+					prop->player && prop->enemy ? _ai_line_of_sight_expand_target : _ai_line_of_sight_normal,
+					FALSE,
+					prop->vehicle_index,
+					actor->input.vehicle_index != NONE);
+			prop->lighting = _prop_lighting_bright;
+
+			if (unit->object.type == _object_type_biped)
+			{
+				struct biped_definition *biped_definition =
+					biped_definition_get(unit->definition_index);
+
+				prop->flying = TEST_FLAG(biped_definition->biped.flags, _biped_flying_bit);
+			}
+			else
+			{
+				prop->flying = FALSE;
+			}
+
+			prop->active_camouflage = unit->unit.active_camouflage > 0.5f;
+			prop->flashlight = TEST_FLAG(unit->unit.flags, _unit_integrated_light_on_bit);
+
+			dead = TEST_FLAG(unit->object.damage_flags, _object_dead_bit);
+			really_dead = dead && unit->unit.feign_death_timer == 0;
+			prop->just_killed = dead && !prop->dead;
+			prop->dead = dead;
+			prop->really_dead = really_dead;
+
+			if (prop->just_killed &&
+				!prop->enemy &&
+				actor->state.mode < _actor_mode_combat)
+			{
+				noticed = TRUE;
+			}
+
+			if (dead)
+			{
+				prop->required_ticks = 0;
+			}
+
+			unit_actor_index = unit->unit.swarm_actor_index;
+			if (unit_actor_index != NONE)
+			{
+				swarm = TRUE;
+			}
+			else
+			{
+				unit_actor_index = unit->unit.actor_index;
+				swarm = FALSE;
+			}
+
+			if (unit_actor_index != prop->actor_index)
+			{
+				prop->swarm = swarm;
+				prop->actor_index = unit_actor_index;
+				if (prop->orphan_prop_index != NONE)
+				{
+					struct prop_datum *orphan = prop_get(prop->orphan_prop_index);
+
+					orphan->actor_index = prop->actor_index;
+					orphan->swarm = prop->swarm;
+				}
+			}
+
+			if (unit_actor_index == NONE)
+			{
+				noncombat = FALSE;
+				in_combat = FALSE;
+				fighting = !prop->dead;
+			}
+			else
+			{
+				noncombat = actor_is_noncombat(prop->actor_index);
+				in_combat = actor_in_combat(prop->actor_index);
+				fighting = actor_is_fighting(prop->actor_index);
+
+				if (in_combat &&
+					!prop->in_combat &&
+					!prop->enemy &&
+					actor->state.mode < _actor_mode_combat)
+				{
+					noticed = TRUE;
+				}
+			}
+
+			prop->fighting = fighting;
+			prop->noncombat = noncombat;
+			prop->in_combat = in_combat;
+
+			if (noticed)
+			{
+				short visibility = _actor_perception_none;
+
+				if (!blind)
+				{
+					char lighting = prop->flashlight ? _prop_lighting_bright : prop->lighting;
+
+					visibility =
+						actor_visibility_at_point(
+							actor_index,
+							position,
+							&prop->head_position,
+							lighting,
+							prop->line_of_sight,
+							TRUE,
+							FALSE,
+							actor_get_perception_knowledge(actor_index, prop_index));
+				}
+
+				if (visibility < _actor_perception_full)
+				{
+					prop->perception = visibility;
+					prop->visibility = visibility;
+					prop->state = _prop_state_unacknowledged;
+				}
+			}
+
+			if (prop->ignore)
+			{
+				prop->perception = _actor_perception_none;
+				prop->ineffability = _actor_perception_none;
+				prop->audibility = _actor_perception_none;
+				prop->visibility = _actor_perception_none;
+			}
+			else
+			{
+				boolean invisible = blind;
+
+				if ((game_connection() == _game_connection_local && ai_debug.blind) ||
+					(game_connection() == _game_connection_local && ai_debug.invisible_player && prop->player))
+				{
+					invisible = TRUE;
+				}
+
+				if (prop->active_camouflage)
+				{
+					invisible = prop->enemy || (prop->player && prop->distance > 4.0f);
+				}
+
+				if (invisible)
+				{
+					prop->visibility = _actor_perception_none;
+					prop->just_became_visible = FALSE;
+				}
+				else
+				{
+					boolean use_maximum_distance = TRUE;
+					char lighting;
+					short visibility;
+
+					if (actor->input.vehicle_driver_type == _actor_vehicle_driver_directional_flying ||
+						actor->meta.type == _actor_mounted_weapon)
+					{
+						use_maximum_distance = FALSE;
+					}
+					else if (!prop->enemy)
+					{
+						use_maximum_distance = FALSE;
+						if (actor->state.mode < _actor_mode_combat &&
+							(prop->dead || prop->in_combat))
+						{
+							use_maximum_distance = TRUE;
+						}
+					}
+					else if (prop_acknowledged(prop))
+					{
+						use_maximum_distance = FALSE;
+					}
+
+					lighting = prop->flashlight ? _prop_lighting_bright : prop->lighting;
+					visibility =
+						actor_visibility_at_point(
+							actor_index,
+							position,
+							&prop->head_position,
+							lighting,
+							prop->line_of_sight,
+							use_maximum_distance,
+							prop->player,
+							actor_get_perception_knowledge(actor_index, prop_index));
+					prop->just_became_visible =
+						prop->visibility == _actor_perception_none &&
+						visibility > _actor_perception_none;
+					prop->visibility = visibility;
+					if (visibility != _actor_perception_none)
+					{
+						prop->last_visible_head_position = prop->head_position;
+						prop->last_visible_time = game_time;
+					}
+				}
+
+				if ((game_connection() == _game_connection_local && ai_debug.deaf) ||
+					(encounter != NULL && encounter->deaf))
+				{
+					prop->audibility = _actor_perception_none;
+				}
+				else if (prop->unit_effect == _ai_unit_effect_shooting ||
+					prop->unit_effect == _ai_unit_effect_death_scream)
+				{
+					prop->audibility = _actor_perception_unmistakable;
+				}
+				else
+				{
+					long sound_unit_index =
+						prop->vehicle_index != NONE ?
+							prop->vehicle_index :
+							prop->unit_index;
+					struct unit_datum *sound_unit = unit_get(sound_unit_index);
+					struct unit_definition *sound_unit_definition =
+						unit_definition_get(sound_unit->definition_index);
+
+					prop->audibility =
+						actor_audibility_at_point(
+							actor_index,
+							position,
+							&prop->body_position,
+							&prop->body_location,
+							sound_unit_definition->unit.constant_sound,
+							1.0f,
+							prop->line_of_sight);
+				}
+
+				prop->ineffability = _actor_perception_none;
+				if (prop->unit_effect == _ai_unit_effect_bump)
+				{
+					prop->ineffability = _actor_perception_unmistakable;
+				}
+
+				if (prop->flashlight &&
+					prop->quantized_facing <= 2 &&
+					prop->quantized_distance <= 2 &&
+					(prop->line_of_sight == _ai_line_of_sight_clear ||
+						prop->line_of_sight == _ai_line_of_sight_occluded))
+				{
+					prop->ineffability = MAX(prop->ineffability, _actor_perception_partial);
+				}
+
+				prop->perception =
+					MAX(prop->visibility, MAX(prop->audibility, prop->ineffability));
+				if (prop->perception == _actor_perception_partial &&
+					prop_acknowledged(prop))
+				{
+					prop->perception = _actor_perception_full;
+				}
+			}
+
+			if (prop->perception != _actor_perception_none)
+			{
+				prop->last_perceived_body_position = prop->body_position;
+				prop->last_perceived_time = game_time;
+			}
+
+			if (prop_acknowledged(prop))
+			{
+				struct actor_datum *source_actor;
+
+				if (prop->visibility >= _actor_perception_full ||
+					(prop->definitely_located &&
+						prop->definite_knowledge_source_actor != NONE &&
+						(source_actor = actor_try_and_get(prop->definite_knowledge_source_actor)) != NULL &&
+						source_actor->target.target_type >= _actor_target_visible_enemy &&
+						source_actor->target.target_prop_index != NONE &&
+						source_actor->orders.combat.shoot_at_target &&
+						prop_get(source_actor->target.target_prop_index)->unit_index == prop->unit_index))
+				{
+					prop->definitely_located = TRUE;
+					prop->ticks_since_definitely_located = 0;
+				}
+			}
+		}
+
+		if (prop->dangerous_vehicle_driver)
+		{
+			actor_perception_assess_vehicle_danger(
+				actor_index,
+				prop->vehicle_index,
+				prop->perception >= _actor_perception_full,
+				position);
+		}
+
+		if (prop->suicide_radius > 0.0f &&
+			(prop->dead || unit->unit.animation.state == _unit_state_melee_attack))
+		{
+			actor_perception_assess_suicide_danger(
+				actor_index,
+				prop->unit_index,
+				prop->suicide_radius,
+				prop->distance,
+				prop->enemy,
+				prop->perception >= _actor_perception_full);
+		}
+
+		if (prop->enemy &&
+			prop_acknowledged(prop))
+		{
+			if ((actor_has_ranged_weapon(actor_index) &&
+					prop->distance < actor->control.weapon_maximum_range) ||
+				(TEST_FLAG(definition->flags, _actor_definition_suicidal_melee_attack_bit) &&
+					prop->distance < definition->berserk.melee_attack_range))
+			{
+				actor_perception_unreachable(actor_index, prop_index, FALSE);
+			}
+		}
+
+		if (prop->last_unreachable_time != NONE &&
+			prop->last_unreachable_time + 150 < game_time)
+		{
+			actor_perception_unreachable(actor_index, prop_index, FALSE);
+		}
+
+		if (prop->delay_requirement_decision)
+		{
+			if (!actor_perception_desire_prop(
+					actor_index,
+					NONE,
+					prop->unit_index,
+					prop->actor_index,
+					prop->in_use,
+					prop->player,
+					prop->enemy,
+					prop->dead,
+					prop->dead_ticks,
+					prop->suicide_radius,
+					prop->distance * prop->distance,
+					0,
+					NULL))
+			{
+				prop->required_ticks = 0;
+			}
+
+			prop->delay_requirement_decision = FALSE;
+		}
+
+		prop->unopposable_enemy = actor_compute_prop_unopposable(actor_index, prop_index);
+		prop->target_weight = actor_compute_prop_target_weight(actor_index, prop_index);
+		prop->look_interest = actor_look_compute_prop_interest(actor_index, prop_index);
+		prop->refresh_stimuli = TRUE;
+	}
+
+	return;
 }
 
 boolean actor_expected_acknowledgement(

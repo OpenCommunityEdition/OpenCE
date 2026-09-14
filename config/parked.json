@@ -3727,17 +3727,6 @@
     },
     {
       "unit": "source/ai/actor_perception",
-      "function": "_actor_situation_combat_status_update",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed combat-status update reconstructed from January control flow and independently corroborated HCEA behavior. Target and candidate are both 320 padded bytes with seven relocations; the remaining normalized-code delta is ordinary scheduling, not missing logic. All 32 inherited exact owners survive. No raw offsets, compiler anchors, address-derived names, or source-shape tuning are retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source or compiler-context evidence.",
-      "measurements": {
-        "target": { "size": 320, "relocation_count": 7, "normalized_sha256": "b68099052dd13bf25e9cd07538962718ade381ea6696590d98ddebb13078e581" },
-        "base": { "size": 320, "relocation_count": 7, "normalized_sha256": "79aa0ac4d19c8c65927cc9ad902ba68a2867cffc665e94c39eae6f0193e7f59c" },
-        "objdiff_percent": 93.541664
-      }
-    },
-    {
-      "unit": "source/ai/actor_perception",
       "function": "_actor_perception_friend_prop_is_attacking",
       "class": "instruction-scheduling",
       "evidence": "Complete typed friend-attack predicate reconstructed from January and HCEA evidence. Target and candidate are both 432 padded bytes with all 16 relocations; the remaining delta is a compiler scheduling choice in otherwise complete logic. No fake dependency, raw object cast, volatile/register steering, or numeric enum substitution is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source or compiler-context evidence.",
