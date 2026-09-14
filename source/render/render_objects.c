@@ -240,10 +240,10 @@ static boolean render_object_shadow_begin(
 	struct object_render_data *data,
 	real level_of_detail);
 static void shadow_volume_plane_pair(
-	real_plane3d *plane,
 	real_vector3d const *normal,
-	real_plane3d *opposite_plane,
-	real_point3d const *point);
+	real_point3d const *point,
+	real_plane3d *plane,
+	real_plane3d *opposite_plane);
 static void render_object_shadow_end(
 	struct object_render_data *data);
 static void object_render_state_refresh(
@@ -819,10 +819,10 @@ static boolean render_object_shadow_begin(
 }
 
 static void shadow_volume_plane_pair(
-	real_plane3d *plane,
 	real_vector3d const *normal,
-	real_plane3d *opposite_plane,
-	real_point3d const *point)
+	real_point3d const *point,
+	real_plane3d *plane,
+	real_plane3d *opposite_plane)
 {
 	plane->n = *normal;
 	plane->d = normal->i * point->x + normal->j * point->y + normal->k * point->z;
@@ -838,26 +838,26 @@ static void render_object_shadow_end(
 	real_rectangle3d shadow_volume_bounds;
 
 	shadow_volume_plane_pair(
-		&shadow_volume_planes[0],
 		&data->shadow_matrix.up,
-		&shadow_volume_planes[1],
-		&data->shadow_matrix.position);
+		&data->shadow_matrix.position,
+		&shadow_volume_planes[0],
+		&shadow_volume_planes[1]);
 	shadow_volume_planes[0].d -= data->shadow_bounding_radius * 0.5f;
 	shadow_volume_planes[1].d -= data->shadow_bounding_radius * 4.f;
 
 	shadow_volume_plane_pair(
-		&shadow_volume_planes[2],
 		&data->shadow_matrix.forward,
-		&shadow_volume_planes[3],
-		&data->shadow_matrix.position);
+		&data->shadow_matrix.position,
+		&shadow_volume_planes[2],
+		&shadow_volume_planes[3]);
 	shadow_volume_planes[2].d -= data->shadow_bounding_radius;
 	shadow_volume_planes[3].d -= data->shadow_bounding_radius;
 
 	shadow_volume_plane_pair(
-		&shadow_volume_planes[4],
 		&data->shadow_matrix.left,
-		&shadow_volume_planes[5],
-		&data->shadow_matrix.position);
+		&data->shadow_matrix.position,
+		&shadow_volume_planes[4],
+		&shadow_volume_planes[5]);
 	shadow_volume_planes[4].d -= data->shadow_bounding_radius;
 	shadow_volume_planes[5].d -= data->shadow_bounding_radius;
 
@@ -967,81 +967,73 @@ static void object_render_state_refresh(
 		lights_prepare_for_object_dynamic(object_index, &state->desired_lighting);
 	}
 
-	if (!rebuild)
+	if (!rebuild && !refresh)
 	{
-		if (!refresh)
+		if (scene_age > 0)
 		{
-			if (scene_age > 0)
-			{
-				state->lighting.point_light_count = state->desired_lighting.point_light_count;
-				state->lighting.point_light_indices[0] =
-					state->desired_lighting.point_light_indices[0];
-				state->lighting.point_light_indices[1] =
-					state->desired_lighting.point_light_indices[1];
-			}
-		}
-		else if (object_light_interpolate)
-		{
-			real_vector3d velocity;
-			struct render_lighting *lighting = &state->lighting;
-			struct render_lighting *desired_lighting = &state->desired_lighting;
-
-			match_assert(
-				"c:\\halo\\SOURCE\\render\\render_objects.c",
-				635,
-				state->desired_lighting.distant_light_count ==
-					MAXIMUM_RENDERED_DISTANT_LIGHTS);
-
-			object_get_velocities(object_index, &velocity, NULL);
-			if (velocity.i != 0.f ||
-				velocity.j != 0.f ||
-				velocity.k != 0.f ||
-				object_try_and_get_and_verify_type(object_index, _object_mask_machine))
-			{
-				interpolate_real_rgb_color(
-					&lighting->ambient_color,
-					&desired_lighting->ambient_color,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_real_argb_color(
-					&lighting->reflection_tint_color,
-					&desired_lighting->reflection_tint_color,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_real_rgb_color(
-					&lighting->distant_lights[0].color,
-					&desired_lighting->distant_lights[0].color,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_normal(
-					&lighting->distant_lights[0].direction,
-					&desired_lighting->distant_lights[0].direction,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_real_rgb_color(
-					&lighting->distant_lights[1].color,
-					&desired_lighting->distant_lights[1].color,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_normal(
-					&lighting->distant_lights[1].direction,
-					&desired_lighting->distant_lights[1].direction,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-				interpolate_normal(
-					&lighting->shadow_vector,
-					&desired_lighting->shadow_vector,
-					OBJECT_LIGHTING_MAXIMUM_SHADOW_VECTOR_DELTA);
-				interpolate_real_rgb_color(
-					&lighting->shadow_color,
-					&desired_lighting->shadow_color,
-					OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
-			}
-
 			state->lighting.point_light_count = state->desired_lighting.point_light_count;
 			state->lighting.point_light_indices[0] =
 				state->desired_lighting.point_light_indices[0];
 			state->lighting.point_light_indices[1] =
 				state->desired_lighting.point_light_indices[1];
 		}
-		else
+	}
+	else if (!rebuild && object_light_interpolate)
+	{
+		real_vector3d velocity;
+		struct render_lighting *lighting = &state->lighting;
+		struct render_lighting *desired_lighting = &state->desired_lighting;
+
+		match_assert(
+			"c:\\halo\\SOURCE\\render\\render_objects.c",
+			635,
+			state->desired_lighting.distant_light_count==2);
+
+		object_get_velocities(object_index, &velocity, NULL);
+		if (velocity.i != 0.f ||
+			velocity.j != 0.f ||
+			velocity.k != 0.f ||
+			object_try_and_get_and_verify_type(object_index, _object_mask_machine))
 		{
-			state->lighting = state->desired_lighting;
+			interpolate_real_rgb_color(
+				&lighting->ambient_color,
+				&desired_lighting->ambient_color,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_real_argb_color(
+				&lighting->reflection_tint_color,
+				&desired_lighting->reflection_tint_color,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_real_rgb_color(
+				&lighting->distant_lights[0].color,
+				&desired_lighting->distant_lights[0].color,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_normal(
+				&lighting->distant_lights[0].direction,
+				&desired_lighting->distant_lights[0].direction,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_real_rgb_color(
+				&lighting->distant_lights[1].color,
+				&desired_lighting->distant_lights[1].color,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_normal(
+				&lighting->distant_lights[1].direction,
+				&desired_lighting->distant_lights[1].direction,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
+			interpolate_normal(
+				&lighting->shadow_vector,
+				&desired_lighting->shadow_vector,
+				OBJECT_LIGHTING_MAXIMUM_SHADOW_VECTOR_DELTA);
+			interpolate_real_rgb_color(
+				&lighting->shadow_color,
+				&desired_lighting->shadow_color,
+				OBJECT_LIGHTING_MAXIMUM_COLOR_DELTA);
 		}
+
+		state->lighting.point_light_count = state->desired_lighting.point_light_count;
+		state->lighting.point_light_indices[0] =
+			state->desired_lighting.point_light_indices[0];
+		state->lighting.point_light_indices[1] =
+			state->desired_lighting.point_light_indices[1];
 	}
 	else
 	{
@@ -1058,9 +1050,8 @@ static void object_render_state_refresh(
 			match_assert(
 				"c:\\halo\\SOURCE\\render\\render_objects.c",
 				690,
-				state->lighting.point_light_indices[point_light_index] >= 0 &&
-					state->lighting.point_light_indices[point_light_index] <
-						debug_rasterizer_light_count);
+				state->lighting.point_light_indices[point_light_index]>=0 &&
+					state->lighting.point_light_indices[point_light_index]<debug_rasterizer_light_count);
 		}
 	}
 
