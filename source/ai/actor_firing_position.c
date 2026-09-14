@@ -487,11 +487,15 @@ static void pre_evaluator_combatmove(
 	short firing_position_count,
 	struct firing_position *firing_positions)
 {
-	struct actor_variant_definition *variant_definition= actor_combat_get_firing_variant_definition(actor_index);
-	real range_weight= 8.0f;
+	struct actor_variant_definition *variant_definition;
+	real range_weight;
 	boolean in_range= TRUE;
 	struct firing_position *firing_position;
 	short index;
+
+	actor_get(actor_index);
+	variant_definition= actor_combat_get_firing_variant_definition(actor_index);
+	range_weight= 8.0f;
 
 	if (evaluation_context->has_target)
 	{
@@ -589,12 +593,13 @@ static long post_evaluator_global(
 {
 	struct actor_datum *actor= actor_get(actor_index);
 
+	actor_definition_get(actor->meta.definition_index);
+
 	if (evaluation_context->flying)
 	{
 		if (!firing_position)
 		{
 			evaluation_context->post_evaluation_bound+= 15.0f;
-			return TRUE;
 		}
 		else
 		{
@@ -620,12 +625,12 @@ static long post_evaluator_global(
 		}
 	}
 
-	if (firing_position)
+	if (!firing_position)
 	{
-		return firing_position->valid;
+		return TRUE;
 	}
 
-	return TRUE;
+	return firing_position->valid;
 }
 
 static long post_evaluator_pursuit(
@@ -1163,7 +1168,6 @@ static void pre_evaluator_global(
 		{
 			real_vector3d danger_vector;
 			real_vector3d path_vector;
-			real bounding_radius = actor->danger_zone.bounding_sphere_radius + 2.5f;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\ai\\actor_firing_position.c",
@@ -1175,8 +1179,9 @@ static void pre_evaluator_global(
 				&actor->danger_zone.predict_danger_position,
 				&danger_vector);
 			if (distance_squared3d(
-					&firing_position->definition->position,
-					&actor->danger_zone.bounding_sphere_center) < bounding_radius * bounding_radius)
+					&actor->danger_zone.bounding_sphere_center,
+					&firing_position->definition->position) <
+				(actor->danger_zone.bounding_sphere_radius + 2.5f) * (actor->danger_zone.bounding_sphere_radius + 2.5f))
 			{
 				real distance_squared = point_to_line_distance_squared3d(
 					&firing_position->definition->position,
@@ -1213,27 +1218,31 @@ static void pre_evaluator_global(
 					_firing_position_evaluation_danger_clearance);
 			}
 
-			bounding_radius = actor->danger_zone.bounding_sphere_radius + 3.0f;
 			if (distance_squared3d(
-					&actor->input.position.body_position,
-					&actor->danger_zone.bounding_sphere_center) < bounding_radius * bounding_radius &&
-				actor->danger_zone.current_distance_from_actor > actor->danger_zone.danger_radius &&
-				point_to_line_distance_squared3d(
+					&actor->danger_zone.bounding_sphere_center,
+					&actor->input.position.body_position) <
+				(actor->danger_zone.bounding_sphere_radius + 3.0f) * (actor->danger_zone.bounding_sphere_radius + 3.0f) &&
+				actor->danger_zone.current_distance_from_actor > actor->danger_zone.danger_radius)
+			{
+				real distance_squared = point_to_line_distance_squared3d(
 					&actor->input.position.body_position,
 					&actor->danger_zone.position,
-					&danger_vector) > actor->danger_zone.danger_radius * actor->danger_zone.danger_radius)
-			{
-				scale_vector3d(&firing_position->path_direction_from_actor, 3.0f, &path_vector);
-				if (magnitude_squared3d(&path_vector) > _real_epsilon &&
-					vector_to_line_distance_squared3d(
-						&actor->input.position.body_position,
-						&path_vector,
-						&actor->danger_zone.position,
-						&danger_vector) < actor->danger_zone.danger_radius * actor->danger_zone.danger_radius &&
-					firing_position_reject(evaluation_context, firing_position))
+					&danger_vector);
+
+				if (distance_squared > actor->danger_zone.danger_radius * actor->danger_zone.danger_radius)
 				{
-					firing_position->valid = FALSE;
-					continue;
+					scale_vector3d(&firing_position->path_direction_from_actor, 3.0f, &path_vector);
+					if (magnitude_squared3d(&path_vector) > _real_epsilon &&
+						vector_to_line_distance_squared3d(
+							&actor->input.position.body_position,
+							&path_vector,
+							&actor->danger_zone.position,
+							&danger_vector) < actor->danger_zone.danger_radius * actor->danger_zone.danger_radius &&
+						firing_position_reject(evaluation_context, firing_position))
+					{
+						firing_position->valid = FALSE;
+						continue;
+					}
 				}
 			}
 		}
@@ -1250,18 +1259,22 @@ static void pre_evaluator_global(
 		if (evaluation_context->avoid_point_count > 0)
 		{
 			real closest_ratio = 1.0f;
-			real evaluation = 10.0f;
+			real evaluation;
 			short avoid_index;
 
 			for (avoid_index = 0; avoid_index < evaluation_context->avoid_point_count; avoid_index++)
 			{
-				struct firing_position_avoid_point *avoid_point = &evaluation_context->avoid_points[avoid_index];
 				real ratio = distance_squared3d(
-					&avoid_point->point,
-					&firing_position->definition->position) / (avoid_point->radius * avoid_point->radius);
+					&firing_position->definition->position,
+					&evaluation_context->avoid_points[avoid_index].point) /
+					(evaluation_context->avoid_points[avoid_index].radius * evaluation_context->avoid_points[avoid_index].radius);
 
-				closest_ratio = MIN(closest_ratio, ratio);
+				if (ratio < closest_ratio)
+				{
+					closest_ratio = ratio;
+				}
 			}
+			evaluation = 10.0f;
 			if (closest_ratio < 1.0f)
 			{
 				evaluation = square_root(closest_ratio) * 10.0f;
@@ -1289,10 +1302,10 @@ static void pre_evaluator_global(
 
 				vector_from_points3d(&vehicle_origin, &firing_position->definition->position, &direction);
 				distance_squared = magnitude_squared3d(&direction);
-				if (fabs(distance_squared) >= _real_epsilon && distance_squared < 30.0f * 30.0f)
+				if (!(fabs(distance_squared) < _real_epsilon) && distance_squared < 30.0f * 30.0f)
 				{
 					real alignment = dot_product3d(&direction, &vehicle->object.forward) / square_root(distance_squared);
-					real evaluation = 15.0f;
+					real evaluation;
 
 					if ((evaluation_context->directional_driving_cannot_stop ||
 						magnitude_squared3d(&vehicle->object.translational_velocity) > 1.0f / 144.0f) &&
@@ -1304,6 +1317,7 @@ static void pre_evaluator_global(
 						continue;
 					}
 
+					evaluation = 15.0f;
 					if (alignment < 0.0f)
 					{
 						evaluation = 15.0f - alignment * -15.0f;
