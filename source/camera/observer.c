@@ -121,9 +121,53 @@ enum
 };
 
 #define DEFAULT_OBSERVER_FIELD_OF_VIEW DEGREES_TO_RADIANS(50.f)
-#define OBSERVER_SINE_REGION_ANGLE 0.174f
 
 /* ---------- macros */
+
+#define match_assert_valid_observer_command(file, line, command) \
+	match_vassert( \
+		file, \
+		line, \
+		(command) && \
+		(!TEST_FLAG((command)->flags, _observer_command_valid_bit) || \
+		(valid_real_vector3d_axes2(&(command)->forward, &(command)->up) && \
+			valid_real((command)->focus_position.x) && (command)->focus_position.x>=-5000.f && (command)->focus_position.x<=5000.f && \
+			valid_real((command)->focus_position.y) && (command)->focus_position.y>=-5000.f && (command)->focus_position.y<=5000.f && \
+			valid_real((command)->focus_position.z) && (command)->focus_position.z>=-5000.f && (command)->focus_position.z<=5000.f && \
+			valid_real((command)->focus_offset.i) && (command)->focus_offset.i>=-5000.f && (command)->focus_offset.i<=5000.f && \
+			valid_real((command)->focus_offset.j) && (command)->focus_offset.j>=-5000.f && (command)->focus_offset.j<=5000.f && \
+			valid_real((command)->focus_offset.k) && (command)->focus_offset.k>=-5000.f && (command)->focus_offset.k<=5000.f && \
+			valid_real_vector3d(&(command)->focus_velocity) && \
+			valid_real((command)->focus_distance) && (command)->focus_distance>=0.f && (command)->focus_distance<=5000.f && \
+			valid_real((command)->field_of_view) && (command)->field_of_view>=0.001f && (command)->field_of_view<=_pi / 2.f && \
+			valid_real((command)->timer) && (command)->timer>=0.f && (command)->timer<=3600.f)), \
+		csprintf( \
+			temporary, \
+			"Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, %f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, FL: %ld", \
+			(command)->forward.i, \
+			(command)->forward.j, \
+			(command)->forward.k, \
+			(command)->up.i, \
+			(command)->up.j, \
+			(command)->up.k, \
+			(command)->focus_position.x, \
+			(command)->focus_position.y, \
+			(command)->focus_position.z, \
+			(command)->focus_offset.i, \
+			(command)->focus_offset.j, \
+			(command)->focus_offset.k, \
+			(command)->focus_distance, \
+			(command)->focus_velocity.i, \
+			(command)->focus_velocity.j, \
+			(command)->focus_velocity.k, \
+			(command)->field_of_view, \
+			(command)->timer, \
+			(command)->flags))
+
+#define valid_world_real(value) (valid_real(value) && (value)>=-5000.f && (value)<=5000.f)
+#define valid_world_real_point3d(point) (valid_world_real((point)->x) && valid_world_real((point)->y) && valid_world_real((point)->z))
+#define valid_focus_distance(distance) (valid_real(distance) && (distance)>=0.f && (distance)<=5000.f)
+#define valid_field_of_view(field_of_view) (valid_real(field_of_view) && (field_of_view)>=0.001f && (field_of_view)<=_pi/2.f)
 
 /* ---------- structures */
 
@@ -207,6 +251,13 @@ static boolean observer_collision_test_with_t(
 	real_point3d const *point1,
 	real *t,
 	boolean ignore_media);
+static boolean observer_collision_test_differential(
+	real_point3d const *origin,
+	real_point3d const *destination,
+	real_vector3d const *differential_basis,
+	real differential,
+	real *t,
+	boolean ignore_media);
 static void observer_update_command(
 	short local_player_index);
 static void observer_update_polynomial(
@@ -246,6 +297,8 @@ static real const observer_maximum_accelerations[NUMBER_OF_OBSERVER_COMMAND_PARA
 	100000.f,
 	100000.f
 };
+
+static real const sine_region_angle = 0.174f;
 
 static short observer_parameter_real_counts[NUMBER_OF_OBSERVER_COMMAND_PARAMETERS] =
 {
@@ -439,44 +492,10 @@ void observer_set_camera(
 {
 	struct observer *observer = observer_get(local_player_index);
 
-	match_vassert(
+	match_assert_valid_observer_command(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0xE9,
-		command &&
-		(!TEST_FLAG(command->flags, _observer_command_valid_bit) ||
-		(valid_real_vector3d_axes2(&command->forward, &command->up) &&
-			valid_real(command->focus_position.x) && command->focus_position.x>=-5000.f && command->focus_position.x<=5000.f &&
-			valid_real(command->focus_position.y) && command->focus_position.y>=-5000.f && command->focus_position.y<=5000.f &&
-			valid_real(command->focus_position.z) && command->focus_position.z>=-5000.f && command->focus_position.z<=5000.f &&
-			valid_real(command->focus_offset.i) && command->focus_offset.i>=-5000.f && command->focus_offset.i<=5000.f &&
-			valid_real(command->focus_offset.j) && command->focus_offset.j>=-5000.f && command->focus_offset.j<=5000.f &&
-			valid_real(command->focus_offset.k) && command->focus_offset.k>=-5000.f && command->focus_offset.k<=5000.f &&
-			valid_real_vector3d(&command->focus_velocity) &&
-			valid_real(command->focus_distance) && command->focus_distance>=0.f && command->focus_distance<=5000.f &&
-			valid_real(command->field_of_view) && command->field_of_view>=0.001f && command->field_of_view<=_pi / 2.f &&
-			valid_real(command->timer) && command->timer>=0.f && command->timer<=3600.f)),
-		csprintf(
-			temporary,
-			"Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, %f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, FL: %ld",
-			command->forward.i,
-			command->forward.j,
-			command->forward.k,
-			command->up.i,
-			command->up.j,
-			command->up.k,
-			command->focus_position.x,
-			command->focus_position.y,
-			command->focus_position.z,
-			command->focus_offset.i,
-			command->focus_offset.j,
-			command->focus_offset.k,
-			command->focus_distance,
-			command->focus_velocity.i,
-			command->focus_velocity.j,
-			command->focus_velocity.k,
-			command->field_of_view,
-			command->timer,
-			command->flags));
+		command);
 
 	observer->pending_command = command;
 	observer->updated_for_frame = FALSE;
@@ -512,27 +531,23 @@ static void observer_update_accelerations(
 		parameter_index++)
 	{
 		real remaining_time = *timer - observer_globals.dtime;
-		short value_count = observer_parameter_derivative_real_counts[parameter_index];
-		short value_index;
 
-		if (!(remaining_time > 0.f))
+		if (remaining_time > 0.f)
 		{
-			csmemset(acceleration, 0, sizeof(real)*value_count);
-		}
-		else
-		{
-			for (value_index = 0; value_index < value_count; value_index++)
+			real remaining_time_squared = remaining_time*remaining_time;
+			real remaining_time_cubed = remaining_time_squared*remaining_time;
+			short value_index;
+
+			for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
 			{
-				real remaining_time_squared = remaining_time*remaining_time;
-				real value =
-					20.f*a[value_index]*remaining_time_squared*remaining_time +
+				acceleration[value_index] =
+					20.f*a[value_index]*remaining_time_cubed +
 					12.f*b[value_index]*remaining_time_squared +
 					6.f*c[value_index]*remaining_time +
 					2.f*d[value_index];
 
-				acceleration[value_index] = value;
-				if (value > observer_maximum_accelerations[parameter_index] ||
-					value < -observer_maximum_accelerations[parameter_index])
+				if (acceleration[value_index] > observer_maximum_accelerations[parameter_index] ||
+					acceleration[value_index] < -observer_maximum_accelerations[parameter_index])
 				{
 					short other_parameter_index;
 
@@ -550,12 +565,16 @@ static void observer_update_accelerations(
 				}
 			}
 		}
+		else
+		{
+			csmemset(acceleration, 0, sizeof(real)*(observer_parameter_derivative_real_counts[parameter_index]));
+		}
 
-		acceleration += value_count;
-		a += value_count;
-		b += value_count;
-		c += value_count;
-		d += value_count;
+		acceleration += observer_parameter_derivative_real_counts[parameter_index];
+		a += observer_parameter_derivative_real_counts[parameter_index];
+		b += observer_parameter_derivative_real_counts[parameter_index];
+		c += observer_parameter_derivative_real_counts[parameter_index];
+		d += observer_parameter_derivative_real_counts[parameter_index];
 		timer++;
 	}
 
@@ -583,49 +602,45 @@ static void observer_update_velocities(
 		parameter_index++)
 	{
 		real remaining_time = *timer - observer_globals.dtime;
-		short value_count = observer_parameter_derivative_real_counts[parameter_index];
 		short value_index;
 
-		if (!(remaining_time > 0.f))
+		if (remaining_time > 0.f)
 		{
-			if (TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit))
-			{
-				if (TEST_FLAG(*parameter_flags, _observer_time_force_bit) ||
-					TEST_FLAG(observer->last_command.flags, _observer_command_force_time_bit))
-				{
-					csmemset(velocity, 0, sizeof(real)*value_count);
-				}
-				else
-				{
-					for (value_index = 0; value_index < value_count; value_index++)
-					{
-						velocity[value_index] = -displacement[value_index]*inverse_dtime;
-					}
-				}
-			}
-		}
-		else
-		{
-			for (value_index = 0; value_index < value_count; value_index++)
-			{
-				real remaining_time_squared = remaining_time*remaining_time;
+			real remaining_time_squared = remaining_time*remaining_time;
+			real remaining_time_cubed = remaining_time_squared*remaining_time;
+			real remaining_time_fourth = remaining_time_cubed*remaining_time;
 
+			for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
+			{
 				velocity[value_index] =
-					5.f*a[value_index]*remaining_time_squared*remaining_time_squared +
-					4.f*b[value_index]*remaining_time_squared*remaining_time +
+					5.f*a[value_index]*remaining_time_fourth +
+					4.f*b[value_index]*remaining_time_cubed +
 					3.f*c[value_index]*remaining_time_squared +
 					2.f*d[value_index]*remaining_time +
 					e[value_index];
 			}
 		}
+		else if (TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit) &&
+			(TEST_FLAG(*parameter_flags, _observer_time_force_bit) ||
+			TEST_FLAG(observer->last_command.flags, _observer_command_force_time_bit)))
+		{
+			csmemset(velocity, 0, sizeof(real)*observer_parameter_derivative_real_counts[parameter_index]);
+		}
+		else if (TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit))
+		{
+			for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
+			{
+				velocity[value_index] = -displacement[value_index]*inverse_dtime;
+			}
+		}
 
-		displacement += value_count;
-		velocity += value_count;
-		a += value_count;
-		b += value_count;
-		c += value_count;
-		d += value_count;
-		e += value_count;
+		displacement += observer_parameter_derivative_real_counts[parameter_index];
+		velocity += observer_parameter_derivative_real_counts[parameter_index];
+		a += observer_parameter_derivative_real_counts[parameter_index];
+		b += observer_parameter_derivative_real_counts[parameter_index];
+		c += observer_parameter_derivative_real_counts[parameter_index];
+		d += observer_parameter_derivative_real_counts[parameter_index];
+		e += observer_parameter_derivative_real_counts[parameter_index];
 		timer++;
 		parameter_flags++;
 	}
@@ -647,9 +662,12 @@ static boolean observer_collision_test_with_t(
 		FLAG(_collision_test_objects_scenery_bit);
 	real_vector3d vector;
 	struct collision_result collision;
-	boolean result;
+	boolean result = FALSE;
 
-	SET_FLAG(flags, _collision_test_media_bit, !ignore_media);
+	if (ignore_media)
+	{
+		SET_FLAG(flags, _collision_test_media_bit, FALSE);
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
@@ -658,10 +676,10 @@ static boolean observer_collision_test_with_t(
 	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_observer;
 
 	vector_from_points3d(point0, point1, &vector);
-	result = collision_test_vector(flags, point0, &vector, NONE, &collision);
-	if (result)
+	if (collision_test_vector(flags, point0, &vector, NONE, &collision))
 	{
 		*t = collision.t;
+		result = TRUE;
 	}
 
 	match_assert(
@@ -673,6 +691,23 @@ static boolean observer_collision_test_with_t(
 	return result;
 }
 
+static boolean observer_collision_test_differential(
+	real_point3d const *origin,
+	real_point3d const *destination,
+	real_vector3d const *differential_basis,
+	real differential,
+	real *t,
+	boolean ignore_media)
+{
+	real_point3d differential_destination;
+
+	differential_destination.x = differential*differential_basis->i + destination->x;
+	differential_destination.y = differential*differential_basis->j + destination->y;
+	differential_destination.z = differential*differential_basis->k + destination->z;
+
+	return observer_collision_test_with_t(origin, &differential_destination, t, ignore_media);
+}
+
 static void observer_update_command(
 	short local_player_index)
 {
@@ -680,44 +715,10 @@ static void observer_update_command(
 	struct observer_command *command = observer->pending_command;
 	short parameter_index;
 
-	match_vassert(
+	match_assert_valid_observer_command(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x172,
-		command &&
-		(!TEST_FLAG(command->flags, _observer_command_valid_bit) ||
-		(valid_real_vector3d_axes2(&command->forward, &command->up) &&
-			valid_real(command->focus_position.x) && command->focus_position.x>=-5000.f && command->focus_position.x<=5000.f &&
-			valid_real(command->focus_position.y) && command->focus_position.y>=-5000.f && command->focus_position.y<=5000.f &&
-			valid_real(command->focus_position.z) && command->focus_position.z>=-5000.f && command->focus_position.z<=5000.f &&
-			valid_real(command->focus_offset.i) && command->focus_offset.i>=-5000.f && command->focus_offset.i<=5000.f &&
-			valid_real(command->focus_offset.j) && command->focus_offset.j>=-5000.f && command->focus_offset.j<=5000.f &&
-			valid_real(command->focus_offset.k) && command->focus_offset.k>=-5000.f && command->focus_offset.k<=5000.f &&
-			valid_real_vector3d(&command->focus_velocity) &&
-			valid_real(command->focus_distance) && command->focus_distance>=0.f && command->focus_distance<=5000.f &&
-			valid_real(command->field_of_view) && command->field_of_view>=0.001f && command->field_of_view<=_pi / 2.f &&
-			valid_real(command->timer) && command->timer>=0.f && command->timer<=3600.f)),
-		csprintf(
-			temporary,
-			"Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, %f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, FL: %ld",
-			command->forward.i,
-			command->forward.j,
-			command->forward.k,
-			command->up.i,
-			command->up.j,
-			command->up.k,
-			command->focus_position.x,
-			command->focus_position.y,
-			command->focus_position.z,
-			command->focus_offset.i,
-			command->focus_offset.j,
-			command->focus_offset.k,
-			command->focus_distance,
-			command->focus_velocity.i,
-			command->focus_velocity.j,
-			command->focus_velocity.k,
-			command->field_of_view,
-			command->timer,
-			command->flags));
+		command);
 
 	if (TEST_FLAG(command->flags, _observer_command_valid_bit))
 	{
@@ -768,50 +769,15 @@ static void observer_update_polynomial(
 	real *timer = observer->last_command.parameter_timers;
 	short parameter_index;
 
-	match_vassert(
+	match_assert_valid_observer_command(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x1F6,
-		!TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit) ||
-		(valid_real_vector3d_axes2(&observer->last_command.forward, &observer->last_command.up) &&
-			valid_real(observer->last_command.focus_position.x) && observer->last_command.focus_position.x>=-5000.f && observer->last_command.focus_position.x<=5000.f &&
-			valid_real(observer->last_command.focus_position.y) && observer->last_command.focus_position.y>=-5000.f && observer->last_command.focus_position.y<=5000.f &&
-			valid_real(observer->last_command.focus_position.z) && observer->last_command.focus_position.z>=-5000.f && observer->last_command.focus_position.z<=5000.f &&
-			valid_real(observer->last_command.focus_offset.i) && observer->last_command.focus_offset.i>=-5000.f && observer->last_command.focus_offset.i<=5000.f &&
-			valid_real(observer->last_command.focus_offset.j) && observer->last_command.focus_offset.j>=-5000.f && observer->last_command.focus_offset.j<=5000.f &&
-			valid_real(observer->last_command.focus_offset.k) && observer->last_command.focus_offset.k>=-5000.f && observer->last_command.focus_offset.k<=5000.f &&
-			valid_real_vector3d(&observer->last_command.focus_velocity) &&
-			valid_real(observer->last_command.focus_distance) && observer->last_command.focus_distance>=0.f && observer->last_command.focus_distance<=5000.f &&
-			valid_real(observer->last_command.field_of_view) && observer->last_command.field_of_view>=0.001f && observer->last_command.field_of_view<=_pi / 2.f &&
-			valid_real(observer->last_command.timer) && observer->last_command.timer>=0.f && observer->last_command.timer<=3600.f),
-		csprintf(
-			temporary,
-			"Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, %f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, FL: %ld",
-			observer->last_command.forward.i,
-			observer->last_command.forward.j,
-			observer->last_command.forward.k,
-			observer->last_command.up.i,
-			observer->last_command.up.j,
-			observer->last_command.up.k,
-			observer->last_command.focus_position.x,
-			observer->last_command.focus_position.y,
-			observer->last_command.focus_position.z,
-			observer->last_command.focus_offset.i,
-			observer->last_command.focus_offset.j,
-			observer->last_command.focus_offset.k,
-			observer->last_command.focus_distance,
-			observer->last_command.focus_velocity.i,
-			observer->last_command.focus_velocity.j,
-			observer->last_command.focus_velocity.k,
-			observer->last_command.field_of_view,
-			observer->last_command.timer,
-			observer->last_command.flags));
+		&observer->last_command);
 
 	for (parameter_index = 0;
 		parameter_index < NUMBER_OF_OBSERVER_COMMAND_PARAMETERS;
 		parameter_index++)
 	{
-		short value_count = observer_parameter_derivative_real_counts[parameter_index];
-
 		if (TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit) &&
 			*timer > observer_globals.dtime)
 		{
@@ -822,20 +788,20 @@ static void observer_update_polynomial(
 			real inverse_time_fifth = inverse_time_fourth*inverse_time;
 			short value_index;
 
-			for (value_index = 0; value_index < value_count; value_index++)
+			for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
 			{
 				a[value_index] =
 					acceleration[value_index]*inverse_time_cubed*0.5f -
-					(displacement[value_index]*inverse_time_fifth*6.f +
-						velocity[value_index]*inverse_time_fourth*3.f);
+					(velocity[value_index]*inverse_time_fourth*3.f +
+						displacement[value_index]*inverse_time_fifth*6.f);
 				b[value_index] =
-					displacement[value_index]*inverse_time_fourth*15.f +
-					velocity[value_index]*inverse_time_cubed*7.f -
+					velocity[value_index]*inverse_time_cubed*7.f +
+					displacement[value_index]*inverse_time_fourth*15.f -
 					acceleration[value_index]*inverse_time_squared;
 				c[value_index] =
 					acceleration[value_index]*inverse_time*0.5f -
-					(displacement[value_index]*inverse_time_cubed*10.f +
-						velocity[value_index]*inverse_time_squared*4.f);
+					(velocity[value_index]*inverse_time_squared*4.f +
+						displacement[value_index]*inverse_time_cubed*10.f);
 				d[value_index] = 0.f;
 				e[value_index] = 0.f;
 				f[value_index] = displacement[value_index];
@@ -852,15 +818,15 @@ static void observer_update_polynomial(
 			}
 		}
 
-		acceleration += value_count;
-		displacement += value_count;
-		velocity += value_count;
-		a += value_count;
-		b += value_count;
-		c += value_count;
-		d += value_count;
-		e += value_count;
-		f += value_count;
+		acceleration += observer_parameter_derivative_real_counts[parameter_index];
+		displacement += observer_parameter_derivative_real_counts[parameter_index];
+		velocity += observer_parameter_derivative_real_counts[parameter_index];
+		a += observer_parameter_derivative_real_counts[parameter_index];
+		b += observer_parameter_derivative_real_counts[parameter_index];
+		c += observer_parameter_derivative_real_counts[parameter_index];
+		d += observer_parameter_derivative_real_counts[parameter_index];
+		e += observer_parameter_derivative_real_counts[parameter_index];
+		f += observer_parameter_derivative_real_counts[parameter_index];
 		timer++;
 	}
 
@@ -1068,49 +1034,54 @@ static void observer_check_penetration(
 	real *distance,
 	real safe_distance)
 {
+	real first_t = 1.f;
 	struct location focus_location;
 	boolean ignore_media;
-	real collision_t = 1.f;
-	real reach = *distance + safe_distance;
+	real_vector3d backward;
 	real_point3d desired_position;
-	real step = *distance*OBSERVER_SINE_REGION_ANGLE;
+	real step;
 	real_vector3d perturbations[2];
-	real first_t;
 	real best_t;
-	real_vector3d *best_offset = NULL;
-	real best_sign = 0.f;
+	real_vector3d const *best_offset;
+	real best_sign;
+	real distance_scale;
 	short probe_index;
 
 	scenario_location_from_point(&focus_location, focus_position);
 	ignore_media = scenario_location_underwater(&focus_location, focus_position, NULL);
 
-	desired_position.x = focus_position->x - forward->i*reach;
-	desired_position.y = focus_position->y - forward->j*reach;
-	desired_position.z = focus_position->z - forward->k*reach;
+	backward.i = -forward->i*(*distance + safe_distance);
+	backward.j = -forward->j*(*distance + safe_distance);
+	backward.k = -forward->k*(*distance + safe_distance);
+	desired_position.x = backward.i + focus_position->x;
+	desired_position.y = backward.j + focus_position->y;
+	desired_position.z = backward.k + focus_position->z;
 	observer_collision_test_with_t(
 		focus_position,
 		&desired_position,
-		&collision_t,
+		&first_t,
 		ignore_media);
 
-	scale_vector3d(up, step, &perturbations[0]);
+	best_t = first_t;
+	best_offset = NULL;
+
+	step = *distance*sine_region_angle;
+	perturbations[0] = *up;
 	cross_product3d(up, forward, &perturbations[1]);
+	scale_vector3d(&perturbations[0], step, &perturbations[0]);
 	scale_vector3d(&perturbations[1], step, &perturbations[1]);
 
-	first_t = collision_t;
-	best_t = first_t;
 	for (probe_index = 0; probe_index < 4; probe_index++)
 	{
-		real sign = TEST_FLAG(probe_index, 1) ? 1.f : -1.f;
-		real_vector3d *offset = &perturbations[probe_index & 1];
-		real_point3d probe;
+		real sign = TEST_FLAG(probe_index, 1) ? 1 : -1;
+		real_vector3d const *offset = &perturbations[probe_index & 1];
+		real collision_t;
 
-		probe.x = desired_position.x + sign*offset->i;
-		probe.y = desired_position.y + sign*offset->j;
-		probe.z = desired_position.z + sign*offset->k;
-		if (observer_collision_test_with_t(
+		if (observer_collision_test_differential(
 			focus_position,
-			&probe,
+			&desired_position,
+			offset,
+			sign,
 			&collision_t,
 			ignore_media) &&
 			collision_t < best_t)
@@ -1123,26 +1094,24 @@ static void observer_check_penetration(
 
 	if (best_offset)
 	{
-		real last_miss_t = first_t;
-		real last_hit_t = best_t;
 		real lower = 0.f;
 		real upper = best_sign;
+		real last_miss_t = first_t;
+		real last_hit_t = best_t;
 		short iteration;
 
 		for (iteration = 0; iteration < 10; iteration++)
 		{
 			real middle = (upper + lower)*0.5f;
-			real_point3d probe;
-			boolean hit;
-
-			probe.x = desired_position.x + middle*best_offset->i;
-			probe.y = desired_position.y + middle*best_offset->j;
-			probe.z = desired_position.z + middle*best_offset->k;
-			hit = observer_collision_test_with_t(
+			real collision_t;
+			boolean hit = observer_collision_test_differential(
 				focus_position,
-				&probe,
+				&desired_position,
+				best_offset,
+				middle,
 				&collision_t,
 				ignore_media);
+
 			if (hit && fabs(collision_t - last_hit_t) < 0.1f)
 			{
 				upper = middle;
@@ -1155,12 +1124,8 @@ static void observer_check_penetration(
 			}
 		}
 
-		if (last_miss_t < last_hit_t)
-			upper = lower;
-		else if (upper < 0.f)
-			upper = -upper;
-
-		*distance *= (1.f - upper)*best_t + upper*first_t;
+		distance_scale = ABS(last_miss_t < last_hit_t ? lower : upper);
+		*distance *= (1.f - distance_scale)*best_t + distance_scale*first_t;
 	}
 	else
 	{
@@ -1176,21 +1141,13 @@ static void observer_postcheck(
 	struct observer *observer = observer_get(local_player_index);
 	real_point3d focus_position = observer->focus_position;
 	real focus_distance = PIN(observer->focus_distance, 0.f, REAL_MAX);
-	real heading_length;
-	real heading_i = observer->forward.i;
-	real heading_j = observer->forward.j;
-	real offset_i;
-	real offset_j;
-	struct location location;
+	real_vector2d heading;
 	real water_depth;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x3AF,
-		valid_real_point3d(&focus_position) &&
-		focus_position.x>=-5000.f && focus_position.x<=5000.f &&
-		focus_position.y>=-5000.f && focus_position.y<=5000.f &&
-		focus_position.z>=-5000.f && focus_position.z<=5000.f);
+		valid_world_real_point3d(&focus_position));
 	match_assert_valid_real_vector3d_axes2(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x3B0,
@@ -1199,14 +1156,11 @@ static void observer_postcheck(
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x3B1,
-		valid_real_vector3d(&observer->focus_offset) &&
-		observer->focus_offset.i>=-5000.f && observer->focus_offset.i<=5000.f &&
-		observer->focus_offset.j>=-5000.f && observer->focus_offset.j<=5000.f &&
-		observer->focus_offset.k>=-5000.f && observer->focus_offset.k<=5000.f);
+		valid_world_real_point3d((real_point3d *) &observer->focus_offset));
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x3B2,
-		valid_real(focus_distance) && focus_distance>=0.f && focus_distance<=5000.f);
+		valid_focus_distance(focus_distance));
 
 	observer->field_of_view = PIN(observer->field_of_view, 0.001f, _pi/2.f);
 	focus_position.x = PIN(focus_position.x, -5000.f, 5000.f);
@@ -1214,17 +1168,12 @@ static void observer_postcheck(
 	focus_position.z = PIN(focus_position.z, -5000.f, 5000.f);
 	focus_distance = PIN(focus_distance, 0.f, 5000.f);
 
-	heading_length = square_root(heading_i*heading_i + heading_j*heading_j);
-	if (fabs(heading_length) >= 0.0001f)
-	{
-		heading_i /= heading_length;
-		heading_j /= heading_length;
-	}
+	heading.i = observer->forward.i;
+	heading.j = observer->forward.j;
+	normalize2d(&heading);
 
-	offset_i = observer->focus_offset.i*heading_i + observer->focus_offset.j*heading_j;
-	offset_j = observer->focus_offset.i*heading_j - observer->focus_offset.j*heading_i;
-	focus_position.x += offset_i;
-	focus_position.y += offset_j;
+	focus_position.x += observer->focus_offset.i*heading.i + observer->focus_offset.j*heading.j;
+	focus_position.y += observer->focus_offset.i*heading.j - observer->focus_offset.j*heading.i;
 	focus_position.z += observer->focus_offset.k;
 
 	if (!TEST_FLAG(observer->last_command.flags, _observer_command_ignore_obstructions_bit) &&
@@ -1242,19 +1191,23 @@ static void observer_postcheck(
 	observer->result.position.y = focus_position.y - observer->forward.j*focus_distance;
 	observer->result.position.z = focus_position.z - observer->forward.k*focus_distance;
 
-	scenario_location_from_point(&location, &observer->result.position);
-	if (location.cluster_index != NONE)
 	{
-		if (location.cluster_index != observer->result.location.cluster_index)
-		{
-			struct structure_cluster *cluster = TAG_BLOCK_GET_ELEMENT(
-				&global_structure_bsp_get()->clusters,
-				location.cluster_index,
-				struct structure_cluster);
+		struct location location;
 
-			predicted_resources_precache(&cluster->predicted_resources);
+		scenario_location_from_point(&location, &observer->result.position);
+		if (location.cluster_index != NONE)
+		{
+			if (location.cluster_index != observer->result.location.cluster_index)
+			{
+				struct structure_cluster *cluster = TAG_BLOCK_GET_ELEMENT(
+					&global_structure_bsp_get()->clusters,
+					location.cluster_index,
+					struct structure_cluster);
+
+				predicted_resources_precache(&cluster->predicted_resources);
+			}
+			observer->result.location = location;
 		}
-		observer->result.location = location;
 	}
 
 	water_depth = scenario_location_water_depth(
@@ -1275,10 +1228,7 @@ static void observer_postcheck(
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x41F,
-		valid_real_point3d(&observer->result.position) &&
-		observer->result.position.x>=-5000.f && observer->result.position.x<=5000.f &&
-		observer->result.position.y>=-5000.f && observer->result.position.y<=5000.f &&
-		observer->result.position.z>=-5000.f && observer->result.position.z<=5000.f);
+		valid_world_real_point3d(&observer->result.position));
 	match_assert_valid_real_vector3d_axes2(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x420,
@@ -1287,8 +1237,7 @@ static void observer_postcheck(
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x421,
-		valid_real(observer->field_of_view) &&
-		observer->field_of_view>=0.001f && observer->field_of_view<=_pi/2.f);
+		valid_field_of_view(observer->field_of_view));
 
 	observer->result.position.x = PIN(observer->result.position.x, -5000.f, 5000.f);
 	observer->result.position.y = PIN(observer->result.position.y, -5000.f, 5000.f);

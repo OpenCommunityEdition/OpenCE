@@ -6277,39 +6277,6 @@
     },
     {
       "unit": "source/camera/observer",
-      "function": "_observer_update_accelerations",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. It is complete natural source, remains non-exact at the current production compile, and receives zero credit; no register tuning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 464, "relocation_count": 13, "normalized_sha256": "928529875fdad2ff46972e74d088bff5f94d15be907617e9e513ec8a41b315a7" },
-        "base": { "size": 528, "relocation_count": 13, "normalized_sha256": "c3229a797b41078842c37b3777cbdb8e3d45b25dce7f77d260c7c40a529aac84" },
-        "objdiff_percent": 50.05298
-      }
-    },
-    {
-      "unit": "source/camera/observer",
-      "function": "_observer_update_velocities",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer velocity-integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. It is complete natural source, remains non-exact at the current production compile, and receives zero credit; no register tuning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 512, "relocation_count": 14, "normalized_sha256": "9af560df9a899bb1ac53b0ed6c773d014e9a4ead892db1b76b5da195a96e1ac1" },
-        "base": { "size": 544, "relocation_count": 14, "normalized_sha256": "d486a70d554e015b79b1315a7707624a4503fc2481e6e3d0fc50d413f36f38ef" },
-        "objdiff_percent": 13.716867
-      }
-    },
-    {
-      "unit": "source/camera/observer",
-      "function": "_observer_collision_test_with_t",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer collision helper retained from the authenticated penetration packet and the 2026-09-12 replacement packet. January's real penetration caller invokes this helper directly; the complete natural body remains non-exact and receives zero credit. No fake caller, register forcing, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 224, "relocation_count": 15, "normalized_sha256": "6c92e9642a9735f928a35438ce063b0218de0f14eeeca1703776bf35f5b0d6f1" },
-        "base": { "size": 208, "relocation_count": 15, "normalized_sha256": "cdfc7f2239730b884060df50b8b395766abe4c1cc68d1a424cb47c6dc48e2696" },
-        "objdiff_percent": 81.87692
-      }
-    },
-    {
-      "unit": "source/camera/observer",
       "function": "_observer_update_command",
       "class": "unclassified",
       "evidence": "Behavior-reviewed Observer command-update body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural control flow remains non-exact at the current production compile and receives zero credit; no byte forcing or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
@@ -6321,17 +6288,6 @@
     },
     {
       "unit": "source/camera/observer",
-      "function": "_observer_update_polynomial",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer polynomial-update body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete endpoint/interpolation logic remains non-exact at the current production compile and receives zero credit; no codegen steering or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 1440, "relocation_count": 48, "normalized_sha256": "23fa700f3f11e331415fc0f5c190e02781ec07f6ff3790eb824d0634e32ef9e4" },
-        "base": { "size": 1488, "relocation_count": 46, "normalized_sha256": "62378d20b35384cebac90c2f18a0d2341cbc8c3350b5e65cebe30d2e1c24c58d" },
-        "objdiff_percent": 75.87404
-      }
-    },
-    {
-      "unit": "source/camera/observer",
       "function": "_observer_update_positions",
       "class": "unclassified",
       "evidence": "Behavior-reviewed Observer position-integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural source remains non-exact at the current production compile and receives zero credit; no representation punning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
@@ -6339,28 +6295,6 @@
         "target": { "size": 1568, "relocation_count": 40, "normalized_sha256": "8dce5e181abf19a30fc9a87e483c1e0a16050eeb48c03c48c2b6209e7fd59deb" },
         "base": { "size": 1280, "relocation_count": 28, "normalized_sha256": "53f9635a438d2ebd8fa36e24a991df1c3adb5023eafbc440c0e060a00d1a7fe0" },
         "objdiff_percent": 45.926723
-      }
-    },
-    {
-      "unit": "source/camera/observer",
-      "function": "_observer_check_penetration",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer penetration refinement retained from the independently reviewed 2026-09-05 packet and reconciled in the 2026-09-12 replacement packet. It preserves the real collision-test-with-t call graph but remains non-exact and receives zero credit; no fake differential call or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 752, "relocation_count": 11, "normalized_sha256": "ef9a396b122f6b5f45532ca7361227e1cbeaa47273bb9802a67187a32e09b140" },
-        "base": { "size": 688, "relocation_count": 10, "normalized_sha256": "1062b1380ec193b28d059a3861e36941619b4f9ce06eb1ab157226731495b09a" },
-        "objdiff_percent": 54.21348
-      }
-    },
-    {
-      "unit": "source/camera/observer",
-      "function": "_observer_postcheck",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer postcheck body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. Its complete natural camera/collision logic remains non-exact at the current production compile and receives zero credit; no compiler steering or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 2112, "relocation_count": 104, "normalized_sha256": "04956fe0b7c20823ab4605b5f92b0a76797b937bee96c30a8db360c5d990cbbb" },
-        "base": { "size": 1968, "relocation_count": 107, "normalized_sha256": "49f65a0234d12825cb1452d46b1a6972f61ff9084504ac9558af1ca1f7c9e127" },
-        "objdiff_percent": 90.80541
       }
     },
     {
