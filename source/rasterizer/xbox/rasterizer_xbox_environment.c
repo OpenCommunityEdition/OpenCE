@@ -1260,9 +1260,7 @@ void _rasterizer_environment_diffuse_light_begin(
 			light->definition->gel.roll_period>0.0f);
 
 		{
-			real_vector3d gel_forward;
-			real_vector3d gel_up;
-			real_vector3d gel_side;
+			real_matrix3x3 gel_matrix;
 
 			{
 				real yaw = periodic_function_evaluate(
@@ -1277,12 +1275,12 @@ void _rasterizer_environment_diffuse_light_begin(
 				real_matrix4x3 gel_rotation;
 
 				matrix4x3_rotation_from_angles(&gel_rotation, yaw, pitch, roll);
-				matrix4x3_transform_normal(&gel_rotation, &light->forward, &gel_forward);
-				matrix4x3_transform_normal(&gel_rotation, &light->up, &gel_up);
+				matrix4x3_transform_normal(&gel_rotation, &light->forward, &gel_matrix.forward);
+				matrix4x3_transform_normal(&gel_rotation, &light->up, &gel_matrix.up);
 			}
 
-			cross_product3d(&gel_up, &gel_forward, &gel_side);
-			normalize3d(&gel_side);
+			cross_product3d(&gel_matrix.forward, &gel_matrix.up, &gel_matrix.left);
+			normalize3d(&gel_matrix.left);
 
 			{
 				real vertex_constants[20];
@@ -1290,17 +1288,17 @@ void _rasterizer_environment_diffuse_light_begin(
 				vertex_constants[1] = light->position.y;
 				vertex_constants[2] = light->position.z;
 				vertex_constants[3] = 0.5f / light->radius;
-				vertex_constants[4] = -gel_forward.i;
-				vertex_constants[5] = -gel_forward.j;
-				vertex_constants[6] = -gel_forward.k;
+				vertex_constants[4] = -gel_matrix.forward.i;
+				vertex_constants[5] = -gel_matrix.forward.j;
+				vertex_constants[6] = -gel_matrix.forward.k;
 				vertex_constants[7] = 1.0f;
-				vertex_constants[8] = -gel_side.i;
-				vertex_constants[9] = -gel_side.j;
-				vertex_constants[10] = -gel_side.k;
+				vertex_constants[8] = -gel_matrix.left.i;
+				vertex_constants[9] = -gel_matrix.left.j;
+				vertex_constants[10] = -gel_matrix.left.k;
 				vertex_constants[11] = 1.0f;
-				vertex_constants[12] = -gel_up.i;
-				vertex_constants[13] = -gel_up.j;
-				vertex_constants[14] = -gel_up.k;
+				vertex_constants[12] = -gel_matrix.up.i;
+				vertex_constants[13] = -gel_matrix.up.j;
+				vertex_constants[14] = -gel_matrix.up.k;
 				vertex_constants[15] = 1.0f;
 				vertex_constants[16] = 0.0f;
 				vertex_constants[17] = 0.0f;

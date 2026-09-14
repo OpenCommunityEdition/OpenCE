@@ -2744,25 +2744,6 @@
     },
     {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
-      "function": "__rasterizer_environment_diffuse_light_begin",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after reconstructing the full diffuse-light setup in ordinary typed C from January disassembly and Halo/Xbox renderer evidence. Target and candidate both occupy 928 padded bytes with all 58 relocation identities; objdiff reports 99.89695 percent similarity. The remaining normalized difference is C2's assignment of three coherent local basis vectors to different stack slots. Bounded declaration-scope and vector-shape probes did not produce a natural closure. No volatile or register steering, barrier, pragma, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those stack lifetimes.",
-      "measurements": {
-        "target": {
-          "size": 928,
-          "relocation_count": 58,
-          "normalized_sha256": "96f42a578f493250f9fb27beb69c6e4bbd03472de63c1e81e039ec7723dbfcf7"
-        },
-        "base": {
-          "size": 928,
-          "relocation_count": 58,
-          "normalized_sha256": "6b3b2693e14dabc8837d8ae5f0c01d349f16ed4f347f60a7be6d226baee60252"
-        },
-        "objdiff_percent": 99.89695
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
       "function": "_rasterizer_environment_specular_spot_light_begin",
       "class": "register-allocation",
       "evidence": "Fuzzy-parked after retaining the complete HCEA-backed spot-light vector and cross-product implementation in ordinary C. January is 960 padded bytes and the candidate 944, with all 64 relocations shared and objdiff at 82.64557 percent. The remaining difference is compiler vector/local allocation and scheduling, not absent renderer behavior; bounded helper and declaration-shape probes did not close it. The source uses project real/vector types and existing math helpers and preserves the January inline schedule without emitting point_from_line3d. No forced inline/noinline, volatile steering, barrier, pragma, assembly, fake arithmetic, raw address, or undefined behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the vector lifetime schedule.",
