@@ -1419,6 +1419,12 @@ static void widget_instance_render_spinner_list(
 	rectangle2d *clip_rect,
 	point2d offset,
 	boolean focus);
+static void widget_instance_render_column_list(
+	struct widget_instance *widget,
+	struct ui_widget_definition *definition,
+	rectangle2d *clip_rect,
+	point2d offset,
+	boolean focus);
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -5189,47 +5195,6 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
-static void widget_instance_render_column_list(
-	struct widget_instance *widget,
-	struct ui_widget_definition *definition,
-	rectangle2d *clip_rect,
-	point2d offset,
-	boolean focus)
-{
-	if (widget->parameters.list.extended_description)
-	{
-		widget->parameters.list.extended_description->alpha_modifier =
-			widget_instance_get_cumulative_alpha_modifier(widget);
-		widget_instance_render_recursive(
-			widget->parameters.list.extended_description,
-			clip_rect,
-			offset,
-			FALSE,
-			TRUE);
-	}
-	if (TEST_FLAG(definition->list_flags, _list_items_generated_in_code))
-	{
-		struct widget_instance *child;
-		long item_index = 0;
-
-		for (child = widget->child; child; child = child->next)
-		{
-			if (item_index >= widget->parameters.list.number_of_items)
-				break;
-			widget_instance_render_recursive(
-				child,
-				clip_rect,
-				offset,
-				focus,
-				item_index == widget->parameters.list.selected_index);
-			item_index++;
-		}
-	}
-	widget->parameters.list.last_list_tab_direction = 0;
-
-	return;
-}
-
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -5536,6 +5501,47 @@ void render_ui_widgets(
 }
 
 /* ---------- private code */
+
+static void widget_instance_render_column_list(
+	struct widget_instance *widget,
+	struct ui_widget_definition *definition,
+	rectangle2d *clip_rect,
+	point2d offset,
+	boolean focus)
+{
+	if (widget->parameters.list.extended_description)
+	{
+		widget->parameters.list.extended_description->alpha_modifier =
+			widget_instance_get_cumulative_alpha_modifier(widget);
+		widget_instance_render_recursive(
+			widget->parameters.list.extended_description,
+			clip_rect,
+			offset,
+			FALSE,
+			TRUE);
+	}
+	if (TEST_FLAG(definition->list_flags, _list_items_generated_in_code))
+	{
+		struct widget_instance *child;
+		long item_index = 0;
+
+		for (child = widget->child; child; child = child->next)
+		{
+			if (item_index >= widget->parameters.list.number_of_items)
+				break;
+			widget_instance_render_recursive(
+				child,
+				clip_rect,
+				offset,
+				focus,
+				item_index == widget->parameters.list.selected_index);
+			item_index++;
+		}
+	}
+	widget->parameters.list.last_list_tab_direction = 0;
+
+	return;
+}
 
 static __inline void widget_instance_update_animation_parameters(
 	struct widget_instance *widget)
