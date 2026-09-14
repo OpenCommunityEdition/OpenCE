@@ -97,25 +97,6 @@
       }
     },
     {
-      "unit": "source/main/main",
-      "function": "_set_window_camera_values",
-      "class": "unclassified",
-      "evidence": "Best complete ordinary-C window/camera state reconstruction. It uses named engine globals and project types, keeps its prototype with the Main owner, and contains no compiler-steering constructs. Candidate and target retain all 19 relocation identities but differ by one 16-byte padded slot (416 candidate versus 432 target), scoring 88.32374% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 432,
-          "relocation_count": 19,
-          "normalized_sha256": "b6b77e1325d664686277c8ab3678b163f92e428ce003a51526ef628c20a2e771"
-        },
-        "base": {
-          "size": 416,
-          "relocation_count": 19,
-          "normalized_sha256": "9b3998256a96c5a2a09fe7c4c99b586627059b2c97d1628cfcf088ccb7b33eff"
-        },
-        "objdiff_percent": 88.32374
-      }
-    },
-    {
       "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum_bounds",
       "class": "unclassified",
@@ -691,25 +672,6 @@
     },
     {
       "unit": "source/main/main",
-      "function": "_main_setup_connection",
-      "class": "unclassified",
-      "evidence": "Complete January startup behavior and owner API reconstructed naturally. Film request reports the target error and returns to menu; direct menu and local map branches preserved. Target182/192 meaningful/padded17relocations versus candidate173/176 and16relocations; ordinary objdiff90.42%. Candidate cross-jumps the two main_menu_load/return tails, removing9meaningful bytes and one physical call relocation; all other operations correspond. Do not repeat forbidden donor ReadWriteBarrier tail control or source spelling searches. All75 inherited code/53data owner bytes, orderedrelocations and runtimeproperties remain unchanged; one25B target/property-exact literal added, no helper/COMMON/newglobal/point owner. Full833target census proves sole Main loop caller and existing HS-facing flag setter. Zero exactcode credit; see docs/object_matching_logs/main_obj_startup_connection_natural_boundary_20260905.md.",
-      "measurements": {
-        "target": {
-          "size": 192,
-          "relocation_count": 17,
-          "normalized_sha256": "c5411956292ae880665d080ef10f13e76665ff55bb11fdb8983c5209a4260c72"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 16,
-          "normalized_sha256": "7337c8f95e5e76c6be2f564871682de0ddd5916cff77a9eb825f02a3664ec2d6"
-        },
-        "objdiff_percent": 90.416664
-      }
-    },
-    {
-      "unit": "source/main/main",
       "function": "_main_get_window_count",
       "class": "unclassified",
       "evidence": "Complete typed January window-count policy reconstructed from the HCEA behavior and target call graph. It forces one window for engine single-screen mode, cinematics, or fewer than one local player, caps the result at MAXIMUM_WINDOWS, and otherwise returns the local-player count. Target and candidate are both 64 padded bytes with all five relocation identities. Ordinary source produces a 79.210526 percent residual because VC7 reorders the repeated local_player_count calls and branch tails; the prior bounded source-shape review did not recover January's placement without artificial control. No compiler steering, barrier, volatile access, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
@@ -725,44 +687,6 @@
           "normalized_sha256": "47b068a1fa916098b3899d2671b2e8e01ef76a05b8de0061eff434d63c795eae"
         },
         "objdiff_percent": 79.210526
-      }
-    },
-    {
-      "unit": "source/main/main",
-      "function": "_main_change_map_name",
-      "class": "unclassified",
-      "evidence": "Complete typed January deferred-map-change lifecycle reconstructed from the HCEA source map and the historical same-compiler exact donor. It preserves menu-music fade timing, UI inhibition, local-game disposal/precache/reload, exact main_new_map ownership, and last-level profile persistence. Target and candidate are both 384 padded bytes with all 35 relocation identities. Ordinary coherent source remains a 65.166664 percent control-flow-placement residual; the target and candidate select different shared hot/cold tails despite corresponding behavior and callees. No compiler steering, barrier, volatile access, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 384,
-          "relocation_count": 35,
-          "normalized_sha256": "d4399d9558fa56ca1b98419bb62a950b8018cfa101637b50b9d5312af4cd8c3e"
-        },
-        "base": {
-          "size": 384,
-          "relocation_count": 35,
-          "normalized_sha256": "8273c50210453c6ec97c145fdf4bbf7d7c390bc08708b7e3eb23a6a36f3589f8"
-        },
-        "objdiff_percent": 65.166664
-      }
-    },
-    {
-      "unit": "source/main/main",
-      "function": "_main_get_solo_level_from_name",
-      "class": "unclassified",
-      "evidence": "Complete bounded lowercase scenario-name classifier reconstructed from the HCEA source map and historical same-compiler donor. It recognizes the ten campaign level stems and returns NONE otherwise. The natural short return type is retained because it is the owner contract used by the already-exact main_won_map_private caller; changing it to long closes this isolated body but regresses that exact caller and is therefore rejected. January is 368 padded bytes and the compatible candidate is 352, both with 22 relocations; objdiff reports 99.62406 percent similarity. No unrelated local extern, compiler steering, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 368,
-          "relocation_count": 22,
-          "normalized_sha256": "68e7372c529d46cf6292e2698cf022704ed3085cbabae5fd7bedc48598bf81a9"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 22,
-          "normalized_sha256": "980a37d83b9de7f7512e5004af01bdd801eeb09e69695638a5fef766c18d2c42"
-        },
-        "objdiff_percent": 99.62406
       }
     },
     {
@@ -2351,25 +2275,6 @@
           "normalized_sha256": "edd705dfff90e3b299dca140e8b7558db363d700e2a276ef89b21011be641136"
         },
         "objdiff_percent": 94.347824
-      }
-    },
-    {
-      "unit": "source/main/main",
-      "function": "_compute_window_bounds",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete HCEA-authenticated window-geometry routine with January's three exact assertions, semantic rectangle2d types, and named rasterizer screen_bounds/frame_bounds fields. Target and candidate have the same 496-byte padded envelope, all 25 relocation identities at the same addresses, and the same 176 decoded instructions. The only two differences are commutative integer products: January copies horizontal_index or first_player_spans_two_columns into EDX and multiplies by horizontal_count, while VC7 copies horizontal_count into EDX and multiplies by the other operand. Ordinary declaration-order, product-local, operand-order, and expression-grouping corrections either compile to this fixed point or perturb more code, so the natural donor topology is retained. No carrier variable, volatile access, barrier, assembly, fake dependency, raw-address field, or nonsensical control flow is present. The public prototype is isolated in main_runtime.h because adding the rectangle type to broad main.h changed an unrelated shell_xbox rdata COMDAT owner under C2; the narrow owner header preserves every consumer. Reopen only for authoritative January source/local records or a natural same-compiler register-lifetime donor.",
-      "measurements": {
-        "target": {
-          "size": 496,
-          "relocation_count": 25,
-          "normalized_sha256": "9e74a78d008dcdaa4ecd0e8290296cab0e4bc43a5ea1222200a9867d80677e76"
-        },
-        "base": {
-          "size": 496,
-          "relocation_count": 25,
-          "normalized_sha256": "102856c3048a4eca32fbcb6e11ad419f5f9d1d581ee12f6832cf90a2f73e99bf"
-        },
-        "objdiff_percent": 99.87578
       }
     },
     {

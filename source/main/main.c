@@ -376,6 +376,7 @@ symbols in this file:
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
+#include "effects/player_effects.h"
 #include "physics/collision_usage.h"
 #include "physics/collision_debug.h"
 #include "hs/hs.h"
@@ -1133,14 +1134,12 @@ void set_window_camera_values(
 	struct render_window *window,
 	struct observer_result const *observer)
 {
-	struct render_camera *camera = &window->rasterizer_camera;
-
 	if (observer)
 	{
-		camera->position = observer->position;
-		camera->forward = observer->forward;
-		camera->up = observer->up;
-		camera->vertical_field_of_view =
+		window->rasterizer_camera.position = observer->position;
+		window->rasterizer_camera.forward = observer->forward;
+		window->rasterizer_camera.up = observer->up;
+		window->rasterizer_camera.vertical_field_of_view =
 			2.0f * arctangent(
 				0.75f * render_camera_get_adjusted_field_of_view_tangent(
 					observer->field_of_view),
@@ -1166,28 +1165,28 @@ void set_window_camera_values(
 			matrix4x3_multiply(&view_matrix, &effect_matrix, &view_matrix);
 			matrix4x3_to_point_and_vectors(
 				&view_matrix,
-				&camera->position,
-				&camera->forward,
-				&camera->up);
+				&window->rasterizer_camera.position,
+				&window->rasterizer_camera.forward,
+				&window->rasterizer_camera.up);
 		}
 	}
 	else
 	{
-		camera->position = *global_origin3d;
-		camera->forward = *global_forward3d;
-		camera->up = *global_up3d;
-		camera->vertical_field_of_view =
+		window->rasterizer_camera.position = *global_origin3d;
+		window->rasterizer_camera.forward = *global_forward3d;
+		window->rasterizer_camera.up = *global_up3d;
+		window->rasterizer_camera.vertical_field_of_view =
 			2.0f * arctangent(
 				0.75f * render_camera_get_adjusted_field_of_view_tangent(
 					DEGREES_TO_RADIANS(80.0f)),
 				1.0f);
 	}
 
-	camera->mirrored = FALSE;
-	camera->z_near = rasterizer_globals.near_clip_distance;
-	camera->z_far = rasterizer_globals.far_clip_distance;
+	window->rasterizer_camera.mirrored = FALSE;
+	window->rasterizer_camera.z_near = rasterizer_globals.near_clip_distance;
+	window->rasterizer_camera.z_far = rasterizer_globals.far_clip_distance;
 	if (!debug_render_freeze)
-		window->render_camera = *camera;
+		window->render_camera = window->rasterizer_camera;
 
 	return;
 }
@@ -1246,31 +1245,34 @@ short main_get_solo_level_from_name(
 	char const *name)
 {
 	char lower_name[128] = { 0 };
+	short level;
 
 	csstrncpy(lower_name, name, NUMBEROF(lower_name) - 1);
 	lower_name[NUMBEROF(lower_name) - 1] = 0;
 	strlwr(lower_name);
 
 	if (strstr(lower_name, "a10"))
-		return 0;
-	if (strstr(lower_name, "a30"))
-		return 1;
-	if (strstr(lower_name, "a50"))
-		return 2;
-	if (strstr(lower_name, "b30"))
-		return 3;
-	if (strstr(lower_name, "b40"))
-		return 4;
-	if (strstr(lower_name, "c10"))
-		return 5;
-	if (strstr(lower_name, "c20"))
-		return 6;
-	if (strstr(lower_name, "c40"))
-		return 7;
-	if (strstr(lower_name, "d20"))
-		return 8;
+		level = 0;
+	else if (strstr(lower_name, "a30"))
+		level = 1;
+	else if (strstr(lower_name, "a50"))
+		level = 2;
+	else if (strstr(lower_name, "b30"))
+		level = 3;
+	else if (strstr(lower_name, "b40"))
+		level = 4;
+	else if (strstr(lower_name, "c10"))
+		level = 5;
+	else if (strstr(lower_name, "c20"))
+		level = 6;
+	else if (strstr(lower_name, "c40"))
+		level = 7;
+	else if (strstr(lower_name, "d20"))
+		level = 8;
+	else
+		level = strstr(lower_name, "d40") ? 9 : NONE;
 
-	return strstr(lower_name, "d40") ? 9 : NONE;
+	return level;
 }
 
 short main_get_current_solo_level(
@@ -1341,7 +1343,7 @@ void compute_window_bounds(
 	long vertical_index;
 	long subframe_width;
 	long subframe_height;
-	long safe_frame_inset;
+	short safe_frame_inset;
 	boolean first_player_spans_two_columns;
 
 	match_assert(
@@ -1494,47 +1496,47 @@ void main_change_map_name(
 			ui_widgets_set_fade_value(
 				1.0f - (real)remaining_milliseconds * 0.001f);
 		}
-
-		if (main_globals.frame_start_milliseconds < main_globals.map_change_load_timer)
-			return;
 	}
 	else
 	{
 		main_globals.map_change_load_timer = 0;
 	}
 
-	ui_widgets_set_fade_value(-1.0f);
-	ui_stop_main_menu_music();
-	main_menu_active(FALSE);
-	main_globals.main_menu_scenario_loaded = FALSE;
-	ui_widgets_inhibit_processing(FALSE);
-
-	if (game_in_progress() && main_globals.connection == _game_connection_local)
+	if (main_globals.frame_start_milliseconds >= main_globals.map_change_load_timer)
 	{
-		struct game_options options;
-		short local_player_index;
+		ui_widgets_set_fade_value(-1.0f);
+		ui_stop_main_menu_music();
+		main_menu_active(FALSE);
+		main_globals.main_menu_scenario_loaded = FALSE;
+		ui_widgets_inhibit_processing(FALSE);
 
-		game_options_new(&options);
-		csstrncpy(
-			options.map_name,
-			main_globals.soloplayer_map_name,
-			NUMBEROF(options.map_name) - 1);
-		options.map_name[NUMBEROF(options.map_name) - 1] = 0;
-		options.difficulty = global_difficulty_level;
-		game_dispose_from_old_map();
-		game_precache_new_map(options.map_name, TRUE);
-		game_unload();
-		main_new_map(&options);
-
-		for (local_player_index = 0;
-			local_player_index < player_spawn_count;
-			local_player_index++)
+		if (game_in_progress() && main_globals.connection == _game_connection_local)
 		{
-			player_profile_save_last_level_played(local_player_index);
-		}
-	}
+			struct game_options options;
+			short local_player_index;
 
-	main_globals.map_change_load_timer = 0;
+			game_options_new(&options);
+			csstrncpy(
+				options.map_name,
+				main_globals.soloplayer_map_name,
+				NUMBEROF(options.map_name) - 1);
+			options.map_name[NUMBEROF(options.map_name) - 1] = 0;
+			options.difficulty = global_difficulty_level;
+			game_dispose_from_old_map();
+			game_precache_new_map(options.map_name, TRUE);
+			game_unload();
+			main_new_map(&options);
+
+			for (local_player_index = 0;
+				local_player_index < player_spawn_count;
+				local_player_index++)
+			{
+				player_profile_save_last_level_played(local_player_index);
+			}
+		}
+
+		main_globals.map_change_load_timer = 0;
+	}
 
 	return;
 }
@@ -2498,14 +2500,7 @@ void main_setup_connection(
 	struct game_options options;
 
 	if (main_globals.playback_last_recording)
-	{
 		main_globals.want_to_be_at_main_menu = FALSE;
-		main_globals.connection = _game_connection_film_playback;
-		error(_error_silent, "error opening saved film");
-		main_globals.want_to_be_at_main_menu = TRUE;
-		main_menu_load();
-		return;
-	}
 
 	if (main_globals.want_to_be_at_main_menu)
 	{
@@ -2513,17 +2508,27 @@ void main_setup_connection(
 		return;
 	}
 
-	main_globals.connection = _game_connection_local;
-	game_options_new(&options);
-	csstrncpy(
-		options.map_name,
-		main_globals.soloplayer_map_name,
-		NUMBEROF(options.map_name) - 1);
-	options.map_name[NUMBEROF(options.map_name) - 1] = 0;
-	options.difficulty = global_difficulty_level;
-	game_precache_new_map(options.map_name, TRUE);
-	game_dispose_from_old_map();
-	main_new_map(&options);
+	if (main_globals.playback_last_recording)
+	{
+		main_globals.connection = _game_connection_film_playback;
+		error(_error_silent, "error opening saved film");
+		main_globals.want_to_be_at_main_menu = TRUE;
+		main_menu_load();
+	}
+	else
+	{
+		main_globals.connection = _game_connection_local;
+		game_options_new(&options);
+		csstrncpy(
+			options.map_name,
+			main_globals.soloplayer_map_name,
+			NUMBEROF(options.map_name) - 1);
+		options.map_name[NUMBEROF(options.map_name) - 1] = 0;
+		options.difficulty = global_difficulty_level;
+		game_precache_new_map(options.map_name, TRUE);
+		game_dispose_from_old_map();
+		main_new_map(&options);
+	}
 
 	return;
 }
