@@ -33,9 +33,9 @@ The machine-readable per-function record is `opus5_100k_consolidated_admission_m
 
 | source | meaningful (approx.) | mechanism |
 | --- | ---: | --- |
-| Wave A/B/C worker landings | ~17,600 | one worker per `.c`, adversarial verifier per landing |
-| Header/config packets (single coordinator) | ~24,000 | worker proposals → owner header → full build → bisect |
-| Park re-investigation (waves C and D) | ~46,000 | new measured VC7 laws; every reopen adversarially verified, one dedicated commit per object |
+| Wave A/B/C worker landings | ~16,500 | one worker per `.c`, adversarial verifier per landing |
+| Header/config packets (single coordinator) | ~21,000 | worker proposals → owner header → full build → bisect |
+| Park re-investigation (waves C and D) | ~50,200 (51,440 padded) | new measured VC7 laws; every reopen adversarially verified, one dedicated commit per object |
 
 Checkpoints: +40K (`3754eed8c`), +60K (`548451f6d`), and the final manifest in this commit. Every packet was verified by:
 - full `ninja all_source progress semantic_progress`;
@@ -74,9 +74,9 @@ It was resolved without steering, either by removing a verbatim duplicate protot
 ## Parks
 
 74 parks were removed:
-- wave C: 19;
+- wave C: 14;
 - bitmap packet: 5;
-- wave D: 50.
+- wave D: 55 (actors 1, 14-object batch 43, object_lights 5, observer 6).
 
 Each reopen went through an independent adversarial verifier that checked:
 - strict exact;
