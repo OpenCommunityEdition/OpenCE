@@ -103,3 +103,7 @@ Data: owner set identical to build/base. Code owners gain the header-inline COMD
 
 Three functions strict exact and retained (1,344 padded bytes). collision_test_vector_exit stays active residual.
 Seven unwritten functions are header-blocked with measured candidates; no parked entries were added or touched.
+
+## Header packets P1/P2 (orchestrator, checkpoint 4)
+
+`line_from_planes3d` is declared in the focused owner header `math/real_math_planes.h`. The same declaration in real_math.h regressed two distant exact functions and drifted four parks at any position. The fog plane fields are named `region_index` / `runtime_material_type`. The full2.c body then landed with its shim removed. Full build: collision_test_vector and the four clip helpers are exact (2,080 padded); collision_move_point and object_test_vector stay fuzzy at zero credit; 0 regressions; parks clean.
