@@ -74,11 +74,9 @@ symbols in this file:
 #define distance_squared2d distance_squared2d_inline
 #define negate_vector2d negate_vector2d_inline
 #define point_from_line2d point_from_line2d_inline
-#define REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "actions.h"
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
-#undef REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
 #undef point_from_line2d
 #undef negate_vector2d
 #undef distance_squared2d
@@ -312,38 +310,34 @@ static boolean action_vehicle_desirable(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct unit_datum *vehicle = unit_get(vehicle_index);
-	boolean desirable = FALSE;
+	boolean desirable;
 
-	if (!TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
+	if (TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
 	{
-		if (scripted_request)
+		desirable = FALSE;
+	}
+	else if (scripted_request)
+	{
+		desirable = TRUE;
+	}
+	else
+	{
+		real maximum_distance = already_attempting_entry ?
+			attempt_start_distance : attempt_continue_distance;
+		real_point3d origin;
+
+		desirable = FALSE;
+		object_get_origin(vehicle_index, &origin);
+		if (already_inside ||
+			distance_squared3d(&actor->input.position.body_position, &origin) <
+				maximum_distance*maximum_distance)
 		{
 			desirable = TRUE;
-		}
-		else
-		{
-			real maximum_distance = already_attempting_entry ?
-				attempt_start_distance : attempt_continue_distance;
-			real_point3d origin;
-			real dx;
-			real dy;
-			real dz;
-
-			object_get_origin(vehicle_index, &origin);
-			dx = origin.x - actor->input.position.body_position.x;
-			dy = origin.y - actor->input.position.body_position.y;
-			dz = origin.z - actor->input.position.body_position.z;
-			if (already_inside ||
-				dx*dx + dz*dz + dy*dy <
-					maximum_distance*maximum_distance)
+			if (!already_inside && !already_attempting_entry &&
+				magnitude_squared3d(&vehicle->object.translational_velocity) >
+					(1.0f / (60.0f*60.0f)))
 			{
-				desirable = TRUE;
-				if (!already_inside && !already_attempting_entry &&
-					magnitude_squared3d(&vehicle->object.translational_velocity) >
-						(1.0f / (60.0f*60.0f)))
-				{
-					desirable = FALSE;
-				}
+				desirable = FALSE;
 			}
 		}
 	}
@@ -575,6 +569,7 @@ static boolean action_vehicle_find_destination(
 		vehicle_definition->unit.flags,
 		_unit_has_entrance_points_inside_bounding_sphere_bit))
 	{
+		real_point3d const *actor_position;
 		real_point3d marker;
 		real approach_distance;
 		real_point3d anchor_point;
@@ -605,10 +600,11 @@ static boolean action_vehicle_find_destination(
 		}
 
 		anchor_point = use_entry_point ? *entry_point : *hint_point;
+		actor_position = &actor->input.position.body_position;
 		entry_direction.i =
-			anchor_point.x - actor->input.position.body_position.x;
+			anchor_point.x - actor_position->x;
 		entry_direction.j =
-			anchor_point.y - actor->input.position.body_position.y;
+			anchor_point.y - actor_position->y;
 		anchor_to_marker.i = marker.x - anchor_point.x;
 		anchor_to_marker.j = marker.y - anchor_point.y;
 
@@ -627,7 +623,7 @@ static boolean action_vehicle_find_destination(
 		}
 
 		debug->last_vehicle_avoidance_time = game_time_get();
-		debug->field_C8 = actor->input.position.body_position;
+		debug->field_C8 = *actor_position;
 		debug->field_D4 = marker;
 		debug->field_E0 = approach_distance;
 		debug->field_E4 = anchor_point;
@@ -640,9 +636,9 @@ static boolean action_vehicle_find_destination(
 			boolean refined = FALSE;
 			real_vector2d perpendicular;
 			real marker_dx =
-				marker.x - actor->input.position.body_position.x;
+				marker.x - actor_position->x;
 			real marker_dy =
-				marker.y - actor->input.position.body_position.y;
+				marker.y - actor_position->y;
 			real t =
 				(entry_direction.j*marker_dy + entry_direction.i*marker_dx) /
 				(entry_direction.j*entry_direction.j +
@@ -678,10 +674,10 @@ static boolean action_vehicle_find_destination(
 				chosen_point.y = marker.y + perpendicular.j*offset_distance;
 				chosen_point.z = entry_point->z;
 				chosen_to_actor.i =
-					chosen_point.x - actor->input.position.body_position.x;
+					chosen_point.x - actor_position->x;
 				chosen_to_actor.j =
-					chosen_point.y - actor->input.position.body_position.y;
-				dz = entry_point->z - actor->input.position.body_position.z;
+					chosen_point.y - actor_position->y;
+				dz = entry_point->z - actor_position->z;
 				distance_squared =
 					chosen_to_actor.i*chosen_to_actor.i + dz*dz +
 					chosen_to_actor.j*chosen_to_actor.j;
