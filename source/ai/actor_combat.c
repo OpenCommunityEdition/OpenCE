@@ -2042,12 +2042,15 @@ void actor_combat_update(
 			}
 			else
 			{
-				/* January also snapshots this alignment test (time, aligned flags,
-				 * weapon and aim vectors, threshold and alignment) into
-				 * actor_debug_info; ai_debug.h does not name those fields yet. */
 				fire = TRUE;
 				actor->control.aiming_at_fire_target = TRUE;
-				if (!TEST_FLAG(actor_definition->flags, _actor_definition_start_firing_before_aligned_bit))
+				actor_debug_info->burst_alignment.time = game_time_get();
+				if (TEST_FLAG(actor_definition->flags, _actor_definition_start_firing_before_aligned_bit))
+				{
+					actor_debug_info->burst_alignment.aligned = TRUE;
+					actor_debug_info->burst_alignment.aligned_immediately = TRUE;
+				}
+				else
 				{
 					real alignment_threshold = actor->control.current_fire_target_range < 1.5f ?
 						actor->control.current_fire_target_range*((0.97f - 0.70710677f)/1.5f) + 0.70710677f :
@@ -2061,6 +2064,12 @@ void actor_combat_update(
 					{
 						hold_burst_start = TRUE;
 					}
+					actor_debug_info->burst_alignment.weapon_vector = weapon_vector;
+					actor_debug_info->burst_alignment.aim_vector = actor->control.current_fire_target_aim_vector;
+					actor_debug_info->burst_alignment.alignment = alignment;
+					actor_debug_info->burst_alignment.threshold = alignment_threshold;
+					actor_debug_info->burst_alignment.aligned = alignment >= alignment_threshold;
+					actor_debug_info->burst_alignment.aligned_immediately = FALSE;
 				}
 			}
 		}
@@ -2255,14 +2264,18 @@ void actor_combat_update(
 				actor_debug_info->burst_last_known_position = actor->control.burst_origin;
 			}
 
-			add_vectors3d(
-				&actor->control.burst_adjustment,
-				&actor->control.burst_relative_position,
-				&actor->control.burst_relative_position);
-			add_vectors3d(
-				&actor->control.burst_origin,
-				&actor->control.burst_relative_position,
-				&actor->control.burst_target);
+			{
+				real_vector3d *burst_relative_position = &actor->control.burst_relative_position;
+
+				add_vectors3d(
+					&actor->control.burst_adjustment,
+					burst_relative_position,
+					burst_relative_position);
+				add_vectors3d(
+					burst_relative_position,
+					&actor->control.burst_origin,
+					&actor->control.burst_target);
+			}
 
 			if (actor->input.vehicle_index != NONE)
 			{
