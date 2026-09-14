@@ -3026,44 +3026,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
-      "function": "__rasterizer_decals_draw",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed decal draw path from January disassembly, assertion strings, XDK 3911 interfaces, and HaloCEA naming/semantic evidence. The retained C validates the decal, resolves its shader, maintains the semantic bitmap cache, configures the texture and framebuffer blend mode, computes the LRUV vertex offset, draws the triangle fan, and updates frame statistics. Target and candidate share the 848-byte padded envelope and all 77 ordered relocation identities; objdiff reports 94.63415 percent. The first meaningful gap is a VC7 instruction-order choice around the cached bitmap group/index stores near +0x20A; the retained group-then-index source order agrees with independent HaloCEA evidence. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No reordered semantic writes, volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining this schedule.",
-      "measurements": {
-        "target": {
-          "size": 848,
-          "relocation_count": 77,
-          "normalized_sha256": "99a8c7dd1568c82d25de2211ce0c77f6b595223e55cead8d10d22b2906bfc9e6"
-        },
-        "base": {
-          "size": 848,
-          "relocation_count": 77,
-          "normalized_sha256": "90faf57d723b6455d1a0cdc0e5cadfe23f9acab7619890f2f2c56596e4e93206"
-        },
-        "objdiff_percent": 94.63415
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_decals",
-      "function": "__rasterizer_decals_initialize",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after retaining the natural typed initialization sequence: assert the D3D device, allocate and initialize the D3DVertexBuffer descriptor, allocate its GPU storage, register it, create the decal LRUV cache, and assert both allocations. January is 272 padded bytes with 31 relocations; the candidate is 288 with 33 and objdiff reports 90.710526 percent. The first meaningful divergence is at +0x64: January preserves the address of the Data member in ESI across game_state_gpu_malloc, while VC7 recompilation reloads the semantic local_d3d_vertex_buffer global. An explicit inner-block pointer-lvalue probe did not close the function and was rejected as needless compiler steering. HaloCEA independently authenticates the local_d3d_vertex_buffer and local_vertex_cache global names. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, or invented control flow is retained. Reopen only for authoritative January source/local records, the exact original SDK declaration context, or a natural same-compiler donor explaining the lvalue lifetime.",
-      "measurements": {
-        "target": {
-          "size": 272,
-          "relocation_count": 31,
-          "normalized_sha256": "87bdf054c7cc834eb2ed4baa6be508efc6476dca660b1c3d50a89e8cb5940b1a"
-        },
-        "base": {
-          "size": 288,
-          "relocation_count": 33,
-          "normalized_sha256": "fe276f982fbaab2c6a9049e415f1d1013882ab7bc6eb9296b87cac4bda0bec1c"
-        },
-        "objdiff_percent": 90.710526
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_lights",
       "function": "_rasterizer_sun_glow_draw",
       "class": "unclassified",

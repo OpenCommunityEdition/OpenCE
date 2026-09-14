@@ -318,15 +318,15 @@ static boolean rasterizer_decal_vertices_locked_proc(
 
 extern struct data_array *global_decal_data;
 extern D3DDevice *global_d3d_device;
-extern boolean local_filthy_decal_fog_hack_enabled;
-extern short local_framebuffer_blend_function;
-extern short local_layer;
-extern D3DVertexBuffer *local_d3d_vertex_buffer;
-extern struct lruv_cache *local_vertex_cache;
-extern boolean locked_decal_reported;
-extern boolean permanent_decal_reported;
-extern long rasterizer_decal_cached_bitmap_group_index;
-extern short rasterizer_decal_cached_bitmap_index;
+static short local_layer = 0;
+static long rasterizer_decal_cached_bitmap_group_index = 0;
+static short rasterizer_decal_cached_bitmap_index = 0;
+static short local_framebuffer_blend_function = 0;
+static D3DVertexBuffer *local_d3d_vertex_buffer = NULL;
+static struct lruv_cache *local_vertex_cache = NULL;
+static boolean locked_decal_reported = FALSE;
+static boolean permanent_decal_reported = FALSE;
+static boolean local_filthy_decal_fog_hack_enabled = FALSE;
 extern struct rasterizer_decals_debug_options rasterizer_debug_options;
 extern struct rasterizer_decals_window_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
