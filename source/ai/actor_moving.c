@@ -205,7 +205,6 @@ symbols in this file:
 /* ---------- headers */
 
 #define arccosine arccosine_inline
-#define normalize3d normalize3d_inline
 #define scale_vector3d scale_vector3d_inline
 #define distance3d distance3d_inline
 #define object_get_bounding_sphere object_get_bounding_sphere_inline
@@ -242,7 +241,6 @@ symbols in this file:
 #undef PATH_EXTERNAL_FLEE_ROUTINES
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #undef arccosine
-#undef normalize3d
 #undef scale_vector3d
 #undef distance3d
 #undef object_get_bounding_sphere
@@ -343,9 +341,6 @@ typedef char actor_moving_vehicle_steering_max_throttle_offset_assert[
 
 /* The owner declaration in actions.h is macro-renamed while importing the
  * January inline set; restore the external name after that schedule ends. */
-real normalize3d(
-	real_vector3d *vector);
-
 void object_get_bounding_sphere(
 	long object_index,
 	real_point3d *center,
