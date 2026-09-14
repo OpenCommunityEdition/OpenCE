@@ -869,7 +869,7 @@
 { "file_offset": 313088, "flags": 32, "name": "_path_state_new" },
 { "file_offset": 313152, "flags": 32, "name": "_path_state_destination" },
 { "file_offset": 313200, "flags": 32, "name": "_path_state_reset", "static": true },
-{ "file_offset": 313264, "flags": 32, "name": "_code_0004c7b0" },
+{ "file_offset": 313264, "flags": 32, "name": "_path_heap_verify", "static": true },
 { "file_offset": 313280, "flags": 32, "name": "_path_heap_bubble_up", "static": true },
 { "file_offset": 313760, "flags": 32, "name": "_path_heap_bubble_down", "static": true },
 { "file_offset": 314320, "flags": 32, "name": "_path_heap_pop_cheapest_node", "static": true },

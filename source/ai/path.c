@@ -229,6 +229,8 @@ typedef char path_node_surface_index_offset_assert[
 
 static void path_state_reset(
 	struct path_state *state);
+static boolean path_heap_verify(
+	struct path_state *state);
 static void path_heap_bubble_up(
 	struct path_state *state,
 	short heap_location);
@@ -381,6 +383,16 @@ static void path_state_reset(
 	state->closest_cost_estimate = REAL_MAX;
 
 	return;
+}
+
+/* January retains this private heap check with a body that reduces to TRUE
+ * (name from the 2001-09-25 Xbox linker map, same link slot).  Callers check
+ * the heap on entry and exit, as path_obstacle_avoidance.c's heap_verify does.
+ */
+static boolean path_heap_verify(
+	struct path_state *state)
+{
+	return TRUE;
 }
 
 static void path_heap_bubble_up(
@@ -547,6 +559,8 @@ static short path_heap_pop_cheapest_node(
 {
 	short node_index = NONE;
 
+	path_heap_verify(state);
+
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\path.c",
 		0x572,
@@ -578,6 +592,7 @@ static short path_heap_pop_cheapest_node(
 			state->heap[1] = state->heap[state->heap_count];
 			path_heap_bubble_down(state, 1);
 		}
+		path_heap_verify(state);
 	}
 
 	return node_index;
@@ -589,6 +604,8 @@ static void path_heap_insert(
 	short quantized_cost_estimate)
 {
 	short heap_location;
+
+	path_heap_verify(state);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\path.c",
@@ -602,6 +619,7 @@ static void path_heap_insert(
 		state->heap[heap_location].node_index = node_index;
 		state->heap[heap_location].quantized_cost_estimate = quantized_cost_estimate;
 		path_heap_bubble_up(state, heap_location);
+		path_heap_verify(state);
 	}
 	else
 	{
