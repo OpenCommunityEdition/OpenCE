@@ -838,25 +838,6 @@
     },
     {
       "unit": "source/input/input_xbox",
-      "function": "_input_get_raw_data_string",
-      "class": "unclassified",
-      "evidence": "Natural January raw-gamepad diagnostic formatting through genuine stick/handle arrays, signed16-bit size ABI and original snprintf literals. Target and candidate have equal240-byte padded extent and14 relocations; equivalent pointer setup/register scheduling differs. Retained first ordinary pointer/count implementation without declaration-order tuning, raw offsets, representation punning, helper anchors, compiler controls or assembly. All inherited exact functions and prior parks remain unchanged; key dequeue and key-state retrieval now independently close. Reopen only for authentic source or new type/ABI evidence. See docs/object_matching_logs/input_xbox_obj_remaining_public_leaves_20260904.md and input_xbox_obj_public_leaves_independent_review_20260904.md. No exact credit is claimed for this formatter.",
-      "measurements": {
-        "target": {
-          "size": 240,
-          "relocation_count": 14,
-          "normalized_sha256": "3a95b06caa2d47b995d9c24ba0a7450d1ccbc091e6a4dc288cc6a986d8f76c5a"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 14,
-          "normalized_sha256": "1032cde83ef635472499ea3ef854f7bbd2877bc5fb0ef29aa4dc4f41c631557e"
-        },
-        "objdiff_percent": 96.69512
-      }
-    },
-    {
-      "unit": "source/input/input_xbox",
       "function": "_input_update_analog_button_state",
       "class": "unclassified",
       "evidence": "Genuine January standalone private analog-button hysteresis helper at file offset 780288, with an ordinary static source definition and authentic auto-inlining into the device poller. Target and candidate are 48 padded bytes with no relocations; only sub al,32 versus compiler-canonical add al,-32 differs. Retain the natural threshold subtraction, not assembly, optimizer steering or an invented helper. All 16 inherited exact owners are preserved and no extra code owner or point_from_line3d is emitted. Reopen only for new authentic compiler/source evidence. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md. This park grants no exact credit.",
@@ -5322,17 +5303,6 @@
         "target": { "size": 1568, "relocation_count": 40, "normalized_sha256": "8dce5e181abf19a30fc9a87e483c1e0a16050eeb48c03c48c2b6209e7fd59deb" },
         "base": { "size": 1280, "relocation_count": 28, "normalized_sha256": "53f9635a438d2ebd8fa36e24a991df1c3adb5023eafbc440c0e060a00d1a7fe0" },
         "objdiff_percent": 45.926723
-      }
-    },
-    {
-      "unit": "source/input/input_xbox",
-      "function": "_input_flush_rumble",
-      "class": "unclassified",
-      "evidence": "Complete private rumble-state update retained with the genuine input worker/initializer call graph. January proves the four feedback updates and suppression conditions; the current natural body remains 160 versus 176 padded bytes with one fewer relocation, so it receives zero credit. The inferred keyboard lifecycle field is explicitly not treated as original-name evidence. See docs/object_matching_logs/input_xbox_obj_lifecycle_unknown_230_blocker_20260904.md.",
-      "measurements": {
-        "target": { "size": 176, "relocation_count": 8, "normalized_sha256": "f473cb2d504d90b7ac4014fa2d05f189e9ef27ace087fd7fb23d69a6c9c19949" },
-        "base": { "size": 160, "relocation_count": 7, "normalized_sha256": "f9b857cc2a18599535d68140b11d5bf9c0b479a253f27a37146f7cceacdfea73" },
-        "objdiff_percent": 84.2
       }
     },
     {

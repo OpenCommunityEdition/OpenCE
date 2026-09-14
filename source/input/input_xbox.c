@@ -626,30 +626,22 @@ void input_get_raw_data_string(
 			buffer,
 			size,
 			"|n|n|n|ngamepad|tleft stick|tright stick|t|n");
-		struct raw_gamepad_state *raw_gamepad_state = input_globals.raw_gamepad_states;
-		HANDLE *gamepad_handle = input_globals.gamepad_handles;
-		long gamepad_index = 0;
-		long gamepad_count = MAXIMUM_GAMEPADS;
+		short gamepad_index;
 
-		while (gamepad_count)
+		for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
 		{
-			if (*gamepad_handle != NULL)
+			if (input_globals.gamepad_handles[gamepad_index] != NULL)
 			{
 				buffer_length += (short)_snprintf(
 					buffer + buffer_length,
 					size - buffer_length,
 					"gamepad %d|t(%d, %d)|t(%d, %d)|n",
 					gamepad_index,
-					raw_gamepad_state->sticks[_gamepad_stick_left].x,
-					raw_gamepad_state->sticks[_gamepad_stick_left].y,
-					raw_gamepad_state->sticks[_gamepad_stick_right].x,
-					raw_gamepad_state->sticks[_gamepad_stick_right].y);
+					input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_left].x,
+					input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_left].y,
+					input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_right].x,
+					input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_right].y);
 			}
-
-			gamepad_index++;
-			gamepad_handle++;
-			raw_gamepad_state++;
-			gamepad_count--;
 		}
 	}
 
@@ -1139,35 +1131,29 @@ static void input_flush_rumble(
 		console_is_active() ||
 		game_time_get_paused() ||
 		!game_in_progress();
-	XINPUT_FEEDBACK *gamepad_feedback = input_globals.gamepad_feedbacks;
-	HANDLE *gamepad_handle = input_globals.gamepad_handles;
-	struct vibrate_data *gamepad_rumbler_state = input_globals.gamepad_rumbler_states;
-	long gamepad_count = MAXIMUM_GAMEPADS;
+	short gamepad_index;
 
-	while (gamepad_count)
+	for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
 	{
-		if (*gamepad_handle != NULL)
+		if (input_globals.gamepad_handles[gamepad_index] != NULL)
 		{
-			if (gamepad_feedback->Header.dwStatus == ERROR_SUCCESS)
+			if (input_globals.gamepad_feedbacks[gamepad_index].Header.dwStatus == ERROR_SUCCESS)
 			{
-				gamepad_feedback->Rumble.wLeftMotorSpeed = suppress_rumble
+				input_globals.gamepad_feedbacks[gamepad_index].Rumble.wLeftMotorSpeed = suppress_rumble
 					? 0
-					: gamepad_rumbler_state->left_frequency;
-				gamepad_feedback->Rumble.wRightMotorSpeed = suppress_rumble
+					: input_globals.gamepad_rumbler_states[gamepad_index].left_frequency;
+				input_globals.gamepad_feedbacks[gamepad_index].Rumble.wRightMotorSpeed = suppress_rumble
 					? 0
-					: gamepad_rumbler_state->right_frequency;
-				XInputSetState(*gamepad_handle, gamepad_feedback);
+					: input_globals.gamepad_rumbler_states[gamepad_index].right_frequency;
+				XInputSetState(
+					input_globals.gamepad_handles[gamepad_index],
+					&input_globals.gamepad_feedbacks[gamepad_index]);
 			}
-			else if (gamepad_feedback->Header.dwStatus != ERROR_IO_PENDING)
+			else if (input_globals.gamepad_feedbacks[gamepad_index].Header.dwStatus != ERROR_IO_PENDING)
 			{
-				gamepad_feedback->Header.dwStatus = ERROR_SUCCESS;
+				input_globals.gamepad_feedbacks[gamepad_index].Header.dwStatus = ERROR_SUCCESS;
 			}
 		}
-
-		gamepad_feedback++;
-		gamepad_handle++;
-		gamepad_rumbler_state++;
-		gamepad_count--;
 	}
 
 	return;
