@@ -122,7 +122,7 @@ char const *global_game_team_names[NUMBER_OF_GAME_TEAMS] =
 	"unused9"
 };
 
-struct game_allegiance_globals *game_allegiance_globals = NULL;
+static struct game_allegiance_globals *game_allegiance_globals = NULL;
 
 /* ---------- public code */
 
@@ -460,15 +460,13 @@ void game_allegiance_create(
 	short incident_decay_time,
 	boolean requires_communication)
 {
-	game_allegiance_globals_type *globals;
 	struct game_allegiance_record *allegiance;
 	short allegiance_count;
 	short allegiance_index;
 	short allegiance_team1_index;
 
-	globals = game_allegiance_globals;
-	allegiance = globals->allegiances;
-	allegiance_count = globals->allegiance_count;
+	allegiance = game_allegiance_globals->allegiances;
+	allegiance_count = game_allegiance_globals->allegiance_count;
 	allegiance_index = 0;
 	if (allegiance_count > 0)
 	{
@@ -490,15 +488,15 @@ void game_allegiance_create(
 			allegiance_index++;
 			allegiance++;
 		}
-		while (allegiance_index < globals->allegiance_count);
+		while (allegiance_index < game_allegiance_globals->allegiance_count);
 	}
 
-	if (allegiance_index >= allegiance_count)
+	if (allegiance_index >= game_allegiance_globals->allegiance_count)
 	{
 		if (allegiance_count < 8)
 		{
 			allegiance_index = allegiance_count;
-			globals->allegiance_count = allegiance_count + 1;
+			game_allegiance_globals->allegiance_count = allegiance_count + 1;
 		}
 		else
 		{
@@ -506,14 +504,13 @@ void game_allegiance_create(
 				_error_silent,
 				"game_allegiance_create: too many allegiances (maximum is %d)",
 				8);
-			globals = game_allegiance_globals;
 		}
 	}
 
-	if (allegiance_index < globals->allegiance_count)
+	if (allegiance_index < game_allegiance_globals->allegiance_count)
 	{
 		struct game_allegiance_record *target =
-			&globals->allegiances[allegiance_index];
+			&game_allegiance_globals->allegiances[allegiance_index];
 
 		target->team1_index = team1_index;
 		target->team1_suspicious = team1_suspicious;
