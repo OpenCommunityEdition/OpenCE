@@ -294,16 +294,14 @@ void king_engine_post_rasterize(
 {
 	struct game_globals *game_globals;
 	struct game_globals_multiplayer_information *multiplayer_information;
-	real accumulated_distance;
+	long hill_point_count;
+	long shader_index;
+	long point_index;
 	real hill_perimeter;
+	real accumulated_distance;
 	real inverse_segment_count;
 	real texels_per_unit;
 	real previous_u;
-	long hill_point_count;
-	long shader_index;
-	long next_point_index;
-	long remaining_point_count;
-	real_point3d const *current_point;
 
 	global_scenario_get();
 	game_globals = scenario_get_game_globals();
@@ -311,27 +309,16 @@ void king_engine_post_rasterize(
 		&game_globals->multiplayer_information,
 		0,
 		struct game_globals_multiplayer_information);
-	hill_point_count = king_globals.hill_point_count;
 	hill_perimeter = 0.0f;
 	shader_index = multiplayer_information->hill_shader.index;
+	hill_point_count = king_globals.hill_point_count;
 
-	if (hill_point_count > 0)
+	for (point_index = 0; point_index < king_globals.hill_point_count; point_index++)
 	{
-		next_point_index = 1;
-		remaining_point_count = hill_point_count;
-		current_point = king_globals.hill_points;
-
-		do
-		{
-			hill_perimeter += distance3d(
-				current_point,
-				&king_globals.hill_points[
-					next_point_index == hill_point_count ? 0 : next_point_index]);
-			current_point++;
-			next_point_index++;
-			remaining_point_count--;
-		}
-		while (remaining_point_count != 0);
+		hill_perimeter += distance3d(
+			&king_globals.hill_points[point_index],
+			&king_globals.hill_points[
+				point_index + 1 == king_globals.hill_point_count ? 0 : point_index + 1]);
 	}
 
 	inverse_segment_count = (real)(1.0/floor(hill_perimeter + 0.5f));
@@ -339,67 +326,49 @@ void king_engine_post_rasterize(
 	previous_u = 0.0f;
 	accumulated_distance = 0.0f;
 
-	if (hill_point_count > 0)
+	for (point_index = 0; point_index < hill_point_count; point_index++)
 	{
-		next_point_index = 1;
-		remaining_point_count = hill_point_count;
-		current_point = king_globals.hill_points;
+		struct model_vertex_uncompressed vertices[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
+		real_vector3d sides[2];
+		real_vector3d normal;
+		real edge_length = distance3d(
+			&king_globals.hill_points[point_index],
+			&king_globals.hill_points[
+				point_index + 1 == hill_point_count ? 0 : point_index + 1]);
+		real edge_end_u = (edge_length + accumulated_distance)*texels_per_unit;
 
-		do
-		{
-			struct model_vertex_uncompressed vertices[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
-			real_vector3d side0;
-			real_vector3d side1;
-			real_vector3d normal;
-			real edge_length = distance3d(
-				current_point,
-				&king_globals.hill_points[
-					next_point_index == hill_point_count ? 0 : next_point_index]);
-			real edge_end_u = (edge_length + accumulated_distance)*texels_per_unit;
+		accumulated_distance = edge_length + accumulated_distance;
+		csmemset(vertices, 0, sizeof(vertices));
+		vertices[1].position = king_globals.hill_points[point_index];
+		vertices[1].position.z += 0.8f;
+		vertices[0].position = king_globals.hill_points[point_index];
+		vertices[2].position = vertices[3].position = king_globals.hill_points[
+			point_index + 1 == hill_point_count ? 0 : point_index + 1];
+		vertices[2].position.z += 0.8f;
 
-			accumulated_distance = edge_length + accumulated_distance;
-			csmemset(vertices, 0, sizeof(vertices));
-			vertices[1].position = *current_point;
-			vertices[1].position.z += 0.8f;
-			vertices[0].position = *current_point;
-			vertices[3].position = king_globals.hill_points[
-				next_point_index == hill_point_count ? 0 : next_point_index];
-			vertices[2].position = king_globals.hill_points[
-				next_point_index == hill_point_count ? 0 : next_point_index];
-			vertices[2].position.z += 0.8f;
+		vector_from_points3d(&vertices[0].position, &vertices[1].position, &sides[0]);
+		vector_from_points3d(&vertices[1].position, &vertices[2].position, &sides[1]);
+		cross_product3d(&sides[0], &sides[1], &normal);
+		normalize3d(&normal);
+		vertices[0].normal = vertices[1].normal = vertices[2].normal = vertices[3].normal = normal;
 
-			vector_from_points3d(&vertices[0].position, &vertices[1].position, &side0);
-			vector_from_points3d(&vertices[1].position, &vertices[2].position, &side1);
-			cross_product3d(&side0, &side1, &normal);
-			normalize3d(&normal);
-			vertices[0].normal = normal;
-			vertices[1].normal = normal;
-			vertices[2].normal = normal;
-			vertices[3].normal = normal;
+		vertices[0].texcoord.x = previous_u*inverse_segment_count;
+		vertices[0].texcoord.y = 1.0f;
+		vertices[1].texcoord.x = previous_u*inverse_segment_count;
+		vertices[1].texcoord.y = 0.2f;
+		vertices[2].texcoord.x = edge_end_u*inverse_segment_count;
+		vertices[2].texcoord.y = 0.2f;
+		vertices[3].texcoord.x = edge_end_u*inverse_segment_count;
+		vertices[3].texcoord.y = 1.0f;
+		previous_u = edge_end_u;
 
-			vertices[0].texcoord.x = previous_u*inverse_segment_count;
-			vertices[0].texcoord.y = 1.0f;
-			vertices[1].texcoord.x = previous_u*inverse_segment_count;
-			vertices[1].texcoord.y = 0.2f;
-			vertices[2].texcoord.x = edge_end_u*inverse_segment_count;
-			vertices[2].texcoord.y = 0.2f;
-			vertices[3].texcoord.x = edge_end_u*inverse_segment_count;
-			vertices[3].texcoord.y = 1.0f;
-			previous_u = edge_end_u;
-
-			render_dynamic_quad(
-				vertices,
-				shader_index,
-				NULL,
-				NULL,
-				1.0f/inverse_segment_count,
-				1.0f);
-
-			current_point++;
-			next_point_index++;
-			remaining_point_count--;
-		}
-		while (remaining_point_count != 0);
+		render_dynamic_quad(
+			vertices,
+			shader_index,
+			NULL,
+			NULL,
+			1.0f/inverse_segment_count,
+			1.0f);
 	}
 
 	return;
@@ -961,14 +930,12 @@ static void find_hill(
 		maximum = king_globals.hill_points[0];
 		for (i = 0; i < hull_point_count; i++)
 		{
-			real_point3d *point = &king_globals.hill_points[i];
-
-			minimum.x = MIN(minimum.x, point->x);
-			minimum.y = MIN(minimum.y, point->y);
-			minimum.z = MIN(minimum.z, point->z);
-			maximum.x = MAX(maximum.x, point->x);
-			maximum.y = MAX(maximum.y, point->y);
-			maximum.z = MAX(maximum.z, point->z);
+			minimum.x = MIN(minimum.x, king_globals.hill_points[i].x);
+			minimum.y = MIN(minimum.y, king_globals.hill_points[i].y);
+			minimum.z = MIN(minimum.z, king_globals.hill_points[i].z);
+			maximum.x = MAX(maximum.x, king_globals.hill_points[i].x);
+			maximum.y = MAX(maximum.y, king_globals.hill_points[i].y);
+			maximum.z = MAX(maximum.z, king_globals.hill_points[i].z);
 		}
 		king_globals.hill_bottom = minimum.z - 0.1f;
 		king_globals.hill_top = maximum.z + 0.8f;
