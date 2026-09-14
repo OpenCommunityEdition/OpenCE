@@ -254,7 +254,7 @@ short animation_choose_random_permutation_internal(
 	long animation_graph_index,
 	short animation_index);
 short animation_update_internal(
-	short animation_type,
+	long render_or_affects_game_state,
 	long animation_graph_index,
 	struct animation_state *state,
 	long *sound_index);

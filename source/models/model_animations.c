@@ -435,7 +435,7 @@ void animation_set_frame_size(
 }
 
 short animation_update_internal(
-	short render_or_affects_game_state,
+	long render_or_affects_game_state,
 	long animation_graph_index,
 	struct animation_state *state,
 	long *sound_index)

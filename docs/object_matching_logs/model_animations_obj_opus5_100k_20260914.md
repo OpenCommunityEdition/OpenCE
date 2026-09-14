@@ -145,3 +145,7 @@ parked and untouched (no drift). Final gate:
 python -B tools/campaign/gate.py source/models/model_animations --all --forbid-emitted-symbol _point_from_line3d --out scratch/workers/model_animations/final.obj
 == exact 25  residual 7  unwritten 0  (of 32 listed)
 ```
+
+## Header packet H1 (orchestrator, applied)
+
+The parameter width of `animation_update_internal` is now `long render_or_affects_game_state`, in both `model_animation_definitions.h` and the definition. The 14 includers were rebuilt in a full ninja. Stable diff: +1 exact (`_animation_update_internal`, 304 padded), 0 regressions; parks 465 active / 0 stale / 0 invalid. The declaration count is unchanged: only a parameter type changed.
