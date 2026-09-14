@@ -4775,25 +4775,6 @@
     },
     {
       "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_path_new",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete natural reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 480 padded bytes with all 24 relocation identities; the remaining difference is ordinary field-store scheduling. The body uses the real typed path structures and named limits, with no raw offsets, register pressure, forced inline, invented logic or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 24,
-          "normalized_sha256": "5d754d83f2bb8621dfab62179b4bde5ac1a57f4e94238d669cbd305208d3845a"
-        },
-        "base": {
-          "size": 480,
-          "relocation_count": 24,
-          "normalized_sha256": "5eec6c7258e58d880f83c6e52d154413872c69797ee5d539edbe00e11a7b01c0"
-        },
-        "objdiff_percent": 95.76
-      }
-    },
-    {
-      "unit": "source/ai/path_obstacle_avoidance",
       "function": "_path_add_steps",
       "class": "register-allocation",
       "evidence": "Best complete natural reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 816 padded bytes with all 30 relocation identities; only a private register and word-store allocation tie remains. The real typed step-building algorithm is retained without source-pressure tuning, fake dependencies, invented branches or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
@@ -4828,25 +4809,6 @@
           "normalized_sha256": "ebd074f70b98e427ea8e4304e5039f9d7bd1a58c6b22a4940466c1eb9789368d"
         },
         "objdiff_percent": 90.164444
-      }
-    },
-    {
-      "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_render_debug_path",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete natural debug-path reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 608 padded bytes with all 28 relocation identities; two independent point locals occupy opposite stack slots. The ordinary typed render graph is retained without declaration-order searches, source pressure, fake logic or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 608,
-          "relocation_count": 28,
-          "normalized_sha256": "3a4858ca4cf82b84fd23ff99e17f3aae4ddd3fef218daa8174b650ca5cbd9d99"
-        },
-        "base": {
-          "size": 608,
-          "relocation_count": 28,
-          "normalized_sha256": "a1779f59405d48cc89513787a67a413d9757abd6c3ccc0a81474d40eae0148a1"
-        },
-        "objdiff_percent": 99.96172
       }
     },
     {

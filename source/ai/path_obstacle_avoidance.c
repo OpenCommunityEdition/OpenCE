@@ -480,14 +480,17 @@ void render_debug_path(
 	{
 		struct collision_bsp *bsp= TAG_BLOCK_GET_ELEMENT(&path->structure->collision_bsp, 0, struct collision_bsp);
 		long on_path[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_OBSTACLE_AVOIDANCE_STEPS)];
-		real_point3d point;
-		real_point3d previous_point;
 		short step_index;
 
-		collision_surface_project_point2d(bsp, path->steps[0].surface_index, _z, TRUE, &path->steps[0].point, &previous_point);
-		collision_surface_project_point2d(bsp, path->goal_surface_index, _z, TRUE, &path->goal, &point);
-		render_debug_point(TRUE, &previous_point, 0.125f, path->goal_step_index!=NONE ? global_real_argb_white : global_real_argb_yellow);
-		render_debug_point(TRUE, &point, 0.125f, path->goal_step_index!=NONE ? global_real_argb_white : global_real_argb_yellow);
+		{
+			real_point3d start_point;
+			real_point3d goal_point;
+
+			collision_surface_project_point2d(bsp, path->steps[0].surface_index, _z, TRUE, &path->steps[0].point, &start_point);
+			collision_surface_project_point2d(bsp, path->goal_surface_index, _z, TRUE, &path->goal, &goal_point);
+			render_debug_point(TRUE, &start_point, 0.125f, path->goal_step_index!=NONE ? global_real_argb_white : global_real_argb_yellow);
+			render_debug_point(TRUE, &goal_point, 0.125f, path->goal_step_index!=NONE ? global_real_argb_white : global_real_argb_yellow);
+		}
 
 		step_index= path->goal_step_index;
 		csmemset(on_path, 0, BIT_VECTOR_SIZE_IN_BYTES(path->step_count));
@@ -506,6 +509,8 @@ void render_debug_path(
 			if (step->previous_step_index!=NONE)
 			{
 				struct obstacle_path_step *previous_step= path_get_step(path, step->previous_step_index);
+				real_point3d previous_point;
+				real_point3d point;
 
 				collision_surface_project_point2d(bsp, previous_step->surface_index, _z, TRUE, &previous_step->point, &previous_point);
 				collision_surface_project_point2d(bsp, step->surface_index, _z, TRUE, &step->point, &point);
@@ -645,10 +650,10 @@ static void path_new(
 	match_assert_valid_real_point2d("c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 441, start);
 	match_assert_valid_real_point2d("c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 442, goal);
 
+	path->obstacles= obstacles;
 	path->radius= radius;
 	path->structure= structure;
 	path->ignore_broken_surfaces= ignore_broken_surfaces;
-	path->obstacles= obstacles;
 	path->goal_found_exactly= FALSE;
 	path->goal= *goal;
 	path->goal_surface_index= goal_surface_index;
