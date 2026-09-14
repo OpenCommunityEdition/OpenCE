@@ -1184,7 +1184,7 @@ void _rasterizer_environment_lightmap_begin(
 		}
 		else
 		{
-			D3DDevice_SetTexture(2, NULL);
+			IDirect3DDevice8_SetTexture(global_d3d_device, 2, NULL);
 			rasterizer_environment_globals.lightmap_missing = TRUE;
 		}
 
