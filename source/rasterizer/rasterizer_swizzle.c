@@ -465,7 +465,6 @@ void rasterizer_xbox_bitmap_swizzle(
 
 				case _bitmap_type_cube_map:
 				{
-					long face_size = pixel_data_size/6;
 					byte *source = pixels;
 					byte *destination = buffer;
 					short face_index;
@@ -488,8 +487,8 @@ void rasterizer_xbox_bitmap_swizzle(
 								break;
 						}
 
-						destination += face_size;
-						source += face_size;
+						destination += pixel_data_size/NUMBER_OF_FACES_PER_CUBE;
+						source += pixel_data_size/NUMBER_OF_FACES_PER_CUBE;
 					}
 					break;
 				}
