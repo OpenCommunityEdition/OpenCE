@@ -1492,11 +1492,11 @@ static long biped_find_ground_surface(
 	return surface_index;
 }
 
-short biped_approximate_surface_index(
+long biped_approximate_surface_index(
 	long biped_index,
 	real_point3d *point)
 {
-	return (short)biped_find_ground_surface(biped_index, global_down3d, 2.f, point, NULL);
+	return biped_find_ground_surface(biped_index, global_down3d, 2.f, point, NULL);
 }
 
 long biped_find_pathfinding_surface_index(

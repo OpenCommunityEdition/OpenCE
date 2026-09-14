@@ -158,7 +158,7 @@ void biped_falling_danger(
 	long biped_index);
 void biped_render_debug(
 	long biped_index);
-short biped_approximate_surface_index(
+long biped_approximate_surface_index(
 	long biped_index,
 	real_point3d *point);
 long biped_find_pathfinding_surface_index(

@@ -4726,17 +4726,6 @@
       }
     },
     {
-      "unit": "source/ai/ai_script",
-      "function": "_ai_scripting_teleport_starting_location_private",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed HCEA-backed teleport helper retained under its authenticated semantic private name. Target and candidate both occupy 288 padded bytes and have the same 13 relocation destinations; the remaining one-byte schedule displacement begins after the January biped_approximate_surface_index call. Widening that shared function's return type can close this helper but perturbs accepted consumers, so that ABI change is rejected. This natural body receives zero credit. See docs/object_matching_logs/ai_flee_teleport_model_node_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 288, "relocation_count": 13, "normalized_sha256": "755b7a6e2990f977b15fb61eb09a0106990c68fcd7d69128922e69cc12e52c5e" },
-        "base": { "size": 288, "relocation_count": 13, "normalized_sha256": "9c0415c2243227d13b1b96ca944e476f75acf40417113dab2fc3edcaa501b22e" },
-        "objdiff_percent": 99.9375
-      }
-    },
-    {
       "unit": "source/items/weapons",
       "function": "_weapon_can_be_fired",
       "class": "unclassified",
