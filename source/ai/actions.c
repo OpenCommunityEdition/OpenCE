@@ -413,10 +413,6 @@ typedef char firing_position_evaluation_context_size_assert[
 
 /* ---------- prototypes */
 
-boolean actor_action_set_default_state(
-	long actor_index,
-	short override_state);
-
 boolean action_guard_setup_from_fleeing(
 	long actor_index,
 	struct flee_state_data *flee_state,

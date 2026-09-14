@@ -55,8 +55,6 @@ void ai_handle_unit_effect(
 	short volume);
 void ai_flush_spatial_effects(
 	void);
-void ai_reconnect_to_structure_bsp(
-	void);
 void ai_erase(
 	long encounter_index,
 	long platoon_index,

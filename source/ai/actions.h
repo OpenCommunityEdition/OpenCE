@@ -420,6 +420,9 @@ short actor_action_class(
 	long actor_index);
 short actor_action_get_default_state(
 	short initial_state);
+boolean actor_action_set_default_state(
+	long actor_index,
+	short override_state);
 
 boolean actor_action_handle_initial_action(
 	long actor_index);
