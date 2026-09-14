@@ -550,7 +550,6 @@ static void handle_one_player_input(
 		0,
 		struct game_globals_player_control);
 	struct input_blob input;
-	struct player_action action;
 	long current_weapon_index;
 
 	csmemset(
@@ -713,6 +712,8 @@ static void handle_one_player_input(
 
 	if (local_player_get_player_index(local_player_index) != NONE)
 	{
+		struct player_action action;
+
 		match_assert_valid_real(
 			"c:\\halo\\SOURCE\\game\\player_control.c",
 			0x35D,
@@ -726,13 +727,14 @@ static void handle_one_player_input(
 			0x35F,
 			player->primary_trigger);
 
-		action.control_flags = player->control_flags;
 		action.desired_facing = player->desired_angles;
-		action.throttle = player->throttle;
-		action.primary_trigger = player->primary_trigger;
+		action.control_flags = player->control_flags;
 		action.desired_weapon_index = player->desired_weapon_index;
 		action.desired_grenade_index = player->desired_grenade_index;
 		action.desired_zoom_level = player->zoom_level;
+		action.throttle = player->throttle;
+		action.primary_trigger = player->primary_trigger;
+
 		match_assert_valid_real(
 			"c:\\halo\\SOURCE\\game\\player_control.c",
 			0x369,
