@@ -1,0 +1,962 @@
+{
+ "summary": {
+  "label": "checkpoint-w1",
+  "base_commit": "12f7375d4b845725c5ae3fda7ad715998ee54975",
+  "head_commit": "8e9a6de05d55c3aac3aab52f651f9a10dcedf317",
+  "accepted_functions": 7205,
+  "accepted_meaningful": 1275467,
+  "accepted_gain_functions": 56,
+  "accepted_gain_meaningful": 30497,
+  "strict_new_functions": 54,
+  "strict_new_meaningful": 29021,
+  "strict_new_padded": 29440,
+  "nonstrict_new_accepted_functions": 2,
+  "nonstrict_new_accepted_meaningful": 1476,
+  "strict_gains_not_in_accepted_ledger": 0,
+  "regressions": [],
+  "target_meaningful": 1394970,
+  "strict_remaining_to_150k": 120979
+ },
+ "strict_functions": [
+  {
+   "unit": "source/ai/action_vehicle",
+   "function": "_action_vehicle_perform",
+   "meaningful_bytes": 767,
+   "relocations": 18,
+   "normalized_sha256": "e61cabd696765a6f53b6e530b98dfe6abe5b720b7c3c12cb5d6f68849498ddeb",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 768,
+   "previous_name": "_action_vehicle_perform",
+   "commits": [
+    "cbc9fbf5a action_vehicle: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/action_vehicle",
+   "function": "_action_vehicle_setup_specific",
+   "meaningful_bytes": 328,
+   "relocations": 15,
+   "normalized_sha256": "aa10ba89a138d06b58677ffdea136e5631273c7f019791abac0cf1f45456bf5f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 336,
+   "previous_name": "_action_vehicle_setup_specific",
+   "commits": [
+    "cbc9fbf5a action_vehicle: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "function": "_actor_look_find_random_vector",
+   "meaningful_bytes": 595,
+   "relocations": 35,
+   "normalized_sha256": "424bed166d4ac6bbb65e144cbd5d5a6981232e1201a8ad5752c25b3a371ee8b5",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 608,
+   "previous_name": "_actor_look_find_random_vector",
+   "commits": [
+    "de8873833 actor_looking: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "function": "_actor_aim_jump",
+   "meaningful_bytes": 244,
+   "relocations": 4,
+   "normalized_sha256": "141b04fcbe71e0761c688c7a766b0791721fecc38d3d58eb14e6b319fa4f0e84",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 256,
+   "previous_name": "_actor_aim_jump",
+   "commits": [
+    "b8d1d0c73 actor_moving: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "function": "_actor_move_calculate_movement",
+   "meaningful_bytes": 2744,
+   "relocations": 99,
+   "normalized_sha256": "970ee1ef079d1207ed73681307822d4055ed22c8ff5ca6d50b8ecbb11cf03cdc",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:33",
+   "padded_bytes": 2752,
+   "previous_name": "_actor_move_calculate_movement",
+   "commits": [
+    "b8d1d0c73 actor_moving: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_perception",
+   "function": "_actor_perception_desire_prop",
+   "meaningful_bytes": 549,
+   "relocations": 16,
+   "normalized_sha256": "f9729e40ecdc2cbd04fcb50024e74431499a7f69d9d071ca13b8cf6eea3def13",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "padded_bytes": 560,
+   "previous_name": "_actor_perception_desire_prop",
+   "commits": [
+    "d4046d4df actor_perception: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_communication",
+   "function": "_ai_conversation_begin",
+   "meaningful_bytes": 1735,
+   "relocations": 54,
+   "normalized_sha256": "4ac91071ef1ee4f6e17df958f06ddfcb727ef821e855baceca2e77f32c94cb12",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:43",
+   "padded_bytes": 1744,
+   "previous_name": "_ai_conversation_begin",
+   "commits": [
+    "a9ffabb00 ai_communication: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "function": "_ai_scripting_allegiance_broken",
+   "meaningful_bytes": 65,
+   "relocations": 2,
+   "normalized_sha256": "08396f5b188d67da5cd6a45c250ada24f08cd65780fef43cbb3d41d0b897522a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:54",
+   "padded_bytes": 80,
+   "previous_name": "_ai_scripting_allegiance_broken",
+   "commits": [
+    "ffd0e1d4b ai_script: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "function": "_encounter_control_actors",
+   "meaningful_bytes": 436,
+   "relocations": 16,
+   "normalized_sha256": "75f6b08c5eadabec3c27ae977933a927518dd5554523f02534ea147f44454848",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:59",
+   "padded_bytes": 448,
+   "previous_name": "_encounter_control_actors",
+   "commits": [
+    "0f92089d8 encounters: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "function": "_encounter_new",
+   "meaningful_bytes": 652,
+   "relocations": 31,
+   "normalized_sha256": "3984b20f66ae9674d23c3fa400197b1e9a332f054b37bd572ed3bc3ce2c1d288",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "padded_bytes": 656,
+   "previous_name": "_encounter_new",
+   "commits": [
+    "0f92089d8 encounters: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/encounters",
+   "function": "_encounter_place_actor",
+   "meaningful_bytes": 368,
+   "relocations": 14,
+   "normalized_sha256": "d005c7cf24715e91e80c79870822dc1205afe5e257dea8ea3c56344074115898",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:49",
+   "padded_bytes": 368,
+   "previous_name": "_encounter_place_actor",
+   "commits": [
+    "0f92089d8 encounters: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path_obstacle_avoidance",
+   "function": "_path_new",
+   "meaningful_bytes": 476,
+   "relocations": 24,
+   "normalized_sha256": "5d754d83f2bb8621dfab62179b4bde5ac1a57f4e94238d669cbd305208d3845a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 480,
+   "previous_name": "_path_new",
+   "commits": [
+    "1886d3944 path_obstacle_avoidance: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/path_obstacle_avoidance",
+   "function": "_render_debug_path",
+   "meaningful_bytes": 604,
+   "relocations": 28,
+   "normalized_sha256": "3a4858ca4cf82b84fd23ff99e17f3aae4ddd3fef218daa8174b650ca5cbd9d99",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 608,
+   "previous_name": "_render_debug_path",
+   "commits": [
+    "1886d3944 path_obstacle_avoidance: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/props",
+   "function": "_prop_get_base_by_unit_index",
+   "meaningful_bytes": 395,
+   "relocations": 15,
+   "normalized_sha256": "6c8805cdd5bca500238e2026ea2923bfe520b62cfc542eb3c43e19ee02c579f7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "padded_bytes": 400,
+   "previous_name": "_prop_get_base_by_unit_index",
+   "commits": [
+    "bacc15195 props: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "function": "_extract_get_bitmap_format",
+   "meaningful_bytes": 568,
+   "relocations": 20,
+   "normalized_sha256": "de642601ab31964719ffd3853c0be2514d729c1b266f7e65dcab606b6312400e",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "padded_bytes": 576,
+   "previous_name": "_extract_get_bitmap_format",
+   "commits": [
+    "1f2c40aef bitmap_extract: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_extract",
+   "function": "_extract_plateless_cube_map",
+   "meaningful_bytes": 824,
+   "relocations": 19,
+   "normalized_sha256": "f55f10e75310fe5c98c6bff63288c76c13e64850a4ec6ffaa7ed03244d64c2e2",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 832,
+   "previous_name": "_extract_plateless_cube_map",
+   "commits": [
+    "1f2c40aef bitmap_extract: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_utilities",
+   "function": "_bitmap_2d_shrink",
+   "meaningful_bytes": 649,
+   "relocations": 18,
+   "normalized_sha256": "e032c32d2cf00f0b14b44627abd321b829450ea9d964b379b1ad51969755c87c",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 656,
+   "previous_name": "_bitmap_2d_shrink",
+   "commits": [
+    "723ce4dd3 bitmap_utilities: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_utilities",
+   "function": "_bitmap_2d_uncompress_from_mipmap",
+   "meaningful_bytes": 866,
+   "relocations": 49,
+   "normalized_sha256": "4f4b53aed0db63a496b4c239249e9adaaa70adee056f6e6bc6118dc30dc2b4ab",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 880,
+   "previous_name": "_bitmap_2d_uncompress_from_mipmap",
+   "commits": [
+    "723ce4dd3 bitmap_utilities: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/bitmap_utilities",
+   "function": "_bitmap_3d_shrink",
+   "meaningful_bytes": 799,
+   "relocations": 18,
+   "normalized_sha256": "5435cdf751f34b0fcdd56e703d1f8feb3d21dd3c4f95ac2a8bc65b06b9e9e8b4",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:5",
+   "padded_bytes": 800,
+   "previous_name": "_bitmap_3d_shrink",
+   "commits": [
+    "723ce4dd3 bitmap_utilities: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "function": "_acquire_read_request",
+   "meaningful_bytes": 104,
+   "relocations": 1,
+   "normalized_sha256": "e02ac996c6a8e2aba3cb61d7188815f082442aca055f7710066c81546a45badb",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 112,
+   "previous_name": "_acquire_read_request",
+   "commits": [
+    "2755cc267 cache_files_decompress_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "function": "_cache_copy_get_status",
+   "meaningful_bytes": 389,
+   "relocations": 20,
+   "normalized_sha256": "3a3d93f1205a4dcc032b3f6bed85f2a553cf884942b7ff770dc03fb79865eba0",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:29",
+   "padded_bytes": 400,
+   "previous_name": "_cache_copy_get_status",
+   "commits": [
+    "2755cc267 cache_files_decompress_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "function": "_cache_copy_update_write_buffers",
+   "meaningful_bytes": 484,
+   "relocations": 18,
+   "normalized_sha256": "415c4305c972ccc70e19adbf482a423884bcf555f02d33a9a6fd9955b5cbddcf",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:43",
+   "padded_bytes": 496,
+   "previous_name": "_cache_copy_update_write_buffers",
+   "commits": [
+    "2755cc267 cache_files_decompress_windows: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/camera/editor_flying_camera",
+   "function": "_editor_camera_orbiting_update",
+   "meaningful_bytes": 1117,
+   "relocations": 49,
+   "normalized_sha256": "280e2c91cb77eeafa93951dae28c4d74b793d9ab0d5e7e4f5adbf851c5231ce0",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "padded_bytes": 1120,
+   "previous_name": "_editor_camera_orbiting_update",
+   "commits": [
+    "1a8ceaf44 editor_flying_camera: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/contrails",
+   "function": "_contrail_scale_random_value",
+   "meaningful_bytes": 102,
+   "relocations": 2,
+   "normalized_sha256": "45251a9f1f22cc5ea22d197f1e307f2d1b22d9d1de67c2c5566242dc17f150dd",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 112,
+   "previous_name": "_contrail_scale_random_value",
+   "commits": [
+    "06304f817 contrails: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/decals",
+   "function": "_decal_update",
+   "meaningful_bytes": 387,
+   "relocations": 25,
+   "normalized_sha256": "dcc6a629481fabd93292d708b860675421698d6ef2dc9e0679b57331d784d35f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "padded_bytes": 400,
+   "previous_name": "_decal_update",
+   "commits": [
+    "8e5976ae9 decals: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "function": "_find_aim_assist_targets",
+   "meaningful_bytes": 294,
+   "relocations": 6,
+   "normalized_sha256": "2f48dbfde992d379336893e7ee987072aae523819cb38f686069122ef4215dd3",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 304,
+   "previous_name": "_find_aim_assist_targets",
+   "commits": [
+    "b0cb3bd3b aim_assist: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "function": "_find_closest_player_index",
+   "meaningful_bytes": 444,
+   "relocations": 18,
+   "normalized_sha256": "4c90ec184c403112ccdd4b254be7841546362efefda25464c37fe8c16c767639",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:132",
+   "padded_bytes": 448,
+   "previous_name": "_find_closest_player_index",
+   "commits": [
+    "4916e70a0 game_engine: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "function": "_game_engine_get_place",
+   "meaningful_bytes": 367,
+   "relocations": 12,
+   "normalized_sha256": "91161c382c55b5a853880db9762c078496b19779acec4a23fb5ae6837afd3323",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:74",
+   "padded_bytes": 368,
+   "previous_name": "_game_engine_get_place",
+   "commits": [
+    "4916e70a0 game_engine: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "function": "_multiplayer_message",
+   "meaningful_bytes": 140,
+   "relocations": 5,
+   "normalized_sha256": "675e96da950ff2a58c1909ba9eaa76b83af16c8a0263c0fa07aac34fdcd64447",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:143",
+   "padded_bytes": 144,
+   "previous_name": "_multiplayer_message",
+   "commits": [
+    "4916e70a0 game_engine: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "function": "_player_teleport_on_bsp_switch",
+   "meaningful_bytes": 320,
+   "relocations": 21,
+   "normalized_sha256": "73f7fae1e4082fd761f5db63b3648a2b5ca519901a19abd8499126c231447c5c",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:62",
+   "padded_bytes": 320,
+   "previous_name": "_player_teleport_on_bsp_switch",
+   "commits": [
+    "ba5f668a1 players: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "function": "_players_compute_combined_pvs",
+   "meaningful_bytes": 354,
+   "relocations": 22,
+   "normalized_sha256": "9e3ab79a5087c8d11b97f52c30afc3f596faa4aa6122480dc9f16d247be8ca9f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:32",
+   "padded_bytes": 368,
+   "previous_name": "_players_compute_combined_pvs",
+   "commits": [
+    "ba5f668a1 players: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "function": "_players_reconnect_to_structure_bsp",
+   "meaningful_bytes": 729,
+   "relocations": 40,
+   "normalized_sha256": "de7f7f7138236ad854dd13a4d754a97a5041c10d9dbef3260d18cffcb8eb886b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:63",
+   "padded_bytes": 736,
+   "previous_name": "_players_reconnect_to_structure_bsp",
+   "commits": [
+    "ba5f668a1 players: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "function": "_unit_should_autopick_weapon",
+   "meaningful_bytes": 134,
+   "relocations": 7,
+   "normalized_sha256": "1c1da7cda8b1b98ddf4579327d112f3078eb5e2ca2d69aba7cea8f568610999f",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:35",
+   "padded_bytes": 144,
+   "previous_name": "_unit_should_autopick_weapon",
+   "commits": [
+    "ba5f668a1 players: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "function": "_hs_evaluate_inequality",
+   "meaningful_bytes": 525,
+   "relocations": 40,
+   "normalized_sha256": "63ee22c1451726f68f114f399e057f6636f9af0b25180143a459a566d16e464d",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:57",
+   "padded_bytes": 528,
+   "previous_name": "_hs_evaluate_inequality",
+   "commits": [
+    "0e52be360 hs_runtime: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "function": "_get_flash_color",
+   "meaningful_bytes": 607,
+   "relocations": 32,
+   "normalized_sha256": "0717c2b85934e185e6cfb38a82a90f3160bc2e1b3372c2eb80d27af1f4f1818b",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 608,
+   "previous_name": "_get_flash_color",
+   "commits": [
+    "72b9cb3b7 hud_draw: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "function": "_hud_draw_bitmap_direct",
+   "meaningful_bytes": 310,
+   "relocations": 15,
+   "normalized_sha256": "6ec7215284a2c2248b4524f4229982fa6855489a4033c233b7c9ba5505a9a8c8",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "padded_bytes": 320,
+   "previous_name": "_hud_draw_bitmap_direct",
+   "commits": [
+    "72b9cb3b7 hud_draw: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "function": "_hud_draw_bitmap_internal",
+   "meaningful_bytes": 544,
+   "relocations": 16,
+   "normalized_sha256": "afc1044b43f5f168eed9a6f96553231667e861929533abbac26a2b229df5b972",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 544,
+   "previous_name": "_hud_draw_bitmap_internal",
+   "commits": [
+    "72b9cb3b7 hud_draw: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_draw",
+   "function": "_hud_draw_bitmap_with_meter",
+   "meaningful_bytes": 374,
+   "relocations": 17,
+   "normalized_sha256": "e44c9d5bbd7d5279cc45630280f6b347dfc572ab2e635e4a5a84ad940d3ac4e8",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "padded_bytes": 384,
+   "previous_name": "_hud_draw_bitmap_with_meter",
+   "commits": [
+    "72b9cb3b7 hud_draw: 4 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_messaging",
+   "function": "_scripted_hud_get_timer_ticks",
+   "meaningful_bytes": 70,
+   "relocations": 2,
+   "normalized_sha256": "c28cd50e0150845564921ef4ab5bb445c5a9cb58ac319a84461460fa53686468",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 80,
+   "previous_name": "_scripted_hud_get_timer_ticks",
+   "commits": [
+    "b22cc0a42 hud_messaging: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_messaging",
+   "function": "_scripted_hud_set_objective",
+   "meaningful_bytes": 147,
+   "relocations": 8,
+   "normalized_sha256": "a83e487b78b95cb689279b7de9dfe2a3078ce9e67c5809282fdd7a6b3ebc6a54",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 160,
+   "previous_name": "_scripted_hud_set_objective",
+   "commits": [
+    "b22cc0a42 hud_messaging: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_weapon",
+   "function": "_hud_render_weapon_interface",
+   "meaningful_bytes": 494,
+   "relocations": 24,
+   "normalized_sha256": "dc32e965f3a6f7f3669479b1c29808bc5fee32c237370e197d41e38d972cf7e4",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 496,
+   "previous_name": "_hud_render_weapon_interface",
+   "commits": [
+    "86d55bf7b hud_weapon: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/motion_sensor",
+   "function": "_blip_type_get",
+   "meaningful_bytes": 351,
+   "relocations": 21,
+   "normalized_sha256": "cb65a91e416950514c828a2fbed685df031a289140a3218812a754128d8ad64e",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 352,
+   "previous_name": "_blip_type_get",
+   "commits": [
+    "800179a20 motion_sensor: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/motion_sensor",
+   "function": "_motion_sensor_blip_set_type_and_size",
+   "meaningful_bytes": 87,
+   "relocations": 4,
+   "normalized_sha256": "c28dfa90e22bd48348034ae8cb472a5b6d0ebe45476d8ff47bcdaa672c060a5d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "padded_bytes": 96,
+   "previous_name": "_motion_sensor_blip_set_type_and_size",
+   "commits": [
+    "800179a20 motion_sensor: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/motion_sensor",
+   "function": "_should_draw_object",
+   "meaningful_bytes": 211,
+   "relocations": 7,
+   "normalized_sha256": "13cd9e4469147c6d8d340c8f80647e653a8e0ef1bf957b9cfb7b09eef6360f66",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "padded_bytes": 224,
+   "previous_name": "_should_draw_object",
+   "commits": [
+    "800179a20 motion_sensor: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "function": "_widget_instance_render_column_list",
+   "meaningful_bytes": 163,
+   "relocations": 2,
+   "normalized_sha256": "3ce0dd36497a87a116fe5588e3c876c2b6b6df7677ad99bf698e094009c5dd60",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:87",
+   "padded_bytes": 176,
+   "previous_name": "_widget_instance_render_column_list",
+   "commits": [
+    "6fba49504 ui_widget: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_network_pregame_status_screen_update",
+   "meaningful_bytes": 1980,
+   "relocations": 81,
+   "normalized_sha256": "1a93e54737381c28f6977f4a053cc4f5753eb19083dcad0b38d295a0720730b2",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "padded_bytes": 1984,
+   "previous_name": "_network_pregame_status_screen_update",
+   "commits": [
+    "ae373843a ui_widget_game_data_input_functions: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/items/weapons",
+   "function": "_animation_update",
+   "meaningful_bytes": 27,
+   "relocations": 1,
+   "normalized_sha256": "1bba085c2f0d1d5e282a9626f765732497b85eda67e5fd1b4888f575227bf500",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 32,
+   "previous_name": "_animation_update",
+   "commits": [
+    "b929ac233 weapons: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_text",
+   "function": "_rasterizer_draw_character",
+   "meaningful_bytes": 228,
+   "relocations": 3,
+   "normalized_sha256": "b99fef50df849db13d457df4788f0340d0bc8314538a1a3010e4982ad4ccc84a",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:11",
+   "padded_bytes": 240,
+   "previous_name": "_rasterizer_draw_character",
+   "commits": [
+    "029e2cf76 rasterizer_text: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_text",
+   "function": "_rasterizer_draw_character_with_dropshadow",
+   "meaningful_bytes": 354,
+   "relocations": 4,
+   "normalized_sha256": "31edbdb0f9c11a2f849c00ec068d08f71584167f3d83ec157c64463cba4a3be0",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 368,
+   "previous_name": "_rasterizer_draw_character_with_dropshadow",
+   "commits": [
+    "029e2cf76 rasterizer_text: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_text",
+   "function": "_rasterizer_text_cache_initialize",
+   "meaningful_bytes": 139,
+   "relocations": 13,
+   "normalized_sha256": "2fa3158fdf45b82f2ecc28f3009273ff781b9d95850603b18b22bbf7b702ca6c",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "padded_bytes": 144,
+   "previous_name": "_rasterizer_text_cache_initialize",
+   "commits": [
+    "029e2cf76 rasterizer_text: 3 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
+   "function": "__rasterizer_environment_diffuse_light_begin",
+   "meaningful_bytes": 914,
+   "relocations": 58,
+   "normalized_sha256": "96f42a578f493250f9fb27beb69c6e4bbd03472de63c1e81e039ec7723dbfcf7",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:29",
+   "padded_bytes": 928,
+   "previous_name": "__rasterizer_environment_diffuse_light_begin",
+   "commits": [
+    "ccc0f26ea rasterizer_xbox_environment: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_objects",
+   "function": "_object_render_state_refresh",
+   "meaningful_bytes": 786,
+   "relocations": 38,
+   "normalized_sha256": "3ab7188f61980610a00bda7923133d2649b40e8d273a03b20f6987e00b3d9f91",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 800,
+   "previous_name": "_object_render_state_refresh",
+   "commits": [
+    "ab0fbecfa render_objects: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_objects",
+   "function": "_render_object_shadow_end",
+   "meaningful_bytes": 711,
+   "relocations": 24,
+   "normalized_sha256": "251a0caf61b8b48e20d96ed5e09ff9d162e4e899cdddc898c3982c6308f2c9a3",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 720,
+   "previous_name": "_render_object_shadow_end",
+   "commits": [
+    "ab0fbecfa render_objects: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_sound_new_impulse",
+   "meaningful_bytes": 970,
+   "relocations": 48,
+   "normalized_sha256": "7c5e4d796323cca53890f5519b0dfd33dd6299b6994aaf8a263fed25fd0dfff8",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:56",
+   "padded_bytes": 976,
+   "previous_name": "_sound_new_impulse",
+   "commits": [
+    "85984a463 sound_manager: 1 function(s) strict exact"
+   ]
+  }
+ ],
+ "nonstrict_accepted_functions": [
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_update_cache_for_nwide_list",
+   "meaningful_bytes": 268,
+   "relocations": null,
+   "normalized_sha256": null,
+   "proof_sources": [
+    "objdiff",
+    "objdiff-coff-shape"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_splitscreen_pregame_status_screen_update",
+   "meaningful_bytes": 1208,
+   "relocations": null,
+   "normalized_sha256": null,
+   "proof_sources": [
+    "objdiff",
+    "objdiff-coff-shape"
+   ]
+  }
+ ],
+ "strict_not_accepted": []
+}
