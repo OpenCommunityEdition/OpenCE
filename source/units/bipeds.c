@@ -1097,20 +1097,6 @@ boolean biped_fix_position(
 	boolean use_radius_as_multiplier)
 {
 	boolean fixed = FALSE;
-	real_point3d line_of_sight_position;
-	struct biped_datum *biped;
-	unsigned long collision_flags;
-	real_point3d position;
-	real pill_height;
-	real pill_width;
-	struct collision_model_instance line_of_sight_instance;
-	real_vector3d left;
-	real_vector3d pill_vector;
-	short maximum_fudge_vector_count;
-	short fudge_vector_index;
-	struct collision_result pill_collision;
-	struct collision_result line_collision;
-	struct collision_model_test_pill_result model_pill_collision;
 
 	match_assert("c:\\halo\\SOURCE\\units\\bipeds.c", 893,
 		final_position || !dont_teleport);
@@ -1119,11 +1105,17 @@ boolean biped_fix_position(
 	global_current_collision_users[global_current_collision_user_depth++] =
 		_collision_user_bipeds;
 
-	if (biped_index == NONE && line_of_sight_object_index == NONE)
-		goto collision_user_end;
-
+	if (biped_index != NONE || line_of_sight_object_index != NONE)
 	{
 		boolean line_of_sight_only;
+		real_point3d line_of_sight_position;
+		struct biped_datum *biped;
+		unsigned long collision_flags;
+		real_point3d position;
+		real pill_height;
+		real pill_width;
+		struct collision_model_instance line_of_sight_instance;
+		short maximum_fudge_vector_count;
 
 		if (line_of_sight_object_index != NONE)
 		{
@@ -1186,94 +1178,100 @@ boolean biped_fix_position(
 				line_of_sight_object_index);
 		}
 
-		cross_product3d(&biped->object.forward, &biped->object.up, &left);
-		normalize3d(&left);
-		scale_vector3d(global_up3d, pill_height, &pill_vector);
-		if (use_radius_as_multiplier)
-			maximum_radius_fudge_factor *= pill_width;
-
-		fudge_vector_index = 0;
-		do
 		{
-			real_point3d fixed_position;
+			real_vector3d left;
+			real_vector3d pill_vector;
+			short fudge_vector_index;
 
-			if (fudge_vector_index >= maximum_fudge_vector_count)
-				break;
+			cross_product3d(&biped->object.forward, &biped->object.up, &left);
+			normalize3d(&left);
+			scale_vector3d(global_up3d, pill_height, &pill_vector);
+			if (use_radius_as_multiplier)
+				maximum_radius_fudge_factor *= pill_width;
 
-			if (fix_below_new_position)
+			for (fudge_vector_index = 0;
+				!fixed && fudge_vector_index < maximum_fudge_vector_count;
+				++fudge_vector_index)
 			{
-				real distance =
-					maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].i;
+				real_point3d fixed_position;
+				long cluster_index;
+				struct collision_result pill_collision;
+				struct collision_result line_collision;
+				struct collision_model_test_pill_result model_pill_collision;
 
-				fixed_position.x = biped->object.forward.i*distance + position.x;
-				fixed_position.y = biped->object.forward.j*distance + position.y;
-				fixed_position.z = biped->object.forward.k*distance + position.z;
-				distance = maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].j;
-				fixed_position.x += left.i*distance;
-				fixed_position.y += left.j*distance;
-				fixed_position.z += left.k*distance;
-				distance = maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].k;
-				fixed_position.x += biped->object.up.i*distance;
-				fixed_position.y += biped->object.up.j*distance;
-				fixed_position.z += biped->object.up.k*distance;
-			}
-			else
-			{
-				real_vector3d const *fudge_vector =
-					&fudge_vectors[fudge_vector_index];
+				if (fix_below_new_position)
+				{
+					real distance =
+						maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].i;
 
-				fixed_position.x =
-					maximum_radius_fudge_factor*fudge_vector->i + position.x;
-				fixed_position.y =
-					maximum_radius_fudge_factor*fudge_vector->j + position.y;
-				fixed_position.z =
-					maximum_radius_fudge_factor*fudge_vector->k + position.z;
-			}
+					fixed_position.x = biped->object.forward.i*distance + position.x;
+					fixed_position.y = biped->object.forward.j*distance + position.y;
+					fixed_position.z = biped->object.forward.k*distance + position.z;
+					distance = maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].j;
+					fixed_position.x += left.i*distance;
+					fixed_position.y += left.j*distance;
+					fixed_position.z += left.k*distance;
+					distance = maximum_radius_fudge_factor*fudge_vectors[fudge_vector_index].k;
+					fixed_position.x += biped->object.up.i*distance;
+					fixed_position.y += biped->object.up.j*distance;
+					fixed_position.z += biped->object.up.k*distance;
+				}
+				else
+				{
+					real_vector3d const *fudge_vector =
+						&fudge_vectors[fudge_vector_index];
 
-			if (scenario_leaf_index_from_point(&fixed_position) != NONE)
-			{
-				long cluster_index = TAG_BLOCK_GET_ELEMENT(
-					&global_structure_bsp_get()->leaves,
-					scenario_leaf_index_from_point(&fixed_position) & LONG_MAX,
-					struct structure_leaf)->cluster_index;
+					fixed_position.x =
+						maximum_radius_fudge_factor*fudge_vector->i + position.x;
+					fixed_position.y =
+						maximum_radius_fudge_factor*fudge_vector->j + position.y;
+					fixed_position.z =
+						maximum_radius_fudge_factor*fudge_vector->k + position.z;
+				}
 
+				cluster_index = scenario_leaf_index_from_point(&fixed_position) == NONE ?
+					NONE :
+					TAG_BLOCK_GET_ELEMENT(
+						&global_structure_bsp_get()->leaves,
+						scenario_leaf_index_from_point(&fixed_position) & LONG_MAX,
+						struct structure_leaf)->cluster_index;
 				if (cluster_index != NONE &&
 					collision_fix_pill(
-					collision_flags,
-					&fixed_position,
-					pill_width*2.f,
-					pill_height,
-					pill_width,
-					biped_index,
-					&fixed_position) &&
-				!collision_test_pill(
-					collision_flags,
-					&fixed_position,
-					&pill_vector,
-					pill_width,
-					biped_index,
-					&pill_collision) &&
-				(line_of_sight_object_index == NONE ||
-					(!collision_model_test_pill(
-						&line_of_sight_instance,
+						collision_flags,
+						&fixed_position,
+						pill_width*2.f,
+						pill_height,
+						pill_width,
+						biped_index,
+						&fixed_position) &&
+					!collision_test_pill(
+						collision_flags,
 						&fixed_position,
 						&pill_vector,
 						pill_width,
-						&model_pill_collision) &&
-					(!collision_test_line(
-						collision_flags,
-						&fixed_position,
-						&line_of_sight_position,
 						biped_index,
-						&line_collision) ||
-						line_collision.object_index == line_of_sight_object_index) &&
-					(!collision_test_line(
-						collision_flags,
-						&line_of_sight_position,
-						&fixed_position,
-						line_of_sight_object_index,
-						&line_collision) ||
-						line_collision.object_index == biped_index))))
+						&pill_collision) &&
+					(line_of_sight_object_index == NONE ||
+						(!collision_model_test_pill(
+							&line_of_sight_instance,
+							&fixed_position,
+							&pill_vector,
+							pill_width,
+							&model_pill_collision) &&
+						(!collision_test_line(
+							collision_flags,
+							&fixed_position,
+							&line_of_sight_position,
+							biped_index,
+							&line_collision) ||
+							line_collision.object_index == line_of_sight_object_index) &&
+						(!collision_test_line(
+							collision_flags,
+							&line_of_sight_position,
+							&fixed_position,
+							line_of_sight_object_index,
+							&line_collision) ||
+							line_collision.object_index == biped_index))))
 				{
 					struct biped_definition *definition =
 						biped_definition_get(biped->definition_index);
@@ -1304,13 +1302,9 @@ boolean biped_fix_position(
 					fixed = TRUE;
 				}
 			}
-
-			++fudge_vector_index;
 		}
-		while (!fixed);
 	}
 
-collision_user_end:
 	match_assert("c:\\halo\\SOURCE\\units\\bipeds.c", 1080,
 		global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;

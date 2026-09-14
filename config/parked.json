@@ -117,25 +117,6 @@
     },
     {
       "unit": "source/units/bipeds",
-      "function": "_biped_fix_position",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete typed ordinary-C position correction retained from January disassembly/relocations and HCEA semantic corroboration. Target and candidate share the 1,232-byte padded envelope and all 47 relocation identities; the current owner-correct context improves the measured similarity to 99.588234 percent, with only a narrow-load/sign-extension schedule remaining. The discarded pill-base result remains a genuine real_point3d and is not representation-punned to steer code generation. No barrier, volatile/register forcing, pragma, assembly, fake dependency or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor explaining the remaining schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
-      "measurements": {
-        "target": {
-          "size": 1232,
-          "relocation_count": 47,
-          "normalized_sha256": "8932705148ab7aa1b778d8854ae1ae69e3eee275111372c0df4594eeab02ab33"
-        },
-        "base": {
-          "size": 1232,
-          "relocation_count": 47,
-          "normalized_sha256": "6298e459f43db4977c58f617de0c65ac0bb2201983976468803960eae6c9fcac"
-        },
-        "objdiff_percent": 99.588234
-      }
-    },
-    {
-      "unit": "source/units/bipeds",
       "function": "_biped_update_turning",
       "class": "unclassified",
       "evidence": "Best complete house-rule-compliant ordinary-C turning update reconstructed from January target authority and donor-corroborated gameplay semantics. The earlier 1,712-byte / 95.2675-percent candidate obtained its closer schedule through real_vector3d-to-real_vector2d pointer casts. The retained source replaces those representation-punning casts with explicit typed two-dimensional locals; it is 1,760 versus January's 1,712 padded bytes, keeps all 49 relocation identities, and measures 89.90126 percent. The natural two-dimensional math path emits documented helper COMDAT debt, which receives no credit; no fake dependency, forced inline, barrier, volatile/register steering, pragma, assembly or nonsensical logic is present. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the normalized-code residual without representation punning. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
