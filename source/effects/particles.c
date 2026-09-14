@@ -532,20 +532,20 @@ static boolean particle_next_frame(
 		if (particle->frame_index > 0)
 		{
 			particle->frame_index--;
-
-			return result;
 		}
-
-		result = particle_next_sequence(particle_index);
-
-		if (result)
+		else
 		{
-			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
-				&bitmap->sequences,
-				particle->sequence_index,
-				struct bitmap_group_sequence);
+			result = particle_next_sequence(particle_index);
 
-			particle->frame_index = (short)(sequence->sprites.count - 1);
+			if (result)
+			{
+				struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+					&bitmap->sequences,
+					particle->sequence_index,
+					struct bitmap_group_sequence);
+
+				particle->frame_index = (short)(sequence->sprites.count - 1);
+			}
 		}
 	}
 	else
@@ -558,14 +558,12 @@ static boolean particle_next_frame(
 		if (particle->frame_index + 1 < sequence->sprites.count)
 		{
 			particle->frame_index++;
-
-			return result;
 		}
-
-		result = particle_next_sequence(particle_index);
-		particle->frame_index = 0;
-
-		return result;
+		else
+		{
+			result = particle_next_sequence(particle_index);
+			particle->frame_index = 0;
+		}
 	}
 
 	return result;
@@ -623,22 +621,17 @@ static boolean particle_update_physics(
 {
 	struct particle_datum *particle = particle_get(particle_index);
 	struct particle_definition *definition = particle_definition_get(particle->definition_index);
-	struct point_physics_definition *physics;
-	real_vector3d *velocity;
-	boolean settled = FALSE;
 
 	if (!TEST_FLAG(particle->flags, _particle_datum_at_rest_bit))
 	{
-		physics = point_physics_definition_get(definition->physics.index);
+		boolean settled = FALSE;
+		struct point_physics_definition *physics = point_physics_definition_get(definition->physics.index);
 
 		if (particle->object_index == NONE)
 		{
 			real_vector3d collision_normal;
 			short collision_material_type;
 			unsigned long collision_flags;
-			unsigned long collided_with_structure;
-
-			velocity = &particle->translational_velocity;
 
 			collision_flags = point_physics_update(
 				0,
@@ -646,24 +639,21 @@ static boolean particle_update_physics(
 				&particle->location,
 				NONE,
 				&particle->position,
-				velocity,
+				&particle->translational_velocity,
 				NULL,
 				&collision_normal,
 				&collision_material_type,
 				particle_get_radius(particle_index),
 				dt);
 
-			collided_with_structure = collision_flags &
-				(unsigned)FLAG(_point_physics_collided_with_structure_bit);
-
-			if (collided_with_structure)
+			if (TEST_FLAG(collision_flags, _point_physics_collided_with_structure_bit))
 			{
 				long collision_effect_index = definition->collision_effect.index;
 
 				if (collision_effect_index != NONE ||
 					definition->collision_material_effects.index)
 				{
-					real scale = (magnitude3d(velocity) -
+					real scale = (magnitude3d(&particle->translational_velocity) -
 						particle_collision_effect_scale_bounds[_particle_collision_scale_lower_bound]) /
 						(particle_collision_effect_scale_bounds[_particle_collision_scale_upper_bound] -
 							particle_collision_effect_scale_bounds[_particle_collision_scale_lower_bound]);
@@ -720,7 +710,7 @@ static boolean particle_update_physics(
 				return FALSE;
 			}
 
-			if (collided_with_structure ||
+			if (TEST_FLAG(collision_flags, _point_physics_collided_with_structure_bit) ||
 				TEST_FLAG(collision_flags, _point_physics_collided_with_water_bit))
 			{
 				if (collision_normal.k > 0.8f)
@@ -762,32 +752,34 @@ static boolean particle_update_physics(
 					scale = 1.0f;
 			}
 
-			velocity = &particle->translational_velocity;
+			particle->translational_velocity.i = scale * particle->translational_velocity.i;
+			particle->translational_velocity.j = scale * particle->translational_velocity.j;
+			particle->translational_velocity.k = scale * particle->translational_velocity.k;
+
+			particle->position.x = particle->translational_velocity.i * dt + particle->position.x;
+			particle->position.y = particle->translational_velocity.j * dt + particle->position.y;
+			particle->position.z = particle->translational_velocity.k * dt + particle->position.z;
+
 			settled = TRUE;
-
-			velocity->i = scale * velocity->i;
-			velocity->j = scale * velocity->j;
-			velocity->k = scale * velocity->k;
-
-			particle->position.x = velocity->i * dt + particle->position.x;
-			particle->position.y = velocity->j * dt + particle->position.y;
-			particle->position.z = velocity->k * dt + particle->position.z;
 		}
 
-		if (magnitude_squared3d(velocity) >= 0.0625f)
+		if (magnitude_squared3d(&particle->translational_velocity) < 0.0625f)
 		{
-			particle->direction = *velocity;
-		}
-		else if (settled)
-		{
-			if (TEST_FLAG(definition->flags, _particle_definition_dies_at_rest_bit))
+			if (settled)
 			{
-				particle_die(particle_index);
+				if (TEST_FLAG(definition->flags, _particle_definition_dies_at_rest_bit))
+				{
+					particle_die(particle_index);
 
-				return FALSE;
+					return FALSE;
+				}
+
+				SET_FLAG(particle->flags, _particle_datum_at_rest_bit, TRUE);
 			}
-
-			SET_FLAG(particle->flags, _particle_datum_at_rest_bit, TRUE);
+		}
+		else
+		{
+			particle->direction = particle->translational_velocity;
 		}
 
 		particle->rotation = dt * particle->angular_velocity + particle->rotation;
