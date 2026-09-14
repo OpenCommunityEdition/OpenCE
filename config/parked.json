@@ -884,63 +884,6 @@
     },
     {
       "unit": "source/tag_files/files_windows",
-      "function": "_file_open",
-      "class": "unclassified",
-      "evidence": "Typed January open/append/error flow reconstructed; candidate is 16 padded bytes shorter with return/control-topology differences. Natural file_error calls auto-inline to the same packets without source-level forcing. Previously rejected early-return donor not repeated. No fake dependencies, raw offsets, punning, assembly or compiler controls. Reopen for authentic source or family-level type/API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 23,
-          "normalized_sha256": "b91ff127948eb458e70ae51cf1efc5158a353749d27b2e29a03ad3abcb7b930b"
-        },
-        "base": {
-          "size": 384,
-          "relocation_count": 23,
-          "normalized_sha256": "7a5172a1a82ec4c9d83a0577970c4a341bdd52ab76907b0d330a5f537f3ef0eb"
-        },
-        "objdiff_percent": 84.65151
-      }
-    },
-    {
-      "unit": "source/tag_files/files_windows",
-      "function": "_file_read",
-      "class": "unclassified",
-      "evidence": "Complete typed read, exact-count check, EOF error and natural file_error call preserve January behavior. Same padded size and relocation count; register selection and reload placement remain different. No proven compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 13,
-          "normalized_sha256": "8442e02641914ce558f9947431dc6e60171d38dd9ba1c9882defba9f2e39773a"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 13,
-          "normalized_sha256": "51d43b44745309d3e8c9033422b29f4444fc8f19b492702bf0936aeae50a4a06"
-        },
-        "objdiff_percent": 93.43284
-      }
-    },
-    {
-      "unit": "source/tag_files/files_windows",
-      "function": "_file_write",
-      "class": "unclassified",
-      "evidence": "Complete typed write/count/error behavior with natural file_error call. Same padded size and relocation count; register selection and reload placement remain different. No proven compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 12,
-          "normalized_sha256": "f1fb6f5c8738ecea224c025c70e077c7175200d705df410ce5773d166733e101"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 12,
-          "normalized_sha256": "44d258415364d089b03af100e28a101e14bda1aace15f786f95f0f764ad0b7a3"
-        },
-        "objdiff_percent": 93.23077
-      }
-    },
-    {
-      "unit": "source/tag_files/files_windows",
       "function": "_file_get_size",
       "class": "unclassified",
       "evidence": "Complete typed path/attribute lookup, low-size return and natural file_error call. Same padded size and relocation count; info-pointer lifetime/register differences remain. No proven narrow compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",

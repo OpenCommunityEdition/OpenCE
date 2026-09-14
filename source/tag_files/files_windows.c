@@ -476,7 +476,7 @@ boolean file_open(
 	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
 	unsigned long desired_access = 0;
 	void *file_handle;
-	boolean result;
+	boolean result = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
@@ -500,19 +500,16 @@ boolean file_open(
 
 	file_handle = CreateFileA(full_path, desired_access, 0, NULL,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	result = file_handle != INVALID_HANDLE_VALUE;
-	if (result)
+	if (file_handle != INVALID_HANDLE_VALUE)
 	{
 		info->file_handle = file_handle;
-		if (TEST_FLAG(flags, _permission_append_bit))
+		result = TRUE;
+		if (TEST_FLAG(flags, _permission_append_bit) &&
+			SetFilePointer(file_handle, 0, NULL, FILE_END) == (unsigned long)NONE)
 		{
-			result = SetFilePointer(file_handle, 0, NULL, FILE_END) !=
-				(unsigned long)NONE;
-			if (!result)
-			{
-				CloseHandle(info->file_handle);
-				info->file_handle = NULL;
-			}
+			CloseHandle(info->file_handle);
+			info->file_handle = NULL;
+			result = FALSE;
 		}
 	}
 
@@ -841,10 +838,11 @@ boolean file_read(
 	unsigned long count,
 	void *buffer)
 {
-	struct file_reference_info const *info;
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	unsigned long bytes_read;
+	boolean result = FALSE;
 
-	info = file_reference_get_const_info(file);
 	match_assert(
 		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
 		423,
@@ -853,14 +851,21 @@ boolean file_read(
 	if (ReadFile(info->file_handle, buffer, count, &bytes_read, NULL))
 	{
 		if (bytes_read == count)
-			return TRUE;
-
-		SetLastError(ERROR_HANDLE_EOF);
+		{
+			result = TRUE;
+		}
+		else
+		{
+			SetLastError(ERROR_HANDLE_EOF);
+		}
 	}
 
-	file_error(file, "file_read");
+	if (!result)
+	{
+		file_error(file, "file_read");
+	}
 
-	return FALSE;
+	return result;
 }
 
 boolean file_write(
@@ -868,10 +873,11 @@ boolean file_write(
 	unsigned long count,
 	void const *buffer)
 {
-	struct file_reference_info const *info;
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	unsigned long bytes_written;
+	boolean result = FALSE;
 
-	info = file_reference_get_const_info(file);
 	match_assert(
 		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
 		451,
@@ -880,12 +886,14 @@ boolean file_write(
 	if (WriteFile(info->file_handle, buffer, count, &bytes_written, NULL) &&
 		bytes_written == count)
 	{
-		return TRUE;
+		result = TRUE;
+	}
+	else
+	{
+		file_error(file, "file_write");
 	}
 
-	file_error(file, "file_write");
-
-	return FALSE;
+	return result;
 }
 
 boolean file_read_from_position(
