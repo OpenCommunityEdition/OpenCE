@@ -345,6 +345,31 @@ enum
 		"a problem occurred while executing the script %s: %s (%s)", \
 		hs_thread_format(thread_index), reason, #expr))
 
+/* the four ordered comparisons of hs_evaluate_inequality, expanded once per operand
+   representation; each expansion reports its own case's location */
+#define HS_EVALUATE_INEQUALITY(first, second, line) \
+	value0 = (first); \
+	value1 = (second); \
+	switch (function_index) \
+	{ \
+	case _hs_function_gt: \
+		comparison = value0>value1; \
+		break; \
+	case _hs_function_lt: \
+		comparison = value0<value1; \
+		break; \
+	case _hs_function_gte: \
+		comparison = value0>=value1; \
+		break; \
+	case _hs_function_lte: \
+		comparison = value0<=value1; \
+		break; \
+	default: \
+		comparison = FALSE; \
+		match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", line, FALSE, NULL); \
+		break; \
+	}
+
 union hs_conversion_result
 {
 	boolean boolean;
@@ -1777,88 +1802,16 @@ void hs_evaluate_inequality(
 		switch (parameter_types[0])
 		{
 		case _hs_type_real:
-			value0 = ((real *)arguments)[0];
-			value1 = ((real *)arguments)[1];
-			switch (function_index)
-			{
-			case _hs_function_gt:
-				comparison = value0>value1;
-				break;
-			case _hs_function_lt:
-				comparison = value0<value1;
-				break;
-			case _hs_function_gte:
-				comparison = value0>=value1;
-				break;
-			case _hs_function_lte:
-				comparison = value0<=value1;
-				break;
-			default:
-				comparison = FALSE;
-				match_vassert(
-					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
-					0x16b,
-					FALSE,
-					NULL);
-				break;
-			}
+			HS_EVALUATE_INEQUALITY(((real *)arguments)[0], ((real *)arguments)[1], 0x16b);
 			break;
 		case _hs_type_long_integer:
-			value0 = (real)arguments[0];
-			value1 = (real)arguments[1];
-			switch (function_index)
-			{
-			case _hs_function_gt:
-				comparison = value0>value1;
-				break;
-			case _hs_function_lt:
-				comparison = value0<value1;
-				break;
-			case _hs_function_gte:
-				comparison = value0>=value1;
-				break;
-			case _hs_function_lte:
-				comparison = value0<=value1;
-				break;
-			default:
-				comparison = FALSE;
-				match_vassert(
-					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
-					0x16e,
-					FALSE,
-					NULL);
-				break;
-			}
+			HS_EVALUATE_INEQUALITY((real)arguments[0], (real)arguments[1], 0x16e);
 			break;
 		default:
 			match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x171,
 				parameter_types[0]==_hs_type_short_integer || HS_TYPE_IS_ENUM(parameter_types[0]));
 
-			value0 = (real)(short)arguments[0];
-			value1 = (real)(short)arguments[1];
-			switch (function_index)
-			{
-			case _hs_function_gt:
-				comparison = value0>value1;
-				break;
-			case _hs_function_lt:
-				comparison = value0<value1;
-				break;
-			case _hs_function_gte:
-				comparison = value0>=value1;
-				break;
-			case _hs_function_lte:
-				comparison = value0<=value1;
-				break;
-			default:
-				comparison = FALSE;
-				match_vassert(
-					"c:\\halo\\source\\hs\\hs_library_internal_runtime.h",
-					0x172,
-					FALSE,
-					NULL);
-				break;
-			}
+			HS_EVALUATE_INEQUALITY((real)(short)arguments[0], (real)(short)arguments[1], 0x172);
 			break;
 		}
 

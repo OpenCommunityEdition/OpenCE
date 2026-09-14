@@ -4700,25 +4700,6 @@
       }
     },
     {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_evaluate_inequality",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed ordinary-C evaluator retained as the best coherent reconstruction from the Opus lane, with correct syntax traversal, HS enum cases, comparison semantics, assertions, result convention, and explicit return. Target and candidate are both 528 padded bytes with the same 40 relocation dependencies, but January keeps a different x87 lifetime for the two real values. A redundant real-to-double-to-real round trip made the donor exact but was rejected as unsupported compiler steering under the no-fake-matching house rule. Canonical uses direct real loads and assigns zero exact credit. No register or volatile forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/hs_runtime_inequality_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 528,
-          "relocation_count": 40,
-          "normalized_sha256": "63ee22c1451726f68f114f399e057f6636f9af0b25180143a459a566d16e464d"
-        },
-        "base": {
-          "size": 528,
-          "relocation_count": 40,
-          "normalized_sha256": "35e92238733bcbabb14299ef539bc9cf67fd1bebc1dddd72c43ca3aae005c7c3"
-        },
-        "objdiff_percent": 88.47953
-      }
-    },
-    {
       "unit": "source/bink/bink_playback",
       "function": "_bink_alloc@4",
       "class": "tu-context-optimization",
