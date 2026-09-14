@@ -1345,7 +1345,6 @@ void object_cause_damage(
 	short damaged_object_count;
 	real total_damage;
 	struct object_datum *current_object;
-	struct collision_model const *collision_model;
 	struct damage_resistance_material const *damage_material;
 	long current_object_index;
 	unsigned long being_damaged_flags;
@@ -1353,6 +1352,7 @@ void object_cause_damage(
 	real body_damage;
 	real body_damage_multiplier;
 	short body_part;
+	short object_number;
 	long damaged_object_indices[16];
 
 	damage_effect = damage_effect_definition_get(damage->definition_index);
@@ -1370,12 +1370,9 @@ void object_cause_damage(
 		damage_globals.debug_object_index = object_index;
 
 	{
-		real damage_lower_bound = damage_definition->damage_lower_bound;
-		real damage_upper_bound = damage_definition->damage_upper_bound;
-		real random_damage = real_seed_random_range(
-			get_global_random_seed_address(),
-			damage_lower_bound,
-			damage_upper_bound);
+		real random_damage = real_random_range(
+			damage_definition->damage_lower_bound,
+			damage_definition->damage_upper_bound);
 
 		total_damage =
 			((1.f - damage->scale) * damage_definition->damage_minimum +
@@ -1397,9 +1394,9 @@ void object_cause_damage(
 				attacker = unit_get(attacker->unit.gunner_object_index);
 			}
 
-			actor_index = attacker->unit.swarm_actor_index;
-			if (actor_index == NONE)
-				actor_index = attacker->unit.actor_index;
+			actor_index = attacker->unit.swarm_actor_index != NONE ?
+				attacker->unit.swarm_actor_index :
+				attacker->unit.actor_index;
 
 			if (actor_index != NONE)
 				ai_adjust_damage(actor_index, damage, &total_damage);
@@ -1477,12 +1474,11 @@ void object_cause_damage(
 			struct unit_datum *vehicle = unit_get(object_index);
 			struct unit_definition const *vehicle_definition =
 				unit_definition_get(vehicle->definition_index);
-			long child_object_index;
+			long child_object_index = vehicle->object.first_child_object_index;
 
 			damage->multiplier =
 				(1.f - damage_definition->vehicle_passthrough_penalty) *
 				vehicle_definition->unit.child_damage_fraction;
-			child_object_index = vehicle->object.first_child_object_index;
 			while (child_object_index != NONE)
 			{
 				struct object_datum *child_object = object_get(child_object_index);
@@ -1493,15 +1489,15 @@ void object_cause_damage(
 					damaged_object_count<sizeof(damaged_object_indices)/sizeof(long));
 				if (child_object->object.type == _object_type_biped)
 				{
-					struct unit_datum *child_unit = unit_get(child_object_index);
+					long player_index = unit_get(child_object_index)->unit.player_index;
 
-					if (child_unit->unit.player_index != NONE ||
-						child_object_index == vehicle->unit.gunner_object_index)
+					if (player_index != NONE ||
+						child_object_index == vehicle->unit.driver_object_index)
 					{
 						SET_FLAG(
 							damage->flags,
 							_damage_bypasses_shields_bit,
-							child_unit->unit.player_index == NONE);
+							player_index == NONE);
 						object_cause_damage(
 							damage,
 							child_object_index,
@@ -1523,43 +1519,35 @@ void object_cause_damage(
 		}
 	}
 
-	if (damaged_object_count > 0)
+	for (object_number = 0;
+		object_number < damaged_object_count;
+		object_number++)
 	{
-		long *damaged_object_index = damaged_object_indices;
-		short remaining_object_count = damaged_object_count;
+		struct unit_datum *unit = unit_try_and_get(damaged_object_indices[object_number]);
 
-		do
+		if (unit)
 		{
-			struct unit_datum *unit = unit_try_and_get(*damaged_object_index);
+			long player_index = unit->unit.player_index;
 
-			if (unit)
+			if (player_index != NONE)
 			{
-				long player_index = unit->unit.player_index;
-
-				if (player_index != NONE)
-				{
-					player_effect_start(
-						player_index,
-						damage,
-						&damage->direction,
-						damage->scale,
-						total_damage);
-				}
-				else if (cheat.reflexive_damage_effects)
-				{
-					player_effect_start(
-						local_player_get_player_index(0),
-						damage,
-						&damage->direction,
-						damage->scale,
-						total_damage);
-				}
+				player_effect_start(
+					player_index,
+					damage,
+					&damage->direction,
+					damage->scale,
+					total_damage);
 			}
-
-			damaged_object_index++;
-			remaining_object_count--;
+			else if (cheat.reflexive_damage_effects)
+			{
+				player_effect_start(
+					local_player_get_player_index(0),
+					damage,
+					&damage->direction,
+					damage->scale,
+					total_damage);
+			}
 		}
-		while (remaining_object_count > 0);
 	}
 
 	if (total_damage > 0.f)
@@ -1584,12 +1572,11 @@ void object_cause_damage(
 
 			if (collision_model_index != NONE)
 			{
+				struct collision_model const *collision_model =
+					collision_model_definition_get(collision_model_index);
 				boolean force_kill = TEST_FLAG(
 					damage->flags,
 					_damage_kill_instantly_bit);
-
-				collision_model = collision_model_definition_get(
-					collision_model_index);
 
 				if (node_index >= 0 && node_index < collision_model->nodes.count)
 				{

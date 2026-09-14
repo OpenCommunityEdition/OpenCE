@@ -5034,25 +5034,6 @@
     },
     {
       "unit": "source/objects/damage",
-      "function": "_object_cause_damage",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete master object-damage dispatcher in ordinary typed C. January COFF remains the sole byte, ABI, control-flow, constant and relocation authority; independent HCEA source and Stian's PC lift corroborate the parent walk, damage randomization and modifiers, vehicle-child recursion, player feedback, collision material selection, shield/body dispatch, material-effect reporting, aftermath and deletion behavior. The current same-TU context includes strict-exact object_damage_shield, object_damage_aftermath, damage_effect_new_at_location and object_destroy_region bodies, plus the separately parked typed object_damage_body residual. The target occupies 1,984 padded / 1,971 meaningful bytes; the candidate occupies 1,968 padded bytes, carries the same 75 relocation identities and scores 95.71607% objdiff. The remaining broad register, frame and x87 schedule differences have no proved source-level mechanism. No raw offset, false type, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline/noinline, undefined behavior, nonsensical branch or fake context is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor explaining the residual.",
-      "measurements": {
-        "target": {
-          "size": 1984,
-          "relocation_count": 75,
-          "normalized_sha256": "68f55b08e71a95b90b258c6d1a1d50f7a637eca0af4fd3ea7388c0f7884015c0"
-        },
-        "base": {
-          "size": 1968,
-          "relocation_count": 75,
-          "normalized_sha256": "899b76c53282a5218dee64258c603b9fbaf8b11a078e3c0ab97d2638d9f713cd"
-        },
-        "objdiff_percent": 95.71607
-      }
-    },
-    {
-      "unit": "source/objects/damage",
       "function": "_object_damage_body",
       "class": "unclassified",
       "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete body-damage stage in ordinary typed C. January COFF is the byte and ABI authority; independent HCEA source and Stian's PC lift corroborate occupied-only damage, falling-damage difficulty handling, friendly resistance, headshots, regional damage and destruction, deathless-player child traversal, body thresholds, localized and area effects, and output multipliers. The named material fields preserve the authenticated 0x48 layout and exact +0x28/+0x2C/+0x3C offsets; region flags and damage categories use genuine enum constants, and typed tag/object access macros own all subsystem retrieval. The target occupies 1360 padded / 1347 meaningful bytes with 43 relocations; the retained house-rule candidate occupies 1392 padded / 1389 meaningful bytes with 44 relocations and objdiff reports 88.00236 percent similarity. The extra lookup/relocation is the honest typed unit_get boundary after a generic child object type check. Fable's 1360-byte 98.31-percent probe used a repeated raw object_get downcast to unit_datum; it is explicitly rejected under the typed-access house rule and receives no exact credit. The separately reconstructed private helpers damage_effect_new_at_location and object_destroy_region are strict exact under their exact-tier symbol aliases. No fake matching, raw offset, false prototype, volatile/register forcing, barrier, optimizer pragma, assembly, undefined behavior, nonsensical branch, or fake context is retained. Reopen for authoritative January source/local records or a natural owner-safe accessor arrangement that improves code generation without violating typed access.",
