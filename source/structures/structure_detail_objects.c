@@ -603,99 +603,85 @@ void render_debug_detail_objects(
 		local_player_data = get_local_player_datum(0);
 		if (debug_detail_objects.enabled)
 		{
-			struct detail_object_view_data *view_data = &local_player_data->view_data;
+			struct detail_object_view_data *view_data = &get_local_player_datum(0)->view_data;
+			short layer_index;
 
-			if (view_data->layer_count > 0)
+			for (layer_index = 0; layer_index < view_data->layer_count; layer_index++)
 			{
-				short layer_index = 0;
+				struct detail_object_layer_data *layer = &local_player_data->layers[layer_index];
+				short cell_index;
 
-				do
+				for (cell_index = 0; cell_index < layer->cell_count; cell_index++)
 				{
-					struct detail_object_layer_data *layer =
-						&local_player_data->layers[layer_index];
+					struct detail_object_cell_data *cell = &layer->cells[cell_index];
+					boolean clipped = FALSE;
+					long detail_object_index;
 
-					if (layer->cell_count > 0)
+					if (debug_detail_objects.fudge_vector)
 					{
-						short cell_index = 0;
+						cell->z_reference_vector->l +=
+							debug_detail_objects.fudge_offset * 0.125f;
+					}
+					for (detail_object_index = 0;
+						detail_object_index < cell->detail_object_count;
+						detail_object_index++)
+					{
+						struct detail_object *detail_object = detail_object_get(
+							&detail_object_data->detail_objects,
+							cell->first_detail_object_index + detail_object_index);
+						real_vector3d detail_object_position;
+						real_point3d position;
 
-						do
+						detail_object_position.i = (real)detail_object->position[0];
+						detail_object_position.j = (real)detail_object->position[1];
+						detail_object_position.k = (real)detail_object->position[2];
+
+						position.x = calculate_world_from_cell_index_and_offset(
+							(real)cell->cell_x,
+							(real)detail_object->position[0]);
+						position.y = calculate_world_from_cell_index_and_offset(
+							(real)cell->cell_y,
+							(real)detail_object->position[1]);
+						position.z =
+							((detail_object_position.i * cell->z_reference_vector->i +
+								detail_object_position.j * cell->z_reference_vector->j +
+								detail_object_position.k * cell->z_reference_vector->k) *
+								(1.0f / 255.0f) + cell->z_reference_vector->l +
+								cell->cell_z) * 8.0f;
+
+						if (position.z > (cell->cell_z + 1.0f) * 8.0f ||
+							position.z < cell->cell_z * 8.0f)
 						{
-							struct detail_object_cell_data *cell = &layer->cells[cell_index];
-							boolean clipped = FALSE;
-							long detail_object_index;
-							real_rectangle3d bounds;
-
-							if (debug_detail_objects.fudge_vector)
-							{
-								cell->z_reference_vector->l +=
-									debug_detail_objects.fudge_offset * 0.125f;
-							}
-							for (detail_object_index = 0;
-								detail_object_index < cell->detail_object_count;
-								detail_object_index++)
-							{
-								struct detail_object *detail_object = detail_object_get(
-									&detail_object_data->detail_objects,
-									cell->first_detail_object_index + detail_object_index);
-								real_point3d position;
-								real_vector4d const *z_reference_vector = cell->z_reference_vector;
-								real_vector4d detail_object_position;
-
-								detail_object_position.i = (real)detail_object->position[0];
-								detail_object_position.j = (real)detail_object->position[1];
-								detail_object_position.k = (real)detail_object->position[2];
-								detail_object_position.l = 255.0f;
-
-								position.x = calculate_world_from_cell_index_and_offset(
-									(real)cell->cell_x,
-									detail_object_position.i);
-								position.y = calculate_world_from_cell_index_and_offset(
-									(real)cell->cell_y,
-									detail_object_position.j);
-								position.z =
-									((detail_object_position.i * z_reference_vector->i +
-										detail_object_position.j * z_reference_vector->j +
-										detail_object_position.k * z_reference_vector->k) *
-										(1.0f / 255.0f) + z_reference_vector->l +
-										cell->cell_z) * 8.0f;
-
-								if (position.z > (cell->cell_z + 1.0f) * 8.0f ||
-									position.z < cell->cell_z * 8.0f)
-								{
-									clipped = TRUE;
-								}
-
-								render_debug_point(
-									TRUE,
-									&position,
-									0.1f,
-									global_real_argb_red);
-							}
-
-							bounds.x0 = (real)(cell->cell_x * 8);
-							bounds.x1 = (real)((cell->cell_x + 1) * 8);
-							bounds.y0 = (real)(cell->cell_y * 8);
-							bounds.y1 = (real)((cell->cell_y + 1) * 8);
-							bounds.z0 = cell->cell_z * 8.0f;
-							bounds.z1 = (cell->cell_z + 1.0f) * 8.0f;
-							render_debug_box_outline(TRUE, &bounds, global_real_argb_blue);
-
-							if (clipped)
-							{
-								real_argb_color clipped_color = *global_real_argb_grey;
-
-								clipped_color.alpha = 0.3f;
-								render_debug_box_outline(TRUE, &bounds, &clipped_color);
-							}
-
-							cell_index++;
+							clipped = TRUE;
 						}
-						while (cell_index < layer->cell_count);
+
+						render_debug_point(
+							TRUE,
+							&position,
+							0.1f,
+							global_real_argb_red);
 					}
 
-					layer_index++;
+					{
+						real_rectangle3d bounds = {
+							(real)(cell->cell_x * 8),
+							(real)(cell->cell_x * 8 + 8),
+							(real)(cell->cell_y * 8),
+							(real)(cell->cell_y * 8 + 8),
+							cell->cell_z * 8.0f,
+							(cell->cell_z + 1.0f) * 8.0f };
+
+						render_debug_box_outline(TRUE, &bounds, global_real_argb_blue);
+
+						if (clipped)
+						{
+							real_argb_color clipped_color = *global_real_argb_grey;
+
+							clipped_color.alpha = 0.3f;
+							render_debug_box_outline(TRUE, &bounds, &clipped_color);
+						}
+					}
 				}
-				while (layer_index < view_data->layer_count);
 			}
 		}
 

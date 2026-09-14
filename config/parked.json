@@ -2046,25 +2046,6 @@
       }
     },
     {
-      "unit": "source/structures/structure_detail_objects",
-      "function": "_render_debug_detail_objects",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked after restoring the complete debug traversal from January disassembly and relocations, cross-checking its control/traversal/reset subset against the later HCEA renderer, and using the independent Pastudan PC lift for the target-specific packed decode and drawing path. The retained ordinary C performs the target-backed duplicate enable check, visible layer/cell traversal, optional reference-plane offset, packed detail-object decode, clipping test, point draw, cell bounds draw, clipped overlay, and one-shot debug-state reset using semantic project types and named structures. It preserves all 33 relocation destinations in semantic sequence and compiles to 736 padded bytes versus January's 752; the residual is x87 stack/frame and pointer-lifetime scheduling. A credible dot_product4d spelling recovered the 752-byte envelope but introduced a 34th unsupported multiply-by-one relocation and was reverted; direct-vector, declaration/scope, bounds-arithmetic, comparison-order, view-data access, and loop-shape variants either return to this fixed point or regress relocation topology. No forced inline/noinline, barrier, volatile access, pragma, assembly in this routine, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records, the original translation-unit context, or a natural same-compiler donor that explains the remaining x87 and frame schedule.",
-      "measurements": {
-        "target": {
-          "size": 752,
-          "relocation_count": 33,
-          "normalized_sha256": "3e4c30c13847d08060c08d64bd9114a3c6592eb827ba69d422c93f046d70a6a7"
-        },
-        "base": {
-          "size": 736,
-          "relocation_count": 33,
-          "normalized_sha256": "4457d66b4b59e307e3671bba697b89ab0c51f05f4c7b48284ef89a92b068a822"
-        },
-        "objdiff_percent": 78.78802
-      }
-    },
-    {
       "unit": "source/ai/action_alert",
       "function": "_action_alert_next_position",
       "class": "register-allocation",
