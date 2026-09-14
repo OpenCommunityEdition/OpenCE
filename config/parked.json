@@ -4373,25 +4373,6 @@
       }
     },
     {
-      "unit": "source/items/projectiles",
-      "function": "_projectile_aim_ballistic",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 880,
-          "relocation_count": 35,
-          "normalized_sha256": "fbc7e95f65b75fdae9a94e16b800e681c145c3449dcb9f70dcf87efb9eba370d"
-        },
-        "base": {
-          "size": 880,
-          "relocation_count": 36,
-          "normalized_sha256": "6e936a41aee4d8d56ae60e217127e8b8dff81b1e7229e2e2b2f70ffa868a39e6"
-        },
-        "objdiff_percent": 86.6431
-      }
-    },
-    {
       "unit": "source/structures/structures",
       "function": "_render_debug_fog_planes",
       "class": "unclassified",

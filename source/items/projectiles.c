@@ -114,11 +114,9 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define normalize3d normalize3d_inline
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries.h"
 #include "projectiles.h"
-#undef normalize3d
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 #include "projectiles_callbacks.h"
@@ -318,9 +316,6 @@ typedef char projectile_runtime_rotation_cosine_offset_assert[
 		: -1];
 
 /* ---------- prototypes */
-
-real normalize3d(
-	real_vector3d *v);
 
 boolean projectile_aim_linear(
 	real base_velocity,
@@ -1974,9 +1969,11 @@ boolean projectile_aim_ballistic(
 	boolean solution = FALSE;
 	real_vector3d delta;
 	real_vector3d aim_vector;
-	real acceleration, a, b, c, four_a_c, two_a;
+	real acceleration, a, b, c;
 	real acceleration_height;
+	real horizontal_distance_squared;
 	real t_squared_max, t_max, v_min, t;
+	real v_max = base_velocity;
 	real v_desired, v_desired_sq;
 	real distance, vertical_velocity, horizontal_velocity;
 
@@ -1984,17 +1981,17 @@ boolean projectile_aim_ballistic(
 	delta.j = target_point->y - origin->y;
 	delta.k = target_point->z - origin->z;
 
+	horizontal_distance_squared = delta.i * delta.i + delta.j * delta.j;
 	acceleration = MAX(0.f, global_gravity * gravity_scale);
 	a = acceleration * acceleration * 0.25f;
-	c = magnitude_squared3d(&delta);
-	four_a_c = 4.f * a * c;
+	c = horizontal_distance_squared + delta.k * delta.k;
+
 	match_assert(
 		"c:\\halo\\SOURCE\\items\\projectiles.c",
 		760,
 		4.0f * a * c > 0.0f);
-	b = -square_root(four_a_c);
-	two_a = a + a;
-	t_squared_max = -(b / two_a);
+	b = -square_root(4.0f * a * c);
+	t_squared_max = -(b / (2.0f * a));
 	match_assert(
 		"c:\\halo\\SOURCE\\items\\projectiles.c",
 		764,
@@ -2011,7 +2008,7 @@ boolean projectile_aim_ballistic(
 	}
 	else
 	{
-		v_desired = base_velocity;
+		v_desired = v_max;
 
 		if (target_ballistic_fraction_min)
 		{
@@ -2027,7 +2024,7 @@ boolean projectile_aim_ballistic(
 					"c:\\halo\\SOURCE\\items\\projectiles.c",
 					806,
 					v_desired_sq > 0.0f);
-				if (base_velocity > square_root(v_desired_sq))
+				if (v_max > square_root(v_desired_sq))
 					v_desired = square_root(v_desired_sq);
 			}
 		}
@@ -2036,13 +2033,13 @@ boolean projectile_aim_ballistic(
 	if (v_desired >= v_min)
 	{
 		real b_desired = acceleration_height - v_desired * v_desired;
-		real discriminant = b_desired * b_desired - four_a_c;
+		real discriminant = b_desired * b_desired - 4.0f * a * c;
 
 		if (b_desired < 0.0f && discriminant >= 0.0f)
 		{
 			real t_squared =
 				(square_root(discriminant) * (lob ? 1 : -1) - b_desired) /
-				two_a;
+				(2.0f * a);
 
 			if (t_squared > 0.0f)
 			{
@@ -2070,8 +2067,8 @@ boolean projectile_aim_ballistic(
 
 	if (normalize3d(&aim_vector) == 0.0f)
 	{
-		aim_vector = delta;
 		result = FALSE;
+		aim_vector = delta;
 		if (normalize3d(&aim_vector) == 0.0f)
 			aim_vector = *global_up3d;
 	}
