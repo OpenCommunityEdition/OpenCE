@@ -914,7 +914,7 @@ static boolean actor_look_find_random_vector(
 	real_vector3d pitch_axis;
 	real_vector3d direction;
 	short attempt_count;
-	boolean unobstructed = FALSE;
+	boolean result = FALSE;
 
 	pitch_axis.i = -base_vector->j;
 	pitch_axis.j = base_vector->i;
@@ -922,7 +922,7 @@ static boolean actor_look_find_random_vector(
 	if (normalize3d(&pitch_axis) == 0.0f)
 		pitch_axis = *global_left3d;
 
-	for (attempt_count = 0; !unobstructed && attempt_count < 10; attempt_count++)
+	for (attempt_count = 0; attempt_count < 10; attempt_count++)
 	{
 		real yaw = real_seed_random_range(
 			get_global_random_seed_address(),
@@ -932,6 +932,7 @@ static boolean actor_look_find_random_vector(
 			get_global_random_seed_address(),
 			pitch_minimum,
 			pitch_maximum);
+		boolean unobstructed = TRUE;
 
 		direction = *base_vector;
 		rotate_vector_about_axis(
@@ -945,7 +946,6 @@ static boolean actor_look_find_random_vector(
 			(real)sin(yaw),
 			(real)cos(yaw));
 
-		unobstructed = TRUE;
 		if (avoid_obstructions)
 		{
 			real_vector3d collision_vector;
@@ -972,19 +972,21 @@ static boolean actor_look_find_random_vector(
 				global_current_collision_user_depth > 1);
 			--global_current_collision_user_depth;
 		}
+
+		if (unobstructed)
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+				1077,
+				result_vector);
+			normalize3d(&direction);
+			*result_vector = direction;
+			result = TRUE;
+			break;
+		}
 	}
 
-	if (unobstructed)
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\ai\\actor_looking.c",
-			1077,
-			result_vector);
-		normalize3d(&direction);
-		*result_vector = direction;
-	}
-
-	return unobstructed;
+	return result;
 }
 
 boolean valid_real_normal2d(
