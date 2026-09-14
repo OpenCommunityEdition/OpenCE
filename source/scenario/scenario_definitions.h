@@ -36,6 +36,14 @@ enum
 	_scenario_trigger_volume_type_oriented,
 };
 
+enum
+{
+	_weapon_created_at_rest_bit = 0,
+	_weapon_obsolete_bit,
+	_weapon_does_accelerate_bit,
+	NUMBER_OF_SCENARIO_WEAPON_FLAGS,
+};
+
 enum netgame_flag_type
 {
 	_netgame_flag_ctf_flag = 0,
@@ -78,6 +86,24 @@ struct scenario_object_datum
 struct scenario_placeholder_datum
 {
 	struct scenario_object_datum object;
+};
+
+struct scenario_object_permutation
+{
+	unsigned long change_colors[4];
+	byte region_permutations[8];
+	unsigned long unused2[2];
+};
+
+struct scenario_weapon_datum
+{
+	struct scenario_object_datum object;
+	struct scenario_object_permutation permutation;
+	short rounds_total;
+	short rounds_loaded;
+	word flags;
+	word pad;
+	unsigned long unused[3];
 };
 
 struct scenario_object_name
