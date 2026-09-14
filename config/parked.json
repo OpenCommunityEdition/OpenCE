@@ -5017,35 +5017,13 @@
     },
     {
       "unit": "source/ai/action_flee",
-      "function": "_action_flee_setup",
-      "class": "unclassified",
-      "evidence": "Best complete typed caller retained to connect the exact private action_flee_find_flee_position owner. January and the independent later HaloCEA lift support initialization, panic-target acquisition, blind-panic random stationary behavior and firing-position search. Target is 272 padded bytes/12 relocations; candidate is 256/12 with 80.265305 percent objdiff similarity. The remaining code hash and allocation differences have no proved source-level mechanism and receive zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler donor.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 12, "normalized_sha256": "1a415a0adece0dd541b62c1c9ada51604d58751e66d769d88619d76db5471d79" },
-        "base": { "size": 256, "relocation_count": 12, "normalized_sha256": "cfc7ace7bcb857227c8c0559c80681a4f9ff2b142fa9df3e57c59af75960a898" },
-        "objdiff_percent": 80.265305
-      }
-    },
-    {
-      "unit": "source/ai/action_flee",
-      "function": "_action_flee_current_position_exposed",
-      "class": "register-allocation",
-      "evidence": "Best complete typed private exposure query retained to connect the action_flee_perform caller. January and the independent later HaloCEA lift support the encounter/firing-position lookup, crouching head estimate, eight-argument AI line-of-sight query, acknowledged-prop exposure result and approach-point update. Target and candidate are both 352 padded bytes with all 13 relocation identities; objdiff reports 83.46342 percent similarity. The remaining difference is a coherent EDI/EBX actor/encounter allocation and one candidate pointer home, not missing behavior. It receives zero exact credit. No compiler steering, raw offset, fake dependency, representation pun, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler allocation donor.",
-      "measurements": {
-        "target": { "size": 352, "relocation_count": 13, "normalized_sha256": "498dc2c046073108d309d0057bb5fc0405a8112c5532e90ef7ec5e79f21d7708" },
-        "base": { "size": 352, "relocation_count": 13, "normalized_sha256": "bbfe7ce7c3bafd235c0528f0480f5836b1d5016ec27e364ef77db6381c616c60" },
-        "objdiff_percent": 83.46342
-      }
-    },
-    {
-      "unit": "source/ai/action_flee",
       "function": "_action_flee_perform",
       "class": "unclassified",
-      "evidence": "Best complete typed ActionFlee state-machine caller retained so the exact private arrival and firing-position owners have their genuine caller graph. January control flow and the independent later HaloCEA lift support stationary panic, destination arrival, prop status updates, enum-correct threat completion, timesliced replanning, flee communications and both January assertions. Target is 864 padded bytes/30 relocations; candidate is 848/30 with the same relocation identities and 77.46595 percent objdiff similarity. The remaining control-flow and allocation residual is not assigned a speculative compiler mechanism and receives zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler donor.",
+      "evidence": "Best complete typed ActionFlee state-machine caller retained so the exact private arrival and firing-position owners have their genuine caller graph. January control flow and the independent later HaloCEA lift support stationary panic, destination arrival, prop status updates, enum-correct threat completion, timesliced replanning, flee communications and both January assertions. Target is 864 padded bytes/30 relocations; candidate is 848/30 with the same relocation identities and 77.46595 percent objdiff similarity. The remaining control-flow and allocation residual is not assigned a speculative compiler mechanism and receives zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior, forced inline or nonsensical branch is retained. See docs/object_matching_logs/action_flee_obj_position_helpers_exact_20260909.md; reopen only for authoritative January source/local records or another natural same-compiler donor. On September 14 (lane opus/150k-house-clean-20260914, wave w2, adversarially verified) the sibling _action_flee_setup reopen gave action_flee_find_flee_position its PDB- and January-proven third parameter, so this caller now pushes TRUE, and carries verified January-proven structural corrections; it is target-size and relocation-count exact (864/30), still fuzzy. See docs/object_matching_logs/action_flee_obj_opus5_150k_w2_20260914.md.",
       "measurements": {
         "target": { "size": 864, "relocation_count": 30, "normalized_sha256": "d62f05304574f88eefd7c025a452910d821e3986442777adcb223dc0d2085dc2" },
-        "base": { "size": 848, "relocation_count": 30, "normalized_sha256": "e4b2a3cecd2525f5989ea94abd238fd8cc687627248f91ba39f597fe4ae66f7e" },
-        "objdiff_percent": 77.46595
+        "base": { "size": 864, "relocation_count": 30, "normalized_sha256": "cefb8e42bcdf2d49703da1c44727b91d0038ac8be4d58bc0eb119829504a46b2" },
+        "objdiff_percent": 96.37993
       }
     },
     {

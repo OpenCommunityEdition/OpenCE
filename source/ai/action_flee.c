@@ -92,6 +92,7 @@ enum
 
 static void action_flee_find_flee_position(
 	long actor_index,
+	boolean respect_direction,
 	struct flee_state_data *state_data);
 static boolean action_flee_current_position_exposed(
 	long actor_index,
@@ -145,8 +146,10 @@ void action_flee_modify_color(
 	return;
 }
 
+/* respect_direction is not consulted by this build; setup passes FALSE and perform passes TRUE. */
 static void action_flee_find_flee_position(
 	long actor_index,
+	boolean respect_direction,
 	struct flee_state_data *state_data)
 {
 	struct firing_position_evaluation_context search;
@@ -261,8 +264,8 @@ static boolean action_flee_current_position_exposed(
 	long actor_index,
 	struct flee_state_data *state_data)
 {
-	boolean exposed = FALSE;
 	struct actor_datum *actor = actor_get(actor_index);
+	boolean exposed = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\action_flee.c",
@@ -309,7 +312,7 @@ static boolean action_flee_current_position_exposed(
 			line_of_sight == _ai_line_of_sight_to_cover)
 		{
 			state_data->has_approach_point = TRUE;
-			state_data->approach_point = prop->head_position;
+			state_data->approach_point = prop->body_position;
 		}
 	}
 
@@ -357,12 +360,12 @@ boolean action_flee_setup(
 			44,
 			state_data);
 		csmemset(state_data, 0, sizeof(*state_data));
+		state_data->forced_flee_ticks = force_state_entry ? 6*TICKS_PER_SECOND : 0;
+		state_data->flee_firing_position_index = NONE;
 		state_data->panic_type = panic_type;
 		state_data->flee_from_last_visible_location = flee_from_last_visible_location;
 		state_data->allow_occluded_points = allow_occluded_points;
 		state_data->flee_prop_index = panic_prop_index;
-		state_data->flee_firing_position_index = NONE;
-		state_data->forced_flee_ticks = force_state_entry ? 6*TICKS_PER_SECOND : 0;
 
 		if (panic_prop_index != NONE)
 		{
@@ -377,7 +380,7 @@ boolean action_flee_setup(
 		}
 		else if (!actor->meta.swarm)
 		{
-			action_flee_find_flee_position(actor_index, state_data);
+			action_flee_find_flee_position(actor_index, FALSE, state_data);
 			if (state_data->flee_firing_position_index != NONE)
 			{
 				success = TRUE;
@@ -582,7 +585,11 @@ boolean action_flee_perform(
 			state_data->forced_flee_ticks = 6*TICKS_PER_SECOND;
 		}
 
-		if (state_data->flee_stationary_ticks <= 0)
+		if (state_data->flee_stationary_ticks > 0)
+		{
+			state_data->flee_firing_position_index = NONE;
+		}
+		else
 		{
 			if (state_data->flee_firing_position_index == NONE)
 			{
@@ -616,21 +623,16 @@ boolean action_flee_perform(
 					if (flee_prop_index != NONE)
 					{
 						struct prop_datum *prop = prop_get(flee_prop_index);
-						short perception = MAX(prop->audibility, prop->ineffability);
 
 						prop->visibility = 0;
-						prop->unopposable_enemy = FALSE;
-						prop->perception = perception;
+						prop->perception = MAX(prop->audibility, prop->ineffability);
+						prop->currently_damaging_me = FALSE;
 						prop->line_of_sight = _ai_line_of_sight_from_cover;
 						actor_situation_update_target_status(actor_index);
 						actor_situation_combat_status_update(actor_index);
 					}
 				}
 			}
-		}
-		else
-		{
-			state_data->flee_firing_position_index = NONE;
 		}
 
 		switch (state_data->panic_type)
@@ -670,7 +672,7 @@ boolean action_flee_perform(
 			}
 			else if (state_data->find_new_flee_position)
 			{
-				action_flee_find_flee_position(actor_index, state_data);
+				action_flee_find_flee_position(actor_index, TRUE, state_data);
 				if (state_data->flee_firing_position_index == NONE)
 				{
 					state_data->unable_to_flee = TRUE;
@@ -712,21 +714,14 @@ boolean action_flee_perform(
 			}
 			else
 			{
-				long cause_unit_index = state_data->flee_prop_index == NONE ? NONE :
-					prop_get(state_data->flee_prop_index)->unit_index;
+				long cause_unit_index = NONE;
 
-				if (state_data->communicated_flee)
+				if (state_data->flee_prop_index != NONE)
 				{
-					ai_communication_event(
-						_ai_communication_flee_idle,
-						actor->meta.unit_index,
-						cause_unit_index,
-						NONE,
-						NONE,
-						NONE,
-						NULL);
+					cause_unit_index = prop_get(state_data->flee_prop_index)->unit_index;
 				}
-				else
+
+				if (!state_data->communicated_flee)
 				{
 					ai_communication_event(
 						state_data->panic_type == _actor_panic_friend_leader_type_killed ?
@@ -739,19 +734,33 @@ boolean action_flee_perform(
 						NULL);
 					state_data->communicated_flee = TRUE;
 				}
+				else
+				{
+					ai_communication_event(
+						_ai_communication_flee_idle,
+						actor->meta.unit_index,
+						cause_unit_index,
+						NONE,
+						NONE,
+						NONE,
+						NULL);
+				}
 			}
 			state_data->last_communication_time = now;
 		}
 	}
 
-	match_assert(
-		"c:\\halo\\SOURCE\\ai\\action_flee.c",
-		302,
-		(!actor->meta.timeslice && state_data->find_new_flee_position) ||
-			(state_data->flee_stationary_ticks > 0) ||
-			(state_data->flee_firing_position_index != NONE) ||
-			state_data->unable_to_flee ||
-			state_data->done_fleeing);
+	if (!actor->meta.swarm)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\action_flee.c",
+			302,
+			(!actor->meta.timeslice && state_data->find_new_flee_position) ||
+				(state_data->flee_stationary_ticks > 0) ||
+				(state_data->flee_firing_position_index != NONE) ||
+				state_data->unable_to_flee ||
+				state_data->done_fleeing);
+	}
 	return state_data->unable_to_flee || state_data->done_fleeing;
 }
 
