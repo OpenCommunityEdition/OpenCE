@@ -530,7 +530,7 @@ void collision_log_render(
 	return;
 }
 
-static long collision_log_get_current_user(
+static short collision_log_get_current_user(
 	short collision_function)
 {
 	short user;
@@ -553,19 +553,20 @@ static long collision_log_get_current_user(
 
 	if (!game_in_progress() || game_in_editor() || !global_collision_log_enable)
 	{
-		return NONE;
+		user = NONE;
 	}
-
-	if (collision_usage_current_period == NONE)
+	else if (collision_usage_current_period == NONE)
 	{
-		return NONE;
+		user = NONE;
 	}
-
-	match_assert(
-		"c:\\halo\\SOURCE\\physics\\collision_usage.c",
-		424,
-		(collision_usage_current_period >= 0) &&
-			(collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS));
+	else
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\physics\\collision_usage.c",
+			424,
+			(collision_usage_current_period >= 0) &&
+				(collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS));
+	}
 
 	return user;
 }

@@ -1790,8 +1790,8 @@
     {
       "unit": "source/physics/collision_usage",
       "function": "_collision_log_get_current_user",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the complete private user-selection helper retained in ordinary typed C and its semantic name recovered from historical Xbox donor source. The retained stack-top access is global_current_collision_users[global_current_collision_user_depth - 1], as independently proved by January's collision_usage_current+2974 relocation resolving two bytes before global_current_collision_users. Target and candidate share the 256-byte padded envelope and 23 relocations. After resolving that csplit alias, their instruction streams align for every instruction except the final successful return: January emits mov ax,si while VC7 emits movsx eax,si. Restoring the target assertion punctuation recovered the authentic owned strings. The independent PC machine-code lifts infer a short return, but neither has source or PDB type provenance; compiling that signature collapses January's separate NONE exits and shrinks the function to 240 bytes, so the Xbox donor's natural long-return topology is retained. Prior declaration, local-result, and return-shape experiments are documented as exhausted. No barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January prototype/local-lifetime evidence or a natural same-compiler donor that explains the narrow AX return without changing the rest of the function.",
+      "class": "csplit-relocation-alias",
+      "evidence": "Fuzzy-parked under the current house rule with the complete private user-selection helper retained in ordinary typed C and its semantic name recovered from historical Xbox donor source. The retained stack-top access is global_current_collision_users[global_current_collision_user_depth - 1], as independently proved by January's collision_usage_current+2974 relocation resolving two bytes before global_current_collision_users. Target and candidate share the 256-byte padded envelope and 23 relocations. After resolving that csplit alias, their instruction streams align for every instruction except the final successful return: January emits mov ax,si while VC7 emits movsx eax,si. Restoring the target assertion punctuation recovered the authentic owned strings. The independent PC machine-code lifts infer a short return, but neither has source or PDB type provenance; compiling that signature collapses January's separate NONE exits and shrinks the function to 240 bytes, so the Xbox donor's natural long-return topology is retained. Prior declaration, local-result, and return-shape experiments are documented as exhausted. No barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January prototype/local-lifetime evidence or a natural same-compiler donor that explains the narrow AX return without changing the rest of the function. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): Body replaced by the verified single-exit short-return form (law A3(c), C4244 at both callers). It is code-identical to January and differs only by the csplit negative-index relocation alias (_global_current_collision_users-2 == _collision_usage_current+2974). The park stays but its class changes from unclassified to csplit-relocation-alias. Base = the rebuilt object. The evidence text and objdiff_percent should be refreshed. Validate with tools/parked_functions.py, which must report ordinary-different and resolved-equal.",
       "measurements": {
         "target": {
           "size": 256,
@@ -1801,9 +1801,9 @@
         "base": {
           "size": 256,
           "relocation_count": 23,
-          "normalized_sha256": "0f1289b9c2652df52cbd35e38ba0778b3d2ada82a9dd87a9528fb5928c017bf3"
+          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
         },
-        "objdiff_percent": 99.14286
+        "objdiff_percent": 100.0
       }
     },
     {
