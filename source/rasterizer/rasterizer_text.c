@@ -225,6 +225,7 @@ rasterizer_text_cache_initialize(
 	void)
 {
 	struct bitmap_data *bitmap;
+	boolean success = TRUE;
 
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 118, !hardware_character_cache.initialized);
 
@@ -242,14 +243,20 @@ rasterizer_text_cache_initialize(
 		{
 			hardware_character_cache.bitmap = bitmap;
 			hardware_character_cache.initialized = TRUE;
-
-			return TRUE;
+		}
+		else
+		{
+			error(_error_silent, "### ERROR failed to initialize hardware text cache");
+			success = FALSE;
 		}
 	}
+	else
+	{
+		error(_error_silent, "### ERROR failed to initialize hardware text cache");
+		success = FALSE;
+	}
 
-	error(_error_silent, "### ERROR failed to initialize hardware text cache");
-
-	return FALSE;
+	return success;
 }
 
 void
@@ -527,6 +534,8 @@ rasterizer_draw_character_with_dropshadow(
 	if (font_character->hardware_character_index != NONE)
 	{
 		struct dynamic_screen_vertex vertices[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
+		real x_offset = 1.0f;
+		real y_offset = 1.0f;
 		unsigned long shadow_color = global_shadow_color
 			? global_shadow_color
 			: (color & 0xFF000000);
@@ -534,8 +543,6 @@ rasterizer_draw_character_with_dropshadow(
 		real right = (real)(x0 + dx);
 		real top = (real)y0;
 		real bottom = (real)(y0 + dy);
-		real x_offset = 1.0f;
-		real y_offset = 1.0f;
 		boolean shadow = TRUE;
 
 		while (TRUE)
@@ -568,8 +575,7 @@ rasterizer_draw_character_with_dropshadow(
 				break;
 
 			shadow = FALSE;
-			x_offset = 0.0f;
-			y_offset = 0.0f;
+			x_offset = y_offset = 0.0f;
 		}
 	}
 
@@ -660,15 +666,18 @@ cache_hardware_format_character(
 			hardware_character_cache.x0 = 0;
 			hardware_character_cache.maximum_character_height = 0;
 
-			while (hardware_character_cache.read_index != hardware_character_cache.write_index)
+			if (hardware_character_cache.read_index != hardware_character_cache.write_index)
 			{
-				hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
+				do
+				{
+					hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
 
-				if (hardware_character->y0 <= 0)
-					break;
+					if (hardware_character->y0 <= 0)
+						break;
 
-				flush_hardware_character(hardware_character);
-				hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
+					flush_hardware_character(hardware_character);
+					hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
+				} while (hardware_character_cache.read_index != hardware_character_cache.write_index);
 			}
 		}
 
@@ -677,15 +686,18 @@ cache_hardware_format_character(
 			y0 = hardware_character_cache.y0 + hardware_character_cache.maximum_character_height;
 			y1 = hardware_character_cache.y0 + font_character->bitmap_height;
 
-			while (hardware_character_cache.read_index != hardware_character_cache.write_index)
+			if (hardware_character_cache.read_index != hardware_character_cache.write_index)
 			{
-				hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
+				do
+				{
+					hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
 
-				if (hardware_character->y0 < y0 || hardware_character->y0 >= y1)
-					break;
+					if (hardware_character->y0 < y0 || hardware_character->y0 >= y1)
+						break;
 
-				flush_hardware_character(hardware_character);
-				hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
+					flush_hardware_character(hardware_character);
+					hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
+				} while (hardware_character_cache.read_index != hardware_character_cache.write_index);
 			}
 
 			hardware_character_cache.maximum_character_height = font_character->bitmap_height;
