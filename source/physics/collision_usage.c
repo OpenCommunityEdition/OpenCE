@@ -333,8 +333,7 @@ void collision_log_render(
 	{
 		char line_buffer[2048];
 		short function_index;
-		rectangle2d frame_bounds = rasterizer_globals.reserved04.frame_bounds;
-		long debug_string_position = frame_bounds.y1 - 30;
+		short debug_string_position = rasterizer_globals.reserved04.frame_bounds.y1 - 30;
 
 		for (function_index = 0; function_index < NUMBER_OF_COLLISION_FUNCTION_TYPES; function_index++)
 		{
@@ -372,19 +371,22 @@ void collision_log_render(
 								{
 									if (collision_usage_buffer[time_period_index].reset_upon_next_use)
 									{
-										struct collision_log const *usage =
-											&collision_usage_buffer[time_period_index]
-												.function[function_index]
-												.usage_by_user[user_index];
-
-										overall_usage[user_index].usage_by_period[time_period_index] = *usage;
-										overall_usage[user_index].total_all_periods.calls += usage->calls;
-										overall_usage[user_index].total_all_periods.elapsed_time += usage->elapsed_time;
-										total_usage.total_all_periods.calls += usage->calls;
-										total_usage.total_all_periods.elapsed_time += usage->elapsed_time;
-										total_usage.usage_by_period[time_period_index].calls += usage->calls;
-										total_usage.usage_by_period[time_period_index].elapsed_time += usage->elapsed_time;
+										overall_usage[user_index].usage_by_period[time_period_index] =
+											collision_usage_buffer[time_period_index].function[function_index].usage_by_user[user_index];
+										total_usage.usage_by_period[time_period_index].calls +=
+											collision_usage_buffer[time_period_index].function[function_index].usage_by_user[user_index].calls;
+										total_usage.usage_by_period[time_period_index].elapsed_time +=
+											collision_usage_buffer[time_period_index].function[function_index].usage_by_user[user_index].elapsed_time;
 									}
+
+									overall_usage[user_index].total_all_periods.calls +=
+										overall_usage[user_index].usage_by_period[time_period_index].calls;
+									overall_usage[user_index].total_all_periods.elapsed_time +=
+										overall_usage[user_index].usage_by_period[time_period_index].elapsed_time;
+									total_usage.total_all_periods.calls +=
+										overall_usage[user_index].usage_by_period[time_period_index].calls;
+									total_usage.total_all_periods.elapsed_time +=
+										overall_usage[user_index].usage_by_period[time_period_index].elapsed_time;
 								}
 							}
 						}
@@ -409,11 +411,10 @@ void collision_log_render(
 							for (index = 0; index < NUMBER_OF_COLLISION_TIME_PERIODS; index++)
 							{
 								char temporary_buffer[256];
-								short length;
+								short length = (short)csstrlen(temporary_string);
 
 								collision_log_format_usage(temporary_buffer, &total_usage.usage_by_period[index]);
-								length = (short)csstrlen(temporary_string);
-								snprintf(
+								_snprintf(
 									temporary_string + length,
 									sizeof(temporary_string) - length,
 									"%c%s",
@@ -424,11 +425,10 @@ void collision_log_render(
 						else
 						{
 							char temporary_buffer[256];
-							short length;
+							short length = (short)csstrlen(temporary_string);
 
 							collision_log_format_usage(temporary_buffer, &total_usage.total_all_periods);
-							length = (short)csstrlen(temporary_string);
-							snprintf(
+							_snprintf(
 								temporary_string + length,
 								sizeof(temporary_string) - length,
 								" %s",
@@ -454,7 +454,7 @@ void collision_log_render(
 							{
 								char temporary_string[512];
 
-								snprintf(
+								_snprintf(
 									temporary_string,
 									sizeof(temporary_string),
 									" %s",
@@ -467,13 +467,12 @@ void collision_log_render(
 									for (time_period_index = 0; time_period_index < NUMBER_OF_COLLISION_TIME_PERIODS; time_period_index++)
 									{
 										char temporary_buffer[256];
-										short length;
+										short length = (short)csstrlen(temporary_string);
 
 										collision_log_format_usage(
 											temporary_buffer,
 											&overall_usage[index].usage_by_period[time_period_index]);
-										length = (short)csstrlen(temporary_string);
-										snprintf(
+										_snprintf(
 											temporary_string + length,
 											sizeof(temporary_string) - length,
 											"%c%s",
@@ -484,13 +483,12 @@ void collision_log_render(
 								else
 								{
 									char temporary_buffer[256];
-									short length;
+									short length = (short)csstrlen(temporary_string);
 
 									collision_log_format_usage(
 										temporary_buffer,
 										&overall_usage[index].total_all_periods);
-									length = (short)csstrlen(temporary_string);
-									snprintf(
+									_snprintf(
 										temporary_string + length,
 										sizeof(temporary_string) - length,
 										" %s",
@@ -506,10 +504,10 @@ void collision_log_render(
 						rectangle2d bounds;
 						point2d cursor;
 
-						bounds.y0 = (short)debug_string_position;
-						bounds.x0 = frame_bounds.x0;
-						bounds.y1 = SHORT_MAX;
+						bounds.y0 = debug_string_position;
+						bounds.x0 = rasterizer_globals.reserved04.frame_bounds.x0;
 						bounds.x1 = SHORT_MAX;
+						bounds.y1 = SHORT_MAX;
 
 						interface_set_bitmap_text_draw_mode(
 							_interface_font_terminal,
