@@ -117,30 +117,12 @@ enum
 
 /* ---------- structures */
 
-/* cleared whole by ai_debug_select_encounter, so one object in the original.
-Only the three members code_00041220 reads are named. */
-struct ai_debug_block_7D384
-{
-	char __unknown000[67];
-	boolean field_043;
-	char __unknown044[1464];
-	boolean field_5FC;
-	char __unknown5FD[7];
-	real_point3d field_604;
-	char __unknown610[96];
-};
-
+/* one record per encounter firing position, filled by actor_select_firing_position */
 struct ai_debug_actor_record
 {
-	boolean field_00;
-	boolean field_01;
-	char __unknown02[34];
-	real_point3d field_24;
-	char __unknown30[4];
-	boolean field_34;
-	char __unknown35[3];
-	real field_38;
-	real field_3C;
+	boolean pursuit;
+	boolean valid;
+	struct firing_position firing_position;
 };
 
 struct ai_debug_lineofsight_pair
@@ -347,9 +329,9 @@ struct ai_debug_state
 	boolean field_608A8;
 	char __unknown608A9[91];
 	struct path_debug_storage path_storage;
-	boolean field_7D380;
+	boolean evaluation_context_valid;
 	char __unknown7D381[3];
-	struct ai_debug_block_7D384 field_7D384;
+	struct firing_position_evaluation_context evaluation_context;
 	struct ai_debug_actor_record actor_record[NUMBER_OF_AI_DEBUG_ACTOR_RECORDS];
 	long field_859F4;
 	boolean field_859F8;
@@ -392,21 +374,21 @@ typedef char ai_debug_state_path_state_offset_assert[
 typedef char ai_debug_state_path_storage_offset_assert[
 	offsetof(struct ai_debug_state, path_storage) == 0x60904 ? 1 : -1];
 typedef char ai_debug_state_field_7D3C7_offset_assert[
-	offsetof(struct ai_debug_state, field_7D384.field_043) == 0x7D3C7 ? 1 : -1];
+	offsetof(struct ai_debug_state, evaluation_context.find_path_direction_from_target) == 0x7D3C7 ? 1 : -1];
 typedef char ai_debug_state_field_7D980_offset_assert[
-	offsetof(struct ai_debug_state, field_7D384.field_5FC) == 0x7D980 ? 1 : -1];
+	offsetof(struct ai_debug_state, evaluation_context.has_target) == 0x7D980 ? 1 : -1];
 typedef char ai_debug_state_field_7D988_offset_assert[
-	offsetof(struct ai_debug_state, field_7D384.field_604) == 0x7D988 ? 1 : -1];
+	offsetof(struct ai_debug_state, evaluation_context.target_point) == 0x7D988 ? 1 : -1];
 typedef char ai_debug_state_actor_record_offset_assert[
 	offsetof(struct ai_debug_state, actor_record) == 0x7D9F4 ? 1 : -1];
 typedef char ai_debug_actor_record_size_assert[
 	sizeof(struct ai_debug_actor_record) == 0x40 ? 1 : -1];
 typedef char ai_debug_actor_record_field_24_offset_assert[
-	offsetof(struct ai_debug_actor_record, field_24) == 0x24 ? 1 : -1];
+	offsetof(struct ai_debug_actor_record, firing_position.path_direction_from_target) == 0x24 ? 1 : -1];
 typedef char ai_debug_actor_record_field_3C_offset_assert[
-	offsetof(struct ai_debug_actor_record, field_3C) == 0x3C ? 1 : -1];
+	offsetof(struct ai_debug_actor_record, firing_position.evaluation) == 0x3C ? 1 : -1];
 typedef char ai_debug_state_field_7D380_offset_assert[
-	offsetof(struct ai_debug_state, field_7D380) == 0x7D380 ? 1 : -1];
+	offsetof(struct ai_debug_state, evaluation_context_valid) == 0x7D380 ? 1 : -1];
 
 struct actor_debug_info
 {

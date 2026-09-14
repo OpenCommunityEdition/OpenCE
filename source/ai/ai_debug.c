@@ -4608,9 +4608,9 @@ void ai_debug_select_encounter(
 	if (ai_debug.selected_squad_index!=encounter_index)
 	{
 		ai_debug.selected_squad_index = encounter_index;
-		ai_debug.field_7D380 = FALSE;
+		ai_debug.evaluation_context_valid = FALSE;
 
-		csmemset(&ai_debug.field_7D384, 0, sizeof(ai_debug.field_7D384));
+		csmemset(&ai_debug.evaluation_context, 0, sizeof(ai_debug.evaluation_context));
 		csmemset(ai_debug.actor_record, 0, sizeof(ai_debug.actor_record));
 
 		ai_debug_select_actor(encounter_index, NONE);
@@ -4631,11 +4631,11 @@ void ai_debug_select_actor(
 		ai_debug_select_encounter(encounter_index);
 
 		ai_debug.selected_actor_index = actor_index;
-		ai_debug.field_7D380 = FALSE;
+		ai_debug.evaluation_context_valid = FALSE;
 
 		for (record = ai_debug.actor_record, index = NUMBER_OF_AI_DEBUG_ACTOR_RECORDS; index>0; index--, record++)
 		{
-			record->field_01 = FALSE;
+			record->valid = FALSE;
 		}
 
 		ai_debug_idle_look_clear(actor_index);
@@ -5913,7 +5913,7 @@ default_firing_position_colors:
 
 		ai_debug_drawstack_setup(&point);
 
-		if (ai_debug.render_pursuit && ai_debug.actor_record[index].field_00)
+		if (ai_debug.render_pursuit && ai_debug.actor_record[index].pursuit)
 		{
 			boolean pursued = FALSE;
 			boolean examined;
@@ -5922,8 +5922,8 @@ default_firing_position_colors:
 			if (ai_debug.selected_actor_index!=NONE)
 			{
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
-					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C),
-					ai_debug.actor_record[index].field_34 ?
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].firing_position.evaluation),
+					ai_debug.actor_record[index].firing_position.valid ?
 						global_real_argb_white : global_real_argb_red);
 			}
 
@@ -5949,37 +5949,37 @@ default_firing_position_colors:
 				pursued ? global_real_argb_yellow :
 					examined ? global_real_argb_blue : global_real_argb_white);
 
-			if (ai_debug.field_7D380 &&
-				ai_debug.field_7D384.field_5FC && ai_debug.field_7D384.field_043 &&
-				ai_debug.actor_record[index].field_01 &&
-				ai_debug.actor_record[index].field_34)
+			if (ai_debug.evaluation_context_valid &&
+				ai_debug.evaluation_context.has_target && ai_debug.evaluation_context.find_path_direction_from_target &&
+				ai_debug.actor_record[index].valid &&
+				ai_debug.actor_record[index].firing_position.valid)
 			{
 				real_point3d origin;
 
-				origin.x = ai_debug.field_7D384.field_604.x+
-					ai_debug.actor_record[index].field_24.x;
-				origin.y = ai_debug.field_7D384.field_604.y+
-					ai_debug.actor_record[index].field_24.y;
-				origin.z = ai_debug.field_7D384.field_604.z+
-					ai_debug.actor_record[index].field_24.z;
+				origin.x = ai_debug.evaluation_context.target_point.x+
+					ai_debug.actor_record[index].firing_position.path_direction_from_target.i;
+				origin.y = ai_debug.evaluation_context.target_point.y+
+					ai_debug.actor_record[index].firing_position.path_direction_from_target.j;
+				origin.z = ai_debug.evaluation_context.target_point.z+
+					ai_debug.actor_record[index].firing_position.path_direction_from_target.k;
 
-				render_debug_line(TRUE, &ai_debug.field_7D384.field_604, &origin,
+				render_debug_line(TRUE, &ai_debug.evaluation_context.target_point, &origin,
 					global_real_argb_yellow);
 				render_debug_line(TRUE, &origin, &position->position, global_real_argb_green);
 			}
 		}
-		else if (ai_debug.render_evaluations && ai_debug.actor_record[index].field_01 &&
-			!ai_debug.actor_record[index].field_00 &&
+		else if (ai_debug.render_evaluations && ai_debug.actor_record[index].valid &&
+			!ai_debug.actor_record[index].pursuit &&
 			ai_debug.selected_actor_index!=NONE)
 		{
 			real_argb_color const *color;
 			real_argb_color const *string_color = NULL;
 
-			if (!ai_debug.actor_record[index].field_34)
+			if (!ai_debug.actor_record[index].firing_position.valid)
 			{
 				color = global_real_argb_red;
 			}
-			else if (ai_debug.actor_record[index].field_38>0.f)
+			else if (ai_debug.actor_record[index].firing_position.pre_evaluation>0.f)
 			{
 				string_color = global_real_argb_white;
 				color = *owner_actor_index==ai_debug.selected_actor_index ?
@@ -5993,16 +5993,16 @@ default_firing_position_colors:
 			if (string_color)
 			{
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
-					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_38),
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].firing_position.pre_evaluation),
 					string_color);
 
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
-					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C), color);
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].firing_position.evaluation), color);
 			}
 			else
 			{
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(),
-					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].field_3C), color);
+					csprintf(temporary, "%3.2f", ai_debug.actor_record[index].firing_position.evaluation), color);
 			}
 		}
 	}

@@ -2042,7 +2042,7 @@ short actor_select_firing_position(
 			evaluation_context->debug_skipped_count= 0;
 		if (debug_evaluation)
 		{
-			ai_debug.field_7D380= TRUE;
+			ai_debug.evaluation_context_valid= TRUE;
 			/* January also copies *evaluation_context into ai_debug here (needs the typed ai_debug.h member) */
 		}
 
@@ -2064,13 +2064,13 @@ short actor_select_firing_position(
 
 				if (debug_evaluation)
 				{
-					ai_debug.actor_record[index].field_01= FALSE;
+					ai_debug.actor_record[index].valid= FALSE;
 				}
 				if (TEST_FLAG(evaluation_context->allowed_position_mask, firing_position_definition->group_index))
 				{
 					if (actor->meta.encounter_index==ai_debug.selected_squad_index)
 					{
-						ai_debug.actor_record[index].field_00=
+						ai_debug.actor_record[index].pursuit=
 							evaluation_context->evaluation_mode==_firing_point_evaluation_mode_pursue;
 					}
 					if ((evaluation_context->flying || firing_position_definition->surface_index!=NONE) &&
@@ -2333,7 +2333,7 @@ short actor_select_firing_position(
 				}
 				if (debug_evaluation)
 				{
-					ai_debug.actor_record[firing_position->original_index].field_01= TRUE;
+					ai_debug.actor_record[firing_position->original_index].valid= TRUE;
 					/* January also copies *firing_position into this ai_debug record (needs the typed ai_debug.h member) */
 				}
 			}
@@ -2410,7 +2410,7 @@ short actor_select_firing_position(
 				{
 					for (index= 0; index<firing_position_count; index++)
 					{
-						ai_debug.actor_record[firing_positions[index].original_index].field_01= TRUE;
+						ai_debug.actor_record[firing_positions[index].original_index].valid= TRUE;
 						/* January also copies firing_positions[index] into this ai_debug record (needs the typed ai_debug.h member) */
 					}
 				}
