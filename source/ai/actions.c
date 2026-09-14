@@ -2857,12 +2857,8 @@ boolean actor_action_handle_lost_contact(
 	long actor_index)
 {
 	struct path_state search_workspace;
-	struct firing_position_evaluation_context search;
-	struct firing_position candidate;
 	struct action_state_data action_data;
 	struct actor_datum *actor = actor_get(actor_index);
-	struct actor_firing_position_data *firing_positions =
-		&actor->firing_positions;
 	struct actor_definition *definition =
 		actor_definition_get(actor->meta.definition_index);
 	struct encounter_datum *encounter = actor->meta.encounter_index == NONE ?
@@ -2898,23 +2894,24 @@ boolean actor_action_handle_lost_contact(
 	{
 		struct prop_datum *orphan = actor->target.target_prop_index == NONE ?
 			NULL : prop_get(actor->target.target_prop_index);
+		boolean pursue_tenacious = FALSE;
 		boolean allow_target_uncover = FALSE;
 		boolean allow_indefinite_target_uncover = FALSE;
 		boolean allow_target_search = FALSE;
 		boolean allow_pursuit = FALSE;
 		boolean allow_pursuit_search = FALSE;
-		boolean pursue_tenacious = FALSE;
 		boolean wait_after_pursuit = FALSE;
-		boolean controlling_group_pursuit;
-		boolean group_pursuit_controller;
-		boolean controlled_by_group_pursuit;
-		short desire_pursuit;
-		short desire_pursuit_search;
-		short group_pursuit_restriction;
-		short desire_target_search;
 
 		if (!orphan || !orphan->abandoned_search)
 		{
+			boolean controlling_group_pursuit;
+			boolean group_pursuit_controller;
+			boolean controlled_by_group_pursuit;
+			short desire_pursuit;
+			short desire_pursuit_search;
+			short group_pursuit_restriction;
+			short desire_target_search;
+
 			desire_target_search =
 				actor_type_get_when_to_search_at_target(actor->meta.type);
 			desire_pursuit = actor_type_get_when_to_pursue(actor->meta.type);
@@ -2991,14 +2988,14 @@ boolean actor_action_handle_lost_contact(
 				&wait_after_pursuit);
 		}
 
-		if (firing_positions->pursuit_prop_index !=
+		if (actor->firing_positions.pursuit_prop_index !=
 			actor->target.target_prop_index)
 		{
-			firing_positions->pursuit_prop_index =
+			actor->firing_positions.pursuit_positions_count = 0;
+			actor->firing_positions.pursuit_prop_index =
 				actor->target.target_prop_index;
-			firing_positions->pursuit_positions_count = 0;
-			firing_positions->pursuit_fired_at_orphan = FALSE;
-			firing_positions->pursuit_communicated_lost_contact = FALSE;
+			actor->firing_positions.pursuit_fired_at_orphan = FALSE;
+			actor->firing_positions.pursuit_communicated_lost_contact = FALSE;
 		}
 
 		if (allow_target_uncover &&
@@ -3035,18 +3032,12 @@ boolean actor_action_handle_lost_contact(
 
 			if (!handled)
 			{
-				short firing_position_index = NONE;
-				boolean pursuit_from_uncover = FALSE;
-				boolean search_started = FALSE;
-				boolean position_flags = FALSE;
-				long previous_owner_actor_index = NONE;
-
 				actor_perception_tried_to_search(
 					actor_index,
 					actor->target.target_prop_index);
 
-				if (firing_positions->pursuit_fired_at_orphan &&
-					!firing_positions->pursuit_communicated_lost_contact)
+				if (actor->firing_positions.pursuit_fired_at_orphan &&
+					!actor->firing_positions.pursuit_communicated_lost_contact)
 				{
 					ai_communication_event(
 						13,
@@ -3056,21 +3047,29 @@ boolean actor_action_handle_lost_contact(
 						NONE,
 						NONE,
 						NULL);
-					firing_positions->pursuit_communicated_lost_contact = TRUE;
+					actor->firing_positions.pursuit_communicated_lost_contact = TRUE;
 				}
 
 				if (allow_pursuit)
 				{
+					short firing_position_index = NONE;
+					boolean pursuit_from_uncover = FALSE;
+
 					actor->state.searching = TRUE;
 
 					if (actor->meta.swarm)
 					{
-						if (allow_pursuit_search)
-						{
-							search_started = action_search_setup_undirected(
+						if (allow_pursuit_search &&
+							action_search_setup_undirected(
 								actor_index,
 								pursue_tenacious,
-								&action_data.search);
+								&action_data.search))
+						{
+							actor_action_change(
+								actor_index,
+								_actor_action_search,
+								&action_data);
+							handled = TRUE;
 						}
 					}
 					else
@@ -3093,17 +3092,22 @@ boolean actor_action_handle_lost_contact(
 									definition->pursuit.coordinated_pursuit_positions;
 
 							if (pursue_tenacious ||
-								firing_positions->pursuit_prop_index !=
+								actor->firing_positions.pursuit_prop_index !=
 									actor->target.target_prop_index ||
-								firing_positions->pursuit_positions_count <
+								actor->firing_positions.pursuit_positions_count <
 									examined_threshold)
 							{
+								struct firing_position_evaluation_context search;
+								struct firing_position candidate;
+								long previous_owner_actor_index;
+								boolean position_flags;
+
 								csmemset(&search, 0, sizeof(search));
 								search.evaluation_mode = _firing_point_evaluation_mode_pursue;
 								search.evaluation_data.pursue.orphan_prop_index =
 									actor->target.target_prop_index;
-								search.evaluation_data.pursue.last_perceived_time = orphan ?
-									orphan->last_perceived_time : NONE;
+								search.evaluation_data.pursue.last_perceived_time = orphan == NULL ?
+									NONE : orphan->last_perceived_time;
 								search.evaluation_data.pursue.tenacious = pursue_tenacious;
 								search.find_path_direction_from_target =
 									actor->target.target_prop_index != NONE;
@@ -3137,54 +3141,54 @@ boolean actor_action_handle_lost_contact(
 									&action_data);
 								handled = TRUE;
 							}
-
-							if (!handled && allow_pursuit_search)
-							{
-								search_started = action_search_setup_pursuit(
+							else if (allow_pursuit_search &&
+								action_search_setup_pursuit(
 									actor_index,
 									firing_position_index,
 									pursue_tenacious,
-									&action_data.search);
+									&action_data.search))
+							{
+								actor_action_change(
+									actor_index,
+									_actor_action_search,
+									&action_data);
+								handled = TRUE;
 							}
 						}
 					}
 
-					if (search_started)
+					if (handled)
 					{
-						actor_action_change(
-							actor_index,
-							_actor_action_search,
-							&action_data);
-						handled = TRUE;
-					}
+						long last_perceived_time = orphan == NULL ?
+							NONE : orphan->last_perceived_time;
 
-					if (handled &&
-						actor->meta.encounter_index != NONE &&
-						encounter_mark_examined_pursuit_position(
-							actor->meta.encounter_index,
-							actor_index,
-							firing_position_index,
-							orphan ? orphan->last_perceived_time : NONE))
-					{
-						if (firing_positions->pursuit_positions_count == 0)
+						if (actor->meta.encounter_index != NONE &&
+							encounter_mark_examined_pursuit_position(
+								actor->meta.encounter_index,
+								actor_index,
+								firing_position_index,
+								last_perceived_time))
 						{
-							ai_communication_event(
-								16,
-								actor->meta.unit_index,
-								NONE,
-								NONE,
-								NONE,
-								NONE,
-								NULL);
-						}
+							if (actor->firing_positions.pursuit_positions_count == 0)
+							{
+								ai_communication_event(
+									16,
+									actor->meta.unit_index,
+									NONE,
+									NONE,
+									NONE,
+									NONE,
+									NULL);
+							}
 
-						firing_positions->pursuit_positions_count++;
+							actor->firing_positions.pursuit_positions_count++;
+						}
 					}
 				}
 
 				if (!handled)
 				{
-					if (firing_positions->pursuit_positions_count > 0 &&
+					if (actor->firing_positions.pursuit_positions_count > 0 &&
 						actor->meta.unit_index != NONE)
 					{
 						ai_communication_event(
@@ -4844,180 +4848,179 @@ boolean actor_action_handle_danger_avoidance(
 			}
 		}
 
-		if (!body_within_danger)
+		if (body_within_danger)
+		{
+			boolean reaction_is_urgent = FALSE;
+			real urgency = fast_vector_intersection_with_sphere(
+				&actor->danger_zone.position,
+				&danger_line_delta,
+				&actor->input.position.body_position,
+				actor->danger_zone.danger_radius);
+
+			if (urgency < REAL_MAX)
+				urgency *= 45.0f;
+
+			switch (actor->danger_zone.danger_type)
+			{
+			case _actor_danger_zone_suicide:
+				if (urgency == 0.0f &&
+					actor->danger_zone.suicide.time_until_death != NONE &&
+					actor->danger_zone.suicide.time_until_death < 30)
+				{
+					reaction_is_urgent = TRUE;
+				}
+				break;
+
+			case _actor_danger_zone_projectile:
+				if (urgency == 0.0f &&
+					actor->danger_zone.projectile.time_until_explosion != NONE &&
+					actor->danger_zone.projectile.time_until_explosion < 20)
+				{
+					reaction_is_urgent = TRUE;
+				}
+				break;
+
+			case _actor_danger_zone_vehicle:
+				if (urgency < 30.0f)
+					reaction_is_urgent = TRUE;
+				break;
+			}
+
+			if ((!actor->danger_zone.hostility || reaction_is_urgent) &&
+				!actor->danger_zone.communicated)
+			{
+				long hostility = NONE;
+
+				switch (actor->danger_zone.hostility)
+				{
+				case _actor_danger_hostility_enemy:
+					hostility = _comm_hostility_enemy;
+					break;
+				case _actor_danger_hostility_friend:
+					hostility = _comm_hostility_friend;
+					break;
+				case _actor_danger_hostility_self:
+					hostility = _comm_hostility_self;
+					break;
+				}
+
+				if (actor->danger_zone.danger_type ==
+					_actor_danger_zone_projectile)
+				{
+					ai_communication_event(
+						_ai_communication_grenade_danger,
+						actor->meta.unit_index,
+						NONE,
+						hostility,
+						NONE,
+						NONE,
+						NULL);
+				}
+
+				actor->danger_zone.communicated = TRUE;
+			}
+
+			{
+				real_vector2d alignment_vector;
+				boolean escape_found;
+				boolean escape_is_ledge;
+
+				escape_found = actor_action_find_escape_from_danger(
+					actor_index,
+					&escape_direction,
+					&escape_distance,
+					&alignment_vector,
+					&escape_is_ledge);
+
+				if (escape_direction == NONE)
+				{
+					debug_info->danger_decision =
+						_danger_avoidance_no_safe_direction;
+					goto try_avoid_action;
+				}
+
+				if (actor->danger_zone.allow_dive_evasion &&
+					actor->input.vehicle_index == NONE)
+				{
+					boolean should_dive = FALSE;
+
+					switch (actor->danger_zone.danger_type)
+					{
+					case _actor_danger_zone_suicide:
+						if ((escape_found || escape_is_ledge) && urgency == 0.0f)
+						{
+							debug_info->danger_decision =
+								_danger_avoidance_can_avoid;
+							should_dive = TRUE;
+						}
+						else if (reaction_is_urgent)
+						{
+							debug_info->danger_decision =
+								_danger_avoidance_imminent_explosion;
+							should_dive = TRUE;
+						}
+						break;
+
+					case _actor_danger_zone_projectile:
+						if ((escape_found || escape_is_ledge) && urgency < 7.0f)
+						{
+							debug_info->danger_decision =
+								_danger_avoidance_can_avoid;
+							should_dive = TRUE;
+						}
+						else if (reaction_is_urgent)
+						{
+							debug_info->danger_decision =
+								_danger_avoidance_imminent_explosion;
+							should_dive = TRUE;
+						}
+						break;
+
+					case _actor_danger_zone_vehicle:
+						if (reaction_is_urgent)
+						{
+							debug_info->danger_decision =
+								_danger_avoidance_imminent_impact;
+							should_dive = TRUE;
+						}
+						break;
+					}
+
+					if (should_dive)
+					{
+						struct actor_definition *definition =
+							actor_definition_get(actor->meta.definition_index);
+						real ledge_avoidance_distance =
+							TEST_FLAG(
+								definition->flags,
+								_actor_definition_dive_off_ledges_bit) ?
+								8.0f : 0.0f;
+
+						result = actor_action_try_to_dive(
+							actor_index,
+							escape_direction,
+							escape_distance,
+							&alignment_vector,
+							ledge_avoidance_distance);
+					}
+					else
+					{
+						debug_info->danger_decision = _danger_avoidance_no_desire;
+						debug_info->danger_intersect_time = urgency;
+					}
+				}
+				else
+				{
+					debug_info->danger_decision = _danger_avoidance_evasion_disallowed;
+				}
+			}
+		}
+		else
 		{
 			debug_info->danger_decision = _danger_avoidance_outside_zone;
 			debug_info->danger_zone_dist =
 				square_root(body_line_distance_squared);
 			debug_info->danger_zone_radius = actor->danger_zone.danger_radius;
-			goto try_avoid_action;
-		}
-	}
-
-	{
-		boolean reaction_is_urgent = FALSE;
-		real urgency = fast_vector_intersection_with_sphere(
-			&actor->danger_zone.position,
-			&danger_line_delta,
-			&actor->input.position.body_position,
-			actor->danger_zone.danger_radius);
-
-		if (urgency < REAL_MAX)
-			urgency *= 45.0f;
-
-		switch (actor->danger_zone.danger_type)
-		{
-		case _actor_danger_zone_suicide:
-			if (urgency == 0.0f &&
-				actor->danger_zone.suicide.time_until_death != NONE &&
-				actor->danger_zone.suicide.time_until_death < 30)
-			{
-				reaction_is_urgent = TRUE;
-			}
-			break;
-
-		case _actor_danger_zone_projectile:
-			if (urgency == 0.0f &&
-				actor->danger_zone.projectile.time_until_explosion != NONE &&
-				actor->danger_zone.projectile.time_until_explosion < 20)
-			{
-				reaction_is_urgent = TRUE;
-			}
-			break;
-
-		case _actor_danger_zone_vehicle:
-			if (urgency < 30.0f)
-				reaction_is_urgent = TRUE;
-			break;
-		}
-
-		if ((!actor->danger_zone.hostility || reaction_is_urgent) &&
-			!actor->danger_zone.communicated)
-		{
-			long hostility = NONE;
-
-			switch (actor->danger_zone.hostility)
-			{
-			case _actor_danger_hostility_enemy:
-				hostility = _comm_hostility_enemy;
-				break;
-			case _actor_danger_hostility_friend:
-				hostility = _comm_hostility_friend;
-				break;
-			case _actor_danger_hostility_self:
-				hostility = _comm_hostility_self;
-				break;
-			}
-
-			if (actor->danger_zone.danger_type ==
-				_actor_danger_zone_projectile)
-			{
-				ai_communication_event(
-					_ai_communication_grenade_danger,
-					actor->meta.unit_index,
-					NONE,
-					hostility,
-					NONE,
-					NONE,
-					NULL);
-			}
-
-			actor->danger_zone.communicated = TRUE;
-		}
-
-		{
-			real_vector2d alignment_vector;
-			boolean escape_found;
-			boolean escape_is_ledge;
-
-			escape_found = actor_action_find_escape_from_danger(
-				actor_index,
-				&escape_direction,
-				&escape_distance,
-				&alignment_vector,
-				&escape_is_ledge);
-
-			if (escape_direction == NONE)
-			{
-				debug_info->danger_decision =
-					_danger_avoidance_no_safe_direction;
-				goto try_avoid_action;
-			}
-
-			if (actor->danger_zone.allow_dive_evasion &&
-				actor->input.vehicle_index == NONE)
-			{
-				boolean should_dive = FALSE;
-
-				switch (actor->danger_zone.danger_type)
-				{
-				case _actor_danger_zone_suicide:
-					if ((escape_found || escape_is_ledge) && urgency == 0.0f)
-					{
-						debug_info->danger_decision =
-							_danger_avoidance_can_avoid;
-						should_dive = TRUE;
-					}
-					else if (reaction_is_urgent)
-					{
-						debug_info->danger_decision =
-							_danger_avoidance_imminent_explosion;
-						should_dive = TRUE;
-					}
-					break;
-
-				case _actor_danger_zone_projectile:
-					if ((escape_found || escape_is_ledge) && urgency < 7.0f)
-					{
-						debug_info->danger_decision =
-							_danger_avoidance_can_avoid;
-						should_dive = TRUE;
-					}
-					else if (reaction_is_urgent)
-					{
-						debug_info->danger_decision =
-							_danger_avoidance_imminent_explosion;
-						should_dive = TRUE;
-					}
-					break;
-
-				case _actor_danger_zone_vehicle:
-					if (reaction_is_urgent)
-					{
-						debug_info->danger_decision =
-							_danger_avoidance_imminent_impact;
-						should_dive = TRUE;
-					}
-					break;
-				}
-
-				if (should_dive)
-				{
-					struct actor_definition *definition =
-						actor_definition_get(actor->meta.definition_index);
-					real ledge_avoidance_distance =
-						TEST_FLAG(
-							definition->flags,
-							_actor_definition_dive_off_ledges_bit) ?
-							8.0f : 0.0f;
-
-					result = actor_action_try_to_dive(
-						actor_index,
-						escape_direction,
-						escape_distance,
-						&alignment_vector,
-						ledge_avoidance_distance);
-				}
-				else
-				{
-					debug_info->danger_decision = _danger_avoidance_no_desire;
-					debug_info->danger_intersect_time = urgency;
-				}
-			}
-			else
-			{
-				debug_info->danger_decision = _danger_avoidance_evasion_disallowed;
-			}
 		}
 	}
 
