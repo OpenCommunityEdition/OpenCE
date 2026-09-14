@@ -498,6 +498,8 @@ struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] 
 	{ 10.0f,  10.0f, 1.5f, FALSE }
 };
 
+static real const seconds_per_tick = 1.0f / TICKS_PER_SECOND;
+
 /* ---------- public code */
 
 void decals_initialize(
@@ -2512,7 +2514,7 @@ static void decal_update(
 	long decal_index)
 {
 	struct decal_datum *decal = DECAL_GET(decal_index);
-	real elapsed = (game_time_get() - decal->creation_time) * (1.0f / TICKS_PER_SECOND);
+	real elapsed = (game_time_get() - decal->creation_time) * seconds_per_tick;
 
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 307, decal->definition_index!=NONE);
 
@@ -2522,7 +2524,23 @@ static void decal_update(
 
 	if (!TEST_FLAG(decal->flags, _decal_permanent_bit))
 	{
-		if (decal->lifetime != 0.0f && elapsed >= decal->lifetime)
+		if (decal->lifetime == 0.0f || elapsed < decal->lifetime)
+		{
+			if (decal->lifetime > 0.0f && decal->decay_time > 0.0f)
+			{
+				real f = decal->lifetime - elapsed;
+
+				if (f < decal->decay_time)
+				{
+					f /= decal->decay_time;
+
+					match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 322, f>=0.0f && f<=1.0f);
+
+					decal->intensity = (byte)fast_ftol(f * 255.0f);
+				}
+			}
+		}
+		else
 		{
 			if (TEST_FLAG(decal->flags, _decal_locked_bit))
 			{
@@ -2538,19 +2556,6 @@ static void decal_update(
 			}
 
 			rasterizer_decal_vertices_delete(decal_index);
-		}
-		else if (decal->lifetime > 0.0f && decal->decay_time > 0.0f)
-		{
-			real f = decal->lifetime - elapsed;
-
-			if (f < decal->decay_time)
-			{
-				f /= decal->decay_time;
-
-				match_assert("..\\bitmaps\\bitmaps_inlines.h", 322, f>=0.0f && f<=1.0f);
-
-				decal->intensity = (byte)(f * 255.0f);
-			}
 		}
 	}
 
