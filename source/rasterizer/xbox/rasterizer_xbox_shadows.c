@@ -874,12 +874,9 @@ void _rasterizer_environment_shadow_draw(
 				inverse_radius * 0.5f;
 			vertex_constants[0][3] =
 				(1.0f -
-				(rasterizer_environment_shadows_globals.shadow_matrix.position.x *
-					rasterizer_environment_shadows_globals.shadow_matrix.forward.i +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.y *
-					rasterizer_environment_shadows_globals.shadow_matrix.forward.j +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.z *
-					rasterizer_environment_shadows_globals.shadow_matrix.forward.k) *
+				dot_product3d(
+					(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+					&rasterizer_environment_shadows_globals.shadow_matrix.forward) *
 				inverse_radius) * 0.5f;
 			vertex_constants[1][0] =
 				rasterizer_environment_shadows_globals.shadow_matrix.left.i *
@@ -891,12 +888,9 @@ void _rasterizer_environment_shadow_draw(
 				rasterizer_environment_shadows_globals.shadow_matrix.left.k *
 				inverse_radius * -0.5f;
 			vertex_constants[1][3] =
-				((rasterizer_environment_shadows_globals.shadow_matrix.position.x *
-					rasterizer_environment_shadows_globals.shadow_matrix.left.i +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.y *
-					rasterizer_environment_shadows_globals.shadow_matrix.left.j +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.z *
-					rasterizer_environment_shadows_globals.shadow_matrix.left.k) *
+				(dot_product3d(
+					(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+					&rasterizer_environment_shadows_globals.shadow_matrix.left) *
 				inverse_radius + 1.0f) * 0.5f;
 			vertex_constants[2][0] =
 				rasterizer_environment_shadows_globals.shadow_matrix.up.i *
@@ -907,13 +901,9 @@ void _rasterizer_environment_shadow_draw(
 			vertex_constants[2][2] =
 				rasterizer_environment_shadows_globals.shadow_matrix.up.k *
 				inverse_radius_quarter;
-			position_dot_up =
-				rasterizer_environment_shadows_globals.shadow_matrix.position.x *
-					rasterizer_environment_shadows_globals.shadow_matrix.up.i +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.y *
-					rasterizer_environment_shadows_globals.shadow_matrix.up.j +
-				rasterizer_environment_shadows_globals.shadow_matrix.position.z *
-					rasterizer_environment_shadows_globals.shadow_matrix.up.k;
+			position_dot_up = dot_product3d(
+				(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+				&rasterizer_environment_shadows_globals.shadow_matrix.up);
 			vertex_constants[2][3] =
 				-(position_dot_up * inverse_radius_quarter);
 			vertex_constants[3][0] =

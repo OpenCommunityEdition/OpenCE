@@ -3197,25 +3197,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
-      "function": "__rasterizer_environment_shadow_draw",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed January environment-shadow projection and draw path from the target instruction/relocation topology, stock XDK render-state interfaces, January's own global and statistics evidence, and the later HaloCEA shadow pipeline. The retained routine performs the optional exact convolution pass, configures all three textures and fixed-function states, constructs the target pixel shader, derives and uploads the five projection constants, restores the primary target exactly once, draws the requested dynamic triangles under the reject stencil mode, and updates shadow statistics. Target and candidate both occupy 1472 padded bytes with all 146 relocation types and destinations, and objdiff reports 95.55 percent similarity. The residual is confined to equivalent x87 term/operand ordering in the three commutative dot products; six source-order spellings and the bounded declaration/include variants compiled back to the same schedule. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the x87 scheduler choice.",
-      "measurements": {
-        "target": {
-          "size": 1472,
-          "relocation_count": 146,
-          "normalized_sha256": "ddc0ede010a6293c32aa9a30e712b9cde81eaf12e9e5b8124119d13ff9cc16cb"
-        },
-        "base": {
-          "size": 1472,
-          "relocation_count": 146,
-          "normalized_sha256": "e24df5bd0c0b9df9ff9fd77aafa3f2ec51274c6e8e7151d95b3cbbbb3850e3c3"
-        },
-        "objdiff_percent": 95.546745
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
       "function": "__rasterizer_screen_effect",
       "class": "unclassified",
