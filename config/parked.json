@@ -174,44 +174,6 @@
     },
     {
       "unit": "source/game/player_queues_new",
-      "function": "_update_client_get_maximum_possible_server_time",
-      "class": "instruction-scheduling",
-      "evidence": "Best currently reviewed Fable reconstruction. The complete bounded update-window traversal is supported by January disassembly and the HCEA cross-build semantic map. Target and candidate are both 80 padded bytes with three relocations; the only remaining divergence is an independent compare/load transposition at +0x0d. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "30ffd0838c5ff2ede2048d24ee662704576c5f1a3dcd0b28b547ebc8ba71dd96"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "1e89386ca07f7c6177e1185e1b57677f16c7dc643933deb8e2d6dd4171558f57"
-        },
-        "objdiff_percent": 92.11539
-      }
-    },
-    {
-      "unit": "source/game/player_queues_new",
-      "function": "_update_queues_reset_and_fill_with_lies",
-      "class": "instruction-scheduling",
-      "evidence": "Best currently reviewed Fable reconstruction. It retains the complete queue reset, bounded 128-entry history fill, named constants and typed queue datum; HCEA corroborates the cross-build algorithm. Target and candidate are both 272 padded bytes with 24 relocations. The remaining mismatch is one independent store scheduled around a push. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 272,
-          "relocation_count": 24,
-          "normalized_sha256": "786c6c80f9616932ef40b3146089fa32653cdaecada706c74ae2dae993d4ba70"
-        },
-        "base": {
-          "size": 272,
-          "relocation_count": 24,
-          "normalized_sha256": "f76f7cbc4610f79054248415a81369440801966b04db8783981e8d3a491592bd"
-        },
-        "objdiff_percent": 97.297295
-      }
-    },
-    {
-      "unit": "source/game/player_queues_new",
       "function": "_update_client_local_ticks",
       "class": "tu-context-optimization",
       "evidence": "Best currently reviewed Fable reconstruction. It retains the complete local action-to-server tick path with an ordinary long update_number local; the earlier fake `(long *)&ticks` cast is rejected. January calls the already-exact update_server_build_server_update, while VC7 inlines that callee in this TU context, producing 352 candidate bytes versus 192 target bytes and 31 versus 15 relocations. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",

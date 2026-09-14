@@ -230,8 +230,8 @@ static struct update *update_client_get_update(
 
 /* ---------- globals */
 
-struct update_server_globals update_server_globals = { 0 };
-struct update_client_globals update_client_globals = { 0 };
+static struct update_server_globals update_server_globals = { 0 };
+static struct update_client_globals update_client_globals = { 0 };
 
 /* ---------- public code */
 
@@ -746,11 +746,12 @@ void update_queues_reset_and_fill_with_lies(
 		update_number = MAX(0, game_time-MAXIMUM_CLIENT_UPDATES);
 		for (update_index = 0; update_number<game_time; ++update_index, ++update_number)
 		{
-			struct server_update *update = &update_client_globals.updates[update_index].update;
-
 			update_client_globals.updates[update_index].update_number = update_number;
-			update->action_count = 1;
-			csmemset(update->actions, 0, sizeof(update->actions));
+			update_client_globals.updates[update_index].update.action_count = 1;
+			csmemset(
+				update_client_globals.updates[update_index].update.actions,
+				0,
+				sizeof(update_client_globals.updates[update_index].update.actions));
 		}
 		update_client_globals.next_update_number_to_dequeue = game_time;
 		update_client_globals.latest_update_number_received = game_time-1;
