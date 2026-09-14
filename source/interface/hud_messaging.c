@@ -759,15 +759,12 @@ void scripted_hud_set_objective(
 
 		if (message->element_count == 1 && element->type == _hud_message_type_text)
 		{
-			struct hud_globals_definition *hud = hud_globals;
-			struct hud_messaging_globals_definition *globals = hud_messaging_globals;
-			short up_ticks;
-			short fade_ticks;
+			struct hud_color_definition *objective_color = &hud_globals->messaging.objective_color;
 
-			globals->objective.message = message;
-			up_ticks = hud->messaging.objective_color.custom.objective.up_ticks;
-			fade_ticks = hud->messaging.objective_color.custom.objective.fade_ticks;
-			globals->objective.uptime = fade_ticks + up_ticks;
+			hud_messaging_globals->objective.message = message;
+			hud_messaging_globals->objective.uptime =
+				objective_color->custom.objective.up_ticks +
+				objective_color->custom.objective.fade_ticks;
 		}
 		else
 		{
@@ -855,24 +852,25 @@ short scripted_hud_get_timer_ticks(
 	void)
 {
 	struct hud_timer_data_definition *timer = &hud_messaging_globals->timer;
-	boolean enabled = timer->enabled;
-	short result = 0;
+	short ticks = 0;
 
-	if (enabled)
+	if (timer->enabled)
 	{
 		if (timer->ticks == NONE)
-			return NONE;
-		result = timer->ticks;
-
-		if (!timer->paused)
 		{
-			return (short)(
-				(word)(timer->ticks + (word)timer->reference_time) -
-				game_time_get());
+			ticks = NONE;
+		}
+		else if (timer->paused)
+		{
+			ticks = timer->ticks;
+		}
+		else
+		{
+			ticks = (short)(timer->ticks + timer->reference_time - game_time_get());
 		}
 	}
 
-	return result;
+	return ticks;
 }
 
 void scripted_hud_time_code_show(
