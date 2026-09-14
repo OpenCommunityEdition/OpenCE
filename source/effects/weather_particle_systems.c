@@ -71,6 +71,7 @@ symbols in this file:
 #include <math.h>
 
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
 #include "effects/weather_particle_definitions.h"
 #include "math/real_math.h"
