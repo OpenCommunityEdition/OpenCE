@@ -647,6 +647,7 @@ cache_hardware_format_character(
 		byte *source;
 		short y0, y1;
 		short x, y;
+		short next_write_index;
 
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 645, font_character->bitmap_width<=HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH);
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 646, font_character->bitmap_height<=HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT);
@@ -655,8 +656,8 @@ cache_hardware_format_character(
 
 		if (font_character->bitmap_width + hardware_character_cache.x0 > HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH)
 		{
-			hardware_character_cache.y0 += hardware_character_cache.maximum_character_height;
 			hardware_character_cache.x0 = 0;
+			hardware_character_cache.y0 += hardware_character_cache.maximum_character_height;
 			hardware_character_cache.maximum_character_height = 0;
 		}
 
@@ -666,18 +667,16 @@ cache_hardware_format_character(
 			hardware_character_cache.x0 = 0;
 			hardware_character_cache.maximum_character_height = 0;
 
-			if (hardware_character_cache.read_index != hardware_character_cache.write_index)
+			for (;
+				hardware_character_cache.read_index != hardware_character_cache.write_index;
+				hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1))
 			{
-				do
-				{
-					hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
+				hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
 
-					if (hardware_character->y0 <= 0)
-						break;
+				if (hardware_character->y0 <= 0)
+					break;
 
-					flush_hardware_character(hardware_character);
-					hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
-				} while (hardware_character_cache.read_index != hardware_character_cache.write_index);
+				flush_hardware_character(hardware_character);
 			}
 		}
 
@@ -686,32 +685,31 @@ cache_hardware_format_character(
 			y0 = hardware_character_cache.y0 + hardware_character_cache.maximum_character_height;
 			y1 = hardware_character_cache.y0 + font_character->bitmap_height;
 
-			if (hardware_character_cache.read_index != hardware_character_cache.write_index)
+			for (;
+				hardware_character_cache.read_index != hardware_character_cache.write_index;
+				hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1))
 			{
-				do
-				{
-					hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
+				hardware_character = &hardware_character_cache.characters[hardware_character_cache.read_index];
 
-					if (hardware_character->y0 < y0 || hardware_character->y0 >= y1)
-						break;
+				if (hardware_character->y0 < y0 || hardware_character->y0 >= y1)
+					break;
 
-					flush_hardware_character(hardware_character);
-					hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
-				} while (hardware_character_cache.read_index != hardware_character_cache.write_index);
+				flush_hardware_character(hardware_character);
 			}
 
 			hardware_character_cache.maximum_character_height = font_character->bitmap_height;
 		}
 
-		if (((hardware_character_cache.write_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1)) == hardware_character_cache.read_index)
+		next_write_index = (hardware_character_cache.write_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
+		if (next_write_index == hardware_character_cache.read_index)
 		{
 			flush_hardware_character(&hardware_character_cache.characters[hardware_character_cache.read_index]);
 			hardware_character_cache.read_index = (hardware_character_cache.read_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
 		}
 
+		hardware_character = &hardware_character_cache.characters[hardware_character_cache.write_index];
 		font_character->hardware_character_index = hardware_character_cache.write_index;
 
-		hardware_character = &hardware_character_cache.characters[hardware_character_cache.write_index];
 		hardware_character->character = font_character;
 		hardware_character->x0 = hardware_character_cache.x0;
 		hardware_character->y0 = hardware_character_cache.y0;
