@@ -551,27 +551,6 @@
       }
     },
     {
-      "unit": "source/cache/xbox_texture_cache",
-      "function": "_texture_cache_locked_block_proc",
-      "class": "unclassified",
-      "evidence": "Natural private boolean callback reconstructed once from the January control flow and authenticated Xbox texture-cache/LRUV types. It returns FALSE exactly when the cache entry is loaded and the XDK resource is not busy, otherwise TRUE. January LRUV consumes this callback through the byte-returning lruv_locked_block_proc contract: all five target indirect call sites test AL, not EAX, so the earlier 2026-08-30 claim that January required a full-width return is retracted. Target and candidate are both 64 padded / 51 meaningful bytes with the same three relocation addresses, types, identities and static owner properties; objdiff reports 95.0 percent. The only emitted differences are the natural boolean return materialization (candidate xor al,al / mov al,1 versus January returning the known-zero IsBusy EAX / mov eax,1) and the two-byte branch displacement induced by that materialization. The fail-closed classifier returns UNKNOWN. No return-type retry, source variant, forced inline, pragma, barrier, register control, raw offset, representation cast, assembly, fake caller, emission anchor, extra helper, COMMON owner, data owner, or point_from_line3d COMDAT is present. Reopen only for authoritative January source/local records or compiler-context evidence explaining the return materialization.",
-      "measurements": {
-        "target": {
-          "size": 64,
-          "meaningful_size": 51,
-          "relocation_count": 3,
-          "normalized_sha256": "9f883aeaa9d5a930f38b79b2960d634b647d971b5fcd92675174941d340b1f1d"
-        },
-        "base": {
-          "size": 64,
-          "meaningful_size": 51,
-          "relocation_count": 3,
-          "normalized_sha256": "ef0debbd170c841a4c89b83eb0363369278f09c33897019f50199a9b888efbf4"
-        },
-        "objdiff_percent": 95
-      }
-    },
-    {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_winsock_error_to_string",
       "class": "unclassified",
@@ -5172,17 +5151,6 @@
     },
     {
       "unit": "source/cache/xbox_texture_cache",
-      "function": "_texture_cache_build_hardware_format",
-      "class": "unclassified",
-      "evidence": "Complete typed hardware-format construction retained from the published 2026-09-09 Xbox texture-cache reconstruction. January and the candidate share the 336-byte extent and all 17 relocation identities but have different normalized streams; ordinary objdiff acceptance elsewhere does not make this function strict. It remains a zero-credit fuzzy research body in this manifest, with no representation trick or compiler steering admitted. See docs/object_matching_logs/lane_reconciliation_10k_batch_5_20260909.md.",
-      "measurements": {
-        "target": { "size": 336, "relocation_count": 17, "normalized_sha256": "0cd7b038ddc0b8773d695bcb2ec539680f553390c06a200afa39ee617c44b6d3" },
-        "base": { "size": 336, "relocation_count": 17, "normalized_sha256": "e4f39cc0bc638dd2aecf3d46fd6af9973f664f0ba864bd06caff08558515ccde" },
-        "objdiff_percent": 96.293106
-      }
-    },
-    {
-      "unit": "source/cache/xbox_texture_cache",
       "function": "_render_inverse_transform_screen_point",
       "class": "register-allocation",
       "evidence": "Complete HCEA-authenticated typed inverse screen transform retained with the Xbox texture-cache debug caller. Target and candidate share the 256-byte extent and all 22 relocations; the residual is the equivalent ECX/EDX allocation of the two output pointers after ordinary declaration and parameter-order probes converged. No volatile/register forcing or fake dependency is retained, and this body receives zero credit. The analogous sound-cache boundary is documented in docs/object_matching_logs/xbox_sound_cache_obj_complete_fuzzy_closeout_20260901.md.",
@@ -5190,17 +5158,6 @@
         "target": { "size": 256, "relocation_count": 22, "normalized_sha256": "c39690660070bc740fc89bc34ed735ce9c30406d8f26cfe5f853c9d2e5261bee" },
         "base": { "size": 256, "relocation_count": 22, "normalized_sha256": "d434a17b8d90be4fa31d5651b27f45be31c5a6c6e5d0c21b366fc2d174e23acc" },
         "objdiff_percent": 99.347824
-      }
-    },
-    {
-      "unit": "source/cache/xbox_texture_cache",
-      "function": "_texture_cache_start_loading_bitmap",
-      "class": "unclassified",
-      "evidence": "Complete typed asynchronous bitmap-load start path retained from the published 2026-09-09 Xbox texture-cache reconstruction. January and the candidate share the 224-byte extent and all 16 relocation identities but remain different normalized streams. No fake ownership, volatile carrier, or compiler steering is admitted; the fail-closed class claims no unsupported mechanism and the body receives zero credit. See docs/object_matching_logs/lane_reconciliation_10k_batch_5_20260909.md.",
-      "measurements": {
-        "target": { "size": 224, "relocation_count": 16, "normalized_sha256": "2bf7d1281710a4abd400acfd47119798635ceafae0e1dde6b31dfc8ea7798999" },
-        "base": { "size": 224, "relocation_count": 16, "normalized_sha256": "19a25b22d733ecdf32d1281283f5b2a1ada07436d22ce2f9d848f114896a675e" },
-        "objdiff_percent": 96.47059
       }
     },
     {

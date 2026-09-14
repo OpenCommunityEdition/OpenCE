@@ -607,13 +607,8 @@ static boolean texture_cache_locked_block_proc(
 		xbox_texture_cache_globals.textures,
 		block_index);
 
-	if (texture->loaded &&
-		!IDirect3DBaseTexture8_IsBusy(&texture->hardware_format))
-	{
-		return FALSE;
-	}
-
-	return TRUE;
+	return !texture->loaded ||
+		IDirect3DBaseTexture8_IsBusy(&texture->hardware_format);
 }
 
 static void texture_cache_delete_block_proc(
@@ -672,25 +667,23 @@ static void texture_cache_build_hardware_format(
 			D3DFORMAT_BORDERSOURCE_COLOR |
 			D3DFORMAT_DMACHANNEL_A;
 		texture->Size =
-			(((bitmap_mipmap_get_row_pitch(bitmap, 0) / D3DTEXTURE_PITCH_ALIGNMENT - 1) << D3DSIZE_HEIGHT_SHIFT |
-			(bitmap->height - 1)) << D3DSIZE_HEIGHT_SHIFT) |
+			((bitmap_mipmap_get_row_pitch(bitmap, 0) / D3DTEXTURE_PITCH_ALIGNMENT - 1) << D3DSIZE_PITCH_SHIFT) |
+			((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) |
 			(bitmap->width - 1);
 	}
 	else
 	{
-		long format =
-			(((((floor_log2(bitmap->depth) << 4 |
-			floor_log2(bitmap->height)) << 4 |
-			floor_log2(bitmap->width)) << 12 |
-			bitmap_format_to_d3d_format(bitmap->format, bitmap->flags)) << 4 |
-			(bitmap->type == _bitmap_type_3d ? 3 : 2)) << 4) |
-			((rasterizer_xbox_bitmap_get_max_mipmap_count(bitmap) + 1) << D3DFORMAT_MIPMAP_SHIFT);
-
-		texture->Size = 0;
-		texture->Format = format |
+		texture->Format =
+			(floor_log2(bitmap->depth) << D3DFORMAT_PSIZE_SHIFT) |
+			(floor_log2(bitmap->height) << D3DFORMAT_VSIZE_SHIFT) |
+			(floor_log2(bitmap->width) << D3DFORMAT_USIZE_SHIFT) |
+			(bitmap_format_to_d3d_format(bitmap->format, bitmap->flags) << D3DFORMAT_FORMAT_SHIFT) |
+			((bitmap->type == _bitmap_type_3d ? 3 : 2) << D3DFORMAT_DIMENSION_SHIFT) |
+			((rasterizer_xbox_bitmap_get_max_mipmap_count(bitmap) + 1) << D3DFORMAT_MIPMAP_SHIFT) |
 			(bitmap->type == _bitmap_type_cube_map ? D3DFORMAT_CUBEMAP : 0) |
 			D3DFORMAT_BORDERSOURCE_COLOR |
 			D3DFORMAT_DMACHANNEL_A;
+		texture->Size = 0;
 	}
 	IDirect3DBaseTexture8_Register(texture, bitmap->base_address);
 
