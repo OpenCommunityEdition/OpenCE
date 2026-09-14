@@ -524,7 +524,7 @@ boolean collision_get_features_in_sphere(
 
 		if (objects && result.leaf_count > 0)
 		{
-			short leaf_index;
+			short leaf_reference_index;
 
 			if (!(flags & _collision_test_objects_all_types_flags))
 			{
@@ -533,11 +533,14 @@ boolean collision_get_features_in_sphere(
 
 			structure_cluster_marker_begin();
 			object_marker_begin();
-			for (leaf_index = 0; leaf_index < result.leaf_count; leaf_index++)
+			for (leaf_reference_index = 0;
+				leaf_reference_index < result.leaf_count;
+				leaf_reference_index++)
 			{
+				long leaf_index = result.leaf_indices[leaf_reference_index];
 				struct structure_leaf const *leaf = TAG_BLOCK_GET_ELEMENT(
 					&structure_bsp->leaves,
-					result.leaf_indices[leaf_index] & LONG_MAX,
+					leaf_index & LONG_MAX,
 					struct structure_leaf);
 
 				if (structure_cluster_mark(leaf->cluster_index))
@@ -592,12 +595,6 @@ boolean collision_fix_pill(
 	boolean result = FALSE;
 	struct collision_feature_list features;
 	struct collision_plane first_collision;
-	struct collision_plane collision;
-	real_vector3d ground_vector;
-	real_point3d candidate;
-	real_point3d fallback;
-	boolean have_fallback;
-	short offset_index;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\physics\\collisions.c",
@@ -609,9 +606,11 @@ boolean collision_fix_pill(
 	{
 		real_point3d center;
 
-		center.x = old_position->x;
-		center.y = old_position->y;
-		center.z = height * 0.5f + old_position->z;
+		set_real_point3d(
+			&center,
+			old_position->x,
+			old_position->y,
+			height * 0.5f + old_position->z);
 		collision_get_features_in_sphere(
 			flags,
 			&center,
@@ -630,12 +629,18 @@ boolean collision_fix_pill(
 	}
 	else
 	{
+		struct collision_plane collision;
+		real_point3d fallback;
+		boolean have_fallback;
+		short offset_index;
+
 		have_fallback = FALSE;
 		for (offset_index = 0;
 			offset_index < NUMBEROF(collision_fix_pill_offsets);
 			offset_index++)
 		{
 			real_vector3d const *offset = &collision_fix_pill_offsets[offset_index];
+			real_point3d candidate;
 
 			candidate.x = offset->i * distance + old_position->x;
 			candidate.y = offset->j * distance + old_position->y;
@@ -644,6 +649,8 @@ boolean collision_fix_pill(
 			if (!collision_features_test_point(&features, &candidate, &collision) &&
 				!collision_test_point(flags, &candidate, ignore_object_index))
 			{
+				real_vector3d ground_vector;
+
 				ground_vector.i = global_down3d->i * distance;
 				ground_vector.j = global_down3d->j * distance;
 				ground_vector.k = global_down3d->k * distance;
@@ -675,6 +682,8 @@ boolean collision_fix_pill(
 
 		if (!result && have_fallback)
 		{
+			real_vector3d ground_vector;
+
 			ground_vector.i = old_position->x - fallback.x;
 			ground_vector.j = old_position->y - fallback.y;
 			ground_vector.k = old_position->z - fallback.z;
@@ -1028,10 +1037,10 @@ static void collision_fix_pill_nudge_collision(
 	long ignore_object_index,
 	struct collision_plane *collision)
 {
-	real_point3d *contact = &collision->point;
-
 	if (collision->t > 0.0f)
 	{
+		real_point3d *contact = &collision->point;
+
 		do
 		{
 			real t;
