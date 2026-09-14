@@ -3349,25 +3349,6 @@
       }
     },
     {
-      "unit": "source/camera/director",
-      "function": "_director_update_controls",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed Xbox gamepad and dormant mouse/keyboard Director input paths from January's instruction and relocation topology, with HaloCEA types and donor semantics used only where corroborated. The retained body initializes camera_control, resolves the typed player datum, implements the black-button switch cadence and debug-control toggle, maps authenticated gamepad/key enums into named camera-control bits, integrates Director variables, applies the January float constants, and inhibits normal input/facing while debug control is active. Target and candidate are both 960 padded bytes with all 45 relocation identities, and objdiff reports 97.700325 percent similarity; remaining differences are instruction/register/x87 scheduling within otherwise aligned paths. No HCEA-only speed override or forced switch global, assembly, volatile/register forcing, barrier, pragma, fake dependency, raw offset, address-derived name, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining schedule.",
-      "measurements": {
-        "target": {
-          "size": 960,
-          "relocation_count": 45,
-          "normalized_sha256": "7b4bef8961ac5919acc38751bc1ef3ecc03b5779ab4601e5fa5e9cbd4e296584"
-        },
-        "base": {
-          "size": 960,
-          "relocation_count": 45,
-          "normalized_sha256": "2d2cc82fb3a6cc531b4549653fe802ff8a8cfd904d108612cb06375df6fd37be"
-        },
-        "objdiff_percent": 97.700325
-      }
-    },
-    {
       "unit": "source/units/unit_dialogue",
       "function": "_unit_dialogue_determine_variant",
       "class": "unclassified",
