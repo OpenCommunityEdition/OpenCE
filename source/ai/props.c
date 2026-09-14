@@ -639,9 +639,13 @@ long prop_get_base_by_unit_index(
 	{
 		struct actor_datum *actor = actor_get(actor_index);
 		struct unit_datum *unit = unit_get(unit_index);
-		long target_actor_index = unit->unit.swarm_actor_index;
+		long target_actor_index;
 
-		if (target_actor_index == NONE)
+		if (unit->unit.swarm_actor_index != NONE)
+		{
+			target_actor_index = unit->unit.swarm_actor_index;
+		}
+		else
 		{
 			target_actor_index = unit->unit.actor_index;
 		}
@@ -649,33 +653,26 @@ long prop_get_base_by_unit_index(
 		if (unit->object.type == _object_type_biped &&
 			target_actor_index != actor_index)
 		{
-			long next_prop_index = actor_get(actor_index)->meta.first_prop_index;
-			long prop_index;
+			struct prop_iterator iterator;
 			struct prop_datum *prop;
 
-			do
+			prop_iterator_new(&iterator, actor_index);
+			while ((prop = prop_iterator_next(&iterator)) != NULL)
 			{
-				prop_index = next_prop_index;
-				if (prop_index == NONE)
+				if (prop->unit_index == unit_index ||
+					(prop->swarm &&
+					 prop->actor_index != NONE &&
+					 prop->actor_index == target_actor_index))
 				{
 					break;
 				}
-
-				prop = prop_get(prop_index);
-				next_prop_index = prop->next_prop_index;
 			}
-			while (prop->unit_index != unit_index &&
-				(!prop->swarm ||
-				 prop->actor_index == NONE ||
-				 prop->actor_index != target_actor_index));
 
-			if (prop_index != NONE)
+			if (prop != NULL)
 			{
-				result = prop_index;
-				if (prop->orphan_prop_index != NONE)
-				{
-					result = prop->orphan_prop_index;
-				}
+				result = prop->orphan_prop_index == NONE ?
+					iterator.index :
+					prop->orphan_prop_index;
 			}
 
 			if (result == NONE && create_if_missing && actor->meta.active)
@@ -686,7 +683,7 @@ long prop_get_base_by_unit_index(
 				if (result != NONE)
 				{
 					struct actor_position_data position;
-					struct prop_datum *prop = prop_get(result);
+					struct prop_datum *new_prop = prop_get(result);
 
 					prop_position_refresh(
 						actor_index,
@@ -694,18 +691,18 @@ long prop_get_base_by_unit_index(
 						&position,
 						FALSE,
 						update_status);
-					prop->required_ticks = TICKS_PER_SECOND;
-					prop->delay_requirement_decision = TRUE;
+					new_prop->required_ticks = TICKS_PER_SECOND;
+					new_prop->delay_requirement_decision = TRUE;
 
 					if (update_status)
 					{
 						prop_status_refresh(actor_index, result, &position);
-						if (prop->perception >= 2)
+						if (new_prop->perception >= 2)
 						{
 							boolean expected_acknowledgement =
 								actor_expected_acknowledgement(actor_index, result);
 
-							prop->state = _prop_state_acknowledged;
+							new_prop->state = _prop_state_acknowledged;
 							actor_perception_acknowledge(
 								actor_index,
 								result,
