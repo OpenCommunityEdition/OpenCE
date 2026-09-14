@@ -1441,28 +1441,16 @@ static long looping_sound_new(
 					&definition->details,
 					detail_index,
 					struct looping_sound_detail);
-				real scale;
-				real upper_scale;
-				real lower_scale;
-				real period_upper_bound;
-				real period_lower_bound;
-				real period;
 
 				sound_definition_get(detail->sound.index);
-				scale = source->scale;
-				upper_scale =
-					definition->scale_upper_bound.detail_period;
-				lower_scale =
-					definition->scale_lower_bound.detail_period;
-				period_upper_bound = detail->period_bounds.upper;
-				period_lower_bound = detail->period_bounds.lower;
-				period = real_seed_random_range(
-					get_global_local_random_seed_address(),
-					period_lower_bound,
-					period_upper_bound);
 				looping_sound->detail_play_times[detail_index] = (long)(
-					((upper_scale - lower_scale) * scale + lower_scale) *
-					period * 1000.f + sound_manager_globals.render_time);
+					sound_scale_random_value(
+						detail->period_bounds.lower,
+						detail->period_bounds.upper,
+						definition->scale_lower_bound.detail_period,
+						definition->scale_upper_bound.detail_period,
+						source->scale) * 1000.f +
+					sound_manager_globals.render_time);
 			}
 		}
 	}
@@ -2360,14 +2348,9 @@ long sound_new_impulse(
 	void const *track_data,
 	short track_data_size)
 {
+	long sound_index = NONE;
 	struct sound_definition *definition = sound_definition_get(definition_index);
 	real scale = source->scale;
-	long result = NONE;
-	short listener_index;
-	short promotion_result;
-	long sound_index;
-	struct sound_datum *sound;
-	long travel_milliseconds;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
@@ -2384,8 +2367,7 @@ long sound_new_impulse(
 		definition->sound_class ==
 			_sound_class_scripted_dialog_force_unspatialized)
 	{
-		long game_time = game_time_get();
-		long dialog_stop_time = game_time +
+		long dialog_stop_time = game_time_get() +
 			30 * definition->longest_permutation_length / 1000 + 10;
 
 		if (dialog_stop_time >
@@ -2407,137 +2389,138 @@ long sound_new_impulse(
 		source->spatialization_mode = _sound_spatialization_mode_none;
 	}
 
-	if (!sound_manager_globals.initialized || !sound_manager_globals.enabled)
+	if (sound_manager_globals.initialized && sound_manager_globals.enabled)
 	{
-		return result;
-	}
-
-	if (definition->compression != _sound_compression_xbox_adpcm ||
-		(definition->encoding != _sound_encoding_stereo &&
-			(definition->encoding != _sound_encoding_mono ||
-				definition->sample_rate != 0)))
-	{
-		error(
-			_error_silent,
-			"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
-		return result;
-	}
-
-	if (source->scale == 0.f && definition->zero_gain_modifier == 0.f)
-	{
-		return result;
-	}
-
-	if (real_seed_random(get_global_local_random_seed_address()) <=
-		sound_scale_value(
-			definition->skip_fraction,
-			definition->zero_skip_fraction_modifier,
-			definition->one_skip_fraction_modifier,
-			scale))
-	{
-		return result;
-	}
-
-	{
-		real maximum_distance =
-			sound_definition_get_maximum_distance(definition_index);
-
-		if (!sound_definition_is_playable(definition_index))
+		if (definition->compression == _sound_compression_xbox_adpcm &&
+			((definition->encoding == _sound_encoding_mono &&
+				definition->sample_rate == 0) ||
+				definition->encoding == _sound_encoding_stereo))
 		{
-			return result;
+			if (source->scale != 0.f || definition->zero_gain_modifier != 0.f)
+			{
+				real random = real_seed_random(
+					get_global_local_random_seed_address());
+
+				if (random > sound_scale_value(
+					definition->skip_fraction,
+					definition->zero_skip_fraction_modifier,
+					definition->one_skip_fraction_modifier,
+					scale))
+				{
+					real maximum_distance =
+						sound_definition_get_maximum_distance(definition_index);
+
+					if (sound_definition_is_playable(definition_index))
+					{
+						short listener_index = source_audible(
+							source,
+							maximum_distance);
+
+						if (listener_index != NONE)
+						{
+							short promotion_result =
+								sound_definition_promote(definition_index);
+
+							if (promotion_result == _sound_promotion_dont)
+							{
+								sound_index = datum_new(sound_data);
+								if (sound_index != NONE)
+								{
+									struct sound_datum *sound = sound_get(sound_index);
+									long travel_milliseconds = sound_travel_milliseconds(
+										source_distance(listener_index, source));
+
+									sound->definition_index = definition_index;
+									sound->playing_channel_index = NONE;
+									sound->listener_index = listener_index;
+									sound->type = _sound_impulse;
+									sound->pitch = sound_scale_random_value(
+										definition->random_pitch_bounds.lower,
+										definition->random_pitch_bounds.upper,
+										definition->zero_pitch_modifier,
+										definition->one_pitch_modifier,
+										source->scale);
+									sound->flags = 0;
+									sound->source_identifier = source_identifier;
+									sound->source = *source;
+									sound->track_proc = track_proc;
+
+									if (track_proc)
+									{
+										match_assert(
+											"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+											0x28E,
+											sound->track_data);
+										csmemcpy(
+											sound->track_data,
+											track_data,
+											track_data_size);
+									}
+
+									sound->pitch_range_index =
+										sound_definition_find_pitch_range_by_pitch(
+											definition,
+											sound->pitch,
+											NONE);
+									sound->permutation_index =
+										sound_definition_next_permutation(
+											definition,
+											sound->pitch_range_index,
+											NONE);
+									sound->fade_stop_time = 0;
+									sound->fade_start_time = 0;
+									sound->loop_track_index = NONE;
+									_sound_cache_sound_request(
+										sound_permutation_get(
+											sound->definition_index,
+											sound->pitch_range_index,
+											sound->permutation_index),
+										FALSE,
+										TRUE,
+										FALSE);
+
+									if (travel_milliseconds > speed_of_sound_threshold)
+									{
+										sound->start_time =
+											sound_manager_globals.render_time +
+											travel_milliseconds;
+										SET_FLAG(sound->flags, _sound_delayed_bit, TRUE);
+									}
+									else
+									{
+										sound->start_time = sound_manager_globals.render_time;
+									}
+								}
+							}
+							else if (promotion_result == _sound_promotion_do)
+							{
+								sound_index = sound_new_impulse(
+									definition->promotion_sound.index,
+									source,
+									source_identifier,
+									track_proc,
+									track_data,
+									track_data_size);
+							}
+							else
+							{
+								/* the promotion throttle rejected this play */
+								sound_index = NONE;
+							}
+						}
+					}
+				}
+			}
 		}
-
-		listener_index = source_audible(source, maximum_distance);
-	}
-
-	if (listener_index == NONE)
-	{
-		return result;
-	}
-
-	promotion_result = sound_definition_promote(definition_index);
-	if (promotion_result != _sound_promotion_dont)
-	{
-		if (promotion_result == _sound_promotion_do)
+		else
 		{
-			return sound_new_impulse(
-				definition->promotion_sound.index,
-				source,
-				source_identifier,
-				track_proc,
-				track_data,
-				track_data_size);
+			error(
+				_error_silent,
+				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
 		}
-
-		return result;
 	}
 
-	sound_index = datum_new(sound_data);
-	if (sound_index == NONE)
-	{
-		return result;
-	}
-
-	result = sound_index;
-	sound = sound_get(sound_index);
-	travel_milliseconds = sound_travel_milliseconds(
-		source_distance(listener_index, source));
-
-	sound->definition_index = definition_index;
-	sound->playing_channel_index = NONE;
-	sound->listener_index = listener_index;
-	sound->type = _sound_impulse;
-	sound->source_identifier = source_identifier;
-	sound->flags = 0;
-	sound->pitch = sound_scale_random_value(
-		definition->random_pitch_bounds.lower,
-		definition->random_pitch_bounds.upper,
-		definition->zero_pitch_modifier,
-		definition->one_pitch_modifier,
-		source->scale);
-	sound->source = *source;
-	sound->track_proc = track_proc;
-
-	if (track_proc)
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\sound\\sound_manager.c",
-			0x28E,
-			sound->track_data);
-		csmemcpy(sound->track_data, track_data, track_data_size);
-	}
-
-	sound->pitch_range_index = sound_definition_find_pitch_range_by_pitch(
-		definition,
-		sound->pitch,
-		NONE);
-	sound->permutation_index = sound_definition_next_permutation(
-		definition,
-		sound->pitch_range_index,
-		NONE);
-	sound->loop_track_index = NONE;
-	sound->fade_stop_time = 0;
-	sound->fade_start_time = 0;
-	_sound_cache_sound_request(
-		sound_permutation_get(
-			sound->definition_index,
-			sound->pitch_range_index,
-			sound->permutation_index),
-		FALSE,
-		TRUE,
-		FALSE);
-
-	if (travel_milliseconds > speed_of_sound_threshold)
-	{
-		sound->start_time = sound_manager_globals.render_time + travel_milliseconds;
-		SET_FLAG(sound->flags, _sound_delayed_bit, TRUE);
-	}
-	else
-	{
-		sound->start_time = sound_manager_globals.render_time;
-	}
-
-	return result;
+	return sound_index;
 }
 
 boolean sound_refresh_looping(
