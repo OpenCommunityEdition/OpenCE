@@ -974,6 +974,7 @@ boolean actor_attacking_target(
 	real_vector3d *attack_vector)
 {
 	struct actor_datum *actor = actor_get(actor_index);
+	boolean result = FALSE;
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1688, attack_vector);
 
@@ -982,18 +983,17 @@ boolean actor_attacking_target(
 	{
 		if (actor->control.grenade_trying_to_throw)
 		{
+			result = TRUE;
 			*attack_vector = actor->input.aiming_vector;
-			return TRUE;
 		}
-
-		if (actor->control.current_fire_target_type > _actor_fire_target_none)
+		else if (actor->control.current_fire_target_type > _actor_fire_target_none)
 		{
+			result = TRUE;
 			*attack_vector = actor->control.current_fire_target_aim_vector;
-			return TRUE;
 		}
 	}
 
-	return FALSE;
+	return result;
 }
 
 boolean actor_is_leaping(
