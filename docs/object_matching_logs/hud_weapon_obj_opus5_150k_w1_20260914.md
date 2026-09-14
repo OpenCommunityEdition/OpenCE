@@ -63,7 +63,7 @@ Admission checks on the final real-file object:
   - the spaced assert literal becomes January's no-space literal;
   - `__real@3fa00000` disappears;
   - `__real@3ff0000000000000` is added and `__real@3ff4000000000000` is now defined; both are January-referenced.
-  
+
   The `_power` and `_square_root` COMDATs already exist in base. No code, data, BSS or COMMON owner is new.
 - `tools/fake_match_scan.py` finds 0 leads before and after.
 - `git diff --check` passes.

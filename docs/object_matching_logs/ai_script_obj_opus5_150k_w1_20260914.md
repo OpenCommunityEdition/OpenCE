@@ -36,9 +36,9 @@
 
   if (team1_index != NONE && team2_index != NONE)
   {
-  	broken =
-  		game_team_is_ally(team1_index, team2_index) &&
-  		game_team_is_enemy(team1_index, team2_index);
+    broken =
+        game_team_is_ally(team1_index, team2_index) &&
+        game_team_is_enemy(team1_index, team2_index);
   }
 
   return broken;
@@ -74,8 +74,8 @@
 
   ```c
   boolean actor_action_set_default_state(
-  	long actor_index,
-  	short override_state);
+    long actor_index,
+    short override_state);
   ```
 
   Then remove the duplicate `.c`-local prototype at `source/ai/actions.c:416-418`.

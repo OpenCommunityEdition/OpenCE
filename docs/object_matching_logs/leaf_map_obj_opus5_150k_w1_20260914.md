@@ -145,18 +145,18 @@ Admission checks for f7:
 
 1. **Header fix** in `source/math/real_math.h`, `projection_from_vector3d` (lines 974-981). Replace the current body with:
    ```c
-   	if (k >= j && k >= i)
-   	{
-   		return _z;
-   	}
-   	else if (j >= i)
-   	{
-   		return _y;
-   	}
-   	else
-   	{
-   		return _x;
-   	}
+    if (k >= j && k >= i)
+    {
+        return _z;
+    }
+    else if (j >= i)
+    {
+        return _y;
+    }
+    else
+    {
+        return _x;
+    }
    ```
    It currently reads `if (k < j || k < i) { return j < i; } else { return _z; }`.
    - **Consumers:** 188 files name `real_math.h` directly; all 446 C build units include it transitively. The direct callers are `decals.c` (own copy), `real_math.c`, `collision_features.c`, `leaf_map.c` and `structures.c`.
