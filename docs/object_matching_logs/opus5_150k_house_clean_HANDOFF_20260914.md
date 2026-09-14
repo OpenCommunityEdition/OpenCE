@@ -1,26 +1,26 @@
 # Opus5 150K house-clean lane — HANDOFF (2026-09-14)
 
 Branch `opus/150k-house-clean-20260914`, worktree `C:\halo-worktrees\opus5-150k-house-clean-20260914`.
-Base `12f7375d4b845725c5ae3fda7ad715998ee54975` (7,149 functions / 1,244,970 meaningful). Final commit: `ff1acbf89b59b7ede6fd77b574e26574df8ef461 (plus the handoff docs commit on top)`.
+Base `12f7375d4b845725c5ae3fda7ad715998ee54975` (7,149 functions / 1,244,970 meaningful). Final commit: `fe586a59b3ac7cf263c21a0e640755c3b9f5212f (plus the handoff docs commit on top)`.
 Nothing was pushed. The canonical checkout and the 100K donor worktree were not modified.
 
 ## 1. Result
 
 | measure | value |
 | --- | ---: |
-| Strict new exact functions (stable diff vs 12f7375d4 snapshot) | 131 |
-| **Strict new meaningful bytes (counts toward 150K)** | **79,397** |
-| Strict new padded bytes (reported separately) | 80,336 |
+| Strict new exact functions (stable diff vs 12f7375d4 snapshot) | 138 |
+| **Strict new meaningful bytes (counts toward 150K)** | **84,893** |
+| Strict new padded bytes (reported separately) | 85,872 |
 | Target | 150,000 |
-| Shortfall | 70,603 |
+| Shortfall | 65,107 |
 | Regressions vs baseline snapshot | 0 |
-| Accepted ledger (build/semantic_report.json) | 7,283 / 1,326,319 |
+| Accepted ledger (build/semantic_report.json) | 7,290 / 1,331,815 |
 | Newly accepted but NOT strict (objdiff-shape only; zero credit) | 3 fns / 1,952 B |
-| Parks | 391 at base -> 288 active, 0 stale, 0 invalid |
+| Parks | 391 at base -> 284 active, 0 stale, 0 invalid |
 
 **The 150K target was not reached.** The campaign was truncated at the owner's request, with about 15% of the weekly token
 budget left, to bank completed and verified results. Wave 3b (50 groups of smaller units) and 24 of the 40 wave 3a
-groups were never run. Section 7 lists the remaining reachable pool.
+groups were never run; wave 3a ran truncated to its 16 largest groups. Section 7 lists the remaining reachable pool.
 
 The inherited 100K donor work (+104,809) is excluded: the accounting subtracts the 100K worktree's accepted ledger and
 counts only strict `section_infos_equal` gains in the stable diff against `scratch/claude150k-before.json`. That
@@ -37,7 +37,7 @@ unit, section, padded and meaningful bytes, relocations, sha and commits.
 | w2 | park re-investigation + residuals; 52 groups / 83 units | 54 fns / 33,824 padded (source-only) + 15 fns / 8,960 padded (config batch) | laws in scratch/w2/laws_w2.md |
 | packets | P1 ai_debug.h, P3 actions.h, P4 bipeds.h, P5 path.h, P6 real_math.h (+ P2 zero credit) | 6 fns / 7,248 padded (P1 4,672; P3 160; P4 288; P5 816; P6 1,312) | P7 reverted, P8/P9/P10 rejected |
 | w1 Batch B | config-held w1 landables | 2 fns / 864 padded | path, particle_systems; leaf_map zero credit |
-| w3a (truncated) | second pass, 16 largest units | 0 (both launches were killed by session limits before any agent finished; nothing landed) | |
+| w3a (truncated) | second pass, 16 largest-residual units, run as two batches of 8 | 7 fns / 5,536 padded (actor_moving x3, actor_looking, projectiles, actor_perception, bipeds via units.h/weapons.h) | the first two launches were killed by session limits; the third completed |
 
 ## 3. Header and config changes (each with its consumers)
 
@@ -66,6 +66,7 @@ Every change had its own commit, a full `ninja` build and a whole-board stable s
 - `source/ai/path.h` (2ac274833): `obstacle_from_disc` returns `short`. 55 consumers; +816 (`_path_add_steps`).
 - `source/math/real_math.h` (21c41cb4b): `real_local_random_range` named result, justified by a scan of 9 January inline
   sites. All 572 cl edges shadow-compiled; +608 glow, plus +704 weather via a genuine `#include "bitmaps/bitmaps.h"`.
+- `source/units/units.h` + `source/items/weapons.h` (082f9171b, wave w3a): owner prototypes for `unit_animation_start_action`, `unit_cause_player_melee_damage`, `unit_update_animation` (plus a forward declaration of `struct unit_animation_update_data`), `weapon_stop_reload` and `weapon_prevents_melee_attack`, which bipeds.c had been calling through C4013 implicit declarations. 76 consumers were blast-compiled, including units.c, vehicles.c and weapons.c, whose objects did not change; the only other change is the hash of the non-exact physics `_physics_update_old`. This is +1,120 (`_biped_update`, park removed). The header and bipeds.c are in one commit because the header alone moves the parked body's hash.
 - `source/scenario/scenario_definitions.h` (cc93a1fd1): scenario weapon datum owner types (HCEX PDB). 55 consumers, zero
   credit; `_weapon_place` written as a fuzzy body.
 - `config/parked.json`: only in-place edits. It removed every park that became exact (unpark tool) and re-measured
@@ -98,7 +99,7 @@ Every change had its own commit, a full `ninja` build and a whole-board stable s
 - **Verifier rejection patterns** R1-R12 (scratch/w2/laws_w2.md section B), e.g. a result temp in a one-return function,
   the same statement in both arms, commutative x87 operand swaps, hand-written `= {0}` expansion, `(long)NUMBEROF`
   casts, consumer-local prototypes, varargs/UB forms.
-
+- **w3a:** `_actor_move_initialize` was REJECTED despite a strict-exact candidate, because a standing hold (actor_moving_obj_fable_independent_intake_20260906.md) requires independent provenance for its 15 constants, the linker-common arrays and the ray types. Nine of the 16 w3a groups landed nothing (ai_communication, physics, rasterizer_xbox_models, hud_weapon, ui_widget, render_cameras, actors, encounters, geometry, rasterizer_xbox_screen_effect); their blockers and proposals are in `docs/object_matching_logs/*_opus5_150k_w3_20260914.md`.
 
 ## 5. Do-not-repeat findings
 
@@ -110,26 +111,26 @@ Every change had its own commit, a full `ninja` build and a whole-board stable s
   `_ai_debug_render_actor`, and the profiler switch without authentic enum names.
 - Header packets that are each clean can regress together (P6 + P7). Always rebuild and sweep each packet on top of the
   previous ones.
-
+- The w3a ledgers record, per unit, the shapes spent on the remaining largest residuals, e.g. ai_communication, physics, rasterizer_xbox_models, hud_weapon, ui_widget and render_cameras, where the second pass with the w2 laws found no new closure. Read them before spending on those objects again.
 
 ## 6. Verification (final)
 
-Run at `ff1acbf89` (the handoff commit only adds these two docs):
+Run at `fe586a59b` (the handoff commit only adds these docs):
 
 - `ninja`: pass, and the parked-function verification inside it passes.
-- `stable_verdicts snapshot scratch/claude150k-final.json`, diffed against `scratch/claude150k-before.json`: **131 gained / 80,336 padded / 0 regressions** (8,245 functions, 7,250 exact).
-- `python -B -m tools.parked_functions`: 288 active / 0 stale / 0 invalid.
+- `stable_verdicts snapshot scratch/claude150k-final.json`, diffed against `scratch/claude150k-before.json`: **138 gained / 85,872 padded / 0 regressions** (8,245 functions, 7,257 exact).
+- `python -B -m tools.parked_functions`: 284 active / 0 stale / 0 invalid.
 - `python -B -m tools.audit_object_admission`: pass. It reports 0 contradicted and 7 rejected (unchanged from baseline), plus **6 new whole-object candidates**, where every function and data owner is exact: game_statistics, input_abstraction, network_server_message_handler, rasterizer_cinematics, rasterizer_swizzle, rasterizer_xbox_decals (decision `audit-coff-ownership-before-admission`). These are not admitted by this lane and carry no credit.
-- `tools/fake_match_scan.py` over all 74 changed .c files: 10 leads at HEAD, identical to the same files at the base commit (profile.c rdtsc macro x7, decals.c and hud_draw.c inline-asm/codegen leads). No new leads.
+- `tools/fake_match_scan.py` over all 75 changed .c files: 10 leads at HEAD, identical to the same files at the base commit (profile.c rdtsc macro x7, decals.c and hud_draw.c inline-asm/codegen leads). No new leads.
 - `pytest --basetemp scratch/pytest-final`: 1151 passed, 5 skipped.
 - `git diff --check 12f7375d4 HEAD`: pass. `git status --short`: no tracked changes. Untracked files are local `scratch/` evidence only and were not committed (objects, IDA/Ghidra exports, shadow trees).
-- Zero-credit fuzzy or close bodies landed (reported separately, not counted): action_vehicle `_action_vehicle_find_destination` and `_action_vehicle_desirable`, hud_weapon `_crosshairs_draw`, ui_widget_game_data_input_functions `_player_profile_update_cache_for_nwide_list` and `_splitscreen_pregame_status_screen_update` (w1); action_charge `_action_charge_setup` (w2); weapons `_weapon_place` (P2); leaf_map `_leaf_map_build_portals_from_leaf` (resolved-address identical, csplit alias). The accepted ledger credits 3 of them through objdiff shape only (1,952 B), and they are excluded from the 150K count.
+- Zero-credit fuzzy or close bodies landed (reported separately, not counted): action_vehicle `_action_vehicle_find_destination` and `_action_vehicle_desirable`, hud_weapon `_crosshairs_draw`, ui_widget_game_data_input_functions `_player_profile_update_cache_for_nwide_list` and `_splitscreen_pregame_status_screen_update` (w1); action_charge `_action_charge_setup` (w2); weapons `_weapon_place` (P2); leaf_map `_leaf_map_build_portals_from_leaf` (resolved-address identical, csplit alias); actor_perception `_prop_status_refresh` and `_actor_situation_update`, decals `_decal_new_from_collision` (w3a; no `point_from_line3d` form, guard passes). The accepted ledger credits 3 of them through objdiff shape only (1,952 B), and they are excluded from the 150K count.
 
 ## 7. Remaining blockers and reachable pool
 
-- At the w3 launch HEAD, 150 units had about 391,700 B of residual/unwritten padded bytes, excluding the protected
-  files and `rasterizer_xbox_transparent_geometry`; 288 parks remain active. Wave 3 groups for the un-run units are
-  prepared in `scratch/wave3b-groups.json` and entries 17-40 of `scratch/wave3a-groups.json` (with notes, C4013
+- At the w3 launch HEAD (before the truncated w3a landings), 150 units had about 391,700 B of residual/unwritten padded bytes, excluding the protected
+  files and `rasterizer_xbox_transparent_geometry`; 284 parks remain active after w3a. Wave 3 groups for the un-run units are
+  prepared in `scratch/wave3b-groups.json` and entries 17-40 of `scratch/wave3a-groups.json` (entries 1-16 were run as the truncated w3a) (with notes, C4013
   census `scratch/w3/c4013.txt`, laws `scratch/w2/laws_w2.md`, brief section 9b).
 - Highest-yield next steps, in order:
   1. Park re-investigation with laws A1-A21 over the un-run units (w2 closed 69 functions this way).
@@ -139,7 +140,7 @@ Run at `ff1acbf89` (the handoff commit only adds these two docs):
 
 ## 8. Changed files
 
-84 source/config files:
+87 source/config files:
 
 - `config/parked.json`
 - `config/symbols.json`
@@ -200,7 +201,9 @@ Run at `ff1acbf89` (the handoff commit only adds these two docs):
 - `source/interface/motion_sensor.c`
 - `source/interface/ui_widget.c`
 - `source/interface/ui_widget_game_data_input_functions.c`
+- `source/items/projectiles.c`
 - `source/items/weapons.c`
+- `source/items/weapons.h`
 - `source/math/geometry.c`
 - `source/math/real_math.h`
 - `source/networking/network_server_message_handler.c`
@@ -225,8 +228,9 @@ Run at `ff1acbf89` (the handoff commit only adds these two docs):
 - `source/units/bipeds.c`
 - `source/units/bipeds.h`
 - `source/units/unit_dialogue.c`
+- `source/units/units.h`
 
-Plus 142 files under `docs/object_matching_logs/` (per-object w1/w2 ledgers, checkpoint, manifest, this handoff).
+Plus 159 files under `docs/object_matching_logs/` (per-object w1/w2/w3 ledgers, checkpoint, manifest, this handoff).
 
 ## 9. Dependency-aware integration order
 

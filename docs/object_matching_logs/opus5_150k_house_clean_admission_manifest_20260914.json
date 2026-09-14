@@ -1,21 +1,21 @@
 {
  "summary": {
-  "label": "final",
+  "label": "final (after truncated wave w3a)",
   "base_commit": "12f7375d4b845725c5ae3fda7ad715998ee54975",
-  "head_commit": "ff1acbf89b59b7ede6fd77b574e26574df8ef461",
-  "accepted_functions": 7283,
-  "accepted_meaningful": 1326319,
-  "accepted_gain_functions": 134,
-  "accepted_gain_meaningful": 81349,
-  "strict_new_functions": 131,
-  "strict_new_meaningful": 79397,
-  "strict_new_padded": 80336,
+  "head_commit": "fe586a59b3ac7cf263c21a0e640755c3b9f5212f",
+  "accepted_functions": 7290,
+  "accepted_meaningful": 1331815,
+  "accepted_gain_functions": 141,
+  "accepted_gain_meaningful": 86845,
+  "strict_new_functions": 138,
+  "strict_new_meaningful": 84893,
+  "strict_new_padded": 85872,
   "nonstrict_new_accepted_functions": 3,
   "nonstrict_new_accepted_meaningful": 1952,
   "strict_gains_not_in_accepted_ledger": 0,
   "regressions": [],
   "target_meaningful": 1394970,
-  "strict_remaining_to_150k": 70603
+  "strict_remaining_to_150k": 65107
  },
  "strict_functions": [
   {
@@ -155,6 +155,23 @@
   },
   {
    "unit": "source/ai/actor_looking",
+   "function": "_actor_look_decode_direction",
+   "meaningful_bytes": 1624,
+   "relocations": 98,
+   "normalized_sha256": "4f3714fab510f0c407dc0792b3cbea003ba4d1dfdb4aee74d201d9a9e5dc14a9",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "padded_bytes": 1632,
+   "previous_name": "_actor_look_decode_direction",
+   "commits": [
+    "7f529504c actor_looking: 1 function(s) strict exact",
+    "de8873833 actor_looking: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
    "function": "_actor_look_find_random_vector",
    "meaningful_bytes": 595,
    "relocations": 35,
@@ -167,6 +184,7 @@
    "padded_bytes": 608,
    "previous_name": "_actor_look_find_random_vector",
    "commits": [
+    "7f529504c actor_looking: 1 function(s) strict exact",
     "de8873833 actor_looking: 1 function(s) strict exact"
    ]
   },
@@ -184,6 +202,25 @@
    "padded_bytes": 256,
    "previous_name": "_actor_aim_jump",
    "commits": [
+    "901a6ae73 actor_moving: 3 function(s) strict exact",
+    "b8d1d0c73 actor_moving: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "function": "_actor_move_avoidance_setup",
+   "meaningful_bytes": 571,
+   "relocations": 18,
+   "normalized_sha256": "3060b44f3fcbaf83249e8d29cae511a270ae254e93ca3c562eeefe991e353312",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "padded_bytes": 576,
+   "previous_name": "_actor_move_avoidance_setup",
+   "commits": [
+    "901a6ae73 actor_moving: 3 function(s) strict exact",
     "b8d1d0c73 actor_moving: 2 function(s) strict exact"
    ]
   },
@@ -200,6 +237,42 @@
    "padded_bytes": 2752,
    "previous_name": "_actor_move_calculate_movement",
    "commits": [
+    "901a6ae73 actor_moving: 3 function(s) strict exact",
+    "b8d1d0c73 actor_moving: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "function": "_actor_move_try_evasion_direction",
+   "meaningful_bytes": 409,
+   "relocations": 18,
+   "normalized_sha256": "a306a2cda400a435d5caba15f52c3b08fcb267ad1e120ec60a521c719058bdfb",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "padded_bytes": 416,
+   "previous_name": "_actor_move_try_evasion_direction",
+   "commits": [
+    "901a6ae73 actor_moving: 3 function(s) strict exact",
+    "b8d1d0c73 actor_moving: 2 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "function": "_actor_move_try_evasion_vector",
+   "meaningful_bytes": 589,
+   "relocations": 24,
+   "normalized_sha256": "48da9be7024d1b0583b781f8fcb6e9791f23e93af0e6966f393eea2fed15f957",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "padded_bytes": 592,
+   "previous_name": "_actor_move_try_evasion_vector",
+   "commits": [
+    "901a6ae73 actor_moving: 3 function(s) strict exact",
     "b8d1d0c73 actor_moving: 2 function(s) strict exact"
    ]
   },
@@ -217,6 +290,25 @@
    "padded_bytes": 560,
    "previous_name": "_actor_perception_desire_prop",
    "commits": [
+    "c2b750351 actor_perception: 1 function(s) strict exact",
+    "d4046d4df actor_perception: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_perception",
+   "function": "_actor_situation_combat_status_update",
+   "meaningful_bytes": 312,
+   "relocations": 7,
+   "normalized_sha256": "b68099052dd13bf25e9cd07538962718ade381ea6696590d98ddebb13078e581",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "padded_bytes": 320,
+   "previous_name": "_actor_situation_combat_status_update",
+   "commits": [
+    "c2b750351 actor_perception: 1 function(s) strict exact",
     "d4046d4df actor_perception: 1 function(s) strict exact"
    ]
   },
@@ -812,6 +904,7 @@
    "padded_bytes": 400,
    "previous_name": "_decal_update",
    "commits": [
+    "ec177ec2f decals: retain verified credible source at zero credit",
     "8e5976ae9 decals: 1 function(s) strict exact"
    ]
   },
@@ -1526,6 +1619,23 @@
    ]
   },
   {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_aim_ballistic",
+   "meaningful_bytes": 875,
+   "relocations": 35,
+   "normalized_sha256": "fbc7e95f65b75fdae9a94e16b800e681c145c3449dcb9f70dcf87efb9eba370d",
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "padded_bytes": 880,
+   "previous_name": "_projectile_aim_ballistic",
+   "commits": [
+    "d79205374 projectiles: 1 function(s) strict exact"
+   ]
+  },
+  {
    "unit": "source/items/weapons",
    "function": "_animation_update",
    "meaningful_bytes": 27,
@@ -2183,6 +2293,25 @@
    "padded_bytes": 1232,
    "previous_name": "_biped_fix_position",
    "commits": [
+    "082f9171b units.h/weapons.h: owner prototypes for biped_update callees (bipeds: 1 function strict exact)",
+    "276b0368f bipeds.h: biped_approximate_surface_index returns long (ai_script: 1 function strict exact)",
+    "4f66b6d8b bipeds: 1 function(s) strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/bipeds",
+   "function": "_biped_update",
+   "meaningful_bytes": 1116,
+   "relocations": 61,
+   "normalized_sha256": "fe3b81e079c33a132e6aa3403c6148ecbba692047ca2368e46dabe1884348f7e",
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:51",
+   "padded_bytes": 1120,
+   "previous_name": "_biped_update",
+   "commits": [
+    "082f9171b units.h/weapons.h: owner prototypes for biped_update callees (bipeds: 1 function strict exact)",
     "276b0368f bipeds.h: biped_approximate_surface_index returns long (ai_script: 1 function strict exact)",
     "4f66b6d8b bipeds: 1 function(s) strict exact"
    ]
