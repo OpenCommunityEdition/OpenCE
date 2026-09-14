@@ -876,40 +876,41 @@ static void biped_start_landing(
 	real minimum_hard_landing_velocity =
 		definition->biped.minimum_hard_landing_velocity * (1.f / TICKS_PER_SECOND);
 
-	if (landing_velocity >= minimum_soft_landing_velocity)
+	short landing_type;
+	real velocity;
+	real velocity_range;
+	real recovery_time;
+
+	if (landing_velocity < minimum_soft_landing_velocity)
+		return;
+
+	if (landing_velocity < minimum_hard_landing_velocity)
 	{
-		short landing_type;
-		real velocity_range;
-		real recovery_time;
-		real fraction;
+		velocity = landing_velocity - minimum_soft_landing_velocity;
+		velocity_range =
+			minimum_hard_landing_velocity - minimum_soft_landing_velocity;
+		recovery_time = definition->biped.maximum_soft_landing_time;
+		landing_type = 0;
+	}
+	else
+	{
+		velocity = landing_velocity;
+		velocity_range =
+			definition->biped.maximum_hard_landing_velocity *
+				(1.f / TICKS_PER_SECOND) - minimum_hard_landing_velocity;
+		recovery_time = definition->biped.maximum_hard_landing_time;
+		landing_type = 1;
+	}
 
-		if (landing_velocity < minimum_hard_landing_velocity)
-		{
-			landing_velocity -= minimum_soft_landing_velocity;
-			velocity_range =
-				minimum_hard_landing_velocity - minimum_soft_landing_velocity;
-			recovery_time = definition->biped.maximum_soft_landing_time;
-			landing_type = 0;
-		}
-		else
-		{
-			velocity_range =
-				definition->biped.maximum_hard_landing_velocity *
-					(1.f / TICKS_PER_SECOND) - minimum_hard_landing_velocity;
-			recovery_time = definition->biped.maximum_hard_landing_time;
-			landing_type = 1;
-		}
-
-		recovery_time *= TICKS_PER_SECOND;
-		if (velocity_range > 0.f)
-		{
-			fraction = landing_velocity / velocity_range;
-			fraction = PIN(fraction, 0.f, 1.f);
-			biped->biped.landing = landing_type;
-			biped->biped.landing_recovery_counter = 0;
-			biped->biped.landing_recovery_time =
-				(char)(long)(recovery_time * fraction);
-		}
+	recovery_time *= TICKS_PER_SECOND;
+	if (velocity_range > 0.f)
+	{
+		velocity /= velocity_range;
+		velocity = PIN(velocity, 0.f, 1.f);
+		biped->biped.landing = landing_type;
+		biped->biped.landing_recovery_counter = 0;
+		biped->biped.landing_recovery_time =
+			(char)(long)(recovery_time * velocity);
 	}
 
 	return;
@@ -2226,66 +2227,40 @@ static void biped_update_jumping(
 			TEST_FLAG(biped->unit.control_flags, _unit_control_throw_grenade_bit))
 		{
 			real forward_velocity = MAX(
+				0.f,
 				dot_product3d(
 					&biped->object.translational_velocity,
-					&biped->unit.aiming_vector),
-				0.f);
+					&biped->unit.aiming_vector));
 			real acceleration_scale = PIN(forward_velocity * 0.71428573f, 0.f, 1.f);
-			real_point3d velocity_point;
-			real_point3d velocity_result;
 			real_vector3d lateral_velocity;
 
-			set_real_point3d(
-				&velocity_point,
-				biped->object.translational_velocity.i,
-				biped->object.translational_velocity.j,
-				biped->object.translational_velocity.k);
 			point_from_line3d(
-				&velocity_point,
+				(real_point3d *)&biped->object.translational_velocity,
 				&biped->unit.aiming_vector,
 				-forward_velocity,
-				&velocity_result);
-			set_real_vector3d(
-				&lateral_velocity,
-				velocity_result.x,
-				velocity_result.y,
-				velocity_result.z);
+				(real_point3d *)&lateral_velocity);
 			point_from_line3d(
-				&velocity_point,
+				(real_point3d *)&biped->object.translational_velocity,
 				&lateral_velocity,
-				-0.2f,
-				&velocity_result);
-			set_real_vector3d(
-				&biped->object.translational_velocity,
-				velocity_result.x,
-				velocity_result.y,
-				velocity_result.z);
-			set_real_point3d(
-				&velocity_point,
-				biped->object.translational_velocity.i,
-				biped->object.translational_velocity.j,
-				biped->object.translational_velocity.k);
+				0.8f - 1.f,
+				(real_point3d *)&biped->object.translational_velocity);
 			point_from_line3d(
-				&velocity_point,
+				(real_point3d *)&biped->object.translational_velocity,
 				&biped->unit.aiming_vector,
 				acceleration_scale * 0.04f -
 					acceleration_scale * acceleration_scale * 0.05f + 0.01f,
-				&velocity_result);
-			set_real_vector3d(
-				&biped->object.translational_velocity,
-				velocity_result.x,
-				velocity_result.y,
-				velocity_result.z);
+				(real_point3d *)&biped->object.translational_velocity);
 			SET_FLAG(biped->biped.flags, _biped_airborne_bit, TRUE);
 			impulse = TRUE;
 		}
-		else if (TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit) &&
+
+		if (!impulse &&
+			TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit) &&
 			TEST_FLAG(biped->biped.flags, _biped_airborne_bit))
 		{
-			scale_vector3d(
-				&biped->object.translational_velocity,
-				-0.2f,
-				&biped->object.translational_velocity);
+			real_vector3d *velocity = &biped->object.translational_velocity;
+
+			scale_vector3d(velocity, 0.8f - 1.f, velocity);
 		}
 
 		if (player->local_player_index != NONE && impulse)
@@ -2385,872 +2360,686 @@ static void biped_find_nearby_support_surface(
 static void biped_update_physics(
 	struct biped_physics *physics)
 {
-    word in_flags = physics->in_flags;
-    boolean          grounded = TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit);
-    real             horizontal_x = 0.0f;
-    real             horizontal_y = 0.0f;
+	real_vector2d facing = { 0.f, 0.f };
+	boolean climbing = TEST_FLAG(physics->in_flags, _biped_physics_in_climb_anything_bit);
+	word in_flags;
+	real_point3d position;
+	real_vector3d velocity;
+	real_point3d clipped_position;
+	real_vector3d clipped_velocity;
+	struct collision_plane collisions[16];
+	short collision_count;
+	unsigned long collision_flags;
 
-    real_vector3d    accel;
-    real_vector3d    move_direction;
-    real_vector3d   *new_velocity = &physics->new_velocity;
-    real             speed_scale;
+	match_assert_valid_real_point3d("c:\\halo\\SOURCE\\units\\bipeds.c", 0xBCC, &physics->position);
+	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\units\\bipeds.c", 0xBCD, &physics->velocity);
 
-    physics->out_flags = 0;
+	in_flags = physics->in_flags;
+	physics->out_flags = 0;
+	if (TEST_FLAG(in_flags, _biped_physics_in_flying_bit))
+	{
+		real_vector3d up;
+		real_vector3d left;
+		real_vector3d desired_velocity;
+		real_vector3d acceleration;
+		real_vector3d direction;
+		real_vector3d velocity_change;
 
-    if (TEST_FLAG(in_flags, _biped_physics_in_flying_bit))
-    {
-        /* ---- flying: rotate desired movement into a flying (left, up, forward) basis ---- */
-        real_vector3d flying_left, flying_up;
-        real movement_penalty_inv;
-        real desired_x, desired_y, desired_z;
-        real clamped_x, clamped_y, clamped_z;
-        real accel_magnitude;
+		biped_build_flying_axes(&physics->forward, &left, &up);
+		desired_velocity.i = physics->forward.i * physics->movement_desired.i +
+			left.i * physics->movement_desired.j +
+			up.i * physics->movement_desired.k;
+		desired_velocity.j = physics->forward.j * physics->movement_desired.i +
+			left.j * physics->movement_desired.j +
+			up.j * physics->movement_desired.k;
+		desired_velocity.k = physics->forward.k * physics->movement_desired.i +
+			left.k * physics->movement_desired.j +
+			up.k * physics->movement_desired.k;
+		scale_vector3d(&desired_velocity, 1.f - physics->movement_penalty, &desired_velocity);
+		acceleration.i = desired_velocity.i - physics->velocity.i;
+		acceleration.j = desired_velocity.j - physics->velocity.j;
+		acceleration.k = desired_velocity.k - physics->velocity.k;
+		direction = acceleration;
+		if (normalize3d(&direction) > physics->acceleration_maximum)
+			scale_vector3d(&direction, physics->acceleration_maximum, &velocity_change);
+		else
+			velocity_change = acceleration;
+		add_vectors3d(&velocity_change, &physics->velocity, &physics->new_velocity);
+		SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, TRUE);
+		SET_FLAG(physics->out_flags, _biped_physics_out_slipping_bit, FALSE);
+	}
+	else if (TEST_FLAG(in_flags, _biped_physics_in_absolute_movement_bit))
+	{
+		physics->new_velocity.k = physics->movement_desired.k;
+		facing.i = physics->new_velocity.i =
+			physics->movement_desired.i * physics->forward.i -
+			physics->forward.j * physics->movement_desired.j;
+		facing.j = physics->new_velocity.j =
+			physics->movement_desired.j * physics->forward.i +
+			physics->movement_desired.i * physics->forward.j;
+	}
+	else if (TEST_FLAG(in_flags, _biped_physics_in_airborne_bit))
+	{
+		real_vector2d desired_velocity;
+		real_vector2d acceleration;
+		real_vector2d direction;
+		real_vector2d velocity_change;
 
-        biped_build_flying_axes(&physics->forward, &flying_left, &flying_up);
+		desired_velocity.i = physics->movement_desired.i * physics->forward.i -
+			physics->forward.j * physics->movement_desired.j;
+		desired_velocity.j = physics->movement_desired.j * physics->forward.i +
+			physics->movement_desired.i * physics->forward.j;
+		scale_vector2d(&desired_velocity, 1.f - physics->movement_penalty, &desired_velocity);
+		acceleration.i = desired_velocity.i - physics->velocity.i;
+		acceleration.j = desired_velocity.j - physics->velocity.j;
+		direction = acceleration;
+		if (normalize2d(&direction) > physics->airborne_acceleration_maximum)
+			scale_vector2d(&direction, physics->airborne_acceleration_maximum, &velocity_change);
+		else
+			velocity_change = acceleration;
+		physics->new_velocity.i = velocity_change.i + physics->velocity.i;
+		physics->new_velocity.j = velocity_change.j + physics->velocity.j;
+		physics->new_velocity.k = physics->velocity.k - global_gravity;
+		physics->out_flags = TEST_FLAG(in_flags, _biped_physics_in_slipping_bit) ?
+			FLAG(_biped_physics_out_slipping_bit) : 0;
+	}
+	else
+	{
+		real speed = magnitude3d(&physics->movement_desired);
+		real_vector3d const *ground_normal = &physics->ground_plane.n;
+		real_vector3d move_direction;
 
-        movement_penalty_inv = 1.0f - physics->movement_penalty;
-        desired_z = ((physics->movement_desired.k * flying_up.k)
-                  + ((physics->forward.k * physics->movement_desired.i)
-                          + (physics->movement_desired.j * flying_left.k)));
-        desired_x = ((physics->movement_desired.j * flying_left.i)
-                          + (physics->movement_desired.k * flying_up.i));
+		if (TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
+		{
+			real_vector3d forward = physics->aiming;
+			real_vector3d left;
 
-        accel.j = (movement_penalty_inv
-                        * ((physics->movement_desired.k * flying_up.j)
-                                + ((physics->forward.j * physics->movement_desired.i)
-                                        + (physics->movement_desired.j * flying_left.j))))
-                - physics->velocity.j;
-        accel.k = (movement_penalty_inv * desired_z) - physics->velocity.k;
-        accel.i = (movement_penalty_inv
-                        * ((physics->movement_desired.i * physics->forward.i)
-                                + desired_x))
-                - physics->velocity.i;
+			cross_product3d(ground_normal, &forward, &left);
+			if (normalize3d(&left) == 0.f)
+			{
+				cross_product3d(ground_normal, global_up3d, &left);
+				if (normalize3d(&left) == 0.f)
+				{
+					cross_product3d(ground_normal, global_forward3d, &left);
+					normalize3d(&left);
+				}
+			}
+			cross_product3d(&left, ground_normal, &forward);
+			normalize3d(&forward);
 
-        clamped_y = accel.j;
-        clamped_x = accel.i;
-        clamped_z = accel.k;
-        accel_magnitude = normalize3d(&accel);
-        if (accel_magnitude <= physics->acceleration_maximum)
-        {
-            accel.i = clamped_x;
-            accel.j = clamped_y;
-            accel.k = clamped_z;
-        }
-        else
-        {
-            clamped_x = (accel.i * physics->acceleration_maximum);
-            clamped_y = (accel.j * physics->acceleration_maximum);
-            clamped_z = (accel.k * physics->acceleration_maximum);
-        }
+			move_direction.i = forward.i * physics->movement_desired.i +
+				left.i * physics->movement_desired.j;
+			move_direction.j = forward.j * physics->movement_desired.i +
+				left.j * physics->movement_desired.j;
+			move_direction.k = forward.k * physics->movement_desired.i +
+				left.k * physics->movement_desired.j +
+				physics->movement_desired.k;
+			normalize3d(&move_direction);
+		}
+		else if (ground_normal->k > _real_epsilon)
+		{
+			move_direction.i = facing.i =
+				physics->movement_desired.i * physics->forward.i -
+				physics->forward.j * physics->movement_desired.j;
+			move_direction.j = facing.j =
+				physics->movement_desired.j * physics->forward.i +
+				physics->movement_desired.i * physics->forward.j;
+			move_direction.k = physics->movement_desired.k -
+				(move_direction.j * ground_normal->j + move_direction.i * ground_normal->i) /
+				ground_normal->k;
+			normalize3d(&move_direction);
+		}
+		else
+		{
+			real_vector3d forward = physics->aiming;
+			real_vector3d left;
 
-        new_velocity->i = clamped_x + physics->velocity.i;
-        new_velocity->j = clamped_y + physics->velocity.j;
-        new_velocity->k = clamped_z + physics->velocity.k;
-        SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, TRUE);
-        SET_FLAG(physics->out_flags, _biped_physics_out_slipping_bit, FALSE);
-    }
-    else if (TEST_FLAG(in_flags, _biped_physics_in_absolute_movement_bit))
-    {
-        /* ---- facing-relative (scripted) velocity: rotate movement_desired by the facing yaw ---- */
-        new_velocity->k = physics->movement_desired.k;
-        new_velocity->j = ((physics->forward.j * physics->movement_desired.i)
-                                + (physics->movement_desired.j * physics->forward.i));
-        new_velocity->i = ((physics->forward.i * physics->movement_desired.i)
-                                - (physics->forward.j * physics->movement_desired.j));
-        horizontal_y = new_velocity->j;
-        horizontal_x = new_velocity->i;
-    }
-    else if (TEST_FLAG(in_flags, _biped_physics_in_airborne_bit))
-    {
-        /* ---- airborne: horizontal accel clamped to the airborne budget, plus gravity ---- */
-        real_vector2d horizontal_accel;
-        real movement_penalty_inv = 1.0f - physics->movement_penalty;
-        real clamped_x, clamped_y;
+			cross_product3d(global_up3d, &physics->aiming, &left);
+			normalize3d(&left);
+			point_from_line3d(
+				(real_point3d *)&forward,
+				ground_normal,
+				-dot_product3d(&forward, ground_normal),
+				(real_point3d *)&forward);
+			point_from_line3d(
+				(real_point3d *)&left,
+				ground_normal,
+				-dot_product3d(&left, ground_normal),
+				(real_point3d *)&left);
+			facing.i = physics->movement_desired.i * physics->forward.i -
+				physics->forward.j * physics->movement_desired.j;
+			facing.j = physics->movement_desired.j * physics->forward.i +
+				physics->movement_desired.i * physics->forward.j;
+			move_direction.i = forward.i * physics->movement_desired.i +
+				left.i * physics->movement_desired.j;
+			move_direction.j = forward.j * physics->movement_desired.i +
+				left.j * physics->movement_desired.j;
+			move_direction.k = forward.k * physics->movement_desired.i +
+				left.k * physics->movement_desired.j +
+				physics->movement_desired.k;
+			if (!climbing)
+				move_direction.k *= 5.f;
+			normalize3d(&move_direction);
+		}
 
-        horizontal_accel.i = ((movement_penalty_inv
-                                   * ((physics->forward.i * physics->movement_desired.i)
-                                           - (physics->forward.j * physics->movement_desired.j)))
-                                   - physics->velocity.i);
-        horizontal_accel.j = ((movement_penalty_inv
-                                   * ((physics->forward.j * physics->movement_desired.i)
-                                           + (physics->movement_desired.j * physics->forward.i)))
-                                   - physics->velocity.j);
-        clamped_x = horizontal_accel.i;
-        clamped_y = horizontal_accel.j;
-        if (normalize2d(&horizontal_accel) <= physics->airborne_acceleration_maximum)
-        {
-            horizontal_accel.i = clamped_x;
-            horizontal_accel.j = clamped_y;
-        }
-        else
-        {
-            clamped_x = (horizontal_accel.i * physics->airborne_acceleration_maximum);
-            clamped_y = (horizontal_accel.j * physics->airborne_acceleration_maximum);
-        }
-        new_velocity->j = physics->velocity.j + clamped_y;
-        new_velocity->i = physics->velocity.i + clamped_x;
-        new_velocity->k = physics->velocity.k - global_gravity;
-        SET_FLAG(
-            physics->out_flags,
-            _biped_physics_out_slipping_bit,
-            TEST_FLAG(in_flags, _biped_physics_in_slipping_bit));
-    }
-    else
-    {
-        /* ---- grounded walking ---- */
-        real_vector3d const *ground_normal = &physics->ground_plane.n;
-        boolean airborne = FALSE;
+		if (!TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
+		{
+			if (move_direction.k <= physics->downhill_k1)
+			{
+				speed *= physics->downhill_velocity_scale;
+			}
+			else if (move_direction.k < physics->downhill_k0)
+			{
+				speed *= (move_direction.k - physics->downhill_k0) *
+					(physics->downhill_velocity_scale - 1.f) /
+					(physics->downhill_k1 - physics->downhill_k0) + 1.f;
+			}
+			else if (move_direction.k >= physics->uphill_k1)
+			{
+				speed *= physics->uphill_velocity_scale;
+			}
+			else if (move_direction.k > physics->uphill_k0)
+			{
+				speed *= (move_direction.k - physics->uphill_k0) *
+					(physics->uphill_velocity_scale - 1.f) /
+					(physics->uphill_k1 - physics->uphill_k0) + 1.f;
+			}
+		}
 
-        speed_scale = square_root(((physics->movement_desired.k * physics->movement_desired.k)
-                             + ((physics->movement_desired.i * physics->movement_desired.i)
-                                     + (physics->movement_desired.j * physics->movement_desired.j))));
+		{
+			real_vector3d desired_velocity;
+			real_vector3d acceleration;
+			real_vector3d direction;
+			real_vector3d velocity_change;
+			boolean slipping = FALSE;
 
-        if (TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
-        {
-            /* on a resolved ground plane: build a tangent basis from the aiming vector and the
-             * ground normal, then express the desired movement in it */
-            real_vector3d tangent, bitangent;
+			scale_vector3d(&move_direction, speed * (1.f - physics->movement_penalty), &desired_velocity);
+			acceleration.i = desired_velocity.i - physics->velocity.i;
+			acceleration.j = desired_velocity.j - physics->velocity.j;
+			acceleration.k = desired_velocity.k - physics->velocity.k;
+			direction = acceleration;
+			if (normalize3d(&direction) > physics->acceleration_maximum)
+			{
+				if (!TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
+					slipping = TEST_FLAG(in_flags, _biped_physics_in_slipping_bit);
+				scale_vector3d(&direction, physics->acceleration_maximum, &velocity_change);
+			}
+			else
+			{
+				velocity_change = acceleration;
+			}
 
-            tangent.i = (physics->ground_plane.n.j * physics->aiming.k)
-                      - (physics->ground_plane.n.k * physics->aiming.j);
-            tangent.j = (physics->ground_plane.n.k * physics->aiming.i)
-                      - (physics->ground_plane.n.i * physics->aiming.k);
-            tangent.k = (physics->ground_plane.n.i * physics->aiming.j)
-                      - (physics->ground_plane.n.j * physics->aiming.i);
-            if (normalize3d(&tangent) == 0.0f)
-            {
-                /* aiming parallel to the ground normal — fall back to global up, then forward */
-                tangent.i = (global_up3d->n[2] * physics->ground_plane.n.j)
-                          - (global_up3d->n[1] * physics->ground_plane.n.k);
-                tangent.j = (global_up3d->n[0] * physics->ground_plane.n.k)
-                          - (global_up3d->n[2] * physics->ground_plane.n.i);
-                tangent.k = (global_up3d->n[1] * physics->ground_plane.n.i)
-                          - (global_up3d->n[0] * physics->ground_plane.n.j);
-                if (normalize3d(&tangent) == 0.0f)
-                {
-                    tangent.i = (global_forward3d->n[2] * physics->ground_plane.n.j)
-                              - (global_forward3d->n[1] * physics->ground_plane.n.k);
-                    tangent.j = (global_forward3d->n[0] * physics->ground_plane.n.k)
-                              - (global_forward3d->n[2] * physics->ground_plane.n.i);
-                    tangent.k = (global_forward3d->n[1] * physics->ground_plane.n.i)
-                              - (global_forward3d->n[0] * physics->ground_plane.n.j);
-                    normalize3d(&tangent);
-                }
-            }
+			velocity_change.i -= ground_normal->i * (1.f / 128.f);
+			velocity_change.j -= ground_normal->j * (1.f / 128.f);
+			velocity_change.k -= ground_normal->k * (1.f / 128.f);
+			physics->out_flags = slipping ? FLAG(_biped_physics_out_slipping_bit) : 0;
+			add_vectors3d(&velocity_change, &physics->velocity, &physics->new_velocity);
+			if (TEST_FLAG(physics->out_flags, _biped_physics_out_slipping_bit))
+				physics->new_velocity.k -= global_gravity;
+		}
+	}
 
-            bitangent.i = (physics->ground_plane.n.j * tangent.k)
-                        - (physics->ground_plane.n.k * tangent.j);
-            bitangent.j = (physics->ground_plane.n.k * tangent.i)
-                        - (physics->ground_plane.n.i * tangent.k);
-            bitangent.k = (physics->ground_plane.n.i * tangent.j)
-                        - (physics->ground_plane.n.j * tangent.i);
-            normalize3d(&bitangent);
+	if (TEST_FLAG(physics->in_flags, _biped_physics_in_no_collision_bit))
+	{
+		collision_flags = 0;
+	}
+	else if (TEST_FLAG(physics->in_flags, _biped_physics_in_dead_bit))
+	{
+		collision_flags = _collision_test_for_bipeds_dead_flags;
+	}
+	else
+	{
+		collision_flags = TEST_FLAG(physics->in_flags, _biped_physics_in_pass_through_bipeds_bit) ?
+			_collision_test_for_bipeds_passthrough_living_flags :
+			_collision_test_for_bipeds_living_flags;
+	}
 
-            move_direction.i = (physics->movement_desired.j * tangent.i)
-                             + (physics->movement_desired.i * bitangent.i);
-            move_direction.j = (physics->movement_desired.j * tangent.j)
-                             + (physics->movement_desired.i * bitangent.j);
-            move_direction.k = ((physics->movement_desired.j * tangent.k)
-                                     + (physics->movement_desired.i * bitangent.k))
-                             + physics->movement_desired.k;
-        }
-        else if (physics->ground_plane.n.k <= 0.000099999997f)
-        {
-            /* no usable ground plane — build a tangent from aiming x global-up */
-            real_vector3d tangent;
-            real bitangent_x, bitangent_y, bitangent_z;
-            real aiming_i = physics->aiming.i;
-            real aiming_j = physics->aiming.j;
-            real aiming_k = physics->aiming.k;
+	position = physics->position;
+	velocity = physics->new_velocity;
+	velocity.k += physics->crouch_velocity;
+	if (debug_biped_skip_collision)
+	{
+		collisions[0].t = 0.f;
+		collisions[0].point = physics->position;
+		collisions[0].plane.n = *global_up3d;
+		collisions[0].plane.d = -position.z;
+		collisions[0].object_index = physics->biped_index;
+		collisions[0].surface_index = NONE;
+		collisions[0].flags = 0;
+		collisions[0].breakable_surface_index = 0;
+		collisions[0].material_index = NONE;
+		clipped_velocity = velocity;
+		clipped_position.x = position.x + clipped_velocity.i;
+		clipped_position.y = position.y + clipped_velocity.j;
+		clipped_position.z = position.z;
+		clipped_velocity.k = 0.f;
+		collision_count = 1;
+	}
+	else
+	{
+		collision_count = collision_move_pill(
+			collision_flags,
+			&position,
+			&velocity,
+			physics->height,
+			physics->width,
+			physics->biped_index,
+			&clipped_position,
+			&clipped_velocity,
+			16,
+			collisions);
+	}
 
-            tangent.k = (aiming_j * global_up3d->n[0]) - (aiming_i * global_up3d->n[1]);
-            tangent.i = (aiming_k * global_up3d->n[1]) - (aiming_j * global_up3d->n[2]);
-            tangent.j = (aiming_i * global_up3d->n[2]) - (aiming_k * global_up3d->n[0]);
-            normalize3d(&tangent);
-            ground_normal = &physics->ground_plane.n;
+	SET_FLAG(physics->out_flags, _biped_physics_out_splatter_bit, collision_count >= 16);
+	physics->stick_surface_index = NONE;
+	if (!collision_count && physics->existing_support_surface_index != NONE)
+	{
+		struct collision_bsp *bsp = global_collision_bsp_get();
+		long best_surface_index = NONE;
+		real best_distance_squared = REAL_MAX;
 
-            horizontal_x = ((physics->forward.i * physics->movement_desired.i)
-                                 - (physics->forward.j * physics->movement_desired.j));
-            horizontal_y = ((physics->forward.j * physics->movement_desired.i)
-                                 + (physics->movement_desired.j * physics->forward.i));
+		if (VALID_INDEX(physics->existing_support_surface_index, bsp->surfaces.count))
+		{
+			struct collision_surface *surface = TAG_BLOCK_GET_ELEMENT(
+				&bsp->surfaces,
+				physics->existing_support_surface_index,
+				struct collision_surface);
+			long edge_index = surface->first_edge_index;
+			real_plane3d plane;
+			real_plane3d best_plane;
+			real best_velocity_dot;
+			real_point3d point;
+			real distance;
 
-            /* project (aiming, tangent) rotation of the desired movement onto the ground-normal plane */
-            bitangent_z = ((physics->forward.k
-                        * ((-((physics->ground_plane.n.i * tangent.i)
-                                                 + ((physics->ground_plane.n.j * tangent.j)
-                                                         + (physics->ground_plane.n.k * tangent.k)))
-                                        * physics->ground_plane.n.k)
-                                + tangent.k))
-                        + (physics->forward.i
-                        * ((-((physics->ground_plane.n.i * aiming_i)
-                                                 + ((physics->ground_plane.n.j * aiming_j)
-                                                         + (physics->ground_plane.n.k * aiming_k)))
-                                        * physics->ground_plane.n.k)
-                                + aiming_k)));
-            bitangent_y = ((physics->forward.k
-                        * ((-((physics->ground_plane.n.i * tangent.i)
-                                                 + ((physics->ground_plane.n.j * tangent.j)
-                                                         + (physics->ground_plane.n.k * tangent.k)))
-                                        * physics->ground_plane.n.j)
-                                + tangent.j))
-                        + (physics->forward.i
-                        * ((-((physics->ground_plane.n.i * aiming_i)
-                                                 + ((physics->ground_plane.n.j * aiming_j)
-                                                         + (physics->ground_plane.n.k * aiming_k)))
-                                        * physics->ground_plane.n.j)
-                                + aiming_j)));
-            bitangent_x = (physics->forward.k
-                        * ((-((physics->ground_plane.n.i * tangent.i)
-                                                 + ((physics->ground_plane.n.j * tangent.j)
-                                                         + (physics->ground_plane.n.k * tangent.k)))
-                                        * physics->ground_plane.n.i)
-                                + tangent.i))
-                        + (physics->forward.i
-                        * ((-((physics->ground_plane.n.i * aiming_i)
-                                                 + ((physics->ground_plane.n.j * aiming_j)
-                                                         + (physics->ground_plane.n.k * aiming_k)))
-                                        * physics->ground_plane.n.i)
-                                + aiming_i));
+			bsp3d_get_plane_from_designator(&bsp->bsp3d, surface->plane_designator, &plane);
+			distance = -(plane.n.i * clipped_position.x +
+				plane.n.j * clipped_position.y +
+				plane.n.k * clipped_position.z -
+				plane.d);
+			point.x = plane.n.i * distance + clipped_position.x;
+			point.y = plane.n.j * distance + clipped_position.y;
+			point.z = plane.n.k * distance + clipped_position.z;
 
-            move_direction.i = bitangent_x;
-            move_direction.j = bitangent_y;
-            move_direction.k = bitangent_z + physics->forward.k;
-            if (!TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
-                move_direction.k = (bitangent_z + physics->forward.k) * 5.0f;
-        }
-        else
-        {
-            /* on a slope: rotate the desired movement by the facing yaw, then keep it in-plane */
-            ground_normal = &physics->ground_plane.n;
-            horizontal_x = ((physics->forward.i * physics->movement_desired.i)
-                                 - (physics->forward.j * physics->movement_desired.j));
-            horizontal_y = ((physics->forward.j * physics->movement_desired.i)
-                                 + (physics->movement_desired.j * physics->forward.i));
-            move_direction.j = horizontal_y;
-            move_direction.i = horizontal_x;
-            move_direction.k = physics->movement_desired.k
-                - (((physics->ground_plane.n.j * horizontal_y)
-                                + (physics->ground_plane.n.i * horizontal_x))
-                        / physics->ground_plane.n.k);
-        }
+			do
+			{
+				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+					&bsp->edges,
+					edge_index,
+					struct collision_edge);
+				boolean reverse = physics->existing_support_surface_index == edge->surface_indices[1];
+				long neighbor_surface_index = edge->surface_indices[!reverse];
 
-        normalize3d(&move_direction);
+				if (neighbor_surface_index != NONE)
+				{
+					struct collision_surface *neighbor_surface = TAG_BLOCK_GET_ELEMENT(
+						&bsp->surfaces,
+						neighbor_surface_index,
+						struct collision_surface);
 
-        /* slope-dependent speed scaling from the downhill/uphill response curve */
-        if (!TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
-        {
-            real slope = move_direction.k;
-            if (slope > physics->downhill_k1)
-            {
-                if (slope >= physics->downhill_k0)
-                {
-                    real curve_hi, curve_lo, curve_scale;
-                    if (slope >= physics->uphill_k1)
-                    {
-                        speed_scale = (physics->uphill_velocity_scale * speed_scale);
-                        goto integrate_velocity;
-                    }
-                    curve_hi = physics->uphill_k1;
-                    if (slope <= physics->uphill_k0)
-                        goto integrate_velocity;
-                    curve_lo = physics->uphill_k0;
-                    curve_scale = physics->uphill_velocity_scale;
-                    speed_scale = (((((move_direction.k - curve_lo)
-                                                   * (curve_scale - 1.0f))
-                                           / (curve_hi - curve_lo))
-                                   + 1.0f)
-                           * speed_scale);
-                    goto integrate_velocity;
-                }
-                else
-                {
-                    real curve_hi = physics->downhill_k0;
-                    real curve_lo = physics->downhill_k1;
-                    real curve_scale = physics->downhill_velocity_scale;
-                    speed_scale = (((((move_direction.k - curve_lo)
-                                                   * (curve_scale - 1.0f))
-                                           / (curve_hi - curve_lo))
-                                   + 1.0f)
-                           * speed_scale);
-                    goto integrate_velocity;
-                }
-            }
-            speed_scale = (physics->downhill_velocity_scale * speed_scale);
-        }
+					if (TEST_FLAG(physics->in_flags, _biped_physics_in_climb_anything_bit) ||
+						TEST_FLAG(neighbor_surface->flags, _collision_surface_climbable_bit))
+					{
+						real velocity_dot;
 
-    integrate_velocity:
-        {
-            real target_scale = ((1.0f - physics->movement_penalty) * speed_scale);
-            real desired_x = (move_direction.i * target_scale);
-            real clamped_x, clamped_y, clamped_z;
-            real ground_nudge;
+						bsp3d_get_plane_from_designator(
+							&bsp->bsp3d,
+							neighbor_surface->plane_designator,
+							&plane);
+						velocity_dot = dot_product3d(&plane.n, &clipped_velocity);
+						if (velocity_dot > 0.f &&
+							plane.n.i * clipped_position.x +
+								plane.n.j * clipped_position.y +
+								plane.n.k * clipped_position.z -
+								plane.d > physics->width * -0.5f)
+						{
+							struct collision_vertex *vertex0 = TAG_BLOCK_GET_ELEMENT(
+								&bsp->vertices,
+								edge->vertex_indices[0],
+								struct collision_vertex);
+							struct collision_vertex *vertex1 = TAG_BLOCK_GET_ELEMENT(
+								&bsp->vertices,
+								edge->vertex_indices[1],
+								struct collision_vertex);
+							real_vector3d edge_vector;
+							real_point3d closest_point;
+							real t;
+							real distance_squared;
 
-            accel.j = (move_direction.j * target_scale) - physics->velocity.j;
-            accel.k = (move_direction.k * target_scale) - physics->velocity.k;
-            accel.i = desired_x - physics->velocity.i;
+							vector_from_points3d(&vertex0->point, &vertex1->point, &edge_vector);
+							t = ((point.x - vertex0->point.x) * edge_vector.i +
+								(point.y - vertex0->point.y) * edge_vector.j +
+								(point.z - vertex0->point.z) * edge_vector.k) /
+								magnitude_squared3d(&edge_vector);
+							if (t < 0.f)
+								closest_point = vertex0->point;
+							else if (t > 1.f)
+								closest_point = vertex1->point;
+							else
+								point_from_line3d(&vertex0->point, &edge_vector, t, &closest_point);
 
-            clamped_y = accel.j;
-            clamped_x = accel.i;
-            clamped_z = accel.k;
-            if (normalize3d(&accel) <= physics->acceleration_maximum)
-            {
-                accel.i = clamped_x;
-                accel.j = clamped_y;
-                accel.k = clamped_z;
-            }
-            else
-            {
-                if (!TEST_FLAG(in_flags, _biped_physics_in_climb_anything_bit))
-                    airborne = TEST_FLAG(in_flags, _biped_physics_in_slipping_bit);
-                clamped_y = (accel.j * physics->acceleration_maximum);
-                clamped_x = (accel.i * physics->acceleration_maximum);
-                clamped_z = (accel.k * physics->acceleration_maximum);
-            }
+							distance_squared = distance_squared3d(&point, &closest_point);
+							if (distance_squared < best_distance_squared)
+							{
+								best_distance_squared = distance_squared;
+								best_surface_index = neighbor_surface_index;
+								best_plane = plane;
+								best_velocity_dot = velocity_dot;
+							}
+						}
+					}
+				}
 
-            /* small (1/128) push along the ground normal keeps the pill seated on the surface */
-            ground_nudge = -((ground_normal->n[0] * 0.0078125f) - clamped_x);
-            SET_FLAG(physics->out_flags, _biped_physics_out_slipping_bit, airborne);
-            physics->new_velocity.i = ground_nudge + physics->velocity.i;
-            physics->new_velocity.j = physics->velocity.j
-                - ((ground_normal->n[1] * 0.0078125f) - clamped_y);
-            physics->new_velocity.k = physics->velocity.k
-                - ((ground_normal->n[2] * 0.0078125f) - clamped_z);
-            if (TEST_FLAG(physics->out_flags, _biped_physics_out_slipping_bit))
-                physics->new_velocity.k = physics->new_velocity.k - global_gravity;
-        }
-    }
+				edge_index = edge->edge_indices[reverse];
+			}
+			while (edge_index != surface->first_edge_index);
 
-    /* ===================== common tail: sweep the pill and resolve contacts ===================== */
-    {
-        unsigned long   collision_flags;
-        real_point3d    start_position;
-        real_vector3d   start_velocity;
-        real_point3d    moved_position;
-        real_vector3d   moved_velocity;
-        struct collision_plane collisions[16];
-        short           collision_count;
-        long            support_surface_index;
-        long            chosen_surface_index = NONE;
-        boolean         stuck_object_valid = FALSE;
-        long            bump_object = NONE;
-        boolean         have_walkable = FALSE;
-        boolean         have_facing = FALSE;
-        real            best_normal_dot = -REAL_MAX;
-        real            best_normal_k = -REAL_MAX;
+			if (best_surface_index != NONE &&
+				best_distance_squared <= (physics->width * 2.f) * (physics->width * 2.f) &&
+				best_velocity_dot <= 1.6f / TICKS_PER_SECOND)
+			{
+				distance = best_plane.n.i * clipped_position.x +
+					best_plane.n.j * clipped_position.y +
+					best_plane.n.k * clipped_position.z -
+					(best_plane.d + physics->width);
+				if (!(fabs(distance) > physics->width * 0.5f))
+				{
+					real new_velocity_dot = dot_product3d(&best_plane.n, &clipped_velocity);
 
-        word flags = physics->in_flags;
-        if (TEST_FLAG(flags, _biped_physics_in_no_collision_bit))
-            collision_flags = 0;
-        else if (TEST_FLAG(flags, _biped_physics_in_dead_bit))
-            collision_flags = _collision_test_for_bipeds_dead_flags;
-        else if (TEST_FLAG(physics->in_flags, _biped_physics_in_pass_through_bipeds_bit))
-            collision_flags = _collision_test_for_bipeds_passthrough_living_flags;
-        else
-            collision_flags = _collision_test_for_bipeds_living_flags;
+					clipped_position.x = best_plane.n.i * -distance + clipped_position.x;
+					clipped_position.y = best_plane.n.j * -distance + clipped_position.y;
+					clipped_position.z = best_plane.n.k * -distance + clipped_position.z;
+					if (new_velocity_dot > -1.f / TICKS_PER_SECOND)
+					{
+						point_from_line3d(
+							(real_point3d *)&clipped_velocity,
+							&best_plane.n,
+							-(new_velocity_dot + 1.f / TICKS_PER_SECOND),
+							(real_point3d *)&clipped_velocity);
+					}
 
-        start_position = physics->position;
-        start_velocity = physics->new_velocity;
-        start_velocity.k = start_velocity.k + physics->crouch_velocity;
+					collisions[0].t = 0.f;
+					collisions[0].point.x = best_plane.n.i * -physics->width + clipped_position.x;
+					collisions[0].point.y = best_plane.n.j * -physics->width + clipped_position.y;
+					collisions[0].point.z = best_plane.n.k * -physics->width + clipped_position.z;
+					collisions[0].plane = best_plane;
+					collisions[0].object_index = NONE;
+					collisions[0].surface_index = best_surface_index;
+					collisions[0].flags = 0;
+					collisions[0].breakable_surface_index = 0;
+					collisions[0].material_index = NONE;
+					collision_count = 1;
+					physics->stick_surface_index = best_surface_index;
+				}
+			}
+		}
+	}
 
-        collision_count = collision_move_pill(collision_flags, &start_position, &start_velocity,
-                                              physics->height, physics->width, physics->biped_index,
-                                              &moved_position, &moved_velocity, 16, collisions);
+	{
+		real magnitude_squared = facing.j * facing.j + facing.i * facing.i;
 
-        SET_FLAG(
-            physics->out_flags,
-            _biped_physics_out_splatter_bit,
-            collision_count >= 16);
-        physics->stick_surface_index = NONE;
+		if (magnitude_squared > _real_epsilon * _real_epsilon)
+		{
+			real inverse_magnitude = 1.0 / square_root(magnitude_squared);
 
-        {
-            struct collision_bsp *collision_bsp = global_collision_bsp_get();
+			facing.i *= inverse_magnitude;
+			facing.j *= inverse_magnitude;
+		}
+	}
 
-        support_surface_index = physics->existing_support_surface_index;
-        if (!collision_count &&
-            VALID_INDEX(support_surface_index, collision_bsp->surfaces.count))
-        {
-            /* ---- ground adhesion: walk the support surface edge loop for a walkable neighbour ---- */
-            struct collision_bsp     *bsp = collision_bsp;
-            struct collision_surface *support_surface =
-                TAG_BLOCK_GET_ELEMENT(
-                    &bsp->surfaces,
-                    support_surface_index,
-                    struct collision_surface);
-            long first_edge = support_surface->first_edge_index;
-            long current_edge = first_edge;
-            real_plane3d support_plane;
-            real_plane3d neighbour_plane;
-            real best_dist_sq = REAL_MAX;
-            long best_neighbour = NONE;
-            real surface_normal_i, surface_normal_j, surface_normal_k, surface_distance;
-            real probe_x, probe_y, probe_z;
-            real best_cos = 2.0f;
-            real projection;
+	{
+		short best_collision_index = NONE;
+		boolean best_walkable = FALSE;
+		boolean best_stuck = FALSE;
+		real best_normal_k = -REAL_MAX;
+		real best_velocity_dot = -REAL_MAX;
 
-            bsp3d_get_plane_from_designator(&bsp->bsp3d, support_surface->plane_designator, &support_plane);
-            surface_normal_i = support_plane.n.i;
-            surface_normal_j = support_plane.n.j;
-            surface_normal_k = support_plane.n.k;
-            surface_distance = support_plane.d;
+		if (!TEST_FLAG(physics->in_flags, _biped_physics_in_flying_bit))
+		{
+			short collision_index;
 
-            /* project the moved position onto the support plane to seed the probe point */
-            projection = -(((moved_position.x * support_plane.n.i)
-                                + ((moved_position.z * support_plane.n.k)
-                                        + (moved_position.y * support_plane.n.j)))
-                                - support_plane.d);
-            probe_x = ((support_plane.n.i * projection) + moved_position.x);
-            probe_y = ((support_plane.n.j * projection) + moved_position.y);
-            probe_z = ((support_plane.n.k * projection) + moved_position.z);
+			for (collision_index = 0; collision_index < collision_count; collision_index++)
+			{
+				struct collision_plane *collision = &collisions[collision_index];
+				boolean walkable =
+					!TEST_FLAG(physics->in_flags, _biped_physics_in_dead_bit) &&
+					(climbing || TEST_FLAG(collision->flags, _collision_surface_climbable_bit));
+				boolean stuck =
+					physics->stick_surface_index != NONE &&
+					best_collision_index != NONE &&
+					collisions[best_collision_index].surface_index == physics->stick_surface_index;
+				real velocity_dot = -dot_product3d(&collision->plane.n, &physics->new_velocity);
+				boolean better;
 
-            do
-            {
-                struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
-                    &bsp->edges,
-                    current_edge,
-                    struct collision_edge);
-                boolean is_left = edge->surface_indices[1] == support_surface_index;
-                long neighbour = is_left ? edge->surface_indices[0] : edge->surface_indices[1];
-                if (neighbour != NONE)
-                {
-                    struct collision_surface *neighbour_surface =
-                        TAG_BLOCK_GET_ELEMENT(
-                            &bsp->surfaces,
-                            neighbour,
-                            struct collision_surface);
-                    if (TEST_FLAG(physics->in_flags, _biped_physics_in_climb_anything_bit) ||
-                        TEST_FLAG(neighbour_surface->flags, _collision_surface_climbable_bit))
-                    {
-                        bsp3d_get_plane_from_designator(&bsp->bsp3d, neighbour_surface->plane_designator,
-                                                        &neighbour_plane);
-                        if (((neighbour_plane.n.i * moved_velocity.i)
-                                  + ((neighbour_plane.n.j * moved_velocity.j)
-                                          + (neighbour_plane.n.k * moved_velocity.k))) > 0.0f
-                            && (((neighbour_plane.n.i * moved_position.x)
-                                             + ((neighbour_plane.n.k * moved_position.z)
-                                                     + (neighbour_plane.n.j * moved_position.y)))
-                                     - neighbour_plane.d)
-                               > physics->width * -0.5f)
-                        {
-                            /* clamp the probe onto the neighbour edge segment, keep the closest surface */
-                            struct collision_vertex const *edge_start = TAG_BLOCK_GET_ELEMENT(
-                                &bsp->vertices,
-                                edge->vertex_indices[0],
-                                struct collision_vertex);
-                            struct collision_vertex const *edge_end = TAG_BLOCK_GET_ELEMENT(
-                                &bsp->vertices,
-                                edge->vertex_indices[1],
-                                struct collision_vertex);
-                            real edge_dy = edge_end->point.y - edge_start->point.y;
-                            real edge_dz = edge_end->point.z - edge_start->point.z;
-                            real start_x = edge_start->point.x;
-                            real edge_dx = edge_end->point.x - edge_start->point.x;
-                            real segment_fraction =
-                                ((((probe_x - edge_start->point.x) *
-                                        (edge_end->point.x - edge_start->point.x))
-                                       + (((probe_z - edge_start->point.z) *
-                                                (edge_end->point.z - edge_start->point.z))
-                                               + ((probe_y - edge_start->point.y) *
-                                                    (edge_end->point.y - edge_start->point.y))))
-                                     / (((edge_end->point.x - edge_start->point.x) *
-                                            (edge_end->point.x - edge_start->point.x))
-                                             + ((edge_dz * edge_dz)
-                                                     + (edge_dy * edge_dy))));
-                            real closest_x, closest_y, closest_z;
-                            real dist_sq;
-                            if (segment_fraction >= 0.0f)
-                            {
-                                if (segment_fraction <= 1.0f)
-                                {
-                                    closest_z = ((edge_end->point.z - edge_start->point.z) *
-                                        segment_fraction) + edge_start->point.z;
-                                    closest_y = ((edge_end->point.y - edge_start->point.y) *
-                                        segment_fraction) + edge_start->point.y;
-                                    closest_x = (edge_dx * segment_fraction) + start_x;
-                                }
-                                else
-                                {
-                                    closest_x = edge_end->point.x;
-                                    closest_y = edge_end->point.y;
-                                    closest_z = edge_end->point.z;
-                                }
-                            }
-                            else
-                            {
-                                closest_x = edge_start->point.x;
-                                closest_y = edge_start->point.y;
-                                closest_z = edge_start->point.z;
-                            }
-                            dist_sq = (((closest_x - probe_x) * (closest_x - probe_x))
-                                     + (((closest_z - probe_z) * (closest_z - probe_z))
-                                             + ((closest_y - probe_y) * (closest_y - probe_y))));
-                            if (dist_sq < best_dist_sq)
-                            {
-                                best_dist_sq = dist_sq;
-                                best_cos = ((neighbour_plane.n.i * moved_velocity.i)
-                                         + ((neighbour_plane.n.j * moved_velocity.j)
-                                                 + (neighbour_plane.n.k * moved_velocity.k)));
-                                best_neighbour = neighbour;
-                                surface_normal_i = neighbour_plane.n.i;
-                                surface_normal_j = neighbour_plane.n.j;
-                                surface_normal_k = neighbour_plane.n.k;
-                                surface_distance = neighbour_plane.d;
-                            }
-                        }
-                    }
-                }
-                current_edge = is_left ? edge->edge_indices[1] : edge->edge_indices[0];
-            }
-            while (current_edge != first_edge);
+				if (walkable)
+				{
+					if (!climbing && collision->plane.n.i * facing.i + collision->plane.n.j * facing.j > 0.5f)
+						better = FALSE;
+					else if (!best_walkable || stuck)
+						better = TRUE;
+					else if (best_stuck)
+						better = FALSE;
+					else
+						better = velocity_dot > best_velocity_dot;
+				}
+				else
+				{
+					better = !best_walkable && collision->plane.n.k > best_normal_k;
+				}
 
-            if (best_neighbour != NONE
-                && best_dist_sq <= ((physics->width * 2.0f) * (physics->width * 2.0f))
-                && best_cos <= 0.053333335f)
-            {
-                real drop = (((surface_normal_i * moved_position.x)
-                                   + ((surface_normal_k * moved_position.z)
-                                           + (surface_normal_j * moved_position.y)))
-                                   - (surface_distance + physics->width));
-                if (fabs(drop) <= (physics->width * 0.5f))
-                {
-                    /* snap the moved position onto the neighbour plane and synthesize one contact */
-                    moved_position.x = (surface_normal_i * -drop) + moved_position.x;
-                    moved_position.y = (surface_normal_j * -drop) + moved_position.y;
-                    moved_position.z = (surface_normal_k * -drop) + moved_position.z;
-                    if (((surface_normal_i * moved_velocity.i)
-                              + ((surface_normal_j * moved_velocity.j)
-                                      + (surface_normal_k * moved_velocity.k))) > -0.033333335f)
-                    {
-                        real bias = -(((surface_normal_i * moved_velocity.i)
-                                            + ((surface_normal_j * moved_velocity.j)
-                                                    + (surface_normal_k * moved_velocity.k)))
-                                            + (1.f / TICKS_PER_SECOND));
-                        moved_velocity.i = (bias * surface_normal_i) + moved_velocity.i;
-                        moved_velocity.j = (surface_normal_j * bias) + moved_velocity.j;
-                        moved_velocity.k = (surface_normal_k * bias) + moved_velocity.k;
-                    }
-                    physics->stick_surface_index = best_neighbour;
-                    collision_count = 1;
-                    collisions[0].t = 0.0f;
-                    collisions[0].point.x = (-physics->width * surface_normal_i) + moved_position.x;
-                    collisions[0].point.y = (surface_normal_j * -physics->width) + moved_position.y;
-                    collisions[0].point.z = (surface_normal_k * -physics->width) + moved_position.z;
-                    collisions[0].plane.n.i = surface_normal_i;
-                    collisions[0].plane.n.j = surface_normal_j;
-                    collisions[0].plane.n.k = surface_normal_k;
-                    collisions[0].plane.d = surface_distance;
-                    collisions[0].object_index = NONE;
-                    collisions[0].surface_index = best_neighbour;
-                    collisions[0].flags = 0;
-                    collisions[0].breakable_surface_index = 0;
-                    collisions[0].material_index = NONE;
-                }
-            }
-        }
+				if (better)
+				{
+					best_velocity_dot = velocity_dot;
+					best_walkable = walkable;
+					best_collision_index = collision_index;
+					best_stuck = stuck;
+					best_normal_k = collision->plane.n.k;
+				}
 
-        /* re-normalize the facing used to bias support-surface selection */
-        {
-            real facing_len_sq = ((horizontal_y * horizontal_y)
-                                 + (horizontal_x * horizontal_x));
-            if (facing_len_sq > 0.0000000099999991f)
-            {
-                real facing_len = square_root(facing_len_sq);
-                horizontal_x = ((1.0f / facing_len) * horizontal_x);
-                horizontal_y = ((1.0f / facing_len) * horizontal_y);
-            }
-        }
+				if (!TEST_FLAG(physics->out_flags, _biped_physics_out_volatile_collision_bit) &&
+					(TEST_FLAG(collision->flags, _collision_surface_breakable_bit) ||
+					(collision->object_index != NONE &&
+					!TEST_FLAG(_object_mask_scenery, object_get_type(collision->object_index)))))
+				{
+					SET_FLAG(physics->out_flags, _biped_physics_out_volatile_collision_bit, TRUE);
+				}
+			}
+		}
 
-        /* ---- pick the best support surface among the contacts ---- */
-        if (!TEST_FLAG(physics->in_flags, _biped_physics_in_flying_bit) &&
-            collision_count > 0)
-        {
-            long  stick_surface = physics->stick_surface_index;
-            short i = 0;
-            long  index = 0;
-            do
-            {
-                real_vector3d const *contact_normal = &collisions[index].plane.n;
-                boolean walkable = !TEST_FLAG(
-                    physics->in_flags,
-                    _biped_physics_in_dead_bit) &&
-                    (grounded || TEST_FLAG(
-                        collisions[index].flags,
-                        _collision_surface_climbable_bit));
-                boolean is_stick = (stick_surface != NONE
-                    && chosen_surface_index != NONE
-                    && collisions[chosen_surface_index].surface_index == stick_surface);
-                boolean take = FALSE;
+		if (best_collision_index != NONE)
+		{
+			struct collision_plane *collision = &collisions[best_collision_index];
+			real_plane3d plane = collision->plane;
+			boolean supported = TRUE;
+			real velocity_dot = -dot_product3d(&plane.n, &velocity);
 
-                if (!walkable)
-                {
-                    if (!have_walkable)
-                        take = (collisions[index].plane.n.k > best_normal_k);
-                }
-                else if (!grounded
-                         && ((collisions[index].plane.n.j * horizontal_y)
-                                  + (collisions[index].plane.n.i * horizontal_x)) > 0.5f)
-                {
-                    take = FALSE;
-                }
-                else if (have_walkable)
-                {
-                    if (is_stick)
-                        take = TRUE;
-                    else if (!have_facing)
-                        take = -((contact_normal->i * physics->new_velocity.i)
-                                             + ((contact_normal->k * physics->new_velocity.k)
-                                                     + (contact_normal->j * physics->new_velocity.j)))
-                             > best_normal_dot;
-                }
-                else
-                {
-                    take = TRUE;
-                }
+			if (!best_walkable && !best_stuck)
+			{
+				if (best_normal_k < physics->minimum_normal_k)
+				{
+					supported = FALSE;
+				}
+				else if (TEST_FLAG(physics->in_flags, _biped_physics_in_airborne_bit) &&
+					physics->ground_tangential_velocity_max < REAL_MAX)
+				{
+					real_vector3d tangential_velocity;
+					real maximum = physics->ground_tangential_velocity_max;
 
-                if (take)
-                {
-                    best_normal_dot = -((contact_normal->i * physics->new_velocity.i)
-                                    + ((contact_normal->k * physics->new_velocity.k)
-                                            + (contact_normal->j * physics->new_velocity.j)));
-                    chosen_surface_index = i;
-                    have_walkable = walkable;
-                    have_facing = is_stick;
-                    best_normal_k = collisions[index].plane.n.k;
-                }
+					point_from_line3d(
+						(real_point3d *)&velocity,
+						&plane.n,
+						velocity_dot,
+						(real_point3d *)&tangential_velocity);
+					if (magnitude_squared3d(&tangential_velocity) > maximum * maximum &&
+						velocity_dot / magnitude3d(&velocity) < physics->ground_tangential_angle)
+					{
+						supported = FALSE;
+					}
+				}
+			}
 
-                if (!TEST_FLAG(
-                    physics->out_flags,
-                    _biped_physics_out_volatile_collision_bit) &&
-                    (TEST_FLAG(
-                        collisions[index].flags,
-                        _collision_surface_breakable_bit) ||
-                    (collisions[index].object_index != NONE &&
-                        !TEST_FLAG(
-                            _object_mask_scenery,
-                            object_get_type(collisions[index].object_index)))))
-                {
-                    SET_FLAG(
-                        physics->out_flags,
-                        _biped_physics_out_volatile_collision_bit,
-                        TRUE);
-                }
+			if (supported)
+			{
+				SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, FALSE);
+				physics->ground_plane = collision->plane;
+				physics->support_surface_index = collision->surface_index;
+				if (physics->support_surface_index == NONE ||
+					physics->support_surface_index != physics->stick_surface_index)
+				{
+					physics->landing_velocity = -dot_product3d(&velocity, &physics->ground_plane.n);
+				}
+				else
+				{
+					physics->landing_velocity = 0.f;
+				}
+			}
+			else
+			{
+				SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, TRUE);
+				physics->ground_plane = depths_of_hell;
+				physics->support_surface_index = NONE;
+				physics->landing_velocity = 0.f;
+			}
+		}
+		else
+		{
+			SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, TRUE);
+			physics->ground_plane = depths_of_hell;
+			physics->support_surface_index = NONE;
+			physics->landing_velocity = 0.f;
+		}
+	}
 
-                i = (short)(index + 1);
-                index = i;
-            }
-            while (i < collision_count);
-        }
+	{
+		long bumped_object_index = NONE;
+		short bumped_object_type;
+		real bumped_speed_squared;
+		short collision_index;
 
-        /* ---- resolve the support plane from the chosen contact ---- */
-        if (chosen_surface_index != NONE)
-        {
-            real_vector3d const *chosen_normal = &collisions[chosen_surface_index].plane.n;
-            real normal_i = collisions[chosen_surface_index].plane.n.i;
-            real normal_j = chosen_normal->j;
-            real normal_k = chosen_normal->k;
+		for (collision_index = 0; collision_index < collision_count; collision_index++)
+		{
+			long object_index = collisions[collision_index].object_index;
 
-            if (have_walkable || have_facing)
-            {
-                stuck_object_valid = TRUE;
-            }
-            else if (best_normal_k >= physics->minimum_normal_k)
-            {
-                stuck_object_valid = TRUE;
-                if (TEST_FLAG(physics->in_flags, _biped_physics_in_airborne_bit) &&
-                    physics->ground_tangential_velocity_max < REAL_MAX)
-                {
-                    real projection = -((normal_k * start_velocity.k)
-                                     + ((start_velocity.j * normal_j)
-                                             + (normal_i * start_velocity.i)));
-                    real slide_z = ((normal_k * projection) + start_velocity.k);
-                    real slide_x = (normal_i * projection) + start_velocity.i;
-                    real slide_y = (normal_j * projection) + start_velocity.j;
-                    if (((slide_x * slide_x)
-                              + ((slide_z * slide_z)
-                                      + (slide_y * slide_y)))
-                        > physics->ground_tangential_velocity_max *
-                            physics->ground_tangential_velocity_max)
-                    {
-                        stuck_object_valid =
-                            (projection
-                                  / square_root(((start_velocity.i * start_velocity.i)
-                                                   + ((start_velocity.k * start_velocity.k)
-                                                           + (start_velocity.j * start_velocity.j)))))
-                            >= physics->ground_tangential_angle;
-                    }
-                }
-            }
+			if (object_index != NONE)
+			{
+				struct object_datum *object = object_get(object_index);
+				real_vector3d relative_velocity;
+				real speed_squared;
+				boolean bump;
 
-            if (stuck_object_valid)
-            {
-                SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, FALSE);
-                physics->support_surface_index = collisions[chosen_surface_index].surface_index;
-                physics->ground_plane.n.i = collisions[chosen_surface_index].plane.n.i;
-                physics->ground_plane.n.j = collisions[chosen_surface_index].plane.n.j;
-                physics->ground_plane.n.k = collisions[chosen_surface_index].plane.n.k;
-                physics->ground_plane.d = collisions[chosen_surface_index].plane.d;
-                if (physics->support_surface_index == NONE
-                    || physics->support_surface_index != physics->stick_surface_index)
-                {
-                    physics->landing_velocity =
-                        -((start_velocity.i * physics->ground_plane.n.i)
-                               + ((physics->ground_plane.n.j * start_velocity.j)
-                                       + (physics->ground_plane.n.k * start_velocity.k)));
-                    goto support_done;
-                }
-            }
-        }
+				relative_velocity.i = object->object.translational_velocity.i - clipped_velocity.i;
+				relative_velocity.j = object->object.translational_velocity.j - clipped_velocity.j;
+				relative_velocity.k = object->object.translational_velocity.k - clipped_velocity.k;
+				speed_squared = magnitude_squared3d(&relative_velocity);
+				if (bumped_object_index == NONE)
+					bump = TRUE;
+				else if (bumped_object_type == _object_type_vehicle)
+					bump = object->object.type == _object_type_vehicle && speed_squared > bumped_speed_squared;
+				else
+					bump = object->object.type == _object_type_vehicle || speed_squared > bumped_speed_squared;
 
-        if (!stuck_object_valid)
-        {
-            SET_FLAG(physics->out_flags, _biped_physics_out_airborne_bit, TRUE);
-            physics->ground_plane = depths_of_hell;
-            physics->support_surface_index = NONE;
-        }
-        physics->landing_velocity = 0.0f;
-    support_done:;
-        }
+				if (bump)
+				{
+					bumped_object_type = object->object.type;
+					bumped_speed_squared = speed_squared;
+					bumped_object_index = object_index;
+				}
+			}
+		}
+		physics->bumped_object_index = bumped_object_index;
+	}
 
-        /* ---- pick the bumped object ---- */
-        if (collision_count > 0)
-        {
-            real    best_bump_sq = 2.0f;
-            short   best_bump_type = _object_type_biped;
-            short   i = 0;
-            long    index = 0;
-            for (;;)
-            {
-                long object_index = collisions[index].object_index;
-                if (object_index != NONE)
-                {
-                    struct object_datum *contact_object = object_get(object_index);
-                    real bump_dy = contact_object->object.translational_velocity.j - moved_velocity.j;
-                    real bump_dz = contact_object->object.translational_velocity.k - moved_velocity.k;
-                    real bump_dx = contact_object->object.translational_velocity.i - moved_velocity.i;
-                    real bump_sq = ((bump_dz * bump_dz)
-                                   + ((bump_dy * bump_dy)
-                                           + (bump_dx * bump_dx)));
-                    boolean take;
-                    if (bump_object == NONE)
-                        take = TRUE;
-                    else if (best_bump_type == _object_type_vehicle)
-                        take = (contact_object->object.type == _object_type_vehicle);
-                    else if (contact_object->object.type != _object_type_vehicle)
-                        take = (bump_sq > best_bump_sq);
-                    else
-                        take = TRUE;
-                    if (take)
-                    {
-                        best_bump_type = contact_object->object.type;
-                        bump_object = object_index;
-                        best_bump_sq = bump_sq;
-                    }
-                }
-                i = (short)(index + 1);
-                index = i;
-                if (i >= collision_count)
-                    break;
-            }
-        }
-        physics->bumped_object_index = bump_object;
+	physics->elevator_object_index = NONE;
+	{
+		short collision_index;
 
-        /* ---- pick the elevator object (a mover carrying the biped) ---- */
-        physics->elevator_object_index = NONE;
-        if (collision_count > 0)
-        {
-            short i = 0;
-            long  index = 0;
-            do
-            {
-                long object_index = collisions[index].object_index;
-                if (object_index != NONE)
-                {
-                    struct object_datum *elevator = object_try_and_get(object_index);
-                    if (elevator && elevator->object.type == _object_type_machine)
-                    {
-                        struct machine_definition *elevator_definition =
-                            machine_definition_get(elevator->definition_index);
-                        if (TEST_FLAG(
-                            elevator_definition->machine.flags,
-                            _machine_never_appears_locked_bit) &&
-                            elevator_definition->machine.elevator_node_index != NONE)
-                            physics->elevator_object_index = object_index;
-                    }
-                }
-                i = (short)(index + 1);
-                index = i;
-            }
-            while (i < collision_count);
-        }
+		for (collision_index = 0; collision_index < collision_count; collision_index++)
+		{
+			long object_index = collisions[collision_index].object_index;
 
-        /* ---- write the resolved position/velocity and the total travel distance ---- */
-        physics->new_position.x = moved_position.x;
-        physics->new_position.y = moved_position.y;
-        physics->new_position.z = moved_position.z;
-        physics->new_velocity.k = moved_velocity.k;
-        physics->new_velocity.i = moved_velocity.i;
-        physics->new_velocity.j = moved_velocity.j;
-        physics->new_velocity.k = physics->new_velocity.k - physics->crouch_velocity;
-        physics->collision_velocity = square_root(
-              (((moved_velocity.i - start_velocity.i)
-                            * (moved_velocity.i - start_velocity.i))
-                    + (((moved_velocity.k - start_velocity.k)
-                                    * (moved_velocity.k - start_velocity.k))
-                            + ((moved_velocity.j - start_velocity.j)
-                                    * (moved_velocity.j - start_velocity.j)))));
+			if (object_index != NONE)
+			{
+				struct object_datum *machine = object_try_and_get_and_verify_type(
+					object_index,
+					_object_mask_machine);
 
-        /* ---- final ledge/step feature test for climbable geometry ---- */
-        {
-            word flags3 = physics->in_flags;
-            if (TEST_FLAG(flags3, _biped_physics_in_crouched_bit) &&
-                TEST_FLAG(flags3, _biped_physics_in_trying_to_stand_bit))
-            {
-                struct biped_datum *biped_object = biped_get(physics->biped_index);
-                if (biped_object->unit.player_index != NONE)
-                {
-                    struct biped_definition *definition =
-                        biped_definition_get(biped_object->definition_index);
-                    unsigned long definition_flags = definition->biped.flags;
-                    if (!TEST_FLAG(definition_flags, _biped_pill_centered_at_origin_bit) &&
-                        !TEST_FLAG(definition_flags, _biped_spherical_bit))
-                    {
-                        unsigned long feature_flags = TEST_FLAG(
-                            flags3,
-                            _biped_physics_in_dead_bit)
-                            ? _collision_test_for_bipeds_dead_flags : _collision_test_for_bipeds_living_flags;
-                        real sphere_radius = (definition->biped.collision_height_standing * 0.5f);
-                        real sphere_width  = definition->biped.collision_radius;
-                        real_point3d     sphere_center;
-                        struct collision_feature_list features;
-                        real_vector3d    probe_vector;
-                        struct collision_plane  feature_hit;
+				if (machine)
+				{
+					struct machine_definition *machine_definition =
+						machine_definition_get(machine->definition_index);
 
-                        sphere_center.x = moved_position.x;
-                        sphere_center.y = moved_position.y;
-                        sphere_center.z = moved_position.z + sphere_radius;
-                        if (collision_get_features_in_sphere(feature_flags, &sphere_center, sphere_radius,
-                                                             0.0f, sphere_width, physics->biped_index,
-                                                             &features))
-                        {
-                            real probe_scale = -((sphere_width * 2.0f)
-                                                       - definition->biped.collision_height_standing);
-                            probe_vector.i = probe_scale * global_up3d->n[0];
-                            probe_vector.j = global_up3d->n[1] * probe_scale;
-                            probe_vector.k = global_up3d->n[2] * probe_scale;
-                            if (collision_features_test_vector(&features,
-                                                               &physics->new_position,
-                                                               &probe_vector, &feature_hit))
-                            {
-                                SET_FLAG(
-                                    physics->out_flags,
-                                    _biped_physics_out_cannot_stand_bit,
-                                    TRUE);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+					if (TEST_FLAG(machine_definition->machine.flags, _machine_never_appears_locked_bit) &&
+						machine_definition->machine.elevator_node_index != NONE)
+					{
+						physics->elevator_object_index = object_index;
+					}
+				}
+			}
+		}
+	}
+
+	physics->new_position = clipped_position;
+	physics->new_velocity = clipped_velocity;
+	{
+		real_vector3d velocity_delta;
+
+		velocity_delta.i = clipped_velocity.i - velocity.i;
+		velocity_delta.j = clipped_velocity.j - velocity.j;
+		velocity_delta.k = clipped_velocity.k - velocity.k;
+		physics->collision_velocity = magnitude3d(&velocity_delta);
+	}
+	physics->new_velocity.k -= physics->crouch_velocity;
+
+	if (TEST_FLAG(physics->in_flags, _biped_physics_in_crouched_bit) &&
+		TEST_FLAG(physics->in_flags, _biped_physics_in_trying_to_stand_bit))
+	{
+		struct biped_datum *biped = biped_get(physics->biped_index);
+
+		if (biped->unit.player_index != NONE)
+		{
+			struct biped_definition *definition = biped_definition_get(biped->definition_index);
+
+			if (!TEST_FLAG(definition->biped.flags, _biped_pill_centered_at_origin_bit) &&
+				!TEST_FLAG(definition->biped.flags, _biped_spherical_bit))
+			{
+				real radius = definition->biped.collision_height_standing * 0.5f;
+				real_point3d center = physics->new_position;
+				struct collision_feature_list features;
+
+				center.z += radius;
+				if (collision_get_features_in_sphere(
+					TEST_FLAG(physics->in_flags, _biped_physics_in_dead_bit) ?
+						_collision_test_for_bipeds_dead_flags :
+						_collision_test_for_bipeds_living_flags,
+					&center,
+					radius,
+					0.f,
+					definition->biped.collision_radius,
+					physics->biped_index,
+					&features))
+				{
+					real_vector3d standing_vector;
+					struct collision_plane collision;
+
+					scale_vector3d(
+						global_up3d,
+						definition->biped.collision_height_standing -
+							2.f * definition->biped.collision_radius,
+						&standing_vector);
+					if (collision_features_test_vector(
+						&features,
+						&physics->new_position,
+						&standing_vector,
+						&collision))
+					{
+						SET_FLAG(physics->out_flags, _biped_physics_out_cannot_stand_bit, TRUE);
+					}
+				}
+			}
+		}
+	}
+
+	match_assert_valid_real_point3d("c:\\halo\\SOURCE\\units\\bipeds.c", 0xF10, &physics->new_position);
+	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\units\\bipeds.c", 0xF11, &physics->new_velocity);
 
 	return;
 }
