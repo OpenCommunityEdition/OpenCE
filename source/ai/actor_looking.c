@@ -1016,18 +1016,6 @@ static boolean actor_look_decode_direction(
 		}
 		break;
 
-	case _direction_specification_prop:
-		{
-			struct prop_datum *prop = prop_try_and_get(specification->prop_index);
-
-			if (prop)
-			{
-				vector_from_points3d(&actor->input.position.head_position, &prop->head_position, direction);
-				result = normalize3d(direction) > 0.0f;
-			}
-		}
-		break;
-
 	case _direction_specification_target:
 		if (actor->control.fire_state == _actor_fire_state_bursting)
 		{
@@ -1045,6 +1033,18 @@ static boolean actor_look_decode_direction(
 
 			vector_from_points3d(&actor->input.position.head_position, &prop->center_of_mass, direction);
 			result = normalize3d(direction) > 0.0f;
+		}
+		break;
+
+	case _direction_specification_prop:
+		{
+			struct prop_datum *prop = prop_try_and_get(specification->prop_index);
+
+			if (prop)
+			{
+				vector_from_points3d(&actor->input.position.head_position, &prop->head_position, direction);
+				result = normalize3d(direction) > 0.0f;
+			}
 		}
 		break;
 
@@ -1096,9 +1096,11 @@ static boolean actor_look_decode_direction(
 
 	if (result)
 	{
-		if (!valid_real_normal3d(direction))
+		real magnitude_squared = magnitude_squared3d(direction);
+
+		if (!valid_realcmp(magnitude_squared, 1.0f))
 		{
-			real magnitude = magnitude3d(direction);
+			real magnitude = square_root(magnitude_squared);
 
 			switch (specification->type)
 			{
@@ -1115,16 +1117,6 @@ static boolean actor_look_decode_direction(
 					actor->control.moving_towards_vector.i,
 					actor->control.moving_towards_vector.j,
 					actor->control.moving_towards_vector.k);
-				break;
-
-			case _direction_specification_prop:
-				{
-					struct prop_datum *prop = prop_try_and_get(specification->prop_index);
-
-					sprintf(temporary, "denormalized %f: prop 0x%08X%s (actor 0x%08X / us 0x%08X)",
-						magnitude, specification->prop_index, prop ? "" : " (invalid)",
-						prop ? prop->owner_actor_index : 0, actor_index);
-				}
 				break;
 
 			case _direction_specification_target:
@@ -1155,6 +1147,16 @@ static boolean actor_look_decode_direction(
 				else
 				{
 					sprintf(temporary, "denormalized %f: target (none)", magnitude);
+				}
+				break;
+
+			case _direction_specification_prop:
+				{
+					struct prop_datum *prop = prop_try_and_get(specification->prop_index);
+
+					sprintf(temporary, "denormalized %f: prop 0x%08X%s (actor 0x%08X / us 0x%08X)",
+						magnitude, specification->prop_index, !prop ? " (invalid)" : "",
+						!prop ? 0 : prop->owner_actor_index, actor_index);
 				}
 				break;
 
