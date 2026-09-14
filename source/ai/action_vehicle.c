@@ -264,13 +264,13 @@ void action_vehicle_control(
 
 	if (state_data->lock_facing)
 	{
-		actor->orders.look.primary_priority = _primary_priority_locked_aiming;
+		actor->orders.look.primary_priority = _primary_priority_exact_facing;
 		actor->orders.look.primary_direction.type = _direction_specification_vector;
 		actor->orders.look.primary_direction.vector = state_data->destination_facing;
 	}
 	else if (actor_path_has_path(actor_index))
 	{
-		actor->orders.look.primary_priority = _primary_priority_aiming;
+		actor->orders.look.primary_priority = _primary_priority_facing;
 		actor->orders.look.primary_direction.type = _direction_specification_movement;
 	}
 	else

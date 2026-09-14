@@ -60,9 +60,12 @@ enum
 enum
 {
 	_primary_priority_none = 0,
+	_primary_priority_face_360,
+	_primary_priority_opportunity_aiming,
 	_primary_priority_facing,
 	_primary_priority_exact_facing,
 	_primary_priority_aiming,
+	_primary_priority_locked_facing,
 	_primary_priority_locked_aiming,
 	NUMBER_OF_PRIMARY_LOOK_TYPES,
 };
@@ -1209,6 +1212,8 @@ short actor_change_firing_position(
 
 struct weapon_definition;
 
+boolean actor_combat_currently_firing_burst(
+	long actor_index);
 void actor_combat_fire_wildly(
 	long actor_index,
 	short fire_ticks);
@@ -1254,6 +1259,8 @@ void actor_combat_update(
 
 void actor_move_initialize(
 	void);
+boolean actor_move_force_stop(
+	long actor_index);
 boolean actor_move_animation_busy(
 	long actor_index);
 boolean actor_move_animation_impulse(
@@ -1302,7 +1309,7 @@ boolean actor_move_halt(
 boolean actor_move_halt_at_firing_position(
 	long actor_index);
 
-void actor_look_secondary(
+boolean actor_look_secondary(
 	long actor_index,
 	short type,
 	short priority,

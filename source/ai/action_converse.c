@@ -187,7 +187,7 @@ void action_converse_control(
 
 	if (prop_index != NONE)
 	{
-		actor->orders.look.primary_priority = _primary_priority_aiming;
+		actor->orders.look.primary_priority = _primary_priority_facing;
 		actor->orders.look.primary_direction.type = _direction_specification_prop;
 		actor->orders.look.primary_direction.prop_index = prop_index;
 	}

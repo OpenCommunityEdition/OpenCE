@@ -169,6 +169,4 @@ extern boolean profile_dump_lost_frames;
 
 /* ---------- public code */
 
-void profile_initialize(void);
-
 #endif // __PROFILE_H

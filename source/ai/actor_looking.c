@@ -391,7 +391,7 @@ void actor_look_affect_movement(
 	}
 
 	actor->control.moving_forced_by_aiming =
-		actor->orders.look.primary_priority >= _primary_priority_aiming &&
+		actor->orders.look.primary_priority >= _primary_priority_facing &&
 		movement_direction->type != _direction_specification_movement &&
 		actor_look_decode_direction(
 			actor_index,
