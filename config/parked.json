@@ -405,17 +405,6 @@
     },
     {
       "unit": "source/math/geometry",
-      "function": "_geosphere_new",
-      "class": "unclassified",
-      "evidence": "Coherent natural geosphere public entry and four genuine private callees retained after one defined-C repair: calculate_vertex interpolates into a real_vector3d, uses normalize3d, then copies scalar components into the destination real_point3d. The rejected donor pointer-punning first object is preserved separately; no source-shape search followed the repair. Integrated January/typed-first/actual execution passes20 cases from only this public entry, including the real16-segment caller, both explicit x87 control modes, child/per-face allocation failures and original capacity assertion. Exact full heap, vertices, strips, normalization inputs, call order and public ABI agree. Authentic primitive table and existing owner header are preserved. All6255 inherited strict functions survive; no new point_from_line3d. Seven natural helpers gain no credit and the four existing ActionCharge NODUPLICATES conflicts explicitly veto whole-object admission. This is zero exact-byte credit, not a classified compiler-mechanism proof. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. Reopen only with genuine source/type/compiler-context evidence, not expression, declaration, qualifier or helper-emission tuning.",
-      "measurements": {
-        "target": { "size": 496, "relocation_count": 25, "normalized_sha256": "89b49ad03b434d6258ac264dc7b71bb625984c51016d55a82ad146c86d474911" },
-        "base": { "size": 496, "relocation_count": 25, "normalized_sha256": "56760ccae276f6ff7f6f188448a6f19fbffa288c993cd71d4dd9cad5c9b1c978" },
-        "objdiff_percent": 88.11176
-      }
-    },
-    {
-      "unit": "source/math/geometry",
       "function": "_get_edge_vertex",
       "class": "unclassified",
       "evidence": "Genuine private edge-subdivision member of the typed geosphere reconstruction, coherently compiled with its actual public/private callers. One semantic repair removes point/vector representation-pointer punning; no attempt follows to recover the donor's stronger byte shape. Twenty integrated January/first/actual cases pass exact full heap, coordinates, strips, normalization inputs, calls and ABI under two explicit x87 modes, including production16 segments. All inherited exact/runtime owners survive; no new point_from_line3d. Seven authentic natural helpers carry zero credit and four ActionCharge NODUPLICATES conflicts veto whole-object completion. See docs/object_matching_logs/geometry_obj_fable_geosphere_reconciliation_20260906.md. The 416/400 padded extent is an honest residual, not claimed exactness; reopen only with genuine source/type/compiler-context evidence. The 2026-09-12 complete geosphere private-call graph and correctly owned Geometry declarations change only this already-fuzzy translation-unit allocation context. The refreshed 400-byte form remains natural and receives zero exact credit. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the sibling calculate_vertex reopen fixed its private parameter order (sphere, new_vertex, parent1, parent2, subdivision_count, subdivision_index), so this call site follows it and va/vb become MIN/MAX: 400 bytes, 17 relocations, still fuzzy. See docs/object_matching_logs/geometry_obj_opus5_100k_waveD_20260914.md.",
@@ -4047,17 +4036,6 @@
     },
     {
       "unit": "source/math/geometry",
-      "function": "_convex_hull3d_begin",
-      "class": "unclassified",
-      "evidence": "Complete typed tetrahedron seed reconstructed from January assertions, layout and disassembly with the independent HCEA convex-hull source as a semantic map. January is 1,488 padded bytes and canonical is 1,472, both with 28 relocations and the same ordered destinations. The remaining 16-byte aggregate-home and topology schedule difference has no proved source-level mechanism. No compiler steering, raw layout, fake dependency, extra helper owner, forced inline or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/geometry_obj_convex_hull3d_begin_expand_reconciliation_20260908.md.",
-      "measurements": {
-        "target": { "size": 1488, "relocation_count": 28, "normalized_sha256": "d3e0ba2e2077ce1e167e22398d1ce4b18329c8a3301ef606b46f56456ee282bc" },
-        "base": { "size": 1472, "relocation_count": 28, "normalized_sha256": "1b5824819ddffa0f161d260eec28283d4b1e3fc5a7422dee6ec8e5f5653f8804" },
-        "objdiff_percent": 93.49269
-      }
-    },
-    {
-      "unit": "source/math/geometry",
       "function": "_convex_hull3d_expand",
       "class": "unclassified",
       "evidence": "Complete typed convex-hull expansion reconstructed from January assertions, layout and disassembly with independent HCEA source as a semantic map. Target and canonical are both 1,808 padded bytes with 67 relocations and the same ordered destinations. Final audit moved indexed surface and edge pointer formation behind the corresponding bounds validation, removing abstract-C undefined behavior from the earlier, superficially closer candidate. That valid source perturbs VC7 allocation and relocation addresses across the horizon walk, reducing objdiff to 84.64924 percent; it is retained because semantic validity outranks similarity. No compiler steering, raw layout, fake dependency, extra helper owner, forced inline, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/geometry_obj_convex_hull3d_begin_expand_reconciliation_20260908.md.",
@@ -4763,17 +4741,6 @@
         "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "a45fe6649ea60e23685d2c15640529bc16e9720ff02715c1809b04bd0301f8d0" },
         "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "2cb093e3d436cd9fc015b77afe56b67514e29035a6b9069dd45508a2d2756a56" },
         "objdiff_percent": 99.960526
-      }
-    },
-    {
-      "unit": "source/math/geometry",
-      "function": "_build_torus",
-      "class": "unclassified",
-      "evidence": "Complete typed torus-builder reconstruction retained from the reconciled Fable geometry packet. January controls the ABI and relocation topology; the house-rule repair now uses a correctly typed real_vector3d local instead of a point-to-vector pointer cast. The natural implementation remains 752 versus 768 padded bytes with all 18 relocations and receives zero credit. The fail-closed class makes no unsupported codegen diagnosis; no register forcing, punning, or synthetic branch is admitted. Donor provenance: commit f9dd42218.",
-      "measurements": {
-        "target": { "size": 768, "relocation_count": 18, "normalized_sha256": "6460f3c33d8f750aa8651ce8c7a26cb9670b258dfe080d9f13af8baff1c48022" },
-        "base": { "size": 752, "relocation_count": 18, "normalized_sha256": "204b063ec59c73dbdc75a7bb5361a86776ba7942fd0a4a5e6aa008e36dfea2e2" },
-        "objdiff_percent": 73.81274
       }
     },
     {

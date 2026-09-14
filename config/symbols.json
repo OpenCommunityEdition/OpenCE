@@ -17615,6 +17615,7 @@
 { "file_offset": 2597500, "flags": 0, "name": "??_C@_0CA@PHDHMACA@?$CFs?5had?5a?5bad?5forward?5?$CI?$CFf?0?$CFf?0?$CFf?$CJ?$AA@" },
 { "file_offset": 2597532, "flags": 0, "name": "??_C@_0BG@NNFMPBFP@?$CFs?5had?5a?5bad?5scale?5?$CFf?$AA@" },
 { "file_offset": 2597560, "flags": 0, "name": "_geosphere_primitive_vertices", "static": true },
+{ "file_offset": 2597632, "flags": 0, "name": "_geosphere_primitive_triangles", "static": true },
 { "file_offset": 2597680, "flags": 0, "name": "??_C@_0CG@DDHFMONE@sphere?9?$DOtriangle_strip_vertex_in@" },
 { "file_offset": 2597720, "flags": 0, "name": "??_C@_0BB@NLDBGHK@sphere?9?$DOvertices?$AA@" },
 { "file_offset": 2597740, "flags": 0, "name": "??_C@_06FOHEPPJH@sphere?$AA@" },

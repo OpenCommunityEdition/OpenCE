@@ -330,8 +330,8 @@ void build_torus(
 	short cylinder_segment_count,
 	real cylinder_radius)
 {
-	long vertex_count = 0;
-	long triangle_strip_count = 0;
+	short triangle_strip_count = 0;
+	short vertex_count = 0;
 	short ring_index;
 
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 346, ring_segment_count>2);
@@ -341,22 +341,16 @@ void build_torus(
 	{
 		real ring_fraction = (real)ring_index / (real)ring_segment_count;
 		real ring_angle = ring_fraction * 2.f*_pi;
-		real ring_cosine = cosine(ring_angle);
-		real ring_sine = sine(ring_angle);
-		real ring_cosine_radius = ring_cosine*ring_radius;
-		real ring_sine_radius = ring_sine*ring_radius;
 		real_vector3d radial;
 		real_vector3d axis;
-		real cylinder_cosine_radius;
-		real cylinder_sine_radius;
+		real_point3d cylinder_point;
 		short cylinder_index;
 
-		set_real_vector3d(&radial, ring_cosine_radius, ring_sine_radius, 0.f);
+		set_real_vector3d(&radial, cosine(ring_angle)*ring_radius, sine(ring_angle)*ring_radius, 0.f);
 		cross_product3d(&radial, global_up3d, &axis);
 		normalize3d(&axis);
 
-		cylinder_cosine_radius = ring_cosine*cylinder_radius;
-		cylinder_sine_radius = ring_sine*cylinder_radius;
+		set_real_point3d(&cylinder_point, cosine(ring_angle)*cylinder_radius, sine(ring_angle)*cylinder_radius, 0.f);
 
 		for (cylinder_index = 0; cylinder_index <= cylinder_segment_count; cylinder_index++)
 		{
@@ -370,8 +364,8 @@ void build_torus(
 					triangle_strip_count++;
 				}
 
-				*triangle_strip_vertex_indices++ = (short)vertex_count;
-				*triangle_strip_vertex_indices++ = (short)(vertex_count - cylinder_segment_count - 1);
+				*triangle_strip_vertex_indices++ = vertex_count;
+				*triangle_strip_vertex_indices++ = vertex_count - cylinder_segment_count - 1;
 			}
 
 			if (ring_index == ring_segment_count)
@@ -392,23 +386,16 @@ void build_torus(
 				else
 				{
 					real cylinder_angle = ((real)cylinder_index / (real)cylinder_segment_count)*2.f*_pi;
-					real_vector3d rotated_point;
 
-					set_real_vector3d(
-						&rotated_point,
-						cylinder_cosine_radius,
-						cylinder_sine_radius,
-						0.f);
+					*points = cylinder_point;
 					rotate_vector_about_axis(
-						&rotated_point,
+						(real_vector3d *)points,
 						&axis,
 						sine(cylinder_angle),
 						cosine(cylinder_angle));
-					set_real_point3d(
-						points,
-						rotated_point.i + ring_cosine_radius,
-						rotated_point.j + ring_sine_radius,
-						rotated_point.k);
+					points->x += radial.i;
+					points->y += radial.j;
+					points->z += radial.k;
 					matrix4x3_transform_point(matrix, points, points);
 				}
 			}
@@ -419,8 +406,8 @@ void build_torus(
 		}
 	}
 
-	*vertex_count_reference = (short)vertex_count;
-	*triangle_strip_count_reference = (short)triangle_strip_count;
+	*vertex_count_reference = vertex_count;
+	*triangle_strip_count_reference = triangle_strip_count;
 
 	return;
 }
@@ -1203,14 +1190,15 @@ boolean convex_hull3d_begin(
 	{
 		real_vector3d offset;
 		real_vector3d projection = line_direction;
+		real_vector3d perpendicular;
 		real t;
 		real distance_squared;
 
 		vector_from_points3d(points + minimum_x_point_index, points + point_index, &offset);
 		t = dot_product3d(&offset, &line_direction) / magnitude_squared3d(&line_direction);
 		scale_vector3d(&projection, t, &projection);
-		subtract_vectors3d(&offset, &projection, &offset);
-		distance_squared = magnitude_squared3d(&offset);
+		subtract_vectors3d(&offset, &projection, &perpendicular);
+		distance_squared = magnitude_squared3d(&perpendicular);
 
 		if (distance_squared > maximum_line_distance_squared)
 		{
@@ -1230,8 +1218,7 @@ boolean convex_hull3d_begin(
 		points + farthest_line_point_index);
 	for (point_index = 0; point_index < point_count; point_index++)
 	{
-		real distance = points[point_index].x*plane.n.i +
-			points[point_index].y*plane.n.j + points[point_index].z*plane.n.k - plane.d;
+		real distance = plane3d_distance_to_point(&plane, points + point_index);
 
 		if (fabs(distance) > fabs(maximum_plane_distance))
 		{
@@ -1251,33 +1238,24 @@ boolean convex_hull3d_begin(
 		farthest_line_point_index = swap;
 	}
 
-	vertices[1].point_index = farthest_point_index;
-	vertices[2].point_index = farthest_line_point_index;
-	vertices[0].point_index = minimum_x_point_index;
-	vertices[3].edge_index = 3;
 	vertices[0].extant = TRUE;
+	vertices[0].point_index = minimum_x_point_index;
 	vertices[0].edge_index = 0;
 	vertices[1].extant = TRUE;
+	vertices[1].point_index = farthest_point_index;
 	vertices[1].edge_index = 0;
 	vertices[2].extant = TRUE;
+	vertices[2].point_index = farthest_line_point_index;
 	vertices[2].edge_index = 1;
 	vertices[3].extant = TRUE;
 	vertices[3].point_index = farthest_plane_point_index;
+	vertices[3].edge_index = 3;
 
-	edges[0].edge_indices[1] = 3;
-	edges[2].edge_indices[1] = 5;
-	edges[2].surface_indices[1] = 3;
-	edges[3].vertex_indices[1] = 3;
-	edges[3].surface_indices[1] = 3;
-	edges[4].vertex_indices[0] = 3;
-	edges[4].edge_indices[1] = 5;
-	edges[5].vertex_indices[0] = 3;
-	edges[5].edge_indices[1] = 3;
-	edges[5].surface_indices[1] = 3;
 	edges[0].extant = TRUE;
 	edges[0].vertex_indices[0] = 0;
 	edges[0].vertex_indices[1] = 1;
 	edges[0].edge_indices[0] = 1;
+	edges[0].edge_indices[1] = 3;
 	edges[0].surface_indices[0] = 0;
 	edges[0].surface_indices[1] = 1;
 	edges[1].extant = TRUE;
@@ -1291,21 +1269,30 @@ boolean convex_hull3d_begin(
 	edges[2].vertex_indices[0] = 2;
 	edges[2].vertex_indices[1] = 0;
 	edges[2].edge_indices[0] = 0;
+	edges[2].edge_indices[1] = 5;
 	edges[2].surface_indices[0] = 0;
+	edges[2].surface_indices[1] = 3;
 	edges[3].extant = TRUE;
 	edges[3].vertex_indices[0] = 0;
+	edges[3].vertex_indices[1] = 3;
 	edges[3].edge_indices[0] = 4;
 	edges[3].edge_indices[1] = 2;
 	edges[3].surface_indices[0] = 1;
+	edges[3].surface_indices[1] = 3;
 	edges[4].extant = TRUE;
+	edges[4].vertex_indices[0] = 3;
 	edges[4].vertex_indices[1] = 1;
 	edges[4].edge_indices[0] = 0;
+	edges[4].edge_indices[1] = 5;
 	edges[4].surface_indices[0] = 1;
 	edges[4].surface_indices[1] = 2;
 	edges[5].extant = TRUE;
+	edges[5].vertex_indices[0] = 3;
 	edges[5].vertex_indices[1] = 2;
 	edges[5].edge_indices[0] = 1;
+	edges[5].edge_indices[1] = 3;
 	edges[5].surface_indices[0] = 2;
+	edges[5].surface_indices[1] = 3;
 
 	surfaces[0].extant = TRUE;
 	plane3d_from_points(&surfaces[0].plane,
@@ -1805,18 +1792,19 @@ struct geosphere *geosphere_new(
 
 		if (result->vertices && result->triangle_strip_vertex_indices && vertex_subdivision_indices)
 		{
-			short vertex_index;
+			short vertex_index = 0;
 			short triangle_strip_vertex_indices_index = 0;
 			short triangle_index;
+			short index;
 
-			for (vertex_index = 0; vertex_index < MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT; vertex_index++)
+			for (index = 0; index < MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT*MAXIMUM_GEOSPHERE_PRIMITIVE_VERTEX_COUNT; index++)
 			{
-				vertex_subdivision_indices[vertex_index] = NONE;
+				vertex_subdivision_indices[index] = NONE;
 			}
 
-			for (vertex_index = 0; vertex_index < GEOSPHERE_PRIMITIVE_VERTEX_COUNT; vertex_index++)
+			for (index = 0; index < GEOSPHERE_PRIMITIVE_VERTEX_COUNT; index++)
 			{
-				result->vertices[vertex_index] = geosphere_primitive_vertices[vertex_index];
+				result->vertices[vertex_index++] = geosphere_primitive_vertices[index];
 			}
 
 			for (triangle_index = 0; triangle_index < GEOSPHERE_PRIMITIVE_TRIANGLE_COUNT; triangle_index++)
