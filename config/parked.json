@@ -4587,25 +4587,6 @@
     },
     {
       "unit": "source/bink/bink_playback",
-      "function": "_bink_playback_idle",
-      "class": "register-allocation",
-      "evidence": "Complete typed playback-idle logic retained from the Fable graph reconciliation. January is 160 padded bytes and canonical is 176; both carry the same 14 relocation dependencies, while VC7 spills the authentic allow_skipping boolean instead of retaining it in AL. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 160,
-          "relocation_count": 14,
-          "normalized_sha256": "8a3e23da9d6e73e456d5ac27d74066ff6d80583545aba88bf10f7a10b71c4de2"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 14,
-          "normalized_sha256": "86021bbf771c32c0a9c2b925043631f2659a4fa1ca45afd6440264801e4f6d50"
-        },
-        "objdiff_percent": 85.96154
-      }
-    },
-    {
-      "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
       "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",

@@ -1001,12 +1001,8 @@ static void bink_playback_idle(
 
 		if (TEST_FLAG(bink_globals.flags, _bink_playback_button_click_stops_movie_bit))
 		{
-			boolean allow_skipping= TRUE;
-
-			if (TEST_FLAG(bink_globals.flags, _bink_playback_dont_allow_skipping_if_filesystem_check_thread_is_active_bit))
-			{
-				allow_skipping= !filesystem_check_thread_is_active();
-			}
+			boolean allow_skipping= TEST_FLAG(bink_globals.flags, _bink_playback_dont_allow_skipping_if_filesystem_check_thread_is_active_bit) ?
+				!filesystem_check_thread_is_active() : TRUE;
 
 			if (allow_skipping && bink_query_analog_controller_buttons())
 			{
