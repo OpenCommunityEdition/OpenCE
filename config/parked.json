@@ -4717,25 +4717,6 @@
       }
     },
     {
-      "unit": "source/camera/editor_flying_camera",
-      "function": "_editor_camera_orbiting_update",
-      "class": "unclassified",
-      "evidence": "Complete ordinary-C reconstruction retained from independent HaloCEA behavior and January's typed instruction, relocation, constant and assertion topology. It fills the player camera info, applies yaw/pitch orbit input, clamps pitch to plus/minus 0.4 pi, updates wheel distance with the 0.6 minimum, derives forward/up and unit velocity, and emits the complete line-571 camera-command validation. Target and candidate are both 1120 padded bytes with all 49 relocation identities; objdiff reports 99.49045 percent. Remaining differences are natural expression and local scheduling, not missing behavior. The function is a genuine static owner referenced by the exact 52-byte/9-relocation update dispatch table and receives zero exact credit. No raw offset, representation pun, volatile/register forcing, barrier, pragma, assembly, forced inline, fake dependency, candidate-only helper, or nonsensical branch is retained. See docs/object_matching_logs/editor_flying_camera_obj_owner_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 1120,
-          "relocation_count": 49,
-          "normalized_sha256": "280e2c91cb77eeafa93951dae28c4d74b793d9ab0d5e7e4f5adbf851c5231ce0"
-        },
-        "base": {
-          "size": 1120,
-          "relocation_count": 49,
-          "normalized_sha256": "9463178809d2bfb1bf576e5389a16ece8f2afbfd963a75ab30cd958c7a733c5d"
-        },
-        "objdiff_percent": 99.49045
-      }
-    },
-    {
       "unit": "source/hs/hs_compile",
       "function": "_hs_parse_enum",
       "class": "csplit-relocation-alias",

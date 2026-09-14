@@ -90,6 +90,7 @@ symbols in this file:
 #include "editor_flying_camera.h"
 #include "flying_camera.h"
 #include "camera_scripting.h"
+#include "director.h"
 #include "game/player_control.h"
 #include "main/console.h"
 #include "observer.h"
