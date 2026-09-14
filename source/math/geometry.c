@@ -253,11 +253,11 @@ static short get_edge_vertex(
 	short *vertex_subdivision_indices);
 static void calculate_vertex(
 	struct geosphere *sphere,
-	short subdivision_index,
-	short subdivision_count,
+	short new_vertex,
 	short parent1,
 	short parent2,
-	short new_vertex);
+	short subdivision_count,
+	short subdivision_index);
 
 /* ---------- globals */
 
@@ -2033,7 +2033,7 @@ static short get_face_vertex(
 			short parent2 = get_edge_vertex(sphere, v1, v2, row, vertex_index, vertex_subdivision_indices);
 
 			vertex_face_indices[face_index] = new_vertex;
-			calculate_vertex(sphere, column, row, parent1, parent2, new_vertex);
+			calculate_vertex(sphere, new_vertex, parent1, parent2, row, column);
 		}
 	}
 
@@ -2048,21 +2048,10 @@ static short get_edge_vertex(
 	short *vertex_index,
 	short *vertex_subdivision_indices)
 {
+	short va = MIN(v1, v2);
+	short vb = MAX(v1, v2);
 	boolean reversed = v1 > v2;
-	short va;
-	short vb;
 	short *edge_vertex_index;
-
-	if (v1 > v2)
-	{
-		va = v2;
-		vb = v1;
-	}
-	else
-	{
-		va = v1;
-		vb = v2;
-	}
 
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 269, sphere);
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 270, va >= 0 && va < sphere->vertex_count);
@@ -2088,7 +2077,7 @@ static short get_edge_vertex(
 		{
 			short new_vertex = (*vertex_index)++;
 
-			calculate_vertex(sphere, index, sphere->segment_count, va, vb, new_vertex);
+			calculate_vertex(sphere, new_vertex, va, vb, sphere->segment_count, index);
 		}
 	}
 
@@ -2102,27 +2091,25 @@ static short get_edge_vertex(
 
 static void calculate_vertex(
 	struct geosphere *sphere,
-	short subdivision_index,
-	short subdivision_count,
+	short new_vertex,
 	short parent1,
 	short parent2,
-	short new_vertex)
+	short subdivision_count,
+	short subdivision_index)
 {
 	real t = (real)subdivision_index/subdivision_count;
 	real one_minus_t = 1.f - t;
-	real_vector3d vertex;
 
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 315, subdivision_index > 0 && subdivision_index < subdivision_count);
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 316, parent1 >=0 && parent1 <= sphere->vertex_count);
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 317, parent2 >=0 && parent2 <= sphere->vertex_count);
 	match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 318, new_vertex >=0 && new_vertex <= sphere->vertex_count);
 
-	set_real_vector3d(&vertex,
+	set_real_point3d(&sphere->vertices[new_vertex],
 		one_minus_t*sphere->vertices[parent1].x + t*sphere->vertices[parent2].x,
 		one_minus_t*sphere->vertices[parent1].y + t*sphere->vertices[parent2].y,
 		one_minus_t*sphere->vertices[parent1].z + t*sphere->vertices[parent2].z);
-	normalize3d(&vertex);
-	set_real_point3d(&sphere->vertices[new_vertex], vertex.i, vertex.j, vertex.k);
+	normalize3d((real_vector3d *)&sphere->vertices[new_vertex]);
 
 	return;
 }
