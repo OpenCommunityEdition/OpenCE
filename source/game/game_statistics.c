@@ -83,9 +83,6 @@ void game_statistics_record_damage(
 	return;
 }
 
-/* NonMatching: the natural direct-member source preserves the complete target
-   topology. The only residual is one independent load/store transpose in the
-   credited-kill statistics update. */
 void game_statistics_record_kill(
 	long dead_unit_index,
 	long killing_player_index,
@@ -95,8 +92,16 @@ void game_statistics_record_kill(
 	if (game_statistics_active)
 	{
 		long dead_player_index = player_index_from_unit_index(dead_unit_index);
+		long statistic_index;
 
-		if (dead_player_index != NONE)
+		/* only player victims are tallied (NONE otherwise); the later HCEA build
+		   still indexes kills[] and assists[] through this NONE-or-zero value */
+		if (dead_player_index == NONE)
+			statistic_index = NONE;
+		else
+			statistic_index = 0;
+
+		if (statistic_index != NONE)
 		{
 			struct player_datum *dead_player = player_get(dead_player_index);
 			long dead_team_index = dead_player->team_index;
@@ -175,7 +180,7 @@ void game_statistics_record_kill(
 
 				if (game_team_is_enemy(dead_team_index, (short)credited_player->team_index))
 				{
-					credited_player->statistics.kills[0]++;
+					credited_player->statistics.kills[statistic_index]++;
 					credited_player->statistics.kills_in_a_row++;
 					if (credited_player->statistics.last_kill_time >= assist_time)
 						credited_player->statistics.multiple_kills++;
@@ -204,7 +209,7 @@ void game_statistics_record_kill(
 						struct player_datum *assisting_player = player_get(attacker->player_index);
 
 						if (game_team_is_enemy(dead_team_index, (short)assisting_player->team_index))
-							assisting_player->statistics.assists[0]++;
+							assisting_player->statistics.assists[statistic_index]++;
 					}
 				}
 			}
