@@ -467,6 +467,35 @@ boolean weapon_put_away(
 	return put_away;
 }
 
+boolean weapon_aim(
+	long weapon_index,
+	short trigger_index,
+	real_point3d const *origin,
+	real_point3d const *target_point,
+	boolean lob,
+	real_vector3d *result_aim_vector,
+	real *result_ticks,
+	real *result_distance,
+	boolean *result_linear)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
+	boolean result = FALSE;
+
+	if (trigger_index>=0 && trigger_index<weapon_definition->weapon.triggers.count)
+	{
+		struct weapon_trigger *trigger = weapon_trigger_get(weapon, trigger_index);
+		struct weapon_trigger_definition *trigger_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+		projectile_aim(projectile_definition_get(trigger_definition->projectile.index), origin, target_point, NULL, NULL, NULL, NULL, lob, result_aim_vector, NULL, result_ticks, result_distance, result_linear);
+		match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\items\\weapons.c", 1301, result_aim_vector);
+
+		result = TRUE;
+	}
+
+	return result;
+}
+
 boolean weapon_is_flag(
 	long weapon_index)
 {
