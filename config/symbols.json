@@ -22507,7 +22507,7 @@
 { "file_offset": 4451840, "flags": 0, "name": "_game_statistics_active" },
 { "file_offset": 4451844, "flags": 0, "name": "_game_time_statistics" },
 { "file_offset": 4451884, "flags": 0, "name": "_game_time_globals" },
-{ "file_offset": 4451888, "flags": 0, "name": "_player_control_globals" },
+{ "file_offset": 4451888, "flags": 0, "name": "_player_control_globals", "static": true },
 { "file_offset": 4451892, "flags": 0, "name": "_debug_input_target" },
 { "file_offset": 4451896, "flags": 0, "name": "_player_look_yaw_rate" },
 { "file_offset": 4451912, "flags": 0, "name": "_player_look_pitch_rate" },

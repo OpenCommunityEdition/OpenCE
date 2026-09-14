@@ -244,6 +244,7 @@ enum mouse_button
 
 real const MOUSE_YAW_SCALE = 0.0031415927f;
 real const MOUSE_PITCH_SCALE = 0.0031415927f;
+static real const ANALOG_BUTTON_SCALE = 1.f / 255.f;
 
 /* ---------- macros */
 
@@ -327,7 +328,7 @@ real player_look_zoomed_scale = 0.5f;
 
 static struct profile_section player_control_update_section = {"player_control_update", NONE, TRUE};
 
-struct player_control_globals_data *player_control_globals;
+static struct player_control_globals_data *player_control_globals;
 short debug_input_target;
 real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
@@ -1105,10 +1106,7 @@ static void get_local_player_input_blob(
 					long doubled_spin;
 					real yaw_spin_scale;
 					real pitch_spin_scale;
-					real yaw_delta;
-					real pitch_delta;
-					real_euler_angles2d target_angular_position;
-					real_euler_angles2d target_angular_velocity;
+					real_euler_angles2d look_delta;
 
 					if (input_state->buttons[_button_scope_zoom] &&
 						controls_enable_doubled_spin)
@@ -1134,11 +1132,11 @@ static void get_local_player_input_blob(
 						"c:\\halo\\SOURCE\\game\\player_control.c",
 						0x1C8,
 						constants->look_function.count>1);
-					yaw_delta = evaluate_piecewise_linear_function(
+					look_delta.yaw = evaluate_piecewise_linear_function(
 						constants->look_function.count,
 						constants->look_function.address,
 						clamped_yaw) * yaw_spin_scale * look_yaw_rate;
-					pitch_delta = evaluate_piecewise_linear_function(
+					look_delta.pitch = evaluate_piecewise_linear_function(
 						constants->look_function.count,
 						constants->look_function.address,
 						clamped_pitch) * pitch_spin_scale * look_pitch_rate;
@@ -1149,8 +1147,8 @@ static void get_local_player_input_blob(
 							player->unit_index,
 							control->zoom_level);
 
-						yaw_delta *= inverse_zoom;
-						pitch_delta *= inverse_zoom;
+						look_delta.yaw *= inverse_zoom;
+						look_delta.pitch *= inverse_zoom;
 					}
 					if (player->unit_index != NONE)
 					{
@@ -1163,19 +1161,15 @@ static void get_local_player_input_blob(
 						real stun_scale = 1.f - unit->unit.body_stun *
 							player_information->stun_turning_penalty;
 
-						yaw_delta *= stun_scale;
-						pitch_delta *= stun_scale;
+						look_delta.yaw *= stun_scale;
+						look_delta.pitch *= stun_scale;
 					}
 
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\player_control.c",
 						0x1E3,
 						constants->look_acceleration_time>0.0f);
-					if (fabs(clamped_yaw) < constants->look_pegging_threshold)
-					{
-						control->look_acceleration_time = 0.f;
-					}
-					else
+					if (fabs(clamped_yaw) >= constants->look_pegging_threshold)
 					{
 						real acceleration = PIN(
 							control->look_acceleration_time /
@@ -1183,52 +1177,63 @@ static void get_local_player_input_blob(
 							0.f,
 							1.f);
 
-						yaw_delta *= (constants->look_acceleration_scale - 1.f) *
+						look_delta.yaw *= (constants->look_acceleration_scale - 1.f) *
 							acceleration + 1.f;
 						control->look_acceleration_time += time_delta_sec;
 					}
-
-					control->target_object_index = local_player_aim_assist(
-						local_player_index,
-						&control->autoaim_level,
-						&control->magnetism_level,
-						&target_angular_position,
-						&target_angular_velocity);
-					if (player_magnetism_flag && control->magnetism_level > 0.f &&
-						(fabs(clamped_yaw) > _real_epsilon ||
-						fabs(clamped_pitch) > _real_epsilon ||
-						fabs(input->throttle.i) > _real_epsilon ||
-						fabs(input->throttle.j) > _real_epsilon))
+					else
 					{
-						real game_speed = game_time_get_speed();
-						real input_scale = 1.f - control->magnetism_level *
-							PIN(constants->magnetism_friction, 0.f, 1.f);
-						real magnetism_scale = control->magnetism_level *
-							PIN(constants->magnetism_adhesion, 0.f, 1.f);
+						control->look_acceleration_time = 0.f;
+					}
 
-						if (game_players_are_double_speed())
+					{
+						real_euler_angles2d target_angular_position;
+						real_euler_angles2d target_angular_velocity;
+
+						control->target_object_index = local_player_aim_assist(
+							local_player_index,
+							&control->autoaim_level,
+							&control->magnetism_level,
+							&target_angular_position,
+							&target_angular_velocity);
+						if (player_magnetism_flag && control->magnetism_level > 0.f &&
+							(fabs(clamped_yaw) > _real_epsilon ||
+							fabs(clamped_pitch) > _real_epsilon ||
+							fabs(input->throttle.i) > _real_epsilon ||
+							fabs(input->throttle.j) > _real_epsilon))
 						{
-							game_speed *= 0.5f;
+							real game_speed = game_time_get_speed();
+							real input_scale = 1.f - control->magnetism_level *
+								PIN(constants->magnetism_friction, 0.f, 1.f);
+							real magnetism_scale = control->magnetism_level *
+								PIN(constants->magnetism_adhesion, 0.f, 1.f);
+
+							if (game_players_are_double_speed())
+							{
+								game_speed *= 0.5f;
+							}
+							target_angular_velocity.yaw *= game_speed;
+							target_angular_velocity.pitch *= game_speed;
+							target_angular_velocity.yaw = PIN(
+								target_angular_velocity.yaw,
+								-DEGREES_TO_RADIANS(6.f),
+								DEGREES_TO_RADIANS(6.f));
+							target_angular_velocity.pitch = PIN(
+								target_angular_velocity.pitch,
+								-DEGREES_TO_RADIANS(3.f),
+								DEGREES_TO_RADIANS(3.f));
+							look_delta.yaw = target_angular_velocity.yaw * magnetism_scale +
+								look_delta.yaw * input_scale;
+							look_delta.pitch = target_angular_velocity.pitch * magnetism_scale +
+								look_delta.pitch * input_scale;
 						}
-						target_angular_velocity.yaw = PIN(
-							target_angular_velocity.yaw * game_speed,
-							-DEGREES_TO_RADIANS(6.f),
-							DEGREES_TO_RADIANS(6.f));
-						target_angular_velocity.pitch = PIN(
-							target_angular_velocity.pitch * game_speed,
-							-DEGREES_TO_RADIANS(3.f),
-							DEGREES_TO_RADIANS(3.f));
-						yaw_delta = target_angular_velocity.yaw * magnetism_scale +
-							yaw_delta * input_scale;
-						pitch_delta = target_angular_velocity.pitch * magnetism_scale +
-							pitch_delta * input_scale;
 					}
 
 					{
 						real facing_scale = time_delta_sec * TICKS_PER_SECOND;
 
-						input->facing_delta.yaw = facing_scale * yaw_delta;
-						input->facing_delta.pitch = facing_scale * pitch_delta;
+						input->facing_delta.yaw = facing_scale * look_delta.yaw;
+						input->facing_delta.pitch = facing_scale * look_delta.pitch;
 					}
 				}
 				else
@@ -1295,7 +1300,7 @@ static void get_local_player_input_blob(
 				}
 
 				input->primary_trigger =
-					(real)input_state->buttons[_button_fire] * 0.0039215689f;
+					(real)input_state->buttons[_button_fire] * ANALOG_BUTTON_SCALE;
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_weapon_primary_trigger_bit,
@@ -1743,13 +1748,12 @@ check_accept:
 void player_control_initialize_for_new_map(
 	void)
 {
-	struct player_control_globals_data *globals = player_control_globals;
 	short local_player_index;
 
-	globals->action_flags = 0;
-	globals->action_test_flags = 0;
-	globals->suppressed_action_flags = 0;
-	globals->flags = 0;
+	player_control_globals->action_test_flags = 0;
+	player_control_globals->action_flags = 0;
+	player_control_globals->suppressed_action_flags = 0;
+	player_control_globals->flags = 0;
 
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
