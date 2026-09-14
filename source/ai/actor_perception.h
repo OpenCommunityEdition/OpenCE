@@ -37,5 +37,9 @@ boolean actor_perception_friend_prop_is_attacking(
 	long actor_index,
 	long friend_prop_index,
 	real_vector3d *attack_vector);
+void actor_perception_unreachable(
+	long actor_index,
+	long prop_index,
+	boolean unreachable);
 
 #endif // __ACTOR_PERCEPTION_H

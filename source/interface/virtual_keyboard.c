@@ -88,8 +88,12 @@ symbols in this file:
 #include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
 #include "input/input.h"
+#include "rasterizer/rasterizer.h"
 #include "saved games/saved_game_files.h"
 #include "tag_files/tag_groups.h"
+#include "text/draw_string.h"
+#include "text/font_group.h"
+#include "text/text_group.h"
 #include "text/unicode.h"
 
 /* ---------- constants */
@@ -208,13 +212,32 @@ struct virtual_keyboard_key
 	wchar_t shift_caps_character;
 	wchar_t shift_symbols_character;
 	wchar_t caps_symbols_character;
-	byte reserved10[0x40];
+	struct tag_reference unselected_background_bitmap_tag;
+	struct tag_reference selected_background_bitmap_tag;
+	struct tag_reference active_background_bitmap_tag;
+	struct tag_reference sticky_background_bitmap_tag;
 };
 
 struct virtual_keyboard_definition
 {
-	byte reserved0[0x30];
+	struct tag_reference font_tag;
+	struct tag_reference background_bitmap_tag;
+	struct tag_reference special_key_labels_string_list_tag;
 	struct tag_block keys;
+};
+
+/* font_group.h leaves this incomplete; draw_string.c and rasterizer_text.c define it the same way */
+struct font_character
+{
+	word character;
+	short character_width;
+	short bitmap_width;
+	short bitmap_height;
+	short bitmap_origin_x;
+	short bitmap_origin_y;
+	short hardware_character_index;
+	word pad;
+	long pixels_offset;
 };
 
 struct virtual_keyboard_globals
@@ -253,7 +276,7 @@ static wchar_t virtual_keyboard_get_character(
 	word keycode);
 wchar_t virtual_keyboard_get_current_character(
 	void);
-void virtual_keyboard_render_internal(
+static void virtual_keyboard_render_internal(
 	void);
 static boolean virtual_keyboard_select(
 	void);
@@ -269,6 +292,54 @@ char const virtual_keyboard_key_layout[VIRTUAL_KEYBOARD_ROW_COUNT][VIRTUAL_KEYBO
 	{ _vkey_caps, _vkey_k, _vkey_l, _vkey_m, _vkey_n, _vkey_o, _vkey_p, _vkey_q, _vkey_r, _vkey_s, _vkey_t },
 	{ _vkey_symbols, _vkey_u, _vkey_v, _vkey_w, _vkey_x, _vkey_y, _vkey_z, _vkey_backspace, _vkey_backspace, _vkey_backspace, _vkey_backspace },
 	{ _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_space, _vkey_left, _vkey_left, _vkey_right, _vkey_right },
+};
+
+static rectangle2d keyboard_rect[NUMBER_OF_VIRTUAL_KEYS] =
+{
+	{ 158, 208, 190, 240 }, /* 1 */
+	{ 158, 240, 190, 272 }, /* 2 */
+	{ 158, 272, 190, 304 }, /* 3 */
+	{ 158, 304, 190, 336 }, /* 4 */
+	{ 158, 336, 190, 368 }, /* 5 */
+	{ 158, 368, 190, 400 }, /* 6 */
+	{ 158, 400, 190, 432 }, /* 7 */
+	{ 158, 432, 190, 464 }, /* 8 */
+	{ 158, 464, 190, 496 }, /* 9 */
+	{ 158, 496, 190, 528 }, /* 0 */
+	{ 190, 208, 222, 240 }, /* a */
+	{ 190, 240, 222, 272 }, /* b */
+	{ 190, 272, 222, 304 }, /* c */
+	{ 190, 304, 222, 336 }, /* d */
+	{ 190, 336, 222, 368 }, /* e */
+	{ 190, 368, 222, 400 }, /* f */
+	{ 190, 400, 222, 432 }, /* g */
+	{ 190, 432, 222, 464 }, /* h */
+	{ 190, 464, 222, 496 }, /* i */
+	{ 190, 496, 222, 528 }, /* j */
+	{ 222, 208, 254, 240 }, /* k */
+	{ 222, 240, 254, 272 }, /* l */
+	{ 222, 272, 254, 304 }, /* m */
+	{ 222, 304, 254, 336 }, /* n */
+	{ 222, 336, 254, 368 }, /* o */
+	{ 222, 368, 254, 400 }, /* p */
+	{ 222, 400, 254, 432 }, /* q */
+	{ 222, 432, 254, 464 }, /* r */
+	{ 222, 464, 254, 496 }, /* s */
+	{ 222, 496, 254, 528 }, /* t */
+	{ 254, 208, 286, 240 }, /* u */
+	{ 254, 240, 286, 272 }, /* v */
+	{ 254, 272, 286, 304 }, /* w */
+	{ 254, 304, 286, 336 }, /* x */
+	{ 254, 336, 286, 368 }, /* y */
+	{ 254, 368, 286, 400 }, /* z */
+	{ 158, 112, 190, 208 }, /* done */
+	{ 190, 112, 222, 208 }, /* shift */
+	{ 222, 112, 254, 208 }, /* caps */
+	{ 254, 112, 286, 208 }, /* symbols */
+	{ 254, 400, 286, 528 }, /* backspace */
+	{ 286, 400, 318, 464 }, /* left */
+	{ 286, 464, 318, 528 }, /* right */
+	{ 286, 208, 318, 400 }, /* space */
 };
 
 struct virtual_keyboard_globals virtual_keyboard_globals;
@@ -549,6 +620,287 @@ wchar_t virtual_keyboard_get_current_character(
 {
 	return virtual_keyboard_get_character(virtual_keyboard_key_layout[
 		virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
+}
+
+static void virtual_keyboard_render_internal(
+	void)
+{
+	real_argb_color caption_color;
+	real_argb_color text_color;
+	struct font_header *keyboard_font_header;
+
+	text_color.alpha = 1.0f;
+	text_color.red = 0.9f;
+	text_color.green = 0.9f;
+	text_color.blue = 0.9f;
+	caption_color = text_color;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		1036,
+		(virtual_keyboard_globals.keyboard != NULL) && (virtual_keyboard_globals.keyboard->font_tag.index != NONE));
+	keyboard_font_header = font_definition_get(virtual_keyboard_globals.keyboard->font_tag.index);
+	match_assert(
+		"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+		1038,
+		keyboard_font_header);
+
+	if (virtual_keyboard_globals.keyboard->background_bitmap_tag.index != NONE)
+	{
+		rectangle2d bounds;
+		struct bitmap_data *bitmap;
+
+		bounds.y0 = 0;
+		bounds.x0 = 0;
+		bounds.y1 = 480;
+		bounds.x1 = 640;
+		bitmap = bitmap_group_get_bitmap_from_sequence(virtual_keyboard_globals.keyboard->background_bitmap_tag.index, 0, 0);
+		match_assert(
+			"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+			1046,
+			bitmap);
+		draw_bitmap_in_rect(bitmap, &bounds, &bounds, NULL, 0xffffffff, NULL, FALSE);
+	}
+
+	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 0, 0, &caption_color);
+	if (virtual_keyboard_globals.keyboard->special_key_labels_string_list_tag.index != NONE)
+	{
+		rectangle2d bounds;
+		wchar_t *caption = unicode_string_list_get_string(
+			virtual_keyboard_globals.keyboard->special_key_labels_string_list_tag.index,
+			virtual_keyboard_globals.caption_index);
+
+		bounds.y0 = 78;
+		bounds.x0 = 114;
+		bounds.y1 = 110;
+		bounds.x1 = 640;
+		rasterizer_draw_unicode_string(&bounds, &bounds, NULL, 0, caption);
+	}
+
+	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 2, 0, &text_color);
+	{
+		rectangle2d bounds;
+
+		bounds.y0 = 118;
+		bounds.x0 = 220;
+		bounds.y1 = 143;
+		bounds.x1 = 420;
+		if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
+		{
+			struct bitmap_data *bitmap = bitmap_group_get_bitmap_from_sequence(virtual_keyboard_globals.caret_bitmap_index, 0, 0);
+
+			if (bitmap)
+			{
+				rectangle2d text_bounds;
+				rectangle2d cursor_bounds;
+
+				draw_unicode_string_compute_bounds(&bounds, virtual_keyboard_globals.text_buffer, &text_bounds, &cursor_bounds);
+				text_bounds.x0 -= 2;
+				text_bounds.x1 += 2;
+				draw_bitmap_in_rect(bitmap, &text_bounds, &bounds, NULL, 0x7f7f7f7f, NULL, FALSE);
+			}
+		}
+		rasterizer_draw_unicode_string(&bounds, &bounds, NULL, 0, virtual_keyboard_globals.text_buffer);
+	}
+
+	if (!virtual_keyboard_globals.first_key_replaces_buffer &&
+		virtual_keyboard_globals.caret_bitmap_index != NONE &&
+		(system_milliseconds() / 1000) & 1)
+	{
+		wchar_t *character = virtual_keyboard_globals.text_buffer;
+		short height = keyboard_font_header->descending_height + keyboard_font_header->ascending_height;
+		short cursor_offset = 0;
+		short width = 0;
+		struct bitmap_data *bitmap = bitmap_group_get_bitmap_from_sequence(virtual_keyboard_globals.caret_bitmap_index, 0, 0);
+		rectangle2d caret_bounds;
+
+		if (bitmap)
+		{
+			/* January tests the pointer, not the character; the terminator ends the walk because the font has no glyph for it */
+			while (character)
+			{
+				struct font_character *font_character = font_get_character_by_ascii_code(keyboard_font_header, *character);
+
+				if (!font_character)
+					break;
+				if (character < virtual_keyboard_globals.cursor)
+					cursor_offset += font_character->character_width;
+				width += font_character->character_width;
+				character++;
+			}
+
+			/* 320 is the horizontal center of the 220..420 text box */
+			caret_bounds.x0 = 320 - (width >> 1) + cursor_offset;
+			caret_bounds.x1 = caret_bounds.x0 + 1;
+			caret_bounds.y0 = 120;
+			caret_bounds.y1 = height + 120;
+			draw_bitmap_in_rect(bitmap, &caret_bounds, NULL, NULL, 0xffffffff, NULL, FALSE);
+		}
+	}
+
+	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 2, 0, &text_color);
+	{
+		struct virtual_keyboard_key *keys = virtual_keyboard_globals.keyboard->keys.address;
+		wchar_t string[24] = {0};
+		long key_index;
+
+		for (key_index = 0; key_index < NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS; key_index++)
+		{
+			struct virtual_keyboard_key *key = &keys[key_index];
+			struct font_character *font_character;
+			long bitmap_index;
+			struct bitmap_data *bitmap;
+
+			string[0] = virtual_keyboard_get_character((word)key_index);
+			font_character = font_get_character_by_ascii_code(keyboard_font_header, string[0]);
+			if (!font_character)
+			{
+				string[0] = 0x7F;
+				font_character = font_get_character_by_ascii_code(keyboard_font_header, string[0]);
+			}
+			if (font_character)
+			{
+				rectangle2d key_bounds = keyboard_rect[key_index];
+
+				key_bounds.x0 += 2;
+				key_bounds.x1 += 2;
+				key_bounds.y0 += 5;
+				key_bounds.y1 += 5;
+				rasterizer_draw_unicode_string(&key_bounds, NULL, NULL, 0, string);
+			}
+
+			if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == key_index)
+			{
+				if (virtual_keyboard_globals.last_event == _event_key_select)
+					bitmap_index = key->active_background_bitmap_tag.index;
+				else
+					bitmap_index = key->selected_background_bitmap_tag.index;
+			}
+			else
+			{
+				bitmap_index = key->unselected_background_bitmap_tag.index;
+			}
+
+			if (bitmap_index != NONE)
+			{
+				bitmap = bitmap_group_get_bitmap_from_sequence(bitmap_index, 0, 0);
+				if (bitmap)
+					draw_bitmap_in_rect(bitmap, &keyboard_rect[key_index], NULL, NULL, 0xffffffff, NULL, FALSE);
+			}
+		}
+
+		if (virtual_keyboard_globals.keyboard->special_key_labels_string_list_tag.index != NONE)
+		{
+			for (; key_index < NUMBER_OF_VIRTUAL_KEYS; key_index++)
+			{
+				struct virtual_keyboard_key *key = &keys[key_index];
+				wchar_t *label = unicode_string_list_get_string(
+					virtual_keyboard_globals.keyboard->special_key_labels_string_list_tag.index,
+					(short)(key_index - NUMBER_OF_CONFIGURABLE_VIRTUAL_KEYS));
+				long bitmap_index = NONE;
+				struct bitmap_data *bitmap = NULL;
+
+				switch (key_index)
+				{
+				case _vkey_done:
+				case _vkey_backspace:
+				case _vkey_left:
+				case _vkey_right:
+				case _vkey_space:
+					if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == key_index)
+					{
+						if (virtual_keyboard_globals.last_event == _event_key_select)
+							bitmap_index = key->active_background_bitmap_tag.index;
+						else
+							bitmap_index = key->selected_background_bitmap_tag.index;
+					}
+					else
+					{
+						bitmap_index = key->unselected_background_bitmap_tag.index;
+					}
+					break;
+
+				case _vkey_shift:
+					if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == key_index)
+					{
+						if (virtual_keyboard_globals.last_event == _event_key_select)
+							bitmap_index = key->active_background_bitmap_tag.index;
+						else
+							bitmap_index = key->selected_background_bitmap_tag.index;
+					}
+					else if (virtual_keyboard_globals.shift_active)
+					{
+						bitmap_index = key->sticky_background_bitmap_tag.index;
+					}
+					else
+					{
+						bitmap_index = key->unselected_background_bitmap_tag.index;
+					}
+					break;
+
+				case _vkey_caps:
+					if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == key_index)
+					{
+						if (virtual_keyboard_globals.last_event == _event_key_select)
+							bitmap_index = key->active_background_bitmap_tag.index;
+						else
+							bitmap_index = key->selected_background_bitmap_tag.index;
+					}
+					else if (virtual_keyboard_globals.caps_active)
+					{
+						bitmap_index = key->sticky_background_bitmap_tag.index;
+					}
+					else
+					{
+						bitmap_index = key->unselected_background_bitmap_tag.index;
+					}
+					break;
+
+				case _vkey_symbols:
+					if (virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column] == key_index)
+					{
+						if (virtual_keyboard_globals.last_event == _event_key_select)
+							bitmap_index = key->active_background_bitmap_tag.index;
+						else
+							bitmap_index = key->selected_background_bitmap_tag.index;
+					}
+					else if (virtual_keyboard_globals.symbols_active)
+					{
+						bitmap_index = key->sticky_background_bitmap_tag.index;
+					}
+					else
+					{
+						bitmap_index = key->unselected_background_bitmap_tag.index;
+					}
+					break;
+
+				default:
+					match_assert(
+						"c:\\halo\\SOURCE\\interface\\virtual_keyboard.c",
+						1408,
+						!"what key is this?");
+				}
+
+				if (bitmap_index != NONE)
+					bitmap = bitmap_group_get_bitmap_from_sequence(bitmap_index, 0, 0);
+
+				if (label)
+				{
+					rectangle2d label_bounds = keyboard_rect[key_index];
+
+					label_bounds.x0 += 2;
+					label_bounds.x1 += 2;
+					label_bounds.y0 += 5;
+					label_bounds.y1 += 5;
+					rasterizer_draw_unicode_string(&label_bounds, NULL, NULL, 0, label);
+				}
+				if (bitmap)
+					draw_bitmap_in_rect(bitmap, &keyboard_rect[key_index], &keyboard_rect[key_index], NULL, 0xffffffff, NULL, FALSE);
+			}
+		}
+	}
+
+	return;
 }
 
 long virtual_keyboard_free_space_in_text_buffer(

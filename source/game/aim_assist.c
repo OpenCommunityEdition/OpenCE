@@ -299,7 +299,9 @@ static void object_compute_autoaim_target(
 		real normal_magnitude_squared;
 
 		biped_get_autoaim_pill(object_index, &base, &height, &width);
-		cross_product3d(&height, direction, &normal);
+		normal.i= height.j*direction->k - height.k*direction->j;
+		normal.j= height.k*direction->i - height.i*direction->k;
+		normal.k= height.i*direction->j - height.j*direction->i;
 		normal_magnitude_squared= magnitude_squared3d(&normal);
 		if (normal_magnitude_squared>0.f)
 		{

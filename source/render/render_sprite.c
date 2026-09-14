@@ -771,56 +771,61 @@ static short build_sprite_get_group(
 			"a build_sprites_begin call can accomodate at most %d bitmaps",
 			MAXIMUM_BUILD_SPRITE_GROUPS));
 
-	if (group_index >= data->group_count &&
-		data->group_count >= MAXIMUM_BUILD_SPRITE_GROUPS)
+	if (group_index < data->group_count ||
+		data->group_count < MAXIMUM_BUILD_SPRITE_GROUPS)
 	{
-		return NONE;
-	}
-
-	if (group_index >= data->group_count)
-	{
-		struct build_sprite_group *group = &data->groups[group_index];
-
-		data->group_count++;
-		group->bitmap = bitmap;
-		if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+		if (group_index >= data->group_count)
 		{
-			rasterizer_globals.current_lock_operation = _rasterizer_lock_sprite;
-			group->vertex_buffer_index = rasterizer_dynamic_vertices_new(
-				TEST_FLAG(data->flags, _build_sprites_screen_space_bit) ? 8 : 6,
-				NUMBER_OF_VERTICES_PER_QUADRILATERAL*data->maximum_sprite_count);
-			if (group->vertex_buffer_index != NONE)
+			struct build_sprite_group *group = &data->groups[group_index];
+
+			data->group_count++;
+			group->bitmap = bitmap;
+			if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 			{
-				group->vertices = rasterizer_dynamic_vertices_lock(
-					group->vertex_buffer_index);
-				match_assert(
-					"c:\\halo\\SOURCE\\render\\render_sprite.c",
-					294,
-					group->vertices);
+				rasterizer_globals.current_lock_operation = _rasterizer_lock_sprite;
+				group->vertex_buffer_index = rasterizer_dynamic_vertices_new(
+					TEST_FLAG(data->flags, _build_sprites_screen_space_bit) ? 8 : 6,
+					NUMBER_OF_VERTICES_PER_QUADRILATERAL*data->maximum_sprite_count);
+				if (group->vertex_buffer_index != NONE)
+				{
+					group->vertices = rasterizer_dynamic_vertices_lock(
+						group->vertex_buffer_index);
+					match_assert(
+						"c:\\halo\\SOURCE\\render\\render_sprite.c",
+						294,
+						group->vertices);
+				}
+				else
+				{
+					if (!build_sprite_vertex_allocation_failure_reported)
+					{
+						error(
+							_error_silent,
+							"build_sprite failed to allocate dynamic vertices");
+						build_sprite_vertex_allocation_failure_reported = TRUE;
+					}
+					group->vertices = NULL;
+				}
+				rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
 			}
 			else
 			{
-				if (!build_sprite_vertex_allocation_failure_reported)
-				{
-					error(
-						_error_silent,
-						"build_sprite failed to allocate dynamic vertices");
-					build_sprite_vertex_allocation_failure_reported = TRUE;
-				}
 				group->vertices = NULL;
 			}
-			rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
+			group->sprite_count = 0;
 		}
-		else
-		{
-			group->vertices = NULL;
-		}
-		group->sprite_count = 0;
+	}
+	else
+	{
+		group_index = NONE;
 	}
 
-	return (group_index == NONE || data->groups[group_index].vertices)
-		? group_index
-		: (short)NONE;
+	if (group_index != NONE && !data->groups[group_index].vertices)
+	{
+		group_index = NONE;
+	}
+
+	return group_index;
 }
 
 static void build_sprite_compute_basis(

@@ -73,13 +73,6 @@ enum move_position_order
 
 /* ---------- structures */
 
-struct ai_animation_reference_definition
-{
-	char animation_name[TAG_STRING_LENGTH + 1];
-	struct tag_reference animation_graph;
-	long unused[3];
-};
-
 /* ---------- prototypes */
 
 static short action_alert_next_position(
