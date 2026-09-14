@@ -1428,18 +1428,13 @@ static void bsp2d_test_sphere_recursive(
 	struct collision_bsp_test_sphere_context *data,
 	long child_index)
 {
-	real_point2d const *center2d = &data->center2d;
-
 	while (!(child_index & LONG_MIN))
 	{
 		struct bsp2d_node const *node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp2d.nodes,
 			child_index,
 			struct bsp2d_node);
-		real distance =
-			node->plane.n.j * center2d->y +
-			center2d->x * node->plane.n.i -
-			node->plane.d;
+		real distance = plane2d_distance_to_point(&node->plane, &data->center2d);
 		boolean reaches_first_child = distance <= data->radius;
 		boolean reaches_second_child = distance >= -data->radius;
 
@@ -1701,18 +1696,12 @@ static void bsp3d_test_sphere_recursive(
 						&data->bsp->bsp3d.planes,
 						reference->plane_designator & LONG_MAX,
 						real_plane3d);
-					real plane_distance = -(
-						plane->n.i * data->center->x +
-						(
-							data->center->z * plane->n.k +
-							data->center->y * plane->n.j) -
-						plane->d);
+					real plane_distance = -plane3d_distance_to_point(plane, data->center);
 					real_point3d projected_center;
 					real absolute_i;
 					real absolute_j;
 					real absolute_k;
 					short projection;
-					boolean projection_sign;
 
 					projected_center.x =
 						plane->n.i * plane_distance + data->center->x;
@@ -1728,12 +1717,8 @@ static void bsp3d_test_sphere_recursive(
 					else
 						projection = absolute_j >= absolute_i ? _y : _x;
 					data->projection_axis = projection;
-					match_assert(
-						"..\\math\\real_math.h",
-						848,
-						projection>=_x && projection<=_z);
-					projection_sign = plane->n.n[projection] > 0.f;
-					data->projection_sign = projection_sign !=
+					data->projection_sign =
+						projection_sign_from_vector3d(&plane->n, projection) !=
 						(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
 					project_point3d(
 						&projected_center,
@@ -1773,18 +1758,7 @@ static boolean collision_bsp_test_vector_recursive(
 		boolean reaches_back = distance0 < 0.f || distance1 < 0.f;
 		boolean reaches_front = distance0 >= 0.f || distance1 >= 0.f;
 
-		if (!reaches_back || !reaches_front)
-		{
-			if (collision_bsp_test_vector_recursive(
-				data,
-				node->children[reaches_front],
-				t0,
-				t1))
-			{
-				return TRUE;
-			}
-		}
-		else
+		if (reaches_back && reaches_front)
 		{
 			boolean front = dot > 0.f;
 			real t = -(distance/dot);
@@ -1811,8 +1785,14 @@ static boolean collision_bsp_test_vector_recursive(
 				return TRUE;
 			}
 		}
-
-		return FALSE;
+		else if (collision_bsp_test_vector_recursive(
+			data,
+			node->children[reaches_front],
+			t0,
+			t1))
+		{
+			return TRUE;
+		}
 	}
 	else
 	{
@@ -1919,9 +1899,9 @@ static boolean collision_bsp_test_vector_recursive(
 		}
 		data->last_leaf_index = leaf_index;
 		data->last_contents = contents;
-
-		return FALSE;
 	}
+
+	return FALSE;
 }
 
 static boolean collision_surface_test_pill(
@@ -2017,13 +1997,10 @@ static boolean bsp2d_test_pill_recursive(
 			&data->bsp->bsp2d.nodes,
 			child_index,
 			struct bsp2d_node);
-		real distance0 =
-			data->point2d.y*node->plane.n.j +
-			data->point2d.x*node->plane.n.i -
-			node->plane.d;
+		real distance0 = plane2d_distance_to_point(&node->plane, &data->point2d);
 		real distance1 =
-			data->vector2d.j*node->plane.n.j +
-			data->vector2d.i*node->plane.n.i +
+			node->plane.n.i*data->vector2d.i +
+			node->plane.n.j*data->vector2d.j +
 			distance0;
 		boolean reaches_back =
 			distance0 <= data->radius + BSP2D_TEST_PILL_EPSILON ||
@@ -2153,6 +2130,7 @@ static boolean bsp3d_test_pill_recursive(
 						long surface_index;
 						real_point3d start_point;
 						real_point3d sweep_point;
+						real negative_distance;
 						real negative_dot;
 
 						if (absolute_k >= absolute_j && absolute_k >= absolute_i)
@@ -2161,7 +2139,7 @@ static boolean bsp3d_test_pill_recursive(
 							projection = absolute_j >= absolute_i ? _y : _x;
 						data->projection_axis = projection;
 						data->projection_sign =
-							(plane->n.n[data->projection_axis] > 0.f) !=
+							projection_sign_from_vector3d(&plane->n, projection) !=
 							(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
 						pill_point.x = data->vector->i*t + data->point->x;
 						pill_point.y = data->vector->j*t + data->point->y;
@@ -2212,9 +2190,10 @@ static boolean bsp3d_test_pill_recursive(
 							hit = TRUE;
 						}
 
-						start_point.x = plane->n.i*-distance0 + data->point->x;
-						start_point.y = plane->n.j*-distance0 + data->point->y;
-						start_point.z = plane->n.k*-distance0 + data->point->z;
+						negative_distance = -distance0;
+						start_point.x = plane->n.i*negative_distance + data->point->x;
+						start_point.y = plane->n.j*negative_distance + data->point->y;
+						start_point.z = plane->n.k*negative_distance + data->point->z;
 						project_point3d(
 							&start_point,
 							data->projection_axis,
@@ -2224,14 +2203,11 @@ static boolean bsp3d_test_pill_recursive(
 						sweep_point.x = plane->n.i*negative_dot + data->vector->i;
 						sweep_point.y = plane->n.j*negative_dot + data->vector->j;
 						sweep_point.z = plane->n.k*negative_dot + data->vector->k;
-						data->vector2d.i = sweep_point.n[
-							global_projection3d_mappings
-								[data->projection_axis]
-								[data->projection_sign][0]];
-						data->vector2d.j = sweep_point.n[
-							global_projection3d_mappings
-								[data->projection_axis]
-								[data->projection_sign][1]];
+						project_point3d(
+							&sweep_point,
+							data->projection_axis,
+							data->projection_sign,
+							(real_point2d *)&data->vector2d);
 						if (bsp2d_test_pill_recursive(data, reference->root_index))
 						{
 							hit = TRUE;

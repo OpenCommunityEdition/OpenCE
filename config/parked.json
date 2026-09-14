@@ -4692,28 +4692,9 @@
     },
     {
       "unit": "source/physics/collision_bsp",
-      "function": "_bsp2d_test_sphere_recursive",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed private 2D BSP sphere traversal and recovering its semantic name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. Target and candidate both occupy 160 padded bytes, contain 77 instructions, and carry the same three ordered relocation identities at the same addresses; objdiff reports 98.064514 percent similarity. The aligned residual is exactly one commutative multiply operand load: January loads center2d->x then multiplies by plane->n.i, while the retained natural direct expression loads plane->n.i then multiplies by center2d->x. Calling the shared plane2d_distance_to_point inline helper makes this function strict exact but also emits a 32-byte _plane2d_distance_to_point COMDAT absent from the January object, so that candidate is rejected. The retained direct expression follows the independent HCEA lift and avoids the extra helper without an optimizer control, forced inline, fake dependency, or unnatural arithmetic. Reopen only for authoritative January source or a natural shared-helper linkage context that preserves the one-function schedule without adding a non-target COMDAT.",
-      "measurements": {
-        "target": {
-          "size": 160,
-          "relocation_count": 3,
-          "normalized_sha256": "3d3e2ebc2475a44e6fc46a61a195af74e7bfe2b9123b724beb96f1fb3dc9c8f1"
-        },
-        "base": {
-          "size": 160,
-          "relocation_count": 3,
-          "normalized_sha256": "bbd48caaee511fea2e988c180bd90ee0e2b3ea970e1b12ca9e147a10ddeb5e15"
-        },
-        "objdiff_percent": 98.064514
-      }
-    },
-    {
-      "unit": "source/physics/collision_bsp",
       "function": "_bsp3d_test_sphere_recursive",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed recursive 3D BSP sphere traversal and recovering its semantic private name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. The retained function descends single-sided nodes, recursively visits both sides while maintaining the authenticated 128-entry signed plane stack, records overlapping leaves, resolves matching 2D references, projects the sphere center, and invokes the reconstructed 2D walker. Audit retracted the earlier claim that the residual was three equivalent unordered-value branch encodings: the shared projection_from_vector3d body actually selected the wrong axis for x- or y-dominant vectors, and different x87 unordered branches are not generally equivalent for NaNs. The retained named-axis conditional implements the HCEA semantics and matches January's dominant-axis comparisons instruction-for-instruction, including their unordered/NaN behavior, while direct projected-point and sign expressions avoid non-target _point_from_line3d, _projection_from_vector3d, and _projection_sign_from_vector3d COMDATs. January's embedded real_math.h assertion string and line prove that projection-sign logic was expanded in this caller even though no helper section exists in the target. Target and candidate both occupy 800 padded bytes and carry the same 22 ordered relocation identities; the candidate has 290 instructions versus January's 287 and objdiff reports 99.08602 percent similarity. The remaining aligned differences are a commutative y/z plane-distance evaluation order and the natural byte boolean's mov al/xor al sequence versus January's 32-bit mov eax/xor eax sequence; the latter shifts the final two call relocations three bytes earlier and leaves three bytes of alignment padding. The conservative unclassified label reflects that this is not instruction scheduling alone. No forced inline, shared-header edit, optimizer control, representation cast, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source or a natural type/helper context that accounts for the 32-bit boolean materialization without reintroducing non-target COMDATs or changing the protected January inline schedule.",
+      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed recursive 3D BSP sphere traversal and recovering its semantic private name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. The retained function descends single-sided nodes, recursively visits both sides while maintaining the authenticated 128-entry signed plane stack, records overlapping leaves, resolves matching 2D references, projects the sphere center, and invokes the reconstructed 2D walker. Audit retracted the earlier claim that the residual was three equivalent unordered-value branch encodings: the shared projection_from_vector3d body actually selected the wrong axis for x- or y-dominant vectors, and different x87 unordered branches are not generally equivalent for NaNs. The retained named-axis conditional implements the HCEA semantics and matches January's dominant-axis comparisons instruction-for-instruction, including their unordered/NaN behavior, while direct projected-point and sign expressions avoid non-target _point_from_line3d, _projection_from_vector3d, and _projection_sign_from_vector3d COMDATs. January's embedded real_math.h assertion string and line prove that projection-sign logic was expanded in this caller even though no helper section exists in the target. Target and candidate both occupy 800 padded bytes and carry the same 22 ordered relocation identities; the candidate has 290 instructions versus January's 287 and objdiff reports 99.08602 percent similarity. The remaining aligned differences are a commutative y/z plane-distance evaluation order and the natural byte boolean's mov al/xor al sequence versus January's 32-bit mov eax/xor eax sequence; the latter shifts the final two call relocations three bytes earlier and leaves three bytes of alignment padding. The conservative unclassified label reflects that this is not instruction scheduling alone. No forced inline, shared-header edit, optimizer control, representation cast, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source or a natural type/helper context that accounts for the 32-bit boolean materialization without reintroducing non-target COMDATs or changing the protected January inline schedule. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed to the helper-form reconstruction with January's 287-instruction count (800 bytes, 22 relocations), still fuzzy, alongside the exact bsp2d sphere/pill reopens. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
       "measurements": {
         "target": {
           "size": 800,
@@ -4723,16 +4704,16 @@
         "base": {
           "size": 800,
           "relocation_count": 22,
-          "normalized_sha256": "f0b2e6723519920dcc3ca4060725b75b2b3fc3cd032e52595af3a6a9669ea008"
+          "normalized_sha256": "947b581780131f4c0dd9d48e75bd08ef8a29d7e7c9b07aac8df7adaff8665574"
         },
-        "objdiff_percent": 99.08602
+        "objdiff_percent": 99.985664
       }
     },
     {
       "unit": "source/physics/collision_bsp",
       "function": "_collision_bsp_test_vector_recursive",
       "class": "unclassified",
-      "evidence": "Complete typed reconstruction of the private recursive vector traversal, including semantic empty/semi-empty/solid transitions, correct front/back/two-sided flag handling, leaf reporting and genuine private surface resolution. Independent HCEA source corroborates the behavior; January COFF remains authoritative. The target is 800 padded bytes and the natural candidate is 784, both with the same thirteen relocation identities; objdiff is 98.178215 percent. No target-absent helper or point_from_line3d owner is emitted, and all inherited exact owners survive. Retained as credible fuzzy source with zero exact credit; reopen only for authentic source/type/compiler context.",
+      "evidence": "Complete typed reconstruction of the private recursive vector traversal, including semantic empty/semi-empty/solid transitions, correct front/back/two-sided flag handling, leaf reporting and genuine private surface resolution. Independent HCEA source corroborates the behavior; January COFF remains authoritative. The target is 800 padded bytes and the natural candidate is 784, both with the same thirteen relocation identities; objdiff is 98.178215 percent. No target-absent helper or point_from_line3d owner is emitted, and all inherited exact owners survive. Retained as credible fuzzy source with zero exact credit; reopen only for authentic source/type/compiler context. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed to a straddle-first else-if with a single bottom return (size now equals the target, 800 bytes, 13 relocations), still fuzzy. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
       "measurements": {
         "target": {
           "size": 800,
@@ -4740,37 +4721,18 @@
           "normalized_sha256": "843ff490914a065f0b80a94d52b63c7176ff57515a249d83655c4c69909058fc"
         },
         "base": {
-          "size": 784,
+          "size": 800,
           "relocation_count": 13,
-          "normalized_sha256": "7626157916622d26ad5e7a4cbf12854a3e8b3b0a17b7f54ca87bc01ea9dc8ed2"
+          "normalized_sha256": "24422defd815e28511914e5b25e3b0f8722eebc230654b7df3eac9688bd266e4"
         },
-        "objdiff_percent": 98.178215
-      }
-    },
-    {
-      "unit": "source/physics/collision_bsp",
-      "function": "_bsp2d_test_pill_recursive",
-      "class": "instruction-scheduling",
-      "evidence": "Complete natural private 2D BSP pill traversal using project real types, named epsilon, genuine tag-block access and the recovered surface test. Target and candidate are both 272 padded bytes with the same six ordered relocation identities; objdiff is 98.95652 percent. The remaining gap is a small ordinary expression/control schedule, and no compiler steering or extra code owner is retained. This best credible fuzzy body receives zero exact credit; reopen for authoritative January source or natural compiler-context evidence.",
-      "measurements": {
-        "target": {
-          "size": 272,
-          "relocation_count": 6,
-          "normalized_sha256": "40f743a1aebcedeaaf128f692bf200d33fb5694033dc89fe37eff3b6b8ba9a9d"
-        },
-        "base": {
-          "size": 272,
-          "relocation_count": 6,
-          "normalized_sha256": "fbfc56173dffadd2460310f6003a0789e42d875f741ba619c2bef7abda02a782"
-        },
-        "objdiff_percent": 98.95652
+        "objdiff_percent": 99.30693
       }
     },
     {
       "unit": "source/physics/collision_bsp",
       "function": "_bsp3d_test_pill_recursive",
       "class": "unclassified",
-      "evidence": "Complete typed private 3D BSP pill traversal reconstructed from January disassembly with independent HCEA corroboration. It preserves the authenticated traversal stack, real_math assertion, semantic projection state, leaf/reference walks, surface/edge tests and global projection mapping while expanding natural math at call sites so no target-absent helper or point_from_line3d owner is emitted. The target is 1504 padded bytes with 31 relocations; the natural candidate is 1472 with 28 relocations and objdiff is 85.46875 percent. The structural schedule remains fuzzy and receives zero exact credit. Reopen only for authoritative January source or genuine compiler-context evidence, never fake dependencies, forced inlining, raw offsets or nonsensical logic.",
+      "evidence": "Complete typed private 3D BSP pill traversal reconstructed from January disassembly with independent HCEA corroboration. It preserves the authenticated traversal stack, real_math assertion, semantic projection state, leaf/reference walks, surface/edge tests and global projection mapping while expanding natural math at call sites so no target-absent helper or point_from_line3d owner is emitted. The target is 1504 padded bytes with 31 relocations; the natural candidate is 1472 with 28 relocations and objdiff is 85.46875 percent. The structural schedule remains fuzzy and receives zero exact credit. Reopen only for authoritative January source or genuine compiler-context evidence, never fake dependencies, forced inlining, raw offsets or nonsensical logic. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed with the projection_sign helper and a third project_point3d call (size and relocation count now equal the target, 1504 bytes, 31 relocations), still fuzzy. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
       "measurements": {
         "target": {
           "size": 1504,
@@ -4778,11 +4740,11 @@
           "normalized_sha256": "057a2c8bfb82a96726d0e834b8c8724e71bfa42180cb31b7dab6f725f154667c"
         },
         "base": {
-          "size": 1472,
-          "relocation_count": 28,
-          "normalized_sha256": "2811fc4e3aebae94947e5d3cfa8072e55478d17813b5c14b034951e711fed4eb"
+          "size": 1504,
+          "relocation_count": 31,
+          "normalized_sha256": "0f9c2342ca7c0c0dc86469278e10d2526e247e35eb5dc2b1be4a923e2e196019"
         },
-        "objdiff_percent": 85.46875
+        "objdiff_percent": 97.21691
       }
     },
     {
