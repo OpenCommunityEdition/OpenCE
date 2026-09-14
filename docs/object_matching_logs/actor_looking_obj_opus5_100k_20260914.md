@@ -113,3 +113,7 @@ aim/look fuzzy (zero credit). Parks unchanged. Header proposal recorded in
 ## Orchestrator admission note (checkpoint 1)
 
 The verifier accepted `_actor_looking_test_validity` (exact) and the two fuzzy vector validators. It rejected the real-file hunks that add or rewrite five uncalled statics (idle_find_prop, idle_new_major/minor_direction, idle_timer, find_random_vector): nothing in the TU emits or measures them. The orchestrator therefore kept the whole actor_looking landing out of checkpoint 1. The worker file is preserved as `scratch/orch/actor_looking_waveA.c`. It will be re-landed as one packet together with the actors.h header proposals (actor_move_force_stop / actor_combat_currently_firing_burst prototypes, boolean actor_look_secondary, primary-priority enum), which root the whole update graph.
+
+## Header packet (orchestrator, checkpoint 4)
+
+The actors.h packet landed as a separate commit, together with the profile.h duplicate-prototype cleanup that the units declaration-count tie required. The complete look graph then lands from the worker candidate, with the scratch shims removed and all statics rooted by `actor_look_update`. Full build: +6 exact (update helpers, secondary and test_validity; 2,384 padded), 0 regressions, parks clean. `actor_look_update` (4688 vs 4720), `idle_find_prop`, `find_random_vector` and the two vector validators stay fuzzy at zero credit.

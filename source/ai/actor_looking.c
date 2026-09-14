@@ -180,6 +180,7 @@ symbols in this file:
 #include "props.h"
 #include "units/units.h"
 
+
 /* ---------- constants */
 
 enum
@@ -192,6 +193,34 @@ enum
 	NUMBER_OF_IDLE_LOOK_TYPES,
 };
 
+/* TU-local copy: no shared header owns the actor mode domain yet; partial or
+ * complete copies also exist in actors.c, actor_moving.c, actor_perception.c,
+ * actor_stimulus.c, actor_type_flood.c, ai_communication.c, ai_script.c,
+ * encounters.c and actions.c. */
+enum
+{
+	_actor_mode_braindead = 0,
+	_actor_mode_asleep,
+	_actor_mode_alert,
+	_actor_mode_combat,
+	NUMBER_OF_ACTOR_MODES,
+};
+
+/* TU-local copy: no shared header owns the actor combat status domain yet; a
+ * complete copy also exists in action_obey.c (partial ones in action_charge.c). */
+enum
+{
+	_actor_combat_status_none = 0,
+	_actor_combat_status_wary,
+	_actor_combat_status_investigate,
+	_actor_combat_status_definite,
+	_actor_combat_status_certain,
+	_actor_combat_status_clear_los,
+	_actor_combat_status_dangerous,
+	_actor_combat_status_visible,
+	NUMBER_OF_ACTOR_COMBAT_STATUS_LEVELS,
+};
+
 enum
 {
 	_idle_timer_facing = 0,
@@ -202,6 +231,9 @@ enum
 /* ---------- macros */
 
 #define ACTOR_LOOKING_DEBUG_PRINTING_ENABLED() (ai_debug.print_secondary_looking)
+/* TU-local copy of the real_math.h comparison macro (also copied in actors.c,
+ * matrix_math.c and biped_limp_noodle.c). */
+#define realcmp(a, b) (fabs((a) - (b)) < _real_epsilon)
 
 /* ---------- structures */
 
@@ -236,10 +268,6 @@ typedef char actor_looking_prop_shooting_offset_must_be_0x12F[
 
 /* ---------- prototypes */
 
-static boolean actor_look_decode_direction(
-	long actor_index,
-	struct direction_specification *specification,
-	real_vector3d *direction);
 static struct actor_idle_looking *actor_look_get_looking_definition(
 	long actor_index);
 static boolean actor_look_valid_aim_vector(
@@ -252,6 +280,12 @@ static boolean actor_look_valid_look_vector(
 	real_vector3d const *aiming_vector,
 	real_vector3d const *attempted_looking_vector,
 	real_vector3d const *look_vector);
+static boolean actor_look_idle_find_prop(
+	long actor_index,
+	boolean free_facing,
+	boolean aim_at_prop,
+	struct direction_specification *direction,
+	boolean *interesting_prop);
 static long actor_look_idle_timer(
 	long actor_index,
 	struct actor_idle_looking *looking_definition,
@@ -266,10 +300,62 @@ static boolean actor_look_find_random_vector(
 	real pitch_minimum,
 	real pitch_maximum,
 	real_vector3d *result_vector);
+static boolean actor_look_decode_direction(
+	long actor_index,
+	struct direction_specification *specification,
+	real_vector3d *direction);
+static boolean actor_look_idle_new_major_direction(
+	long actor_index,
+	struct actor_idle_looking *looking_definition,
+	real_vector3d const *base_vector,
+	boolean free_facing,
+	boolean major_is_aiming,
+	boolean minor_variation);
+static void actor_look_idle_new_minor_direction(
+	long actor_index,
+	struct actor_idle_looking *looking_definition,
+	real_vector3d const *base_vector);
 
 /* ---------- globals */
 
-/* ---------- public code */
+short const global_secondary_look_priorities[NUMBER_OF_SECONDARY_LOOK_TYPES][2] =
+{
+	{ _secondary_look_priority_default, _secondary_look_priority_default },
+	{ _secondary_look_priority_idle_look, _secondary_look_priority_idle_look },
+	{ _secondary_look_priority_idle_look, _secondary_look_priority_idle_look },
+	{ _secondary_look_priority_idle_aim, _secondary_look_priority_idle_aim },
+	{ _secondary_look_priority_turn_and_aim, _secondary_look_priority_idle_aim },
+	{ _secondary_look_priority_aim, _secondary_look_priority_aim },
+	{ _secondary_look_priority_turn_and_aim, _secondary_look_priority_aim },
+	{ _secondary_look_priority_turn_and_aim, _secondary_look_priority_aim },
+	{ _secondary_look_priority_aim, _secondary_look_priority_idle_aim },
+	{ _secondary_look_priority_turn_and_aim, _secondary_look_priority_turn_and_aim },
+	{ _secondary_look_priority_stop_and_aim, _secondary_look_priority_idle_aim },
+	{ _secondary_look_priority_stop_and_aim, _secondary_look_priority_idle_aim },
+	{ _secondary_look_priority_override, _secondary_look_priority_turn_and_aim },
+	{ _secondary_look_priority_override, _secondary_look_priority_idle_look },
+};
+
+real const global_secondary_look_times[NUMBER_OF_SECONDARY_LOOK_TYPES] =
+{
+	0.0f,
+	1.3f,
+	0.9f,
+	0.9f,
+	0.9f,
+	0.7f,
+	0.9f,
+	0.9f,
+	1.2f,
+	2.0f,
+	2.0f,
+	2.5f,
+	1.5f,
+	1000.0f,
+};
+
+
+/* ---------- code */
 
 void actor_look_secondary_stop(
 	long actor_index)
@@ -372,37 +458,6 @@ real actor_look_compute_prop_interest(
 	return interest;
 }
 
-boolean valid_real_normal2d(
-	real_vector2d const *normal)
-{
-	return valid_realcmp(magnitude_squared2d(normal), 1.0f);
-}
-
-void actor_look_affect_movement(
-	long actor_index)
-{
-	struct actor_datum *actor = actor_get(actor_index);
-	struct direction_specification *movement_direction = &actor->orders.look.primary_direction;
-
-	if (movement_direction->type == _direction_specification_movement &&
-		!actor_path_has_path(actor_index))
-	{
-		actor->orders.look.primary_priority = _primary_priority_none;
-	}
-
-	actor->control.moving_forced_by_aiming =
-		actor->orders.look.primary_priority >= _primary_priority_facing &&
-		movement_direction->type != _direction_specification_movement &&
-		actor_look_decode_direction(
-			actor_index,
-			movement_direction,
-			&actor->control.moving_forced_aim_direction);
-
-	return;
-}
-
-/* ---------- private code */
-
 static struct actor_idle_looking *actor_look_get_looking_definition(
 	long actor_index)
 {
@@ -421,21 +476,154 @@ static struct actor_idle_looking *actor_look_get_looking_definition(
 	return &definition->looking.idle_look_guard;
 }
 
+boolean actor_look_secondary(
+	long actor_index,
+	short type,
+	short priority,
+	struct direction_specification const *direction)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	boolean locked_aiming;
+	real duration;
+	long ticks;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+		135,
+		(type >= 0) && (type < NUMBER_OF_SECONDARY_LOOK_TYPES));
+
+	if (actor->state.mode <= _actor_mode_asleep && type < _secondary_look_scripted)
+		return FALSE;
+	if (actor->control.secondary_look_type > type)
+		return FALSE;
+
+	locked_aiming = actor->orders.look.primary_priority >= _primary_priority_locked_aiming;
+	if (type < _secondary_look_scripted &&
+		actor->state.action == _actor_action_obey &&
+		!actor->state.action_data.obey.allow_looking)
+	{
+		return FALSE;
+	}
+	if (locked_aiming && type < _secondary_look_newly_acknowledged_prop)
+		return FALSE;
+
+	if (direction->type == _direction_specification_prop)
+	{
+		struct prop_datum *prop = prop_try_and_get(direction->prop_index);
+
+		if (!prop)
+			return FALSE;
+
+		if (type < _secondary_look_communicating_prop &&
+			((!prop->enemy && !prop->dead) || (prop->dead && actor->state.mode >= _actor_mode_combat)))
+		{
+			long game_time = game_time_get();
+
+			if (locked_aiming)
+				return FALSE;
+			if ((!prop->player || type < _secondary_look_newly_acknowledged_prop) &&
+				prop->last_idle_look_time != NONE &&
+				prop->last_idle_look_time + 20 * TICKS_PER_SECOND > game_time)
+			{
+				return FALSE;
+			}
+
+			prop->last_idle_look_time = game_time;
+			prop->last_idle_look_interest = MAX(prop->last_idle_look_interest, prop->look_interest);
+		}
+	}
+
+	duration = global_secondary_look_times[type];
+	if (actor->state.mode < _actor_mode_combat || !actor->state.combat_status)
+		duration *= 2.0f;
+
+	if (definition->looking.event_look_modifier_lower_bound != 0.0f ||
+		definition->looking.event_look_modifier_upper_bound != 0.0f)
+	{
+		real lower_bound = MAX(definition->looking.event_look_modifier_lower_bound, 0.5f);
+		real upper_bound = MIN(definition->looking.event_look_modifier_upper_bound, 2.0f);
+
+		duration *= real_seed_random_range(
+			get_global_random_seed_address(),
+			lower_bound,
+			upper_bound);
+	}
+
+	ticks = fast_ftol(duration * TICKS_PER_SECOND);
+	ticks = MIN(ticks, SHORT_MAX);
+
+	if (priority == _secondary_look_priority_default)
+	{
+		boolean certain = actor->state.combat_status >= _actor_combat_status_certain;
+
+		priority = global_secondary_look_priorities[type][certain];
+	}
+
+	if (ACTOR_LOOKING_DEBUG_PRINTING_ENABLED())
+	{
+		char const *type_names[] =
+		{
+			"none",
+			"environment",
+			"moving-prop",
+			"impact",
+			"new-prop",
+			"shooting-prop",
+			"comm-prop",
+			"comm-direction",
+			"combat-prop",
+			"damage",
+			"danger",
+			"scripted",
+		};
+		char const *priority_names[NUMBER_OF_SECONDARY_LOOK_PRIORITIES] =
+		{
+			"none",
+			"default",
+			"idle-look",
+			"idle-aim",
+			"aim",
+			"turn-and-aim",
+			"stop-and-aim",
+			"override",
+			"override-facing",
+		};
+
+		console_printf(
+			FALSE,
+			"%s: look %s %s %d",
+			ai_debug_describe_actor(
+				actor_index,
+				NONE,
+				FALSE,
+				temporary,
+				NUMBEROF(temporary)),
+			type_names[type],
+			priority_names[priority],
+			(short)ticks);
+	}
+
+	actor->control.secondary_look_type = type;
+	actor->control.secondary_look_priority = priority;
+	actor->control.secondary_look_timer = (short)ticks;
+	actor->control.secondary_look_direction = *direction;
+
+	return TRUE;
+}
+
 static boolean actor_look_valid_aim_vector(
 	real yaw_deviation,
 	real_vector3d const *facing_vector,
 	real_vector3d const *attempted_aiming_vector)
 {
 	real_vector2d aiming_vector2d;
-	real_vector2d facing_vector2d;
 	boolean result = FALSE;
 
 	aiming_vector2d.i = attempted_aiming_vector->i;
 	aiming_vector2d.j = attempted_aiming_vector->j;
-	facing_vector2d.i = facing_vector->i;
-	facing_vector2d.j = facing_vector->j;
 	if (normalize2d(&aiming_vector2d) > 0.0f &&
-		dot_product2d(&aiming_vector2d, &facing_vector2d) > yaw_deviation)
+		aiming_vector2d.i * facing_vector->i + aiming_vector2d.j * facing_vector->j > yaw_deviation)
 	{
 		result = TRUE;
 	}
@@ -450,29 +638,187 @@ static boolean actor_look_valid_look_vector(
 	real_vector3d const *attempted_looking_vector,
 	real_vector3d const *look_vector)
 {
-	real_vector2d aiming_vector2d;
-	real_vector2d attempted_looking_vector2d;
 	real_vector2d looking_vector2d;
+	real_vector2d attempted_looking_vector2d;
 	boolean result = FALSE;
 
-	aiming_vector2d.i = aiming_vector->i;
-	aiming_vector2d.j = aiming_vector->j;
-	attempted_looking_vector2d.i = attempted_looking_vector->i;
-	attempted_looking_vector2d.j = attempted_looking_vector->j;
 	looking_vector2d.i = look_vector->i;
 	looking_vector2d.j = look_vector->j;
+	attempted_looking_vector2d.i = attempted_looking_vector->i;
+	attempted_looking_vector2d.j = attempted_looking_vector->j;
 
 	if (normalize2d(&looking_vector2d) > 0.0f &&
-		dot_product2d(&looking_vector2d, &aiming_vector2d) > yaw_deviation &&
+		looking_vector2d.i * aiming_vector->i + looking_vector2d.j * aiming_vector->j > yaw_deviation &&
 		normalize2d(&attempted_looking_vector2d) > 0.0f)
 	{
 		short side = cross_product2d(&looking_vector2d, &attempted_looking_vector2d) > 0.0f;
 
-		if (dot_product2d(&attempted_looking_vector2d, &looking_vector2d) > cone_limits->n[side])
+		if (dot_product2d(&looking_vector2d, &attempted_looking_vector2d) > cone_limits->n[side])
 			result = TRUE;
 	}
 
 	return result;
+}
+
+void actor_looking_test_validity(
+	long actor_index,
+	real_vector3d const *vector,
+	boolean *aiming_valid,
+	boolean *looking_valid)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	real_vector2d looking_bounds;
+
+	*aiming_valid = actor_look_valid_aim_vector(
+		definition->looking.runtime_maximum_aiming_deviation_cosine.yaw,
+		&actor->input.facing_vector,
+		vector);
+
+	if (actor->state.mode == _actor_mode_combat)
+	{
+		looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+		looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+	}
+	else
+	{
+		looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+		looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+	}
+
+	*looking_valid = actor_look_valid_look_vector(
+		definition->looking.runtime_maximum_looking_deviation_cosine.yaw,
+		&looking_bounds,
+		&actor->input.facing_vector,
+		&actor->input.aiming_vector,
+		vector);
+
+	return;
+}
+
+static boolean actor_look_idle_find_prop(
+	long actor_index,
+	boolean free_facing,
+	boolean aim_at_prop,
+	struct direction_specification *direction,
+	boolean *interesting_prop)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	long best_prop_index = NONE;
+	real best_weight = 0.0f;
+	struct prop_datum *best_prop = NULL;
+	boolean best_interesting = FALSE;
+	long game_time = game_time_get();
+	real aiming_cosine = definition->looking.runtime_maximum_aiming_deviation_cosine.yaw;
+	real looking_cosine = definition->looking.runtime_maximum_looking_deviation_cosine.yaw;
+	real_vector2d looking_bounds;
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+
+	if (actor->state.mode == _actor_mode_combat)
+	{
+		looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+		looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+	}
+	else
+	{
+		looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+		looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+	}
+
+	if (actor_index == ai_debug.selected_actor_index)
+		ai_debug_idle_look_clear(actor_index);
+
+	prop_iterator_new(&iterator, actor_index);
+	while (prop = prop_iterator_next(&iterator))
+	{
+		real weight = 0.0f;
+		boolean interesting = FALSE;
+
+		if (prop->state >= _prop_state_becoming_unacknowledged &&
+			prop->state <= _prop_state_acknowledged &&
+			prop->visibility)
+		{
+			if (prop->look_interest > 0.0f)
+			{
+				real recency;
+				real novelty;
+
+				if (prop->last_idle_look_time == NONE)
+				{
+					recency = 1.0f;
+				}
+				else
+				{
+					recency = ((real)game_time - prop->last_idle_look_time) / (20.0f * TICKS_PER_SECOND) - 1.0f;
+				}
+
+				novelty = (prop->look_interest - prop->last_idle_look_interest) / prop->look_interest + recency;
+				if (novelty > 1.0f)
+					novelty = 1.0f;
+				weight = novelty * prop->look_interest;
+				interesting = prop->look_interest > prop->last_idle_look_interest;
+			}
+		}
+		else
+		{
+			prop->last_idle_look_interest = 0.0f;
+		}
+
+		if (actor_index == ai_debug.selected_actor_index)
+			ai_debug_idle_look_addprop(iterator.index, weight);
+
+		if (weight > 0.0f)
+		{
+			boolean valid;
+
+			if (aim_at_prop)
+			{
+				if (free_facing && interesting)
+				{
+					valid = TRUE;
+				}
+				else
+				{
+					valid = actor_look_valid_aim_vector(
+						aiming_cosine,
+						&actor->control.desired_facing_vector,
+						&prop->actor_to_prop);
+				}
+			}
+			else
+			{
+				valid = actor_look_valid_look_vector(
+					looking_cosine,
+					&looking_bounds,
+					&actor->control.desired_facing_vector,
+					&actor->control.desired_aiming_vector,
+					&prop->actor_to_prop);
+			}
+
+			if (valid && weight > best_weight)
+			{
+				best_prop = prop;
+				best_prop_index = iterator.index;
+				best_weight = weight;
+				best_interesting = interesting;
+			}
+		}
+	}
+
+	if (best_prop_index != NONE)
+	{
+		best_prop->last_idle_look_time = game_time;
+		best_prop->last_idle_look_interest = best_prop->look_interest;
+		direction->type = _direction_specification_prop;
+		direction->prop_index = best_prop_index;
+		*interesting_prop = best_interesting;
+
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 static long actor_look_idle_timer(
@@ -482,14 +828,13 @@ static long actor_look_idle_timer(
 	boolean interesting_direction)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-	struct weapon_definition *weapon_definition;
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	struct weapon_definition *weapon_definition = actor_get_weapon_definition(actor_index);
 	real time_lower_bound;
 	real time_upper_bound;
 	real time;
 	long ticks;
 
-	(void)actor_definition_get(actor->meta.definition_index);
-	weapon_definition = actor_get_weapon_definition(actor_index);
 	switch (timer_type)
 	{
 	case _idle_timer_facing:
@@ -568,8 +913,8 @@ static boolean actor_look_find_random_vector(
 {
 	real_vector3d pitch_axis;
 	real_vector3d direction;
-	short attempt_count = 0;
-	boolean unobstructed;
+	short attempt_count;
+	boolean unobstructed = FALSE;
 
 	pitch_axis.i = -base_vector->j;
 	pitch_axis.j = base_vector->i;
@@ -577,7 +922,7 @@ static boolean actor_look_find_random_vector(
 	if (normalize3d(&pitch_axis) == 0.0f)
 		pitch_axis = *global_left3d;
 
-	do
+	for (attempt_count = 0; !unobstructed && attempt_count < 10; attempt_count++)
 	{
 		real yaw = real_seed_random_range(
 			get_global_random_seed_address(),
@@ -627,23 +972,25 @@ static boolean actor_look_find_random_vector(
 				global_current_collision_user_depth > 1);
 			--global_current_collision_user_depth;
 		}
-
-		if (!unobstructed)
-			attempt_count++;
 	}
-	while (!unobstructed && attempt_count < 10);
 
-	if (!unobstructed)
-		return FALSE;
+	if (unobstructed)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+			1077,
+			result_vector);
+		normalize3d(&direction);
+		*result_vector = direction;
+	}
 
-	match_assert(
-		"c:\\halo\\SOURCE\\ai\\actor_looking.c",
-		1077,
-		result_vector);
-	normalize3d(&direction);
-	*result_vector = direction;
+	return unobstructed;
+}
 
-	return TRUE;
+boolean valid_real_normal2d(
+	real_vector2d const *normal)
+{
+	return valid_realcmp(magnitude_squared2d(normal), 1.0f);
 }
 
 static boolean actor_look_decode_direction(
@@ -847,4 +1194,775 @@ static boolean actor_look_decode_direction(
 	}
 
 	return result;
+}
+
+static boolean actor_look_idle_new_major_direction(
+	long actor_index,
+	struct actor_idle_looking *looking_definition,
+	real_vector3d const *base_vector,
+	boolean free_facing,
+	boolean major_is_aiming,
+	boolean minor_variation)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	boolean interesting_direction = FALSE;
+	boolean found = FALSE;
+
+	actor->control.idle_major_active = FALSE;
+
+	if (!minor_variation)
+	{
+		found = actor_look_idle_find_prop(
+			actor_index,
+			free_facing,
+			major_is_aiming,
+			&actor->control.idle_major_direction,
+			&interesting_direction);
+	}
+
+	if (!found)
+	{
+		real_vector3d vector = *base_vector;
+		real yaw_bound;
+		real pitch_bound;
+		real pitch_minimum;
+
+		if (major_is_aiming)
+		{
+			yaw_bound = free_facing ?
+				_pi :
+				MIN(definition->looking.maximum_aiming_deviation.yaw, definition->looking.idle_aiming_deviation.yaw);
+			pitch_bound = MIN(definition->looking.maximum_aiming_deviation.pitch, definition->looking.idle_aiming_deviation.pitch);
+
+			vector.k = 0.0f;
+			if (normalize3d(&vector) == 0.0f)
+				vector = *global_forward3d;
+		}
+		else
+		{
+			yaw_bound = MIN(definition->looking.maximum_looking_deviation.yaw, definition->looking.idle_looking_deviation.yaw);
+			pitch_bound = MIN(definition->looking.maximum_looking_deviation.pitch, definition->looking.idle_looking_deviation.pitch);
+		}
+
+		pitch_minimum = -pitch_bound;
+		if (actor->input.vehicle_gunner)
+			pitch_minimum *= 0.5f;
+
+		actor->control.idle_major_direction.type = _direction_specification_vector;
+		found = actor_look_find_random_vector(
+			&actor->input.position.head_position,
+			&vector,
+			TRUE,
+			-yaw_bound,
+			yaw_bound,
+			pitch_minimum,
+			pitch_bound,
+			&actor->control.idle_major_direction.vector);
+	}
+
+	if (found)
+	{
+		actor->control.idle_major_timer = actor_look_idle_timer(
+			actor_index,
+			looking_definition,
+			major_is_aiming ? _idle_timer_aiming : _idle_timer_looking,
+			interesting_direction);
+		if (actor->control.idle_major_timer)
+		{
+			actor->control.idle_major_active = TRUE;
+			actor->control.idle_major_is_aiming = major_is_aiming;
+		}
+	}
+
+	return interesting_direction;
+}
+
+static void actor_look_idle_new_minor_direction(
+	long actor_index,
+	struct actor_idle_looking *looking_definition,
+	real_vector3d const *base_vector)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	boolean interesting_direction = FALSE;
+	boolean found;
+
+	actor->control.idle_minor_active = FALSE;
+
+	found = actor_look_idle_find_prop(
+		actor_index,
+		FALSE,
+		FALSE,
+		&actor->control.idle_minor_direction,
+		&interesting_direction);
+	if (!found)
+	{
+		real yaw_bound = MIN(definition->looking.maximum_looking_deviation.yaw, definition->looking.idle_looking_deviation.yaw);
+		real pitch_bound = MIN(definition->looking.maximum_looking_deviation.pitch, definition->looking.idle_looking_deviation.pitch);
+		real const *delta_angles = actor->state.mode == _actor_mode_combat ?
+			definition->looking.combat_looking_delta_angles :
+			definition->looking.noncombat_looking_delta_angles;
+		real yaw_minimum = MAX(-yaw_bound, -delta_angles[0]);
+		real yaw_maximum = MIN(yaw_bound, delta_angles[1]);
+		real_vector3d vector;
+
+		found = actor_look_find_random_vector(
+			&actor->input.position.head_position,
+			base_vector,
+			FALSE,
+			yaw_minimum,
+			yaw_maximum,
+			-pitch_bound,
+			pitch_bound,
+			&vector);
+		if (found)
+		{
+			actor->control.idle_minor_direction.type = _direction_specification_vector;
+			actor->control.idle_minor_direction.vector = vector;
+			interesting_direction = FALSE;
+		}
+	}
+
+	if (found)
+	{
+		actor->control.idle_minor_timer = actor_look_idle_timer(
+			actor_index,
+			looking_definition,
+			_idle_timer_looking,
+			interesting_direction);
+		if (actor->control.idle_minor_timer)
+			actor->control.idle_minor_active = TRUE;
+	}
+
+	return;
+}
+
+void actor_look_update(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
+	boolean aiming_at_target = FALSE;
+	boolean looking_enabled = TRUE;
+	boolean can_look;
+
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1103, &actor->control.desired_facing_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1104, &actor->control.desired_aiming_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1105, &actor->control.desired_looking_vector);
+
+	if (actor->output.movement_type == _actor_movement_type_asleep)
+	{
+		can_look = FALSE;
+		looking_enabled = FALSE;
+	}
+	else if (actor->input.vehicle_gunner)
+	{
+		can_look = TRUE;
+	}
+	else if (actor->output.movement_type == _actor_movement_type_alert ||
+		actor->output.movement_type == _actor_movement_type_combat)
+	{
+		can_look = actor_get_weapon(actor_index) != NONE;
+	}
+	else
+	{
+		can_look = FALSE;
+	}
+
+	if (!looking_enabled)
+	{
+		actor->control.desired_aiming_vector = actor->control.desired_facing_vector;
+		actor->control.desired_looking_vector = actor->control.desired_facing_vector;
+		goto update_facing;
+	}
+
+	{
+		boolean looking_free;
+		boolean facing_free;
+		boolean facing_optional;
+		boolean aiming_free;
+		boolean facing_locked;
+		boolean looking_locked;
+		real aiming_cosine;
+		real looking_cosine;
+		real_vector2d looking_bounds;
+		short primary_priority;
+		short secondary_priority;
+		real_vector3d primary_vector;
+		real_vector3d secondary_vector;
+		boolean burst_direction = FALSE;
+
+		looking_free = can_look;
+		facing_free = actor->control.free_facing_vector;
+		facing_optional = actor->control.optional_facing_vector;
+		aiming_cosine = definition->looking.runtime_maximum_aiming_deviation_cosine.yaw;
+		looking_cosine = definition->looking.runtime_maximum_looking_deviation_cosine.yaw;
+		aiming_free = TRUE;
+		facing_locked = FALSE;
+		looking_locked = FALSE;
+
+		if (actor->state.mode == _actor_mode_combat)
+		{
+			looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+			looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+		}
+		else
+		{
+			looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+			looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+		}
+
+		if (actor_combat_currently_firing_burst(actor_index) &&
+			!actor->orders.combat.abort_burst)
+		{
+			struct direction_specification burst_specification;
+
+			burst_specification.type = _direction_specification_target;
+			if (actor_look_decode_direction(actor_index, &burst_specification, &primary_vector))
+			{
+				primary_priority = _primary_priority_locked_aiming;
+				aiming_at_target = TRUE;
+				burst_direction = TRUE;
+			}
+		}
+
+		if (!burst_direction)
+		{
+			primary_priority = actor->orders.look.primary_priority;
+			if (primary_priority != _primary_priority_none &&
+				primary_priority != _primary_priority_face_360)
+			{
+				if (actor_look_decode_direction(actor_index, &actor->orders.look.primary_direction, &primary_vector))
+				{
+					aiming_at_target = actor->orders.look.primary_direction.type == _direction_specification_target;
+				}
+				else
+				{
+					primary_priority = _primary_priority_none;
+				}
+			}
+		}
+
+		secondary_priority = _secondary_look_priority_none;
+		if (actor->control.secondary_look_type >= _secondary_look_none &&
+			actor->control.secondary_look_timer > 0 &&
+			actor_look_decode_direction(actor_index, &actor->control.secondary_look_direction, &secondary_vector))
+		{
+			secondary_priority = actor->control.secondary_look_priority;
+		}
+
+		if (actor->control.moving &&
+			actor_action_class(actor_index) == _action_class_transitory)
+		{
+			secondary_priority = MIN(secondary_priority, _secondary_look_priority_turn_and_aim);
+		}
+
+		if (primary_priority != _primary_priority_none &&
+			primary_priority != _primary_priority_face_360)
+		{
+			match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1226, &primary_vector);
+		}
+
+		if (secondary_priority != _secondary_look_priority_none)
+		{
+			match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1230, &secondary_vector);
+		}
+
+		if (actor->control.secondary_look_timer > 0 &&
+			--actor->control.secondary_look_timer == 0)
+		{
+			if (ACTOR_LOOKING_DEBUG_PRINTING_ENABLED())
+			{
+				console_printf(
+					FALSE,
+					"%s: look timer expire",
+					ai_debug_describe_actor(
+						actor_index,
+						NONE,
+						FALSE,
+						temporary,
+						NUMBEROF(temporary)));
+			}
+
+			actor->control.secondary_look_type = _secondary_look_none;
+			actor->control.secondary_look_priority = _secondary_look_priority_none;
+		}
+
+		actor->control.aiming_away_from_primary = FALSE;
+
+		if (primary_priority >= _primary_priority_opportunity_aiming)
+		{
+			boolean primary_accepted = FALSE;
+
+			if (primary_priority >= _primary_priority_aiming &&
+				(facing_free || actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &primary_vector)))
+			{
+				primary_accepted = TRUE;
+			}
+			else if (primary_priority >= _primary_priority_facing && facing_optional)
+			{
+				facing_optional = FALSE;
+				facing_free = TRUE;
+				primary_accepted = TRUE;
+			}
+
+			if (primary_accepted)
+			{
+				actor->control.desired_aiming_vector = primary_vector;
+				aiming_free = FALSE;
+				looking_free = can_look;
+
+				if (primary_priority >= _primary_priority_locked_aiming)
+				{
+					looking_locked = TRUE;
+					if (can_look)
+						actor->control.desired_looking_vector = primary_vector;
+				}
+			}
+
+			if (primary_priority == _primary_priority_opportunity_aiming)
+				primary_priority = facing_free ? _primary_priority_aiming : _primary_priority_none;
+
+			if (facing_free)
+			{
+				actor->control.desired_facing_vector = primary_vector;
+				actor->control.face_exactly |= (primary_priority == _primary_priority_exact_facing);
+				facing_free = FALSE;
+				facing_optional = FALSE;
+			}
+
+			facing_locked = (!actor->control.free_facing_vector && !actor->control.optional_facing_vector) ||
+				primary_priority >= _primary_priority_locked_facing;
+		}
+
+		switch (secondary_priority)
+		{
+		case _secondary_look_priority_idle_look:
+		case _secondary_look_priority_idle_aim:
+		case _secondary_look_priority_aim:
+		case _secondary_look_priority_turn_and_aim:
+		case _secondary_look_priority_stop_and_aim:
+			{
+				boolean secondary_aim_valid = actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &secondary_vector);
+
+				if (!facing_locked && !looking_locked &&
+					((secondary_priority >= _secondary_look_priority_stop_and_aim && actor_move_force_stop(actor_index)) ||
+					(secondary_priority >= _secondary_look_priority_turn_and_aim && (facing_optional || actor->control.free_facing_vector)) ||
+					(secondary_priority >= _secondary_look_priority_aim && !secondary_aim_valid && facing_free && aiming_free)))
+				{
+					if (!actor->control.face_exactly || !secondary_aim_valid)
+					{
+						actor->control.desired_facing_vector = secondary_vector;
+						actor->control.face_exactly = FALSE;
+					}
+
+					actor->control.desired_aiming_vector = secondary_vector;
+					actor->control.desired_looking_vector = secondary_vector;
+					looking_free = can_look;
+					facing_free = FALSE;
+					actor->control.aiming_away_from_primary = TRUE;
+					looking_locked = FALSE;
+					aiming_free = FALSE;
+				}
+				else if (!looking_locked && secondary_aim_valid &&
+					(secondary_priority >= _secondary_look_priority_turn_and_aim ||
+					(secondary_priority >= _secondary_look_priority_idle_aim && aiming_free)))
+				{
+					actor->control.desired_aiming_vector = secondary_vector;
+					actor->control.desired_looking_vector = secondary_vector;
+					looking_free = can_look;
+					actor->control.aiming_away_from_primary = TRUE;
+					looking_locked = FALSE;
+					aiming_free = FALSE;
+				}
+				else if (can_look &&
+					actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &secondary_vector))
+				{
+					actor->control.desired_looking_vector = secondary_vector;
+					looking_free = FALSE;
+				}
+				else if (aiming_free && secondary_aim_valid)
+				{
+					actor->control.desired_aiming_vector = secondary_vector;
+					actor->control.desired_looking_vector = secondary_vector;
+					looking_free = TRUE;
+					aiming_free = FALSE;
+				}
+			}
+			break;
+
+		case _secondary_look_priority_override:
+		case _secondary_look_priority_override_exact_facing:
+			{
+				boolean change_facing = secondary_priority == _secondary_look_priority_override_exact_facing;
+				boolean face_exactly = change_facing;
+				boolean succeeded = FALSE;
+
+				if (actor->control.free_facing_vector)
+				{
+					change_facing = TRUE;
+					succeeded = TRUE;
+				}
+				else if (actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &secondary_vector))
+				{
+					succeeded = TRUE;
+				}
+				else if (actor_move_force_stop(actor_index))
+				{
+					face_exactly = TRUE;
+					change_facing = TRUE;
+					succeeded = TRUE;
+				}
+
+				if (succeeded)
+				{
+					if (change_facing)
+					{
+						actor->control.desired_facing_vector = secondary_vector;
+						actor->control.face_exactly = face_exactly;
+					}
+
+					actor->control.desired_aiming_vector = secondary_vector;
+					actor->control.desired_looking_vector = secondary_vector;
+					looking_free = can_look;
+					facing_free = FALSE;
+					actor->control.aiming_away_from_primary = TRUE;
+					looking_locked = FALSE;
+					aiming_free = FALSE;
+				}
+			}
+			break;
+		}
+
+		if (primary_priority == _primary_priority_opportunity_aiming &&
+			aiming_free &&
+			actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &primary_vector))
+		{
+			actor->control.desired_aiming_vector = primary_vector;
+			if (looking_free)
+				actor->control.desired_looking_vector = primary_vector;
+			actor->control.aiming_away_from_primary = FALSE;
+			aiming_free = FALSE;
+		}
+
+		{
+			struct actor_idle_looking *looking_definition = actor_look_get_looking_definition(actor_index);
+			boolean idle_facing = looking_definition->idle_facing_time_upper_bound > 0.0f;
+			boolean idle_aiming = looking_definition->idle_aim_time_upper_bound > 0.0f;
+			boolean idle_looking = looking_definition->idle_look_time_upper_bound > 0.0f;
+
+			if (actor->orders.look.idle_look_type > _idle_look_none &&
+				!looking_locked &&
+				(aiming_free || looking_free) &&
+				(idle_facing || idle_aiming || idle_looking))
+			{
+				boolean new_major = FALSE;
+				boolean aiming_variation = FALSE;
+				boolean major_valid = FALSE;
+				boolean free_facing = idle_facing && facing_free &&
+					primary_priority == _primary_priority_face_360 &&
+					actor->control.idle_facing_timer == 0;
+				real_vector3d idle_major_vector;
+
+				if (actor->control.idle_facing_timer > 0)
+					actor->control.idle_facing_timer--;
+
+				if (actor->control.idle_major_active &&
+					actor->control.idle_major_is_aiming &&
+					!aiming_free)
+				{
+					actor->control.idle_major_active = TRUE;
+					actor->control.idle_major_timer = actor_look_idle_timer(actor_index, looking_definition, _idle_timer_looking, TRUE);
+					actor->control.idle_major_direction.type = _direction_specification_vector;
+					actor->control.idle_major_direction.vector = actor->control.desired_aiming_vector;
+				}
+
+				if (!actor->control.idle_major_active || !actor->control.idle_major_timer)
+				{
+					boolean major_is_aiming = TRUE;
+					boolean major_possible = aiming_free && idle_aiming;
+
+					if (!major_possible)
+					{
+						major_is_aiming = FALSE;
+						major_possible = looking_free && idle_looking;
+					}
+
+					if (major_possible)
+					{
+						actor->control.idle_major_direction_is_interesting = actor_look_idle_new_major_direction(
+							actor_index,
+							looking_definition,
+							major_is_aiming ? &actor->control.desired_facing_vector : &actor->control.desired_aiming_vector,
+							free_facing,
+							major_is_aiming,
+							major_is_aiming && looking_free && idle_looking);
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+							1501,
+							!actor->control.idle_major_active || (actor->control.idle_major_timer > 0));
+						new_major = TRUE;
+					}
+				}
+
+				if (actor->control.idle_major_active)
+				{
+					actor->control.idle_major_timer--;
+					if (actor_look_decode_direction(actor_index, &actor->control.idle_major_direction, &idle_major_vector))
+					{
+						match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1512, &idle_major_vector);
+
+						if (aiming_free)
+						{
+							if (facing_free && idle_facing && actor->state.flying)
+							{
+								free_facing = TRUE;
+								aiming_variation = TRUE;
+							}
+
+							if (free_facing)
+							{
+								actor->control.desired_facing_vector = idle_major_vector;
+								actor->control.desired_aiming_vector = idle_major_vector;
+								actor->control.aiming_away_from_primary = TRUE;
+								major_valid = TRUE;
+							}
+							else if (actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &idle_major_vector))
+							{
+								actor->control.desired_aiming_vector = idle_major_vector;
+								actor->control.aiming_away_from_primary = TRUE;
+								major_valid = TRUE;
+							}
+						}
+						else if (actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_major_vector))
+						{
+							actor->control.desired_looking_vector = idle_major_vector;
+							major_valid = TRUE;
+						}
+					}
+				}
+
+				if (major_valid)
+				{
+					if (new_major && idle_looking)
+					{
+						actor->control.idle_minor_active = TRUE;
+						actor->control.idle_minor_timer = actor_look_idle_timer(
+							actor_index,
+							looking_definition,
+							_idle_timer_looking,
+							actor->control.idle_major_direction_is_interesting);
+						actor->control.idle_minor_direction = actor->control.idle_major_direction;
+						if (free_facing)
+						{
+							actor->control.idle_facing_timer = actor_look_idle_timer(
+								actor_index,
+								looking_definition,
+								_idle_timer_facing,
+								actor->control.idle_major_direction_is_interesting);
+						}
+					}
+				}
+				else
+				{
+					actor->control.idle_major_active = FALSE;
+					idle_major_vector = actor->control.desired_aiming_vector;
+				}
+
+				if (aiming_free &&
+					((looking_free && idle_looking) || (aiming_variation && idle_aiming)))
+				{
+					if (!actor->control.idle_minor_timer)
+					{
+						actor_look_idle_new_minor_direction(actor_index, looking_definition, &idle_major_vector);
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+							1581,
+							actor->control.idle_minor_timer > 0);
+					}
+
+					actor->control.idle_minor_timer--;
+					if (actor->control.idle_minor_active)
+					{
+						real_vector3d idle_minor_vector;
+
+						if (actor_look_decode_direction(actor_index, &actor->control.idle_minor_direction, &idle_minor_vector) &&
+							(aiming_variation ?
+								actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &idle_minor_vector) :
+								actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_minor_vector)))
+						{
+							match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1605, &idle_minor_vector);
+
+							if (aiming_variation)
+								actor->control.desired_aiming_vector = idle_minor_vector;
+							actor->control.desired_looking_vector = idle_minor_vector;
+						}
+						else
+						{
+							actor->control.idle_minor_active = FALSE;
+						}
+					}
+				}
+				else
+				{
+					actor->control.idle_minor_active = FALSE;
+				}
+			}
+			else
+			{
+				actor->control.idle_major_active = FALSE;
+				actor->control.idle_major_direction_is_interesting = FALSE;
+				actor->control.idle_minor_active = FALSE;
+			}
+		}
+
+		if (!actor->control.moving &&
+			!actor->control.moving_forced_by_aiming &&
+			!unit_is_busy(actor->meta.unit_index) &&
+			actor->input.vehicle_index == NONE)
+		{
+			if ((actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector) &&
+				!actor_look_valid_aim_vector(aiming_cosine, &actor->input.facing_vector, &actor->control.desired_aiming_vector)) ||
+				(can_look &&
+				actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector) &&
+				!actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->input.facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector)))
+			{
+				actor->control.face_exactly = TRUE;
+			}
+		}
+
+		if (!can_look)
+			actor->control.desired_looking_vector = actor->control.desired_aiming_vector;
+	}
+
+update_facing:
+	if (!actor->state.flying)
+	{
+		if (!realcmp(actor->control.desired_facing_vector.k, 0.0f))
+		{
+			actor->control.desired_facing_vector.k = 0.0f;
+			if (normalize2d((real_vector2d *)&actor->control.desired_facing_vector) == 0.0f)
+				actor->control.desired_facing_vector = actor->input.facing_vector;
+		}
+
+		match_vassert(
+			"c:\\halo\\SOURCE\\ai\\actor_looking.c",
+			1673,
+			valid_real_normal2d((real_vector2d *)&actor->output.facing_vector),
+			csprintf(
+				temporary,
+				"%s: assert_valid_real_normal2d(%f, %f)",
+				"(real_vector2d *) &actor->output.facing_vector",
+				actor->output.facing_vector.i,
+				actor->output.facing_vector.j));
+	}
+
+	if (actor->control.desire_stationary_facing)
+	{
+		if (!actor->control.fixed_stationary_facing)
+		{
+			if (!actor->control.moving &&
+				dot_product3d(&actor->input.aiming_vector, &actor->control.desired_aiming_vector) > 0.9f)
+			{
+				actor->control.fixed_stationary_facing = TRUE;
+				actor->control.fixed_stationary_facing_vector = actor->control.desired_facing_vector;
+			}
+		}
+		else if (definition->defensive.stationary_facing_angle > 0.0f)
+		{
+			real cosine = (real)cos(definition->defensive.stationary_facing_angle);
+			boolean valid;
+
+			if (actor->state.flying)
+			{
+				valid = dot_product3d(&actor->control.desired_facing_vector, &actor->control.fixed_stationary_facing_vector) > cosine &&
+					dot_product3d(&actor->control.desired_aiming_vector, &actor->control.fixed_stationary_facing_vector) > cosine;
+			}
+			else
+			{
+				real_vector2d facing2d;
+				real_vector2d aiming2d;
+				real_vector2d fixed2d;
+
+				facing2d.i = actor->control.desired_facing_vector.i;
+				facing2d.j = actor->control.desired_facing_vector.j;
+				aiming2d.i = actor->control.desired_aiming_vector.i;
+				aiming2d.j = actor->control.desired_aiming_vector.j;
+				fixed2d.i = actor->control.fixed_stationary_facing_vector.i;
+				fixed2d.j = actor->control.fixed_stationary_facing_vector.j;
+
+				valid = normalize2d(&facing2d) != 0.0f &&
+					normalize2d(&aiming2d) != 0.0f &&
+					normalize2d(&fixed2d) != 0.0f &&
+					dot_product2d(&fixed2d, &facing2d) > cosine &&
+					dot_product2d(&aiming2d, &fixed2d) > cosine;
+			}
+
+			if (!valid)
+			{
+				actor->control.fixed_stationary_facing = FALSE;
+				actor_stimulus_abandon_stationary_facing(actor_index);
+			}
+		}
+	}
+	else
+	{
+		actor->control.fixed_stationary_facing = FALSE;
+	}
+
+	actor->output.facing_vector = actor->control.desired_facing_vector;
+	actor->output.aiming_vector = actor->control.desired_aiming_vector;
+	actor->output.looking_vector = actor->control.desired_looking_vector;
+	actor_unit_control_exact_facing(actor_index, actor->control.face_exactly);
+
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1736, &actor->output.facing_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1737, &actor->output.aiming_vector);
+	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1738, &actor->output.looking_vector);
+
+	if (aiming_at_target || actor->orders.look.idle_look_type == _idle_look_combat)
+	{
+		actor->output.aiming_speed = _unit_aiming_speed_alert;
+	}
+	else
+	{
+		switch (actor->control.secondary_look_type)
+		{
+		case _secondary_look_weapon_impact:
+		case _secondary_look_detonation:
+		case _secondary_look_combat_stimulus_prop:
+		case _secondary_look_damage:
+		case _secondary_look_dangerous_object:
+			actor->output.aiming_speed = _unit_aiming_speed_alert;
+			break;
+		default:
+			actor->output.aiming_speed = _unit_aiming_speed_casual;
+			break;
+		}
+	}
+
+	return;
+}
+
+void actor_look_affect_movement(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct direction_specification *movement_direction = &actor->orders.look.primary_direction;
+
+	if (movement_direction->type == _direction_specification_movement &&
+		!actor_path_has_path(actor_index))
+	{
+		actor->orders.look.primary_priority = _primary_priority_none;
+	}
+
+	actor->control.moving_forced_by_aiming =
+		actor->orders.look.primary_priority >= _primary_priority_facing &&
+		movement_direction->type != _direction_specification_movement &&
+		actor_look_decode_direction(
+			actor_index,
+			movement_direction,
+			&actor->control.moving_forced_aim_direction);
+
+	return;
 }
