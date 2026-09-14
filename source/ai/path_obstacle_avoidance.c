@@ -255,14 +255,11 @@ boolean debug_obstacle_path= FALSE;
 
 /* ---------- private code */
 
-long obstacle_from_disc(
+short obstacle_from_disc(
 	struct obstacles const *obstacles,
 	short disc_index)
 {
-	if (disc_index != NONE)
-		return obstacles_get_disc(obstacles, disc_index)->obstacle_index;
-
-	return NONE;
+	return disc_index!=NONE ? obstacles_get_disc(obstacles, disc_index)->obstacle_index : NONE;
 }
 
 struct obstacle_path_step *path_get_step(
@@ -657,7 +654,7 @@ static void path_new(
 	path->goal_found_exactly= FALSE;
 	path->goal= *goal;
 	path->goal_surface_index= goal_surface_index;
-	path->goal_obstacle_index= (short)obstacle_from_disc(obstacles, obstacles_test_circle(obstacles, NONE, goal, radius));
+	path->goal_obstacle_index= obstacle_from_disc(obstacles, obstacles_test_circle(obstacles, NONE, goal, radius));
 	path->finishing= finishing_path;
 	path->goal_step_index= NONE;
 	path->best_goal_blocked_distance= REAL_MAX;

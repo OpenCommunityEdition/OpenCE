@@ -3537,25 +3537,6 @@
     },
     {
       "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_path_add_steps",
-      "class": "register-allocation",
-      "evidence": "Best complete natural reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January and candidate are both 816 padded bytes with all 30 relocation identities; only a private register and word-store allocation tie remains. The real typed step-building algorithm is retained without source-pressure tuning, fake dependencies, invented branches or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 816,
-          "relocation_count": 30,
-          "normalized_sha256": "9e03f302b0caf5a5e6b53433fdded66b356d7b50378c2bb652e4647761ae3f3f"
-        },
-        "base": {
-          "size": 816,
-          "relocation_count": 30,
-          "normalized_sha256": "708637ce28f153838eb46d5a0df699c351dfcac5edd5f13088f8f18646aaadf1"
-        },
-        "objdiff_percent": 99.4
-      }
-    },
-    {
-      "unit": "source/ai/path_obstacle_avoidance",
       "function": "_path_avoid_obstacles",
       "class": "register-allocation",
       "evidence": "Best complete typed reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January is 1360 padded bytes and the natural candidate is 1312, with the same 49 relocation identities; January's boolean/register schedule is not reproduced by the ordinary source. The complete algorithm is retained as honest fuzzy work with no raw offsets, source pressure, nonsensical control flow or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",

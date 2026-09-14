@@ -432,7 +432,7 @@ void render_debug_obstacles(
 __inline struct obstacle_disc const *obstacles_get_disc(
 	struct obstacles const *obstacles,
 	short disc_index);
-long obstacle_from_disc(
+short obstacle_from_disc(
 	struct obstacles const *obstacles,
 	short disc_index);
 void render_debug_path(
