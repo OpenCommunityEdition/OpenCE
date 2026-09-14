@@ -4634,17 +4634,6 @@
       }
     },
     {
-      "unit": "source/structures/structures",
-      "function": "_structure_render_surface_from_point_and_leaf",
-      "class": "instruction-scheduling",
-      "evidence": "Best reviewed natural typed structure-surface query retained from the 2026-09-09 structures packet. It walks the leaf surface references, matches the BSP plane, resolves the lightmap and material, obtains the three environment vertices, tests point_in_triangle3d, and returns the surface/lightmap/material outputs. Target and candidate share the 432-byte envelope and all 13 dependency identities; only statement and register scheduling remain different. Zero exact credit; no representation pun, fake dependency, or raw address is retained.",
-      "measurements": {
-        "target": { "size": 432, "relocation_count": 13, "normalized_sha256": "0554dba934d6bb4545ff3a40d968b5ba8480c15e9820af556c9911ab4e3d0c7d" },
-        "base": { "size": 432, "relocation_count": 13, "normalized_sha256": "b32bba9dfdbb7d999245ad799c2591fc176d3b1890cdcfd459b03f83d93ee6c0" },
-        "objdiff_percent": 84.0875
-      }
-    },
-    {
       "unit": "source/ai/path",
       "function": "_path_state_estimated_distance",
       "class": "unclassified",
@@ -4881,25 +4870,6 @@
           "normalized_sha256": "3b867b30927311d97aed7094ec07a3b176faded2b3bd27c5280dc4e6f734ea4a"
         },
         "objdiff_percent": 90.588234
-      }
-    },
-    {
-      "unit": "source/structures/structures",
-      "function": "_structure_clusters_in_cone",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 26,
-          "normalized_sha256": "7dace3a28da0af6b4ba088102aea9d2cac40a2f8c43ae0a86d7ee0d4fe8b0735"
-        },
-        "base": {
-          "size": 480,
-          "relocation_count": 25,
-          "normalized_sha256": "771335c67292ccfe8f04ecaa7bb5b27615bfd70b652087e19fc7589004a557d9"
-        },
-        "objdiff_percent": 84.54967
       }
     },
     {

@@ -490,6 +490,7 @@ boolean structure_render_surface_from_point_and_leaf(
 		leaf_index & LONG_MAX,
 		struct structure_leaf);
 	long surface_reference_index;
+	boolean found = FALSE;
 
 	for (surface_reference_index = leaf->first_surface_reference_index;
 		surface_reference_index <
@@ -500,17 +501,15 @@ boolean structure_render_surface_from_point_and_leaf(
 			&structure->surface_references,
 			surface_reference_index,
 			struct structure_surface_reference);
-		long bsp3d_node_index = surface_reference->bsp3d_node_index;
 
-		if (bsp3d_node_index != NONE)
+		if (surface_reference->bsp3d_node_index != NONE)
 		{
-			struct collision_bsp *collision_bsp = TAG_BLOCK_GET_ELEMENT(
-				&structure->collision_bsp,
-				0,
-				struct collision_bsp);
 			struct bsp3d_node *node = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->bsp3d.nodes,
-				bsp3d_node_index,
+				&TAG_BLOCK_GET_ELEMENT(
+					&structure->collision_bsp,
+					0,
+					struct collision_bsp)->bsp3d.nodes,
+				surface_reference->bsp3d_node_index,
 				struct bsp3d_node);
 
 			if (node->plane_designator == plane_index)
@@ -568,14 +567,15 @@ boolean structure_render_surface_from_point_and_leaf(
 						t))
 					{
 						*surface_index = surface_reference->surface_index;
-						return TRUE;
+						found = TRUE;
+						break;
 					}
 				}
 			}
 		}
 	}
 
-	return FALSE;
+	return found;
 }
 
 void render_debug_fog_planes(
@@ -718,7 +718,7 @@ short structure_clusters_in_cone(
 	cluster_stack[0] = position_cluster_index;
 	stack_depth = 1;
 
-	while (cluster_count < maximum_cluster_count && stack_depth > 0)
+	while (stack_depth > 0 && cluster_count < maximum_cluster_count)
 	{
 		short cluster_index = cluster_stack[--stack_depth];
 		struct structure_cluster_graph *cluster = TAG_BLOCK_GET_ELEMENT(
