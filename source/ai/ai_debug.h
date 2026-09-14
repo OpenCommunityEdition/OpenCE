@@ -399,7 +399,16 @@ struct actor_debug_info
 	real_point3d burst_last_known_position;
 	real_point3d burst_tracked_position;
 	real_vector3d burst_lead_vector;
-	char __unknown1C[40];
+	struct
+	{
+		long time;
+		boolean aligned;
+		boolean aligned_immediately;
+		real_vector3d weapon_vector;
+		real_vector3d aim_vector;
+		real threshold;
+		real alignment;
+	} burst_alignment;
 	long last_projectile_aiming_time;
 	boolean field_60;
 	real_point3d field_64;
