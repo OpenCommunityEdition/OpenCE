@@ -841,6 +841,8 @@ static char blip_type_get(
 	long owner_player_index;
 	long controlling_local_player_index;
 	struct unit_datum *unit;
+	long team_index;
+	char blip_type;
 
 	if (object_index == NONE)
 		return _blip_type_custom;
@@ -852,26 +854,34 @@ static char blip_type_get(
 	if (controlling_local_player_index == local_player_index)
 		return _blip_type_self;
 
-	unit = unit_try_and_get(object_index);
-	if (!unit)
+	if (!unit_try_and_get(object_index))
 		return _blip_type_enemy;
 
 	unit = unit_get(object_index);
 	if (vehicle_try_and_get(object_index))
 	{
 		struct unit_datum *vehicle = vehicle_get(object_index);
-		long seat_unit_index = vehicle->unit.gunner_object_index;
 
-		if (seat_unit_index == NONE)
-			seat_unit_index = vehicle->unit.driver_object_index;
-
-		if (seat_unit_index != NONE)
+		if (vehicle->unit.gunner_object_index != NONE)
 		{
-			return (char)(
-				_blip_type_vehicle_friend +
-				(game_team_is_enemy(
-					unit_get(seat_unit_index)->object.owner_team_index,
-					local_player_team) != FALSE));
+			struct unit_datum *seat_unit = unit_get(vehicle->unit.gunner_object_index);
+
+			blip_type = (game_team_is_enemy(
+				seat_unit->object.owner_team_index,
+				local_player_team) != FALSE) + _blip_type_vehicle_friend;
+
+			return blip_type;
+		}
+
+		if (vehicle->unit.driver_object_index != NONE)
+		{
+			struct unit_datum *seat_unit = unit_get(vehicle->unit.driver_object_index);
+
+			blip_type = (game_team_is_enemy(
+				seat_unit->object.owner_team_index,
+				local_player_team) != FALSE) + _blip_type_vehicle_friend;
+
+			return blip_type;
 		}
 
 		{
@@ -893,12 +903,12 @@ static char blip_type_get(
 		return _blip_type_vehicle_friend;
 	}
 
-	return (char)(
-		_blip_type_friend +
-		(game_team_is_enemy(
-			unit->object.owner_team_index,
-			player_get(
-				local_player_get_player_index(local_player_index))->team_index) != FALSE));
+	team_index = player_get(local_player_get_player_index(local_player_index))->team_index;
+	blip_type = (game_team_is_enemy(
+		unit->object.owner_team_index,
+		team_index) != FALSE) + _blip_type_friend;
+
+	return blip_type;
 }
 
 static void motion_sensor_blip_set_type_and_size(
@@ -906,22 +916,24 @@ static void motion_sensor_blip_set_type_and_size(
 	long unit_index,
 	long local_player_index)
 {
+	char blip_size;
+
 	blip->type = blip_type_get(unit_index, local_player_index);
 	if (unit_index != NONE && unit_try_and_get(unit_index))
 	{
 		struct unit_definition *definition =
 			unit_definition_get(unit_get(unit_index)->definition_index);
-		short blip_size = definition->unit.blip_type;
+		short size_type = definition->unit.blip_type;
 
-		if (!VALID_INDEX(blip_size, NUMBER_OF_HUD_BLIP_TYPES))
-			blip->size = _hud_blip_type_medium;
-		else
-			blip->size = (char)blip_size;
+		if (!VALID_INDEX(size_type, NUMBER_OF_HUD_BLIP_TYPES))
+			size_type = _hud_blip_type_medium;
+		blip_size = (char)size_type;
 	}
 	else
 	{
-		blip->size = _hud_blip_type_medium;
+		blip_size = _hud_blip_type_medium;
 	}
+	blip->size = blip_size;
 
 	return;
 }
@@ -999,37 +1011,40 @@ static void blip_begin(
 static boolean should_draw_object(
 	long object_index)
 {
-	struct unit_datum *unit;
-	real_vector3d velocity;
-	boolean visible;
-	boolean moving;
+	boolean result = FALSE;
 
-	if (!unit_try_and_get(object_index) ||
-		!game_engine_draw_object_in_motion_sensor(object_index))
+	if (unit_try_and_get(object_index) &&
+		game_engine_draw_object_in_motion_sensor(object_index))
 	{
-		return FALSE;
+		struct unit_datum *unit = unit_get(object_index);
+
+		if (TEST_FLAG(
+			unit->unit.control_flags,
+			_unit_control_weapon_primary_trigger_bit) ||
+			(unit->unit.grenade_throw_state != _unit_grenade_throw_idle &&
+				unit->unit.grenade_throw_state != _unit_grenade_throw_ending))
+		{
+			result = TRUE;
+		}
+		else
+		{
+			real_vector3d velocity;
+			boolean visible;
+			boolean moving;
+
+			object_get_velocities(object_index, &velocity, NULL);
+			visible = (boolean)(
+				game_engine_running() ||
+				!TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit));
+			moving = (boolean)(
+				magnitude_squared3d(&velocity) >=
+					hud_globals->defaults.motion_sensor_velocity_sensitivity ||
+				debug_motion_sensor_draw_all_units);
+			result = (boolean)(visible && moving);
+		}
 	}
 
-	unit = unit_get(object_index);
-	if (TEST_FLAG(
-		unit->unit.control_flags,
-		_unit_control_weapon_primary_trigger_bit) ||
-		(unit->unit.grenade_throw_state != _unit_grenade_throw_idle &&
-			unit->unit.grenade_throw_state != _unit_grenade_throw_ending))
-	{
-		return TRUE;
-	}
-
-	object_get_velocities(object_index, &velocity, NULL);
-	visible = (boolean)(
-		game_engine_running() ||
-		!TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit));
-	moving = (boolean)(
-		magnitude_squared3d(&velocity) >=
-			hud_globals->defaults.motion_sensor_velocity_sensitivity ||
-		debug_motion_sensor_draw_all_units);
-
-	return (boolean)(visible && moving);
+	return result;
 }
 
 static void render_blip(

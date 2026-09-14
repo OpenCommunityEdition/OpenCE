@@ -5458,47 +5458,9 @@
     },
     {
       "unit": "source/interface/motion_sensor",
-      "function": "_blip_type_get",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 21,
-          "normalized_sha256": "cb65a91e416950514c828a2fbed685df031a289140a3218812a754128d8ad64e"
-        },
-        "base": {
-          "size": 368,
-          "relocation_count": 21,
-          "normalized_sha256": "96890d3f5ec91d4143be970194bfa3cfdeb3d43cc5a1e85c699db8d4b1b3c948"
-        },
-        "objdiff_percent": 82.347824
-      }
-    },
-    {
-      "unit": "source/interface/motion_sensor",
-      "function": "_motion_sensor_blip_set_type_and_size",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 96,
-          "relocation_count": 4,
-          "normalized_sha256": "c28dfa90e22bd48348034ae8cb472a5b6d0ebe45476d8ff47bcdaa672c060a5d"
-        },
-        "base": {
-          "size": 96,
-          "relocation_count": 4,
-          "normalized_sha256": "9017714cf6af70be634c7df315274d181143f59c15e804a30813e339c331574e"
-        },
-        "objdiff_percent": 89.84849
-      }
-    },
-    {
-      "unit": "source/interface/motion_sensor",
       "function": "_motion_sensor_update",
       "class": "unclassified",
-      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. January emits the otherwise-discarded game_engine_running call immediately before the live game_time_get call, and the later first-party HCEA PDB assigns the two calls distinct source lines, so the former is an authenticated source quirk rather than fake matching. January and the accepted HUD family also authenticate the return-EIP and 0x62 stack-sentinel diagnostics. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. January emits the otherwise-discarded game_engine_running call immediately before the live game_time_get call, and the later first-party HCEA PDB assigns the two calls distinct source lines, so the former is an authenticated source quirk rather than fake matching. January and the accepted HUD family also authenticate the return-EIP and 0x62 stack-sentinel diagnostics. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1, adversarially verified) the reopened private callees blip_type_get / motion_sensor_blip_set_type_and_size / should_draw_object fixed their January ABIs; this parked caller's call sites follow (same size and relocations), still fuzzy. See docs/object_matching_logs/motion_sensor_obj_opus5_150k_w1_20260914.md.",
       "measurements": {
         "target": {
           "size": 1168,
@@ -5508,9 +5470,9 @@
         "base": {
           "size": 1136,
           "relocation_count": 44,
-          "normalized_sha256": "a500a22dabf0b552854bfa0f08476cc706ba2062cb3c0f3b59d89d706f99c0c6"
+          "normalized_sha256": "40e4819de2760a22f92de216083517f8387393c10f58017b139c756f60fe1e99"
         },
-        "objdiff_percent": 60.598267
+        "objdiff_percent": 60.86127
       }
     },
     {
@@ -5553,28 +5515,9 @@
     },
     {
       "unit": "source/interface/motion_sensor",
-      "function": "_should_draw_object",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 7,
-          "normalized_sha256": "13cd9e4469147c6d8d340c8f80647e653a8e0ef1bf957b9cfb7b09eef6360f66"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 7,
-          "normalized_sha256": "8b893ff8a14a03489422f2a2bd1d6de7dc1ff67db399367a3949da5bb4fcd02d"
-        },
-        "objdiff_percent": 85.988235
-      }
-    },
-    {
-      "unit": "source/interface/motion_sensor",
       "function": "_update_motion_sensor",
       "class": "unclassified",
-      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. Two decompiler-style 0.0f products were removed in favor of the typed magnitude_squared2d helper already used by this TU; January's two zero-real relocations reflect unresolved x87 scheduling and are not recreated with fake source pressure. The otherwise-discarded game_time_get call and the return-EIP/0x62 stack-sentinel diagnostics are present in January and independently authenticated by the later first-party HCEA build/PDB. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. Two decompiler-style 0.0f products were removed in favor of the typed magnitude_squared2d helper already used by this TU; January's two zero-real relocations reflect unresolved x87 scheduling and are not recreated with fake source pressure. The otherwise-discarded game_time_get call and the return-EIP/0x62 stack-sentinel diagnostics are present in January and independently authenticated by the later first-party HCEA build/PDB. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1, adversarially verified) the reopened private callees fixed their January ABIs; this parked caller follows and moves strictly closer to January (816 of 864 bytes, 37 relocations), still fuzzy. See docs/object_matching_logs/motion_sensor_obj_opus5_150k_w1_20260914.md.",
       "measurements": {
         "target": {
           "size": 864,
@@ -5582,11 +5525,11 @@
           "normalized_sha256": "b37814ed8aaa3427a5d8e1fe1327e22cc80190383562143e94c35df03f5db06b"
         },
         "base": {
-          "size": 800,
+          "size": 816,
           "relocation_count": 37,
-          "normalized_sha256": "84b9c39937441c96077c365acc97afd3875f9cbd58bc70cee61dab9e7d421f0c"
+          "normalized_sha256": "5bae910d9c27cad0c50ecad905a614a6bc13edc3c450c1717918dbeea76355aa"
         },
-        "objdiff_percent": 74.21111
+        "objdiff_percent": 76.04444
       }
     },
     {
