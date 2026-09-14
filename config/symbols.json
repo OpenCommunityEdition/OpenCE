@@ -22199,7 +22199,7 @@
 { "file_offset": 3189352, "flags": 0, "name": "_data_0030aa68" },
 { "file_offset": 3191472, "flags": 0, "name": "_data_0030b2b0" },
 { "file_offset": 3191672, "flags": 0, "name": "_object_deleted_procs" },
-{ "file_offset": 3191688, "flags": 0, "name": "_data_0030b388" },
+{ "file_offset": 3191688, "flags": 0, "name": "_lights_section", "static": true },
 { "file_offset": 3193216, "flags": 0, "name": "_object_light_ambient_base" },
 { "file_offset": 3193220, "flags": 0, "name": "_object_light_ambient_scale" },
 { "file_offset": 3193224, "flags": 0, "name": "_object_light_secondary_scale" },

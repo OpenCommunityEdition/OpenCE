@@ -1614,50 +1614,6 @@
       }
     },
     {
-      "unit": "source/objects/object_lights",
-      "function": "_light_unmarked",
-      "class": "unclassified",
-      "evidence": "The retained private helper is the direct semantic predicate `lights_globals.marker != light->marker`, naturally called by the reconstructed find_point_lights_for_object_in_cluster graph. Restoring that genuine same-TU graph naturally moves the one-expression helper to the January 96-byte envelope with the same eight relocation identities, but its normalized stream remains different. The previously discovered if/return/return spelling reaches the January stream only by artificial source topology and remains explicitly rejected. Reopen only for authoritative January source or independent evidence for a natural historical control-flow spelling. Do not admit the known byte-oriented respelling, volatile state, dead branches, assembly, or a fake caller.",
-      "measurements": {
-        "target": { "size": 96, "relocation_count": 8, "normalized_sha256": "6aa93207648f0793874a395bb091edda96bd71c50fd33a1eb3ef9d34ce6ff498" },
-        "base": { "size": 96, "relocation_count": 8, "normalized_sha256": "721187363fa3f19cc22344982ff520d8431a5982c19d84e4234e0c8f16c16f3c" },
-        "objdiff_percent": 92.22222
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
-      "function": "_find_point_lights_for_object_in_cluster",
-      "class": "instruction-scheduling",
-      "evidence": "The authenticated private helper is naturally retained because lights_prepare_for_object_dynamic calls it; it traverses the real cluster light partition and uses light_unmarked/light_mark as one link-closed marker packet. The complete typed body is corroborated by January disassembly and the later HCEA reconstruction. Target and candidate have the same 560-byte padded envelope and all 31 relocation identities; the generated report records 99.3617 percent similarity, with the residual confined to ordinary instruction scheduling. No uncalled duplicate, address-derived name, dummy carrier, forced inline, volatile access, fake dependency, manual address logic, or assembly is retained. Reopen only for authoritative January source or independent same-compiler evidence for the traversal/lifetime schedule.",
-      "measurements": {
-        "target": { "size": 560, "relocation_count": 31, "normalized_sha256": "39d22fa1133941bdd6a0b52cfe5ff4e0df3e109e21e6318f46774740811f96be" },
-        "base": { "size": 560, "relocation_count": 31, "normalized_sha256": "3c814b365210b7757eb6ba5dee596c15ec8fefe476a335ad299af138e89876a2" },
-        "objdiff_percent": 99.3617
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
-      "function": "_build_distant_lights",
-      "class": "instruction-scheduling",
-      "evidence": "The retained private helper is complete typed lighting source corroborated by the later HCEA reconstruction and January's control flow, data references, and 78 relocation identities. The candidate has the same semantic stages and every target relocation but differs in a narrow x87 schedule around construction of the horizontal shadow vector, producing a 1008-byte section versus January's 1024-byte envelope. The generated report records 96.383835 percent similarity. No behavior is missing, and no volatile access, artificial dependency, register forcing, inline assembly, optimizer pragma, or target-shaped control flow is retained. Reopen only for authoritative January source or natural same-compiler source-shape evidence that explains the x87 store/reload schedule.",
-      "measurements": {
-        "target": { "size": 1024, "relocation_count": 78, "normalized_sha256": "9040b294b2196ad5856ae91dc985071fc099c4df2afc3095ea8b2c49bf62529c" },
-        "base": { "size": 1008, "relocation_count": 78, "normalized_sha256": "1b4925a4b1ee51c16c1e16898040c719aae5cd39a2431a3adeb7a37802da1891" },
-        "objdiff_percent": 96.383835
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
-      "function": "_lights_prepare_for_object_static",
-      "class": "instruction-scheduling",
-      "evidence": "The retained public function is complete typed static-object lighting source corroborated by the later HCEA reconstruction and January's calls, constants, and all 17 relocation identities. Target and candidate have the same 832-byte envelope; the generated report records 97.64286 percent similarity, with the residual confined to a short point.z load/store interleaving and ordinary x87 instruction scheduling. The implementation preserves the January scale_vector3d inline schedule and does not emit point_from_line3d. No volatile access, artificial dependency, register forcing, inline assembly, optimizer pragma, or target-shaped branch is retained. Reopen only for authoritative January source or natural same-compiler evidence for the local declaration/evaluation schedule.",
-      "measurements": {
-        "target": { "size": 832, "relocation_count": 17, "normalized_sha256": "99209b5ebb1bce3e750c483032987911774acc613c74965847b808a3d7fc5068" },
-        "base": { "size": 832, "relocation_count": 17, "normalized_sha256": "b4b295c47c7202130f3af582bbe93e05d6acfb9d0846eade9a78ad29b8cf04b1" },
-        "objdiff_percent": 97.64286
-      }
-    },
-    {
       "unit": "source/bungie_net/common/thread_win32",
       "function": "_get_mutex_from_pool",
       "class": "csplit-relocation-alias",
@@ -6427,17 +6383,6 @@
         "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
         "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "a112cf32c0e3baf805bd69c440b5beadbe51394f6a7f3161f61d4c470ea88292" },
         "objdiff_percent": 93.48387
-      }
-    },
-    {
-      "unit": "source/objects/object_lights",
-      "function": "_lights_preprocess_scene",
-      "class": "register-allocation",
-      "evidence": "Complete HCEA-guided, January-corrected scene-light preprocessing graph retained from the 2026-09-12 packet. Target and candidate have identical 2400-byte extents, 165 relocations, call order, and behavior; the measured residual is systematic local allocation/instruction scheduling, including a 0x3E0 candidate frame versus January's 0x3DC. Artificial locals and register steering are rejected, and the body receives zero credit. See docs/object_matching_logs/object_lights_obj_preprocess_scene_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 2400, "relocation_count": 165, "normalized_sha256": "726548627571357009de646c259615ae7b6df8ca5abe3e1d13018ee126e28b52" },
-        "base": { "size": 2400, "relocation_count": 165, "normalized_sha256": "32951ca676c566965d56b67a33c516271944eb950d93c6e02e67304edf985368" },
-        "objdiff_percent": 95.15638
       }
     },
     {

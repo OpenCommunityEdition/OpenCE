@@ -810,18 +810,17 @@ void lights_preprocess_scene(
 		light_index = data_next_index(light_data, light_index))
 	{
 		struct light_datum *light = light_get(light_index);
-		long transition_start_time = light->parent_light_index;
 
 		SET_FLAG(
 			light->flags,
 			_point_light_attached_to_first_person_weapon_bit,
 			FALSE);
 		light->rasterizer_light_index = NONE;
-		if (transition_start_time != NONE)
+		if (light->parent_light_index != NONE)
 		{
 			struct light_definition *definition = light_definition_get(
 				light->definition_index);
-			real elapsed = (real)(current_time - transition_start_time);
+			real elapsed = (real)(current_time - light->parent_light_index);
 
 			if (elapsed > definition->transition_duration)
 			{
@@ -937,14 +936,13 @@ void lights_preprocess_scene(
 			if (TEST_FLAG(_object_mask_unit, ultimate_parent->object.type))
 			{
 				struct unit_datum *parent_unit = unit_get(ultimate_parent_index);
-				real active_camouflage = parent_unit->unit.active_camouflage;
 
-				if (active_camouflage > 0.0f
+				if (parent_unit->unit.active_camouflage > 0.0f
 					&& !TEST_FLAG(
 						light_definition_get(light->definition_index)->flags,
 						_light_definition_dont_fade_active_camouflage_bit))
 				{
-					lens_flare_scale = 1.0f - active_camouflage;
+					lens_flare_scale = 1.0f - parent_unit->unit.active_camouflage;
 					light->color.red *= lens_flare_scale;
 					light->color.green *= lens_flare_scale;
 					light->color.blue *= lens_flare_scale;
@@ -982,8 +980,8 @@ void lights_preprocess_scene(
 					light_parameters.position = light->position;
 					light_parameters.forward = light->forward;
 					light_parameters.up = light->up;
-					light_parameters.color = light->color;
 					light_parameters.radius = light->radius;
+					light_parameters.color = light->color;
 					match_assert(
 						"c:\\halo\\SOURCE\\objects\\object_lights.c",
 						0x1EE,
@@ -1106,7 +1104,7 @@ void lights_preprocess_scene(
 						lens_flare_parameters.position = markers[marker_index].matrix.position;
 						lens_flare_parameters.compressed_direction =
 							compress_real_vector3d_to_int32_clamp(
-								&markers[marker_index].matrix.left);
+								&markers[marker_index].matrix.forward);
 						lens_flare_parameters.compressed_up =
 							compress_real_vector3d_to_int32_clamp(
 								&markers[marker_index].matrix.up);
@@ -1412,8 +1410,12 @@ static boolean light_unmarked(
 		"c:\\halo\\SOURCE\\objects\\object_lights.c",
 		0x66F,
 		lights_globals.marker_initialized);
+	if (light->marker != lights_globals.marker)
+	{
+		return TRUE;
+	}
 
-	return lights_globals.marker != light->marker;
+	return FALSE;
 }
 
 static void light_marker_end(
@@ -2048,8 +2050,7 @@ static void build_distant_lights(
 	accuracy = power(radiosity_accuracy, 0.25f);
 	lighting->shadow_vector.i = lighting->distant_lights[0].direction.i * accuracy;
 	lighting->shadow_vector.j = lighting->distant_lights[0].direction.j * accuracy;
-	horizontal_length = square_root(lighting->shadow_vector.i * lighting->shadow_vector.i
-		+ lighting->shadow_vector.j * lighting->shadow_vector.j);
+	horizontal_length = magnitude2d((real_vector2d *)&lighting->shadow_vector);
 	if (horizontal_length < 0.707f)
 	{
 		lighting->shadow_vector.k = -square_root(1.0f - horizontal_length * horizontal_length);
@@ -2057,8 +2058,9 @@ static void build_distant_lights(
 	else
 	{
 		lighting->shadow_vector.k = -0.707f;
-		lighting->shadow_vector.i *= 0.707f / horizontal_length;
-		lighting->shadow_vector.j *= 0.707f / horizontal_length;
+		horizontal_length = 0.707f / horizontal_length;
+		lighting->shadow_vector.i *= horizontal_length;
+		lighting->shadow_vector.j *= horizontal_length;
 	}
 	ambient = (1.0f - radiosity_accuracy) * 0.5f;
 	lighting->shadow_color.red = PIN(1.0f - lighting->distant_lights[0].color.red * 1.3f + ambient,
@@ -2271,7 +2273,6 @@ void lights_prepare_for_object_static(
 {
 	struct object_datum *object = object_get(object_index);
 	long flags = 0;
-	real_point3d point;
 	struct render_lighting sample;
 	short sample_count;
 	short corner_index;
@@ -2310,6 +2311,8 @@ void lights_prepare_for_object_static(
 	}
 	for (corner_index = 0; corner_index < 4; corner_index++)
 	{
+		real_point3d point;
+
 		point.x = (TEST_FLAG(corner_index, 0) ? 0.70710678f : -0.70710678f)
 			* object->object.bounding_sphere_radius
 			+ object->object.bounding_sphere_center.x;
