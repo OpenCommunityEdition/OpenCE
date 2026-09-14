@@ -530,10 +530,9 @@ static boolean hud_draw_multitexture_overlay_get_current_weapon_definition(
 		if (unit->object.parent_object_index != NONE &&
 			unit->unit.parent_seat_index != NONE)
 		{
-			struct unit_definition *parent_definition = unit_definition_get(
-				unit_get(unit->object.parent_object_index)->definition_index);
+			struct unit_datum *parent_unit = unit_get(unit->object.parent_object_index);
 			struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
-				&parent_definition->unit.seats,
+				&unit_definition_get(parent_unit->definition_index)->unit.seats,
 				unit->unit.parent_seat_index,
 				struct unit_seat);
 
@@ -576,9 +575,9 @@ static void hud_draw_multitexture_overlay(
 	real theta,
 	pixel32 color)
 {
-	static real animation_phase;
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
+	struct player_datum *player;
 	struct weapon_interface_state weapon_state;
 	struct dynamic_screen_vertex vertices[4];
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
@@ -617,16 +616,16 @@ static void hud_draw_multitexture_overlay(
 	geometry_offset.j = 0.0f;
 	cos_theta = (real)cos(theta);
 
+	player = player_get(local_player_get_player_index(local_player_index));
 	hud_draw_multitexture_overlay_get_current_weapon_definition(
-		player_get(local_player_get_player_index(local_player_index)),
+		player,
 		&weapon_state);
 
 	for (vertex_index = 0; vertex_index < 4; vertex_index++)
 	{
-		long use_x1 = (vertex_index + 1) & 2;
-		real texture_x = use_x1 ? clip->x1 : clip->x0;
+		real texture_x = ((vertex_index + 1) & 2) ? clip->x1 : clip->x0;
 		real texture_y = vertex_index > 1 ? clip->y1 : clip->y0;
-		real bound_x = use_x1 ? bounds->x1 : bounds->x0;
+		real bound_x = ((vertex_index + 1) & 2) ? bounds->x1 : bounds->x0;
 		real bound_y = vertex_index > 1 ? bounds->y1 : bounds->y0;
 
 		vertices[vertex_index].position.x = (real)(point->x + fast_ftol(
@@ -641,9 +640,9 @@ static void hud_draw_multitexture_overlay(
 	csmemset(&parameters, 0, sizeof(parameters));
 	parameters.map_texture_scale[0].j = 1.0f;
 	parameters.map_texture_scale[0].i = 1.0f;
-	parameters.meter_parameters = NULL;
 	parameters.map_scale[0].j = 1.0f;
 	parameters.map_scale[0].i = 1.0f;
+	parameters.meter_parameters = NULL;
 	parameters.point_sampled = local_player_count() == 1;
 	parameters.map[0] = bitmap_group_get_bitmap_from_sequence(
 		overlay->map[0].index,
@@ -660,22 +659,22 @@ static void hud_draw_multitexture_overlay(
 
 	for (map_index = 0; map_index < 3; map_index++)
 	{
-		struct bitmap_data *bitmap = parameters.map[map_index];
-
-		if (bitmap)
+		if (parameters.map[map_index])
 		{
 			real scale_x = overlay->map_scale[map_index].i == 0.0f ?
 				1.0f : 1.0f/overlay->map_scale[map_index].i;
 			real scale_y = overlay->map_scale[map_index].j == 0.0f ?
 				1.0f : 1.0f/overlay->map_scale[map_index].j;
+			boolean non_power_of_two =
+				((parameters.map[map_index]->width-1)&parameters.map[map_index]->width) != 0 ||
+				((parameters.map[map_index]->height-1)&parameters.map[map_index]->height) != 0;
 
-			if (((bitmap->width-1)&bitmap->width) != 0 ||
-				((bitmap->height-1)&bitmap->height) != 0)
+			if (non_power_of_two)
 			{
 				parameters.map_texture_scale[map_index].i =
-					1.0f/(real)bitmap->width;
+					1.0f/(real)parameters.map[map_index]->width;
 				parameters.map_texture_scale[map_index].j =
-					1.0f/(real)bitmap->height;
+					1.0f/(real)parameters.map[map_index]->height;
 			}
 			else
 			{
@@ -736,30 +735,27 @@ static void hud_draw_multitexture_overlay(
 		function_index < overlay->functions.count;
 		function_index++)
 	{
-		struct multitexture_overlay_hud_element_effector_definition *effector =
-			TAG_BLOCK_GET_ELEMENT(
-				&overlay->functions,
-				function_index,
-				struct multitexture_overlay_hud_element_effector_definition);
+		static real theta;
+		struct multitexture_overlay_hud_element_effector_definition *effector;
 		real source_value;
 		real dest_value;
 		real_rgb_color dest_color;
 
-		animation_phase += 0.05f;
+		theta += 0.05f;
+		effector = TAG_BLOCK_GET_ELEMENT(
+			&overlay->functions,
+			function_index,
+			struct multitexture_overlay_hud_element_effector_definition);
 
 		switch (effector->source)
 		{
 		case _hud_multitexture_overlay_effector_source_player_pitch:
 			{
-				long unit_index = local_player_get_player_index(local_player_index);
+				long unit_index = local_player_get_player_index(local_player_index) == NONE ?
+					NONE :
+					player_get(local_player_get_player_index(local_player_index))->unit_index;
 				real_vector3d direction;
 				real_euler_angles2d angles;
-
-				if (unit_index == NONE)
-					unit_index = 0;
-				else
-					unit_index = player_get(
-						local_player_get_player_index(local_player_index))->unit_index;
 
 				unit_get_aiming_vector(unit_index, &direction);
 				euler_angles2d_from_vector3d(&angles, &direction);
@@ -844,12 +840,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				texture_offset[0].x += dest_value;
+				((real_point2d *)parameters.map_offset[0])->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				texture_offset[0].y += dest_value;
+				((real_point2d *)parameters.map_offset[0])->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
@@ -873,12 +869,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				texture_offset[1].x += dest_value;
+				((real_point2d *)parameters.map_offset[1])->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				texture_offset[1].y += dest_value;
+				((real_point2d *)parameters.map_offset[1])->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
@@ -902,12 +898,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				texture_offset[2].x += dest_value;
+				((real_point2d *)parameters.map_offset[2])->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				texture_offset[2].y += dest_value;
+				((real_point2d *)parameters.map_offset[2])->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
