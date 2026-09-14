@@ -3623,13 +3623,14 @@ boolean actor_swarm_attach_unit(
 	struct actor_datum *actor;
 	struct unit_datum *unit;
 	boolean succeeded;
-	long component_index = NONE;
 
 	actor = actor_get(actor_index);
 	unit = unit_get(unit_index);
 	succeeded = TRUE;
 	if (unit->unit.swarm_actor_index != actor_index)
 	{
+		long component_index = NONE;
+
 		if (actor->meta.swarm_cache_index != NONE)
 		{
 			component_index = datum_new(swarm_component_data);
@@ -3640,73 +3641,74 @@ boolean actor_swarm_attach_unit(
 					_error_silent,
 					"unable to create any more swarm components (max %d)",
 					MAXIMUM_SWARM_COMPONENTS);
-
-				return succeeded;
 			}
 		}
 
-		if (unit->unit.swarm_actor_index != NONE)
+		if (succeeded)
 		{
-			actor_swarm_detach_from_unit(unit->unit.swarm_actor_index, unit_index);
+			if (unit->unit.swarm_actor_index != NONE)
+			{
+				actor_swarm_detach_from_unit(unit->unit.swarm_actor_index, unit_index);
+			}
+
+			if (unit->unit.actor_index != NONE)
+			{
+				actor_delete(unit->unit.actor_index, FALSE);
+			}
+
+			if (actor->meta.unit_index != NONE)
+			{
+				actor_detach_from_unit(actor_index);
+			}
+
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1299, actor->meta.swarm);
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1300, actor->meta.unit_index == NONE);
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1301, unit->unit.actor_index == NONE);
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1302, unit->unit.swarm_actor_index == NONE);
+			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1305, actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
+
+			unit->unit.swarm_actor_index = actor_index;
+			unit->unit.swarm_next_unit_index = actor->meta.swarm_unit_index;
+			unit->unit.swarm_prev_unit_index = NONE;
+			if (actor->meta.swarm_unit_index != NONE)
+			{
+				struct unit_datum *swarm_first_unit = unit_get(actor->meta.swarm_unit_index);
+
+				match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1316, swarm_first_unit->unit.swarm_prev_unit_index == NONE);
+				swarm_first_unit->unit.swarm_prev_unit_index = unit_index;
+			}
+			actor->meta.swarm_unit_index = unit_index;
+
+			if (actor->meta.swarm_cache_index != NONE)
+			{
+				actor_swarm_component_setup(
+					actor->meta.swarm_cache_index,
+					unit_index,
+					component_index);
+			}
+
+			actor->meta.swarm_unit_count++;
+			actor->meta.swarm_original_unit_count++;
+			if (actor->meta.encounter_index != NONE)
+			{
+				struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
+
+				encounter_attach_unit(actor->meta.encounter_index, unit_index);
+				unit->object.owner_team_index = encounter->team_index;
+			}
+
+			actor->meta.team_index = unit->object.owner_team_index;
+			object_set_automatic_deactivation(unit_index, FALSE);
+			if (actor->meta.dormant)
+			{
+				object_deactivate(unit_index);
+			}
+			else
+			{
+				object_activate(unit_index);
+			}
+			unit_set_actively_controlled(unit_index, TRUE);
 		}
-
-		if (unit->unit.actor_index != NONE)
-		{
-			actor_delete(unit->unit.actor_index, FALSE);
-		}
-
-		if (actor->meta.unit_index != NONE)
-		{
-			actor_detach_from_unit(actor_index);
-		}
-
-		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1299, actor->meta.swarm);
-		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1300, actor->meta.unit_index == NONE);
-		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1301, unit->unit.actor_index == NONE);
-		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1302, unit->unit.swarm_actor_index == NONE);
-		match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1305, actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM);
-
-		unit->unit.swarm_actor_index = actor_index;
-		unit->unit.swarm_next_unit_index = actor->meta.swarm_unit_index;
-		unit->unit.swarm_prev_unit_index = NONE;
-		if (actor->meta.swarm_unit_index != NONE)
-		{
-			struct unit_datum *swarm_first_unit = unit_get(actor->meta.swarm_unit_index);
-
-			match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 1316, swarm_first_unit->unit.swarm_prev_unit_index == NONE);
-			swarm_first_unit->unit.swarm_prev_unit_index = unit_index;
-		}
-		actor->meta.swarm_unit_index = unit_index;
-
-		if (actor->meta.swarm_cache_index != NONE)
-		{
-			actor_swarm_component_setup(
-				actor->meta.swarm_cache_index,
-				unit_index,
-				component_index);
-		}
-
-		actor->meta.swarm_unit_count++;
-		actor->meta.swarm_original_unit_count++;
-		if (actor->meta.encounter_index != NONE)
-		{
-			struct encounter_datum *encounter = encounter_get(actor->meta.encounter_index);
-
-			encounter_attach_unit(actor->meta.encounter_index, unit_index);
-			unit->object.owner_team_index = encounter->team_index;
-		}
-
-		actor->meta.team_index = unit->object.owner_team_index;
-		object_set_automatic_deactivation(unit_index, FALSE);
-		if (actor->meta.dormant)
-		{
-			object_deactivate(unit_index);
-		}
-		else
-		{
-			object_activate(unit_index);
-		}
-		unit_set_actively_controlled(unit_index, TRUE);
 	}
 
 	return succeeded;
