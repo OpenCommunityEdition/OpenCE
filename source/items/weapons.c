@@ -2478,13 +2478,13 @@ static void weapon_trigger_fire(
 		{
 			effect_type= _trigger_firing_effect;
 			effect_scale= trigger->rate_of_fire;
-			if (weapon_definition->weapon.heat_overheated_threshold!=0.0f)
+			if (weapon_definition->weapon.heat_overheated_threshold==0.0f)
 			{
-				effect_error= weapon->weapon.heat/weapon_definition->weapon.heat_overheated_threshold;
+				effect_error= 0.0f;
 			}
 			else
 			{
-				effect_error= 0.0f;
+				effect_error= weapon->weapon.heat/weapon_definition->weapon.heat_overheated_threshold;
 			}
 		}
 
