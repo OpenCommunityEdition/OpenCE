@@ -174,23 +174,26 @@ static void randomize_particle_variables(
 
 /* ---------- globals */
 
-static particle_system_update_proc const particle_system_update_functions[] =
+static particle_system_update_proc const system_update_functions[] =
 {
 	particle_system_update_default,
 	particle_system_update_explosion,
 };
 
-static particle_system_particle_creation_proc const particle_system_particle_creation_functions[] =
+static particle_system_particle_creation_proc const particle_creation_functions[] =
 {
 	particle_system_new_particle_default,
 	particle_system_new_particle_explosion,
 	particle_system_new_particle_jet,
 };
 
-static particle_system_particle_update_proc const particle_system_particle_update_functions[] =
+static particle_system_particle_update_proc const particle_update_functions[] =
 {
 	particle_system_update_particle_default,
 };
+
+real const ground_error = 0.05f;
+static real const seconds_per_tick = 1.0f/TICKS_PER_SECOND;
 
 /* ---------- public code */
 
@@ -625,14 +628,16 @@ static void particle_system_new_particles(
 		type_index,
 		struct particle_system_type);
 	boolean initializing = TEST_FLAG(system->flags, _particle_system_initializing_bit);
-	struct particle_system_type_state *state_definition;
+	struct particle_system_type_state *state_definition = initializing ? NULL : TAG_BLOCK_GET_ELEMENT(
+		&type_definition->type_states,
+		type->state_index,
+		struct particle_system_type_state);
 	short target_particle_count;
 	struct object_marker markers[8];
 	short marker_count;
 
 	if (initializing)
 	{
-		state_definition = NULL;
 		if (TEST_FLAG(type_definition->flags, _particle_system_type_initial_count_scales_bit))
 		{
 			target_particle_count = (short)(
@@ -645,23 +650,16 @@ static void particle_system_new_particles(
 	}
 	else
 	{
-		state_definition = TAG_BLOCK_GET_ELEMENT(
-			&type_definition->type_states,
-			type->state_index,
-			struct particle_system_type_state);
+		real particle_count = delta_time*type->variables.particle_creation_rate;
+		short whole_particle_count = (short)(long)particle_count;
 
+		target_particle_count = type->particle_count + whole_particle_count;
+		type->fractional_particle_count += particle_count - (real)whole_particle_count;
+
+		if (type->fractional_particle_count > 1.0f)
 		{
-			real particle_count = delta_time*type->variables.particle_creation_rate;
-			short whole_particle_count = (short)(long)particle_count;
-
-			type->fractional_particle_count += particle_count - (real)whole_particle_count;
-			target_particle_count = type->particle_count + whole_particle_count;
-
-			if (type->fractional_particle_count > 1.0f)
-			{
-				target_particle_count++;
-				type->fractional_particle_count -= 1.0f;
-			}
+			target_particle_count++;
+			type->fractional_particle_count -= 1.0f;
 		}
 	}
 
@@ -709,6 +707,8 @@ static void particle_system_new_particles(
 					short creation_function_index = initializing
 						? type_definition->initial_particle_creation_physics
 						: state_definition->particle_creation_physics;
+					short marker_index;
+					real rotation;
 
 					match_assert(
 						"c:\\halo\\SOURCE\\effects\\particle_systems.c",
@@ -720,10 +720,11 @@ static void particle_system_new_particles(
 					particle->transition_state_index = NONE;
 					particle->states_moving_forward = TRUE;
 					particle->sprite_index = -1.0f;
-					particle->rotation = real_seed_random_range(
+					rotation = real_seed_random_range(
 						get_global_local_random_seed_address(),
 						0.0f,
 						_pi*2.0f);
+					particle->rotation = rotation;
 
 					match_assert(
 						"c:\\halo\\SOURCE\\effects\\particle_systems.c",
@@ -731,21 +732,19 @@ static void particle_system_new_particles(
 						creation_function_index>=0 &&
 						creation_function_index<NUMBER_OF_PARTICLE_SYSTEM_TYPE_CREATION_PHYSICS);
 
-					particle_system_particle_creation_functions[creation_function_index](
+					marker_index = seed_random_range(get_global_local_random_seed_address(), 0, marker_count);
+					particle_creation_functions[creation_function_index](
 						system,
 						type_index,
 						particle,
-						&markers[seed_random_range(
-							get_global_local_random_seed_address(),
-							0,
-							marker_count)]);
+						&markers[marker_index]);
 
 					scenario_location_from_point(&particle->location, &particle->position);
 
 					if (particle->location.cluster_index != NONE)
 					{
-						particle->next_particle_index = type->first_particle_index;
 						type->particle_count++;
+						particle->next_particle_index = type->first_particle_index;
 						type->first_particle_index = particle_index;
 					}
 					else
@@ -943,8 +942,8 @@ void particle_system_new_particle_jet(
 		&type_definition->physics_constants,
 		_jet_type_definition_physics_constant_rotates_up,
 		struct particle_system_physics_constant)->k;
-	real spread_scale = spread_fraction*(velocity*(1.0f/TICKS_PER_SECOND));
-	real directed_scale = (1.0f - spread_fraction)*(velocity*(1.0f/TICKS_PER_SECOND));
+	real spread_scale = spread_fraction*(velocity*seconds_per_tick);
+	real directed_scale = (1.0f - spread_fraction)*(velocity*seconds_per_tick);
 	real_vector3d random_direction;
 
 	local_random_direction3d(&random_direction);
@@ -1034,7 +1033,7 @@ void particle_system_update(
 
 	assert(definition->system_update_physics >= 0 &&
 		definition->system_update_physics < NUMBER_OF_PARTICLE_SYSTEM_UPDATE_PHYSICS);
-	particle_system_update_functions[definition->system_update_physics](system, delta_time);
+	system_update_functions[definition->system_update_physics](system, delta_time);
 
 	for (type_index = 0; type_index < definition->types.count; type_index++)
 	{
@@ -1309,7 +1308,7 @@ void particle_system_update(
 
 					assert(type_state_definition->particle_update_physics >= 0 &&
 						type_state_definition->particle_update_physics < NUMBER_OF_PARTICLE_SYSTEM_TYPE_UPDATE_PHYSICS);
-					particle_system_particle_update_functions[type_state_definition->particle_update_physics](
+					particle_update_functions[type_state_definition->particle_update_physics](
 						system,
 						type_index,
 						delta_time,
