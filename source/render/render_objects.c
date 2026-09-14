@@ -504,10 +504,11 @@ static void render_object_list(
 	while (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
-		struct render_model_effect model_effect;
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored)
 		{
+			struct render_model_effect model_effect;
+
 			if (!data->shadow)
 			{
 				match_assert(
@@ -515,17 +516,20 @@ static void render_object_list(
 					390,
 					parent_model_effect);
 
+				model_effect = *parent_model_effect;
+
 				/* a modifier effect is not inherited by an object's children */
 				if (parent_model_effect->type == _render_model_effect_type_modifier)
 				{
-					model_effect = *parent_model_effect;
 					model_effect.type = _render_model_effect_type_none;
 					model_effect.modifier_shader = NULL;
-					model_effect.modifier_animation.colors = NULL;
 					model_effect.modifier_animation.values = NULL;
+					model_effect.modifier_animation.colors = NULL;
 				}
 				else
 				{
+					/* January copies the parent effect again on this path (a second block copy in
+					   both the PC and Xbox builds) */
 					model_effect = *parent_model_effect;
 				}
 			}
@@ -603,12 +607,13 @@ static void render_object_list(
 							!TEST_FLAG(object_header->flags, _object_header_active_bit) &&
 							definition->object.model.index != NONE)
 						{
-							text_point.x = global_up3d->i * 0.2f +
-								object->object.bounding_sphere_center.x;
-							text_point.y = global_up3d->j * 0.2f +
-								object->object.bounding_sphere_center.y;
-							text_point.z = global_up3d->k * 0.2f +
-								object->object.bounding_sphere_center.z;
+							/* point_from_line3d(center, global_up3d, 0.2f, &text_point), expanded so this
+							   object does not emit the real_math.h point_from_line3d COMDAT */
+							real_point3d const *center = &object->object.bounding_sphere_center;
+
+							text_point.x = global_up3d->i * 0.2f + center->x;
+							text_point.y = global_up3d->j * 0.2f + center->y;
+							text_point.z = global_up3d->k * 0.2f + center->z;
 
 							sprintf(
 								name,
@@ -617,7 +622,7 @@ static void render_object_list(
 
 							render_debug_point(
 								FALSE,
-								&object->object.bounding_sphere_center,
+								center,
 								object->object.bounding_sphere_radius,
 								global_real_argb_blue);
 							render_debug_string_at_point(
