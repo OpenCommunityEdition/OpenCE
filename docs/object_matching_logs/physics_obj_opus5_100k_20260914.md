@@ -160,3 +160,7 @@ Consumers: every includer of `math/real_math.h`. After it lands, apply
 
 `physics.obj` remains NonMatching at 11/17 strict functions. Only
 `_physics_compute_biped_collision` receives new exact credit.
+
+## Header packet (orchestrator, checkpoint 4)
+
+`matrix3x3_multiply` is declared in the focused owner header `math/matrix_math.h`, whose genuine owner is matrix_math.c; real_math.h placement regressed distant exact functions. The prepared body landed. Full build: physics_update_new (1,984) and rotate_vectors3d_by_angular_velocity (432) are exact, 0 regressions, parks clean. The vehicle +0x478 store uses the pre-existing canonical `stuck_mass_point_flags` field (5d3444f79); nothing was invented here.
