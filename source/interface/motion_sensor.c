@@ -798,7 +798,7 @@ void motion_sensor_tick(
 {
 	real sweep_time = (real)fmod(
 		(real)game_time_get() * (1.0f / TICKS_PER_SECOND),
-		2.1);
+		2.1f);
 
 	if (sweep_time < 2.0375f)
 	{
@@ -938,7 +938,7 @@ static struct motion_sensor_player *get_motion_sensor_data(
 	match_assert(
 		"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
 		287,
-		local_player_index>=0 && local_player_index<4);
+		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 
 	return &motion_sensor_globals->players[local_player_index];
 }

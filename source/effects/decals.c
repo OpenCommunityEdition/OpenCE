@@ -2617,9 +2617,9 @@ static long decal_insert(
 	long decal_index = datum_new_at_index(global_decal_data, cache_index);
 
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 479,
-		cluster_index >= 0 && cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE);
+		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 480,
-		layer >= 0 && layer < NUMBER_OF_DECAL_LAYERS);
+		layer>=0 && layer<NUMBER_OF_DECAL_LAYERS);
 
 	if (decal_index != NONE)
 	{
@@ -2683,21 +2683,21 @@ static long decal_insert(
 		}
 		if (next_decal_index != NONE)
 		{
-			struct decal_datum *next_decal = DECAL_GET(next_decal_index);
+			struct decal_datum *next = DECAL_GET(next_decal_index);
 
 			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 556,
-				next_decal->cluster_index == cluster_index);
+				next->cluster_index==cluster_index);
 
-			if (next_decal->previous_decal_index != NONE)
+			if (next->previous_decal_index != NONE)
 			{
-				DECAL_GET(next_decal->previous_decal_index)->next_decal_index = decal_index;
+				DECAL_GET(next->previous_decal_index)->next_decal_index = decal_index;
 			}
 			else
 			{
 				decal_set_first_decal_index(cluster_index, layer, decal_index);
 			}
 
-			next_decal->previous_decal_index = decal_index;
+			next->previous_decal_index = decal_index;
 			new_decal->previous_decal_index = decal_index;
 			new_decal->next_decal_index = next_decal_index;
 			new_decal->cluster_index = cluster_index;
