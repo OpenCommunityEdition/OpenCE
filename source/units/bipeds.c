@@ -4208,12 +4208,6 @@ boolean biped_update(
 
 		switch (biped->unit.animation.state)
 		{
-		case _unit_state_idle:
-		case _unit_state_turn_left:
-		case _unit_state_turn_right:
-			biped->biped.state = biped_state_idle;
-			break;
-
 		case _unit_state_move_front:
 		case _unit_state_move_back:
 		case _unit_state_move_left:
@@ -4221,12 +4215,18 @@ boolean biped_update(
 			biped->biped.state = biped_state_moving;
 			break;
 
+		case _unit_state_idle:
+		case _unit_state_turn_left:
+		case _unit_state_turn_right:
+			biped->biped.state = biped_state_idle;
+			break;
+
 		default:
 			biped->biped.state = biped_state_unknown;
 			break;
 		}
 
-		if (magnitude_squared3d(&biped->unit.throttle)<0.01f)
+		if (magnitude_squared3d(&biped->unit.throttle)<0.1f*0.1f)
 			biped->unit.throttle = *global_zero_vector3d;
 
 		if (TEST_FLAG(biped->biped.flags, _biped_airborne_bit))
@@ -4295,29 +4295,28 @@ boolean biped_update(
 				if (!weapon_prevents_melee_attack(weapon_index) &&
 					biped->unit.current_zoom_level==NONE)
 				{
-					char total_time;
-					char damage_offset;
+					short melee_speedup_ticks;
 
 					unit_animation_start_action(biped_index, _unit_animation_action_melee);
 					weapon_stop_reload(weapon_index);
 					first_person_weapon_message_from_unit(
 						biped_index,
 						_first_person_weapon_message_melee);
-					total_time = (char)weapon_get_first_person_animation_time(
+					biped->biped.player_melee_ticks = weapon_get_first_person_animation_time(
 						weapon_index,
 						_weapon_first_person_animation_time_frame_count,
 						_first_person_weapon_animation_melee,
 						NONE);
-					biped->biped.player_melee_ticks = total_time;
-					damage_offset = (char)weapon_get_first_person_animation_time(
-						weapon_index,
-						_weapon_first_person_animation_time_private_key_frame,
-						_first_person_weapon_animation_melee,
-						NONE);
-					biped->biped.player_melee_attack_tick = total_time - damage_offset;
-					biped->biped.player_melee_ticks = total_time - (total_time >> 2);
-					biped->biped.player_melee_attack_tick =
-						total_time - damage_offset - (total_time >> 2);
+					biped->biped.player_melee_attack_tick = biped->biped.player_melee_ticks -
+						weapon_get_first_person_animation_time(
+							weapon_index,
+							_weapon_first_person_animation_time_private_key_frame,
+							_first_person_weapon_animation_melee,
+							NONE);
+
+					melee_speedup_ticks = biped->biped.player_melee_ticks >> 2;
+					biped->biped.player_melee_ticks -= melee_speedup_ticks;
+					biped->biped.player_melee_attack_tick -= melee_speedup_ticks;
 				}
 			}
 		}

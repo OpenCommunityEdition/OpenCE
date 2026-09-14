@@ -135,25 +135,6 @@
       }
     },
     {
-      "unit": "source/units/bipeds",
-      "function": "_biped_update",
-      "class": "unclassified",
-      "evidence": "Best complete typed natural-C Biped update body retained from January control-flow/relocation authority and HCEA semantic corroboration. January occupies 1,120 padded bytes with 61 relocations; the candidate occupies 1,104 padded bytes with the same 61 relocation identities and scores 93.09064% objdiff. The broad residual is not assigned a speculative compiler mechanism. No fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical branch is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
-      "measurements": {
-        "target": {
-          "size": 1120,
-          "relocation_count": 61,
-          "normalized_sha256": "fe3b81e079c33a132e6aa3403c6148ecbba692047ca2368e46dabe1884348f7e"
-        },
-        "base": {
-          "size": 1104,
-          "relocation_count": 61,
-          "normalized_sha256": "95e78b0eb93d7d95433b3f66c4cda1e70557d9b7f6b50a9efa48dc69e56e27fd"
-        },
-        "objdiff_percent": 93.09064
-      }
-    },
-    {
       "unit": "source/models/model_animations",
       "function": "_inverse_kinematics_adjust_matrices",
       "class": "instruction-scheduling",

@@ -907,6 +907,16 @@ boolean unit_make_damage_sound(
 boolean unit_scream(
 	long unit_index,
 	short scream_type);
+struct unit_animation_update_data;
+
+void unit_animation_start_action(
+	long unit_index,
+	short action);
+void unit_cause_player_melee_damage(
+	long unit_index);
+short unit_update_animation(
+	long unit_index,
+	struct unit_animation_update_data *data);
 void unit_dialogue_update(
 	long unit_index);
 

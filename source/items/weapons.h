@@ -276,6 +276,10 @@ void weapon_build_weapon_interface_state(long weapon_index, struct weapon_interf
 boolean weapon_can_be_fired(long weapon_index);
 
 short weapon_get_first_person_animation_time(long weapon_index, short mode, short animation_type, short shotgun_reload_type);
+void weapon_stop_reload(
+	long weapon_index);
+boolean weapon_prevents_melee_attack(
+	long weapon_index);
 
 boolean weapon_aim(
 	long weapon_index,
