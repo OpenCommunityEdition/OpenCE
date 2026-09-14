@@ -6433,17 +6433,6 @@
       }
     },
     {
-      "unit": "source/ai/ai_script",
-      "function": "_ai_scripting_allegiance_broken",
-      "class": "register-allocation",
-      "evidence": "Complete natural allegiance predicate retained from January control flow and preserved project history. It rejects NONE teams, then requires both game_team_is_ally and game_team_is_enemy through the correct game_allegiance owner. Four ordinary equivalent source forms previously converged on the same 64-byte result: January alone hoists one FALSE materialization before the guard, repeats it after the calls, and delays the EDI save. The candidate is 64 versus 80 padded bytes with the same two call relocations. No artificial live range, duplicate condition, forced register, volatile, assembly, or nonsensical branch is admitted. This honest 83.333336 percent residual receives zero exact credit. See docs/object_matching_logs/small_unwritten_threshold_wave_main_hs_ai_20260913.md.",
-      "measurements": {
-        "target": { "size": 80, "relocation_count": 2, "normalized_sha256": "08396f5b188d67da5cd6a45c250ada24f08cd65780fef43cbb3d41d0b897522a" },
-        "base": { "size": 64, "relocation_count": 2, "normalized_sha256": "ad461677842d7bf249efecdf66ea2c371a8ce99435c27ddba6fb197c8c7157ee" },
-        "objdiff_percent": 83.333336
-      }
-    },
-    {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_set_endpoint_blocking",
       "class": "register-allocation",

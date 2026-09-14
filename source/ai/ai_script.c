@@ -2810,16 +2810,16 @@ boolean ai_scripting_allegiance_broken(
 	short team1_index,
 	short team2_index)
 {
+	boolean broken = FALSE;
+
 	if (team1_index != NONE && team2_index != NONE)
 	{
-		if (game_team_is_ally(team1_index, team2_index) &&
-			game_team_is_enemy(team1_index, team2_index))
-		{
-			return TRUE;
-		}
+		broken =
+			game_team_is_ally(team1_index, team2_index) &&
+			game_team_is_enemy(team1_index, team2_index);
 	}
 
-	return FALSE;
+	return broken;
 }
 
 boolean ai_scripting_conversation(
