@@ -205,9 +205,6 @@ symbols in this file:
 /* ---------- headers */
 
 #define arccosine arccosine_inline
-#define scale_vector3d scale_vector3d_inline
-#define distance3d distance3d_inline
-#define object_get_bounding_sphere object_get_bounding_sphere_inline
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
@@ -241,9 +238,6 @@ symbols in this file:
 #undef PATH_EXTERNAL_FLEE_ROUTINES
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #undef arccosine
-#undef scale_vector3d
-#undef distance3d
-#undef object_get_bounding_sphere
 
 /* ---------- constants */
 
@@ -338,22 +332,6 @@ typedef char actor_moving_vehicle_steering_max_throttle_offset_assert[
 	offsetof(struct vehicle_definition, ai_steering_max_throttle) == 0x3A4 ? 1 : -1];
 
 /* ---------- prototypes */
-
-/* The owner declaration in actions.h is macro-renamed while importing the
- * January inline set; restore the external name after that schedule ends. */
-void object_get_bounding_sphere(
-	long object_index,
-	real_point3d *center,
-	real *radius);
-
-real distance3d(
-	real_point3d const *a,
-	real_point3d const *b);
-
-real_vector3d *scale_vector3d(
-	real_vector3d const *vector,
-	real scale,
-	real_vector3d *result);
 
 static void actor_move_vector_avoidance(
 	long actor_index,
@@ -805,7 +783,6 @@ static void actor_move_avoidance_setup(
 						sphere_index,
 						struct pathfinding_sphere);
 					real_point3d sphere_center;
-					real_vector2d center_offset;
 					real sphere_radius;
 					real sphere_distance;
 
@@ -823,9 +800,9 @@ static void actor_move_avoidance_setup(
 						sphere_radius = world_matrix.scale*sphere->radius;
 					}
 
-					center_offset.i = sphere_center.x - center.x;
-					center_offset.j = sphere_center.y - center.y;
-					sphere_distance = magnitude2d(&center_offset) + sphere_radius;
+					sphere_distance = distance2d(
+						(real_point2d const *)&center,
+						(real_point2d const *)&sphere_center) + sphere_radius;
 					maximum_radius = MAX(maximum_radius, sphere_distance);
 				}
 
@@ -1053,11 +1030,11 @@ void actor_move_initialize(
 					cosine(avoidance_ray_angles[direction_index]),
 					sine(avoidance_ray_angles[direction_index]));
 				avoidance_ray->length = avoidance_ray_length;
-				scale_vector3d_inline(
+				scale_vector3d(
 					&avoidance_directions[direction_index],
 					offset,
 					&avoidance_ray->offset);
-				scale_vector3d_inline(
+				scale_vector3d(
 					&avoidance_directions[direction_index],
 					divergence_sine,
 					&avoidance_ray->divergence);
@@ -1231,8 +1208,8 @@ boolean actor_move_try_evasion_vector(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
-	boolean evasion_is_ledge = FALSE;
 	boolean found = FALSE;
+	boolean evasion_is_ledge = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actor_moving.c",
@@ -1263,9 +1240,12 @@ boolean actor_move_try_evasion_vector(
 			real height_delta = result->point.z - actor->input.position.body_position.z;
 
 			found = TRUE;
-			if (height_delta > evade_distance * 0.5f ||
-				(maximum_ledge_height == 0.0f &&
-					height_delta < evade_distance * -0.5f))
+			if (height_delta > evade_distance * 0.5f)
+			{
+				found = FALSE;
+			}
+			else if (maximum_ledge_height == 0.0f &&
+				height_delta < evade_distance * -0.5f)
 			{
 				found = FALSE;
 			}
@@ -1350,8 +1330,9 @@ boolean actor_move_try_evasion_direction(
 	short attempt_count;
 	short attempt_index;
 	short evade_direction;
+	boolean success = FALSE;
 
-	(void)actor_get(actor_index);
+	actor_get(actor_index);
 	attempt_count = 1;
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actor_moving.c",
@@ -1362,39 +1343,33 @@ boolean actor_move_try_evasion_direction(
 	switch (evade_direction)
 	{
 	case _actor_evade_left:
-		evasion_vector.i = -alignment_vector->j;
-		evasion_vector.j = alignment_vector->i;
+		set_real_vector2d(&evasion_vector, -alignment_vector->j, alignment_vector->i);
 		break;
 
 	case _actor_evade_right:
-		evasion_vector.i = alignment_vector->j;
-		evasion_vector.j = -alignment_vector->i;
+		set_real_vector2d(&evasion_vector, alignment_vector->j, -alignment_vector->i);
 		break;
 
 	case _actor_evade_forward:
-		evasion_vector = *alignment_vector;
+		set_real_vector2d(&evasion_vector, alignment_vector->i, alignment_vector->j);
 		break;
 
 	case _actor_evade_back:
-		evasion_vector.i = -alignment_vector->i;
-		evasion_vector.j = -alignment_vector->j;
+		set_real_vector2d(&evasion_vector, -alignment_vector->i, -alignment_vector->j);
 		break;
 
 	case _actor_evade_random_side:
 		if (seed_random(get_global_random_seed_address()) > 0x8000)
 		{
 			evade_direction = _actor_evade_left;
-			evasion_vector.i = -alignment_vector->j;
-			evasion_vector.j = alignment_vector->i;
-			attempt_count = 2;
+			set_real_vector2d(&evasion_vector, -alignment_vector->j, alignment_vector->i);
 		}
 		else
 		{
 			evade_direction = _actor_evade_right;
-			evasion_vector.i = alignment_vector->j;
-			evasion_vector.j = -alignment_vector->i;
-			attempt_count = 2;
+			set_real_vector2d(&evasion_vector, alignment_vector->j, -alignment_vector->i);
 		}
+		attempt_count = 2;
 		break;
 
 	default:
@@ -1406,33 +1381,26 @@ boolean actor_move_try_evasion_direction(
 		break;
 	}
 
-	attempt_index = 0;
-	if (attempt_count > 0)
+	for (attempt_index = 0; attempt_index < attempt_count; attempt_index++, evade_direction ^= 1)
 	{
-		do
+		if (actor_move_try_evasion_vector(
+			actor_index,
+			&evasion_vector,
+			evade_distance,
+			maximum_ledge_height,
+			evasion_is_ledge,
+			result))
 		{
-			if (actor_move_try_evasion_vector(
-				actor_index,
-				&evasion_vector,
-				evade_distance,
-				maximum_ledge_height,
-				evasion_is_ledge,
-				result))
-			{
-				*evade_direction_reference = evade_direction;
-				return TRUE;
-			}
-
-			attempt_index++;
-			evasion_vector.i = -evasion_vector.i;
-			evade_direction ^= 1;
-			evasion_vector.j = -evasion_vector.j;
+			success = TRUE;
+			break;
 		}
-		while (attempt_index < attempt_count);
+
+		evasion_vector.i = -evasion_vector.i;
+		evasion_vector.j = -evasion_vector.j;
 	}
 
-	*evade_direction_reference = NONE;
-	return FALSE;
+	*evade_direction_reference = success ? evade_direction : NONE;
+	return success;
 }
 
 static void actor_move_vector_avoidance(
@@ -2243,7 +2211,7 @@ void actor_destination_update(
 		actor->control.moving = TRUE;
 		actor->control.movement_complete = FALSE;
 		distance = (real)(reverse ? -1 : 1) * 3.f;
-		scale_vector3d_inline(
+		scale_vector3d(
 			&actor->input.facing_vector,
 			distance,
 			&actor->control.moving_towards_vector);
@@ -3084,7 +3052,7 @@ void actor_move_update(
 		}
 		else
 		{
-			scale_vector3d_inline(
+			scale_vector3d(
 				&actor->input.facing_vector,
 				3.f,
 				&scaled_facing);
@@ -3243,7 +3211,7 @@ void actor_move_update(
 				if (normalize3d(&escape_direction) > 0.f)
 				{
 					actor->control.moving = TRUE;
-					scale_vector3d_inline(
+					scale_vector3d(
 						&escape_direction,
 						3.f,
 						&actor->control.moving_towards_vector);
