@@ -1,0 +1,1382 @@
+{
+ "lane": "opus5-pdb-ida-15k-20260914",
+ "branch": "opus/pdb-ida-15k-20260914",
+ "worktree": "C:/halo-worktrees/opus5-pdb-ida-15k-20260914",
+ "base_commit": "c3e257e9ab9a5d7e1c9b39862f87ac2abde4359c",
+ "baseline": {
+  "accepted_functions": 6972,
+  "accepted_meaningful": 1140161,
+  "parks": 465,
+  "open_unparked": 327,
+  "open_residual": 215,
+  "open_unwritten": 112
+ },
+ "evidence_used": {
+  "january_pdb": "cachebeta.pdb via tools/pdb200_extract.py -> scratch/pdb200-current (18,674 symbols, 1,836 types; public names only; no Halo types; 0 enumerators)",
+  "ida": "IDA Free 9.4 present; private copy of cachebeta-pal-january.i64 in scratch/ida; headless export impossible (-S rejected, no IDAPython); names equal the PDB export",
+  "ghidra": "Ghidra 12.1.2 headless decompilation of the five January split objects (scratch/ghidra/out)",
+  "january_map_atlas": "4cc87b45...jsonl exact-tier private names (projectile_detonate, projectile_collision, six actor_combat routines)",
+  "hcea_2020_marathon": "semantic/name corroboration only"
+ },
+ "totals": {
+  "final_accepted_functions": 6977,
+  "final_accepted_meaningful": 1141458,
+  "verified_new_exact_functions": 5,
+  "verified_new_exact_meaningful": 1297,
+  "verified_new_exact_padded": 1328,
+  "fuzzy_meaningful_target_bytes_zero_credit": 11051,
+  "target_15000_met": false,
+  "lost_exact_functions": 0
+ },
+ "evidence_hashes": {
+  "scratch/before.json": "39557d49a2652d18d1286e119e861983e71a0e7e0e86a80592a3f58bca69e41d",
+  "scratch/w1b-snapshot.json": "2191a94ff9a3ccf61c7d71f3345970cc5e5162648a4d06ce0183f1b8d03bd746",
+  "build/semantic_report.json": "389e6059f1b008c13d6945e627f1649cbbac5a37a8bf6d6513d5afce5e256c0b",
+  "build/report.json": "c0c39a9a9c38beef21476e34eccb474fba0cbce6b51cf96fa8bb9cfe101f0740",
+  "config/symbols.json": "8153ecdb0011e74e141ef02bdd3959363fdf1409ded7c194b4a52179f90a7b53",
+  "config/parked.json": "8df7b5d472d46cbce4c8dce8e03f203774b2aab2490c89f7635679bb15f7fe97"
+ },
+ "config_and_header_changes": [
+  {
+   "commit": "2364150f9",
+   "files": [
+    "config/symbols.json"
+   ],
+   "change": "5 projectile private function names + seconds_per_tick, projectile_update_section, effect_marker_names (static)"
+  },
+  {
+   "commit": "(none)",
+   "files": [
+    "source/cseries/cseries_windows.h"
+   ],
+   "change": "load_symbol_table declaration TRIED and REVERTED",
+   "blast_radius": "full build regressed game_engine::_populate_statistic_buffer"
+  }
+ ],
+ "owner_census_disclosures": [
+  "projectiles: header-inline SELECT_ANY copies _cross_product3d, _distance3d, _valid_real_point3d, _valid_real_vector3d_axes2 (January references as undefined) and _dot_product3d, _set_real_euler_angles2d, _valid_real_normal3d, _valid_realcmp, _vector_from_points3d (unreferenced); xtl.h select-any D3D data via physics/collision_usage.h; one candidate-only double literal used by a fuzzy body",
+  "No new non-inline code, BSS or COMMON owner."
+ ],
+ "exact_functions": [
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "source_path": "source/cseries/stack_walk_windows.c",
+   "january_target_section_index": 3,
+   "target_symbol": "_symbol_sort_proc",
+   "candidate_symbol": "_symbol_sort_proc",
+   "name_provenance": "existing January split name (HCEA/HCEX private name recorded 2026-09-13)",
+   "baseline_verdict": "unwritten",
+   "final_verdict": "exact",
+   "meaningful_bytes": 47,
+   "padded_bytes": 48,
+   "target_normalized_sha256": "444999547dd1ee50dcb9bc22d0d3abf3f065cc99c0eb763c77cd3c7ed6955f32",
+   "candidate_normalized_sha256": "444999547dd1ee50dcb9bc22d0d3abf3f065cc99c0eb763c77cd3c7ed6955f32",
+   "relocation_count": 0,
+   "ordered_relocation_fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "candidate_relocation_fingerprint_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "ordered_relocations": [],
+   "abi_and_prototype_owner": "TU-private static qsort comparator; emitted via genuine load_symbol_table caller",
+   "source_evidence": "reviewed 2026-09-04 withheld natural reconstruction; January fcomp-free unsigned compares of rva_base with zero-sentinel ordering",
+   "exact_comparator": {
+    "tool": "tools.coff_compare.section_infos_equal",
+    "result": true
+   },
+   "owner_census": {
+    "no_new_candidate_only_owner": true,
+    "code": {
+     "base_candidate_only": [],
+     "final_candidate_only": [],
+     "base_target_only": [
+      "_load_symbol_table",
+      "_symbol_sort_proc"
+     ],
+     "final_target_only": [],
+     "new_candidate_only": []
+    },
+    "data_new_candidate_only": [],
+    "data_literal_comdats_referenced_undefined_by_target": [
+     "??_C@_01KDCPPGHE@r?$AA@"
+    ],
+    "data_compile_path_file_literal_artifacts": [],
+    "data_base_candidate_only": [
+     "??_C@_09EEKGDCPH@?$DMunknown?$DO?$AA@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE"
+    ],
+    "data_final_candidate_only": [
+     "??_C@_01KDCPPGHE@r?$AA@",
+     "??_C@_09EEKGDCPH@?$DMunknown?$DO?$AA@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE"
+    ],
+    "common_new_candidate_only": []
+   },
+   "point_from_line3d_guard": {
+    "defined_in_final_object": false,
+    "exit": 0,
+    "guard_passed": true,
+    "gate_line": "== exact 9  residual 7  unwritten 0  (of 16 listed)"
+   },
+   "adversarial_review": "lead gate + full build",
+   "commit": "3be9c1703",
+   "exact_credit": "strict"
+  },
+  {
+   "unit": "source/items/projectiles",
+   "source_path": "source/items/projectiles.c",
+   "january_target_section_index": 14,
+   "target_symbol": "_projectile_set_action",
+   "candidate_symbol": "_projectile_set_action",
+   "name_provenance": "caller graph + register ABI + HCEA projectile_set_action.c (no atlas/PDB record); symbols.json 2364150f9",
+   "baseline_verdict": "unwritten",
+   "final_verdict": "exact",
+   "meaningful_bytes": 28,
+   "padded_bytes": 32,
+   "target_normalized_sha256": "f1f3a50d14c173918869c007d4ce3889de8718702ba454c87d05411e2a2302a8",
+   "candidate_normalized_sha256": "f1f3a50d14c173918869c007d4ce3889de8718702ba454c87d05411e2a2302a8",
+   "relocation_count": 1,
+   "ordered_relocation_fingerprint_sha256": "9b9db9a78ba91484d8d61803f980d40e17e05fbfdb8f8abaabfa075d6ee3cf9f",
+   "candidate_relocation_fingerprint_sha256": "9b9db9a78ba91484d8d61803f980d40e17e05fbfdb8f8abaabfa075d6ee3cf9f",
+   "ordered_relocations": [
+    [
+     4,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ]
+   ],
+   "abi_and_prototype_owner": "TU-private static (eax=projectile_index, si=action); emitted by projectile_update REL32 call",
+   "source_evidence": "raises runtime action only upward; matches HCEA",
+   "exact_comparator": {
+    "tool": "tools.coff_compare.section_infos_equal",
+    "result": true
+   },
+   "owner_census": {
+    "no_new_candidate_only_owner": false,
+    "code": {
+     "base_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_vector3d"
+     ],
+     "final_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_set_real_euler_angles2d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ],
+     "base_target_only": [
+      "_projectile_collision",
+      "_projectile_collision_test_line",
+      "_projectile_detonate",
+      "_projectile_effect_new",
+      "_projectile_set_action",
+      "_projectile_update"
+     ],
+     "final_target_only": [],
+     "new_candidate_only": [
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_set_real_euler_angles2d",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ]
+    },
+    "data_new_candidate_only": [
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@3f50624de0000000"
+    ],
+    "data_literal_comdats_referenced_undefined_by_target": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e99999a",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@bf800000"
+    ],
+    "data_compile_path_file_literal_artifacts": [],
+    "data_base_candidate_only": [
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "__real@00000000",
+     "__real@3e800000",
+     "__real@3f000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40800000",
+     "__real@41f00000"
+    ],
+    "data_final_candidate_only": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@00000000",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e800000",
+     "__real@3e99999a",
+     "__real@3f000000",
+     "__real@3f50624de0000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40800000",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@41f00000",
+     "__real@bf800000"
+    ],
+    "common_new_candidate_only": []
+   },
+   "point_from_line3d_guard": {
+    "defined_in_final_object": false,
+    "exit": 0,
+    "guard_passed": true,
+    "gate_line": "== exact 24  residual 6  unwritten 0  (of 30 listed)"
+   },
+   "adversarial_review": "ACCEPT",
+   "commit": "7b6bbfbb7",
+   "exact_credit": "strict"
+  },
+  {
+   "unit": "source/items/projectiles",
+   "source_path": "source/items/projectiles.c",
+   "january_target_section_index": 15,
+   "target_symbol": "_projectile_effect_new",
+   "candidate_symbol": "_projectile_effect_new",
+   "name_provenance": "caller graph + register ABI + HCEA projectile_effect_new.c; data owners per particles.obj precedent; symbols.json 2364150f9",
+   "baseline_verdict": "unwritten",
+   "final_verdict": "exact",
+   "meaningful_bytes": 92,
+   "padded_bytes": 96,
+   "target_normalized_sha256": "3733234e28ec6fa968e582d3d69a647fa4aca4c013055429a2af8d12ddd1f1f7",
+   "candidate_normalized_sha256": "3733234e28ec6fa968e582d3d69a647fa4aca4c013055429a2af8d12ddd1f1f7",
+   "relocation_count": 4,
+   "ordered_relocation_fingerprint_sha256": "879205e8d4cdf0a7279ca76c28d46de82b9bafd58cfd03d922a9199def334d2d",
+   "candidate_relocation_fingerprint_sha256": "879205e8d4cdf0a7279ca76c28d46de82b9bafd58cfd03d922a9199def334d2d",
+   "ordered_relocations": [
+    [
+     34,
+     6,
+     [
+      "symbol",
+      "_effect_marker_names",
+      0
+     ]
+    ],
+    [
+     45,
+     20,
+     [
+      "symbol",
+      "_effect_new_attached_from_markers",
+      0
+     ]
+    ],
+    [
+     72,
+     6,
+     [
+      "symbol",
+      "_effect_marker_names",
+      0
+     ]
+    ],
+    [
+     83,
+     20,
+     [
+      "symbol",
+      "_effect_new_unattached_from_markers",
+      0
+     ]
+    ]
+   ],
+   "abi_and_prototype_owner": "TU-private static, inlined twice in projectile_collision and emitted",
+   "source_evidence": "attached vs unattached effect_new_*_from_markers with the 5-entry effect_marker_names table",
+   "exact_comparator": {
+    "tool": "tools.coff_compare.section_infos_equal",
+    "result": true
+   },
+   "owner_census": {
+    "no_new_candidate_only_owner": false,
+    "code": {
+     "base_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_vector3d"
+     ],
+     "final_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_set_real_euler_angles2d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ],
+     "base_target_only": [
+      "_projectile_collision",
+      "_projectile_collision_test_line",
+      "_projectile_detonate",
+      "_projectile_effect_new",
+      "_projectile_set_action",
+      "_projectile_update"
+     ],
+     "final_target_only": [],
+     "new_candidate_only": [
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_set_real_euler_angles2d",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ]
+    },
+    "data_new_candidate_only": [
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@3f50624de0000000"
+    ],
+    "data_literal_comdats_referenced_undefined_by_target": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e99999a",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@bf800000"
+    ],
+    "data_compile_path_file_literal_artifacts": [],
+    "data_base_candidate_only": [
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "__real@00000000",
+     "__real@3e800000",
+     "__real@3f000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40800000",
+     "__real@41f00000"
+    ],
+    "data_final_candidate_only": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@00000000",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e800000",
+     "__real@3e99999a",
+     "__real@3f000000",
+     "__real@3f50624de0000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40800000",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@41f00000",
+     "__real@bf800000"
+    ],
+    "common_new_candidate_only": []
+   },
+   "point_from_line3d_guard": {
+    "defined_in_final_object": false,
+    "exit": 0,
+    "guard_passed": true,
+    "gate_line": "== exact 24  residual 6  unwritten 0  (of 30 listed)"
+   },
+   "adversarial_review": "ACCEPT",
+   "commit": "7b6bbfbb7",
+   "exact_credit": "strict"
+  },
+  {
+   "unit": "source/items/projectiles",
+   "source_path": "source/items/projectiles.c",
+   "january_target_section_index": 26,
+   "target_symbol": "_projectile_detonate",
+   "candidate_symbol": "_projectile_detonate",
+   "name_provenance": "January debug map atlas exact tier; symbols.json 2364150f9",
+   "baseline_verdict": "unwritten",
+   "final_verdict": "exact",
+   "meaningful_bytes": 1031,
+   "padded_bytes": 1040,
+   "target_normalized_sha256": "315992f201ed6fa3c9907396f9f2d4a62bda8864341367b3986fa9941dcade8d",
+   "candidate_normalized_sha256": "315992f201ed6fa3c9907396f9f2d4a62bda8864341367b3986fa9941dcade8d",
+   "relocation_count": 37,
+   "ordered_relocation_fingerprint_sha256": "3e5c70fcf1c90dbff2676547a5c3d1c0b32b7d2f424437dea75b2c6b329d80e5",
+   "candidate_relocation_fingerprint_sha256": "a59e845a1167cdbe0273d39312b88e7059eac8c6b966dea1cd5429a55d3fcf22",
+   "ordered_relocations": [
+    [
+     19,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     34,
+     20,
+     [
+      "symbol",
+      "_tag_get",
+      0
+     ]
+    ],
+    [
+     43,
+     6,
+     [
+      "symbol",
+      "??_C@_00CNPNBAHC@?$AA@",
+      0
+     ]
+    ],
+    [
+     50,
+     6,
+     [
+      "symbol",
+      "??_C@_07GFBFDLBM@gravity?$AA@",
+      0
+     ]
+    ],
+    [
+     115,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     149,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     170,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     226,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     245,
+     20,
+     [
+      "symbol",
+      "_game_engine_running",
+      0
+     ]
+    ],
+    [
+     292,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     313,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     335,
+     20,
+     [
+      "symbol",
+      "_object_get_and_verify_type",
+      0
+     ]
+    ],
+    [
+     359,
+     20,
+     [
+      "symbol",
+      "_get_global_random_seed_address",
+      0
+     ]
+    ],
+    [
+     365,
+     20,
+     [
+      "symbol",
+      "_real_seed_random",
+      0
+     ]
+    ],
+    [
+     382,
+     20,
+     [
+      "symbol",
+      "_get_global_random_seed_address",
+      0
+     ]
+    ],
+    [
+     388,
+     20,
+     [
+      "symbol",
+      "_real_seed_random",
+      0
+     ]
+    ],
+    [
+     468,
+     20,
+     [
+      "symbol",
+      "_object_get_origin",
+      0
+     ]
+    ],
+    [
+     477,
+     20,
+     [
+      "symbol",
+      "_object_detach",
+      0
+     ]
+    ],
+    [
+     512,
+     20,
+     [
+      "symbol",
+      "_object_translate",
+      0
+     ]
+    ],
+    [
+     522,
+     20,
+     [
+      "symbol",
+      "_object_force_inside_bsp",
+      0
+     ]
+    ],
+    [
+     528,
+     20,
+     [
+      "symbol",
+      "_object_compute_node_matrices_recursive",
+      0
+     ]
+    ],
+    [
+     571,
+     20,
+     [
+      "symbol",
+      "_object_compute_node_matrices",
+      0
+     ]
+    ],
+    [
+     577,
+     6,
+     [
+      "symbol",
+      "__real@3f800000",
+      0
+     ]
+    ],
+    [
+     599,
+     6,
+     [
+      "defined-noncode",
+      ".rdata",
+      "_seconds_per_tick",
+      0
+     ]
+    ],
+    [
+     610,
+     20,
+     [
+      "symbol",
+      "_contrail_owner_collision",
+      0
+     ]
+    ],
+    [
+     623,
+     20,
+     [
+      "symbol",
+      "_object_get_origin",
+      0
+     ]
+    ],
+    [
+     640,
+     20,
+     [
+      "symbol",
+      "_object_get_orientation",
+      0
+     ]
+    ],
+    [
+     662,
+     6,
+     [
+      "symbol",
+      "_global_down3d",
+      0
+     ]
+    ],
+    [
+     720,
+     20,
+     [
+      "symbol",
+      "_effect_new_unattached_from_markers",
+      0
+     ]
+    ],
+    [
+     766,
+     20,
+     [
+      "symbol",
+      "_damage_data_new",
+      0
+     ]
+    ],
+    [
+     793,
+     20,
+     [
+      "symbol",
+      "_object_get_orientation",
+      0
+     ]
+    ],
+    [
+     806,
+     20,
+     [
+      "symbol",
+      "_object_get_origin",
+      0
+     ]
+    ],
+    [
+     889,
+     20,
+     [
+      "symbol",
+      "_object_cause_damage",
+      0
+     ]
+    ],
+    [
+     941,
+     20,
+     [
+      "symbol",
+      "_tag_block_get_element_with_size",
+      0
+     ]
+    ],
+    [
+     951,
+     6,
+     [
+      "symbol",
+      "_default_projectile_material_response",
+      0
+     ]
+    ],
+    [
+     990,
+     20,
+     [
+      "symbol",
+      "_effect_new_unattached_from_markers",
+      0
+     ]
+    ],
+    [
+     1017,
+     20,
+     [
+      "symbol",
+      "_ai_handle_spatial_effect",
+      0
+     ]
+    ]
+   ],
+   "abi_and_prototype_owner": "TU-private static cdecl (projectile_index, first_collision, time_left); sole caller projectile_update",
+   "source_evidence": "super-combining polarity, contrail dt and two-marker effect/damage stages match HCEA; seconds_per_tick .rdata static",
+   "exact_comparator": {
+    "tool": "tools.coff_compare.section_infos_equal",
+    "result": true
+   },
+   "owner_census": {
+    "no_new_candidate_only_owner": false,
+    "code": {
+     "base_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_vector3d"
+     ],
+     "final_candidate_only": [
+      "_add_vectors3d",
+      "_cosine",
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_magnitude3d",
+      "_magnitude_squared3d",
+      "_random_direction3d",
+      "_real_random",
+      "_real_random_range",
+      "_scale_vector3d",
+      "_set_real_euler_angles2d",
+      "_sine",
+      "_square_root",
+      "_valid_real",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ],
+     "base_target_only": [
+      "_projectile_collision",
+      "_projectile_collision_test_line",
+      "_projectile_detonate",
+      "_projectile_effect_new",
+      "_projectile_set_action",
+      "_projectile_update"
+     ],
+     "final_target_only": [],
+     "new_candidate_only": [
+      "_cross_product3d",
+      "_distance3d",
+      "_dot_product3d",
+      "_set_real_euler_angles2d",
+      "_valid_real_normal3d",
+      "_valid_real_point3d",
+      "_valid_real_vector3d_axes2",
+      "_valid_realcmp",
+      "_vector_from_points3d"
+     ]
+    },
+    "data_new_candidate_only": [
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@3f50624de0000000"
+    ],
+    "data_literal_comdats_referenced_undefined_by_target": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e99999a",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@bf800000"
+    ],
+    "data_compile_path_file_literal_artifacts": [],
+    "data_base_candidate_only": [
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "__real@00000000",
+     "__real@3e800000",
+     "__real@3f000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40800000",
+     "__real@41f00000"
+    ],
+    "data_final_candidate_only": [
+     "??_C@_00CNPNBAHC@?$AA@",
+     "??_C@_06IKLLLDHL@normal?$AA@",
+     "??_C@_07GFBFDLBM@gravity?$AA@",
+     "??_C@_0CI@OJMAHDFE@global_current_collision_user_de@",
+     "??_C@_0CK@EAOMHCPC@?$CFs?3?5assert_valid_real_point3d?$CI?$CFf@",
+     "??_C@_0CL@HMPNAHGK@?$CFs?3?5assert_valid_real_vector2d?$CI?$CF@",
+     "??_C@_0EC@LAMMDMMJ@?$CFs?0?5?$CFs?3?5assert_valid_real_vector@",
+     "??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@00000000",
+     "__real@38d1b717",
+     "__real@3a83126f",
+     "__real@3c360b61",
+     "__real@3d088889",
+     "__real@3e000000",
+     "__real@3e800000",
+     "__real@3e99999a",
+     "__real@3f000000",
+     "__real@3f50624de0000000",
+     "__real@3f800000",
+     "__real@3fc90fdb",
+     "__real@40000000",
+     "__real@40490fdb",
+     "__real@40800000",
+     "__real@40c90fdb",
+     "__real@41200000",
+     "__real@41f00000",
+     "__real@bf800000"
+    ],
+    "common_new_candidate_only": []
+   },
+   "point_from_line3d_guard": {
+    "defined_in_final_object": false,
+    "exit": 0,
+    "guard_passed": true,
+    "gate_line": "== exact 24  residual 6  unwritten 0  (of 30 listed)"
+   },
+   "adversarial_review": "ACCEPT",
+   "commit": "7b6bbfbb7",
+   "exact_credit": "strict"
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+   "source_path": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c",
+   "january_target_section_index": 1,
+   "target_symbol": "_real_alpha_to_pixel32",
+   "candidate_symbol": "_real_alpha_to_pixel32",
+   "name_provenance": "January PDB public / atlas inline copy",
+   "baseline_verdict": "unwritten",
+   "final_verdict": "exact",
+   "meaningful_bytes": 99,
+   "padded_bytes": 112,
+   "target_normalized_sha256": "28913a006347a05e936678a44d230c0137795a8e427083b4ff0f1367ecd73596",
+   "candidate_normalized_sha256": "28913a006347a05e936678a44d230c0137795a8e427083b4ff0f1367ecd73596",
+   "relocation_count": 6,
+   "ordered_relocation_fingerprint_sha256": "5fc8af55a8a208c3e3bb8cb19b5fb1113b76d8b672b3134b9a13c080994c2d03",
+   "candidate_relocation_fingerprint_sha256": "b7e7753959875edbaa57555d4679fc27027837613104255f89c980d34f4f0c66",
+   "ordered_relocations": [
+    [
+     18,
+     6,
+     [
+      "symbol",
+      "__real@00000000",
+      0
+     ]
+    ],
+    [
+     34,
+     6,
+     [
+      "symbol",
+      "__real@3f800000",
+      0
+     ]
+    ],
+    [
+     53,
+     6,
+     [
+      "symbol",
+      "??_C@_0BN@KCHNANLB@?4?4?2bitmaps?2bitmaps_inlines?4h?$AA@",
+      0
+     ]
+    ],
+    [
+     58,
+     6,
+     [
+      "symbol",
+      "??_C@_0BL@NGHLOACP@alpha?$DO?$DN0?40f?5?$CG?$CG?5alpha?$DM?$DN1?40f?$AA@",
+      0
+     ]
+    ],
+    [
+     63,
+     20,
+     [
+      "symbol",
+      "_display_assert",
+      0
+     ]
+    ],
+    [
+     70,
+     20,
+     [
+      "symbol",
+      "_system_exit",
+      0
+     ]
+    ]
+   ],
+   "abi_and_prototype_owner": "already-admitted bitmaps_inlines.h inline (commit 56cbe8470), emitted out of line by the genuine draw caller",
+   "source_evidence": "January relocation at draw+0x795; no asm or /QIfist added to this TU",
+   "exact_comparator": {
+    "tool": "tools.coff_compare.section_infos_equal",
+    "result": true
+   },
+   "owner_census": {
+    "no_new_candidate_only_owner": true,
+    "code": {
+     "base_candidate_only": [],
+     "final_candidate_only": [],
+     "base_target_only": [
+      "_rasterizer_active_camouflage_draw",
+      "_real_alpha_to_pixel32"
+     ],
+     "final_target_only": [],
+     "new_candidate_only": []
+    },
+    "data_new_candidate_only": [],
+    "data_literal_comdats_referenced_undefined_by_target": [
+     "??_C@_05MGJOOGAJ@group?$AA@",
+     "??_C@_0BL@NGHLOACP@alpha?$DO?$DN0?40f?5?$CG?$CG?5alpha?$DM?$DN1?40f?$AA@",
+     "??_C@_0BN@KCHNANLB@?4?4?2bitmaps?2bitmaps_inlines?4h?$AA@",
+     "__real@00000000",
+     "__real@3f800000"
+    ],
+    "data_compile_path_file_literal_artifacts": [],
+    "data_base_candidate_only": [
+     "??_C@_0BC@EFLMEHLA@global_d3d_device?$AA@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE"
+    ],
+    "data_final_candidate_only": [
+     "??_C@_05MGJOOGAJ@group?$AA@",
+     "??_C@_0BC@EFLMEHLA@global_d3d_device?$AA@",
+     "??_C@_0BL@NGHLOACP@alpha?$DO?$DN0?40f?5?$CG?$CG?5alpha?$DM?$DN1?40f?$AA@",
+     "??_C@_0BN@KCHNANLB@?4?4?2bitmaps?2bitmaps_inlines?4h?$AA@",
+     "_D3DPRIMITIVETOVERTEXCOUNT",
+     "_D3DSIMPLERENDERSTATEENCODE",
+     "_D3DTEXTUREDIRECTENCODE",
+     "__real@00000000",
+     "__real@3f800000"
+    ],
+    "common_new_candidate_only": []
+   },
+   "point_from_line3d_guard": {
+    "defined_in_final_object": false,
+    "exit": 0,
+    "guard_passed": true,
+    "gate_line": "== exact 11  residual 1  unwritten 0  (of 12 listed)"
+   },
+   "adversarial_review": "ACCEPT",
+   "commit": "1086dd183",
+   "exact_credit": "strict"
+  }
+ ],
+ "fuzzy_retained_zero_credit": [
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_update",
+   "baseline_status": "unwritten",
+   "final_status": "fuzzy",
+   "meaningful_target_bytes": 4055,
+   "target_padded": 4064,
+   "candidate_padded": 4064,
+   "target_relocations": 179,
+   "candidate_relocations": 179,
+   "target_normalized_sha256": "0cfda26e2e60281c1f9012c580fc209ce006de1844b356eee2bf4782e6871355",
+   "candidate_normalized_sha256": "c721dcef2d2393aeb5e7207f3814d0181d100e6ef3608327758f90fff3caf517",
+   "objdiff_percent": 98.92832,
+   "blocker": "allocator/frame-order tie (identical slot reference census; esi/edi exchange)",
+   "exact_credit": 0,
+   "commit": "7b6bbfbb7"
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_collision",
+   "baseline_status": "unwritten",
+   "final_status": "fuzzy",
+   "meaningful_target_bytes": 2928,
+   "target_padded": 2928,
+   "candidate_padded": 2928,
+   "target_relocations": 100,
+   "candidate_relocations": 100,
+   "target_normalized_sha256": "165584245b9f5a0820690a8c3f28cbff962dc2ff50805d7900b684947625998f",
+   "candidate_normalized_sha256": "c6a62ce8b166ed4c6b0774c347b7851d464e22211b3376604c8b833687de7c81",
+   "objdiff_percent": 86.38724,
+   "blocker": "x87 home tie (speed_squared kept on the FPU stack in January)",
+   "exact_credit": 0,
+   "commit": "7b6bbfbb7"
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_collision_test_line",
+   "baseline_status": "unwritten",
+   "final_status": "fuzzy",
+   "meaningful_target_bytes": 498,
+   "target_padded": 512,
+   "candidate_padded": 496,
+   "target_relocations": 10,
+   "candidate_relocations": 10,
+   "target_normalized_sha256": "2e02f384a9254ed2e5443fd3e9832b1141e50a9311ce18bd59c8eefb2fe83511",
+   "candidate_normalized_sha256": "ca8afada1f519e39b42a9a3116660a7021135c87083e513be7705cd130860db8",
+   "objdiff_percent": null,
+   "blocker": "January inlines point_from_line3d; any inline use emits the forbidden _point_from_line3d COMDAT, explicit math CSEs offset*radius",
+   "exact_credit": 0,
+   "commit": "7b6bbfbb7"
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+   "function": "_rasterizer_active_camouflage_draw",
+   "baseline_status": "unwritten",
+   "final_status": "fuzzy",
+   "meaningful_target_bytes": 2014,
+   "target_padded": 2016,
+   "candidate_padded": 2016,
+   "target_relocations": 142,
+   "candidate_relocations": 142,
+   "target_normalized_sha256": "245046250b62273f5267bded552471ba441299227a8ba3a9cf8c3855e518f038",
+   "candidate_normalized_sha256": "19d5f73451e94d1c6e6774b021d32665431075f3b45d1a500c438be7df707572",
+   "objdiff_percent": 94.33518,
+   "blocker": "three independent store-order ties; size, frame, 542 instructions and relocation multiset equal",
+   "exact_credit": 0,
+   "commit": "1086dd183"
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_load_symbol_table",
+   "baseline_status": "unwritten",
+   "final_status": "fuzzy",
+   "meaningful_target_bytes": 1556,
+   "target_padded": 1568,
+   "candidate_padded": 1568,
+   "target_relocations": 93,
+   "candidate_relocations": 94,
+   "target_normalized_sha256": "db62270d0aef399714dcd1f59a9d88e06920e5e4679ec062531ff5b2d452f19f",
+   "candidate_normalized_sha256": "9c360ea92a4a4b05d13bce4e8b55006c008fb0ae79f7c313db3380b34717b89e",
+   "objdiff_percent": 86.23505,
+   "blocker": "duplicated fgets call site from loop rotation, register cycle, 256-byte array slot order",
+   "exact_credit": 0,
+   "commit": "3be9c1703"
+  }
+ ],
+ "rejected_or_withheld": [
+  {
+   "item": "cseries_windows.h load_symbol_table declaration",
+   "reason": "regressed game_engine::_populate_statistic_buffer",
+   "fully_reverted": true
+  },
+  {
+   "item": "raw display_assert/system_exit in new projectile_collision default",
+   "reason": "house rule 23; replaced by byte-identical match_vassert(FALSE, NULL)",
+   "fully_reverted": "replaced"
+  },
+  {
+   "item": "actor_combat graph",
+   "reason": "needs weapons.h prototypes (reserved family) and out-of-line real_math declarations (reserved header)",
+   "fully_reverted": "never landed"
+  },
+  {
+   "item": "interface stall enum",
+   "reason": "not present in PDB/IDA/Ghidra evidence",
+   "fully_reverted": "never landed"
+  }
+ ],
+ "not_landed_inventory": [
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_actor_combat_update",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Parent of the whole private graph. It cannot be written admissibly here because: weapons.h lacks weapon_aim and weapon_estimate_time_to_target; January calls real_math helpers out of line (real_random_range, distance_squared3d, distance3d, vector_from_points3d, point_from_line3d x2, magnitude_squared3d x3) while the same TU inlines some of them elsewhere, and real_math.h is off-limits while consumer-local prototypes are inadmissible; actor_debug_info +0x34..+0x5B is unnamed (char __unknown1C[40]); the flags2 bits have no enumerators. Diagnostic only, in scratch/workers/actor_combat/u3.c with scratch-only declarations: 4672/146, sha-only, 2 of 1334 instructions differ (one commutative x87 load order in the burst_target add).",
+   "reopen": "After the P1 weapons.h declarations, an owner-approved real_math out-of-line declaration mechanism, P3 debug field names and P4 enum owners exist: replay u_update3.inc/u3.c with the owners and re-gate.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_000109a0 (actor_start_burst)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Private static whose only caller is actor_combat_update, so no admissible emitter exists. Diagnostic in the whole-graph TU: 1968/67, sha-only, 53 of 618 instructions differ. The residual is frame-slot colouring plus x87 last-use folding of the rotation cos/sin (same family as the parked find_nearby_target) and one capped-branch store. The tie budget is spent.",
+   "reopen": "With the update owner packet; re-measure inside the real parent.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_0000f590 (actor_combat_enable_special_fire_situation)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 144/2 under --alias, both with a stand-in emitter and inside the real diagnostic parent. Not landable: the only emitter is the blocked actor_combat_update.",
+   "reopen": "Lands with the update packet plus the P2 rename.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_0000f880 (actor_combat_get_firing_parameters)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 160/6 under --alias; the only emitters are the blocked update, start_burst and pause.",
+   "reopen": "Lands with the update packet plus the P2 rename.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_0000fba0 (actor_start_pause)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 176/11 under --alias; the only emitter is the blocked update.",
+   "reopen": "Lands with the update packet plus the P2 rename.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_0000fc50 (actor_start_first_burst_delay)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 208/8 under --alias (the orphan flag must be latched before fire_immediately=TRUE); the only emitter is the blocked update.",
+   "reopen": "Lands with the update packet plus the P2 rename.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_code_00010620 (actor_combat_allow_special_fire_situation)",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 176/9 under --alias; the only emitters are the blocked update and start_burst.",
+   "reopen": "Lands with the update packet plus the P2 rename.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_fast_ftol",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 32/0 as a natural COMDAT of start_burst/update inline fistp uses (no wrapper, no rename, boundary ledger respected). No admissible natural user exists without the graph.",
+   "reopen": "Lands with the graph.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_random_boolean",
+   "classification": "OWNER-BLOCKED",
+   "reason": "Diagnostic EXACT 32/2 as a natural COMDAT of start_burst's random_boolean() use (the isolated-wrapper rejection is respected). No admissible natural user exists without the graph.",
+   "reopen": "Lands with the graph.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_actor_aim_grenade",
+   "classification": "SKIPPED-EXHAUSTED",
+   "reason": "Semantic-withdrawn park (grenade_vehicle_semantic_withdrawal_20260905): January's vehicle path consumes uninitialized or point-shaped stack words, and the size/frame residual cannot be closed without reproducing UB or an unapproved semantic change. No new lifecycle evidence.",
+   "reopen": "An authenticated release-time vehicle_index==NONE invariant, per that ledger.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/ai/actor_combat",
+   "function": "_actor_combat_find_nearby_target, _actor_combat_plan_grenade_trajectory, _actor_combat_reaim_grenade, _actor_aim_projectile",
+   "classification": "PARKED-LOCKED",
+   "reason": "Untouched. Park drift PASS both at baseline and in the diagnostic whole-graph TU.",
+   "reopen": "Per their park records.",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_new",
+   "classification": "PARKED-LOCKED",
+   "reason": "Parked; untouched; measurements.base identical in final object.",
+   "reopen": "per parked.json",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_accelerate",
+   "classification": "PARKED-LOCKED",
+   "reason": "Parked; untouched; measurements.base identical in final object.",
+   "reopen": "per parked.json",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_aim_ballistic",
+   "classification": "PARKED-LOCKED",
+   "reason": "Parked; untouched; measurements.base identical in final object.",
+   "reopen": "per parked.json",
+   "exact_credit": 0
+  },
+  {
+   "unit": "source/interface/interface",
+   "function": "_render_debug_profile_stall_tick / _render_debug_profile",
+   "classification": "enum-evidence blocked",
+   "reason": "PDB/IDA/Ghidra contain no stall enum or enumerators (PDB types are XDK/NT/D3D only)",
+   "reopen": "authoritative source/header/type record recovering the 27 stall categories",
+   "exact_credit": 0
+  }
+ ],
+ "final_gates": {
+  "ninja": "pass (after reverting the cseries_windows.h trial)",
+  "stable_diff": "5 gained / 1,328 padded / 0 regressions",
+  "parked_functions": {
+   "active": 465,
+   "stale": 0,
+   "invalid": 0
+  },
+  "audit_object_admission": {
+   "candidate_count": 0,
+   "contradicted_count": 0,
+   "rejected_count": 7,
+   "revoked_count": 0
+  },
+  "pytest": "1151 passed, 5 skipped, 26 subtests passed",
+  "git_diff_check": "pass",
+  "fake_match_scan": "no new findings (stack_walk_windows keeps its 2 inherited inline-assembly captures)",
+  "point_from_line3d_guard": "pass on all changed units"
+ }
+}
