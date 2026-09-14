@@ -975,11 +975,12 @@ static boolean actor_move_vector_avoidance_find_direction(
 		direction_index < direction_count;
 		direction_index++)
 	{
-		real_vector3d const *direction = &directions[direction_index];
-		real cross = direction->j*direction_vector->k - direction->k*direction_vector->j;
+		real cross =
+			directions[direction_index].j*direction_vector->k -
+			directions[direction_index].k*direction_vector->j;
 
 		if (previous_cross*cross <= 0.f &&
-			dot_product3d(direction, direction_vector) > 0.f)
+			dot_product3d(direction_vector, &directions[direction_index]) > 0.f)
 		{
 			*approximate_direction_reference =
 				((real)previous_index*cross -
