@@ -117,13 +117,6 @@ struct rasterizer_water_debug_options
 	boolean water;
 };
 
-struct rasterizer_water_window_parameters
-{
-	short rasterizer_target;
-	byte reserved02[0x12];
-	real_vector3d camera_forward;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -219,8 +212,6 @@ typedef char verify_water_definition_lod_bias_offset[
 	offsetof(struct shader_transparent_water_definition, ripple_mipmap_lod_bias) == 0xE0 ? 1 : -1];
 typedef char verify_water_geometry_group_plane_offset[
 	offsetof(struct transparent_geometry_group, plane) == 0x80 ? 1 : -1];
-typedef char verify_water_window_parameters_camera_offset[
-	offsetof(struct rasterizer_water_window_parameters, camera_forward) == 0x14 ? 1 : -1];
 typedef char verify_water_definition_mipmap_levels_offset[
 	offsetof(struct shader_transparent_water_definition, ripple_mipmap_levels) == 0xD8 ? 1 : -1];
 typedef char verify_water_definition_ripples_offset[
@@ -234,7 +225,7 @@ boolean water_needs_update_flag;
 boolean water_visible_for_window_flag;
 
 extern struct rasterizer_water_debug_options rasterizer_debug_options;
-extern struct rasterizer_water_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -629,14 +620,17 @@ void rasterizer_water_draw(
 	struct transparent_geometry_group const *group)
 {
 	struct shader_transparent_water_definition *water;
-	real vertex_constants[3][4];
 	real_rgb_color tint_color;
 	short vertex_type;
 	short permutation_index;
 	boolean write_depth;
+	boolean draw_depth_only;
 	real reflection_amount;
-	real mipmap_lod_bias;
-	unsigned long mipmap_lod_bias_bits;
+	union
+	{
+		real value;
+		unsigned long bits;
+	} mipmap_lod_bias;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_water.c",
@@ -651,9 +645,10 @@ void rasterizer_water_draw(
 		water = SHADER_GET_TRANSPARENT_WATER(group->shader);
 		permutation_index = shader_get_vertex_shader_permutation(group->shader);
 		vertex_type = rasterizer_transparent_geometry_get_primary_vertex_type(group);
-		if (TEST_FLAG(water->flags, _shader_transparent_water_draw_before_fog_bit) &&
+		draw_depth_only = TEST_FLAG(water->flags, _shader_transparent_water_draw_before_fog_bit) &&
 			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit) &&
-			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit))
+			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit);
+		if (draw_depth_only)
 		{
 			IDirect3DDevice8_SetRenderState(
 				global_d3d_device,
@@ -975,35 +970,37 @@ void rasterizer_water_draw(
 				vertex_type,
 				permutation_index);
 
-			vertex_constants[0][0] = water->ripple_scale;
-			vertex_constants[0][1] = water->ripple_scale;
-			vertex_constants[0][2] = (real)cos(water->ripple_animation_angle) *
-				water->ripple_animation_velocity * global_frame_parameters.game_time_sec;
-			vertex_constants[0][3] = (real)sin(water->ripple_animation_angle) *
-				water->ripple_animation_velocity * global_frame_parameters.game_time_sec;
-			vertex_constants[1][0] = 0.0f;
-			vertex_constants[1][1] = 0.0f;
-			vertex_constants[1][2] = 0.0f;
-			vertex_constants[1][3] = 0.0f;
-			vertex_constants[2][0] = 0.0f;
-			vertex_constants[2][1] = 0.0f;
-			vertex_constants[2][2] = 0.0f;
-			vertex_constants[2][3] = 0.0f;
-			IDirect3DDevice8_SetVertexShaderConstant(
-				global_d3d_device,
-				-84,
-				vertex_constants,
-				3);
+			{
+				real vertex_constants[3][4] =
+				{
+					{
+						water->ripple_scale,
+						water->ripple_scale,
+						(real)cos(water->ripple_animation_angle) *
+							water->ripple_animation_velocity * global_frame_parameters.game_time_sec,
+						(real)sin(water->ripple_animation_angle) *
+							water->ripple_animation_velocity * global_frame_parameters.game_time_sec
+					},
+					{ 0.0f, 0.0f, 0.0f, 0.0f },
+					{ 0.0f, 0.0f, 0.0f, 0.0f }
+				};
+
+				IDirect3DDevice8_SetVertexShaderConstant(
+					global_d3d_device,
+					-84,
+					vertex_constants,
+					3);
+			}
 
 			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
 			pixel_shader.texture_modes = 0x64621;
 			pixel_shader.dot_mapping = 0x111;
-			pixel_shader.rgb_inputs[0] = 0x0B0B0120;
-			pixel_shader.rgb_outputs[0] = 0xCD;
-			pixel_shader.rgb_inputs[1] = 0x0C0C0000;
 			if (TEST_FLAG(water->flags, _shader_transparent_water_atmospheric_fog_bit))
 			{
 				pixel_shader.combiner_count = 4;
+				pixel_shader.rgb_inputs[0] = 0x0B0B0120;
+				pixel_shader.rgb_outputs[0] = 0xCD;
+				pixel_shader.rgb_inputs[1] = 0x0C0C0000;
 				pixel_shader.rgb_outputs[1] = 0xC0;
 				pixel_shader.rgb_inputs[2] = 0x0C0C0000;
 				pixel_shader.rgb_outputs[2] = 0xC0;
@@ -1014,6 +1011,9 @@ void rasterizer_water_draw(
 			else
 			{
 				pixel_shader.combiner_count = 2;
+				pixel_shader.rgb_inputs[0] = 0x0B0B0120;
+				pixel_shader.rgb_outputs[0] = 0xCD;
+				pixel_shader.rgb_inputs[1] = 0x0C0C0000;
 				pixel_shader.rgb_outputs[1] = 0xC0;
 				pixel_shader.final_combiner_inputs_abcd = 0x2D0F0B00;
 				pixel_shader.final_combiner_inputs_efg = 0x0C0C0000;
@@ -1021,8 +1021,10 @@ void rasterizer_water_draw(
 
 			if (magnitude3d(&group->plane.n) > 0.0f)
 			{
+				struct render_camera const *camera = &global_window_parameters.camera;
+
 				reflection_amount = PIN(
-					-dot_product3d(&global_window_parameters.camera_forward, &group->plane.n),
+					-dot_product3d(&camera->forward, &group->plane.n),
 					0.0f,
 					1.0f);
 				tint_color.red = (1.0f - reflection_amount) * water->view_parallel_tint_color.red +
@@ -1039,16 +1041,12 @@ void rasterizer_water_draw(
 			}
 			rasterizer_set_pixel_shader(&pixel_shader);
 
-			mipmap_lod_bias = -water->ripple_mipmap_lod_bias;
-			csmemcpy(
-				&mipmap_lod_bias_bits,
-				&mipmap_lod_bias,
-				sizeof(mipmap_lod_bias_bits));
+			mipmap_lod_bias.value = -water->ripple_mipmap_lod_bias;
 			IDirect3DDevice8_SetTextureStageState(
 				global_d3d_device,
 				0,
 				D3DTSS_MIPMAPLODBIAS,
-				mipmap_lod_bias_bits);
+				mipmap_lod_bias.bits);
 			rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
 			IDirect3DDevice8_SetTextureStageState(
 				global_d3d_device,

@@ -3045,25 +3045,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_water",
-      "function": "_rasterizer_water_draw",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked with the complete typed water draw pipeline retained: optional pre-fog opacity depth, bumpmap refresh, base-map alpha and color modulation passes, bump/reflection texture setup, atmospheric-fog and reflection combiner constants, mip bias, vertex constants, raster state, and transparent-group draw. January is 2,240 padded bytes with 171 relocations; the candidate is 2,320 with 173 and objdiff reports 91.316414 percent. The remaining differences are broad local/register and x87 scheduling rather than an identified missing pass. The retained mipmap bias conversion uses csmemcpy into an unsigned-long bit container; an earlier donor pointer-pun was rejected as undefined representation aliasing even though it produced a slightly smaller 2,304-byte candidate. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No pointer punning, volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or semantically false path is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the lifetime schedule.",
-      "measurements": {
-        "target": {
-          "size": 2240,
-          "relocation_count": 171,
-          "normalized_sha256": "bc1ccd223540f3d77f9b8d9c55c4e2bc88cf1e6471309c6e6c7f69ae02c61a13"
-        },
-        "base": {
-          "size": 2320,
-          "relocation_count": 173,
-          "normalized_sha256": "4900130dbc9adc4caad687f4bc9322674065b58bb049ededf912ced502d54ae6"
-        },
-        "objdiff_percent": 91.316414
-      }
-    },
-    {
       "unit": "source/camera/director",
       "function": "_director_script_camera",
       "class": "unclassified",
