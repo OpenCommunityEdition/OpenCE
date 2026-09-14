@@ -591,119 +591,80 @@ void bitmap_copy(
 		switch (translation)
 		{
 			case _bitmap_copy_16bit:
-			{
-				word *source_pixels = source_address;
-				word *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word source_pixel = *source_pixels++;
-
-					*destination_pixels++ = source_pixel;
+					*((word *)destination_address)++ = *((word *)source_address)++;
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a1r5g5b5_to_r5g6b5:
-			{
-				word *source_pixels = source_address;
-				word *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word source_pixel = *source_pixels++;
+					word source_pixel = *((word *)source_address)++;
 
-					*destination_pixels++ = (word)(((source_pixel << 1) & 0xffc0) | (source_pixel & 0x3f));
+					*((word *)destination_address)++ = (word)(((source_pixel << 1) & 0xffc0) | (source_pixel & 0x3f));
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_r5g6b5_to_a1r5g5b5:
-			{
-				word *source_pixels = source_address;
-				word *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word source_pixel = *source_pixels++;
+					word source_pixel = *((word *)source_address)++;
 
-					*destination_pixels++ = (word)(((source_pixel >> 1) & 0x7fe0) | (source_pixel & 0x1f));
+					*((word *)destination_address)++ = (word)(((source_pixel >> 1) & 0x7fe0) | (source_pixel & 0x1f));
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_r5g6b5_to_a8r8g8b8:
-			{
-				word *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word source_pixel = *source_pixels++;
+					word source_pixel = *((word *)source_address)++;
 
-					*destination_pixels++ = 0xff000000 |
-						((source_pixel & 0xf800) << 8) | ((source_pixel & 0xe000) << 3) |
-						((source_pixel & 0x7e0) << 5) | ((source_pixel & 0x600) >> 1) |
-						((source_pixel & 0x1f) << 3) | ((source_pixel & 0x1c) >> 2);
+					*((pixel32 *)destination_address)++ = 0xff000000 |
+						(((((source_pixel >> 11) & 0x1f) << 3) | (((source_pixel >> 11) & 0x1f) >> 2)) << 16) |
+						(((((source_pixel >> 5) & 0x3f) << 2) | (((source_pixel >> 5) & 0x3f) >> 4)) << 8) |
+						(((source_pixel & 0x1f) << 3) | ((source_pixel & 0x1f) >> 2));
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a4r4g4b4_to_a8r8g8b8:
-			{
-				word *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word source_pixel = *source_pixels++;
+					word source_pixel = *((word *)source_address)++;
 
-					*destination_pixels++ =
-						((source_pixel & 0xf000) << 16) | ((source_pixel & 0xff00) << 12) |
-						((source_pixel & 0xff0) << 8) | ((source_pixel & 0xff) << 4) |
-						(source_pixel & 0xf);
+					*((pixel32 *)destination_address)++ =
+						(((((source_pixel >> 12) & 0xf) << 4) | ((source_pixel >> 12) & 0xf)) << 24) |
+						(((((source_pixel >> 8) & 0xf) << 4) | ((source_pixel >> 8) & 0xf)) << 16) |
+						(((((source_pixel >> 4) & 0xf) << 4) | ((source_pixel >> 4) & 0xf)) << 8) |
+						(((source_pixel & 0xf) << 4) | (source_pixel & 0xf));
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a4r4g4b4_to_a8r8g8b8_blend:
-			{
-				word *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word pixel = *source_pixels++;
+					word pixel = *((word *)source_address)++;
 					pixel32 source_pixel =
-						((pixel & 0xf000) << 16) | ((pixel & 0xff00) << 12) |
-						((pixel & 0xff0) << 8) | ((pixel & 0xff) << 4) | (pixel & 0xf);
+						(((((pixel >> 12) & 0xf) << 4) | ((pixel >> 12) & 0xf)) << 24) |
+						(((((pixel >> 8) & 0xf) << 4) | ((pixel >> 8) & 0xf)) << 16) |
+						(((((pixel >> 4) & 0xf) << 4) | ((pixel >> 4) & 0xf)) << 8) |
+						(((pixel & 0xf) << 4) | (pixel & 0xf));
 					byte alpha = source_pixel >> 24;
 					byte inverse_alpha = 255 - alpha;
-					pixel32 destination_pixel = *destination_pixels;
 
-					*destination_pixels++ =
-						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
-						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
-						((((source_pixel & 0xff) * alpha) >> 8) + (((destination_pixel & 0xff) * inverse_alpha) >> 8)) |
-						MAX(alpha, destination_pixel >> 24) << 24;
+					*(pixel32 *)destination_address =
+						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
+						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
+						((((source_pixel & 0xff) * alpha) >> 8) + (((*(pixel32 *)destination_address & 0xff) * inverse_alpha) >> 8)) |
+						MAX(alpha, *(pixel32 *)destination_address >> 24) << 24;
+					((pixel32 *)destination_address)++;
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a4r4g4b4_to_a8r8g8b8_modulate_blend:
-			{
-				word *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					word pixel = *source_pixels++;
+					word pixel = *((word *)source_address)++;
 					pixel32 source_pixel =
 						(((pixel >> 12) & 0xf) * ((converted_color >> 12) & 0xf)) << 24 |
 						(((pixel >> 8) & 0xf) * ((converted_color >> 8) & 0xf)) << 16 |
@@ -711,133 +672,100 @@ void bitmap_copy(
 						((pixel & 0xf) * (converted_color & 0xf));
 					byte alpha = source_pixel >> 24;
 					byte inverse_alpha = 255 - alpha;
-					pixel32 destination_pixel = *destination_pixels;
 
-					*destination_pixels++ =
-						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
-						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
-						((((source_pixel & 0xff) * alpha) >> 8) + (((destination_pixel & 0xff) * inverse_alpha) >> 8)) |
-						MAX(alpha, destination_pixel >> 24) << 24;
+					*(pixel32 *)destination_address =
+						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
+						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
+						((((source_pixel & 0xff) * alpha) >> 8) + (((*(pixel32 *)destination_address & 0xff) * inverse_alpha) >> 8)) |
+						MAX(alpha, *(pixel32 *)destination_address >> 24) << 24;
+					((pixel32 *)destination_address)++;
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a8r8g8b8:
-			{
-				pixel32 *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 source_pixel = *source_pixels++;
-
-					*destination_pixels++ = source_pixel;
+					*((pixel32 *)destination_address)++ = *((pixel32 *)source_address)++;
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a8r8g8b8_blend:
-			{
-				pixel32 *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 source_pixel = *source_pixels++;
+					pixel32 source_pixel = *((pixel32 *)source_address)++;
 					byte alpha = source_pixel >> 24;
 					byte inverse_alpha = 255 - alpha;
-					pixel32 destination_pixel = *destination_pixels;
 
-					*destination_pixels++ =
-						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
-						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
-						((((source_pixel & 0xff) * alpha) >> 8) + (((destination_pixel & 0xff) * inverse_alpha) >> 8)) |
-						MAX(alpha, destination_pixel >> 24) << 24;
+					*(pixel32 *)destination_address =
+						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
+						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
+						((((source_pixel & 0xff) * alpha) >> 8) + (((*(pixel32 *)destination_address & 0xff) * inverse_alpha) >> 8)) |
+						MAX(alpha, *(pixel32 *)destination_address >> 24) << 24;
+					((pixel32 *)destination_address)++;
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a8r8g8b8_modulate:
-			{
-				pixel32 *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 pixel = *source_pixels++;
+					pixel32 pixel = *((pixel32 *)source_address)++;
 
-					*destination_pixels++ =
+					*((pixel32 *)destination_address)++ =
 						((((pixel >> 24) & 0xff) * ((converted_color >> 24) & 0xff) >> 8) << 24) |
 						((((pixel >> 16) & 0xff) * ((converted_color >> 16) & 0xff) >> 8) << 16) |
 						((((pixel >> 8) & 0xff) * ((converted_color >> 8) & 0xff) >> 8) << 8) |
 						((pixel & 0xff) * (converted_color & 0xff) >> 8);
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a8r8g8b8_modulate_blend:
-			{
-				pixel32 *source_pixels = source_address;
-				pixel32 *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 pixel = *source_pixels++;
-					pixel32 source_pixel =
-						((((pixel >> 24) & 0xff) * ((converted_color >> 24) & 0xff) >> 8) << 24) |
-						((((pixel >> 16) & 0xff) * ((converted_color >> 16) & 0xff) >> 8) << 16) |
-						((((pixel >> 8) & 0xff) * ((converted_color >> 8) & 0xff) >> 8) << 8) |
-						((pixel & 0xff) * (converted_color & 0xff) >> 8);
-					byte alpha = source_pixel >> 24;
-					byte inverse_alpha = 255 - alpha;
-					pixel32 destination_pixel = *destination_pixels;
+					pixel32 source_pixel = *((pixel32 *)source_address)++;
+					byte alpha;
+					byte inverse_alpha;
 
-					*destination_pixels++ =
-						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
-						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((destination_pixel >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
-						((((source_pixel & 0xff) * alpha) >> 8) + (((destination_pixel & 0xff) * inverse_alpha) >> 8)) |
-						MAX(alpha, destination_pixel >> 24) << 24;
+					source_pixel =
+						((((source_pixel >> 24) & 0xff) * ((converted_color >> 24) & 0xff) >> 8) << 24) |
+						((((source_pixel >> 16) & 0xff) * ((converted_color >> 16) & 0xff) >> 8) << 16) |
+						((((source_pixel >> 8) & 0xff) * ((converted_color >> 8) & 0xff) >> 8) << 8) |
+						((source_pixel & 0xff) * (converted_color & 0xff) >> 8);
+					alpha = source_pixel >> 24;
+					inverse_alpha = 255 - alpha;
+
+					*(pixel32 *)destination_address =
+						(((((source_pixel >> 16) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 16) & 0xff) * inverse_alpha) >> 8)) << 16 |
+						(((((source_pixel >> 8) & 0xff) * alpha) >> 8) + ((((*(pixel32 *)destination_address >> 8) & 0xff) * inverse_alpha) >> 8)) << 8 |
+						((((source_pixel & 0xff) * alpha) >> 8) + (((*(pixel32 *)destination_address & 0xff) * inverse_alpha) >> 8)) |
+						MAX(alpha, *(pixel32 *)destination_address >> 24) << 24;
+					((pixel32 *)destination_address)++;
 				}
 				break;
-			}
 
 			case _bitmap_copy_a8r8g8b8_to_r5g6b5:
-			{
-				pixel32 *source_pixels = source_address;
-				word *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 source_pixel = *source_pixels++;
+					pixel32 source_pixel = *((pixel32 *)source_address)++;
 
-					*destination_pixels++ = (word)
-						(((((source_pixel >> 16) & 0xf8) << 5) | ((source_pixel >> 8) & 0xfc)) << 3 |
-						((source_pixel >> 3) & 0x1f));
+					*((word *)destination_address)++ = (word)(
+						((((source_pixel >> 16) & 0xff) >> 3) << 11) |
+						((((source_pixel >> 8) & 0xff) >> 2) << 5) |
+						((source_pixel & 0xff) >> 3));
 				}
 				break;
-			}
-
 
 			case _bitmap_copy_a8r8g8b8_to_a4r4g4b4:
-			{
-				pixel32 *source_pixels = source_address;
-				word *destination_pixels = destination_address;
-
 				for (x = 0; x < width; x++)
 				{
-					pixel32 source_pixel = *source_pixels++;
+					pixel32 source_pixel = *((pixel32 *)source_address)++;
 
-					*destination_pixels++ = (word)
-						(((source_pixel >> 16) & 0xf000) | ((source_pixel >> 12) & 0xf00) |
-						((source_pixel >> 8) & 0xf0) | ((source_pixel >> 4) & 0xf));
+					*((word *)destination_address)++ = (word)(
+						(((source_pixel >> 24) >> 4) << 12) |
+						((((source_pixel >> 16) & 0xff) >> 4) << 8) |
+						((((source_pixel >> 8) & 0xff) >> 4) << 4) |
+						((source_pixel & 0xff) >> 4));
 				}
 				break;
-			}
-
 
 			default:
 				match_vassert(
