@@ -4466,7 +4466,7 @@
       "unit": "source/effects/effects",
       "function": "_effect_generate_particles",
       "class": "unclassified",
-      "evidence": "The retained ordinary-C implementation completes the event-particle traversal, distribution, marker transforms, environment/disposition filtering, velocity/orientation, tint, split-screen limits, and particle creation using named enums, typed structures, cseries flags, and engine real types. January disassembly and relocations establish the same behavior, and the later HCEA reconstruction corroborates the algorithm. The candidate is 1,616 padded bytes with the same 46 relocation count versus January's 1,888 bytes, at 68.30481 percent objdiff. January inlines effect_real_random_range at three sites, whereas VC7 keeps natural calls in this context; forcing inline would violate the house rule and disturb the exact out-of-line/helper schedule. The fail-closed classifier returns UNKNOWN. No forced inline, duplicated helper body, volatile/register forcing, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen only for authoritative January source or natural compatible-compiler evidence for the three helper-inline decisions.",
+      "evidence": "The retained ordinary-C implementation completes the event-particle traversal, distribution, marker transforms, environment/disposition filtering, velocity/orientation, tint, split-screen limits, and particle creation using named enums, typed structures, cseries flags, and engine real types. January disassembly and relocations establish the same behavior, and the later HCEA reconstruction corroborates the algorithm. The candidate is 1,616 padded bytes with the same 46 relocation count versus January's 1,888 bytes, at 68.30481 percent objdiff. January inlines effect_real_random_range at three sites, whereas VC7 keeps natural calls in this context; forcing inline would violate the house rule and disturb the exact out-of-line/helper schedule. The fail-closed classifier returns UNKNOWN. No forced inline, duplicated helper body, volatile/register forcing, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen only for authoritative January source or natural compatible-compiler evidence for the three helper-inline decisions. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body's particle loop was corrected to January's per-instance count (hoisted count reloaded per instance, dec/jne proven at 0x187-0x196) as the coupled prerequisite of the exact effect_update reopen: 2048 bytes, 55 relocations, still fuzzy; the residual is the environment-helper inline decision plus the loop guard and register form. See docs/object_matching_logs/effects_obj_opus5_100k_waveD_20260914.md.",
       "measurements": {
         "target": {
           "size": 1888,
@@ -4474,30 +4474,11 @@
           "normalized_sha256": "d196a029c22bfe043323cd0def8c1f0365590b559f3fbb65f23c9ef5b4065ef5"
         },
         "base": {
-          "size": 1616,
-          "relocation_count": 46,
-          "normalized_sha256": "54d1ff54d1dc06f03c9e8729f779cc63c3afc13901dad56d027f98534dca5d43"
+          "size": 2048,
+          "relocation_count": 55,
+          "normalized_sha256": "2dccf111fad130493ba4305ac4012e6d5d2b0f724894fa2f468b2e8d01130c27"
         },
-        "objdiff_percent": 68.30481
-      }
-    },
-    {
-      "unit": "source/effects/effects",
-      "function": "_effect_generate_parts",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C implementation walks the current event's typed part block, validates semantic locations and references, applies disposition and environment enums, resolves world marker transforms, honors the world-down flag, computes the effect scale, and dispatches each part. January disassembly/relocations and the independent HCEA reconstruction corroborate the complete behavior. Target and candidate share the same 592-byte padded envelope and all 15 relocation identities; objdiff reports 91.225 percent, with the remaining difference confined to register allocation and one alignment jump. The fail-closed classifier returns UNKNOWN. No representation punning from HCEA, manual offsets, forced inline, volatile/register forcing, barrier, pragma, assembly, or fake branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the local/register schedule.",
-      "measurements": {
-        "target": {
-          "size": 592,
-          "relocation_count": 15,
-          "normalized_sha256": "57b1eb3518c25cd821a330e2cb80201e5196bcd98d140bce265503797999db71"
-        },
-        "base": {
-          "size": 592,
-          "relocation_count": 15,
-          "normalized_sha256": "4d2196b5982f1a6ba4dc7d6db5a070f641d7d02339a5710e692ab01f7d77d221"
-        },
-        "objdiff_percent": 91.225
+        "objdiff_percent": 80.361855
       }
     },
     {
@@ -4517,82 +4498,6 @@
           "normalized_sha256": "89e9defe2b034898c4530c79fdbcc71a6a801d52792da5c22087f9024297e958"
         },
         "objdiff_percent": 92.88461
-      }
-    },
-    {
-      "unit": "source/effects/effects",
-      "function": "_effect_part_allowed_by_disposition",
-      "class": "unclassified",
-      "evidence": "The retained one-expression helper implements the complete named-enum rule: nonviolent effects reject violent parts and other effects reject nonviolent parts. Target and candidate share 32 padded bytes, have no relocations, and implement the same comparisons; objdiff reports 79.166664 percent because January computes through CL/DL and copies to AL while natural VC7 C computes directly in AL with the disposition in CX. Parameter-order probes did not change the allocation, and the independent HCEA reconstruction corroborates the rule. The fail-closed classifier returns UNKNOWN. No register forcing, volatile access, barrier, pragma, assembly, fake temporary, or nonsensical branch is retained. Reopen only for authoritative January prototype/local records or a natural same-compiler donor explaining the private register convention.",
-      "measurements": {
-        "target": {
-          "size": 32,
-          "relocation_count": 0,
-          "normalized_sha256": "e878f1da4c5677d4e788b43988e2655d11524f10570cd45b8d60ffaf745e54df"
-        },
-        "base": {
-          "size": 32,
-          "relocation_count": 0,
-          "normalized_sha256": "4077be2bfbc9b1bafede8b74df69c9be8f3588608edcf86799f21e8b31a06466"
-        },
-        "objdiff_percent": 79.166664
-      }
-    },
-    {
-      "unit": "source/effects/effects",
-      "function": "_effect_scale",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C helper scales an engine real by the effect's scale_a and scale_b values under the corresponding cseries flag masks, exactly matching January's recovered five-parameter semantics and the independent HCEA reconstruction. Target and candidate share 48 padded bytes and have no relocations; objdiff reports 87.5 percent. The retained value-mutation spelling leaves only January's x87 pop/reload pair different and keeps the 128-byte effect_real_random_range caller exact. A separate scaled_value local makes this out-of-line helper exact but regresses that larger exact caller, proving a genuine same-source inline/out-of-line codegen fork. The fail-closed classifier returns UNKNOWN. No duplicate helper, forced inline, volatile/register forcing, barrier, pragma, assembly, or fake dependency is retained. Reopen only for authoritative January source or natural TU-context evidence that satisfies both emitted forms.",
-      "measurements": {
-        "target": {
-          "size": 48,
-          "relocation_count": 0,
-          "normalized_sha256": "fa6e87903a77e69479c8093e30c27f512a543da7c828aa0888a7feb02efcca1d"
-        },
-        "base": {
-          "size": 48,
-          "relocation_count": 0,
-          "normalized_sha256": "3f58193a9072d61aebec6170661e12471f6ef41f2d928084da6a9969f857f122"
-        },
-        "objdiff_percent": 87.5
-      }
-    },
-    {
-      "unit": "source/effects/effects",
-      "function": "_effect_update",
-      "class": "unclassified",
-      "evidence": "The retained typed ordinary-C owner implements the complete effect lifecycle: object/parent location tracking, looping driver updates, stop/delete transitions, color validation, event timing, location updates, particle and part generation, event advance, and terminal cleanup. January control flow and all 48 relocation identities plus the independent HCEA reconstruction corroborate the behavior. The candidate is 1,312 padded bytes versus January's 1,328 and objdiff reports 94.71298 percent. The remaining three-instruction/private-register delta is coupled to January's three inlined effect_real_random_range sites in effect_generate_particles; natural VC7 retains those helper calls and does not establish January's EDI/EBX convention. The fail-closed classifier returns UNKNOWN. No forced inline, register forcing, volatile access, barrier, pragma, assembly, raw offset, representation pun, or fake path is retained. Reopen only for authoritative January source or natural TU-context evidence resolving the downstream helper-inline schedule.",
-      "measurements": {
-        "target": {
-          "size": 1328,
-          "relocation_count": 48,
-          "normalized_sha256": "0e9307dd99a9d220aebf4f39b9c10df08687d3796376148bce23387fe54c6fd3"
-        },
-        "base": {
-          "size": 1312,
-          "relocation_count": 48,
-          "normalized_sha256": "bbafc4b8132a06ed0bc7dc9e1407a77173e4539f8859fb44a7529ce86dd0d172"
-        },
-        "objdiff_percent": 94.71298
-      }
-    },
-    {
-      "unit": "source/effects/effects",
-      "function": "_effects_object_is_corpse",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C predicate uses the typed biped accessor, named dead flag, recovered CORPSE_SETTLING_TIME constant, unit time_of_death field, and game_time_get to implement the complete January corpse test. The later HCEA reconstruction corroborates the semantics. Candidate and target have the same two relocation identities, but VC7 tail-merges the three FALSE exits into 64 padded bytes while January keeps three distinct exits in 80 bytes; objdiff reports 67.870964 percent. The classifier identifies the return-shape signature, but no source-authentic spelling found by Opus prevents the merge. No duplicated fake condition, volatile/register forcing, barrier, pragma, assembly, or undefined behavior is retained. Reopen only for authoritative January source/local records or a natural same-compiler spelling that preserves the separate exits.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 2,
-          "normalized_sha256": "258911960813c6bc362d9c018f048c2a6aac9ed52fb28febb5bca828cddd2e4c"
-        },
-        "base": {
-          "size": 64,
-          "relocation_count": 2,
-          "normalized_sha256": "95450f4504f5450759bdc547245cb0d7ef6407ab93326408f6400caee80c2f16"
-        },
-        "objdiff_percent": 67.870964
       }
     },
     {

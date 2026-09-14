@@ -1515,18 +1515,16 @@ static short effect_marker_list_get_markers_by_name(
 static boolean effects_object_is_corpse(
 	long object_index)
 {
+	boolean is_corpse = FALSE;
 	struct biped_datum *unit = biped_try_and_get(object_index);
 
-	if (!unit || !TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
-		return FALSE;
+	if (unit && TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		is_corpse = unit->unit.time_of_death != NONE &&
+			unit->unit.time_of_death + CORPSE_SETTLING_TIME < game_time_get();
+	}
 
-	if (unit->unit.time_of_death == NONE)
-		return FALSE;
-
-	if (unit->unit.time_of_death + CORPSE_SETTLING_TIME < game_time_get())
-		return TRUE;
-
-	return FALSE;
+	return is_corpse;
 }
 
 static long effect_allocate(
@@ -2005,203 +2003,205 @@ static void effect_generate_particles(
 
 		while (instance)
 		{
-			struct new_particle_data data;
-			real_vector3d random_direction;
-			real_vector3d emission_offset;
-			real_point3d world_position;
-			real_vector3d world_direction;
-			real_vector3d world_velocity;
-			real emission_radius = effect_real_random_range(
-				get_global_local_random_seed_address(),
-				effect,
-				particles->distribution_radius_lower_bound,
-				particles->distribution_radius_upper_bound,
-				particles->scale_a_flags,
-				particles->scale_b_flags,
-				_effect_particle_distribution_radius_bit);
+			short instance_particle_index;
 
-			count_delta--;
-
-			seed_random_direction3d(
-				get_global_local_random_seed_address(),
-				&random_direction);
-			matrix4x3_transform_vector(
-				&instance->matrix,
-				&particles->offset,
-				&emission_offset);
-
-			data.position.x = instance->matrix.position.x +
-				random_direction.i * emission_radius + emission_offset.i;
-			data.position.y = instance->matrix.position.y +
-				random_direction.j * emission_radius + emission_offset.j;
-			data.position.z = instance->matrix.position.z +
-				random_direction.k * emission_radius + emission_offset.k;
-
-			effect_random_translational_velocity(
-				get_global_local_random_seed_address(),
-				effect,
-				&particles->runtime_direction,
-				&data.direction,
-				&data.velocity,
-				particles->velocity_lower_bound,
-				particles->velocity_upper_bound,
-				particles->velocity_cone_angle,
-				particles->scale_a_flags,
-				particles->scale_b_flags);
-
-			matrix4x3_transform_normal(
-				&instance->matrix,
-				&data.direction,
-				&data.direction);
-			matrix4x3_transform_vector(
-				&instance->matrix,
-				&data.velocity,
-				&data.velocity);
-
-			if (instance->node_designator != NONE)
+			for (instance_particle_index = 0;
+				instance_particle_index < count_delta;
+				instance_particle_index++)
 			{
-				real_matrix4x3 *node_matrix = effect_get_node_matrix(
+				struct new_particle_data data;
+				real_vector3d random_direction;
+				real_vector3d emission_offset;
+				real_point3d world_position;
+				real_vector3d world_direction;
+				real_vector3d world_velocity;
+				real emission_radius = effect_real_random_range(
+					get_global_local_random_seed_address(),
 					effect,
-					instance->node_designator);
+					particles->distribution_radius_lower_bound,
+					particles->distribution_radius_upper_bound,
+					particles->scale_a_flags,
+					particles->scale_b_flags,
+					_effect_particle_distribution_radius_bit);
 
-				matrix4x3_transform_point(
-					node_matrix,
-					&data.position,
-					&world_position);
-				matrix4x3_transform_normal(
-					node_matrix,
-					&data.direction,
-					&world_direction);
+				seed_random_direction3d(
+					get_global_local_random_seed_address(),
+					&random_direction);
 				matrix4x3_transform_vector(
-					node_matrix,
+					&instance->matrix,
+					&particles->offset,
+					&emission_offset);
+
+				data.position.x = instance->matrix.position.x +
+					random_direction.i * emission_radius + emission_offset.i;
+				data.position.y = instance->matrix.position.y +
+					random_direction.j * emission_radius + emission_offset.j;
+				data.position.z = instance->matrix.position.z +
+					random_direction.k * emission_radius + emission_offset.k;
+
+				effect_random_translational_velocity(
+					get_global_local_random_seed_address(),
+					effect,
+					&particles->runtime_direction,
+					&data.direction,
 					&data.velocity,
-					&world_velocity);
-			}
-			else
-			{
-				world_position = data.position;
-				world_direction = data.direction;
-				world_velocity = data.velocity;
-			}
+					particles->velocity_lower_bound,
+					particles->velocity_upper_bound,
+					particles->velocity_cone_angle,
+					particles->scale_a_flags,
+					particles->scale_b_flags);
 
-			if (effect_allowed_by_environment(
-				particles->environment,
-				&effect->location,
-				&world_position))
-			{
-				data.definition_index = particles->particle.index;
+				matrix4x3_transform_normal(
+					&instance->matrix,
+					&data.direction,
+					&data.direction);
+				matrix4x3_transform_vector(
+					&instance->matrix,
+					&data.velocity,
+					&data.velocity);
 
-				if (TEST_FLAG(particles->flags, _effect_particle_attached_bit))
+				if (instance->node_designator != NONE)
 				{
-					data.object_index = effect->object_index;
-					data.node_index = instance->node_designator != NONE
-						? (short)(instance->node_designator &
-							(FLAG(_effect_location_first_person_bit) - 1))
-						: NONE;
-					data.initial_impulse = *global_zero_vector3d;
+					real_matrix4x3 *node_matrix = effect_get_node_matrix(
+						effect,
+						instance->node_designator);
+
+					matrix4x3_transform_point(
+						node_matrix,
+						&data.position,
+						&world_position);
+					matrix4x3_transform_normal(
+						node_matrix,
+						&data.direction,
+						&world_direction);
+					matrix4x3_transform_vector(
+						node_matrix,
+						&data.velocity,
+						&world_velocity);
 				}
 				else
 				{
-					if (effect->impulse_field.translational_function)
+					world_position = data.position;
+					world_direction = data.direction;
+					world_velocity = data.velocity;
+				}
+
+				if (effect_allowed_by_environment(
+					particles->environment,
+					&effect->location,
+					&world_position))
+				{
+					data.definition_index = particles->particle.index;
+
+					if (TEST_FLAG(particles->flags, _effect_particle_attached_bit))
 					{
-						effect->impulse_field.translational_function(
-							&data.initial_impulse,
-							&world_position,
-							effect->impulse_field.user_data);
+						data.object_index = effect->object_index;
+						data.node_index = instance->node_designator != NONE
+							? (short)(instance->node_designator &
+								(FLAG(_effect_location_first_person_bit) - 1))
+							: NONE;
+						data.initial_impulse = *global_zero_vector3d;
 					}
 					else
 					{
-						data.initial_impulse = *global_zero_vector3d;
+						if (effect->impulse_field.translational_function)
+						{
+							effect->impulse_field.translational_function(
+								&data.initial_impulse,
+								&world_position,
+								effect->impulse_field.user_data);
+						}
+						else
+						{
+							data.initial_impulse = *global_zero_vector3d;
+						}
+
+						data.object_index = NONE;
+						data.position = world_position;
+						data.direction = world_direction;
+						data.velocity.i = world_velocity.i + effect->velocity.i * 30.0f;
+						data.velocity.j = world_velocity.j + effect->velocity.j * 30.0f;
+						data.velocity.k = world_velocity.k + effect->velocity.k * 30.0f;
 					}
 
-					data.object_index = NONE;
-					data.position = world_position;
-					data.direction = world_direction;
-					data.velocity.i = world_velocity.i + effect->velocity.i * 30.0f;
-					data.velocity.j = world_velocity.j + effect->velocity.j * 30.0f;
-					data.velocity.k = world_velocity.k + effect->velocity.k * 30.0f;
-				}
-
-				data.radius = effect_real_random_range(
-					get_global_local_random_seed_address(),
-					effect,
-					particles->radius_lower_bound,
-					particles->radius_upper_bound,
-					particles->scale_a_flags,
-					particles->scale_b_flags,
-					_effect_particle_radius_bit);
-				data.angular_velocity = effect_real_random_range(
-					get_global_local_random_seed_address(),
-					effect,
-					particles->angular_velocity_lower_bound,
-					particles->angular_velocity_upper_bound,
-					particles->scale_a_flags,
-					particles->scale_b_flags,
-					_effect_angular_velocity_bit);
-				data.rotation = TEST_FLAG(
-					particles->flags,
-					_effect_particle_random_orientation_bit)
-					? real_seed_random_range(
+					data.radius = effect_real_random_range(
 						get_global_local_random_seed_address(),
-						0.0f,
-						2.f*_pi)
-					: 0.0f;
-
-				if (TEST_FLAG(particles->scale_a_flags, _effect_particle_tint_bit) ||
-					TEST_FLAG(particles->scale_b_flags, _effect_particle_tint_bit))
-				{
-					data.color.alpha = effect_scale(
 						effect,
-						1.0f,
+						particles->radius_lower_bound,
+						particles->radius_upper_bound,
 						particles->scale_a_flags,
 						particles->scale_b_flags,
-						_effect_particle_tint_bit);
+						_effect_particle_radius_bit);
+					data.angular_velocity = effect_real_random_range(
+						get_global_local_random_seed_address(),
+						effect,
+						particles->angular_velocity_lower_bound,
+						particles->angular_velocity_upper_bound,
+						particles->scale_a_flags,
+						particles->scale_b_flags,
+						_effect_angular_velocity_bit);
+					data.rotation = TEST_FLAG(
+						particles->flags,
+						_effect_particle_random_orientation_bit)
+						? real_seed_random_range(
+							get_global_local_random_seed_address(),
+							0.0f,
+							2.f*_pi)
+						: 0.0f;
+
+					if (TEST_FLAG(particles->scale_a_flags, _effect_particle_tint_bit) ||
+						TEST_FLAG(particles->scale_b_flags, _effect_particle_tint_bit))
+					{
+						data.color.alpha = effect_scale(
+							effect,
+							1.0f,
+							particles->scale_a_flags,
+							particles->scale_b_flags,
+							_effect_particle_tint_bit);
+					}
+					else
+					{
+						data.color.alpha = real_seed_random(
+							get_global_local_random_seed_address());
+					}
+
+					rgb_colors_interpolate(
+						&data.color.rgb,
+						(particles->flags >> _effect_particle_tint_interpolate_hsv_bit) & 3,
+						&particles->tint_lower_bound.rgb,
+						&particles->tint_upper_bound.rgb,
+						data.color.alpha);
+					data.color.alpha =
+						(1.0f - data.color.alpha) * particles->tint_lower_bound.alpha +
+						particles->tint_upper_bound.alpha * data.color.alpha;
+
+					if (TEST_FLAG(
+						particles->flags,
+						_effect_particle_tint_from_change_color_bit))
+					{
+						data.color.rgb.red *= effect->color.red;
+						data.color.rgb.green *= effect->color.green;
+						data.color.rgb.blue *= effect->color.blue;
+					}
+
+					data.local_player_index = effect->local_player_index;
+					data.attached_to_local_player = instance->node_designator != NONE &&
+						TEST_FLAG(
+							instance->node_designator,
+							_effect_location_first_person_bit);
+					data.dont_draw_first_person =
+						particles->camera_mode == _effect_camera_mode_third_person_only;
+					data.dont_draw_third_person =
+						particles->camera_mode == _effect_camera_mode_first_person_only;
+
+					particle_new(&data);
 				}
-				else
-				{
-					data.color.alpha = real_seed_random(
-						get_global_local_random_seed_address());
-				}
-
-				rgb_colors_interpolate(
-					&data.color.rgb,
-					(particles->flags >> _effect_particle_tint_interpolate_hsv_bit) & 3,
-					&particles->tint_lower_bound.rgb,
-					&particles->tint_upper_bound.rgb,
-					data.color.alpha);
-				data.color.alpha =
-					(1.0f - data.color.alpha) * particles->tint_lower_bound.alpha +
-					particles->tint_upper_bound.alpha * data.color.alpha;
-
-				if (TEST_FLAG(
-					particles->flags,
-					_effect_particle_tint_from_change_color_bit))
-				{
-					data.color.rgb.red *= effect->color.red;
-					data.color.rgb.green *= effect->color.green;
-					data.color.rgb.blue *= effect->color.blue;
-				}
-
-				data.local_player_index = effect->local_player_index;
-				data.attached_to_local_player = instance->node_designator != NONE &&
-					TEST_FLAG(
-						instance->node_designator,
-						_effect_location_first_person_bit);
-				data.dont_draw_first_person =
-					particles->camera_mode == _effect_camera_mode_third_person_only;
-				data.dont_draw_third_person =
-					particles->camera_mode == _effect_camera_mode_first_person_only;
-
-				particle_new(&data);
 			}
 
-			if (count_delta <= 0)
-			{
-				instance = effect_location_get_next_instance(
-					effect,
-					&location_datum_index,
-					particles->camera_mode);
-			}
+			instance = effect_location_get_next_instance(
+				effect,
+				&location_datum_index,
+				particles->camera_mode);
 		}
 	}
 
@@ -2337,14 +2337,16 @@ static void effect_update(
 
 		if (!TEST_FLAG(flags, _effect_invisible_bit))
 		{
-			if (!TEST_FLAG(flags, _effect_loop_bit))
+			if (TEST_FLAG(flags, _effect_loop_bit))
+			{
+				effect->header.flags = (word)(flags | FLAG(_effect_invisible_bit));
+			}
+			else
 			{
 				effect_delete(effect_index);
 
 				return;
 			}
-
-			effect->header.flags = (word)(flags | FLAG(_effect_invisible_bit));
 		}
 	}
 	else
@@ -2417,10 +2419,10 @@ static void effect_update(
 			{
 				word end_flags = effect->header.flags;
 
-				if (!TEST_FLAG(end_flags, _effect_loop_bit))
-					effect_delete(effect_index);
-				else
+				if (TEST_FLAG(end_flags, _effect_loop_bit))
 					effect->header.flags = (word)(end_flags | FLAG(_effect_stopped_bit));
+				else
+					effect_delete(effect_index);
 
 				return;
 			}
@@ -2486,12 +2488,14 @@ static real effect_scale(
 	unsigned long scale_b_flags,
 	short bit_index)
 {
-	if (TEST_FLAG(scale_a_flags, bit_index))
-		value *= effect->scale_a;
-	if (TEST_FLAG(scale_b_flags, bit_index))
-		value *= effect->scale_b;
+	real scaled_value = value;
 
-	return value;
+	if (TEST_FLAG(scale_a_flags, bit_index))
+		scaled_value *= effect->scale_a;
+	if (TEST_FLAG(scale_b_flags, bit_index))
+		scaled_value *= effect->scale_b;
+
+	return scaled_value;
 }
 
 static real effect_real_random_range(
@@ -2641,9 +2645,10 @@ static boolean effect_part_allowed_by_disposition(
 	boolean nonviolent,
 	short disposition)
 {
-	return nonviolent
-		? disposition != _effect_disposition_violent
-		: disposition != _effect_disposition_nonviolent;
+	if (nonviolent)
+		return disposition != _effect_disposition_violent;
+
+	return disposition != _effect_disposition_nonviolent;
 }
 
 static real_matrix4x3 *effect_get_node_matrix(
