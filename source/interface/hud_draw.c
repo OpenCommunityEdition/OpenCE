@@ -1022,28 +1022,28 @@ void hud_calculate_point(
 		switch (corner)
 		{
 		case _hud_anchor_top_left:
-			point.x += bitmap_data->registration_point_x * scale;
-			point.y += bitmap_data->registration_point_y * scale;
+			point.x += bitmap_data->registration_point.x * scale;
+			point.y += bitmap_data->registration_point.y * scale;
 			break;
 
 		case _hud_anchor_top_right:
-			point.x += (bitmap_data->registration_point_x - bitmap_data->width) * scale;
-			point.y += bitmap_data->registration_point_y * scale;
+			point.x += (bitmap_data->registration_point.x - bitmap_data->width) * scale;
+			point.y += bitmap_data->registration_point.y * scale;
 			break;
 
 		case _hud_anchor_bottom_left:
-			point.x += bitmap_data->registration_point_x * scale;
-			point.y += (bitmap_data->registration_point_y - bitmap_data->height) * scale;
+			point.x += bitmap_data->registration_point.x * scale;
+			point.y += (bitmap_data->registration_point.y - bitmap_data->height) * scale;
 			break;
 
 		case _hud_anchor_bottom_right:
-			point.x += (bitmap_data->registration_point_x - bitmap_data->width) * scale;
-			point.y += (bitmap_data->registration_point_y - bitmap_data->height) * scale;
+			point.x += (bitmap_data->registration_point.x - bitmap_data->width) * scale;
+			point.y += (bitmap_data->registration_point.y - bitmap_data->height) * scale;
 			break;
 
 		case _hud_anchor_center:
-			point.x += (bitmap_data->registration_point_x + bitmap_data->width / 2) * scale;
-			point.y += (bitmap_data->registration_point_y + bitmap_data->width / 2) * scale;
+			point.x += (bitmap_data->registration_point.x + bitmap_data->width / 2) * scale;
+			point.y += (bitmap_data->registration_point.y + bitmap_data->width / 2) * scale;
 			break;
 
 		default:

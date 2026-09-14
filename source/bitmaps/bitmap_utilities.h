@@ -42,7 +42,7 @@ void bitmap_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither);
+	pixel32 const *transparent_color);
 void bitmap_uncompress_from_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,

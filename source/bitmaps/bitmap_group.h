@@ -31,13 +31,12 @@ struct bitmap_data
 	unsigned long signature;
 	short width;
 	short height;
-	unsigned short depth;
+	short depth;
 	short type;
 	short format;
 	unsigned short flags;
-	short registration_point_x;
-	short registration_point_y;
-	unsigned short mipmap_count;
+	union point2d registration_point;
+	short mipmap_count;
 	unsigned short pixel_data;
 	unsigned long pixels_offset;
 	unsigned long pixel_data_size;
@@ -87,7 +86,7 @@ struct bitmap_group
 	struct tag_data pixel_data;
 	real smoothing_filter_size;
 	real alpha_bias;
-	unsigned short mipmap_count;
+	short mipmap_count;
 	short sprite_usage;
 	short sprite_spacing;
 	unsigned short unused;

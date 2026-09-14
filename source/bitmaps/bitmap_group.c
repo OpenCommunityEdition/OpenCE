@@ -439,8 +439,8 @@ short bitmap_group_add_bitmap(
 
 	new_bitmap_data.type = type;
 	new_bitmap_data.flags = 0;
-	new_bitmap_data.registration_point_y = 0;
-	new_bitmap_data.registration_point_x = 0;
+	new_bitmap_data.registration_point.y = 0;
+	new_bitmap_data.registration_point.x = 0;
 	new_bitmap_data.mipmap_count = mipmap_count;
 	new_bitmap_data.pixels_offset = 0;
 	new_bitmap_data.hardware_format = NULL;

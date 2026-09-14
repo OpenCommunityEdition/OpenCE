@@ -80,3 +80,14 @@ park re-baseline. Putting the add-bitmap prototype in `bitmap_group.h` instead l
 - Sets A and B are proposed to the orchestrator as park-reopens (A needs no header change; B needs the packet and two
   park re-baselines). No exact credit is claimed in this wave: the real file was not modified.
 - The four remaining parks: reopen only with a spelling that explains the recorded layout/colouring residual.
+
+## Header packet (orchestrator, checkpoint 6)
+
+The bitmap header packet landed after adversarial verification (all items ACCEPT):
+- signed `depth` / `mipmap_count` and `union point2d registration_point` in bitmap_group.h (HCEA types; January movsx reads and a single 32-bit point copy);
+- `bitmap_get_max_mipmap_count` in bitmaps_mipmap.h (fixes a C4013 implicit declaration);
+- `bitmap_group_add_bitmap` in bitmap_group_internal.h (bitmap_group.h placement regressed decals, per the declaration-count law);
+- `transparent_color` pointer parameter for bitmap_compress_to_mipmap (January passes `extract_sequences ? &adjusted_bounds_reference : NULL`);
+- mechanical registration_point respellings in bitmap_group.c, hud_draw.c, interface.c and overhead_map.c.
+
+The five gated bodies are now exact, with byte-neutral verifier cleanups (restored `break;`, no no-op cast, FALSE/TRUE arguments): extract_add_bitmap, extract_build_debug_plate (public, per the PDB), extract_mipmaps_to_bitmap, extract_pixels_from_mipmap and extract_pixels_to_mipmap. Five parks were removed. The parked bitmap_group_add_bitmap was re-baselined (same 992/59, new schedule under the owner types, evidence appended). Full build: +5 exact (4,544 padded), 0 regressions, parks 446/0/0. extract_sequence stays parked.

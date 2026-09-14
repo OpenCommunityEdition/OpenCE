@@ -382,17 +382,17 @@ static void bitmap_2d_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither);
+	pixel32 const *transparent_color);
 static void bitmap_3d_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither);
+	pixel32 const *transparent_color);
 static void bitmap_cm_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither);
+	pixel32 const *transparent_color);
 static void bitmap_2d_uncompress_from_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
@@ -1329,7 +1329,7 @@ void bitmap_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither)
+	pixel32 const *transparent_color)
 {
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x619, bitmap_verify(source_bitmap, TRUE));
 
@@ -1349,7 +1349,7 @@ void bitmap_compress_to_mipmap(
 			source_bitmap,
 			destination_bitmap,
 			destination_mipmap_index,
-			dither);
+			transparent_color);
 		break;
 
 	case _bitmap_type_3d:
@@ -1357,7 +1357,7 @@ void bitmap_compress_to_mipmap(
 			source_bitmap,
 			destination_bitmap,
 			destination_mipmap_index,
-			dither);
+			transparent_color);
 		break;
 
 	case _bitmap_type_cube_map:
@@ -1365,7 +1365,7 @@ void bitmap_compress_to_mipmap(
 			source_bitmap,
 			destination_bitmap,
 			destination_mipmap_index,
-			dither);
+			transparent_color);
 		break;
 
 	default:
@@ -2122,7 +2122,7 @@ static void bitmap_2d_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither)
+	pixel32 const *transparent_color)
 {
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63C, bitmap_verify(source_bitmap, TRUE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63D, source_bitmap->type==_bitmap_type_2d);
@@ -2148,7 +2148,7 @@ static void bitmap_3d_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither)
+	pixel32 const *transparent_color)
 {
 	struct bitmap_data *source_slice_bitmap;
 	struct bitmap_data *destination_slice_bitmap;
@@ -2184,7 +2184,7 @@ static void bitmap_3d_compress_to_mipmap(
 		for (slice_index = 0; slice_index < (short)source_bitmap->depth; slice_index++)
 		{
 			bitmap_3d_slice_extract(source_bitmap, 0, slice_index, source_slice_bitmap);
-			bitmap_2d_compress_to_mipmap(source_slice_bitmap, destination_slice_bitmap, 0, dither);
+			bitmap_2d_compress_to_mipmap(source_slice_bitmap, destination_slice_bitmap, 0, transparent_color);
 			bitmap_3d_slice_insert(
 				destination_slice_bitmap,
 				destination_bitmap,
@@ -2207,7 +2207,7 @@ static void bitmap_cm_compress_to_mipmap(
 	struct bitmap_data *source_bitmap,
 	struct bitmap_data *destination_bitmap,
 	short destination_mipmap_index,
-	boolean dither)
+	pixel32 const *transparent_color)
 {
 	struct bitmap_data *source_face_bitmap;
 	struct bitmap_data *destination_face_bitmap;
@@ -2243,7 +2243,7 @@ static void bitmap_cm_compress_to_mipmap(
 		for (face_index = 0; face_index < NUMBER_OF_FACES_PER_CUBE; face_index++)
 		{
 			bitmap_cube_map_face_extract(source_bitmap, 0, face_index, source_face_bitmap);
-			bitmap_2d_compress_to_mipmap(source_face_bitmap, destination_face_bitmap, 0, dither);
+			bitmap_2d_compress_to_mipmap(source_face_bitmap, destination_face_bitmap, 0, transparent_color);
 			bitmap_cube_map_face_insert(
 				destination_face_bitmap,
 				destination_bitmap,

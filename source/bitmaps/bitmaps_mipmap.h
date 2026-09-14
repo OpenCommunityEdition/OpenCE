@@ -41,5 +41,7 @@ long bitmap_mipmap_get_pixel_data_size(
 long bitmap_mipmap_get_row_pitch(
 	struct bitmap_data *bitmap,
 	short mipmap_index);
+short bitmap_get_max_mipmap_count(
+	struct bitmap_data *bitmap);
 
 #endif /* __BITMAPS_MIPMAP_H */

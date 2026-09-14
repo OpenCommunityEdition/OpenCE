@@ -93,8 +93,8 @@ void overhead_map_post_rasterize(
 
 		overhead_map_globals.viewport_size = *viewport_size;
 		bitmap = overhead_map_globals.bitmap;
-		render_bounds.x0 = ((short)(long)viewport_size->x >> 1) - bitmap->registration_point_x;
-		render_bounds.y0 = ((short)(long)viewport_size->y >> 1) - bitmap->registration_point_y;
+		render_bounds.x0 = ((short)(long)viewport_size->x >> 1) - bitmap->registration_point.x;
+		render_bounds.y0 = ((short)(long)viewport_size->y >> 1) - bitmap->registration_point.y;
 
 		render_bounds.x1 = overhead_map_globals.bitmap_bounds.x1 + render_bounds.x0;
 		render_bounds.y1 = overhead_map_globals.bitmap_bounds.y1 + render_bounds.y0;
