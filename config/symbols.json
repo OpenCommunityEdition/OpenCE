@@ -22671,7 +22671,7 @@
 { "file_offset": 4612842, "flags": 0, "name": "_warned_about_too_many_transparent_geometry_groups", "static": true },
 { "file_offset": 4612844, "flags": 0, "name": "_bss_004662ec" },
 { "file_offset": 4612848, "flags": 0, "name": "_global_rasterizer_model_ambient_reflection_tint" },
-{ "file_offset": 4612852, "flags": 0, "name": "_cinematic_screen_effect_globals" },
+{ "file_offset": 4612852, "flags": 0, "name": "_cinematic_screen_effect_globals", "static": true },
 { "file_offset": 4612856, "flags": 0, "name": "_debug_data", "static": true },
 { "file_offset": 4612896, "flags": 0, "name": "_rasterizer_frame_statistics_private_globals", "static": true },
 { "file_offset": 4615024, "flags": 0, "name": "_fps_sample_count", "static": true },

@@ -114,7 +114,7 @@ short main_get_window_count(
 
 /* ---------- globals */
 
-struct rasterizer_cinematic_screen_effect_state *cinematic_screen_effect_globals = NULL;
+static struct rasterizer_cinematic_screen_effect_state *cinematic_screen_effect_globals = NULL;
 extern const struct rasterizer_global_defaults_prefix rasterizer_global_defaults;
 
 /* ---------- public code */
@@ -143,20 +143,16 @@ void rasterizer_screen_effects_initialize(
 void rasterizer_screen_effects_initialize_for_new_map(
 	void)
 {
-	struct rasterizer_cinematic_screen_effect_state *globals =
-		cinematic_screen_effect_globals;
-
-	if (globals)
+	if (cinematic_screen_effect_globals)
 	{
 		csmemset(
-			globals,
+			cinematic_screen_effect_globals,
 			0,
-			sizeof(*globals));
-		globals = cinematic_screen_effect_globals;
-		globals->script_values[0] = 1.0f;
-		globals->script_values[1] = 1.0f;
-		globals->script_values[2] = 1.0f;
-		globals->script_values[3] = 1.0f;
+			sizeof(*cinematic_screen_effect_globals));
+		cinematic_screen_effect_globals->script_values[0] = 1.0f;
+		cinematic_screen_effect_globals->script_values[1] = 1.0f;
+		cinematic_screen_effect_globals->script_values[2] = 1.0f;
+		cinematic_screen_effect_globals->script_values[3] = 1.0f;
 	}
 
 	return;
@@ -234,28 +230,23 @@ void rasterizer_screen_effect_set_convolution(
 	real convolution_radius_upper_bound,
 	real convolution_time)
 {
-	struct rasterizer_cinematic_screen_effect_state *globals =
-		cinematic_screen_effect_globals;
-
-	if (globals)
+	if (cinematic_screen_effect_globals)
 	{
 		real time;
 
-		globals->parameters.video_on = FALSE;
-		globals->parameters.video_overbright_mode = 0;
-		globals->parameters.video_scanline_map = NULL;
-		globals->parameters.video_noise_intensity = 0.0f;
-		globals->parameters.video_noise_map_scale = 0.0f;
-		globals->parameters.video_noise_map = NULL;
-		globals->parameters.convolution_extra_passes = convolution_extra_passes;
-		globals->parameters.convolution_type = convolution_type;
-		globals->convolution_radius[0] = convolution_radius_lower_bound;
-		globals->convolution_radius[1] = convolution_radius_upper_bound;
-
-		time = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
-		globals = cinematic_screen_effect_globals;
-		globals->convolution_time[0] = time;
-		globals->convolution_time[1] = time + convolution_time;
+		cinematic_screen_effect_globals->parameters.video_on = FALSE;
+		cinematic_screen_effect_globals->parameters.video_overbright_mode = 0;
+		cinematic_screen_effect_globals->parameters.video_scanline_map = NULL;
+		cinematic_screen_effect_globals->parameters.video_noise_intensity = 0.0f;
+		cinematic_screen_effect_globals->parameters.video_noise_map_scale = 0.0f;
+		cinematic_screen_effect_globals->parameters.video_noise_map = NULL;
+		cinematic_screen_effect_globals->parameters.convolution_extra_passes = convolution_extra_passes;
+		cinematic_screen_effect_globals->parameters.convolution_type = convolution_type;
+		cinematic_screen_effect_globals->convolution_radius[0] = convolution_radius_lower_bound;
+		cinematic_screen_effect_globals->convolution_radius[1] = convolution_radius_upper_bound;
+		time = rasterizer_screen_effects_time();
+		cinematic_screen_effect_globals->convolution_time[0] = time;
+		cinematic_screen_effect_globals->convolution_time[1] = time + convolution_time;
 	}
 
 	return;
@@ -269,37 +260,32 @@ void rasterizer_screen_effect_set_filter(
 	boolean filter_desaturation_is_additive,
 	real filter_time)
 {
-	struct rasterizer_cinematic_screen_effect_state *globals =
-		cinematic_screen_effect_globals;
-
-	if (globals)
+	if (cinematic_screen_effect_globals)
 	{
 		real time;
 
-		globals->parameters.video_on = FALSE;
-		globals->parameters.video_overbright_mode = 0;
-		globals->parameters.video_scanline_map = NULL;
-		globals->parameters.video_noise_intensity = 0.0f;
-		globals->parameters.video_noise_map_scale = 0.0f;
-		globals->parameters.video_noise_map = NULL;
-		globals->filter_light_enhancement_intensity[0] =
+		cinematic_screen_effect_globals->parameters.video_on = FALSE;
+		cinematic_screen_effect_globals->parameters.video_overbright_mode = 0;
+		cinematic_screen_effect_globals->parameters.video_scanline_map = NULL;
+		cinematic_screen_effect_globals->parameters.video_noise_intensity = 0.0f;
+		cinematic_screen_effect_globals->parameters.video_noise_map_scale = 0.0f;
+		cinematic_screen_effect_globals->parameters.video_noise_map = NULL;
+		cinematic_screen_effect_globals->filter_light_enhancement_intensity[0] =
 			filter_light_enhancement_intensity_lower_bound;
-		globals->filter_light_enhancement_intensity[1] =
+		cinematic_screen_effect_globals->filter_light_enhancement_intensity[1] =
 			filter_light_enhancement_intensity_upper_bound;
-		globals->filter_desaturation_intensity[0] =
+		cinematic_screen_effect_globals->filter_desaturation_intensity[0] =
 			filter_desaturation_intensity_lower_bound;
-		globals->filter_desaturation_intensity[1] =
+		cinematic_screen_effect_globals->filter_desaturation_intensity[1] =
 			filter_desaturation_intensity_upper_bound;
-
-		time = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
-		globals = cinematic_screen_effect_globals;
-		globals->filter_time[0] = time;
-		globals->filter_time[1] = time + filter_time;
-		globals->parameters.filter_desaturation_is_additive =
+		time = rasterizer_screen_effects_time();
+		cinematic_screen_effect_globals->filter_time[0] = time;
+		cinematic_screen_effect_globals->filter_time[1] = time + filter_time;
+		cinematic_screen_effect_globals->parameters.filter_desaturation_is_additive =
 			filter_desaturation_is_additive;
-		globals->parameters.filter_light_enhancement_uses_convolution_mask =
+		cinematic_screen_effect_globals->parameters.filter_light_enhancement_uses_convolution_mask =
 			FALSE;
-		globals->parameters.filter_desaturation_uses_convolution_mask =
+		cinematic_screen_effect_globals->parameters.filter_desaturation_uses_convolution_mask =
 			FALSE;
 	}
 
@@ -433,12 +419,7 @@ void rasterizer_screen_effect_set_video(
 	short video_overbright_mode,
 	real video_noise_intensity)
 {
-	struct rasterizer_cinematic_screen_effect_state *globals =
-		cinematic_screen_effect_globals;
-	struct bitmap_data *video_scanline_map;
-	struct bitmap_data *video_noise_map;
-
-	if (globals)
+	if (cinematic_screen_effect_globals)
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_cinematics.c",
@@ -451,36 +432,31 @@ void rasterizer_screen_effect_set_video(
 			csmemset(
 				&cinematic_screen_effect_globals->parameters,
 				0,
-				sizeof(globals->parameters));
-			globals = cinematic_screen_effect_globals;
-			globals->convolution_radius[0] = 0.0f;
-			globals->convolution_radius[1] = 0.0f;
-			globals->convolution_time[0] = 0.0f;
-			globals->convolution_time[1] = 0.0f;
-			globals->filter_light_enhancement_intensity[0] = 0.0f;
-			globals->filter_light_enhancement_intensity[1] = 0.0f;
-			globals->filter_desaturation_intensity[0] = 0.0f;
-			globals->filter_desaturation_intensity[1] = 0.0f;
-			globals->filter_time[0] = 0.0f;
-			globals->filter_time[1] = 0.0f;
-			globals->parameters.video_on = TRUE;
-			globals->parameters.video_overbright_mode = video_overbright_mode;
-			video_scanline_map = TAG_BLOCK_GET_ELEMENT(
+				sizeof(cinematic_screen_effect_globals->parameters));
+			cinematic_screen_effect_globals->convolution_radius[0] = 0.0f;
+			cinematic_screen_effect_globals->convolution_radius[1] = 0.0f;
+			cinematic_screen_effect_globals->convolution_time[0] = 0.0f;
+			cinematic_screen_effect_globals->convolution_time[1] = 0.0f;
+			cinematic_screen_effect_globals->filter_light_enhancement_intensity[0] = 0.0f;
+			cinematic_screen_effect_globals->filter_light_enhancement_intensity[1] = 0.0f;
+			cinematic_screen_effect_globals->filter_desaturation_intensity[0] = 0.0f;
+			cinematic_screen_effect_globals->filter_desaturation_intensity[1] = 0.0f;
+			cinematic_screen_effect_globals->filter_time[0] = 0.0f;
+			cinematic_screen_effect_globals->filter_time[1] = 0.0f;
+			cinematic_screen_effect_globals->parameters.video_on = TRUE;
+			cinematic_screen_effect_globals->parameters.video_overbright_mode = video_overbright_mode;
+			cinematic_screen_effect_globals->parameters.video_scanline_map = TAG_BLOCK_GET_ELEMENT(
 				&bitmap_group_get(
 					global_rasterizer_data->screen_effect_video_scanline_map.index)->bitmap_data,
 				0,
 				struct bitmap_data);
-			globals = cinematic_screen_effect_globals;
-			globals->parameters.video_scanline_map = video_scanline_map;
-			globals->parameters.video_noise_intensity = video_noise_intensity;
-			globals->parameters.video_noise_map_scale = 1.0f;
-			video_noise_map = TAG_BLOCK_GET_ELEMENT(
+			cinematic_screen_effect_globals->parameters.video_noise_intensity = video_noise_intensity;
+			cinematic_screen_effect_globals->parameters.video_noise_map_scale = 1.0f;
+			cinematic_screen_effect_globals->parameters.video_noise_map = TAG_BLOCK_GET_ELEMENT(
 				&bitmap_group_get(
 					global_rasterizer_data->screen_effect_video_noise_map.index)->bitmap_data,
 				0,
 				struct bitmap_data);
-			globals = cinematic_screen_effect_globals;
-			globals->parameters.video_noise_map = video_noise_map;
 		}
 		else
 		{
