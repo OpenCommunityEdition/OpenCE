@@ -1956,13 +1956,19 @@ void actor_look_affect_movement(
 		actor->orders.look.primary_priority = _primary_priority_none;
 	}
 
-	actor->control.moving_forced_by_aiming =
-		actor->orders.look.primary_priority >= _primary_priority_facing &&
+	if (actor->orders.look.primary_priority >= _primary_priority_facing &&
 		movement_direction->type != _direction_specification_movement &&
 		actor_look_decode_direction(
 			actor_index,
 			movement_direction,
-			&actor->control.moving_forced_aim_direction);
+			&actor->control.moving_forced_aim_direction))
+	{
+		actor->control.moving_forced_by_aiming = TRUE;
+	}
+	else
+	{
+		actor->control.moving_forced_by_aiming = FALSE;
+	}
 
 	return;
 }
