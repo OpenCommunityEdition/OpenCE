@@ -2043,7 +2043,7 @@ short actor_select_firing_position(
 		if (debug_evaluation)
 		{
 			ai_debug.evaluation_context_valid= TRUE;
-			/* January also copies *evaluation_context into ai_debug here (needs the typed ai_debug.h member) */
+			ai_debug.evaluation_context= *evaluation_context;
 		}
 
 		match_assert(
@@ -2334,7 +2334,7 @@ short actor_select_firing_position(
 				if (debug_evaluation)
 				{
 					ai_debug.actor_record[firing_position->original_index].valid= TRUE;
-					/* January also copies *firing_position into this ai_debug record (needs the typed ai_debug.h member) */
+					ai_debug.actor_record[firing_position->original_index].firing_position= *firing_position;
 				}
 			}
 			else
@@ -2411,7 +2411,7 @@ short actor_select_firing_position(
 					for (index= 0; index<firing_position_count; index++)
 					{
 						ai_debug.actor_record[firing_positions[index].original_index].valid= TRUE;
-						/* January also copies firing_positions[index] into this ai_debug record (needs the typed ai_debug.h member) */
+						ai_debug.actor_record[firing_positions[index].original_index].firing_position= firing_positions[index];
 					}
 				}
 				if (ai_debug.print_evaluation_statistics)

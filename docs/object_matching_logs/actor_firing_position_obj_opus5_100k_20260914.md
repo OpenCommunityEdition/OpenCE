@@ -111,3 +111,7 @@ from the writer (this function) and the reader (ai_debug.c renderer); no January
 
 Object remains NonMatching: 19/27 strict exact (3 new, 1,312 padded bytes), 1 fuzzy structurally complete residual pending a
 header proposal, 7 locked parks. No credit is claimed for the fuzzy body.
+
+## Header packet (orchestrator, applied at checkpoint 3)
+
+The `ai_debug.h` retype is committed separately (typed `firing_position` records, 27 includers, 0 strict regressions, speech-timer park re-measured to its second proven load order). The three January debug copies then land in `actor_select_firing_position`. Full build: `_actor_select_firing_position` strict exact, 5,248 padded; parks 465/0/0.
