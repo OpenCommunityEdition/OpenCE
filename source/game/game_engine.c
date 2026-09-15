@@ -1137,11 +1137,6 @@ static void game_engine_generate_title_string(
 	wchar_t *secondary_string;
 	wchar_t life_string[128];
 	wchar_t score_string[256];
-	union
-	{
-		wchar_t team_names[22];
-		struct postgame_statistic_entry entry;
-	} branch_storage;
 	long string_list_index;
 	wchar_t *format_string;
 
@@ -1212,41 +1207,41 @@ static void game_engine_generate_title_string(
 	{
 		long did_player_win = game_engine_did_player_win(player_index);
 		boolean has_teams = FALSE;
+		wchar_t *outcome_string;
 
 		if (game_engine)
 			has_teams = global_variant.has_teams;
 
-		if (did_player_win == NONE)
+		switch (did_player_win)
 		{
+		case NONE:
 			string_list_index =
 				tag_loaded('ustr', "ui\\multiplayer_game_text");
 			if (string_list_index != NONE)
 			{
-				ustrncpy(
-					title_string,
-					unicode_string_list_get_string(string_list_index, 0x37),
-					80);
-				title_string[79] = 0;
-				return;
+				outcome_string = unicode_string_list_get_string(
+					string_list_index,
+					0x37);
 			}
-		}
-		else if (did_player_win == FALSE)
-		{
+			else
+				outcome_string = L"";
+			ustrncpy(title_string, outcome_string, 80);
+			break;
+
+		case FALSE:
 			if (has_teams)
 			{
 				string_list_index =
 					tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
-					ustrncpy(
-						title_string,
-						unicode_string_list_get_string(
-							string_list_index,
-							0x38),
-						80);
-					title_string[79] = 0;
-					return;
+					outcome_string = unicode_string_list_get_string(
+						string_list_index,
+						0x38);
 				}
+				else
+					outcome_string = L"";
+				ustrncpy(title_string, outcome_string, 80);
 			}
 			else
 			{
@@ -1254,37 +1249,30 @@ static void game_engine_generate_title_string(
 					tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
-					ustrncpy(
-						title_string,
-						unicode_string_list_get_string(
-							string_list_index,
-							0x39),
-						80);
-					title_string[79] = 0;
-					return;
+					outcome_string = unicode_string_list_get_string(
+						string_list_index,
+						0x39);
 				}
+				else
+					outcome_string = L"";
+				ustrncpy(title_string, outcome_string, 80);
 			}
-		}
-		else if (did_player_win == TRUE)
-		{
+			break;
+
+		case TRUE:
 			if (has_teams)
 			{
 				string_list_index =
 					tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
-					wchar_t *outcome_string =
-						unicode_string_list_get_string(
-							string_list_index,
-							0x3A);
-
-					ustrncpy(
-						title_string,
-						outcome_string,
-						80);
-					title_string[79] = 0;
-					return;
+					outcome_string = unicode_string_list_get_string(
+						string_list_index,
+						0x3A);
 				}
+				else
+					outcome_string = L"";
+				ustrncpy(title_string, outcome_string, 80);
 			}
 			else
 			{
@@ -1292,36 +1280,30 @@ static void game_engine_generate_title_string(
 					tag_loaded('ustr', "ui\\multiplayer_game_text");
 				if (string_list_index != NONE)
 				{
-					ustrncpy(
-						title_string,
-						unicode_string_list_get_string(
-							string_list_index,
-							0x3B),
-						80);
-					title_string[79] = 0;
-					return;
+					outcome_string = unicode_string_list_get_string(
+						string_list_index,
+						0x3B);
 				}
+				else
+					outcome_string = L"";
+				ustrncpy(title_string, outcome_string, 80);
 			}
+			break;
 		}
-		else
-			return;
-
-		ustrncpy(title_string, L"", 80);
-		title_string[79] = 0;
-		return;
 	}
-
-	if (game_engine && global_variant.has_teams)
+	else if (game_engine && global_variant.has_teams)
 	{
+		wchar_t team0_name[8];
+		wchar_t team1_name[8];
 		long team0_score;
 		long team1_score;
 
 		game_engine->format_team_name(
 			0,
-			&branch_storage.team_names[14]);
+			team0_name);
 		game_engine->format_team_name(
 			1,
-			&branch_storage.team_names[0]);
+			team1_name);
 		team0_score = game_engine_get_team_score(0);
 		team1_score = game_engine_get_team_score(1);
 
@@ -1341,8 +1323,8 @@ static void game_engine_generate_title_string(
 				title_string,
 				80,
 				format_string,
-				&branch_storage.team_names[14],
-				&branch_storage.team_names[0],
+				team0_name,
+				team1_name,
 				secondary_string);
 		}
 		else if (team0_score < team1_score)
@@ -1361,8 +1343,8 @@ static void game_engine_generate_title_string(
 				title_string,
 				80,
 				format_string,
-				&branch_storage.team_names[0],
-				&branch_storage.team_names[14],
+				team1_name,
+				team0_name,
 				secondary_string);
 		}
 		else
@@ -1381,50 +1363,54 @@ static void game_engine_generate_title_string(
 				title_string,
 				80,
 				format_string,
-				&branch_storage.team_names[0],
+				team1_name,
 				secondary_string);
 		}
-
-		title_string[79] = 0;
-		return;
-	}
-
-	branch_storage.entry =
-		*game_engine_get_player_place(&branch_storage.entry, player_index);
-	game_engine->format_player_score(player_index, score_string);
-
-	if (is_place_tied(&branch_storage.entry))
-	{
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
-		if (string_list_index != NONE)
-		{
-			format_string = unicode_string_list_get_string(
-				string_list_index,
-				0x3F);
-		}
-		else
-			format_string = L"";
 	}
 	else
 	{
-		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
-		if (string_list_index != NONE)
+		struct postgame_statistic_entry entry;
+
+		entry =
+			*game_engine_get_player_place(&entry, player_index);
+		game_engine->format_player_score(player_index, score_string);
+
+		if (is_place_tied(&entry))
 		{
-			format_string = unicode_string_list_get_string(
-				string_list_index,
-				0x40);
+			string_list_index =
+				tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				format_string = unicode_string_list_get_string(
+					string_list_index,
+					0x3F);
+			}
+			else
+				format_string = L"";
 		}
 		else
-			format_string = L"";
+		{
+			string_list_index =
+				tag_loaded('ustr', "ui\\multiplayer_game_text");
+			if (string_list_index != NONE)
+			{
+				format_string = unicode_string_list_get_string(
+					string_list_index,
+					0x40);
+			}
+			else
+				format_string = L"";
+		}
+
+		usnprintf(
+			title_string,
+			80,
+			format_string,
+			get_place_string(&entry),
+			score_string,
+			secondary_string);
 	}
 
-	usnprintf(
-		title_string,
-		80,
-		format_string,
-		get_place_string(&branch_storage.entry),
-		score_string,
-		secondary_string);
 	title_string[79] = 0;
 
 	return;
