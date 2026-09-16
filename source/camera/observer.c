@@ -712,42 +712,46 @@ static void observer_update_command(
 	short local_player_index)
 {
 	struct observer *observer = observer_get(local_player_index);
-	struct observer_command *command = observer->pending_command;
+	real *timer = observer->pending_command->parameter_timers;
+	real *last_timer = observer->last_command.parameter_timers;
+	byte *parameter_flags = observer->pending_command->parameter_flags;
 	short parameter_index;
 
 	match_assert_valid_observer_command(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
 		0x172,
-		command);
+		observer->pending_command);
 
-	if (TEST_FLAG(command->flags, _observer_command_valid_bit))
+	if (TEST_FLAG(observer->pending_command->flags, _observer_command_valid_bit))
 	{
 		for (parameter_index = 0;
 			parameter_index < NUMBER_OF_OBSERVER_COMMAND_PARAMETERS;
 			parameter_index++)
 		{
-			real last_timer = observer->last_command.parameter_timers[parameter_index];
-
-			if (TEST_FLAG(command->parameter_flags[parameter_index], _observer_time_valid_bit))
+			if (TEST_FLAG(*parameter_flags, _observer_time_valid_bit))
 			{
-				if (!TEST_FLAG(command->parameter_flags[parameter_index], _observer_time_force_bit) &&
-					command->parameter_timers[parameter_index] < last_timer)
+				if (!TEST_FLAG(*parameter_flags, _observer_time_force_bit) &&
+					*timer < *last_timer)
 				{
-					command->parameter_timers[parameter_index] = MIN(last_timer, 2.f);
+					*timer = MIN(*last_timer, 2.f);
 				}
 			}
-			else if (command->timer >= last_timer ||
-				TEST_FLAG(command->flags, _observer_command_force_time_bit))
+			else if (observer->pending_command->timer < *last_timer &&
+				!TEST_FLAG(observer->pending_command->flags, _observer_command_force_time_bit))
 			{
-				command->parameter_timers[parameter_index] = command->timer;
+				*timer = MIN(*last_timer, 2.f);
 			}
 			else
 			{
-				command->parameter_timers[parameter_index] = MIN(last_timer, 2.f);
+				*timer = observer->pending_command->timer;
 			}
+
+			timer++;
+			last_timer++;
+			parameter_flags++;
 		}
 
-		observer->last_command = *command;
+		observer->last_command = *observer->pending_command;
 	}
 
 	return;

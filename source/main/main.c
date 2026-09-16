@@ -1418,14 +1418,9 @@ void compute_window_bounds(
 short main_get_window_count(
 	void)
 {
-	if (game_engine_force_single_screen() || cinematic_in_progress())
-		return 1;
-	if (local_player_count() < 1)
-		return 1;
-	if (local_player_count() > MAXIMUM_WINDOWS)
-		return MAXIMUM_WINDOWS;
+	boolean single_window = game_engine_force_single_screen() || cinematic_in_progress();
 
-	return local_player_count();
+	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
 }
 
 void main_new_map(
@@ -1743,9 +1738,7 @@ void main_load_last_solo_map(
 
 			character_count = fread(map_name, 1, 255, file);
 			fclose(file);
-			if (character_count > 255)
-				character_count = 255;
-			map_name[character_count] = 0;
+			map_name[MIN(character_count, 255)] = 0;
 			valid_map_name = main_get_solo_level_from_name(map_name) != NONE;
 		}
 

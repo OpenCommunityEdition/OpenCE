@@ -393,25 +393,6 @@
       }
     },
     {
-      "unit": "source/main/main",
-      "function": "_main_get_window_count",
-      "class": "unclassified",
-      "evidence": "Complete typed January window-count policy reconstructed from the HCEA behavior and target call graph. It forces one window for engine single-screen mode, cinematics, or fewer than one local player, caps the result at MAXIMUM_WINDOWS, and otherwise returns the local-player count. Target and candidate are both 64 padded bytes with all five relocation identities. Ordinary source produces a 79.210526 percent residual because VC7 reorders the repeated local_player_count calls and branch tails; the prior bounded source-shape review did not recover January's placement without artificial control. No compiler steering, barrier, volatile access, raw offset, fake dependency, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_lifecycle_and_fuzzy_reconstruction_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 64,
-          "relocation_count": 5,
-          "normalized_sha256": "cc9155af657ad736bf7fd5410a94b6eb05279075318066650757e10bbdda0e9b"
-        },
-        "base": {
-          "size": 64,
-          "relocation_count": 5,
-          "normalized_sha256": "47b068a1fa916098b3899d2671b2e8e01ef76a05b8de0061eff434d63c795eae"
-        },
-        "objdiff_percent": 79.210526
-      }
-    },
-    {
       "unit": "source/cseries/profile",
       "function": "_profile_frame_get_value",
       "class": "unclassified",
@@ -3775,17 +3756,6 @@
         "target": { "size": 432, "relocation_count": 40, "normalized_sha256": "925a9c065ee97f4b157c20efb60ed226b0852123c626eb2e78b6cbbca0a124df" },
         "base": { "size": 464, "relocation_count": 43, "normalized_sha256": "8eb8e394df47250950f18742f107706f614e8594d8e3830d9b390a0072b302d4" },
         "objdiff_percent": 88.7874
-      }
-    },
-    {
-      "unit": "source/camera/observer",
-      "function": "_observer_update_command",
-      "class": "unclassified",
-      "evidence": "Behavior-reviewed Observer command-update body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural control flow remains non-exact at the current production compile and receives zero credit; no byte forcing or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 1040, "relocation_count": 33, "normalized_sha256": "78930fa0b90a5020a8f21975451e43b2a2b07df1cc96ded8fd5fff0365db8656" },
-        "base": { "size": 1056, "relocation_count": 35, "normalized_sha256": "92596f927e1b02d02469750d87793e5bb23eb948f674c41e27f81add1ede7cc4" },
-        "objdiff_percent": 88.56902
       }
     },
     {
