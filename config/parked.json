@@ -4328,17 +4328,6 @@
       }
     },
     {
-      "unit": "source/render/render_debug",
-      "function": "_render_debug_player",
-      "class": "register-allocation",
-      "evidence": "Complete typed debug-player renderer retained from the 2026-09-12 packet. Target and candidate share the 272-byte extent, all 16 relocations, calls, branches, and behavior; the normalized difference is the formatting-buffer stack slot, with January reserving 0x404 bytes and the natural candidate 0x400. Artificially enlarging the buffer or adding a dead local is rejected, and the body receives zero credit. See docs/object_matching_logs/render_debug_unwritten_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "a45fe6649ea60e23685d2c15640529bc16e9720ff02715c1809b04bd0301f8d0" },
-        "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "2cb093e3d436cd9fc015b77afe56b67514e29035a6b9069dd45508a2d2756a56" },
-        "objdiff_percent": 99.960526
-      }
-    },
-    {
       "unit": "source/math/geometry",
       "function": "_convex_hull2d_perimeter",
       "class": "unclassified",

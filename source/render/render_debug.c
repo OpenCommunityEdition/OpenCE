@@ -173,6 +173,7 @@ enum
 {
 	NUMBER_OF_RENDER_DEBUG_CACHE_STRING_CHARACTERS = 1024,
 	MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES = 512,
+	MAXIMUM_RENDER_DEBUG_PLAYER_TEXT_LENGTH = 1024,
 
 	NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS = 16,
 	MAXIMUM_BSP3D_DEPTH = 128,
@@ -1414,7 +1415,7 @@ static void render_debug_player(
 			{
 				struct vehicle_runtime_datum *vehicle = vehicle_runtime_try_and_get(
 					biped->object.parent_object_index);
-				char text[1024];
+				char text[MAXIMUM_RENDER_DEBUG_PLAYER_TEXT_LENGTH + 1];
 
 				sprintf(
 					text,
