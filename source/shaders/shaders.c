@@ -295,7 +295,7 @@ short shader_get_vertex_shader_permutation(
 			permutation = generic->first_map_type + 1;
 			if (permutation != 1)
 			{
-				if (TEST_FLAG(shader->base.flags, _shader_transparent_lit_bit))
+				if (TEST_FLAG(shader->base.radiosity.flags, _shader_transparent_lit_bit))
 				{
 					permutation = 5;
 				}
@@ -329,7 +329,7 @@ short shader_get_vertex_shader_permutation(
 			}
 
 		test_lit:
-			if (TEST_FLAG(shader->base.flags, _shader_transparent_lit_bit))
+			if (TEST_FLAG(shader->base.radiosity.flags, _shader_transparent_lit_bit))
 			{
 				permutation = 5;
 			}

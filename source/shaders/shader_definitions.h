@@ -24,15 +24,25 @@ header included in hcex build.
 
 /* ---------- structures */
 
-struct shader_base
+struct shader_radiosity_properties
 {
 	unsigned short flags;
 	short detail_level;
 	real power;
 	real_rgb_color color_of_emitted_light;
 	real_rgb_color tint_color;
-	unsigned short physics_flags;
+};
+
+struct shader_physics_properties
+{
+	unsigned short flags;
 	short material_type;
+};
+
+struct shader_base
+{
+	struct shader_radiosity_properties radiosity;
+	struct shader_physics_properties physics;
 	short type;
 	short pad;
 };

@@ -361,7 +361,7 @@ enum
 enum
 {
 	NUMBER_OF_SHADER_ANIMATION_FUNCTIONS = 4,
-	NUMBER_OF_SHADER_ANIMATION_COLORS = 4
+	NUMBER_OF_SHADER_ANIMATION_SOURCES = 5
 };
 
 enum
@@ -484,9 +484,8 @@ struct shader_transparent_generic_stage
 typedef char shader_transparent_generic_stage_size_assert[
 	sizeof(struct shader_transparent_generic_stage) == 0x70 ? 1 : -1];
 
-struct shader_transparent_generic_definition
+struct shader_transparent_generic
 {
-	struct shader shader;
 	byte numeric_counter_limit;
 	byte flags;
 	short type;
@@ -501,8 +500,14 @@ struct shader_transparent_generic_definition
 	struct tag_block stages;
 };
 
+struct shader_transparent_generic_definition
+{
+	struct shader_base shader;
+	struct shader_transparent_generic generic;
+};
+
 typedef char shader_transparent_generic_maps_offset_assert[
-	offsetof(struct shader_transparent_generic_definition, maps) == 0x54 ? 1 : -1];
+	offsetof(struct shader_transparent_generic_definition, generic.maps) == 0x54 ? 1 : -1];
 
 struct shader_transparent_chicago_map
 {
@@ -527,9 +532,8 @@ typedef char shader_transparent_chicago_map_size_assert[
 typedef char shader_transparent_chicago_map_u_scale_offset_assert[
 	offsetof(struct shader_transparent_chicago_map, map_u_scale) == 0x54 ? 1 : -1];
 
-struct shader_transparent_chicago_definition
+struct shader_transparent_chicago
 {
-	struct shader shader;
 	byte numeric_counter_limit;
 	byte flags;
 	short type;
@@ -545,8 +549,14 @@ struct shader_transparent_chicago_definition
 	word pad62;
 };
 
+struct shader_transparent_chicago_definition
+{
+	struct shader_base shader;
+	struct shader_transparent_chicago chicago;
+};
+
 typedef char shader_transparent_chicago_extra_flags_offset_assert[
-	offsetof(struct shader_transparent_chicago_definition, extra_flags) == 0x60 ? 1 : -1];
+	offsetof(struct shader_transparent_chicago_definition, chicago.extra_flags) == 0x60 ? 1 : -1];
 
 struct shader_transparent_glass_definition
 {
@@ -631,7 +641,15 @@ struct transparent_geometry_group
 	byte reserved1C[0x20];
 	real_vector2d model_base_map_scale;
 	long dynamic_triangle_buffer_index;
-	struct triangle_buffer const *triangle_buffer;
+	/* a NULL shader marks a widget group: rasterizer_xbox_widgets.c stores
+	 * render_proc here and its two arguments in the next two fields */
+	union
+	{
+		struct triangle_buffer const *triangle_buffer;
+		void (*render_proc)(
+			long object_index,
+			long widget_index);
+	};
 	long first_triangle_index;
 	long triangle_count;
 	long dynamic_vertex_buffer_index;
@@ -1047,8 +1065,6 @@ void rasterizer_transparent_geometry_group_draw(
 	if ((!group->active_camouflage_transparent_source_object_index || dirty) &&
 		rasterizer_transparent_geometry_get_group_pending_status(group))
 	{
-		struct rasterizer_model_skinning_parameters skinning;
-
 		rasterizer_transparent_geometry_set_group_pending_status(group, FALSE);
 
 		if (group->previous_group_presorted_index != NONE)
@@ -1059,6 +1075,8 @@ void rasterizer_transparent_geometry_group_draw(
 
 		if (rasterizer_debug_options.debug_transparent_geometry)
 		{
+			struct rasterizer_model_skinning_parameters skinning;
+
 			if (!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit) &&
 				group->shader &&
 				group->sorted_index != NONE)
@@ -1066,12 +1084,6 @@ void rasterizer_transparent_geometry_group_draw(
 				short vertex_shader_table[NUMBER_OF_RASTERIZER_VERTEX_TYPES] =
 				{
 					6, 6, 6, 6, 13, 13, 65, 65, NONE, NONE, NONE, NONE
-				};
-				real camera_transform[3][4] =
-				{
-					{ 1.0f, 0.0f, 0.0f, 0.0f },
-					{ 0.0f, 1.0f, 0.0f, 0.0f },
-					{ 0.0f, 0.0f, 1.0f, 0.0f }
 				};
 				short vertex_type =
 					rasterizer_transparent_geometry_get_primary_vertex_type(group);
@@ -1084,6 +1096,7 @@ void rasterizer_transparent_geometry_group_draw(
 				real minimum;
 				real maximum;
 				real scale;
+				long component_index;
 
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
@@ -1153,20 +1166,22 @@ void rasterizer_transparent_geometry_group_draw(
 				color.green = real_seed_random(&seed);
 				color.blue = real_seed_random(&seed);
 
-				minimum = MIN(MIN(color.red, color.green), color.blue);
-				maximum = MAX(MAX(color.red, color.green), color.blue);
+				minimum = MIN(color.red, MIN(color.green, color.blue));
+				maximum = MAX(color.red, MAX(color.green, color.blue));
 				scale = 0.18f/(maximum-minimum);
 
-				color.red = (color.red-minimum)*scale + 0.15f;
-				color.green = (color.green-minimum)*scale + 0.15f;
-				color.blue = (color.blue-minimum)*scale + 0.15f;
+				for (component_index = 0;
+					component_index < NUMBEROF(color.rgb.n);
+					component_index++)
+					color.rgb.n[component_index] = (color.rgb.n[component_index]-minimum)*scale + 0.15f;
 
 				if (accumulate)
 				{
-					real intensity =
-						rasterizer_debug_options.transparent_geometry_intensity>0.0f ?
-						MIN(rasterizer_debug_options.transparent_geometry_intensity, 1.0f) :
-						0.03125f;
+					real intensity = PIN(
+						rasterizer_debug_options.transparent_geometry_intensity, 0.0f, 1.0f);
+
+					if (intensity == 0.0f)
+						intensity = 0.03125f;
 
 					if (rasterizer_debug_options.transparent_geometry_index >=
 						RASTERIZER_TRANSPARENT_GEOMETRY_ALL_GROUPS_INDEX)
@@ -1177,9 +1192,7 @@ void rasterizer_transparent_geometry_group_draw(
 					}
 					else
 					{
-						color.red = intensity;
-						color.green = intensity;
-						color.blue = intensity;
+						color.red= color.green= color.blue= intensity;
 					}
 				}
 
@@ -1214,32 +1227,40 @@ void rasterizer_transparent_geometry_group_draw(
 				}
 				rasterizer_set_model_skinning(&skinning);
 
-				if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_viewspace_bit))
 				{
-					camera_transform[0][0] =
-						global_window_parameters.frustum.view_to_world.forward.i;
-					camera_transform[0][1] =
-						global_window_parameters.frustum.view_to_world.left.i;
-					camera_transform[0][2] =
-						global_window_parameters.frustum.view_to_world.up.i;
-					camera_transform[0][3] =
-						global_window_parameters.camera.position.x;
-					camera_transform[1][0] =
-						global_window_parameters.frustum.view_to_world.forward.j;
-					camera_transform[1][1] =
-						global_window_parameters.frustum.view_to_world.left.j;
-					camera_transform[1][2] =
-						global_window_parameters.frustum.view_to_world.up.j;
-					camera_transform[1][3] =
-						global_window_parameters.camera.position.y;
-					camera_transform[2][0] =
-						global_window_parameters.frustum.view_to_world.forward.k;
-					camera_transform[2][1] =
-						global_window_parameters.frustum.view_to_world.left.k;
-					camera_transform[2][2] =
-						global_window_parameters.frustum.view_to_world.up.k;
-					camera_transform[2][3] =
-						global_window_parameters.camera.position.z;
+					real camera_transform[3][4] =
+					{
+						{ 1.0f, 0.0f, 0.0f, 0.0f },
+						{ 0.0f, 1.0f, 0.0f, 0.0f },
+						{ 0.0f, 0.0f, 1.0f, 0.0f }
+					};
+
+					if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_viewspace_bit))
+					{
+						camera_transform[0][0] =
+							global_window_parameters.frustum.view_to_world.forward.i;
+						camera_transform[0][1] =
+							global_window_parameters.frustum.view_to_world.left.i;
+						camera_transform[0][2] =
+							global_window_parameters.frustum.view_to_world.up.i;
+						camera_transform[0][3] =
+							global_window_parameters.camera.position.x;
+						camera_transform[1][0] =
+							global_window_parameters.frustum.view_to_world.forward.j;
+						camera_transform[1][1] =
+							global_window_parameters.frustum.view_to_world.left.j;
+						camera_transform[1][2] =
+							global_window_parameters.frustum.view_to_world.up.j;
+						camera_transform[1][3] =
+							global_window_parameters.camera.position.y;
+						camera_transform[2][0] =
+							global_window_parameters.frustum.view_to_world.forward.k;
+						camera_transform[2][1] =
+							global_window_parameters.frustum.view_to_world.left.k;
+						camera_transform[2][2] =
+							global_window_parameters.frustum.view_to_world.up.k;
+						camera_transform[2][3] =
+							global_window_parameters.camera.position.z;
 				}
 
 				IDirect3DDevice8_SetVertexShaderConstant(
@@ -1247,6 +1268,7 @@ void rasterizer_transparent_geometry_group_draw(
 					RASTERIZER_TRANSPARENT_GEOMETRY_CAMERA_CONSTANT_INDEX,
 					camera_transform,
 					3);
+				}
 
 				success = TRUE;
 				rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
@@ -1271,63 +1293,67 @@ void rasterizer_transparent_geometry_group_draw(
 		{
 			short pass;
 
-			if (group->effect_type == _render_model_effect_type_cortana &&
-				group->source_object_index !=
-					rasterizer_xbox_transparent_geometry_globals.last_source_object_index &&
-				!dirty)
+			if (group->effect_type == _render_model_effect_type_cortana)
 			{
-				struct transparent_geometry_group *source_group;
+				long source_object_index = group->source_object_index;
 
-				rasterizer_set_vertex_shader_permutation(
-					13,
-					rasterizer_transparent_geometry_get_primary_vertex_type(group),
-					0);
-
-				SetRenderStateSmart(D3DRS_CULLMODE, D3DCULL_NONE);
-				SetRenderStateSmart(D3DRS_COLORWRITEENABLE, 0);
-				SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, FALSE);
-				SetRenderStateSmart(D3DRS_ALPHATESTENABLE, FALSE);
-				SetRenderStateSmart(D3DRS_ZENABLE, TRUE);
-				SetRenderStateSmart(D3DRS_ZWRITEENABLE, TRUE);
-				SetRenderStateSmart(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
-				IDirect3DDevice8_SetRenderState(
-					global_d3d_device,
-					D3DRS_ZBIAS,
-					0);
-
-				csmemset(&pixel_shader, 0, sizeof(pixel_shader));
-				pixel_shader.combiner_count = 1;
-				rasterizer_set_pixel_shader(&pixel_shader);
-
-				for (source_group = group;
-					source_group;
-					source_group = rasterizer_transparent_geometry_next_group(source_group))
+				if (source_object_index != rasterizer_xbox_transparent_geometry_globals.last_source_object_index &&
+					!dirty)
 				{
-					if (source_group->source_object_index != group->source_object_index ||
-						source_group->effect_type != _render_model_effect_type_cortana)
-						break;
+					struct transparent_geometry_group *source_group = group;
 
-					if (!shader_ignores_effect(source_group->shader))
+					rasterizer_set_vertex_shader_permutation(
+						13,
+						rasterizer_transparent_geometry_get_primary_vertex_type(group),
+						0);
+
+					SetRenderStateSmart(D3DRS_CULLMODE, D3DCULL_NONE);
+					SetRenderStateSmart(D3DRS_COLORWRITEENABLE, 0);
+					SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, FALSE);
+					SetRenderStateSmart(D3DRS_ALPHATESTENABLE, FALSE);
+					SetRenderStateSmart(D3DRS_ZENABLE, TRUE);
+					SetRenderStateSmart(D3DRS_ZWRITEENABLE, TRUE);
+					SetRenderStateSmart(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+					IDirect3DDevice8_SetRenderState(
+						global_d3d_device,
+						D3DRS_ZBIAS,
+						0);
+
+					csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+					pixel_shader.combiner_count = 1;
+					rasterizer_set_pixel_shader(&pixel_shader);
+
+					do
 					{
-						if (source_group->node_matrices && source_group->node_matrix_count)
-						{
-							skinning.node_matrix_count = source_group->node_matrix_count;
-							skinning.node_matrices = source_group->node_matrices;
-						}
-						else
-						{
-							skinning.node_matrix_count = 1;
-							skinning.node_matrices = global_identity4x3;
-						}
-						rasterizer_set_model_skinning(&skinning);
+						if (source_group->source_object_index != source_object_index ||
+							source_group->effect_type != _render_model_effect_type_cortana)
+							break;
 
-						if (group->lighting)
-							rasterizer_set_model_lighting(source_group->lighting);
+						if (!shader_ignores_effect(source_group->shader))
+						{
+							struct rasterizer_model_skinning_parameters skinning;
 
-						rasterizer_transparent_geometry_group_draw__internal(
-							source_group,
-							FALSE);
+							if (source_group->node_matrices && source_group->node_matrix_count)
+							{
+								skinning.node_matrix_count = source_group->node_matrix_count;
+								skinning.node_matrices = source_group->node_matrices;
+							}
+							else
+							{
+								skinning.node_matrix_count = 1;
+								skinning.node_matrices = global_identity4x3;
+							}
+							rasterizer_set_model_skinning(&skinning);
+
+							if (group->lighting)
+								rasterizer_set_model_lighting(source_group->lighting);
+
+							rasterizer_transparent_geometry_group_draw__internal(
+								source_group,
+								FALSE);
+						}
 					}
+					while (source_group = rasterizer_transparent_geometry_next_group(source_group));
 				}
 			}
 
@@ -1335,18 +1361,15 @@ void rasterizer_transparent_geometry_group_draw(
 				global_window_parameters.rasterizer_target == 0 &&
 				!dirty)
 			{
-				if (rasterizer_debug_options.active_camouflage_multipass)
-				{
-					if (group->shader &&
+				if (rasterizer_debug_options.active_camouflage_multipass ?
+					(group->shader &&
 						group->shader->base.type == _shader_type_model &&
 						group->effect_type == _render_model_effect_type_active_camouflage &&
 						group->source_object_index !=
-							rasterizer_xbox_transparent_geometry_globals.last_source_object_index)
-						rasterizer_active_camouflage_cache_primary_render_target();
-				}
-				else if (!group->shader ||
-					(group->shader->base.type != _shader_type_transparent_water &&
-						!shader_is_water_decal(group->shader)))
+							rasterizer_xbox_transparent_geometry_globals.last_source_object_index) :
+					(!group->shader ||
+						(group->shader->base.type != _shader_type_transparent_water &&
+							!shader_is_water_decal(group->shader))))
 				{
 					rasterizer_active_camouflage_cache_primary_render_target();
 				}
@@ -1370,7 +1393,13 @@ void rasterizer_transparent_geometry_group_draw(
 					draw_active_camouflage_groups2 = TRUE;
 			}
 
-			if (group->shader)
+			if (!group->shader)
+			{
+				group->render_proc(
+					group->first_triangle_index,
+					group->triangle_count);
+			}
+			else
 			{
 				short shader_permutation_index =
 					shader_get_vertex_shader_permutation(group->shader);
@@ -1379,6 +1408,8 @@ void rasterizer_transparent_geometry_group_draw(
 
 				if (!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit))
 				{
+					struct rasterizer_model_skinning_parameters skinning;
+
 					if (group->node_matrices && group->node_matrix_count)
 					{
 						skinning.node_matrix_count = group->node_matrix_count;
@@ -1458,17 +1489,23 @@ void rasterizer_transparent_geometry_group_draw(
 					switch (group->shader->base.type)
 					{
 						case _shader_type_model:
-							match_vassert(
-								"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
-								683,
-								group->effect_type ==
-									_render_model_effect_type_active_camouflage,
-								"### ERROR unsupported model effect type in transparent group");
+							switch (group->effect_type)
+							{
+								case _render_model_effect_type_active_camouflage:
+									if (rasterizer_xbox_transparent_geometry_globals.test_no_more_active_camo)
+										return;
 
-							if (rasterizer_xbox_transparent_geometry_globals.test_no_more_active_camo)
-								return;
+									rasterizer_active_camouflage_draw(group);
+									break;
 
-							rasterizer_active_camouflage_draw(group);
+								default:
+									match_vassert(
+										"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
+										683,
+										FALSE,
+										"### ERROR unsupported model effect type in transparent group");
+									break;
+							}
 							continue;
 
 						case _shader_type_effect:
@@ -1486,7 +1523,7 @@ void rasterizer_transparent_geometry_group_draw(
 									TEST_FLAG(shader_effect->flags, _shader_effect_uses_nonlinear_tint_bit);
 								real vsh_constants__inverse[3][4];
 								real vsh_constants__texanim[4][4];
-								long combiner_index;
+								short combiner_index;
 								long result;
 
 								/* stage 0 comes from the geometry group, not from the shader */
@@ -1667,6 +1704,7 @@ void rasterizer_transparent_geometry_group_draw(
 									shader_effect->secondary_map.index != NONE &&
 									!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit))
 								{
+									struct render_camera const *camera = &global_window_parameters.camera;
 									real vsh_constants__zsprite[2][4];
 									real radius_scale =
 										shader_effect->secondary_map_zsprite_radius_scale != 0.0f ?
@@ -1674,27 +1712,24 @@ void rasterizer_transparent_geometry_group_draw(
 									real depth_range =
 										RASTERIZER_GLOBALS_FLOATING_POINT_ZBUFFER(rasterizer_globals) ?
 										1.0e30f : 16777215.0f;
+									real z_near = camera->z_near;
+									real z_far = camera->z_far;
 
-									vsh_constants__zsprite[0][0] =
-										global_window_parameters.camera.z_far*depth_range/
-											(global_window_parameters.camera.z_far -
-												global_window_parameters.camera.z_near);
-									vsh_constants__zsprite[0][1] =
-										-(vsh_constants__zsprite[0][0]*
-											global_window_parameters.camera.z_near);
+									vsh_constants__zsprite[0][0] = z_far*depth_range/(z_far - z_near);
+									vsh_constants__zsprite[0][1] = -(vsh_constants__zsprite[0][0]*z_near);
 									vsh_constants__zsprite[0][2] =
 										radius_scale*shader_effect->secondary_map_radius;
 									vsh_constants__zsprite[0][3] =
-										global_window_parameters.camera.z_near + 0.01f;
+										camera->z_near + 0.01f;
 									vsh_constants__zsprite[1][0] =
-										global_window_parameters.camera.forward.i;
+										camera->forward.i;
 									vsh_constants__zsprite[1][1] =
-										global_window_parameters.camera.forward.j;
+										camera->forward.j;
 									vsh_constants__zsprite[1][2] =
-										global_window_parameters.camera.forward.k;
+										camera->forward.k;
 									vsh_constants__zsprite[1][3] = -dot_product3d(
-										&global_window_parameters.camera.forward,
-										(real_vector3d *)&global_window_parameters.camera.position);
+										&camera->forward,
+										(real_vector3d *)&camera->position);
 
 									result = IDirect3DDevice8_SetVertexShaderConstant(
 										global_d3d_device,
@@ -1784,7 +1819,11 @@ void rasterizer_transparent_geometry_group_draw(
 								}
 								else
 								{
-									pixel_shader.texture_modes = secondary_map_active ? 0x21 : 0x01;
+									pixel_shader.texture_modes = PS_TEXTUREMODES(
+										PS_TEXTUREMODES_PROJECT2D,
+										secondary_map_active ? PS_TEXTUREMODES_PROJECT2D : PS_TEXTUREMODES_NONE,
+										PS_TEXTUREMODES_NONE,
+										PS_TEXTUREMODES_NONE);
 								}
 
 								if (rasterizer_debug_options.draw_environment_fog &&
@@ -1826,8 +1865,7 @@ void rasterizer_transparent_geometry_group_draw(
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 												930,
-												shader_effect->framebuffer_blend_function<
-													NUMBER_OF_FRAMEBUFFER_BLEND_FUNCTIONS,
+												FALSE,
 												"### ERROR unsupported framebuffer blend function");
 											break;
 									}
@@ -1847,12 +1885,13 @@ void rasterizer_transparent_geometry_group_draw(
 										_shader_type_transparent_generic);
 							short bitmap_sequence_index = group->shader_permutation_index;
 							real vsh_constants__texanim[8][4];
-							long layer_index;
-							long map_index;
+							short layer_index;
+							short map_index;
+							short stage_index;
 							long result;
 
 							for (layer_index = 0;
-								layer_index < shader_transparent_generic->extra_layers.count;
+								layer_index < shader_transparent_generic->generic.extra_layers.count;
 								layer_index++)
 							{
 								struct transparent_geometry_group layer_group;
@@ -1861,7 +1900,7 @@ void rasterizer_transparent_geometry_group_draw(
 								layer_group.sorted_index = NONE;
 								layer_group.shader = shader_definition_get(
 									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->extra_layers,
+										&shader_transparent_generic->generic.extra_layers,
 										layer_index,
 										struct tag_reference)->index);
 								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
@@ -1874,7 +1913,7 @@ void rasterizer_transparent_geometry_group_draw(
 
 							SetRenderStateSmart(
 								D3DRS_CULLMODE,
-								TEST_FLAG(shader_transparent_generic->flags, _shader_transparent_flag_two_sided_bit) ?
+								TEST_FLAG(shader_transparent_generic->generic.flags, _shader_transparent_flag_two_sided_bit) ?
 									D3DCULL_NONE : D3DCULL_CCW);
 							SetRenderStateSmart(
 								D3DRS_COLORWRITEENABLE,
@@ -1882,26 +1921,24 @@ void rasterizer_transparent_geometry_group_draw(
 							SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, TRUE);
 							SetRenderStateSmart(
 								D3DRS_ALPHATESTENABLE,
-								TEST_FLAG(shader_transparent_generic->flags, _shader_transparent_flag_alpha_tested_bit));
+								TEST_FLAG(shader_transparent_generic->generic.flags, _shader_transparent_flag_alpha_tested_bit));
 							SetRenderStateSmart(D3DRS_ALPHAREF, 0x7F);
 							rasterizer_set_framebuffer_blend_function(
-								shader_transparent_generic->framebuffer_blend_function);
+								shader_transparent_generic->generic.framebuffer_blend_function);
 
-							if (TEST_FLAG(shader_transparent_generic->flags, _shader_transparent_flag_numeric_bit) &&
+							if (TEST_FLAG(shader_transparent_generic->generic.flags, _shader_transparent_flag_numeric_bit) &&
 								group->animation &&
-								shader_transparent_generic->maps.count > 0)
+								shader_transparent_generic->generic.maps.count > 0)
 							{
-								struct shader_transparent_generic_map const *map =
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->maps,
-										0,
-										struct shader_transparent_generic_map);
 								struct bitmap_group const *bitmap_group =
-									bitmap_group_get(map->map.index);
+									bitmap_group_get(TAG_BLOCK_GET_ELEMENT(
+										&shader_transparent_generic->generic.maps,
+										0,
+										struct shader_transparent_generic_map)->map.index);
 								short frame_count = (short)bitmap_group->bitmap_data.count;
-								long counter_limit = shader_transparent_generic->numeric_counter_limit;
 								short function_index = frame_count == 8 ? 3 : 0;
-								long counter_value = PIN(fast_ftol(floor(counter_limit*
+								short counter_limit = shader_transparent_generic->generic.numeric_counter_limit;
+								short counter_value = PIN(fast_ftol(floor(counter_limit*
 									group->animation->values[function_index] + 0.5f)), 0, counter_limit);
 								short digit_index;
 
@@ -1910,165 +1947,167 @@ void rasterizer_transparent_geometry_group_draw(
 									digit_index++)
 									counter_value /= frame_count;
 
-								bitmap_sequence_index = (short)(counter_value%frame_count);
+								bitmap_sequence_index = counter_value%frame_count;
 							}
 
-							for (map_index = 0; map_index < shader_transparent_generic->maps.count; map_index++)
+							if (shader_transparent_generic->generic.maps.count > 0)
 							{
-								short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
+								for (map_index = 0;
+									map_index < NUMBER_OF_SHADER_TRANSPARENT_MAPS;
+									map_index++)
 								{
-									0, 2, 2, 2
-								};
-								unsigned long map_type_address_mode[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
-								{
-									D3DTADDRESS_WRAP,
-									D3DTADDRESS_CLAMP,
-									D3DTADDRESS_CLAMP,
-									D3DTADDRESS_CLAMP
-								};
-								struct shader_transparent_generic_map const *map =
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->maps,
-										map_index,
-										struct shader_transparent_generic_map);
-								short type = shader_transparent_generic->type;
-								short bitmap_type = map_index ? 0 :
-									map_type_bitmap_type[type];
-								unsigned long address_u;
-								unsigned long address_v;
-								unsigned long address_w;
-
-								match_assert(
-									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
-									1030,
-									!TEST_FLAG(shader_transparent_generic->shader.base.flags,
-										_shader_radiosity_FILTHY_transparent_lit_bit) ||
-										shader_transparent_generic->type==_shader_transparent_generic_type_2d_map);
-								match_assert(
-									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
-									1031,
-									type>=0 && type<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_TYPES);
-
-								rasterizer_set_texture(
-									(short)map_index,
-									bitmap_type,
-									0,
-									map->map.index,
-									bitmap_sequence_index);
-
-								if (!bitmap_type &&
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_u_clamped_bit))
-									address_u = D3DTADDRESS_CLAMP;
-								else if (map_index)
-									address_u = D3DTADDRESS_WRAP;
-								else
-									address_u = map_type_address_mode[type];
-
-								if (!bitmap_type &&
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_v_clamped_bit))
-									address_v = D3DTADDRESS_CLAMP;
-								else if (map_index)
-									address_v = D3DTADDRESS_WRAP;
-								else
-									address_v = map_type_address_mode[type];
-
-								if (map_index)
-									address_w = D3DTADDRESS_WRAP;
-								else
-									address_w = map_type_address_mode[type];
-
-								SetTextureStageStateSmart((short)map_index, D3DTSS_ADDRESSU, address_u);
-								SetTextureStageStateSmart((short)map_index, D3DTSS_ADDRESSV, address_v);
-								SetTextureStageStateSmart((short)map_index, D3DTSS_ADDRESSW, address_w);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_MAGFILTER,
-									D3DTEXF_LINEAR);
-								SetTextureStageStateSmart(
-									(short)map_index,
-									D3DTSS_MINFILTER,
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
-										D3DTEXF_POINT : D3DTEXF_LINEAR);
-								SetTextureStageStateSmart(
-									(short)map_index,
-									D3DTSS_MIPFILTER,
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
-										D3DTEXF_POINT : D3DTEXF_LINEAR);
-							}
-
-							for (map_index = 0;
-								map_index < NUMBER_OF_SHADER_TRANSPARENT_MAPS;
-								map_index++)
-							{
-								if (map_index < shader_transparent_generic->maps.count &&
-									(map_index>0 || shader_transparent_generic->type==_shader_transparent_generic_type_2d_map))
-								{
-									struct shader_transparent_generic_map const *map =
-										TAG_BLOCK_GET_ELEMENT(
-											&shader_transparent_generic->maps,
-											map_index,
-											struct shader_transparent_generic_map);
-									real map_u_scale = map->map_u_scale;
-									real map_v_scale = map->map_v_scale;
-
-									if (!map_index &&
-										TEST_FLAG(shader_transparent_generic->flags,
-											_shader_transparent_flag_scale_first_map_with_distance_bit))
+									if (map_index < shader_transparent_generic->generic.maps.count)
 									{
-										map_u_scale = -(map_u_scale*group->z_sort);
-										map_v_scale = -(map_v_scale*group->z_sort);
+										struct shader_transparent_generic_map const *map =
+											TAG_BLOCK_GET_ELEMENT(
+												&shader_transparent_generic->generic.maps,
+												map_index,
+												struct shader_transparent_generic_map);
+										short type = shader_transparent_generic->generic.type;
+										short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
+										{
+											0, 2, 2, 2
+										};
+										unsigned long map_type_address_mode[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
+										{
+											D3DTADDRESS_WRAP,
+											D3DTADDRESS_CLAMP,
+											D3DTADDRESS_CLAMP,
+											D3DTADDRESS_CLAMP
+										};
+										short bitmap_type = map_index ? 0 :
+											map_type_bitmap_type[type];
+										unsigned long address_u;
+										unsigned long address_v;
+
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
+											1030,
+											!TEST_FLAG(shader_transparent_generic->shader.radiosity.flags,
+												_shader_radiosity_FILTHY_transparent_lit_bit) ||
+												shader_transparent_generic->generic.type==_shader_transparent_generic_type_2d_map);
+										match_assert(
+											"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
+											1031,
+											type>=0 && type<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_TYPES);
+
+										rasterizer_set_texture(
+											map_index,
+											bitmap_type,
+											0,
+											map->map.index,
+											bitmap_sequence_index);
+
+										if (!bitmap_type &&
+											TEST_FLAG(map->flags, _shader_transparent_map_flag_u_clamped_bit))
+											address_u = D3DTADDRESS_CLAMP;
+										else if (map_index)
+											address_u = D3DTADDRESS_WRAP;
+										else
+											address_u = map_type_address_mode[type];
+
+										if (!bitmap_type &&
+											TEST_FLAG(map->flags, _shader_transparent_map_flag_v_clamped_bit))
+											address_v = D3DTADDRESS_CLAMP;
+										else if (map_index)
+											address_v = D3DTADDRESS_WRAP;
+										else
+											address_v = map_type_address_mode[type];
+
+										SetTextureStageStateSmart(map_index, D3DTSS_ADDRESSU, address_u);
+										SetTextureStageStateSmart(map_index, D3DTSS_ADDRESSV, address_v);
+										SetTextureStageStateSmart(
+											map_index,
+											D3DTSS_ADDRESSW,
+											map_index ? D3DTADDRESS_WRAP : map_type_address_mode[type]);
+										IDirect3DDevice8_SetTextureStageState(
+											global_d3d_device,
+											map_index,
+											D3DTSS_MAGFILTER,
+											D3DTEXF_LINEAR);
+										SetTextureStageStateSmart(
+											map_index,
+											D3DTSS_MINFILTER,
+											TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
+												D3DTEXF_POINT : D3DTEXF_LINEAR);
+										SetTextureStageStateSmart(
+											map_index,
+											D3DTSS_MIPFILTER,
+											TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
+												D3DTEXF_POINT : D3DTEXF_LINEAR);
 									}
-									else if (!map_index ||
-										!TEST_FLAG(shader_transparent_generic->flags,
+
+									if (map_index < shader_transparent_generic->generic.maps.count &&
+										(map_index>0 || shader_transparent_generic->generic.type==_shader_transparent_generic_type_2d_map))
+									{
+										struct shader_transparent_generic_map const *map =
+											TAG_BLOCK_GET_ELEMENT(
+												&shader_transparent_generic->generic.maps,
+												map_index,
+												struct shader_transparent_generic_map);
+										real_vector2d map_scale;
+
+										map_scale.i = map->map_u_scale;
+										map_scale.j = map->map_v_scale;
+
+										if (!map_index &&
+											TEST_FLAG(shader_transparent_generic->generic.flags,
+												_shader_transparent_flag_scale_first_map_with_distance_bit))
+										{
+											map_scale.i = -(map_scale.i*group->z_sort);
+											map_scale.j = -(map_scale.j*group->z_sort);
+										}
+
+										if (map_index>0 ||
+											!TEST_FLAG(shader_transparent_generic->generic.flags,
+												_shader_transparent_flag_first_map_is_in_screenspace_bit))
+										{
+											map_scale.i *= group->model_base_map_scale.i;
+											map_scale.j *= group->model_base_map_scale.j;
+										}
+
+										shader_texture_animation_evaluate(
+											&map->map_animation,
+											group->animation,
+											map_scale.i,
+											map_scale.j,
+											map->map_u_offset,
+											map->map_v_offset,
+											map->map_rotation,
+											global_frame_parameters.game_time_sec,
+											(real_vector4d *)vsh_constants__texanim[map_index*2],
+											(real_vector4d *)vsh_constants__texanim[map_index*2+1]);
+									}
+									else if (map_index < shader_transparent_generic->generic.maps.count &&
+										TEST_FLAG(shader_transparent_generic->generic.flags,
 											_shader_transparent_flag_first_map_is_in_screenspace_bit))
 									{
-										map_u_scale *= group->model_base_map_scale.i;
-										map_v_scale *= group->model_base_map_scale.j;
+										vsh_constants__texanim[map_index*2][0] =
+											global_window_parameters.frustum.view_to_world.forward.i;
+										vsh_constants__texanim[map_index*2][1] =
+											global_window_parameters.frustum.view_to_world.forward.j;
+										vsh_constants__texanim[map_index*2][2] =
+											global_window_parameters.frustum.view_to_world.forward.k;
+										vsh_constants__texanim[map_index*2+1][0] =
+											global_window_parameters.frustum.view_to_world.left.i;
+										vsh_constants__texanim[map_index*2+1][1] =
+											global_window_parameters.frustum.view_to_world.left.j;
+										vsh_constants__texanim[map_index*2+1][2] =
+											global_window_parameters.frustum.view_to_world.left.k;
+										vsh_constants__texanim[map_index*2][3] = 0.0f;
+										vsh_constants__texanim[map_index*2+1][3] = 0.0f;
 									}
-
-									shader_texture_animation_evaluate(
-										&map->map_animation,
-										group->animation,
-										map_u_scale,
-										map_v_scale,
-										map->map_u_offset,
-										map->map_v_offset,
-										map->map_rotation,
-										global_frame_parameters.game_time_sec,
-										(real_vector4d *)vsh_constants__texanim[map_index*2],
-										(real_vector4d *)vsh_constants__texanim[map_index*2+1]);
-								}
-								else if (map_index < shader_transparent_generic->maps.count &&
-									TEST_FLAG(shader_transparent_generic->flags,
-										_shader_transparent_flag_first_map_is_in_screenspace_bit))
-								{
-									vsh_constants__texanim[map_index*2][0] =
-										global_window_parameters.frustum.view_to_world.forward.i;
-									vsh_constants__texanim[map_index*2][1] =
-										global_window_parameters.frustum.view_to_world.forward.j;
-									vsh_constants__texanim[map_index*2][2] =
-										global_window_parameters.frustum.view_to_world.forward.k;
-									vsh_constants__texanim[map_index*2][3] = 0.0f;
-									vsh_constants__texanim[map_index*2+1][0] =
-										global_window_parameters.frustum.view_to_world.left.i;
-									vsh_constants__texanim[map_index*2+1][1] =
-										global_window_parameters.frustum.view_to_world.left.j;
-									vsh_constants__texanim[map_index*2+1][2] =
-										global_window_parameters.frustum.view_to_world.left.k;
-									vsh_constants__texanim[map_index*2+1][3] = 0.0f;
-								}
-								else
-								{
-									vsh_constants__texanim[map_index*2][0] = 1.0f;
-									vsh_constants__texanim[map_index*2][1] = 0.0f;
-									vsh_constants__texanim[map_index*2][2] = 0.0f;
-									vsh_constants__texanim[map_index*2][3] = 0.0f;
-									vsh_constants__texanim[map_index*2+1][0] = 0.0f;
-									vsh_constants__texanim[map_index*2+1][1] = 1.0f;
-									vsh_constants__texanim[map_index*2+1][2] = 0.0f;
-									vsh_constants__texanim[map_index*2+1][3] = 0.0f;
-								}
+									else
+									{
+										vsh_constants__texanim[map_index*2][0] = 1.0f;
+										vsh_constants__texanim[map_index*2][1] = 0.0f;
+										vsh_constants__texanim[map_index*2][2] = 0.0f;
+										vsh_constants__texanim[map_index*2+1][0] = 0.0f;
+										vsh_constants__texanim[map_index*2+1][1] = 1.0f;
+										vsh_constants__texanim[map_index*2+1][2] = 0.0f;
+										vsh_constants__texanim[map_index*2][3] = 0.0f;
+										vsh_constants__texanim[map_index*2+1][3] = 0.0f;
+									}
 							}
 
 							result = IDirect3DDevice8_SetVertexShaderConstant(
@@ -2078,9 +2117,7 @@ void rasterizer_transparent_geometry_group_draw(
 								VSH_CONSTANTS__TEXANIM_COUNT);
 							if (success && result >= 0)
 							{
-								success = shader_transparent_generic_create(
-									group->shader,
-									&pixel_shader);
+								success = TRUE;
 							}
 							else
 							{
@@ -2089,32 +2126,39 @@ void rasterizer_transparent_geometry_group_draw(
 									result,
 									"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__TEXANIM_OFFSET, vsh_constants__texanim, VSH_CONSTANTS__TEXANIM_COUNT)");
 							}
+							}
+
+							success = success && shader_transparent_generic_create(
+								group->shader,
+								&pixel_shader);
 
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								long stage_index = MAX(shader_transparent_generic->stages.count, 1);
+								short stage_count = FLOOR(shader_transparent_generic->generic.stages.count, 1);
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
-									shader_transparent_generic->framebuffer_blend_function ==
+									shader_transparent_generic->generic.framebuffer_blend_function ==
 										_framebuffer_blend_function_alpha_blend)
 								{
-									real planar_fog_density = MIN(MAX(
-										-(plane3d_distance_to_point(
-											&global_window_parameters.fog.plane,
-											&global_window_parameters.camera.position)/
-											global_window_parameters.fog.planar_maximum_depth), 0.0f), 1.0f)*
-										global_window_parameters.fog.planar_maximum_density;
+									struct render_fog const *fog = &global_window_parameters.fog;
+									struct render_camera const *camera = &global_window_parameters.camera;
+									real plane_distance = plane3d_distance_to_point(
+										&fog->plane,
+										&camera->position);
+									real planar_fog_density = PIN(
+										-(plane_distance/fog->planar_maximum_depth), 0.0f, 1.0f)*
+										fog->planar_maximum_density;
 
-									pixel_shader.constant_0[stage_index] = real_a_rgb_color_to_pixel32(
+									pixel_shader.constant_0[stage_count] = real_a_rgb_color_to_pixel32(
 										planar_fog_density,
-										&global_window_parameters.fog.planar_color);
-									pixel_shader.rgb_inputs[stage_index] = 0x310C1101;
-									pixel_shader.rgb_outputs[stage_index] = 0xC00;
+										&fog->planar_color);
+									pixel_shader.rgb_inputs[stage_count] = 0x310C1101;
+									pixel_shader.rgb_outputs[stage_count] = 0xC00;
 								}
 								else
 								{
 									real vsh_constants__texscale[3][4];
-									short fade_source = shader_transparent_generic->framebuffer_fade_source;
+									short fade_source = shader_transparent_generic->generic.framebuffer_fade_source;
 									unsigned long combiner_constant;
 
 									vsh_constants__texscale[0][0] = 0.0f;
@@ -2132,8 +2176,8 @@ void rasterizer_transparent_geometry_group_draw(
 
 									if (group->effect_type ==
 										_render_model_effect_type_active_camouflage)
-										vsh_constants__texscale[2][2] =
-											MIN(MAX(1.0f-group->effect_intensity, 0.0f), 1.0f);
+										vsh_constants__texscale[2][2] *=
+											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
 									if (fade_source > 0 &&
 										group->animation &&
@@ -2158,7 +2202,7 @@ void rasterizer_transparent_geometry_group_draw(
 											"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__TEXSCALE_OFFSET, vsh_constants__texscale, VSH_CONSTANTS__TEXSCALE_COUNT)");
 									}
 
-									switch (shader_transparent_generic->framebuffer_fade_mode)
+									switch (shader_transparent_generic->generic.framebuffer_fade_mode)
 									{
 										case _framebuffer_fade_mode_none:
 											combiner_constant = 0x14;
@@ -2176,72 +2220,73 @@ void rasterizer_transparent_geometry_group_draw(
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 												1185,
-												shader_transparent_generic->framebuffer_fade_mode>=0 &&
-													shader_transparent_generic->framebuffer_fade_mode<NUMBER_OF_FRAMEBUFFER_FADE_MODES,
+												FALSE,
 												"### ERROR unsupported framebuffer fade mode");
-											combiner_constant = 0;
 											break;
 									}
 
-									switch (shader_transparent_generic->framebuffer_blend_function)
+									switch (shader_transparent_generic->generic.framebuffer_blend_function)
 									{
 										case _framebuffer_blend_function_alpha_blend:
-											pixel_shader.alpha_inputs[stage_index] =
+											pixel_shader.alpha_inputs[stage_count] =
 												(combiner_constant|0x1C00)<<16;
-											pixel_shader.alpha_outputs[stage_index] = 0xC00;
+											pixel_shader.alpha_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_multiply:
 										case _framebuffer_blend_function_component_min:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												((combiner_constant^0x20)|(combiner_constant<<16))|0x0C002000;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_double_multiply:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												((combiner_constant^0x20)|(combiner_constant<<16))|0x0C00A000;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_add:
 										case _framebuffer_blend_function_subtract:
 										case _framebuffer_blend_function_component_max:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												(combiner_constant|0x0C00)<<16;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_alpha_multiply_add:
-											pixel_shader.alpha_inputs[stage_index] =
+											pixel_shader.alpha_inputs[stage_count] =
 												(combiner_constant|0x1C00)<<16;
-											pixel_shader.alpha_outputs[stage_index] = 0xC00;
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.alpha_outputs[stage_count] = 0xC00;
+											pixel_shader.rgb_inputs[stage_count] =
 												(combiner_constant|0x0C00)<<16;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										default:
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 												1216,
-												shader_transparent_generic->framebuffer_blend_function<
-													NUMBER_OF_FRAMEBUFFER_BLEND_FUNCTIONS,
+												FALSE,
 												"### ERROR unsupported framebuffer blend function");
 											break;
 									}
 								}
 							}
 
-							for (map_index = 0; map_index < shader_transparent_generic->stages.count; map_index++)
+							for (stage_index = 0;
+								stage_index < shader_transparent_generic->generic.stages.count;
+								stage_index++)
 							{
 								struct shader_transparent_generic_stage const *stage =
 									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->stages,
-										map_index,
+										&shader_transparent_generic->generic.stages,
+										stage_index,
 										struct shader_transparent_generic_stage);
 								real_argb_color constant_color0;
+								real_argb_color color_delta;
 								real function_value;
+								long component_index;
 
 								match_assert(
 									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
@@ -2258,14 +2303,14 @@ void rasterizer_transparent_geometry_group_draw(
 										global_frame_parameters.game_time_sec/
 											stage->constant_color0_animation_period);
 
-								constant_color0.alpha = (stage->constant_color1.alpha-stage->constant_color0.alpha)*
-									function_value + stage->constant_color0.alpha;
-								constant_color0.red = (stage->constant_color1.red-stage->constant_color0.red)*
-									function_value + stage->constant_color0.red;
-								constant_color0.green = (stage->constant_color1.green-stage->constant_color0.green)*
-									function_value + stage->constant_color0.green;
-								constant_color0.blue = (stage->constant_color1.blue-stage->constant_color0.blue)*
-									function_value + stage->constant_color0.blue;
+								for (component_index = 0;
+									component_index < NUMBEROF(color_delta.n);
+									component_index++)
+									color_delta.n[component_index] = stage->constant_color1.n[component_index]-stage->constant_color0.n[component_index];
+								for (component_index = 0;
+									component_index < NUMBEROF(constant_color0.n);
+									component_index++)
+									constant_color0.n[component_index] = function_value*color_delta.n[component_index] + stage->constant_color0.n[component_index];
 
 								match_assert(
 									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
@@ -2281,8 +2326,8 @@ void rasterizer_transparent_geometry_group_draw(
 									constant_color0.blue >=0.0f && constant_color0.blue <=1.0f);
 
 								if (stage->constant_color0_animation_source > 0 &&
-									stage->constant_color0_animation_source <=
-										NUMBER_OF_SHADER_ANIMATION_COLORS &&
+									stage->constant_color0_animation_source <
+										NUMBER_OF_SHADER_ANIMATION_SOURCES &&
 									group->animation &&
 									group->animation->colors)
 								{
@@ -2303,12 +2348,13 @@ void rasterizer_transparent_geometry_group_draw(
 										1271,
 										external_color->blue >=0.0f && external_color->blue <=1.0f);
 
-									constant_color0.red *= external_color->red;
-									constant_color0.green *= external_color->green;
-									constant_color0.blue *= external_color->blue;
+									for (component_index = 0;
+										component_index < NUMBEROF(external_color->n);
+										component_index++)
+										constant_color0.rgb.n[component_index] *= external_color->n[component_index];
 								}
 
-								pixel_shader.constant_0[map_index] =
+								pixel_shader.constant_0[stage_index] =
 									real_argb_color_to_pixel32(&constant_color0);
 							}
 							break;
@@ -2323,13 +2369,17 @@ void rasterizer_transparent_geometry_group_draw(
 										_shader_type_transparent_chicago);
 							short bitmap_sequence_index = group->shader_permutation_index;
 							real vsh_constants__texanim[8][4];
-							long layer_index;
-							long map_index;
+							short layer_index;
+							short map_index;
 							long result;
 
+							/* BUG (preserved for exact matching): January never advances layer_index, so the
+							 * loop redraws extra layer 0 for as long as the block is non-empty (the bytes push
+							 * index 0 and re-test the count). A corrected build should increment layer_index.
+							 */
 							for (layer_index = 0;
-								layer_index < shader_transparent_chicago->extra_layers.count;
-								layer_index++)
+								layer_index < shader_transparent_chicago->chicago.extra_layers.count;
+								)
 							{
 								struct transparent_geometry_group layer_group;
 
@@ -2337,7 +2387,7 @@ void rasterizer_transparent_geometry_group_draw(
 								layer_group.sorted_index = NONE;
 								layer_group.shader = shader_definition_get(
 									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_chicago->extra_layers,
+										&shader_transparent_chicago->chicago.extra_layers,
 										layer_index,
 										struct tag_reference)->index);
 								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
@@ -2350,7 +2400,7 @@ void rasterizer_transparent_geometry_group_draw(
 
 							SetRenderStateSmart(
 								D3DRS_CULLMODE,
-								TEST_FLAG(shader_transparent_chicago->flags, _shader_transparent_flag_two_sided_bit) ?
+								TEST_FLAG(shader_transparent_chicago->chicago.flags, _shader_transparent_flag_two_sided_bit) ?
 									D3DCULL_NONE : D3DCULL_CCW);
 							SetRenderStateSmart(
 								D3DRS_COLORWRITEENABLE,
@@ -2358,25 +2408,25 @@ void rasterizer_transparent_geometry_group_draw(
 							SetRenderStateSmart(D3DRS_ALPHABLENDENABLE, TRUE);
 							SetRenderStateSmart(
 								D3DRS_ALPHATESTENABLE,
-								TEST_FLAG(shader_transparent_chicago->flags, _shader_transparent_flag_alpha_tested_bit));
+								TEST_FLAG(shader_transparent_chicago->chicago.flags, _shader_transparent_flag_alpha_tested_bit));
 							SetRenderStateSmart(D3DRS_ALPHAREF, 0x7F);
 							rasterizer_set_framebuffer_blend_function(
-								shader_transparent_chicago->framebuffer_blend_function);
+								shader_transparent_chicago->chicago.framebuffer_blend_function);
 
-							if (TEST_FLAG(shader_transparent_chicago->flags, _shader_transparent_flag_numeric_bit) &&
+							if (TEST_FLAG(shader_transparent_chicago->chicago.flags, _shader_transparent_flag_numeric_bit) &&
 								group->animation &&
-								shader_transparent_chicago->maps.count > 0)
+								shader_transparent_chicago->chicago.maps.count > 0)
 							{
 								struct shader_transparent_chicago_map const *map =
 									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_chicago->maps,
+										&shader_transparent_chicago->chicago.maps,
 										0,
 										struct shader_transparent_chicago_map);
 								struct bitmap_group const *bitmap_group =
 									bitmap_group_get(map->map.index);
 								short frame_count = (short)bitmap_group->bitmap_data.count;
 
-								if (TEST_FLAG(shader_transparent_chicago->extra_flags,
+								if (TEST_FLAG(shader_transparent_chicago->chicago.extra_flags,
 									_shader_transparent_chicago_extra_flag_numeric_countdown_timer_bit))
 								{
 									bitmap_sequence_index = numeric_countdown_timer_get(
@@ -2384,9 +2434,9 @@ void rasterizer_transparent_geometry_group_draw(
 								}
 								else
 								{
-									long counter_limit = shader_transparent_chicago->numeric_counter_limit;
 									short function_index = frame_count == 8 ? 3 : 0;
-									long counter_value = PIN(fast_ftol(floor(counter_limit*
+									short counter_limit = shader_transparent_chicago->chicago.numeric_counter_limit;
+									short counter_value = PIN(fast_ftol(floor(counter_limit*
 										group->animation->values[function_index] + 0.5f)), 0, counter_limit);
 									short digit_index;
 
@@ -2395,145 +2445,142 @@ void rasterizer_transparent_geometry_group_draw(
 										digit_index++)
 										counter_value /= frame_count;
 
-									bitmap_sequence_index = (short)(counter_value%frame_count);
+									bitmap_sequence_index = counter_value%frame_count;
 								}
-							}
-
-							for (map_index = 0; map_index < shader_transparent_chicago->maps.count; map_index++)
-							{
-								short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
-								{
-									0, 2, 2, 2
-								};
-								unsigned long map_type_address_mode[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
-								{
-									D3DTADDRESS_WRAP,
-									D3DTADDRESS_CLAMP,
-									D3DTADDRESS_CLAMP,
-									D3DTADDRESS_CLAMP
-								};
-								struct shader_transparent_chicago_map const *map =
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_chicago->maps,
-										map_index,
-										struct shader_transparent_chicago_map);
-								short type = shader_transparent_chicago->type;
-								short bitmap_type = map_index ? 0 :
-									map_type_bitmap_type[type];
-								unsigned long address_u;
-								unsigned long address_v;
-								unsigned long address_w;
-
-								match_assert(
-									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
-									1383,
-									!TEST_FLAG(shader_transparent_chicago->shader.base.flags,
-										_shader_radiosity_FILTHY_transparent_lit_bit) ||
-										shader_transparent_chicago->type==_shader_transparent_chicago_type_2d_map);
-								match_assert(
-									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
-									1384,
-									type>=0 && type<NUMBER_OF_SHADER_TRANSPARENT_CHICAGO_TYPES);
-
-								rasterizer_set_texture(
-									(short)map_index,
-									bitmap_type,
-									0,
-									map->map.index,
-									bitmap_sequence_index);
-
-								if (!bitmap_type &&
-									TEST_FLAG(map->flags,
-										_shader_transparent_chicago_map_flag_u_clamped_bit))
-									address_u = D3DTADDRESS_CLAMP;
-								else if (map_index)
-									address_u = D3DTADDRESS_WRAP;
-								else
-									address_u = map_type_address_mode[type];
-
-								if (!bitmap_type &&
-									TEST_FLAG(map->flags,
-										_shader_transparent_chicago_map_flag_v_clamped_bit))
-									address_v = D3DTADDRESS_CLAMP;
-								else if (map_index)
-									address_v = D3DTADDRESS_WRAP;
-								else
-									address_v = map_type_address_mode[type];
-
-								if (map_index)
-									address_w = D3DTADDRESS_WRAP;
-								else
-									address_w = map_type_address_mode[type];
-
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_ADDRESSU,
-									address_u);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_ADDRESSV,
-									address_v);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_ADDRESSW,
-									address_w);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_MAGFILTER,
-									D3DTEXF_LINEAR);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_MINFILTER,
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
-										D3DTEXF_POINT : D3DTEXF_LINEAR);
-								IDirect3DDevice8_SetTextureStageState(
-									global_d3d_device,
-									(short)map_index,
-									D3DTSS_MIPFILTER,
-									TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
-										D3DTEXF_POINT : D3DTEXF_LINEAR);
 							}
 
 							for (map_index = 0;
 								map_index < NUMBER_OF_SHADER_TRANSPARENT_MAPS;
 								map_index++)
 							{
-								if (map_index < shader_transparent_chicago->maps.count &&
-									(map_index>0 || shader_transparent_chicago->type==_shader_transparent_chicago_type_2d_map))
+								if (map_index < shader_transparent_chicago->chicago.maps.count)
 								{
 									struct shader_transparent_chicago_map const *map =
 										TAG_BLOCK_GET_ELEMENT(
-											&shader_transparent_chicago->maps,
+											&shader_transparent_chicago->chicago.maps,
 											map_index,
 											struct shader_transparent_chicago_map);
-									real map_u_scale = map->map_u_scale;
-									real map_v_scale = map->map_v_scale;
+									short type = shader_transparent_chicago->chicago.type;
+									short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
+									{
+										0, 2, 2, 2
+									};
+									unsigned long map_type_address_mode[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
+									{
+										D3DTADDRESS_WRAP,
+										D3DTADDRESS_CLAMP,
+										D3DTADDRESS_CLAMP,
+										D3DTADDRESS_CLAMP
+									};
+									short bitmap_type = map_index ? 0 :
+										map_type_bitmap_type[type];
+									unsigned long address_u;
+									unsigned long address_v;
+
+									match_assert(
+										"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
+										1383,
+										!TEST_FLAG(shader_transparent_chicago->shader.radiosity.flags,
+											_shader_radiosity_FILTHY_transparent_lit_bit) ||
+											shader_transparent_chicago->chicago.type==_shader_transparent_chicago_type_2d_map);
+									match_assert(
+										"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
+										1384,
+										type>=0 && type<NUMBER_OF_SHADER_TRANSPARENT_CHICAGO_TYPES);
+
+									rasterizer_set_texture(
+										map_index,
+										bitmap_type,
+										0,
+										map->map.index,
+										bitmap_sequence_index);
+
+									if (!bitmap_type &&
+										TEST_FLAG(map->flags,
+											_shader_transparent_chicago_map_flag_u_clamped_bit))
+										address_u = D3DTADDRESS_CLAMP;
+									else if (map_index)
+										address_u = D3DTADDRESS_WRAP;
+									else
+										address_u = map_type_address_mode[type];
+
+									if (!bitmap_type &&
+										TEST_FLAG(map->flags,
+											_shader_transparent_chicago_map_flag_v_clamped_bit))
+										address_v = D3DTADDRESS_CLAMP;
+									else if (map_index)
+										address_v = D3DTADDRESS_WRAP;
+									else
+										address_v = map_type_address_mode[type];
+
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_ADDRESSU,
+										address_u);
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_ADDRESSV,
+										address_v);
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_ADDRESSW,
+										map_index ? D3DTADDRESS_WRAP : map_type_address_mode[type]);
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_MAGFILTER,
+										D3DTEXF_LINEAR);
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_MINFILTER,
+										TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
+											D3DTEXF_POINT : D3DTEXF_LINEAR);
+									IDirect3DDevice8_SetTextureStageState(
+										global_d3d_device,
+										map_index,
+										D3DTSS_MIPFILTER,
+										TEST_FLAG(map->flags, _shader_transparent_map_flag_unfiltered_bit) ?
+											D3DTEXF_POINT : D3DTEXF_LINEAR);
+								}
+
+								if (map_index < shader_transparent_chicago->chicago.maps.count &&
+									(map_index>0 || shader_transparent_chicago->chicago.type==_shader_transparent_chicago_type_2d_map))
+								{
+									struct shader_transparent_chicago_map const *map =
+										TAG_BLOCK_GET_ELEMENT(
+											&shader_transparent_chicago->chicago.maps,
+											map_index,
+											struct shader_transparent_chicago_map);
+									real_vector2d map_scale;
+
+									map_scale.i = map->map_u_scale;
+									map_scale.j = map->map_v_scale;
 
 									if (!map_index &&
-										TEST_FLAG(shader_transparent_chicago->flags,
+										TEST_FLAG(shader_transparent_chicago->chicago.flags,
 											_shader_transparent_flag_scale_first_map_with_distance_bit))
 									{
-										map_u_scale = -(map_u_scale*group->z_sort);
-										map_v_scale = -(map_v_scale*group->z_sort);
+										map_scale.i = -(map_scale.i*group->z_sort);
+										map_scale.j = -(map_scale.j*group->z_sort);
 									}
-									else if (!map_index ||
-										!TEST_FLAG(shader_transparent_chicago->flags,
+
+									if (map_index>0 ||
+										!TEST_FLAG(shader_transparent_chicago->chicago.flags,
 											_shader_transparent_flag_first_map_is_in_screenspace_bit))
 									{
-										map_u_scale *= group->model_base_map_scale.i;
-										map_v_scale *= group->model_base_map_scale.j;
+										map_scale.i *= group->model_base_map_scale.i;
+										map_scale.j *= group->model_base_map_scale.j;
 									}
 
 									shader_texture_animation_evaluate(
 										&map->map_animation,
 										group->animation,
-										map_u_scale,
-										map_v_scale,
+										map_scale.i,
+										map_scale.j,
 										map->map_u_offset,
 										map->map_v_offset,
 										map->map_rotation,
@@ -2541,8 +2588,8 @@ void rasterizer_transparent_geometry_group_draw(
 										(real_vector4d *)vsh_constants__texanim[map_index*2],
 										(real_vector4d *)vsh_constants__texanim[map_index*2+1]);
 								}
-								else if (map_index < shader_transparent_chicago->maps.count &&
-									TEST_FLAG(shader_transparent_chicago->flags,
+								else if (map_index < shader_transparent_chicago->chicago.maps.count &&
+									TEST_FLAG(shader_transparent_chicago->chicago.flags,
 										_shader_transparent_flag_first_map_is_in_screenspace_bit))
 								{
 									vsh_constants__texanim[map_index*2][0] =
@@ -2551,13 +2598,13 @@ void rasterizer_transparent_geometry_group_draw(
 										global_window_parameters.frustum.view_to_world.forward.j;
 									vsh_constants__texanim[map_index*2][2] =
 										global_window_parameters.frustum.view_to_world.forward.k;
-									vsh_constants__texanim[map_index*2][3] = 0.0f;
 									vsh_constants__texanim[map_index*2+1][0] =
 										global_window_parameters.frustum.view_to_world.left.i;
 									vsh_constants__texanim[map_index*2+1][1] =
 										global_window_parameters.frustum.view_to_world.left.j;
 									vsh_constants__texanim[map_index*2+1][2] =
 										global_window_parameters.frustum.view_to_world.left.k;
+									vsh_constants__texanim[map_index*2][3] = 0.0f;
 									vsh_constants__texanim[map_index*2+1][3] = 0.0f;
 								}
 								else
@@ -2565,10 +2612,10 @@ void rasterizer_transparent_geometry_group_draw(
 									vsh_constants__texanim[map_index*2][0] = 1.0f;
 									vsh_constants__texanim[map_index*2][1] = 0.0f;
 									vsh_constants__texanim[map_index*2][2] = 0.0f;
-									vsh_constants__texanim[map_index*2][3] = 0.0f;
 									vsh_constants__texanim[map_index*2+1][0] = 0.0f;
 									vsh_constants__texanim[map_index*2+1][1] = 1.0f;
 									vsh_constants__texanim[map_index*2+1][2] = 0.0f;
+									vsh_constants__texanim[map_index*2][3] = 0.0f;
 									vsh_constants__texanim[map_index*2+1][3] = 0.0f;
 								}
 							}
@@ -2580,9 +2627,7 @@ void rasterizer_transparent_geometry_group_draw(
 								VSH_CONSTANTS__TEXANIM_COUNT);
 							if (success && result >= 0)
 							{
-								success = shader_transparent_chicago_create(
-									group->shader,
-									&pixel_shader);
+								success = TRUE;
 							}
 							else
 							{
@@ -2592,31 +2637,37 @@ void rasterizer_transparent_geometry_group_draw(
 									"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__TEXANIM_OFFSET, vsh_constants__texanim, VSH_CONSTANTS__TEXANIM_COUNT)");
 							}
 
+							success = success && shader_transparent_chicago_create(
+								group->shader,
+								&pixel_shader);
+
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								long stage_index = shader_transparent_chicago->maps.count;
+								short stage_count = shader_transparent_chicago->chicago.maps.count;
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
-									shader_transparent_chicago->framebuffer_blend_function ==
+									shader_transparent_chicago->chicago.framebuffer_blend_function ==
 										_framebuffer_blend_function_alpha_blend)
 								{
-									real planar_fog_density = MIN(MAX(
-										-(plane3d_distance_to_point(
-											&global_window_parameters.fog.plane,
-											&global_window_parameters.camera.position)/
-											global_window_parameters.fog.planar_maximum_depth), 0.0f), 1.0f)*
-										global_window_parameters.fog.planar_maximum_density;
+									struct render_fog const *fog = &global_window_parameters.fog;
+									struct render_camera const *camera = &global_window_parameters.camera;
+									real plane_distance = plane3d_distance_to_point(
+										&fog->plane,
+										&camera->position);
+									real planar_fog_density = PIN(
+										-(plane_distance/fog->planar_maximum_depth), 0.0f, 1.0f)*
+										fog->planar_maximum_density;
 
-									pixel_shader.constant_0[stage_index] = real_a_rgb_color_to_pixel32(
+									pixel_shader.constant_0[stage_count] = real_a_rgb_color_to_pixel32(
 										planar_fog_density,
-										&global_window_parameters.fog.planar_color);
-									pixel_shader.rgb_inputs[stage_index] = 0x310C1101;
-									pixel_shader.rgb_outputs[stage_index] = 0xC00;
+										&fog->planar_color);
+									pixel_shader.rgb_inputs[stage_count] = 0x310C1101;
+									pixel_shader.rgb_outputs[stage_count] = 0xC00;
 								}
 								else
 								{
 									real vsh_constants__texscale[3][4];
-									short fade_source = shader_transparent_chicago->framebuffer_fade_source;
+									short fade_source = shader_transparent_chicago->chicago.framebuffer_fade_source;
 									unsigned long combiner_constant;
 
 									vsh_constants__texscale[0][0] = 0.0f;
@@ -2634,10 +2685,10 @@ void rasterizer_transparent_geometry_group_draw(
 
 									if (group->effect_type ==
 											_render_model_effect_type_active_camouflage &&
-										!TEST_FLAG(shader_transparent_chicago->extra_flags,
+										!TEST_FLAG(shader_transparent_chicago->chicago.extra_flags,
 											_shader_transparent_chicago_extra_flag_dont_fade_active_camouflage_bit))
-										vsh_constants__texscale[2][2] =
-											MIN(MAX(1.0f-group->effect_intensity, 0.0f), 1.0f);
+										vsh_constants__texscale[2][2] *=
+											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
 									if (fade_source > 0 &&
 										group->animation &&
@@ -2662,7 +2713,7 @@ void rasterizer_transparent_geometry_group_draw(
 											"IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, VSH_CONSTANTS__TEXSCALE_OFFSET, vsh_constants__texscale, VSH_CONSTANTS__TEXSCALE_COUNT)");
 									}
 
-									switch (shader_transparent_chicago->framebuffer_fade_mode)
+									switch (shader_transparent_chicago->chicago.framebuffer_fade_mode)
 									{
 										case _framebuffer_fade_mode_none:
 											combiner_constant = 0x14;
@@ -2680,57 +2731,54 @@ void rasterizer_transparent_geometry_group_draw(
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 												1539,
-												shader_transparent_chicago->framebuffer_fade_mode>=0 &&
-													shader_transparent_chicago->framebuffer_fade_mode<NUMBER_OF_FRAMEBUFFER_FADE_MODES,
+												FALSE,
 												"### ERROR unsupported framebuffer fade mode");
-											combiner_constant = 0;
 											break;
 									}
 
-									switch (shader_transparent_chicago->framebuffer_blend_function)
+									switch (shader_transparent_chicago->chicago.framebuffer_blend_function)
 									{
 										case _framebuffer_blend_function_alpha_blend:
-											pixel_shader.alpha_inputs[stage_index] =
+											pixel_shader.alpha_inputs[stage_count] =
 												(combiner_constant|0x1C00)<<16;
-											pixel_shader.alpha_outputs[stage_index] = 0xC00;
+											pixel_shader.alpha_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_multiply:
 										case _framebuffer_blend_function_component_min:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												((combiner_constant^0x20)|(combiner_constant<<16))|0x0C002000;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_double_multiply:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												((combiner_constant^0x20)|(combiner_constant<<16))|0x0C00A000;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_add:
 										case _framebuffer_blend_function_subtract:
 										case _framebuffer_blend_function_component_max:
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.rgb_inputs[stage_count] =
 												(combiner_constant|0x0C00)<<16;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										case _framebuffer_blend_function_alpha_multiply_add:
-											pixel_shader.alpha_inputs[stage_index] =
+											pixel_shader.alpha_inputs[stage_count] =
 												(combiner_constant|0x1C00)<<16;
-											pixel_shader.alpha_outputs[stage_index] = 0xC00;
-											pixel_shader.rgb_inputs[stage_index] =
+											pixel_shader.alpha_outputs[stage_count] = 0xC00;
+											pixel_shader.rgb_inputs[stage_count] =
 												(combiner_constant|0x0C00)<<16;
-											pixel_shader.rgb_outputs[stage_index] = 0xC00;
+											pixel_shader.rgb_outputs[stage_count] = 0xC00;
 											break;
 
 										default:
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 												1570,
-												shader_transparent_chicago->framebuffer_blend_function<
-													NUMBER_OF_FRAMEBUFFER_BLEND_FUNCTIONS,
+												FALSE,
 												"### ERROR unsupported framebuffer blend function");
 											break;
 									}
@@ -2751,7 +2799,6 @@ void rasterizer_transparent_geometry_group_draw(
 										group->shader,
 										_shader_type_transparent_glass);
 							short reflection_type = glass->reflection_type;
-							real vsh_constants__texscale[3][4];
 							long result;
 
 							if (reflection_type ==
@@ -2776,6 +2823,8 @@ void rasterizer_transparent_geometry_group_draw(
 								glass->tint_color.green != 0.0f ||
 								glass->tint_color.blue != 0.0f)
 							{
+								real vsh_constants__texscale[3][4];
+
 								rasterizer_set_texture(
 									0,
 									0,
@@ -2859,12 +2908,14 @@ void rasterizer_transparent_geometry_group_draw(
 								rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
 							}
 
-							if ((glass->reflection_view_perpendicular_color.alpha != 0.0f ||
-									glass->reflection_view_parallel_color.alpha != 0.0f) &&
+							if ((glass->reflection_view_perpendicular_color.alpha > 0.0f ||
+									glass->reflection_view_parallel_color.alpha > 0.0f) &&
 								(glass->reflection_map.index != NONE ||
 									reflection_type ==
 										_shader_transparent_glass_reflection_type_dynamic_mirror))
 							{
+								real vsh_constants__texscale[3][4];
+
 								match_assert(
 									"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 									1694,
@@ -2874,7 +2925,7 @@ void rasterizer_transparent_geometry_group_draw(
 								rasterizer_set_texture(
 									0,
 									0,
-									0,
+									3,
 									glass->reflection_bump_map.index,
 									group->shader_permutation_index);
 								SetTextureStageStateSmart(0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
@@ -3000,7 +3051,7 @@ void rasterizer_transparent_geometry_group_draw(
 										match_vassert(
 											"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 											1799,
-											reflection_type<NUMBER_OF_SHADER_TRANSPARENT_GLASS_REFLECTION_TYPES,
+											FALSE,
 											"### ERROR unsupported reflection type");
 										break;
 								}
@@ -3055,7 +3106,7 @@ void rasterizer_transparent_geometry_group_draw(
 								pixel_shader.final_combiner_inputs_efg =
 									((TEST_FLAG(glass->flags,
 										_shader_transparent_glass_flag_bump_map_is_specular_mask_bit) ?
-										0x14 : 0)<<16) | 0x1C002000;
+										0x08 : 0x14)<<16) | 0x1C002000;
 								rasterizer_set_pixel_shader(&pixel_shader);
 								rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
 							}
@@ -3063,6 +3114,8 @@ void rasterizer_transparent_geometry_group_draw(
 							if (glass->diffuse_map.index != NONE ||
 								glass->diffuse_detail_map.index != NONE)
 							{
+								real vsh_constants__texscale[3][4];
+
 								rasterizer_set_texture(
 									0,
 									0,
@@ -3194,9 +3247,6 @@ void rasterizer_transparent_geometry_group_draw(
 							real gradient_value = 1.0f;
 							real flash_extension = 1.0f;
 							real_rgb_color flash_color;
-							real_rgb_color scaled_tint_color;
-							real_rgb_color const *tint_color;
-							real tint_alpha;
 							real flash_alpha;
 							pixel32 gradient_min_pixel;
 							pixel32 gradient_max_pixel;
@@ -3208,27 +3258,19 @@ void rasterizer_transparent_geometry_group_draw(
 
 							if (group->animation && group->animation->values)
 							{
-								if (meter->meter_brightness_source > 0 &&
-									meter->meter_brightness_source <=
-										NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
+								if (meter->meter_brightness_source>=1 && meter->meter_brightness_source<=NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
 									meter_brightness = group->animation->values[
 										meter->meter_brightness_source-1];
-								if (meter->flash_brightness_source > 0 &&
-									meter->flash_brightness_source <=
-										NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
+								if (meter->flash_brightness_source>=1 && meter->flash_brightness_source<=NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
 									flash_brightness = group->animation->values[
 										meter->flash_brightness_source-1];
-								if (meter->value_source > 0 &&
-									meter->value_source <= NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
+								if (meter->value_source>=1 && meter->value_source<=NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
 									meter_value = group->animation->values[
 										meter->value_source-1];
-								if (meter->gradient_source > 0 &&
-									meter->gradient_source <= NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
+								if (meter->gradient_source>=1 && meter->gradient_source<=NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
 									gradient_value = group->animation->values[
 										meter->gradient_source-1];
-								if (meter->flash_extension_source > 0 &&
-									meter->flash_extension_source <=
-										NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
+								if (meter->flash_extension_source>=1 && meter->flash_extension_source<=NUMBER_OF_SHADER_ANIMATION_FUNCTIONS)
 									flash_extension = group->animation->values[
 										meter->flash_extension_source-1];
 							}
@@ -3260,13 +3302,17 @@ void rasterizer_transparent_geometry_group_draw(
 							flash_color.red = flash_brightness*meter->flash_color.red;
 							flash_color.green = flash_brightness*meter->flash_color.green;
 							flash_color.blue = flash_brightness*meter->flash_color.blue;
-							flash_alpha = 1.0f/MIN(gradient_value*8.0f, 1.0f);
+							flash_alpha = 1.0f/MAX(gradient_value*8.0f, 1.0f);
 
 							if (TEST_FLAG(meter->flags, _shader_transparent_meter_flag_tint_mode_2_bit))
 							{
-								scaled_tint_color.red = meter_brightness*meter->tint_color.red;
-								scaled_tint_color.green = meter_brightness*meter->tint_color.green;
-								scaled_tint_color.blue = meter_brightness*meter->tint_color.blue;
+								real background_alpha = meter->background_transparency;
+								real tint_alpha = meter->meter_transparency;
+								real_rgb_color tint_color;
+
+								tint_color.red = meter_brightness*meter->tint_color.red;
+								tint_color.green = meter_brightness*meter->tint_color.green;
+								tint_color.blue = meter_brightness*meter->tint_color.blue;
 								gradient_min_pixel = real_a_rgb_color_to_pixel32(
 									meter_value,
 									&meter->gradient_min_color);
@@ -3274,13 +3320,12 @@ void rasterizer_transparent_geometry_group_draw(
 									flash_alpha,
 									&meter->gradient_max_color);
 								background_pixel = real_a_rgb_color_to_pixel32(
-									meter->background_transparency,
+									background_alpha,
 									&meter->background_color);
 								flash_pixel = real_a_rgb_color_to_pixel32(
 									flash_extension,
 									&flash_color);
-								tint_color = &scaled_tint_color;
-								tint_alpha = meter->meter_transparency;
+								tint_pixel = real_a_rgb_color_to_pixel32(tint_alpha, &tint_color);
 							}
 							else
 							{
@@ -3296,11 +3341,8 @@ void rasterizer_transparent_geometry_group_draw(
 								flash_pixel = real_a_rgb_color_to_pixel32(
 									flash_extension,
 									&flash_color);
-								tint_color = &meter->tint_color;
-								tint_alpha = meter_brightness;
+								tint_pixel = real_a_rgb_color_to_pixel32(meter_brightness, &meter->tint_color);
 							}
-
-							tint_pixel = real_a_rgb_color_to_pixel32(tint_alpha, tint_color);
 
 							rasterizer_set_texture(
 								0,
@@ -3336,13 +3378,13 @@ void rasterizer_transparent_geometry_group_draw(
 							SetRenderStateSmart(
 								D3DRS_SRCBLEND,
 								TEST_FLAG(meter->flags,
-									_shader_transparent_meter_flag_flash_color_is_negative_bit) ?
+									_shader_transparent_meter_flag_tint_mode_2_bit) ?
 									D3DBLEND_CONSTANTCOLOR : D3DBLEND_CONSTANTALPHA);
 							SetRenderStateSmart(
 								D3DRS_DESTBLEND,
 								TEST_FLAG(meter->flags,
 									_shader_transparent_meter_flag_tint_mode_2_bit) ?
-									D3DBLEND_CONSTANTCOLOR : D3DBLEND_INVCONSTANTCOLOR);
+									D3DBLEND_SRCALPHA : D3DBLEND_CONSTANTCOLOR);
 							SetRenderStateSmart(D3DRS_BLENDCOLOR, tint_pixel);
 							SetRenderStateSmart(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 							SetRenderStateSmart(D3DRS_ALPHATESTENABLE, FALSE);
@@ -3383,34 +3425,34 @@ void rasterizer_transparent_geometry_group_draw(
 
 							csmemset(&pixel_shader, 0, sizeof(pixel_shader));
 							SetTextureStageStateSmart(0, D3DTSS_ALPHAKILL, D3DTALPHAKILL_ENABLE);
-							pixel_shader.alpha_outputs[0] = 0x20C00;
-							pixel_shader.rgb_outputs[0] = 0x20C00;
-							pixel_shader.constant_0[0] = flash_pixel;
-							pixel_shader.constant_1[2] = flash_pixel;
-							pixel_shader.constant_1[0] = gradient_max_pixel;
-							pixel_shader.constant_1[1] = gradient_max_pixel;
-							pixel_shader.constant_0[1] = gradient_min_pixel;
-							pixel_shader.constant_0[2] = gradient_min_pixel;
 							pixel_shader.texture_modes = 1;
 							pixel_shader.combiner_count = 0x11104;
+							pixel_shader.constant_0[0] = flash_pixel;
+							pixel_shader.constant_1[0] = gradient_max_pixel;
 							pixel_shader.alpha_inputs[0] = 0x12081208;
+							pixel_shader.alpha_outputs[0] = 0x20C00;
 							pixel_shader.rgb_inputs[0] = 0x1120E820;
+							pixel_shader.rgb_outputs[0] = 0x20C00;
+							pixel_shader.constant_0[1] = gradient_min_pixel;
+							pixel_shader.constant_1[1] = gradient_max_pixel;
 							pixel_shader.alpha_inputs[1] = 0x6C200000;
 							pixel_shader.alpha_outputs[1] = 0xC0;
 							pixel_shader.rgb_inputs[1] = 0x3C011C02;
 							pixel_shader.rgb_outputs[1] = 0xC00;
+							pixel_shader.constant_0[2] = gradient_min_pixel;
+							pixel_shader.constant_1[2] = flash_pixel;
 							pixel_shader.alpha_inputs[2] = 0x0820B120;
 							pixel_shader.alpha_outputs[2] = 0xC00;
-							pixel_shader.constant_0[3] = background_pixel;
-							pixel_shader.alpha_outputs[3] = 0x4C00;
-							pixel_shader.rgb_outputs[3] = 0x4C00;
-							pixel_shader.rgb_outputs[2] = 0xC00;
 							pixel_shader.rgb_inputs[2] = ((TEST_FLAG(meter->flags,
 								_shader_transparent_meter_flag_flash_color_is_negative_bit) ?
-								0 : 0xE0) + 2) | 0x0C201C00;
+								0xE0 : 0) + 2) | 0x0C201C00;
+							pixel_shader.rgb_outputs[2] = 0xC00;
+							pixel_shader.constant_0[3] = background_pixel;
 							pixel_shader.constant_1[3] = tint_pixel;
 							pixel_shader.alpha_inputs[3] = 0x12201120;
+							pixel_shader.alpha_outputs[3] = 0x4C00;
 							pixel_shader.rgb_inputs[3] = 0x0C200120;
+							pixel_shader.rgb_outputs[3] = 0x4C00;
 							pixel_shader.final_combiner_inputs_abcd = 0x0C180000;
 							pixel_shader.final_combiner_inputs_efg = 0x1C00;
 
@@ -3447,15 +3489,15 @@ void rasterizer_transparent_geometry_group_draw(
 					rasterizer_set_pixel_shader(&pixel_shader);
 					rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
 				}
+
+				if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_zbuffer_bit) &&
+					global_window_parameters.rasterizer_target == 0)
+					rasterizer_set_frustum_z(0.0f, 0.0f);
+
+				if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit) &&
+					group->effect_type == _render_model_effect_type_active_camouflage)
+					rasterizer_set_frustum_z(0.0f, 0.0f);
 			}
-
-			if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_zbuffer_bit) &&
-				global_window_parameters.rasterizer_target == 0)
-				rasterizer_set_frustum_z(0.0f, 0.0f);
-
-			if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit) &&
-				group->effect_type == _render_model_effect_type_active_camouflage)
-				rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 
 		if (!dirty)
@@ -3482,14 +3524,12 @@ void rasterizer_transparent_geometry_group_draw(
 
 			for (group_index = 0; group_index < group_count; group_index++)
 			{
-				struct transparent_geometry_group *camouflage_group = groups2 + group_index;
-
-				if (camouflage_group->active_camouflage_transparent_source_object_index ==
+				if (groups2[group_index].active_camouflage_transparent_source_object_index ==
 						group->source_object_index &&
-					camouflage_group->effect_type ==
+					groups2[group_index].effect_type ==
 						_render_model_effect_type_active_camouflage)
 				{
-					rasterizer_transparent_geometry_group_draw(camouflage_group, TRUE);
+					rasterizer_transparent_geometry_group_draw(&groups2[group_index], TRUE);
 
 					if (rasterizer_debug_options.transparent_geometry_index)
 						rasterizer_xbox_transparent_geometry_globals.test_no_more_active_camo =
