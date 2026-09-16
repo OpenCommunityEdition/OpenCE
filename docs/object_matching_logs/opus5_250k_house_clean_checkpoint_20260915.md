@@ -71,3 +71,47 @@ only the 33 owner objects (`scratch/static_probe/changed_objects.json`).
   R3/A17 ruling-blocked) and game_globals (`_game_load` 208).
 
 Conclusion: at HEAD the static-linkage law has no remaining closures for these residuals.
+
+## 6. Local (token-free) levers run on 2026-09-15, after the 150K operator's guidance
+
+The 150K lane operator confirmed A1 and the C4013 sweep are exhausted, reported that the C2.Dll 13.00.9254 decode
+(Aug 2026) found NO instruction scheduler and NO spill-cost field - allocation is driven by DEFINITION POSITION, which
+is already reachable from source - so there is no compiler-side lever left for the `[sha]` tie pool, and named three
+retired lever classes worth a local re-run. All three were run here, at zero agent cost.
+
+### 6.1 objdiff under-credit sweep - NEGATIVE (0 recoverable bytes)
+
+`scratch/undercredit.py` (written here; the other lane's `add_semantic_matches.py` is not in this worktree).
+114 functions / 88,624 padded bytes are strict-exact (`section_infos_equal`) yet scored below 100% by objdiff. Every
+one already carries internal-label relocation parity, and **all 114 are already in `build/semantic_report.json`
+accepted_ledger** - so there are no uncredited bytes on the floor at this HEAD. 100 of the 114 were already `E` in the
+frozen lane-base snapshot and would not have been claimable for this lane in any case.
+
+### 6.2 Naming-gap attestation - NEGATIVE (0 proposals)
+
+`python -B -m tools.campaign.namegap --json` over all configured units: `proposal_count 0`, `proposal_bytes 0`,
+`ambiguities_rejected 0`. The proposal set that grew after earlier waves is empty at this HEAD.
+
+### 6.3 Donor/history mining - 13 candidates, ALL REJECTED on authenticity
+
+`scratch/hist_sweep.py` over 142 units (every unit with a non-exact row except the nine batch-4 units), gating every
+unique historical blob of each `.c`: 13 functions / 2,032 padded bytes gate strict EXACT in some blob but not at HEAD
+(`scratch/hist/candidates.json`). Verified individually (`scratch/hist/verify.sh`, gate + row diff + parkcheck):
+
+| function | B | verdict |
+| --- | ---: | --- |
+| `__rasterizer_widget_draw_sprite2d` | 528 | REJECT: the blob loses the HEAD-exact `__rasterizer_widget_submit_occlusion_test`; net zero and a regression |
+| `__rasterizer_widget_begin` | 0 | REJECT: same loss, no gain |
+| `_rasterizer_lens_flares_submit_occlusion_tests` | 400 | OUT: `_point_from_line3d` COMDAT (lane rule) |
+| `_hud_play_sound` | 352 | REJECT: the blob body is `word *volatile played_flags` + a consumer-local prototype + `goto mark_played` + hand `|= FLAG(...)`. The park evidence records HEAD's body as the deliberate policy replacement of exactly this one (R18, R8) |
+| `_hs_parse_boolean` | 304 | REJECT: costs 48 exact rows |
+| `_wind_variance_get` | 224 | HANDED TO THE w3d_wind WORKER: union bit-mask replacing `fabs` (laws_w2 B admits a local union bit transfer) but bundled with a `static` linkage change and a second park drift; must be decided from January bytes, minimum hunk only |
+| `_point_in_triangle3d`, `_pill_test_vector3d` | 0 | REJECT: the real_math blob emits the forbidden `_point_from_line3d` |
+| `_convex_hull2d_perimeter` | 96 | REJECT: costs 6 exact rows |
+| `_get_mutex_from_pool` | 64 | REJECT (fake-match): the blob declares `extern struct mutex_reference transport_address_string;` - another TU's *string* symbol, given a wrong type - and walks `(long)&transport_address_string.in_use` as the pool loop bound. An invented extern used for a link-time address |
+| `_rasterizer_lights_reset_for_new_map` | 48 | REJECT: laws_w2 R12 buffer overrun |
+| `_code_000d16d0` | 16 | REJECT: costs 9 exact rows |
+
+**Finding (new do-not-repeat):** at this HEAD, history mining returns only bodies that earlier lanes already rejected
+on policy - the tree has absorbed every admissible historical body. Re-run it only after a source-shape law lands that
+did not exist when those blobs were written.
