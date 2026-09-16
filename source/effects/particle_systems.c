@@ -1006,7 +1006,7 @@ void particle_system_update(
 	long system_index)
 {
 	struct particle_system_datum *system = particle_system_get(system_index);
-	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
+	struct particle_system_definition *system_definition = particle_system_definition_get(system->definition_index);
 	short live_type_count = 0;
 	short type_index;
 
@@ -1031,14 +1031,17 @@ void particle_system_update(
 		system->velocity.k *= TICKS_PER_SECOND;
 	}
 
-	assert(definition->system_update_physics >= 0 &&
-		definition->system_update_physics < NUMBER_OF_PARTICLE_SYSTEM_UPDATE_PHYSICS);
-	system_update_functions[definition->system_update_physics](system, delta_time);
+	match_assert(
+		"c:\\halo\\SOURCE\\effects\\particle_systems.c",
+		0x2E1,
+		system_definition->system_update_physics>=0 &&
+		system_definition->system_update_physics<NUMBER_OF_PARTICLE_SYSTEM_UPDATE_PHYSICS);
+	system_update_functions[system_definition->system_update_physics](system, delta_time);
 
-	for (type_index = 0; type_index < definition->types.count; type_index++)
+	for (type_index = 0; type_index < system_definition->types.count; type_index++)
 	{
 		struct particle_system_type *type_definition = TAG_BLOCK_GET_ELEMENT(
-			&definition->types,
+			&system_definition->types,
 			type_index,
 			struct particle_system_type);
 		struct particle_type *type = &system->types[type_index];
@@ -1048,78 +1051,66 @@ void particle_system_update(
 
 		type->time_left_in_state -= delta_time;
 
-		if (type->state_index != NONE)
+		while (type->state_index != NONE)
 		{
-			struct particle_system_type_state *current_state_definition = NULL;
-			short transition_state_index = NONE;
+			struct particle_system_type_state *state_definition = TAG_BLOCK_GET_ELEMENT(
+				&type_definition->type_states,
+				type->state_index,
+				struct particle_system_type_state);
 
-			while (type->state_index != NONE)
+			if (type->time_left_in_state < 0.0f)
 			{
-				current_state_definition = TAG_BLOCK_GET_ELEMENT(
-					&type_definition->type_states,
-					type->state_index,
-					struct particle_system_type_state);
-				transition_state_index = type->transition_state_index;
+				real duration;
 
-				if (type->time_left_in_state >= 0.0f)
-					break;
-
+				if (type->transition_state_index == NONE)
 				{
-					real lower_bound;
-					real upper_bound;
-
-					if (transition_state_index == NONE)
-					{
-						particle_system_next_type_state_index(system, type, type_definition);
-						lower_bound = current_state_definition->transition_time_lower_bound;
-						upper_bound = current_state_definition->transition_time_upper_bound;
-					}
-					else
-					{
-						struct particle_system_type_state *transition_state_definition = TAG_BLOCK_GET_ELEMENT(
-							&type_definition->type_states,
-							transition_state_index,
-							struct particle_system_type_state);
-
-						type->state_index = transition_state_index;
-						type->transition_state_index = NONE;
-						lower_bound = transition_state_definition->duration_lower_bound;
-						upper_bound = transition_state_definition->duration_upper_bound;
-					}
-
-					{
-						real duration = real_seed_random_range(
-							get_global_local_random_seed_address(),
-							lower_bound,
-							upper_bound);
-
-						type->time_left_in_state += duration;
-						type->state_length = duration;
-					}
+					particle_system_next_type_state_index(system, type, type_definition);
+					duration = real_local_random_range(
+						state_definition->transition_time_lower_bound,
+						state_definition->transition_time_upper_bound);
 				}
-			}
+				else
+				{
+					struct particle_system_type_state *transition_state_definition;
 
-			if (type->state_index != NONE)
+					type->state_index = type->transition_state_index;
+					type->transition_state_index = NONE;
+					transition_state_definition = TAG_BLOCK_GET_ELEMENT(
+						&type_definition->type_states,
+						type->state_index,
+						struct particle_system_type_state);
+					duration = real_local_random_range(
+						transition_state_definition->duration_lower_bound,
+						transition_state_definition->duration_upper_bound);
+				}
+
+				type->state_length = duration;
+				type->time_left_in_state += duration;
+			}
+			else
 			{
-				if (transition_state_index == NONE)
+				real const *transition_state_variables = NULL;
+				real const *state_variables = (real const *)&state_definition->variables;
+
+				if (type->transition_state_index == NONE)
 				{
 					csmemcpy(
 						&type->variables,
-						&current_state_definition->variables,
+						state_variables,
 						sizeof(type->variables));
 				}
 				else
 				{
 					struct particle_system_type_state *transition_state_definition = TAG_BLOCK_GET_ELEMENT(
 						&type_definition->type_states,
-						transition_state_index,
+						type->transition_state_index,
 						struct particle_system_type_state);
-					real t = type->time_left_in_state/type->state_length;
-					real *destination = (real *)&type->variables;
-					real const *current = (real const *)&current_state_definition->variables;
-					real const *transition = (real const *)&transition_state_definition->variables;
+					real *variables = (real *)&type->variables;
+					real t;
 					short variable_index;
 
+					transition_state_variables = (real const *)&transition_state_definition->variables;
+					t = type->time_left_in_state/type->state_length;
 					if (t < 0.0f)
 						t = 0.0f;
 					else if (t > 1.0f)
@@ -1127,8 +1118,7 @@ void particle_system_update(
 
 					for (variable_index = 0; variable_index < 10; variable_index++)
 					{
-						destination[variable_index] =
-							current[variable_index]*t + transition[variable_index]*(1.0f - t);
+						*variables++ = *state_variables++*t + *transition_state_variables++*(1.0f - t);
 					}
 				}
 
@@ -1149,37 +1139,39 @@ void particle_system_update(
 					type->variables.particle_state_randomized_multipliers.animation_rate *= system->scale;
 				if (TEST_FLAG(type_definition->flags, _particle_system_type_rotation_rate_scales_bit))
 					type->variables.particle_state_randomized_multipliers.rotation_rate *= system->scale;
+
+				break;
 			}
 		}
 
 		if (type->state_index != NONE)
 		{
 			struct ps_particle_datum *previous_particle = NULL;
-			long particle_index;
+			short particle_index;
 
 			if (TEST_FLAG(system->flags, _particle_system_active_bit))
 				particle_system_new_particles(system, type_index, delta_time);
 
-			for (particle_index = type->first_particle_index;
-				particle_index != NONE;)
+			particle_index = (short)type->first_particle_index;
+			while (particle_index != NONE)
 			{
-				long current_particle_index = particle_index;
 				struct ps_particle_datum *particle = ps_particle_get(particle_index);
 
 				particle->time_left_in_state -= delta_time;
 
 				if (particle->state_index == NONE && type_definition->particle_states.count > 0)
 				{
-					struct particle_system_type_particle_state *first_state_definition = TAG_BLOCK_GET_ELEMENT(
+					struct particle_system_type_particle_state *state_definition;
+					real duration;
+
+					particle->state_index = 0;
+					state_definition = TAG_BLOCK_GET_ELEMENT(
 						&type_definition->particle_states,
 						0,
 						struct particle_system_type_particle_state);
-					real duration = real_seed_random_range(
-						get_global_local_random_seed_address(),
-						first_state_definition->duration_lower_bound,
-						first_state_definition->duration_upper_bound);
-
-					particle->state_index = 0;
+					duration = real_local_random_range(
+						state_definition->duration_lower_bound,
+						state_definition->duration_upper_bound);
 					particle->time_left_in_state = duration;
 					particle->state_length = duration;
 					randomize_particle_variables(
@@ -1193,76 +1185,67 @@ void particle_system_update(
 
 				while (particle->state_index != NONE)
 				{
-					struct particle_system_type_particle_state *particle_state_definition = TAG_BLOCK_GET_ELEMENT(
+					struct particle_system_type_particle_state *state_definition = TAG_BLOCK_GET_ELEMENT(
 						&type_definition->particle_states,
 						particle->state_index,
 						struct particle_system_type_particle_state);
-					short transition_state_index;
-					real lower_bound;
-					real upper_bound;
 
-					if (particle->time_left_in_state >= 0.0f)
-						break;
-
-					if (particle->transition_state_index == NONE)
+					if (particle->time_left_in_state < 0.0f)
 					{
-						particle_system_next_particle_state_index(particle, type_definition);
-						lower_bound = particle_state_definition->transition_time_lower_bound;
-						upper_bound = particle_state_definition->transition_time_upper_bound;
-					}
-					else
-					{
-						struct particle_system_type_particle_state *transition_state_definition;
+						real duration;
 
-						particle->state_index = particle->transition_state_index;
-						particle->transition_state_index = NONE;
-						transition_state_definition = TAG_BLOCK_GET_ELEMENT(
-							&type_definition->particle_states,
-							particle->state_index,
-							struct particle_system_type_particle_state);
-						lower_bound = transition_state_definition->duration_lower_bound;
-						upper_bound = transition_state_definition->duration_upper_bound;
-					}
+						if (particle->transition_state_index == NONE)
+						{
+							particle_system_next_particle_state_index(particle, type_definition);
+							duration = real_local_random_range(
+								state_definition->transition_time_lower_bound,
+								state_definition->transition_time_upper_bound);
+						}
+						else
+						{
+							struct particle_system_type_particle_state *transition_state_definition;
 
-					transition_state_index = particle->transition_state_index;
+							particle->state_index = particle->transition_state_index;
+							particle->transition_state_index = NONE;
+							transition_state_definition = TAG_BLOCK_GET_ELEMENT(
+								&type_definition->particle_states,
+								particle->state_index,
+								struct particle_system_type_particle_state);
+							duration = real_local_random_range(
+								transition_state_definition->duration_lower_bound,
+								transition_state_definition->duration_upper_bound);
+						}
 
-					{
-						real duration = real_seed_random_range(
-							get_global_local_random_seed_address(),
-							lower_bound,
-							upper_bound);
-
-						particle->time_left_in_state += duration;
 						particle->state_length = duration;
-					}
+						particle->time_left_in_state += duration;
 
-					if (transition_state_index == NONE)
-					{
-						csmemcpy(
-							&particle->randomized_variables,
-							&particle->transition_randomized_variables,
-							sizeof(particle->randomized_variables));
+						if (particle->transition_state_index != NONE)
+						{
+							randomize_particle_variables(
+								type_definition,
+								&particle->transition_randomized_variables,
+								particle->transition_state_index);
+						}
+						else
+						{
+							particle->randomized_variables = particle->transition_randomized_variables;
+						}
 					}
 					else
 					{
-						randomize_particle_variables(
-							type_definition,
-							&particle->transition_randomized_variables,
-							transition_state_index);
+						break;
 					}
 				}
 
 				if (particle->state_index == NONE)
 				{
-					long next_particle_index = particle->next_particle_index;
-
 					if (previous_particle)
-						previous_particle->next_particle_index = next_particle_index;
+						previous_particle->next_particle_index = particle->next_particle_index;
 					else
-						type->first_particle_index = next_particle_index;
+						type->first_particle_index = particle->next_particle_index;
 
-					datum_delete(system_particles, current_particle_index);
-					particle_index = next_particle_index;
+					datum_delete(system_particles, particle_index);
+					particle_index = (short)particle->next_particle_index;
 					type->particle_count--;
 				}
 				else
@@ -1283,31 +1266,38 @@ void particle_system_update(
 					}
 					else
 					{
-						real t = particle->time_left_in_state/particle->state_length;
-						real inverse_t;
-						real animation_rate;
-						real rotation_rate;
+						real t;
+
+						/* January performs this lookup of the current particle state only for its
+						 * validation side effect; the element is not otherwise needed. */
+						TAG_BLOCK_GET_ELEMENT(
+							&type_definition->particle_states,
+							particle->state_index,
+							struct particle_system_type_particle_state);
+						t = particle->time_left_in_state/particle->state_length;
 
 						if (t < 0.0f)
 							t = 0.0f;
 						else if (t > 1.0f)
 							t = 1.0f;
 
-						inverse_t = 1.0f - t;
-						animation_rate = particle->transition_randomized_variables.animation_rate*inverse_t +
-							particle->randomized_variables.animation_rate*t;
-						rotation_rate = particle->transition_randomized_variables.rotation_rate*inverse_t +
-							particle->randomized_variables.rotation_rate*t;
-						particle->rotation += rotation_rate*
+						particle->rotation +=
+							(particle->transition_randomized_variables.rotation_rate*(1.0f - t) +
+								particle->randomized_variables.rotation_rate*t)*
 							type->variables.particle_state_randomized_multipliers.rotation_rate*
 							delta_time;
-						particle->sprite_index += animation_rate*
+						particle->sprite_index +=
+							(particle->transition_randomized_variables.animation_rate*(1.0f - t) +
+								particle->randomized_variables.animation_rate*t)*
 							type->variables.particle_state_randomized_multipliers.animation_rate*
 							delta_time;
 					}
 
-					assert(type_state_definition->particle_update_physics >= 0 &&
-						type_state_definition->particle_update_physics < NUMBER_OF_PARTICLE_SYSTEM_TYPE_UPDATE_PHYSICS);
+					match_assert(
+						"c:\\halo\\SOURCE\\effects\\particle_systems.c",
+						0x3AF,
+						type_state_definition->particle_update_physics>=0 &&
+						type_state_definition->particle_update_physics<NUMBER_OF_PARTICLE_SYSTEM_TYPE_UPDATE_PHYSICS);
 					particle_update_functions[type_state_definition->particle_update_physics](
 						system,
 						type_index,
@@ -1315,7 +1305,7 @@ void particle_system_update(
 						particle);
 
 					previous_particle = particle;
-					particle_index = particle->next_particle_index;
+					particle_index = (short)particle->next_particle_index;
 				}
 			}
 

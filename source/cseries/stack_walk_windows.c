@@ -451,13 +451,14 @@ int load_symbol_table(
 
 	{
 		char line[DEBUG_SYMBOL_STRING_STORAGE_ALLOCATION_SIZE] = "";
+		boolean found_symbols_section = FALSE;
 
 		if (!fgets(line, sizeof(line), map_file))
 		{
 			goto close_map_file;
 		}
 
-		while (TRUE)
+		while (!found_symbols_section)
 		{
 			if (!fgets(line, sizeof(line), map_file))
 			{
@@ -467,10 +468,9 @@ int load_symbol_table(
 
 			if (strstr(line, "Lib:Object"))
 			{
-				break;
+				found_symbols_section = TRUE;
 			}
-
-			if (strstr(line, "Timestamp"))
+			else if (strstr(line, "Timestamp"))
 			{
 				/* BUG (preserved for exact matching): January performs the
 				 * timestamp search but ignores whether it succeeds.  A corrected
@@ -482,21 +482,16 @@ int load_symbol_table(
 		string_storage_size = 0;
 		string_storage_used = 0;
 		symbols_size = 0;
-		previous_library_object_offset = NONE;
 		strcpy(last_object_file_name, "nothing");
+		previous_library_object_offset = NONE;
 
-		if (!fgets(line, sizeof(line), map_file))
-		{
-			goto close_map_file;
-		}
-
-		while (TRUE)
+		while (fgets(line, sizeof(line), map_file))
 		{
 			end_str = NULL;
 			segment = strtok(line, ":");
 			if (!segment || *segment!=' ')
 			{
-				goto read_next_line;
+				continue;
 			}
 
 			token = strtok(NULL, " \t\n\r");
@@ -507,7 +502,12 @@ int load_symbol_table(
 			symbol_address = strtoul(token, &end_str, 16);
 
 			token = strtok(NULL, " \t\n\r");
-			if (!token)
+			if (token)
+			{
+				strncpy(symbol_name, token, sizeof(symbol_name)-1);
+				symbol_name[sizeof(symbol_name)-1] = 0;
+			}
+			else
 			{
 				if (!strstr(line, "entry point at"))
 				{
@@ -549,16 +549,16 @@ int load_symbol_table(
 					goto corrupt_map_file;
 				}
 				symbol_address = strtoul(token, &end_str, 16);
-				token = strtok(NULL, " \t\n\r");
-			}
 
-			/* BUG (preserved for exact matching): January leaves symbol_name
-			 * unchanged if the continuation entry omits its name token, then
-			 * continues parsing.  A corrected build should reject that entry. */
-			if (token)
-			{
-				strncpy(symbol_name, token, sizeof(symbol_name)-1);
-				symbol_name[sizeof(symbol_name)-1] = 0;
+				/* BUG (preserved for exact matching): January leaves symbol_name
+				 * unchanged if the continuation entry omits its name token, then
+				 * continues parsing.  A corrected build should reject that entry. */
+				token = strtok(NULL, " \t\n\r");
+				if (token)
+				{
+					strncpy(symbol_name, token, sizeof(symbol_name)-1);
+					symbol_name[sizeof(symbol_name)-1] = 0;
+				}
 			}
 
 			token = strtok(NULL, " \t\n\r");
@@ -661,25 +661,17 @@ int load_symbol_table(
 					strcpy(last_object_file_name, library_object_file_name);
 				}
 			}
-
-read_next_line:
-			if (!fgets(line, sizeof(line), map_file))
-			{
-				break;
-			}
 		}
 
 		goto close_map_file;
 
 allocation_failed:
-		token = "could not allocate enough memory for map file";
-		goto report_map_file_error;
+		error(_error_silent, "could not allocate enough memory for map file");
+		free_symbol_table(symbol_table);
+		goto close_map_file;
 
 corrupt_map_file:
-		token = "map file appears corrupt";
-
-report_map_file_error:
-		error(_error_silent, token);
+		error(_error_silent, "map file appears corrupt");
 		free_symbol_table(symbol_table);
 
 close_map_file:
@@ -695,16 +687,12 @@ finished:
 			sizeof(*symbol_table->symbols),
 			symbol_sort_proc);
 
-		if (symbol_table->symbols[symbol_table->number_of_symbols-1].rva_base==0)
+		/* BUG (preserved for exact matching): January assumes at least one
+		 * nonzero RVA while trimming sentinels.  A corrected build should
+		 * stop before number_of_symbols reaches zero. */
+		while (symbol_table->symbols[symbol_table->number_of_symbols-1].rva_base==0)
 		{
-			/* BUG (preserved for exact matching): January assumes at least one
-			 * nonzero RVA while trimming sentinels.  A corrected build should
-			 * stop before number_of_symbols reaches zero. */
-			do
-			{
-				symbol_table->number_of_symbols--;
-			}
-			while (symbol_table->symbols[symbol_table->number_of_symbols-1].rva_base==0);
+			symbol_table->number_of_symbols--;
 		}
 	}
 
