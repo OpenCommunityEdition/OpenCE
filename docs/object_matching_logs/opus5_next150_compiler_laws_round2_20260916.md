@@ -7,6 +7,14 @@ conclusions. Evidence and the detector inventory live in `scratch/hs_research/`.
 **This document supersedes parts of `opus5_next150_compiler_laws_20260916.md`; its section 8 lists exactly what.**
 Tags: `[M]` measured this round, `[V]` re-verified by the consolidation pass, `[I]` inferred.
 
+> **PARTLY SUPERSEDED 2026-09-16 by `opus5_next150_research_campaign_20260916.md` (section 3).** A corpus-scale
+> campaign adjudicated this ledger by re-measurement: **LAW S's polarity is INVERTED** - the nearer frame slot goes to
+> the home whose last reference is EARLIER, not later, and the print-order recipe is refuted (micro-TU t1..t3);
+> **the section 10 attack list is refuted on all four items** (king has no cached local - VC7 itself sinks the arm
+> stores into the zero pin; `_player_profile_new` is a missing `_saved_game_file_close` call, not a surplus store;
+> `_render_debug_player` is a buffer's declared extent, not an extra local; `_bink_alloc@4` has since landed).
+> LAW Z's corrected statements, Z4, Z5 and the `_hs_compile_and_evaluate` impossibility bound are unaffected.
+
 ---
 
 **Lane** `C:\halo-worktrees\opus5-150k-house-clean-20260914`, baseline `ae10935da`, 2026-09-16.
