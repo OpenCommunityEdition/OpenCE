@@ -710,19 +710,21 @@ void player_effect_get_screen_flash(
 			if (effect->screen_flash_time_left > 0 ||
 				TEST_FLAG(effect->flags, _player_effect_screen_flash_just_started_bit))
 			{
+				struct screen_flash_definition const *flash = &effect->screen_flash;
+
 				SET_FLAG(
 					effect->flags,
 					_player_effect_screen_flash_just_started_bit,
 					FALSE);
 
-				screen_flash->type = render_screen_flash_type_map[effect->screen_flash.type];
-				screen_flash->color = effect->screen_flash.screen_flash_color;
-				if (effect->screen_flash.duration > 0.0f)
+				screen_flash->type = render_screen_flash_type_map[flash->type];
+				screen_flash->color = flash->screen_flash_color;
+				if (flash->duration > 0.0f)
 					screen_flash->intensity = transition_function_evaluate(
-						effect->screen_flash.fade_function,
-						effect->screen_flash.zero_scale_factor * ((real)effect->screen_flash_time_left / effect->screen_flash.duration));
+						flash->fade_function,
+						flash->zero_scale_factor * ((real)effect->screen_flash_time_left / flash->duration));
 				else
-					screen_flash->intensity = effect->screen_flash.zero_scale_factor;
+					screen_flash->intensity = flash->zero_scale_factor;
 
 				effect->screen_flash_time_left -= game_time_get_elapsed();
 
