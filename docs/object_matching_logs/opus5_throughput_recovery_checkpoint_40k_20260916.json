@@ -1,0 +1,1113 @@
+{
+ "summary": {
+  "label": "h3",
+  "base_commit": "9062b1e969cb3c7626d92381f6d10beaa7b19864",
+  "head_commit": "64fd27d28cf510108a86bc93b1fe72bf9baa91e9",
+  "newly_exact_functions": 56,
+  "new_strict_meaningful_bytes": 44224,
+  "new_strict_padded_bytes": 44656,
+  "strict_gains_without_ledger_entry": 0,
+  "newly_accepted_but_not_strict (zero credit)": 0,
+  "regressions": [],
+  "target": 150000,
+  "remaining_to_target": 105776,
+  "accepted_ledger_now": 7371,
+  "accepted_meaningful_now": 1391693,
+  "accepted_ledger_at_base": 7315,
+  "accepted_meaningful_at_base": 1347469
+ },
+ "credited_functions": [
+  {
+   "unit": "source/ai/actor_looking",
+   "symbol": "_actor_look_valid_aim_vector",
+   "padded_bytes": 128,
+   "meaningful_bytes": 124,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "88d84360c60e60aa0d6f8edb4d8f81a9576d88a47b81139171a69c6791d03b58",
+   "relocations": 3,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:5",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "symbol": "_actor_look_valid_look_vector",
+   "padded_bytes": 240,
+   "meaningful_bytes": 233,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "5b83995753335865d8f68c0574f36c607d21a259394a50723615d265a22095b7",
+   "relocations": 6,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/actor_moving",
+   "symbol": "_actor_move_initialize",
+   "padded_bytes": 336,
+   "meaningful_bytes": 331,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "4cb84b739dfc710ce3452d9c6e9819eef7c05a0a4722be7fdcbf128066c52fb2",
+   "relocations": 15,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "d6df15102 Wave 1: four functions strict exact (moving, decals, ui_widget, projectiles)"
+   ]
+  },
+  {
+   "unit": "source/ai/ai",
+   "symbol": "_ai_handle_editing",
+   "padded_bytes": 1296,
+   "meaningful_bytes": 1291,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "652338b1724b0f70d82160cd72c21e568a24fd099c4208e692215bb4e3d93cf8",
+   "relocations": 70,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:42",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_script",
+   "symbol": "_ai_scripting_follow_target_ai",
+   "padded_bytes": 176,
+   "meaningful_bytes": 171,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "ff4abefdf85e2b32415156d82aadd0db866ec445b6054ad988363fbd29f0b2b1",
+   "relocations": 10,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:99",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "symbol": "_net_startup_debug",
+   "padded_bytes": 16,
+   "meaningful_bytes": 1,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "499f1f307c1cb989f968a6b7fcaec591e1828877223d0b0e7e8e8b76cde8c9ca",
+   "relocations": 0,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:1",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6bcdbba5a Name _net_startup_debug from the Halo CE map files (strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "symbol": "_remove_endpoint_from_set",
+   "padded_bytes": 240,
+   "meaningful_bytes": 238,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "6b4b631ac61f5eee45694fbee875f88fceafc045056afac5289baa7de53f5d34",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6bcdbba5a Name _net_startup_debug from the Halo CE map files (strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "symbol": "_transport_network_available",
+   "padded_bytes": 16,
+   "meaningful_bytes": 8,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "73954fa0da7600bd1a60ddb3387eafabb788779227be715ec886a2fb1bdfe783",
+   "relocations": 1,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6bcdbba5a Name _net_startup_debug from the Halo CE map files (strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "symbol": "_transport_nonce_is_equal",
+   "padded_bytes": 112,
+   "meaningful_bytes": 105,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "c108841f462f3a3172f02c5819cb7a9d4fcb132ecdbc53c1cf29c6cd79a5d914",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6bcdbba5a Name _net_startup_debug from the Halo CE map files (strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_connect_endpoint",
+   "padded_bytes": 480,
+   "meaningful_bytes": 471,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "d51d0a7aaac410b781be4dbf86712bf999dc0b52de5602b7545c5e1176f01d6d",
+   "relocations": 20,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_connect_endpoint_async",
+   "padded_bytes": 336,
+   "meaningful_bytes": 323,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "35f4f722ba6ad78bd3d534cc1c88dff2e15ec139b8177e4ef60c4146de17f8ca",
+   "relocations": 20,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:23",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_endpoint_listening",
+   "padded_bytes": 64,
+   "meaningful_bytes": 56,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "9555d57f2b699cbd43b1c64a752c9d489448a4dcf3d7e2587cfca2b0e5cd0378",
+   "relocations": 4,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:11",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_endpoint_readable",
+   "padded_bytes": 192,
+   "meaningful_bytes": 178,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "4aa245bc023e916684c2f0e85a6c095e39e59b327edf9f0d663f138caf5b8e84",
+   "relocations": 6,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:8",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_read_endpoint",
+   "padded_bytes": 256,
+   "meaningful_bytes": 256,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "1ccff970f392034644ae9ef3f46732fbcaaa6c60076defca35cafe662dd99e0e",
+   "relocations": 16,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_read_from_endpoint",
+   "padded_bytes": 544,
+   "meaningful_bytes": 543,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "436b29a8a3fead8a698af2e95e38faae6e8e1336c2566954e28b7382a1890a9b",
+   "relocations": 30,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:27",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_set_endpoint_blocking",
+   "padded_bytes": 272,
+   "meaningful_bytes": 270,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e2624d687795f7287aee261183e8093951da8b45c4873a0162fca8bee2a11d49",
+   "relocations": 17,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:18",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_winsock_error_to_string",
+   "padded_bytes": 1568,
+   "meaningful_bytes": 1568,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "35e5bf685b7053c6bf425c6f771467a3359cebda61937162f15f708d9b21ae60",
+   "relocations": 177,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:15",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_write_to_endpoint",
+   "padded_bytes": 384,
+   "meaningful_bytes": 384,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "d14d251cab0a59331c2f126a13526012abea159035e313ad7796100d90e3eb90",
+   "relocations": 21,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:28",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "abfb9abfe transport_endpoint.h: January field and parameter widths (4 functions strict exact)",
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "symbol": "_load_symbol_table",
+   "padded_bytes": 1568,
+   "meaningful_bytes": 1556,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "db62270d0aef399714dcd1f59a9d88e06920e5e4679ec062531ff5b2d452f19f",
+   "relocations": 93,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "efb4624aa Wave 4: two functions strict exact (particle_systems, stack_walk_windows)"
+   ]
+  },
+  {
+   "unit": "source/devices/devices",
+   "symbol": "_device_frontfacing",
+   "padded_bytes": 128,
+   "meaningful_bytes": 119,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "7f3f6dab74aed4c5c3a37eb7f916ba4fc0a44b3bf018e2e58f3bc340f5fed74d",
+   "relocations": 4,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:28",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/effects/decals",
+   "symbol": "_decal_sprite_get_bounds",
+   "padded_bytes": 384,
+   "meaningful_bytes": 379,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e77622d865444b0cc3d5b40661452a0a948a15064c53972db1c46490de68eaf3",
+   "relocations": 16,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "d6df15102 Wave 1: four functions strict exact (moving, decals, ui_widget, projectiles)"
+   ]
+  },
+  {
+   "unit": "source/effects/particle_systems",
+   "symbol": "_particle_system_update",
+   "padded_bytes": 1664,
+   "meaningful_bytes": 1651,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "0a74337d69d2dfdfbe58e3fc33892e1b2055db4f16e8c1d12d47d69896804eb3",
+   "relocations": 58,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "efb4624aa Wave 4: two functions strict exact (particle_systems, stack_walk_windows)"
+   ]
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "symbol": "_aim_assist_compute_target",
+   "padded_bytes": 416,
+   "meaningful_bytes": 409,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "03e4e539489a5744a98bfb539de94d9fece69f98716374ac9055ffd35a19c278",
+   "relocations": 16,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "symbol": "_game_engine_generate_title_string",
+   "padded_bytes": 1152,
+   "meaningful_bytes": 1150,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e261315dfb4e4543336e7fd8c18016f7f3d0a390bcdab02271599c459dc8ba9c",
+   "relocations": 73,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:173",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/game_engine",
+   "symbol": "_game_engine_should_spawn_player",
+   "padded_bytes": 256,
+   "meaningful_bytes": 243,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "8259180402f726ea65aa4d62461f38a4138acc21fc1d8fe1c19e9d246b5ff0ef",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:37",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "symbol": "_player_examine_nearby_objects",
+   "padded_bytes": 240,
+   "meaningful_bytes": 233,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "a08d292a1a63cf83ae9c0d5595ffa8f6c765219e3ce18f0aabe62483217e1a03",
+   "relocations": 18,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:69",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "symbol": "_player_examine_nearby_vehicle",
+   "padded_bytes": 448,
+   "meaningful_bytes": 435,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "d68f377ed87e85d1e72156e9922c7406f4792a25c3dd8c397acfb5332fd89949",
+   "relocations": 25,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:64",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "symbol": "_player_handle_powerup",
+   "padded_bytes": 240,
+   "meaningful_bytes": 240,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "84c28544d684b20d6685f15d4528a4e1e87cbd52331f7584ed2838775161d2cc",
+   "relocations": 14,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:56",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "symbol": "_player_handle_powerup_minor",
+   "padded_bytes": 160,
+   "meaningful_bytes": 159,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "27e1638518a37796479d23ab8a05714f8f609c9727483b494f2ed0b3ebf8f70d",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:57",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/game/players",
+   "symbol": "_player_update_powerups",
+   "padded_bytes": 112,
+   "meaningful_bytes": 109,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "826a864ce09f2800e9d9bc1bbbd72558629685792e7c1a508d845864fa162b8b",
+   "relocations": 5,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:58",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "e30b1f358 Wave 2: nine functions strict exact (players, game_engine, aim_assist)"
+   ]
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "symbol": "_hs_parse_begin",
+   "padded_bytes": 432,
+   "meaningful_bytes": 419,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "663ecb4d9a64dad380906f93f8ba212f260c3c8dab9928e5308e3bff1d4f2d44",
+   "relocations": 30,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:47",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "symbol": "_hs_parse_cond_recursive",
+   "padded_bytes": 704,
+   "meaningful_bytes": 691,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e899913b5f1dcd8dda9338440f4bdf0f24d99896d9faba120f6b939357f3176d",
+   "relocations": 49,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:1",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "symbol": "_search_and_replace",
+   "padded_bytes": 464,
+   "meaningful_bytes": 451,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "930c988de84cb1c4931de709d9457e0704e79a098f73a8d77a9687e1af872c7d",
+   "relocations": 16,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:57",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "d6df15102 Wave 1: four functions strict exact (moving, decals, ui_widget, projectiles)"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "symbol": "_projectile_accelerate",
+   "padded_bytes": 496,
+   "meaningful_bytes": 482,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e2f31c3bd7a0aae6dc41d6cf08108355de63d6b3829568a59b363c3db0a5cfc1",
+   "relocations": 32,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:28",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "d6df15102 Wave 1: four functions strict exact (moving, decals, ui_widget, projectiles)"
+   ]
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_get_edge_vertex",
+   "padded_bytes": 416,
+   "meaningful_bytes": 402,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "ebafcbd056870e28f2d96ad7e08a64d9a2e1b2513e911e075aed0fca4b9dc880",
+   "relocations": 17,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:26",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/math/real_math",
+   "symbol": "_pill_test_vector3d",
+   "padded_bytes": 448,
+   "meaningful_bytes": 445,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "2d1aad933f291907866fffa6ae2cb0597b40c008d1ba91ea13950a8b5b89a631",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:50",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/math/real_math",
+   "symbol": "_point_in_triangle3d",
+   "padded_bytes": 432,
+   "meaningful_bytes": 418,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "f0c19ce34603faee28e30b9edb07783f1f591e36bdd06194f4eb273b212a140f",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:53",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_connected",
+   "padded_bytes": 96,
+   "meaningful_bytes": 81,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "50677dce5bbee398989d36573afcb4be3ca3025c446a6e7bb0c005c2cd4fe3f8",
+   "relocations": 5,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:3",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_disconnect",
+   "padded_bytes": 176,
+   "meaningful_bytes": 165,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "302d9e70140896b6321ce92306d66c783f987e0ab790072bb30d6370bb050537",
+   "relocations": 7,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:21",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_get_address",
+   "padded_bytes": 160,
+   "meaningful_bytes": 146,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "76f557523934d9604438564e053c6fdb5ad8971ff9f70bad52f406bd3082295f",
+   "relocations": 8,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_idle",
+   "padded_bytes": 784,
+   "meaningful_bytes": 775,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e1129c78e3cfd2d0cb1c05eaefb4f33994d07d3badb52769c5051203d212e59e",
+   "relocations": 46,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:23",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_idle_server_reliable_endpoint",
+   "padded_bytes": 704,
+   "meaningful_bytes": 693,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "f6b8e5e3395ee155cdac58d340554ca74a3f3cfa4b39defd48eb96d563c3cbf0",
+   "relocations": 44,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_read",
+   "padded_bytes": 144,
+   "meaningful_bytes": 129,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "fd00e2e86571d2dc266206d9ec9c6574b0043096121845113ff18c8326dff0a0",
+   "relocations": 7,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:20",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_read_reliable",
+   "padded_bytes": 480,
+   "meaningful_bytes": 468,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "67b3b81b040b726314e395318076a99747822c0989e5c755115733fbcf0de7d3",
+   "relocations": 32,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_read_unreliable",
+   "padded_bytes": 512,
+   "meaningful_bytes": 501,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "7f61cf188ca1eac6f1ad3fbbb55574aa9f9330cabf6d4edf5f333569ef53f898",
+   "relocations": 33,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:10",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)",
+    "42f573014 Unblocked reserved units: six networking functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox",
+   "symbol": "_rasterizer_set_model_skinning",
+   "padded_bytes": 320,
+   "meaningful_bytes": 315,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "ba181c535da3f3a4b566208d3ce013b4a00c7e9f8c077c30d23b0cadd4b535be",
+   "relocations": 18,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:72",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
+   "symbol": "__rasterizer_screen_effect",
+   "padded_bytes": 3888,
+   "meaningful_bytes": 3881,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "d67a06f0c52e684686aae8a5a8e3a7e5e2bcf6c84e854bd525b54660cc66d7f8",
+   "relocations": 290,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:12",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_screen_effect",
+   "symbol": "__rasterizer_screen_flash",
+   "padded_bytes": 1344,
+   "meaningful_bytes": 1344,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "f1d3e84eebfa355c8aecd1b784f3128fdd6fab0714ccc51b8feafdd988c9f7af",
+   "relocations": 118,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:13",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_transparent_geometry",
+   "symbol": "_rasterizer_transparent_geometry_group_draw",
+   "padded_bytes": 15120,
+   "meaningful_bytes": 15113,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "e9d4cea8f7e21b93a338e3c69573f7d35f98ccd28821142030f8030fc075063f",
+   "relocations": 872,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:22",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "64fd27d28 Nest shader radiosity/physics properties: transparent group draw strict exact"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
+   "symbol": "__rasterizer_widget_draw_sprite2d",
+   "padded_bytes": 528,
+   "meaningful_bytes": 526,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "5adde524c709325b4dd89a59ab62baa7a6f10654ae64b1773bdb05409086f3af",
+   "relocations": 30,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:23",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/render/render_cameras",
+   "symbol": "_render_camera_build_frustum_bounds",
+   "padded_bytes": 288,
+   "meaningful_bytes": 283,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "99e8fde76b974d967c9e83ee16177ec0eae87683db8631e38c5517d886c246e2",
+   "relocations": 9,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:4",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/render/render_cameras",
+   "symbol": "_render_camera_view_to_screen",
+   "padded_bytes": 480,
+   "meaningful_bytes": 468,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "517a6258ff52de38f56f76280f92a6aa61ebfe1c2802a22576f798d499f3eb32",
+   "relocations": 30,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:8",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "symbol": "_sound_dispose_from_old_map",
+   "padded_bytes": 240,
+   "meaningful_bytes": 236,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "80892c74c0d90b7ae1bba73b38c9c773a2baba31629a8194136bdfd71a13206a",
+   "relocations": 21,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:64",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "c2593b885 Wave 3: eight functions strict exact (screen_effect object complete)"
+   ]
+  },
+  {
+   "unit": "source/structures/structures",
+   "symbol": "_structure_cluster_mark",
+   "padded_bytes": 128,
+   "meaningful_bytes": 127,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "c426fbafcf634a63373bab944083c26aaebda5a181121a993ed0e2c0e644921a",
+   "relocations": 12,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:7",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/structures/structures",
+   "symbol": "_structure_cluster_unmarked",
+   "padded_bytes": 128,
+   "meaningful_bytes": 115,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "98b5502fb6c8cb58f48c07e07ae161eb7434b246a299c669a8eb61d33efbed6a",
+   "relocations": 11,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:6",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "51c94f13e Harvest per-function donor bodies: 11 functions strict exact"
+   ]
+  },
+  {
+   "unit": "source/units/vehicles",
+   "symbol": "_vehicle_update",
+   "padded_bytes": 2320,
+   "meaningful_bytes": 2316,
+   "baseline_status": "non-exact (R/U) at 9062b1e96",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "97b1962975b814a3836c7777d155b863245fccfe1ee7667d412d14a05eaec8c2",
+   "relocations": 98,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:39",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "4d6c7f99c Wave 5: eleven functions strict exact (vehicles, networking)"
+   ]
+  }
+ ],
+ "strict_without_ledger_entry": [],
+ "accepted_not_strict_zero_credit": []
+}
