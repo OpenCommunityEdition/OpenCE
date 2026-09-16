@@ -4827,19 +4827,24 @@ static long search_and_replace(
 					"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 					4994);
 				if (!buffer)
-					return NONE;
-				for (match = ustrstr(buffer, search);
-					match;
-					match = ustrstr(buffer, search))
 				{
-					csmemmove(
-						&match[replace_length],
-						&match[search_length],
-						2 * (length - (match - buffer) - search_length));
-					csmemcpy(match, replace, 2 * replace_length);
-					length += delta;
+					replacements = NONE;
 				}
-				*string = buffer;
+				else
+				{
+					for (match = ustrstr(buffer, search);
+						match;
+						match = ustrstr(buffer, search))
+					{
+						csmemmove(
+							&match[replace_length],
+							&match[search_length],
+							2 * (length - (match - buffer) - search_length));
+						csmemcpy(match, replace, 2 * replace_length);
+						length += delta;
+					}
+					*string = buffer;
+				}
 			}
 		}
 	}

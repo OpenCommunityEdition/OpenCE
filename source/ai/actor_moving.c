@@ -979,13 +979,12 @@ static boolean actor_move_vector_avoidance_find_direction(
 void actor_move_initialize(
 	void)
 {
-	long sense_ray_index;
+	short sense_ray_index;
 
 	for (sense_ray_index = 0;
 		sense_ray_index < NUMBEROF(sense_rays);
 		sense_ray_index++)
 	{
-		struct vector_avoidance_ray *ray = &sense_rays[sense_ray_index];
 		real ray_sine = sine(sense_ray_angles[sense_ray_index]);
 		real ray_cosine = cosine(sense_ray_angles[sense_ray_index]);
 		real divergence = sense_ray_divergence *
@@ -994,13 +993,13 @@ void actor_move_initialize(
 		real divergence_cosine = cosine(divergence);
 		real offset = sense_ray_offset * sense_ray_offsets[sense_ray_index];
 
-		ray->length = sense_ray_length;
-		ray->offset.i = 0.f;
-		ray->offset.j = offset * ray_cosine;
-		ray->offset.k = offset * ray_sine;
-		ray->divergence.i = divergence_cosine;
-		ray->divergence.j = divergence_sine * ray_cosine;
-		ray->divergence.k = divergence_sine * ray_sine;
+		sense_rays[sense_ray_index].length = sense_ray_length;
+		sense_rays[sense_ray_index].offset.i = 0.f;
+		sense_rays[sense_ray_index].offset.j = offset * ray_cosine;
+		sense_rays[sense_ray_index].offset.k = offset * ray_sine;
+		sense_rays[sense_ray_index].divergence.i = divergence_cosine;
+		sense_rays[sense_ray_index].divergence.j = divergence_sine * ray_cosine;
+		sense_rays[sense_ray_index].divergence.k = divergence_sine * ray_sine;
 	}
 
 	{
@@ -1021,24 +1020,21 @@ void actor_move_initialize(
 				direction_index < NUMBEROF(avoidance_directions);
 				direction_index++)
 			{
-				struct vector_avoidance_ray *avoidance_ray =
-					&avoidance_rays[direction_index][avoidance_ray_index];
-
 				set_real_vector3d(
 					&avoidance_directions[direction_index],
 					0.f,
 					cosine(avoidance_ray_angles[direction_index]),
 					sine(avoidance_ray_angles[direction_index]));
-				avoidance_ray->length = avoidance_ray_length;
+				avoidance_rays[direction_index][avoidance_ray_index].length = avoidance_ray_length;
 				scale_vector3d(
 					&avoidance_directions[direction_index],
 					offset,
-					&avoidance_ray->offset);
+					&avoidance_rays[direction_index][avoidance_ray_index].offset);
 				scale_vector3d(
 					&avoidance_directions[direction_index],
 					divergence_sine,
-					&avoidance_ray->divergence);
-				avoidance_ray->divergence.i = divergence_cosine;
+					&avoidance_rays[direction_index][avoidance_ray_index].divergence);
+				avoidance_rays[direction_index][avoidance_ray_index].divergence.i = divergence_cosine;
 			}
 		}
 	}

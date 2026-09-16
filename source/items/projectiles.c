@@ -650,8 +650,6 @@ void projectile_accelerate(
 	real_vector3d const *acceleration)
 {
 	struct projectile_runtime_datum *projectile;
-	real_vector3d rotation_axis;
-	real rotation_magnitude;
 
 	projectile = projectile_runtime_get(projectile_index);
 	projectile_definition_get(projectile->definition_index);
@@ -674,16 +672,21 @@ void projectile_accelerate(
 		acceleration,
 		&projectile->object.translational_velocity);
 
-	random_direction3d(&rotation_axis);
-	rotation_magnitude =
-		magnitude3d(acceleration) *
-		real_random() *
-		1.5707964f;
-	scale_vector3d(&rotation_axis, rotation_magnitude, &rotation_axis);
-	add_vectors3d(
-		&projectile->object.angular_velocity,
-		&rotation_axis,
-		&projectile->object.angular_velocity);
+	{
+		real_vector3d rotation_axis;
+		real rotation_magnitude;
+
+		random_direction3d(&rotation_axis);
+		rotation_magnitude =
+			magnitude3d(acceleration) *
+			real_random() *
+			1.5707964f;
+		scale_vector3d(&rotation_axis, rotation_magnitude, &rotation_axis);
+		add_vectors3d(
+			&projectile->object.angular_velocity,
+			&rotation_axis,
+			&projectile->object.angular_velocity);
+	}
 
 	projectile_adjust_for_angular_velocity_change(projectile_index);
 	SET_FLAG(projectile->object.flags, _object_at_rest_bit, FALSE);

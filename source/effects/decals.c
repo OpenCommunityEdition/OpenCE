@@ -814,10 +814,10 @@ static void decal_sprite_get_bounds(
 	width_scale = (real)bitmap->width * scale;
 	height_scale = (real)bitmap->height * scale * aspect_scale;
 
-	extent->x0 = -sprite->registration_point.x * width_scale;
+	extent->x0 = (0.0f - sprite->registration_point.x) * width_scale;
 	extent->x1 = (sprite->bounds.x1 - sprite->registration_point.x
 		- sprite->bounds.x0) * width_scale;
-	extent->y0 = -sprite->registration_point.y * height_scale;
+	extent->y0 = (0.0f - sprite->registration_point.y) * height_scale;
 	extent->y1 = (sprite->bounds.y1 - sprite->registration_point.y
 		- sprite->bounds.y0) * height_scale;
 
