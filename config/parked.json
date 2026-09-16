@@ -740,25 +740,6 @@
     },
     {
       "unit": "source/input/input_xbox",
-      "function": "_input_update_analog_button_state",
-      "class": "unclassified",
-      "evidence": "Genuine January standalone private analog-button hysteresis helper at file offset 780288, with an ordinary static source definition and authentic auto-inlining into the device poller. Target and candidate are 48 padded bytes with no relocations; only sub al,32 versus compiler-canonical add al,-32 differs. Retain the natural threshold subtraction, not assembly, optimizer steering or an invented helper. All 16 inherited exact owners are preserved and no extra code owner or point_from_line3d is emitted. Reopen only for new authentic compiler/source evidence. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md. This park grants no exact credit.",
-      "measurements": {
-        "target": {
-          "size": 48,
-          "relocation_count": 0,
-          "normalized_sha256": "5850a17e99380c5499a719ba1667ef91f992a37284afe5049ba6e7f04e79c826"
-        },
-        "base": {
-          "size": 48,
-          "relocation_count": 0,
-          "normalized_sha256": "78f85bb297cc663f10c1fcea301827288980a1f2dc6cf99b0012b4fe641a1bb9"
-        },
-        "objdiff_percent": 97.0
-      }
-    },
-    {
-      "unit": "source/input/input_xbox",
       "function": "_input_get_device_states",
       "class": "unclassified",
       "evidence": "Typed January Xbox gamepad/memory-unit hotplug and state poller reconstructed with genuine XDK 3911 API/layout declarations, semantic private owners, named device flags and exact natural lookup-table ownership. First natural pointer/count implementation retains frame, register, table-hoisting and scheduling differences: 1280 versus 1232 padded bytes and 32 versus 28 relocations. This is not a proven narrow compiler tie or a byte-exact claim. All inherited exact functions remain exact; the two public callers now close with real private callees. No synthetic lifetime, raw offset, representation pun, forced inline, assembly or declaration-order search. Reopen for new authentic ABI/type/control-flow evidence, not equivalent-expression trials. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md.",
@@ -2988,7 +2969,7 @@
       "unit": "source/effects/effects",
       "function": "_effect_allowed_by_environment",
       "class": "unclassified",
-      "evidence": "The retained ordinary-C environment switch implements the complete January air, water, vacuum, and anywhere behavior with named enum constants and typed location/point arguments, and the later HCEA reconstruction independently corroborates those four arms. January's invalid-enum arm calls the fatal assertion path and then reloads an uninitialized result byte if system_exit unexpectedly returns. The Opus donor reproduced that indeterminate fallthrough and was exact, but it is rejected under the no-undefined-behavior rule. The closest safe natural source initializes the result from the meaningful anywhere predicate before overriding the air/water arms; invalid and vacuum values therefore remain FALSE. It compiles to 112 padded bytes and ten relocations versus January's 128, with 55.909092 percent objdiff, while preserving the donor's better 1,616-byte and 592-byte shapes in both real callers. Simple FALSE initialization and assignment-after-assert forms also produced 112 bytes but caused both callers to inline the assertion body and regress broadly. The fail-closed classifier returns UNKNOWN. No uninitialized read, false noreturn declaration, volatile/register forcing, barrier, pragma, assembly, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source proving a safe result lifetime or a truthful shared noreturn contract that naturally reproduces the target.",
+      "evidence": "The retained ordinary-C environment switch implements the complete January air, water, vacuum, and anywhere behavior with named enum constants and typed location/point arguments, and the later HCEA reconstruction independently corroborates those four arms. January's invalid-enum arm calls the fatal assertion path and then reloads an uninitialized result byte if system_exit unexpectedly returns. The Opus donor reproduced that indeterminate fallthrough and was exact, but it is rejected under the no-undefined-behavior rule. The closest safe natural source initializes the result from the meaningful anywhere predicate before overriding the air/water arms; invalid and vacuum values therefore remain FALSE. It compiles to 112 padded bytes and ten relocations versus January's 128, with 55.909092 percent objdiff, while preserving the donor's better 1,616-byte and 592-byte shapes in both real callers. Simple FALSE initialization and assignment-after-assert forms also produced 112 bytes but caused both callers to inline the assertion body and regress broadly. The fail-closed classifier returns UNKNOWN. No uninitialized read, false noreturn declaration, volatile/register forcing, barrier, pragma, assembly, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source proving a safe result lifetime or a truthful shared noreturn contract that naturally reproduces the target. 2026-09-15 (250K lane wave w3d): re-measured after the coupled A8 callee re-baseline. The body is strictly closer - padded size is now January-exact (was 112), 10 relocations with every external target identical, and four distinct jump-table case entries instead of three. Zero strict credit; the row stays parked and fuzzy [sha], and its strict-exact reopen criterion is unchanged and NOT met.",
       "measurements": {
         "target": {
           "size": 128,
@@ -2996,11 +2977,11 @@
           "normalized_sha256": "a005be4ac405246678b6c4e9a4bf65deb16b96b5208fad9454b45df70e8fa7cd"
         },
         "base": {
-          "size": 112,
+          "size": 128,
           "relocation_count": 10,
-          "normalized_sha256": "19760ee664c88645139c9ce8c61958c388596d76ccd0eae8bba88f5c865632df"
+          "normalized_sha256": "8f9a2185534b3801351e0f354e1fa4e5e3e39f7250559d1020cf2388df9248cf"
         },
-        "objdiff_percent": 55.909092
+        "objdiff_percent": 63.909092
       }
     },
     {
@@ -3026,7 +3007,7 @@
       "unit": "source/effects/effects",
       "function": "_effect_generate_particles",
       "class": "unclassified",
-      "evidence": "The retained ordinary-C implementation completes the event-particle traversal, distribution, marker transforms, environment/disposition filtering, velocity/orientation, tint, split-screen limits, and particle creation using named enums, typed structures, cseries flags, and engine real types. January disassembly and relocations establish the same behavior, and the later HCEA reconstruction corroborates the algorithm. The candidate is 1,616 padded bytes with the same 46 relocation count versus January's 1,888 bytes, at 68.30481 percent objdiff. January inlines effect_real_random_range at three sites, whereas VC7 keeps natural calls in this context; forcing inline would violate the house rule and disturb the exact out-of-line/helper schedule. The fail-closed classifier returns UNKNOWN. No forced inline, duplicated helper body, volatile/register forcing, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen only for authoritative January source or natural compatible-compiler evidence for the three helper-inline decisions. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body's particle loop was corrected to January's per-instance count (hoisted count reloaded per instance, dec/jne proven at 0x187-0x196) as the coupled prerequisite of the exact effect_update reopen: 2048 bytes, 55 relocations, still fuzzy; the residual is the environment-helper inline decision plus the loop guard and register form. See docs/object_matching_logs/effects_obj_opus5_100k_waveD_20260914.md.",
+      "evidence": "The retained ordinary-C implementation completes the event-particle traversal, distribution, marker transforms, environment/disposition filtering, velocity/orientation, tint, split-screen limits, and particle creation using named enums, typed structures, cseries flags, and engine real types. January disassembly and relocations establish the same behavior, and the later HCEA reconstruction corroborates the algorithm. The candidate is 1,616 padded bytes with the same 46 relocation count versus January's 1,888 bytes, at 68.30481 percent objdiff. January inlines effect_real_random_range at three sites, whereas VC7 keeps natural calls in this context; forcing inline would violate the house rule and disturb the exact out-of-line/helper schedule. The fail-closed classifier returns UNKNOWN. No forced inline, duplicated helper body, volatile/register forcing, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen only for authoritative January source or natural compatible-compiler evidence for the three helper-inline decisions. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body's particle loop was corrected to January's per-instance count (hoisted count reloaded per instance, dec/jne proven at 0x187-0x196) as the coupled prerequisite of the exact effect_update reopen: 2048 bytes, 55 relocations, still fuzzy; the residual is the environment-helper inline decision plus the loop guard and register form. See docs/object_matching_logs/effects_obj_opus5_100k_waveD_20260914.md. 2026-09-15 (250K lane wave w3d): re-measured as the caller of the re-baselined callee (A8 cascade). Padded size AND relocation count are now January-exact (was 2048/55), all 46 relocations agree by target, the frame sub esp,0xe4 matches, and the body is 566 vs 562 instructions with 75 aligned diff blocks (was 622 instructions / 120 blocks). Zero strict credit; stays parked and fuzzy [sha].",
       "measurements": {
         "target": {
           "size": 1888,
@@ -3034,11 +3015,11 @@
           "normalized_sha256": "d196a029c22bfe043323cd0def8c1f0365590b559f3fbb65f23c9ef5b4065ef5"
         },
         "base": {
-          "size": 2048,
-          "relocation_count": 55,
-          "normalized_sha256": "2dccf111fad130493ba4305ac4012e6d5d2b0f724894fa2f468b2e8d01130c27"
+          "size": 1888,
+          "relocation_count": 46,
+          "normalized_sha256": "c251b0c184dbcdeb303b45ddd8ad38706f8e446888df359a7177b6bc55a964f9"
         },
-        "objdiff_percent": 80.361855
+        "objdiff_percent": 92.56863
       }
     },
     {

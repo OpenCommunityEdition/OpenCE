@@ -691,36 +691,38 @@ static void input_update_analog_button_state(
 	byte value,
 	boolean pressed)
 {
+	byte new_threshold;
+
 	if (pressed)
 	{
 		if (value < ANALOG_BUTTON_PRESS_THRESHOLD_OFFSET)
 		{
-			value = 0;
+			new_threshold = 0;
 		}
 		else
 		{
-			value -= ANALOG_BUTTON_PRESS_THRESHOLD_OFFSET;
+			new_threshold = value - ANALOG_BUTTON_PRESS_THRESHOLD_OFFSET;
 		}
 
-		if (value > *threshold)
+		if (new_threshold > *threshold)
 		{
-			*threshold = value;
+			*threshold = new_threshold;
 		}
 	}
 	else
 	{
 		if (value > ANALOG_BUTTON_RELEASE_SATURATION)
 		{
-			value = UNSIGNED_CHAR_MAX;
+			new_threshold = UNSIGNED_CHAR_MAX;
 		}
 		else
 		{
-			value += ANALOG_BUTTON_RELEASE_THRESHOLD_OFFSET;
+			new_threshold = value + ANALOG_BUTTON_RELEASE_THRESHOLD_OFFSET;
 		}
 
-		if (value < *threshold)
+		if (new_threshold < *threshold)
 		{
-			*threshold = value;
+			*threshold = new_threshold;
 		}
 	}
 

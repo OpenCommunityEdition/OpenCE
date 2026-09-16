@@ -1961,6 +1961,7 @@ static void effect_generate_particles(
 			particle_index,
 			struct effect_particles_definition);
 		short count_delta;
+		long last_particle_count;
 		long location_datum_index;
 		struct effect_location_datum *instance;
 
@@ -1977,14 +1978,15 @@ static void effect_generate_particles(
 			continue;
 		}
 
+		last_particle_count = (long)(effect_evaluate_function_integral(
+				particles->distribution_function,
+				last_event_fraction) *
+			effect->particle_counts[particle_index]);
 		count_delta = (short)((long)(effect_evaluate_function_integral(
 				particles->distribution_function,
 				event_fraction) *
 			effect->particle_counts[particle_index]) -
-			(long)(effect_evaluate_function_integral(
-				particles->distribution_function,
-				last_event_fraction) *
-			effect->particle_counts[particle_index]));
+			last_particle_count);
 
 		match_assert(
 			"c:\\halo\\SOURCE\\effects\\effects.c",
@@ -2095,11 +2097,13 @@ static void effect_generate_particles(
 
 					if (TEST_FLAG(particles->flags, _effect_particle_attached_bit))
 					{
+						short node_index = instance->node_designator;
+
+						if (node_index != NONE)
+							node_index &= (short)(FLAG(_effect_location_first_person_bit) - 1);
+
 						data.object_index = effect->object_index;
-						data.node_index = instance->node_designator != NONE
-							? (short)(instance->node_designator &
-								(FLAG(_effect_location_first_person_bit) - 1))
-							: NONE;
+						data.node_index = node_index;
 						data.initial_impulse = *global_zero_vector3d;
 					}
 					else
@@ -2611,11 +2615,12 @@ static boolean effect_allowed_by_environment(
 	struct location const *location,
 	real_point3d const *world_point)
 {
-	boolean allowed = environment == _effect_environment_anywhere;
+	boolean allowed = FALSE;
 
 	switch (environment)
 	{
 		case _effect_environment_anywhere:
+			allowed = TRUE;
 			break;
 
 		case _effect_environment_air:

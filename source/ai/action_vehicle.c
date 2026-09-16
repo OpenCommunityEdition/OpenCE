@@ -95,6 +95,7 @@ symbols in this file:
 #include "physics/collisions.h"
 #include "scenario/scenario.h"
 #include "units/unit_definitions.h"
+#include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 
 /* ---------- constants */
@@ -369,180 +370,166 @@ boolean action_vehicle_evaluate_seat(
 	struct actor_variant_definition *variant_definition =
 		actor_variant_definition_get(actor->meta.variant_definition_index);
 	boolean result = FALSE;
-	real_point3d entrance_point;
-	real_point3d seat_point;
-	real_point3d seat_hint_point;
 
-	if (unit_seat_filled(vehicle_index, seat_index) ||
-		(TEST_FLAG(
+	if (!unit_seat_filled(vehicle_index, seat_index) &&
+		(!TEST_FLAG(
 			definition->flags2,
-			_actor_definition_disallow_vehicle_combat_bit) &&
-			!unit_seat_allow_noncombatants(vehicle_index, seat_index)) ||
-		!unit_get_seat_entrance_point(
+			_actor_definition_disallow_vehicle_combat_bit) ||
+			unit_seat_allow_noncombatants(vehicle_index, seat_index)))
+	{
+		real_point3d entrance_point;
+		real_point3d seat_point;
+		real_point3d seat_hint_point;
+
+		if (unit_get_seat_entrance_point(
 			actor->meta.unit_index,
 			vehicle_index,
 			seat_index,
 			&entrance_point,
 			&seat_point,
 			&seat_hint_point))
-	{
-		return result;
-	}
-
-	{
-		real_point3d vehicle_origin;
-		real_vector2d entry_direction;
-		real_vector2d computed_facing;
-		real computed_facing_z = 0.0f;
-		real entrance_dx;
-		real entrance_dy;
-		real seat_dx;
-		real seat_dy;
-		real distance_to_seat;
-		struct prop_iterator iterator;
-		struct prop_datum *prop;
-
-		object_get_origin(vehicle_index, &vehicle_origin);
-		entry_direction.i = seat_point.x - entrance_point.x;
-		entry_direction.j = seat_point.y - entrance_point.y;
-		computed_facing = entry_direction;
-		if (normalize2d(&computed_facing) == 0.0f)
 		{
-			computed_facing.i = actor->input.facing_vector.i;
-			computed_facing.j = actor->input.facing_vector.j;
-			computed_facing_z = actor->input.facing_vector.k;
-		}
+			real_point3d vehicle_origin;
+			real_vector3d facing;
+			real distance_to_seat;
 
-		entrance_dx = entrance_point.x - actor->input.position.body_position.x;
-		seat_dx = seat_point.x - actor->input.position.body_position.x;
-		entrance_dy = entrance_point.y - actor->input.position.body_position.y;
-		seat_dy = seat_point.y - actor->input.position.body_position.y;
-		if (square_root(entrance_dy*entrance_dy + entrance_dx*entrance_dx) <=
-			square_root(seat_dy*seat_dy + seat_dx*seat_dx))
-		{
-			distance_to_seat = square_root(
-				entrance_dy*entrance_dy + entrance_dx*entrance_dx);
-		}
-		else
-		{
-			distance_to_seat = square_root(seat_dy*seat_dy + seat_dx*seat_dx);
-		}
+			result = TRUE;
 
-		prop_iterator_new(&iterator, actor_index);
-		for (prop = prop_iterator_next(&iterator);
-			prop;
-			prop = prop_iterator_next(&iterator))
-		{
-			if (!prop->enemy && prop->actor_index != NONE)
+			object_get_origin(vehicle_index, &vehicle_origin);
+			facing.i = seat_point.x - entrance_point.x;
+			facing.j = seat_point.y - entrance_point.y;
+			facing.k = 0.0f;
+			if (normalize2d((real_vector2d *)&facing) == 0.0f)
 			{
-				struct actor_datum *other_actor = actor_try_and_get(prop->actor_index);
+				facing = actor->input.facing_vector;
+			}
 
-				if (other_actor->state.action == _actor_action_vehicle &&
-					other_actor->state.action_data.vehicle.vehicle_index == vehicle_index)
+			distance_to_seat = MIN(
+				distance2d(
+					(real_point2d const *)&actor->input.position.body_position,
+					(real_point2d const *)&entrance_point),
+				distance2d(
+					(real_point2d const *)&actor->input.position.body_position,
+					(real_point2d const *)&seat_point));
+
+			{
+				struct prop_iterator iterator;
+				struct prop_datum *prop;
+
+				prop_iterator_new(&iterator, actor_index);
+				while (prop = prop_iterator_next(&iterator))
 				{
-					struct vehicle_state_data *other_state =
-						&other_actor->state.action_data.vehicle;
-
-					if (other_state->seat_index == seat_index)
+					if (!prop->enemy && prop->actor_index != NONE)
 					{
-						real other_dx = other_state->destination_point.x -
-							other_actor->input.position.body_position.x;
-						real other_dy = other_state->destination_point.y -
-							other_actor->input.position.body_position.y;
+						struct actor_datum *other_actor =
+							actor_try_and_get(prop->actor_index);
 
-						if (other_dy*other_dy + other_dx*other_dx <
-							distance_to_seat*distance_to_seat)
+						if (other_actor->state.action == _actor_action_vehicle &&
+							other_actor->state.action_data.vehicle.vehicle_index == vehicle_index)
 						{
-							return FALSE;
+							struct vehicle_state_data *other_state =
+								&other_actor->state.action_data.vehicle;
+
+							if (other_state->seat_index == seat_index)
+							{
+								real other_dx = other_state->destination_point.x -
+									other_actor->input.position.body_position.x;
+								real other_dy = other_state->destination_point.y -
+									other_actor->input.position.body_position.y;
+
+								if (other_dy*other_dy + other_dx*other_dx <
+									distance_to_seat*distance_to_seat)
+								{
+									result = FALSE;
+									break;
+								}
+							}
+							else
+							{
+								unit_seat_is_driver(vehicle_index, other_state->seat_index);
+							}
 						}
-					}
-					else
-					{
-						unit_seat_is_driver(vehicle_index, other_state->seat_index);
 					}
 				}
 			}
-		}
 
-		if (!allow_any_seat)
-		{
-			struct unit_datum *vehicle = vehicle_get(vehicle_index);
-			struct vehicle_definition *vehicle_definition =
-				vehicle_specific_definition_get(vehicle->definition_index);
-
-			(void)vehicle_definition;
-			unit_seat_is_driver(vehicle_index, seat_index);
-		}
-
-		{
-			real_vector2d to_seat_direction;
-			real facing_dot;
-			boolean within_range;
-			boolean correct_facing;
-			boolean could_potentially_fake;
-			real seat_weight;
-
-			to_seat_direction.i =
-				seat_point.x - actor->input.position.body_position.x;
-			to_seat_direction.j =
-				seat_point.y - actor->input.position.body_position.y;
-			normalize2d(&to_seat_direction);
-			facing_dot = actor->input.facing_vector.j*to_seat_direction.j +
-				actor->input.facing_vector.i*to_seat_direction.i;
-			within_range = distance_to_seat < 0.7f;
-			correct_facing = facing_dot > 0.6f;
-			could_potentially_fake =
-				distance_to_seat < 1.1f && facing_dot > 0.0f;
-			seat_weight = 10.0f / (distance_to_seat + 1.0f);
-
-			if (TEST_FLAG(
-				variant_definition->flags,
-				_actor_variant_definition_prefer_passenger_seat_bit))
+			if (result)
 			{
-				if (!unit_seat_is_gunner(vehicle_index, seat_index))
+				struct unit_datum *vehicle = vehicle_get(vehicle_index);
+				real_vector2d to_seat_direction;
+				real facing_dot;
+				boolean within_range;
+				boolean correct_facing;
+				boolean could_potentially_fake;
+				real seat_weight;
+
+				if (!allow_any_seat)
+				{
+					vehicle_specific_definition_get(vehicle->definition_index);
+					unit_seat_is_driver(vehicle_index, seat_index);
+				}
+
+				vector_from_points2d(
+					(real_point2d const *)&actor->input.position.body_position,
+					(real_point2d const *)&seat_point,
+					&to_seat_direction);
+				normalize2d(&to_seat_direction);
+				facing_dot = dot_product2d(
+					&to_seat_direction,
+					(real_vector2d const *)&actor->input.facing_vector);
+				within_range = distance_to_seat < 0.7f;
+				correct_facing = facing_dot > 0.6f;
+				could_potentially_fake =
+					distance_to_seat < 1.1f && facing_dot > 0.0f;
+				seat_weight = 10.0f / (distance_to_seat + 1.0f);
+
+				if (TEST_FLAG(
+					variant_definition->flags,
+					_actor_variant_definition_prefer_passenger_seat_bit))
+				{
+					if (!unit_seat_is_gunner(vehicle_index, seat_index))
+					{
+						seat_weight += 3.5f;
+					}
+				}
+				else if (unit_seat_is_gunner(vehicle_index, seat_index))
 				{
 					seat_weight += 3.5f;
 				}
-			}
-			else if (unit_seat_is_gunner(vehicle_index, seat_index))
-			{
-				seat_weight += 3.5f;
-			}
 
-			if (entry_point)
-			{
-				*entry_point = entrance_point;
-			}
-			if (entry_facing)
-			{
-				entry_facing->i = computed_facing.i;
-				entry_facing->j = computed_facing.j;
-				entry_facing->k = computed_facing_z;
-			}
-			if (hint_point)
-			{
-				*hint_point = seat_hint_point;
-			}
-			if (seat_weight_reference)
-			{
-				*seat_weight_reference = seat_weight;
-			}
-			if (within_range_reference)
-			{
-				*within_range_reference = within_range;
-			}
-			if (correct_facing_reference)
-			{
-				*correct_facing_reference = correct_facing;
-			}
-			if (could_potentially_fake_reference)
-			{
-				*could_potentially_fake_reference = could_potentially_fake;
+				if (entry_point)
+				{
+					*entry_point = entrance_point;
+				}
+				if (entry_facing)
+				{
+					*entry_facing = facing;
+				}
+				if (hint_point)
+				{
+					*hint_point = seat_hint_point;
+				}
+				if (seat_weight_reference)
+				{
+					*seat_weight_reference = seat_weight;
+				}
+				if (within_range_reference)
+				{
+					*within_range_reference = within_range;
+				}
+				if (correct_facing_reference)
+				{
+					*correct_facing_reference = correct_facing;
+				}
+				if (could_potentially_fake_reference)
+				{
+					*could_potentially_fake_reference = could_potentially_fake;
+				}
 			}
 		}
 	}
 
-	return TRUE;
+	return result;
 }
 
 static boolean action_vehicle_find_destination(
