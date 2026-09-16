@@ -230,6 +230,7 @@ static boolean should_track_object(
 	long object_index);
 static void blip_begin(
 	real_point2d const *reference,
+	long unused,
 	boolean in_multiplayer,
 	short local_player_index);
 static boolean should_draw_object(
@@ -671,7 +672,7 @@ static void render_motion_sensor(
 		hud_globals->defaults.motion_sensor_range;
 	center.x = (real)reference->x;
 	center.y = (real)reference->y;
-	blip_begin(&center, in_multiplayer, local_player_index);
+	blip_begin(&center, 0, in_multiplayer, local_player_index);
 
 	for (history_index = 0;
 		history_index < MOTION_SENSOR_HISTORY_COUNT;
@@ -990,8 +991,13 @@ static boolean should_track_object(
 	return result;
 }
 
+/* January's only caller (render_motion_sensor) pushes a zero dword for the
+ * second parameter and this body never reads it; its original name and
+ * type are not recoverable (a long 0 and a real 0.0f emit identical bytes).
+ * The parameter name is provisional and describes that evidence. */
 static void blip_begin(
 	real_point2d const *reference,
+	long unused,
 	boolean in_multiplayer,
 	short local_player_index)
 {

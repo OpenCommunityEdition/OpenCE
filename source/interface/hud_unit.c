@@ -892,10 +892,10 @@ void hud_render_unit_interface(
 	if (player->local_player_index == render.local_player_index &&
 		player->unit_index != NONE)
 	{
-		short local_player_index = player->local_player_index;
 		struct unit_datum *unit = unit_get(player->unit_index);
 		struct unit_definition const *unit_definition =
 			unit_definition_get(unit->definition_index);
+		short local_player_index = player->local_player_index;
 		long player_index = local_player_get_player_index(local_player_index);
 		struct unit_hud_state *hud_state = get_hud_state(local_player_index);
 		long unit_indices[18] = { player->unit_index };
@@ -911,7 +911,7 @@ void hud_render_unit_interface(
 		real auxilary_values[1];
 
 		if (hud_state->last_unit_index == NONE)
-			initialize_hud_state(get_hud_state(local_player_index));
+			initialize_hud_state(get_hud_state(player->local_player_index));
 		hud_state->last_unit_index = player->unit_index;
 
 		if (unit->object.parent_object_index != NONE &&
@@ -977,23 +977,23 @@ void hud_render_unit_interface(
 		while (unit_count)
 		{
 			struct unit_datum *hud_unit;
-			long unit_hud_index;
 
 			unit_count--;
 			hud_unit = unit_try_and_get(unit_indices[unit_count]);
-			unit_hud_index = unit_hud_indices[unit_count];
 
-			if (hud_unit && unit_hud_index != NONE)
+			if (hud_unit && unit_hud_indices[unit_count] != NONE)
 			{
 				struct unit_hud_interface_definition *hud_definition =
-					unit_hud_interface_definition_get(unit_hud_index);
+					unit_hud_interface_definition_get(unit_hud_indices[unit_count]);
 
 				if (hud_definition->background.interface_bitmap.index != NONE)
 				{
-					short draw_flags = TEST_FLAG(
-						hud_unit->object.damage_flags,
-						_object_dead_bit) ? FLAG(_hud_draw_disabled_bit) : 0;
+					short draw_flags = 0;
 
+					SET_FLAG(
+						draw_flags,
+						_hud_draw_disabled_bit,
+						TEST_FLAG(hud_unit->object.damage_flags, _object_dead_bit));
 					SET_FLAG(
 						draw_flags,
 						_hud_draw_in_multiplayer_bit,
@@ -1042,73 +1042,76 @@ void hud_render_unit_interface(
 					if (hud_definition->shield_meter.meter.meter_bitmap.index != NONE)
 					{
 						real reference_shield_vitality;
-						short value_scale = hud_definition->shield_meter.meter.value_scale;
-						struct meter_hud_element_definition overcharge_meter =
-							hud_definition->shield_meter.meter;
-						pixel32 color[5] =
-						{
-							0,
-							0x00FF0000,
-							0x0000FF00,
-							0x00FFFF00,
-							0x007F00FF,
-						};
-						long overcharge_index;
+						short value_scale;
+						struct meter_hud_element_definition overcharge_meter;
 
 						game_engine_running();
 						if (unit_count == 0)
 							reference_shield_vitality = hud_state->last_shield_vitality;
 						else
 							reference_shield_vitality = hud_unit->object.shield_vitality;
-						if (value_scale == 0)
-							value_scale = UNSIGNED_CHAR_MAX;
-
-						for (overcharge_index = 0;
-							overcharge_index <= overcharge_count;
-							overcharge_index++)
+						value_scale = hud_definition->shield_meter.meter.value_scale ?
+							hud_definition->shield_meter.meter.value_scale :
+							UNSIGNED_CHAR_MAX;
+						overcharge_meter = hud_definition->shield_meter.meter;
 						{
-							real shield_vitality = PIN(
-								hud_unit->object.shield_vitality - (real)overcharge_index,
-								0.0f,
-								1.0f);
-							real last_shield_vitality = PIN(
-								reference_shield_vitality - (real)overcharge_index,
-								0.0f,
-								1.0f);
-							real maximum_shield_vitality = MAX(
-								last_shield_vitality,
-								shield_vitality);
-							real reference_time =
-								last_shield_vitality > shield_vitality ?
-									hud_state->fade_time : -1.0f;
-							struct meter_hud_element_definition const *meter;
-
-							if (shield_vitality <= 0.0f &&
-								maximum_shield_vitality <= 0.0f)
+							pixel32 color[5] =
 							{
-								break;
-							}
+								0,
+								0x00FF0000,
+								0x0000FF00,
+								0x00FFFF00,
+								0x007F00FF,
+							};
+							pixel32 *overcharge_color = color;
+							long overcharge_index;
 
-							overcharge_meter.min_color = color[overcharge_index];
-							overcharge_meter.max_color = color[overcharge_index];
-							meter = overcharge_index == 0 ?
-								&hud_definition->shield_meter.meter :
-								&overcharge_meter;
-							hud_draw_meter(
-								local_player_index,
-								&hud_definition->absolute_placement,
-								meter,
-								(byte)PIN(
-									fast_ftol((real)value_scale * shield_vitality),
-									0,
-									UNSIGNED_CHAR_MAX),
-								(byte)PIN(
-									fast_ftol((real)value_scale * maximum_shield_vitality),
-									0,
-									UNSIGNED_CHAR_MAX),
-								draw_flags,
-								reference_time,
-								shield_vitality);
+							for (overcharge_index = 0;
+								overcharge_index <= overcharge_count;
+								overcharge_color++, overcharge_index++)
+							{
+								boolean first_meter = overcharge_index == 0;
+								real shield_vitality = PIN(
+									hud_unit->object.shield_vitality - (real)overcharge_index,
+									0.0f,
+									1.0f);
+								real last_shield_vitality = PIN(
+									reference_shield_vitality - (real)overcharge_index,
+									0.0f,
+									1.0f);
+								boolean shield_fading = last_shield_vitality > shield_vitality;
+								real maximum_shield_vitality = shield_fading ?
+									last_shield_vitality :
+									shield_vitality;
+								real reference_time;
+
+								if (shield_vitality <= 0.0f &&
+									maximum_shield_vitality <= 0.0f)
+								{
+									break;
+								}
+
+								overcharge_meter.min_color = *overcharge_color;
+								overcharge_meter.max_color = *overcharge_color;
+								reference_time = shield_fading ? hud_state->fade_time : -1.0f;
+								hud_draw_meter(
+									local_player_index,
+									&hud_definition->absolute_placement,
+									first_meter ?
+										&hud_definition->shield_meter.meter :
+										&overcharge_meter,
+									(byte)PIN(
+										fast_ftol((real)value_scale * shield_vitality),
+										0,
+										UNSIGNED_CHAR_MAX),
+									(byte)PIN(
+										fast_ftol((real)value_scale * maximum_shield_vitality),
+										0,
+										UNSIGNED_CHAR_MAX),
+									draw_flags,
+									reference_time,
+									shield_vitality);
+							}
 						}
 					}
 
@@ -1159,27 +1162,28 @@ void hud_render_unit_interface(
 
 					if (hud_definition->health_meter.meter.meter_bitmap.index != NONE)
 					{
-						short value_scale = hud_definition->health_meter.meter.value_scale;
+						short value_scale = hud_definition->health_meter.meter.value_scale ?
+							hud_definition->health_meter.meter.value_scale :
+							8;
 						struct meter_hud_element_definition health_meter =
 							hud_definition->health_meter.meter;
 
-						if (value_scale == 0)
-							value_scale = 8;
-						if (!(hud_unit->object.body_vitality >=
-							hud_definition->health_meter.health_extras.max_cutoff))
+						if (hud_unit->object.body_vitality >=
+							hud_definition->health_meter.health_extras.max_cutoff)
 						{
-							if (hud_unit->object.body_vitality <=
-								hud_definition->health_meter.health_extras.min_cutoff)
-							{
-								health_meter.max_color = health_meter.min_color;
-							}
-							else
-							{
-								health_meter.max_color =
-									hud_definition->health_meter.health_extras.mid_color;
-							}
+							health_meter.min_color = health_meter.max_color;
 						}
-						health_meter.min_color = health_meter.max_color;
+						else if (hud_unit->object.body_vitality <=
+							hud_definition->health_meter.health_extras.min_cutoff)
+						{
+							health_meter.max_color = health_meter.min_color;
+						}
+						else
+						{
+							health_meter.max_color =
+								hud_definition->health_meter.health_extras.mid_color;
+							health_meter.min_color = health_meter.max_color;
+						}
 
 						hud_draw_meter(
 							local_player_index,
@@ -1279,7 +1283,8 @@ void hud_render_unit_interface(
 				}
 
 				{
-					unsigned long overlay_type_flags = game_engine_has_teams() != FALSE;
+					struct auxilary_panel_definition *auxilary_panel = &hud_definition->auxilary_panel;
+					word overlay_type_flags = game_engine_has_teams() != FALSE;
 					short draw_flags = 0;
 					short overlay_index;
 
@@ -1288,11 +1293,11 @@ void hud_render_unit_interface(
 						_hud_draw_in_multiplayer_bit,
 						local_player_count() > 1);
 					for (overlay_index = 0;
-						overlay_index < hud_definition->auxilary_panel.auxilary_overlays.count;
+						overlay_index < auxilary_panel->auxilary_overlays.count;
 						overlay_index++)
 					{
 						struct auxilary_overlay_definition *overlay = TAG_BLOCK_GET_ELEMENT(
-							&hud_definition->auxilary_panel.auxilary_overlays,
+							&auxilary_panel->auxilary_overlays,
 							overlay_index,
 							struct auxilary_overlay_definition);
 
@@ -1310,7 +1315,7 @@ void hud_render_unit_interface(
 
 							hud_draw_static_element(
 								local_player_index,
-								&hud_definition->auxilary_panel.absolute_placement,
+								&auxilary_panel->absolute_placement,
 								&overlay->static_element,
 								draw_flags,
 								NONE);
@@ -1345,8 +1350,6 @@ void hud_render_unit_interface(
 							long meter_bitmap_index = verify_tag_reference(
 								&meter->panel.meter.meter_bitmap);
 							short draw_flags = 0;
-							short *flash_time =
-								&hud_state->auxilary_flash_time[meter->type];
 
 							SET_FLAG(
 								draw_flags,
@@ -1357,8 +1360,8 @@ void hud_render_unit_interface(
 								_hud_draw_flashing_bit,
 								auxilary_values[meter->type] <=
 									meter->panel.aux_extras.min_cutoff);
-							*flash_time += game_time_get_elapsed();
-							*flash_time %= 2 * get_flash_duration(
+							hud_state->auxilary_flash_time[meter->type] += game_time_get_elapsed();
+							hud_state->auxilary_flash_time[meter->type] %= 2 * get_flash_duration(
 								&meter->panel.background.colors);
 
 							if (background_bitmap_index != NONE)
@@ -1368,12 +1371,11 @@ void hud_render_unit_interface(
 									&hud_definition->absolute_placement,
 									&meter->panel.background,
 									draw_flags,
-									game_time_get() - *flash_time);
+									game_time_get() - hud_state->auxilary_flash_time[meter->type]);
 							}
 
 							if (meter_bitmap_index != NONE)
 							{
-								real value = auxilary_values[meter->type];
 								real value_scale = (real)meter->panel.meter.value_scale;
 
 								hud_draw_meter(
@@ -1381,16 +1383,16 @@ void hud_render_unit_interface(
 									&hud_definition->absolute_placement,
 									&meter->panel.meter,
 									(byte)PIN(
-										fast_ftol(value_scale * value),
+										fast_ftol(value_scale * auxilary_values[meter->type]),
 										0,
 										UNSIGNED_CHAR_MAX),
 									(byte)PIN(
-										fast_ftol(value_scale * value),
+										fast_ftol(value_scale * auxilary_values[meter->type]),
 										0,
 										UNSIGNED_CHAR_MAX),
 									draw_flags,
 									-1.0f,
-									value);
+									auxilary_values[meter->type]);
 							}
 						}
 						else if (TEST_FLAG(
@@ -1402,15 +1404,17 @@ void hud_render_unit_interface(
 						{
 							long background_bitmap_index = verify_tag_reference(
 								&meter->panel.background.interface_bitmap);
-							short draw_flags = FLAG(_hud_draw_flashing_bit);
-							short *flash_time =
-								&hud_state->auxilary_flash_time[meter->type];
+							short draw_flags = 0;
 
 							SET_FLAG(
 								draw_flags,
 								_hud_draw_in_multiplayer_bit,
 								local_player_count() > 1);
-							*flash_time += game_time_get_elapsed();
+							SET_FLAG(
+								draw_flags,
+								_hud_draw_flashing_bit,
+								TRUE);
+							hud_state->auxilary_flash_time[meter->type] += game_time_get_elapsed();
 
 							if (background_bitmap_index != NONE)
 							{
@@ -1419,7 +1423,7 @@ void hud_render_unit_interface(
 									&hud_definition->absolute_placement,
 									&meter->panel.background,
 									draw_flags,
-									game_time_get() - *flash_time);
+									game_time_get() - hud_state->auxilary_flash_time[meter->type]);
 							}
 						}
 						else

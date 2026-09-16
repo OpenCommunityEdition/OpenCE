@@ -714,7 +714,7 @@ void flag_render_proper(
 		struct flag_vertex_datum *corner10;
 		struct flag_vertex_datum *corner01;
 		struct flag_vertex_datum *corner11;
-		short vertex_index = 0;
+		short vertex_index;
 		short i;
 		short x;
 		short y;
@@ -726,7 +726,7 @@ void flag_render_proper(
 		one_over_height = 1.0f / (definition->height - 1);
 		csmemset(&vertex, 0, sizeof(vertex));
 
-		for (x = 0; x < definition->width; x++)
+		for (x = 0, vertex_index = 0; x < definition->width; x++)
 		{
 			for (y = 0; y < definition->height; y++, vertex_index++)
 			{
@@ -757,8 +757,7 @@ void flag_render_proper(
 			}
 		}
 
-		i = 0;
-		for (x = 0; x < definition->width - 1; x++)
+		for (x = 0, i = 0; x < definition->width - 1; x++)
 		{
 			for (y = 0; y < definition->height - 1; y++)
 			{

@@ -1081,9 +1081,12 @@ static boolean path_state_begin(
 
 		if (state->destination_valid)
 		{
-			distance_to_destination = distance3d(
+			struct path_destination const *destination = &state->destination;
+			real distance_squared = distance_squared3d(
 				&state->input.start_point,
-				&state->destination.point);
+				&destination->point);
+
+			distance_to_destination = square_root(distance_squared);
 			quantized_cost_estimate = (long)(distance_to_destination / PATH_COST_ESTIMATE_GRANULARITY);
 			if (quantized_cost_estimate >= SHORT_MAX)
 			{
@@ -1093,14 +1096,16 @@ static boolean path_state_begin(
 					state->input.start_point.x,
 					state->input.start_point.y,
 					state->input.start_point.z,
-					state->destination.point.x,
-					state->destination.point.y,
-					state->destination.point.z,
+					destination->point.x,
+					destination->point.y,
+					destination->point.z,
 					distance_to_destination,
 					SHORT_MAX * PATH_COST_ESTIMATE_GRANULARITY);
-				return FALSE;
 			}
-			result = TRUE;
+			else
+			{
+				result = TRUE;
+			}
 		}
 		else
 		{
@@ -1145,9 +1150,9 @@ static boolean path_state_begin(
 			if (state->destination_valid)
 			{
 				state->closest_distance = distance_to_destination;
-				state->closest_cost_estimate = distance_to_destination;
 				state->closest_node_index = node_index;
 				state->closest_point = state->input.start_point;
+				state->closest_cost_estimate = distance_to_destination;
 			}
 
 			state->hash_table[
