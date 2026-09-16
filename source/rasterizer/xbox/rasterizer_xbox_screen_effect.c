@@ -508,6 +508,8 @@ void _rasterizer_screen_effect(
 		short viewport_width;
 		short viewport_height;
 		real_rectangle2d vertex_bounds;
+		unsigned long light_enhancement_input;
+		unsigned long desaturation_input;
 
 		if (parameters->video_on)
 		{
@@ -562,7 +564,7 @@ void _rasterizer_screen_effect(
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 					313,
-					pass == 0);
+					pass==0);
 
 				source_target = NONE;
 				destination_target = NONE;
@@ -583,7 +585,7 @@ void _rasterizer_screen_effect(
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 					334,
-					pass == 1);
+					pass==1);
 
 				rasterizer_set_target_as_texture(0, source_target, FALSE);
 				IDirect3DDevice8_SetTextureStageState(global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
@@ -623,7 +625,7 @@ void _rasterizer_screen_effect(
 							match_assert(
 								"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 								371,
-								pass == 0);
+								pass==0);
 
 							if (stage == 0)
 								rasterizer_set_texture_bitmap_data(0, parameters->convolution_mask);
@@ -666,29 +668,31 @@ void _rasterizer_screen_effect(
 								"### ERROR non-convolution effect tried to render more than 2 passes");
 						}
 					}
-					else if (parameters->convolution_mask && stage == 0)
+					else if (parameters->convolution_mask)
 					{
-						rasterizer_set_texture_bitmap_data(0, parameters->convolution_mask);
-					}
-					else if (stage == 0)
-					{
-						rasterizer_set_target_as_texture(0, source_target, FALSE);
-					}
-					else if (stage == 1)
-					{
-						rasterizer_set_target_as_texture(1, source_target, FALSE);
-					}
-					else if (stage == 2)
-					{
-						rasterizer_set_target_as_texture(2, source_target, FALSE);
-					}
-					else if (stage == 3)
-					{
-						rasterizer_set_target_as_texture(3, source_target, FALSE);
+						if (stage == 0)
+							rasterizer_set_texture_bitmap_data(0, parameters->convolution_mask);
+						else if (stage == 1)
+							rasterizer_set_target_as_texture(1, source_target, FALSE);
+						else if (stage == 2)
+							rasterizer_set_target_as_texture(2, source_target, FALSE);
+						else if (stage == 3)
+							rasterizer_set_target_as_texture(3, source_target, FALSE);
+						else
+							continue;
 					}
 					else
 					{
-						continue;
+						if (stage == 0)
+							rasterizer_set_target_as_texture(0, source_target, FALSE);
+						else if (stage == 1)
+							rasterizer_set_target_as_texture(1, source_target, FALSE);
+						else if (stage == 2)
+							rasterizer_set_target_as_texture(2, source_target, FALSE);
+						else if (stage == 3)
+							rasterizer_set_target_as_texture(3, source_target, FALSE);
+						else
+							continue;
 					}
 
 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
@@ -745,24 +749,12 @@ void _rasterizer_screen_effect(
 				{
 					long video_overbright_scales[NUMBER_OF_RASTERIZER_SCREEN_EFFECT_VIDEO_OVERBRIGHT_MODES] =
 						{0x00, 0x10, 0x20};
-					real noise_alpha;
 
 					pixel_shader.texture_modes = 0x00000421;
 					pixel_shader.combiner_count = 4;
 
-					if (parameters->video_noise_intensity > 0.0f)
-					{
-						if (parameters->video_noise_intensity > 1.0f)
-							noise_alpha = 1.0f;
-						else
-							noise_alpha = parameters->video_noise_intensity;
-					}
-					else
-					{
-						noise_alpha = 0.0f;
-					}
-
-					pixel_shader.constant_0[0] = real_alpha_to_pixel32(noise_alpha);
+					pixel_shader.constant_0[0] =
+						real_alpha_to_pixel32(PIN(parameters->video_noise_intensity, 0.0f, 1.0f));
 					pixel_shader.alpha_inputs[0] = 0x3120111a;
 					pixel_shader.alpha_outputs[0] = 0x00000c00;
 					pixel_shader.rgb_inputs[0] = 0x3120110a;
@@ -775,8 +767,7 @@ void _rasterizer_screen_effect(
 					match_assert(
 						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 						497,
-						parameters->video_overbright_mode >= 0 &&
-							parameters->video_overbright_mode < NUMBER_OF_RASTERIZER_SCREEN_EFFECT_VIDEO_OVERBRIGHT_MODES);
+						parameters->video_overbright_mode>=0 && parameters->video_overbright_mode<NUMBER_OF_RASTERIZER_SCREEN_EFFECT_VIDEO_OVERBRIGHT_MODES);
 
 					pixel_shader.rgb_inputs[3] = 0x0d0d0820;
 					pixel_shader.rgb_outputs[3] =
@@ -825,7 +816,7 @@ void _rasterizer_screen_effect(
 						match_assert(
 							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 							529,
-							pass == 0);
+							pass==0);
 
 						pixel_shader.texture_modes = 0x00000001;
 						pixel_shader.rgb_inputs[0] = 0x08200000;
@@ -845,36 +836,39 @@ void _rasterizer_screen_effect(
 					}
 					else if (pass == 1)
 					{
-						pixel_shader.texture_modes = 0x00000021;
-						pixel_shader.rgb_outputs[0] = 0x000000c0;
-						combiner_count = 1;
-						pixel_shader.final_combiner_inputs_abcd = 0x0000000c;
-
 						if (parameters->convolution_mask)
 						{
+							pixel_shader.texture_modes = 0x00000021;
 							pixel_shader.rgb_inputs[0] = 0x09200000;
+							pixel_shader.rgb_outputs[0] = 0x000000c0;
+							combiner_count = 1;
 							pixel_shader.final_combiner_inputs_efg = 0x00000800;
+							pixel_shader.final_combiner_inputs_abcd = 0x0000000c;
 						}
 						else
 						{
+							pixel_shader.texture_modes = 0x00000021;
 							pixel_shader.rgb_inputs[0] = 0x08200000;
+							pixel_shader.rgb_outputs[0] = 0x000000c0;
+							combiner_count = 1;
 							pixel_shader.final_combiner_inputs_efg = 0;
+							pixel_shader.final_combiner_inputs_abcd = 0x0000000c;
 						}
 					}
 					else
 					{
-						match_assert(
+						match_vassert(
 							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 							584,
-							pass == 1);
+							FALSE,
+							"### ERROR non-convolution effect tried to render more than 2 passes");
 					}
 				}
 				else
 				{
-					pixel_shader.texture_modes = 0x00008421;
-
 					if (parameters->convolution_mask)
 					{
+						pixel_shader.texture_modes = 0x00008421;
 						pixel_shader.rgb_inputs[0] = 0x89208a20;
 						pixel_shader.rgb_outputs[0] = 0x00000c00;
 						pixel_shader.constant_0[1] = real_alpha_to_pixel32(1.0f / 3.0f);
@@ -889,6 +883,7 @@ void _rasterizer_screen_effect(
 					}
 					else
 					{
+						pixel_shader.texture_modes = 0x00008421;
 						pixel_shader.rgb_inputs[0] = 0x88208920;
 						pixel_shader.rgb_outputs[0] = 0x00030c00;
 						pixel_shader.rgb_inputs[1] = 0x8a208b20;
@@ -904,13 +899,15 @@ void _rasterizer_screen_effect(
 					pixel_shader.final_combiner_inputs_abcd = 0x0000000c;
 				}
 
+				light_enhancement_input = parameters->filter_light_enhancement_uses_convolution_mask ? 0x68 : 0x20;
+				desaturation_input = parameters->filter_desaturation_uses_convolution_mask ? 0x68 : 0x20;
 				pixel_shader.constant_0[combiner_count] =
 					real_alpha_to_pixel32(parameters->filter_light_enhancement_intensity);
 				pixel_shader.constant_1[combiner_count] =
 					real_alpha_to_pixel32(parameters->filter_desaturation_intensity);
 				pixel_shader.alpha_inputs[combiner_count] =
-					((parameters->filter_light_enhancement_uses_convolution_mask ? 0x68 : 0x20) << 16) |
-					(parameters->filter_desaturation_uses_convolution_mask ? 0x68 : 0x20) |
+					(light_enhancement_input << 16) |
+					desaturation_input |
 					0x11001200;
 				pixel_shader.alpha_outputs[combiner_count] = 0x000000cd;
 
@@ -925,7 +922,7 @@ void _rasterizer_screen_effect(
 					combiner_count++;
 					pixel_shader.final_combiner_inputs_abcd = 0x3c0c2d00;
 					pixel_shader.final_combiner_inputs_efg =
-						parameters->convolution_mask ? 0x00000800 : 0;
+						(parameters->convolution_mask ? 8 : 0) << 8;
 				}
 
 				if (pass == pass_count - 1 &&
@@ -973,7 +970,7 @@ void _rasterizer_screen_effect(
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_screen_effect.c",
 					705,
-					combiner_count <= RASTERIZER_MAXIMUM_COMBINER_STAGES);
+					combiner_count<=RASTERIZER_MAXIMUM_COMBINER_STAGES);
 
 				pixel_shader.combiner_count = combiner_count | 0x00011000;
 				rasterizer_set_pixel_shader(&pixel_shader);
@@ -1000,10 +997,10 @@ void _rasterizer_screen_effect(
 				}
 			}
 
-			viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
-				global_window_parameters.camera.viewport_bounds.y0;
 			viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
 				global_window_parameters.camera.viewport_bounds.x0;
+			viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+				global_window_parameters.camera.viewport_bounds.y0;
 
 			if (pass == 0 && main_get_window_count() > 1 && pass_count != 1)
 			{
@@ -1018,10 +1015,8 @@ void _rasterizer_screen_effect(
 			}
 			else
 			{
-				vertex_bounds.x0 = -1.0f;
-				vertex_bounds.x1 = 1.0f;
-				vertex_bounds.y0 = 1.0f;
-				vertex_bounds.y1 = -1.0f;
+				vertex_bounds.x0 = vertex_bounds.y1 = -1.0f;
+				vertex_bounds.x1 = vertex_bounds.y0 = 1.0f;
 			}
 
 			if (IDirect3DDevice8_Begin(
@@ -1067,7 +1062,7 @@ void _rasterizer_screen_effect(
 				success = FALSE;
 				rasterizer_error(
 					0,
-					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, _rasterizer_vertex_register_position, vertex_bounds.x0, vertex_bounds.y1)");
+					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, VSDE_VERTEX, vertex_bounds.x0, vertex_bounds.y1)");
 			}
 
 			if (IDirect3DDevice8_SetVertexData2s(
@@ -1099,7 +1094,7 @@ void _rasterizer_screen_effect(
 				success = FALSE;
 				rasterizer_error(
 					0,
-					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, _rasterizer_vertex_register_position, vertex_bounds.x1, vertex_bounds.y1)");
+					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, VSDE_VERTEX, vertex_bounds.x1, vertex_bounds.y1)");
 			}
 
 			if (IDirect3DDevice8_SetVertexData2s(
@@ -1131,7 +1126,7 @@ void _rasterizer_screen_effect(
 				success = FALSE;
 				rasterizer_error(
 					0,
-					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, _rasterizer_vertex_register_position, vertex_bounds.x1, vertex_bounds.y0)");
+					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, VSDE_VERTEX, vertex_bounds.x1, vertex_bounds.y0)");
 			}
 
 			if (IDirect3DDevice8_SetVertexData2s(
@@ -1163,7 +1158,7 @@ void _rasterizer_screen_effect(
 				success = FALSE;
 				rasterizer_error(
 					0,
-					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, _rasterizer_vertex_register_position, vertex_bounds.x0, vertex_bounds.y0)");
+					"IDirect3DDevice8_SetVertexData2f(global_d3d_device, VSDE_VERTEX, vertex_bounds.x0, vertex_bounds.y0)");
 			}
 
 			if (IDirect3DDevice8_End(global_d3d_device) >= 0 && success)
@@ -1205,8 +1200,6 @@ void _rasterizer_screen_flash(
 	pixel32 flash_pixel;
 	unsigned long rgb_input;
 	unsigned long alpha_input;
-	real one_over_width;
-	real one_over_height;
 	short viewport_width;
 	short viewport_height;
 
@@ -1363,6 +1356,7 @@ void _rasterizer_screen_flash(
 					875,
 					FALSE,
 					"### ERROR unsupported screen flash type");
+				flash_pixel = inverse_flash_pixel;
 				break;
 		}
 
@@ -1381,19 +1375,14 @@ void _rasterizer_screen_flash(
 			global_window_parameters.camera.viewport_bounds.x0;
 		viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
 			global_window_parameters.camera.viewport_bounds.y0;
-		one_over_width = 1.0f / viewport_width;
-
-		vertex_constants[0][0] = one_over_width * 2.0f;
+		vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
 		vertex_constants[0][1] = 0.0f;
 		vertex_constants[0][2] = 0.0f;
-		vertex_constants[0][3] = -1.0f - one_over_width;
-
-		one_over_height = 1.0f / viewport_height;
-
+		vertex_constants[0][3] = -1.0f - 1.0f / viewport_width;
 		vertex_constants[1][0] = 0.0f;
-		vertex_constants[1][1] = one_over_height * -2.0f;
+		vertex_constants[1][1] = 1.0f / viewport_height * -2.0f;
 		vertex_constants[1][2] = 0.0f;
-		vertex_constants[1][3] = one_over_height + 1.0f;
+		vertex_constants[1][3] = 1.0f / viewport_height + 1.0f;
 		vertex_constants[2][0] = 0.0f;
 		vertex_constants[2][1] = 0.0f;
 		vertex_constants[2][2] = 0.0f;

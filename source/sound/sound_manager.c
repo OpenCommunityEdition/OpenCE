@@ -3111,6 +3111,7 @@ void sound_dispose_from_old_map(
 		if (sound_index != NONE)
 		{
 			real stop_time;
+			boolean done = FALSE;
 
 			do
 			{
@@ -3124,9 +3125,16 @@ void sound_dispose_from_old_map(
 			while (sound_index != NONE);
 
 			stop_time = (real)start_time + 300.f;
-			while ((real)system_milliseconds() < stop_time)
+			while (!done)
 			{
-				sound_idle();
+				if ((real)system_milliseconds() < stop_time)
+				{
+					sound_idle();
+				}
+				else
+				{
+					done = TRUE;
+				}
 			}
 		}
 	}

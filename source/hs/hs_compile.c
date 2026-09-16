@@ -710,16 +710,17 @@ static long hs_parse_cond_recursive(
 			new_expression->constant_type = root_type;
 			new_expression->type = root_type;
 			new_expression->data = 0;
-
-			return new_expression_index;
 		}
-
-		if (!TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
+		else if (!TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
 		{
 			long condition_expression_index = hs_syntax_get(expression_index)->data;
 			struct hs_syntax_node *condition_expression = hs_syntax_get(condition_expression_index);
 
-			if (condition_expression->next_node_index != NONE)
+			/* BUG (preserved for exact matching): January tests the logical negation of the
+			 * result index against NONE, which is never true, so a clause without a result is
+			 * not rejected here.  A corrected build tests
+			 * condition_expression->next_node_index != NONE. */
+			if (!condition_expression->next_node_index != NONE)
 			{
 				long if_then_expression_index = datum_new(hs_syntax_data);
 				long then_value_expression_index = datum_new(hs_syntax_data);
@@ -735,14 +736,14 @@ static long hs_parse_cond_recursive(
 						hs_syntax_get(expression_index)->next_node_index);
 					if (if_then_expression->next_node_index != NONE)
 					{
-						new_expression->data = expression_index;
 						new_expression->constant_type = _hs_function_name;
+						new_expression->data = expression_index;
+						expression->data = 0;
 						expression->function_index = _hs_function_if;
 						expression->flags = FLAG(_hs_syntax_node_primitive_bit);
 						expression->next_node_index = condition_expression_index;
 						expression->source_offset = NONE;
 						expression->type = _hs_function_name;
-						expression->data = 0;
 						if_then_expression->data = then_value_expression_index;
 						if_then_expression->flags = 0;
 						if_then_expression->source_offset = new_expression->source_offset;
@@ -753,26 +754,31 @@ static long hs_parse_cond_recursive(
 						then_value_expression->source_offset = NONE;
 						then_value_expression->type = _hs_function_name;
 						condition_expression->next_node_index = if_then_expression_index;
-
-						return new_expression_index;
+					}
+					else
+					{
+						new_expression_index = NONE;
 					}
 				}
 				else
 				{
 					hs_compile_globals.error = "i couldn't allocate a syntax node.";
 					hs_compile_globals.error_offset = hs_syntax_get(root_expression_index)->source_offset;
+					new_expression_index = NONE;
 				}
 			}
 			else
 			{
 				hs_compile_globals.error = "this argument to cond needs a result.";
 				hs_compile_globals.error_offset = hs_syntax_get(condition_expression_index)->source_offset;
+				new_expression_index = NONE;
 			}
 		}
 		else
 		{
 			hs_compile_globals.error = "this argument to cond should be a condition/result pair";
 			hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+			new_expression_index = NONE;
 		}
 	}
 	else
@@ -781,7 +787,7 @@ static long hs_parse_cond_recursive(
 		hs_compile_globals.error_offset = hs_syntax_get(root_expression_index)->source_offset;
 	}
 
-	return NONE;
+	return new_expression_index;
 }
 
 static boolean hs_get_parameter_indices(
@@ -2833,25 +2839,27 @@ boolean hs_parse_begin(
 			else
 				expected_type = _hs_type_void;
 			result = hs_parse(argument_expression_index, expected_type);
-			if (next_expression_index != NONE)
-				continue;
+			if (next_expression_index == NONE && !expression->type && result)
+				expression->type = hs_syntax_get(argument_expression_index)->type;
 		}
 		else
 		{
 			result = hs_parse(argument_expression_index, expression->type);
+			if (!expression->type && result)
+				expression->type = hs_syntax_get(argument_expression_index)->type;
 		}
-
-		if (!expression->type && result)
-			expression->type = hs_syntax_get(argument_expression_index)->type;
 	}
 
 	if (result)
 	{
 		if (argument_count < 1)
 		{
+			/* BUG (preserved for exact matching): January passes the function name
+			 * although this format has no conversion for it; the argument is ignored. */
 			sprintf(
 				hs_compile_globals.error_buffer,
-				"a statement block must contain at least one argument.");
+				"a statement block must contain at least one argument.",
+				hs_function_get(function_index)->name);
 			hs_compile_globals.error = hs_compile_globals.error_buffer;
 			hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 			result = FALSE;

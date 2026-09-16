@@ -708,6 +708,8 @@ void render_camera_build_frustum_bounds(
 	struct render_camera const *camera,
 	real_rectangle2d *frustum_bounds)
 {
+	rectangle2d const *viewport_bounds;
+	rectangle2d const *window_bounds;
 	real aspect_ratio;
 	real inverse_window_height;
 
@@ -720,26 +722,28 @@ void render_camera_build_frustum_bounds(
 		306,
 		frustum_bounds);
 
-	aspect_ratio = (real)(camera->viewport_bounds.y1 - camera->viewport_bounds.y0) /
-		(camera->viewport_bounds.x1 - camera->viewport_bounds.x0);
+	viewport_bounds = &camera->viewport_bounds;
+	window_bounds = &camera->window_bounds;
+	aspect_ratio = (real)(viewport_bounds->y1 - viewport_bounds->y0) /
+		(viewport_bounds->x1 - viewport_bounds->x0);
 	inverse_window_height = 1.0f /
-		(camera->window_bounds.y1 - camera->window_bounds.y0);
+		(window_bounds->y1 - window_bounds->y0);
 
 	frustum_bounds->x0 =
-		(2 * camera->viewport_bounds.x0 -
-		camera->window_bounds.x0 - camera->window_bounds.x1) *
+		(2 * viewport_bounds->x0 -
+		window_bounds->x0 - window_bounds->x1) *
 		inverse_window_height;
 	frustum_bounds->x1 =
-		(2 * camera->viewport_bounds.x1 -
-		camera->window_bounds.x0 - camera->window_bounds.x1) *
+		(2 * viewport_bounds->x1 -
+		window_bounds->x0 - window_bounds->x1) *
 		inverse_window_height;
 	frustum_bounds->y0 =
-		(2 * camera->viewport_bounds.y0 -
-		camera->window_bounds.y0 - camera->window_bounds.y1) *
+		(2 * viewport_bounds->y0 -
+		window_bounds->y0 - window_bounds->y1) *
 		inverse_window_height;
 	frustum_bounds->y1 =
-		(2 * camera->viewport_bounds.y1 -
-		camera->window_bounds.y0 - camera->window_bounds.y1) *
+		(2 * viewport_bounds->y1 -
+		window_bounds->y0 - window_bounds->y1) *
 		inverse_window_height;
 
 	frustum_bounds->x0 *= aspect_ratio;
@@ -848,24 +852,18 @@ boolean render_camera_view_to_screen(
 		if (screen_point->x >= -1.0f && screen_point->x <= 1.0f &&
 			screen_point->y >= -1.0f && screen_point->y <= 1.0f)
 		{
+			real viewport_width = (real)(
+				camera->viewport_bounds.x1 - camera->viewport_bounds.x0);
 			real viewport_height = (real)(
 				camera->viewport_bounds.y1 - camera->viewport_bounds.y0);
-			long viewport_x0 = camera->viewport_bounds.x0;
-			real viewport_width = (real)(
-				camera->viewport_bounds.x1 - viewport_x0);
 
-			result = TRUE;
 			screen_point->x =
-				(real)viewport_width * ((screen_point->x + 1.0f) * 0.5f) +
-				(real)viewport_x0;
-			{
-				long viewport_y0 = camera->viewport_bounds.y0;
-
-				screen_point->y =
-					((screen_point->y + 1.0f) * 0.5f) *
-					(real)viewport_height +
-					(real)viewport_y0;
-			}
+				viewport_width * ((screen_point->x + 1.0f) * 0.5f) +
+				camera->viewport_bounds.x0;
+			screen_point->y =
+				((screen_point->y + 1.0f) * 0.5f) * viewport_height +
+				camera->viewport_bounds.y0;
+			result = TRUE;
 		}
 	}
 
