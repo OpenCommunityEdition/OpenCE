@@ -1370,25 +1370,6 @@
       }
     },
     {
-      "unit": "source/scenario/wind",
-      "function": "_wind_variance_get",
-      "class": "unclassified",
-      "evidence": "The retained ordinary-C helper implements the HCEA-corroborated position/time wind-noise sampler with project real/vector types, the exact two-role three-axis countdown topology, and defined unsigned-character access to the low byte of the bias-added real's object representation. January and the candidate own the same eight relocation destinations and agree through the loop except for January's full-width AND 0x7FFFFFFF sign clear versus VC7's x87 FABS instruction; target/candidate are 224/208 padded bytes. A split fabs assignment emits the same x87 instruction. The only machine-wide exact artifact reads an inactive union member and remains prohibited. Marathon's authenticated cseries.h spells ABS as a conditional expression, not this integer sign clear, and has no direct wind donor. A one-instruction inline-assembly probe reproduced the AND but forced VC7 to spill the live magnitude, changed the frame from 0x0C to 0x10, and remained nonexact, so it was rejected rather than expanding assembly solely to steer x87 lifetime. All seven exact wind siblings remain exact and the already parked natural initializer is measurement-stable. No union punning, volatile access, assembly, fake dependency, address-derived name, or nonsensical branch is retained. Reopen only for authoritative January source or a defined same-compiler full-width sign-clear idiom with provenance.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 8,
-          "normalized_sha256": "4df611f5e5a98c97ca86e2ea03d29c3057296fb1382b36fc687c31f0e58db1a6"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 8,
-          "normalized_sha256": "951ffdb4c1b81a50bceb55a1b2ac7167c51c20a3bdb8542b61524c88e89c37d6"
-        },
-        "objdiff_percent": 93.333336
-      }
-    },
-    {
       "unit": "source/structures/structure_lens_flares",
       "function": "_build_structure_lens_flares",
       "class": "instruction-scheduling",

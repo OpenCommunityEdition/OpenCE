@@ -192,7 +192,7 @@ authentic January source. The park class should be restated from `tu-context-opt
   result/current lockstep pointers, and w2's W1/W2/W4/W5/W6 index typings (W1 re-measured here).
 
 
-## Orchestrator disposition 2026-09-15: HELD, not landed
+## Orchestrator disposition 2026-09-15: OWNER RULING - HOLD LIFTED, LANDED
 
 The candidate is strict EXACT (224/8/`4df611f5e5a98c97`), the whole-TU gate goes 7 -> 8 exact with no sibling or park loss,
 the owner census equals `build/base` exactly and the fake scan is clean. January's own bytes settle the construct:
@@ -210,3 +210,23 @@ alias). The verifier's control `scratch/verify/n1_wind/v3.c`, a two-member `unio
 `sample_index = (byte)sample_key.bits;`, is ALSO strict EXACT. The byte member is a free stylistic choice; the two-member form
 matches the three in-tree precedents and drops an endianness assumption. `bits & 0xFF` (v4) is NOT exact, so the truncation
 must be to byte width.
+
+## Owner ruling 2026-09-15 (supersedes the 2026-08-31 inactive-union hold)
+
+The owner lifted the R13 hold **for `_wind_variance_get` only**: "January explicitly performs a full-width integer sign-bit clear
+on the spilled real. The minimum block-local union transfer reproduces that behavior exactly, local union bit transfers are now an
+admitted project form, and an accepted same-compiler precedent exists in `_rasterizer_water_draw`. This satisfies the recorded
+reopen criterion and is not arbitrary code-generation steering." This ruling explicitly supersedes the
+`wind_obj_jonas_defined_fuzzy_closeout_20260831.md` line "it reads an inactive union member; it remains rejected".
+
+**Landed form:** the verifier's two-member control `scratch/verify/n1_wind/v3.c` - `union { real value; long bits; } sample_key;`
+with `sample_key.bits &= 0x7FFFFFFF;` and `sample_index = (byte)sample_key.bits;` - not the worker's three-member body. Both are
+strict EXACT; the two-member form matches the three in-tree precedents (path_obstacle_avoidance.c, render_cameras.c,
+rasterizer_xbox_water.c) and drops an endianness assumption. `bits & 0xFF` is NOT exact, so the truncation is to byte width.
+
+**Orchestrator verification (re-run independently, not taken from the worker or the verifier):** the diff against
+`git show HEAD:source/scenario/wind.c` is the function hunk ONLY - no linkage change, no rename-define removal, no type or
+initializer changes. Whole-TU gate: `== exact 8 residual 1 unwritten 0`, guard passed, `_wind_variance_get` EXACT 224/8; all seven
+baseline-exact rows stay exact. parkcheck: `_wind_variance_initialize` OK at its base 400/9 (undisturbed, as the ruling requires);
+only the reopened row drifts, to January's own hash. Owner census vs `build/base`: 0 symbols added, 0 removed. Fake scan: 0 leads.
+Whole-board stable diff after landing: gained 5 / 2,752 padded, regressions 0.
