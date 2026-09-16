@@ -1,0 +1,1306 @@
+{
+ "summary": {
+  "label": "final",
+  "base_commit": "ae10935da609486c2f5484757c897fa73e6fdf03",
+  "head_commit": "927d135ecbfbe9396fcb50430c0320253e803210",
+  "newly_exact_functions": 7,
+  "new_strict_meaningful_bytes": 6804,
+  "new_strict_padded_bytes": 6832,
+  "strict_gains_without_ledger_entry": 0,
+  "newly_accepted_but_not_strict (zero credit)": 0,
+  "regressions": [],
+  "target": 150000,
+  "remaining_to_target": 143196,
+  "accepted_ledger_now": 7307,
+  "accepted_meaningful_now": 1344867,
+  "accepted_ledger_at_base": 7300,
+  "accepted_meaningful_at_base": 1338063
+ },
+ "credited_functions": [
+  {
+   "unit": "source/ai/actor_perception",
+   "symbol": "_actor_perception_refresh_test_object",
+   "padded_bytes": 1744,
+   "meaningful_bytes": 1740,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "349e07d4ad3d836e0e6c62ef3aabc820af5776433e07b66789d4a090f7abab08",
+   "relocations": 46,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:41",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6ebd05a96 Match the perception object test and name the encounter debug renderer"
+   ]
+  },
+  {
+   "unit": "source/ai/ai_debug",
+   "symbol": "_ai_debug_render_encounter",
+   "padded_bytes": 2336,
+   "meaningful_bytes": 2330,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "9c6d30187fca343794880f0562623bb475700834b9f0450f95fedd50ab76d71e",
+   "relocations": 169,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:59",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "6ebd05a96 Match the perception object test and name the encounter debug renderer"
+   ]
+  },
+  {
+   "unit": "source/bink/bink_playback",
+   "symbol": "_bink_free_texture_cache",
+   "padded_bytes": 96,
+   "meaningful_bytes": 95,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "9c2a9405a0477844e5a6fee2c1b0c1b0a1d625a530a6b227701aec798386d468",
+   "relocations": 11,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:17",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "3083f800b Reopen four parks: detail objects, character draw, hud sound and bink cache"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_sounds",
+   "symbol": "_hud_play_sound",
+   "padded_bytes": 352,
+   "meaningful_bytes": 349,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "1d026cea1652a4639bc1258234647070cfdb9dfda61f268e1033299edb398f37",
+   "relocations": 13,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:1",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "3083f800b Reopen four parks: detail objects, character draw, hud sound and bink cache"
+   ]
+  },
+  {
+   "unit": "source/scenario/wind",
+   "symbol": "_wind_variance_get",
+   "padded_bytes": 224,
+   "meaningful_bytes": 213,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "4df611f5e5a98c97ca86e2ea03d29c3057296fb1382b36fc687c31f0e58db1a6",
+   "relocations": 8,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:2",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "034141b12 Recover the wind sampler's integer sign-clear under an explicit owner ruling"
+   ]
+  },
+  {
+   "unit": "source/structures/structure_detail_objects",
+   "symbol": "_structure_render_detail_objects",
+   "padded_bytes": 1136,
+   "meaningful_bytes": 1133,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "dbf237f0819e54a61d67102c174e6f79789603a62a8adbac4e97c21e01394658",
+   "relocations": 31,
+   "proof_sources": [
+    "objdiff",
+    "semantic-coff"
+   ],
+   "section": "section:14",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "3083f800b Reopen four parks: detail objects, character draw, hud sound and bink cache"
+   ]
+  },
+  {
+   "unit": "source/text/draw_string",
+   "symbol": "_bitmap_draw_character",
+   "padded_bytes": 944,
+   "meaningful_bytes": 944,
+   "baseline_status": "non-exact (R/U) at ae10935da",
+   "final_status": "strict exact (section_infos_equal)",
+   "normalized_sha256": "1fbab7db0314ed562e1e6908a77d5570fd513dbc8a3e27e261710ed051f3682a",
+   "relocations": 25,
+   "proof_sources": [
+    "semantic-coff"
+   ],
+   "section": "section:16",
+   "was_in_base_ledger": false,
+   "source_commits": [
+    "3083f800b Reopen four parks: detail objects, character draw, hud sound and bink cache"
+   ]
+  }
+ ],
+ "strict_without_ledger_entry": [],
+ "accepted_not_strict_zero_credit": [],
+ "zero_credit_items": [
+  {
+   "unit": "source/game/game_engine",
+   "function": "_game_engine_generate_title_string",
+   "note": "completed body, still residual (landed in the prior 250K lane, listed for continuity)"
+  },
+  {
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_render",
+   "note": "completed body, still residual (prior lane)"
+  },
+  {
+   "unit": "source/structures/structures",
+   "function": "_structure_get_planar_fog",
+   "note": "wave n1 remeasure: added the discarded fog-plane lookup January proves via its 15th _tag_block_get_element_with_size relocation; now 448/448 and 15/15, still parked and [sha]"
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_sound_refresh_looping",
+   "note": "wave n3a remeasure: park premise refuted; removing the fade_in_time phi local recovers January 4th _sound_start_fade relocation; 43/43 relocations, 1088->1120 vs target 1136, alndiff regions 74->37. NOT exact."
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_update_channel_for_looping_sound",
+   "note": "wave n3a remeasure: size and relocations now January-exact at 1360/61; residual [sha] only. NOT exact."
+  },
+  {
+   "unit": "source/hs/hs",
+   "function": "_hs_compile_and_evaluate",
+   "note": "probe candidate scratch/hs_pin/v1.c reaches 592 padded (January size) / 585 meaningful / [sha] only; NOT landed (fuzzy policy forbids replacing a complete body with a non-exact one)"
+  }
+ ],
+ "rejected_candidates": [
+  {
+   "wave": "n1",
+   "group": "n1_bink_playback",
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_alloc@4",
+   "kind": "park-reopen",
+   "reason": "The candidate IS measurably exact (I reproduced it: gate of reopen_alloc_plus.c gives '== exact 22 residual 2', _bink_alloc@4 EXACT 496, parkcheck drift 2 = exactly the two reopened rows, census loses only the '??_C@_0P@MCJOHDFO@end bink_alloc' literal which tinfo --data confirms January does not own), and the int3 evidence is real (alndiff of pP.obj vs target shows a single 'delete target[61:62] @T 0xd1 int3' as the only remaining difference). It is nevertheless inadmissible in this lane: (1) HOUSE RULE 10 / BRIEF SECTION 1 - inline assembly is allowed only for a genuine helper/math routine (fast_ftol class) with evidence no credible C reproduces it; _bink_alloc is a pool allocator, not a helper/math routine, and the __asm block sits in ordinary control flow. (2) NEW FAKE-SCAN LEAD - tools/fake_match_scan.py on the candidate reports 'scratch/.../cand_alloc.c:894: [normal] inline-assembl",
+   "required_fix": "Obtain an explicit owner ruling admitting a breakpoint construct at this single site in a non-helper/non-math function (bare unit-local __asm { int 3 }; the cseries.h debug_break() macro route is not acceptable as proposed, brief section 1 forbids inline asm in a shared header). Then resubmit reopen_alloc_plus.c unchanged, with config/parked.json losing the _bink_alloc@4 entry in the same commit, re-gated in the real tree. Do not land pP.c: it is size/reloc-exact but sha-different, i.e. a zero-c"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_structure_detail_objects_structure_visibility_etc",
+   "unit": "source/structures/structure_visibility",
+   "function": "_portal_hull_from_points",
+   "kind": "park-remeasure",
+   "reason": "Most of pv_v1.c is genuinely byte-proven and worth landing, and I verified each claim independently: (a) January emits `mov eax,2` where the parked body emits `mov ax,2`, which proves the 32-bit `long` return (laws_w2 A3c return-width detector); (b) January's facing test is a single `jne 0x1c8` to the shared bottom epilogue where the parked body inlines an early-return epilogue at 0x77-0x83, which proves `if (facing > 0.0f) { ... } return discarded;`; (c) I read January's split object bytes directly - build/split/.../structure_visibility.obj contains the literals `ooz>0.f` (??_C@_07KLBPNJKH@) and `result->vertex_count!=NONE` (??_C@_0BL@FCCKLIAE@), while the parked body emits `one_over_z > 0.0f` (??_C@_0BC@CJGLIIFL@) and the spaced `result->vertex_count != NONE` (??_C@_0BN@CBCMBAGA@); the census confirms base-only = the two wrong literals and cand-only = January's two, so this is a genuin",
+   "required_fix": "Re-baseline the park to scratch/verify/n1_structure_detail_objects_structure_visibility_etc/pv_ifelse.c instead of pv_v1.c: keep the `long` return type (both the forward declaration at ~line 255 and the definition), the `if (facing > 0.0f) { ... } return _portal_hull_from_portal_discarded;` shape, the `ooz` local with January's two assert expression texts, and the bare `global_structure_bsp_get();` statement, but restore the original `if (winding == 1) { source_index = 0; terminator = result->ve"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_hud_draw_interface_etc",
+   "unit": "source/interface/progress_bar",
+   "function": "_code_000d16d0 -> _progress_bar_create_noise_texture",
+   "kind": "exact-pending-rename",
+   "reason": "The measurements reproduce, but the item is barred by a standing hold AND by the identical verifier rejection this lane already issued. MEASUREMENTS (confirmed): `gate.py source/interface/progress_bar --source scratch/workers/tiny_stubs/pb_v1.c --all --alias progress_bar_create_noise_texture=code_000d16d0 --forbid-emitted-symbol _point_from_line3d` -> `== exact 53  residual 1  unwritten 0`; without the alias the same file gates 52/1/1, i.e. baseline. Owner census adds only `_code_000d16d0` (code), which is present in the target; fake scan 0 leads; guard passes. WHY REJECTED: (1) R13 \u2014 `docs/object_matching_logs/progress_bar_obj_base_layer_reconciliation_20260907.md` \"Unchanged frontier\" states verbatim: \"Do not restore `_code_000d16d0` as a guessed empty noise helper or invent its caller to obtain emission.\" A worker's new evidence does not lift a recorded hold. (2) This EXACT candidate ",
+   "required_fix": "Obtain an explicit owner ruling that relaxes `progress_bar_obj_base_layer_reconciliation_20260907.md` line 142 (guessed empty noise helper + invented caller) and overturns the w1 verifier rejection; OR produce January-side evidence of the caller and its placement (a retained literal, an assert line anchor, a relocation, or a non-inlinable form that makes the call site visible in `_progress_bar_setup`'s bytes). Only then resubmit pb_v1.c together with the config/symbols.json line 3626 rename. Do "
+  },
+  {
+   "wave": "n2",
+   "group": "n2_collision_usage_devices",
+   "unit": "source/devices/devices",
+   "function": "_device_frontfacing",
+   "kind": "exact",
+   "reason": "MECHANICS ALL VERIFIED GOOD, BUT BLOCKED BY A LIVE STANDING HOLD (R13 / brief s.6 item 7 / task item 6).\n\nWhat I independently confirmed (all of the worker's technical claims hold):\n- Scope clean. git status shows exactly one modified source file, source/devices/devices.c (1 insertion / 4 deletions, one hunk). No .h, config/*.json, tools, build or other-worker file touched.\n- Real-file gate: gate.py source/devices/devices --all --forbid-emitted-symbol _point_from_line3d = 'exact 30 residual 0 unwritten 0', guard passed. HEAD copy (scratch/verify/n2_collision_usage_devices/head_devices.c, gated with --source) = 'exact 29 residual 1 unwritten 0' with 'residual 128 _device_frontfacing [sha]'. Row-by-row diff of the two --all listings: the ONLY changed row is _device_frontfacing; all 29 HEAD-EXACT rows stay EXACT. No regression.\n- Strict exact confirmed independently by relocdiff: 'size 128/",
+   "required_fix": "Revert the single hunk in source/devices/devices.c: restore the HEAD text exactly (scratch/workers/n2_collision_usage_devices/base_body.txt) - 'real facing_dot_front = facing->i * front_marker.matrix.forward.i + facing->j * front_marker.matrix.forward.j + facing->k * front_marker.matrix.forward.k;' (four lines, tab-indented, as at HEAD) in place of the dot_product3d() call. That returns devices to 'exact 29 residual 1 unwritten 0' with _device_frontfacing [sha] at 128/4 and leaves 'git diff --st"
+  },
+  {
+   "wave": "n2",
+   "group": "n2_lruv_cache_decals_etc",
+   "unit": "source/effects/decals",
+   "function": "_render_debug_decals",
+   "kind": "exact-pending-rename",
+   "reason": "The worker's byte evidence checks out, but the claim is misfiled and its yield is overstated.\n\nVERIFIED TRUE: (a) relocdiff of _render_debug_decals against a fresh build of the real file prints exactly 'shape: size 432/432, relocations 27/27, sha equal' with a single differing row at @0x53 (January ['defined-noncode','.bss','_debug_decals',0] symbolic=['symbol','_debug_decals',0] vs ours ['symbol','_decal_geometry',-24]). (b) config/symbols.json really carries _debug_decals twice, line 22482 file_offset 4414816 and line 22999 file_offset 5842644; scratch/pdb200-current/pdb_symbols.json has exactly one _debug_decals, rva 5842644 section .data, and publishes nothing between 4414632 and 4415200, so the 4414816 label is not PDB-derived. (c) The address arithmetic holds: symbols.json has _bss_00435cb0@4414640, _debug_decals@4414816, _decal_globals@4414832, _decal_geometry@4414840, so 4414816 ",
+   "required_fix": "Withdraw the exact_pending_rename row. Refile it as a single orchestrator proposal with ZERO claimed strict credit, disclosing that _render_debug_decals is already accepted (ordinary_only / objdiff-coff-shape, 427 code bytes, objdiff 100%) so the only gain is proof class plus relocation-label fidelity. Restate the tool-policy request in terms of symbol-relative equality (both sides are _decal_geometry-24; csplit merely re-anchors to the preceding image symbol) rather than 'same destination addre"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "unit": "source/interface/motion_sensor",
+   "function": "_blip_begin",
+   "kind": "park-reopen",
+   "reason": "Every mechanical check reproduces and the January-side ABI evidence is genuinely correct \u2014 but the item is barred by R13 and R17, and its stated criterion is false on the record for the second wave running.\n\nWHAT I VERIFIED INDEPENDENTLY (lane root, python -B, writes confined to scratch/verify/n3_motion_sensor/):\n- Scope clean. git status --porcelain in this worktree shows ZERO modified tracked files \u2014 only untracked docs/object_matching_logs/*_next150_n3a_* ledgers and scratch/. No .h, config/, tools/, build.ninja or configure.py change. git diff --stat -- source config tools build.ninja configure.py is empty, so real_file_modified:false is accurate. blip_begin is file-private (prototype line 231, call site line 674, definition line 993; nothing else in source/ names it).\n- Baseline reproduced: gate.py source/interface/motion_sensor --all --forbid-emitted-symbol _point_from_line3d -> '=",
+   "required_fix": "Do not resubmit as a landing. Obtain an explicit owner ruling admitting an unauthenticated never-read parameter ('long unused' plus the disclosure comment) in a file-private static \u2014 or recover the authentic name and type from atlas, PDB or first-party source. Only after that ruling lands, resubmit bb1.c unchanged (already fully pre-verified: gate '== exact 15 residual 4', guard passed, census empty both ways, fake scan 0) together with the coupled _render_motion_sensor remeasure. When the rulin"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "unit": "source/interface/motion_sensor",
+   "function": "_render_motion_sensor",
+   "kind": "park-remeasure",
+   "reason": "Falls with the reopen it is coupled to. A zero-credit park remeasure not attached to an ACCEPTed reopen is R11.\n\nI verified the numbers and the causal story independently and both hold. parkcheck.py source/interface/motion_sensor scratch/verify/n3_motion_sensor/bb1.obj reports exactly 'DRIFT _render_motion_sensor 768 40 (784, 40, de9701add36aae94)' plus the reopened 'DRIFT _blip_begin'; the other three parks are untouched at measurements.base (_motion_sensor_update 1136/44, _render_blip 384/17, _update_motion_sensor 816/37). The cause is a genuine A8 callee-ABI cascade, not a source perturbation: bb1.c differs from the real file in three hunks, all of them the blip_begin signature/call.\n\nOn the raw numbers the drift looks like a regression \u2014 padded 768 == January at base, 784 != January after \u2014 and my own aggregate divergence counts get worse (differing target instructions 42 -> 45, diff",
+   "required_fix": "Resubmit only in the same commit as an ACCEPTed _blip_begin reopen, i.e. after the owner ruling. Numbers for config/parked.json at that point: _render_motion_sensor size 784, relocation_count 40, normalized_sha256 beginning de9701add36aae94 (full value from a fresh parkcheck run on the landed object). The evidence text must say it is an A8 callee-ABI cascade from the four-argument blip_begin call site, that the candidate now reproduces January's 'push 0' / 'add esp,0xc' and the 0xa1..0xb0 loop-a"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_bink_playback",
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_draw_frame",
+   "kind": "park-reopen",
+   "reason": "MEASUREMENT: every mechanical claim re-verified and PASSES. Real file == HEAD (git clean for this path); real-file baseline is == exact 21 residual 3 unwritten 0 (of 24), guard passed \u2014 the wave brief's 'exact 20 residual 4' is indeed stale because _bink_free_texture_cache landed in 3083f800b. scratch/workers/n3_bink_playback/reopen_draw_frame_plus_query.c gates == exact 23 residual 1 and reopen_draw_frame.c alone == exact 22 residual 2; the row-by-row diff vs the HEAD listing moves ONLY the reopened rows; parkcheck on the combined object gives parks 3 drift 2 with _bink_alloc@4 unchanged at (512,51) and _bink_draw_frame reaching exactly (912, 59, 24aa7c5023629b6b) = target; owner census vs build/base and build/split is candidate-only [] / base-only-lost [] and its absent-from-target list is byte-identical to a HEAD control object built the same --source way; fake_match_scan 0 leads on b",
+   "required_fix": "Reach January's increment order (inc edx at 0x119, inc esi at 0x123 beside add ecx,0x14) with the element written on the loop's own 0-based index, i.e. 'vertices[vertex_index]' (d2/d3 are the measured fixed point at 912/59). Alternatively obtain an explicit owner ruling admitting 'vertices[corner_index-1]' as recovered lvalue topology, supported by the address-IV-identity law reproduced on at least one INDEPENDENT already-exact January function (R15: a law measured only on the function it closes"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_bink_playback",
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_query_analog_controller_buttons",
+   "kind": "park-reopen",
+   "reason": "MEASUREMENT: all claims re-verified and PASS. q3.c alone gates == exact 22 residual 2; combined == exact 23 residual 1; the row diff moves only the reopened row(s); parkcheck reaches exactly (80, 1, c88d131ba2ff1ac7) = target with _bink_alloc@4 unchanged at (512,51); census clean; fake scan 0 leads; guard passed; CRLF preserved.\n\nThe NEW EVIDENCE is genuine and valuable: I confirmed from January's bytes that the prologue is 'push ebx; push esi' with no 'push ebp; mov ebp,esp' and no 'sub esp,N', i.e. under /Oy- the target has NO stack local, so the park's recorded 'boolean/index register allocation' premise is indeed a symptom, not the cause; ours homes button_pressed at [ebp-1] because it pins the constant 1 in BL and spends it as 'cmp byte [...],bl' three times, and both npads are downstream consequences. That is a real structural detection and should be recorded.\n\nREJECT is on the cho",
+   "required_fix": "Keep the single '||' test and find a source cause that removes the stack home \u2014 i.e. a spelling that leaves button_pressed in a callee-saved byte register and rematerialises the comparison constant as an immediate (candidate levers not yet measured: the result/single-exit shape of the function, the type/width of the compared value, or the loop's break/found form \u2014 all with the '||' intact). The worker's own fallback criterion is the right one. Alternatively an owner ruling extending A26 to a cas"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_RGBToColor",
+   "kind": "park-reopen",
+   "reason": "Reproduced every measurement. Real file is byte-identical to HEAD (git diff empty; head copy at scratch/verify/n3_s3tc/head_s3tc.c matches after CRLF normalisation); baseline gate == exact 12 residual 6 unwritten 0, guard passes, parkcheck on build/base = parks 6 drift 0. scratch/workers/s3tc/reopen_rgbtocolor.c re-gates exact 14 residual 4 and scratch/workers/n3_s3tc/d2.c re-gates exact 15 residual 3, zero sibling loss, guard passes, fake_match_scan 0 leads (same as HEAD), literal census clean (d2 emits exactly January's ??_C@_0N@CLDKFKKD@ / NBFAEMLN@ pair and drops our two wrong ones; no other new owner). The gates are therefore not in dispute. The hunk is. Exactness here is bought ONLY by leaving color.rgba[3] unassigned and then copying the aggregate. I built two controls: scratch/verify/n3_s3tc/ctlA.c (identical phased body plus `color.rgba[3] = 0;` before `*pcolor = color;`) and ct",
+   "required_fix": "Get an explicit owner ruling under the original-bug policy that the vendor-reference indeterminate rgba[3] may be restored, landed first as a config/parked.json criterion change replacing 'Initialize the four-byte color before its aggregate copy; do not restore the original indeterminate alpha read to regain bytes.' Then resubmit the hunk unchanged with a /* BUG (preserved for exact matching): ... */ comment citing dxtn.cpp:71 and the fact that all four call sites (s3tc.c:208/210 via ColorToRGB,"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_DecodeBlockRGB",
+   "kind": "park-reopen",
+   "reason": "Claim verified as stated: zero body change, and the function reaches strict EXACT 448 / 2 relocations purely as an A8 callee-ABI/inline-boundary consequence of the _RGBToColor hunk (January inlines the first RGBToColor call and calls the second out of line). The park criterion's premise ('remaining instruction selection and scheduling are non-exact') is indeed refuted - the gap is an inline boundary, not scheduling. But the function is exact only inside a candidate that carries the rejected _RGBToColor body: my ctlA.c/ctlB.c controls show that with any initialised alpha this row falls straight back to 384 / 3 / non-exact. A coupled reopen inherits its callee's blocker (R17).",
+   "required_fix": "None to this function's body. It becomes landable automatically, in the same commit, if and only if the owner grants the _RGBToColor indeterminate-alpha ruling above; resubmit then with no edit."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_DecodeBlockRGB__single_pixel",
+   "kind": "park-reopen",
+   "reason": "Two independent blockers; the gates themselves are sound. (1) It inherits the _RGBToColor blocker - with HEAD's RGBToColor this row is 432 / 11 and non-exact (ctlA/ctlB controls), and reopen_rgbtocolor.c already carries it to 496 / 10 [sha]-only before any assert or memset change. (2) The remaining and decisive instruction is a buffer overrun. I reproduced alndiff against scratch/verify/n3_s3tc/d1.obj: target 170 instructions, ours 170, one replacement at T 0x11 / O 0x11, `push 0x40` vs `push 4`. That is d2.c's `memset(color, 0, S3TC_BLOCK_PIXELS * sizeof(struct s3tc_color))` = 64 bytes written through `struct s3tc_color *color` (source/bitmaps/s3tc/s3tc.h:75-79 declares a pointer to ONE colour; s3tc.h:51 asserts sizeof == 4), a 60-byte overrun of the caller's object. WORKER_BRIEF section 5 excludes original bugs 'never when the preserved path is undefined behaviour (NULL dereference, un",
+   "required_fix": "Needs two owner rulings before resubmission, not one: (a) the _RGBToColor indeterminate-alpha ruling above, and (b) an original-bug ruling admitting the 64-byte null-source clear as a preserved 60-byte overrun, which the brief's section 5 UB carve-out currently forbids outright - so this is a policy amendment, not an application of existing policy. If (b) is declined, the row stays parked. If both are granted, land d2.c unchanged with a /* BUG (preserved for exact matching): January clears S3TC_"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc.c",
+   "function": "_RGBToColor",
+   "kind": "park-reopen",
+   "reason": "MEASUREMENTS ALL CONFIRMED INDEPENDENTLY. Real file == HEAD (identical modulo CRLF; `git diff --stat` empty). Baseline gate reproduced exactly: == exact 12 residual 6 unwritten 0, guard passed. scratch/workers/s3tc/reopen_rgbtocolor.c gates to == exact 14 residual 4, _RGBToColor strict EXACT 96/0; scratch/workers/n3_s3tc/d2.c gates to == exact 15 residual 3. Owner census of defined symbols: reopen.obj has ZERO new and ZERO lost owners vs build/base; d2.obj only swaps the two wrong ??_C@_0BA@ assert literals for January's own ??_C@_0N@ pair (census-better). fake_match_scan: 0 leads on HEAD and on both candidates. Guard passes on every gate. The single-variable controls are clean and reproduce in both directions: s1_alpha_last.c and s2_alpha_first.c differ from reopen_rgbtocolor.c by exactly one added line (`color.rgba[S3TC_ALPHA] = 0;`) and both revert the whole TU to == exact 12 residual",
+   "required_fix": "Owner ruling admitting an unassigned aggregate member read through a whole-struct copy, as an explicit named exception to WORKER_BRIEF section 5's uninitialized-read exclusion, plus an explicit reversal of the parked.json clause 'do not restore the original indeterminate alpha read to regain bytes'. If granted, resubmit reopen_rgbtocolor.c with the rationalising comment replaced by the `/* BUG (preserved for exact matching): January's RGBToColor (Microsoft/S3 reference rasterizer, dxtn.cpp:71-96"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc.c",
+   "function": "_DecodeBlockRGB",
+   "kind": "park-reopen",
+   "reason": "The premise refutation is GENUINE and I confirmed it directly \u2014 this is the one substantive new result in the packet. `relocdiff --count-by-target --allow-structural` on the real HEAD object gives _RGBToColor JAN 1 / OURS 2, _csmemset 1/1, TOTAL 2/3, with the January call at 0x74 and our two at 0x2b and 0x39. A relocation-COUNT delta is a call-count difference, so the parked.json clause 'remaining instruction selection and scheduling are non-exact' is factually wrong: the gap is an auto-inline boundary owned by the callee. The row reaches strict EXACT 448/2 with ZERO edits to its own body (confirmed by diffing reopen_rgbtocolor.c against the real file: the only hunk in the whole file is the RGBToColor body).\n\nBut the reopen has no independent path. Its exactness is produced entirely by the _RGBToColor body rejected above, so it is a conditional reopen whose prerequisite has not landed an",
+   "required_fix": "Same owner ruling as _RGBToColor; land the callee body and this unpark in one commit (the A8 coupled-callee pattern). Independently and regardless of that ruling, correct the parked.json evidence text so a later wave does not re-spend shapes hunting a register/scheduling tie that the census proves is a call count."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc.c",
+   "function": "_DecodeBlockRGB__single_pixel",
+   "kind": "park-reopen",
+   "reason": "d2.c does gate to strict EXACT 496/10 (== exact 15 residual 3, guard passed, census clean, 0 fake-scan leads). Rejected on all three of its prerequisites.\n\n(a) ASSERT TEXT \u2014 evidence VERIFIED, policy unresolved. I confirmed January's literal directly from the target object rather than from the mangled-name decode: `tinfo --data` shows .rdata[22] = 13 bytes `75 3e 3d 30 20 26 26 20 75 3c 3d 34 00` = `u>=0 && u<=4`, and .rdata[21] = `v>=0 && v<=4`. Our object emits ??_C@_0BA@ (16 bytes, the spaced 0..3 form). docs/assertions.md:93 forbids losing 'original diagnostic text ... failure polarity, or source locations', so the 2026-09-07 repair is itself the deviation, and the assert construct is not UB (it reads and writes nothing). This is the strongest item in the packet and I recommend the owner grant it. I cannot: the parked.json text is a direct contrary directive \u2014 'Require coordinates 0.",
+   "required_fix": "Three separate owner rulings, none of which a reviewer can grant: (a) restore January's byte-proven assert text over the parked.json 0..3 directive \u2014 worth granting on docs/assertions.md:93 alone and independent of the rest; (b) the _RGBToColor indeterminate-member ruling; (c) admission of a 60-byte stack overrun as a preserved original bug, against WORKER_BRIEF section 5 and R12. If only (a) is granted, nothing lands: d1.c/reopen still leave this row non-exact and the change is a zero-credit pa"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "unit": "source/bitmaps/s3tc/s3tc.c",
+   "function": "_Quantize",
+   "kind": "park-remeasure",
+   "reason": "Drift confirmed exactly as claimed: parkcheck on both reopen.obj and d2.obj reports _Quantize moving from base d3d27024351f575d to 528 / 30 / 57685b731729ce83, size and relocation count unchanged. The cause is genuine (the inlined _RGBToColor body changes, not this function's source) and would be an acceptable coupled A8-class re-baseline IF the reopen it is coupled to were accepted. It is not. A standalone zero-credit remeasure that is not tied to a landed reopen and cannot be shown strictly closer (size and relocs were already exact; only the hash moves) is R11 verbatim. Also note parkcheck shows _EncodeBlockRGBColorKey and _DecodeBlockAlpha3__single_pixel OK on both candidates, so the worker's 'unaffected' claim is correct.",
+   "required_fix": "None available standalone. Carry it only inside the same commit as an owner-granted _RGBToColor reopen, with the exact numbers 528 / 30 / 57685b731729ce83."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_bink_playback",
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_draw_frame",
+   "kind": "park-reopen",
+   "reason": "MEASUREMENT: every mechanical claim re-verified and PASSES. Real file == HEAD (git status for source/bink/ is clean; the only tracked modification in the worktree is source/effects/particle_systems.c, another group's path). Real-file baseline at HEAD is '== exact 21 residual 3 unwritten 0 (of 24 listed)', guard passed - the prompt's 'exact 20 residual 4' row list is indeed STALE (_bink_free_texture_cache landed EXACT 96 in 3083f800b). scratch/workers/n4_bink_playback/n4_draw_frame.c gates '== exact 22 residual 2', _bink_draw_frame strict EXACT 912; row-by-row diff vs the HEAD listing moves ONLY that row; parkcheck = parks 3 drift 1, the drifting row reaching exactly (912, 59, '24aa7c5023629b6b') = target, the other two parks OK at (512,51) and (96,1); code owner census vs build/base and build/split is candidate-only [] / base-only-lost [] / candidate-only-vs-base []; fake_match_scan 0 le",
+   "required_fix": "Do not resubmit this body unchanged. Either (a) reach January's increment order (inc edx at 0x119, inc esi at 0x123 beside add ecx,0x14) with the element written on the loop's own 0-based index, vertices[vertex_index] - carrying the seven verified non-subscript hunks forward unchanged - or (b) obtain an explicit owner ruling admitting vertices[corner_index-1] as recovered lvalue topology, supported by the address-IV-identity law reproduced on at least one INDEPENDENT already-exact January functi"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_bink_playback",
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_alloc@4",
+   "kind": "park-reopen",
+   "reason": "MEASUREMENT: every mechanical claim re-verified and PASSES. scratch/workers/n4_bink_playback/a1.c gates '== exact 22 residual 2', _bink_alloc@4 strict EXACT 496; the row diff vs HEAD moves only that row; parkcheck = parks 3 drift 1 reaching exactly (496, 52, '09c916253ce6d4de') = target, the other two parks OK; code owner census candidate-only [] / base-only-lost [] (the only loss is the data literal ??_C@_0P@MCJOHDFO@'end bink_alloc', which tinfo confirms January does not own either - correct); point guard passed; CRLF preserved (1064 CRLF, 0 bare LF). The three source facts are real and I confirmed them from January's bytes myself: tinfo on the target shows _csmemset and _GlobalMemoryStatus@4 TWICE (@0012/@0025 and @0172/@0185, i.e. bink_get_memory_available inlined at both the 'begin' and 'end' sites) with NO 'begin/end bink_alloc' literal relocation, and _is_all_bink_memory_free call",
+   "required_fix": "Obtain an explicit owner ruling admitting a single, unit-local, one-site __asm { int 3 } in a non-helper/non-math function (the cseries.h debug_break() macro route stays forbidden by brief section 1), and an explicit acceptance of the resulting standing fake_match_scan lead. Then resubmit a1.c unchanged with config/parked.json losing the _bink_alloc@4 entry in the same commit, re-gated in the real tree. Do not land a1.c minus the trap and do not land n1's pP.c: size/reloc-exact but sha-different"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_motion_sensor",
+   "unit": "source/interface/motion_sensor",
+   "function": "_motion_sensor_update",
+   "kind": "park-reopen",
+   "reason": "MECHANICS INDEPENDENTLY CONFIRMED (the worker's numbers are all true). Baseline at HEAD reproduces exactly: '== exact 14 residual 5 unwritten 0', guard passes, real file unmodified (git status shows only source/effects/particle_systems.c dirty = another worker's path; no .h/config/tool change by this group). Candidate scratch/workers/n4_motion_sensor/m4.c gates '== exact 15  residual 4  unwritten 0', guard passes, all 14 HEAD-EXACT rows stay EXACT, _motion_sensor_update strict EXACT 1168/43; relocdiff --count-by-target 43 target / 43 candidate / 0 differing rows; parkcheck 'parks 5 drift 1' with _blip_begin 112/10, _render_blip 384/17, _render_motion_sensor 768/40, _update_motion_sensor 816/37 byte-unchanged; fake_match_scan 0 leads on both m4.c and the HEAD copy. I also confirmed the park's recorded premise is genuinely refuted (tinfo shows January calls _game_engine_running twice, @002",
+   "required_fix": "Keep the park. Resubmit only after BOTH prerequisites actually land as owner rulings in this lane - an explicit exception to WORKER_BRIEF section 5 for preserving the uninitialised camera_positions[] read (R12/R5/R19 class), and the R14 / laws_w2 C3 census ruling admitting the _vector_from_points3d + _distance_squared3d surplus COMDATs - and after the three steering constructs are respelled in natural C that is still strict EXACT: '(short)((x + 1) % MOTION_SENSOR_HISTORY_COUNT)' (or a cast with "
+  },
+  {
+   "wave": "n4",
+   "group": "n4_particle_systems",
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_update",
+   "kind": "fuzzy",
+   "reason": "MEASUREMENTS (independent, this review).\nScope: only source/effects/particle_systems.c is dirty; no .h, config/*.json, tool or build file touched. OK.\nHEAD gate (git show HEAD:... -> scratch/verify/n4_particle_systems/head_particle_systems.c, gate --source --all): == exact 21 residual 4 unwritten 0; guard passed; _particle_system_update [size 1616!=1664, sha]. (Note: the orchestrator table's _particle_system_render row [size 1344!=1360, relocs 35!=33] is STALE; measured HEAD row is residual 1360 [sha]. The worker's correction is right.)\nReal-file gate now: == exact 21 residual 4 unwritten 0; guard passed; only changed row is _particle_system_update 1664 [sha]. No HEAD-EXACT row regressed. No parks for this unit (parkcheck: 'no parks'). fake_match_scan: 0 leads on both HEAD and current. Owner census clean: candidate gains exactly the two January-owned assert literals (??_C@_0IB@LHKMAGCA@s",
+   "required_fix": "Two edits, both measured byte-inert (result: 1664/58, relocdiff 0 differing rows, gate == exact 21 residual 4 unwritten 0, guard passes). (1) Replace the unread local at source/effects/particle_systems.c:1267-1271 with laws_w2 A17's admitted bare statement, declaring 't' uninitialised so the call still precedes the division: 'real t;' + blank line, then 'TAG_BLOCK_GET_ELEMENT(&type_definition->particle_states, particle->state_index, struct particle_system_type_particle_state);' as a statement, t"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_game_sound_sound_manager",
+   "unit": "source/sound/game_sound",
+   "function": "_update_potentially_audible_looping_sound",
+   "kind": "park-reopen",
+   "reason": "Every measurement the worker reports is TRUE and independently reproduced; the rejection is purely on lane policy.\n\nVERIFIED (re-run by me at HEAD 927d135ec; both group files byte-identical to HEAD modulo CRLF):\n- Baselines: game_sound == exact 28 residual 3 unwritten 0; sound_manager == exact 58 residual 7 unwritten 0; point guard passed on both; parkcheck 2/0 and 5/0.\n- gate.py --source pas_v2.c --all: == exact 28 residual 3 unwritten 0, row-for-row identical to baseline except the target row, whose tag drops from [size 640!=624, sha] to [sha]; guard passed.\n- tinfo/relocdiff: candidate 624/25 vs target 624/25; sha f3008036d008e7f420776ceb5d387b17d74eabaab77550c7ceef0f2f5a6c58a2 vs target 8fe3a4a8...dd7dc. Per-target relocation counts equal on all 16 targets; the only count row is the ??_C@_08CBBFJFMD@location?$AA@ select-any COMDAT ownership artifact, which relocdiff resolves equal an",
+   "required_fix": "Either (a) close the remaining 4 meaningful bytes (the zero-register pin) so the row is strict EXACT and the item becomes a genuine park-reopen - n1 already spent the tie budget and forbids re-trying 0 vs 0.f, ternary/if-else rewriting, declaration reordering and a named zero local, so a NEW measured instance of the zero-pin lever family is required first; or (b) obtain an explicit orchestrator/owner ruling authorising a zero-credit fidelity re-baseline of this park over R11 and brief sections 2"
+  }
+ ],
+ "proposed_header_config_packets": [
+  {
+   "wave": "n1",
+   "group": "n1_wind",
+   "kind": "park-metadata",
+   "text": "config/parked.json: after verifying the _wind_variance_get reopen, restate the remaining wind park's class for _wind_variance_initialize from 'tu-context-optimization' to 'backend induction-variable selection', with the reopen criterion: 'a measured VC7 rule that makes the compiler share ONE scaled integer induction variable (axis_index * 8) across four &wind_globals.variance[axis][k * 8] address expressions instead of creating a 0x300 pointer IV per expression - an IV-count or register-pressure threshold demonstrated on a micro-lab, or authentic January source. The word control-point locals and the variance[axis_index][x * 8] index spelling are byte-confirmed correct and must not be changed",
+   "evidence": "January _wind_variance_initialize 0xe2-0xf0 computes (axis*8 + idx) * 96 + &wind_globals.variance[0][0] from the scaled integer IV esi (add esi,8), keeping only f1/result as 0x300 pointer IVs, while our build reduces all five addresses; relocation multiset is identical (9/9) and the frames hold the same 14 roles. Recorded in docs/object_matching_logs/wind_obj_opus5_next150_n1_20260915.md and scrat",
+   "consumers": "config/parked.json only. No header is involved: grep -rl 'wind.h' source --include=*.c --include=*.h is unaffected because no header, symbols.json or build-configuration change is proposed by this wave.",
+   "unlocks": "Nothing immediately; it prevents the next wave from re-spending on the already-refuted index-typing family and points it at the one open question."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_draw_string",
+   "kind": "law-for-lane-law-file (no header, config or symbols.json change requested)",
+   "text": "NAMED-INTERMEDIATE OPERAND RANK [new]. In a canonicalised commutative integer or pointer sum VC7 13.00.9254 evaluates the highest-rank addend into the accumulator first and folds the cheapest addend as the memory operand of the final 'add'. Source-level permutations and associations of the sum are inert. Binding one addend's sub-expression to a named local lowers that addend's rank, restores source order, and forces the remaining memory addend into its own register (add esi,[ebx+0x2c] -> mov eax,[ebx+0x2c]; add esi,eax). DETECT: identical frame, identical relocation census and identical instruction counts, with January and the candidate differing only in which addend initialises the accumula",
+   "evidence": "Measured 2x2 on source/text/draw_string at baseline ae10935da: dsL1.c (no named local) 944/25 with one 4-insn block; n1.c (dsL1 + named local) strict EXACT; n2.c (HEAD body + named local) 928 [size]; n4.c (house-style + named local) strict EXACT, sha equal, alndiff 299/299 clean, relocdiff 0 differing rows. Rank argument grounded in the +0xae..+0xcc disassembly of build/split/source/text/draw_stri",
+   "consumers": "None -- documentation only; no source file outside source/text/draw_string.c and no header, config/*.json or build file is affected.",
+   "unlocks": "944 padded bytes immediately (the _bitmap_draw_character park-reopen). As a detector it applies to any residual whose frame and relocation censuses are identical and whose only difference is which add"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_dead_camera",
+   "kind": "owner-ruling",
+   "text": "Admit January's uninitialised local in _dead_camera_update under the original-bug policy. Exact source text in source/camera/dead_camera.c (no header, config or consumer change): declare 'long next_unit_index;' with NO initialiser, carrying the comment '/* BUG (preserved for exact matching): January never initializes next_unit_index; when no next player is found it tests whatever the reused parameter home happens to hold. */', keep 'if (next_player_index != NONE) { next_unit_index = player_get(next_player_index)->unit_index; }' and DELETE the current 'else { next_unit_index = (long)result; }'.",
+   "evidence": "scratch/workers/n1_dead_camera/v1.c + v1.obj reproduce January's 'mov eax,dword ptr [ebp+0x10]' at the fallback byte-identically, leaving exactly one extra instruction (the initialising store at 0x13f) as the whole difference in a 1,248-byte function; v2.c + v2.obj prove VC7 never elides that store (it re-emits it at entry and moves the assert spill slot to [ebp+8]). Frame 0/0, relocations 46/46 i",
+   "consumers": "source/camera/dead_camera.c only - no header, config, symbols.json or parked-function change; nothing else in the tree is touched.",
+   "unlocks": "_dead_camera_update: 1,235 meaningful / 1,248 padded bytes, the largest single row in this object, taking dead_camera.obj to 3/4."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_dead_camera",
+   "kind": "header-packet",
+   "text": "Replace the TU-local shadow struct in dead_camera with the shared owner. In source/camera/dead_camera.h: change the third parameter of dead_camera_update from 'struct dead_camera_command *result' to 'struct observer_command *result' and delete the 'struct dead_camera_command;' forward declaration. In source/camera/dead_camera.c: delete the local 'struct dead_camera_command' definition and its size assert and respell the body against observer.h - 'result->flags = FLAG(_observer_command_valid_bit);', 'result->parameter_flags[_observer_command_parameter_focus_position] = 3;', 'result->parameter_timers[_observer_command_parameter_focus_position] = 0.f;', 'result->focus_position', 'result->focus_",
+   "evidence": "HCEA HCEX.pdb 'DIA2Dump -sym dead_camera_update' gives the authentic signature 'struct dead_camera *camera, const struct camera_control *controls, struct observer_command *result'. source/camera/observer.h - already included by dead_camera.c - owns exactly the 0x68 layout the TU-local struct duplicates (flags; the focus_position/focus_offset/focus_distance/field_of_view/forward/up union; focus_vel",
+   "consumers": "grep -rl 'dead_camera.h' source --include=*.c --include=*.h -> source/camera/dead_camera.c, source/camera/director.c (director.c casts dead_camera_update to director_camera_update_proc, so the parameter type change does not reach it). Workers may neither edit headers nor measure this.",
+   "unlocks": "Authenticity / house-rule compliance only; no bytes expected. Pairs with the _dead_camera_update owner ruling so that the 1,235-byte landing carries the correct owner type."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_key_agreement_prime_numbers_etc",
+   "kind": "parked.json-reclass (no source, header or config code change)",
+   "text": "In config/parked.json, change the entry {unit: source/bungie_net/common/key_agreement, function: _complete_key_exchange} class from \"instruction-scheduling\" to \"value-width\", and replace its reopen sentence with: \"Reopen when a source form makes BOTH (a) the packet_type assignment a 16-bit narrowing stored as a dword with a zero upper half, and (b) the incoming GET_MESSAGE_SIZE(*msgptr) value a 16-bit CSE with the inlined key_agreement_get_packet_type whose 32-bit zero-extension sits at the definition (xor ecx,ecx) rather than at the use. Measured negatives: a 32-bit size expression with or without a word local (loses the helper CSE), .value = (word)helper() (wrong allocation), and the full-",
+   "evidence": "relocdiff reports 17 target / 17 candidate / 0 differing rows with identical addresses; January and ours both emit sub esp,0x30 with an identical [ebp+-N] slot set; alndiff reports 167/167 instructions with exactly two hunks, both width-only (xor+lea vs movzx+sub, and movsx ax vs movsx eax). Nothing in the function is scheduled differently, so the recorded class is factually wrong and misroutes fu",
+   "consumers": "config/parked.json only; no source or header file is touched, and no other unit references this entry.",
+   "unlocks": "0 strict bytes now; it prevents future waves from spending a shape budget on a scheduling hypothesis that the census refutes, and it hands them the one-instruction k3 starting point."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_key_agreement_prime_numbers_etc",
+   "kind": "wave-assignment note (no file change requested)",
+   "text": "Do not assign source/bungie_net/common/thread_win32::_get_mutex_from_pool to another implementation wave. Its normalized bytes already equal January's; the sole difference is the csplit relocation-owner spelling of a one-past-the-end bound, and the park already carries the correct csplit-relocation-alias class. If the row is ever to be credited it is a tools/parked_functions.py admission question (score the resolved destination instead of the owner spelling, as already accepted for the collision_usage A45 reclass), not a source question, and it is worth 0 strict bytes either way.",
+   "evidence": "alndiff 22/22 instructions, one differing line whose only difference is rel@0x1b -> _transport_address_string+36 (target) vs _thread_globals+1580 (ours); both resolve to 3263828. laws_w3 A45. The only exact source form is the fake extern rejected on 2026-08-31, 2026-09-13 and 2026-09-15; branch_sweep still advertises it as BEST history:253d8146 exact 9 residual 0, which is a trap for any worker th",
+   "consumers": "none (process note).",
+   "unlocks": "0 B; saves a wave slot and removes a standing fake-match trap."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_circular_queue_stack_memory_pool",
+   "kind": "config/parked.json evidence text (zero strict credit, text only; precedent laws_w3 E13)",
+   "text": "In the entry {\"unit\":\"source/memory/circular_queue\",\"function\":\"_circular_queue_dequeue_data\"} change ONLY the last sentence of \"evidence\"; leave \"class\" and \"measurements\" (target 256/12/2981341a\u2026, base 240/12/40adf3be\u2026, objdiff 93.947365) exactly as they are \u2014 this is NOT a re-baseline and no body moves. REPLACE: `Reopen only for authoritative source/locals, a strict same-topology donor, or a general natural compiler control that prevents the nested clone without changing the helper ABI.` WITH: `The nested-clone premise is refuted (opus5 next150 wave n1): writing the size computation the way the strict-exact sibling circular_queue_queue_data writes it - an explicit second circular_queue_ve",
+   "evidence": "scratch/workers/n1_circular_queue_stack_memory_pool.md (frame + relocation + instruction census, shape 1) and docs/object_matching_logs/circular_queue_obj_opus5_next150_n1_20260915.md. Re-derivable with: python -B tools/campaign/gate.py source/memory/circular_queue --source scratch/workers/n1_circular_queue_stack_memory_pool/v1.c --all --out <tmp>.obj --forbid-emitted-symbol _point_from_line3d ; p",
+   "consumers": "config/parked.json only \u2014 no header, no source file, no symbols.json, no tools/tests. The parked measurements and the production body are untouched, so the build's park check is unaffected.",
+   "unlocks": "0 strict bytes now; prevents a future wave from re-spending on the refuted nested-clone premise and hands it a body that is 2 instructions from exact (256 padded / 241 meaningful available if the zero"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_bitmap_group_bitmaps_quantitize",
+   "kind": "park-rebaseline",
+   "text": "Replace the parked `_bitmap_group_add_bitmap` body in source/bitmaps/bitmap_group.c with the body in scratch/workers/n1_bitmap_group_bitmaps_quantitize/ab_L5b.c (that file is the current real file with only this body replaced) and re-baseline the config/parked.json entry measurements to size 992, relocation_count 59, normalized_sha256 79586c828ad0b2d4... (current parked base: 992 / 59 / 2e0bbd84c45f2407...). Also change the park class from `unclassified` to `zero-constant materialisation` and replace the criterion with the refined text in the ledger.",
+   "evidence": "Strictly closer in the R11 sense, zero strict credit: same size and relocation count, but (1) the CURRENT REAL body emits three .rdata assert-literal COMDATs January does not own - ours `??_C@_0BD@POFKGBND@space_between?5?$DO?$DN?50` vs January `??_C@_0BB@PIAKKBNN@space_between?$DO?$DN0`; ours `??_C@_0EC@NCJMCPEA@?$CIbyte?5?$CK?$CJbitmap?9?$DObase_address?5?$DO?$DN?5` vs January `??_C@_0DO@OLLHEHH",
+   "consumers": "None - the change is confined to source/bitmaps/bitmap_group.c and config/parked.json. No header, no build configuration, no other translation unit.",
+   "unlocks": "0 strict bytes. It removes three wrong relocation targets from the shipped object and makes any future reopen start from January's literals and control flow."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_game_engine_ctf_game_etc",
+   "kind": "law-for-worker-brief",
+   "text": "ADDRESS-OF-LOCAL NULL FOLD: VC7 13.00.9254 always folds an inlined `if (!p)` when the actual argument is the address of a local, and then forwards the aggregate copy so the local itself disappears. The dead test survives only when the pointer is a call result or a phi. Detector: a January function whose relocation census contains a provably dead arm guarded by `test <lea of frame slot>` cannot be reproduced by any `&local` spelling; look for an intermediate helper or a phi instead.",
+   "evidence": "6 in-tree shapes on _game_set_game_variant_from_name plus 11 out-of-tree lab probes compiled with game.obj's own cflags (scratch/workers/n1_game_engine_ctf_game_etc/lab{1,2,3,4}.c, lab.py). The lab reproduces both in-tree fixed points (48 and 80 bytes) exactly. January keeps the dead arm and even reuses the tested register as the literal 0 memset value; HCEA's later 360 reconstruction records the ",
+   "consumers": "No header or config change is requested; this is a laws_w3-style entry only.",
+   "unlocks": "Nothing directly; it retires a whole family of shapes for any residual whose January bytes contain a dead null test on a frame address (48 padded bytes still open on _game_set_game_variant_from_name)."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_game_engine_ctf_game_etc",
+   "kind": "law-for-worker-brief",
+   "text": "NAMED-ARGUMENT INLINE KILL (refines the inline frequency law): binding a helper's argument to a named local can stop VC7 inlining/unrolling a small static helper entirely. `count_bits_32(race_globals.lap_bit_vector[player->team_index])` inlines and unrolls 8x; `long lap_flags = race_globals.lap_bit_vector[...]; count_bits_32(lap_flags)` drops the function from 224 to 96 bytes.",
+   "evidence": "scratch/workers/n1_game_engine_ctf_game_etc/rs_r3.c and rs_r4.c vs rs_r5.c/HEAD on source/game/game_engine_race _race_engine_get_score.",
+   "consumers": "None (documentation only).",
+   "unlocks": "Prevents wasted shapes on any residual whose January bytes show an unrolled inlined helper."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_structure_detail_objects_structure_visibility_etc",
+   "kind": "park-rebaseline",
+   "text": "Re-baseline the config/parked.json entry for _portal_hull_from_points (source/structures/structure_visibility.c) to C:\\halo-worktrees\\opus5-150k-house-clean-20260914\\scratch\\workers\\n1_structure_detail_objects_structure_visibility_etc\\pv_v1.c -> 480 padded / 16 relocs / sha16 436f25638df8c7a2 (current park base 464/16). New park criterion: a lever that keeps the '?:' pair's ESI/EDI web while materialising the zero before the winding compare.",
+   "evidence": "Strictly closer under R11: the [size] tag is gone (464 -> 480 = January's size) and only 3 instruction slots differ. It also replaces TWO candidate-only .rdata owners with January's exact literal owners - January's object owns \"ooz>0.f\" (??_C@_07KLBPNJKH@) and \"result->vertex_count!=NONE\" (??_C@_0BL@FCCKLIAE@) while the parked body emits \"one_over_z > 0.0f\" and \"result->vertex_count != NONE\"; sinc",
+   "consumers": "none - source/structures/structure_visibility.c only; no header, config or symbols.json text is required",
+   "unlocks": "0 strict bytes (zero-credit remeasure); it makes the park's remaining criterion a single register-web question and fixes two data owners"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_structure_detail_objects_structure_visibility_etc",
+   "kind": "park-rebaseline",
+   "text": "Re-baseline the config/parked.json entry for _structure_get_planar_fog (source/structures/structures.c) to C:\\halo-worktrees\\opus5-150k-house-clean-20260914\\scratch\\workers\\n1_structure_detail_objects_structure_visibility_etc\\fg_v1.c -> 448 padded / 15 relocs / sha16 7e308d0bf30135a5 (current park base 416/14). New park criterion: a lever that makes VC7 reuse the dead 'cluster' register (EAX) for &structure->fog_planes and allocate the masked cluster->fog_reference & SHORT_MAX index to EDX in the FIRST fog-plane lookup.",
+   "evidence": "Closes both structural tags ([size 416!=448] and [relocs 14!=15]) by adding the two January-proven statements: the second _global_structure_bsp_get re-fetch at +0x9b and the discarded fog-plane lookup at +0x16d. 154 vs 154 instructions; the entire residual is one 4-instruction register-naming window. Critically it also REMOVES the blocker w2 recorded for this row ('needs an owner ruling on unused-",
+   "consumers": "none - source/structures/structures.c only; no header, config or symbols.json text is required",
+   "unlocks": "0 strict bytes (zero-credit remeasure); retires one pending owner-ruling item from laws_w2 C3 / the structures w2 ledger"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_structure_detail_objects_structure_visibility_etc",
+   "kind": "decision-requested",
+   "text": "Decide whether scratch/workers/n1_structure_detail_objects_structure_visibility_etc/sph_v2.c should replace the NON-PARKED _sphere_intersects_cluster_portal body in source/structures/structures.c (432/11, structurally correct, zero strict credit, would need a new park entry). Worker recommendation: NO - leave the real file untouched.",
+   "evidence": "The shipped body is byte-provably wrong in two ways (two early returns where January has one shared false epilogue reached by 'jne 0x199' from the first test; 'boolean projection_sign' where January's 'movzx ax,al' at +0xed proves a short) and is 16 bytes short. sph_v2 fixes both without the forbidden COMDAT and regresses nothing (gate exact 12 residual 5, parks 4 drift 0, owner census cand-only [",
+   "consumers": "source/structures/structures.c only",
+   "unlocks": "0 strict bytes; documents that the 416->432 structural gap is NOT caused by _point_from_line3d (only the two x87 leaf-age hunks are)"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_structure_detail_objects_structure_visibility_etc",
+   "kind": "cross-object-sweep",
+   "text": "Scan build/split for the byte pattern 'add esp,N' immediately followed by 'mov [<reloc>],reg' followed by another store through the same reg, restricted to functions that are already strict EXACT, to find a donor construct for the _structure_detail_objects_initialize deferred-pop flush point.",
+   "evidence": "That function's only residual is this one transposition (25 vs 25 instructions, no frame, identical relocations); its documented reopen criterion asks for exactly such a donor, and finding it is a corpus sweep rather than a per-function shape, so it does not fit a worker shape budget.",
+   "consumers": "n/a (read-only sweep over build/split)",
+   "unlocks": "80 padded bytes if a donor construct exists"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_bink_playback",
+   "kind": "config/parked.json",
+   "text": "Remove the entries for unit 'source/bink/bink_playback', function '_bink_free_texture_cache' and (if the inline-asm ruling is granted) function '_bink_alloc@4', in the same commit that lands the matching candidate. Leave the '_bink_draw_frame' and '_bink_query_analog_controller_buttons' entries untouched.",
+   "evidence": "Both entries' recorded premises are refuted with January-side evidence (see park_reopen_proposals). Candidates verified: reopen_free_texture_cache.c = 21 exact/3 residual, reopen_alloc_plus.c = 22 exact/2 residual; in both, no baseline-exact row changes, the point guard passes, the untouched parks show zero drift and the owner census adds nothing.",
+   "consumers": "config/parked.json only; scratch/parkcheck.py and tools/parked_functions.py read it.",
+   "unlocks": "96 padded bytes on its own, 592 with the alloc reopen."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_bink_playback",
+   "kind": "header (source/cseries/cseries.h) - only if the owner prefers a macro to a bare __asm at the single site",
+   "text": "Add immediately after the match_dhalt line (cseries.h:113):\n\n/* VC7 emits int3 exactly where an __asm block is written; the __debugbreak intrinsic is\n   schedulable and sinks into the epilogue, so it does not reproduce January's placement. */\n#define debug_break() __asm { int 3 }\n\nThe bink candidate's failure arm then reads 'debug_break();' instead of '__asm { int 3 }'.",
+   "evidence": "January's _bink_alloc@4 carries the only int3 in the entire 468-object split corpus, at 0xd1, between the 759 assertion's 'add esp,0x14' and the failure arm's epilogue. With the rest of the body byte-identical, __asm { int 3 } closes the function strict EXACT (scratch/workers/n1_bink_playback/m2.c and reopen_alloc_plus.c); __debugbreak() does not - the intrinsic lands at 0xd4, inside the epilogue ",
+   "consumers": "grep -rl 'cseries.h' source --include=*.c --include=*.h : every translation unit in the tree. A #define introduces no declaration into any TU, so the declaration-count oracle and the header-edit blast radius do not apply to it (unlike a prototype); no other TU uses the identifier debug_break.",
+   "unlocks": "496 padded bytes (_bink_alloc@4). If both the macro and the bare __asm are declined, the fallback candidate pP.c is byte-identical to January except that one int3 and carries zero credit."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_bink_playback",
+   "kind": "laws/docs sweep (no code change)",
+   "text": "Record in the shared laws file: 'match_dassert/match_dwarn/match_dhalt wrapper law - the do { } while (FALSE) of the d-family assertion macros is NOT byte-neutral. It inflates VC7's estimated frequency of the enclosed call, so a small static predicate used as the assertion condition is auto-inlined where January calls it out of line. docs/assertions.md already states the d-family is a project convenience wrapper and not a claim about January's source, so per-site use of the attested two-argument vassert/match_vassert spelling is a defect fix, not steering, and needs no header edit.' Then sweep parked/residual rows whose recorded blocker is 'VC7 inlines a predicate/helper in the diagnostic pa",
+   "evidence": "Measured twice in this unit: _bink_free_texture_cache goes from 144/12 to strict EXACT 96/11 on that token alone (v1.c), and the same change at _bink_alloc@4's 735 assertion makes January's first 50 instructions byte-identical (v2.c). Converting all five match_dassert sites in the TU leaves the three inert sites byte-identical and no row regressed (v10.c, 22 exact/2 residual).",
+   "consumers": "grep -rn 'match_dassert\\|dassert(' source --include=*.c to enumerate the sweep; no file is edited by this proposal.",
+   "unlocks": "unknown tree-wide; 592 padded bytes measured in this unit alone."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_bink_playback",
+   "kind": "laws (refinement of laws_w2 A13)",
+   "text": "Record: '&&-depth inline cut-off. For a 64-byte static helper, VC7 inlines at a call site guarded by zero, one or two && operands and declines at three. The decline is conditional depth, not a caller-size budget (deleting unrelated assertion blocks or the whole preceding if block does not restore it) and not a callee property (static __inline and definition order are inert); an early return does not help either and can lose a zero-register pin. A boolean local holding the whole chain restores the inline with identical condition bytes - the A13 device - and its polarity (if (!flag) { error } else { ... }) then also fixes the block layout.'",
+   "evidence": "Probe matrix in scratch/workers/n1_bink_playback/: pF (top level) inlined, pG (1 operand) inlined, pK (2 operands) inlined, pM (3 operands, call alone in the block) not inlined, pH (3 operands, call first statement) not inlined; pA-pE (deletions) all not inlined; v7 (static __inline) byte-identical; pI (January definition order) byte-identical; v6 (early return) not inlined and loses the ESI zero ",
+   "consumers": "documentation only.",
+   "unlocks": "a detector for residuals whose recorded blocker is 'helper stays out of line / inlines at one site only' (laws_w3 C4 A23 sweep)."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_player_profile_game_state_xbox_etc",
+   "kind": "park-rebaseline (TU-local source change in the worker's own file; needs the orchestrator because all three bodies are parked)",
+   "text": "In source/saved games/player_profile.c replace the TU-local file-block declaration\n\nstruct player_profile_file_block\n{\n\tstruct player_profile profile;\n\tXCALCSIG_SIGNATURE checksum;\n\tbyte padding[SAVED_GAME_FILE_BLOCK_SIZE -\n\t\tsizeof(struct player_profile) - sizeof(XCALCSIG_SIGNATURE)];\n};\n\nwith\n\nstruct player_profile_file_contents\n{\n\tstruct player_profile profile;\n\tXCALCSIG_SIGNATURE checksum;\n};\n\nunion player_profile_file_block\n{\n\tbyte data[SAVED_GAME_FILE_BLOCK_SIZE];\n\tstruct player_profile_file_contents contents;\n};\n\nand update the size verifier to `sizeof(union player_profile_file_block)`, the three `union player_profile_file_block block = {0};` declarations, and the `block.profile` / `b",
+   "evidence": "January's `= {0}` in _player_profile_new emits `mov byte ptr [ebp-0x204], bl; lea edi,[ebp-0x203]; rep stosd (0x7f); stosw; stosb`, i.e. a ONE-BYTE explicit head store, while our typed struct emits `mov word ...; lea edi,[ebp-0x202]; rep stosd; stosw`. The head-store width is the width of the object's first scalar, so January's 512-byte block leads with a byte array - it cannot be `struct player_p",
+   "consumers": "None outside the unit - the struct is declared inside source/saved games/player_profile.c (lines 149-158) and is not in any header. `grep -rl player_profile_file_block source --include=*.c --include=*.h` matches only source/saved games/player_profile.c.",
+   "unlocks": "0 strict bytes on its own. It drifts three parks (write_thread_proc inert, new 464/18->464/19, create_default 336->320) so it needs a parked.json re-baseline; two of the three are strictly closer. It "
+  },
+  {
+   "wave": "n1",
+   "group": "n1_player_profile_game_state_xbox_etc",
+   "kind": "law-file addition (scratch/w3 or the next laws file)",
+   "text": "COLD-ELSE VS VALUE-RETURN PLACEMENT. In VC7 13.00.9254, for `if (c) { ... } else { cold_diagnostic; }` followed by a value return, the else block is laid out BEFORE the value-return block only when the else arm FALLS THROUGH into that return. As soon as the else arm carries its own `return <constant>;`, or both value returns are written as sibling `else` arms, the value-return block is hoisted ahead of the cold block. Separately: a failure return reachable only from a point where no callee-saved register is live lets VC7 shrink-wrap the `push <callee-saved>` past the guarding test; keeping one predecessor inside the live region pins the push to the prologue.",
+   "evidence": "Six measured variants of _game_state_open_persistent_storage (scratch/workers/n1_player_profile_game_state_xbox_etc/gsx_v1.c..gsx_v6.c, gated against build/split/source/saved games/game_state_xbox.obj): v4 alone reproduces January's tail order [open-fail assert][return file]; v1/v2/v3 all produce [return file][open-fail assert+ret] and shrink-wrap `push esi` to 139 instructions; v6 folds back to t",
+   "consumers": "Law-file text only; no source or config consumer.",
+   "unlocks": "Diagnostic. It explains the _game_state_open_persistent_storage park and should be checked against other 'terminal cold-block placement' parks before they are re-spent."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_player_profile_game_state_xbox_etc",
+   "kind": "owner-ruling request (original-bug policy) - recorded, NOT re-proposed under laws_w3 R13",
+   "text": "Three saved-game rows are exact only by reproducing an original January defect, each already rejected once (saved_game_family_reconciliation_20260909.md). Recording them so the owner can rule once: (1) _saved_game_files_enumerate_available_to_local_player_index 368 B - the accumulator is declared without an initializer and the unconditional `*number_of_profiles = ...` exports its indeterminate home on the mutex-failure path; (2) _player_profile_create_default_profiles_on_disk 288 B and _player_profile_write_thread_proc@4 352 B - the 512-byte block is written with 444 uninitialised padding bytes; (3) _player_profile_new 464 B - `player_profile_index = NONE` precedes `saved_game_file_close(&fi",
+   "evidence": "This wave added byte-level mechanism for each: (1) the failure store is `mov dx, word ptr [ebp+8]` from the reused player_index/number_of_entries home (law A24); (2) `push 0x200` at write_thread_proc+0xb4 with no zero fill anywhere in the January body; (3) `or esi,0xffffffff` at player_profile_new+0x159 immediately before `push esi; call _saved_game_file_close` at +0x164, plus the second close at ",
+   "consumers": "config/parked.json entries for the four functions; docs/matching_methodology.md original-bug policy.",
+   "unlocks": "Up to 1,120 padded bytes (368 + 288 + 464) if granted, in three separate rows; write_thread_proc's 352 stays blocked regardless."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_hud_draw_interface_etc",
+   "kind": "park-reopen",
+   "text": "Remove the config/parked.json entry `source/interface/hud_sounds :: _hud_play_sound` (class unclassified, base 384/13/5ad2867ca1866a) in the same commit that lands scratch/workers/n1_hud_draw_interface_etc/hs_v3.c into source/interface/hud_sounds.c.",
+   "evidence": "Strict EXACT 352/13/1d026cea1652a463, 125/125 instructions, guard pass, owner census clean, 0 fake-scan leads, no new /W3 warnings; scratch/parkcheck.py shows the expected drift 384 -> 352. Full derivation in docs/object_matching_logs/hud_sounds_obj_opus5_next150_n1_20260915.md.",
+   "consumers": "source/interface/hud_sounds.c only. No prototype, type or argument change, so source/interface/hud.h and the caller _hud_play_unit_sounds in hud_unit.obj are untouched.",
+   "unlocks": "+352 padded / +349 meaningful; hud_sounds.obj becomes 1/1 strict exact."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_hud_draw_interface_etc",
+   "kind": "owner-ruling",
+   "text": "Rule on house rule 7 (\"inline asm only for a genuine evidenced helper/math routine\") for the bitmaps_inlines.h colour converters and fast_ftol_C in source/interface/hud_draw.c. If granted, land scratch/workers/n1_hud_draw_interface_etc/hd_v4.c unchanged. Disclose that tools/fake_match_scan.py then carries one additional `inline-assembly` review lead, and that the owner census gains the two select-any .rdata assert literals ??_C@_05PEENBMOG@color and ??_C@_0CM@MJIBIDD@%s: assert_valid_real_rgb_color( which January's own row references as UNDEFINED symbolic targets.",
+   "evidence": "January's bodies are proven not to be compiler output: 32-bit `fistp dword` (measured conversion-width law - /QIfist routes every C float-to-int conversion through `fistp qword` for every destination type, staging and flag; /Op, /Oi, /Og, /Ot, /Gf re-tested inert here), `fmul st(3),st(0)` / `fmul st(4),st(0)` broadcast scaling of the x87 stack, and integer tests on a float's own bit pattern in fas",
+   "consumers": "source/interface/hud_draw.c only. The prototypes already exist at source/interface/hud_draw.h:42-50; no header, config, flag or build change is involved.",
+   "unlocks": "+192 padded / +181 meaningful immediately (_real_rgb_color_to_pixel32). _real_argb_color_to_pixel32 (320) additionally needs the frame-slot tie solved; _fast_ftol_C (56) remains unreachable for paddin"
+  },
+  {
+   "wave": "n1",
+   "group": "n1_hud_draw_interface_etc",
+   "kind": "owner-ruling+config",
+   "text": "Rule on progress_bar_obj_base_layer_reconciliation_20260907.md:142 (\"Do not restore _code_000d16d0 as a guessed empty noise helper or invent its caller\") now that the name is map-attested, and if granted land scratch/workers/tiny_stubs/pb_v1.c together with config/symbols.json line 3626 -> { \"file_offset\": 857808, \"flags\": 32, \"name\": \"_progress_bar_create_noise_texture\", \"static\": true },",
+   "evidence": "Gate with --alias progress_bar_create_noise_texture=code_000d16d0 gives exact 53 / residual 1 / unwritten 0 with every other row unchanged; without the alias the same file is 52/1/1, so the body is byte-exact and only the COFF name differs. Name from two 2001-09-25 Xbox linker maps (cache_exe 0x49daa0, cachebeta_xbe 0xe0790), corroborated this wave by the January atlas itself naming 0x000d2460 _pr",
+   "consumers": "source/interface/progress_bar.c only.",
+   "unlocks": "+16 padded / +1 meaningful and progress_bar.obj's last unwritten row."
+  },
+  {
+   "wave": "n1",
+   "group": "n1_hud_draw_interface_etc",
+   "kind": "config+names",
+   "text": "Names-only fidelity from the January map atlas (zero bytes): rename _draw_gravy_layer -> draw_layer_int (0x000d1770), _set_blur_texture_coordinates -> do_convoluation_coords (0x000d19c0), _draw_fullscreen_blur -> draw_fade_layer (0x000d1a60), _progress_bar_build_glow_texture -> progress_bar_create_mask_texture (0x000d2460), in both the C identifiers and config/symbols.json. Keep the current `_`-prefixed spelling and the existing \"static\" flags: the atlas decorations (@name@N, and the C++-mangled rows in the sibling interface.obj.txt) come from other builds keyed by January address, so only the NAMES transfer, never the calling convention.",
+   "evidence": "scratch/atlas/progress_bar.obj.txt (\"January debug cachebeta.exe map atlas records, off = January file_offset + 0x400000\") matched against config/symbols.json file offsets.",
+   "consumers": "source/interface/progress_bar.c only - `grep -rn` for all four identifiers across source/*.c and source/*.h returns no hit outside progress_bar.c.",
+   "unlocks": "0 bytes; house-rule naming fidelity. A pure identifier rename is byte-inert here (no assert stringises these names), but the orchestrator should re-gate progress_bar after the symbols.json edit."
+  },
+  {
+   "wave": "n2",
+   "group": "n2_collision_usage_devices",
+   "kind": "owner-ruling disclosure (no header/config/symbols text required)",
+   "text": "Verifier attention, devices.obj _device_frontfacing: the landing restores the genuine dot_product3d() helper call, which emits a surplus select-any _dot_product3d COMDAT. docs/object_matching_logs/devices_obj_frontfacing_withheld_owner_boundary_20260905.md withheld exactly this form on an ownership veto (LNK2005 against source/ai/action_charge.obj, whose copy is COMDAT selection 1 SELECT_NODUPLICATES). I landed it and disclose it here; if laws_w3 R13 is read as binding that 2026-09-05 veto regardless of the census below, the revert is one hunk \u2014 restore the three component products recorded in scratch/workers/n2_collision_usage_devices/base_body.txt, returning the row to [sha] at 128/4 and t",
+   "evidence": "Measured this wave by reading the COMDAT selection from each definition's section aux record across the whole tree: build/base has 70 objects defining _dot_product3d \u2014 69 at selection 2 (SELECT_ANY) and only build/base/source/ai/action_charge.obj at selection 1 (SELECT_NODUPLICATES); build/split (January) has exactly ONE definition, action_charge.obj, selection 1. All 70 base copies and January's ",
+   "consumers": "None \u2014 no header, config/*.json, symbols.json, parks or build change was made or is needed. Only source/devices/devices.c changed (1 insertion, 4 deletions). The _dot_product3d COMDAT is per-TU and affects no other object.",
+   "unlocks": "Closes devices.obj completely (30/30 exact, 0 residual, 0 unwritten) for 128 newly exact padded bytes. If confirmed, the same reasoning frees any other residual whose only recorded blocker was a pre-2"
+  },
+  {
+   "wave": "n2",
+   "group": "n2_real_math",
+   "kind": "owner-ruling",
+   "text": "Admit, in source/math/real_math.c only, the representation-pointer conversions at math-helper argument boundaries that January's own relocations force:\n\n\tproject_point3d((real_point3d const *)&edge0, projection, projection_sign, &projected_edge0);\n\tcross0 = cross_product2d((real_vector2d const *)&projected_edge0, (real_vector2d const *)&projected_offset);\n\tfast_normalize2d((real_vector2d *)normal);\n\nThis lifts the 20260826 do-not-repeat items 'Do not cast point/vector union pointers merely because their layouts match' and 'Do not cast a real_vector3d * to real_vector2d * for normalization', and the 20260831 rejection of the Fable _point_in_triangle3d body, for these two functions. The comple",
+   "evidence": "(1) JANUARY-SIDE PROOF, new: build/split/source/ai/actors.obj contains the assert literals \"(real_vector2d *) &actor->input.facing_vector\" (file offset 36169) and \"(real_vector2d *) &control_data.facing_vector\" (offset 36649). actors.h:501 declares real_vector3d facing_vector; and valid_real_normal2d is a 2D helper, so an assert macro stringised Bungie's own source text casting a real_vector3d to ",
+   "consumers": "source/math/real_math.c ONLY. No header, config, symbols.json, build or other translation unit changes are required; nothing outside this .c file is edited by the candidate.",
+   "unlocks": "880 padded bytes now (_point_in_triangle3d 432 + _pill_test_vector3d 448), landed by taking scratch/workers/n2_real_math/v3.c as-is. The ruling also settles the identical real_point2d/real_vector2d an"
+  },
+  {
+   "wave": "n2",
+   "group": "n2_ai_debug",
+   "kind": "config + source rename (one commit)",
+   "text": "config/symbols.json line 654, edited IN PLACE (never sort or re-serialize the file): change only the \"name\" value `_code_00041220` -> `_ai_debug_render_encounter`. Matching source edit in source/ai/ai_debug.c: word-bounded rename of `code_00041220` -> `ai_debug_render_encounter` at the prototype (line 201), the single call site (line 485) and the definition (line 5700 before this wave's landing; +2 lines after).",
+   "evidence": "scratch/atlas/ai_debug.obj.txt:44 `00041220 fuzzy ai_debug.obj _ai_debug_render_encounter` (atlas exact-tier neighbours for this object are byte-matched at their recorded offsets; w2 re-anchored on 0x375B0 and 0x39920). Caller topology: ai_debug_render passes ai_debug.selected_squad_index; parameter is encounter_index; callees encounter_get / encounter_actor_iterator_new+next / encounter_build_fir",
+   "consumers": "grep -rn 'code_00041220' source tools config docs: no other source file names the identifier. Only mentions are a comment in source/ai/ai_scenario_definitions.h:313 and text in tools/emission_shape_oracle.py and tools/context_diff_oracle.py (those name _code_00039990 and _code_0003a910, not 41220). ",
+   "unlocks": "Removes the last `code_`+address-named strict-exact row in ai_debug.obj; zero byte risk. The remaining 19 names of the w2 atlas batch may ride in the same commit (that proposal is unchanged by this wa"
+  },
+  {
+   "wave": "n2",
+   "group": "n2_ai_debug",
+   "kind": "law promotion (WORKER_BRIEF / laws file)",
+   "text": "Promote and widen laws_w3 A23 (FOR-INCREMENT FREQUENCY): it is now confirmed on a second, independent function and in the OPPOSITE direction \u2014 w3 landed it by ADDING a for-with-increment to make a static inline late (_cache_hardware_format_character); n2 landed it by REMOVING one to make a static stay out of line (_code_00041220, 2,336 B). Two refinements the w3 write-up asked for are now measured: (a) the effect is site-specific, not 'nearest loop' \u2014 the distant calibration loop carried it while the immediately-preceding colour loop was byte-inert; (b) the decision it moves is a PER-SITE frequency threshold, not a caller-growth budget \u2014 making a different site hotter adds an inline without ",
+   "evidence": "docs/object_matching_logs/ai_debug_obj_opus5_next150_n2_20260915.md section 'The lever' (shapes v1/v2/v3 with gate numbers 2544/201, 2448/185 inert, 2336/169 exact) and scratch/workers/n2_ai_debug.md.",
+   "consumers": "None (documentation only). Candidate re-application targets are any residual whose gap is a static/__inline helper split, e.g. the remaining drawstack-style call/inline mismatches recorded elsewhere in the lane.",
+   "unlocks": "A cheap, reusable first probe for every remaining 'inlined here but called there' residual in the lane."
+  },
+  {
+   "wave": "n2",
+   "group": "n2_lruv_cache_decals_etc",
+   "kind": "config",
+   "text": "config/symbols.json, edit the two lines IN PLACE (do not sort or re-serialize the file):\n\nline 22481:  { \"file_offset\": 4414640, \"flags\": 0, \"name\": \"_bss_00435cb0\" },\n  REPLACE WITH\n             { \"file_offset\": 4414640, \"flags\": 0, \"name\": \"_decal_points2d_temp\", \"static\": true },\n\nline 22482:  { \"file_offset\": 4414816, \"flags\": 0, \"name\": \"_debug_decals\" },\n  DELETE (invented duplicate label at an interior address)",
+   "evidence": "(1) symbols.json carries `_debug_decals` twice: line 22482 @4414816 and line 22999 @5842644. scratch/pdb200-current/pdb_symbols.json has exactly ONE `_debug_decals`, rva 5842644, section .data. Nothing is published at 4414816. (2) 4414816 = _decal_geometry(4414840) - 24, the displacement VC7 folds for &decal_geometry.decal_vertices[base+count-1] (decals.c:666-668; _render_debug_decals 0x30..0x50).",
+   "consumers": "config/symbols.json only, plus the csplit regeneration of build/split/source/effects/decals.obj. Neither label appears in any source file: `grep -rn '_bss_00435cb0' source --include=*.c --include=*.h` returns nothing, and `grep -rn 'debug_decals' source --include=*.c --include=*.h` returns only the ",
+   "unlocks": "Fidelity: retires two invented .bss names. Fixes the relocation SPELLING for _render_debug_decals (@0x53) and _decal_clip_to_surface (@0x37a). It does NOT by itself grant the 432 padded bytes: after t"
+  },
+  {
+   "wave": "n2",
+   "group": "n2_lruv_cache_decals_etc",
+   "kind": "tool-policy (decision needed, no text drafted)",
+   "text": "Extend the relocation-identity rule (tools/coff_compare.py relocation_infos_equal, and/or the tools/parked_functions.py resolved-equal admission already used for _collision_log_get_current_user) so that two spellings of the SAME proven .bss destination address compare equal when the destination lies INSIDE a defined non-code object, not only when it lands exactly on an external anchor. Today a negative/interior addend from a following static symbol (ours: _decal_geometry-24) can never match csplit's preceding-symbol spelling, which is why laws_w3 A45 records 'strict exact unreachable ... as an already-written residual' for this class.",
+   "evidence": "_render_debug_decals is the concrete case: relocdiff reports size 432/432, relocations 27/27, sha EQUAL, and exactly one relocation differs only in label. The destination address is identical on both sides (4414816). laws_w3 A45 already admits the mirror case (a negative-index alias, _global_current_collision_users-2 == _collision_usage_current+2974) through parked_functions.py, but only for parke",
+   "consumers": "tools/coff_compare.py, tools/campaign/relocdiff.py, tools/campaign/gate.py consumers, tools/parked_functions.py; whole-board re-measurement required.",
+   "unlocks": "_render_debug_decals 432 padded bytes with ZERO source change (paired with proposal 1). Probably also other [reloc-identity] rows board-wide; I did not survey outside my four units."
+  },
+  {
+   "wave": "n2",
+   "group": "n2_connected_geometry_actor_stimulus_etc",
+   "kind": "park-remeasure",
+   "text": "Replace the parked _triangle_coplanar body in source/tool/connected_geometry.c with the body in scratch/workers/n2_connected_geometry_actor_stimulus_etc/cg/v1.c (identical file except that one function) and rebaseline its config/parked.json hash in the same commit. The new body calls the genuine helpers: fabs(dot_product3d((real_vector3d const *)pointN, &plane->n) - plane->d) < 0.01f for the three points, plane3d_from_points(&triangle_plane, point0, point2, point1) != NULL, and dot_product3d(&triangle_plane.n, &plane->n) > 0.0f, with real_plane3d *plane = predicate_data; declared after the three point fetches. ZERO strict credit - it is not exact.",
+   "evidence": "Measured 384 padded / 11 relocs with exactly 4 differing instructions (alndiff), against 10 for the body currently in production (w2 ledger). Same size, same relocation identities and addresses, 151/151 instructions. It also deletes the production body's hand-expanded plane distance (point0->y*plane->n.j + point0->z*plane->n.k + point0->x*plane->n.i - plane->d) and its three order-forcing locals p",
+   "consumers": "source/tool/connected_geometry.c only; config/parked.json entry for _triangle_coplanar must be rebaselined in the same commit or ninja fails on park drift.",
+   "unlocks": "Nothing immediately (0 strict bytes). It removes a hand-expanded-helper body from production source and leaves the next wave a 4-instruction residual instead of a 10-instruction one."
+  },
+  {
+   "wave": "n2",
+   "group": "n2_connected_geometry_actor_stimulus_etc",
+   "kind": "owner-ruling",
+   "text": "Decide whether _connected_geometry_find_or_add_edge may declare 'boolean forward;' UNINITIALISED, reproducing January's latent indeterminate read of that byte. Current production writes 'boolean forward = TRUE;'.",
+   "evidence": "January writes [ebp-1] at exactly three places and never on entry: +0x47 (forward match, 1), +0x4D (reverse match, 0), +0x67 (new edge, 1); it reads the byte at +0xBE. The read is reachable only when geometry->edges.count < 0, because +0x51 is 'cmp esi,[ebx+0x10]; jne' - an equality test, so the '>=' spelling that would remove the undefined path is refuted by bytes. Our initializer is the ONLY ext",
+   "consumers": "source/tool/connected_geometry.c only; no header or config change is involved.",
+   "unlocks": "At most 240 B, and NOT on its own: an independent return-block layout residual survives the ruling (January lays the shared 'return NONE' block between the two SET_FLAG arms, +0xC8 set / +0xD7 NONE / "
+  },
+  {
+   "wave": "n2",
+   "group": "n2_connected_geometry_actor_stimulus_etc",
+   "kind": "law-candidate",
+   "text": "lrar_cache calibration for the INLINE FREQUENCY LAW: VC7's per-call-site inline decision for a static helper has THREE tiers, not two - T3 full (helper plus its own callees inlined), T1 partial (helper inlined, its callees still called) which is what a plain depth-0 statement gets, and T0 no inline. Respelling an infinite retry loop 'for (;;)' as 'found = FALSE; while (!found) {...}' cools every site inside it by exactly ONE tier, at byte-identical loop code.",
+   "evidence": "Calibrated on January itself in lrar_cache.obj: _lrar_block_address and _lrar_deallocate (depth-0 statements) get T1; _lrar_flush's loop site and _lrar_allocate's in-loop site get T3; _lrar_allocate's two other sites get T0, i.e. colder than a depth-0 statement. Shape n1 (scratch/workers/n2_connected_geometry_actor_stimulus_etc/lr/n1.c) measured 912/37 vs a 1056/47 baseline, with _csprintf and _te",
+   "consumers": "Any residual whose recorded blocker is 'helper stays out of line / inlines only at some sites' (laws_w3 C4 A23 sweep).",
+   "unlocks": "Not measured elsewhere. lrar_allocate itself needs two tiers and the second is unreachable without a code-free (redundant) conditional, so it stays parked."
+  },
+  {
+   "wave": "n2",
+   "group": "n2_actor_perception",
+   "kind": "header",
+   "text": "In source/ai/actor_perception.h line 16, change `long actor_get_perception_knowledge(` to `short actor_get_perception_knowledge(` (paired body scratch/workers/actor_perception/knowledge_final.c from w1).",
+   "evidence": "Carried forward UNCHANGED from the w1 ledger (actor_perception_obj_opus5_150k_w1_20260914.md, proposal A); re-stated here only because it is still the recorded prerequisite for two rows in this unit. January calls actor_get_perception_knowledge out of line at every in-TU site and compares the orphan-derived value with `cmp ax,0xffff` without sign-extending a return; HCEX DB records __int16. Measur",
+   "consumers": "grep -rl 'actor_perception.h' source --include=*.c --include=*.h : source/ai/action_charge.c, source/ai/action_fight.c, source/ai/action_flee.c, source/ai/actor_firing_position.c, source/ai/ai_communication.c (plus actor_perception.c itself). ai_communication.c is the only caller; its park ledger al",
+   "unlocks": "0 strict bytes on its own; prerequisite only (_code_00020990 1472 needs it AND the OUT _point_from_line3d ruling)."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_glow",
+   "kind": "owner-ruling",
+   "text": "Admit, for _get_particle_world_position in source/objects/widgets/glow.c ONLY, the reproduction of two original Bungie defects under the docs' /* BUG (preserved for exact matching): ... */ form: (1) the two- and three-marker paths give NO value to sides[0..3], which the unconditional third nonuniform_cubic_spline_vector3d call then reads; (2) on the three-marker parent_marker_index == 1 path the midpoint knot is written over knots[2] instead of knots[1], so knots[1] is never set. If admitted, replace the parked body with the body in scratch/workers/n3_glow/owner_candidate_n3a.c (a byte-identical copy of scratch/workers/glow/owner_candidate.c; it is the CURRENT real file with only that one bo",
+   "evidence": "January COFF build/split/source/objects/widgets/glow.obj. (a) Relocation census by target: ours is a strict SUPERSET - every call, global and literal matches (3 _display_assert, 3 _system_exit, 3 _nonuniform_cubic_spline_vector3d, 6 assert literals); the only deltas are +6 __real@3f000000, +3 __real@3e800000, +3 __real@3f400000, which at 3 constants per interpolated real_vector3d is exactly the 2-",
+   "consumers": "None. No header, config or shared file is involved; the change is confined to source/objects/widgets/glow.c plus the parked.json unpark. Verified by the owner census: candidate-only [] and base-only [] versus build/base and build/split.",
+   "unlocks": "1,744 padded bytes (1,729 meaningful) - the last non-exact row in glow.obj; the object closes 25/25."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_glow",
+   "kind": "park-rebaseline (zero strict credit; only if the owner DECLINES the ruling above)",
+   "text": "Optional fallback, offered not claimed, and a parked-body edit so it is the orchestrator's call: re-baseline the _get_particle_world_position park from the current 2528 / 55 / fb7bb3c6b7236d62 to the body in scratch/workers/n3_glow/v2.c. v2 is the current real file with ONE hunk: drop the real_vector3d position_vectors[4] staging array, its four-trip fill loop and the real_vector3d position result local, and spline straight through (real_vector3d *)&positions[0..3] into (real_vector3d *)&particle->position, exactly as January does (lea esi,[edi+0x2c]). Measured at HEAD: 2464 / 55, frame sub esp,0xb8 (down from 0xf4), gate exact 24 / residual 1 / unwritten 0 with no sibling change, point guar",
+   "evidence": "Frame census: January 0xc4 = 196 bytes with positions[0..3] at [ebp-0x50/-0x44/-0x38/-0x2c] passed directly as the spline's vector arguments and no position result local (spline 1 writes through lea esi,[edi+0x2c]); our 0xf4 = 244 is exactly 48 bytes larger, the size of the surplus position_vectors[4]. Measured: v2 2464/55 frame 0xb8 (-64 bytes vs the 2528 base); v1, which additionally adopts Janu",
+   "consumers": "",
+   "unlocks": "0 strict bytes. Fidelity only: removes a source construct January does not have and that the lane's admitted-cast rulings no longer require."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_input_xbox",
+   "kind": "board-correction",
+   "text": "Correct the board/baseline row for source/input/input_xbox: the unit is '== exact 25  residual 2  unwritten 0' at HEAD 6ebd05a96, with exactly TWO parked entries (_input_get_device_states, _input_update_keyboard_devices). _input_update_analog_button_state (48 padded) is strict EXACT and no longer parked.",
+   "evidence": "Measured gate: 'python -B tools/campaign/gate.py source/input/input_xbox --all --forbid-emitted-symbol _point_from_line3d' prints 'EXACT 48 _input_update_analog_button_state' and '== exact 25  residual 2  unwritten 0'. 'grep -n input_xbox config/parked.json' returns only the two park entries. 'git show ae10935da -- source/input/input_xbox.c' is the landed new_threshold body; the commit subject is ",
+   "consumers": "None \u2014 board/ledger bookkeeping only; no header, config or source change is requested.",
+   "unlocks": "0 B. Prevents a future wave from re-spending a shape budget on an already-exact row (the brief's section 0 do-not-reconstruct list already names it)."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_hud_unit",
+   "kind": "law-candidate (no header/config change requested)",
+   "text": "VC7 13.00.9254 frame ranking of same-alignment aggregates is neither refs/size (hud_unit w3c v2), nor lexical scope depth by one level (n3a v1), nor the local's name (n3a d1, byte-identical after rename). It flips between 'deepest' and 'next-to-last' on whether the aggregate is declared INSIDE the innermost if-chain that uses it (n3a d2/d3/d4 move the two 18-long index arrays into January's ranks 2-3 while the moved aggregate overshoots to the shallow end). Useful as a DETECTOR for frame-order residuals elsewhere, and as a blocker statement here: for hud_unit no setting of that switch reproduces January's intermediate rank.",
+   "evidence": "scratch/workers/n3_hud_unit/{w1,v1,d1,d2,d3,d4}.obj gated at HEAD 6ebd05a96; frame tables and alndiff extracts recorded in scratch/workers/n3_hud_unit.md and docs/object_matching_logs/hud_unit_obj_opus5_next150_n3a_20260915.md",
+   "consumers": "none (no source, header or config edit proposed)",
+   "unlocks": "cheaper triage of frame-order park residuals in other units; prevents further spend on refs/size or name-based frame-rank hypotheses"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_hud_unit",
+   "kind": "park-base remeasure OPTION - explicitly NOT proposed, zero credit, orchestrator's call",
+   "text": "config/parked.json entry source/interface/hud_unit :: _hud_render_unit_interface could have its base re-measured from the current 3472/102 (struct-diff 127 blocks / 308 insns) to scratch/workers/n3_hud_unit/w1.c (== scratch/workers/hud_unit_messaging/hud_unit_candidate.c), which gates at 3504/102 - January's exact padded size and exact relocation count - struct-diff 41 blocks / 56 insns, all 21 sibling rows still EXACT, guard passing. It would also retire the misleading '[size 3472!=3504]' gate tag that caused this row to be scheduled as a structural target.",
+   "evidence": "gate.py --source scratch/workers/n3_hud_unit/w1.c --all at HEAD 6ebd05a96: 'residual 3504 _hud_render_unit_interface [sha]', exact 21 residual 1 unwritten 0; relocdiff 102/102 all targets equal; scratch/workers/n3_hud_unit/score.py on build/base object = 127/308 vs w1.obj = 41/56",
+   "consumers": "config/parked.json only (orchestrator-owned); no source file changes",
+   "unlocks": "nothing directly - zero strict credit. Recorded because waves w1 and w3c both offered it and it was not taken; R11 (strictly-closer body that changes size, not tied to a reopen) applies, so it stays a"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "kind": "owner-ruling",
+   "text": "Rule on the R14 `_vector_from_points3d` surplus select-any COMDAT. Scope correction: it is not only sun_glow. In motion_sensor it gates BOTH `_motion_sensor_update` (1,168 padded, strict-exact body scratch/workers/motion_sensor/v13.c) and `_update_motion_sensor` (864 padded, best body scratch/workers/w3c_motion_sensor/u7.c at 864/39) \u2014 2,032 padded bytes \u2014 because real_math.h:1177 defines `distance_squared3d` as `magnitude_squared3d(vector_from_points3d(a, b, &v))`, so no call to distance_squared3d can avoid emitting the pair.",
+   "evidence": "scratch/workers/motion_sensor/census.py run against build/base/source/interface/motion_sensor.obj and build/split/...: v13 adds ('code','_distance_squared3d') and ('code','_vector_from_points3d'); u7 adds the same two plus ('data','__real@00000000'). base-only vs candidate is empty in both cases. laws_w2 C3 / laws_w3 R14 record the ruling as pending even though 75 base objects already emit the hel",
+   "consumers": "real_math.h: 188 direct includers in source (95 .c + 93 .h); the helper is a select-any header inline, so the ruling is about census policy, not a header edit.",
+   "unlocks": "2,032 padded bytes in motion_sensor (1,168 conditional on the separate uninitialised-read ruling; 864 conditional additionally on the reassociation tie), plus the recorded 2,352 in sun_glow."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "kind": "owner-ruling",
+   "text": "Rule on preserving January's uninitialised `camera_positions[i]` read in `_motion_sensor_update` (a local player whose unit is NONE never gets a camera position, and the object loop reads the slot anyway). If permitted, the strict-EXACT body is scratch/workers/motion_sensor/v13.c (whole-TU gate '== exact 16 residual 3' at this HEAD, which also carries the _blip_begin reopen).",
+   "evidence": "January's only csmemset in the function is csmemset(&sentinel, 0x62, 0x200) at [ebp-0x284] \u2014 the stack-corruption sentinel \u2014 so the 0x84 bytes of real locals above it, camera_positions included, are never cleared at entry; the parked body zeroes them and is 20 frame bytes short (sub esp,0x270 vs 0x284). Brief section 7 lists uninitialised reads as prohibited.",
+   "consumers": "source/interface/motion_sensor.c only.",
+   "unlocks": "1,168 padded bytes, jointly with the _vector_from_points3d ruling."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "kind": "header-packet-re-evaluation",
+   "text": "laws_w3 E7 (real_math.h rotate_vector2d authentic two-value body) CANNOT be made count-neutral; drop the 'needs a count-neutral compensation' plan. If the 400 B of _render_blip (plus the recorded _biped_update_turning 1,712 prerequisite) is wanted, E7 must ride in one wave with a worker owning source/bitmaps/bitmap_drawing.c and source/game/game_engine_race.c who re-closes _bitmap_copy, _race_engine_player_update and _race_touch_flag under the E7 header. Recorded E7 text is unchanged and sufficient: `real j = sine*v->i + cosine*v->j; real i = cosine*v->i - sine*v->j; result->i = i; result->j = j; return result;` (same signature, __inline real_vector2d *).",
+   "evidence": "Six shadow-tree probes this wave (scratch/workers/n3_motion_sensor/sh{A,B,D,E,G,H}, gated with scratch/workers/w3c_motion_sensor/sgate2.py, real tree untouched): A (two temps, j first), B (one temp `real j`), G (one temp `real i = v->i`), H (two temps, i first) each lose _bitmap_copy at identical size and relocation count (2784/69, sha only); B additionally loses _race_engine_player_update (160/9)",
+   "consumers": "real_math.h: 188 direct includers in source (95 .c + 93 .h); laws_w3 records the transitive blast as 268 TUs.",
+   "unlocks": "+400 (motion_sensor _render_blip, still [sha] on one C2 scheduling window) against -3,280 (2,784 + 160 + 336) unless the three victims are re-closed in the same wave."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_motion_sensor",
+   "kind": "parked.json-evidence-text",
+   "text": "Replace the recorded evidence text of two motion_sensor parks, which this wave's census refutes. `_motion_sensor_update`: the difference is NOT the 'otherwise-discarded game_engine_running call' (both builds emit two of them) \u2014 January inlines motion_sensor_blip_set_type_and_size at this site and fetches the local player once where we fetch it twice. `_update_motion_sensor`: the two zero-real relocations do NOT 'reflect unresolved x87 scheduling' \u2014 they are the k*k term of distance_squared3d(&reference_position, &object_position) with reference_position.z copied from object_position.z, reproduced exactly by scratch/workers/w3c_motion_sensor/u7.c at 864/39.",
+   "evidence": "tools.campaign.relocdiff --count-by-target for both functions (tables in docs/object_matching_logs/motion_sensor_obj_opus5_next150_n3a_20260915.md section 1) and tools.campaign.alndiff against u7_chk.obj / v13_chk.obj.",
+   "consumers": "config/parked.json (orchestrator-owned).",
+   "unlocks": "0 B directly; prevents a third wave from spending its budget against a refuted premise."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_player_effects",
+   "kind": "board-correction",
+   "text": "No tree change requested. Correct this unit's baseline row list on the lane board: source/effects/player_effects gates '== exact 25  residual 4  unwritten 0' at HEAD, not '24/5'. _player_effect_get_screen_flash is already strict EXACT in the real file (landed by wave w3c earlier the same day, docs/object_matching_logs/player_effects_obj_opus5_250k_w3c_20260915.md). The four non-exact rows are _player_effect_add_continuous_effect 320 [sha], _player_effect_get_camera_effect_matrix 1312 [size 1280!=1312, sha] (parked), _player_effect_start 736 [sha] (parked), _player_effect_update_camera_impulse 752 [sha] (parked).",
+   "evidence": "python -B tools/campaign/gate.py source/effects/player_effects --all --forbid-emitted-symbol _point_from_line3d, run at HEAD before and after this wave: 'EXACT 800 _player_effect_get_screen_flash' and '== exact 25  residual 4  unwritten 0  (of 29 listed)'.",
+   "consumers": "lane board / wave packet generator only; no source, header or config file is affected.",
+   "unlocks": "0 B; prevents a later wave from re-reconstructing an already-exact row (the WORKER_BRIEF section 0 do-not-reconstruct list already names _player_effect_get_screen_flash)."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_player_effects",
+   "kind": "lane-observation",
+   "text": "No tree change requested. Three of this unit's four residuals - _player_effect_get_camera_effect_matrix cluster A, _player_effect_start, _player_effect_update_camera_impulse - are one defect class: the operand load order of terms inside inlined real_math.h cross_product3d / dot_product3d bodies, with NO structural delta anywhere (identical frames, identical relocation sets, and identical instruction counts in two of the three). Treat them as a systemic inline-IL question (A35 / A41), not as three independent per-site source defects; per-site spellings are now spent across four waves (w1, the 0904 closeout, w3c, n3a).",
+   "evidence": "alndiff + relocdiff + per-slot [ebp+-N] censuses recorded in scratch/workers/n3_player_effects.md and docs/object_matching_logs/player_effects_obj_opus5_next150_n3a_20260915.md; w3c ledger sections for _player_effect_start and _player_effect_update_camera_impulse.",
+   "consumers": "wave planning only.",
+   "unlocks": "potentially 1312 + 736 + 752 = 2,800 padded bytes in this unit alone if a real_math.h inline-IL law for inlined cross/dot term order is ever measured; 0 B today."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_player_effects",
+   "kind": "new-measured-law",
+   "text": "No tree change requested; proposed for the lane law file. LAW (measured here, narrow): VC7 gives 'a += expr' and 'a = a + expr' the same IL for a struct-member lvalue, and NEVER forwards a stored struct-member value into a later read within the same basic block - the reload is emitted whatever the statement order (candidate v1: x = x + e, byte-identical to +=; candidate v2: the pass-1 x statement moved to be immediately followed by its consumer, still stores and reloads). Corollary detector: when January reads such a value from an x87 register instead of memory, the value was never assigned to that member in the source. SECOND MEASURED FACT: a local real_vector3d whose address is passed only",
+   "evidence": "scratch/workers/n3_player_effects/v1.c, v2.c, v3.c and their .obj, with alndiff and the per-slot frame censuses recorded in scratch/workers/n3_player_effects.md (section 6) and the n3a ledger.",
+   "consumers": "any residual whose recorded blocker is 'January keeps a value in an x87 register where we spill it' or 'helper routing through a temporary vector'.",
+   "unlocks": "0 B directly; removes two whole shape families from future waves."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "kind": "config/parked.json evidence text (zero bytes)",
+   "text": "_DecodeBlockRGB__single_pixel: replace 'Require coordinates 0..3, not the original inclusive 4 which permits an invalid selector shift.' with 'January's assert text is proven twice over - mangled literal ??_C@_0N@CLDKFKKD@ = \"u>=0 && u<=4\" and the signed jle at +0x180/+0x1ae - and must be written verbatim per docs/assertions.md; the only open question is the 64-byte null-source clear (S3TC_BLOCK_PIXELS * sizeof(struct s3tc_color), copy-pasted from DecodeBlockRGB at s3tc.c:586), a 60-byte overrun of the caller's 4-byte output.' _EncodeBlockRGBColorKey: delete the projection-loop index-width clause (superseded by the do-while unroller law plus the struct s3tc_fcolor axis home; e7_probe.c is 21",
+   "evidence": "relocdiff --count-by-target and alndiff of build/split against the d1/d2 candidates; gate re-runs of e6.c (2224/37) and e7_probe.c (2192/36) at this HEAD; git ls-tree of research-cache/windows-server-2003-dxtn commit 5c6fe3db; DIA2Dump -sym over HCEX.pdb.",
+   "consumers": "config/parked.json only (orchestrator-owned); no source or header consumer.",
+   "unlocks": "Text only, 0 bytes directly; it stops the next wave re-spending on the superseded width clause and points it at the two live rulings."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "kind": "lane-wide sweep (new detector, validated on this unit)",
+   "text": "Run scratch/workers/n3_s3tc/assertlit2.py (read-only, ~20 s): for every unit it compares the set of ??_C@ string-literal symbol names in build/split/<unit>.obj against build/base/<unit>.obj and prints the literals OURS emits that January does not have. Output saved at scratch/workers/n3_s3tc/assert_literal_sweep.txt. Triage each hit as a wrong assert/diagnostic SPELLING (MSVC #expr preserves the source's internal token spacing, and the _0<len> field gives the exact character count), not as missing text.",
+   "evidence": "39 objects emit a literal January lacks. s3tc.obj appears with exactly the 2 literals this wave repaired, which validates the detector. Same-class spot checks: bitmaps/bitmap_group.obj J 'space_between>=0' (_0BB=17) vs O 'space_between >= 0' (_0BD=19); rasterizer/xbox/rasterizer_xbox_screen_effect.obj J 'combiner_count<=RASTERIZER_MAXIM...' (_0DD) vs O the spaced form (_0DF), plus four IDirect3DDe",
+   "consumers": "Read-only over build/split and build/base; the scan touches no source, header or config file. Any repair is a per-unit worker edit in the owning .c, or in the owning .h for shared asserts such as ai/encounters.h and math/real_math.h.",
+   "unlocks": "Unquantified, but the mechanism is invisible to gate.py tags (a wrong literal changes neither size nor relocation count) and it cost this unit 4 of the 5 remaining differences in a 496-byte function. "
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_s3tc",
+   "kind": "laws addition (n3a)",
+   "text": "ASSERT-TEXT RECOVERY LAW. MSVC's #expr stringization deletes the whitespace around the macro argument and collapses each internal run to a single space, but inserts none where the source had none. A January ??_C@ assert literal therefore names the original expression character-for-character - operator choice AND whitespace - and its _0<len> field gives the exact character count before any candidate is built. Cross-check the relational operator against the emitted jcc (signed jle = '<=', jl = '<'): two independent proofs. A wrong literal is invisible to gate.py's [size]/[relocs] tags and shows up only in relocdiff --count-by-target or in alndiff's relocation annotations.",
+   "evidence": "s3tc _DecodeBlockRGB__single_pixel: January ??_C@_0N@CLDKFKKD@u?$DO?$DN0?5?$CG?$CG?5u?$DM?$DN4?$AA@ = 'u>=0 && u<=4' with January's jle at +0x180; ours was 'u >= 0 && u < 4' with jl. Restoring the text alone took the row from 5 differing instructions / 2 differing relocation rows to 1 differing instruction / 0 differing relocation rows (scratch/workers/n3_s3tc/d1.c). The historical donor blob dc1e",
+   "consumers": "scratch/w3/laws_w3.md (or the next wave's laws file) and WORKER_BRIEF section 9.",
+   "unlocks": "Generalises to the 39 objects in the sweep proposal above."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_rasterizer_xbox_environment",
+   "kind": "parked.json evidence + class correction (no byte effect, no source/header/config change)",
+   "text": "For config/parked.json entry unit source/rasterizer/xbox/rasterizer_xbox_environment, function _rasterizer_environment_specular_spot_light_begin: change \"class\" from \"register-allocation\" to \"x87-operand-order\", and amend the evidence text to record: \"Wave n3a frame census refutes the recorded allocation premise. January is sub esp,0x84 and the parked body sub esp,0x74; January's slots are vertex constants [-0x84,-0x34), an unreferenced 4 bytes at -0x34, forward -0x30, cross result -0x24, up -0x18 and an unreferenced 12 bytes at -0xc, i.e. a real_matrix4x3 {scale; forward; left; up; position} whose scale and position are never written, while the parked body declares three separate real_vecto",
+   "evidence": "docs/object_matching_logs/rasterizer_xbox_environment_obj_opus5_next150_n3a_20260915.md spot-light sections; measurements in scratch/workers/n3_rasterizer_xbox_environment/{s1.c,s1.obj,s1_dis.txt,spot_jan.txt,spot_base.txt}; gate of s1.c = 42 exact / 2 residual with the spot row at 960/64 [sha]; parkcheck on the unchanged real file = 1 park drift 0.",
+   "consumers": "config/parked.json only. No .h or .c file is touched; the parked body, the real file and every measurements block (target 960/64/e0331f6b94a74f9c, base 944/64/d103843ee5f01bad) stay exactly as they are, so ninja's park check is unaffected.",
+   "unlocks": "Stops future waves re-reading this park as a register-allocation tie and re-spending shapes on declaration/helper probes; points them at the only live levers (a pointer-read commutative-operand law, o"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_rasterizer_xbox_environment",
+   "kind": "lane law to add to the next laws file (WORKER_BRIEF section 9 candidate)",
+   "text": "VC7 FLOAT-ARGUMENT STAGING LAW. VC7 integer-copies every plain float lvalue passed as a 4-byte argument (mov reg,[m]; push reg) - whether it is a scalar local, a parameter, a global, a struct field, an array element, or an address-taken local, and however it was defined (call return or in-line fp expression). It stages an argument through the x87 (push reg; fstp dword [esp], flushing any pending cdecl cleanup first so that [esp] is the argument slot) ONLY when the argument expression is fp-VALUED, or when a call result is consumed directly in the argument list. Detector: January 'fld dword [mem]' immediately followed by 'push reg; fstp dword [esp]' where we emit 'mov reg,[mem]; push reg' pro",
+   "evidence": "scratch/workers/n3_rasterizer_xbox_environment/{lab.py,rep1.c,rep2.c,rep3.c} compiled with rasterizer_xbox_environment's own build.ninja cflags and CL; full results table in docs/object_matching_logs/rasterizer_xbox_environment_obj_opus5_next150_n3a_20260915.md. It also corrects the w3c claim that the 68 January 'fld [reg+off] -> fstp [esp]' sites are 'pointer field' staging: a pointer field alone",
+   "consumers": "Documentation only. Directly relevant to the laws_w3 C3 x87-staged-real-argument family: __rasterizer_environment_lightmap_draw, _object_test_vector, _player_examine_nearby_device, _ai_test_line_of_fire, _biped_update_moving.",
+   "unlocks": "Lets other workers classify that whole family with one census instead of spending shapes on lvalue spellings, and tells the owner exactly which ruling would be needed to close them."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_bink_playback",
+   "kind": "parked.json",
+   "text": "In config/parked.json delete the entry {\"unit\": \"source/bink/bink_playback\", \"function\": \"_bink_draw_frame\"} and the entry {\"unit\": \"source/bink/bink_playback\", \"function\": \"_bink_query_analog_controller_buttons\"}, in the same commit that lands scratch/workers/n3_bink_playback/reopen_draw_frame_plus_query.c. Leave the \"_bink_alloc@4\" entry untouched. (To land only one of the two rows, delete only that entry and land scratch/workers/n3_bink_playback/reopen_draw_frame.c or scratch/workers/n3_bink_playback/q3.c instead.)",
+   "evidence": "Ninja fails once a parked body becomes exact. Both bodies are strict EXACT in a whole-TU gate of the complete candidate: _bink_draw_frame 912 / 59 / sha 24aa7c5023629b6b = target and _bink_query_analog_controller_buttons 80 / 1 / sha c88d131ba2ff1ac7 = target; combined gate '== exact 23 residual 1 unwritten 0 (of 24 listed)' vs the HEAD baseline '== exact 21 residual 3'; row-by-row diff of the two",
+   "consumers": "config/parked.json only. No header, symbols.json, semantic_matches.json, build-config or tool change is required, and no rename is needed (no pending-rename item in this group).",
+   "unlocks": "992 padded bytes (912 + 80) in source/bink/bink_playback."
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_bink_playback",
+   "kind": "laws (documentation)",
+   "text": "Add to the wave laws file, section A: (1) ADDRESS-IV IDENTITY IS A SOURCE FACT, NOT A SCHEDULER TIE. When a loop carries two lockstep counters of different widths, the strength-reduced pointer couples to whichever counter the SUBSCRIPT is written on, and that coupling fixes the emission slots of BOTH increments relative to the body stores. Detector: two adjacent-instruction permutations that both involve an induction-variable update, inside windows whose start and end addresses agree on both sides - that is the wrong subscript variable, not a tie. (2) SUBSCRIPT SPELLING SETS THE CURSOR BIAS: array[index].field biased the cursor +4 while an explicit T *p walked with p++ (declared outside the ",
+   "evidence": "All five measured in this wave on source/bink/bink_playback: (1) d0r/d2/d3 vs d7 (d7 strict EXACT); (2) d1/d4/d5 all bias +8 vs d0r/d2/d3/d7 at +4; (3) d7n; (4) the _bink_query_analog_controller_buttons frame census (January 'push ebx; push esi' only, ours push ebp/mov ebp,esp/push ecx + [ebp-1]); (5) q1/q2 inert vs q3 strict EXACT. Full listings and every candidate in scratch/workers/n3_bink_play",
+   "consumers": "Documentation only - no source, header or config consumer.",
+   "unlocks": "0 B directly. Law (1) applies to any residual whose recorded blocker is an adjacent increment/store permutation in a loop with two counters; law (4) applies to any 'register-allocation' park whose tar"
+  },
+  {
+   "wave": "n3a",
+   "group": "n3_main",
+   "kind": "owner-ruling-question",
+   "text": "TYPE FIDELITY (owner question; do NOT land as written - it trades exact rows). January's `main_get_window_count` is DEFINED with a 32-bit return type while its callers declare it `short`. If the owner rules the original mismatch reproducible, the change is: source/main/main_runtime.h line 17 `short main_get_window_count(` + `\\tvoid);` becomes `long main_get_window_count(` + `\\tvoid);`; source/main/main.c line 1418 `short main_get_window_count(` becomes `long main_get_window_count(`; and, to preserve the caller rows, a consumer-local `short main_get_window_count(void);` view is needed in the three main_runtime.h consumers that call it - the same spelling the tree already carries at source/ras",
+   "evidence": "January's body: `mov eax,1` (0x12), `mov eax,4` (0x2e), `call _local_player_count; movsx eax,ax; ret` (0x34..0x3c) - a 32-bit return on all three paths. Micro-lab scratch/workers/n3_main/lab/wc.c: lab_short reproduces our current 64/5 bytes exactly (`mov ax,1`, `mov ax,4`, tail `jmp`); lab_long is 61 meaningful bytes / 19 instructions / 5 relocations == January on size and relocation identity, lea",
+   "consumers": "main_runtime.h includers: source/interface/interface.c, source/interface/ui_widget.c, source/main/main.c, source/rasterizer/rasterizer_frame_statistics.c, source/rasterizer/xbox/rasterizer_xbox_draw_primitives.c, source/rasterizer/xbox/rasterizer_xbox_screen_effect.c. main_internal.h includers (unaf",
+   "unlocks": "At most 64 padded bytes (_main_get_window_count), and probably still [sha] because of the A43 block placement. On these numbers the packet does not pay for itself - 3,312 exact bytes at risk for 64 - "
+  },
+  {
+   "wave": "n4",
+   "group": "n4_hs_compile",
+   "kind": "owner-policy-ruling",
+   "text": "_hs_compile_postprocess (source/hs/hs_compile.c): admit, under the original-bug policy with the `/* BUG (preserved for exact matching): ... */` comment, the loop-carried `struct hs_script *script` whose `_hs_script_stub` test runs on the previous iteration's pointer when script_index is out of range, i.e. the spelling `if ((script_index >= 0 && script_index < scenario->scripts.count && (script = TAG_BLOCK_GET_ELEMENT(&scenario->scripts, script_index, struct hs_script))->script_type == _hs_script_static) || script->script_type == _hs_script_stub)` with `script` declared outside the expression loop. No header, config, symbols.json or parked.json text is involved - this is a policy decision onl",
+   "evidence": "January build/split/source/hs/hs_compile.obj _hs_compile_postprocess: prologue `sub esp,8` = TWO dword slots, ours `push ecx` = one; [ebp-8] has exactly ONE writer (@0x18d `mov dword ptr [ebp-8],eax`) and ONE reader (@0x1ae `mov eax,dword ptr [ebp-8]`), re-verified on build/split this wave (fourth independent confirmation); both out-of-range exits @0x15f `jl 0x1ae` and @0x170 `jge 0x1ab` converge ",
+   "consumers": "None - no header, config or shared file is touched. Scope is source/hs/hs_compile.c only.",
+   "unlocks": "720 padded / 714 meaningful bytes (_hs_compile_postprocess). Candidate scratch/workers/n4_hs_compile/pp1.c is already size- and relocation-exact; only this one hunk remains."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_hs_compile",
+   "kind": "owner-policy-ruling",
+   "text": "_hs_parse_begin (source/hs/hs_compile.c): re-admit the defined EXCESS `hs_function_get(function_index)->name` argument to the `sprintf(hs_compile_globals.error_buffer, \"a statement block must contain at least one argument.\", hs_function_get(function_index)->name)` call that the owner removed in commit f8c709078. PREREQUISITE ONLY - carried unchanged from w2/w3c and re-verified here; it is worth 0 bytes on its own and must not be scheduled as a wave by itself.",
+   "evidence": "January @0x124-0x13b: `mov ecx,[ebp+8]; push ecx; call _hs_function_get; mov edx,[eax+4]; push edx; push <??_C@_0DG@ILKKMIFN@a statement block must contain a...>; push <_hs_compile_globals+36>; call _sprintf` (`add esp,0x18` @0x159). The mangled literal length 0x36 = 54 bytes = the 53-character string plus NUL, and the string contains no conversion specifier (character count verified by hand this ",
+   "consumers": "None - no header, config or shared file is touched. Scope is source/hs/hs_compile.c only.",
+   "unlocks": "0 bytes alone. It is a prerequisite for _hs_parse_begin (432 padded); the row additionally needs a new measured lever for the cyclic volatile-register rotation from the begin_random arm @0xbf onward ("
+  },
+  {
+   "wave": "n4",
+   "group": "n4_lrar_cache",
+   "kind": "source-order fidelity (byte-inert; candidate scratch/workers/n4_lrar_cache/v1.c)",
+   "text": "In source/memory/lrar_cache.c, move the definition of `lrar_get_block` ahead of `lrar_verify_block` and `lrar_verify_cache`, so the private-code section reads `lrar_get_block`, `lrar_verify_block`, `lrar_verify_cache` (January's order). Definitions only; no prototype, header, symbols.json or config change. Complete candidate file: scratch/workers/n4_lrar_cache/v1.c (pure reordering, byte-identical output).",
+   "evidence": "NEW structural finding; the w2 ledger recorded the opposite ('January section order for statics is not source order here'). Proof 1, assert line anchors (our match_assert/match_vassert calls carry January's own line numbers): lrar_get_block's index assert is 0x16E = line 366, lrar_verify_block's vassert 0x186 = 390, lrar_verify_cache's vassert 0x199 = 409 (lrar_allocate's are 0x111/0x11C = 273/284",
+   "consumers": "source/memory/lrar_cache.c only. The six helpers are static and source/memory/lrar_cache.h declares none of them; `grep -rl lrar_cache.h source` returns lrar_cache.c alone. No header, config or build change.",
+   "unlocks": "0 strict bytes. Fidelity only: it makes lrar_cache.obj's section order match January exactly (prerequisite for any future whole-object byte claim) and retires the w2 ledger's wrong premise about stati"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_lrar_cache",
+   "kind": "names-only rename carried forward from wave w2, still absent from HEAD (0 B)",
+   "text": "config/symbols.json: edit three lines IN PLACE, keeping \"static\": true \u2014 line 4627 `_lrar_verify_block` -> `_verify_lrar_cache_block`; line 4628 `_lrar_verify_cache` -> `_verify_lrar_cache`; line 4631 `_lrar_get_block` -> `_get_lrar_cache_block`. In the same commit rename the identifiers (prototypes, definitions and all call sites) in source/memory/lrar_cache.c.",
+   "evidence": "scratch/atlas/lrar_cache.obj.txt (exact tier): `0010bfe0 exact lrar_cache.obj _verify_lrar_cache_block`, `0010c040 exact lrar_cache.obj _verify_lrar_cache`, `0010c280 exact lrar_cache.obj _get_lrar_cache_block`. The current names are invented (jonas 2026-08-31 cleanup) and match no January record; the atlas names match the sibling lra_cache.obj family (verify_lra_cache_block / verify_lra_cache). w",
+   "consumers": "source/memory/lrar_cache.c only; lrar_cache.h declares none of the three; config/parked.json mentions lrar_get_block in evidence text only.",
+   "unlocks": "0 strict bytes (all three rows are already EXACT). If this and the definition-order proposal are both taken they must be ONE commit \u2014 both touch the same three definitions."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_connected_geometry",
+   "kind": "owner-ruling",
+   "text": "Rule on whether source/tool/connected_geometry.c's connected_geometry_find_or_add_edge may declare 'boolean forward;' WITHOUT an initializer, reproducing January's latent indeterminate read of [ebp-1] on the geometry->edges.count < 0 path. Exact text change: '\\tboolean forward = TRUE;' -> '\\tboolean forward;' (one line, no other edit). Candidate file: scratch/workers/n4_connected_geometry/e1.c.",
+   "evidence": "January build/split/source/tool/connected_geometry.obj writes [ebp-1] at exactly three sites and never on entry: +0x47 'mov byte ptr [ebp-1],1' (forward match arm), +0x4D 'mov byte ptr [ebp-1],0' (reverse match arm), +0x67 'mov byte ptr [ebp-1],1' (new-edge path, between 'cmp esi,-1' and 'je'). It reads the byte once at +0xBE. The only path reaching that read with no preceding write is entry 'jle ",
+   "consumers": "None - single .c body line, no header or config change. Guard passes; all six sibling EXACT rows hold; both parked bodies untouched (parkcheck drift 0).",
+   "unlocks": "0 B on its own. A YES ruling is now MEASURED (not inferred, as n2 had it) to leave one residual: the trailing block order, January [+0xC8 set-bit arm+ret][+0xD7 merged NONE epilogue][+0xE1 clear-bit a"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_connected_geometry",
+   "kind": "parked.json-evidence-correction",
+   "text": "The config/parked.json entry for source/tool/connected_geometry::_triangle_coplanar carries stale evidence text: 'The sole remaining difference is one dependency-free x87 operand choice at target offsets +0x11D/+0x11F'. Correct the text (or remeasure the body) to match what is actually parked.",
+   "evidence": "alndiff of the parked production body against build/split at this HEAD shows THREE hunks / 10 differing instructions: the third point dot's x-term schedule at +0xB4..+0xC8, a pair at +0xE9..+0xF5, and the facing-dot i-term at +0x11D/+0x11F. The body that actually matches the recorded description is n2's genuine-helper candidate scratch/workers/n2_connected_geometry_actor_stimulus_etc/cg/v1.c, re-v",
+   "consumers": "config/parked.json only (orchestrator-owned). Wave n2 already filed the park-remeasure proposal for v1.c; this is the supporting correction, not a duplicate request.",
+   "unlocks": "0 strict bytes; fidelity of the park record and of the reopen criterion."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_bink_playback",
+   "kind": "owner-ruling",
+   "text": "Permit a single, unit-local, one-site `__asm { int 3 }` inside `bink_alloc` in source/bink/bink_playback.c (non-helper function), disclosed as a fake_match_scan lead, with the comment already in the candidate. This is NOT the declined cseries.h `debug_break()` macro and requires no header or config change.",
+   "evidence": "January's _bink_alloc@4 ends its failure arm with `ce add esp,0x14 / d1 int3 / d2 pop edi ... d9 ret 4` - the only int3 in the whole 468-object split corpus. Every non-asm construct is now refuted: DebugBreak() (xbox/include/WinBase.h:912) is a WINBASEAPI function and would emit a 5-byte call with a relocation; _CrtDbgBreak() (xbox/include/CrtDbg.h) maps to __asm { int 3 } only on the dead `#elif ",
+   "consumers": "None - the change is entirely inside source/bink/bink_playback.c. No header, no config/*.json, no build file, no other translation unit.",
+   "unlocks": "_bink_alloc@4, 496 padded bytes (park reopen). Without the ruling the park stays and the 496 bytes are unreachable; do not land the body minus the trap (zero-credit size-changing body, R11)."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "kind": "parked-json-evidence-text",
+   "text": "config/parked.json, entry unit=source/bitmaps/s3tc/s3tc function=_DecodeBlockRGB: replace the clause 'remaining instruction selection and scheduling are non-exact' with 'the gap is one extra out-of-line _RGBToColor call (relocation census by target: JAN 1, OURS 2; TOTAL 2 vs 3). January inlines the first call into its own dead `source` parameter slot [ebp+8]; the boundary is set by the callee body, not by this function, and this body is byte-exact once the callee is correct.'",
+   "evidence": "relocdiff --count-by-target --allow-structural on the real HEAD object; alndiff showing the inlined helper at T 0x2c..0x64 and the out-of-line call at T 0x73; frames identical (sub esp,0x10 both sides). Re-census with scratch/workers/s3tc/reopen_rgbtocolor.c = 2/2, 0 differing rows, row strict EXACT with no body change.",
+   "consumers": "config/parked.json only; text-only change, zero bytes, no source consumers.",
+   "unlocks": "Stops a future wave re-classifying a relocation-count gap as a register/scheduling tie and spending shapes on it."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "kind": "parked-json-evidence-text",
+   "text": "config/parked.json, entry unit=source/bitmaps/s3tc/s3tc function=_DecodeBlockRGB__single_pixel: (1) add the unrecorded third defect - 'one extra out-of-line _RGBToColor call (census JAN 1 / OURS 2), the same coupled inline boundary as _DecodeBlockRGB'; (2) replace 'Require coordinates 0..3, not the original inclusive 4 which permits an invalid selector shift' with 'January's assert text is byte-proven to be u>=0 && u<=4 and v>=0 && v<=4 (mangled literals ??_C@_0N@CLDKFKKD@ and ??_C@_0N@NBFAEMLN@, length field 13 including NUL, against our ??_C@_0BA@ = 16; confirmed independently by jle vs jl at 0x180 and 0x1ae). Restoring it is required by docs/assertions.md and is not UB. Only the 64-byte c",
+   "evidence": "Mangled-name decode performed and verified here (?$DO='>', ?$DN='=', ?5=' ', ?$CG='&', ?$DM='<', ?$AA=NUL); alndiff against scratch/workers/n4_s3tc/reopen.obj shows 170 vs 170 instructions with exactly 5 differing - one `push 0x40` vs `push 4`, two jle/jl, two literal rows.",
+   "consumers": "config/parked.json only; text-only change, zero bytes, no source consumers.",
+   "unlocks": "Completes the row's reopen criterion and stops the assert 'repair' being re-applied as a correctness improvement."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_s3tc",
+   "kind": "lane-tooling-caveat",
+   "text": "Add to the worker brief section 4 / laws: 'relocdiff --count-by-target names the SAME .rdata literal differently on the two sides - defined-noncode:.rdata:<name> for the January object, symbol:<name> for ours. A census delta is real only when the DECODED name differs. On s3tc _EncodeBlockRGBColorKey this artifact produced 36 of 36 rows flagged as differing while the multiset was perfectly equal. Any lane-wide census sweep must compare decoded names, or it will manufacture leverage that does not exist.'",
+   "evidence": "Measured this wave on two functions of this object: _EncodeBlockRGBColorKey 36/36 total with 36 flagged rows over 5 float constants (9/9, 2/2, 1/1, 4/4, 2/2); _Quantize 30/30 total with 9 flagged rows over 1 constant (6/6). Both are artifacts. By contrast the genuine deltas on _DecodeBlockRGB and _DecodeBlockRGB__single_pixel differ by decoded name (_RGBToColor 1 vs 2, and four distinct ??_C@ asse",
+   "consumers": "scratch/opus5-next150/WORKER_BRIEF.md and scratch/w3/laws_w3.md; tooling note only, no source consumers.",
+   "unlocks": "Prevents wasted waves on objects whose census 'delta' is only the two objects' differing symbol resolution for shared float/string literals."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_motion_sensor",
+   "kind": "owner-ruling",
+   "text": "R14 / laws_w2 C3: admit the _vector_from_points3d and _distance_squared3d select-any header-inline COMDATs as systemic owner-census disclosures, at least for source/interface/motion_sensor.c.",
+   "evidence": "Measured this wave over every object: build/split owns each real_math.h helper exactly once (_vector_from_points3d 1, _distance_squared3d 1, _magnitude_squared3d 1, _normalize3d 1, _scale_vector3d 1) - the csplit attribution artifact - while build/base emits _magnitude_squared3d in 91 objects, _normalize3d 60, _scale_vector3d 61, _vector_from_points3d 75, _distance_squared3d 33. _magnitude_squared",
+   "consumers": "No header or config text changes. Ruling only; affects the owner-census admission step of WORKER_BRIEF section 6 item 5.",
+   "unlocks": "source/interface/motion_sensor: _motion_sensor_update 1,168 padded (with the original-bug ruling) and _update_motion_sensor 864 padded (with a further reassociation lever) = 2,032 B in this unit; plus"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_motion_sensor",
+   "kind": "owner-ruling",
+   "text": "Original-bug ruling: permit preserving January's uninitialised read of camera_positions[] in _motion_sensor_update, documented with the docs/matching_methodology.md comment form already present in scratch/workers/n4_motion_sensor/m4.c.",
+   "evidence": "January target bytes +0x19c..+0x1bb are accounted for instruction by instruction (cmp eax,-1; mov ecx,[ebp-0xc]; mov word [ecx],bx; je +0x1bb; lea edx,[edi+edi*2]; lea ecx,[ebp+edx*4-0x84]; push; push; call _unit_get_camera_position; add esp,8; mov [esi+0x78],0): the local_player_indices store is unconditional, the cursor advance at +0x1dc is outside the if, and there is NO store to camera_positio",
+   "consumers": "No header or config text changes.",
+   "unlocks": "_motion_sensor_update 1,168 padded (together with the R14 ruling)."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_motion_sensor",
+   "kind": "parked.json-evidence-text",
+   "text": "Replace the _motion_sensor_update park criterion 'January emits the otherwise-discarded game_engine_running call' with: 'January inlines motion_sensor_blip_set_type_and_size at the blip store (target +0x33d..+0x372 = _blip_type_get / _object_try_and_get_and_verify_type / _object_get_and_verify_type / _tag_get) and has no per-object player re-validation; the body reads camera_positions[] uninitialised for a local player whose unit index is NONE. Reopen needs the original-bug ruling and the R14 _vector_from_points3d census ruling; candidate scratch/workers/n4_motion_sensor/m4.c is strict EXACT at 1168/43.'",
+   "evidence": "n3a already measured that both builds emit two _game_engine_running calls, refuting the recorded premise; this wave's relocation-by-target census (43 vs 44, differing rows quoted in docs/object_matching_logs/motion_sensor_obj_opus5_next150_n4_20260915.md section 1.1) supplies the real cause.",
+   "consumers": "config/parked.json only (orchestrator-owned).",
+   "unlocks": "Fidelity of the park record only; 0 B."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_motion_sensor",
+   "kind": "law-for-next-laws-file",
+   "text": "INLINE-HELPER TEMPORARY OWNS NO FRAME CELL [refines laws_w2 A6 frame-layout / laws_w3 A35 admissibility]: a real_math.h-class __inline helper's internal aggregate temporary is fully forwarded when the helper inlines (no stack home), while the identical arithmetic written with a caller-level named aggregate is homed. A January frame that is exactly one aggregate cell SHORT of the hand-expanded form, with otherwise identical instructions, therefore proves the source called the helper - and makes the resulting surplus COMDAT unavoidable rather than stylistic.",
+   "evidence": "Measured on _motion_sensor_update: m1.c/m4.c with distance_squared3d(&camera_positions[spi], &object_position) = 1168/43 strict EXACT at January's sub esp,0x284; m2.c with 'real_vector3d displacement; displacement.i/.j/.k = ...; magnitude_squared3d(&displacement)' = 1184 [size], +0x10. real_math.h:1177 shows distance_squared3d's body is magnitude_squared3d(vector_from_points3d(a, b, &v)) over a lo",
+   "consumers": "Documentation only (a laws file / WORKER_BRIEF section 9 entry).",
+   "unlocks": "A cheap detector for deciding helper-call vs hand-expansion from the frame census alone, and the R14 admissibility argument above."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_actor_moving",
+   "kind": "owner-ruling",
+   "text": "May a worker write the vector_avoidance_data basis transform out in place at the three January sites that provably neither call nor inline actor_move_transform_avoidance_vector (_actor_move_test_avoidance_vector x2, _actor_move_vector_avoidance 'perpendicular' site)? This is re-filed with decisive new framing, not a new shape; if declined, both rows should be marked permanently owner-blocked so no future wave spends a structural pass on them.",
+   "evidence": "(1) Relocation census: _actor_move_vector_avoidance JAN 4144/135 vs ours 4192/140 with _actor_move_transform_avoidance_vector 1 vs 2 and _global_zero_vector3d 3 vs 2; _actor_move_test_avoidance_vector JAN 752/16 vs ours 544/17 with the helper 0 vs 2 and _global_zero_vector3d 1 vs 0. (2) January section order places _actor_move_test_avoidance_vector (section 18) before _actor_move_transform_avoidan",
+   "consumers": "None outside source/ai/actor_moving.c. No header, symbols.json, parked.json or build-configuration change is involved.",
+   "unlocks": "Prerequisite only, NOT a landing: 4,896 padded bytes are gated on it, but the best recorded bodies containing the expansion are scratch/workers/actor_moving/ta2.c (768/16; 272 vs 272 instructions, Jan"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_actor_moving",
+   "kind": "board-hygiene",
+   "text": "Reclassify _actor_move_update (3136) in the board/verdict data from a [size]-structural residual to an allocation tie, so no future wave spends a structural pass on it.",
+   "evidence": "Wave w3d's census (2026-09-15, re-read and accepted this wave): frame identical (January sub esp,0x44 vs ours sub esp,0x44, no JAN-only or OURS-only [ebp+/-N] cell) and relocation census 72/72 with every row equal, including both _normalize3d, both _normalize2d, _valid_real_normal3d, _vector_from_points3d, _rotate_vector_about_axis, _actor_move_vector_avoidance and _actor_move_calculate_movement. ",
+   "consumers": "Board/verdict tooling only; no source or config change.",
+   "unlocks": "0 bytes; prevents repeated structural passes on a DO-NOT-SPEND row."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_actor_moving",
+   "kind": "board-hygiene",
+   "text": "Retire the laws_w3 C1 row for _actor_get_stopping_distances (464) and add _actor_move_vector_avoidance and _actor_move_test_avoidance_vector to the laws_w3 D do-not-repeat table with the reason 'transform inline hypothesis measured dead; owner ruling only'.",
+   "evidence": "The C1 row asks for 'an earlier by-name read of the same fields' (A35(4)); w3d's full scan of January's own _actor_get_stopping_distances stream shows each velocity/forward component read exactly twice, both inside the two dots, so no earlier read exists and the criterion is unsatisfiable. For the two avoidance rows, this wave's section 3 gives four independent measurements that kill the inline-sc",
+   "consumers": "scratch/w3/laws_w3.md sections C1 and D; documentation only.",
+   "unlocks": "0 bytes; prevents two future waves from re-deriving a dead census."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_particle_systems",
+   "kind": "owner-review",
+   "text": "REVIEW ITEM (no header/config change requested; nothing to apply). The landed _particle_system_update body contains one declared-but-unread local in the transition-interpolation arm: `struct particle_system_type_particle_state *state_definition = TAG_BLOCK_GET_ELEMENT(&type_definition->particle_states, particle->state_index, struct particle_system_type_particle_state);` followed by `real t = particle->time_left_in_state/particle->state_length;`. laws_w2 A17 records that the unused-local spelling 'stays rejected' and carries an owner-ruling caveat, its admitted spelling being the bare statement. Shape v2 tested the bare statement and January refutes it. If the owner still rules the unread loc",
+   "evidence": "January calls _tag_block_get_element_with_size at 0x55e (element size 0x178 = particle_states) and never reads EAX: EDI still carries the type_state_definition from 0x529 when it is used at 0x5ce. The call PRECEDES the division at 0x566/0x569 that computes t. C89 requires statements to follow a block's declarations, so a bare statement necessarily lands after t's initialiser: measured shape v2 cos",
+   "consumers": "source/effects/particle_systems.c only. No header, config/*.json, tool, test or build file was touched; grep -rl over source for any shared declaration is not applicable because nothing outside this .c is involved.",
+   "unlocks": "Nothing further by itself. It is the only house-rule tension in the landing; the landing is zero-credit and its purpose is to remove six provable source defects (wrong random helper, csmemcpy-vs-struc"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_player_profile_main_etc",
+   "kind": "owner-ruling",
+   "text": "Admit inline `__asm` bodies for the `bitmaps_inlines.h` colour converters (`real_rgb_color_to_pixel32`, `real_argb_color_to_pixel32`) in `source/interface/hud_draw.c`, and accept the resulting `fake_match_scan` `inline-assembly` review lead for those bodies, under house rule 10 (\"Helper/math functions may use inline assembly sparingly, with evidence\"). No header, config, symbol-map or compiler-flag text is requested.",
+   "evidence": "Three independent proofs that January's bodies are hand-written assembly (wave n1, re-read this wave): a 32-bit `fistp dword ptr [mem]`, which the measured /QIfist conversion-width law refutes as VC7 output tree-wide; `fmul st(3),st(0)` / `fmul st(4),st(0)` into non-top x87 slots, which has no C spelling; and `fist`/`fisub` integer tests on the float's own bit pattern in `_fast_ftol_C`. In-product",
+   "consumers": "None -- this is a ruling, not a source change. The only file a landing would modify is `source/interface/hud_draw.c`; no header is edited, so there is no consumer blast.",
+   "unlocks": "+192 padded / +181 meaningful immediately (`scratch/workers/n1_hud_draw_interface_etc/hd_v4.c` lands unchanged, zero regressions). `_real_argb_color_to_pixel32` (+320) additionally needs a correct VC7"
+  },
+  {
+   "wave": "n4",
+   "group": "n4_rasterizer_xbox_environment",
+   "kind": "naming (byte-inert, OPTIONAL - not a need; orchestrator may ignore)",
+   "text": "Rename the sixth parameter of rasterizer_environment_lightmap_draw from `vertex_buffer` to `vertex_buffers` in source/rasterizer/rasterizer.h:409-415, source/rasterizer/rasterizer.c:472-478 + 1182-1190 and source/rasterizer/xbox/rasterizer_xbox_environment.c:587 (and its uses at lines 596, 735, 780-781, 812, 817, 1089-1090). NOT proposed for parameter 2 (`bitmap_index`): see evidence.",
+   "evidence": "DIA2Dump.exe -sym <fn> against HCEX.pdb (SHIP, 2011 PowerPC) gives rasterizer_environment_lightmap_draw the parameter list (const struct shader *shader, short shader_permutation_index, long dynamic_triangle_buffer_index, long first_triangle_index, long triangle_count, const struct vertex_buffer *vertex_buffers); the four sibling draw entry points (_diffuse_texture_draw, _diffuse_light_draw, _specu",
+   "consumers": "grep -rl 'rasterizer.h' source --include=*.c --include=*.h is large, but the three files that name this symbol are source/rasterizer/rasterizer.h, source/rasterizer/rasterizer.c, source/rasterizer/xbox/rasterizer_xbox_environment.c (source/structures/structure_render.c calls it but passes positional",
+   "unlocks": "Zero bytes - byte-inert cosmetic/house-rule naming only. Recorded so the evidence is not lost; safe to decline."
+  },
+  {
+   "wave": "n4",
+   "group": "n4_game_sound_sound_manager",
+   "kind": "owner-ruling / owner-census (no header or config text change)",
+   "text": "Admit `_vector_from_points3d` into the accepted systemic select-any header-inline COMDAT class (laws_w2 A4 census, laws_w3 A30), alongside _dot_product3d, _set_real_point3d, _sine, _normalize3d, _scale_vector3d, _distance3d and the real_math surplus. If admitted, apply the `_compute_sound_obstruction` body from scratch/workers/n4_game_sound_sound_manager/gs_v6.c (identical to the w2 scratch/workers/bink_playback_game_sound_etc/gs_v6.c) to source/sound/game_sound.c; no other change. This is a PENDING ruling, not one of the FINAL declined items in brief section 1.",
+   "evidence": "build/base already emits _vector_from_points3d with selection ANY in 75 objects; only csplit's January action_alert.obj copy has selection 1, which is an artifact of splitting a single linked image (a select-any COMDAT survives in exactly one object). The helper is a non-static __inline in source/math/real_math.h, so the emission is forced by the header inline linkage law. Re-measured at THIS HEAD",
+   "consumers": "source/sound/game_sound.c only for this landing. The same ruling is a prerequisite for _rasterizer_sun_glow_draw (laws_w3 C3), but that candidate additionally fails R15/R16 and is NOT part of this proposal. No header, config/*.json or symbols.json text changes.",
+   "unlocks": "512 padded / 498 meaningful strict-exact bytes (game_sound _compute_sound_obstruction), plus removal of an R15 hand expansion. If declined, please say so explicitly so the row can be reclassified from"
+  }
+ ],
+ "fuzzy_bodies_zero_credit": [
+  {
+   "wave": "n4",
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_update",
+   "blocker": "Strength-reduction IV-base selection in the 10-element variable-interpolation loop: 12 of 549 instructions differ, at identical addresses 0x275-0x298. January makes state_variables (EBX, from the hoisted `add ebx,0x34` at 0x208 that the csmemcpy arm also uses) the induction variable and biases transition/dest against it; ours picks transition_state_variables, and the x87 stack positions (fld st(0)"
+  }
+ ],
+ "consumer_blast_radius": {
+  "symbols_json_rename": {
+   "change": "config/symbols.json line 654 _code_00041220 -> _ai_debug_render_encounter (names only, in-place line edit)",
+   "consumers": "source/ai/ai_debug.c only (3 identifiers). csplit regenerated all split objects; whole-board stable diff after the change shows gained 7 / regressions 0.",
+   "authentication": "scratch/atlas/ai_debug.obj.txt line 44; atlas offsets for this object cross-validate against symbols.json (_ai_debug_dispose_from_old_map 226736, _ai_debug_drawstack 235808, _ai_debug_render 269120); no PDB public at 266784; caller topology + encounter_* callees + assert literal."
+  },
+  "headers_changed": "NONE. No .h file was modified in this lane."
+ },
+ "commits_in_order": [
+  "3083f800b51535fc331d594349587d37ab9792b8 Reopen four parks: detail objects, character draw, hud sound and bink cache",
+  "034141b121de5710b67fa3b1c18535f8f7728c4a Recover the wind sampler's integer sign-clear under an explicit owner ruling",
+  "6ebd05a964ef0fdfe78cf31afe9dcae9ee5a0f19 Match the perception object test and name the encounter debug renderer",
+  "927d135ecbfbe9396fcb50430c0320253e803210 Recover a missing fade relocation in the looping-sound refresh (zero credit)"
+ ],
+ "changed_files": [
+  "config/parked.json",
+  "config/symbols.json",
+  "docs/object_matching_logs/actor_perception_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/actor_stimulus_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/actor_type_infection_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/ai_debug_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/bink_playback_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/bink_playback_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/biped_limp_noodle_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/bitmap_group_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/bitmaps_quantitize_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/circular_queue_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/collision_usage_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/connected_geometry_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/dead_camera_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/decals_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/devices_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/draw_string_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/game_engine_ctf_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/game_engine_race_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/game_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/game_sound_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/game_state_xbox_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/glow_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/hs_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/hud_draw_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/hud_sounds_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/hud_unit_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/ima_adpcm_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/input_xbox_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/interface_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/key_agreement_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/lra_cache_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/lrar_cache_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/lruv_cache_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/main_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/motion_sensor_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/player_effects_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/player_profile_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/prime_numbers_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/progress_bar_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/props_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/rasterizer_xbox_environment_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/real_math_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/s3tc_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/saved_game_files_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/sound_manager_obj_opus5_next150_n3a_20260915.md",
+  "docs/object_matching_logs/stack_memory_pool_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/structure_detail_objects_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/structure_visibility_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/structures_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/thread_win32_obj_opus5_next150_n1_20260915.md",
+  "docs/object_matching_logs/unit_dialogue_obj_opus5_next150_n2_20260915.md",
+  "docs/object_matching_logs/wind_obj_opus5_next150_n1_20260915.md",
+  "source/ai/actor_perception.c",
+  "source/ai/ai_debug.c",
+  "source/bink/bink_playback.c",
+  "source/interface/hud_sounds.c",
+  "source/scenario/wind.c",
+  "source/sound/sound_manager.c",
+  "source/structures/structure_detail_objects.c",
+  "source/structures/structures.c",
+  "source/text/draw_string.c"
+ ],
+ "unresolved_dependencies": [
+  "motion_sensor _motion_sensor_update: strict-exact candidate exists (scratch/workers/n4_motion_sensor/m4.c, 1168/43, relocation multiset identical, park premise refuted - January calls _game_engine_running twice) but needs TWO owner rulings: preserving an uninitialised camera_positions[] read, and the _vector_from_points3d + _distance_squared3d census ruling.",
+  "s3tc _RGBToColor / _DecodeBlockRGB / _DecodeBlockRGB__single_pixel (1,040 padded): strict exact in scratch. Needs (a) restoring January byte-proven assert text u>=0 && u<=4 over the parked.json 0..3 directive - the verifier recommends granting this on docs/assertions.md:93 alone; (b) an indeterminate-member read ruling; (c) admission of a 60-byte stack overrun. _Quantize rides along as a coupled remeasure only if (b) is granted.",
+  "hs _hs_compile_and_evaluate: needs a ninth zero-valued statement January provably contains, or a source form removing one use from the strongest interfering competitor (LAW Z boundary).",
+  "game_engine_king _king_calculate_hill_state (448) and bink_playback _bink_alloc@4 (494): LAW Z violators with a named surplus web; not yet attacked under the law."
+ ],
+ "measured_remaining_portfolio": {
+  "active_under_owner_five_category_filter": {
+   "functions": 28,
+   "meaningful": 23544
+  },
+  "no_leverage_must_not_dispatch": {
+   "functions": 142,
+   "meaningful": 107968
+  },
+  "note": "The active figure is BEFORE wave n4 consumed 12 of its 16 groups; after n4 only 4 small groups (939 meaningful) remain untried, and n4 landed nothing."
+ },
+ "do_not_repeat_inventory": {
+  "source": "laws_w2 section D + laws_w3 section D + owner rulings 20260915 + 250K checkpoint section 6",
+  "do_not_repeat_functions": [
+   "__rasterizer_screen_effect",
+   "__rasterizer_widget_draw_sprite2d",
+   "_action_obey_control",
+   "_actor_action_handle_vehicle_entry",
+   "_actor_create_for_unit",
+   "_actor_customize_unit",
+   "_actor_destination_update",
+   "_actor_input_update",
+   "_actor_look_update",
+   "_actor_perception_aiming_vector_test_blockage",
+   "_actor_perception_friend_prop_is_attacking",
+   "_actor_perception_update",
+   "_actor_place",
+   "_actor_situation_update",
+   "_actor_type_flood_desire_shamble",
+   "_actors_searching_same_position",
+   "_actors_spawn_from_unit",
+   "_ai_communication_actor_talk_weight",
+   "_ai_communication_finished",
+   "_ai_communication_update_speech_timers",
+   "_aim_assist_compute_target",
+   "_area_of_effect_cause_damage_to_object",
+   "_bink_query_analog_controller_buttons",
+   "_biped_adjust_placement",
+   "_biped_update_turning",
+   "_bsp",
+   "_cache_files_open_cache_files",
+   "_cached_map_file_read_header",
+   "_channel_queue_packet",
+   "_cinematic_render",
+   "_circle_tangents",
+   "_code_00039990",
+   "_collision_test_vector_exit",
+   "_connected_geometry_add_triangle",
+   "_contrail_add_points",
+   "_convex_hull2d",
+   "_convex_hull3d_expand",
+   "_convex_polygon2d_clip_to_plane",
+   "_custom_render_nav_point",
+   "_debug",
+   "_debug_realloc",
+   "_decal_new_from_collision",
+   "_display_error",
+   "_dsound_initialize",
+   "_editor_camera_set_position_and_roll",
+   "_encounter_compute_activation_cluster_bit_vector",
+   "_encounter_create",
+   "_encounter_update_respawn",
+   "_encounter_update_status",
+   "_encounters_test_activation",
+   "_extract_build_texture_pages_by_sequence",
+   "_file_get_size",
+   "_find_tangent_point",
+   "_find_turning_point",
+   "_game_sound_update",
+   "_get_edge_vertex",
+   "_hs_add_script",
+   "_hud_render_nav_points",
+   "_hud_show_action_response",
+   "_hud_update_weapon",
+   "_hud_update_weapon_local_player",
+   "_input_update_analog_button_state",
+   "_inverse_kinematics_adjust_matrices",
+   "_king_calculate_hill_state",
+   "_lightning_submit",
+   "_load_symbol_table",
+   "_local_player_aim_assist",
+   "_object_damage_body",
+   "_observer_update_positions",
+   "_obstacles_test_circle",
+   "_parse_string",
+   "_physics_compute_vehicle_collision",
+   "_player_control_modify_desired_angles",
+   "_player_profile_get_argb_color",
+   "_player_teleport_internal",
+   "_player_update_powerups",
+   "_projectile_accelerate",
+   "_projectile_new",
+   "_rasterizer_lens_flare_submit_for_cluster",
+   "_rasterizer_model_draw_environment_shader",
+   "_rasterizer_sun_glow_draw",
+   "_rasterizer_triangle_buffer_new",
+   "_rasterizer_vertex_buffer_new",
+   "_real_random_range_evaluate",
+   "_render_camera_build_frustum",
+   "_render_debug_player",
+   "_render_frustum_sphere_visible",
+   "_render_grenade_hud",
+   "_render_particles",
+   "_render_weapon_hud",
+   "_search_and_replace",
+   "_stack_memory_pool_allocate",
+   "_structure_visibility_build_surfaces_traverse_leaf",
+   "_symbol_name_from_address",
+   "_temporary_hud_draw_reticle",
+   "_texture_cache_steal_memory",
+   "_tiff_export",
+   "_ui_widget_launch_widget",
+   "_unit_make_damage_sound",
+   "_update_client_local_ticks",
+   "_virtual_keyboard_select",
+   "_weapon_can_be_fired",
+   "_weapon_magazine_finish_reload",
+   "_widget_instance_process_one_event_recursive",
+   "_widget_instance_render_recursive",
+   "_widget_instance_text_box_is_focused"
+  ],
+  "negative_global_sweeps": [
+   "static-linkage census",
+   "C4013/C4133 census",
+   "objdiff under-credit",
+   "namegap",
+   "historical-blob mining",
+   "park-premise refutation in PREVIOUSLY MINED units (wave n3a: 12 groups / 32,635 meaningful -> 0 strict; the lever is specific to unmined units, where wave n1 closed 5/5)"
+  ],
+  "owner_declined": [
+   "collision_bsp SSE __asm macro",
+   "env_fog 21-static split",
+   "models 13-static split",
+   "editor_flying_camera is_scripted split",
+   "7 whole-object admissions",
+   "P7 projection_from_vector3d",
+   "bitmap_utilities cast trade",
+   "actor_combat shared working vector"
+  ],
+  "lane_rule": "no _point_from_line3d-dependent reconstruction outside action_charge.obj",
+  "owner_directives_20260915": [
+   "n3a banked exactly as reported: +6,804 strict meaningful / 7 functions / 0 regressions.",
+   "Do not run another wave resembling n3a.",
+   "_sound_refresh_looping and _update_channel_for_looping_sound are DOCUMENTED ZERO-CREDIT improvements; size/relocation parity is NOT strict exactness and must never be reported as such.",
+   "Next wave may contain only: (1) genuinely unmined/unwritten functions; (2) structural rows with a NEWLY identified missing/extra call, wrong ABI/type, frame-slot defect, or authenticated donor; (3) header/config prerequisite packets with full consumer blast-radius testing; (4) parks whose explicit reopen criterion is now satisfied by new evidence; (5) authentic CRT/helper assembly where provenance proves the original was assembly.",
+   "No generic sha-only, register-allocation, x87-ordering or previously-mined parked rows. A written leverage statement is required before each assignment.",
+   "If no sufficiently large fresh portfolio remains, consolidate and report the measured ceiling rather than spend another zero-yield wave."
+  ]
+ }
+}
