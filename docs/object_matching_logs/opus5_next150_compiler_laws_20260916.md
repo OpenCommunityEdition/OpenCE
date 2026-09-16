@@ -5,6 +5,18 @@ it settled a question that four earlier waves had classified as an unreachable "
 in `scratch/hs_pin/` (angle1.md, angle2.md, angle3.md, the scan and lab scripts, and ~700 lab probes). Nothing under
 `source/`, `config/`, `tools/` or `build/` was modified by the probe.
 
+> **CORRECTED 2026-09-16 by `opus5_next150_compiler_laws_round2_20260916.md`.** A second probe re-ran these
+> measurements and refuted several quantitative claims below. In particular: **Z2's boundary
+> `stores >= 2*uses + 1` and its U-table are DELETED** (refuted in both directions; it was a within-function
+> calibration, not a corpus law), the "extra basic blocks raise the threshold" clause is DELETED, Z1's
+> "no January function carries three callee-saved webs and a pin" is REPLACED by a 343-row MAXLIVE table plus a
+> single-definition corollary, "178 of 214 pins are EBX" is REPLACED by EBX 259 / EDI 51 / ESI 33 of 343, and the
+> "236 both-pin / 227 exact" cross-tab must be QUALIFIED: 128 of those 240 rows are zero-store `xor ebx,ebx`
+> return values, so the real-pin subset is 112 paired / 189 image-wide. The claim that assigning `source` in every
+> switch arm is "strictly worse (608 / 41 relocations)" is CORRECTED: that family is 608 / **40** relocations and
+> **wins the pin**. Z3 and the LOOP-HEAD ALIGNMENT LAW are unchanged. Read the round-2 ledger for the
+> operative statements; this file is kept as the audit trail of what was claimed first.
+
 ## LAW Z — the whole-function constant-zero register pin
 
 **Statement.** VC7 keeps constant 0 in a callee-saved register for a whole function iff both conditions hold.
