@@ -283,39 +283,6 @@ match_vassert( \
 
 /* ---------- structures */
 
-struct rgb_color
-{
-	word red;
-	word green;
-	word blue;
-};
-
-struct hsv_color
-{
-	word hue;
-	word saturation;
-	word value;
-};
-
-struct argb_color
-{
-	word alpha;
-	word red;
-	word green;
-	word blue;
-};
-
-union real_hsv_color
-{
-	real n[3];
-	struct
-	{
-		real hue;
-		real saturation;
-		real value;
-	};
-};
-
 /* ---------- prototypes */
 
 static struct bitmap_data *bitmap_2d_shrink(
@@ -913,7 +880,7 @@ static void bitmap_2d_smooth(
 
 	if (bitmap->width >= filter_size && bitmap->height >= filter_size)
 	{
-		short y;
+		short x, y;
 
 		pixel_data_size = bitmap_get_pixel_data_size(bitmap);
 		source_pixels = bitmap_mipmap_address(bitmap, 0);
@@ -925,8 +892,6 @@ static void bitmap_2d_smooth(
 		{
 			for (y = 0; y < bitmap->height; y++)
 			{
-				short x;
-
 				for (x = 0; x < bitmap->width; x++)
 				{
 					long alpha = 0;
@@ -941,8 +906,8 @@ static void bitmap_2d_smooth(
 					{
 						short source_x =
 							(short)((bitmap->width + filter_index + x) % bitmap->width);
-						short coefficient = filter_coefficients[filter_index + filter_size];
 						pixel32 pixel = source_pixels[y * bitmap->width + source_x];
+						short coefficient = filter_coefficients[filter_index + filter_size];
 
 						alpha += (pixel >> 24) * coefficient;
 						red += ((pixel >> 16) & 0xFF) * coefficient;
@@ -950,23 +915,16 @@ static void bitmap_2d_smooth(
 						blue += (pixel & 0xFF) * coefficient;
 					}
 
-					{
-						long rounding = 1 << (2 * filter_size - 1);
-						short shift = 2 * filter_size;
-
-						temporary_pixels[y * bitmap->width + x] =
-							((((rounding + alpha) >> shift) << 24) |
-							(((rounding + red) >> shift) << 16) |
-							(((rounding + green) >> shift) << 8) |
-							((rounding + blue) >> shift));
-					}
+					temporary_pixels[y * bitmap->width + x] =
+						((((alpha + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 24) |
+						(((red + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 16) |
+						(((green + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 8) |
+						((blue + (1 << (2 * filter_size - 1))) >> (2 * filter_size)));
 				}
 			}
 
 			for (y = 0; y < bitmap->height; y++)
 			{
-				short x;
-
 				for (x = 0; x < bitmap->width; x++)
 				{
 					long alpha = 0;
@@ -981,8 +939,8 @@ static void bitmap_2d_smooth(
 					{
 						short source_y =
 							(short)((bitmap->height + filter_index + y) % bitmap->height);
-						short coefficient = filter_coefficients[filter_index + filter_size];
 						pixel32 pixel = temporary_pixels[source_y * bitmap->width + x];
+						short coefficient = filter_coefficients[filter_index + filter_size];
 
 						alpha += (pixel >> 24) * coefficient;
 						red += ((pixel >> 16) & 0xFF) * coefficient;
@@ -990,16 +948,11 @@ static void bitmap_2d_smooth(
 						blue += (pixel & 0xFF) * coefficient;
 					}
 
-					{
-						long rounding = 1 << (2 * filter_size - 1);
-						short shift = 2 * filter_size;
-
-						source_pixels[y * bitmap->width + x] =
-							((((rounding + alpha) >> shift) << 24) |
-							(((rounding + red) >> shift) << 16) |
-							(((rounding + green) >> shift) << 8) |
-							((rounding + blue) >> shift));
-					}
+					source_pixels[y * bitmap->width + x] =
+						((((alpha + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 24) |
+						(((red + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 16) |
+						(((green + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 8) |
+						((blue + (1 << (2 * filter_size - 1))) >> (2 * filter_size)));
 				}
 			}
 
