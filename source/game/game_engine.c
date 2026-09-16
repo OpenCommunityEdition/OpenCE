@@ -1387,6 +1387,14 @@ static void game_engine_generate_title_string(
 			}
 			else
 				format_string = L"";
+
+			usnprintf(
+				title_string,
+				80,
+				format_string,
+				get_place_string(&entry),
+				score_string,
+				secondary_string);
 		}
 		else
 		{
@@ -1400,15 +1408,15 @@ static void game_engine_generate_title_string(
 			}
 			else
 				format_string = L"";
-		}
 
-		usnprintf(
-			title_string,
-			80,
-			format_string,
-			get_place_string(&entry),
-			score_string,
-			secondary_string);
+			usnprintf(
+				title_string,
+				80,
+				format_string,
+				get_place_string(&entry),
+				score_string,
+				secondary_string);
+		}
 	}
 
 	title_string[79] = 0;
@@ -7770,19 +7778,13 @@ boolean game_engine_should_spawn_player(
 	{
 		struct player_datum *player = player_get(player_index);
 
-		should_spawn = TRUE;
 		if (player->quit_out_of_game == TRUE)
 		{
 			should_spawn = FALSE;
 		}
 		else if (player->statistics.deaths == 0)
 		{
-			if (game_time_get() > 3 &&
-				game_time_get() % 32 !=
-					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) % 32)
-			{
-				should_spawn = FALSE;
-			}
+			should_spawn = TRUE;
 		}
 		else if (game_engine_player_is_out_of_lives(player_index))
 		{
@@ -7832,14 +7834,18 @@ boolean game_engine_should_spawn_player(
 				player->respawn_timer--;
 				should_spawn = player->respawn_timer == 0;
 			}
-
-			if (should_spawn &&
-				game_time_get() > 3 &&
-				game_time_get() % 32 !=
-					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) % 32)
+			else
 			{
-				should_spawn = FALSE;
+				should_spawn = TRUE;
 			}
+		}
+
+		if (should_spawn &&
+			game_time_get() > 3 &&
+			game_time_get() % 32 !=
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) % 32)
+		{
+			should_spawn = FALSE;
 		}
 	}
 

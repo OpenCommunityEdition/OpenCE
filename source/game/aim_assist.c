@@ -93,7 +93,7 @@ struct aim_assist_target
 
 /* ---------- prototypes */
 
-static real compute_attenuation(
+__inline real compute_attenuation(
 	real variable,
 	real maximum);
 static real compute_composite_attenuation(
@@ -152,7 +152,7 @@ boolean aim_assist(
 
 /* ---------- code (definitions in January object order) */
 
-static real compute_attenuation(
+__inline real compute_attenuation(
 	real variable,
 	real maximum)
 {
@@ -347,28 +347,29 @@ boolean aim_assist_compute_target(
 	real_vector3d const *direction,
 	struct aim_assist_target *target)
 {
-	real distance, cosine, angle;
+	real cosine, angle;
 
 	target->object_index= object_index;
 	object_compute_autoaim_target(object_index, position, direction, &target->position);
 	vector_from_points3d(position, &target->position, &target->vector);
 	target->direction= target->vector;
-	distance= normalize3d(&target->direction);
-	target->distance= distance;
+	target->distance= normalize3d(&target->direction);
 	cosine= dot_product3d(direction, &target->direction);
 	angle= arccosine(PIN(cosine, -1.f, 1.f));
 	target->angle= angle;
 
 	if (parameters)
 	{
-		target->autoaim_level= compute_composite_attenuation(distance, parameters->autoaim_distance,
+		target->autoaim_level= compute_composite_attenuation(target->distance, parameters->autoaim_distance,
 			angle, parameters->autoaim_angle);
-		target->magnetism_level= compute_composite_attenuation(distance, parameters->magnetism_distance,
+		target->magnetism_level= compute_composite_attenuation(target->distance, parameters->magnetism_distance,
 			angle, parameters->magnetism_angle);
 		if (target->magnetism_level>0.f)
 		{
-			if (TEST_FLAG(unit_definition_get(unit_get(target->object_index)->definition_index)->unit.flags,
-				_unit_is_inconsequential_bit))
+			struct unit_datum *unit= unit_get(target->object_index);
+			struct unit_definition *definition= unit_definition_get(unit->definition_index);
+
+			if (TEST_FLAG(definition->unit.flags, _unit_is_inconsequential_bit))
 			{
 				target->magnetism_level*= TAG_BLOCK_GET_ELEMENT(&scenario_get_game_globals()->player_control, 0,
 					struct game_globals_player_control)->magnetism_inconsequential_target_scale;

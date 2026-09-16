@@ -1993,27 +1993,18 @@ static void player_update_powerups(
 	long player_index)
 {
 	struct player_datum *player;
-	short *powerup_duration;
-	long powerup_index;
-	long remaining_powerups;
+	short powerup_index;
 
 	player = player_get(player_index);
-	powerup_index = 0;
-	powerup_duration = player->powerup_durations;
-	remaining_powerups = NUMBER_OF_PLAYER_POWERUPS;
-	do
+	for (powerup_index= 0; powerup_index<NUMBER_OF_PLAYER_POWERUPS; powerup_index++)
 	{
-		if (*powerup_duration > 0)
+		if (player->powerup_durations[powerup_index] > 0)
 		{
-			(*powerup_duration)--;
-			if (*powerup_duration == 0)
-				player_powerup_off(player_index, (short)powerup_index);
+			player->powerup_durations[powerup_index]--;
+			if (player->powerup_durations[powerup_index] == 0)
+				player_powerup_off(player_index, powerup_index);
 		}
-
-		powerup_index++;
-		powerup_duration++;
 	}
-	while (--remaining_powerups);
 
 	return;
 }
@@ -2642,10 +2633,12 @@ static void player_powerup_on(
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if (powerup_type == _player_powerup_active_camouflage)
+	switch (powerup_type)
 	{
+	case _player_powerup_active_camouflage:
 		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, TRUE);
-		unit->unit.cause_for_camo_regrowth = powerup_type;
+		unit->unit.cause_for_camo_regrowth = cause_for_camo_regrowth_default;
+		break;
 	}
 
 	return;
@@ -2661,8 +2654,12 @@ static void player_powerup_additional(
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if (powerup_type == _player_powerup_active_camouflage)
+	switch (powerup_type)
+	{
+	case _player_powerup_active_camouflage:
 		SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit, TRUE);
+		break;
+	}
 
 	return;
 }
@@ -2676,8 +2673,12 @@ static void player_powerup_off(
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
-	if (powerup_type == _player_powerup_active_camouflage)
+	switch (powerup_type)
+	{
+	case _player_powerup_active_camouflage:
 		SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit, FALSE);
+		break;
+	}
 
 	return;
 }
@@ -2694,29 +2695,30 @@ static void player_set_action_result(
 	real_point3d const *new_position;
 	real current_distance;
 	real new_distance;
-	boolean set_action;
+	boolean set_action = FALSE;
 
 	player = player_get(player_index);
-	set_action = TRUE;
-	if (action_result != _player_action_result_flip_vehicle)
+	if (action_result == _player_action_result_flip_vehicle)
 	{
-		if (action_result == player->action_result)
-		{
-			unit_position = &object_get(player->unit_index)->object.position;
-			current_position =
-				&object_get(player->action_object_index)->object.position;
-			new_position = &object_get(object_index)->object.position;
-			current_distance = distance3d(
-				unit_position,
-				current_position);
-			new_distance = distance3d(
-				unit_position,
-				new_position);
-			if (!(current_distance > new_distance))
-				set_action = FALSE;
-		}
-		else if (action_result <= player->action_result)
-			set_action = FALSE;
+		set_action = TRUE;
+	}
+	else if (action_result == player->action_result)
+	{
+		unit_position = &object_get(player->unit_index)->object.position;
+		current_position =
+			&object_get(player->action_object_index)->object.position;
+		new_position = &object_get(object_index)->object.position;
+		current_distance = distance3d(
+			unit_position,
+			current_position);
+		new_distance = distance3d(
+			unit_position,
+			new_position);
+		set_action = current_distance > new_distance;
+	}
+	else if (action_result > player->action_result)
+	{
+		set_action = TRUE;
 	}
 
 	if (set_action)
@@ -2750,7 +2752,7 @@ static void player_examine_nearby_vehicle(
 			struct game_globals_player_control);
 		flipping_angle =
 			(_pi * 0.5f) - player_control->minimum_vehicle_flipping_angle;
-		if (vehicle->object.up.k > cosine(flipping_angle))
+		if (vehicle_get(vehicle_index)->object.up.k > (real)cos(flipping_angle))
 		{
 			if (!unit_overcharged(player->unit_index))
 			{
