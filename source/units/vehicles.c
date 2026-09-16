@@ -1920,23 +1920,6 @@ static real_vector3d *vehicle_cross_product3d_target(
 	return result;
 }
 
-static real vehicle_update_upending_velocity(
-	real const *velocity,
-	byte *upending_ticks)
-{
-	real result = *velocity;
-
-	(*upending_ticks)++;
-	return result;
-}
-
-static real vehicle_update_minimum_upending_velocity(
-	struct vehicle_datum *vehicle)
-{
-	vehicle->vehicle.upending_ticks++;
-	return -0.01f;
-}
-
 static real vehicle_dot_product3d_target(
 	real_vector3d const *a,
 	real_vector3d const *b)
@@ -2460,36 +2443,29 @@ boolean vehicle_update(
 			(vehicle->unit.throttle.i<0.0f && vehicle->vehicle.speed>0.0f))));
 
 	{
-		real_vector3d const *forward = &vehicle->object.forward;
-		real_vector3d const *up = &vehicle->object.up;
-		real_vector3d const *desired_forward = &vehicle->unit.desired_facing_vector;
 		real_vector3d left;
 		real steer_cross;
 		real steer_dot;
 
-		vehicle_cross_product3d_target(up, forward, &left);
-		steer_cross = left.i*desired_forward->i +
-			(left.j*desired_forward->j + left.k*desired_forward->k);
-		steer_dot = desired_forward->i*forward->i +
-			(forward->j*desired_forward->j + forward->k*desired_forward->k);
+		cross_product3d(&vehicle->object.up, &vehicle->object.forward, &left);
+		steer_cross = dot_product3d(&left, &vehicle->unit.desired_facing_vector);
+		steer_dot = dot_product3d(&vehicle->unit.desired_facing_vector, &vehicle->object.forward);
 		steering_angle = arctangent(steer_cross, steer_dot);
 	}
 
 	{
-		word vehicle_flags = vehicle->vehicle.flags;
-
-		if (TEST_FLAG(vehicle_flags, 4) &&
+		if (TEST_FLAG(vehicle->vehicle.flags, 4) &&
 			vehicle->vehicle.upending_type &&
 			vehicle->vehicle.upending_ticks<30 &&
 			vehicle->object.up.k<=0.9f)
 		{
-			byte righting_axis = vehicle->vehicle.upending_type;
 			real_vector3d torque_axis;
 			real roll;
 
-			torque = (righting_axis==2 || righting_axis==4) ? 0.3 : -0.3;
+			torque = (vehicle->vehicle.upending_type==2 ||
+				vehicle->vehicle.upending_type==4) ? 0.3 : -0.3;
 
-			if (righting_axis==4 || righting_axis==3)
+			if (vehicle->vehicle.upending_type==4 || vehicle->vehicle.upending_type==3)
 				cross_product3d(&vehicle->object.forward, &vehicle->object.up, &torque_axis);
 			else
 				torque_axis = vehicle->object.forward;
@@ -2503,7 +2479,7 @@ boolean vehicle_update(
 			torque *= roll;
 			vehicle->object.flags &= ~FLAG(_object_at_rest_bit);
 
-			if (righting_axis==2 || righting_axis==1)
+			if (vehicle->vehicle.upending_type==2 || vehicle->vehicle.upending_type==1)
 			{
 				real_vector3d cross;
 
@@ -2517,32 +2493,20 @@ boolean vehicle_update(
 
 			scale_vector3d(&torque_axis, torque, &vehicle->object.angular_velocity);
 
+			switch (definition->vehicle_type)
 			{
-				long vehicle_type = definition->vehicle_type;
-
-				if (vehicle_type)
-				{
-					if (vehicle_type==_vehicle_type_alien_fighter)
-					{
-						vehicle->object.translational_velocity.k =
-							-0.01f>vehicle->object.translational_velocity.k
-							? vehicle_update_upending_velocity(
-								&vehicle->object.translational_velocity.k,
-								&vehicle->vehicle.upending_ticks)
-							: vehicle_update_minimum_upending_velocity(
-								vehicle);
-						goto seek_speed;
-					}
-				}
-				else
-				{
-					scale_vector3d(
+			case _vehicle_type_alien_fighter:
+				vehicle->object.translational_velocity.k =
+					MIN(-0.01f, vehicle->object.translational_velocity.k);
+				break;
+			case _vehicle_type_human_tank:
+				scale_vector3d(
+					&vehicle->object.forward,
+					dot_product3d(
 						&vehicle->object.forward,
-						dot_product3d(
-							&vehicle->object.forward,
-							&vehicle->object.translational_velocity),
-						&vehicle->object.translational_velocity);
-				}
+						&vehicle->object.translational_velocity),
+					&vehicle->object.translational_velocity);
+				break;
 			}
 
 			vehicle->vehicle.upending_ticks++;
@@ -2555,7 +2519,6 @@ boolean vehicle_update(
 		}
 	}
 
-seek_speed:
 	{
 		struct physics_variable_speed_parameters *speed_parameters =
 			(struct physics_variable_speed_parameters *)&definition->unknown2f8;
@@ -2602,14 +2565,10 @@ seek_speed:
 			}
 			else
 			{
-				real normalized = steering_angle*0.63661975f;
-
-				normalized = PIN(normalized, -1.0f, 1.0f);
-
 				physics_variable_speed_update_seek(
 					&vehicle->vehicle.turn,
 					speed_parameters,
-					normalized*definition->unknown2f8,
+					PIN(steering_angle*0.63661975f, -1.0f, 1.0f)*definition->unknown2f8,
 					2.0f);
 			}
 		}
@@ -2617,13 +2576,11 @@ seek_speed:
 
 	if (definition->unit.object.physics.index!=NONE)
 	{
-		unsigned long flags = definition->flags;
-
-		if ((TEST_FLAG(flags, 0) && vehicle->vehicle.speed!=0.0f) ||
-			(TEST_FLAG(flags, 1) && vehicle->vehicle.turn!=0.0f) ||
-			(TEST_FLAG(flags, 2) && vehicle->unit.seat_power[0]!=0.0f) ||
-			(TEST_FLAG(flags, 3) && vehicle->unit.seat_power[1]!=0.0f) ||
-			(TEST_FLAG(flags, 5) && vehicle->vehicle.slide!=0.0f))
+		if ((TEST_FLAG(definition->flags, 0) && vehicle->vehicle.speed!=0.0f) ||
+			(TEST_FLAG(definition->flags, 1) && vehicle->vehicle.turn!=0.0f) ||
+			(TEST_FLAG(definition->flags, 2) && vehicle->unit.seat_power[0]!=0.0f) ||
+			(TEST_FLAG(definition->flags, 3) && vehicle->unit.seat_power[1]!=0.0f) ||
+			(TEST_FLAG(definition->flags, 5) && vehicle->vehicle.slide!=0.0f))
 		{
 			vehicle->object.flags &= ~FLAG(_object_at_rest_bit);
 		}

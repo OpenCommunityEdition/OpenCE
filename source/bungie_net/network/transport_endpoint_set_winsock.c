@@ -611,7 +611,8 @@ short remove_endpoint_from_set(
 	struct transport_endpoint *ep,
 	struct transport_endpoint_set *set)
 {
-	long endpoint_index;
+	short result = _transport_error_endpoint_not_in_set;
+	long endpoint_index = 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
@@ -622,9 +623,7 @@ short remove_endpoint_from_set(
 		0x256,
 		transport_initialized);
 
-	for (endpoint_index = 0;
-		endpoint_index <= set->last_endpoint_index;
-		endpoint_index++)
+	while (endpoint_index <= set->last_endpoint_index)
 	{
 		if (set->ep_array[endpoint_index] == ep)
 		{
@@ -632,10 +631,12 @@ short remove_endpoint_from_set(
 			SET_FLAG(ep->flags, _transport_endpoint_in_set_bit, FALSE);
 			set->ep_array[endpoint_index] = NULL;
 			set->needs_compaction = TRUE;
-			return _transport_error_none;
+			result = _transport_error_none;
+			break;
 		}
+		endpoint_index++;
 	}
-	return _transport_error_endpoint_not_in_set;
+	return result;
 }
 
 void rewind_endpoint_set(

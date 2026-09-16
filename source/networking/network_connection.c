@@ -274,7 +274,7 @@ struct network_server_connection
 
 static boolean network_connection_read_reliable(
 	struct network_connection *connection,
-	void *buffer,
+	void *message,
 	word *buffer_size,
 	struct transport_address *source_address);
 static struct network_connection *network_connection_new_serverside_client(
@@ -290,7 +290,7 @@ static void network_connection_notify_traffic_event(
 	struct network_connection *connection);
 static boolean network_connection_read_unreliable(
 	struct network_connection *connection,
-	void *buffer,
+	void *message,
 	word *buffer_size,
 	struct transport_address *source_address);
 
@@ -460,25 +460,43 @@ void network_connection_get_address(
 	struct transport_address *reliable_address,
 	struct transport_address *unreliable_address)
 {
-	word address_length = IPV4_ADDRESS_LENGTH;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x292,
 		connection);
 
-	if (reliable_address &&
-		(!connection->reliable_endpoint || get_endpoint_address(connection->reliable_endpoint, reliable_address)))
+	if (reliable_address)
 	{
-		memset(reliable_address, 0, sizeof(*reliable_address));
-		reliable_address->address_length = address_length;
+		if (connection->reliable_endpoint)
+		{
+			if (get_endpoint_address(connection->reliable_endpoint, reliable_address))
+			{
+				memset(reliable_address, 0, sizeof(*reliable_address));
+				reliable_address->address_length = IPV4_ADDRESS_LENGTH;
+			}
+		}
+		else
+		{
+			memset(reliable_address, 0, sizeof(*reliable_address));
+			reliable_address->address_length = IPV4_ADDRESS_LENGTH;
+		}
 	}
 
-	if (unreliable_address &&
-		(!connection->unreliable_endpoint || get_endpoint_address(connection->unreliable_endpoint, unreliable_address)))
+	if (unreliable_address)
 	{
-		memset(unreliable_address, 0, sizeof(*unreliable_address));
-		unreliable_address->address_length = address_length;
+		if (connection->unreliable_endpoint)
+		{
+			if (get_endpoint_address(connection->unreliable_endpoint, unreliable_address))
+			{
+				memset(unreliable_address, 0, sizeof(*unreliable_address));
+				unreliable_address->address_length = IPV4_ADDRESS_LENGTH;
+			}
+		}
+		else
+		{
+			memset(unreliable_address, 0, sizeof(*unreliable_address));
+			unreliable_address->address_length = IPV4_ADDRESS_LENGTH;
+		}
 	}
 
 	return;
@@ -614,7 +632,7 @@ boolean network_connection_going_stale(
 
 static boolean network_connection_read_unreliable(
 	struct network_connection *connection,
-	void *buffer,
+	void *message,
 	word *buffer_size,
 	struct transport_address *source_address)
 {
@@ -631,7 +649,7 @@ static boolean network_connection_read_unreliable(
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x3BB,
-		buffer);
+		message);
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x3BC,
@@ -649,13 +667,10 @@ static boolean network_connection_read_unreliable(
 		{
 			error(
 				_error_silent,
-				"got an unusually large datagram (#%d bytes); resetting unreliable incoming queue",
+				"got an unusually large datagram (#d bytes); resetting unreliable incoming queue",
 				message_size);
-			circular_queue_reset(connection->unreliable_incoming_queue);
-			return FALSE;
 		}
-
-		if (message_size > *buffer_size)
+		else if (message_size > *buffer_size)
 		{
 			error(
 				_error_silent,
@@ -664,14 +679,15 @@ static boolean network_connection_read_unreliable(
 				*buffer_size);
 		}
 		else if (message_size + sizeof(source_ipv4_address) <= (unsigned long)circular_queue_size(connection->unreliable_incoming_queue) &&
-			circular_queue_dequeue_data(connection->unreliable_incoming_queue, buffer, message_size, TRUE) &&
+			circular_queue_dequeue_data(connection->unreliable_incoming_queue, message, message_size, TRUE) &&
 			circular_queue_dequeue_data(connection->unreliable_incoming_queue, &source_ipv4_address, sizeof(source_ipv4_address), TRUE))
 		{
-			*(message_header *)buffer = header;
-			match_assert(
+			*(message_header *)message = header;
+			match_vassert(
 				"c:\\halo\\SOURCE\\networking\\network_connection.c",
 				0x3DF,
-				!TEST_FLAG(header, 0));
+				!TEST_FLAG(header, 0),
+				"encryption should not be active");
 			if (source_address)
 			{
 				source_address->address.long_words[0] = source_ipv4_address;
@@ -681,7 +697,6 @@ static boolean network_connection_read_unreliable(
 			*buffer_size = message_size;
 			return TRUE;
 		}
-
 		else
 		{
 			error(
@@ -1190,22 +1205,23 @@ failed:
 
 static boolean network_connection_read_reliable(
 	struct network_connection *connection,
-	void *buffer,
+	void *message,
 	word *buffer_size,
 	struct transport_address *source_address)
 {
-	struct network_connection *local_connection = connection;
 	message_header header;
 	word message_size;
+	boolean success = FALSE;
+	boolean reset_queue = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x371,
-		local_connection && local_connection->reliable_incoming_queue);
+		connection && connection->reliable_incoming_queue);
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x372,
-		buffer);
+		message);
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x373,
@@ -1215,53 +1231,53 @@ static boolean network_connection_read_reliable(
 		0x374,
 		*buffer_size>sizeof(message_header));
 
-	if (!circular_queue_dequeue_data(local_connection->reliable_incoming_queue, &header, sizeof(header), FALSE))
+	if (circular_queue_dequeue_data(connection->reliable_incoming_queue, &header, sizeof(header), FALSE))
 	{
-		return FALSE;
-	}
-
-	byte_swap_message_header(&header, _byte_order_host);
-	message_size = GET_MESSAGE_SIZE(header);
-	if (message_size > RELIABLE_MESSAGE_MAXIMUM_SIZE)
-	{
-		error(
-			_error_silent,
-			"got an unusually large message (#%d bytes); resetting reliable incoming queue",
-			message_size);
-		circular_queue_reset(local_connection->reliable_incoming_queue);
-		return FALSE;
-	}
-
-	if (message_size > *buffer_size)
-	{
-		error(
-			_error_silent,
-			"packet in queue is #%d bytes, but we can only handle #%d bytes!; resetting reliable incoming queue",
-			message_size,
-			*buffer_size);
-		circular_queue_reset(local_connection->reliable_incoming_queue);
-		return FALSE;
-	}
-
-	if (message_size <= circular_queue_size(local_connection->reliable_incoming_queue) &&
-		circular_queue_dequeue_data(local_connection->reliable_incoming_queue, buffer, message_size, TRUE))
-	{
-		*(message_header *)buffer = header;
-		match_assert(
-			"c:\\halo\\SOURCE\\networking\\network_connection.c",
-			0x394,
-			!TEST_FLAG(header, 0));
-		if (source_address && get_endpoint_address(local_connection->reliable_endpoint, source_address))
+		byte_swap_message_header(&header, _byte_order_host);
+		message_size = GET_MESSAGE_SIZE(header);
+		if (message_size > RELIABLE_MESSAGE_MAXIMUM_SIZE)
 		{
-			memset(source_address, 0, sizeof(*source_address));
-			source_address->address_length = IPV4_ADDRESS_LENGTH;
+			error(
+				_error_silent,
+				"got an unusually large message (#d bytes); resetting reliable incoming queue",
+				message_size);
+			reset_queue = TRUE;
 		}
-		*buffer_size = message_size;
-		local_connection->stream_messages_received++;
-		return TRUE;
+		else if (message_size > *buffer_size)
+		{
+			error(
+				_error_silent,
+				"packet in queue is #%d bytes, but we can only handle #%d bytes!; resetting reliable incoming queue",
+				message_size,
+				*buffer_size);
+			reset_queue = TRUE;
+		}
+		else if (message_size <= circular_queue_size(connection->reliable_incoming_queue) &&
+			circular_queue_dequeue_data(connection->reliable_incoming_queue, message, message_size, TRUE))
+		{
+			*(message_header *)message = header;
+			match_vassert(
+				"c:\\halo\\SOURCE\\networking\\network_connection.c",
+				0x394,
+				!TEST_FLAG(header, 0),
+				"encryption should not be active");
+			if (source_address && get_endpoint_address(connection->reliable_endpoint, source_address))
+			{
+				memset(source_address, 0, sizeof(*source_address));
+				source_address->address_length = IPV4_ADDRESS_LENGTH;
+			}
+			*buffer_size = message_size;
+			success = TRUE;
+			connection->stream_messages_received++;
+		}
+
+		if (reset_queue)
+		{
+			circular_queue_reset(connection->reliable_incoming_queue);
+		}
 	}
 
-	return FALSE;
+	return success;
 }
 
 boolean network_connection_read(
@@ -1280,8 +1296,8 @@ boolean network_connection_read(
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x1E0,
-		(connection->flags&FLAG(_connection_create_clientside_client_bit)) ||
-		(connection->flags&FLAG(_connection_create_serverside_client_bit)));
+		connection->flags&FLAG(_connection_create_clientside_client_bit) ||
+		connection->flags&FLAG(_connection_create_serverside_client_bit));
 
 	result = network_connection_read_reliable(connection, buffer, buffer_size, source_address);
 	if (!result && TEST_FLAG(connection->flags, _connection_create_clientside_client_bit))
@@ -1439,7 +1455,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 									break;
 								}
 							}
-							if (client_index == MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+							if (client_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
 							{
 								error(_error_silent, "error adding new client");
 							}
@@ -1470,23 +1486,21 @@ static boolean network_connection_idle_server_reliable_endpoint(
 
 					for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++)
 					{
-						struct network_connection *client_connection = connection->client_list[client_index];
-
-						if (client_connection &&
-							client_connection->reliable_endpoint == endpoint)
+						if (connection->client_list[client_index] &&
+							connection->client_list[client_index]->reliable_endpoint == endpoint)
 						{
-							success = network_connection_idle_client_reliable_endpoint(client_connection);
+							success = network_connection_idle_client_reliable_endpoint(connection->client_list[client_index]);
 							if (!success)
 							{
 								if (remove_endpoint_from_set(
-									client_connection->reliable_endpoint,
+									connection->client_list[client_index]->reliable_endpoint,
 									connection->endpoint_set) != _transport_error_none)
 								{
 									error(
 										_error_silent,
 										"failed to remove a client endpoint from the server's endpoint set");
 								}
-								SET_FLAG(client_connection->flags, _connection_closed_bit, TRUE);
+								SET_FLAG(connection->client_list[client_index]->flags, _connection_closed_bit, TRUE);
 								success = TRUE;
 							}
 							break;
@@ -1563,7 +1577,6 @@ boolean network_connection_idle(
 		if (!success)
 		{
 			error(_error_silent, "network_connection_idle_server_reliable_endpoint failed");
-			return FALSE;
 		}
 	}
 	else if (connection->flags &
@@ -1573,11 +1586,10 @@ boolean network_connection_idle(
 		if (!success)
 		{
 			error(_error_silent, "network_connection_idle_client_reliable_endpoint failed");
-			return FALSE;
 		}
 	}
 
-	if (connection->unreliable_endpoint)
+	if (success && connection->unreliable_endpoint)
 	{
 		long free_space = circular_queue_free_space(connection->unreliable_incoming_queue);
 
@@ -1586,8 +1598,9 @@ boolean network_connection_idle(
 		{
 			struct transport_address source_address;
 			long buffer_size;
+			unsigned long source_ipv4_address;
 
-			if (endpoint_connected(connection->unreliable_endpoint))
+			if ((boolean)endpoint_connected(connection->unreliable_endpoint))
 			{
 				buffer_size = read_endpoint(
 					connection->unreliable_endpoint,
@@ -1632,31 +1645,29 @@ boolean network_connection_idle(
 				return success;
 			}
 
+			source_ipv4_address = source_address.address.long_words[0];
+			if (source_ipv4_address)
 			{
-				unsigned long source_ipv4_address = source_address.address.long_words[0];
-
-				if (source_ipv4_address)
-				{
-					csmemcpy(
-						buffer + buffer_size,
-						&source_ipv4_address,
-						sizeof(source_ipv4_address));
-					buffer_size += sizeof(source_ipv4_address);
-					success = circular_queue_queue_data(
-						connection->unreliable_incoming_queue,
-						buffer,
-						buffer_size);
-					match_vassert(
-						"c:\\halo\\SOURCE\\networking\\network_connection.c",
-						0x279,
-						success,
-						"circular_queue_queue_data() failed though it should have had enough room");
-				}
-				else
-				{
-					error(_error_silent, "datagram received from unknown address");
-				}
+				csmemcpy(
+					buffer + buffer_size,
+					&source_ipv4_address,
+					sizeof(source_ipv4_address));
+				buffer_size += sizeof(source_ipv4_address);
+				success = circular_queue_queue_data(
+					connection->unreliable_incoming_queue,
+					buffer,
+					buffer_size);
+				match_vassert(
+					"c:\\halo\\SOURCE\\networking\\network_connection.c",
+					0x279,
+					success,
+					"circular_queue_queue_data() failed though it should have had enough room");
 			}
+			else
+			{
+				error(_error_silent, "datagram received from unknown address");
+			}
+
 			free_space = circular_queue_free_space(connection->unreliable_incoming_queue);
 		}
 	}

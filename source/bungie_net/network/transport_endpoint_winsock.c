@@ -1308,15 +1308,16 @@ static unsigned long __stdcall connect_endpoint_process(
 short connect_endpoint_async(
 	struct transport_endpoint *ep,
 	struct transport_address const *address,
-	transport_connect_process_ref *process_reference)
+	transport_connect_process_ref *process_ref_ptr)
 {
 	struct connect_process_input *input;
+	short result;
 
 	connection_thread_list_maintenance();
 	match_assert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
 		0x268,
-		ep && address && process_reference);
+		ep && address && process_ref_ptr);
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x269, transport_initialized);
 
 	input = debug_malloc(
@@ -1335,27 +1336,30 @@ short connect_endpoint_async(
 		{
 			if (connection_thread_list_add(input->thread))
 			{
-				short result = _transport_result_connect_in_progress;
-
-				*process_reference = input;
-				ep->error = result;
-				return result;
+				result = _transport_result_connect_in_progress;
+				*process_ref_ptr = input;
 			}
-
-			dispose_thread(input->thread);
-			dispose_mutex(input->mutex);
-			input->thread = NULL;
-			ep->error = _transport_error_unknown;
-			return _transport_error_unknown;
+			else
+			{
+				dispose_thread(input->thread);
+				dispose_mutex(input->mutex);
+				input->thread = NULL;
+				result = _transport_error_unknown;
+			}
 		}
-
-		match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x282, input);
-		ep->error = _transport_error_connect_failed;
-		return _transport_error_connect_failed;
+		else
+		{
+			match_free(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x282, input);
+			result = _transport_error_connect_failed;
+		}
+	}
+	else
+	{
+		result = _transport_error_out_of_memory;
 	}
 
-	ep->error = _transport_error_out_of_memory;
-	return _transport_error_out_of_memory;
+	ep->error = result;
+	return result;
 }
 
 void disconnect_endpoint(
@@ -1478,6 +1482,7 @@ long read_from_endpoint(
 {
 	struct sockaddr_in socket_address;
 	int address_length = sizeof(socket_address);
+	long result;
 
 	match_assert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
@@ -1509,8 +1514,6 @@ long read_from_endpoint(
 
 	if (ep->socket != INVALID_SOCKET)
 	{
-		long result;
-
 		match_assert(
 			TRANSPORT_ENDPOINT_WINSOCK_FILE,
 			0x38B,
@@ -1523,42 +1526,46 @@ long read_from_endpoint(
 			0,
 			(struct sockaddr *)&socket_address,
 			&address_length);
-		if (result != SOCKET_ERROR)
-		{
-			if (result >= 0)
-			{
-				src_addr->address.long_words[0] = SWAP4(socket_address.sin_addr.s_addr);
-				src_addr->address_length = IPV4_ADDRESS_LENGTH;
-				src_addr->port = (word)SWAP2(socket_address.sin_port);
-			}
-
-			return result;
-		}
 	}
 	else
 	{
 		ep->error = _transport_error_unknown;
+		result = SOCKET_ERROR;
 	}
 
-	switch (WSAGetLastError())
+	if (result == SOCKET_ERROR)
 	{
-	case WSAEWOULDBLOCK:
-		return _transport_result_operation_would_block;
+		switch (WSAGetLastError())
+		{
+		case WSAEWOULDBLOCK:
+			result = _transport_result_operation_would_block;
+			break;
 
-	case WSAENETRESET:
-	case WSAECONNABORTED:
-	case WSAECONNRESET:
-	case WSAENOTCONN:
-	case WSAESHUTDOWN:
-	case WSAETIMEDOUT:
-		SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
-		SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
-		return _transport_error_connection_lost;
+		case WSAENETRESET:
+		case WSAECONNABORTED:
+		case WSAECONNRESET:
+		case WSAENOTCONN:
+		case WSAESHUTDOWN:
+		case WSAETIMEDOUT:
+			SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
+			SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
+			result = _transport_error_connection_lost;
+			break;
 
-	default:
-		SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
-		return _transport_error_endpoint_io;
+		default:
+			result = _transport_error_endpoint_io;
+			SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
+			break;
+		}
 	}
+	else if (result >= 0)
+	{
+		src_addr->address.long_words[0] = SWAP4(socket_address.sin_addr.s_addr);
+		src_addr->address_length = IPV4_ADDRESS_LENGTH;
+		src_addr->port = (word)SWAP2(socket_address.sin_port);
+	}
+
+	return result;
 }
 
 long write_to_endpoint(
@@ -1568,6 +1575,7 @@ long write_to_endpoint(
 	struct transport_address const *dest_addr)
 {
 	struct sockaddr_in socket_address;
+	long result;
 
 	match_assert(
 		TRANSPORT_ENDPOINT_WINSOCK_FILE,
@@ -1587,45 +1595,49 @@ long write_to_endpoint(
 			ep->type == _transport_type_udp);
 
 		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-		if (ep->socket == INVALID_SOCKET)
-		{
-			ep->error = _transport_error_unknown;
-		}
 	}
 
 	if (ep->socket != INVALID_SOCKET)
 	{
-		long result = sendto(
+		result = sendto(
 			ep->socket,
 			buffer,
 			length,
 			0,
 			(struct sockaddr const *)&socket_address,
 			sizeof(socket_address));
+	}
+	else
+	{
+		ep->error = _transport_error_unknown;
+		result = SOCKET_ERROR;
+	}
 
-		if (result != SOCKET_ERROR)
+	if (result == SOCKET_ERROR)
+	{
+		switch (WSAGetLastError())
 		{
-			return result;
+		case WSAEWOULDBLOCK:
+			result = _transport_result_operation_would_block;
+			break;
+
+		case WSAENETRESET:
+		case WSAECONNABORTED:
+		case WSAECONNRESET:
+		case WSAENOTCONN:
+		case WSAESHUTDOWN:
+		case WSAETIMEDOUT:
+			SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
+			result = _transport_error_connection_lost;
+			break;
+
+		default:
+			result = _transport_error_endpoint_io;
+			break;
 		}
 	}
 
-	switch (WSAGetLastError())
-	{
-	case WSAEWOULDBLOCK:
-		return _transport_result_operation_would_block;
-
-	case WSAENETRESET:
-	case WSAECONNABORTED:
-	case WSAECONNRESET:
-	case WSAENOTCONN:
-	case WSAESHUTDOWN:
-	case WSAETIMEDOUT:
-		SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
-		return _transport_error_connection_lost;
-
-	default:
-		return _transport_error_endpoint_io;
-	}
+	return result;
 }
 
 void delete_transport_endpoint(
