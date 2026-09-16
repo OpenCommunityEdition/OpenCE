@@ -294,15 +294,14 @@ boolean structure_cluster_unmarked(
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structures.c",
-		0x10E,
+		0x10e,
 		structure_globals.cluster_marker_initialized);
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structures.c",
-		0x10F,
+		0x10f,
 		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
 
-	return structure_globals.cluster_magic_numbers[cluster_index] !=
-		structure_globals.cluster_marker;
+	return (boolean)(structure_globals.cluster_magic_numbers[cluster_index]!=structure_globals.cluster_marker);
 }
 
 boolean structure_cluster_mark(
@@ -310,23 +309,20 @@ boolean structure_cluster_mark(
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structures.c",
-		0x11E,
+		0x11e,
 		structure_globals.cluster_marker_initialized);
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structures.c",
-		0x11F,
+		0x11f,
 		cluster_index>=0 && cluster_index<MAXIMUM_CLUSTERS_PER_STRUCTURE);
 
-	if (structure_globals.cluster_magic_numbers[cluster_index] ==
-		structure_globals.cluster_marker)
+	if (structure_globals.cluster_magic_numbers[cluster_index]!=structure_globals.cluster_marker)
 	{
-		return FALSE;
+		structure_globals.cluster_magic_numbers[cluster_index]= structure_globals.cluster_marker;
+		return TRUE;
 	}
 
-	structure_globals.cluster_magic_numbers[cluster_index] =
-		structure_globals.cluster_marker;
-
-	return TRUE;
+	return FALSE;
 }
 
 boolean sphere_intersects_cluster_portal(

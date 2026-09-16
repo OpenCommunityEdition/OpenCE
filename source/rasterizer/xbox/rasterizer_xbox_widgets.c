@@ -730,15 +730,8 @@ void _rasterizer_widget_draw_sprite2d(
 			scale_x = scale_y = 1.0f;
 		}
 
-		if (texture_scale)
-		{
-			texture_u = (long)texture_scale->i;
-			texture_v = (long)texture_scale->j;
-		}
-		else
-		{
-			texture_u = texture_v = 1;
-		}
+		texture_u = texture_scale ? (long)texture_scale->i : 1;
+		texture_v = texture_scale ? (long)texture_scale->j : 1;
 
 		IDirect3DDevice8_Begin(
 			global_d3d_device,

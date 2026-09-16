@@ -618,12 +618,12 @@ static boolean actor_look_valid_aim_vector(
 	real_vector3d const *attempted_aiming_vector)
 {
 	real_vector2d aiming_vector2d;
-	boolean result = FALSE;
+	boolean result;
 
-	aiming_vector2d.i = attempted_aiming_vector->i;
-	aiming_vector2d.j = attempted_aiming_vector->j;
+	aiming_vector2d = *(real_vector2d const *)attempted_aiming_vector;
+	result = FALSE;
 	if (normalize2d(&aiming_vector2d) > 0.0f &&
-		aiming_vector2d.i * facing_vector->i + aiming_vector2d.j * facing_vector->j > yaw_deviation)
+		dot_product2d(&aiming_vector2d, (real_vector2d const *)facing_vector) > yaw_deviation)
 	{
 		result = TRUE;
 	}
@@ -638,22 +638,20 @@ static boolean actor_look_valid_look_vector(
 	real_vector3d const *attempted_looking_vector,
 	real_vector3d const *look_vector)
 {
-	real_vector2d looking_vector2d;
 	real_vector2d attempted_looking_vector2d;
+	real_vector2d looking_vector2d;
 	boolean result = FALSE;
 
-	looking_vector2d.i = look_vector->i;
-	looking_vector2d.j = look_vector->j;
-	attempted_looking_vector2d.i = attempted_looking_vector->i;
-	attempted_looking_vector2d.j = attempted_looking_vector->j;
+	looking_vector2d = *(real_vector2d const *)look_vector;
+	attempted_looking_vector2d = *(real_vector2d const *)attempted_looking_vector;
 
 	if (normalize2d(&looking_vector2d) > 0.0f &&
-		looking_vector2d.i * aiming_vector->i + looking_vector2d.j * aiming_vector->j > yaw_deviation &&
+		dot_product2d(&looking_vector2d, (real_vector2d const *)aiming_vector) > yaw_deviation &&
 		normalize2d(&attempted_looking_vector2d) > 0.0f)
 	{
-		short side = cross_product2d(&looking_vector2d, &attempted_looking_vector2d) > 0.0f;
+		boolean side = cross_product2d(&looking_vector2d, &attempted_looking_vector2d) > 0.0f;
 
-		if (dot_product2d(&looking_vector2d, &attempted_looking_vector2d) > cone_limits->n[side])
+		if (dot_product2d(&attempted_looking_vector2d, &looking_vector2d) > cone_limits->n[side])
 			result = TRUE;
 	}
 

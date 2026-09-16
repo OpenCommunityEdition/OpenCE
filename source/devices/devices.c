@@ -1006,10 +1006,7 @@ boolean device_frontfacing(
 		!TEST_FLAG(control->control.flags, _control_usable_from_both_sides_bit) &&
 		object_get_marker_by_name(device_index, "front", &front_marker, 1) == 1)
 	{
-		real facing_dot_front =
-			facing->i * front_marker.matrix.forward.i +
-			facing->j * front_marker.matrix.forward.j +
-			facing->k * front_marker.matrix.forward.k;
+		real facing_dot_front = dot_product3d(facing, &front_marker.matrix.forward);
 
 		frontfacing = !(facing_dot_front > 0.0f);
 	}

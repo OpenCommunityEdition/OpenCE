@@ -1590,7 +1590,11 @@ void ai_scripting_follow_target_ai(
 		char target_ai_name[512];
 
 		ai_index_to_string(ai_reference, global_scenario_get(), ai_name, sizeof(ai_name));
-		ai_index_to_string(target_ai_reference, global_scenario_get(), target_ai_name, sizeof(target_ai_name));
+		/* BUG (preserved for exact matching): January formats ai_reference again instead of
+		 * target_ai_reference, so the log prints the first name twice. A corrected build should
+		 * pass target_ai_reference here.
+		 */
+		ai_index_to_string(ai_reference, global_scenario_get(), target_ai_name, sizeof(target_ai_name));
 		error(_error_silent, "%s: ai_follow_target_ai %s %s", hs_runtime_get_executing_thread_name(), ai_name, target_ai_name);
 	}
 

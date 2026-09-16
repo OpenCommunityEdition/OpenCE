@@ -959,9 +959,9 @@ boolean point_in_triangle3d(
 	real *t0,
 	real *t1)
 {
-	real_point3d edge0;
-	real_point3d edge1;
-	real_point3d offset;
+	real_vector3d edge0;
+	real_vector3d edge1;
+	real_vector3d offset;
 	real_vector3d normal;
 	real_point2d projected_edge0;
 	real_point2d projected_edge1;
@@ -970,69 +970,48 @@ boolean point_in_triangle3d(
 	real cross0;
 	real cross1;
 	real determinant;
+	boolean result;
 	short projection;
 	boolean projection_sign;
-	boolean result;
 
-	offset.x = point->x - triangle0->x;
-	offset.y = point->y - triangle0->y;
-	offset.z = point->z - triangle0->z;
-	edge0.x = triangle1->x - triangle0->x;
-	edge0.y = triangle1->y - triangle0->y;
-	edge0.z = triangle1->z - triangle0->z;
-	edge1.x = triangle2->x - triangle0->x;
-	edge1.y = triangle2->y - triangle0->y;
-	edge1.z = triangle2->z - triangle0->z;
-	{
-		real normal_k;
-		real normal_j;
-		real normal_i;
-
-		normal_k = edge0.x * edge1.y - edge0.y * edge1.x;
-		normal_j = edge0.z * edge1.x - edge0.x * edge1.z;
-		normal_i = edge0.y * edge1.z - edge0.z * edge1.y;
-		normal.i = normal_i;
-		normal.j = normal_j;
-		normal.k = normal_k;
-	}
-	plane_distance =
-		normal.i * offset.x +
-		normal.j * offset.y +
-		normal.k * offset.z;
+	vector_from_points3d(triangle0, point, &offset);
+	vector_from_points3d(triangle0, triangle1, &edge0);
+	vector_from_points3d(triangle0, triangle2, &edge1);
+	cross_product3d(&edge0, &edge1, &normal);
+	plane_distance = dot_product3d(&normal, &offset);
 	if (plane_distance * plane_distance <
-		(normal.i * normal.i + normal.j * normal.j + normal.k * normal.k) *
-		_real_epsilon)
+		magnitude_squared3d(&normal) * _real_epsilon)
 	{
 		projection = projection_from_vector3d(&normal);
 		projection_sign = projection_sign_from_vector3d(&normal, projection);
 		project_point3d(
-			&edge0,
+			(real_point3d const *)&edge0,
 			projection,
 			projection_sign,
 			&projected_edge0);
 		project_point3d(
-			&offset,
+			(real_point3d const *)&offset,
 			projection,
 			projection_sign,
 			&projected_offset);
-		cross0 =
-			projected_edge0.x * projected_offset.y -
-			projected_edge0.y * projected_offset.x;
+		cross0 = cross_product2d(
+			(real_vector2d const *)&projected_edge0,
+			(real_vector2d const *)&projected_offset);
 		if (cross0 >= 0.0f)
 		{
 			project_point3d(
-				&edge1,
+				(real_point3d const *)&edge1,
 				projection,
 				projection_sign,
 				&projected_edge1);
-			cross1 =
-				projected_offset.x * projected_edge1.y -
-				projected_offset.y * projected_edge1.x;
+			cross1 = cross_product2d(
+				(real_vector2d const *)&projected_offset,
+				(real_vector2d const *)&projected_edge1);
 			if (cross1 >= 0.0f)
 			{
-				determinant =
-					projected_edge0.x * projected_edge1.y -
-					projected_edge0.y * projected_edge1.x;
+				determinant = cross_product2d(
+					(real_vector2d const *)&projected_edge0,
+					(real_vector2d const *)&projected_edge1);
 				if (cross0 + cross1 <= determinant)
 				{
 					real inverse_determinant;
@@ -2820,11 +2799,9 @@ boolean pill_test_vector3d(
 	else if (xv < 0.0f)
 	{
 		*t = n;
-		x.i = x.i + n * vector->i;
-		x.j = x.j + n * vector->j;
-		fast_normalize2d(&x);
-		normal->i = x.i;
-		normal->j = x.j;
+		normal->i = x.i + n * vector->i;
+		normal->j = x.j + n * vector->j;
+		fast_normalize2d((real_vector2d *)normal);
 		normal->k = 0.0f;
 	}
 	else

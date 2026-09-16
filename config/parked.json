@@ -363,17 +363,6 @@
       "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. This was previously exact (693 meaningful bytes), now explicitly debited. Proper shared PlayerProfile ownership changes only two independent ordinary stack loads at +0x9a/+0x9d: EAX from [EBP-0xc] and EDI from [EBP+8]. Both complete code sections and ordered relocation identities otherwise agree. The previous playlist-only no-loss hold remains historical; this coherent ownership migration is retained under the user's house-rules/honest-fuzzy direction, not relabelled exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_widgets",
-      "function": "__rasterizer_widget_draw_sprite2d",
-      "class": "unclassified",
-      "evidence": "Natural Opus first-body typed sprite2d reconstruction retained with the genuine rasterizer_widgets.h contract and required draw-call stream. January and candidate have 528 padded bytes and 30 ordered relocations. The remaining null-texture-scale path assigns the same integer unit scales using opposite EBX/EDI assignment order; the donor exact two-ternary rewrite followed a 12-variant code-generation search and is not imported as source-authenticated. No new math helper, forced inline, raw access, foreign prototype, visibility wrapper or point_from_line3d is emitted. This Halo body remains fuzzy with zero exact credit. See docs/object_matching_logs/rasterizer_xbox_widgets_obj_natural_opus_pair_20260906.md. Reopen for genuine source/compiler-context evidence rather than equivalent-expression or declaration permutations.",
-      "measurements": {
-        "target": { "size": 528, "relocation_count": 30, "normalized_sha256": "5adde524c709325b4dd89a59ab62baa7a6f10654ae64b1773bdb05409086f3af" },
-        "base": { "size": 528, "relocation_count": 30, "normalized_sha256": "0297644a3e1501a48dd9d7bbf24744b366d2892607ee9d29d26307e7be593a6a" },
-        "objdiff_percent": 99.911766
-      }
-    },
-    {
       "unit": "source/ai/path_obstacles",
       "function": "_obstacles_test_circle",
       "class": "unclassified",
@@ -2681,25 +2670,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox",
-      "function": "_rasterizer_set_model_skinning",
-      "class": "private-register-convention",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed 44-node skinning constant upload from January's assertions, instruction/relocation topology, and the independently used model-skinning parameter layout. Target and candidate both occupy 320 padded bytes with all 18 relocations and objdiff reports 95.92233 percent similarity. Their instruction streams implement the same transposed, scale-folded matrices and differ only by an EAX/ECX register exchange. Five natural declaration orders and direct-index forms either returned to this fixed point or worsened code generation. No register keyword, volatile access, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical logic is retained.",
-      "measurements": {
-        "target": {
-          "size": 320,
-          "relocation_count": 18,
-          "normalized_sha256": "ba181c535da3f3a4b566208d3ce013b4a00c7e9f8c077c30d23b0cadd4b535be"
-        },
-        "base": {
-          "size": 320,
-          "relocation_count": 18,
-          "normalized_sha256": "3b0471f353677f94ad13f447678034d81d82e2fc8126b598c699f499f98d3258"
-        },
-        "objdiff_percent": 95.92233
-      }
-    },
-    {
       "unit": "source/hs/hs_runtime",
       "function": "_hs_inspect_enum",
       "class": "csplit-relocation-alias",
@@ -3732,17 +3702,6 @@
       }
     },
     {
-      "unit": "source/ai/ai",
-      "function": "_ai_handle_editing",
-      "class": "unclassified",
-      "evidence": "Complete typed live-editor reconciliation reconstructed from January code, strings, assertions, and relocations with HCEA as an independent semantic map. The retained body deliberately corrects January's unsafe unscaled csmemmove record counts by multiplying the squad and platoon spans by their datum sizes. Target and candidate remain 1,296 padded bytes with all 70 relocations, but the safe source is non-exact and receives zero credit. No fake dependency, raw offset, forced inline, undefined behavior, or nonsensical logic is retained. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
-      "measurements": {
-        "target": { "size": 1296, "relocation_count": 70, "normalized_sha256": "652338b1724b0f70d82160cd72c21e568a24fd099c4208e692215bb4e3d93cf8" },
-        "base": { "size": 1296, "relocation_count": 70, "normalized_sha256": "5a0356c0457d3b500449b2cb4abfeeee8d281c857e47b9eb1521e35d63dbf5fd" },
-        "objdiff_percent": 93.23018
-      }
-    },
-    {
       "unit": "source/structures/leaf_map",
       "function": "_node_stack_read",
       "class": "csplit-relocation-alias",
@@ -4131,44 +4090,6 @@
           "normalized_sha256": "a8adaa33cd572e879ba65d3b5c042368b8d5d29e90739dc418b65cadb1652474"
         },
         "objdiff_percent": 70.925
-      }
-    },
-    {
-      "unit": "source/structures/structures",
-      "function": "_structure_cluster_mark",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 12,
-          "normalized_sha256": "c426fbafcf634a63373bab944083c26aaebda5a181121a993ed0e2c0e644921a"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 12,
-          "normalized_sha256": "6a2ecd6bf009e8daca71c82a97e74f82e02a4c69336e61acabbfffff357af60c"
-        },
-        "objdiff_percent": 77.948715
-      }
-    },
-    {
-      "unit": "source/structures/structures",
-      "function": "_structure_cluster_unmarked",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 11,
-          "normalized_sha256": "98b5502fb6c8cb58f48c07e07ae161eb7434b246a299c669a8eb61d33efbed6a"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 11,
-          "normalized_sha256": "3b867b30927311d97aed7094ec07a3b176faded2b3bd27c5280dc4e6f734ea4a"
-        },
-        "objdiff_percent": 90.588234
       }
     },
     {

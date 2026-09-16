@@ -1360,8 +1360,8 @@ void rasterizer_set_model_skinning(
 		skinning->node_matrix_count>0 && skinning->node_matrix_count<RASTERIZER_MAXIMUM_NODES_PER_MODEL);
 	for (node_index = 0; node_index < skinning->node_matrix_count; node_index++)
 	{
+		real scale = skinning->node_matrices[node_index].scale;
 		real_matrix4x3 const *matrix = &skinning->node_matrices[node_index];
-		real scale = matrix->scale;
 		real (*constants)[4] = node_matrix_constants[node_index];
 
 		constants[0][0] = scale * matrix->forward.i;
