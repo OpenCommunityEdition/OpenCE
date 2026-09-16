@@ -861,12 +861,13 @@ static void * __stdcall bink_alloc(
 	unsigned long size_in_bytes)
 {
 	void *result= NULL;
+	boolean can_allocate;
 
 	bink_get_memory_available("begin bink_alloc");
 
 	if (bink_pointer_block_count>0 && !bink_pointer_blocks[0])
 	{
-		match_dassert(
+		match_vassert(
 			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
 			735,
 			is_all_bink_memory_free(),
@@ -878,9 +879,21 @@ static void * __stdcall bink_alloc(
 		}
 	}
 
-	if (bink_globals.memory_pool_offset+size_in_bytes<=bink_globals.memory_pool_size &&
+	can_allocate= bink_globals.memory_pool_offset+size_in_bytes<=bink_globals.memory_pool_size &&
 		bink_pointer_block_count<MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS &&
-		bink_globals.memory_pool_base)
+		bink_globals.memory_pool_base;
+
+	if (!can_allocate)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
+			759,
+			!"bink memory allocation should not fail");
+		/* January emits the only int3 in the whole image here; the intrinsic form sinks
+		   into the epilogue, so the original text was an inline-assembly breakpoint. */
+		__asm { int 3 }
+	}
+	else
 	{
 		result= bink_globals.memory_pool_base+bink_globals.memory_pool_offset;
 		bink_globals.memory_pool_offset+= size_in_bytes;
@@ -891,7 +904,7 @@ static void * __stdcall bink_alloc(
 			bink_globals.memory_pool_offset<=bink_globals.memory_pool_size,
 			csprintf(temporary, "### FATAL_ERROR bink needs more memory (requested %d bytes over the %d-byte limit)",
 				bink_globals.memory_pool_offset-bink_globals.memory_pool_size, bink_globals.memory_pool_size));
-		match_dassert(
+		match_vassert(
 			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
 			787,
 			bink_pointer_block_count<MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS,
@@ -909,13 +922,6 @@ static void * __stdcall bink_alloc(
 		{
 			bink_globals.memory_pool_offset= bink_globals.memory_pool_size;
 		}
-	}
-	else
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
-			759,
-			!"bink memory allocation should not fail");
 	}
 
 	return result;

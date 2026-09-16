@@ -3480,25 +3480,6 @@
     },
     {
       "unit": "source/bink/bink_playback",
-      "function": "_bink_alloc@4",
-      "class": "tu-context-optimization",
-      "evidence": "Complete ordinary-C Bink pool allocator retained from the Fable graph reconciliation. It follows the authenticated allocation, protection, guard, bookkeeping, diagnostic, and fallback behavior. January is 496 padded bytes with 52 relocations; canonical is 512 bytes with 51 because VC7 chooses a different first memory-free predicate call/inlining context and block schedule. It receives zero exact credit. No force-inline/noinline directive, local clone, volatile/register carrier, optimizer pragma, fake dependency, assembly, raw offset, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 496,
-          "relocation_count": 52,
-          "normalized_sha256": "09c916253ce6d4de138897643092eb0801cd14d0e7abdf8ca88c3bb6369a33ac"
-        },
-        "base": {
-          "size": 512,
-          "relocation_count": 51,
-          "normalized_sha256": "e4612444abc905a9f2ba8587f89856d75389dac12ac7443a16fe2f8b1d8fb888"
-        },
-        "objdiff_percent": 55.544827
-      }
-    },
-    {
-      "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
       "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
