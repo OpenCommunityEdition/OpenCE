@@ -1235,9 +1235,10 @@ void player_effect_start(
 							&delta);
 						cross_product3d(&camera->forward, &camera->up, &left);
 
-						relative.i = dot_product3d(&left, &delta);
-						relative.j = dot_product3d(&delta, &camera->forward);
-						relative.k = dot_product3d(&delta, &camera->up);
+						set_real_vector3d(&relative,
+							dot_product3d(&left, &delta),
+							dot_product3d(&delta, &camera->forward),
+							dot_product3d(&delta, &camera->up));
 
 						if (normalize3d(&relative) != 0.0f)
 						{

@@ -1130,10 +1130,10 @@ void actor_get_stopping_distances(
 
 	if (actor->input.vehicle_index != NONE)
 	{
-		long vehicle_driver_type = actor->input.vehicle_driver_type;
-
-		if (vehicle_driver_type >= _actor_vehicle_driver_hovering_ground &&
-			vehicle_driver_type <= _actor_vehicle_driver_nondirectional_ground)
+		switch (actor->input.vehicle_driver_type)
+		{
+		case _actor_vehicle_driver_hovering_ground:
+		case _actor_vehicle_driver_nondirectional_ground:
 		{
 			struct unit_datum *vehicle = vehicle_get(actor->input.vehicle_index);
 			struct vehicle_definition *definition =
@@ -1145,6 +1145,8 @@ void actor_get_stopping_distances(
 			reference_speed = definition->maximum_forward_speed;
 			deceleration = definition->speed_acceleration;
 			stopping_deceleration = deceleration;
+			break;
+		}
 		}
 	}
 	else if (actor->meta.unit_index != NONE)
