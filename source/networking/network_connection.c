@@ -314,16 +314,10 @@ boolean network_connection_connected(
 		0x15C,
 		connection);
 
-	if (connection->flags & (FLAG(_connection_create_clientside_client_bit) | FLAG(_connection_create_serverside_client_bit)))
-	{
-		if (connection->reliable_endpoint &&
-			(boolean)endpoint_connected(connection->reliable_endpoint))
-		{
-			return TRUE;
-		}
-	}
-
-	return FALSE;
+	return ((connection->flags & FLAG(_connection_create_clientside_client_bit)) ||
+		(connection->flags & FLAG(_connection_create_serverside_client_bit))) &&
+		connection->reliable_endpoint &&
+		(boolean)endpoint_connected(connection->reliable_endpoint);
 }
 
 static void network_connection_notify_traffic_event(
@@ -1355,10 +1349,10 @@ boolean network_connection_disconnect(
 {
 	boolean success = TRUE;
 
-	if ((boolean)network_connection_connected(connection))
+	if (network_connection_connected(connection))
 	{
-		if (connection->flags &
-			(FLAG(_connection_create_clientside_client_bit) | FLAG(_connection_create_serverside_client_bit)))
+		if ((connection->flags & FLAG(_connection_create_clientside_client_bit)) ||
+			(connection->flags & FLAG(_connection_create_serverside_client_bit)))
 		{
 			network_connection_idle_client_reliable_endpoint(connection);
 		}
@@ -1370,20 +1364,14 @@ boolean network_connection_disconnect(
 		struct transport_address address;
 
 		address.address_length = IPV4_ADDRESS_LENGTH;
-		address.address.long_words[0] = 0;
+		address.address.ipv4_address = 0;
 		address.port = connection->well_known_port;
+
 		delete_transport_endpoint(connection->unreliable_endpoint);
 		connection->unreliable_endpoint = create_transport_endpoint(_transport_type_udp);
-		if (!connection->unreliable_endpoint ||
-			bind_endpoint(connection->unreliable_endpoint, &address) ||
-			set_endpoint_blocking(connection->unreliable_endpoint, FALSE))
-		{
-			success = FALSE;
-		}
-		else
-		{
-			return TRUE;
-		}
+		success = connection->unreliable_endpoint &&
+			(bind_endpoint(connection->unreliable_endpoint, &address) == _transport_error_none) &&
+			(set_endpoint_blocking(connection->unreliable_endpoint, FALSE) == _transport_error_none);
 	}
 
 	return success;

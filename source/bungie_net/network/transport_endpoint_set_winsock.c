@@ -383,7 +383,9 @@ short transport_dispose(
 boolean transport_network_available(
 	void)
 {
-	return (XNetGetEthernetLinkStatus() & XNET_ETHERNET_LINK_ACTIVE) != 0;
+	boolean available = XNetGetEthernetLinkStatus() & XNET_ETHERNET_LINK_ACTIVE;
+
+	return available;
 }
 
 struct transport_endpoint_set *create_endpoint_set(
@@ -714,7 +716,8 @@ boolean transport_nonce_is_equal(
 		"c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
 		0xA4,
 		dst != NULL);
-	return memcmp(src, dst, sizeof(global_nonce)) == 0;
+
+	return (boolean)(memcmp(src, dst, sizeof(global_nonce)) == 0);
 }
 
 boolean transport_is_nonce(

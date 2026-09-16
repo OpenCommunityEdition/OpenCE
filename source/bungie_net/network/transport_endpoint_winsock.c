@@ -473,8 +473,8 @@ long read_endpoint(
 		switch (WSAGetLastError())
 		{
 		case WSAEWOULDBLOCK:
-			ep->error = _transport_result_operation_would_block;
-			return _transport_result_operation_would_block;
+			result = _transport_result_operation_would_block;
+			break;
 
 		case WSAENETRESET:
 		case WSAECONNABORTED:
@@ -484,17 +484,18 @@ long read_endpoint(
 		case WSAETIMEDOUT:
 			SET_FLAG(ep->flags, _transport_endpoint_connected_bit, FALSE);
 			SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
-			ep->error = _transport_error_connection_lost;
-			return _transport_error_connection_lost;
+			result = _transport_error_connection_lost;
+			break;
 
 		default:
+			result = _transport_error_endpoint_io;
 			SET_FLAG(ep->flags, _transport_endpoint_readable_bit, FALSE);
-			ep->error = _transport_error_endpoint_io;
-			return _transport_error_endpoint_io;
+			break;
 		}
-	}
 
-	if (result == 0)
+		ep->error = (word)result;
+	}
+	else if (result == 0)
 	{
 		result = _transport_error_connection_lost;
 	}
@@ -640,14 +641,6 @@ char const *winsock_error_to_string(
 	 */
 	switch (error_code)
 	{
-	case (long)WSA_WAIT_FAILED:
-		error_string = "WSA_WAIT_FAILED";
-		break;
-
-	case (long)WSA_INVALID_EVENT:
-		error_string = "WSA_INVALID_EVENT";
-		break;
-
 	case ERROR_INVALID_HANDLE:
 		error_string = "WSA_INVALID_HANDLE";
 		break;
@@ -656,20 +649,28 @@ char const *winsock_error_to_string(
 		error_string = "WSA_NOT_ENOUGH_MEMORY";
 		break;
 
+	case (long)WSA_INVALID_EVENT:
+		error_string = "WSA_INVALID_EVENT";
+		break;
+
 	case WSA_MAXIMUM_WAIT_EVENTS:
 		error_string = "WSA_MAXIMUM_WAIT_EVENTS";
+		break;
+
+	case (long)WSA_WAIT_FAILED:
+		error_string = "WSA_WAIT_FAILED";
 		break;
 
 	case ERROR_INVALID_PARAMETER:
 		error_string = "WSA_INVALID_PARAMETER";
 		break;
 
-	case WAIT_IO_COMPLETION:
-		error_string = "WSA_WAIT_IO_COMPLETION";
-		break;
-
 	case WSA_WAIT_TIMEOUT:
 		error_string = "WSA_WAIT_TIMEOUT";
+		break;
+
+	case WAIT_IO_COMPLETION:
+		error_string = "WSA_WAIT_IO_COMPLETION";
 		break;
 
 	case ERROR_OPERATION_ABORTED:

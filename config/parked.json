@@ -443,44 +443,6 @@
     },
     {
       "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_winsock_error_to_string",
-      "class": "unclassified",
-      "evidence": "One complete natural84-case named SDK switch with exact January strings, real error API, existing global semantic ownership and target-proven post-log field return. Target/candidate1568B/177relocs and normalized bytes agree but10 relocation destinations differ: first five string bodies and compensating jump-table destinations are physically permuted. This is not strict exact and no semantic exception applies. Existing22 code and20 data owners/property records unchanged;86 new target literals1363B all strict/property-exact. Two frozen objects pass33069 stubbed logger behavior cases each, including stored-string mutation, all codes/gaps and ABI checks. No variants, new helper/global/COMMON or point_from_line3d. See docs/object_matching_logs/transport_endpoint_winsock_obj_error_string_natural_boundary_20260905.md.",
-      "measurements": {
-        "target": {
-          "size": 1568,
-          "relocation_count": 177,
-          "normalized_sha256": "35e5bf685b7053c6bf425c6f771467a3359cebda61937162f15f708d9b21ae60"
-        },
-        "base": {
-          "size": 1568,
-          "relocation_count": 177,
-          "normalized_sha256": "35e5bf685b7053c6bf425c6f771467a3359cebda61937162f15f708d9b21ae60"
-        },
-        "objdiff_percent": 49.78903
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_read_endpoint",
-      "class": "unclassified",
-      "evidence": "Complete one-shot natural January stream read through the existing real SDK recv owner, public long endpoint/void-buffer/long-length API, target assertions, WSA error constants, and cseries flag macros. Target and candidate are256 padded bytes/16 relocations. The documented old residual remains: January's default error arm loads flags into CL, masks/stores them and writes the short error; VC7 uses the equivalent in-memory byte AND, shortening this arm by5 bytes and shifting the tail/tables. No E38–E42 variant was repeated. WSAEWOULDBLOCK sets error-4 and leaves flags; connection errors clear connected/readable and set error-3; other failures clear readable and set error-2. Positive reads return their count. EOF returns-3 without updating endpoint fields, preserving January. All20 inherited emitted code owners (17 exact/3 parked) and17 runtime-data owners remain byte/relocation-identical with unchanged real-owner offset/storage/type/flags/alignment/COMDAT selection. Exactly one new public code owner, no new data/COMMON/helpers/point_from_line3d. Reopen only with authentic source/type/compiler context, not scheduling variants. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_natural_boundary_20260905.md.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 16,
-          "normalized_sha256": "1ccff970f392034644ae9ef3f46732fbcaaa6c60076defca35cafe662dd99e0e"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 16,
-          "normalized_sha256": "61b84f3b48ae319f309c469afd1bc3ded1721e6a319844f1a7d8d1355a57101f"
-        },
-        "objdiff_percent": 67.14286
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
       "function": "_read_from_endpoint",
       "class": "unclassified",
       "evidence": "First complete natural January datagram receive using the existing exact static create_endpoint_socket, real public short-return bind_endpoint, naturally inlined endpoint_connected predicate, and stock recvfrom/WSA API. Target is 544 padded bytes and current candidate is 560, both with 30 relocations; target is 543 meaningful bytes. Natural VC7 keeps length in EBX and saves/restores it whereas January reloads the stack parameter; it uses a different zero-initialization store schedule, places the address-copy success block before errors, and chooses equivalent flag-update instructions. The candidate changed from 544 to 560 bytes only after the supplied Bungie networking source required the genuine `ipv4_address` alias in the proper shared transport union; that authentic header correction is retained and the snapshot is honestly refreshed. Zero datagrams return 0 and populate IPv4/port; unused source-address fields stay untouched. No fake dependency, raw access, compiler steering, or point_from_line3d emission is used. Park credible fuzzy; reopen only from authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_read_from_natural_boundary_20260905.md.",
@@ -557,17 +519,6 @@
     },
     {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
-      "function": "_transport_network_available",
-      "class": "unclassified",
-      "evidence": "Restore the natural boolean XDK Ethernet-link query under current fuzzy-park policy. January and candidate both16padded/1reloc, calling the real XNetGetEthernetLinkStatus API and testing its named XNET_ETHERNET_LINK_ACTIVE mask. January masks AL, natural C masks EAX; no cast, flag, declaration-order or register search is repeated from the August26 exact-only rejection. Existing transport.h owns the boolean(void) API; UI event handler consumes that owner instead of a local prototype and duplicate transport-address layouts. All14 current strict target functions and5 inherited parks remain unchanged; no new code/COMMON/point_from_line3d is introduced. Unknown source/compiler mechanism, no exact credit. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_client_stop_bss_lifecycle_leaves_20260904.md and the admitting batch checkpoint.",
-      "measurements": {
-        "target": {"size": 16, "relocation_count": 1, "normalized_sha256": "73954fa0da7600bd1a60ddb3387eafabb788779227be715ec886a2fb1bdfe783"},
-        "base": {"size": 16, "relocation_count": 1, "normalized_sha256": "eef4bf49c6b243bcaae881c7f8494b0d0f6d9e65505d6dbe7d8138d1f2b12b2b"},
-        "objdiff_percent": 98.333336
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_endpoint_set_compare_entries",
       "class": "unclassified",
       "evidence": "Natural typed qsort callback reconstructed with its real poll caller. Both entries are loaded, non-NULL entries precede NULL entries, and the callback returns the January -1/0/1 relation. Private semantic name is inferred and mapped to the original target owner at 0x70B10 without an alias or linkage change. Both48B/0relocs; only EAX/ECX assignment differs. No register/declaration-order search or ABI steering. All12 inherited exact owners and the nonce park are unchanged; no candidate-only code or point_from_line3d is emitted. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
@@ -630,25 +581,6 @@
         "target": {"size": 192, "relocation_count": 6, "normalized_sha256": "4aa245bc023e916684c2f0e85a6c095e39e59b327edf9f0d663f138caf5b8e84"},
         "base": {"size": 176, "relocation_count": 6, "normalized_sha256": "2bd094fae4e082a8f11aac9fca4ac91313b619d39105ec1dbd4fc9d67515106c"},
         "objdiff_percent": 82.361115
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
-      "function": "_transport_nonce_is_equal",
-      "class": "unclassified",
-      "evidence": "Natural first-shot typed nonce comparison follows January's two non-NULL assertions and compares exactly sizeof(global_nonce)=8 bytes with the existing cseries memcmp macro. Public prototype already belongs to transport.h; the named external nonce has an eight-byte January symbol span, also corroborated by network message nonce arrays. Target/candidate are both112 padded bytes with all9 relocation addresses/types/destinations identical; objdiff99.60526 percent. Aligned instructions differ only in boolean materialization after neg eax: January sbb al,al / inc al, candidate sbb eax,eax / inc eax, plus trailing padding. Both return the same low-byte boolean. No source/ABI/compiler-context cause is asserted, so park unclassified rather than forcing casts or instruction bytes. The related public functions transport_get_nonce and transport_is_nonce are strict, all10 inherited stricts remain unchanged, no extra code/COMMON is emitted, and the hard _point_from_line3d guard passes. Reopen for authentic source/type/compiler-context evidence only, not expression or declaration permutations. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_nonce_trio_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 112,
-          "relocation_count": 9,
-          "normalized_sha256": "c108841f462f3a3172f02c5819cb7a9d4fcb132ecdbc53c1cf29c6cd79a5d914"
-        },
-        "base": {
-          "size": 112,
-          "relocation_count": 9,
-          "normalized_sha256": "b61ebb30a9066ba1513167bfab96aca7c891a1b2caeb6dd9b8b8079022e1e06f"
-        },
-        "objdiff_percent": 99.60526
       }
     },
     {
@@ -2211,44 +2143,6 @@
           "normalized_sha256": "ea92b8ec1f0cba653087aed130e5f50f6072042402c748eacd9bc25c7c1b33e9"
         },
         "objdiff_percent": 65.47899
-      }
-    },
-    {
-      "unit": "source/networking/network_connection",
-      "function": "_network_connection_connected",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after retaining the complete typed connection predicate supported by January and independent HCEA behavior. Correcting the owner contract from generic long to project boolean naturally narrows the candidate from 96 to 80 padded bytes while preserving the five relocation identities; January remains 96 padded bytes. The remaining difference is ordinary return-width and register allocation rather than missing behavior. Coercive register steering and a false owner type were rejected. No volatile/register forcing, barrier, pragma, assembly, fake dependency, or semantic distortion is present. Reopen only for authoritative January source or a natural same-compiler allocation donor.",
-      "measurements": {
-        "target": {
-          "size": 96,
-          "relocation_count": 5,
-          "normalized_sha256": "50677dce5bbee398989d36573afcb4be3ca3025c446a6e7bb0c005c2cd4fe3f8"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 5,
-          "normalized_sha256": "94c65a6742d8ae1738407c82cc2a2c2afbd1211b7c7104b96ed087796db42f3a"
-        },
-        "objdiff_percent": 98.90625
-      }
-    },
-    {
-      "unit": "source/networking/network_connection",
-      "function": "_network_connection_disconnect",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after reconstructing the complete client disconnect and UDP rebind path from January's seven-call relocation topology and independent HCEA semantics. The retained code drains the reliable endpoint, disconnects it, recreates and rebinds the datagram endpoint when a well-known port exists, and reports success honestly. Target/candidate meaningful sizes are 165/159 bytes and padded sizes are 176/160, with all seven relocation identities preserved. The first substantive divergence at +0x95 is January's ESI/EBX cleanup and direct false epilogue versus the candidate's BL result carrier; the endpoint call order is unchanged. No register forcing, volatile access, barrier, pragma, assembly, raw offset, or fake control flow is retained. Reopen for authoritative January source or a natural same-compiler lifetime donor.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 7,
-          "normalized_sha256": "302d9e70140896b6321ce92306d66c783f987e0ab790072bb30d6370bb050537"
-        },
-        "base": {
-          "size": 160,
-          "relocation_count": 7,
-          "normalized_sha256": "e8a2e1507f52e0e66029898ce6c2dade668576dd6e322fdcd89ee3d0ce9c5238"
-        },
-        "objdiff_percent": 92.05882
       }
     },
     {
