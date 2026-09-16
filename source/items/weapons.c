@@ -1312,27 +1312,26 @@ boolean weapon_can_be_fired(
 {
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
-	struct weapon_magazine_definition *magazine_definition;
+	boolean result;
 
 	if (weapon->weapon.age>=1.0f)
-		return FALSE;
-	if (!game_engine_running())
-		return TRUE;
-	if (weapon_definition->weapon.magazines.count<=0)
-		return TRUE;
+	{
+		result = FALSE;
+	}
+	else if (game_engine_running() &&
+		weapon_definition->weapon.magazines.count>0 &&
+		TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, 0, struct weapon_magazine_definition)->rounds_loaded_maximum>0 &&
+		!weapon->weapon.magazines[0].rounds_loaded &&
+		!weapon->weapon.magazines[0].rounds_total)
+	{
+		result = FALSE;
+	}
+	else
+	{
+		result = TRUE;
+	}
 
-	magazine_definition = TAG_BLOCK_GET_ELEMENT(
-		&weapon_definition->weapon.magazines,
-		0,
-		struct weapon_magazine_definition);
-	if (magazine_definition->rounds_loaded_maximum<=0)
-		return TRUE;
-	if (weapon->weapon.magazines[0].rounds_loaded)
-		return TRUE;
-	if (weapon->weapon.magazines[0].rounds_total)
-		return TRUE;
-
-	return FALSE;
+	return result;
 }
 
 real weapon_compute_movement_penalty(

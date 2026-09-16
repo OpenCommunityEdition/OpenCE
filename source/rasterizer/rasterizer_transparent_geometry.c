@@ -198,6 +198,8 @@ extern struct rasterizer_transparent_geometry_window_parameters global_window_pa
 boolean rasterizer_transparent_geometry_initialize(
 	void)
 {
+	boolean success = TRUE;
+
 	transparent_geometry_groups = debug_malloc(
 		RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS * sizeof(struct transparent_geometry_group),
 		FALSE, "c:\\halo\\SOURCE\\rasterizer\\rasterizer_transparent_geometry.c", 0x29);
@@ -216,13 +218,12 @@ boolean rasterizer_transparent_geometry_initialize(
 		!transparent_geometry_groups2)
 	{
 		error(_error_silent, "### ERROR failed to allocate transparent geometry buffer");
-		return FALSE;
+		success = FALSE;
 	}
 
-	if (!rasterizer_transparent_geometry_initialize_aux_buffer())
-		return FALSE;
+	success = success && rasterizer_transparent_geometry_initialize_aux_buffer();
 
-	return TRUE;
+	return success;
 }
 
 void rasterizer_transparent_geometry_begin(

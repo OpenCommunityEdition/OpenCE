@@ -110,6 +110,11 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	NUMBER_OF_TEMPORARY_HUD_RETICLE_POINTS = 16
+};
+
 enum player_respawn_failure
 {
 	_player_respawn_failure_none = 0,
@@ -820,7 +825,7 @@ void temporary_hud_draw_reticle(
 	real angle,
 	real_argb_color const *color)
 {
-	real_point3d points[16];
+	real_point3d points[NUMBER_OF_TEMPORARY_HUD_RETICLE_POINTS];
 	real radius = tangent(angle * 0.5f) * 0.0625f;
 	long point_index;
 	long next_point_index;
@@ -828,11 +833,13 @@ void temporary_hud_draw_reticle(
 	real_point3d *point;
 
 	angle = 0.0f;
-	for (point_index = 0; point_index < NUMBEROF(points); point_index++)
+	for (point_index = 0; point_index < NUMBER_OF_TEMPORARY_HUD_RETICLE_POINTS; point_index++)
 	{
-		points[point_index].x = cosine(angle) * radius;
-		points[point_index].y = sine(angle) * radius;
-		points[point_index].z = -0.0625f;
+		set_real_point3d(
+			&points[point_index],
+			cosine(angle) * radius,
+			sine(angle) * radius,
+			-0.0625f);
 		matrix4x3_transform_point(
 			&render.frustum.view_to_world,
 			&points[point_index],
@@ -841,13 +848,13 @@ void temporary_hud_draw_reticle(
 	}
 
 	next_point_index = 1;
-	line_count = NUMBEROF(points);
+	line_count = NUMBER_OF_TEMPORARY_HUD_RETICLE_POINTS;
 	point = points;
 	do
 	{
 		rasterizer_debug_line(
 			point,
-			&points[next_point_index % NUMBEROF(points)],
+			&points[next_point_index % NUMBER_OF_TEMPORARY_HUD_RETICLE_POINTS],
 			color);
 		next_point_index++;
 		point++;

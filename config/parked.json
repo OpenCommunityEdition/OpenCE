@@ -1276,25 +1276,6 @@
     },
     {
       "unit": "source/rasterizer/rasterizer_transparent_geometry",
-      "function": "_rasterizer_transparent_geometry_initialize",
-      "class": "instruction-scheduling",
-      "evidence": "The retained ordinary C is the complete transparent-geometry lifecycle initializer: it allocates the primary 384-group pool, the 384-entry sorted-index array, and the secondary 32-group pool with the January source path and line numbers, clears both group counts, reports the attested silent allocation error, and initializes the Xbox auxiliary buffer. This topology is independently corroborated by the later HCEA implementation, the Stian lift, and the historical b6adf6705 donor. Target and candidate share the 160-byte padded envelope, 51-instruction count, and all 16 logical relocation destinations. The sole fixed point is block placement: January keeps the error block before the auxiliary-buffer call, while VC7 lays out the success call before the error block and uses SETNE for the successful return. Four documented natural result-lifetime/error-path families, public donors, and a 1,571-worktree census produced the same candidate hash or regressed it. No assembly, volatile access, barrier, fake dependency, dead branch, raw address, or optimizer-only carrier is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains this block order.",
-      "measurements": {
-        "target": {
-          "size": 160,
-          "relocation_count": 16,
-          "normalized_sha256": "63251d0d8cc730b0de774a4c06b489f06bd0af5849fa8281705d46e40473e678"
-        },
-        "base": {
-          "size": 160,
-          "relocation_count": 16,
-          "normalized_sha256": "15f6dc8cbb204d551c2c25b60baf4e21ca760125fc43678f40cb24a48fcbdbe4"
-        },
-        "objdiff_percent": 76.0
-      }
-    },
-    {
-      "unit": "source/rasterizer/rasterizer_transparent_geometry",
       "function": "_rasterizer_sort_external",
       "class": "register-allocation",
       "evidence": "The retained ordinary C is the cross-build HCEA rasterizer_sort_external topology: fill the short sorted-index array with identity order while invoking rasterizer_sort_internal, qsort it with group_sorted_indices_cmpfn, then stamp each group's resulting sorted_index. The semantic names replace the former address placeholders in both source and the symbol atlas. Target and candidate share the 176-byte padded envelope and 14 logical relocation destinations. The residual is VC7 lifetime allocation and scheduling: January forms the first-pass group through ECX from an EDX base and delays loading the qsort base, while the natural candidate uses EAX/ECX and loads that base earlier. Direct-expression, block-local-pointer, pre-test-index, Pastudan loop-local pointer, HCEA, declaration-order, and register-lifetime families are already exhausted; the best natural trial aligned the tail but not the first-pass allocation. No assembly, volatile/register forcing, barrier, fake dependency, raw offset, or synthetic control flow is retained. Reopen only for authoritative January local/statement provenance or a strict same-compiler C donor that naturally emits the target allocation.",
@@ -1823,25 +1804,6 @@
           "normalized_sha256": "c3e389512e793e3f30c928b755506131ce5a2d1f95fbc4a547fb31eec929bdf1"
         },
         "objdiff_percent": 94.235954
-      }
-    },
-    {
-      "unit": "source/interface/hud",
-      "function": "_temporary_hud_draw_reticle",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule with a complete ordinary-C reticle renderer recovered from January disassembly: it constructs sixteen typed world-space points from sine/cosine and the render view transform, then closes the ring through rasterizer_debug_line. January and the retained candidate have the same six relocation identities. The residual is limited to two compiler choices: January schedules the pi/8 x87 add before call-stack cleanup, and retains the generic signed remainder-by-16 sequence, whereas VC7 proves the reconstructed index nonnegative and emits an and 0xf. Natural for-loop, increment-placement, signed long-index, pointer-loop, and declaration-order variants were tested; they either return to this fixed point or perturb more code. No volatile or register forcing, artificial signedness carrier, inline assembly, barrier, raw offset, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local-lifetime evidence or a natural same-compiler donor explaining both the x87 and remainder schedules.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 6,
-          "normalized_sha256": "34a33fe789d2858840e360558ebc1d2674a329e6a14d59572a3dfb9c1bc2255c"
-        },
-        "base": {
-          "size": 192,
-          "relocation_count": 6,
-          "normalized_sha256": "676b43cbdb66de19263a32f71a6c895b867d638c75f5fcd404e031b808e47afa"
-        },
-        "objdiff_percent": 90.676926
       }
     },
     {
@@ -4402,25 +4364,6 @@
         "target": { "size": 784, "relocation_count": 18, "normalized_sha256": "87952366bca787dc5174221b78335b6a9e91770433b8d76266bdb21d1bf65975" },
         "base": { "size": 784, "relocation_count": 18, "normalized_sha256": "a72cd2b9285abc4fe3ed3a8f4de6c0606fe474c9e01a1049e16b3285f1497f01" },
         "objdiff_percent": 81.60833
-      }
-    },
-    {
-      "unit": "source/items/weapons",
-      "function": "_weapon_can_be_fired",
-      "class": "unclassified",
-      "evidence": "Complete typed ordinary-C firing predicate retained after auditing the historically stronger Fable weapons blob 45d791510 and independently corroborating its behavior against January control flow and the HCEA semantic reconstruction. The body rejects fully aged weapons and otherwise applies the authentic game-engine, magazine-capacity, loaded-round, and reserve-round policy through weapon_get, weapon_definition_get, TAG_BLOCK_GET_ELEMENT, project types, and the proper game_engine.h API owner. Target and candidate share the 144-byte padded envelope and five relocation destinations, while ordinary VC7 control-flow placement remains different; objdiff reports 84.69 percent similarity. The historical combined-condition residual is superseded by this target-shaped sequential form. No branch-spelling search, local prototype, raw offset, surrogate layout, volatile/register forcing, barrier, pragma, assembly, fake dependency, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/weapons_obj_historical_packet_reconciliation_20260912.md.",
-      "measurements": {
-        "target": {
-          "size": 144,
-          "relocation_count": 5,
-          "normalized_sha256": "ba8b3806624808498c9815871e5b6e94428c0dac363ca1543591f6530687cedc"
-        },
-        "base": {
-          "size": 144,
-          "relocation_count": 5,
-          "normalized_sha256": "a0706edaa4f925be59bbbd739403e62a5a21407645eaeea1670d7dc4c38ff4e3"
-        },
-        "objdiff_percent": 84.6875
       }
     },
     {
