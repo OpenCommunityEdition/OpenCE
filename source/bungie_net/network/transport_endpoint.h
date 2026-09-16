@@ -27,7 +27,7 @@ enum
 struct transport_endpoint
 {
 	long socket;
-	byte flags;
+	char flags;
 	char type;
 	short error;
 };
@@ -69,6 +69,8 @@ long endpoint_connected(
 	struct transport_endpoint const *endpoint);
 long endpoint_listening(
 	struct transport_endpoint const *endpoint);
+boolean endpoint_blocking(
+	struct transport_endpoint const *endpoint);
 short get_endpoint_address(
 	struct transport_endpoint *endpoint,
 	struct transport_address *address);
@@ -83,7 +85,7 @@ void cancel_connect_process(
 	transport_connect_process_ref input);
 short set_endpoint_blocking(
 	struct transport_endpoint *endpoint,
-	boolean blocking);
+	long blocking);
 short bind_endpoint(
 	struct transport_endpoint *endpoint,
 	struct transport_address *address);

@@ -483,28 +483,6 @@
       }
     },
     {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_endpoint_listening",
-      "class": "unclassified",
-      "evidence": "Restore credible natural source under current fuzzy-park rules, superseding the August29 exact-only removal. One TEST_FLAG expression on the authentic listening bit returns the same 0/1 long as January after the original ep assertion at line0x42E. Both64B/4relocs; target masks bit1 then shifts, candidate shifts then masks bit0. No spelling search, bitfield, signed flag change, asm, volatile or source steering. All16 inherited exact owners remain unchanged and no extra code or point_from_line3d is emitted. Reopen only with authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_shared_types_readiness_20260904.md.",
-      "measurements": {
-        "target": {"size": 64, "relocation_count": 4, "normalized_sha256": "9555d57f2b699cbd43b1c64a752c9d489448a4dcf3d7e2587cfca2b0e5cd0378"},
-        "base": {"size": 64, "relocation_count": 4, "normalized_sha256": "0c517bca0e44c9ecaecbb36cbd0fcef89f7336b3879329f6d5092fd4749ae12d"},
-        "objdiff_percent": 90.42857
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_endpoint_readable",
-      "class": "unclassified",
-      "evidence": "Restore natural readable-endpoint implementation under current fuzzy-park policy. January-valid socket guard, cached endpoint-set readability, unsigned16-bit timeout, typed select fd_set/timeval and API results are preserved. Public prototype corrected to word timeout in owning winsock header. Candidate176B/6relocs versus target192B/6; January retains EBX zero and separate invalid return, natural C uses immediate zeros and merges false returns. No coupling booleans to pointer/null values, lifetime shaping, raw offsets or codegen controls. Complete8B endpoint struct is shared through a real owner header, with semantic flag constants and TEST_FLAG. All16 inherited exacts unchanged, no extra code/no point_from_line3d. Reopen only with authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_winsock_obj_shared_types_readiness_20260904.md.",
-      "measurements": {
-        "target": {"size": 192, "relocation_count": 6, "normalized_sha256": "4aa245bc023e916684c2f0e85a6c095e39e59b327edf9f0d663f138caf5b8e84"},
-        "base": {"size": 176, "relocation_count": 6, "normalized_sha256": "2bd094fae4e082a8f11aac9fca4ac91313b619d39105ec1dbd4fc9d67515106c"},
-        "objdiff_percent": 82.361115
-      }
-    },
-    {
       "unit": "source/sound/game_sound",
       "function": "_update_potentially_audible_looping_sound",
       "class": "unclassified",
@@ -3918,28 +3896,6 @@
         "target": { "size": 1088, "relocation_count": 34, "normalized_sha256": "5789a872498d7ef2bca2ea4d3e4687e0294ef9ef9e1b11ad7629b63fbae9abdb" },
         "base": { "size": 1088, "relocation_count": 34, "normalized_sha256": "66af597069fc087b6095a9add3e960cdeb1af96f3e8a6f3184028352ba053023" },
         "objdiff_percent": 94.96407
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_set_endpoint_blocking",
-      "class": "register-allocation",
-      "evidence": "Complete natural endpoint blocking-mode implementation reconstructed from the January body and the real Winsock API. It uses the owning endpoint flags, SET_FLAG, project boolean/short types, and FIONBIO without register forcing or source-pressure tricks. Target and candidate both occupy 272 padded bytes with all 17 relocations; the remaining difference is the stable ESI/EDI allocation and equivalent boolean-width scheduling. Zero exact credit. See docs/object_matching_logs/transport_endpoint_winsock_obj_async_leaf_packet_20260913.md.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 17, "normalized_sha256": "e2624d687795f7287aee261183e8093951da8b45c4873a0162fca8bee2a11d49" },
-        "base": { "size": 272, "relocation_count": 17, "normalized_sha256": "3d8990f16d5a16c5bdc0a7d0ecbbce510849ff574da6519da317653118f33737" },
-        "objdiff_percent": 68.60215
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_winsock",
-      "function": "_connect_endpoint",
-      "class": "register-allocation",
-      "evidence": "Complete natural synchronous connect implementation reconstructed from January control flow and real Winsock semantics. It uses typed transport addresses, SWAP2/SWAP4, system_milliseconds, select, semantic endpoint flags, and the public blocking-mode owner. Target and candidate both occupy 480 padded bytes with all 20 relocations. The stable residual is January keeping the original blocking state in BL while natural VC7 keeps the deadline in EBX and spills the boolean. No register forcing, volatile, raw offsets, or fake logic is retained. Zero exact credit. See docs/object_matching_logs/transport_endpoint_winsock_obj_async_leaf_packet_20260913.md.",
-      "measurements": {
-        "target": { "size": 480, "relocation_count": 20, "normalized_sha256": "d51d0a7aaac410b781be4dbf86712bf999dc0b52de5602b7545c5e1176f01d6d" },
-        "base": { "size": 480, "relocation_count": 20, "normalized_sha256": "684880f5cbb3cc0dedaacd0424f160f01fb9cb98b6aa259682c6d6c223565ad9" },
-        "objdiff_percent": 82.354836
       }
     },
     {

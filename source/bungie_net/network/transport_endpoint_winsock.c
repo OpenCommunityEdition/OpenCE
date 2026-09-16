@@ -564,31 +564,32 @@ boolean endpoint_readable(
 	struct transport_endpoint *ep,
 	word timeout)
 {
+	boolean readable = FALSE;
+
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x3F3, ep);
 
 	if (ep->socket != INVALID_SOCKET)
 	{
-		fd_set readable;
-		struct timeval timeval;
-
 		if (TEST_FLAG(ep->flags, _transport_endpoint_in_set_bit))
 		{
-			return TEST_FLAG(ep->flags, _transport_endpoint_readable_bit);
+			readable = TEST_FLAG(ep->flags, _transport_endpoint_readable_bit);
 		}
-
-		readable.fd_array[0] = ep->socket;
-		timeval.tv_sec = 0;
-		timeval.tv_usec = timeout * MILLISECONDS_PER_SECOND;
-		readable.fd_count = 1;
-
-		if (select(1, &readable, NULL, NULL, &timeval) > 0 &&
-			__WSAFDIsSet(ep->socket, &readable))
+		else
 		{
-			return TRUE;
+			fd_set readable_sockets;
+			struct timeval timeval;
+
+			readable_sockets.fd_array[0] = ep->socket;
+			timeval.tv_sec = 0;
+			timeval.tv_usec = timeout * MILLISECONDS_PER_SECOND;
+			readable_sockets.fd_count = 1;
+
+			readable = select(1, &readable_sockets, NULL, NULL, &timeval) > 0 &&
+				__WSAFDIsSet(ep->socket, &readable_sockets);
 		}
 	}
 
-	return FALSE;
+	return readable;
 }
 
 boolean endpoint_writeable(
@@ -615,12 +616,12 @@ boolean endpoint_writeable(
 	return FALSE;
 }
 
-long endpoint_blocking(
+boolean endpoint_blocking(
 	struct transport_endpoint const *ep)
 {
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x436, ep);
 
-	return ~(ep->flags >> 4) & 1;
+	return !TEST_FLAG(ep->flags, _transport_endpoint_nonblocking_bit);
 }
 
 short get_endpoint_error(
@@ -1064,7 +1065,7 @@ short get_endpoint_address(
 
 short set_endpoint_blocking(
 	struct transport_endpoint *ep,
-	boolean blocking)
+	long blocking)
 {
 	short error = _transport_error_none;
 
@@ -1077,14 +1078,15 @@ short set_endpoint_blocking(
 		{
 			u_long nonblocking = FALSE;
 
-			if (ioctlsocket(ep->socket, FIONBIO, &nonblocking) != 0)
+			error = ioctlsocket(ep->socket, FIONBIO, &nonblocking);
+			if (error == 0)
 			{
-				winsock_error_to_string(WSAGetLastError());
-				error = _transport_error_options_failed;
+				SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
 			}
 			else
 			{
-				SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
+				winsock_error_to_string(WSAGetLastError());
+				error = _transport_error_options_failed;
 			}
 		}
 	}
@@ -1092,14 +1094,15 @@ short set_endpoint_blocking(
 	{
 		u_long nonblocking = TRUE;
 
-		if (ioctlsocket(ep->socket, FIONBIO, &nonblocking) != 0)
+		error = ioctlsocket(ep->socket, FIONBIO, &nonblocking);
+		if (error == 0)
 		{
-			winsock_error_to_string(WSAGetLastError());
-			error = _transport_error_options_failed;
+			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, TRUE);
 		}
 		else
 		{
-			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, TRUE);
+			winsock_error_to_string(WSAGetLastError());
+			error = _transport_error_options_failed;
 		}
 	}
 
@@ -1172,7 +1175,6 @@ short connect_endpoint(
 {
 	short result = _transport_error_none;
 	int socket_type;
-	boolean blocking;
 
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x1B5, ep && address);
 	match_assert(TRANSPORT_ENDPOINT_WINSOCK_FILE, 0x1B6, transport_initialized);
@@ -1193,6 +1195,7 @@ short connect_endpoint(
 	if (result == _transport_error_none)
 	{
 		struct sockaddr_in socket_address;
+		boolean blocking;
 		long error;
 
 		if (ep->socket == INVALID_SOCKET)
@@ -1203,26 +1206,28 @@ short connect_endpoint(
 		socket_address.sin_addr.s_addr = SWAP4(address->address.long_words[0]);
 		socket_address.sin_port = (word)SWAP2(address->port);
 		socket_address.sin_family = AF_INET;
-		blocking = (boolean)endpoint_blocking(ep);
+		blocking = endpoint_blocking(ep);
 		set_endpoint_blocking(ep, FALSE);
 		error = connect(ep->socket, (struct sockaddr *)&socket_address, sizeof(socket_address));
 
-		if (error == SOCKET_ERROR)
+		if (error != 0)
 		{
 			error = WSAGetLastError();
 			if (error == WSAEWOULDBLOCK)
 			{
 				unsigned long timeout = system_milliseconds() + 10 * MILLISECONDS_PER_SECOND;
 				struct timeval timeval;
-				fd_set writeable;
 
 				timeval.tv_sec = 1;
 				timeval.tv_usec = 0;
-				writeable.fd_count = 1;
-				writeable.fd_array[0] = ep->socket;
 
 				do
 				{
+					fd_set writeable;
+
+					writeable.fd_array[0] = ep->socket;
+					writeable.fd_count = 1;
+
 					if (select(1, NULL, &writeable, NULL, &timeval) == 1)
 					{
 						error = 0;
@@ -1234,8 +1239,8 @@ short connect_endpoint(
 
 					if (system_milliseconds() > timeout)
 					{
-						closesocket(ep->socket);
 						error = WSAEINPROGRESS;
+						closesocket(ep->socket);
 						break;
 					}
 				}
@@ -1251,6 +1256,7 @@ short connect_endpoint(
 		else
 		{
 			set_endpoint_blocking(ep, blocking);
+			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
 			SET_FLAG(ep->flags, _transport_endpoint_connected_bit, TRUE);
 			SET_FLAG(ep->flags, _transport_endpoint_client_bit, TRUE);
 		}
