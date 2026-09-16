@@ -2620,32 +2620,52 @@ boolean sound_refresh_looping(
 								_sound_start_track);
 					}
 				}
-				else if (refresh_state == _looping_sound_refresh_stop)
-				{
-					goto begin_stop;
-				}
 
-				if (loop->ordered_sounds_finished)
+				if (refresh_state != _looping_sound_refresh_stop &&
+					!loop->ordered_sounds_finished)
 				{
-					goto begin_stop;
-				}
-
-				sound_definition_index = track->loop_sound.index;
-				if (alternate && track->alternate_loop_sound.index != NONE)
-				{
-					sound_definition_index = track->alternate_loop_sound.index;
-				}
-
-				if (sound_definition_index != NONE)
-				{
-					if (*playing_sound_index != NONE &&
-						(refresh_state != _looping_sound_refresh_start ||
-							!TEST_FLAG(track->flags, _fade_in_at_start_bit)))
+					sound_definition_index = track->loop_sound.index;
+					if (alternate && track->alternate_loop_sound.index != NONE)
 					{
-						sound_get(*playing_sound_index);
+						sound_definition_index = track->alternate_loop_sound.index;
+					}
 
-						if (alternate != loop->alternate &&
-							TEST_FLAG(track->flags, _fade_in_alternate_bit))
+					if (sound_definition_index != NONE)
+					{
+						if (*playing_sound_index != NONE &&
+							(refresh_state != _looping_sound_refresh_start ||
+								!TEST_FLAG(track->flags, _fade_in_at_start_bit)))
+						{
+							sound_get(*playing_sound_index);
+
+							if (alternate != loop->alternate &&
+								TEST_FLAG(track->flags, _fade_in_alternate_bit))
+							{
+								long new_sound_index =
+									update_potentially_audible_looping_sound(
+										sound_definition_index,
+										looping_sound_index,
+										track_index,
+										_sound_loop_track);
+
+								if (new_sound_index != NONE)
+								{
+									sound_start_fade(
+										_sound_fade_mode_linear,
+										track->fade_out_duration,
+										new_sound_index,
+										*playing_sound_index);
+									*playing_sound_index = new_sound_index;
+								}
+							}
+							else if (!new_looping_sound)
+							{
+								sound_set_definition_begin(
+									*playing_sound_index,
+									sound_definition_index);
+							}
+						}
+						else
 						{
 							long new_sound_index =
 								update_potentially_audible_looping_sound(
@@ -2656,65 +2676,34 @@ boolean sound_refresh_looping(
 
 							if (new_sound_index != NONE)
 							{
-								sound_start_fade(
-									_sound_fade_mode_linear,
-									track->fade_out_duration,
-									new_sound_index,
-									*playing_sound_index);
+								sound_get(new_sound_index);
+
+								if (refresh_state == _looping_sound_refresh_start)
+								{
+									if (TEST_FLAG(track->flags, _fade_in_at_start_bit))
+									{
+										sound_start_fade(
+											_sound_fade_mode_linear,
+											track->fade_in_duration,
+											new_sound_index,
+											NONE);
+									}
+								}
+								else
+								{
+									sound_start_fade(
+										_sound_fade_mode_linear,
+										sound_inaudible_fade_out_time,
+										new_sound_index,
+										NONE);
+								}
+
 								*playing_sound_index = new_sound_index;
 							}
-						}
-						else if (!new_looping_sound)
-						{
-							sound_set_definition_begin(
-								*playing_sound_index,
-								sound_definition_index);
-						}
-					}
-					else
-					{
-						long new_sound_index =
-							update_potentially_audible_looping_sound(
-								sound_definition_index,
-								looping_sound_index,
-								track_index,
-								_sound_loop_track);
-
-						if (new_sound_index != NONE)
-						{
-							real fade_in_time;
-							sound_get(new_sound_index);
-
-							if (refresh_state != _looping_sound_refresh_start)
-							{
-								fade_in_time = sound_inaudible_fade_out_time;
-							}
-							else if (TEST_FLAG(
-								track->flags,
-								_fade_in_at_start_bit))
-							{
-								fade_in_time = track->fade_in_duration;
-							}
-							else
-							{
-								*playing_sound_index = new_sound_index;
-								continue;
-							}
-
-							sound_start_fade(
-								_sound_fade_mode_linear,
-								fade_in_time,
-								new_sound_index,
-								NONE);
-							*playing_sound_index = new_sound_index;
 						}
 					}
 				}
-
-				continue;
-
-			begin_stop:
-				if (loop->state != _looping_sound_refresh_stop)
+				else if (loop->state != _looping_sound_refresh_stop)
 				{
 					if (fade_time != 0.f)
 					{
@@ -2740,16 +2729,16 @@ boolean sound_refresh_looping(
 								*playing_sound_index);
 						}
 
-						sound_definition_index = track->stop_sound.index;
-						if (alternate &&
-							track->alternate_stop_sound.index != NONE)
+						if (track->stop_sound.index != NONE)
 						{
-							sound_definition_index =
-								track->alternate_stop_sound.index;
-						}
+							sound_definition_index = track->stop_sound.index;
+							if (alternate &&
+								track->alternate_stop_sound.index != NONE)
+							{
+								sound_definition_index =
+									track->alternate_stop_sound.index;
+							}
 
-						if (sound_definition_index != NONE)
-						{
 							if (TEST_FLAG(
 								track->flags,
 								_fade_out_at_stop_bit))
@@ -2786,7 +2775,8 @@ boolean sound_refresh_looping(
 
 			loop->alternate = alternate;
 			loop->state = refresh_state;
-			result = FALSE;
+
+			return FALSE;
 		}
 	}
 
@@ -2867,25 +2857,23 @@ static void update_channel_for_looping_sound(
 	}
 	else
 	{
-		real limited_pitch;
-
 		pitch_range = TAG_BLOCK_GET_ELEMENT(
 			&definition->pitch_ranges,
 			sound->pitch_range_index,
 			struct sound_pitch_range);
-		limited_pitch = limit_pitch(
+		pitch = limit_pitch(
 			pitch,
 			channel_get(sound->playing_channel_index)->pitch *
 				pitch_range->natural_pitch,
 			definition->maximum_bend_per_second);
-		properties.pitch = limited_pitch * pitch_range->playback_rate;
+		properties.pitch = pitch * pitch_range->playback_rate;
 
 		if (sound->type == _sound_loop_track &&
 			(sound->fade_start_time == sound->fade_stop_time ||
 				sound->fade_interpolation_end != 0.f) &&
 			sound_definition_find_pitch_range_by_pitch(
 				definition,
-				limited_pitch,
+				pitch,
 				(word)sound->pitch_range_index) != sound->pitch_range_index &&
 			channel->sound_index == *primary_sound_index &&
 			!sound_manager_globals.idling)
@@ -2943,19 +2931,19 @@ static void update_channel_for_looping_sound(
 						0xA1C,
 						TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit));
 
-					if (TEST_FLAG(
+					if (!TEST_FLAG(
 						looping_definition->flags,
 						_looping_sound_fake_impulse_sound_bit))
-					{
-						sound->type = _sound_stop_track;
-						looping_sound->ordered_sounds_finished = TRUE;
-					}
-					else
 					{
 						permutation_index = sound_definition_next_permutation(
 							definition,
 							sound->pitch_range_index,
 							NONE);
+					}
+					else
+					{
+						sound->type = _sound_stop_track;
+						looping_sound->ordered_sounds_finished = TRUE;
 					}
 				}
 
