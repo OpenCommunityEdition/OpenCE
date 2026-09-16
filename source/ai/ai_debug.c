@@ -198,7 +198,7 @@ static void code_00041120(
 	void);
 static void code_000411d0(
 	boolean render_inactive_actors);
-static void code_00041220(
+static void ai_debug_render_encounter(
 	long encounter_index);
 static void code_00039990(
 	struct path_node *node,
@@ -482,7 +482,7 @@ void ai_debug_render(
 
 			if (ai_debug.selected_squad_index!=NONE)
 			{
-				code_00041220(ai_debug.selected_squad_index);
+				ai_debug_render_encounter(ai_debug.selected_squad_index);
 			}
 
 			if (ai_debug.selected_actor_index!=NONE)
@@ -5697,7 +5697,7 @@ static void code_000411d0(
 	return;
 }
 
-static void code_00041220(
+static void ai_debug_render_encounter(
 	long encounter_index)
 {
 	long owner_actor_indices[NUMBER_OF_AI_DEBUG_ACTOR_RECORDS];
@@ -5730,13 +5730,15 @@ static void code_00041220(
 
 	if (global_ai_debug_firing_position_color_count==NONE)
 	{
-		for (global_ai_debug_firing_position_color_count = 0;
-			global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].alpha<=1.f &&
+		global_ai_debug_firing_position_color_count = 0;
+
+		while (global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].alpha<=1.f &&
 			global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].red<=1.f &&
 			global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].green<=1.f &&
-			global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].blue<=1.f;
-			global_ai_debug_firing_position_color_count++)
-			;
+			global_ai_debug_firing_position_colors[global_ai_debug_firing_position_color_count].blue<=1.f)
+		{
+			global_ai_debug_firing_position_color_count++;
+		}
 	}
 
 	encounter_build_firing_position_owner_actor_indices(encounter_index, owner_actor_indices);

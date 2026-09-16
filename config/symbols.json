@@ -651,7 +651,7 @@
 { "file_offset": 266128, "flags": 32, "name": "_ai_debug_render_actor_jmptable" },
 { "file_offset": 266528, "flags": 32, "name": "_code_00041120" },
 { "file_offset": 266704, "flags": 32, "name": "_code_000411d0" },
-{ "file_offset": 266784, "flags": 32, "name": "_code_00041220" },
+{ "file_offset": 266784, "flags": 32, "name": "_ai_debug_render_encounter" },
 { "file_offset": 269120, "flags": 32, "name": "_ai_debug_render" },
 { "file_offset": 269456, "flags": 32, "name": "_ai_profile_initialize" },
 { "file_offset": 269488, "flags": 32, "name": "_ai_profile_dispose" },

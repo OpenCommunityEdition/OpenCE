@@ -5288,21 +5288,19 @@ void actor_perception_refresh_test_object(
 				struct unit_datum *unit =
 					(struct unit_datum *)current_object;
 				struct actor_position_data position;
-				struct actor_perception_actor_view *unit_actor;
-				struct actor_perception_actor_view *current_actor;
 				struct actor_perception_refresh_list *list;
 				struct unit_definition *unit_definition;
 				real_point3d origin;
 				real distance_squared;
 				real suicide_radius;
-				long unit_index;
+				long unit_index = object_index;
 				long unit_actor_index;
 				long prop_index;
 				short dead_ticks;
 				boolean player;
 				boolean enemy;
 				boolean dead;
-				boolean candidate;
+				boolean optional;
 
 				object_get_origin(object_index, &origin);
 				actor_perception_find_sense_position(
@@ -5311,9 +5309,9 @@ void actor_perception_refresh_test_object(
 					NONE,
 					&position);
 
-				unit_actor_index = unit->unit.swarm_actor_index;
-				if (unit_actor_index != NONE)
+				if (unit->unit.swarm_actor_index != NONE)
 				{
+					unit_actor_index = unit->unit.swarm_actor_index;
 					unit_index =
 						actor_perception_unit_from_swarm(
 							unit_actor_index,
@@ -5330,7 +5328,6 @@ void actor_perception_refresh_test_object(
 				else
 				{
 					unit_actor_index = unit->unit.actor_index;
-					unit_index = object_index;
 				}
 
 				if (unit_index == NONE ||
@@ -5344,28 +5341,24 @@ void actor_perception_refresh_test_object(
 						actor->meta.team_index,
 						unit->object.owner_team_index);
 
-				if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) ||
-					unit->unit.feign_death_timer != 0)
-				{
-					dead = FALSE;
+				dead =
+					TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+					unit->unit.feign_death_timer == 0;
+
+				if (!dead)
 					dead_ticks = 0;
-				}
+				else if (unit->unit.time_of_death == NONE)
+					dead_ticks = 0x7FFF;
 				else
-				{
-					dead = TRUE;
-					if (unit->unit.time_of_death == NONE)
-						dead_ticks = 0x7FFF;
-					else
-						dead_ticks =
-							(short)game_time_get() -
-							(short)unit->unit.time_of_death;
-				}
+					dead_ticks =
+						(short)game_time_get() -
+						(short)unit->unit.time_of_death;
 
 				suicide_radius = unit_definition->unit.ai_danger_radius;
 				distance_squared =
 					distance_squared3d(
-						&origin,
-						&position.body_position);
+						&position.body_position,
+						&origin);
 
 				if (suicide_radius > 0.0f &&
 					(dead ||
@@ -5381,144 +5374,58 @@ void actor_perception_refresh_test_object(
 						FALSE);
 				}
 
-				current_actor =
-					(struct actor_perception_actor_view *)actor_get(
-						actor_index);
-				unit_actor =
-					unit_actor_index == NONE
-						? NULL
-						: (struct actor_perception_actor_view *)actor_get(
-							unit_actor_index);
-				candidate = FALSE;
-
-				if (player)
-					goto choose_list;
-
-				if (unit_actor != NULL &&
-					(!unit_actor->active || unit_actor->dormant))
+				if (actor_perception_desire_prop(
+						actor_index,
+						_prop_state_unacknowledged,
+						unit_index,
+						unit_actor_index,
+						FALSE,
+						player,
+						enemy,
+						dead,
+						dead_ticks,
+						suicide_radius,
+						distance_squared,
+						0,
+						&optional))
 				{
-					goto object_done;
-				}
+					list = enemy ? enemy_list : friend_list;
 
-				if (distance_squared > 1600.0f)
-					goto object_done;
-
-				if (dead)
-				{
-					boolean interest_allowed = TRUE;
-					boolean encounter_clear = FALSE;
-
-					if (current_actor->encounter_index != NONE)
+					if (optional)
 					{
-						struct actor_perception_encounter_view *encounter =
-							(struct actor_perception_encounter_view *)
-								encounter_get(current_actor->encounter_index);
-						struct unit_datum *corpse_unit =
-							unit_get(unit_index);
-						long ignore_time = encounter->corpse_ignore_time;
-
-						if (ignore_time <= current_actor->corpse_ignore_time)
-							ignore_time = current_actor->corpse_ignore_time;
-						if (ignore_time != NONE &&
-							(corpse_unit->unit.time_of_death == NONE ||
-								corpse_unit->unit.time_of_death < ignore_time))
-						{
-							interest_allowed = FALSE;
-						}
-
-						encounter_clear =
-							!encounter->enemy_target &&
-							!encounter->stand_down &&
-							!encounter->blind;
-					}
-
-					if (!interest_allowed)
-						goto object_done;
-					if (encounter_clear)
-					{
-						if (distance_squared < 225.0f)
-							goto choose_list;
-						goto object_done;
-					}
-					goto corpse_fallback;
-				}
-				goto live_unit;
-
-choose_list:
-				list = enemy ? enemy_list : friend_list;
-				if (candidate)
-				{
 #line 2966 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
-					assert(!dead);
+						assert(!dead);
 #line 3258 "source\\ai\\actor_perception.c"
 
-					if (list->entry_count < 128)
-					{
-						list->entries[list->entry_count].prop_index = NONE;
-						list->entries[list->entry_count].unit_index =
-							unit_index;
-						list->entries[list->entry_count].priority =
-							distance_squared;
-						list->entry_count++;
+						if (list->entry_count < 128)
+						{
+							list->entries[list->entry_count].prop_index = NONE;
+							list->entries[list->entry_count].unit_index =
+								unit_index;
+							list->entries[list->entry_count].priority =
+								distance_squared;
+							list->entry_count++;
+						}
 					}
-					goto object_done;
-				}
-
-				goto create_prop;
-
-corpse_fallback:
-				if (suicide_radius > 0.0f)
-					goto choose_list;
-
-				if ((!enemy || dead_ticks <= 150) &&
-					actor_action_class(actor_index) <= 1)
-				{
-					real maximum_distance_squared = 16.0f;
-
-					if (!enemy && current_actor->combat_status < 3)
-						maximum_distance_squared = 64.0f;
-					if (distance_squared < maximum_distance_squared)
-						goto choose_list;
-				}
-				goto object_done;
-
-live_unit:
-				if (enemy)
-				{
-					candidate = distance_squared > 36.0f;
-					goto choose_list;
-				}
-
-				if (distance_squared >= 225.0f)
-					goto object_done;
-
-				if (current_actor->combat_status >= 4)
-				{
-					candidate = TRUE;
-				}
-				else if (!current_actor->corpse_interest_inhibited &&
-					distance_squared > 16.0f)
-				{
-					candidate = TRUE;
-				}
-				goto choose_list;
-
-create_prop:
-				prop_index =
-					prop_new_unacknowledged(
-						actor_index,
-						unit_index,
-						enemy);
-				if (prop_index != NONE)
-				{
-					prop_position_refresh(
-						actor_index,
-						prop_index,
-						&position,
-						FALSE,
-						FALSE);
-					if (!dead)
-						list->accepted_count++;
+					else
+					{
+						prop_index =
+							prop_new_unacknowledged(
+								actor_index,
+								unit_index,
+								enemy);
+						if (prop_index != NONE)
+						{
+							prop_position_refresh(
+								actor_index,
+								prop_index,
+								&position,
+								FALSE,
+								FALSE);
+							if (!dead)
+								list->accepted_count++;
+						}
+					}
 				}
 			}
 			else if (current_object->object.type == _object_type_vehicle)
@@ -5560,8 +5467,8 @@ create_prop:
 						&position);
 					distance =
 						distance3d(
-							&origin,
-							&position.body_position);
+							&position.body_position,
+							&origin);
 
 					if (distance <
 							projectile_definition->projectile.danger_radius +
@@ -5573,7 +5480,7 @@ create_prop:
 									actor->danger_zone
 										.current_distance_from_actor)))
 					{
-						long owner_unit_index = NONE;
+						long owner_unit_index;
 						struct object_datum *owner_object = NULL;
 
 						csmemset(
@@ -5591,6 +5498,7 @@ create_prop:
 						actor->danger_zone.currently_perceived = FALSE;
 						actor->danger_zone.hostility = 0;
 
+						owner_unit_index = NONE;
 						if (current_object->object.owner_object_index != NONE)
 						{
 							owner_object =
