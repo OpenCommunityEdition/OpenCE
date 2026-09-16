@@ -972,13 +972,16 @@ void structure_get_planar_fog(
 
 	if (fog_definition_index != NONE)
 	{
-		struct structure_cluster *cluster = TAG_BLOCK_GET_ELEMENT(
-			&global_structure_bsp_get()->clusters,
+		struct structure_cluster *cluster;
+		struct structure_planar_fog_definition *definition;
+
+		structure = global_structure_bsp_get();
+		cluster = TAG_BLOCK_GET_ELEMENT(
+			&structure->clusters,
 			cluster_index,
 			struct structure_cluster);
-		struct structure_planar_fog_definition *definition =
-			(struct structure_planar_fog_definition *)fog_definition_get(
-				fog_definition_index);
+		definition = (struct structure_planar_fog_definition *)fog_definition_get(
+			fog_definition_index);
 
 		if (screen_fog)
 		{
@@ -991,13 +994,11 @@ void structure_get_planar_fog(
 		{
 			if (TEST_FLAG((word)cluster->fog_reference, SHORT_BITS - 1))
 			{
-				struct structure_fog_plane_render *fog_plane = TAG_BLOCK_GET_ELEMENT(
+				fog->planar_mode = _render_planar_fog_mode_normal;
+				fog->plane = TAG_BLOCK_GET_ELEMENT(
 					&structure->fog_planes,
 					cluster->fog_reference & SHORT_MAX,
-					struct structure_fog_plane_render);
-
-				fog->planar_mode = _render_planar_fog_mode_normal;
-				fog->plane = fog_plane->plane;
+					struct structure_fog_plane_render)->plane;
 			}
 			else
 			{
@@ -1006,16 +1007,22 @@ void structure_get_planar_fog(
 
 			fog->planar_color = definition->color;
 			fog->planar_maximum_density = definition->maximum_density;
-			fog->planar_maximum_distance = definition->maximum_distance;
 			fog->planar_maximum_depth = definition->maximum_depth;
+			fog->planar_maximum_distance = definition->maximum_distance;
 
 			if (TEST_FLAG((word)cluster->fog_reference, SHORT_BITS - 1))
 			{
+				real offset;
+				real_vector3d offset_vector;
+
+				TAG_BLOCK_GET_ELEMENT(
+					&structure->fog_planes,
+					cluster->fog_reference & SHORT_MAX,
+					struct structure_fog_plane_render);
 				/* BUG: January and two independent later reconstructions scale
 				 * the authored animation distance by a literal zero, disabling
 				 * planar-fog motion. */
-				real offset = definition->animation_distance * 0.0f;
-				real_vector3d offset_vector;
+				offset = definition->animation_distance * 0.0f;
 
 				fog->plane.d += offset;
 				offset_vector.i = fog->plane.n.i * offset;

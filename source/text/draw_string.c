@@ -495,17 +495,17 @@ static void bitmap_draw_character(
 	short dx,
 	short dy)
 {
-	unsigned long coverage_scale = color >> 24;
-	byte *glyph_pixels = (byte *)font->pixels.address + character->pixels_offset;
 	short format = draw_character_software_globals.bitmap->format;
-	pixel32 destination_color = color;
+	short coverage_scale = (short)(color >> 24);
+	byte *glyph_pixels = (byte *)font->pixels.address + character->pixels_offset;
+	word destination_color;
 	short row;
 
 	if (format == _bitmap_format_r5g6b5)
 	{
-		destination_color =
-			(8 * (((color >> 11) & 0xFF00) | ((color >> 8) & 0xFC))) |
-			((byte)color >> 3);
+		destination_color = (word)(((((color >> 16) & 0xFF) >> 3) << 11) |
+			((((color >> 8) & 0xFF) >> 2) << 5) |
+			((color & 0xFF) >> 3));
 	}
 
 	if (dy <= 0)
@@ -513,12 +513,13 @@ static void bitmap_draw_character(
 
 	for (row = dy; row > 0; row--, y++, y0++)
 	{
-		short bits_per_pixel = bitmap_format_get_bits_per_pixel(
-			draw_character_software_globals.bitmap->format);
-		byte *source_pixel = &glyph_pixels[character->bitmap_width * y + x];
+		long row_pitch = bitmap_format_get_bits_per_pixel(
+			draw_character_software_globals.bitmap->format) *
+			draw_character_software_globals.bitmap->width / 8;
 		byte *destination_pixel = (byte *)draw_character_software_globals.bitmap->base_address +
 			(x0 << draw_character_software_globals.encoding_shift) +
-			y0 * (bits_per_pixel * draw_character_software_globals.bitmap->width / 8);
+			y0 * row_pitch;
+		byte *source_pixel = &glyph_pixels[character->bitmap_width * y + x];
 		short column;
 
 		match_assert(
@@ -537,12 +538,14 @@ static void bitmap_draw_character(
 		case _bitmap_format_ay8:
 			for (column = dx; column > 0; column--, source_pixel++, destination_pixel++)
 			{
-				if (*source_pixel)
+				short coverage = *source_pixel;
+
+				if (coverage)
 				{
 					byte destination_value = *destination_pixel;
-					short coverage = (short)(((short)coverage_scale * *source_pixel) >> 8);
-					coverage = MIN(coverage, destination_value);
-					*destination_pixel = (byte)coverage;
+
+					coverage = (coverage * coverage_scale) >> 8;
+					*destination_pixel = (byte)MIN(coverage, destination_value);
 				}
 			}
 			break;
@@ -552,13 +555,14 @@ static void bitmap_draw_character(
 			{
 				if (*source_pixel)
 				{
-					short coverage = (short)(((short)coverage_scale * *source_pixel) >> 8);
-					short inverse = (short)(255 - coverage);
 					word destination = *(word *)destination_pixel;
-					*(word *)destination_pixel =
-						(word)((((destination * inverse + (word)destination_color * coverage) >> 8) & 0xF800) |
-						((((destination & 0x1F) * inverse + ((word)destination_color & 0x1F) * coverage) >> 8) & 0x1F) |
-						((((destination & 0x7FF) * inverse + ((word)destination_color & 0x7FF) * coverage) >> 8) & 0x7E0));
+					short coverage = (*source_pixel * coverage_scale) >> 8;
+					short inverse = 255 - coverage;
+
+					*(word *)destination_pixel = (word)(
+						(((destination_color * coverage + destination * inverse) >> 8) & 0xF800) |
+						((((destination_color & 0x7FF) * coverage + (destination & 0x7FF) * inverse) >> 8) & 0x7E0) |
+						((((destination_color & 0x1F) * coverage + (destination & 0x1F) * inverse) >> 8) & 0x1F));
 				}
 			}
 			break;
@@ -566,24 +570,19 @@ static void bitmap_draw_character(
 		case _bitmap_format_a8r8g8b8:
 			for (column = dx; column > 0; column--, source_pixel++, destination_pixel += 4)
 			{
-				if (*source_pixel)
+				short source_value = *source_pixel;
+
+				if (source_value)
 				{
 					pixel32 destination = *(pixel32 *)destination_pixel;
-					short coverage = (short)(((short)coverage_scale * *source_pixel) >> 8);
-					short inverse = (short)(255 - coverage);
-					pixel32 destination_alpha = MAX((pixel32)coverage, destination >> 24);
-					pixel32 red;
-					pixel32 green;
-					pixel32 blue;
+					short coverage = (source_value * coverage_scale) >> 8;
+					short inverse = 255 - coverage;
 
-					red = ((((destination >> 16) & 0xFF) * inverse) & 0xFFFFFF00) +
-						((((color >> 16) & 0xFF) * coverage) & 0xFFFFFF00);
-					green = ((((destination >> 8) & 0xFF) * inverse) & 0xFFFFFF00) +
-						((((color >> 8) & 0xFF) * coverage) & 0xFFFFFF00);
-					blue = (((destination & 0xFF) * inverse) >> 8) +
-						(((color & 0xFF) * coverage) >> 8);
 					*(pixel32 *)destination_pixel =
-						(red << 8) | green | blue | (destination_alpha << 24);
+						((((((destination >> 16) & 0xFF) * inverse) >> 8) + ((((color >> 16) & 0xFF) * coverage) >> 8)) << 16) |
+						((((((destination >> 8) & 0xFF) * inverse) >> 8) + ((((color >> 8) & 0xFF) * coverage) >> 8)) << 8) |
+						((((destination & 0xFF) * inverse) >> 8) + (((color & 0xFF) * coverage) >> 8)) |
+						(MAX((pixel32)coverage, destination >> 24) << 24);
 				}
 			}
 			break;

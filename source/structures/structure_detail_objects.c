@@ -390,191 +390,142 @@ void structure_detail_objects_initialize_for_new_map(
 void structure_render_detail_objects(
 	void)
 {
-	struct structure_detail_object_data *detail_object_data;
-	struct detail_object_runtime_data *local_player_data;
-	struct detail_object_cell_coordinate camera_cell;
-	real cell_coordinate_value;
-	long integer_cell_coordinate;
-
-	if (local_player_count() != 1 || render.local_player_index == NONE)
+	if (local_player_count() == 1 && render.local_player_index != NONE)
 	{
-		return;
-	}
+		struct structure_detail_object_data *detail_object_data =
+			global_structure_bsp_get()->detail_object_data.count ?
+				structure_detail_object_data_get(&global_structure_bsp_get()->detail_object_data, 0) :
+				NULL;
+		struct detail_object_runtime_data *local_player_data = get_local_player_datum(0);
+		struct detail_object_cell_coordinate camera_cell = {
+			(short)fast_ftol(render.camera.position.x * 0.125f - 0.5f),
+			(short)fast_ftol(render.camera.position.y * 0.125f - 0.5f),
+			(short)fast_ftol(render.camera.position.z * 0.125f - 0.5f) };
 
-	if (global_structure_bsp_get()->detail_object_data.count)
-	{
-		detail_object_data = structure_detail_object_data_get(
-			&global_structure_bsp_get()->detail_object_data,
-			0);
-	}
-	else
-	{
-		detail_object_data = NULL;
-	}
-
-	local_player_data = get_local_player_datum(0);
-
-	cell_coordinate_value = render.camera.position.x * 0.125f - 0.5f;
-	integer_cell_coordinate = fast_ftol(cell_coordinate_value);
-	camera_cell.x = (short)integer_cell_coordinate;
-	cell_coordinate_value = render.camera.position.y * 0.125f - 0.5f;
-	integer_cell_coordinate = fast_ftol(cell_coordinate_value);
-	camera_cell.y = (short)integer_cell_coordinate;
-	cell_coordinate_value = render.camera.position.z * 0.125f - 0.5f;
-	integer_cell_coordinate = fast_ftol(cell_coordinate_value);
-	camera_cell.z = (short)integer_cell_coordinate;
-	camera_cell.initialized = FALSE;
-	camera_cell.pad07 = 0;
-
-	if (!detail_object_data->valid)
-	{
-		return;
-	}
-
-	rasterizer_detail_objects_begin();
-
-	if (camera_cell.x != local_player_data->cell_coordinate.x ||
-		camera_cell.y != local_player_data->cell_coordinate.y ||
-		camera_cell.z != local_player_data->cell_coordinate.z ||
-		!local_player_data->cell_coordinate.initialized ||
-		TEST_FLAG(detail_object_data->valid, 1))
-	{
-		short layer_cell_counts[32];
-		unsigned long visible_layer_flags;
-		short x_delta;
-		short y_delta;
-
-		layer_cell_counts[0] = 0;
-		visible_layer_flags = 0;
-		memset(&layer_cell_counts[1], 0, sizeof(layer_cell_counts) - sizeof(layer_cell_counts[0]));
-
-		detail_object_data->valid = TRUE;
-		local_player_data->cell_coordinate = camera_cell;
-		local_player_data->cell_coordinate.initialized = TRUE;
-
-		for (x_delta = -1; x_delta <= 1; x_delta++)
+		if (detail_object_data->valid)
 		{
-			for (y_delta = -1; y_delta <= 1; y_delta++)
+			rasterizer_detail_objects_begin();
+
+			if (camera_cell.x != local_player_data->cell_coordinate.x ||
+				camera_cell.y != local_player_data->cell_coordinate.y ||
+				camera_cell.z != local_player_data->cell_coordinate.z ||
+				!local_player_data->cell_coordinate.initialized ||
+				TEST_FLAG(detail_object_data->valid, 1))
 			{
-				struct detail_object_cell_coordinate key;
-				struct detail_object_cell_definition *begin;
-				struct detail_object_cell_definition *end;
-				struct detail_object_cell_definition *lower_bound_cell;
-				struct detail_object_cell_definition *upper_bound_cell;
+				unsigned long visible_layer_flags = 0;
+				short layer_cell_counts[32] = { 0 };
+				short x_delta;
+				short y_delta;
 
-				begin = detail_object_cell_definition_get(&detail_object_data->cells, 0);
-				end = detail_object_cell_definition_get(
-					&detail_object_data->cells,
-					detail_object_data->cells.count - 1) + 1;
+				detail_object_data->valid = TRUE;
+				local_player_data->cell_coordinate = camera_cell;
+				local_player_data->cell_coordinate.initialized = TRUE;
 
-				key.x = (short)(camera_cell.x - x_delta);
-				key.y = (short)(camera_cell.y - y_delta);
-				key.z = (short)(camera_cell.z - 1);
-				key.initialized = FALSE;
-				key.pad07 = 0;
-				lower_bound_cell = get_lower_bound_cell(begin, end, &key);
-				key.z = (short)(key.z + 3);
-				upper_bound_cell = get_upper_bound_cell(begin, end, &key);
-				key.z = camera_cell.z;
-				upper_bound_cell--;
-
-				if (lower_bound_cell->cell_x == key.x &&
-					lower_bound_cell->cell_y == key.y &&
-					upper_bound_cell->cell_x == key.x &&
-					upper_bound_cell->cell_y == key.y)
+				for (x_delta = -1; x_delta <= 1; x_delta++)
 				{
-					struct detail_object_cell_definition *cell;
-					long cell_count;
-
-					match_assert(
-						"c:\\halo\\SOURCE\\structures\\structure_detail_objects.c",
-						0xC6,
-						lower_bound_cell<=upper_bound_cell);
-
-					upper_bound_cell++;
-					cell = lower_bound_cell;
-					cell_count = upper_bound_cell - lower_bound_cell;
-					while (cell_count > 0)
+					for (y_delta = -1; y_delta <= 1; y_delta++)
 					{
-						if (abs(camera_cell.z - cell->cell_z) <= 1)
+						struct detail_object_cell_definition *begin =
+							detail_object_cell_definition_get(&detail_object_data->cells, 0);
+						struct detail_object_cell_definition *end = detail_object_cell_definition_get(
+							&detail_object_data->cells,
+							detail_object_data->cells.count - 1) + 1;
+						struct detail_object_cell_coordinate key = {
+							(short)(camera_cell.x - x_delta),
+							(short)(camera_cell.y - y_delta),
+							camera_cell.z };
+						struct detail_object_cell_definition *lower_bound_cell;
+						struct detail_object_cell_definition *upper_bound_cell;
+
+						key.z--;
+						lower_bound_cell = get_lower_bound_cell(begin, end, &key);
+						key.z += 3;
+						upper_bound_cell = get_upper_bound_cell(begin, end, &key) - 1;
+						key.z = camera_cell.z;
+
+						if (lower_bound_cell->cell_x == key.x &&
+							lower_bound_cell->cell_y == key.y &&
+							upper_bound_cell->cell_x == key.x &&
+							upper_bound_cell->cell_y == key.y)
 						{
-							long first_detail_object_index = 0;
-							short count_index = 0;
-							short layer_index;
+							struct detail_object_cell_definition *cell;
 
-							visible_layer_flags |= cell->valid_layers;
-							for (layer_index = 0; layer_index < 32; layer_index++)
+							match_assert(
+								"c:\\halo\\SOURCE\\structures\\structure_detail_objects.c",
+								0xC6,
+								lower_bound_cell<=upper_bound_cell);
+
+							upper_bound_cell++;
+							for (cell = lower_bound_cell; cell < upper_bound_cell; cell++)
 							{
-								if (TEST_FLAG(cell->valid_layers, layer_index))
+								if (abs(camera_cell.z - cell->cell_z) <= 1)
 								{
-									short layer_cell_index = layer_cell_counts[layer_index]++;
-									struct detail_object_cell_data *cell_data =
-										&local_player_data->cells[layer_index][layer_cell_index];
-									word *detail_object_count = detail_object_count_get(
-										&detail_object_data->counts,
-										cell->count_index + count_index);
+									long first_detail_object_index = 0;
+									short count_index = 0;
+									short layer_index;
 
-									cell_data->cell_x = cell->cell_x;
-									cell_data->cell_y = cell->cell_y;
-									cell_data->cell_z =
-										(real)cell->offset_z * (1.0f / 255.0f) + (real)cell->cell_z;
-									cell_data->first_detail_object_index =
-										cell->start_index + first_detail_object_index;
-									cell_data->detail_object_count = *detail_object_count;
-									if (detail_object_data->z_reference_vectors.count)
+									visible_layer_flags |= cell->valid_layers;
+									for (layer_index = 0; layer_index < 32; layer_index++)
 									{
-										cell_data->z_reference_vector =
-											detail_object_z_reference_vector_get(
-												&detail_object_data->z_reference_vectors,
+										if (TEST_FLAG(cell->valid_layers, layer_index))
+										{
+											struct detail_object_cell_data *cell_data =
+												&local_player_data->cells[layer_index][layer_cell_counts[layer_index]++];
+
+											cell_data->cell_x = cell->cell_x;
+											cell_data->cell_y = cell->cell_y;
+											cell_data->cell_z =
+												(real)cell->offset_z * (1.0f / 255.0f) + (real)cell->cell_z;
+											cell_data->first_detail_object_index =
+												cell->start_index + first_detail_object_index;
+											cell_data->detail_object_count = *detail_object_count_get(
+												&detail_object_data->counts,
 												cell->count_index + count_index);
-									}
-									else
-									{
-										cell_data->z_reference_vector =
-											&detail_object_global_runtime_data->default_z_reference_vector;
-									}
+											cell_data->z_reference_vector = detail_object_data->z_reference_vectors.count ?
+												detail_object_z_reference_vector_get(
+													&detail_object_data->z_reference_vectors,
+													cell->count_index + count_index) :
+												&detail_object_global_runtime_data->default_z_reference_vector;
 
-									first_detail_object_index += cell_data->detail_object_count;
-									count_index++;
+											first_detail_object_index += cell_data->detail_object_count;
+											count_index++;
+										}
+									}
 								}
 							}
 						}
-
-						cell++;
-						cell_count--;
 					}
 				}
-			}
-		}
 
-		{
-			struct detail_object_view_data *view_data = &local_player_data->view_data;
-			short render_layer_index = 0;
-			short layer_index;
-
-			view_data->layers = local_player_data->layers;
-			view_data->layer_count = 0;
-			for (layer_index = 0; layer_index < 32; layer_index++)
-			{
-				if (TEST_FLAG(visible_layer_flags, layer_index) && layer_cell_counts[layer_index])
 				{
-					struct detail_object_layer_data *layer =
-						&view_data->layers[render_layer_index++];
+					short render_layer_index = 0;
+					short layer_index;
 
-					layer->cells = local_player_data->cells[layer_index];
-					layer->cell_count = layer_cell_counts[layer_index];
-					layer->collection_definition_index = layer_index;
-					view_data->layer_count++;
+					local_player_data->view_data.layers = local_player_data->layers;
+					local_player_data->view_data.layer_count = 0;
+					for (layer_index = 0; layer_index < 32; layer_index++)
+					{
+						if (TEST_FLAG(visible_layer_flags, layer_index) && layer_cell_counts[layer_index])
+						{
+							struct detail_object_layer_data *layer =
+								&local_player_data->layers[render_layer_index++];
+
+							layer->cells = local_player_data->cells[layer_index];
+							layer->cell_count = layer_cell_counts[layer_index];
+							layer->collection_definition_index = layer_index;
+							local_player_data->view_data.layer_count++;
+						}
+					}
+
+					rasterizer_detail_objects_rebuild_vertices(
+						&local_player_data->view_data);
 				}
 			}
 
-			rasterizer_detail_objects_rebuild_vertices(
-				view_data);
+			rasterizer_detail_objects_draw(&local_player_data->view_data);
+			rasterizer_detail_objects_end();
 		}
 	}
-
-	rasterizer_detail_objects_draw(&local_player_data->view_data);
-	rasterizer_detail_objects_end();
 
 	return;
 }

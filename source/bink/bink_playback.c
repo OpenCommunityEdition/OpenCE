@@ -797,7 +797,7 @@ static void bink_free_texture_cache(
 {
 	if (bink_globals.initialized && bink_globals.memory_pool_base)
 	{
-		match_dassert(
+		match_vassert(
 			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
 			665,
 			is_all_bink_memory_free(),

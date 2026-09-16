@@ -720,25 +720,6 @@
       }
     },
     {
-      "unit": "source/interface/hud_sounds",
-      "function": "_hud_play_sound",
-      "class": "unclassified",
-      "evidence": "Policy-driven replacement of the inherited unsupported volatile local pointer and redundant nested handle guard with ordinary pointer semantics, natural impulse-sound rising-edge control, SET_FLAG and explicit return. The proper five-argument public API is now declared in closest owner hud.h. Target352 versus candidate384 padded bytes, both13 relocations; source is honestly nonexact and the former Matching label is revoked rather than retained through compiler steering. Original exact-but-noncompliant source remains in Git at d556ba530 and32580a870. No comparator waiver, volatile/register steering, fake lifetime, inline forcing, assembly or expression-order search is used. Reopen only for authentic source/type/control-flow evidence preserving these house rules. See docs/object_matching_logs/hud_sounds_obj_source_authenticity_review_20260904.md and input_hud_player_ui_followup_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 13,
-          "normalized_sha256": "1d026cea1652a4639bc1258234647070cfdb9dfda61f268e1033299edb398f37"
-        },
-        "base": {
-          "size": 384,
-          "relocation_count": 13,
-          "normalized_sha256": "5ad2867ca1866ae4cda357d19e78baca3a47d275b39f6640653948f1728cb858"
-        },
-        "objdiff_percent": 82.10656
-      }
-    },
-    {
       "unit": "source/input/input_xbox",
       "function": "_input_get_device_states",
       "class": "unclassified",
@@ -1731,25 +1712,6 @@
       }
     },
     {
-      "unit": "source/structures/structure_detail_objects",
-      "function": "_structure_render_detail_objects",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked after reconstructing the complete January visible-cell rebuild and render path from the target disassembly and relocations, the first-party HCEA function, and the independent Pastudan PC lift. The retained ordinary C has the exact 1,136-byte padded envelope and 31 relocations; it uses named cell/layer/view structures, typed tag-block accessors, the authenticated fast_ftol helper, January's intrinsic memset/abs lowering, the exact lower/upper-bound helpers, and the original lower_bound_cell<=upper_bound_cell assertion. The residual spans VC7 frame coloring, local/register allocation, one reciprocal/count-access scheduling swap, and x87 lifetimes. Natural runtime/view aliases, declaration and scope order, loop spelling, direct-global fallback, and reciprocal placement were boundedly tested; variants either returned to this fixed point, disturbed the exact helper family, or added unsupported alias-only source. No forced inline/noinline, barrier, volatile access, pragma, assembly in this routine, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, the original translation-unit context, or a natural same-compiler donor that explains the allocation and x87 schedule.",
-      "measurements": {
-        "target": {
-          "size": 1136,
-          "relocation_count": 31,
-          "normalized_sha256": "dbf237f0819e54a61d67102c174e6f79789603a62a8adbac4e97c21e01394658"
-        },
-        "base": {
-          "size": 1136,
-          "relocation_count": 31,
-          "normalized_sha256": "eb6883e150ad20816c89d64a99075684ab290ad767736f7942e56317ac3d4fb1"
-        },
-        "objdiff_percent": 76.39528
-      }
-    },
-    {
       "unit": "source/ai/action_alert",
       "function": "_action_alert_next_position",
       "class": "register-allocation",
@@ -2545,25 +2507,6 @@
           "normalized_sha256": "004a86dfae5e2df2c0c60a4d98e0f845725354a5dfc8d133f14a03833571924d"
         },
         "objdiff_percent": 85.31645
-      }
-    },
-    {
-      "unit": "source/text/draw_string",
-      "function": "_bitmap_draw_character",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed software glyph blender from the January target and the independent HCEA implementation. The retained ordinary C clips each glyph row and column, decodes the supported A8/Y8/AY8/R5G6B5/A8R8G8B8 formats, applies the source alpha and draw color, and uses the semantic aggregate draw_string_globals rather than anonymous BSS symbols. Direct bitmap-field access restores January's 25-relocation topology; target and candidate are 944 and 912 padded bytes respectively and objdiff reports 70.833885 percent. Bounded experiments covered destination pixel width, row/column widths, source-format switches, MIN/MAX macros, and direct-versus-cached global loads; the retained form was the closest source-authentic result. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw address, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the remaining allocation and schedule gap.",
-      "measurements": {
-        "target": {
-          "size": 944,
-          "relocation_count": 25,
-          "normalized_sha256": "1fbab7db0314ed562e1e6908a77d5570fd513dbc8a3e27e261710ed051f3682a"
-        },
-        "base": {
-          "size": 912,
-          "relocation_count": 25,
-          "normalized_sha256": "a779c56eb5f9c0f580bd13d928b5298c28f868bdfd35cef40c26fdf2884faed9"
-        },
-        "objdiff_percent": 70.833885
       }
     },
     {
@@ -3575,25 +3518,6 @@
     },
     {
       "unit": "source/bink/bink_playback",
-      "function": "_bink_free_texture_cache",
-      "class": "tu-context-optimization",
-      "evidence": "Coherent typed texture-cache release retained from the Fable graph reconciliation. January emits 96 padded bytes with 11 relocations while canonical emits 144 bytes with 12 because VC7 chooses a different predicate call/inlining context in the diagnostic path. The function receives zero exact credit. No inline control, duplicate helper, volatile/register forcing, pragma, assembly, fake dependency, raw offset, or nonsensical logic is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 96,
-          "relocation_count": 11,
-          "normalized_sha256": "9c2a9405a0477844e5a6fee2c1b0c1b0a1d625a530a6b227701aec798386d468"
-        },
-        "base": {
-          "size": 144,
-          "relocation_count": 12,
-          "normalized_sha256": "292d116be7d25fd9fcc59b6a20832ec5e6cd0719381567afdba7706936a33eb1"
-        },
-        "objdiff_percent": 19.545454
-      }
-    },
-    {
-      "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
       "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
@@ -4346,7 +4270,7 @@
       "unit": "source/structures/structures",
       "function": "_structure_get_planar_fog",
       "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md.",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. 2026-09-15 (next-150K lane wave n1): re-measured after adding the discarded fog-plane lookup that January provably executes. relocdiff shows January owns four _tag_block_get_element_with_size relocations (@0x75, @0xb0, @0xfd, @0x16d) where the parked body owned three; the missing 15th relocation is exactly that discarded lookup. Both structural tags now close: size 448/448 and relocations 15/15 (was 416/14), and alndiff is 154 vs 154 instructions with the whole residual confined to one 4-slot EDX/ECX register-naming window. Zero strict credit; the row stays parked and fuzzy [sha].",
       "measurements": {
         "target": {
           "size": 448,
@@ -4354,11 +4278,11 @@
           "normalized_sha256": "a5aa0f690e82204d70cb108e143047be76871fd5cf1a979119ce80e8163c097b"
         },
         "base": {
-          "size": 416,
-          "relocation_count": 14,
-          "normalized_sha256": "7a670604363eebcb3d91e0a6a9a2ba90aa5983e1c5e9e062407b4f78f7ff07bf"
+          "size": 448,
+          "relocation_count": 15,
+          "normalized_sha256": "7e308d0bf30135a5dcfeb73442f3f7a61b25bb0281c6cbd45868eaa0ce1d9869"
         },
-        "objdiff_percent": 38.43919
+        "objdiff_percent": 99.76351
       }
     },
     {

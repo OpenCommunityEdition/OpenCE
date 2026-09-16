@@ -58,21 +58,18 @@ void hud_play_sound(
 
 			if (state_flags & sound->state_flags)
 			{
-				long index;
-
 				switch (sound->sound.group_tag)
 				{
 				default:
 					match_assert("c:\\halo\\SOURCE\\interface\\hud_sounds.c", 47, !"unreachable");
-					SET_FLAG(*played_flags, absolute_sound_index, TRUE);
-					goto next_sound;
+					break;
 
 				case SOUND_DEFINITION_TAG:
-					index = sound_indices[absolute_sound_index];
-					if (index == NONE || !TEST_FLAG(*played_flags, absolute_sound_index))
+					if (sound_indices[absolute_sound_index] == NONE ||
+						!TEST_FLAG(*played_flags, absolute_sound_index))
 					{
-						if (index != NONE)
-							sound_stop_impulse(index);
+						if (sound_indices[absolute_sound_index] != NONE)
+							sound_stop_impulse(sound_indices[absolute_sound_index]);
 						sound_indices[absolute_sound_index] =
 							unspatialized_impulse_sound_new(sound->sound.index, sound->scale);
 					}
@@ -89,8 +86,7 @@ void hud_play_sound(
 			}
 			else
 			{
-				long index = sound_indices[absolute_sound_index];
-				if (index != NONE)
+				if (sound_indices[absolute_sound_index] != NONE)
 				{
 					switch (sound->sound.group_tag)
 					{
@@ -100,7 +96,7 @@ void hud_play_sound(
 					case SOUND_DEFINITION_TAG:
 						break;
 					case LOOPING_SOUND_DEFINITION_TAG:
-						unattached_looping_sound_stop(index);
+						unattached_looping_sound_stop(sound_indices[absolute_sound_index]);
 						break;
 					}
 
@@ -109,7 +105,6 @@ void hud_play_sound(
 				}
 			}
 
-		next_sound:
 			sound_index++;
 			absolute_sound_index = sound_index;
 		}
