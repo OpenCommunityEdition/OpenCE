@@ -957,17 +957,6 @@
     },
     {
       "unit": "source/ai/actor_combat",
-      "function": "_actor_combat_find_nearby_target",
-      "class": "instruction-scheduling",
-      "evidence": "The retained source uses the HCEA-authenticated private signature, typed real_point3d/real_vector3d arithmetic, the January random-seed API, and the existing collision-vector API. Target and candidate have the same 352-byte envelope, twelve relocations, and identical relocation identities. The only meaningful residual is the final inline point expansion: January keeps height live on the x87 stack through direction.k and then pops it, while VC7 recognizes the last use and folds the memory operand. Natural typed-local, pointer-alias, and expression-shape variants did not reproduce January without fake lifetime steering. No synthetic helper, volatile access, inactive-union overlay, assembly, or point_from_line3d COMDAT is retained. Reopen only for authoritative source or a natural same-compiler lifetime/inlining donor.",
-      "measurements": {
-        "target": { "size": 352, "relocation_count": 12, "normalized_sha256": "d81707099ff33b584760980c0676308538c7bd08d3f6988d4aaec680fb9b26e6" },
-        "base": { "size": 352, "relocation_count": 12, "normalized_sha256": "ea9a37ad3b0e51df21b0011f3b93aa55152b23bbb72ddde606d46a33173afb96" },
-        "objdiff_percent": 97.28814
-      }
-    },
-    {
-      "unit": "source/ai/actor_combat",
       "function": "_actor_combat_plan_grenade_trajectory",
       "class": "register-allocation",
       "evidence": "The retained function now uses the HCEA-authenticated build-trajectory argument order and typed grenade constants. Target and candidate have the same 288-byte envelope, five relocations, and identical relocation identities. January uses a 0x30-byte frame by reusing a dead incoming parameter home slot, while this VC7 source shape uses a 0x34-byte frame and a separate local slot. Natural declaration/lifetime and signature corrections do not reproduce the stack-slot colouring. No volatile access, raw overlay, fake dependency, assembly, or manual stack control is retained. Reopen only for authoritative source or a natural same-compiler stack-lifetime donor.",
@@ -975,17 +964,6 @@
         "target": { "size": 288, "relocation_count": 5, "normalized_sha256": "7edcb9d4e87b0a5fe7d095bf5ba048614e46a9708e7d858889cbeb627aa0a0de" },
         "base": { "size": 288, "relocation_count": 5, "normalized_sha256": "ff9a7477deb2aa304240db075c9182d629f8b82c13cf4e4c48a51af1efc5170a" },
         "objdiff_percent": 94.7
-      }
-    },
-    {
-      "unit": "source/ai/actor_combat",
-      "function": "_actor_combat_reaim_grenade",
-      "class": "unclassified",
-      "evidence": "The genuine actor_get_grenade_definition helper and its two ordinary caller uses restore a missed January owner without fake retention. The typed caller keeps projectile_aim outputs, planar-facing and ballistic line-of-fire tests and the successful aim latch. January and candidate both448 padded bytes,16 relocations,162 instructions; all16 relocation addresses/types/destinations agree. The natural replay changes prior hash b2a1aa5c to180b57e6 and improves objdiff98.509674 to99.86452 percent. It fixes the post-tag_get cleanup/move ordering; remaining differences are frame0x30 versus0x2c, stack-slot coloring and corresponding independent velocity-product placement/order. This remeasured park is conservatively unclassified rather than claimed as one allocator tie. All18 inherited strict owners remain strict and the restored64-byte helper is independently exact. No new candidate-only helper, point_from_line3d COMDAT, forced inline, declaration search, volatile/register device, fake reference, assembly or nonsensical branch is introduced. Reopen only for new authentic source/type/compiler-context evidence. See docs/object_matching_logs/actor_combat_obj_grenade_definition_opus_reaudit_20260904.md and docs/object_matching_logs/props_actor_perception_grenade_canonical_integration_20260904.md.",
-      "measurements": {
-        "target": { "size": 448, "relocation_count": 16, "normalized_sha256": "8d2e09aa4f73bc982c4cf17d6e4f9a963ffd7db0b486ff7f037d19966ef52772" },
-        "base": { "size": 448, "relocation_count": 16, "normalized_sha256": "180b57e66e87ba40a0ed66e202278c097623976af9e7a41da86825a5d889a6c6" },
-        "objdiff_percent": 99.86452
       }
     },
     {
@@ -1643,25 +1621,6 @@
           "normalized_sha256": "dc74abcc212d5c0ac407b7605d242aec8d0f66983aa263fcbd98ef35d7ef3490"
         },
         "objdiff_percent": 78.03
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_2d_sharpen",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete toroidally wrapped 3x3 2D sharpen filter in ordinary typed C from January disassembly and table relocations, cross-checked against the later HaloCEA algorithm while retaining January's x86 parameter order. The retained body verifies the bitmap and signed positive/negative lookup tables, skips images smaller than 3x3, allocates a full scratch bitmap, processes each ARGB byte with the positive center term and eight negative neighbor terms using the cseries PIN macro, copies the result back, reports allocation failure, and frees at source line 0x3D1. January is 1,152 padded bytes and the candidate is 1,184; both have 29 relocations and the report records 60.921833 percent similarity. The fail-closed classifier returns UNKNOWN; the remaining difference is broad C2 frame/register/pointer scheduling, not missing logic. The PPC HaloCEA float-last ABI was deliberately not transplanted. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, raw offset, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
-      "measurements": {
-        "target": {
-          "size": 1152,
-          "relocation_count": 29,
-          "normalized_sha256": "38d28fa8cc7ad1141ae0e3eeee9cefd225f50d30675345ae64f826e6aa5cf042"
-        },
-        "base": {
-          "size": 1184,
-          "relocation_count": 29,
-          "normalized_sha256": "8a988645f8b5734c6607564d032d20a39c294dde3a2ba0b5107c766da700dcc2"
-        },
-        "objdiff_percent": 60.921833
       }
     },
     {

@@ -1330,61 +1330,55 @@ static void bitmap_2d_sharpen(
 				byte *current_row = bitmap_2d_address(bitmap, 0, y, 0);
 				byte *next_row = bitmap_2d_address(bitmap, 0, next_y, 0);
 				byte *destination_row = temporary_pixels + 4 * bitmap->width * y;
-				short row_size = 4 * bitmap->width;
 				short byte_index = 0;
+				short last_byte_index;
 
 				do
 				{
-					short wrapped_left = row_size + byte_index;
-					long value =
-						positive_table[current_row[byte_index]] -
-						negative_table[next_row[wrapped_left - 4]] -
-						negative_table[current_row[wrapped_left - 4]] -
-						negative_table[previous_row[wrapped_left - 4]] -
-						negative_table[previous_row[byte_index + 4]] -
-						negative_table[next_row[byte_index + 4]] -
-						negative_table[current_row[byte_index + 4]] -
-						negative_table[previous_row[byte_index]] -
-						negative_table[next_row[byte_index]];
+					short wrapped_left = 4 * bitmap->width + byte_index;
 
-					destination_row[byte_index] = (byte)PIN(value, 0, 255);
+					destination_row[byte_index] = (byte)PIN(
+						positive_table[current_row[byte_index]] -
+						negative_table[previous_row[wrapped_left - 4]] -
+						negative_table[previous_row[byte_index]] -
+						negative_table[previous_row[byte_index + 4]] -
+						negative_table[current_row[wrapped_left - 4]] -
+						negative_table[current_row[byte_index + 4]] -
+						negative_table[next_row[wrapped_left - 4]] -
+						negative_table[next_row[byte_index]] -
+						negative_table[next_row[byte_index + 4]], 0, 255);
 					byte_index++;
 				}
 				while (byte_index < 4);
 
-				while (byte_index < row_size - 4)
+				for (last_byte_index = 4 * bitmap->width - 4; byte_index < last_byte_index; byte_index++)
 				{
-					long value =
+					destination_row[byte_index] = (byte)PIN(
 						positive_table[current_row[byte_index]] -
 						negative_table[previous_row[byte_index - 4]] -
+						negative_table[previous_row[byte_index]] -
 						negative_table[previous_row[byte_index + 4]] -
-						negative_table[next_row[byte_index - 4]] -
-						negative_table[next_row[byte_index + 4]] -
 						negative_table[current_row[byte_index - 4]] -
 						negative_table[current_row[byte_index + 4]] -
-						negative_table[previous_row[byte_index]] -
-						negative_table[next_row[byte_index]];
-
-					destination_row[byte_index] = (byte)PIN(value, 0, 255);
-					byte_index++;
+						negative_table[next_row[byte_index - 4]] -
+						negative_table[next_row[byte_index]] -
+						negative_table[next_row[byte_index + 4]], 0, 255);
 				}
 
-				while (byte_index < row_size)
+				for (last_byte_index += 4; byte_index < last_byte_index; byte_index++)
 				{
-					short wrapped_right = byte_index - row_size;
-					long value =
-						positive_table[current_row[byte_index]] -
-						negative_table[next_row[wrapped_right + 4]] -
-						negative_table[current_row[wrapped_right + 4]] -
-						negative_table[previous_row[wrapped_right + 4]] -
-						negative_table[previous_row[byte_index - 4]] -
-						negative_table[next_row[byte_index - 4]] -
-						negative_table[current_row[byte_index - 4]] -
-						negative_table[previous_row[byte_index]] -
-						negative_table[next_row[byte_index]];
+					short wrapped_right = byte_index - 4 * bitmap->width;
 
-					destination_row[byte_index] = (byte)PIN(value, 0, 255);
-					byte_index++;
+					destination_row[byte_index] = (byte)PIN(
+						positive_table[current_row[byte_index]] -
+						negative_table[previous_row[byte_index - 4]] -
+						negative_table[previous_row[byte_index]] -
+						negative_table[previous_row[wrapped_right + 4]] -
+						negative_table[current_row[byte_index - 4]] -
+						negative_table[current_row[wrapped_right + 4]] -
+						negative_table[next_row[byte_index - 4]] -
+						negative_table[next_row[byte_index]] -
+						negative_table[next_row[wrapped_right + 4]], 0, 255);
 				}
 			}
 
@@ -1918,12 +1912,10 @@ void bitmap_compress_to_mipmap(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x619, bitmap_verify(source_bitmap, TRUE));
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61B, bitmap_verify(destination_bitmap, FALSE));
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61C, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61C, destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61D, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61E, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61F, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x61F, MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x620, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
 
 	switch (source_bitmap->type)
@@ -1971,12 +1963,10 @@ static void bitmap_2d_compress_to_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x63F, bitmap_verify(destination_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x640, destination_bitmap->type==_bitmap_type_2d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x641, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x641, destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x642, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x643, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x644, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x644, MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x645, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
 
 	/* The Xbox tool build does not compress bitmaps at runtime. */
@@ -2000,12 +1990,10 @@ static void bitmap_3d_compress_to_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B2, bitmap_verify(destination_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B3, destination_bitmap->type==_bitmap_type_3d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B4, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B4, destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B5, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B6, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B7, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B7, MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6B8, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
 
 	source_slice_bitmap = bitmap_2d_new(
@@ -2059,12 +2047,10 @@ static void bitmap_cm_compress_to_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FD, bitmap_verify(destination_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FE, destination_bitmap->type==_bitmap_type_cube_map);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FF, destination_mipmap_index>=0 && destination_mipmap_index<=(short)destination_bitmap->mipmap_count,
-		"destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x6FF, destination_mipmap_index>=0 && destination_mipmap_index<=destination_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x700, MAX(1, destination_bitmap->width >>destination_mipmap_index)==source_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x701, MAX(1, destination_bitmap->height>>destination_mipmap_index)==source_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x702, MAX(1, (short)destination_bitmap->depth >>destination_mipmap_index)==(short)source_bitmap->depth,
-		"MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x702, MAX(1, destination_bitmap->depth >>destination_mipmap_index)==source_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x703, TEST_FLAG(destination_bitmap->flags, _bitmap_compressed_bit));
 
 	source_face_bitmap = bitmap_2d_new(
@@ -2110,12 +2096,10 @@ void bitmap_uncompress_from_mipmap(
 	short source_mipmap_index)
 {
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x746, bitmap_verify(source_bitmap, FALSE));
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x747, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
-		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x747, source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x748, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x749, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74A, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
-		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74A, MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74B, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x74D, bitmap_verify(destination_bitmap, TRUE));
@@ -2155,12 +2139,10 @@ static void bitmap_2d_uncompress_from_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x766, bitmap_verify(source_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x767, source_bitmap->type==_bitmap_type_2d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x768, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
-		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x768, source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x769, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x76A, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x76B, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
-		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x76B, MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x76C, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x76E, bitmap_verify(destination_bitmap, TRUE));
@@ -2234,12 +2216,10 @@ static void bitmap_3d_uncompress_from_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B0, bitmap_verify(source_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B1, source_bitmap->type==_bitmap_type_3d);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B2, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
-		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B2, source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B3, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B4, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B5, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
-		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B5, MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B6, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7B8, bitmap_verify(destination_bitmap, TRUE));
@@ -2290,12 +2270,10 @@ static void bitmap_cm_uncompress_from_mipmap(
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7F9, bitmap_verify(source_bitmap, FALSE));
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FA, source_bitmap->type==_bitmap_type_cube_map);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FB, source_mipmap_index>=0 && source_mipmap_index<=(short)source_bitmap->mipmap_count,
-		"source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FB, source_mipmap_index>=0 && source_mipmap_index<=source_bitmap->mipmap_count);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FC, MAX(1, source_bitmap->width >>source_mipmap_index)==destination_bitmap->width);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FD, MAX(1, source_bitmap->height>>source_mipmap_index)==destination_bitmap->height);
-	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FE, MAX(1, (short)source_bitmap->depth >>source_mipmap_index)==(short)destination_bitmap->depth,
-		"MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth");
+	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FE, MAX(1, source_bitmap->depth >>source_mipmap_index)==destination_bitmap->depth);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x7FF, TEST_FLAG(source_bitmap->flags, _bitmap_compressed_bit));
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x801, bitmap_verify(destination_bitmap, TRUE));

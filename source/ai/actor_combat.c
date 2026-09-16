@@ -621,11 +621,10 @@ static void actor_combat_find_nearby_target(
 			NONE,
 			&collision))
 		{
-			real distance = MAX(0.0f, collision.t*miss_distance - 0.1f);
-
-			target.x = direction.i*distance + above.x;
-			target.y = direction.j*distance + above.y;
-			target.z = direction.k*distance + above.z;
+			miss_distance = MAX(0.0f, collision.t*miss_distance - 0.1f);
+			target.x = direction.i*miss_distance + above.x;
+			target.y = direction.j*miss_distance + above.y;
+			target.z = direction.k*miss_distance + above.z;
 		}
 	}
 
@@ -715,7 +714,6 @@ static boolean actor_combat_reaim_grenade(
 	struct projectile_definition *projectile_definition =
 		actor_get_grenade_definition(
 			variant_definition->grenade_combat.grenade_type);
-	real_vector2d aim_vector2d;
 	real_vector3d aim_vector;
 	real aim_speed;
 	real aim_ticks;
@@ -742,13 +740,20 @@ static boolean actor_combat_reaim_grenade(
 		NULL,
 		&linear))
 	{
-		aim_vector2d.i = aim_vector.i;
-		aim_vector2d.j = aim_vector.j;
+		boolean within_aiming_angle;
 
-		if (normalize2d(&aim_vector2d) > 0.0f &&
-			aim_vector2d.i*actor->input.facing_vector.i +
-				aim_vector2d.j*actor->input.facing_vector.j >
-					GRENADE_AIMING_ANGLE_COSINE)
+		{
+			real_vector2d aim_vector2d;
+
+			aim_vector2d.i = aim_vector.i;
+			aim_vector2d.j = aim_vector.j;
+			within_aiming_angle = normalize2d(&aim_vector2d) > 0.0f &&
+				aim_vector2d.i*actor->input.facing_vector.i +
+					aim_vector2d.j*actor->input.facing_vector.j >
+						GRENADE_AIMING_ANGLE_COSINE;
+		}
+
+		if (within_aiming_angle)
 		{
 			real_vector3d aim_velocity;
 			real aim_gravity;
@@ -1246,15 +1251,7 @@ static void actor_start_burst(
 	boolean use_nearby_target = FALSE;
 	struct actor_burst_geometry *burst_geometry;
 	struct actor_firing_pattern *firing_pattern;
-	real_point3d target;
-	real_vector3d aim_vector;
-	real_vector3d burst_relative_position;
-	real_vector3d burst_adjustment;
 	real new_target_time;
-	real origin_angle;
-	real return_angle;
-	real origin_radius;
-	real return_radius;
 
 	if (actor->control.next_burst_secondary &&
 		!actor_combat_allow_special_fire_situation(
@@ -1410,108 +1407,117 @@ static void actor_start_burst(
 			prop->visibility == _actor_perception_none;
 	}
 
-	target = actor->control.current_fire_target_position;
-	if (use_nearby_target)
 	{
-		actor_combat_find_nearby_target(
-			&target,
-			firing_variant_definition->ranged_combat.weapon_bombardment_range);
-	}
+		real_point3d target = actor->control.current_fire_target_position;
+		real_vector3d aim_vector;
+		real_vector3d burst_relative_position;
+		real_vector3d burst_adjustment;
+		real origin_angle;
+		real return_angle;
+		real origin_radius;
+		real return_radius;
 
-	{
-		real_vector3d target_direction;
-		real_vector3d const up = {0.0f, 0.0f, 1.0f};
-
-		actor_combat_vector_from_points3d_inline(
-			&actor->input.position.head_position,
-			&target,
-			&target_direction);
-		cross_product3d(&target_direction, &up, &aim_vector);
-		normalize3d(&aim_vector);
-		if (random_boolean())
+		if (use_nearby_target)
 		{
-			aim_vector.i = -aim_vector.i;
-			aim_vector.j = -aim_vector.j;
-			aim_vector.k = -aim_vector.k;
+			actor_combat_find_nearby_target(
+				&target,
+				firing_variant_definition->ranged_combat.weapon_bombardment_range);
 		}
-	}
 
-	origin_angle = actor_combat_real_random_range_inline(
-		-burst_geometry->burst_origin_angle,
-		burst_geometry->burst_origin_angle);
-	return_angle = actor_combat_real_random_range_inline(
-		-burst_geometry->burst_return_angle,
-		burst_geometry->burst_return_angle) + origin_angle;
-	origin_radius = game_difficulty_get_team_value(
-		_game_difficulty_value_burst_error,
-		actor->meta.team_index)*burst_geometry->burst_origin_radius;
-	return_radius = actor_combat_real_random_range_inline(
-		burst_geometry->burst_return_length_lower_bound,
-		burst_geometry->burst_return_length_upper_bound);
-	return_radius *= game_difficulty_get_team_value(
-		_game_difficulty_value_burst_error,
-		actor->meta.team_index);
-	if (actor->external_orders.playfighting)
-	{
-		origin_radius *= 2.0f;
-		return_radius *= 2.0f;
-	}
-
-	if (actor->control.fire_state_timer > 0 &&
-		burst_geometry->burst_maximum_angular_velocity > 0.0f)
-	{
-		real burst_ticks = actor->control.fire_state_timer;
-		real sweep_angle = MIN(
-			burst_ticks*burst_geometry->burst_maximum_angular_velocity*(1.0f/TICKS_PER_SECOND),
-			_pi/4.0f);
-		real maximum_origin_radius = tangent(sweep_angle)*actor->control.current_fire_target_range;
-
-		if (origin_radius > maximum_origin_radius)
 		{
-			if (origin_radius < maximum_origin_radius*1.5f)
+			real_vector3d target_direction;
+			real_vector3d const up = {0.0f, 0.0f, 1.0f};
+
+			actor_combat_vector_from_points3d_inline(
+				&actor->input.position.head_position,
+				&target,
+				&target_direction);
+			cross_product3d(&target_direction, &up, &aim_vector);
+			normalize3d(&aim_vector);
+			if (random_boolean())
 			{
-				actor->control.fire_state_timer =
-					(short)fast_ftol(burst_ticks*(origin_radius/maximum_origin_radius));
-			}
-			else
-			{
-				actor->control.fire_state_timer = (short)fast_ftol(burst_ticks*1.5f);
-				return_radius = maximum_origin_radius*1.5f/origin_radius*return_radius;
-				origin_radius = maximum_origin_radius*1.5f;
+				negate_vector3d(&aim_vector, &aim_vector);
 			}
 		}
+
+		origin_angle = actor_combat_real_random_range_inline(
+			-burst_geometry->burst_origin_angle,
+			burst_geometry->burst_origin_angle);
+		return_angle = actor_combat_real_random_range_inline(
+			-burst_geometry->burst_return_angle,
+			burst_geometry->burst_return_angle) + origin_angle;
+		origin_radius = game_difficulty_get_team_value(
+			_game_difficulty_value_burst_error,
+			actor->meta.team_index)*burst_geometry->burst_origin_radius;
+		return_radius = actor_combat_real_random_range_inline(
+			burst_geometry->burst_return_length_lower_bound,
+			burst_geometry->burst_return_length_upper_bound);
+		return_radius *= game_difficulty_get_team_value(
+			_game_difficulty_value_burst_error,
+			actor->meta.team_index);
+		if (actor->external_orders.playfighting)
+		{
+			origin_radius *= 2.0f;
+			return_radius *= 2.0f;
+		}
+
+		if (actor->control.fire_state_timer > 0 &&
+			burst_geometry->burst_maximum_angular_velocity > 0.0f)
+		{
+			real burst_ticks = actor->control.fire_state_timer;
+			real sweep_angle = MIN(
+				burst_ticks*burst_geometry->burst_maximum_angular_velocity*(1.0f/TICKS_PER_SECOND),
+				_pi/4.0f);
+			real maximum_origin_radius = tangent(sweep_angle)*actor->control.current_fire_target_range;
+
+			if (origin_radius > maximum_origin_radius)
+			{
+				if (origin_radius < maximum_origin_radius*1.5f)
+				{
+					actor->control.fire_state_timer =
+						(short)fast_ftol(burst_ticks*(origin_radius/maximum_origin_radius));
+				}
+				else
+				{
+					actor->control.fire_state_timer = (short)fast_ftol(burst_ticks*1.5f);
+					maximum_origin_radius *= 1.5f;
+					return_radius = maximum_origin_radius/origin_radius*return_radius;
+					origin_radius = maximum_origin_radius;
+				}
+			}
+		}
+
+		{
+			real origin_cosine = cosine(origin_angle);
+			real origin_sine = sine(origin_angle);
+			real return_cosine = cosine(return_angle);
+			real return_sine = sine(return_angle);
+
+			burst_relative_position.i = (origin_cosine*aim_vector.i + 0.0f*origin_sine)*origin_radius;
+			burst_relative_position.j = (origin_cosine*aim_vector.j + 0.0f*origin_sine)*origin_radius;
+			burst_relative_position.k = (origin_cosine*aim_vector.k + origin_sine)*origin_radius;
+			burst_adjustment.i = -((return_cosine*aim_vector.i + return_sine*0.0f)*return_radius);
+			burst_adjustment.j = -((return_cosine*aim_vector.j + return_sine*0.0f)*return_radius);
+			burst_adjustment.k = -((return_cosine*aim_vector.k + return_sine)*return_radius);
+		}
+
+		if (actor->control.fire_state_timer > 0)
+		{
+			real inverse_ticks = 1.0f/actor->control.fire_state_timer;
+
+			burst_adjustment.i *= inverse_ticks;
+			burst_adjustment.j *= inverse_ticks;
+			burst_adjustment.k *= inverse_ticks;
+		}
+
+		actor->control.burst_initial_position = target;
+		actor->control.burst_relative_position = burst_relative_position;
+		actor->control.burst_adjustment = burst_adjustment;
+		add_vectors3d(
+			&actor->control.burst_initial_position,
+			&actor->control.burst_relative_position,
+			&actor->control.burst_target);
 	}
-
-	{
-		real origin_cosine = cosine(origin_angle);
-		real origin_sine = sine(origin_angle);
-		real return_cosine = cosine(return_angle);
-		real return_sine = sine(return_angle);
-
-		burst_relative_position.i = (origin_cosine*aim_vector.i + 0.0f*origin_sine)*origin_radius;
-		burst_relative_position.j = (origin_cosine*aim_vector.j + 0.0f*origin_sine)*origin_radius;
-		burst_relative_position.k = (origin_cosine*aim_vector.k + origin_sine)*origin_radius;
-		burst_adjustment.i = -((return_cosine*aim_vector.i + return_sine*0.0f)*return_radius);
-		burst_adjustment.j = -((return_cosine*aim_vector.j + return_sine*0.0f)*return_radius);
-		burst_adjustment.k = -((return_cosine*aim_vector.k + return_sine)*return_radius);
-	}
-
-	if (actor->control.fire_state_timer > 0)
-	{
-		real inverse_ticks = 1.0f/actor->control.fire_state_timer;
-
-		burst_adjustment.i *= inverse_ticks;
-		burst_adjustment.j *= inverse_ticks;
-		burst_adjustment.k *= inverse_ticks;
-	}
-
-	actor->control.burst_initial_position = target;
-	actor->control.burst_relative_position = burst_relative_position;
-	actor->control.burst_adjustment = burst_adjustment;
-	add_vectors3d(
-		&actor->control.burst_initial_position,
-		&actor->control.burst_relative_position,
-		&actor->control.burst_target);
 
 	if (actor->state.combat_status >= _actor_combat_status_visible)
 	{
