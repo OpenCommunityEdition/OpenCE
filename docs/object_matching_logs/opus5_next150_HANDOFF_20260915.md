@@ -1,202 +1,215 @@
-# next-150K lane — HANDOFF (started 2026-09-15, completed 2026-09-16)
+# next-150K lane — FINAL HANDOFF (2026-09-15 to 2026-09-16)
 
 Worktree `C:\halo-worktrees\opus5-150k-house-clean-20260914`, branch `opus/next-150k-house-clean-20260915`.
-Frozen baseline **`ae10935da609486c2f5484757c897fa73e6fdf03`**; final commit **`927d135ec`** plus this documentation
-commit. **Nothing was pushed. The canonical checkout was never touched** (it remains `6e579b395` on
-`jonas/exact-pilots` with only its own pre-existing dirty files).
+Frozen baseline **`ae10935da609486c2f5484757c897fa73e6fdf03`**; final commit **`26601453e`** plus this documentation
+commit. **Nothing was pushed** (no upstream is configured). **The canonical checkout was never touched**: it is still
+`6e579b395` on `jonas/exact-pilots`, with only its own 8 pre-existing dirty files.
+
+Supersedes the interim version of this file written at `927d135ec` (+6,804).
 
 ## 1. Result
 
 | measure | value |
 | --- | ---: |
-| **New strict meaningful exact bytes (the target metric)** | **6,804** |
-| New strict padded bytes | 6,832 |
-| Newly exact functions | 7 |
+| **New strict meaningful exact bytes (the target metric)** | **9,406** |
+| New strict padded bytes | 9,504 |
+| Newly exact functions | 15 |
 | Newly exact whole objects | 1 (board 308 -> 309 of 619) |
-| Accepted semantic/COFF-shape functions newly accepted but NOT strict | 0 |
-| Fuzzy bodies landed (always zero credit) | 0 in this lane |
-| Park reopens | 5 |
-| Park re-baselines (zero credit) | 3 |
+| Newly accepted but NOT strict | 0 |
+| Fuzzy bodies landed (always zero credit) | 0 |
+| Park reopens / parks removed | 11 (279 -> 268 active) |
+| Zero-credit park re-baselines | 3 |
 | **Regressions** | **0** |
 | Target | 150,000 |
-| Shortfall | 143,196 |
+| Shortfall | 140,594 |
 
-Accepted ledger 7,300 / 1,338,063 -> **7,307 / 1,344,867**. Strict snapshot 7,266 -> **7,273 exact** of 8,245.
-Board 1,387,661 -> **1,394,493** of 1,922,413 padded. Parks 279 -> **274 active / 0 stale / 0 invalid**.
+Accepted ledger 7,300 / 1,338,063 -> **7,315 / 1,347,469**. Strict snapshot 7,266 -> **7,281** exact of 8,245. Board
+1,387,661 -> **1,397,165** of 1,922,413 padded bytes; functions 7,264 -> 7,279.
 
-### Credited functions
+**The target was not met and was not reachable.** It was reported unreachable at startup, before any spend, and every
+subsequent measurement confirmed it (section 7).
 
-| object | function | padded | meaningful | how it closed |
-| --- | --- | ---: | ---: | --- |
-| ai/ai_debug | `_ai_debug_render_encounter` | 2336 | 2330 | January's counting loop is a `while` with the initialiser before it, not a `for` with an empty body. Carries an authenticated names-only rename (see section 4). |
-| ai/actor_perception | `_actor_perception_refresh_test_object` | 1744 | 1740 | wave n2 |
-| structures/structure_detail_objects | `_structure_render_detail_objects` | 1136 | 1133 | natural array initializer — the form the w2 verifier asked for when it rejected the hand-written `a[0]=0; memset` expansion (R6) |
-| text/draw_string | `_bitmap_draw_character` | 944 | 941 | park reopen |
-| interface/hud_sounds | `_hud_play_sound` | 352 | 349 | removing the one-use `index` alias and reading `sound_indices` directly (A5). **Not** the `volatile`/`goto` body the park record shows was deliberately replaced |
-| scenario/wind | `_wind_variance_get` | 224 | 224 | recovered integer sign-clear, under an explicit owner ruling (section 4) |
-| bink/bink_playback | `_bink_free_texture_cache` | 96 | 87 | the park premise was the repo's own `match_dassert` wrapper; Bungie's own `random_math.c` spells those two sites `vassert`, and the tree is 874 `match_vassert` to 14 `match_dassert` |
+### 1.1 Credited functions
 
-## 2. Waves
+| wave | object | function | padded | meaningful | how it closed |
+| --- | --- | --- | ---: | ---: | --- |
+| n2 | ai/ai_debug | `_ai_debug_render_encounter` | 2336 | 2330 | January's counting loop is a `while` with the initialiser before it; plus an atlas-authenticated names-only rename of `_code_00041220` |
+| n2 | ai/actor_perception | `_actor_perception_refresh_test_object` | 1744 | 1740 | wave n2 |
+| n1 | structures/structure_detail_objects | `_structure_render_detail_objects` | 1136 | 1133 | natural array initializer, the form the w2 verifier required (R6) |
+| n1 | text/draw_string | `_bitmap_draw_character` | 944 | 944 | park reopen |
+| Tier A | effects/player_effects | `_player_effect_start` | 736 | 735 | LAW M8 + A4 helper routing: one `set_real_vector3d` call |
+| n5 | bink/bink_playback | `_bink_alloc@4` | 496 | 494 | LAW Z diagnosis, plus the owner-admitted one-site `__asm { int 3 }` |
+| n1 | bink/bink_playback | `_bink_free_texture_cache` | 96 | 95 | the park premise was the repo's own `match_dassert` wrapper |
+| Tier A | ai/actor_moving | `_actor_get_stopping_distances` | 464 | 449 | LAW M8 (one IL local too many) + A9 switch width over adjacent enum values |
+| n1 | interface/hud_sounds | `_hud_play_sound` | 352 | 349 | one-use alias removed (A5); not the `volatile`/`goto` body |
+| ruling | render/render_debug | `_render_debug_player` | 272 | 266 | LAW D: declared extent, written `MAXIMUM_RENDER_DEBUG_PLAYER_TEXT_LENGTH + 1` |
+| n1 | scenario/wind | `_wind_variance_get` | 224 | 213 | January's integer sign-clear, under an owner ruling |
+| Tier B | interface/hud | `_temporary_hud_draw_reticle` | 208 | 196 | signed `% 16`: a signed named count replaces the `size_t` NUMBEROF |
+| ruling | interface/hud_draw | `_real_rgb_color_to_pixel32` | 192 | 181 | owner-admitted helper asm, evidenced by dword fistp and non-top-slot fmul |
+| Tier B | rasterizer/rasterizer_transparent_geometry | `_rasterizer_transparent_geometry_initialize` | 160 | 149 | single exit `success = success && aux()` |
+| Tier B | items/weapons | `_weapon_can_be_fired` | 144 | 132 | single exit; two byte-proven distinct FALSE exits (A26) |
 
-| wave | scope | dispatched | strict result | subagent tokens |
-| --- | --- | ---: | --- | ---: |
-| n1 | fresh structural priority (section 8 list), 13 groups | 16,583 meaningful | 5 park reopens, **+2,734** | 4.5M |
-| n2 | remaining unmined units, 6 groups | 17,032 | 2 exact + 1 authenticated rename, **+4,070** | 2.3M |
-| n3a | parked-structural rows in already-mined units, 12 groups | 32,635 | **0**, 2 zero-credit remeasures | 3.9M |
-| n4 | evidence-led: rows with a named missing/extra call, 12 groups | 22,605 | **0** | 3.2M |
-| hs-pin | 3-angle probe on `_hs_compile_and_evaluate` | 1 function | **0**, but produced LAW Z | 1.0M |
+## 2. Waves, gains and cost
 
-**The n1 pattern that mattered:** all five n1 landings were parks whose recorded premise was wrong. The park text named
-a compiler tie; the real cause was a source defect — a missing statement whose relocation January owns, a hand-expanded
-initializer, a one-use alias, a repo-side assert-API spelling, a recovered integer idiom.
+| wave | scope | strict meaningful | subagent tokens |
+| --- | --- | ---: | ---: |
+| n1 | 13 fresh structural groups | +2,734 (5 fns) | 4,505,694 |
+| n2 | 6 fresh unmined groups | +4,070 (2 fns) | 2,290,464 |
+| n3a | 12 parked-structural groups in mined units | **0** | 3,851,252 |
+| n4 | 12 evidence-led groups (named missing/extra calls) | **0** | 3,246,976 |
+| hs probe | 3-angle study of `_hs_compile_and_evaluate` | 0 (produced LAW Z) | 1,026,709 |
+| n5 | LAW Z targets | +494 (1 fn) | 1,081,729 |
+| hs research | round-2 probe | 0 (Z4-Z6, S, X; hs proven unreachable) | 938,860 |
+| research campaign | 6 corpus studies + adjudication (one interruption, resumed) | 0 directly | 2,920,673 on resume |
+| Tier A | the campaign's measured closures | +1,184 (2 fns) | orchestrator-verified |
+| owner rulings | render_debug extent + RGB helper | +447 (2 fns) | orchestrator-verified |
+| Tier B | final wave, 10 named functions | +477 (3 fns) | 3,257,063 on resume |
 
-**n3a tested whether that generalises to already-mined units. It does not** (12 groups / 32,635 meaningful -> 0 strict),
-and "park-premise refutation in previously mined units" is now in the do-not-repeat inventory at the owner's direction.
+The Tier B wave was paused once, 7 minutes in, at the owner's request. Measured from the first run's transcripts, the
+pause discarded 263,038 output tokens, 3,269,814 uncached and cache-write tokens, 91,754,617 cache-read tokens and 353
+tool calls. The loss scales with elapsed time; pausing at a wave boundary costs nothing.
 
-**n4 tested the strongest remaining signal** — a relocation-by-target census naming a callee one side references and the
-other does not — and returned zero. The censuses were real but did not convert: several resolved to naming artifacts,
-one was an A17 discarded-result call, and the two that produced strict-exact scratch candidates
-(`_motion_sensor_update`, the s3tc trio) are blocked on owner rulings involving an uninitialised read, a documented
-assert-text reversal and a 60-byte stack overrun.
+## 3. Owner rulings obtained in this lane
 
-## 3. The compiler laws this lane produced
-
-Full statement and evidence: **`opus5_next150_compiler_laws_20260916.md`**. In brief:
-
-- **LAW Z — the constant-zero register pin is source-determined.** Over 572 paired objects: January pins and we pin in
-  236 functions (227 strict exact); January pins and we do not in 5 (0 exact); **we pin and January does not in zero**.
-  Z1: EBX is the only byte-addressable callee-saved register, so the pin is always a two-way contest for EBX, and no
-  January function carries three genuine callee-saved webs and a pin. Z2: only zero **stores** seed the web, boundary
-  `stores >= 2 x uses(strongest interfering competitor) + 1`. Z3: what competes is the competitor's span, not ordinal
-  position; the zero variable's own seed position is inert, which refutes the "seeded flag" hypothesis in earlier
-  ledgers. **Triage consequence: "January pins, we do not" is a SOURCE defect (a surplus long-lived value), not a
-  class-D register tie.** The non-protected violators still open are `_king_calculate_hill_state` (448) and
-  `_bink_alloc@4` (494).
-- **Loop-head alignment law.** A loop head is padded to the next 16-byte boundary iff the distance is 1..8 (5 and 8 emit
-  `jmp` plus a nop); 9..15 emits nothing. Detector `(-natural_head) mod 16`.
+- **`_wind_variance_get`:** the 2026-08-31 inactive-union hold was lifted for this function only. January spills the
+  scaled real, clears its sign bit with a 32-bit `and dword ptr [ebp+0xc],0x7fffffff` and reloads it as a float, which no
+  floating spelling produces. Minimum hunk; `_wind_variance_initialize` untouched.
+- **`_bink_alloc@4`:** one unit-local `__asm { int 3 }`, as a helper under house rule 10. A capstone census of all 833
+  January objects finds four in-body int3, exactly one in Halo source; `__debugbreak()` provably relocates the trap
+  from 0xd1 to 0xd4, so only inline assembly reproduces January's placement. That one instruction only.
+- **`_render_debug_player`:** the pre-LAW-D buffer-size rejection is superseded. The extent is written in the house
+  `[X_LENGTH+1]` idiom as a named enumerator in the file's existing constants enum, never a bare `1025`.
+- **`_real_rgb_color_to_pixel32`:** the single evidenced asm block, justified by affirmative hand-written evidence
+  (dword fistp, fmul on non-top x87 slots). This does not authorize `_real_argb_color_to_pixel32`, `_fast_ftol_C` or
+  assembly elsewhere.
+- **Declined** (do not re-propose): the bitmap_utilities cast trade (it trades an exact row), the actor_combat shared
+  working vector (standing hold plus read-before-write UB), and every 150K-lane held item (SSE `__asm` distance macro,
+  both `.bss` splits, the camera anchor split, the 7 whole-object admissions, P7). No `_point_from_line3d`-dependent
+  reconstruction was used anywhere.
 
 ## 4. Header and config changes, with consumers
 
-**No header was modified in this lane.** One config change:
+- **No header was modified.** `git diff --name-only ae10935da HEAD -- '*.h'` is empty.
+- `config/symbols.json`: one in-place line edit (line 654), `_code_00041220` -> `_ai_debug_render_encounter`, landed with
+  the matching C identifiers. Consumer: `source/ai/ai_debug.c` only. Authenticated by the January map atlas
+  (`scratch/atlas/ai_debug.obj.txt` line 44), whose offsets for this object cross-validate against symbols.json; no PDB
+  public exists at 266784, consistent with the static. csplit regenerated every split object; the sweep was clean.
+- `config/parked.json`: in-place edits only. 11 parks removed by the unpark tool as they became exact, and 3 already
+  fuzzy parks re-baselined with dated evidence (`_structure_get_planar_fog`, `_sound_refresh_looping`,
+  `_update_channel_for_looping_sound`).
 
-- `config/symbols.json` line 654, in-place line edit, names only: `_code_00041220` -> `_ai_debug_render_encounter`,
-  with the three matching C identifiers in `source/ai/ai_debug.c` (house rule 7 — no `code_<address>` names).
-  **Consumers: that one translation unit.** Authentication: the January map atlas (`scratch/atlas/ai_debug.obj.txt`
-  line 44), whose offsets for this object cross-validate against symbols.json (`_ai_debug_dispose_from_old_map`
-  226736, `_ai_debug_drawstack` 235808, `_ai_debug_render` 269120); no PDB public exists at 266784, consistent with the
-  static; corroborated by caller topology, the `encounter_*` callee set and the firing-position assert literal. csplit
-  regenerated every split object and the whole-board sweep after the change was gained 7 / regressions 0. The rename
-  carries **no additional byte credit**.
-- `config/parked.json`: in-place edits only — 5 parks removed by the unpark tool as they became exact, 3 re-measured
-  with dated evidence.
+## 5. Compiler laws produced (the lane's most durable output)
 
-## 5. Owner rulings obtained during the lane
+Ledgers: `opus5_next150_compiler_laws_20260916.md` (round 1, bannered as corrected),
+`opus5_next150_compiler_laws_round2_20260916.md` (round 2, bannered where the campaign overturned it), and
+`opus5_next150_research_campaign_20260916.md` (the adjudicated campaign). All detectors were validated for zero false
+positives against 7,283 strict-exact controls.
 
-- **`_wind_variance_get`: the 2026-08-31 "inactive union member" hold was lifted for this function only.** January
-  spills the scaled real, clears its sign bit with a 32-bit `and dword ptr [ebp+0xc],0x7fffffff`, reloads it as a float
-  and takes the low byte — not producible by any floating spelling, and the previous `fabs()` body canonicalises to x87
-  `fabs` at 208 bytes. Landed as the minimum function hunk (the two-member union form matching the three in-tree
-  precedents), with `_wind_variance_initialize` untouched at its parked base. The ruling explicitly supersedes the
-  2026-08-31 line, and that supersession is recorded in the object ledger.
-- Standing rulings re-confirmed and honoured: the collision_bsp SSE `__asm` macro, both `.bss` splits, the
-  editor_flying_camera anchor split, the 7 whole-object admissions, P7, the bitmap cast trade and the actor_combat
-  shared working vector all remain declined; no `_point_from_line3d`-dependent reconstruction was used anywhere.
+- **LAW Z:** the whole-function constant-zero register pin is source-determined. EBX is the only byte-addressable
+  callee-saved register, so it is a two-way contest; what competes is a web's span, not its ordinal position.
+  "January pins, we do not" is a source defect, not a register tie. Its round-1 store-count boundary was refuted and
+  retracted. **Z4:** VC7 coalesces pointer copies before ranking webs, so respelling a phi is structurally inert.
+- **LAW I:** the inliner prices a helper by how it is spelled, against the call block's frequency.
+  `REAL_MATH_EXTERNAL_<X>` makes a helper extern for the whole TU. **The 82 KB "inline boundary" family was
+  misattributed**: 93.6% of it makes the same inline decision at every site.
+- **LAW M8:** the offset-0 term of an inlined helper loads first the operand with the smaller IL-local ordinal mod 8.
+  **Source operand order is inert** for a bare product, so the R3 swap never worked. This produced both Tier A closures.
+- **LAW F3 / D / U:** frame layout by tier (byte cells, scalars, aggregates). This **refutes the long-standing
+  "refs/size" frame rule**. A dead whole object costs no frame; a partly homed aggregate costs its declared extent.
+- **Three separate count keys** replace the old "declaration-count oracle": M8 (in-function IL locals mod 8), H3
+  (pre-function declarations mod 32) and F1 (inline-body IL structure consuming per-TU numbering).
+- **CJ4** (cross-jump survivor binding), **LAW C** (small struct copies), **LAW E** (emission order), the loop-head
+  alignment law, and round 2's LAW S (slot assignment, polarity since corrected) and LAW X (cross-jump tail merge).
 
-## 6. Verification (final, at `927d135ec`)
+## 6. Verification (final, at `26601453e`)
 
-- `ninja`: pass; the parked-function check validates 274 ties.
-- `stable_verdicts` snapshot `scratch/opus5-next150-final.json` diffed against `scratch/opus5-next150-before.json`:
-  **gained 7 / 6,832 padded / regressions 0**.
-- `tools/campaign/board.py`: 309/619 objects, 1,394,493/1,922,413 bytes, 7,271/8,245 functions.
-- `tools.parked_functions`: 274 active / 0 stale / 0 invalid.
-- `tools.audit_object_admission`: 0 contradicted, 7 rejected, 8 candidates (was 7 — `structure_detail_objects` became
-  a whole-object candidate; **not admitted**, zero credit).
-- `pytest --basetemp scratch/pytest-next150-final`: **1,151 passed, 5 skipped, 26 subtests**.
+- `ninja`: pass; the parked-function check validates 268 ties.
+- `stable_verdicts` snapshot `scratch/opus5-next150-FINAL.json` diffed against `scratch/opus5-next150-before.json`:
+  **gained 15 / 9,504 padded / regressions 0**.
+- `tools/campaign/board.py`: 309/619 objects, 1,397,165/1,922,413 bytes, 7,279/8,245 functions.
+- `tools.parked_functions`: **268 active / 0 stale / 0 invalid**.
+- `tools.audit_object_admission`: **0 contradicted**, 7 rejected, 8 candidates. The candidate count rose from 7 because
+  `structure_detail_objects` became whole-object eligible; it is **not admitted** and carries zero credit.
+- `pytest --basetemp scratch/pytest-next150-FINAL`: **1,151 passed, 5 skipped, 26 subtests**, identical to the baseline.
 - `git diff --check ae10935da HEAD`: pass. `git status --short`: no tracked dirt.
-- `fake_match_scan.py` over all 9 changed `.c` files: **0 review leads**.
-- `_point_from_line3d` guard: passes on every changed unit except `source/ai/ai_debug`, where it is a **pre-existing
-  baseline failure** — the `ae10935da` copy of ai_debug.c fails identically (same symbol index 99, same 48-byte
-  section) — and the owner census for that unit shows exactly `_code_00041220` removed / `_ai_debug_render_encounter`
-  added and nothing else.
-- Owner census on every other changed unit: no new candidate-only code/data/BSS/COMMON owner.
+- Per-file audit of all 16 changed `.c` files (`scratch/final_audit/audit.py`):
+  - `_point_from_line3d` guard: passes on 15. ai_debug is a **pre-existing** baseline failure; its `ae10935da` copy
+    fails identically.
+  - fake_match_scan: 14 files are 0/0 against the baseline. The two increases are **exactly the two owner-admitted asm
+    blocks** (bink_playback 1/0; hud_draw 3/2, where 2 are the pre-existing naked `get_return_eip`).
+  - Owner census against the baseline: `$L` entries are compiler-internal labels being renumbered, not owners. The
+    real changes are all intended: the authenticated rename; the `end bink_alloc` literal correctly disappearing
+    (January does not own it); the RGB helper's own assert literals; and `_set_real_vector3d` / `_set_real_point3d`,
+    which are in the admitted select-any class (laws_w2 A4, laws_w3 A30).
 
-## 7. Measured ceiling (why 150,000 was not reachable)
+## 7. Measured ceiling
 
-Reported at startup from the whole-board portfolio (`scratch/opus5-next150/portfolio.json`, 457 rows built from the
-COFF objects) and unchanged by the lane's work:
+At startup, before any wave, the whole-board portfolio (`scratch/opus5-next150/portfolio.json`) held 457 non-exact
+source functions / 450,776 meaningful bytes, of which **135,795 were eligible**. Closing every eligible function at
+100% would still miss 150,000, and 62,283 of that is sha-only.
 
-| pool | fns | meaningful |
-| --- | ---: | ---: |
-| All non-exact functions in source units at `ae10935da` | 457 | 450,776 |
-| Blocked (protected 35, Codex-reserved 9, do-not-repeat 153, ruling/policy 84, owner-declined 14, do-not-spend 11) | 280 | 312,460 |
-| **Eligible** | 173 | **135,795** |
-| of which `[sha]`-only ties with no compiler-side lever | 86 | 62,283 |
-| of which csplit reloc-identity (bytes already identical) | 16 | 6,283 |
-| Non-exact in `libs/` (all libcmt, all have source) | 8 | 3,251 |
+The research campaign then adjudicated what remains:
 
-Closing **every eligible function at 100%** — which has never happened in any wave — yields 135,795, below the target.
-Section 2's bar (~450K high-confidence, or ~750K generic residual) is missed by roughly a factor of six. After the
-owner's five-category filter was applied (2026-09-15) the *active* portfolio was 28 functions / 23,544 meaningful, of
-which wave n4 consumed 12 groups / 22,605 and landed nothing; **939 meaningful in 4 small groups is all that remains
-untried**, and the 142 no-leverage rows (107,968 meaningful) must not be dispatched.
+| pool | bytes | disposition |
+| --- | ---: | --- |
+| Proven unreachable by admissible source | 4,581 | retired: CJ4, H3, LAW U reads, the carrier-only parameter home, P7-bound, the ESP anchor |
+| csplit alias rows | 5,856 | retired from strict credit (bytes already identical) |
+| Retire-pending (measured exhausted) | 1,884 | excluded |
+| Strict-exact candidates blocked on UB or steering | ~6,063 | owner-declined class (indeterminate reads, a stack overrun, a steering subscript, `_point_from_line3d`) |
+| Tier B not closed | 7,121 | all 7 stopped correctly at allocation or x87 ties |
+| Tier C hypotheses | ~52,000 | not schedulable without new evidence |
 
-Prebuilt vendor objects (xapilib, binkxbox, d3d8) are excluded deliberately: section 9 forbids counting opaque prebuilt
-objects as progress.
+**No sufficiently large admissible portfolio remains.** Per the owner's directive, no further research or residual wave
+is to be launched from this lane.
 
-## 8. Levers measured EXHAUSTED (do not re-run without a new law)
+## 8. Unresolved dependencies
 
-From this lane and the 250K checkpoint ledger, all measured rather than assumed:
+1. **Tier B, not closed:** `_path_state_traverse` (structural gap closed in scratch; an x87 term-order tie and an
+   edge-cursor IV bias remain), `_flag_update` and `_bitmap_2d_sharpen` (register allocation; lens refuted at HEAD),
+   `_light_volume_render` (x87 residency tie), `_actor_stimulus_prop_acknowledged` and `_stack_memory_pool_allocate`
+   (register allocation after the structural facts matched), `_particle_system_new_particle_jet` (x87 operand order).
+   The per-object `*_next150_tierB_*` ledgers record each census.
+2. **UB-blocked strict-exact candidates**, which need owner rulings the owner has so far declined:
+   `_get_particle_world_position` (two indeterminate array reads), `_motion_sensor_update` (an uninitialised read), and
+   the s3tc trio (an indeterminate member plus a 60-byte stack overrun). The s3tc assert text `u>=0 && u<=4` can be
+   restored independently on `docs/assertions.md` grounds, but that alone gains nothing.
+3. **`_hs_compile_and_evaluate`:** proven unreachable by legitimate source. Its parameter-home phi with cross-jumping
+   sprintf arms needs four web references, which need six in-region zero stores, and only five exist.
+4. **`_king_calculate_hill_state`:** retire-pending. VC7 sinks both arm stores into the zero pin, and every measured
+   non-sinking route is prohibited.
 
-- **Static-linkage census (A1):** 53 January-static globals probed with a scratch csplit plus `static` in C —
-  **0 function rows moved** in 17 units; `king_globals` static loses 2 exact rows.
-- **C4013/C4133 census** over all 468 units: only 7 sites sit inside non-exact functions, all already known to w3.
-- **objdiff under-credit:** 114 strict-exact rows score below 100%, and **all 114 are already in the accepted ledger**.
-- **namegap:** 0 proposals.
-- **Historical/donor mining** over 142 units and every blob: 13 candidates, **all 13 fail admission** — they are the
-  bodies earlier lanes rejected on policy, plus one outright fake (thread_win32's blob declares another TU's *string*
-  symbol as a `struct mutex_reference` to use its link address as a loop bound).
-- **Park-premise refutation in previously mined units** (n3a): 32,635 meaningful -> 0 strict.
-- **New-law detectors run this lane, both clean negatives:** no other function on the board carries January's integer
-  sign-clear fingerprint; the remaining `match_dassert` sites are all in functions that are asm-rejected,
-  owner-declined or held.
+## 9. Integration order
 
-## 9. Unresolved dependencies (each needs an owner ruling, none is a worker task)
+The history is linear. Apply `git log --reverse ae10935da..HEAD`:
 
-1. **motion_sensor `_motion_sensor_update`** — strict-exact candidate exists (`scratch/workers/n4_motion_sensor/m4.c`,
-   1168/43, relocation multiset identical) and the park premise is refuted (January calls `_game_engine_running`
-   twice). Needs a ruling on preserving an uninitialised `camera_positions[]` read **and** the `_vector_from_points3d`
-   census ruling.
-2. **s3tc `_RGBToColor` + `_DecodeBlockRGB` + `_DecodeBlockRGB__single_pixel`** (1,040 padded) — strict exact in
-   scratch. Needs (a) restoring January's byte-proven assert text `u>=0 && u<=4` over the parked.json 0..3 directive
-   (the verifier recommends granting this on `docs/assertions.md:93` alone, and it is independent of the rest);
-   (b) an indeterminate-member read ruling; (c) admission of a 60-byte stack overrun. `_Quantize` is a coupled
-   remeasure only if (b) is granted. Separately and unconditionally: the parked.json evidence for `_DecodeBlockRGB` is
-   factually wrong — the census proves a call-count difference, not "instruction selection and scheduling".
-3. **LAW Z violators not yet attacked under the law:** `_king_calculate_hill_state` (448; the surplus is a global
-   read-modify-write `mov ebx,[0x194]; inc ebx` that January keeps in a scratch register) and `_bink_alloc@4` (494).
-4. **`_hs_compile_and_evaluate`** — needs a ninth zero-valued statement January provably contains (the eight known ones
-   are already written), or a source form removing one use from the strongest interfering competitor.
+1. `3083f800b` — four park reopens and the planar-fog remeasure
+2. `034141b12` — wind, under the owner ruling
+3. `6ebd05a96` — actor_perception and ai_debug, **including the symbols.json rename**; the config line and the three C
+   identifiers must land together
+4. `927d135ec` — sound_manager zero-credit re-baselines
+5. `3faefe7f6` — interim handoff, manifest and LAW Z ledger (documentation)
+6. `9470345c0` — bink allocator, under the int 3 ruling
+7. `6e26c8ed9` — round-2 laws and round-1 corrections (documentation)
+8. `417fc10e4` — Tier A closures
+9. `1068df6d6` — research campaign ledger (documentation)
+10. `6d6529d98` — the two owner-ruled closures
+11. `26601453e` — Tier B closures
+12. this documentation commit
 
-## 10. Integration order
-
-The history is linear; apply `git log --reverse ae10935da..HEAD`:
-
-1. `3083f800b` — four park reopens (structure_detail_objects, draw_string, hud_sounds, bink_playback) + the
-   `_structure_get_planar_fog` remeasure. Touches `config/parked.json`.
-2. `034141b12` — wind `_wind_variance_get` under the owner ruling.
-3. `6ebd05a96` — actor_perception + ai_debug, **including the `config/symbols.json` rename**; the config line and the
-   three C identifiers must land together.
-4. `927d135ec` — sound_manager zero-credit re-baselines.
-5. this documentation commit.
-
-`config/parked.json` is edited in place in most commits, so cherry-picking out of order will conflict on it and fail
+`config/parked.json` is edited in place in most code commits, so cherry-picking out of order conflicts on it and fails
 the ninja park check. Integrate as one ordered range.
 
-## 11. Overlap
+Changed source files: `ai/actor_moving.c`, `ai/actor_perception.c`, `ai/ai_debug.c`, `bink/bink_playback.c`,
+`effects/player_effects.c`, `interface/hud.c`, `interface/hud_draw.c`, `interface/hud_sounds.c`, `items/weapons.c`,
+`rasterizer/rasterizer_transparent_geometry.c`, `render/render_debug.c`, `scenario/wind.c`, `sound/sound_manager.c`,
+`structures/structure_detail_objects.c`, `structures/structures.c`, `text/draw_string.c`; plus `config/parked.json`,
+`config/symbols.json` and documentation under `docs/object_matching_logs/`.
+
+## 10. Overlap
 
 Codex's verified packet `faae809ab` owns `transport_endpoint_set_winsock.c`, `transport_endpoint_winsock.c` and
-`network_connection.c`; those, plus `matrix_math.c`, `units.c` and `vehicles.c`, are untouched
-(`git diff --name-only ae10935da HEAD` contains none of the six, verified). The Codex action-family reservation
-(`action_alert/converse/flee/guard/obey/search/uncover.c`, `actions.c/h`, `ai_runtime.h`, `units.h`) was honoured: none
-was dispatched or modified. The two protected transport functions appear in this handoff only as **read-only evidence**
-for LAW Z.
+`network_connection.c`. Those three, plus `matrix_math.c`, `units.c` and `vehicles.c`, are untouched, and none of the
+six corresponding park entries was edited or re-baselined. The Codex action-family reservation (`action_alert`,
+`action_converse`, `action_flee`, `action_guard`, `action_obey`, `action_search`, `action_uncover`, `actions.c/h`,
+`ai_runtime.h`, `units.h`) was honoured: none was dispatched or modified. `git diff --name-only ae10935da HEAD` over
+all 17 files is empty. The two protected transport functions appear in the law ledgers only as read-only evidence.
