@@ -3,7 +3,7 @@ TRANSPORT_ENDPOINT_SET_WINSOCK.C
 
 symbols in this file:
 00070420 0010:
-	_code_00070420 (0000)
+	_net_startup_debug (0000)
 00070430 0040:
 	_transport_endpoint_set_get_next_index (0000)
 00070470 0080:
@@ -172,6 +172,12 @@ extern XNKEY global_key;
 extern byte global_nonce[TRANSPORT_NONCE_LENGTH];
 
 /* ---------- private code */
+
+void net_startup_debug(
+	void)
+{
+	return;
+}
 
 static long transport_endpoint_set_get_next_index(
 	struct transport_endpoint_set *set)

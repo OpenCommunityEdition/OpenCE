@@ -87,6 +87,8 @@ char const *transport_address_to_string(
 	struct transport_address const *addr);
 char const *transport_error_to_string(
 	short error);
+void net_startup_debug(
+	void);
 boolean transport_is_nonce(
 	void const *nonce,
 	long nonce_length);
