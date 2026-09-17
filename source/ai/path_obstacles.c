@@ -689,9 +689,11 @@ static void circle_tangents(
 	real_vector2d *left_direction,
 	real *tangent_distance)
 {
-	real sine = MIN(radius / distance, 1.0f);
-	real cosine = square_root(1.0f - sine * sine);
+	real sine = radius / distance;
+	real cosine;
 
+	sine = MIN(sine, 1.0f);
+	cosine = square_root(1.0f - sine * sine);
 	rotate_vector2d(direction, -sine, cosine, right_direction);
 	rotate_vector2d(direction, sine, cosine, left_direction);
 	*tangent_distance = cosine * distance;

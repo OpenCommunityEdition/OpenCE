@@ -559,25 +559,6 @@
       }
     },
     {
-      "unit": "source/memory/circular_queue",
-      "function": "_circular_queue_dequeue_data",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the current house rule after 37 recorded legal-C experiments, both compatible local VC7 builds, January and October 2001 machine-topology comparison, donor scanning, and the later HCEA queue family were exhausted. The retained ordinary C preserves all 12 relocation identities, seven strict-exact sibling functions, and every owned rdata byte. January and October materialize FALSE in BL, then reuse EBX for read_offset and keep separate success/failure tails; the current compiler instead assigns the queue to EBX, read_offset to EDI, and folds failure directly into AL, producing 240 padded bytes versus 256. A natural single-iteration loop reaches the BL/EBX lifetime but also triggers a second validator inline, growing to 336 bytes and 17 relocations. Preventing that clone destroys the desired lifetime, while taking the validator address changes its private ABI and regresses exact siblings. Barriers, register hints, forced inlining/noinline, redundant predicates, union overlays, switches, and synthetic control flow are rejected rather than retained. The exact January symbol atlas recovers the private helper name circular_queue_verify. Reopen only for authoritative source/locals, a strict same-topology donor, or a general natural compiler control that prevents the nested clone without changing the helper ABI.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 12,
-          "normalized_sha256": "2981341a22238a314c0f885d555149dc279257b6109242e674f38ccfb0ccd1f9"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 12,
-          "normalized_sha256": "40adf3be1fa79c0b9aaf6b169e37da2e59aa4e306efef68a9573b7aa7ec8dede"
-        },
-        "objdiff_percent": 93.947365
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
       "function": "_rasterizer_vertex_buffer_new",
       "class": "instruction-scheduling",
@@ -2222,25 +2203,6 @@
     },
     {
       "unit": "source/game/game",
-      "function": "_game_load",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the complete January-authenticated loading path retained as ordinary typed C. The function asserts the inactive and unloaded preconditions at January lines 0x192 and 0x193, lets the already-exact game_options_verify owner inline at line 0x194, enables the random-seed log, copies the complete typed 0x10C game_options value into the runtime globals, loads the named scenario, conditionally records map_loaded, and returns that flag. The Stian January-PC lift independently corroborates this exact source shape; HCEA's later game_precache_new_map call is excluded because January has no such relocation. Target and candidate share the 208-byte padded envelope, all 19 relocation identities, and 96.5 percent objdiff similarity. The residual is confined to the tail after scenario_load: January cleans the argument stack, tests AL, then loads game_globals into EAX, while VC7 schedules the independent load before cleanup into ECX. Bounded declaration-order, cached-pointer, nested-scope, and direct-global variants either reproduced this fixed point or worsened it to 224 bytes with duplicated global loads. The fail-closed classifier returns UNKNOWN. No false prototype, raw offset, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January local/source records or a natural same-compiler TU context that explains the final pointer-load schedule.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 19,
-          "normalized_sha256": "a80cab9a8ed85380cdfb09ec10d06eb1c215c83c1a2a80105f45bda76e9f82f5"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 19,
-          "normalized_sha256": "23af1db0ec128baef3d56cc61289d9c22ca22bd6b378c149b3b67c3aca9babf2"
-        },
-        "objdiff_percent": 96.5
-      }
-    },
-    {
-      "unit": "source/game/game",
       "function": "_game_set_game_variant_from_name",
       "class": "unclassified",
       "evidence": "Fuzzy-parked under the current house rule with the high-confidence historical two-local source retained: copy the result of game_engine_get_variant_by_name into a semantic game_variant local, then pass that local to the already-exact game_set_game_variant owner. January independently proves two 0x68 stack locals, the returned-structure copy, and the inlined setter including its unreachable null branch; the historical exact-repository commit 8aed00b49 and the independent HCEA behavior corroborate this source while HCEA's later network-server refresh is excluded. Current VC7 folds the intermediate local and known-nonnull inlined branch into one 48-byte global copy, versus January's 96-byte owner, for 54.0 percent objdiff similarity. Both January source-order placement at the end of the owner and historical placement beside the setter were tested, along with bounded current-header and historical prototype-context probes, without changing that optimizer fixed point. The fail-closed classifier returns UNKNOWN. Reconstructing the missing dead branch explicitly or using an emission anchor would be fake source, so neither is retained. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation pun, dummy dependency, forced inline, or nonsensical branch is used. Reopen only for authoritative January source/local records or a natural same-compiler TU context that preserves the two-local inlined-setter schedule.",
@@ -3152,25 +3114,6 @@
           "normalized_sha256": "e286347823095bc8eb26bcf1768e6607851c2c8e2b1bc646d8636257e6444245"
         },
         "objdiff_percent": 77.47895
-      }
-    },
-    {
-      "unit": "source/ai/path_obstacles",
-      "function": "_circle_tangents",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 128,
-          "relocation_count": 3,
-          "normalized_sha256": "13e114ec1e11801cdc5da866057bcc4de4136dc423b6ebe8340456a24147f986"
-        },
-        "base": {
-          "size": 128,
-          "relocation_count": 3,
-          "normalized_sha256": "a54010efa25a9daafaee40aae4871c8b3078128a03e6614ac33deeee1293069c"
-        },
-        "objdiff_percent": 87.34694
       }
     },
     {

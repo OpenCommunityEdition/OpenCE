@@ -165,14 +165,6 @@ boolean circular_queue_dequeue_data(
 	long data_size,
 	boolean advance)
 {
-	/* NonMatching: target/candidate are 0x100/0xF0 padded bytes with all
-	   12 relocation identities preserved. January keeps FALSE in BL, later
-	   coalesces EBX with read_offset, and returns BL on failure; this TU folds
-	   FALSE into AL and rotates queue/read_offset through EBX/EDI. The bounded
-	   legal-C search and its reopen criteria are recorded in
-	   docs/object_matching_logs/circular_queue_obj.md. */
-	long read_offset;
-	long contiguous_size;
 	boolean result = FALSE;
 
 	circular_queue_verify(queue);
@@ -180,8 +172,9 @@ boolean circular_queue_dequeue_data(
 
 	if (data_size <= circular_queue_size(queue))
 	{
-		read_offset = queue->read_offset;
-		contiguous_size = queue->buffer_size - read_offset;
+		long contiguous_size = queue->buffer_size - queue->read_offset;
+		long read_offset = queue->read_offset;
+
 		if (data_size >= contiguous_size)
 		{
 			csmemcpy(data, queue->buffer + read_offset, contiguous_size);

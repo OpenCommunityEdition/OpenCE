@@ -360,7 +360,7 @@ void numeric_countdown_timer_update(
 
 /* ---------- globals */
 
-struct game_runtime_globals_prefix *game_globals = NULL;
+static struct game_runtime_globals_prefix *game_globals = NULL;
 extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
 extern short player_spawn_count;
@@ -670,9 +670,6 @@ void set_random_seed(
 boolean game_load(
 	struct game_options *options)
 {
-	struct game_runtime_globals_prefix *globals;
-	boolean loaded;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game.c",
 		0x192,
@@ -688,12 +685,12 @@ boolean game_load(
 
 	random_seed_debug_log(TRUE);
 	csmemcpy(&game_globals->options, options, sizeof(*options));
-	loaded = scenario_load(options->map_name);
-	globals = game_globals;
-	if (loaded)
-		globals->map_loaded = TRUE;
+	if (scenario_load(options->map_name))
+	{
+		game_globals->map_loaded = TRUE;
+	}
 
-	return globals->map_loaded;
+	return game_globals->map_loaded;
 }
 
 void game_initialize_for_new_map(
