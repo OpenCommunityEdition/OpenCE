@@ -59,7 +59,7 @@ symbols in this file:
 000D16A0 0030:
 	_code_000d16a0 (0000)
 000D16D0 0010:
-	_code_000d16d0 (0000)
+	_progress_bar_create_noise_texture (0000)
 000D16E0 0010:
 	_code_000d16e0 (0000)
 000D16F0 0010:
@@ -306,6 +306,9 @@ void draw_fullscreen_blur(
 
 static void progress_bar_load_loading_texture(
 	IDirect3DTexture8 **texture);
+
+static void progress_bar_create_noise_texture(
+	void);
 
 static void progress_bar_build_glow_texture(
 	void);
@@ -961,6 +964,15 @@ static void progress_bar_draw(
 	return;
 }
 
+/* January retains this private step with an empty body (name from the 2001-09-25
+ * Xbox linker maps, where it sits between the loading and mask textures).
+ */
+static void progress_bar_create_noise_texture(
+	void)
+{
+	return;
+}
+
 static void progress_bar_build_glow_texture(
 	void)
 {
@@ -1005,6 +1017,7 @@ static void progress_bar_setup(
 	D3DXMatrixOrthoLH(&progress_bar_globals.projection, 2.f, 2.f, -1.f, 2.f);
 	D3DXMatrixPerspectiveLH(&progress_bar_globals.screen_transform, 0.64f, 0.48f, 1.f, 1000.f);
 	progress_bar_load_loading_texture(&progress_bar_mode.texture0);
+	progress_bar_create_noise_texture();
 	progress_bar_build_glow_texture();
 	IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);
 	IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);

@@ -447,6 +447,7 @@ static HANDLE game_state_open_persistent_storage(
 	byte zeroes[16*1024];
 	HANDLE file;
 	unsigned long bytes_written;
+	boolean success = FALSE;
 
 	if (directory || game_state_get_persistent_storage_path(path))
 	{
@@ -464,6 +465,7 @@ static HANDLE game_state_open_persistent_storage(
 			NULL);
 		if (file != INVALID_HANDLE_VALUE)
 		{
+			success = TRUE;
 			if (GetFileSize(file, NULL) != GAME_STATE_FILE_SIZE)
 			{
 				memset(zeroes, 0, sizeof(zeroes));
@@ -481,23 +483,22 @@ static HANDLE game_state_open_persistent_storage(
 							"couldn't resize persistent storage \"%s\"", path));
 					delete_persistent_storage();
 					CloseHandle(file);
-
-					return INVALID_HANDLE_VALUE;
+					success = FALSE;
 				}
 			}
-
-			return file;
 		}
-
-		match_vassert(
-			"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
-			498,
-			FALSE,
-			csprintf(temporary, "couldn't open or create persistent storage \"%s\"",
-				path));
+		else
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\saved games\\game_state_xbox.c",
+				498,
+				FALSE,
+				csprintf(temporary, "couldn't open or create persistent storage \"%s\"",
+					path));
+		}
 	}
 
-	return INVALID_HANDLE_VALUE;
+	return success ? file : INVALID_HANDLE_VALUE;
 }
 
 boolean game_state_read_header_from_persistent_storage(

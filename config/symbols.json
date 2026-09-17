@@ -3623,7 +3623,7 @@
 { "file_offset": 857712, "flags": 32, "name": "_IDirect3DDevice8_BlockUntilVerticalBlank@4" },
 { "file_offset": 857728, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData2f@16" },
 { "file_offset": 857760, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData4f@24" },
-{ "file_offset": 857808, "flags": 32, "name": "_code_000d16d0" },
+{ "file_offset": 857808, "flags": 32, "name": "_progress_bar_create_noise_texture", "static": true },
 { "file_offset": 857824, "flags": 32, "name": "_IDirect3DDevice8_Begin@8" },
 { "file_offset": 857840, "flags": 32, "name": "_IDirect3DDevice8_End@4" },
 { "file_offset": 857856, "flags": 32, "name": "_gen_cloud_coord" },

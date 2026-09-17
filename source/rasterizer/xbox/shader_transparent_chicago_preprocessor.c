@@ -101,7 +101,8 @@ struct shader_transparent_chicago_combiner_table
 /* ---------- prototypes */
 
 boolean shader_map_verify(
-	void);
+	struct shader_transparent_chicago_map *map,
+	short map_index);
 
 boolean shader_transparent_chicago_create(
 	struct shader *shader,
@@ -138,7 +139,8 @@ const struct shader_transparent_chicago_combiner_table shader_transparent_chicag
 /* ---------- public code */
 
 boolean shader_map_verify(
-	void)
+	struct shader_transparent_chicago_map *map,
+	short map_index)
 {
 	return TRUE;
 }
@@ -192,6 +194,11 @@ boolean shader_transparent_chicago_create(
 
 			pixel_shader->alpha_outputs[map_index] = 0x00000c00;
 			pixel_shader->rgb_outputs[map_index] = 0x00000c00;
+
+			if (result)
+			{
+				result = shader_map_verify(map, map_index);
+			}
 		}
 	}
 	else

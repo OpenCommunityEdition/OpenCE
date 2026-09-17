@@ -231,103 +231,86 @@ void *lra_allocate(
 	long *address)
 {
 	void *result = NULL;
-	struct lra_block *last_block;
-	struct lra_block *next_block;
-	struct lra_block *first_deleted_block;
-	long number_of_passes;
-	long write_offset;
 
 	verify_lra_cache(cache);
 
 	size += sizeof(struct lra_block);
-	if (size&3)
+	size = (size&3) ? (size|3)+1 : size;
+
+	if (size>=0 && size<=cache->size)
 	{
-		size = (size|3)+1;
-	}
+		struct lra_block *last_block = cache->last_block;
+		struct lra_block *next_block = last_block ? last_block->next : NULL;
+		struct lra_block *first_deleted_block = NULL;
+		short number_of_passes = 0;
 
-	if (size<0 || size>cache->size)
-	{
-		return NULL;
-	}
-
-	last_block = cache->last_block;
-	next_block = last_block ? last_block->next : NULL;
-	first_deleted_block = NULL;
-	number_of_passes = 0;
-
-	do
-	{
-		if (last_block)
+		do
 		{
-			write_offset = lra_block_offset(cache, last_block) + last_block->size;
-		}
-		else
-		{
-			write_offset = 0;
-		}
+			long write_offset = last_block ? lra_block_offset(cache, last_block)+last_block->size : 0;
 
-		if (next_block)
-		{
-			verify_lra_cache_block(next_block, cache);
-
-			if (write_offset+size>lra_block_offset(cache, next_block))
+			if (next_block)
 			{
-				if (TEST_FLAG(next_block->signature, _lra_block_locked_bit))
+				verify_lra_cache_block(next_block, cache);
+
+				if (write_offset+size>lra_block_offset(cache, next_block))
 				{
-					last_block = next_block;
-					next_block = next_block->next;
-					first_deleted_block = NULL;
-				}
-				else
-				{
-					if (!first_deleted_block)
+					if (TEST_FLAG(next_block->signature, _lra_block_locked_bit))
 					{
-						first_deleted_block = next_block;
+						last_block = next_block;
+						next_block = next_block->next;
+						first_deleted_block = NULL;
 					}
-					next_block = next_block->next;
+					else
+					{
+						if (!first_deleted_block)
+						{
+							first_deleted_block = next_block;
+						}
+						next_block = next_block->next;
+					}
+
+					continue;
+				}
+			}
+
+			if (write_offset+size>cache->size)
+			{
+				next_block = (struct lra_block *)cache->base_address;
+				last_block = NULL;
+				first_deleted_block = NULL;
+
+				if (number_of_passes++)
+				{
+					break;
+				}
+			}
+			else
+			{
+				struct lra_block *block;
+
+				for (block = first_deleted_block; block && block!=next_block; block = block->next)
+				{
+					lra_block_delete(block, cache);
 				}
 
-				continue;
+				block = (struct lra_block *)((char *)cache->base_address + write_offset);
+				block->size = size;
+				block->signature = LRA_BLOCK_SIGNATURE;
+				block->address = address;
+				block->next = next_block;
+
+				result = (char *)block + sizeof(struct lra_block);
+				cache->update_proc(address, (long)result);
+
+				if (last_block)
+				{
+					last_block->next = block;
+				}
+				cache->last_block = block;
 			}
 		}
-
-		if (write_offset+size<=cache->size)
-		{
-			struct lra_block *block;
-
-			for (block = first_deleted_block; block && block!=next_block; block = block->next)
-			{
-				lra_block_delete(block, cache);
-			}
-
-			block = (struct lra_block *)((char *)cache->base_address + write_offset);
-			block->size = size;
-			block->signature = LRA_BLOCK_SIGNATURE;
-			block->address = address;
-			block->next = next_block;
-
-			result = (char *)block + sizeof(struct lra_block);
-			cache->update_proc(address, (long)result);
-
-			if (last_block)
-			{
-				last_block->next = block;
-			}
-			cache->last_block = block;
-		}
-		else
-		{
-			next_block = (struct lra_block *)cache->base_address;
-			last_block = NULL;
-			first_deleted_block = NULL;
-
-			if ((short)(number_of_passes++))
-			{
-				break;
-			}
-		}
+		while (!result);
 	}
-	while (!result);
 
 	return result;
 }

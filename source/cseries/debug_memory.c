@@ -530,12 +530,10 @@ void *debug_realloc(
 	long line)
 {
 	void *result = NULL;
-	unsigned long old_size = 0;
+	struct debug_memory_header *header = NULL;
 	unsigned long allocation_size =
 		size + sizeof(struct debug_memory_header) + sizeof(unsigned long);
-	struct debug_memory_header *header = NULL;
-	const char *allocation_file = file;
-	long allocation_line = line;
+	unsigned long old_size = 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\cseries\\debug_memory.c",
@@ -549,25 +547,27 @@ void *debug_realloc(
 
 	if (pointer != NULL)
 	{
-		header = (struct debug_memory_header *)pointer - 1;
-		debug_check_pointer_header(header, file, line);
-		debug_check_pointer_overrun(pointer, file, line);
-		debug_memory_remove_pointer(header, file, line);
+		struct debug_memory_header *old_header = (struct debug_memory_header *)pointer - 1;
 
-		allocation_line = header->line;
+		debug_check_pointer_header(old_header, file, line);
+		debug_check_pointer_overrun(pointer, file, line);
+		debug_memory_remove_pointer(old_header, file, line);
+		old_header->signature = debug_memory_disposed_signature;
+
+		header = old_header;
+		line = header->line;
+		file = header->file;
 		old_size = header->size;
-		allocation_file = header->file;
-		header->signature = debug_memory_disposed_signature;
 	}
 
 	header = system_realloc(
 		header,
-		pointer != NULL && size == 0 ? 0 : allocation_size);
+		size == 0 && pointer != NULL ? 0 : allocation_size);
 	if (header != NULL)
 	{
 		header->signature = debug_memory_allocated_signature;
-		header->line = allocation_line;
-		header->file = allocation_file;
+		header->line = line;
+		header->file = file;
 		header->allocation_id = debug_memory_globals.next_allocation_id++;
 		header->size = size;
 		*(unsigned long *)((byte *)(header + 1) + size) =

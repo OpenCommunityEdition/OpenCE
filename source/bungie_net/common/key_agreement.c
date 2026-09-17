@@ -245,33 +245,32 @@ boolean complete_key_exchange(
 	struct message_initiate_key_agreement initiate_packet;
 	struct message_finalize_key_agreement finalize_packet;
 	struct public_key key;
-	union key_agreement_packet_value encoded_packet_size;
-	union key_agreement_packet_value packet_type;
-	union key_agreement_packet_value packet_version;
+	short encoded_packet_size;
+	short packet_type;
+	short packet_version = KEY_AGREEMENT_PACKET_VERSION;
 	word *message;
 	short message_size;
 	byte message_type;
 
-	packet_version.value = KEY_AGREEMENT_PACKET_VERSION;
 	match_assert(KEY_AGREEMENT_FILE, 0x105, msgptr && prime && secret && private_key);
 
 	message_size = GET_MESSAGE_SIZE(*msgptr);
-	encoded_packet_size.value = (word)message_size - sizeof(word);
+	encoded_packet_size = message_size - sizeof(word);
 	message_type = GET_MESSAGE_TYPE(*msgptr);
 	if (message_type == _message_type_packet)
 	{
-		packet_type.value = key_agreement_get_packet_type(msgptr);
+		packet_type = key_agreement_get_packet_type(msgptr);
 
-		switch ((enum key_agreement_packet_type)packet_type.encoded)
+		switch (packet_type)
 		{
 		case _key_agreement_packet_type_initiate:
 			{
 				if (!key_agreement_decode_packet(
 					&initiate_packet,
 					msgptr + 1,
-					&encoded_packet_size.encoded,
-					&packet_type.encoded,
-					&packet_version.encoded,
+					&encoded_packet_size,
+					&packet_type,
+					&packet_version,
 					0))
 				{
 					return FALSE;
@@ -301,9 +300,9 @@ boolean complete_key_exchange(
 				if (!key_agreement_decode_packet(
 					&finalize_packet,
 					msgptr + 1,
-					&encoded_packet_size.encoded,
-					&packet_type.encoded,
-					&packet_version.encoded,
+					&encoded_packet_size,
+					&packet_type,
+					&packet_version,
 					0))
 				{
 					return FALSE;
