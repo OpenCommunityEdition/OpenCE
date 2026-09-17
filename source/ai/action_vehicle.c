@@ -219,11 +219,7 @@ real distance3d(
 	real_point3d const *a,
 	real_point3d const *b)
 {
-	real dx = b->x - a->x;
-	real dy = b->y - a->y;
-	real dz = b->z - a->z;
-
-	return square_root(dx*dx + dy*dy + dz*dz);
+	return square_root(distance_squared3d(a, b));
 }
 
 real_vector2d *negate_vector2d(

@@ -1024,16 +1024,17 @@ void hud_render_nav_points(
 	short local_player_index)
 {
 	if (local_player_index!=NONE &&
-		local_player_get_player_index(local_player_index)!=NONE &&
-		player_get(local_player_get_player_index(local_player_index))->unit_index!=NONE &&
+		(local_player_get_player_index(local_player_index)==NONE ?
+			NONE :
+			player_get(local_player_get_player_index(local_player_index))->unit_index)!=NONE &&
 		hud_globals->waypoint.arrow_bitmap.index!=NONE)
 	{
 		struct hud_nav_point_player_datum *datum = get_nav_point_datum(local_player_index);
-		struct hud_nav_point_datum *nav_point = datum->nav_points;
-		long nav_point_count = MAXIMUM_NUMBER_OF_NAV_POINTS;
+		short nav_point_index;
 
-		do
+		for (nav_point_index = 0; nav_point_index<MAXIMUM_NUMBER_OF_NAV_POINTS; nav_point_index++)
 		{
+			struct hud_nav_point_datum *nav_point = &datum->nav_points[nav_point_index];
 			real_point3d position;
 
 			if (nav_point->nav_index==NONE ||
@@ -1086,9 +1087,7 @@ void hud_render_nav_points(
 				&position,
 				nav_point->nav_index,
 				nav_point->screen_type);
-
 		}
-		while (nav_point++, --nav_point_count);
 	}
 
 	game_engine_render_nav_points(local_player_index);

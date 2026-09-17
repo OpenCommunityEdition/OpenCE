@@ -1320,25 +1320,6 @@
       }
     },
     {
-      "unit": "source/interface/hud_nav_points",
-      "function": "_hud_render_nav_points",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the current house rule with the complete typed four-waypoint traversal retained. The routine validates the local player and arrow bitmap, resolves flag/object/game-engine destinations with typed tag and object access, applies the vertical offset, and calls the reconstructed renderer with the named screen type. All 17 relocation identities remain in the same semantic order. January biases its ESI loop cursor to reference_index at datum+8 and addresses the other fields negatively, producing 400 padded bytes; the direct typed pointer loop anchors ESI at the datum base and produces 416. Natural indexed-for, short/long index, and count-derived array forms do recover the +8 cursor but spill the count and perturb the frame/register allocation, giving a structurally worse 416-byte family; the direct pointer form remains the best lawful source. No raw byte cursor, containing-record alias, volatile access, compiler barrier, forced inlining, pragma, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler typed traversal that explains the biased cursor without spilling the count.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 17,
-          "normalized_sha256": "f2bb689a08030b4b54e28e13307de141eab53b71b0acc334bc2bec2f1dd78391"
-        },
-        "base": {
-          "size": 416,
-          "relocation_count": 17,
-          "normalized_sha256": "0df4703281637b185fa8bd6f44392a688be3a3e4e2b11e6bc6314ae756823274"
-        },
-        "objdiff_percent": 95.26667
-      }
-    },
-    {
       "unit": "source/cache/xbox_sound_cache",
       "function": "_render_inverse_transform_screen_point",
       "class": "register-allocation",
