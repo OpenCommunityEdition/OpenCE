@@ -896,43 +896,34 @@ boolean dsound_initialize(
 						}
 					}
 
-					if (success && create_inanity_channel())
-					{
-						success= TRUE;
-						dsound_globals.initialized= TRUE;
-					}
-					else
-					{
-						success= FALSE;
-
-						dsound_dispose();
-					}
+					success= success && create_inanity_channel();
 				}
 				else
 				{
 					dsound_error(result, "could not adjust rolloff factor");
-
-					dsound_dispose();
 				}
 			}
 			else
 			{
 				dsound_error(result, "could not adjust distance factor");
-
-				dsound_dispose();
 			}
 		}
 		else
 		{
 			dsound_error(result, "could not get caps for sound card?");
-
-			dsound_dispose();
 		}
 	}
 	else
 	{
 		dsound_error(result, "could not create direct sound object");
+	}
 
+	if (success)
+	{
+		dsound_globals.initialized= TRUE;
+	}
+	else
+	{
 		dsound_dispose();
 	}
 

@@ -3520,17 +3520,6 @@
     },
     {
       "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_build_texture_pages_by_sequence",
-      "class": "unclassified",
-      "evidence": "Complete typed texture-page packing reconstruction retained from the 2026-09-12 private packet. January control flow and relocations plus the independent Pastudan/HCEA maps support the behavior, but the current natural candidate is 672 versus 608 padded bytes and remains non-exact. The fail-closed class makes no unsupported codegen diagnosis; this body receives zero exact-function and zero exact-byte credit. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): A8 callee-ABI cascade coupled to the _extract_sprites reopen. The body is strictly closer: base 672/22 a0a34a20 goes to target size 608 with 22 relocations, and alndiff blocks drop from 49 to 21, leaving one floated new-page arm and alignment filler. Control: without it _extract_sprites is not exact. The function stays parked.",
-      "measurements": {
-        "target": { "size": 608, "relocation_count": 22, "normalized_sha256": "70092abc226e6d9400baed2f856500896bf821f08e7ee9c8b9a7691013a4ce44" },
-        "base": { "size": 608, "relocation_count": 22, "normalized_sha256": "da8246c856fc6d86814908319b6600b6ff89bd4564dcff9222904c77bb51f359" },
-        "objdiff_percent": 91.909546
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
       "function": "_extract_sequence",
       "class": "unclassified",
       "evidence": "Complete typed bitmap-run and border-trimming reconstruction retained from the 2026-09-12 private packet. The source deliberately omits an apparently behaviorally redundant January branch rather than reproducing it only for bytes; the current candidate therefore remains an honest residual and receives zero credit. The fail-closed class asserts no single compiler mechanism. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",

@@ -1260,8 +1260,6 @@ static void extract_build_texture_pages_by_sequence(
 			{
 				texture_page = texture_pages[page_index];
 				new_page = FALSE;
-				if (texture_page)
-					texture_page_textures_begin(texture_page);
 			}
 			else if (page_count < 32)
 			{
@@ -1272,6 +1270,9 @@ static void extract_build_texture_pages_by_sequence(
 			{
 				break;
 			}
+
+			if (texture_page)
+				texture_page_textures_begin(texture_page);
 
 			page_complete = TRUE;
 			for (bitmap_index = first_bitmap_index;
