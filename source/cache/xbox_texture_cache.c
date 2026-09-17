@@ -695,7 +695,6 @@ static void render_inverse_transform_screen_point(
 	real_point3d *world_position,
 	real_vector3d *world_vector)
 {
-	real const *origin;
 	real screen_x;
 	real screen_y;
 	real_vector3d delta0;
@@ -704,10 +703,10 @@ static void render_inverse_transform_screen_point(
 
 	screen_x = screen_position->x * (1.0f / 640.0f);
 	screen_y = 1.0f - screen_position->y * (1.0f / 480.0f);
-	origin = global_zero_vector3d->n;
-	world_position->x = render.frustum.world_vertices[4].n[0] + origin[0];
-	world_position->y = render.frustum.world_vertices[4].n[1] + origin[1];
-	world_position->z = render.frustum.world_vertices[4].n[2] + origin[2];
+	add_vectors3d(
+		(real_vector3d const *)&render.frustum.world_vertices[4],
+		global_zero_vector3d,
+		(real_vector3d *)world_position);
 
 	delta0.i = render.frustum.world_vertices[1].n[0] - render.frustum.world_vertices[0].n[0];
 	delta0.j = render.frustum.world_vertices[1].n[1] - render.frustum.world_vertices[0].n[1];

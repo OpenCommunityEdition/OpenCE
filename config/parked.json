@@ -1321,28 +1321,9 @@
     },
     {
       "unit": "source/cache/xbox_sound_cache",
-      "function": "_render_inverse_transform_screen_point",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the HCEA-authenticated private name, typed point/vector signature, and parameter order. Target and candidate share the 256-byte padded envelope and all 22 relocation identities in semantic order. Their normalized instruction streams have the same length and behavior; the residual is the equivalent ECX/EDX assignment of the two output pointers. Ordinary declaration, type, expression, and parameter-order probes converge on this compiler allocation. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January locals/source, an authenticated compiler/QFE difference, or a natural same-compiler register-allocation donor.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 22,
-          "normalized_sha256": "c39690660070bc740fc89bc34ed735ce9c30406d8f26cfe5f853c9d2e5261bee"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 22,
-          "normalized_sha256": "d434a17b8d90be4fa31d5651b27f45be31c5a6c6e5d0c21b366fc2d174e23acc"
-        },
-        "objdiff_percent": 99.347824
-      }
-    },
-    {
-      "unit": "source/cache/xbox_sound_cache",
       "function": "_sound_cache_debug_render",
       "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the current house rule with the complete debug page-usage renderer retained in ordinary typed C. Target and candidate share the 368-byte padded envelope and all 14 relocation identities in semantic order. Moving the four debug colors under the debug predicate naturally recovered January's flag/color prefix; the remaining packet is the nested-loop local/register schedule and the equivalent private render helper ECX/EDX allocation. Declaration and scope permutations either reproduce this fixed point or worsen the broader stream. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, an authenticated compiler/QFE difference, or a natural same-compiler donor that explains the private-helper ABI and nested-loop lifetimes together.",
+      "evidence": "Fuzzy-parked under the current house rule with the complete debug page-usage renderer retained in ordinary typed C. Target and candidate share the 368-byte padded envelope and all 14 relocation identities in semantic order. Moving the four debug colors under the debug predicate naturally recovered January's flag/color prefix; the remaining packet is the nested-loop local/register schedule and the equivalent private render helper ECX/EDX allocation. Declaration and scope permutations either reproduce this fixed point or worsen the broader stream. No volatile/register forcing, barrier, pragma, forced inline, assembly, fake dependency, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, an authenticated compiler/QFE difference, or a natural same-compiler donor that explains the private-helper ABI and nested-loop lifetimes together. Re-measured 2026-09-16: the static helper render_inverse_transform_screen_point became strict exact (add_vectors3d origin), which restores January's private register convention at this caller's call site; the caller body is unchanged and still non-exact (368 bytes / 14 relocations).",
       "measurements": {
         "target": {
           "size": 368,
@@ -1352,9 +1333,9 @@
         "base": {
           "size": 368,
           "relocation_count": 14,
-          "normalized_sha256": "10efee1b75e2372c741dc9d5bd93615fec17157ad0d52456f032c5d758df8dc3"
+          "normalized_sha256": "8ae719b831e3e4705e309f751bbe7567e5ba96cb62d0dbc23278205dc7ccb5d3"
         },
-        "objdiff_percent": 86.17647
+        "objdiff_percent": 86.260506
       }
     },
     {
@@ -3376,20 +3357,9 @@
     },
     {
       "unit": "source/cache/xbox_texture_cache",
-      "function": "_render_inverse_transform_screen_point",
-      "class": "register-allocation",
-      "evidence": "Complete HCEA-authenticated typed inverse screen transform retained with the Xbox texture-cache debug caller. Target and candidate share the 256-byte extent and all 22 relocations; the residual is the equivalent ECX/EDX allocation of the two output pointers after ordinary declaration and parameter-order probes converged. No volatile/register forcing or fake dependency is retained, and this body receives zero credit. The analogous sound-cache boundary is documented in docs/object_matching_logs/xbox_sound_cache_obj_complete_fuzzy_closeout_20260901.md.",
-      "measurements": {
-        "target": { "size": 256, "relocation_count": 22, "normalized_sha256": "c39690660070bc740fc89bc34ed735ce9c30406d8f26cfe5f853c9d2e5261bee" },
-        "base": { "size": 256, "relocation_count": 22, "normalized_sha256": "d434a17b8d90be4fa31d5651b27f45be31c5a6c6e5d0c21b366fc2d174e23acc" },
-        "objdiff_percent": 99.347824
-      }
-    },
-    {
-      "unit": "source/cache/xbox_texture_cache",
       "function": "_texture_cache_debug_render",
       "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md.",
+      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md. Re-measured 2026-09-16: the static helper render_inverse_transform_screen_point became strict exact (add_vectors3d origin), restoring January's edx=screen / ecx=vector call-site order; the caller body is unchanged and still non-exact (784 bytes / 46 relocations; remaining gap is the tab-stop spelling plus the _bss_004d1198 label name).",
       "measurements": {
         "target": {
           "size": 784,
@@ -3399,9 +3369,9 @@
         "base": {
           "size": 784,
           "relocation_count": 46,
-          "normalized_sha256": "5a3d5f2d21a3a7416760c0efdbd4489c670ae641042e6c564dd9b34ee4a6432f"
+          "normalized_sha256": "a4dbade33d66bc82f944650a54b6fb451250008246844aab22e4aa68c0cfe35b"
         },
-        "objdiff_percent": 91.88461
+        "objdiff_percent": 91.92735
       }
     },
     {

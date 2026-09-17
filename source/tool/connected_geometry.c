@@ -357,26 +357,17 @@ long connected_geometry_add_triangle(
 	real_point3d const *point2,
 	boolean report_duplicates)
 {
-	long triangle_index;
+	long triangle_index = dynamic_array_add_element(&geometry->triangles);
 
-	triangle_index = dynamic_array_add_element(&geometry->triangles);
 	if (triangle_index != NONE)
 	{
-		long point_indices[NUMBER_OF_EDGES_PER_TRIANGLE];
-		struct connected_geometry_triangle *triangle;
-		struct connected_geometry_triangle *existing_triangle;
-		long *edge_designator;
-		long *point_index;
-		long next_point_index;
-		long remaining_edge_count;
-		long existing_triangle_index;
-		short triangle_edge_index;
-		short existing_triangle_edge_index;
-
-		triangle = dynamic_array_get_element(
+		struct connected_geometry_triangle *triangle = dynamic_array_get_element(
 			&geometry->triangles,
 			triangle_index,
 			sizeof(*triangle));
+		long point_indices[NUMBER_OF_EDGES_PER_TRIANGLE];
+		short edge_index;
+
 		point_indices[0] = connected_geometry_find_or_add_vertex(geometry, point0);
 		point_indices[1] = connected_geometry_find_or_add_vertex(geometry, point1);
 		point_indices[2] = connected_geometry_find_or_add_vertex(geometry, point2);
@@ -387,79 +378,73 @@ long connected_geometry_add_triangle(
 			triangle_index = NONE;
 		}
 
-		next_point_index = 1;
-		remaining_edge_count = NUMBER_OF_EDGES_PER_TRIANGLE;
-		edge_designator = triangle->edge_designators;
-		point_index = point_indices;
-		do
+		for (edge_index = 0; edge_index < NUMBER_OF_EDGES_PER_TRIANGLE; edge_index++)
 		{
-			*edge_designator = connected_geometry_find_or_add_edge(
+			triangle->edge_designators[edge_index] = connected_geometry_find_or_add_edge(
 				geometry,
 				triangle_index,
-				*point_index,
-				point_indices[next_point_index % NUMBER_OF_EDGES_PER_TRIANGLE]);
-			if (*edge_designator == NONE)
+				point_indices[edge_index],
+				point_indices[(edge_index + 1) % NUMBER_OF_EDGES_PER_TRIANGLE]);
+			if (triangle->edge_designators[edge_index] == NONE)
 			{
 				triangle_index = NONE;
 			}
-			next_point_index++;
-			point_index++;
-			edge_designator++;
-			remaining_edge_count--;
 		}
-		while (remaining_edge_count != 0);
 
 		triangle->coplanar_group_index = NONE;
 		memset(triangle->unused, 0, sizeof(triangle->unused));
 
 		if (report_duplicates)
 		{
-			existing_triangle_index = 0;
-			if (geometry->triangles.count - 1 > 0)
+			long existing_triangle_index;
+
+			for (existing_triangle_index = 0;
+				existing_triangle_index < geometry->triangles.count - 1;
+				existing_triangle_index++)
 			{
-				do
+				struct connected_geometry_triangle *existing_triangle = dynamic_array_get_element(
+					&geometry->triangles,
+					existing_triangle_index,
+					sizeof(*existing_triangle));
+				short triangle_edge_index;
+				short existing_triangle_edge_index;
+
+				for (triangle_edge_index = 0;
+					triangle_edge_index < NUMBER_OF_EDGES_PER_TRIANGLE;
+					triangle_edge_index++)
 				{
-					existing_triangle = dynamic_array_get_element(
-						&geometry->triangles,
-						existing_triangle_index,
-						sizeof(*existing_triangle));
-					triangle_edge_index = 0;
-					for (;;)
+					for (existing_triangle_edge_index = 0;
+						existing_triangle_edge_index < NUMBER_OF_EDGES_PER_TRIANGLE;
+						existing_triangle_edge_index++)
 					{
-						existing_triangle_edge_index = 0;
-						do
-						{
-							if ((existing_triangle->edge_designators[existing_triangle_edge_index] & LONG_MAX) ==
-								(triangle->edge_designators[triangle_edge_index] & LONG_MAX))
-							{
-								break;
-							}
-							existing_triangle_edge_index++;
-						}
-						while (existing_triangle_edge_index < NUMBER_OF_EDGES_PER_TRIANGLE);
-						if (existing_triangle_edge_index == NUMBER_OF_EDGES_PER_TRIANGLE)
+						if ((existing_triangle->edge_designators[existing_triangle_edge_index] & LONG_MAX) ==
+							(triangle->edge_designators[triangle_edge_index] & LONG_MAX))
 						{
 							break;
 						}
-						triangle_edge_index++;
-						if (triangle_edge_index >= NUMBER_OF_EDGES_PER_TRIANGLE)
-						{
-							error_geometry_triangle(
-								point0,
-								point1,
-								point2,
-								global_real_argb_orange);
-							if (!warned_about_duplicate_triangles)
-							{
-								printf("### WARNING: found duplicate triangle building connected geometry. YOU SHOULD FIX THIS. (see orange in error geometry)\r\n");
-								warned_about_duplicate_triangles = TRUE;
-							}
-							return NONE;
-						}
 					}
-					existing_triangle_index++;
+					if (existing_triangle_edge_index == NUMBER_OF_EDGES_PER_TRIANGLE)
+					{
+						break;
+					}
 				}
-				while (existing_triangle_index < geometry->triangles.count - 1);
+
+				if (existing_triangle_edge_index != NUMBER_OF_EDGES_PER_TRIANGLE)
+				{
+					error_geometry_triangle(
+						point0,
+						point1,
+						point2,
+						global_real_argb_orange);
+					if (!warned_about_duplicate_triangles)
+					{
+						printf("### WARNING: found duplicate triangle building connected geometry. YOU SHOULD FIX THIS. (see orange in error geometry)\r\n");
+						warned_about_duplicate_triangles = TRUE;
+					}
+
+					triangle_index = NONE;
+					break;
+				}
 			}
 		}
 	}
