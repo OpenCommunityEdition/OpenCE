@@ -676,11 +676,14 @@ void encounter_compute_activation_cluster_bit_vector(
 
 			while (unit_index != NONE)
 			{
+				long ultimate_parent_index;
+				struct object_datum *parent_object;
 				short cluster_index;
 
 				unit = unit_get(unit_index);
-				cluster_index = object_get(
-					object_get_ultimate_parent(unit_index))->object.location.cluster_index;
+				ultimate_parent_index = object_get_ultimate_parent(unit_index);
+				parent_object = object_get(ultimate_parent_index);
+				cluster_index = parent_object->object.location.cluster_index;
 
 				if (cluster_index != NONE)
 				{
@@ -698,11 +701,14 @@ void encounter_compute_activation_cluster_bit_vector(
 		}
 		else
 		{
+			long ultimate_parent_index;
+			struct object_datum *parent_object;
 			short cluster_index;
 
 			unit = unit_get(actor->meta.unit_index);
-			cluster_index = object_get(
-				object_get_ultimate_parent(actor->meta.unit_index))->object.location.cluster_index;
+			ultimate_parent_index = object_get_ultimate_parent(actor->meta.unit_index);
+			parent_object = object_get(ultimate_parent_index);
+			cluster_index = parent_object->object.location.cluster_index;
 			if (cluster_index != NONE)
 			{
 				match_assert(
@@ -773,15 +779,14 @@ void encounter_compute_activation_cluster_bit_vector(
 				actor->meta.squad_index);
 
 			if (squad->disable_dormant)
-				actor->meta.dormant_desire = FALSE;
-			else
-				actor->meta.dormant_desire = dormant_desire;
+				dormant_desire = FALSE;
+			actor->meta.dormant_desire = dormant_desire;
 		}
 
 		actor_index = actor->meta.next_actor_index;
 	}
 
-	if (firing_position_group_mask && encounter_definition->firing_positions.count > 0)
+	if (firing_position_group_mask)
 	{
 		short firing_position_index;
 
@@ -806,7 +811,7 @@ void encounter_compute_activation_cluster_bit_vector(
 		}
 	}
 
-	if (active_squad_mask && encounter_definition->squads.count > 0)
+	if (active_squad_mask)
 	{
 		short squad_index;
 
@@ -925,6 +930,7 @@ void encounter_update_status(
 	boolean post_combat_behavior_pending = FALSE;
 	boolean had_visible_enemy = FALSE;
 	boolean been_in_combat = FALSE;
+	boolean stay_active;
 	short i;
 
 	encounter->enemy_alive = FALSE;
@@ -957,7 +963,6 @@ void encounter_update_status(
 		struct squad_datum *squad = encounter_get_squad(encounter, actor->meta.squad_index);
 		short body_count;
 		real strength;
-		boolean fighting;
 
 		if (actor->meta.unit_index != NONE)
 		{
@@ -966,8 +971,8 @@ void encounter_update_status(
 		}
 		else
 		{
+			strength = (real)actor->meta.swarm_unit_count/actor->meta.swarm_original_unit_count;
 			body_count = actor->meta.swarm_unit_count;
-			strength = (real)body_count/actor->meta.swarm_original_unit_count;
 		}
 
 		if (actor->meta.platoon_index != NONE)
@@ -975,18 +980,17 @@ void encounter_update_status(
 			struct platoon_datum *platoon = encounter_get_platoon(encounter, actor->meta.platoon_index);
 
 			platoon->current_count += body_count;
-			platoon->current_strength_fraction += strength;
 			platoon->current_swarm_count += actor->meta.swarm*body_count;
+			platoon->current_strength_fraction += strength;
 		}
 		squad->current_count += body_count;
-		squad->current_strength_fraction += strength;
 		squad->current_swarm_count += actor->meta.swarm*body_count;
+		squad->current_strength_fraction += strength;
 		encounter->current_count += body_count;
 		encounter->current_swarm_count += actor->meta.swarm*body_count;
 		encounter->current_in_combat_count += actor_in_combat(iterator.index)*body_count;
-		fighting = actor_is_fighting(iterator.index);
+		encounter->current_fighting_count += actor_is_fighting(iterator.index)*body_count;
 		encounter->current_strength_fraction += strength;
-		encounter->current_fighting_count += fighting*body_count;
 
 		if (actor->target.target_prop_index != NONE)
 		{
@@ -1024,10 +1028,11 @@ void encounter_update_status(
 	if (real_enemy_targeted)
 		encounter->enemy_traitor = FALSE;
 
-	if (encounter->enemy_visible ||
+	stay_active = encounter->enemy_visible ||
 		(encounter->enemy_visible_timer != NONE && encounter->enemy_visible_timer < ENCOUNTER_ENEMY_RECENT_TICKS) ||
 		((encounter->enemy_alive || (encounter->enemy_alive_timer != NONE && encounter->enemy_alive_timer < ENCOUNTER_ENEMY_RECENT_TICKS)) &&
-			encounter->enemy_visible_timer != NONE && encounter->enemy_visible_timer < ENCOUNTER_ENEMY_MEMORY_TICKS))
+			encounter->enemy_visible_timer != NONE && encounter->enemy_visible_timer < ENCOUNTER_ENEMY_MEMORY_TICKS);
+	if (stay_active)
 	{
 		encounter->stand_down = FALSE;
 		encounter->post_combat = FALSE;
@@ -3214,37 +3219,31 @@ static void encounter_update_respawn(
 			squad_index,
 			struct squad_definition);
 
-		if (squad->respawn_actors_left > 0)
+		while (squad->respawn_actors_left > 0 && squad->current_count < squad_definition->respawn_min_actors)
 		{
-			while (squad->current_count < squad_definition->respawn_min_actors)
+			if (ai_debug.print_respawn)
+			{
+				console_printf(
+					FALSE,
+					"%s/%s: current %d < min %d -> spawn (%d left)",
+					encounter_definition->name,
+					squad_definition->name,
+					squad->current_count,
+					squad_definition->respawn_min_actors,
+					squad->respawn_actors_left);
+			}
+
+			if (!encounter_spawn_actor(encounter_index, squad_index))
 			{
 				if (ai_debug.print_respawn)
 				{
 					console_printf(
 						FALSE,
-						"%s/%s: current %d < min %d -> spawn (%d left)",
+						"%s/%s: unable to spawn, out of starting points",
 						encounter_definition->name,
-						squad_definition->name,
-						squad->current_count,
-						squad_definition->respawn_min_actors,
-						squad->respawn_actors_left);
+						squad_definition->name);
 				}
-
-				if (!encounter_spawn_actor(encounter_index, squad_index))
-				{
-					if (ai_debug.print_respawn)
-					{
-						console_printf(
-							FALSE,
-							"%s/%s: unable to spawn, out of starting points",
-							encounter_definition->name,
-							squad_definition->name);
-					}
-					break;
-				}
-
-				if (squad->respawn_actors_left <= 0)
-					break;
+				break;
 			}
 		}
 
@@ -3293,27 +3292,31 @@ static void encounter_update_respawn(
 				{
 					if (ai_debug.print_respawn)
 					{
+						struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+							&encounter_definition->squads,
+							squad_index,
+							struct squad_definition);
+
 						console_printf(
 							FALSE,
 							"%s/%s: randomly selected to spawn",
 							encounter_definition->name,
-							TAG_BLOCK_GET_ELEMENT(
-								&encounter_definition->squads,
-								squad_index,
-								struct squad_definition)->name);
+							squad_definition->name);
 					}
 					return;
 				}
 				else if (ai_debug.print_respawn)
 				{
+					struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+						&encounter_definition->squads,
+						squad_index,
+						struct squad_definition);
+
 					console_printf(
 						FALSE,
 						"%s/%s: unable to spawn, out of starting points",
 						encounter_definition->name,
-						TAG_BLOCK_GET_ELEMENT(
-							&encounter_definition->squads,
-							squad_index,
-							struct squad_definition)->name);
+						squad_definition->name);
 				}
 			}
 		}
@@ -3821,6 +3824,7 @@ static void encounters_test_activation(
 	struct encounter_datum *encounter;
 	struct actor_datum *actor;
 	long actor_index;
+	boolean active;
 
 	for (actor_index = ai_globals->first_encounterless_actor_index; actor_index != NONE; actor_index = actor->meta.next_actor_index)
 	{
@@ -3838,7 +3842,9 @@ static void encounters_test_activation(
 				while (unit_index != NONE)
 				{
 					struct unit_datum *unit = unit_get(unit_index);
-					short cluster_index = object_get(object_get_ultimate_parent(unit_index))->object.location.cluster_index;
+					long ultimate_parent_index = object_get_ultimate_parent(unit_index);
+					struct object_datum *parent_object = object_get(ultimate_parent_index);
+					short cluster_index = parent_object->object.location.cluster_index;
 
 					if (cluster_index != NONE && BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index))
 					{
@@ -3856,7 +3862,9 @@ static void encounters_test_activation(
 
 				for (i = 0; i < swarm->unit_count; ++i)
 				{
-					short cluster_index = object_get(object_get_ultimate_parent(swarm->unit_indices[i]))->object.location.cluster_index;
+					long ultimate_parent_index = object_get_ultimate_parent(swarm->unit_indices[i]);
+					struct object_datum *parent_object = object_get(ultimate_parent_index);
+					short cluster_index = parent_object->object.location.cluster_index;
 
 					if (cluster_index != NONE && BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index))
 					{
@@ -3868,7 +3876,9 @@ static void encounters_test_activation(
 		}
 		else
 		{
-			short cluster_index = object_get(object_get_ultimate_parent(actor->meta.unit_index))->object.location.cluster_index;
+			long ultimate_parent_index = object_get_ultimate_parent(actor->meta.unit_index);
+			struct object_datum *parent_object = object_get(ultimate_parent_index);
+			short cluster_index = parent_object->object.location.cluster_index;
 
 			if (cluster_index == NONE)
 				actor->meta.dormant_desire = TRUE;
@@ -3876,7 +3886,11 @@ static void encounters_test_activation(
 				actor->meta.dormant_desire = !BIT_VECTOR_TEST_FLAG(combined_pvs, cluster_index);
 		}
 
-		if (!actor->meta.dormant_desire || actor->meta.force_active || game_in_editor() || ai_debug.force_all_active)
+		active = actor->meta.force_active;
+		active |= game_in_editor();
+		active |= !actor->meta.dormant_desire;
+		active |= ai_debug.force_all_active;
+		if (active)
 		{
 			encounterless_activate(actor_index);
 		}
@@ -3896,23 +3910,28 @@ static void encounters_test_activation(
 	data_iterator_new(&iterator, encounter_data);
 	while ((encounter = (struct encounter_datum *)data_iterator_next(&iterator)) != NULL)
 	{
-		long encounter_index = iterator.datum_index;
 		struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
-		boolean force_active = encounter->force_active || game_in_editor() || encounter->respawn_delay_ticks > 0 || ai_debug.force_all_active;
-		boolean active = FALSE;
+			&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), struct encounter_definition);
+		active = encounter->force_active;
+		active |= game_in_editor();
+		active |= encounter->respawn_delay_ticks > 0;
+		active |= ai_debug.force_all_active;
 
 		if (encounter_definition->runtime_structure_bsp_reference_index == NONE ||
 			encounter_definition->runtime_structure_bsp_reference_index == global_structure_bsp_index)
 		{
-			encounter_compute_activation_cluster_bit_vector(encounter_index, TRUE, MAXIMUM_CLUSTERS_PER_STRUCTURE, combined_pvs, activation_cluster_bit_vector);
-			active = bit_vector_and(structure_bsp->clusters.count, combined_pvs, activation_cluster_bit_vector, NULL) || force_active;
+			encounter_compute_activation_cluster_bit_vector(iterator.datum_index, TRUE, MAXIMUM_CLUSTERS_PER_STRUCTURE, combined_pvs, activation_cluster_bit_vector);
+			active |= bit_vector_and(structure_bsp->clusters.count, combined_pvs, activation_cluster_bit_vector, NULL);
+		}
+		else
+		{
+			active = FALSE;
 		}
 
 		if (active)
 		{
 			encounter->remain_active_timer = ENCOUNTER_REMAIN_ACTIVE_TIME;
-			encounter_activate(encounter_index);
+			encounter_activate(iterator.datum_index);
 		}
 		else if (encounter->active && encounter->remain_active_timer > TICKS_PER_SECOND)
 		{
@@ -3925,15 +3944,17 @@ static void encounters_test_activation(
 
 			for (i = 0; i < encounter->link_encounter_count; ++i)
 			{
-				if (encounter_get(encounter->link_encounter_indices[i])->remain_active_timer > 0)
+				struct encounter_datum *link_encounter = encounter_get(encounter->link_encounter_indices[i]);
+
+				if (link_encounter->remain_active_timer > 0)
 					link_active = TRUE;
 			}
 
 			encounter->remain_active_timer = 0;
 			if (link_active)
-				encounter_activate(encounter_index);
+				encounter_activate(iterator.datum_index);
 			else
-				encounter_deactivate(encounter_index);
+				encounter_deactivate(iterator.datum_index);
 		}
 	}
 

@@ -1614,25 +1614,6 @@
     },
     {
       "unit": "source/networking/network_connection",
-      "function": "_network_connection_new",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked fail-closed after reconstructing the full typed server/client allocation path from January's 29-relocation call topology, assertions, queue labels, role flags, and independent HCEA behavior. It allocates the correct 0x50/0x38 layouts through named structs, creates and configures TCP/UDP endpoints, creates role-sized queues, records the well-known port, opens traffic accounting, and tears down every failure through network_connection_delete. Target/candidate meaningful sizes are 569/542 bytes and padded sizes are 576/544, with every relocation identity preserved. The first divergence is the 0x20 versus 0x1C stack frame at +0x03, followed by broad but semantically equivalent local lifetime and branch scheduling differences. No more specific compiler mechanism is proven, so the class remains unclassified. No raw layout arithmetic, volatile/register steering, pragma, assembly, fake dependency, or undefined behavior is retained. Reopen for authoritative January source or a natural same-compiler implementation.",
-      "measurements": {
-        "target": {
-          "size": 576,
-          "relocation_count": 29,
-          "normalized_sha256": "a58c7f31b2b5f8ceb0d2d13e2f9b7f00f9ba754b4089c1a527849e5d876f9f37"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 29,
-          "normalized_sha256": "ecbcea4b217116826bd7210f33461f2008dc64b1150eebaf55519ad25dd76e9f"
-        },
-        "objdiff_percent": 64.01031
-      }
-    },
-    {
-      "unit": "source/networking/network_connection",
       "function": "_network_server_close_client_connection",
       "class": "unclassified",
       "evidence": "Fuzzy-parked under an explicit semantic veto after reconstructing the complete typed server-client removal path. Target and candidate both have 307 meaningful bytes, 320 padded bytes, and all 24 relocation identities; their only normalized instruction difference is January's loop comparison against 5 versus the candidate's comparison against the authenticated four-entry client_list. The fifth pointer-sized slot at offset 0x4C is the adjacent allow_client_connections field in the proven 0x50 server layout. Emitting a five-element C array or deliberate out-of-bounds read solely to reproduce that instruction would be nonsensical and violate the anti-fake rule. The retained implementation searches the valid client slots, removes the endpoint, deletes the connection, clears the slot, and reports success honestly. The class remains fail-closed as unclassified rather than inventing a compiler explanation. Reopen only if authoritative January source or structure-layout evidence proves a different valid bound.",
@@ -2221,25 +2202,6 @@
       }
     },
     {
-      "unit": "source/networking/network_connection",
-      "function": "_network_connection_write",
-      "class": "unclassified",
-      "evidence": "Natural typed reconstruction of the last unwritten NetworkConnection owner from the complete January body and the frozen Pastudan semantic reconstruction. It validates the generic header-first packet, swaps from the named host byte order, dispatches server datagrams, reliable stream writes and ordinary unreliable writes, retains January's single positive partial-write success rule, traffic log and counters, and returns the target boolean outcomes. Target/candidate meaningful sizes are 802/772 and padded sizes are 816/784. Candidate has 59 relocations versus target 60; the only missing identity is one traffic-notification call because VC7 coalesces the two normal-unreliable notification tails. Other differences are natural error/success branch orientation, early-return layout, endpoint_connected AL versus current long-returning owner EAX, and constant selected-owner topology. All 22 inherited owners are byte/relocation-identical, all 11 inherited exacts remain exact, the only new code owner is the target function, all 8 new literals are target-owned, and there is no new candidate-only non-code/COMMON/point_from_line3d owner. No alternate control spellings, narrowing casts, fake branches, register/volatile steering, pragmas, assembly, raw packet offsets or helper anchors were tried. Reopen only for authoritative source or genuine owner-prototype/compiler-context evidence. See docs/object_matching_logs/network_connection_obj_write_natural_boundary_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 816,
-          "relocation_count": 60,
-          "normalized_sha256": "3ab29726ced2524439c488e5d3b8442130baeec0ce4a86deae89ab50559822f6"
-        },
-        "base": {
-          "size": 784,
-          "relocation_count": 59,
-          "normalized_sha256": "9a5c37ee266f90e94139446b81189e71eed5b386616ab2d00fc7637eee6770c6"
-        },
-        "objdiff_percent": 74.261536
-      }
-    },
-    {
       "unit": "source/ai/path",
       "function": "_closest_point_to_attractor",
       "class": "unclassified",
@@ -2479,28 +2441,6 @@
         "target": { "size": 832, "relocation_count": 49, "normalized_sha256": "8f3cbdbbeb986ce027cd2510d2064c6e60dba0e4976726f131104e8172a38df4" },
         "base": { "size": 832, "relocation_count": 49, "normalized_sha256": "72f4bcb844f45d84691f70d4ab447bb229e12b6241e99a092b8e614e94eaf8dc" },
         "objdiff_percent": 99.98419
-      }
-    },
-    {
-      "unit": "source/ai/encounters",
-      "function": "_encounter_compute_activation_cluster_bit_vector",
-      "class": "unclassified",
-      "evidence": "Complete typed activation-cluster traversal reconstructed from January disassembly and HCEA behavior. January is 1,200 padded bytes and canonical is 1,232; both carry 46 relocations. The remaining code/offset gap is not assigned a speculative mechanism. Named actor modes, combat status, cluster bit-vector macros, and typed accessors are retained; no compiler bait or raw structure overlay is used. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
-      "measurements": {
-        "target": { "size": 1200, "relocation_count": 46, "normalized_sha256": "acd4a94a5e81ffd2c2568f2ab2ce7a9f919bf85b70314864ea017ff060a171b4" },
-        "base": { "size": 1232, "relocation_count": 46, "normalized_sha256": "3c5635f77de7879f0621e26ecadbb4c5385dfbd7ff086c2fdf1ae9f67b3c2cf7" },
-        "objdiff_percent": 92.32905
-      }
-    },
-    {
-      "unit": "source/ai/encounters",
-      "function": "_encounter_update_respawn",
-      "class": "unclassified",
-      "evidence": "Complete ordinary-C respawn update retained from January and HCEA evidence. Target and candidate are both 704 padded bytes with all 27 relocations, but the normalized code remains materially different and no precise compiler blocker is proved. Typed encounter access and named fields are preserved without fake matching constructs. The body was untouched by the 2026-09-09 Leaf Map packet; recompilation under the newly proper Geometry owner declarations changed only its already-fuzzy translation-unit allocation context. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md. On September 14 the genuine ai_scenario_definitions.h command-list modifier/reference declarations (lane opus/30k-fresh-graphs-20260914) changed only this already-fuzzy body's translation-unit allocation context: a commuting reload swap at +0x90, same 704 bytes and 27 relocations, 77.697876 percent; the encounters worker measured the identical state from an encounters.c-only change, proving a compiler-internal tie rather than a source defect. No respawn source changed; zero inherited strict losses. See docs/object_matching_logs/encounters_obj_opus5_fresh_graphs_20260914.md. On September 14 (lane opus/150k-house-clean-20260914, header packet P3) the genuine actions.h owner prototype for actor_action_set_default_state (plus removal of the verbatim duplicate ai_reconnect_to_structure_bsp prototype from ai_runtime.h) changed only the declaration count seen by encounters.c; this unchanged, already-fuzzy body flips allocation hash at identical size and relocations (704/27, sha 32d0a247..., the same alternate hash the P2 scenario_definitions.h evaluation measured). Declaration-count oracle, no source change. On September 14 (lane opus/150k-house-clean-20260914, header packet P2) the genuine scenario_definitions.h owner types scenario_object_permutation / scenario_weapon_datum and the scenario weapon flag enum (HCEX PDB names; January _weapon_place offsets) changed only the declaration count seen by encounters.c, which uses none of them; this unchanged, already-fuzzy body returns to its original 704/27 allocation hash 647cc2e7... (it toggles with declaration count, cf. the P3 note). No source change.",
-      "measurements": {
-        "target": { "size": 704, "relocation_count": 27, "normalized_sha256": "284b0de2b79bd79600f3495bb1372b261e026d2959de7adeed7edb074fc5219d" },
-        "base": { "size": 704, "relocation_count": 27, "normalized_sha256": "647cc2e7c6b1161aac51d47e0d4b97bdc81e429042cca996570a7d1f86e8917e" },
-        "objdiff_percent": 77.697876
       }
     },
     {

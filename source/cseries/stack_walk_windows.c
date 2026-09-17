@@ -244,24 +244,20 @@ char *symbol_name_from_address(
 {
 	static char symbol_buffer[0x4000];
 	unsigned long address = stack_walk_globals.fixup + fake_address;
-	long number_of_symbols;
 
 	csstrcpy(symbol_buffer, "<unknown>");
-	number_of_symbols = symbol_table->number_of_symbols;
-	if (number_of_symbols > 0)
+	if (symbol_table->number_of_symbols > 0)
 	{
-		struct debug_symbol *symbols = symbol_table->symbols;
-
-		if (address >= symbols[0].rva_base && address < symbols[number_of_symbols - 1].rva_base + 0xFFFF)
+		if (address >= symbol_table->symbols[0].rva_base && address < symbol_table->symbols[symbol_table->number_of_symbols - 1].rva_base + 0xFFFF)
 		{
 			long symbol_index = 1;
 
-			if (number_of_symbols > 1)
+			if (symbol_table->number_of_symbols > 1)
 			{
-				while (symbols[symbol_index - 1].rva_base > address || address >= symbols[symbol_index].rva_base)
+				while (symbol_table->symbols[symbol_index - 1].rva_base > address || address >= symbol_table->symbols[symbol_index].rva_base)
 				{
 					symbol_index++;
-					if (symbol_index >= number_of_symbols)
+					if (symbol_index >= symbol_table->number_of_symbols)
 					{
 						return symbol_buffer;
 					}
@@ -271,9 +267,9 @@ char *symbol_name_from_address(
 					symbol_buffer,
 					0x3FFF,
 					"%s + %04lX : %s",
-					symbol_table->string_storage + symbols[symbol_index - 1].name_string_offset,
-					address - symbols[symbol_index - 1].rva_base,
-					symbol_table->string_storage + symbols[symbol_index - 1].library_object_string_offset);
+					symbol_table->string_storage + symbol_table->symbols[symbol_index - 1].name_string_offset,
+					address - symbol_table->symbols[symbol_index - 1].rva_base,
+					symbol_table->string_storage + symbol_table->symbols[symbol_index - 1].library_object_string_offset);
 			}
 		}
 	}
