@@ -360,6 +360,9 @@ rasterizer_draw_string(
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
+		struct rasterizer_dynamic_screen_geometry_parameters parameters;
+		rectangle2d window_bounds;
+		rectangle2d viewport_bounds;
 
 		magic_number++;
 
@@ -369,10 +372,6 @@ rasterizer_draw_string(
 
 		if (bitmap && string[0])
 		{
-			struct rasterizer_dynamic_screen_geometry_parameters parameters;
-			rectangle2d window_bounds;
-			rectangle2d viewport_bounds;
-
 			/* January calls strlen() here and discards the result; the call is
 			part of the object and is reproduced. */
 			strlen(string);
@@ -444,6 +443,9 @@ rasterizer_draw_unicode_string(
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
+		struct rasterizer_dynamic_screen_geometry_parameters parameters;
+		rectangle2d window_bounds;
+		rectangle2d viewport_bounds;
 
 		magic_number++;
 
@@ -453,10 +455,6 @@ rasterizer_draw_unicode_string(
 
 		if (bitmap && string[0])
 		{
-			struct rasterizer_dynamic_screen_geometry_parameters parameters;
-			rectangle2d window_bounds;
-			rectangle2d viewport_bounds;
-
 			/* January calls ustrlen() here and discards the result; the call is
 			part of the object and is reproduced. */
 			ustrlen(string);

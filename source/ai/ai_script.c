@@ -782,73 +782,77 @@ boolean ai_index_from_string(
 	long *ai_index_reference)
 {
 	long ai_reference = NONE;
+	boolean success;
 	char const *separator;
 
 	match_assert("c:\\halo\\SOURCE\\ai\\ai_script.c", 87, ai_string && ai_index_reference);
 
 	if (!_stricmp(ai_string, "none"))
 	{
-		*ai_index_reference = ai_reference;
-		return TRUE;
-	}
-
-	separator = strrchr(ai_string, '/');
-	if (!separator)
-	{
-		long encounter_index = scenario_get_encounter_by_name(scenario, ai_string);
-
-		if (encounter_index != NONE)
-			ai_reference = encounter_index & UNSIGNED_SHORT_MAX;
+		success = TRUE;
 	}
 	else
 	{
-		long encounter_name_length = separator - ai_string;
-
-		if (encounter_name_length <= TAG_STRING_LENGTH)
+		separator = strrchr(ai_string, '/');
+		if (!separator)
 		{
-			char encounter_name[TAG_STRING_LENGTH+1];
-			long encounter_index;
+			long encounter_index = scenario_get_encounter_by_name(scenario, ai_string);
 
-			csstrncpy(encounter_name, ai_string, encounter_name_length);
-			encounter_name[encounter_name_length] = 0;
-
-			encounter_index = scenario_get_encounter_by_name(scenario, encounter_name);
 			if (encounter_index != NONE)
-			{
-				struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
-					&scenario->ai_encounters,
-					encounter_index,
-					struct encounter_definition);
-				long squad_index = encounter_definition_get_squad_by_name(
-					encounter_definition,
-					separator + 1);
+				ai_reference = encounter_index & UNSIGNED_SHORT_MAX;
+		}
+		else
+		{
+			long encounter_name_length = separator - ai_string;
 
-				if (squad_index != NONE)
+			if (encounter_name_length <= TAG_STRING_LENGTH)
+			{
+				char encounter_name[TAG_STRING_LENGTH+1];
+				long encounter_index;
+
+				csstrncpy(encounter_name, ai_string, encounter_name_length);
+				encounter_name[encounter_name_length] = 0;
+
+				encounter_index = scenario_get_encounter_by_name(scenario, encounter_name);
+				if (encounter_index != NONE)
 				{
-					ai_reference = (_ai_reference_type_squad << 30) |
-						((squad_index & UNSIGNED_CHAR_MAX) << 16) |
-						(encounter_index & UNSIGNED_SHORT_MAX);
-				}
-				else
-				{
-					long platoon_index = encounter_definition_get_platoon_by_name(
+					struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
+						&scenario->ai_encounters,
+						encounter_index,
+						struct encounter_definition);
+					long squad_index = encounter_definition_get_squad_by_name(
 						encounter_definition,
 						separator + 1);
 
-					if (platoon_index != NONE)
+					if (squad_index != NONE)
 					{
-						ai_reference = (_ai_reference_type_platoon << 30) |
-							((platoon_index & UNSIGNED_CHAR_MAX) << 16) |
+						ai_reference = (_ai_reference_type_squad << 30) |
+							((squad_index & UNSIGNED_CHAR_MAX) << 16) |
 							(encounter_index & UNSIGNED_SHORT_MAX);
+					}
+					else
+					{
+						long platoon_index = encounter_definition_get_platoon_by_name(
+							encounter_definition,
+							separator + 1);
+
+						if (platoon_index != NONE)
+						{
+							ai_reference = (_ai_reference_type_platoon << 30) |
+								((platoon_index & UNSIGNED_CHAR_MAX) << 16) |
+								(encounter_index & UNSIGNED_SHORT_MAX);
+						}
 					}
 				}
 			}
 		}
+
+		success = ai_reference != NONE;
 	}
 
 	*ai_index_reference = ai_reference;
 
-	return ai_reference != NONE;
+	return success;
 }
 
 void ai_index_squad_iterator_new(
@@ -3420,8 +3424,7 @@ void ai_scripting_renew(
 
 			if (actor_variant_definition->grenade_combat.grenade_type != NONE)
 			{
-				short desired_grenade_count = seed_random_range(
-					get_global_random_seed_address(),
+				short desired_grenade_count = random_range(
 					actor_variant_definition->items.grenades_lower_bound,
 					actor_variant_definition->items.grenades_upper_bound + 1);
 				short grenade_count = unit_get_grenade_count(
