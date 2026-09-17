@@ -184,7 +184,6 @@ static void prop_add(
 			struct unit_datum *prop_unit = unit_get(unit_index);
 			struct unit_definition *unit_definition =
 				unit_definition_get(prop_unit->definition_index);
-			boolean dead;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\ai\\props.c",
@@ -200,12 +199,11 @@ static void prop_add(
 			prop->ally = game_team_is_ally(actor->meta.team_index, prop->team_index);
 			prop->ally_status_changed =
 				game_team_ally_status_changed(actor->meta.team_index, prop->team_index);
-			dead = TEST_FLAG(prop_unit->object.damage_flags, _object_dead_bit);
-			prop->dead = dead;
+			prop->dead = TEST_FLAG(prop_unit->object.damage_flags, _object_dead_bit);
 			prop->suicide_radius = unit_definition->unit.ai_danger_radius;
 			prop->really_dead =
-				dead && prop_unit->unit.feign_death_timer == 0;
-			prop->dead_ticks = dead ? 1000 : 0;
+				prop->dead && prop_unit->unit.feign_death_timer == 0;
+			prop->dead_ticks = prop->dead ? 1000 : 0;
 			prop->player = prop_unit->object.owner_player_index != NONE;
 
 			if (prop_unit->unit.swarm_actor_index != NONE)
@@ -227,7 +225,9 @@ static void prop_add(
 			{
 				if (prop->actor_index != NONE)
 				{
-					prop->type = actor_get(prop->actor_index)->meta.type;
+					struct actor_datum *prop_actor = actor_get(prop->actor_index);
+
+					prop->type = prop_actor->meta.type;
 				}
 				else
 				{

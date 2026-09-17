@@ -4573,11 +4573,14 @@ void hs_hack(
 	return;
 }
 
+/* January expands this helper inline in hs_compile_and_evaluate (its source-file
+ * branch folds away there but leaves the dead loop's alignment pad before the
+ * error call) and keeps an out-of-line private-ABI copy for hs_compile_source. */
 static void hs_compile_source_error(
-	struct hs_source_file const *source_file,
+	char const *error_source,
 	char *error_message,
-	char const *source,
-	char const *error_source)
+	struct hs_source_file const *source_file,
+	char const *source)
 {
 	char *newline = NULL;
 
@@ -4650,10 +4653,10 @@ boolean hs_compile_source(
 				0,
 				source_file->source.size);
 			hs_compile_source_error(
-				source_file,
+				error_source,
 				(char *)error_message,
-				source,
-				error_source);
+				source_file,
+				source);
 			success = FALSE;
 		}
 		source_file_index++;
@@ -6469,65 +6472,64 @@ boolean hs_compile_and_evaluate(
 		{
 			if (!isspace(*character))
 			{
-			short type;
-			long expression_index;
-			char const *source;
+				short type;
+				long expression_index;
 
-			type = 0;
-			source = expression;
-			hs_compile_initialize(FALSE);
-			if (buffer[0] != '(')
-			{
-				char *space;
-
-				space = strchr(buffer, ' ');
-				if (space)
-					*space = 0;
-				if (hs_find_global_by_name(buffer) == NONE)
-					type = 1;
-				else if (space)
-					type = 2;
-				if (space)
-					*space = ' ';
-			}
-			switch (type)
-			{
-			case 0:
-				break;
-			case 1:
-				sprintf(expanded, "(%s)", buffer);
-				source = expanded;
-				break;
-			case 2:
-				sprintf(expanded, "(set %s)", buffer);
-				source = expanded;
-				break;
-			default:
-				display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs.c", 1287, TRUE);
-				system_exit(-1);
-				break;
-			}
-			/* BUG (original): January and HCEA pass the message/source outputs
-			 * in reverse. Keep the authentic target behavior explicit. */
-			expression_index = hs_compile_expression(csstrlen(source), source, &error_source, &error_message);
-			if (expression_index != NONE)
-			{
-				success = TRUE;
-				hs_runtime_evaluate(expression_index);
-			}
-			else if (error_source)
-			{
-				if (error_message)
+				type = 0;
+				hs_compile_initialize(FALSE);
+				if (buffer[0] != '(')
 				{
-					char *newline;
+					char *space;
 
-					newline = strchr(error_message, '\n');
-					if (newline)
-						*newline = 0;
+					space = strchr(buffer, ' ');
+					if (space)
+						*space = 0;
+					if (hs_find_global_by_name(buffer) != NONE)
+					{
+						if (space)
+							type = 2;
+					}
+					else
+					{
+						type = 1;
+					}
+					if (space)
+						*space = ' ';
 				}
-				error(2, "%s: %s", error_source, error_message);
-			}
-			hs_compile_dispose();
+				switch (type)
+				{
+				case 0:
+					break;
+				case 1:
+					sprintf(expanded, "(%s)", buffer);
+					expression = expanded;
+					break;
+				case 2:
+					sprintf(expanded, "(set %s)", buffer);
+					expression = expanded;
+					break;
+				default:
+					display_assert(NULL, "c:\\halo\\SOURCE\\hs\\hs.c", 1287, TRUE);
+					system_exit(-1);
+					break;
+				}
+				/* BUG (original): January and HCEA pass the message/source outputs
+				 * in reverse. Keep the authentic target behavior explicit. */
+				expression_index = hs_compile_expression(csstrlen(expression), expression, &error_source, &error_message);
+				if (expression_index != NONE)
+				{
+					success = TRUE;
+					hs_runtime_evaluate(expression_index);
+				}
+				else if (error_source)
+				{
+					hs_compile_source_error(
+						error_source,
+						(char *)error_message,
+						NULL,
+						expression);
+				}
+				hs_compile_dispose();
 				break;
 			}
 			character++;

@@ -116,25 +116,6 @@
       }
     },
     {
-      "unit": "source/models/model_animations",
-      "function": "_inverse_kinematics_adjust_matrices",
-      "class": "instruction-scheduling",
-      "evidence": "Best reviewed house-rule-compliant semantic reconstruction from the 2026-09-09 large-function packet. The complete two-bone IK solution uses ordinary named vector algebra and authentic shoulder/elbow matrix roles. Target and candidate are both 864 padded bytes with seven matching relocation identities; the remaining differences are commutative operand scheduling in the shoulder-basis cross products. No fake casts or spill steering are admitted. Zero exact credit. See docs/object_matching_logs/model_animations_obj_large_reconstruction_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 864,
-          "relocation_count": 7,
-          "normalized_sha256": "e1cd1ac47b76f42334c53adb2fbd8b10702421c0417e1935a370b01913ae77ad"
-        },
-        "base": {
-          "size": 864,
-          "relocation_count": 7,
-          "normalized_sha256": "d9fc11bebc1ea09f8bf293268952861f24b6df0bc9d093dc433a9d0c4018cec8"
-        },
-        "objdiff_percent": 99.190186
-      }
-    },
-    {
       "unit": "source/game/player_queues_new",
       "function": "_update_client_local_ticks",
       "class": "tu-context-optimization",
@@ -746,17 +727,6 @@
           "normalized_sha256": "fb0142cb223b631a4753a951718e0cfb7b4946eeafe6bdc99913cb95431a9d97"
         },
         "objdiff_percent": 97.42038
-      }
-    },
-    {
-      "unit": "source/memory/lrar_cache",
-      "function": "_lrar_allocate",
-      "class": "tu-context-optimization",
-      "evidence": "The retained allocation is the natural typed source: every block lookup calls the same private lrar_get_block helper, and all six formerly address-named private routines now have descriptive LRA-family names. The prior 12/12 result is rejected because it required __declspec(noinline) plus two selectively hand-expanded copies of lrar_get_block's validation body. With those source-shaping controls removed, 11/12 functions remain strict exact. January calls lrar_get_block at offsets +131 and +207, while this incomplete reconstruction's VC7 translation unit inlines the helper validation paths and grows the function from 784 bytes/27 relocations to 1056 bytes/47 relocations. The fail-closed classifier reports UNKNOWN; the narrower TU-context label records only the directly observed selective-inlining boundary, not a claimed recipe. The published Marathon source was checked as a first-party style analogue but contains no LRAR implementation. Reopen only with original LRAR source, a historically supported call-graph restoration, or another natural source form; never restore noinline, duplicated helper bodies, pragmas, barriers, volatile controls, or dead code for byte credit.",
-      "measurements": {
-        "target": { "size": 784, "relocation_count": 27, "normalized_sha256": "a34c14dad0afc2a3462c738ca6153c3b46d2bdd0164b176dd208295594f86663" },
-        "base": { "size": 1056, "relocation_count": 47, "normalized_sha256": "8a2fe453345af3d00eaf476f17eedbfc67629d8af6d6a036cc097d669dcc3652" },
-        "objdiff_percent": 67.61811
       }
     },
     {
@@ -1966,25 +1936,6 @@
       }
     },
     {
-      "unit": "source/camera/director",
-      "function": "_director_script_camera",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete scripted-camera mode switch in ordinary typed C from January's target disassembly and the independently reconstructed HaloCEA donor at _research_cache/halocea/src/blam/camera/director_script_camera.c. The retained body updates the authenticated camera_scripted state, resolves each local player's typed Director state through director_get, selects the scripted update procedure or restores game perspective, resets the two authenticated debug-control fields, and enables or disables scripted camera state. January is 304 padded bytes with 23 relocations; the candidate is 256 padded bytes with 19 relocations and objdiff reports 86.36 percent similarity. January performs a second bounds-checked director_get assertion in each branch after already resolving the same state; ordinary C with one necessary typed accessor per path does not reproduce those redundant assertion sequences. A director_set_camera variant also remained 256 bytes with 19 relocations and diverged earlier. Adding an unused duplicate accessor, fake dependency, or nonsensical branch solely to imitate the extra assertions would violate the no-fake-matching rule, so it is not retained. The fail-closed classifier therefore remains UNKNOWN with class unclassified. No raw offset, address-derived name, forced inline/noinline, volatile or register forcing, optimizer barrier, pragma, assembly, fabricated control flow, or duplicate assertion call is present. Reopen only for authoritative January source/local records or a natural same-compiler donor that explains the repeated accessor checks.",
-      "measurements": {
-        "target": {
-          "size": 304,
-          "relocation_count": 23,
-          "normalized_sha256": "dfba772232540bf6926d16fb6554f65c256948c84e827cf14e52db1252c203ed"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 19,
-          "normalized_sha256": "fd2c8c5b220ad335bf62943e3e4e0d5065913b93d202bf8e15fff8f140dc8faa"
-        },
-        "objdiff_percent": 86.36364
-      }
-    },
-    {
       "unit": "source/objects/widgets/flags",
       "function": "_flag_update",
       "class": "unclassified",
@@ -2267,25 +2218,6 @@
           "normalized_sha256": "c251b0c184dbcdeb303b45ddd8ad38706f8e446888df359a7177b6bc55a964f9"
         },
         "objdiff_percent": 92.56863
-      }
-    },
-    {
-      "unit": "source/ai/actor_stimulus",
-      "function": "_actor_stimulus_prop_acknowledged",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed prop-acknowledgement response from January's control flow, fields, constants, strings, and all 32 relocation identities, with the independent later HCEA lift corroborating the gameplay semantics. The retained ordinary C directs the actor's look, computes front/flank surprise levels from combat status, shooting, and distance, emits the authenticated surprise diagnostic, posts the unexpected-enemy communication, and applies the named medusa cheat behavior. Target and candidate both occupy 800 padded bytes with 32 relocations and objdiff reports 94.97531 percent similarity. The residual is a coherent whole-function allocation tie: January keeps the actor in EBX then spills it, keeps surprise_level in EDI, and homes combat_status; VC7 instead keeps the actor in EDI, uses EBX for surprise_level with three homes, and rematerializes combat status. Reversing the dot-product operands and using explicit named surprise branches recovered January's x87 order, branch topology, and exact padded extent. Bounded declaration-order and signed/unsigned status-width variants did not change the allocation or worsened the instruction stream. No register/volatile forcing, barrier, pragma, assembly, raw offset, representation pun, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the EBX/EDI lifetime choice.",
-      "measurements": {
-        "target": {
-          "size": 800,
-          "relocation_count": 32,
-          "normalized_sha256": "b66ac2399346e00349948c7ff4ac539414f83869a38ed7ba62d5f4aafa21524d"
-        },
-        "base": {
-          "size": 800,
-          "relocation_count": 32,
-          "normalized_sha256": "0f62d6950730557f884ae53b66518852751bf8414fe24bb8eb3011fe333e54fe"
-        },
-        "objdiff_percent": 94.97531
       }
     },
     {

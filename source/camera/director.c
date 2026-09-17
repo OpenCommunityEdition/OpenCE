@@ -654,14 +654,14 @@ void director_script_camera(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		struct director *director = director_get(local_player_index);
+		director_get(local_player_index);
 
 		if (scripted)
 		{
-			director->camera_proc =
-				(director_camera_update_proc)scripted_camera_update;
-			director->debug_input_scale = 1.f;
-			director->debug_controls = FALSE;
+			director_set_camera(
+				local_player_index,
+				(director_camera_update_proc)scripted_camera_update,
+				FALSE);
 		}
 		else
 		{

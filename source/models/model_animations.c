@@ -1326,6 +1326,7 @@ void inverse_kinematics_adjust_matrices(
 	real_vector3d bend_plane_normal;
 	real_vector3d bend_direction;
 	real maximum_reach;
+	real upper_arm_length_squared;
 	real elbow_projection;
 	real elbow_remainder;
 	real elbow_height;
@@ -1351,23 +1352,25 @@ void inverse_kinematics_adjust_matrices(
 		hand_distance = maximum_reach;
 	}
 
+	upper_arm_length_squared = upper_arm_length*upper_arm_length;
 	elbow_projection =
-		(hand_distance*hand_distance+upper_arm_length*upper_arm_length-forearm_length*forearm_length)/
+		(hand_distance*hand_distance+upper_arm_length_squared-forearm_length*forearm_length)/
 		(hand_distance+hand_distance);
 	elbow_remainder = hand_distance-elbow_projection;
-	elbow_height = square_root(upper_arm_length*upper_arm_length-elbow_projection*elbow_projection);
+	elbow_height = square_root(upper_arm_length_squared-elbow_projection*elbow_projection);
 
 	{
-		real_vector3d *shoulder_left = &shoulder_matrix->left;
 		real_vector3d *shoulder_forward = &shoulder_matrix->forward;
+		real_vector3d *shoulder_left = &shoulder_matrix->left;
+		real_vector3d *shoulder_up = &shoulder_matrix->up;
 
 		shoulder_forward->i = elbow_projection*hand_direction.i+elbow_height*bend_direction.i;
 		shoulder_forward->j = elbow_projection*hand_direction.j+elbow_height*bend_direction.j;
 		shoulder_forward->k = elbow_projection*hand_direction.k+elbow_height*bend_direction.k;
 		normalize3d(shoulder_forward);
-		cross_product3d(shoulder_forward, shoulder_left, &shoulder_matrix->up);
-		normalize3d(&shoulder_matrix->up);
-		cross_product3d(&shoulder_matrix->up, shoulder_forward, shoulder_left);
+		cross_product3d(shoulder_forward, shoulder_left, shoulder_up);
+		normalize3d(shoulder_up);
+		cross_product3d(shoulder_up, shoulder_forward, shoulder_left);
 
 		new_elbow_position.x = shoulder_matrix->position.x+shoulder_forward->i*upper_arm_length;
 		new_elbow_position.y = shoulder_matrix->position.y+shoulder_forward->j*upper_arm_length;
@@ -1375,15 +1378,16 @@ void inverse_kinematics_adjust_matrices(
 	}
 	{
 		real_vector3d *elbow_forward = &elbow_matrix->forward;
+		real_vector3d *elbow_left = &elbow_matrix->left;
 		real_vector3d *elbow_up = &elbow_matrix->up;
 
 		elbow_forward->i = elbow_remainder*hand_direction.i-elbow_height*bend_direction.i;
 		elbow_forward->j = elbow_remainder*hand_direction.j-elbow_height*bend_direction.j;
 		elbow_forward->k = elbow_remainder*hand_direction.k-elbow_height*bend_direction.k;
 		normalize3d(elbow_forward);
-		cross_product3d(elbow_forward, &elbow_matrix->left, elbow_up);
+		cross_product3d(elbow_forward, elbow_left, elbow_up);
 		normalize3d(elbow_up);
-		cross_product3d(elbow_up, elbow_forward, &elbow_matrix->left);
+		cross_product3d(elbow_up, elbow_forward, elbow_left);
 	}
 	elbow_matrix->position = new_elbow_position;
 

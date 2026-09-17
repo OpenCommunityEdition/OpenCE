@@ -815,12 +815,9 @@ void actor_stimulus_prop_acknowledged(
 					}
 					if (prop->distance < definition->panic.surprise_distance)
 					{
-						if (surprise_level <=
-							_actor_surprise_unprepared_enemy_close)
-						{
-							surprise_level =
-								_actor_surprise_unprepared_enemy_close;
-						}
+						surprise_level = MAX(
+							surprise_level,
+							_actor_surprise_unprepared_enemy_close);
 					}
 				}
 			}
@@ -835,18 +832,15 @@ void actor_stimulus_prop_acknowledged(
 			{
 				if (flanked)
 				{
-					if (surprise_level <=
-						_actor_surprise_unexpected_enemy_close_flanked_shooting)
-					{
-						surprise_level =
-							_actor_surprise_unexpected_enemy_close_flanked_shooting;
-					}
+					surprise_level = MAX(
+						surprise_level,
+						_actor_surprise_unexpected_enemy_close_flanked_shooting);
 				}
-				else if (surprise_level <=
-					_actor_surprise_unexpected_enemy_close_shooting)
+				else
 				{
-					surprise_level =
-						_actor_surprise_unexpected_enemy_close_shooting;
+					surprise_level = MAX(
+						surprise_level,
+						_actor_surprise_unexpected_enemy_close_shooting);
 				}
 			}
 
@@ -868,9 +862,9 @@ void actor_stimulus_prop_acknowledged(
 					FALSE,
 					"%s %d: surprise %s: %s %sexp %s %sshoot %s (%.1f%c%.1f)",
 					actor_type_get_name((word)actor->meta.type),
-					(word)actor_index,
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index),
 					surprise_names[surprise_level],
-					combat_status ? "combat" : "noncom",
+					!combat_status ? "noncom" : "combat",
 					expected_acknowledgement ? "" : "un",
 					flanked ? "flank" : "front",
 					prop->shooting ? "" : "not",

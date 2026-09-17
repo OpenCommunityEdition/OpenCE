@@ -298,6 +298,7 @@ short lrar_allocate(
 	short test_block_index;
 	unsigned long search_address;
 	unsigned long alignment_mask;
+	boolean found = FALSE;
 	struct lrar_cache_block *block;
 	struct lrar_cache_block *new_block;
 	struct lrar_cache_block *test_block;
@@ -318,7 +319,7 @@ short lrar_allocate(
 			new_block_index = 0;
 		}
 
-		for (;;)
+		while (!found)
 		{
 			if (cache->last_block_index == NONE)
 			{
@@ -364,46 +365,47 @@ short lrar_allocate(
 
 			if (adjusted_new_block_address+size <= cache->maximum_address)
 			{
-				break;
-			}
-
-			cache->last_block_index = NONE;
-		}
-
-		new_block = &cache->blocks[new_block_index];
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-			0x111,
-			adjusted_new_block_address>=cache->minimum_address &&
-			adjusted_new_block_address+size<=cache->maximum_address);
-
-		for (test_block_index = 0; test_block_index < cache->block_count; test_block_index++)
-		{
-			test_block = &cache->blocks[test_block_index];
-			if (test_block->signature == _lrar_block_signature &&
-				adjusted_new_block_address < test_block->address+test_block->size &&
-				adjusted_new_block_address+size > test_block->address)
-			{
+				new_block = &cache->blocks[new_block_index];
 				match_assert(
 					"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
-					0x11C,
-					adjusted_new_block_address>=test_block->address+test_block->size ||
-					adjusted_new_block_address+size<=test_block->address);
+					0x111,
+					adjusted_new_block_address>=cache->minimum_address &&
+					adjusted_new_block_address+size<=cache->maximum_address);
+
+				for (test_block_index = 0; test_block_index < cache->block_count; test_block_index++)
+				{
+					test_block = &cache->blocks[test_block_index];
+					if (test_block->signature == _lrar_block_signature &&
+						adjusted_new_block_address < test_block->address+test_block->size &&
+						adjusted_new_block_address+size > test_block->address)
+					{
+						match_assert(
+							"c:\\halo\\SOURCE\\memory\\lrar_cache.c",
+							0x11C,
+							adjusted_new_block_address>=test_block->address+test_block->size ||
+							adjusted_new_block_address+size<=test_block->address);
+					}
+				}
+
+				new_block->size = size;
+				new_block->signature = _lrar_block_signature;
+				new_block->address = adjusted_new_block_address;
+				new_block->user_data = user_data;
+				cache->lock_proc(user_data, new_block_index);
+				cache->last_block_index = new_block_index;
+				if (block_index == NONE)
+				{
+					block_index = new_block_index;
+				}
+
+				cache->first_block_index = block_index;
+				found = TRUE;
+			}
+			else
+			{
+				cache->last_block_index = NONE;
 			}
 		}
-
-		new_block->size = size;
-		new_block->signature = _lrar_block_signature;
-		new_block->address = adjusted_new_block_address;
-		new_block->user_data = user_data;
-		cache->lock_proc(user_data, new_block_index);
-		cache->last_block_index = new_block_index;
-		if (block_index == NONE)
-		{
-			block_index = new_block_index;
-		}
-
-		cache->first_block_index = block_index;
 	}
 
 	return new_block_index;
