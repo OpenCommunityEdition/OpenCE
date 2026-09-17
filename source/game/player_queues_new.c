@@ -612,18 +612,18 @@ void update_client_local_ticks(
 	struct player_action_collection action_collection;
 	struct server_update update;
 	long update_number;
-	short tick_index;
+	long machine_index = 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 		0x20B,
 		game_connection()==_game_connection_local);
 	update_client_build_client_update(&action_collection);
-	update_server_handle_client_update(0, action_collection.actions);
-	for (tick_index = 0; tick_index<ticks; ++tick_index)
+	update_server_handle_client_update(machine_index, action_collection.actions);
+	while (ticks-->0)
 	{
 		update_server_next_update();
-		update_server_build_server_update(0, &update, &update_number);
+		update_server_build_server_update(machine_index, &update, &update_number);
 	}
 
 	return;

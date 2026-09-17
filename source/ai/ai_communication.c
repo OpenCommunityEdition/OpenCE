@@ -555,6 +555,7 @@ symbols in this file:
 #include "actors.h"
 #include "actor_types.h"
 #include "ai_scenario_definitions.h"
+#include "cseries/errors.h"
 #include "encounters.h"
 #include "game/game.h"
 #include "game/players.h"
@@ -3289,6 +3290,7 @@ static void ai_communication_update_speech_timers(
 
 				if (ai_debug.print_speech_timers)
 				{
+					char const *timer_name = priority >= _unit_speech_talk ? "talk" : "chatter";
 					char const *team_name =
 						global_communication_team_names[communication_team * 2];
 
@@ -3299,7 +3301,7 @@ static void ai_communication_update_speech_timers(
 						unit_get_speech_priority_name(priority),
 						dialogue_type_index,
 						dialogue_get_vocalization_name(vocalization_type, TRUE),
-						priority >= _unit_speech_talk ? "talk" : "chatter",
+						timer_name,
 						notification_time - time);
 				}
 			}

@@ -1406,6 +1406,8 @@ static void cached_map_issue_async_write(
 static boolean cached_map_block_on_async_request(
 	volatile boolean const *completion_flag)
 {
+	boolean completed;
+
 	while (!*completion_flag)
 	{
 		if (SleepEx(5000, TRUE) != WAIT_IO_COMPLETION)
@@ -1413,8 +1415,9 @@ static boolean cached_map_block_on_async_request(
 			break;
 		}
 	}
+	completed = *completion_flag;
 
-	return *completion_flag;
+	return completed;
 }
 
 static void cached_map_file_get_path(

@@ -761,12 +761,10 @@ boolean collision_surface_find_closest_point2d(
 		after = FALSE;
 		project_point3d(&origin->point, projection, sign, &origin2d);
 		project_point3d(&target->point, projection, sign, &target2d);
-		point_vector.i = point->x-origin2d.x;
-		point_vector.j = point->y-origin2d.y;
-		edge_vector.i = target2d.x-origin2d.x;
-		edge_vector.j = target2d.y-origin2d.y;
+		vector_from_points2d(&origin2d, point, &point_vector);
+		vector_from_points2d(&origin2d, &target2d, &edge_vector);
 
-		if (edge_vector.j*point_vector.i-edge_vector.i*point_vector.j > 0.f)
+		if (cross_product2d(&point_vector, &edge_vector) > 0.f)
 		{
 			dot = dot_product2d(&point_vector, &edge_vector);
 			if (dot < 0.f)
@@ -1803,15 +1801,12 @@ static boolean collision_bsp_test_vector_recursive(
 
 		if (node_index != NONE)
 		{
-			struct collision_leaf const *leaf;
-
 			leaf_index = node_index & LONG_MAX;
-			leaf = TAG_BLOCK_GET_ELEMENT(
-				&data->bsp->leaves,
-				leaf_index,
-				struct collision_leaf);
 			contents = TEST_FLAG(
-				leaf->flags,
+				TAG_BLOCK_GET_ELEMENT(
+					&data->bsp->leaves,
+					leaf_index,
+					struct collision_leaf)->flags,
 				_collision_leaf_contains_two_sided_bit) ?
 				_contents_semi_empty : _contents_empty;
 		}

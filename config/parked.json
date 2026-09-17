@@ -116,25 +116,6 @@
       }
     },
     {
-      "unit": "source/game/player_queues_new",
-      "function": "_update_client_local_ticks",
-      "class": "tu-context-optimization",
-      "evidence": "Best currently reviewed Fable reconstruction. It retains the complete local action-to-server tick path with an ordinary long update_number local; the earlier fake `(long *)&ticks` cast is rejected. January calls the already-exact update_server_build_server_update, while VC7 inlines that callee in this TU context, producing 352 candidate bytes versus 192 target bytes and 31 versus 15 relocations. Zero exact credit. See docs/object_matching_logs/player_queues_new_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 192,
-          "relocation_count": 15,
-          "normalized_sha256": "006837ab68e640685cba73184552b14fce1cb09c8b4286c8a7aa689f02b81c46"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 31,
-          "normalized_sha256": "af7f4084e08112b9a60a42c0739a64c19cc1202277fbf8969f9d245b37c4f0f4"
-        },
-        "objdiff_percent": 1.6181818
-      }
-    },
-    {
       "unit": "source/bitmaps/s3tc/s3tc",
       "function": "_RGBToColor",
       "class": "unclassified",
@@ -815,25 +796,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/rasterizer_transparent_geometry",
-      "function": "_rasterizer_sort_external",
-      "class": "register-allocation",
-      "evidence": "The retained ordinary C is the cross-build HCEA rasterizer_sort_external topology: fill the short sorted-index array with identity order while invoking rasterizer_sort_internal, qsort it with group_sorted_indices_cmpfn, then stamp each group's resulting sorted_index. The semantic names replace the former address placeholders in both source and the symbol atlas. Target and candidate share the 176-byte padded envelope and 14 logical relocation destinations. The residual is VC7 lifetime allocation and scheduling: January forms the first-pass group through ECX from an EDX base and delays loading the qsort base, while the natural candidate uses EAX/ECX and loads that base earlier. Direct-expression, block-local-pointer, pre-test-index, Pastudan loop-local pointer, HCEA, declaration-order, and register-lifetime families are already exhausted; the best natural trial aligned the tail but not the first-pass allocation. No assembly, volatile/register forcing, barrier, fake dependency, raw offset, or synthetic control flow is retained. Reopen only for authoritative January local/statement provenance or a strict same-compiler C donor that naturally emits the target allocation.",
-      "measurements": {
-        "target": {
-          "size": 176,
-          "relocation_count": 14,
-          "normalized_sha256": "4f78b8476535a901325781b67d7ed04665e59478fb419ddd0c607c95220655d5"
-        },
-        "base": {
-          "size": 176,
-          "relocation_count": 14,
-          "normalized_sha256": "30cd227ef42506ffe5a4050491eff57faef6a200cbffc05301077bca69f40a50"
-        },
-        "objdiff_percent": 80.08772
-      }
-    },
-    {
       "unit": "source/bitmaps/bitmap_utilities",
       "function": "_bitmap_2d_alpha_bleed",
       "class": "instruction-scheduling",
@@ -1461,25 +1423,6 @@
       }
     },
     {
-      "unit": "source/ai/ai_communication",
-      "function": "_ai_communication_update_speech_timers",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed speech-timer update through its genuine ai_communication_started caller. Independent HCEA source authenticates the semantic ai_communication_update_speech_timers and actor_reset_idle_vocalization_timer names; the retained implementation uses unit_get and actor_get, named speech-priority constants, the typed AI communication globals, and the established dialogue/reply table structures. Target and candidate are both 672 padded bytes with all 43 relocation identities. The owning game_sound.h migration previously measured 97.67839 percent. The September 5 genuine Encounters platoon schema and named flag additions naturally transpose only two independent stack loads at +0x167..0x16E; the unchanged source then measured 97.76382 percent. Complete thirteen-consumer inspection preserves all other runtime records apart from compiler-local label spelling, with no new owner, helper, COMMON, ABI change, or inherited strict loss. Root independently verifies that both loads use distinct destinations and stack locations, change no flags, and have no incoming branch inside the reordered block. See docs/object_matching_logs/encounters_obj_initialize_cluster_natural_20260905.md. The remaining gap is the previously documented C2 register/lifetime schedule: January retains the unit in EDI and time in ESI while the natural candidate selects the inverse allocation, with a small associated load-order tie. Prior bounded declaration, initialization, and expression-order probes did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, fake dependency, false alias, raw offset, forced inline/noinline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the register lifetimes. The later September 5 shared swarm/biped owner-schema and API correction returns exactly those two independent stack loads to the prior 97.67839-percent order. Full frozen comparison across all 58 actual consumers preserves every one of the 6,233 inherited exact owners, all data/COMMON/owner contracts, and all other runtime records apart from compiler-local labels and the separately proven signed-word mask encoding change in infection_swarm_control. No speech-timer source change or schedule tuning was made. Both load orders have the same register, memory and flag effects on the valid-frame domain. See docs/object_matching_logs/action_obey_obj_shared_schema_and_structure_flush_reconciliation_20260905.md for the independent complete delta review. On September 6 the genuine actor_aim_jump declaration in actors.h again selects the previously proven second load order, with no speech-timer source change. A fresh 47-consumer frozen audit preserves all 6,257 inherited strict functions; 3,104 inherited runtime sections are unchanged, 56 differ only in compiler-local labels, and this is the sole executable delta. Complete function/branch/relocation review plus 24 real-instruction block executions proves the independent EBX and DI loads commute on valid stack frames, including EDI high bits, flags and DF. The source remains fuzzy and receives no exact credit. See docs/object_matching_logs/actor_moving_obj_fable_natural_aim_reconciliation_20260906.md. The September 6 genuine Path 3D declarations in path.h select the first load order again: 97.67839 percent, still fuzzy and uncredited. The full 50-consumer header trial preserves 6,266 inherited strict functions and 3,263 other runtime records (3,206 unchanged and 57 compiler-local-label-only). The complete current 672-byte/43-relocation forms are strictly identical to the two previously proven variants, with the same private NODUP owner and unchanged 27-branch graph. Root re-executed both actual seven-byte blocks in 24 register/flags/memory states and rejected the wrong-source-offset control. This is an evidence refresh for the same commuting loads, not a source edit or scoring exception. See docs/object_matching_logs/path_obj_3d_pair_reconciliation_20260906.md and scratch/path-3d-speech-timer-proof-20260906.json. The September 6 genuine obstacles_get_disc header restoration again selects the second load order, 97.76382 percent. A fresh complete 51-consumer trial preserves all 6,269 inherited strict functions. Independent and root full-section/relocation/literal/branch reviews prove that only the same seven-byte pair of flag-neutral EBX and DI loads changed in this already-fuzzy function. The separate accessor COMDAT transition is authenticated as genuine header-inline ownership. No AI communication source edit, scoring exception or exact credit is introduced. See docs/object_matching_logs/path_obstacles_obj_circle_query_natural_20260906.md and scratch/path-obstacles-circle-owner-root-replay-20260906.json. On September 14 the genuine ai_scenario_definitions.h command-list atom modifier enums and the three ai animation/script/recording reference structures (lane opus/30k-fresh-graphs-20260914) again select the other order of the same flag-neutral load pair: 672 bytes, 43 relocations, 97.67839 percent, still fuzzy. The full build and rename-stable census show zero inherited strict losses; no AI communication source changed. See docs/object_matching_logs/opus5_fresh_graphs_HANDOFF_20260914.md. On September 14 (lane opus/100k-consolidated-20260914) the genuine ai_debug.h retype, which replaces the placeholder actor-record and 0x7D384 block with the typed firing_position / firing_position_evaluation_context members that actor_select_firing_position copies, selects the second load order again: 672 bytes, 43 relocations, 97.76382 percent, still fuzzy. The full build shows zero inherited strict losses and no other park drift; no AI communication source changed. See docs/object_matching_logs/actor_firing_position_obj_opus5_100k_20260914.md. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): the units.h owner prototypes for unit_start_running_blindly and unit_is_speaking (removing action_flee.c's C4013 implicit declarations) change only the declaration count seen by ai_communication.c; this unchanged, already-fuzzy body returns to its previously documented 97.67839% flag-neutral two-load order (672/43, sha 885fdb81...). No source change.",
-      "measurements": {
-        "target": {
-          "size": 672,
-          "relocation_count": 43,
-          "normalized_sha256": "91999fda75815c6638478824f3efa53ee6717572f365530362cbec00e78a50ac"
-        },
-        "base": {
-          "size": 672,
-          "relocation_count": 43,
-          "normalized_sha256": "885fdb81966284acf5ba7138a4bbbd2221e7c61c89114fdd6f53b96ba89b81a0"
-        },
-        "objdiff_percent": 97.67839
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
       "function": "_rasterizer_environment_specular_spot_light_begin",
       "class": "register-allocation",
@@ -1785,28 +1728,9 @@
     },
     {
       "unit": "source/cache/cache_files_windows",
-      "function": "_cached_map_file_read_header",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed asynchronous header-read path from January's instructions, assertion/error strings, exact relocation topology, and the independently named HaloCEA Xbox implementation. The retained C obtains the semantic cached-map record, records its FILETIME, issues the 2048-byte overlapped read, waits alertably on a volatile completion flag, verifies the header, clears invalid header/time data, and invalidates the handle on failed completion. Target and candidate share the 400-byte padded envelope and all 26 relocation identities; objdiff reports 98.70079 percent similarity. The residual is confined to VC7 register selection around the asynchronous request and a redundant volatile completion reload/control-flow schedule; changing the local away from volatile worsened the authentic initialization schedule and was rejected. No raw offsets, fake alias, inert read, barrier, pragma, assembly, forced inline, or semantically false path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor explaining the redundant completion reload.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 26,
-          "normalized_sha256": "1a3412aeb8f52881b0a0317f1671f1bef803f138ec9d594be08e349072fe034a"
-        },
-        "base": {
-          "size": 400,
-          "relocation_count": 26,
-          "normalized_sha256": "5abb084355a19b12c72870099def7db0523ce8f3e2ff464cb2f75c69e2ce7bfe"
-        },
-        "objdiff_percent": 98.70079
-      }
-    },
-    {
-      "unit": "source/cache/cache_files_windows",
       "function": "_cache_files_open_cache_files",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the full cache-file startup loop retained as ordinary typed C. January's 47-relocation call graph, file/API constants, assertions, diagnostic strings, cache-file layout, and the surrounding HaloCEA cache subsystem establish the behavior: delete the sentinel slot, open each cache file, preserve correctly sized existing files, rewrite stale files asynchronously, truncate them to the configured size, install the handle, validate cached headers against the DVD checksum/build, and clear invalid slots. Target and candidate share the 752-byte padded envelope and all 47 relocation identities; objdiff reports 83.333336 percent similarity. The residual is broad VC7 basic-block and register scheduling, especially cold CreateFile/setup-failure placement and the post-open validation path, without evidence for a unique source rewrite. No goto reshaping, raw offsets, volatile/register forcing beyond the real asynchronous completion flag, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical success path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor that explains the cold-block layout.",
+      "evidence": "Fuzzy-parked under the current house rule with the full cache-file startup loop retained as ordinary typed C. January's 47-relocation call graph, file/API constants, assertions, diagnostic strings, cache-file layout, and the surrounding HaloCEA cache subsystem establish the behavior: delete the sentinel slot, open each cache file, preserve correctly sized existing files, rewrite stale files asynchronously, truncate them to the configured size, install the handle, validate cached headers against the DVD checksum/build, and clear invalid slots. Target and candidate share the 752-byte padded envelope and all 47 relocation identities; objdiff reports 83.333336 percent similarity. The residual is broad VC7 basic-block and register scheduling, especially cold CreateFile/setup-failure placement and the post-open validation path, without evidence for a unique source rewrite. No goto reshaping, raw offsets, volatile/register forcing beyond the real asynchronous completion flag, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical success path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor that explains the cold-block layout. Re-measured 2026-09-16: the exact static helper cached_map_block_on_async_request now snapshots the completion flag, reproducing January's double volatile load at this inlined wait tail (0x17a/0x17d); the body is otherwise unchanged and still non-exact (752 bytes / 47 relocations; alndiff 48 -> 36 differing target instructions; the CreateFileA-failure vassert placement remains).",
       "measurements": {
         "target": {
           "size": 752,
@@ -1816,9 +1740,9 @@
         "base": {
           "size": 752,
           "relocation_count": 47,
-          "normalized_sha256": "5ac13a55c15d04794a7e301ed502b8962f97c1466484b36d13aacec0ff3648bc"
+          "normalized_sha256": "54553053bda7f8841b99fe7fffbc35e44c8f97490433028ff6256b33840d2abd"
         },
-        "objdiff_percent": 83.333336
+        "objdiff_percent": 85.32895
       }
     },
     {
@@ -2183,25 +2107,6 @@
       }
     },
     {
-      "unit": "source/physics/collision_bsp",
-      "function": "_collision_surface_find_closest_point2d",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reopening the documented first-shot rejection on the January-authenticated opposite dot-product predicate. The retained ordinary typed C follows the independent HCEA circular oriented-edge walk while January's COFF fixes the tag-block lookup topology, three project_point3d calls, dot < 0.0f branch orientation, zero constants, and wrap-corner flow. It also corrects the public prototype from a point pointer to boolean, consistent with the function's inside/outside result and its caller. Target and candidate both occupy 560 padded bytes, have 555 meaningful bytes, and carry the same 11 ordered relocation identities; objdiff reports 98.81739 percent similarity. The remaining differences are confined to commutative x87 operand scheduling in the projection math and a destructive multiply/store choice in point_from_line2d's naturally inlined second coordinate, which shifts the final three relocation addresses four bytes earlier without changing their identities. Bounded natural variants covering initial flag lifetime, nested control flow, point/edge-vector assignment order, dot-product operand order, manual equivalent expressions, and length-squared scope either worsened the envelope or returned to this fixed point. No raw offset, false type or prototype, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler helper/TU context that resolves the x87 scheduling tie without altering the authenticated January inline schedule.",
-      "measurements": {
-        "target": {
-          "size": 560,
-          "relocation_count": 11,
-          "normalized_sha256": "c61b255f98ff4e2265d41eed79757db722c37a9d62db50b20142d839be363d6a"
-        },
-        "base": {
-          "size": 560,
-          "relocation_count": 11,
-          "normalized_sha256": "044384f284562918f8e9709fa15d8ce1b435047fac8d46ddb75bfc2779d2ab43"
-        },
-        "objdiff_percent": 98.81739
-      }
-    },
-    {
       "unit": "source/objects/damage",
       "function": "_object_damage_body",
       "class": "unclassified",
@@ -2256,25 +2161,6 @@
           "normalized_sha256": "947b581780131f4c0dd9d48e75bd08ef8a29d7e7c9b07aac8df7adaff8665574"
         },
         "objdiff_percent": 99.985664
-      }
-    },
-    {
-      "unit": "source/physics/collision_bsp",
-      "function": "_collision_bsp_test_vector_recursive",
-      "class": "unclassified",
-      "evidence": "Complete typed reconstruction of the private recursive vector traversal, including semantic empty/semi-empty/solid transitions, correct front/back/two-sided flag handling, leaf reporting and genuine private surface resolution. Independent HCEA source corroborates the behavior; January COFF remains authoritative. The target is 800 padded bytes and the natural candidate is 784, both with the same thirteen relocation identities; objdiff is 98.178215 percent. No target-absent helper or point_from_line3d owner is emitted, and all inherited exact owners survive. Retained as credible fuzzy source with zero exact credit; reopen only for authentic source/type/compiler context. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed to a straddle-first else-if with a single bottom return (size now equals the target, 800 bytes, 13 relocations), still fuzzy. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 800,
-          "relocation_count": 13,
-          "normalized_sha256": "843ff490914a065f0b80a94d52b63c7176ff57515a249d83655c4c69909058fc"
-        },
-        "base": {
-          "size": 800,
-          "relocation_count": 13,
-          "normalized_sha256": "24422defd815e28511914e5b25e3b0f8722eebc230654b7df3eac9688bd266e4"
-        },
-        "objdiff_percent": 99.30693
       }
     },
     {

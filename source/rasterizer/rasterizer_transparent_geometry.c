@@ -180,15 +180,15 @@ void rasterizer_set_frustum_z(
 
 /* ---------- globals */
 
-short transparent_geometry_group_index;
-unsigned long transparent_geometry_group_pending_flags[
+static short transparent_geometry_group_index;
+static unsigned long transparent_geometry_group_pending_flags[
 	BIT_VECTOR_SIZE_IN_LONGS(RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)];
-struct transparent_geometry_group *transparent_geometry_groups;
-struct transparent_geometry_group *transparent_geometry_groups2;
-long transparent_geometry_group_count;
-long transparent_geometry_group_count2;
-short *transparent_geometry_group_sorted_indices;
-short transparent_geometry_next_group_sorted_index;
+static struct transparent_geometry_group *transparent_geometry_groups;
+static struct transparent_geometry_group *transparent_geometry_groups2;
+static long transparent_geometry_group_count;
+static long transparent_geometry_group_count2;
+static short *transparent_geometry_group_sorted_indices;
+static short transparent_geometry_next_group_sorted_index;
 
 extern struct rasterizer_transparent_geometry_debug_options rasterizer_debug_options;
 extern struct rasterizer_transparent_geometry_window_parameters global_window_parameters;
@@ -534,12 +534,10 @@ void rasterizer_sort_external(
 	void)
 {
 	short group_index;
-	struct transparent_geometry_group *group;
 
 	for (group_index = 0; group_index<transparent_geometry_group_count; group_index++)
 	{
-		group = transparent_geometry_groups + group_index;
-		rasterizer_sort_internal(group);
+		rasterizer_sort_internal(transparent_geometry_groups + group_index);
 		transparent_geometry_group_sorted_indices[group_index] = group_index;
 	}
 
@@ -549,22 +547,9 @@ void rasterizer_sort_external(
 		sizeof(*transparent_geometry_group_sorted_indices),
 		group_sorted_indices_cmpfn);
 
+	for (group_index = 0; group_index<transparent_geometry_group_count; group_index++)
 	{
-		long group_count = transparent_geometry_group_count;
-
-		if (group_count>0)
-		{
-			short *group_sorted_indices = transparent_geometry_group_sorted_indices;
-
-			group = transparent_geometry_groups;
-			group_index = 0;
-			do
-			{
-				group[group_sorted_indices[group_index]].sorted_index = group_index;
-				group_index++;
-			}
-			while (group_index<group_count);
-		}
+		transparent_geometry_groups[transparent_geometry_group_sorted_indices[group_index]].sorted_index = group_index;
 	}
 
 	return;
