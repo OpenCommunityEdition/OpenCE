@@ -85,7 +85,7 @@ symbols in this file:
 002A7E38 0044:
 	??_C@_0EE@BCDFBEJK@YOU?5GOT?5STABBED?$CB?$CB?$CB?$CB?5double?9click@ (0000)
 004D1198 1618:
-	_bss_004d1198 (0000)
+	_texture_cache_debug_bitmaps (0000)
 	_xbox_texture_cache_globals (1600)
 	_texture_cache_debug_options (1610)
 	_debug_texture_cache (1612)
@@ -380,6 +380,8 @@ static const long bitmap_d3d_format_tables
 		NONE,
 	},
 };
+/* provisional name: the January map leaves this .bss array unnamed; it holds the debug
+ * listing's cached bitmaps */
 static struct bitmap_data *texture_cache_debug_bitmaps[XBOX_TEXTURE_CACHE_PAGE_COUNT];
 static struct xbox_texture_cache_globals xbox_texture_cache_globals;
 struct texture_cache_debug_options texture_cache_debug_options;
@@ -929,7 +931,7 @@ void texture_cache_debug_render(
 
 		font_index = interface_get_tag_index(_interface_font_terminal);
 		tab_stops[0] = rasterizer_globals.reserved04.frame_bounds.x0;
-		tab_stops[1] = tab_stops[0] + 110;
+		tab_stops[1] = rasterizer_globals.reserved04.frame_bounds.x0 + 110;
 		draw_string_set_tab_stops(tab_stops, 2);
 		if (font_index != NONE)
 		{
