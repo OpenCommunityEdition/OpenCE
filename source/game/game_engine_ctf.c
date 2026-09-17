@@ -665,8 +665,8 @@ static void ctf_engine_weapon_update(
 
 		if (connected_to_map && weapon->object.parent_object_index == NONE)
 		{
-			short return_team_index = weapon->object.owner_team_index;
-			long return_other_team_index = (return_team_index + 1) % 2;
+			long return_team_index = weapon->object.owner_team_index;
+			long return_other_team_index = (weapon->object.owner_team_index + 1) % 2;
 
 			if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit))
 			{

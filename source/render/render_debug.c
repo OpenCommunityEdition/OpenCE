@@ -2153,99 +2153,107 @@ static void render_debug_add_cache_entry(
 		render_debug_globals.string_offset = 0;
 		render_debug_globals.strings[0] = 0;
 	}
-	else if (render_debug_globals.entry_count >= MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES)
+
+	if (render_debug_globals.entry_count < MAXIMUM_RENDER_DEBUG_CACHE_ENTRIES)
 	{
-		if (!render_debug_globals.entry_overflow_reported)
+		entry = &render_debug_globals.entries[render_debug_globals.entry_count++];
+		entry->type = type;
+
+		/*
+		 * MSVC i386 gives the named short a four-byte cdecl argument slot;
+		 * va_start therefore begins at the following slot.  Arguments after the
+		 * ellipsis use the C default promotions: short/boolean -> int, real -> double.
+		 */
+		va_start(list, type);
+
+		switch (type)
 		{
-			error(_error_silent, "render debug cache overflow.");
-			render_debug_globals.entry_overflow_reported = TRUE;
+			case _render_debug_cache_circle:
+				entry->circle.plane = *va_arg(list, real_plane3d const *);
+				entry->circle.projection = (short)va_arg(list, int);
+				entry->circle.sign = (boolean)va_arg(list, int);
+				entry->circle.center = *va_arg(list, real_point2d const *);
+				entry->circle.radius = (real)va_arg(list, double);
+				entry->circle.color = *va_arg(list, real_argb_color const *);
+				entry->circle.offset = (real)va_arg(list, double);
+				break;
+
+			case _render_debug_cache_point:
+				entry->point.point = *va_arg(list, real_point3d const *);
+				entry->point.size = (real)va_arg(list, double);
+				entry->point.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_line:
+				entry->line.point0 = *va_arg(list, real_point3d const *);
+				entry->line.point1 = *va_arg(list, real_point3d const *);
+				entry->line.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_sphere:
+				entry->point.point = *va_arg(list, real_point3d const *);
+				entry->point.size = (real)va_arg(list, double);
+				entry->point.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_cylinder:
+				entry->pill.base = *va_arg(list, real_point3d const *);
+				entry->pill.height = *va_arg(list, real_vector3d const *);
+				entry->pill.width = (real)va_arg(list, double);
+				entry->pill.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_pill:
+				entry->pill.base = *va_arg(list, real_point3d const *);
+				entry->pill.height = *va_arg(list, real_vector3d const *);
+				entry->pill.width = (real)va_arg(list, double);
+				entry->pill.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_box:
+				entry->box.bounds = *va_arg(list, real_rectangle3d const *);
+				entry->box.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_box_outline:
+				entry->box.bounds = *va_arg(list, real_rectangle3d const *);
+				entry->box.color = *va_arg(list, real_argb_color const *);
+				break;
+
+			case _render_debug_cache_string:
+				cached_string = render_debug_add_cache_string(va_arg(list, char const *));
+				if (cached_string)
+				{
+					entry->string.string = cached_string;
+				}
+				else
+				{
+					render_debug_globals.entry_count--;
+				}
+				break;
+
+			case _render_debug_cache_string_at_point:
+				cached_string = render_debug_add_cache_string(va_arg(list, char const *));
+				if (cached_string)
+				{
+					entry->string_at_point.string = cached_string;
+					entry->string_at_point.point = *va_arg(list, real_point3d const *);
+					entry->string_at_point.color = *va_arg(list, real_argb_color const *);
+				}
+				else
+				{
+					render_debug_globals.entry_count--;
+				}
+				break;
 		}
 
-		return;
+		va_end(list);
 	}
-
-	entry = &render_debug_globals.entries[render_debug_globals.entry_count++];
-	entry->type = type;
-
-	/*
-	 * MSVC i386 gives the named short a four-byte cdecl argument slot;
-	 * va_start therefore begins at the following slot.  Arguments after the
-	 * ellipsis use the C default promotions: short/boolean -> int, real -> double.
-	 */
-	va_start(list, type);
-
-	switch (type)
+	else if (!render_debug_globals.entry_overflow_reported)
 	{
-		case _render_debug_cache_circle:
-			entry->circle.plane = *va_arg(list, real_plane3d const *);
-			entry->circle.projection = (short)va_arg(list, int);
-			entry->circle.sign = (boolean)va_arg(list, int);
-			entry->circle.center = *va_arg(list, real_point2d const *);
-			entry->circle.radius = (real)va_arg(list, double);
-			entry->circle.color = *va_arg(list, real_argb_color const *);
-			entry->circle.offset = (real)va_arg(list, double);
-			break;
-
-		case _render_debug_cache_point:
-		case _render_debug_cache_sphere:
-			entry->point.point = *va_arg(list, real_point3d const *);
-			entry->point.size = (real)va_arg(list, double);
-			entry->point.color = *va_arg(list, real_argb_color const *);
-			break;
-
-		case _render_debug_cache_line:
-			entry->line.point0 = *va_arg(list, real_point3d const *);
-			entry->line.point1 = *va_arg(list, real_point3d const *);
-			entry->line.color = *va_arg(list, real_argb_color const *);
-			break;
-
-		case _render_debug_cache_cylinder:
-			entry->pill.base = *va_arg(list, real_point3d const *);
-			entry->pill.height = *va_arg(list, real_vector3d const *);
-			entry->pill.width = (real)va_arg(list, double);
-			entry->pill.color = *va_arg(list, real_argb_color const *);
-			break;
-
-		case _render_debug_cache_pill:
-			entry->pill.base = *va_arg(list, real_point3d const *);
-			entry->pill.height = *va_arg(list, real_vector3d const *);
-			entry->pill.width = (real)va_arg(list, double);
-			entry->pill.color = *va_arg(list, real_argb_color const *);
-			break;
-
-		case _render_debug_cache_box:
-		case _render_debug_cache_box_outline:
-			entry->box.bounds = *va_arg(list, real_rectangle3d const *);
-			entry->box.color = *va_arg(list, real_argb_color const *);
-			break;
-
-		case _render_debug_cache_string:
-			cached_string = render_debug_add_cache_string(va_arg(list, char const *));
-			if (cached_string)
-			{
-				entry->string.string = cached_string;
-			}
-			else
-			{
-				render_debug_globals.entry_count--;
-			}
-			break;
-
-		case _render_debug_cache_string_at_point:
-			cached_string = render_debug_add_cache_string(va_arg(list, char const *));
-			if (!cached_string)
-			{
-				render_debug_globals.entry_count--;
-				break;
-			}
-
-			entry->string_at_point.string = cached_string;
-			entry->string_at_point.point = *va_arg(list, real_point3d const *);
-			entry->string_at_point.color = *va_arg(list, real_argb_color const *);
-			break;
+		error(_error_silent, "render debug cache overflow.");
+		render_debug_globals.entry_overflow_reported = TRUE;
 	}
-
-	va_end(list);
 
 	return;
 }

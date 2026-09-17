@@ -103,13 +103,6 @@ boolean action_uncover_setup_pursuit(
 boolean action_uncover_perform(
 	long actor_index)
 {
-	boolean position_flags;
-	long previous_owner_actor_index;
-	short selected_firing_position_index;
-	struct firing_position candidate;
-	char temporary[256];
-	struct firing_position_evaluation_context search;
-	struct path_state workspace;
 	struct actor_datum *actor = actor_get(actor_index);
 	struct uncover_state_data *state_data = &actor->state.action_data.uncover;
 
@@ -118,18 +111,25 @@ boolean action_uncover_perform(
 		!actor->input.vehicle_passenger &&
 		!state_data->uncover_done)
 	{
+		boolean position_flags;
+		long previous_owner_actor_index;
+		short selected_firing_position_index;
+		struct firing_position candidate;
+		char temporary[256];
+		struct firing_position_evaluation_context search;
+		struct path_state workspace;
+
 		csmemset(&search, 0, sizeof(search));
+		search.evaluation_mode = _firing_point_evaluation_mode_uncover;
 		if (state_data->pursuit_location.type == _pursuit_location_position)
 		{
-			search.evaluation_mode = _firing_point_evaluation_mode_uncover;
+			search.specific_target_enable = TRUE;
 			search.specific_target_point = state_data->pursuit_location.position;
 			search.specific_target_surface_index = state_data->pursuit_location.surface_index;
-			search.specific_target_enable = TRUE;
 			search.specific_target_cluster_index = state_data->pursuit_location.cluster_index;
 		}
 		else
 		{
-			search.evaluation_mode = _firing_point_evaluation_mode_uncover;
 			search.use_last_visible_target_position = state_data->no_target_sight_available;
 		}
 

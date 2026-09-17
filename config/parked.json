@@ -730,25 +730,6 @@
       }
     },
     {
-      "unit": "source/bitmaps/bitmaps_quantitize",
-      "function": "_row_dither",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after the full row-dither provenance packet, the later 1,571-worktree freshness census, all ten source identities, both obvious source statement orders, and the declaration/loop-tail/pointer/dependency families were exhausted. The retained natural Floyd-Steinberg C has the same 464-byte padded size, zero relocations, exact frame/control flow, and differs only in the order of three independent loop-maintenance operations: January emits inc EAX; add EBX,2; add ECX,2, while the retained compiler emits add EBX,2; inc EAX; add ECX,2. Reversing the two source statements puts ECX between EAX and EBX instead. Barriers, pragmas, artificial dependencies, volatile/register forcing, inline assembly, and byte patches are rejected. The January atlas and multiple cross-build maps recover row_dither; bitmap_quantitize_read_row and bits_per_channel_reversed are descriptive names because no original private names were found. Reopen only for original local/statement provenance, a same-compiler natural-C donor with this dependency context, or a genuinely new lawful scheduling control.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 0,
-          "normalized_sha256": "a5feef0c98bc8565991a9cf9722e0258d2bd556e23fc0326891aa0ce0ebca5db"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 0,
-          "normalized_sha256": "7afe02e297bf06dd682a9c44bfd00aacf39c2f7ea0c0f45acce838dc9b696da4"
-        },
-        "objdiff_percent": 98.809525
-      }
-    },
-    {
       "unit": "source/bungie_net/common/key_agreement",
       "function": "_complete_key_exchange",
       "class": "instruction-scheduling",
@@ -918,44 +899,6 @@
         "target": { "size": 720, "relocation_count": 27, "normalized_sha256": "22aacf2cc27693354c5025ab0df43e759489116f19e4e3600ad74e4f1e8973ac" },
         "base": { "size": 720, "relocation_count": 27, "normalized_sha256": "44113369d29436c6449ac416cc0a68340f752929938a3f099acd6fd10ab6101c" },
         "objdiff_percent": 98.017395
-      }
-    },
-    {
-      "unit": "source/memory/lruv_cache",
-      "function": "_lruv_debug_to_file",
-      "class": "register-allocation",
-      "evidence": "The retained body is coherent typed C and follows the HaloCEA-authenticated cache->name, unsigned age, and lruv_cache_bytes_to_pages topology while preserving January's measured control-flow envelope. Target and candidate are both 464 bytes with 20 relocations. Their symbolic relocation-target multisets match 20/20; the three raw-owner differences are only csplit's external-versus-local representation of the shared empty, space, and newline string literals. The remaining divergence begins in the callee-saved register cycle and continues as ordinary VC7 stack colouring and instruction scheduling. Fifty-five documented natural-C experiments, the Demon-oracle pair, the unsigned-age one-shot, and a twelve-blob branch sweep found no strict source-level closure. No barrier, volatile access, register hint, fake dependency, raw overlay, assembly, manual byte control, or nonsensical type pun is retained. Reopen only for authenticated January source/local records or a natural same-compiler lifetime/topology donor that changes the initial register cycle.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 20,
-          "normalized_sha256": "fb7c7a22cacb060e9e3fa2e5a57942daa52e259dccc6b7796bf744bf28d291bb"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 20,
-          "normalized_sha256": "8b2776c4666f22765aba53a34d4bff1f09d4223456d38fb1ee53b3ae69b355aa"
-        },
-        "objdiff_percent": 91.38323
-      }
-    },
-    {
-      "unit": "source/ai/action_uncover",
-      "function": "_action_uncover_perform",
-      "class": "instruction-scheduling",
-      "evidence": "The retained body is coherent typed C recovered from January disassembly and the established action-uncover donor, with HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c corroborating the short selector/change ABI and high-level state transitions. January and candidate have the same 544-byte envelope, 164 instructions, and all 19 relocation addresses, types, destinations, and addends. Only 43 normalized byte positions differ in the contiguous +0xA2..+0xD3 pursuit-point copy: January loads all three point dwords before interleaving the independent flag/surface/cluster stores, while VC7 lowers the natural aggregate assignment as alternating loads and stores. The prior aggregate, scalar, alias, helper, field-order, scope, barrier, and 45 documented defined-C topology families are exhausted; forcing the target schedule would require prohibited gameplay assembly or artificial source. Reopen only for authenticated January source/local records, a strict same-compiler C donor, or a new natural lifetime fact that preserves the frame, relocations, compact source LEA, and downstream exact suffix.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 19,
-          "normalized_sha256": "ddd3ed044dc0de47ecb6ba83ac683372ff87b3cb7d8fee318d20da5467c39ed8"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 19,
-          "normalized_sha256": "f6c5eb3588f3efccd66611ba0c133b20dc3fb449fad4894f3022b8e9c6f04bd0"
-        },
-        "objdiff_percent": 98.77778
       }
     },
     {
@@ -1640,25 +1583,6 @@
           "normalized_sha256": "4f2137667212ade01aa3926e67a3ad0b3d726bec432a345a596e2e03a5948ce8"
         },
         "objdiff_percent": 84.45783
-      }
-    },
-    {
-      "unit": "source/game/game_engine_ctf",
-      "function": "_ctf_engine_weapon_update",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete CTF objective-weapon tick in ordinary typed C from January disassembly and assertions, the January engine-table role, the target-shaped Halo CE decompilation, and the independent HaloCEA implementation. The retained body handles single-flag swapping, unattended connected-flag return, warning and score messaging, carrier discovery, and both world/carrier goal markers through named cseries flags and typed weapon access. Isolating the return phase with its genuine short owner-team value, a long opposing-team result, the connected-map boolean, and the carrier-present fallthrough improves objdiff from 77.044945 to 90.87079 percent. January and the candidate now both occupy 576 padded bytes, contain 566 meaningful bytes, emit 188 instructions, and carry the same ordered 40-relocation behavior set. Alignment-aware comparison is exact before offset 0x13A and from offset 0x19A through the end; all remaining differences are confined to the idle-return message block. January promotes the owner team into EDI and computes the opposing team in EBX before testing the handled flag, while natural VC7 C keeps the short value in BX until the sound/message calls and schedules the handled test first. The fail-closed blocker classifier returns UNKNOWN, so this remains honestly unclassified rather than assigned an invented recipe. All local Claude, Opus, and Fable donors were audited; bounded whole-block/return-block short-versus-long types, declaration order, signedness, connected-flag, handled-local, tail-polarity, and explicit-promotion variants either reproduced this fixed point or regressed it. No forced inline/noinline, barrier, volatile/register forcing, pragma, assembly, manual replacement for the retained cseries flag macro, raw address, fake dependency, representation pun, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the one remaining promotion/scheduling block.",
-      "measurements": {
-        "target": {
-          "size": 576,
-          "relocation_count": 40,
-          "normalized_sha256": "0c8e2649895a583167f4b4c8d53d9d29c7e4c0edbad2488e717d4517ce66d20b"
-        },
-        "base": {
-          "size": 576,
-          "relocation_count": 40,
-          "normalized_sha256": "bff168bc4a51e834f7be79383114d53173377a1ba2c60404ff287930f5e5ecd5"
-        },
-        "objdiff_percent": 90.87079
       }
     },
     {
@@ -2612,25 +2536,6 @@
       }
     },
     {
-      "unit": "source/render/render_debug",
-      "function": "_render_debug_add_cache_entry",
-      "class": "unclassified",
-      "evidence": "Complete natural variadic cache dispatcher retained with its genuine private static caller graph and typed tagged-union/cache globals, not an exported emission anchor. Default promotions use int and double. A recovered cached_string local preserves January's stale slot payload when string insertion fails; the old donor's unconditional NULL store is not copied. Target656/27R versus candidate672/27R, objdiff57.757446 percent; residuals are unforced basic-block, save/restore and tail-sharing choices, not missing cases. All ten valid helper type contracts and the real public string chain pass41 scenarios/81invocations with full cache, API-entry snapshots, ABI and guards. Type0 is tested only with its complete valid argument contract: the separate January circle caller omits the offset double and remains unwritten/unapproved. No claim of correctness for that original invalid caller path. Both private string helper and public wrapper are separately strict; all inherited owners and the full strict sweep are preserved, with no extra helper, COMMON or point_from_line3d. See docs/object_matching_logs/render_debug_obj_cache_string_natural_reconciliation_20260905.md. Reopen only from genuine source/schema/compiler evidence, not equivalent spelling or layout searches.",
-      "measurements": {
-        "target": {
-          "size": 656,
-          "relocation_count": 27,
-          "normalized_sha256": "758a747bdf7be941e3f5d2ed8af568da259bfd54f31c20040d5e020dd3a26039"
-        },
-        "base": {
-          "size": 672,
-          "relocation_count": 27,
-          "normalized_sha256": "253ff517307f1ce0930b283987a3440871ba949616ecc6ed43ff1ce939911398"
-        },
-        "objdiff_percent": 57.757446
-      }
-    },
-    {
       "unit": "source/ai/path",
       "function": "_closest_point_to_attractor",
       "class": "unclassified",
@@ -2647,25 +2552,6 @@
           "normalized_sha256": "d96eb8493bcb04e1293629a7c9b5d3735b8eb5f1b30ea2ff2ec5438376d389ab"
         },
         "objdiff_percent": 98.567566
-      }
-    },
-    {
-      "unit": "source/ai/action_guard",
-      "function": "_action_guard_perform",
-      "class": "unclassified",
-      "evidence": "Best currently integrated house-rule-compliant reconstruction after the 2026-09-07 ActorFiringPosition owner/ABI reconciliation. The genuine boolean selection flag, firing_position records and path_state workspace replace the prior opaque long/byte facades. This proper shared ownership changes the actor_change_firing_position call encoding and following layout while preserving the 448-byte size and all 13 relocation identities. The former 437 meaningful exact bytes are explicitly debited; this function receives zero exact credit. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md for donor provenance, full-batch evidence and research pointers.",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 13,
-          "normalized_sha256": "d977c9d5393c42c808bd1b16613d64e889b937c6e12af2de2d01d42fb0e7bf2a"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 13,
-          "normalized_sha256": "e5bd29903c9626c22a35480c01a556e383a5c27a364a7f4ca2c25f9e3fcabd8f"
-        },
-        "objdiff_percent": 99.22481
       }
     },
     {

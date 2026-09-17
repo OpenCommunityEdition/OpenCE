@@ -681,7 +681,7 @@ action_guard_perform(
 {
 	boolean position_flags;
 	long previous_owner_actor_index;
-	long selected_firing_position_index;
+	short selected_firing_position_index;
 	real guard_position_time_lower_bound;
 	real guard_position_time_upper_bound;
 	short firing_position_index;

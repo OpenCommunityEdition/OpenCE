@@ -154,80 +154,45 @@ static void row_dither(
 	byte *destination)
 {
 	short pixel_index;
-	long channel_index;
 
 	for (pixel_index = 0; pixel_index < pixel_count; pixel_index++)
 	{
 		byte original[CHANNEL_COUNT];
 		byte quantized[CHANNEL_COUNT];
-		short *source_channel;
-		short *source_after_pixel;
-		byte *original_channel;
-		short const *bits_channel;
-		short const *minimum_channel;
-		long channels_remaining;
-		long quantized_value;
+		short channel_index;
 
-		source_channel = source;
-		original_channel = original;
-		channels_remaining = CHANNEL_COUNT;
-		do
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
 		{
-			short value = *source_channel;
-			*original_channel = value < 0 ? 0 : value > 255 ? 255 : value;
-			source_channel++;
-			original_channel++;
+			original[channel_index] = PIN(source[channel_index], 0, 255);
 		}
-		while (--channels_remaining);
-		source_after_pixel = source_channel;
 
-		bits_channel = bits_per_channel;
-		channel_index = 0;
-		channels_remaining = CHANNEL_COUNT;
-		do
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
 		{
-			if (*bits_channel)
-			{
-				quantized_value =
-					((original[channel_index] >> (CHANNEL_BITS - *bits_channel)) * 255) /
-					((1 << *bits_channel) - 1);
-			}
-			else
-			{
-				quantized_value = 0;
-			}
-			quantized[channel_index] = quantized_value;
-			destination[channel_index] = quantized_value;
-			channel_index++;
-			bits_channel++;
+			destination[channel_index] = quantized[channel_index] = bits_per_channel[channel_index] ?
+				((original[channel_index] >> (CHANNEL_BITS - bits_per_channel[channel_index])) * 255) /
+					((1 << bits_per_channel[channel_index]) - 1) :
+				0;
 		}
-		while (--channels_remaining);
 
-		minimum_channel = minimum_error;
-		channel_index = 0;
-		channels_remaining = CHANNEL_COUNT;
-		do
+		for (channel_index = 0; channel_index < CHANNEL_COUNT; channel_index++)
 		{
 			short error = original[channel_index] - quantized[channel_index];
 
-			if (pixel_index < pixel_count - 1 && source[CHANNEL_COUNT + channel_index] > *minimum_channel)
+			if (pixel_index < pixel_count - 1 && source[CHANNEL_COUNT + channel_index] > minimum_error[channel_index])
 				source[CHANNEL_COUNT + channel_index] += (error * 7) / 16;
 
 			if (next_source)
 			{
-				if (pixel_index && next_source[-CHANNEL_COUNT + channel_index] > *minimum_channel)
+				if (pixel_index && next_source[-CHANNEL_COUNT + channel_index] > minimum_error[channel_index])
 					next_source[-CHANNEL_COUNT + channel_index] += (error * 3) / 16;
-				if (next_source[channel_index] > *minimum_channel)
+				if (next_source[channel_index] > minimum_error[channel_index])
 					next_source[channel_index] += (error * 5) / 16;
-				if (pixel_index < pixel_count - 1 && next_source[CHANNEL_COUNT + channel_index] > *minimum_channel)
+				if (pixel_index < pixel_count - 1 && next_source[CHANNEL_COUNT + channel_index] > minimum_error[channel_index])
 					next_source[CHANNEL_COUNT + channel_index] += error / 16;
 			}
-			minimum_channel++;
-			channel_index++;
 		}
-		while (--channels_remaining);
 
-		source = source_after_pixel;
+		source += CHANNEL_COUNT;
 		destination += CHANNEL_COUNT;
 		if (next_source)
 			next_source += CHANNEL_COUNT;

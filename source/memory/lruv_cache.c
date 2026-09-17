@@ -368,9 +368,6 @@ void lruv_resize(
 	return;
 }
 
-/* NonMatching: target and candidate are both 0x1D0 padded bytes with all 20
- * semantic relocations present. The remaining difference is VC7 control-flow
- * scheduling and callee-saved register allocation in the block-report loop. */
 void lruv_debug_to_file(
 	const char *path,
 	const char *allocation_name,
@@ -422,11 +419,11 @@ void lruv_debug_to_file(
 		{
 			age = 0;
 			locked = FALSE;
+			block_name = NULL;
 			if (block_index == NONE)
 			{
 				page_count = cache->page_count - page_index;
 				page_index = cache->page_count;
-				goto output_hole;
 			}
 			else
 			{
@@ -446,8 +443,6 @@ void lruv_debug_to_file(
 					page_index = block->first_page_index + block->page_count;
 					block_name = block_name_proc(block_index);
 					block_index = block->next_block_index;
-					if (block_name)
-						goto output_block;
 				}
 				else
 				{
@@ -460,20 +455,13 @@ void lruv_debug_to_file(
 				}
 			}
 
-		output_hole:
-			block_name = "";
-
-		output_block:
-
-			age = MIN(age, 9999);
-
 			fprintf(
 				stream,
 				"%s % 5d% 5d %s\n",
 				locked ? "L" : " ",
 				page_count,
-				age,
-				block_name);
+				MIN(9999, age),
+				block_name ? block_name : "");
 		}
 
 		fprintf(stream, "\n");
