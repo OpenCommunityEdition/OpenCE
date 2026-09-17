@@ -1633,25 +1633,6 @@
     },
     {
       "unit": "source/structures/structure_visibility",
-      "function": "_structure_visibility_traverse_surface_lists",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete fallback visibility path used by old BSPs without subclusters. January's code, relocations, exact diagnostic string, and profile ownership establish the loop shape; HaloCEA independently supplies the named behavior. The retained typed C emits the one-time reimport warning in the caller, clears surface flags, walks every rendered cluster surface list, marks surfaces, and records each rendered cluster's surface span. Target and candidate share the 528-byte padded envelope and all 27 relocations; objdiff reports 71.402435 percent. The residual is distributed VC7 loop/register scheduling rather than a proved source defect, so it is honestly unclassified. No barriers, volatile/register forcing, pragma, assembly, raw offset logic, fake dependency, forced inline, or semantic distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
-      "measurements": {
-        "target": {
-          "size": 528,
-          "relocation_count": 27,
-          "normalized_sha256": "2a6617213b8569bb3d60a0106335609d210a6abb8a1d87a43c061f6413abf2b2"
-        },
-        "base": {
-          "size": 528,
-          "relocation_count": 27,
-          "normalized_sha256": "9aeaac4160f423a5cbe83cf89b2247549e2e255f31b77ad393bfe9218bf30db5"
-        },
-        "objdiff_percent": 71.402435
-      }
-    },
-    {
-      "unit": "source/structures/structure_visibility",
       "function": "_portal_hull_from_points",
       "class": "unclassified",
       "evidence": "Fuzzy-parked after reconstructing the complete portal projection helper from January's projection calls, assertion strings, loop shape, and return topology, with HaloCEA providing the authenticated private name and behavior. The retained typed C projects each real_point3d through the current camera/frustum, rejects a hull only when every point is behind the screen plane, computes the 2D convex hull, and returns January's three-state result. Target is 480 padded bytes and the candidate 464, with all 16 relocation identities preserved; objdiff reports 85.31645 percent. The remaining 16-byte gap spans VC7 local/register and floating-point scheduling, with no unique source recipe proved, so the entry is unclassified. No representation pun, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or geometric distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",

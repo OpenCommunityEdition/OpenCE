@@ -488,32 +488,26 @@ static void structure_visibility_traverse_surface_lists(
 			&structure->clusters,
 			rendered_cluster->cluster_index,
 			struct structure_visibility_cluster);
+		long *surface_index_buffer = (long *)cluster->surface_indices.address;
 		struct render_frustum *frustum = structures_use_pvs_for_vs || render.cluster_index == NONE
 			? &render.frustum
 			: &rendered_cluster->frustum;
-		long *surface_index_buffer = (long *)cluster->surface_indices.address;
 		long consumed_surface_index_count = 0;
 
 		while (consumed_surface_index_count < cluster->surface_indices.count)
 		{
-			long lightmap_index = surface_index_buffer[0];
-			long material_index = surface_index_buffer[1];
-			long group_end = consumed_surface_index_count + surface_index_buffer[2] + 3;
-			struct structure_lightmap *lightmap;
-			struct structure_material *material;
-			byte *vertex_buffer;
-
-			consumed_surface_index_count += 3;
-			surface_index_buffer += 3;
-			lightmap = TAG_BLOCK_GET_ELEMENT(
-				&structure->lightmaps,
-				lightmap_index,
-				struct structure_lightmap);
-			material = TAG_BLOCK_GET_ELEMENT(
-				&lightmap->materials,
-				material_index,
+			struct structure_material *material = TAG_BLOCK_GET_ELEMENT(
+				&TAG_BLOCK_GET_ELEMENT(
+					&structure->lightmaps,
+					surface_index_buffer[0],
+					struct structure_lightmap)->materials,
+				surface_index_buffer[1],
 				struct structure_material);
-			vertex_buffer = (byte *)material->compressed_vertex_data.address;
+			long group_end;
+
+			surface_index_buffer += 2;
+			group_end = consumed_surface_index_count + *surface_index_buffer++ + 3;
+			consumed_surface_index_count += 3;
 
 			while (consumed_surface_index_count < group_end)
 			{
@@ -535,12 +529,21 @@ static void structure_visibility_traverse_surface_lists(
 						&structure->surfaces,
 						surface_index,
 						struct structure_visibility_surface);
+					real_point3d const *vertex0 = (real_point3d const *)(
+						(byte *)material->compressed_vertex_data.address +
+						surface->vertex_indices[0] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
+					real_point3d const *vertex1 = (real_point3d const *)(
+						(byte *)material->compressed_vertex_data.address +
+						surface->vertex_indices[1] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
+					real_point3d const *vertex2 = (real_point3d const *)(
+						(byte *)material->compressed_vertex_data.address +
+						surface->vertex_indices[2] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
 
 					if (render_frustum_triangle_visible(
 						frustum,
-						(real_point3d const *)(vertex_buffer + surface->vertex_indices[0] * COMPRESSED_STRUCTURE_VERTEX_SIZE),
-						(real_point3d const *)(vertex_buffer + surface->vertex_indices[1] * COMPRESSED_STRUCTURE_VERTEX_SIZE),
-						(real_point3d const *)(vertex_buffer + surface->vertex_indices[2] * COMPRESSED_STRUCTURE_VERTEX_SIZE)))
+						vertex0,
+						vertex1,
+						vertex2))
 					{
 						BIT_VECTOR_SET_FLAG(render.environment_surface_flags, surface_index, TRUE);
 						render.environment_surface_count++;
