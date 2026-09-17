@@ -162,7 +162,7 @@ void edit_text_handle_key(
 			}
 		}
 	}
-	else if (key->ascii_code && key->ascii_code!=(byte)NONE)
+	else if (key->ascii_code && key->ascii_code!=NONE)
 	{
 		short selection_end;
 		short selection_start;

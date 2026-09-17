@@ -304,10 +304,8 @@ static boolean find_turning_point(
 	struct collision_edge const *collision_edge;
 	struct collision_vertex const *vertex_a;
 	struct collision_vertex const *vertex_b;
-	real negative_radius;
 	real edge_dx;
 	real edge_dy;
-	real magnitude;
 	real_vector2d edge_direction;
 	real_point2d positive_point;
 	real_point2d negative_point;
@@ -337,7 +335,6 @@ static boolean find_turning_point(
 #line 511 "c:\\halo\\SOURCE\\ai\\path_smoothing.c"
 	match_assert("c:\\halo\\SOURCE\\ai\\path_smoothing.c", 0x1ff, clockwise==TRUE || clockwise==FALSE);
 
-	negative_radius = -radius;
 	edge_index = first_edge_index;
 	while (TRUE)
 	{
@@ -363,26 +360,13 @@ static boolean find_turning_point(
 
 		edge_dx = vertex_b->point.x - vertex_a->point.x;
 		edge_dy = vertex_b->point.y - vertex_a->point.y;
-		edge_direction.i = edge_dy;
-		edge_direction.j = -edge_dx;
+		set_real_vector2d(&edge_direction, edge_dy, -edge_dx);
 
 		valid = FALSE;
-		magnitude = (real)sqrt(
-			edge_direction.i*edge_direction.i + edge_direction.j*edge_direction.j);
-		if (!(_real_epsilon > fabs(magnitude - 0.0f)))
-		{
-			edge_direction.i = edge_direction.i*(1.0f / magnitude);
-			edge_direction.j = edge_direction.j*(1.0f / magnitude);
-		}
-		else
-		{
-			magnitude = 0.0f;
-		}
+		normalize2d(&edge_direction);
 
-		positive_point.x = point->x + edge_direction.i*radius;
-		positive_point.y = point->y + edge_direction.j*radius;
-		negative_point.x = point->x + edge_direction.i*negative_radius;
-		negative_point.y = point->y + edge_direction.j*negative_radius;
+		point_from_line2d(point, &edge_direction, radius, &positive_point);
+		point_from_line2d(point, &edge_direction, -radius, &negative_point);
 
 		vertex_to_positive.i = vertex_a->point.x - positive_point.x;
 		vertex_to_positive.j = vertex_a->point.y - positive_point.y;

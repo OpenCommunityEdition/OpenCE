@@ -373,11 +373,7 @@ void update_ticks(
 
 	if (down)
 	{
-		value = *ticks + 1;
-		if (value > UNSIGNED_CHAR_MAX)
-		{
-			value = UNSIGNED_CHAR_MAX;
-		}
+		value = MIN(*ticks + 1, UNSIGNED_CHAR_MAX);
 	}
 	else
 	{
@@ -732,91 +728,85 @@ static void input_update_analog_button_state(
 static void input_get_device_states(
 	void)
 {
-	unsigned long insertions;
-	unsigned long removals;
 	unsigned long memory_unit_insertions;
 	unsigned long memory_unit_removals;
 	unsigned long device_change_flags = 0;
-	long gamepad_index = 0;
+	short gamepad_index;
 
-	if (XGetDeviceChanges(
-		XDEVICE_TYPE_GAMEPAD,
-		&insertions,
-		&removals))
 	{
-		HANDLE *gamepad_handle = input_globals.gamepad_handles;
-		long gamepad_count = MAXIMUM_GAMEPADS;
+		unsigned long insertions;
+		unsigned long removals;
 
-		while (gamepad_count)
+		if (XGetDeviceChanges(
+			XDEVICE_TYPE_GAMEPAD,
+			&insertions,
+			&removals))
 		{
-			unsigned long gamepad_mask = FLAG(gamepad_index);
-
-			if (removals & gamepad_mask)
+			for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
 			{
-				match_assert(
-					"c:\\halo\\SOURCE\\input\\input_xbox.c",
-					0x217,
-					input_globals.gamepad_handles[gamepad_index]);
-				XInputClose(*gamepad_handle);
-				*gamepad_handle = NULL;
-			}
-
-			if (insertions & gamepad_mask)
-			{
-				match_assert(
-					"c:\\halo\\SOURCE\\input\\input_xbox.c",
-					0x21E,
-					input_globals.gamepad_handles[gamepad_index]==NULL);
-				*gamepad_handle = XInputOpen(
-					XDEVICE_TYPE_GAMEPAD,
-					gamepad_index,
-					XDEVICE_NO_SLOT,
-					NULL);
-				if (*gamepad_handle == NULL)
+				if (TEST_FLAG(removals, gamepad_index))
 				{
-					error(
-						_error_silent,
-						"XInputOpen (gamepad) failed (#%d) during input_update()",
-						GetLastError());
+					match_assert(
+						"c:\\halo\\SOURCE\\input\\input_xbox.c",
+						0x217,
+						input_globals.gamepad_handles[gamepad_index]);
+					XInputClose(input_globals.gamepad_handles[gamepad_index]);
+					input_globals.gamepad_handles[gamepad_index] = NULL;
+				}
+
+				if (TEST_FLAG(insertions, gamepad_index))
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\input\\input_xbox.c",
+						0x21E,
+						input_globals.gamepad_handles[gamepad_index]==NULL);
+					input_globals.gamepad_handles[gamepad_index] = XInputOpen(
+						XDEVICE_TYPE_GAMEPAD,
+						gamepad_index,
+						XDEVICE_NO_SLOT,
+						NULL);
+					if (input_globals.gamepad_handles[gamepad_index] == NULL)
+					{
+						error(
+							_error_silent,
+							"XInputOpen (gamepad) failed (#%d) during input_update()",
+							GetLastError());
+					}
 				}
 			}
 
-			gamepad_index++;
-			gamepad_handle++;
-			gamepad_count--;
-		}
-
-		if (TEST_FLAG(removals, XDEVICE_PORT0))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad0_removed, TRUE);
-		}
-		if (TEST_FLAG(removals, XDEVICE_PORT1))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad1_removed, TRUE);
-		}
-		if (TEST_FLAG(removals, XDEVICE_PORT2))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad2_removed, TRUE);
-		}
-		if (TEST_FLAG(removals, XDEVICE_PORT3))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad3_removed, TRUE);
-		}
-		if (TEST_FLAG(insertions, XDEVICE_PORT0))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad0_inserted, TRUE);
-		}
-		if (TEST_FLAG(insertions, XDEVICE_PORT1))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad1_inserted, TRUE);
-		}
-		if (TEST_FLAG(insertions, XDEVICE_PORT2))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad2_inserted, TRUE);
-		}
-		if (TEST_FLAG(insertions, XDEVICE_PORT3))
-		{
-			SET_FLAG(device_change_flags, _input_device_change_gamepad3_inserted, TRUE);
+			if (TEST_FLAG(removals, XDEVICE_PORT0))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad0_removed, TRUE);
+			}
+			if (TEST_FLAG(removals, XDEVICE_PORT1))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad1_removed, TRUE);
+			}
+			if (TEST_FLAG(removals, XDEVICE_PORT2))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad2_removed, TRUE);
+			}
+			if (TEST_FLAG(removals, XDEVICE_PORT3))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad3_removed, TRUE);
+			}
+			if (TEST_FLAG(insertions, XDEVICE_PORT0))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad0_inserted, TRUE);
+			}
+			if (TEST_FLAG(insertions, XDEVICE_PORT1))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad1_inserted, TRUE);
+			}
+			if (TEST_FLAG(insertions, XDEVICE_PORT2))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad2_inserted, TRUE);
+			}
+			if (TEST_FLAG(insertions, XDEVICE_PORT3))
+			{
+				SET_FLAG(device_change_flags, _input_device_change_gamepad3_inserted, TRUE);
+			}
 		}
 	}
 
@@ -893,96 +883,65 @@ static void input_get_device_states(
 
 	input_abstraction_update_device_changes(device_change_flags);
 
+	for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
 	{
-		struct raw_gamepad_state *raw_gamepad_state = input_globals.raw_gamepad_states;
-		struct gamepad_state *gamepad_state = input_globals.gamepad_states;
-		HANDLE *gamepad_handle = input_globals.gamepad_handles;
-		long gamepad_count = MAXIMUM_GAMEPADS;
-
-		while (gamepad_count)
+		if (input_globals.gamepad_handles[gamepad_index] != NULL)
 		{
-			if (*gamepad_handle != NULL)
+			XINPUT_STATE input_state;
+			long result = (long)XInputGetState(
+				input_globals.gamepad_handles[gamepad_index],
+				&input_state);
+
+			if (result >= 0)
 			{
-				XINPUT_STATE input_state;
-				long result = (long)XInputGetState(*gamepad_handle, &input_state);
+				struct gamepad_state *gamepad_state = &input_globals.gamepad_states[gamepad_index];
+				short button_index;
 
-				if (result >= 0)
+				for (button_index = 0; button_index < NUMBER_OF_GAMEPAD_ANALOG_BUTTONS; button_index++)
 				{
-					const byte *analog_button_index = gamepad_analog_button_indices;
-					byte *analog_button = gamepad_state->analog_buttons;
-					byte *analog_button_threshold = gamepad_state->analog_button_thresholds;
-					byte *analog_button_ticks = &gamepad_state->buttons[FIRST_GAMEPAD_ANALOG_BUTTON];
-					long button_count = NUMBER_OF_GAMEPAD_ANALOG_BUTTONS;
-
-					while (button_count)
-					{
-						byte value = input_state.Gamepad.bAnalogButtons[
-							*analog_button_index];
-
-						*analog_button = value;
-						update_ticks(
-							analog_button_ticks,
-							value > *analog_button_threshold);
-						input_update_analog_button_state(
-							analog_button_threshold,
-							value,
-							*analog_button_ticks != 0);
-
-						analog_button_index++;
-						analog_button++;
-						analog_button_threshold++;
-						analog_button_ticks++;
-						button_count--;
-					}
-
-					{
-						const byte *binary_button_mask = gamepad_binary_button_masks;
-						byte *binary_button_ticks = &gamepad_state->buttons[FIRST_GAMEPAD_BINARY_BUTTON];
-						long binary_button_count = NUMBER_OF_GAMEPAD_BINARY_BUTTONS;
-
-						while (binary_button_count)
-						{
-							update_ticks(
-								binary_button_ticks,
-								(input_state.Gamepad.wButtons & *binary_button_mask) != 0);
-
-							binary_button_mask++;
-							binary_button_ticks++;
-							binary_button_count--;
-						}
-					}
-
-					raw_gamepad_state->sticks[_gamepad_stick_left].x = input_state.Gamepad.sThumbLX;
-					raw_gamepad_state->sticks[_gamepad_stick_left].y = input_state.Gamepad.sThumbLY;
-					raw_gamepad_state->sticks[_gamepad_stick_right].x = input_state.Gamepad.sThumbRX;
-					raw_gamepad_state->sticks[_gamepad_stick_right].y = input_state.Gamepad.sThumbRY;
-
-					gamepad_state->sticks[_gamepad_stick_left].x = fix_dead_zone(
-						input_state.Gamepad.sThumbLX,
-						GAMEPAD_STICK_DEAD_RANGE);
-					gamepad_state->sticks[_gamepad_stick_left].y = fix_dead_zone(
-						input_state.Gamepad.sThumbLY,
-						GAMEPAD_STICK_DEAD_RANGE);
-					gamepad_state->sticks[_gamepad_stick_right].x = fix_dead_zone(
-						input_state.Gamepad.sThumbRX,
-						GAMEPAD_STICK_DEAD_RANGE);
-					gamepad_state->sticks[_gamepad_stick_right].y = fix_dead_zone(
-						input_state.Gamepad.sThumbRY,
-						GAMEPAD_STICK_DEAD_RANGE);
+					gamepad_state->analog_buttons[button_index] =
+						input_state.Gamepad.bAnalogButtons[gamepad_analog_button_indices[button_index]];
+					update_ticks(
+						&gamepad_state->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + button_index],
+						gamepad_state->analog_buttons[button_index] > gamepad_state->analog_button_thresholds[button_index]);
+					input_update_analog_button_state(
+						&gamepad_state->analog_button_thresholds[button_index],
+						gamepad_state->analog_buttons[button_index],
+						gamepad_state->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + button_index] != 0);
 				}
-				else
+
+				for (button_index = 0; button_index < NUMBER_OF_GAMEPAD_BINARY_BUTTONS; button_index++)
 				{
-					error(
-						_error_silent,
-						"XGetState (gamepad) failed (#%d) during input_update()",
-						result);
+					update_ticks(
+						&gamepad_state->buttons[FIRST_GAMEPAD_BINARY_BUTTON + button_index],
+						(input_state.Gamepad.wButtons & gamepad_binary_button_masks[button_index]) != 0);
 				}
+
+				input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_left].x = input_state.Gamepad.sThumbLX;
+				input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_left].y = input_state.Gamepad.sThumbLY;
+				input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_right].x = input_state.Gamepad.sThumbRX;
+				input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_right].y = input_state.Gamepad.sThumbRY;
+
+				gamepad_state->sticks[_gamepad_stick_left].x = fix_dead_zone(
+					input_state.Gamepad.sThumbLX,
+					GAMEPAD_STICK_DEAD_RANGE);
+				gamepad_state->sticks[_gamepad_stick_left].y = fix_dead_zone(
+					input_state.Gamepad.sThumbLY,
+					GAMEPAD_STICK_DEAD_RANGE);
+				gamepad_state->sticks[_gamepad_stick_right].x = fix_dead_zone(
+					input_state.Gamepad.sThumbRX,
+					GAMEPAD_STICK_DEAD_RANGE);
+				gamepad_state->sticks[_gamepad_stick_right].y = fix_dead_zone(
+					input_state.Gamepad.sThumbRY,
+					GAMEPAD_STICK_DEAD_RANGE);
 			}
-
-			gamepad_handle++;
-			gamepad_state++;
-			raw_gamepad_state++;
-			gamepad_count--;
+			else
+			{
+				error(
+					_error_silent,
+					"XGetState (gamepad) failed (#%d) during input_update()",
+					result);
+			}
 		}
 	}
 
@@ -1045,7 +1004,7 @@ static void input_update_keyboard_devices(
 	}
 
 	{
-		long key_code;
+		short key_code;
 
 		for (key_code = 0; key_code < NUMBER_OF_KEYS; key_code++)
 		{
@@ -1081,8 +1040,8 @@ static void input_update_keyboard_devices(
 				0x305,
 				keystroke.Ascii>=0 && keystroke.Ascii<NUMBER_OF_ASCII_CODES);
 			key.ascii_code = ascii_to_key_code[keystroke.Ascii] != NONE
-				? (byte)keystroke.Ascii
-				: (byte)NONE;
+				? keystroke.Ascii
+				: NONE;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\input\\input_xbox.c",

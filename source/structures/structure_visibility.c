@@ -241,7 +241,7 @@ typedef char structure_visibility_shader_environment_refraction_offset_assert[
 
 /* ---------- prototypes */
 
-static long bounding_rectangles_intersect(
+static short bounding_rectangles_intersect(
 	real_rectangle3d const *test_rectangle,
 	real_rectangle3d const *rectangle);
 static long planes_intersect_rectangle(
@@ -556,10 +556,12 @@ static void structure_visibility_traverse_surface_lists(
 	return;
 }
 
-static long bounding_rectangles_intersect(
+static short bounding_rectangles_intersect(
 	real_rectangle3d const *test_rectangle,
 	real_rectangle3d const *rectangle)
 {
+	short result;
+
 	if (rectangle->x1 < test_rectangle->x0 ||
 		rectangle->x0 > test_rectangle->x1 ||
 		rectangle->y1 < test_rectangle->y0 ||
@@ -567,20 +569,23 @@ static long bounding_rectangles_intersect(
 		rectangle->z1 < test_rectangle->z0 ||
 		rectangle->z0 > test_rectangle->z1)
 	{
-		return _intersection_out;
+		result = _intersection_out;
 	}
-
-	if (test_rectangle->x0 < rectangle->x0 ||
+	else if (test_rectangle->x0 < rectangle->x0 ||
 		test_rectangle->x1 > rectangle->x1 ||
 		test_rectangle->y0 < rectangle->y0 ||
 		test_rectangle->y1 > rectangle->y1 ||
 		test_rectangle->z0 < rectangle->z0 ||
 		test_rectangle->z1 > rectangle->z1)
 	{
-		return _intersection_spanning;
+		result = _intersection_spanning;
+	}
+	else
+	{
+		result = _intersection_in;
 	}
 
-	return _intersection_in;
+	return result;
 }
 
 static long planes_intersect_rectangle(

@@ -52,6 +52,11 @@ enum
 	_collision_surface_breakable_bit = 3,
 };
 
+enum
+{
+	_path_test_pill_endpoint_near_wall_ok_bit = 0,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -512,6 +517,154 @@ long structure_surface_index_from_point(
 	}
 
 	return NONE;
+}
+
+boolean structure_test_pill2d(
+	struct structure_bsp const *structure,
+	boolean ignore_broken_surfaces,
+	real_point2d const *p0,
+	long p0_surface_index,
+	real_point2d const *p1,
+	long p1_surface_index,
+	real radius,
+	unsigned long flags,
+	struct path_collision_result *result)
+{
+	boolean collision = FALSE;
+	real_vector2d direction;
+	real_vector2d perpendicular;
+
+	vector_from_points2d(p0, p1, &direction);
+	set_real_vector2d(&perpendicular, -direction.j, direction.i);
+	if (normalize2d(&perpendicular) > 0.0f)
+	{
+		real_point2d left_p0;
+		real_point2d left_p1;
+		real_point2d right_p0;
+		real_point2d right_p1;
+		long left_p0_surface_index;
+		long left_p1_surface_index;
+		long right_p0_surface_index;
+		long right_p1_surface_index;
+		struct path_collision_result left_result;
+		struct path_collision_result right_result;
+		struct path_collision_result endpoint_result;
+		struct path_collision_result *best_result;
+
+		left_p0_surface_index = structure_surface_index_from_point(
+			structure,
+			ignore_broken_surfaces,
+			p0,
+			p0_surface_index,
+			point_from_line2d(p0, &perpendicular, radius, &left_p0));
+		left_p1_surface_index = structure_surface_index_from_point(
+			structure,
+			ignore_broken_surfaces,
+			p1,
+			p1_surface_index,
+			point_from_line2d(p1, &perpendicular, radius, &left_p1));
+		right_p0_surface_index = structure_surface_index_from_point(
+			structure,
+			ignore_broken_surfaces,
+			p0,
+			p0_surface_index,
+			point_from_line2d(p0, &perpendicular, -radius, &right_p0));
+		right_p1_surface_index = structure_surface_index_from_point(
+			structure,
+			ignore_broken_surfaces,
+			p1,
+			p1_surface_index,
+			point_from_line2d(p1, &perpendicular, -radius, &right_p1));
+
+		if (left_p0_surface_index == NONE)
+		{
+			left_result.collision = FALSE;
+		}
+		else if (structure_test_line2d(
+				structure,
+				ignore_broken_surfaces,
+				&left_p0,
+				left_p0_surface_index,
+				&left_p1,
+				left_p1_surface_index,
+				&left_result) &&
+			left_result.surface_index != NONE &&
+			!TEST_FLAG(flags, _path_test_pill_endpoint_near_wall_ok_bit) &&
+			!structure_test_line2d(
+				structure,
+				ignore_broken_surfaces,
+				(real_point2d const *)&left_result.point,
+				left_result.surface_index,
+				p1,
+				p1_surface_index,
+				&endpoint_result))
+		{
+			left_result.collision = FALSE;
+		}
+
+		if (right_p0_surface_index == NONE)
+		{
+			right_result.collision = FALSE;
+		}
+		else if (structure_test_line2d(
+				structure,
+				ignore_broken_surfaces,
+				&right_p0,
+				right_p0_surface_index,
+				&right_p1,
+				right_p1_surface_index,
+				&right_result) &&
+			right_result.surface_index != NONE &&
+			!TEST_FLAG(flags, _path_test_pill_endpoint_near_wall_ok_bit) &&
+			!structure_test_line2d(
+				structure,
+				ignore_broken_surfaces,
+				(real_point2d const *)&right_result.point,
+				right_result.surface_index,
+				p1,
+				p1_surface_index,
+				&endpoint_result))
+		{
+			right_result.collision = FALSE;
+		}
+
+		if (left_result.collision && right_result.collision)
+		{
+			if (left_result.t < right_result.t)
+			{
+				best_result = &left_result;
+			}
+			else
+			{
+				best_result = &right_result;
+			}
+		}
+		else if (left_result.collision)
+		{
+			best_result = &left_result;
+		}
+		else if (right_result.collision)
+		{
+			best_result = &right_result;
+		}
+		else
+		{
+			best_result = NULL;
+		}
+
+		if (!best_result ||
+			distance_squared2d((real_point2d const *)&best_result->point, p1) < radius * radius)
+		{
+			*result = left_result;
+		}
+		else
+		{
+			*result = *best_result;
+			collision = TRUE;
+		}
+	}
+
+	return collision;
 }
 
 /* ---------- private code */

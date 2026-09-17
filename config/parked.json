@@ -502,44 +502,6 @@
       }
     },
     {
-      "unit": "source/input/input_xbox",
-      "function": "_input_get_device_states",
-      "class": "unclassified",
-      "evidence": "Typed January Xbox gamepad/memory-unit hotplug and state poller reconstructed with genuine XDK 3911 API/layout declarations, semantic private owners, named device flags and exact natural lookup-table ownership. First natural pointer/count implementation retains frame, register, table-hoisting and scheduling differences: 1280 versus 1232 padded bytes and 32 versus 28 relocations. This is not a proven narrow compiler tie or a byte-exact claim. All inherited exact functions remain exact; the two public callers now close with real private callees. No synthetic lifetime, raw offset, representation pun, forced inline, assembly or declaration-order search. Reopen for new authentic ABI/type/control-flow evidence, not equivalent-expression trials. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 1232,
-          "relocation_count": 28,
-          "normalized_sha256": "56316233dc2ab683b304fa910b38ac5a82e29e8a13850a48cf31af300c81d580"
-        },
-        "base": {
-          "size": 1280,
-          "relocation_count": 32,
-          "normalized_sha256": "b7cded6529564446f880d89597e525942284f3f273aea62da3e10b259c0acdde"
-        },
-        "objdiff_percent": 89.23637
-      }
-    },
-    {
-      "unit": "source/input/input_xbox",
-      "function": "_input_update_keyboard_devices",
-      "class": "unclassified",
-      "evidence": "Typed January debug-keyboard hotplug, key-tick aging and SDK keystroke queue/ring handling using the genuine XDK keystroke type, semantic modifier/key constants and exact private ASCII/virtual-key tables. Natural source reaches the 640-byte target extent but retains scheduling and relocation differences (51 versus 49); no exact or general equivalence claim. All inherited exact owners remain preserved. No fake helper, raw-offset access, representation cast, assembly, forced inline, compiler control or source-order hunt. Reopen only for new authentic source or ABI/control-flow evidence. See docs/object_matching_logs/input_xbox_obj_device_keyboard_pollers_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 640,
-          "relocation_count": 49,
-          "normalized_sha256": "80bcd2f76c52c728ac2196960ec81c6f2364ab006debe2291d6405a3c7372d89"
-        },
-        "base": {
-          "size": 640,
-          "relocation_count": 51,
-          "normalized_sha256": "3e938f14594007d55c8c4582e070f1912ce6788c9ebbb76d7eae75d5bd2923dc"
-        },
-        "objdiff_percent": 93.70744
-      }
-    },
-    {
       "unit": "source/tag_files/files_windows",
       "function": "_file_get_size",
       "class": "unclassified",
@@ -2001,25 +1963,6 @@
           "normalized_sha256": "9aeaac4160f423a5cbe83cf89b2247549e2e255f31b77ad393bfe9218bf30db5"
         },
         "objdiff_percent": 71.402435
-      }
-    },
-    {
-      "unit": "source/structures/structure_visibility",
-      "function": "_structure_visibility_build_surfaces_traverse_leaf",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked with the full recursive BSP-leaf surface collector reconstructed from January's instruction, relocation, bounds-dequantization, and assertion topology and cross-checked against HaloCEA's named implementation. The retained typed C dequantizes the leaf bounds, combines box/plane intersection states, walks the leaf surface references, filters against rendered environment surfaces, de-duplicates with bit-vector macros, and respects maximum_count. Target and candidate share the 480-byte padded envelope and all 27 relocations; objdiff reports 91.46154 percent. The residual is ordinary VC7 local/register scheduling without a uniquely proved source mechanism, hence unclassified. No inline-schedule workaround, raw overlay, volatile/register forcing, pragma, assembly, fake dependency, or nonsensical branch is retained. Reopen for authoritative January source/local records or a natural same-compiler donor. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) planes_intersect_rectangle became exact with its proven private ABI (count on the stack, long return), so this call site changes; the body gained natural leaf-shape corrections: 480 bytes, 27 relocations, still fuzzy. See docs/object_matching_logs/structure_visibility_obj_opus5_100k_waveD_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 27,
-          "normalized_sha256": "89ca9208599f6ce411ed2f8c1f4979a14ce42172b6ff9e0f3d62f4a68263cc1a"
-        },
-        "base": {
-          "size": 480,
-          "relocation_count": 27,
-          "normalized_sha256": "f18ce216611c937faf04ad47048498fcb9a4b389ac19c757afa66cc324b428c5"
-        },
-        "objdiff_percent": 98.71795
       }
     },
     {

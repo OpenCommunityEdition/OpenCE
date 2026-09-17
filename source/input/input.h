@@ -185,7 +185,7 @@ enum
 struct key_stroke
 {
 	byte modifier_flags;
-	byte ascii_code;
+	char ascii_code;
 	short key_code;
 };
 
