@@ -86,6 +86,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps_inlines.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "cache/texture_cache.h"
 #include "effects/particles.h"
@@ -840,12 +841,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				((real_point2d *)parameters.map_offset[0])->x += dest_value;
+				parameters.map_offset[0]->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				((real_point2d *)parameters.map_offset[0])->y += dest_value;
+				parameters.map_offset[0]->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
@@ -869,12 +870,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				((real_point2d *)parameters.map_offset[1])->x += dest_value;
+				parameters.map_offset[1]->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				((real_point2d *)parameters.map_offset[1])->y += dest_value;
+				parameters.map_offset[1]->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
@@ -898,12 +899,12 @@ static void hud_draw_multitexture_overlay(
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_horizontal_offset)
 			{
-				((real_point2d *)parameters.map_offset[2])->x += dest_value;
+				parameters.map_offset[2]->x += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_vertical_offset)
 			{
-				((real_point2d *)parameters.map_offset[2])->y += dest_value;
+				parameters.map_offset[2]->y += dest_value;
 			}
 			else if (effector->destination_type ==
 				_hud_multitexture_overlay_effector_type_alpha)
@@ -924,55 +925,6 @@ static void hud_draw_multitexture_overlay(
 	hud_draw_stack_buffer_check(1372);
 
 	return;
-}
-
-/* The January diagnostic names the inline's own owner header and line. */
-#define match_assert_valid_real_rgb_color(file, line, rgb) \
-	match_vassert( \
-		file, \
-		line, \
-		valid_real_rgb_color(rgb), \
-		csprintf( \
-			temporary, \
-			"%s: assert_valid_real_rgb_color(%f, %f, %f)", \
-			#rgb, \
-			(*rgb).red, \
-			(*rgb).green, \
-			(*rgb).blue))
-
-pixel32 real_rgb_color_to_pixel32(
-	real_rgb_color const *color)
-{
-	pixel32 result;
-	real scale = (real)UNSIGNED_CHAR_MAX;
-
-	match_assert_valid_real_rgb_color("..\\bitmaps\\bitmaps_inlines.h", 0xC9, color);
-
-	__asm
-	{
-		mov edx, color
-		fld dword ptr [edx]
-		fld dword ptr [edx+4]
-		fld dword ptr [edx+8]
-		fld scale
-		fmul st(3), st(0)
-		fmul st(2), st(0)
-		fmulp st(1), st(0)
-		fistp result
-		and result, 0ffh
-		mov edx, result
-		fistp result
-		and result, 0ffh
-		shl result, 8
-		or edx, result
-		fistp result
-		and result, 0ffh
-		shl result, 16
-		or edx, result
-		mov result, edx
-	}
-
-	return result;
 }
 
 pixel32 real_alpha_intensity_to_pixel32(

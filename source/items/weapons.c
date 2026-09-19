@@ -539,7 +539,7 @@ void weapon_place(
 	}
 
 	SET_FLAG(weapon->object.flags, _object_at_rest_bit, TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit));
-	weapon->object.flags |= FLAG(_object_cannot_be_garbage_bit);
+	SET_FLAG(weapon->object.flags, _object_cannot_be_garbage_bit, TRUE);
 	SET_FLAG(weapon->item.flags, _item_does_not_accelerate_bit, !TEST_FLAG(scenario_weapon->flags, _weapon_does_accelerate_bit));
 
 	if (!TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit))

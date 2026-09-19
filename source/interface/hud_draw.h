@@ -46,8 +46,6 @@ pixel32 real_argb_color_to_pixel32(
 pixel32 real_alpha_intensity_to_pixel32(
 	real alpha,
 	real intensity);
-pixel32 real_rgb_color_to_pixel32(
-	real_rgb_color const *color);
 void hud_calculate_point(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *absolute_placement,

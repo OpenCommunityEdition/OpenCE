@@ -171,6 +171,8 @@ symbols in this file:
 #undef normalize2d
 #undef cross_product2d
 
+#include "math/real_math_declarations.h"
+
 /* ---------- constants */
 
 enum
@@ -285,33 +287,6 @@ static void actor_get_weapon_vector(
 	real_vector3d *weapon_vector);
 static struct projectile_definition *actor_get_grenade_definition(
 	short grenade_type_index);
-/* The owner declarations in actions.h and real_math.h are macro-renamed while
- * importing the January inline set; restore the external names after that
- * schedule ends (January calls these out of line from this object). */
-real normalize2d(
-	real_vector2d *vector);
-real normalize3d(
-	real_vector3d *vector);
-real real_random_range(
-	real lower_bound,
-	real upper_bound);
-real distance_squared3d(
-	real_point3d const *a,
-	real_point3d const *b);
-real distance3d(
-	real_point3d const *a,
-	real_point3d const *b);
-real_vector3d *vector_from_points3d(
-	real_point3d const *a,
-	real_point3d const *b,
-	real_vector3d *result);
-real_point3d *point_from_line3d(
-	real_point3d const *p,
-	real_vector3d const *v,
-	real t,
-	real_point3d *result);
-real magnitude_squared3d(
-	real_vector3d const *v);
 static boolean actor_combat_build_grenade_trajectory(
 	short grenade_type_index,
 	real_point3d const *grenade_origin,

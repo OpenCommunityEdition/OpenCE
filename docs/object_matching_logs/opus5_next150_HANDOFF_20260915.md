@@ -74,7 +74,8 @@ tool calls. The loss scales with elapsed time; pausing at a wave boundary costs 
 - **`_wind_variance_get`:** the 2026-08-31 inactive-union hold was lifted for this function only. January spills the
   scaled real, clears its sign bit with a 32-bit `and dword ptr [ebp+0xc],0x7fffffff` and reloads it as a float, which no
   floating spelling produces. Minimum hunk; `_wind_variance_initialize` untouched.
-- **`_bink_alloc@4`:** one unit-local `__asm { int 3 }`, as a helper under house rule 10. A capstone census of all 833
+- **`_bink_alloc@4`:** one unit-local `__asm { int 3 }`, under an explicit one-site owner exception to house rule 10
+  that does not authorize assembly elsewhere. A capstone census of all 833
   January objects finds four in-body int3, exactly one in Halo source; `__debugbreak()` provably relocates the trap
   from 0xd1 to 0xd4, so only inline assembly reproduces January's placement. That one instruction only.
 - **`_render_debug_player`:** the pre-LAW-D buffer-size rejection is superseded. The extent is written in the house

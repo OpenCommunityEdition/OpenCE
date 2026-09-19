@@ -65,7 +65,7 @@ symbols in this file:
 00020780 0210:
 	_code_00020780 (0000)
 00020990 05c0:
-	_code_00020990 (0000)
+	_actor_perception_refresh_danger_zone (0000)
 00020F50 0180:
 	_actor_expected_acknowledgement (0000)
 000210D0 0090:

@@ -6,6 +6,7 @@ RASTERIZER_XBOX_DEBUG.C
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "real_math.h"
 /* The January object retains out-of-line copies of the D3D inline wrappers.

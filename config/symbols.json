@@ -357,7 +357,7 @@
 { "file_offset": 131600, "flags": 32, "name": "_actor_perception_unit_from_swarm", "static": true },
 { "file_offset": 132096, "flags": 32, "name": "_prop_position_refresh" },
 { "file_offset": 132992, "flags": 32, "name": "_actor_perception_assess_vehicle_danger", "static": true },
-{ "file_offset": 133520, "flags": 32, "name": "_code_00020990" },
+{ "file_offset": 133520, "flags": 32, "name": "_actor_perception_refresh_danger_zone", "static": true },
 { "file_offset": 134992, "flags": 32, "name": "_actor_expected_acknowledgement" },
 { "file_offset": 135376, "flags": 32, "name": "_actor_perception_unreachable" },
 { "file_offset": 135520, "flags": 32, "name": "_actor_perception_tried_to_uncover" },

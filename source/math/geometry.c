@@ -845,8 +845,8 @@ boolean convex_hull2d_verify(
 {
 	real total_angle = 0.f;
 	short index;
-	register real_point2d const *point_base = vertices;
-	register short const *index_base = indices;
+	real_point2d const *point_base = vertices;
+	short const *index_base = indices;
 
 	for (index = 0; index < index_count; index++)
 	{
@@ -882,8 +882,8 @@ boolean convex_hull2d_test_circle(
 {
 	short index;
 	boolean result = TRUE;
-	register real_point2d const *point_base = points;
-	register real_point2d const *circle_center = center;
+	real_point2d const *point_base = points;
+	real_point2d const *circle_center = center;
 	real radius_squared = radius*radius;
 
 	for (index = 0; index < count; index++)
@@ -922,7 +922,7 @@ boolean convex_hull2d_test_point(
 {
 	short index;
 	boolean result = TRUE;
-	register real_point2d const *point_base = points;
+	real_point2d const *point_base = points;
 
 	for (index = 0; index < count; index++)
 	{
@@ -955,8 +955,8 @@ boolean convex_hull2d_test_point_indexed(
 {
 	short index;
 	boolean result = TRUE;
-	register short const *index_base = indices;
-	register real_point2d const *point_base = points;
+	short const *index_base = indices;
+	real_point2d const *point_base = points;
 
 	for (index = 0; index < count; index++)
 	{

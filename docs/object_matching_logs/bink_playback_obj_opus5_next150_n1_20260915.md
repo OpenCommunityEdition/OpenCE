@@ -76,7 +76,8 @@ emits `_csmemset`, `_GlobalMemoryStatus@4` and a second `_bink_saved_state` insi
    (the CFG is canonical); with it, the polarity fixes the block layout and the row reaches 496/52,
    byte-identical to January except one instruction.
 
-**The remaining byte.** January carries the only `int3` in the whole 468-object split corpus, at 0xd1,
+**The remaining byte.** The wave-local scanner reported January's `int3` at 0xd1 as unique in its
+468-object filtered corpus; the final reconciliation census supersedes that raw count. It lies
 between the 759 assertion's `add esp,0x14` and the failure arm's epilogue. `__asm { int 3 }` reproduces it
 exactly and closes the function strict EXACT. `__debugbreak()` does not: the intrinsic is schedulable and
 sinks into the epilogue at 0xd4 (`pQ.c`), which is positive evidence that the original text was an

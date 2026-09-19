@@ -392,6 +392,7 @@ symbols in this file:
 #include "cseries/profile.h"
 #include "effects/decals.h"
 #include "game/game_globals.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "main/main_internal.h"
 #include "rasterizer/common/rasterizer_common.h"

@@ -151,7 +151,7 @@ struct rasterizer_dynamic_screen_geometry_parameters
 	struct bitmap_data *map[3];
 	boolean map_wrapped[3];
 	byte pad1B;
-	real_point2d const *map_offset[3];
+	real_point2d *map_offset[3];
 	real_vector2d map_scale[3];
 	real_vector2d map_texture_scale[3];
 	real_rgb_color const *map_tint[3];

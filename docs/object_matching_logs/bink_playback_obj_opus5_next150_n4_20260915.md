@@ -132,7 +132,7 @@ changes. Post-fix census: **52 target, 52 candidate, 0 differing rows**. The own
     c7  push -1
     c9  call _system_exit
     ce  add esp, 0x14
-    d1  int3            <-- the only int3 in the whole 468-object split corpus
+    d1  int3            <-- site-local trap (the old filtered-corpus count was later superseded)
     d2  pop edi ... d9 ret 4
 
 New this wave: the last non-`__asm` route is refuted **from the vendor headers**, not only from
@@ -146,9 +146,10 @@ New this wave: the last non-`__asm` route is refuted **from the vendor headers**
   VC7 13.00.9254. Without `_DEBUG` (this build uses `/DDEBUG`) the macro is `((void)0)` at line 232.
 - `__debugbreak()` was measured in n1 (`pQ.c`): the intrinsic is schedulable and sinks to 0xd4 inside
   the epilogue — positive evidence the original text was inline assembly.
-- `__declspec(noreturn) system_exit` is refuted by corpus uniqueness: `match_assert` lowers to
-  `display_assert(...); system_exit(-1);` at thousands of sites image-wide and only this one carries an
-  `int3`, so the trap is site-local source text, not an attribute on the callee.
+- `__declspec(noreturn) system_exit` is refuted by the local control: `match_assert` lowers to
+  `display_assert(...); system_exit(-1);` at thousands of sites image-wide, while only this assertion
+  sequence inside `_bink_alloc@4` carries the following `int3`; the trap is site-local source text, not
+  an attribute on the callee.
 - `halt_and_catch_fire` (main.c:2766) and `system_exit` (cseries_windows.c:116) are ordinary out-of-line
   functions, and `fast_ftol` (cseries.h:314) is the only `__asm` in any project header.
 

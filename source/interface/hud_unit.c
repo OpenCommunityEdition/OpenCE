@@ -74,6 +74,7 @@ symbols in this file:
 #include "game/players.h"
 #include "cache/texture_cache.h"
 #include "interface/hud_definitions.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "interface/hud.h"
 #include "interface/motion_sensor.h"

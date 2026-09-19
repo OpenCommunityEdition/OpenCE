@@ -11,5 +11,7 @@ BITMAP_COLOR_CONVERSION.H
 
 pixel32 real_alpha_to_pixel32(
 	real alpha);
+pixel32 real_rgb_color_to_pixel32(
+	union real_rgb_color const *color);
 
 #endif /* __BITMAP_COLOR_CONVERSION_H */

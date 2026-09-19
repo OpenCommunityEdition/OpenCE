@@ -889,8 +889,8 @@ static void * __stdcall bink_alloc(
 			"c:\\halo\\SOURCE\\bink\\bink_playback.c",
 			759,
 			!"bink memory allocation should not fail");
-		/* January emits the only int3 in the whole image here; the intrinsic form sinks
-		   into the epilogue, so the original text was an inline-assembly breakpoint. */
+		/* January emits a site-local int3 here; the intrinsic form sinks into the
+		   epilogue, so the original text was an inline-assembly breakpoint. */
 		__asm { int 3 }
 	}
 	else

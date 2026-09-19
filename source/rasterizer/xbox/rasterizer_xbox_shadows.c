@@ -66,6 +66,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "math/real_math.h"
 #include "game/game_globals.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_frame_statistics.h"

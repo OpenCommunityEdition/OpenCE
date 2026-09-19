@@ -117,8 +117,9 @@ holds.
   `bink_get_memory_available` calls inside `bink_alloc`. This is a per-callee decision, not a caller budget.
 - January section numbers follow bottom-up compile order. Reordering our definitions to January's order
   (`bk_ro1.c`) reproduces the emission order of all 20 Halo functions but changes no bytes.
-- The "should not fail" path in `bink_alloc` ends in the only `int3` in the whole 468-object split corpus
-  (`int3scan.py`), then returns NULL. `__debugbreak()` reproduces the `int3` (`alloc_b.c`), but not the layout or the
+- The wave-local `int3scan.py` reported the `bink_alloc` trap as unique in its 468-object filtered corpus;
+  the final reconciliation census supersedes that raw count. The "should not fail" path ends in a site-local
+  `int3`, then returns NULL. `__debugbreak()` reproduces the `int3` (`alloc_b.c`), but not the layout or the
   inlining. Without an attested debug-break macro it is not admissible.
 
 **Refuted levers** (all byte-identical):

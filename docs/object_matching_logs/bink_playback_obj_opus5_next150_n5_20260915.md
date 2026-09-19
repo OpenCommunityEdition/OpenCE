@@ -99,12 +99,12 @@ January's failure arm ends:
     00d1  int3
     00d2  pop edi ; mov eax,esi ; pop esi ; mov esp,ebp ; pop ebp ; ret 4
 
-New census over **all 833 January split objects**
-(`scratch/workers/n5_bink_playback/int3scan.py`, `sysexit_census.py`, both read-only):
+The wave-local scanner over **all 833 January split objects**
+(`scratch/workers/n5_bink_playback/int3scan.py`, `sysexit_census.py`, both read-only) reported:
 
-- in-body `int 3` instructions corpus-wide: **2**. One is
+- in-body `int 3` instructions under that scanner's filter: **2**. One is
   `libs\d3d8\mpintr.obj : ?ServiceGrInterrupt@CMiniport@D3D@@AAEKXZ` @0x130 — a Microsoft vendor
-  object. The other is this site. **No other Halo-source function in the image traps.**
+  object. The other is this site.
 - `_system_exit` relocation sites corpus-wide: **230**; `_display_assert`: **253**. Exactly one of the
   230 is followed by `int3`.
 - inside `_bink_alloc@4` itself, the `display_assert; system_exit; add esp,0x14` sequence occurs
@@ -112,7 +112,12 @@ New census over **all 833 January split objects**
   by a trap — verified by disassembly: @006c `add esp,0x14` is followed at @006f by
   `call _is_all_bink_memory_free`.
 
-Those four measurements refute every non-site-local explanation simultaneously: a
+The final reconciliation's broader census supersedes the raw total above: it finds additional vendor
+and compiler-tail `0xCC` instructions, while the final filtered admission census records four in-body
+traps and only this evidenced site-local/manual Halo-source trap. The policy conclusion depends on that
+site-local proof, not on claiming a unique `int3` byte in the image.
+
+Those measurements refute every non-site-local explanation simultaneously: a
 `__declspec(noreturn)` `system_exit` would trap at 230 sites; an assert-macro trap would trap at four
 sites inside this one function; a compiler or flag artifact would not be unique across 833 objects.
 n4's vendor-header sweep stands (`DebugBreak()` is a `WINBASEAPI` call with its own relocation;
@@ -245,9 +250,10 @@ additionally needs the `__asm { int 3 }` policy ruling.
 
 ## Reusable facts measured this wave
 
-1. **A corpus-wide trap census settles "is this instruction source text?" without any source sweep.**
-   Two `int 3` instructions exist across 833 January split objects and one of them is in a Microsoft
-   vendor object; with 230 `_system_exit` and 253 `_display_assert` relocation sites corpus-wide, and
+1. **A corpus-wide trap census helps settle "is this instruction source text?" without relying on a source sweep.**
+   The wave-local filter reported two `int 3` instructions across 833 January split objects; final
+   reconciliation supersedes that raw total as described above. With 230 `_system_exit` and 253
+   `_display_assert` relocation sites corpus-wide, and
    four `display_assert; system_exit; add esp,0x14` sequences inside the one function under study of
    which exactly one traps, every callee-attribute, macro-wide and compiler-flag explanation falls at
    once. Scanners: `scratch/workers/n5_bink_playback/int3scan.py`, `sysexit_census.py`.

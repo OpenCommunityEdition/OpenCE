@@ -113,6 +113,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "objects/object_types.h"
 #include "render/render.h"
