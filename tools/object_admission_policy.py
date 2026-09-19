@@ -15,6 +15,7 @@ import json
 ALLOWED_CLASSES = {
     "bss-symbol-layout-mismatch",
     "candidate-only-comdat-owner",
+    "comdat-selection-mismatch",
     "source-layout-incomplete",
 }
 

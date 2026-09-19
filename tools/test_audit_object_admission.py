@@ -169,6 +169,26 @@ class ObjectAdmissionAuditTests(unittest.TestCase):
         ):
             rejection_index({"version": 1, "entries": [entry]})
 
+    def test_comdat_selection_mismatch_is_a_valid_admission_blocker(self):
+        entry = _source_layout_rejection()
+        entry.update(
+            unit="libs/binkxbox/binkxbox",
+            **{
+                "class": "comdat-selection-mismatch",
+                "symbol": ".rdata literals",
+                "reason": "candidate and target use different COMDAT selections",
+                "evidence": "docs/bink-comdat-evidence.md",
+                "reopen": "recover the authentic selection metadata",
+            },
+        )
+
+        policy = rejection_index(
+            {"version": 1, "entries": [entry]},
+            {entry["unit"]},
+        )
+
+        self.assertEqual(policy[entry["unit"]], [entry])
+
     def test_source_layout_policy_requires_every_evidence_field(self):
         for field in ("unit", "class", "symbol", "reason", "evidence", "reopen"):
             for invalid in (None, "", "   ", 123):

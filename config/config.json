@@ -1079,17 +1079,29 @@
 		{
 			"name": "binkxbox",
 			"guid": "{D0C0A7FB-D6F3-4179-B7DC-29F86F0D60D1}",
+			"options": {
+				"cflags": [
+					"/O2",
+					"/Gy"
+				],
+				"include_dirs": [
+					"xbox/include"
+				],
+				"defines": [
+					"xbox"
+				]
+			},
 			"objects": [
-				{ "name": "libs/binkxbox/binkxbox.c", "index": 600, "status": "MISSING" },
-				{ "name": "libs/binkxbox/binkread.c", "index": 601, "status": "MISSING" },
-				{ "name": "libs/binkxbox/binkds.c", "index": 602, "status": "MISSING" },
+				{ "name": "libs/binkxbox/binkxbox.c", "index": 600, "status": "NonMatching" },
+				{ "name": "libs/binkxbox/binkread.c", "index": 601, "status": "NonMatching" },
+				{ "name": "libs/binkxbox/binkds.cpp", "index": 602, "status": "NonMatching" },
 				{ "name": "libs/binkxbox/expand.c", "index": 603, "status": "MISSING" },
-				{ "name": "libs/binkxbox/wintimer.c", "index": 604, "status": "MISSING" },
-				{ "name": "libs/binkxbox/binkfile.c", "index": 605, "status": "MISSING" },
+				{ "name": "libs/binkxbox/wintimer.c", "index": 604, "status": "NonMatching" },
+				{ "name": "libs/binkxbox/binkfile.c", "index": 605, "status": "NonMatching" },
 				{ "name": "libs/binkxbox/yuv.c", "index": 606, "status": "MISSING" },
-				{ "name": "libs/binkxbox/binkac.c", "index": 607, "status": "MISSING" },
-				{ "name": "libs/binkxbox/radcb.c", "index": 608, "status": "MISSING" },
-				{ "name": "libs/binkxbox/varbits.c", "index": 609, "status": "MISSING" },
+				{ "name": "libs/binkxbox/binkac.c", "index": 607, "status": "NonMatching" },
+				{ "name": "libs/binkxbox/radcb.c", "index": 608, "status": "Matching" },
+				{ "name": "libs/binkxbox/varbits.c", "index": 609, "status": "Matching" },
 				{ "name": "libs/binkxbox/dct.c", "index": 610, "status": "MISSING" },
 				{ "name": "libs/binkxbox/bitplane.c", "index": 611, "status": "MISSING" },
 				{ "name": "libs/binkxbox/yuv32.c", "index": 612, "status": "MISSING" },

@@ -2,6 +2,14 @@
   "version": 1,
   "entries": [
     {
+      "unit": "libs/binkxbox/binkxbox",
+      "class": "comdat-selection-mismatch",
+      "symbol": ".rdata literals",
+      "reason": "All five target functions and the target-owned data bytes compare exact, but the rebuilt object emits 17 literal .rdata COMDATs with SELECT_ANY selection (2), whereas January uses NODUPLICATES selection (1). Exact literal bytes do not establish equivalent ownership or link behavior, so the object remains NonMatching while its five independently proven functions retain credit.",
+      "evidence": "docs/object_matching_logs/bink_handoff_reconciliation_20260919.md#whole-object-admission",
+      "reopen": "Recover the authentic compiler/source topology that emits all 17 literal COMDATs with January's selection metadata, then repeat the complete code, data, relocation, symbol-owner, undefined-external and surplus-section audit. Do not rewrite target metadata, weaken the comparator, add artificial owners, or grant Matching from byte equality alone."
+    },
+    {
       "unit": "source/ai/action_obey",
       "class": "candidate-only-comdat-owner",
       "symbol": "_normalize3d",
