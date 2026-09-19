@@ -531,8 +531,8 @@ def discover_sources(args: argparse.Namespace) -> tuple[list[SourceSpec], list[s
         canonical_path,
         'canonical',
         canonical_branch,
-        (repo_root / 'config' / 'parked.json').resolve(),
-        (repo_root / 'config' / 'object_admission_rejections.json').resolve(),
+        (canonical_root / 'config' / 'parked.json').resolve(),
+        (canonical_root / 'config' / 'object_admission_rejections.json').resolve(),
     ))
 
     if args.all_worktrees:
