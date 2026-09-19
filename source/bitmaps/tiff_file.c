@@ -50,6 +50,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps_internal.h"
 #include "bitmaps/libtiff/tiffio.h"
+#include "bitmaps/tiff_file.h"
 #include "math/integer_math.h"
 #include "tag_files/files.h"
 
@@ -75,7 +76,7 @@ enum
 
 /* ---------- globals */
 
-char error_message_buffer[512] = {0};
+static char error_message_buffer[512] = {0};
 
 /* ---------- public code */
 

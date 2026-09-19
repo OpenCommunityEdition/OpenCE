@@ -225,6 +225,7 @@ symbols in this file:
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmaps_internal.h"
 #include "bitmaps/bitmaps_mipmap.h"
+#include "bitmaps/bitmaps_quantitize_internal.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
@@ -432,9 +433,6 @@ static boolean extract_sequence(
 /* ---------- globals */
 
 static struct bitmap_extract_data extract_data;
-extern short bits_per_channel_r5g6b5[4];
-extern short bits_per_channel_a1r5g5b5[4];
-extern short bits_per_channel_a4r4g4b4[4];
 
 /* ---------- public code */
 

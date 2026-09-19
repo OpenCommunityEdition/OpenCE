@@ -55,9 +55,11 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_globals.h"
+#include "main/main_internal.h"
 #include "real_math.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_cinematics.h"
+#include "rasterizer/rasterizer_globals_internal.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */
@@ -76,11 +78,6 @@ struct rasterizer_cinematic_screen_effect_state
 	real filter_desaturation_intensity[2];
 	real filter_time[2];
 	real script_values[4];
-	real near_clip_distance;
-};
-
-struct rasterizer_global_defaults_prefix
-{
 	real near_clip_distance;
 };
 
@@ -107,15 +104,9 @@ typedef char rasterizer_cinematic_screen_effect_state_script_values_offset_asser
 typedef char rasterizer_cinematic_screen_effect_state_near_clip_distance_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_state, near_clip_distance) == 0x74 ? 1 : -1];
 
-/* ---------- prototypes */
-
-short main_get_window_count(
-	void);
-
 /* ---------- globals */
 
 static struct rasterizer_cinematic_screen_effect_state *cinematic_screen_effect_globals = NULL;
-extern const struct rasterizer_global_defaults_prefix rasterizer_global_defaults;
 
 /* ---------- public code */
 

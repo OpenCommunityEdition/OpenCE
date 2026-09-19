@@ -305,6 +305,7 @@ symbols in this file:
 #include "rasterizer_widgets.h"
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_globals_internal.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_models.h"
 #include <xtl.h>
@@ -331,15 +332,6 @@ enum
 #define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.debug_model_vertices
 
 /* ---------- structures */
-
-struct rasterizer_global_defaults
-{
-	real near_clip_distance;
-	real far_clip_distance;
-	real first_person_weapon_near_clip_distance;
-	real first_person_weapon_far_clip_distance;
-};
-
 
 struct rasterizer_window_parameters
 {

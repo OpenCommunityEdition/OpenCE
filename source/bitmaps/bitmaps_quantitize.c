@@ -26,6 +26,7 @@ symbols in this file:
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
+#include "bitmaps/bitmaps_quantitize_internal.h"
 
 /* ---------- constants */
 

@@ -361,6 +361,7 @@ symbols in this file:
 #include "cache/predicted_resources.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/tiff_file.h"
 #include "interface/hud.h"
 #include "interface/interface.h"
 #include "interface/terminal.h"
@@ -688,10 +689,6 @@ extern struct bitmap_data *bitmap_2d_new(
 	short height,
 	short mipmap_count,
 	short format);
-extern char const *tiff_export(
-	struct file_reference *file,
-	struct bitmap_data *bitmap);
-
 extern struct main_hud_globals_definition *hud_globals;
 
 /* ---------- globals */
