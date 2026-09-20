@@ -1100,25 +1100,6 @@
       }
     },
     {
-      "unit": "source/ai/action_alert",
-      "function": "_action_alert_next_position",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete alert-position traversal from January disassembly and relocation evidence, the later HCEA semantic implementation, and the matching AI data definitions. The retained ordinary C rejects disabled actors, resolves the actor's encounter and squad through typed accessors, filters every move position by current position, actor distance, noncombat sequence, and nearby props, records unavailable positions with the cseries bit-vector macro, performs weighted-random selection, and implements forward, ping-pong, and per-tick-random traversal with semantic enum constants. It also recovers the private name action_alert_next_position and preserves all eleven exact siblings. Target and candidate carry the same 18 relocation identities in order; January is 784 padded bytes, the candidate is 768, and the freshly generated campaign report records 99.46479 percent similarity. Aligned instruction comparison shows the complete geometry, iterator, bit-vector, random-selection, and traversal body is byte-identical; the residual is limited to January preloading the NONE result in EAX, consequent AL/CL and EAX/ECX register choices in the entry guard, two equivalent full-EAX versus AX sentinel returns, and target-envelope padding. Bounded ordinary-C experiments covered combined, separate, and enclosing entry guards; short and long default-result lifetimes; declaration order; direct versus assigned random returns; natural for/while traversal; and switch/default shapes. They either returned to this fixed point or disturbed exact body code; no volatile or register forcing, compiler barrier, pragma, inline assembly, fake dependency, raw offset, undefined behavior, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local-variable records or a natural compatible-compiler donor explaining the default-result register lifetime.",
-      "measurements": {
-        "target": {
-          "size": 784,
-          "relocation_count": 18,
-          "normalized_sha256": "677fd6cc1a9e66de32123c4614de5a0cc1188501baee69ea20fd5bf74eac3fe4"
-        },
-        "base": {
-          "size": 768,
-          "relocation_count": 18,
-          "normalized_sha256": "4e16c85b544ded3352df48ee7baa0e19b5a34a45e421a975cf11cd771184f371"
-        },
-        "objdiff_percent": 99.46479
-      }
-    },
-    {
       "unit": "source/physics/collision_usage",
       "function": "_collision_log_get_current_user",
       "class": "csplit-relocation-alias",
@@ -2638,11 +2619,11 @@
       "unit": "source/ai/ai_communication",
       "function": "_ai_communication_finished",
       "class": "unclassified",
-      "evidence": "Best coherent typed reply-dispatch reconstruction retained from the independent later HaloCEA lift and checked against January's public signature, table traversal, calls, and relocation graph. It handles reply-row selection, protagonist resolution, scripted-dialog and damage gates, chance/filter checks, speech construction, timer updates, and the secondary look response. January is 1,584 padded bytes with 87 relocations; the natural candidate is 896 padded bytes with 29 relocations and objdiff reports 40.492752 percent. The missing envelope is primarily unreconstructed January diagnostic/debug-string work, so no precise compiler blocker or completion claim is invented. Semantic enums, typed unit/actor access, project real types, and proper owner prototypes are retained; no compiler steering, raw offset, fake dependency, undefined read, forced inline, or nonsensical logic is present. Zero exact credit. See docs/object_matching_logs/ai_communication_obj_private_speech_graph_20260909.md; reopen for January diagnostics/source evidence or after the remaining private conversation/reply graph is naturally reconstructed.",
+      "evidence": "Best coherent typed reply-dispatch reconstruction retained from the independent later HaloCEA lift and checked against January's public signature, table traversal, calls, and relocation graph. It handles reply-row selection, protagonist resolution, scripted-dialog and damage gates, chance/filter checks, speech construction, timer updates, and the secondary look response. January is 1,584 padded bytes with 87 relocations; the pre-Astra candidate was 896 padded bytes with 29 relocations and objdiff reports 40.492752 percent. The missing envelope is primarily unreconstructed January diagnostic/debug-string work, so no precise compiler blocker or completion claim is invented. Semantic enums, typed unit/actor access, project real types, and proper owner prototypes are retained; no compiler steering, raw offset, fake dependency, undefined read, forced inline, or nonsensical logic is present. Zero exact credit. See docs/object_matching_logs/ai_communication_obj_private_speech_graph_20260909.md; reopen for January diagnostics/source evidence or after the remaining private conversation/reply graph is naturally reconstructed. Astra 2026-09-20: the reply-selection graph is now reconstructed and exact; HCEA DIA records and January callers authenticate short animation_type in the three private forwarding helpers. The collateral caller rebuild is 912 padded bytes/29 relocations/42.120083 percent, still zero credit. No source-body spelling of this parked function was changed and no diagnostic completeness is claimed. Refreshed only the candidate snapshot; original reopen requirement remains. See docs/object_matching_logs/astra_90pct_communication_independent_review_20260920.md.",
       "measurements": {
         "target": { "size": 1584, "relocation_count": 87, "normalized_sha256": "79de598402e5831bf7376d7471f92958b7ecf34ee356b0110ec16127875e524b" },
-        "base": { "size": 896, "relocation_count": 29, "normalized_sha256": "44eba783428926e28e6c68010f33daa6f131348a390fa28dca3a14a0fc79a212" },
-        "objdiff_percent": 40.492752
+        "base": { "size": 912, "relocation_count": 29, "normalized_sha256": "82a473937c8a5918beba743b203206c7f251f5a649bab1c28cae60c10210b5c6" },
+        "objdiff_percent": 42.120083
       }
     },
     {
@@ -2864,17 +2845,6 @@
           "normalized_sha256": "7e308d0bf30135a5dcfeb73442f3f7a61b25bb0281c6cbd45868eaa0ce1d9869"
         },
         "objdiff_percent": 99.76351
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_extract",
-      "function": "_extract_sequence",
-      "class": "unclassified",
-      "evidence": "Complete typed bitmap-run and border-trimming reconstruction retained from the 2026-09-12 private packet. The source deliberately omits an apparently behaviorally redundant January branch rather than reproducing it only for bytes; the current candidate therefore remains an honest residual and receives zero credit. The fail-closed class asserts no single compiler mechanism. See docs/object_matching_logs/bitmap_extract_obj_remaining_private_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 720, "relocation_count": 28, "normalized_sha256": "5f106d5c4f2bb3024df015b0b10b2236b3ffc3818cff7588e4fd3a7c7a810e56" },
-        "base": { "size": 656, "relocation_count": 27, "normalized_sha256": "662a00511374710cd51cc4b0c7cec0d0d9d2b7248b8ab34656e5c162a725f548" },
-        "objdiff_percent": 71.78667
       }
     },
     {

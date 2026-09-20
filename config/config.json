@@ -763,7 +763,7 @@
 				{ "name": "source/bitmaps/bitmaps.c", "index": 388, "status": "NonMatching" },
 				{ "name": "source/bitmaps/bitmap_utilities.c", "index": 389, "status": "NonMatching" },
 				{ "name": "source/bitmaps/bitmap_group.c", "index": 390, "status": "NonMatching" },
-				{ "name": "source/bitmaps/bitmap_extract.c", "index": 391, "status": "NonMatching" },
+				{ "name": "source/bitmaps/bitmap_extract.c", "index": 391, "status": "Matching" },
 				{ "name": "source/bitmaps/bitmap_drawing.c", "index": 392, "status": "NonMatching" },
 				{ "name": "source/bitmaps/bitmap_compress.c", "index": 393, "status": "Matching" },
 				{ "name": "source/bitmaps/s3tc/s3tc.c", "index": 394, "status": "NonMatching" },
@@ -844,7 +844,7 @@
 				{ "name": "source/ai/action_converse.c", "index": 469, "status": "NonMatching" },
 				{ "name": "source/ai/action_charge.c", "index": 470, "status": "NonMatching" },
 				{ "name": "source/ai/action_avoid.c", "index": 471, "status": "Matching" },
-				{ "name": "source/ai/action_alert.c", "index": 472, "status": "NonMatching" },
+				{ "name": "source/ai/action_alert.c", "index": 472, "status": "Matching" },
 				{ "name": "source/linker_common.c", "index": 847, "status": "MISSING" }
 			]
 		},

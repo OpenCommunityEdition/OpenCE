@@ -276,7 +276,7 @@ static boolean actor_look_valid_aim_vector(
 	real_vector3d const *attempted_aiming_vector);
 static boolean actor_look_valid_look_vector(
 	real yaw_deviation,
-	real_vector2d const *cone_limits,
+	real *look_delta_deviations,
 	real_vector3d const *aiming_vector,
 	real_vector3d const *attempted_looking_vector,
 	real_vector3d const *look_vector);
@@ -633,7 +633,7 @@ static boolean actor_look_valid_aim_vector(
 
 static boolean actor_look_valid_look_vector(
 	real yaw_deviation,
-	real_vector2d const *cone_limits,
+	real *look_delta_deviations,
 	real_vector3d const *aiming_vector,
 	real_vector3d const *attempted_looking_vector,
 	real_vector3d const *look_vector)
@@ -651,7 +651,7 @@ static boolean actor_look_valid_look_vector(
 	{
 		boolean side = cross_product2d(&looking_vector2d, &attempted_looking_vector2d) > 0.0f;
 
-		if (dot_product2d(&attempted_looking_vector2d, &looking_vector2d) > cone_limits->n[side])
+		if (dot_product2d(&attempted_looking_vector2d, &looking_vector2d) > look_delta_deviations[side])
 			result = TRUE;
 	}
 
@@ -666,7 +666,7 @@ void actor_looking_test_validity(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
-	real_vector2d looking_bounds;
+	real look_delta_deviations[2];
 
 	*aiming_valid = actor_look_valid_aim_vector(
 		definition->looking.runtime_maximum_aiming_deviation_cosine.yaw,
@@ -675,18 +675,18 @@ void actor_looking_test_validity(
 
 	if (actor->state.mode == _actor_mode_combat)
 	{
-		looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-		looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+		look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+		look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
 	}
 	else
 	{
-		looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-		looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+		look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+		look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
 	}
 
 	*looking_valid = actor_look_valid_look_vector(
 		definition->looking.runtime_maximum_looking_deviation_cosine.yaw,
-		&looking_bounds,
+		look_delta_deviations,
 		&actor->input.facing_vector,
 		&actor->input.aiming_vector,
 		vector);
@@ -710,19 +710,19 @@ static boolean actor_look_idle_find_prop(
 	long game_time = game_time_get();
 	real aiming_cosine = definition->looking.runtime_maximum_aiming_deviation_cosine.yaw;
 	real looking_cosine = definition->looking.runtime_maximum_looking_deviation_cosine.yaw;
-	real_vector2d looking_bounds;
+	real look_delta_deviations[2];
 	struct prop_iterator iterator;
 	struct prop_datum *prop;
 
 	if (actor->state.mode == _actor_mode_combat)
 	{
-		looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-		looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+		look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+		look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
 	}
 	else
 	{
-		looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-		looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+		look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+		look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
 	}
 
 	if (actor_index == ai_debug.selected_actor_index)
@@ -789,7 +789,7 @@ static boolean actor_look_idle_find_prop(
 			{
 				valid = actor_look_valid_look_vector(
 					looking_cosine,
-					&looking_bounds,
+					look_delta_deviations,
 					&actor->control.desired_facing_vector,
 					&actor->control.desired_aiming_vector,
 					&prop->actor_to_prop);
@@ -1388,31 +1388,31 @@ void actor_look_update(
 		boolean looking_locked;
 		real aiming_cosine;
 		real looking_cosine;
-		real_vector2d looking_bounds;
+		real look_delta_deviations[2];
 		short primary_priority;
 		short secondary_priority;
 		real_vector3d primary_vector;
 		real_vector3d secondary_vector;
 		boolean burst_direction = FALSE;
 
-		looking_free = can_look;
 		facing_free = actor->control.free_facing_vector;
-		facing_optional = actor->control.optional_facing_vector;
-		aiming_cosine = definition->looking.runtime_maximum_aiming_deviation_cosine.yaw;
-		looking_cosine = definition->looking.runtime_maximum_looking_deviation_cosine.yaw;
 		aiming_free = TRUE;
+		looking_free = can_look;
+		facing_optional = actor->control.optional_facing_vector;
 		facing_locked = FALSE;
 		looking_locked = FALSE;
+		aiming_cosine = definition->looking.runtime_maximum_aiming_deviation_cosine.yaw;
+		looking_cosine = definition->looking.runtime_maximum_looking_deviation_cosine.yaw;
 
 		if (actor->state.mode == _actor_mode_combat)
 		{
-			looking_bounds.i = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-			looking_bounds.j = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+			look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
+			look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
 		}
 		else
 		{
-			looking_bounds.i = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-			looking_bounds.j = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+			look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
+			look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
 		}
 
 		if (actor_combat_currently_firing_burst(actor_index) &&
@@ -1528,10 +1528,10 @@ void actor_look_update(
 
 			if (facing_free)
 			{
-				actor->control.desired_facing_vector = primary_vector;
-				actor->control.face_exactly |= (primary_priority == _primary_priority_exact_facing);
 				facing_free = FALSE;
 				facing_optional = FALSE;
+				actor->control.desired_facing_vector = primary_vector;
+				actor->control.face_exactly |= (primary_priority == _primary_priority_exact_facing);
 			}
 
 			facing_locked = (!actor->control.free_facing_vector && !actor->control.optional_facing_vector) ||
@@ -1579,7 +1579,7 @@ void actor_look_update(
 					aiming_free = FALSE;
 				}
 				else if (can_look &&
-					actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &secondary_vector))
+					actor_look_valid_look_vector(looking_cosine, look_delta_deviations, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &secondary_vector))
 				{
 					actor->control.desired_looking_vector = secondary_vector;
 					looking_free = FALSE;
@@ -1597,9 +1597,9 @@ void actor_look_update(
 		case _secondary_look_priority_override:
 		case _secondary_look_priority_override_exact_facing:
 			{
-				boolean change_facing = secondary_priority == _secondary_look_priority_override_exact_facing;
-				boolean face_exactly = change_facing;
 				boolean succeeded = FALSE;
+				boolean change_facing = secondary_priority == _secondary_look_priority_override_exact_facing;
+				boolean face_exactly = secondary_priority == _secondary_look_priority_override_exact_facing;
 
 				if (actor->control.free_facing_vector)
 				{
@@ -1737,7 +1737,7 @@ void actor_look_update(
 								major_valid = TRUE;
 							}
 						}
-						else if (actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_major_vector))
+						else if (actor_look_valid_look_vector(looking_cosine, look_delta_deviations, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_major_vector))
 						{
 							actor->control.desired_looking_vector = idle_major_vector;
 							major_valid = TRUE;
@@ -1792,7 +1792,7 @@ void actor_look_update(
 						if (actor_look_decode_direction(actor_index, &actor->control.idle_minor_direction, &idle_minor_vector) &&
 							(aiming_variation ?
 								actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &idle_minor_vector) :
-								actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_minor_vector)))
+								actor_look_valid_look_vector(looking_cosine, look_delta_deviations, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &idle_minor_vector)))
 						{
 							match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1605, &idle_minor_vector);
 
@@ -1827,8 +1827,8 @@ void actor_look_update(
 			if ((actor_look_valid_aim_vector(aiming_cosine, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector) &&
 				!actor_look_valid_aim_vector(aiming_cosine, &actor->input.facing_vector, &actor->control.desired_aiming_vector)) ||
 				(can_look &&
-				actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector) &&
-				!actor_look_valid_look_vector(looking_cosine, &looking_bounds, &actor->input.facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector)))
+				actor_look_valid_look_vector(looking_cosine, look_delta_deviations, &actor->control.desired_facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector) &&
+				!actor_look_valid_look_vector(looking_cosine, look_delta_deviations, &actor->input.facing_vector, &actor->control.desired_aiming_vector, &actor->control.desired_looking_vector)))
 			{
 				actor->control.face_exactly = TRUE;
 			}

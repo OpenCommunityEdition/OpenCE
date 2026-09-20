@@ -1,0 +1,9 @@
+# Collision-debug header: independent root build review
+
+Before editing the header, root enumerated its three existing C consumers and absence of header consumers. Bipeds and HS add two consumers. All five were built into frozen scratch objects before the declaration change and independently rebuilt afterwards. `scratch/astra_wave3_header_context.py` preserves that boundary; `scratch/astra_wave3_header_review.py` verifies all code, data and owner identities.
+
+All 145 existing exact controls survive. Every function section, named runtime owner, runtime data section, and COMMON inventory in all five units is identical across the header-only migration. No point helper is emitted. This includes the entire HS table, its pointer indirection table and count, and collision-debug's dimension storage. Type names come from cseries.h and math/real_math.h, following the nearby collision_features.h dependency pattern. No local type facade or new storage definition is introduced.
+
+Six extern declarations move to the true collision-debug owner. Three duplicate C-file extern declarations are removed, while the three real scalar definitions remain. HS includes the owner header and replaces six byte-array declarations and ten raw address expressions with named scalar/component addresses; all relocation meanings stay identical. The three linker-common globals remain imports. The biped diagnostic body was separately reviewed after this header-only proof, preserving its 42 exact siblings and all owners. These control counts overlap and must not be added as distinct functions.
+
+The full build, semantic/stable comparisons, tests, parks, admission, fake scans and whole-tree owner/COMMON census are in scratch/astra-wave3. The change introduces no exact credit, target/symbol/comparator modification or ownership exception. Independent primary type/storage evidence is in the accompanying header evidence packet.

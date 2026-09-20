@@ -1782,10 +1782,10 @@ static boolean action_obey_command_begin(
 		case _ai_atom_look_object:
 			if (complex_control)
 			{
-				real look_duration = command->parameter1;
 				short look_point_index = NONE;
 				long look_prop_index = NONE;
 				long look_unit_index = NONE;
+				real look_duration = command->parameter1;
 
 				if (command->atom_type == _ai_atom_look)
 				{
@@ -1793,6 +1793,7 @@ static boolean action_obey_command_begin(
 						command->point1_index < command_list->points.count)
 					{
 						look_point_index = command->point1_index;
+						look_duration = command->parameter1;
 					}
 				}
 				else if (command->atom_type == _ai_atom_look_random)
@@ -1818,20 +1819,22 @@ static boolean action_obey_command_begin(
 				}
 				else if (command->atom_type == _ai_atom_look_player)
 				{
-					struct prop_iterator prop_iterator;
-					struct prop_datum *prop;
-					real closest_prop_distance = REAL_MAX;
-
-					prop_iterator_new(&prop_iterator, actor_index);
-					while (prop = prop_iterator_next(&prop_iterator))
 					{
-						if (prop->state >= _prop_state_becoming_unacknowledged &&
-							prop->state <= _prop_state_acknowledged &&
-							prop->player &&
-							prop->distance < closest_prop_distance)
+						struct prop_iterator prop_iterator;
+						struct prop_datum *prop;
+						real closest_prop_distance = REAL_MAX;
+
+						prop_iterator_new(&prop_iterator, actor_index);
+						while (prop = prop_iterator_next(&prop_iterator))
 						{
-							look_prop_index = prop_iterator.index;
-							closest_prop_distance = prop->distance;
+							if (prop->state >= _prop_state_becoming_unacknowledged &&
+								prop->state <= _prop_state_acknowledged &&
+								prop->player &&
+								prop->distance < closest_prop_distance)
+							{
+								look_prop_index = prop_iterator.index;
+								closest_prop_distance = prop->distance;
+							}
 						}
 					}
 
@@ -2021,8 +2024,8 @@ static boolean action_obey_command_begin(
 						dot_product3d(&unit->object.translational_velocity, &unit->object.forward) > 0.06666667f;
 				}
 
-				simple_control->pause_timer = 2 * TICKS_PER_SECOND;
 				simple_control->jump.delay_ticks = moving_forward ? 0 : 10;
+				simple_control->pause_timer = 2 * TICKS_PER_SECOND;
 				result = TRUE;
 			}
 			break;

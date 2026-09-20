@@ -113,10 +113,7 @@ extern boolean collision_debug;
 extern boolean collision_debug_features;
 extern unsigned long collision_debug_flags;
 extern real_point3d collision_debug_phantom_bsp_point;
-extern real_point3d collision_debug_point;
-extern boolean collision_debug_repeat;
 extern boolean collision_debug_spray;
-extern real_vector3d collision_debug_vector;
 
 extern boolean collision_debug_flag_back_facing_surfaces;
 extern boolean collision_debug_flag_ignore_breakable_surfaces;

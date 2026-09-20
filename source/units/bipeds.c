@@ -266,6 +266,7 @@ symbols in this file:
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_bsp_definitions.h"
+#include "physics/collision_debug.h"
 #include "physics/collision_features.h"
 #include "physics/collision_models.h"
 #include "physics/collisions.h"
@@ -2622,6 +2623,17 @@ static void biped_update_physics(
 			&clipped_velocity,
 			16,
 			collisions);
+	}
+
+	if (debug_biped_physics &&
+		object_get(physics->biped_index)->object.owner_player_index != NONE)
+	{
+		collision_debug_repeat = TRUE;
+		collision_debug_point = position;
+		collision_debug_vector = velocity;
+		collision_debug_length = 1.0f;
+		collision_debug_width = physics->width;
+		collision_debug_height = physics->height;
 	}
 
 	SET_FLAG(physics->out_flags, _biped_physics_out_splatter_bit, collision_count >= 16);

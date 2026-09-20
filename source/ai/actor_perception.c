@@ -6254,9 +6254,8 @@ void actor_perception_update(
 	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
 	short highest_prop_timer = 1;
 	boolean prop_serviced = FALSE;
-	long nearest_orphan_index = NONE;
+	long interesting_orphan_index = NONE;
 	real nearest_orphan_distance = REAL_MAX;
-	long interesting_orphan_index;
 	struct prop_iterator iterator;
 	struct prop_datum *prop;
 	struct actor_position_data position;
@@ -6284,8 +6283,10 @@ void actor_perception_update(
 			else if (actor->danger_zone.acknowledgement_timer > 0 &&
 				actor->danger_zone.currently_perceived)
 			{
-				if (actor->state.uncertain_combat_timer == NONE ||
-					actor->state.uncertain_combat_timer >= 60)
+				if (actor->danger_zone.hostility == 0 &&
+					!actor->danger_zone.attached_to_us &&
+					(actor->state.uncertain_combat_timer == NONE ||
+						actor->state.uncertain_combat_timer >= 60))
 				{
 					acknowledge_danger = --actor->danger_zone.acknowledgement_timer == 0;
 				}
@@ -7020,7 +7021,7 @@ void actor_perception_update(
 			prop->state <= _prop_state_inspected_orphan &&
 			prop->distance < nearest_orphan_distance)
 		{
-			nearest_orphan_index = iterator.index;
+			interesting_orphan_index = iterator.index;
 			nearest_orphan_distance = prop->distance;
 		}
 
@@ -7071,7 +7072,6 @@ void actor_perception_update(
 		}
 	}
 
-	interesting_orphan_index = nearest_orphan_index;
 	if (actor->target.target_prop_index != NONE)
 	{
 		struct prop_datum *target_prop = prop_get(actor->target.target_prop_index);

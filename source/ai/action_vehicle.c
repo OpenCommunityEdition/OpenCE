@@ -307,7 +307,7 @@ static boolean action_vehicle_desirable(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct unit_datum *vehicle = unit_get(vehicle_index);
-	boolean desirable;
+	boolean desirable = FALSE;
 
 	if (TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
 	{
@@ -323,7 +323,6 @@ static boolean action_vehicle_desirable(
 			attempt_start_distance : attempt_continue_distance;
 		real_point3d origin;
 
-		desirable = FALSE;
 		object_get_origin(vehicle_index, &origin);
 		if (already_inside ||
 			distance_squared3d(&actor->input.position.body_position, &origin) <

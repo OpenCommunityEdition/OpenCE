@@ -3702,59 +3702,164 @@ void player_profile_1wide_list_update(
 		list_widget == profile_description->next,
 		"expected qtr-screen profile select wrapper screen to have 3 child widgets (pic, description, list... in that order)");
 
-	for (;;)
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x86F,
+		list_widget->parameters.list.selected_list_item_index >= 0 &&
+			list_widget->parameters.list.selected_list_item_index <
+				list_widget->parameters.list.number_of_items,
+		"qtr-screen profile list has invalid list item index");
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x872,
+		list_widget->parameters.list.selected_list_item_index >= 0 &&
+			list_widget->parameters.list.selected_list_item_index <
+				list_widget->parameters.list.number_of_items,
+		"invalid list item index");
+
+	profile_index = ((long *)list_widget->parameters.list.list_items)
+		[list_widget->parameters.list.selected_list_item_index];
+	player_profile_update_cache_for_nwide_list(&profile_index, 1);
+	profile = NULL;
+
+	if (profile_index != NONE)
 	{
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-			0x86F,
-			list_widget->parameters.list.selected_list_item_index >= 0 &&
-				list_widget->parameters.list.selected_list_item_index <
-					list_widget->parameters.list.number_of_items,
-			"qtr-screen profile list has invalid list item index");
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-			0x872,
-			list_widget->parameters.list.selected_list_item_index >= 0 &&
-				list_widget->parameters.list.selected_list_item_index <
-					list_widget->parameters.list.number_of_items,
-			"invalid list item index");
+		long cache_index;
 
-		profile_index = ((long *)list_widget->parameters.list.list_items)
-			[list_widget->parameters.list.selected_list_item_index];
-		player_profile_update_cache_for_nwide_list(&profile_index, 1);
-		profile = NULL;
-
-		if (profile_index != NONE)
+		for (cache_index = 0;
+			cache_index < (long)NUMBEROF(cached_player_profile);
+			cache_index++)
 		{
-			long cache_index;
-
-			for (cache_index = 0;
-				cache_index < (long)NUMBEROF(cached_player_profile);
-				cache_index++)
+			if (cached_player_profile[cache_index].profile_index == profile_index)
 			{
-				if (cached_player_profile[cache_index].profile_index == profile_index)
-				{
-					profile = &cached_player_profile[cache_index].profile;
-					break;
-				}
+				profile = &cached_player_profile[cache_index].profile;
+				break;
 			}
 		}
+	}
 
-		if (profile)
-			break;
-
-		if (list_widget->parameters.list.number_of_items > 0)
+	if (profile)
+	{
+		list_widget->parameters.list.item_text = ui_widget_realloc(
+			list_widget->parameters.list.item_text,
+			0x18,
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x886);
+		if (list_widget->parameters.list.item_text)
 		{
-			list_widget->parameters.list.number_of_items = (word)filter_invalid_list_indices(
-				(long *)list_widget->parameters.list.list_items,
-				list_widget->parameters.list.number_of_items);
-			list_widget->parameters.list.selected_list_item_index = (short)PIN(
-				list_widget->parameters.list.selected_list_item_index,
-				0,
-				list_widget->parameters.list.number_of_items - 1);
-			continue;
-		}
+			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
+			{
+				long default_name_index = profile->flags >> 8;
+				long names_tag_index = tag_loaded(
+					UNICODE_STRING_LIST_TAG,
+					"ui\\shell\\strings\\default_player_profile_names");
+				wchar_t const *profile_name = L"";
 
+				if (names_tag_index != NONE)
+				{
+					profile_name = unicode_string_list_get_string(
+						names_tag_index,
+						(short)default_name_index);
+				}
+
+				ustrncpy(list_widget->parameters.list.item_text, profile_name, 0xB);
+				list_widget->parameters.list.item_text[0xB] = 0;
+			}
+			else
+			{
+				ustrncpy(list_widget->parameters.list.item_text, profile->player_name, 0xB);
+				list_widget->parameters.list.item_text[0xB] = 0;
+			}
+
+			name_bitmap->animation.current_frame_index = (short)PIN(
+				profile->primary_color_index,
+				0,
+				player_profile_number_of_available_primary_colors() - 1);
+
+			profile_description->parameters.text_box.text = ui_widget_realloc(
+				profile_description->parameters.text_box.text,
+				0x200,
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x89C);
+			if (profile_description->parameters.text_box.text)
+			{
+				if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
+				{
+					long joystick_descriptions_tag_index = tag_loaded(
+						UNICODE_STRING_LIST_TAG,
+						"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions");
+					long button_descriptions_tag_index = tag_loaded(
+						UNICODE_STRING_LIST_TAG,
+						"ui\\shell\\main_menu\\player_profiles_select\\button_set_long_descriptions");
+
+					if (joystick_descriptions_tag_index != NONE &&
+						button_descriptions_tag_index != NONE)
+					{
+						wchar_t const *joystick_description = unicode_string_list_get_string(
+							joystick_descriptions_tag_index,
+							profile->controller_settings.joystick_preset);
+						wchar_t const *button_description = unicode_string_list_get_string(
+							button_descriptions_tag_index,
+							profile->controller_settings.button_preset);
+
+						usnprintf(
+							profile_description->parameters.text_box.text,
+							0xFF,
+							L"%s%hs%s",
+							joystick_description,
+							"\r\n",
+							button_description);
+						profile_description->parameters.text_box.text[0xFF] = 0;
+					}
+					else
+						profile_description->parameters.text_box.text[0] = 0;
+				}
+				else
+				{
+					long joystick_descriptions_tag_index = tag_loaded(
+						UNICODE_STRING_LIST_TAG,
+						"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_short_descriptions");
+					long button_descriptions_tag_index = tag_loaded(
+						UNICODE_STRING_LIST_TAG,
+						"ui\\shell\\main_menu\\player_profiles_select\\button_set_short_descriptions");
+
+					if (joystick_descriptions_tag_index != NONE &&
+						button_descriptions_tag_index != NONE)
+					{
+						wchar_t const *joystick_description = unicode_string_list_get_string(
+							joystick_descriptions_tag_index,
+							profile->controller_settings.joystick_preset);
+						wchar_t const *button_description = unicode_string_list_get_string(
+							button_descriptions_tag_index,
+							profile->controller_settings.button_preset);
+
+						usnprintf(
+							profile_description->parameters.text_box.text,
+							0xFF,
+							L"%s%hs%s",
+							joystick_description,
+							"\r\n",
+							button_description);
+					}
+				}
+
+				profile_description->parameters.text_box.text[0xFF] = 0;
+			}
+		}
+	}
+	else if (list_widget->parameters.list.number_of_items > 0)
+	{
+		list_widget->parameters.list.number_of_items = (word)filter_invalid_list_indices(
+			(long *)list_widget->parameters.list.list_items,
+			list_widget->parameters.list.number_of_items);
+		list_widget->parameters.list.selected_list_item_index = (short)PIN(
+			list_widget->parameters.list.selected_list_item_index,
+			0,
+			list_widget->parameters.list.number_of_items - 1);
+		player_profile_1wide_list_update(list_widget);
+	}
+	else
+	{
 		list_widget->parameters.list.item_text = ui_widget_realloc(
 			list_widget->parameters.list.item_text,
 			4,
@@ -3771,109 +3876,6 @@ void player_profile_1wide_list_update(
 			0x8D7);
 		if (profile_description->parameters.text_box.text)
 			profile_description->parameters.text_box.text[0] = 0;
-		return;
-	}
-
-	list_widget->parameters.list.item_text = ui_widget_realloc(
-		list_widget->parameters.list.item_text,
-		0x18,
-		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-		0x886);
-	if (list_widget->parameters.list.item_text)
-	{
-		if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
-		{
-			long default_name_index = profile->flags >> 8;
-			long names_tag_index = tag_loaded(
-				UNICODE_STRING_LIST_TAG,
-				"ui\\shell\\strings\\default_player_profile_names");
-			wchar_t const *profile_name = L"";
-
-			if (names_tag_index != NONE)
-			{
-				profile_name = unicode_string_list_get_string(
-					names_tag_index,
-					(short)default_name_index);
-			}
-
-			ustrncpy(list_widget->parameters.list.item_text, profile_name, 0xB);
-			list_widget->parameters.list.item_text[0xB] = 0;
-		}
-		else
-		{
-			ustrncpy(list_widget->parameters.list.item_text, profile->player_name, 0xB);
-			list_widget->parameters.list.item_text[0xB] = 0;
-		}
-
-		name_bitmap->animation.current_frame_index = (short)PIN(
-			profile->primary_color_index,
-			0,
-			player_profile_number_of_available_primary_colors() - 1);
-
-		profile_description->parameters.text_box.text = ui_widget_realloc(
-			profile_description->parameters.text_box.text,
-			0x200,
-			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-			0x89C);
-		if (profile_description->parameters.text_box.text)
-		{
-			if (TEST_FLAG(profile->flags, _player_profile_default_profile_bit))
-			{
-				long joystick_descriptions_tag_index = tag_loaded(
-					UNICODE_STRING_LIST_TAG,
-					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions");
-				long button_descriptions_tag_index = tag_loaded(
-					UNICODE_STRING_LIST_TAG,
-					"ui\\shell\\main_menu\\player_profiles_select\\button_set_long_descriptions");
-
-				if (joystick_descriptions_tag_index != NONE &&
-					button_descriptions_tag_index != NONE)
-				{
-					usnprintf(
-						profile_description->parameters.text_box.text,
-						0xFF,
-						L"%s%hs%s",
-						unicode_string_list_get_string(
-							joystick_descriptions_tag_index,
-							profile->controller_settings.joystick_preset),
-						"\r\n",
-						unicode_string_list_get_string(
-							button_descriptions_tag_index,
-							profile->controller_settings.button_preset));
-				}
-				else
-					profile_description->parameters.text_box.text[0] = 0;
-
-				profile_description->parameters.text_box.text[0xFF] = 0;
-			}
-			else
-			{
-				long joystick_descriptions_tag_index = tag_loaded(
-					UNICODE_STRING_LIST_TAG,
-					"ui\\shell\\main_menu\\player_profiles_select\\joystick_set_short_descriptions");
-				long button_descriptions_tag_index = tag_loaded(
-					UNICODE_STRING_LIST_TAG,
-					"ui\\shell\\main_menu\\player_profiles_select\\button_set_short_descriptions");
-
-				if (joystick_descriptions_tag_index != NONE &&
-					button_descriptions_tag_index != NONE)
-				{
-					usnprintf(
-						profile_description->parameters.text_box.text,
-						0xFF,
-						L"%s%hs%s",
-						unicode_string_list_get_string(
-							joystick_descriptions_tag_index,
-							profile->controller_settings.joystick_preset),
-						"\r\n",
-						unicode_string_list_get_string(
-							button_descriptions_tag_index,
-							profile->controller_settings.button_preset));
-				}
-
-				profile_description->parameters.text_box.text[0xFF] = 0;
-			}
-		}
 	}
 	return;
 }

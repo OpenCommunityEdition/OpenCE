@@ -1016,7 +1016,7 @@ void render_camera_mirror(
 
 	if (mirror->index_of_refraction == 0.0f)
 	{
-		if (fabs(dot_product3d(&plane.n, &camera->forward)) < 0.0125)
+		if (fabs(dot_product3d(&plane.n, &camera->forward)) < 0.0125f)
 		{
 			real_point3d point_on_plane;
 			real_vector3d const *forward = &camera->forward;

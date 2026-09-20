@@ -220,159 +220,169 @@ static short action_alert_next_position(
 	boolean *direction_increasing)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-	struct encounter_definition *encounter;
-	struct squad_definition *squad;
-	struct tag_block *move_positions;
-	unsigned long unavailable_positions[BIT_VECTOR_SIZE_IN_LONGS(32)];
-	boolean any_position_available;
-	short position_index;
-	short next_position_index;
+	short result = NONE;
 
 	if (actor->input.vehicle_passenger ||
 		move_position_order == _move_position_order_none)
 	{
-		return NONE;
+		result = NONE;
 	}
-	if (actor->meta.encounter_index == NONE)
-		return NONE;
-
-	encounter = TAG_BLOCK_GET_ELEMENT(
-		&global_scenario_get()->ai_encounters,
-		DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
-		struct encounter_definition);
-	squad = TAG_BLOCK_GET_ELEMENT(
-		&encounter->squads,
-		actor->meta.squad_index,
-		struct squad_definition);
-
-	match_assert("c:\\halo\\SOURCE\\ai\\action_alert.c", 275, !actor->meta.swarm);
-	if (move_position_order == _move_position_order_repeat &&
-		current_position_index != NONE)
+	else if (actor->meta.encounter_index != NONE)
 	{
-		return current_position_index;
-	}
+		struct encounter_definition *encounter = TAG_BLOCK_GET_ELEMENT(
+			&global_scenario_get()->ai_encounters,
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index),
+			struct encounter_definition);
+		struct squad_definition *squad = TAG_BLOCK_GET_ELEMENT(
+			&encounter->squads,
+			actor->meta.squad_index,
+			struct squad_definition);
 
-	any_position_available = FALSE;
-	csmemset(
-		unavailable_positions,
-		0,
-		sizeof(unavailable_positions));
-	position_index = 0;
-	move_positions = &squad->move_positions;
-	while (position_index < move_positions->count)
-	{
-		struct move_position_definition *move_position =
-			TAG_BLOCK_GET_ELEMENT(
-				move_positions,
-				position_index,
-				struct move_position_definition);
-		boolean position_available = TRUE;
-		struct prop_iterator iterator;
-		struct prop_datum *prop;
-
-		if (position_index == current_position_index)
-			position_available = FALSE;
-
-		if (current_position_index != NONE &&
-			distance_squared3d(
-				&actor->input.position.body_position,
-				&move_position->position) < 0.25f)
+		match_assert("c:\\halo\\SOURCE\\ai\\action_alert.c", 275, !actor->meta.swarm);
+		if (move_position_order == _move_position_order_repeat &&
+			current_position_index != NONE)
 		{
-			position_available = FALSE;
+			result = current_position_index;
 		}
-
-		if (move_position->sequence_id &&
-			move_position->sequence_id != actor->state.noncombat_sequence_id)
+		else
 		{
-			position_available = FALSE;
-		}
+			struct tag_block *move_positions;
+			unsigned long unavailable_positions[BIT_VECTOR_SIZE_IN_LONGS(32)];
+			boolean any_position_available = FALSE;
+			short position_index;
 
-		prop_iterator_new(&iterator, actor_index);
-		for (prop = prop_iterator_next(&iterator);
-			prop;
-			prop = prop_iterator_next(&iterator))
-		{
-			if (prop->state >= _prop_state_becoming_unacknowledged &&
-				prop->state <= _prop_state_acknowledged &&
-				distance_squared3d(
-					&prop->body_position,
-					&move_position->position) < 0.25f)
+			csmemset(
+				unavailable_positions,
+				0,
+				sizeof(unavailable_positions));
+			position_index = 0;
+			move_positions = &squad->move_positions;
+			while (position_index < move_positions->count)
 			{
-				position_available = FALSE;
-				break;
+				struct move_position_definition *move_position =
+					TAG_BLOCK_GET_ELEMENT(
+						move_positions,
+						position_index,
+						struct move_position_definition);
+				boolean position_available = TRUE;
+				struct prop_iterator iterator;
+				struct prop_datum *prop;
+
+				if (position_index == current_position_index)
+					position_available = FALSE;
+
+				if (current_position_index != NONE &&
+					distance_squared3d(
+						&actor->input.position.body_position,
+						&move_position->position) < 0.25f)
+				{
+					position_available = FALSE;
+				}
+
+				if (move_position->sequence_id &&
+					move_position->sequence_id != actor->state.noncombat_sequence_id)
+				{
+					position_available = FALSE;
+				}
+
+				prop_iterator_new(&iterator, actor_index);
+				for (prop = prop_iterator_next(&iterator);
+					prop;
+					prop = prop_iterator_next(&iterator))
+				{
+					if (prop->state >= _prop_state_becoming_unacknowledged &&
+						prop->state <= _prop_state_acknowledged &&
+						distance_squared3d(
+							&prop->body_position,
+							&move_position->position) < 0.25f)
+					{
+						position_available = FALSE;
+						break;
+					}
+				}
+
+				if (position_available)
+					any_position_available = TRUE;
+				else
+					BIT_VECTOR_SET_FLAG(unavailable_positions, position_index, TRUE);
+
+				position_index++;
+			}
+
+			if (!any_position_available)
+			{
+				result = NONE;
+			}
+			else
+			{
+				if (move_position_order == _move_position_order_random)
+				{
+					result = choose_random_array_element(
+						squad->move_positions.address,
+						sizeof(struct move_position_definition),
+						move_positions->count,
+						offsetof(struct move_position_definition, weight),
+						unavailable_positions);
+				}
+				else
+				{
+					short next_position_index;
+
+					if (current_position_index < 0 ||
+						current_position_index >= move_positions->count)
+						next_position_index = 0;
+					else
+						next_position_index = current_position_index;
+
+					do
+					{
+						boolean increasing = TRUE;
+
+						switch (move_position_order)
+						{
+						case _move_position_order_loop:
+							increasing = TRUE;
+							break;
+						case _move_position_order_loop_back_and_forth:
+							if (next_position_index == 0)
+								increasing = TRUE;
+							else if (next_position_index == move_positions->count - 1)
+								increasing = FALSE;
+							else if (direction_increasing)
+								increasing = *direction_increasing;
+							else
+								increasing = TRUE;
+							break;
+						case _move_position_order_loop_randomly:
+							increasing = TEST_FLAG(game_time_get(), 0);
+							break;
+						}
+
+						if (direction_increasing)
+							*direction_increasing = increasing;
+
+						if (increasing)
+						{
+							next_position_index++;
+							if (next_position_index >= move_positions->count)
+								next_position_index = 0;
+						}
+						else
+						{
+							next_position_index--;
+							if (next_position_index < 0)
+								next_position_index = (short)(move_positions->count - 1);
+						}
+					}
+					while (BIT_VECTOR_TEST_FLAG(unavailable_positions, next_position_index));
+
+					result = next_position_index;
+				}
 			}
 		}
-
-		if (position_available)
-			any_position_available = TRUE;
-		else
-			BIT_VECTOR_SET_FLAG(unavailable_positions, position_index, TRUE);
-
-		position_index++;
 	}
 
-	if (!any_position_available)
-		return NONE;
-
-	if (move_position_order == _move_position_order_random)
-	{
-		return choose_random_array_element(
-			squad->move_positions.address,
-			sizeof(struct move_position_definition),
-			move_positions->count,
-			offsetof(struct move_position_definition, weight),
-			unavailable_positions);
-	}
-
-	if (current_position_index < 0 ||
-		current_position_index >= move_positions->count)
-		next_position_index = 0;
-	else
-		next_position_index = current_position_index;
-
-	do
-	{
-		boolean increasing = TRUE;
-
-		switch (move_position_order)
-		{
-		case _move_position_order_loop:
-			increasing = TRUE;
-			break;
-		case _move_position_order_loop_back_and_forth:
-			if (next_position_index == 0)
-				increasing = TRUE;
-			else if (next_position_index == move_positions->count - 1)
-				increasing = FALSE;
-			else if (direction_increasing)
-				increasing = *direction_increasing;
-			else
-				increasing = TRUE;
-			break;
-		case _move_position_order_loop_randomly:
-			increasing = TEST_FLAG(game_time_get(), 0);
-			break;
-		}
-
-		if (direction_increasing)
-			*direction_increasing = increasing;
-
-		if (increasing)
-		{
-			next_position_index++;
-			if (next_position_index >= move_positions->count)
-				next_position_index = 0;
-		}
-		else
-		{
-			next_position_index--;
-			if (next_position_index < 0)
-				next_position_index = (short)(move_positions->count - 1);
-		}
-	}
-	while (BIT_VECTOR_TEST_FLAG(unavailable_positions, next_position_index));
-
-	return next_position_index;
+	return result;
 }
 
 /* ---------- public code */

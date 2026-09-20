@@ -1,0 +1,11 @@
+# Actor looking: independent source and preservation review
+
+Root independently rebuilt frozen wave1 HEAD `905e5e3b41591af98c82accf3f57fc38118c2e7f` and the final candidate through the unchanged scratch gate. All 14 exact siblings remain strict. Only `_actor_look_update` changes among the 33 function owners. Named runtime owners, runtime noncode sections, and COMMON inventory are identical. No point helper is emitted; fake scan has zero findings. The replay verifies the exact number of each private type replacement rather than assuming a unique occurrence.
+
+Fresh raw DIA records explicitly identify `float *look_delta_deviations` in the private helper and `float[0x2] look_delta_deviations` in all three callers. The patch uses the project `real` type, true two-element arrays, and their existing private declaration. All indices are within the array and no header or public ABI changes. The helper and the two other caller bodies retain their baseline machine code.
+
+Root read the raw Ghidra instructions at `0045f89c..0045f90d`, `0045fe76..0045feb6`, and `00460241..0046028c`. These establish the enabled flag-store order, primary free/optional clears before vector installation, and two independent equality evaluations after initializing succeeded to FALSE. The repeated comparison is source-authenticated; it is not an invented dependency. The cross-build evidence does not establish a general compiler law or prove identical source revision. January remains the strict authority.
+
+The resulting update is 4704 padded bytes and 159 relocations, versus January 4720 padded / 4714 meaningful bytes and 159 relocations. Normalized SHA remains different. This is an admissible source correction at **zero exact credit**, with no park retirement or whole-object admission. No dead flag, filler, forced memory home, or speculative address-taking was added. Remaining register and stack allocation requires new evidence.
+
+Reproduction: `python -B scratch/astra_wave2_looking_review.py`. Full frozen/candidate objects, gates, source hashes, strict controls, and fake scan are under `scratch/astra-wave2/looking-independent-*`. The source-evidence packet is `astra_90pct_actor_looking_packet_20260920.md`. `IDA_AUTOMATION_UNAVAILABLE` is recorded; the user authorized Ghidra and DIA without an IDA blocker.

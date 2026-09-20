@@ -1364,26 +1364,28 @@ static void ai_debug_render_actor(
 						}
 						else if (BIT_VECTOR_TEST_FLAG(pvs, cluster_index))
 						{
+							real_point3d mid_point;
 							real_point3d p0;
 							real_point3d p1;
 							real_point3d p2;
 							real_point3d p3;
 
-							point_from_line3d(&base_point, global_up3d, 0.2f, &p0);
-							p1.x = base_point.x+global_up3d->i*0.1f;
-							p1.y = base_point.y+global_up3d->j*0.1f;
-							p1.z = base_point.z+global_up3d->k*0.1f;
-							p3.x = p1.x+offset_vector.i*0.1f;
-							p3.y = p1.y+offset_vector.j*0.1f;
-							p3.z = p1.z+offset_vector.k*0.1f;
-							p2.x = p1.x-offset_vector.i*0.1f;
-							p2.y = p1.y-offset_vector.j*0.1f;
-							p2.z = p1.z-offset_vector.k*0.1f;
+							p0 = base_point;
+							point_from_line3d(&base_point, global_up3d, 0.2f, &p2);
+							mid_point.x = base_point.x+global_up3d->i*0.1f;
+							mid_point.y = base_point.y+global_up3d->j*0.1f;
+							mid_point.z = base_point.z+global_up3d->k*0.1f;
+							p1.x = mid_point.x+offset_vector.i*0.1f;
+							p1.y = mid_point.y+offset_vector.j*0.1f;
+							p1.z = mid_point.z+offset_vector.k*0.1f;
+							p3.x = mid_point.x-offset_vector.i*0.1f;
+							p3.y = mid_point.y-offset_vector.j*0.1f;
+							p3.z = mid_point.z-offset_vector.k*0.1f;
 
-							render_debug_line(TRUE, &base_point, &p3, actor_color);
+							render_debug_line(TRUE, &p0, &p1, actor_color);
+							render_debug_line(TRUE, &p1, &p2, actor_color);
+							render_debug_line(TRUE, &p2, &p3, actor_color);
 							render_debug_line(TRUE, &p3, &p0, actor_color);
-							render_debug_line(TRUE, &p0, &p2, actor_color);
-							render_debug_line(TRUE, &p2, &base_point, actor_color);
 						}
 						else
 						{
@@ -3589,18 +3591,10 @@ static void ai_debug_render_actor(
 						headspace_vector.j = sine_horizontal_angle * sine_vertical_angle[ring_index] * ((real)(side_index==0 ? 1 : -1));
 						headspace_vector.k = cosine_vertical_angle[ring_index];
 
-					direction_vector[side_index][ring_index].i =
-						actor->input.looking_vector.i*headspace_vector.i +
-						actor->input.looking_left_vector.i*headspace_vector.j +
-						actor->input.looking_up_vector.i*headspace_vector.k;
-					direction_vector[side_index][ring_index].j =
-						actor->input.looking_vector.j*headspace_vector.i +
-						actor->input.looking_left_vector.j*headspace_vector.j +
-						actor->input.looking_up_vector.j*headspace_vector.k;
-					direction_vector[side_index][ring_index].k =
-						actor->input.looking_vector.k*headspace_vector.i +
-						actor->input.looking_left_vector.k*headspace_vector.j +
-						actor->input.looking_up_vector.k*headspace_vector.k;
+						direction_vector[side_index][ring_index] = *global_zero_vector3d;
+						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_vector, headspace_vector.i, (real_point3d *)&direction_vector[side_index][ring_index]);
+						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_left_vector, headspace_vector.j, (real_point3d *)&direction_vector[side_index][ring_index]);
+						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_up_vector, headspace_vector.k, (real_point3d *)&direction_vector[side_index][ring_index]);
 					}
 				}
 

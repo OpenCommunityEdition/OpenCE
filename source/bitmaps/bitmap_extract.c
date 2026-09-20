@@ -2563,33 +2563,35 @@ static boolean extract_sequence(
 	short bottom)
 {
 	boolean result = TRUE;
-	short x = 0;
+	short x;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 		0x234,
-		top >= 0);
+		top>=0);
 	match_assert(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 		0x235,
-		bottom > top);
+		bottom>=top);
 	match_assert(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 		0x236,
-		bottom <= extract_data.plate->height);
+		bottom<=extract_data.plate->height);
 
+	x = 0;
 	while (result && x < extract_data.plate->width)
 	{
 		rectangle2d bounds;
 		short extraction_state = 0;
 
-		bounds.y0 = top;
 		bounds.x0 = SHORT_MAX;
-		bounds.y1 = bottom;
+		bounds.y0 = top;
 		bounds.x1 = SHORT_MIN;
-		while (extraction_state != 2 && x < extract_data.plate->width)
+		bounds.y1 = bottom;
+		while (x < extract_data.plate->width && extraction_state != 2)
 		{
 			boolean found_bitmap = FALSE;
+			boolean found_bottom_reference = FALSE;
 			short y;
 
 			for (y = top; y < bottom; y++)
@@ -2600,42 +2602,58 @@ static boolean extract_sequence(
 					y,
 					0) & 0xFFFFFF;
 
-				if (color != extract_data.bottom_reference &&
-					color != extract_data.top_reference)
+				if (color == extract_data.bottom_reference)
+				{
+					found_bottom_reference = TRUE;
+				}
+				else if (color != extract_data.top_reference)
 				{
 					found_bitmap = TRUE;
-					if (extraction_state == 0)
+					switch (extraction_state)
 					{
+					case 0:
 						extraction_state = 1;
 						bounds.x0 = x;
+						/* fall through */
+					case 1:
+						bounds.y0 = MIN(y, bounds.y0);
+						bounds.y1 = MAX(y, bounds.y1);
+						bounds.x1 = x;
+						break;
 					}
-
-					bounds.y0 = MIN(y, bounds.y0);
-					bounds.y1 = MAX(y, bounds.y1);
-					bounds.x1 = x;
 				}
 			}
 
+			if ((found_bottom_reference || extract_data.single_sequence) && !found_bitmap)
+			{
+				if (extraction_state == 1)
+					extraction_state = 2;
+			}
 			if (extraction_state == 1 && !found_bitmap)
+			{
 				extraction_state = 2;
+			}
 			x++;
 		}
 
 		if (extraction_state != 0)
 		{
+			rectangle2d adjusted_bounds;
+
 			bounds.x1++;
 			bounds.y1++;
+			adjusted_bounds = bounds;
 			if (TEST_FLAG(
 				extract_data.group->flags,
 				_bitmap_group_extract_sprites_filthy_bug_fix_bit))
 			{
 				short trim_y;
 
-				for (trim_y = bounds.y0; trim_y < bounds.y1; trim_y++)
+				for (trim_y = adjusted_bounds.y0; trim_y < adjusted_bounds.y1; trim_y++)
 				{
 					short trim_x;
 
-					for (trim_x = bounds.x0; trim_x < bounds.x1; trim_x++)
+					for (trim_x = adjusted_bounds.x0; trim_x < adjusted_bounds.x1; trim_x++)
 					{
 						pixel32 color = *(pixel32 *)bitmap_2d_address(
 							extract_data.plate,
@@ -2647,16 +2665,16 @@ static boolean extract_sequence(
 							break;
 					}
 
-					if (trim_x < bounds.x1)
+					if (trim_x < adjusted_bounds.x1)
 						break;
 				}
-				bounds.y0 = trim_y;
+				adjusted_bounds.y0 = trim_y;
 
-				for (trim_y = bounds.y1 - 2; trim_y >= bounds.y0; trim_y--)
+				for (trim_y = adjusted_bounds.y1 - 2; trim_y >= adjusted_bounds.y0; trim_y--)
 				{
 					short trim_x;
 
-					for (trim_x = bounds.x0; trim_x < bounds.x1; trim_x++)
+					for (trim_x = adjusted_bounds.x0; trim_x < adjusted_bounds.x1; trim_x++)
 					{
 						pixel32 color = *(pixel32 *)bitmap_2d_address(
 							extract_data.plate,
@@ -2668,13 +2686,13 @@ static boolean extract_sequence(
 							break;
 					}
 
-					if (trim_x < bounds.x1)
+					if (trim_x < adjusted_bounds.x1)
 						break;
 				}
-				bounds.y1 = trim_y + 1;
+				adjusted_bounds.y1 = trim_y + 1;
 			}
 
-			result = extract_bitmap(&bounds);
+			result = extract_bitmap(&adjusted_bounds);
 		}
 	}
 

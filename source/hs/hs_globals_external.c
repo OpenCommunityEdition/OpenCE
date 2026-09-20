@@ -900,6 +900,7 @@ symbols in this file:
 #include "main/main.h"
 #include "main/main_internal.h"
 #include "networking/network_connection.h"
+#include "physics/collision_debug.h"
 
 /* ---------- constants */
 
@@ -951,14 +952,8 @@ extern byte collision_debug_flag_skip_passthrough_bipeds[];
 extern byte collision_debug_flag_structure[];
 extern byte collision_debug_flag_try_to_keep_location_valid[];
 extern byte collision_debug_flag_use_vehicle_physics[];
-extern byte collision_debug_height[];
-extern byte collision_debug_length[];
 extern byte collision_debug_phantom_bsp[];
-extern byte collision_debug_point[];
-extern byte collision_debug_repeat[];
 extern byte collision_debug_spray[];
-extern byte collision_debug_vector[];
-extern byte collision_debug_width[];
 extern byte collision_log_detailed[];
 extern byte collision_log_extended[];
 extern byte collision_log_render_enable[];
@@ -1308,7 +1303,7 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "collision_debug", _hs_type_boolean, 0, collision_debug },
 	{ "collision_debug_spray", _hs_type_boolean, 0, collision_debug_spray },
 	{ "collision_debug_features", _hs_type_boolean, 0, collision_debug_features },
-	{ "collision_debug_repeat", _hs_type_boolean, 0, collision_debug_repeat },
+	{ "collision_debug_repeat", _hs_type_boolean, 0, &collision_debug_repeat },
 	{ "collision_debug_flag_front_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_front_facing_surfaces },
 	{ "collision_debug_flag_back_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_back_facing_surfaces },
 	{ "collision_debug_flag_ignore_two_sided_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_two_sided_surfaces },
@@ -1330,15 +1325,15 @@ struct hs_external_global_definition hs_external_global_definitions[442] =
 	{ "collision_debug_flag_try_to_keep_location_valid", _hs_type_boolean, 0, collision_debug_flag_try_to_keep_location_valid },
 	{ "collision_debug_flag_skip_passthrough_bipeds", _hs_type_boolean, 0, collision_debug_flag_skip_passthrough_bipeds },
 	{ "collision_debug_flag_use_vehicle_physics", _hs_type_boolean, 0, collision_debug_flag_use_vehicle_physics },
-	{ "collision_debug_point_x", _hs_type_real, 0, collision_debug_point },
-	{ "collision_debug_point_y", _hs_type_real, 0, collision_debug_point + 0x4 },
-	{ "collision_debug_point_z", _hs_type_real, 0, collision_debug_point + 0x8 },
-	{ "collision_debug_vector_i", _hs_type_real, 0, collision_debug_vector },
-	{ "collision_debug_vector_j", _hs_type_real, 0, collision_debug_vector + 0x4 },
-	{ "collision_debug_vector_k", _hs_type_real, 0, collision_debug_vector + 0x8 },
-	{ "collision_debug_length", _hs_type_real, 0, collision_debug_length },
-	{ "collision_debug_width", _hs_type_real, 0, collision_debug_width },
-	{ "collision_debug_height", _hs_type_real, 0, collision_debug_height },
+	{ "collision_debug_point_x", _hs_type_real, 0, &collision_debug_point.x },
+	{ "collision_debug_point_y", _hs_type_real, 0, &collision_debug_point.y },
+	{ "collision_debug_point_z", _hs_type_real, 0, &collision_debug_point.z },
+	{ "collision_debug_vector_i", _hs_type_real, 0, &collision_debug_vector.i },
+	{ "collision_debug_vector_j", _hs_type_real, 0, &collision_debug_vector.j },
+	{ "collision_debug_vector_k", _hs_type_real, 0, &collision_debug_vector.k },
+	{ "collision_debug_length", _hs_type_real, 0, &collision_debug_length },
+	{ "collision_debug_width", _hs_type_real, 0, &collision_debug_width },
+	{ "collision_debug_height", _hs_type_real, 0, &collision_debug_height },
 	{ "collision_debug_phantom_bsp", _hs_type_boolean, 0, collision_debug_phantom_bsp },
 	{ "debug_obstacle_path", _hs_type_boolean, 0, debug_obstacle_path },
 	{ "debug_obstacle_path_on_failure", _hs_type_boolean, 0, debug_obstacle_path_on_failure },
