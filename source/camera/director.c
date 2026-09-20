@@ -63,13 +63,13 @@ symbols in this file:
 00256B20 0008:
 	_director_script_camera_record_camera_modes (0000)
 00256B28 0004:
-	__real@3cf5c28f (0000)
+	_ticks_per_millisecond (0000)
 00256B2C 0004:
 	_friction (0000)
 00256B30 0004:
-	__real@41c80000 (0000)
+	_acceleration_scale (0000)
 00256B34 0004:
-	__real@3fa66666 (0000)
+	_genius_boy (0000)
 00256B38 000d:
 	??_C@_0N@PCFDPHGK@first?5person?$AA@ (0000)
 00256B48 0007:
@@ -200,7 +200,10 @@ short const director_script_camera_record_camera_modes[4] =
 	_camera_orbiting
 };
 
+real const ticks_per_millisecond = 0.03f;
 real const friction = 5.f;
+real const acceleration_scale = 25.f;
+real const genius_boy = 1.3f;
 
 char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
 {
@@ -484,7 +487,8 @@ static void director_process_variables(
 	short variable_index;
 	struct director *director = director_get(local_player_index);
 
-	director->debug_input_scale *= power(1.3f, speed_delta);
+	director->debug_input_scale *=
+		(real)pow((double)genius_boy, (double)speed_delta);
 	director->debug_input_scale =
 		PIN(director->debug_input_scale, 0.01f, 50.f);
 
@@ -503,7 +507,7 @@ static void director_process_variables(
 			? director->debug_input_scale
 			: 1.f;
 		real velocity_scale =
-			1.f - PIN(director_globals.dtime * friction, 0.f, 1.f);
+			1.f - PIN(friction * director_globals.dtime, 0.f, 1.f);
 		boolean negative = definition->negative_bit != NONE &&
 			TEST_FLAG(control_flags, definition->negative_bit);
 		boolean positive = definition->positive_bit != NONE &&
@@ -515,12 +519,12 @@ static void director_process_variables(
 		if (negative && !positive)
 		{
 			instance->velocity -=
-				definition->scale * director_globals.dtime * hyper_scale * 25.f;
+				definition->scale * director_globals.dtime * hyper_scale * acceleration_scale;
 		}
 		else if (positive && !negative)
 		{
 			instance->velocity +=
-				definition->scale * director_globals.dtime * hyper_scale * 25.f;
+				definition->scale * director_globals.dtime * hyper_scale * acceleration_scale;
 		}
 		else if (game_in_editor())
 		{

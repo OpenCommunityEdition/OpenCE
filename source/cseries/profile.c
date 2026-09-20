@@ -914,10 +914,15 @@ real profile_frame_get_value(
 				if (player_window_count>=4)
 					break;
 
-				value += frame->windows[window_index].total;
-
 				if (frame->window_ids[window_index])
+				{
+					value += frame->windows[window_index].total;
 					player_window_count++;
+				}
+				else
+				{
+					value += frame->windows[window_index].total;
+				}
 			}
 			break;
 		}

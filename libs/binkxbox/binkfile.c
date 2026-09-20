@@ -34,15 +34,20 @@ static void __stdcall bink_file_close(
 static unsigned long __stdcall bink_file_idle(
 	BINKIO *io);
 
-/* Target has an ADD without LOCK. This ordinary-C reconstruction is not an
- * atomic primitive and does not reproduce the target's original instruction
- * selection/inline operand homes. No assembly or volatility is introduced.
+/* Period RAD.H defines the non-threaded LockedAddFunc helper with this exact
+ * register/ADD sequence. January likewise has no LOCK prefix. Keep the helper
+ * out of line here because January owns a standalone function contribution.
  */
 void LockedAddFunc(
 	unsigned long *value,
 	unsigned long amount)
 {
-	*value += amount;
+	__asm
+	{
+		mov eax, [value]
+		mov edx, [amount]
+		add [eax], edx
+	}
 	return;
 }
 

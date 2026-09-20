@@ -1291,59 +1291,55 @@ boolean sphere_intersects_rectangle3d(
 boolean sphere_intersects_triangle3d(
 	real_point3d const *center,
 	real radius,
-	real_point3d const *triangle0,
-	real_point3d const *triangle1,
-	real_point3d const *triangle2)
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2)
 {
-	real_vector3d center_offset;
-	real_vector3d edge01;
-	real_vector3d edge12;
-	real_vector3d edge20;
-	real_vector3d normal;
-	real_vector3d cross;
+	real_vector3d v;
+	real_vector3d e0;
+	real_vector3d e1;
+	real_vector3d e2;
+	real_vector3d n;
 	real plane_dot;
 	real normal_magnitude_squared;
 	boolean result;
 
 	result = TRUE;
-	vector_from_points3d(triangle0, center, &center_offset);
-	vector_from_points3d(triangle0, triangle1, &edge01);
-	vector_from_points3d(triangle1, triangle2, &edge12);
-	cross_product3d(&edge01, &edge12, &normal);
-	plane_dot = dot_product3d(&normal, &center_offset);
-	normal_magnitude_squared = magnitude_squared3d(&normal);
+	vector_from_points3d(p0, center, &v);
+	vector_from_points3d(p0, p1, &e0);
+	vector_from_points3d(p1, p2, &e1);
+	cross_product3d(&e0, &e1, &n);
+	plane_dot = dot_product3d(&n, &v);
+	normal_magnitude_squared = magnitude_squared3d(&n);
 	if (plane_dot * plane_dot > normal_magnitude_squared * radius * radius)
 	{
 		return FALSE;
 	}
 
-	cross_product3d(&center_offset, &edge01, &cross);
-	if (dot_product3d(&normal, &cross) > 0.0f)
+	if (triple_product3d(&v, &e0, &n) > 0.0f)
 	{
-		if (fast_vector_intersects_sphere(triangle0, &edge01, center, radius))
+		if (fast_vector_intersects_sphere(p0, &e0, center, radius))
 		{
 			return TRUE;
 		}
 		result = FALSE;
 	}
 
-	vector_from_points3d(triangle1, center, &center_offset);
-	cross_product3d(&center_offset, &edge12, &cross);
-	if (dot_product3d(&normal, &cross) > 0.0f)
+	vector_from_points3d(p1, center, &v);
+	if (triple_product3d(&v, &e1, &n) > 0.0f)
 	{
-		if (fast_vector_intersects_sphere(triangle1, &edge12, center, radius))
+		if (fast_vector_intersects_sphere(p1, &e1, center, radius))
 		{
 			return TRUE;
 		}
 		result = FALSE;
 	}
 
-	vector_from_points3d(triangle2, triangle0, &edge20);
-	vector_from_points3d(triangle2, center, &center_offset);
-	cross_product3d(&center_offset, &edge20, &cross);
-	if (dot_product3d(&normal, &cross) < 0.0f)
+	vector_from_points3d(p2, center, &v);
+	vector_from_points3d(p2, p0, &e2);
+	if (triple_product3d(&v, &e2, &n) < 0.0f)
 	{
-		if (fast_vector_intersects_sphere(triangle2, &edge20, center, radius))
+		if (fast_vector_intersects_sphere(p2, &e2, center, radius))
 		{
 			return TRUE;
 		}
@@ -1354,31 +1350,29 @@ boolean sphere_intersects_triangle3d(
 }
 
 boolean pill_intersects_triangle3d(
-	real_point3d const *pill_base,
-	real_vector3d const *pill_height,
-	real pill_width,
-	real_point3d const *triangle0,
-	real_point3d const *triangle1,
-	real_point3d const *triangle2)
+	real_point3d const *base,
+	real_vector3d const *height,
+	real width,
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2)
 {
-	real_vector3d edge12;
-	real_vector3d edge01;
-	real_vector3d normal;
-	real_vector3d edge20;
-	real_vector3d cross;
-	real_vector3d offset;
-	real_point3d projected_point;
+	real_vector3d e0;
+	real_vector3d e1;
+	real_vector3d e2;
+	real_vector3d v;
+	real_vector3d n;
+	real_point3d p;
 	real t;
 	real closest_t;
 	real plane_distance;
-	boolean outside;
+	boolean outside = FALSE;
 
-	vector_from_points3d(triangle0, triangle1, &edge01);
-	outside = FALSE;
-	vector_from_points3d(triangle1, triangle2, &edge12);
-	vector_from_points3d(pill_base, triangle0, &offset);
-	cross_product3d(&edge01, &edge12, &normal);
-	t = dot_product3d(&normal, &offset) / dot_product3d(&normal, pill_height);
+	vector_from_points3d(p0, p1, &e0);
+	vector_from_points3d(p1, p2, &e1);
+	vector_from_points3d(base, p0, &v);
+	cross_product3d(&e0, &e1, &n);
+	t = dot_product3d(&n, &v) / dot_product3d(&n, height);
 
 	if (t < 0.0f)
 	{
@@ -1392,56 +1386,52 @@ boolean pill_intersects_triangle3d(
 	{
 		closest_t = t;
 	}
-	point_from_line3d(pill_base, pill_height, closest_t, &projected_point);
-	vector_from_points3d(triangle0, &projected_point, &offset);
-	cross_product3d(&edge01, &offset, &cross);
+	point_from_line3d(base, height, closest_t, &p);
+	vector_from_points3d(p0, &p, &v);
 
-	if (dot_product3d(&cross, &normal) < 0.0f)
+	if (triple_product3d(&e0, &v, &n) < 0.0f)
 	{
 		if ((boolean)vector_intersects_pill3d(
-			triangle0,
-			&edge01,
-			pill_base,
-			pill_height,
-			pill_width))
-		{
-return_true:
-			return TRUE;
-		}
-		outside = TRUE;
-	}
-
-	vector_from_points3d(triangle1, &projected_point, &offset);
-	cross_product3d(&edge12, &offset, &cross);
-	if (dot_product3d(&cross, &normal) < 0.0f)
-	{
-		if ((boolean)vector_intersects_pill3d(
-			triangle1,
-			&edge12,
-			pill_base,
-			pill_height,
-			pill_width))
+			p0,
+			&e0,
+			base,
+			height,
+			width))
 		{
 			return TRUE;
 		}
 		outside = TRUE;
 	}
 
-	vector_from_points3d(triangle2, triangle0, &edge20);
-	vector_from_points3d(triangle2, &projected_point, &offset);
-	cross_product3d(&edge20, &offset, &cross);
-	if (dot_product3d(&cross, &normal) < 0.0f)
+	vector_from_points3d(p1, &p, &v);
+	if (triple_product3d(&e1, &v, &n) < 0.0f)
 	{
 		if ((boolean)vector_intersects_pill3d(
-			triangle2,
-			&edge20,
-			pill_base,
-			pill_height,
-			pill_width))
+			p1,
+			&e1,
+			base,
+			height,
+			width))
 		{
 			return TRUE;
 		}
-		return FALSE;
+		outside = TRUE;
+	}
+
+	vector_from_points3d(p2, p0, &e2);
+	vector_from_points3d(p2, &p, &v);
+	if (triple_product3d(&e2, &v, &n) < 0.0f)
+	{
+		if ((boolean)vector_intersects_pill3d(
+			p2,
+			&e2,
+			base,
+			height,
+			width))
+		{
+			return TRUE;
+		}
+		outside = TRUE;
 	}
 
 	if (outside)
@@ -1450,11 +1440,11 @@ return_true:
 	}
 	if (t > 0.0f && t < 1.0f)
 	{
-		goto return_true;
+		return TRUE;
 	}
-	plane_distance = dot_product3d(&normal, &offset);
+	plane_distance = dot_product3d(&n, &v);
 	return plane_distance * plane_distance <=
-		magnitude_squared3d(&normal) * pill_width * pill_width;
+		magnitude_squared3d(&n) * width * width;
 }
 
 

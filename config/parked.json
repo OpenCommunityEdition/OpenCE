@@ -110,9 +110,9 @@
         "base": {
           "size": 1760,
           "relocation_count": 49,
-          "normalized_sha256": "5148f334e4cd36fb4c901c9ec516c623e0205145298a63eb9128f947c8848129"
+          "normalized_sha256": "9215bc2e3feb132f276c3f48b01672972cb9b12ed9ac11cfe7803b8483e80517"
         },
-        "objdiff_percent": 89.90126
+        "objdiff_percent": 89.73429
       }
     },
     {
@@ -317,25 +317,6 @@
       }
     },
     {
-      "unit": "source/ai/encounters",
-      "function": "_encounter_test_rule",
-      "class": "unclassified",
-      "evidence": "Complete natural private rule evaluator retained through its genuine encounter_update_platoons caller. January and original PDB authenticate the owning eight-byte platoon_rule, embedded rule fields, ten named rule enums and full-long handle. Typed encounter accessors, real strength values, signed-short counts, natural signed arithmetic and all original diagnostic formats are preserved. First natural candidate is 656 padded bytes/45 relocations versus January 656/46, objdiff 91.02511 percent. Target dispatch includes a redundant never-rule switch slot; VC7 naturally compresses to rules1..9 with a range branch to false. Both code-owned tables preserve all semantic destinations; the omitted default slot explains the single internal relocation difference. The other difference is natural fallback field-load order/register choice; all470 instruction bytes after dispatch align exactly after relocation masking and one-byte address shift. Integrated real-caller/static-callee/accessor execution passes111 cases with matching output arguments, calls, state, signed counts, invalid-index fallback, thresholds/NaNs and guard/ABI checks. All45 inherited exact Encounters functions remain exact; only the intended two code owners and genuine literals appear, with no new point_from_line3d. No source spelling/order search, fake declaration, anchor, forced inline, register/volatile steering, compiler flag or custom ABI was tried. See docs/object_matching_logs/encounters_obj_platoon_rule_pair_natural_20260905.md and its independent runtime and owner reviews. Reopen only for authentic source or compiler-context evidence; do not force the redundant table entry.",
-      "measurements": {
-        "target": {
-          "size": 656,
-          "relocation_count": 46,
-          "normalized_sha256": "ba62edfcd33544627a6b126232380c7f9da859156bbd098cc6425a6e86825c57"
-        },
-        "base": {
-          "size": 656,
-          "relocation_count": 45,
-          "normalized_sha256": "98d8b09149975b27ae9c9fe9f4c0bc9f839a98a76de5b000907b095e0b3b9813"
-        },
-        "objdiff_percent": 91.02511
-      }
-    },
-    {
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_transport_initialize",
       "class": "unclassified",
@@ -352,25 +333,6 @@
           "normalized_sha256": "a125c3a8cdab486c1d6414d8644d27b067a58b2ce26c9d769a3a41ef0562b45e"
         },
         "objdiff_percent": 78.47794
-      }
-    },
-    {
-      "unit": "source/cseries/profile",
-      "function": "_profile_frame_get_value",
-      "class": "unclassified",
-      "evidence": "Complete natural older Opus frame-value getter reconciled with January's three-argument public real-return API, private frame-value enum, true real seconds_elapsed field and setter, and owning profile.h declarations. Target/candidate are928 padded bytes/50 relocations; the sole residual region is the render0_3np loop's ordinary window-count/player-count register and load/add schedule. All cases, including zero results for game1..7/player1..3 and the unused caller-proven third section_index parameter, follow January. No source-shape search, register/lifetime steering, raw offsets, representation pun, fake inline control, anchors, or extra code owners. All35 inherited exact Profile functions and2 parks are retained; the independent parser is strict1072 padded/1063 meaningful bytes. The natural owning-header build covers25 direct consumers, Units remains189/189, and the full stable sweep gains one exact owner without losses. Pooled idle literal has compatible selected target/base ownership and receives no target-owned data credit. Reopen only for authentic source/type/compiler context, not schedule variants. See docs/object_matching_logs/profile_obj_frame_value_getters_natural_boundary_20260905.md.",
-      "measurements": {
-        "target": {
-          "size": 928,
-          "relocation_count": 50,
-          "normalized_sha256": "34007f52073a5931791a093800b82b1569907d4fe1c5f5dd5333df7ecaacf121"
-        },
-        "base": {
-          "size": 928,
-          "relocation_count": 50,
-          "normalized_sha256": "4e64455e0b5ef659900eee87601b7c65210340e95655975ca17cc2c4ffa461e6"
-        },
-        "objdiff_percent": 90.12195
       }
     },
     {
@@ -1016,11 +978,11 @@
           "normalized_sha256": "2548ce8b22f46d482056a0e7fce5078dfa8f2d4d5e064a9e1943c90b8147d990"
         },
         "base": {
-          "size": 704,
+          "size": 720,
           "relocation_count": 29,
-          "normalized_sha256": "1489a21aa830ee0316bfe8fea3886993bee7ad2372e4c0173669cbf618ca2c9e"
+          "normalized_sha256": "e669dd203dc45dcf78821186c2ce2edced0cbc618417693fc4afc285f5c8623a"
         },
-        "objdiff_percent": 85.18107
+        "objdiff_percent": 86.03292
       }
     },
     {
@@ -1227,7 +1189,7 @@
         "base": {
           "size": 992,
           "relocation_count": 59,
-          "normalized_sha256": "0bd88e42b1b36f4e9df5a8bed007887a18a1443d6f895f15ea9d275f2f6526c4"
+          "normalized_sha256": "2e0bbd84c45f240758cc76a2d4df8c78be689cfe9bc21af6a52e017f218e7ca0"
         },
         "objdiff_percent": 60.99099
       }
@@ -1491,30 +1453,11 @@
           "normalized_sha256": "38d0b2f1fcd5109d57fab7a261e7d8abe3bf5d4b8c1d44e26feccf0941ded7e1"
         },
         "base": {
-          "size": 672,
+          "size": 688,
           "relocation_count": 29,
-          "normalized_sha256": "8c163f7b091727361868c65de3aaf62f4e8b4ac9d495435b3e00f45adeb68eba"
+          "normalized_sha256": "6920d01004049e7bcf335a2442429ed51756dfb5ded01554a9e641412e11b952"
         },
-        "objdiff_percent": 54.82266
-      }
-    },
-    {
-      "unit": "source/ai/actors",
-      "function": "_actor_place",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed actor-placement path from January disassembly and independent HCEA behavior. The retained ordinary C validates and optionally upgrades the actor variant, builds the unit placement, reports January's exact unit/actor creation diagnostics, reads squad starting state, customizes and creates the actor, cleans up on failure, and verifies activation. Target is 800 padded bytes and the candidate 816, with all 41 relocation identities preserved; objdiff reports 90.887215 percent similarity. The common prefix remains close, but the residual spans several VC7 allocation, lifetime, and scheduling choices rather than one isolated proven mechanism. Bounded natural declaration-lifetime, branch, and local-placement forms did not close it. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the remaining code generation.",
-      "measurements": {
-        "target": {
-          "size": 800,
-          "relocation_count": 41,
-          "normalized_sha256": "a4258acc637a3ae90493b151b147e75fea1243d941bcc699f9ec7463542ec5fb"
-        },
-        "base": {
-          "size": 816,
-          "relocation_count": 41,
-          "normalized_sha256": "ff120b98736b6eb6c41f5c41c8c5e33f6a4e15a5179d42a938b8c320f1ec6a2f"
-        },
-        "objdiff_percent": 90.887215
+        "objdiff_percent": 80.46798
       }
     },
     {
@@ -1529,11 +1472,11 @@
           "normalized_sha256": "bf2e87448623ee925aa42e94ee93f1e1ebc439fd58971dba93e1a2b993c0d9b8"
         },
         "base": {
-          "size": 2400,
+          "size": 2384,
           "relocation_count": 89,
-          "normalized_sha256": "7820324643af007011e488b773988db634efcf67378be6c4a78ff5ee20a1bb54"
+          "normalized_sha256": "f6ff0151006bb86f375c641286002998d8d558f4d0d30684ab5d5c05c6127280"
         },
-        "objdiff_percent": 94.84425
+        "objdiff_percent": 98.51674
       }
     },
     {
@@ -1743,25 +1686,6 @@
           "normalized_sha256": "776ba88304402bf2ae995d27de02026f8a9a6655fe565c6385712bbf55c8d2ee"
         },
         "objdiff_percent": 96.43883
-      }
-    },
-    {
-      "unit": "source/camera/director",
-      "function": "_director_process_variables",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed four-variable Director integrator from January disassembly and relocation evidence, corroborated by the later HaloCEA donor at research-cache/halocea-full-blobs-20260830/src/blam/camera/director_process_variables.c. The retained body scales and clamps debug input, applies frame-time friction, decodes the authenticated control-bit definitions, accelerates or damps each variable, resets requested values, integrates deltas, and clamps the result. The January-proven use of variables[_variable_height].has_hyper_scale for every element is retained and documented as an original bug. Target and candidate are both 544 padded bytes with all 27 relocation identities, and objdiff reports 98.56725 percent similarity; the residual consists of the 1.3 constant load width and an x87 multiplication-order difference. No assembly, volatile/register forcing, barrier, pragma, fake dependency, raw offset, address-derived name, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those two x87 choices.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 27,
-          "normalized_sha256": "bef5cd3d13acbdff614b49be03828e844198e6cb56bcd27e13e13909d0e9f42c"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 27,
-          "normalized_sha256": "c757e7d92cc71ea6051675f46f2c899e94f15d174392ed6322e92a66acbd839d"
-        },
-        "objdiff_percent": 98.56725
       }
     },
     {
@@ -2861,9 +2785,9 @@
         "base": {
           "size": 384,
           "relocation_count": 17,
-          "normalized_sha256": "2eeacc63ed8514975642035ea2087f3baced8d1db8ec0e99a655b2e4ecfc40d9"
+          "normalized_sha256": "8c61fb3da182c48052bc9bb1182738b3d42f0c40996ac5afb7932902c6b7d6e3"
         },
-        "objdiff_percent": 67.72868
+        "objdiff_percent": 78.8062
       }
     },
     {
@@ -2993,8 +2917,8 @@
       "evidence": "Behavior-reviewed Observer position-integrator body retained from the authenticated 2026-09-05 caller packet and reconciled in the 2026-09-12 replacement packet. The complete natural source remains non-exact at the current production compile and receives zero credit; no representation punning, fake dependency, or unsupported blocker mechanism is claimed. See docs/object_matching_logs/observer_obj_replacement_exact_packet_20260912.md.",
       "measurements": {
         "target": { "size": 1568, "relocation_count": 40, "normalized_sha256": "8dce5e181abf19a30fc9a87e483c1e0a16050eeb48c03c48c2b6209e7fd59deb" },
-        "base": { "size": 1280, "relocation_count": 28, "normalized_sha256": "53f9635a438d2ebd8fa36e24a991df1c3adb5023eafbc440c0e060a00d1a7fe0" },
-        "objdiff_percent": 45.926723
+        "base": { "size": 1648, "relocation_count": 32, "normalized_sha256": "4c1641507b74dfec51939790c78503d4a27f6a22b9f1fe10d42cab2aaa1554f9" },
+        "objdiff_percent": 62.452587
       }
     },
     {
@@ -3094,6 +3018,25 @@
         "target": { "size": 1088, "relocation_count": 34, "normalized_sha256": "5789a872498d7ef2bca2ea4d3e4687e0294ef9ef9e1b11ad7629b63fbae9abdb" },
         "base": { "size": 1088, "relocation_count": 34, "normalized_sha256": "66af597069fc087b6095a9add3e960cdeb1af96f3e8a6f3184028352ba053023" },
         "objdiff_percent": 94.96407
+      }
+    },
+    {
+      "unit": "libs/libcmt/frnd",
+      "function": "__frnd",
+      "class": "asm-implemented",
+      "evidence": "Authenticated original Microsoft/XDK inline-assembly recovery admitted under the house rule allowing sparse evidenced assembly in helper and math functions. XDK 3911 CodeView records name fpw32\\tran\\i386\\frnd.c, the double argument x, and the double local result; consecutive source-line records map fld x, frndint, and fstp result to three consecutive lines in the historical C source. The normal VC7 compile emits the exact 19-byte, zero-relocation January function with identical COMDAT ownership and no byte directives, object splicing, post-processing, undefined behavior, or fake C steering. This entry records admitted original assembly provenance rather than ordinary-C reconstruction credit. See docs/object_matching_logs/libcmt_frnd_obj_authenticated_asm_20260919.md.",
+      "measurements": {
+        "target": {
+          "size": 19,
+          "relocation_count": 0,
+          "normalized_sha256": "b2acfb60d9432e4ad64781ac801918ada55d9c22650b1504c4ee039ed85da31f"
+        },
+        "base": {
+          "size": 19,
+          "relocation_count": 0,
+          "normalized_sha256": "b2acfb60d9432e4ad64781ac801918ada55d9c22650b1504c4ee039ed85da31f"
+        },
+        "objdiff_percent": 100
       }
     },
     {

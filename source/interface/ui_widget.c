@@ -4718,31 +4718,32 @@ static boolean widget_instance_text_box_is_focused(
 	struct widget_instance *widget)
 {
 	struct widget_instance *parent = widget->parent;
-	boolean focused;
+	boolean focused = parent ? parent->focused_child == widget : TRUE;
 
-	if (parent)
+	if (!focused && parent)
 	{
-		focused = parent->focused_child == widget;
-		if (!focused)
+		struct widget_instance *ancestor;
+
+		do
 		{
-			while (parent)
+			ancestor = parent->parent;
+			if (ancestor)
 			{
-				struct widget_instance *ancestor = parent->parent;
-
-				if (ancestor)
+				if (ancestor->focused_child != parent)
+					break;
+				if (ancestor->type == _ui_widget_type_spinner_list ||
+					ancestor->type == _ui_widget_type_column_list)
 				{
-					if (ancestor->focused_child != parent)
-						break;
-					focused = ancestor->type == _ui_widget_type_spinner_list ||
-						ancestor->type == _ui_widget_type_column_list;
+					focused = TRUE;
 				}
-				parent = ancestor;
+				else
+				{
+					focused = FALSE;
+				}
 			}
+			parent = ancestor;
 		}
-	}
-	else
-	{
-		focused = TRUE;
+		while (ancestor);
 	}
 
 	return focused;
@@ -5381,16 +5382,34 @@ void render_ui_widgets_postgame(
 		widget_index++)
 	{
 		struct widget_instance *widget = widget_globals.active_widgets[widget_index];
+		boolean should_render = FALSE;
 
-		if (widget &&
-			(widget->render_regardless_of_controller_index == TRUE ||
-			(widget->widget_is_error_dialog == TRUE
-				? (widget->local_player_index == local_player_index ||
+		if (widget)
+		{
+			if (widget->render_regardless_of_controller_index == TRUE)
+			{
+				should_render = TRUE;
+			}
+			else if (widget->widget_is_error_dialog == TRUE)
+			{
+				if (widget->local_player_index == local_player_index ||
 					widget->local_player_index == NONE ||
 					local_player_index == NONE ||
 					we_are_at_the_main_menu)
-				: ((widget->local_player_index == NONE && widget_index == 0) ||
-					widget->local_player_index == local_player_index))))
+				{
+					should_render = TRUE;
+				}
+			}
+			else if (widget->local_player_index == NONE && widget_index == 0)
+			{
+				should_render = TRUE;
+			}
+			else if (widget->local_player_index == local_player_index)
+			{
+				should_render = TRUE;
+			}
+		}
+		if (should_render)
 		{
 			bounds.x0 = 0;
 			bounds.y0 = 0;
@@ -5423,83 +5442,102 @@ void render_ui_widgets(
 		local_player_index == NONE ? 0 : local_player_index;
 	if (bink_playback_ui_rendering_inhibited())
 		return;
-	if (virtual_keyboard_active())
+	if (!virtual_keyboard_active())
 	{
-		virtual_keyboard_render();
-
-		return;
-	}
-	local_player_index = PIN(
-		local_player_index,
-		0,
-		MAXIMUM_NUMBER_OF_LOCAL_PLAYERS - 1);
-	for (widget_index = 0;
-		widget_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
-		widget_index++)
-	{
-		struct widget_instance *widget = widget_globals.active_widgets[widget_index];
-
-		if (widget &&
-			(widget->render_regardless_of_controller_index == TRUE ||
-			(widget->widget_is_error_dialog == TRUE
-				? (widget->local_player_index == local_player_index ||
-					widget->local_player_index == NONE ||
-					local_player_index == NONE ||
-					we_are_at_the_main_menu)
-				: ((widget->local_player_index == NONE && widget_index == 0) ||
-					widget->local_player_index == local_player_index))))
+		local_player_index = PIN(
+			local_player_index,
+			0,
+			MAXIMUM_NUMBER_OF_LOCAL_PLAYERS - 1);
+		for (widget_index = 0;
+			widget_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+			widget_index++)
 		{
-			point2d offset;
+			struct widget_instance *widget = widget_globals.active_widgets[widget_index];
+			boolean should_render = FALSE;
 
-			bounds.x0 = 0;
-			bounds.y0 = 0;
-			bounds.x1 = window_bounds->x1 - window_bounds->x0;
-			bounds.y1 = window_bounds->y1 - window_bounds->y0;
-			offset.x = 0;
-			offset.y = 0;
-			widget_instance_render_recursive(
-				widget_globals.active_widgets[widget_index],
-				&bounds,
-				offset,
-				TRUE,
-				FALSE);
-			if (widget_globals.debug_show_path)
+			if (widget)
 			{
-				real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
+				if (widget->render_regardless_of_controller_index == TRUE)
+				{
+					should_render = TRUE;
+				}
+				else if (widget->widget_is_error_dialog == TRUE)
+				{
+					if (widget->local_player_index == local_player_index ||
+						widget->local_player_index == NONE ||
+						local_player_index == NONE ||
+						we_are_at_the_main_menu)
+					{
+						should_render = TRUE;
+					}
+				}
+				else if (widget->local_player_index == NONE && widget_index == 0)
+				{
+					should_render = TRUE;
+				}
+				else if (widget->local_player_index == local_player_index)
+				{
+					should_render = TRUE;
+				}
+			}
+			if (should_render)
+			{
+				point2d offset;
 
-				bounds.x0 += 32;
-				bounds.x1 += 32;
-				bounds.y0 += 32;
-				bounds.y1 += 32;
-				draw_string_set_draw_mode(
-					tag_loaded(FONT_GROUP_TAG, "ui\\small_ui"),
-					NONE,
-					0,
-					0,
-					&color);
-				rasterizer_draw_string(
+				bounds.x0 = 0;
+				bounds.y0 = 0;
+				bounds.x1 = window_bounds->x1 - window_bounds->x0;
+				bounds.y1 = window_bounds->y1 - window_bounds->y0;
+				offset.x = 0;
+				offset.y = 0;
+				widget_instance_render_recursive(
+					widget_globals.active_widgets[widget_index],
 					&bounds,
-					NULL,
-					NULL,
-					0,
-					tag_get_name(
-						widget_globals.active_widgets[widget_index]->definition_tag_index));
+					offset,
+					TRUE,
+					FALSE);
+				if (widget_globals.debug_show_path)
+				{
+					real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+					bounds.x0 += 32;
+					bounds.x1 += 32;
+					bounds.y0 += 32;
+					bounds.y1 += 32;
+					draw_string_set_draw_mode(
+						tag_loaded(FONT_GROUP_TAG, "ui\\small_ui"),
+						NONE,
+						0,
+						0,
+						&color);
+					rasterizer_draw_string(
+						&bounds,
+						NULL,
+						NULL,
+						0,
+						tag_get_name(
+							widget_globals.active_widgets[widget_index]->definition_tag_index));
+				}
 			}
 		}
-	}
-	if (widget_globals.fade_to_black >= 0.0f &&
-		widget_globals.fade_to_black <= 1.0f)
-	{
-		real alpha;
+		if (widget_globals.fade_to_black >= 0.0f &&
+			widget_globals.fade_to_black <= 1.0f)
+		{
+			real alpha;
 
-		bounds.x0 = 0;
-		bounds.x1 = 640;
-		bounds.y0 = 0;
-		bounds.y1 = 480;
-		if (widget_globals.fade_to_black >= 0.95f)
-			widget_globals.fade_to_black = 1.0f;
-		alpha = widget_globals.fade_to_black * 255.0f;
-		draw_quad(&bounds, fast_ftol(alpha) << 24);
+			bounds.x0 = 0;
+			bounds.x1 = 640;
+			bounds.y0 = 0;
+			bounds.y1 = 480;
+			if (widget_globals.fade_to_black >= 0.95f)
+				widget_globals.fade_to_black = 1.0f;
+			alpha = widget_globals.fade_to_black * 255.0f;
+			draw_quad(&bounds, fast_ftol(alpha) << 24);
+		}
+	}
+	else
+	{
+		virtual_keyboard_render();
 	}
 
 	return;

@@ -371,6 +371,13 @@ real path_attractor_weight(
 	real_point3d const *point,
 	real_point3d const *previous_point,
 	real *closest_distance);
+boolean path_state_estimated_distance(
+	struct path_state *state,
+	real_point3d const *end_point,
+	long end_surface_index,
+	real *distance_reference,
+	real *closest_approach_to_attractor_reference,
+	real_vector3d *estimated_direction_reference);
 
 void paths_initialize(
 	void);

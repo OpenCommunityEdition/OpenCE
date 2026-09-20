@@ -166,6 +166,8 @@ boolean convex_hull3d(
 	struct edge3d *edges,
 	short surface_count,
 	struct surface3d *surfaces);
+boolean convex_hull3d_verify(
+	void);
 boolean convex_hull3d_test_point(
 	short point_count,
 	real_point3d const *points,

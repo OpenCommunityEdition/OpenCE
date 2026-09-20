@@ -1035,7 +1035,7 @@ long actor_create_for_unit(
 	short initial_state,
 	short default_state,
 	short initial_command_list_index,
-	char noncombat_sequence_id);
+	short noncombat_sequence_id);
 
 short actors_spawn_from_unit(
 	long unit_index,

@@ -66,14 +66,6 @@
       "reopen": "Authenticate the full January playlist-profile layout and place shared declarations in their genuine owner without opaque fake padding or transplantation of the incompatible later152-byte format. Preserve inherited exact functions across affected callers and finish the documented natural select-any string ownership/coalescing audit before whole-object admission. Do not debit valid target-function progress for this separate source-layout veto."
     },
     {
-      "unit": "source/game/player_rumble",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_fast_ftol",
-      "reason": "The rebuilt translation unit emits a select-any _fast_ftol COMDAT absent from the player_rumble target, while January's selected actor_combat owner is no-duplicates and currently has no compatible rebuilt owner.",
-      "evidence": "docs/object_matching_logs/player_rumble_obj_jonas_object_accounting_audit_20260831.md#exact-blocker-_fast_ftol-ownership",
-      "reopen": "Remove this rejection only after an ordinary base/base link proves a compatible authenticated canonical owner can discard the player_rumble copy, or authentic source topology prevents the copy from being emitted."
-    },
-    {
       "unit": "source/models/models",
       "class": "bss-symbol-layout-mismatch",
       "symbol": ".bss",
@@ -104,6 +96,22 @@
       "reason": "The exact typed decal_projection_create body naturally inlines cross_product2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Actor Combat copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
       "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
       "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
+    },
+    {
+      "unit": "source/camera/director",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_dot_product3d, _cross_product3d",
+      "reason": "All target functions now compare strict exact, but the rebuilt translation unit emits select-any _dot_product3d and _cross_product3d helper copies absent from the January Director split. January's selected helper owners are no-duplicates and mixed target/candidate link probes fail with duplicate-definition errors.",
+      "evidence": "docs/object_matching_logs/director_obj_exact_function_owner_boundary_20260919.md",
+      "reopen": "Remove only after authentic source/header topology prevents the surplus helper copies or an ordinary compatible canonical-owner link proves their safe disposal without forced inline/noinline, pragmas, or other matching-only constructs."
+    },
+    {
+      "unit": "source/camera/director",
+      "class": "bss-symbol-layout-mismatch",
+      "symbol": ".bss",
+      "reason": "The rebuilt Director globals use COMMON ownership where the January split records .bss ownership, so exact target-function bytes alone cannot certify equivalent object storage and linked addresses.",
+      "evidence": "docs/object_matching_logs/director_obj_exact_function_owner_boundary_20260919.md",
+      "reopen": "Reconcile the Director global COMMON/.bss ownership through authentic declarations and source topology without custom sections, fake aggregates, pragmas, or other matching-only constructs."
     },
     {
       "unit": "source/physics/collision_features",

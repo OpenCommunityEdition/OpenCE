@@ -637,10 +637,10 @@ void unit_get_center_of_mass(
 	real_point3d *center_of_mass);
 boolean unit_test_animation_impulse(
 	long unit_index,
-	long animation_impulse);
+	short animation_impulse);
 boolean unit_start_animation_impulse(
 	long unit_index,
-	long animation_impulse,
+	short animation_impulse,
 	real_vector2d *alignment_vector);
 long unit_get_aiming_unit_index(long unit_index);
 void unit_get_aiming_vector(

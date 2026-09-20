@@ -1565,7 +1565,7 @@ static void actor_input_update(
 		real_point3d *swarm_center = &swarm->swarm_center;
 		long component_index;
 
-		*swarm_center = *global_origin3d;
+		swarm->swarm_center = *global_origin3d;
 		for (
 			component_index = 0;
 			(short)component_index < swarm->unit_count;
@@ -1645,30 +1645,28 @@ static void actor_input_update(
 				vehicle_specific_definition_get(vehicle->definition_index);
 
 			actor->input.vehicle_index = vehicle_index;
-			actor->input.vehicle_gunner_bombardment = FALSE;
 			actor->input.vehicle_gunner = FALSE;
+			actor->input.vehicle_gunner_bombardment = FALSE;
 			actor->input.vehicle_driver_type = _actor_vehicle_driver_none;
 
 			if (vehicle->unit.driver_object_index == actor->meta.unit_index)
 			{
-				unsigned long vehicle_flags = vehicle_definition->flags;
-
 				actor->input.vehicle_driver_type =
 					_actor_vehicle_driver_unknown;
-				if (TEST_FLAG(vehicle_flags, _vehicle_ai_driver_enable_bit))
+				if (TEST_FLAG(vehicle_definition->flags, _vehicle_ai_driver_enable_bit))
 				{
-					if (TEST_FLAG(vehicle_flags, _vehicle_ai_driver_flying_bit))
+					if (TEST_FLAG(vehicle_definition->flags, _vehicle_ai_driver_flying_bit))
 					{
-						actor->state.flying = TRUE;
 						actor->input.vehicle_driver_type =
 							_actor_vehicle_driver_directional_flying;
+						actor->state.flying = TRUE;
 					}
 					else if (TEST_FLAG(
-						vehicle_flags,
+						vehicle_definition->flags,
 						_vehicle_ai_driver_nondirectional_bit))
 					{
 						actor->input.vehicle_driver_type =
-							TEST_FLAG(vehicle_flags, _vehicle_ai_driver_hovering_bit)
+							TEST_FLAG(vehicle_definition->flags, _vehicle_ai_driver_hovering_bit)
 								? _actor_vehicle_driver_hovering_ground
 								: _actor_vehicle_driver_nondirectional_ground;
 					}
@@ -1689,17 +1687,16 @@ static void actor_input_update(
 
 			if (vehicle->unit.fake_encounter_index != NONE)
 			{
-				long actor_encounter_index = actor->meta.encounter_index;
 				boolean migrate = FALSE;
 
-				if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_encounter_index) ==
+				if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index) ==
 					vehicle->unit.fake_encounter_index)
 				{
 					if (vehicle->unit.fake_squad_index != NONE &&
 						actor->meta.squad_index != vehicle->unit.fake_squad_index)
 					{
 						struct encounter_datum *encounter =
-							encounter_get(actor_encounter_index);
+							encounter_get(actor->meta.encounter_index);
 
 						migrate = TRUE;
 						if (encounter->follow_target_type > 0)
@@ -1713,10 +1710,10 @@ static void actor_input_update(
 								encounter,
 								vehicle->unit.fake_squad_index);
 
-							if (actor_squad->automatic_migration_target)
+							if (actor_squad->automatic_migration_target &&
+								vehicle_squad->automatic_migration_target)
 							{
-								migrate =
-									vehicle_squad->automatic_migration_target == FALSE;
+								migrate = FALSE;
 							}
 						}
 					}
@@ -1731,14 +1728,14 @@ static void actor_input_update(
 					if (!actor->meta.stored_prevehicle_encounter)
 					{
 						actor->meta.prevehicle_encounter_index =
-							actor_encounter_index;
+							actor->meta.encounter_index;
 						actor->meta.prevehicle_squad_index =
 							actor->meta.squad_index;
 						actor->meta.stored_prevehicle_encounter = TRUE;
 
-						if (actor_encounter_index != NONE)
+						if (actor->meta.encounter_index != NONE)
 						{
-							encounter_get(actor_encounter_index)->
+							encounter_get(actor->meta.encounter_index)->
 								is_prevehicle_encounter = TRUE;
 						}
 					}
@@ -1870,11 +1867,18 @@ static void actor_input_update(
 			actor->input.pathfinding_point = biped->biped.pathfinding_point;
 		}
 
-		unit_get_facing_vector(
-			actor->input.vehicle_driver_type > _actor_vehicle_driver_none
-				? actor->input.vehicle_index
-				: actor->meta.unit_index,
-			&actor->input.facing_vector);
+		if (actor->input.vehicle_driver_type > _actor_vehicle_driver_none)
+		{
+			unit_get_facing_vector(
+				actor->input.vehicle_index,
+				&actor->input.facing_vector);
+		}
+		else
+		{
+			unit_get_facing_vector(
+				actor->meta.unit_index,
+				&actor->input.facing_vector);
+		}
 		if (!actor->state.flying)
 		{
 			if (normalize2d((real_vector2d *)&actor->input.facing_vector) > 0.f)
@@ -2544,7 +2548,7 @@ long actor_create_for_unit(
 	short initial_state,
 	short default_state,
 	short initial_command_list_index,
-	char noncombat_sequence_id)
+	short noncombat_sequence_id)
 {
 	long actor_index = NONE;
 	struct actor_datum *actor;
@@ -2788,10 +2792,10 @@ long actor_place(
 				squad_index,
 				struct squad_definition);
 
-			initial_state = squad_definition->initial_state;
-			default_state = squad_definition->default_state;
 			initially_braindead =
 				TEST_FLAG(encounter_definition->flags, _encounter_braindead_bit);
+			initial_state = squad_definition->initial_state;
+			default_state = squad_definition->default_state;
 		}
 
 		if (starting_location->initial_state > actor_default_state_none)
@@ -2803,19 +2807,24 @@ long actor_place(
 			default_state = starting_location->default_state;
 		}
 
-		actor_index = actor_create_for_unit(
-			swarm,
-			unit_index,
-			actor_variant_definition_index,
-			encounter_index,
-			squad_index,
-			FALSE,
-			NONE,
-			initially_braindead,
-			initial_state,
-			default_state,
-			starting_location->command_list_index,
-			starting_location->noncombat_sequence_id);
+		{
+			word command_list_index = starting_location->command_list_index;
+			short noncombat_sequence_id = starting_location->noncombat_sequence_id;
+
+			actor_index = actor_create_for_unit(
+				swarm,
+				unit_index,
+				actor_variant_definition_index,
+				encounter_index,
+				squad_index,
+				FALSE,
+				NONE,
+				initially_braindead,
+				initial_state,
+				default_state,
+				command_list_index,
+				noncombat_sequence_id);
+		}
 		if (actor_index == NONE)
 		{
 			if (encounter_index == NONE)
@@ -2857,127 +2866,125 @@ short actors_spawn_from_unit(
 	real throw_velocity)
 {
 	long spawned_actor_count = 0;
-	struct unit_datum *source_unit;
-	short encounter_index;
-	short squad_index;
-	struct actor_variant_definition *actor_variant_definition;
-	struct actor_definition *actor_definition;
 
-	if (actor_variant_definition_index == NONE || actor_count <= 0)
+	if (actor_variant_definition_index != NONE && actor_count > 0)
 	{
-		return 0;
-	}
+		struct unit_datum *source_unit = unit_get(unit_index);
+		short encounter_index;
+		short squad_index;
 
-	source_unit = unit_get(unit_index);
-	if (source_unit->unit.swarm_actor_index != NONE ||
-		source_unit->unit.actor_index != NONE)
-	{
-		struct actor_datum *source_actor = actor_get(source_unit->unit.actor_index);
-
-		encounter_index = source_actor->meta.encounter_index;
-		squad_index = source_actor->meta.squad_index;
-	}
-	else
-	{
-		encounter_index = source_unit->unit.fake_encounter_index;
-		squad_index = source_unit->unit.fake_squad_index;
-	}
-
-	if (encounter_index == NONE || squad_index == NONE)
-	{
-		return 0;
-	}
-
-	actor_variant_definition = actor_variant_definition_get(actor_variant_definition_index);
-	actor_definition = actor_definition_get(actor_variant_definition->actor_reference.index);
-	while (actor_count-- > 0)
-	{
-		real angle = real_seed_random_range(
-			get_global_random_seed_address(),
-			0.f,
-			2.f * _pi);
-		struct object_placement_data placement_data;
-		long spawned_unit_index;
-
-		object_placement_data_new(
-			&placement_data,
-			actor_variant_definition->unit_reference.index,
-			NONE);
-		vector3d_from_angle(&placement_data.forward, angle);
-		object_get_origin(unit_index, &placement_data.position);
-		placement_data.position.x =
-			placement_data.forward.i * 0.3f + placement_data.position.x;
-		placement_data.position.y =
-			placement_data.forward.j * 0.3f + placement_data.position.y;
-		placement_data.position.z =
-			placement_data.forward.k * 0.3f + (placement_data.position.z + 0.3f);
-
-		spawned_unit_index = object_new(&placement_data);
-		if (spawned_unit_index != NONE)
+		if (source_unit->unit.swarm_actor_index != NONE ||
+			source_unit->unit.actor_index != NONE)
 		{
-			struct unit_datum *spawned_unit = unit_get(spawned_unit_index);
-			long actor_index;
+			struct actor_datum *source_actor = actor_get(source_unit->unit.actor_index);
 
-			if (spawned_unit->object.type == _object_type_biped)
-			{
-				biped_fix_position(
-					spawned_unit_index,
-					NONE,
-					&placement_data.position,
-					NULL,
-					1.f,
-					TRUE,
-					FALSE,
-					FALSE);
-			}
+			encounter_index = source_actor->meta.encounter_index;
+			squad_index = source_actor->meta.squad_index;
+		}
+		else
+		{
+			encounter_index = source_unit->unit.fake_encounter_index;
+			squad_index = source_unit->unit.fake_squad_index;
+		}
 
-			actor_customize_unit(actor_variant_definition_index, spawned_unit_index);
-			actor_index = actor_create_for_unit(
-				TEST_FLAG(actor_definition->flags, _actor_definition_swarm_actor_bit),
-				spawned_unit_index,
-				actor_variant_definition_index,
-				encounter_index,
-				squad_index,
-				FALSE,
-				NONE,
-				FALSE,
-				actor_default_state_alert,
-				actor_default_state_none,
-				NONE,
-				0);
-			if (actor_index == NONE)
+		if (encounter_index != NONE && squad_index != NONE)
+		{
+			struct actor_variant_definition *actor_variant_definition =
+				actor_variant_definition_get(actor_variant_definition_index);
+			struct actor_definition *actor_definition =
+				actor_definition_get(actor_variant_definition->actor_reference.index);
+			short spawn_index;
+
+			for (spawn_index = 0; spawn_index < actor_count; spawn_index++)
 			{
-				error(
-					_error_silent,
-					"WARNING: cannot create actor to be spawned from unit");
-				object_delete(spawned_unit_index);
-			}
-			else
-			{
-				actor_verify_activation(actor_index);
-				if (throw_velocity > 0.f)
+				real angle = real_seed_random_range(
+					get_global_random_seed_address(),
+					0.f,
+					2.f * _pi);
+				struct object_placement_data placement_data;
+				long spawned_unit_index;
+
+				object_placement_data_new(
+					&placement_data,
+					actor_variant_definition->unit_reference.index,
+					NONE);
+				vector3d_from_angle(&placement_data.forward, angle);
+				object_get_origin(unit_index, &placement_data.position);
+				placement_data.position.z += 0.3f;
+				placement_data.position.x =
+					placement_data.forward.i * 0.3f + placement_data.position.x;
+				placement_data.position.y =
+					placement_data.forward.j * 0.3f + placement_data.position.y;
+				placement_data.position.z =
+					placement_data.forward.k * 0.3f + placement_data.position.z;
+
+				spawned_unit_index = object_new(&placement_data);
+				if (spawned_unit_index != NONE)
 				{
-					real speed_factor = real_seed_random_range(
-						get_global_random_seed_address(),
-						0.5f,
-						1.f);
-					real vertical_factor = real_seed_random_range(
-						get_global_random_seed_address(),
-						0.8f,
-						1.5f);
-					real_vector3d acceleration;
+					struct unit_datum *spawned_unit = unit_get(spawned_unit_index);
+					long actor_index;
 
-					acceleration.i =
-						placement_data.forward.i * speed_factor * throw_velocity;
-					acceleration.j =
-						placement_data.forward.j * speed_factor * throw_velocity;
-					acceleration.k = vertical_factor * throw_velocity;
 					if (spawned_unit->object.type == _object_type_biped)
 					{
-						biped_accelerate(spawned_unit_index, &acceleration);
+						biped_fix_position(
+							spawned_unit_index,
+							NONE,
+							&placement_data.position,
+							NULL,
+							1.f,
+							TRUE,
+							FALSE,
+							FALSE);
+					}
+
+					actor_customize_unit(actor_variant_definition_index, spawned_unit_index);
+					actor_index = actor_create_for_unit(
+						TEST_FLAG(actor_definition->flags, _actor_definition_swarm_actor_bit),
+						spawned_unit_index,
+						actor_variant_definition_index,
+						encounter_index,
+						squad_index,
+						FALSE,
+						NONE,
+						FALSE,
+						actor_default_state_alert,
+						actor_default_state_none,
+						NONE,
+						0);
+					if (actor_index == NONE)
+					{
+						error(
+							_error_silent,
+							"WARNING: cannot create actor to be spawned from unit");
+						object_delete(spawned_unit_index);
+					}
+					else
+					{
+						actor_verify_activation(actor_index);
+						if (throw_velocity > 0.f)
+						{
+							real speed_factor = real_seed_random_range(
+								get_global_random_seed_address(),
+								0.5f,
+								1.f);
+							real vertical_factor = real_seed_random_range(
+								get_global_random_seed_address(),
+								0.8f,
+								1.5f);
+							real_vector3d acceleration;
+
+							acceleration.i = placement_data.forward.i * speed_factor;
+							acceleration.j = placement_data.forward.j * speed_factor;
+							acceleration.k = vertical_factor;
+							scale_vector3d(&acceleration, throw_velocity, &acceleration);
+							if (spawned_unit->object.type == _object_type_biped)
+							{
+								biped_accelerate(spawned_unit_index, &acceleration);
+							}
+						}
+						spawned_actor_count++;
 					}
 				}
-				spawned_actor_count++;
 			}
 		}
 	}

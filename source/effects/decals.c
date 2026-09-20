@@ -884,9 +884,7 @@ real triple_product3d(
 {
 	real_vector3d cross;
 
-	cross_product3d(a, b, &cross);
-
-	return dot_product3d(&cross, n);
+	return dot_product3d(cross_product3d(a, b, &cross), n);
 }
 
 real_plane2d *plane2d_from_points(

@@ -780,8 +780,8 @@ int __cdecl sort_statistic_buffer_ranking(
 
 static void drawline(
 	wchar_t const *string,
-	long justification,
-	long row_index);
+	long row_index,
+	short justification);
 
 boolean game_engine_infinite_grenades_internal(
 	void);
@@ -1908,18 +1908,20 @@ void game_engine_rasterize_in_game_score(
 
 static void drawline(
 	wchar_t const *string,
-	long justification,
-	long row_index)
+	long row_index,
+	short justification)
 {
 	rectangle2d bounds = render.camera.window_bounds;
+	long line_height = 18;
+	long line_spacing = 8;
 
 	offset_rectangle2d(
 		&bounds,
 		-render.camera.viewport_bounds.x0,
 		-render.camera.viewport_bounds.y0);
-	bounds.y0 = (short)(row_index * 18);
-	bounds.y1 = (short)((row_index + 1) * 18 + 8);
-	draw_string_set_format(NONE, (short)justification, 0);
+	bounds.y0 = (short)(row_index * line_height);
+	bounds.y1 = (short)((row_index + 1) * line_height + line_spacing);
+	draw_string_set_format(NONE, justification, 0);
 	rasterizer_draw_unicode_string(&bounds, 0, 0, 0, string);
 
 	return;
@@ -1935,7 +1937,7 @@ void game_engine_post_rasterize_post_game(
 	real_argb_color winner_color;
 	real_argb_color normal_color;
 	real_argb_color hilite_color;
-	rectangle2d bounds;
+	long font_index;
 	long entry_count;
 
 	if (!game_engine)
@@ -1948,12 +1950,13 @@ void game_engine_post_rasterize_post_game(
 	tab_stops[4] = 410;
 	tab_stops[5] = 500;
 
+	font_index = hud_globals->no_local_player_message_font_index;
 	get_postgame_hilite_colors(
 		&winner_color,
 		&normal_color,
 		&hilite_color);
 	draw_string_set_draw_mode(
-		hud_globals->no_local_player_message_font_index,
+		font_index,
 		NONE,
 		2,
 		8,
@@ -1961,22 +1964,20 @@ void game_engine_post_rasterize_post_game(
 	draw_string_set_color(&winner_color);
 	draw_string_set_format(NONE, 0, 0);
 
-	bounds.x0 = 0;
-	bounds.y0 = 0;
-	bounds.x1 = 640;
-	bounds.y1 = 480;
 	{
 		struct game_engine_postgame_hud_definition *hud_definition =
 			game_engine_postgame_hud_definition_get(
 				interface_get_tag_index(_interface_hud_globals));
-		long bitmap_group_index = hud_definition->bitmap_group_index;
-		struct bitmap_data *bitmap =
-			bitmap_group_try_and_get_bitmap(bitmap_group_index, 0);
+		rectangle2d bounds;
 
-		if (bitmap)
+		bounds.x0 = 0;
+		bounds.y0 = 0;
+		bounds.x1 = 640;
+		bounds.y1 = 480;
+		if (bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0))
 		{
 			draw_bitmap_in_rect(
-				bitmap_group_try_and_get_bitmap(bitmap_group_index, 0),
+				bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0),
 				&bounds,
 				&bounds,
 				NULL,
@@ -1993,7 +1994,9 @@ void game_engine_post_rasterize_post_game(
 		wchar_t const *team_formats[2];
 		long string_list_index;
 		long team_row;
+		long red_team_won;
 
+		red_team_won = game_engine_did_team_win(0);
 		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 		team_formats[0] =
 			string_list_index != NONE ?
@@ -2005,7 +2008,7 @@ void game_engine_post_rasterize_post_game(
 				unicode_string_list_get_string(string_list_index, 0x42) :
 				L"";
 
-		if (!game_engine_did_team_win(0))
+		if (!red_team_won)
 		{
 			team_order[0] = 1;
 			team_order[1] = 0;
@@ -2024,7 +2027,8 @@ void game_engine_post_rasterize_post_game(
 				NUMBEROF(row_string),
 				team_formats[team_index],
 				score_string);
-			drawline(row_string, 0, team_row + 4);
+			row_string[NUMBEROF(row_string) - 1] = 0;
+			drawline(row_string, team_row + 4, 0);
 		}
 	}
 
@@ -2071,58 +2075,57 @@ void game_engine_post_rasterize_post_game(
 			column_strings[4]);
 		row_string[NUMBEROF(row_string) - 1] = 0;
 		draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
-		drawline(row_string, 0, 7);
+		drawline(row_string, 7, 0);
 	}
 
 	entry_count = select_players_to_display(0, NONE, entries, 12);
-	if (entry_count > 0)
 	{
-		long entry_index = 8;
-		struct postgame_statistic_entry *entry = entries;
+		long entry_index;
 
-		do
+		for (entry_index = 0; entry_index < entry_count; entry_index++)
 		{
-			long draw_row = entry_index;
-			long player_index = entry->values[0];
+			long player_index = entries[entry_index].values[0];
+			long draw_row = entry_index + 8;
 			struct player_datum *player = player_get(player_index);
-			real_argb_color red_team_color;
-			real_argb_color blue_team_color;
-			long place = PIN(entry->values[6] & 0x7F, 0, 15);
-			long string_list_index =
-				tag_loaded('ustr', "ui\\multiplayer_game_text");
-			wchar_t const *place_string =
+			real_argb_color team_colors[2];
+			long place;
+			long string_list_index;
+			wchar_t const *place_string;
+
+			if (player->local_player_index != NONE)
+				draw_string_set_color(&normal_color);
+			else
+				draw_string_set_color(&winner_color);
+			draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
+			place = PIN(entries[entry_index].values[6] & 0x7F, 0, 15);
+			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+			place_string =
 				string_list_index != NONE ?
 					unicode_string_list_get_string(string_list_index, place + 36) :
 					L"";
-
-			draw_string_set_color(
-				player->local_player_index == NONE ?
-					&winner_color :
-					&normal_color);
-			draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
 			usnprintf(row_string, NUMBEROF(row_string), L" \t%s", place_string);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_color(&winner_color);
 
 			if (global_variant.has_teams)
 			{
-				red_team_color.alpha = 1.0f;
-				red_team_color.red = 0.8f;
-				red_team_color.green = 0.4f;
-				red_team_color.blue = 0.4f;
-				blue_team_color.alpha = 1.0f;
-				blue_team_color.red = 0.4f;
-				blue_team_color.green = 0.4f;
-				blue_team_color.blue = 0.8f;
+				long team_index = player->team_index;
+
+				team_colors[0].red = 0.8f;
+				team_colors[0].green = 0.4f;
+				team_colors[0].blue = 0.4f;
+				team_colors[0].alpha = 1.0f;
+				team_colors[1].red = 0.4f;
+				team_colors[1].green = 0.4f;
+				team_colors[1].blue = 0.8f;
+				team_colors[1].alpha = 1.0f;
 				draw_string_set_color(
-					player->team_index <= 0 ?
-						&red_team_color :
-						&blue_team_color);
+					&team_colors[PIN(team_index, 0, 1)]);
 			}
 			usnprintf(row_string, NUMBEROF(row_string), L" \t \t%s", player->name);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_color(&winner_color);
 
 			if (!postgame_statistic_get_rating(player_index, 1, 0))
@@ -2132,7 +2135,7 @@ void game_engine_post_rasterize_post_game(
 				score_string);
 			usnprintf(row_string, NUMBEROF(row_string), L" \t \t \t%s", score_string);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_color(&winner_color);
 
 			if (!postgame_statistic_get_rating(player_index, 2, 0))
@@ -2143,7 +2146,7 @@ void game_engine_post_rasterize_post_game(
 				L" \t \t \t \t%d",
 				(long)player->statistics.kills[0]);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_color(&winner_color);
 
 			if (!postgame_statistic_get_rating(player_index, 3, 0))
@@ -2154,7 +2157,7 @@ void game_engine_post_rasterize_post_game(
 				L" \t \t \t \t \t%d",
 				(long)player->statistics.assists[0]);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_color(&winner_color);
 
 			if (!postgame_statistic_get_rating(player_index, 4, 0))
@@ -2165,28 +2168,23 @@ void game_engine_post_rasterize_post_game(
 				L" \t \t \t \t \t \t%d",
 				(long)player->statistics.deaths);
 			row_string[NUMBEROF(row_string) - 1] = 0;
-			drawline(row_string, 0, draw_row);
+			drawline(row_string, draw_row, 0);
 			draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
-
-			entry++;
-			entry_index++;
-			entry_count--;
 		}
-		while (entry_count != 0);
 	}
 
 	{
-		real_argb_color prompt_color = winner_color;
+		real_argb_color prompt_color;
 		long string_list_index;
 		wchar_t const *prompt;
 		struct network_game_server *server;
+		rectangle2d bounds;
 
-		prompt_color.alpha = game_engine_globals.postgame_progress;
 		bounds = render.camera.window_bounds;
-		bounds.x0 = 70;
+		prompt_color = winner_color;
+		prompt_color.alpha = game_engine_globals.postgame_progress;
 		bounds.y0 = 410;
-		bounds.x1 = 640;
-		bounds.y1 = 480;
+		bounds.x0 = 70;
 		offset_rectangle2d(
 			&bounds,
 			-render.camera.viewport_bounds.x0,
@@ -2197,7 +2195,7 @@ void game_engine_post_rasterize_post_game(
 		server = global_network_game_server_get();
 		if (server)
 		{
-			bounds.y0 = 380;
+			bounds.x0 = 380;
 			string_list_index =
 				tag_loaded('ustr', "ui\\multiplayer_game_text");
 			if (string_list_index != NONE)
@@ -2215,7 +2213,7 @@ void game_engine_post_rasterize_post_game(
 			return;
 		}
 
-		bounds.y0 = 520;
+		bounds.x0 = 520;
 		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 		if (string_list_index != NONE)
 			prompt = unicode_string_list_get_string(string_list_index, 0x49);
@@ -2809,37 +2807,38 @@ static real game_engine_get_friendly_bonus(
  */
 
 static real default_starting_location_rate_function(
-	struct player_starting_location const *starting_location,
-	long player_index)
+	long player_index,
+	struct player_starting_location const *starting_location)
 {
 	struct player_datum *player = player_get(player_index);
-	real rating;
+	real rating = 1.0f;
 
-	if (game_engine &&
-		game_engine->test_flag &&
-		game_engine->test_flag(0) &&
+	if (game_engine_running() &&
+		game_engine_test_flag(0) &&
 		player->team_index != starting_location->team_index)
 	{
 		rating = 0.0f;
 	}
-	else
+
+	if (rating > 0.0f)
 	{
-		rating = game_engine_get_distance_rating_for_spawn(
+		rating *= game_engine_get_distance_rating_for_spawn(
 			player_index,
 			&starting_location->position);
 	}
 
-	if (game_engine)
+	if (game_engine_running() && rating > 0.0f && game_engine_has_teams())
 	{
-		if (rating > 0.0f && global_variant.has_teams)
-			rating *= game_engine_get_friendly_bonus(player_index, &starting_location->position);
+		rating *= game_engine_get_friendly_bonus(
+			player_index,
+			&starting_location->position);
+	}
 
-		if (game_engine && game_engine->starting_location_rating)
-		{
-			rating *= game_engine->starting_location_rating(
-				player_index,
-				starting_location);
-		}
+	if (game_engine_running() && game_engine->starting_location_rating)
+	{
+		rating *= game_engine->starting_location_rating(
+			player_index,
+			starting_location);
 	}
 
 	return rating;
@@ -6434,7 +6433,7 @@ real game_engine_get_starting_location_rating(
 	if (nearby_vehicle(player_index, starting_location))
 		return 0.0f;
 
-	return default_starting_location_rate_function(starting_location, player_index);
+	return default_starting_location_rate_function(player_index, starting_location);
 }
 
 real game_engine_get_damage_multiplier(

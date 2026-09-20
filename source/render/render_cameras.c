@@ -564,14 +564,18 @@ short render_frustum_cube_visible(
 		for (vertex_index = 0; vertex_index < NUMBEROF(cube_vertices); vertex_index++)
 		{
 			real_point3d const *vertex = &cube_vertices[vertex_index];
-			word flags = plane3d_distance_to_point(&frustum->world_planes[0], vertex) > 0.0f ?
+			word flags = dot_product3d((real_vector3d *)vertex, &frustum->world_planes[0].n) -
+				frustum->world_planes[0].d > 0.0f ?
 				FLAG(_render_frustum_point_flags_left_bit) : 0;
 
-			flags |= plane3d_distance_to_point(&frustum->world_planes[1], vertex) > 0.0f ?
+			flags |= dot_product3d((real_vector3d *)vertex, &frustum->world_planes[1].n) -
+				frustum->world_planes[1].d > 0.0f ?
 				FLAG(_render_frustum_point_flags_right_bit) : 0;
-			flags |= plane3d_distance_to_point(&frustum->world_planes[2], vertex) > 0.0f ?
+			flags |= dot_product3d((real_vector3d *)vertex, &frustum->world_planes[2].n) -
+				frustum->world_planes[2].d > 0.0f ?
 				FLAG(_render_frustum_point_flags_bottom_bit) : 0;
-			flags |= plane3d_distance_to_point(&frustum->world_planes[3], vertex) > 0.0f ?
+			flags |= dot_product3d((real_vector3d *)vertex, &frustum->world_planes[3].n) -
+				frustum->world_planes[3].d > 0.0f ?
 				FLAG(_render_frustum_point_flags_top_bit) : 0;
 
 			intersection_flags &= flags;
@@ -594,12 +598,20 @@ short render_frustum_cube_visible(
 			for (vertex_index = 0; vertex_index < NUMBEROF(frustum->world_vertices); vertex_index++)
 			{
 				real_point3d const *vertex = &frustum->world_vertices[vertex_index];
+				word right_bit;
+				word bottom_bit;
+				word top_bit;
+				word near_bit;
 				word flags = vertex->x <= bounds->x0 ? FLAG(_render_frustum_point_flags_left_bit) : 0;
 
-				flags |= vertex->x >= bounds->x1 ? FLAG(_render_frustum_point_flags_right_bit) : 0;
-				flags |= vertex->y <= bounds->y0 ? FLAG(_render_frustum_point_flags_bottom_bit) : 0;
-				flags |= vertex->y >= bounds->y1 ? FLAG(_render_frustum_point_flags_top_bit) : 0;
-				flags |= vertex->z <= bounds->z0 ? FLAG(_render_frustum_point_flags_near_bit) : 0;
+				right_bit = vertex->x >= bounds->x1 ? FLAG(_render_frustum_point_flags_right_bit) : 0;
+				flags |= right_bit;
+				bottom_bit = vertex->y <= bounds->y0 ? FLAG(_render_frustum_point_flags_bottom_bit) : 0;
+				flags |= bottom_bit;
+				top_bit = vertex->y >= bounds->y1 ? FLAG(_render_frustum_point_flags_top_bit) : 0;
+				flags |= top_bit;
+				near_bit = vertex->z <= bounds->z0 ? FLAG(_render_frustum_point_flags_near_bit) : 0;
+				flags |= near_bit;
 				flags |= vertex->z >= bounds->z1 ? FLAG(_render_frustum_point_flags_far_bit) : 0;
 				intersection_flags &= flags;
 			}

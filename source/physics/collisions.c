@@ -727,19 +727,17 @@ boolean collision_test_vector_exit(
 		real_point3d reverse_origin;
 		real_vector3d reverse_vector;
 
-		reverse_origin.x = point->x + vector->i;
-		reverse_origin.y = point->y + vector->j;
-		reverse_origin.z = point->z + vector->k;
-		reverse_vector.i = -vector->i;
-		reverse_vector.j = -vector->j;
-		reverse_vector.k = -vector->k;
+		set_real_point3d(
+			&reverse_origin,
+			vector->i + point->x,
+			(vector->j) + point->y,
+			vector->k + point->z);
+		negate_vector3d(vector, &reverse_vector);
 
 		{
-			long object_index;
 			struct collision_model_instance instance;
 
-			object_index = previous_collision->object_index;
-			if (collision_model_instance_new(&instance, object_index))
+			if (collision_model_instance_new(&instance, previous_collision->object_index))
 			{
 				struct collision_model_test_vector_result result;
 
@@ -756,7 +754,7 @@ boolean collision_test_vector_exit(
 						&instance.matrices[result.node_index],
 						result.bsp_result.plane,
 						&exit_collision->plane);
-					if (result.bsp_result.plane_designator < 0)
+					if (result.bsp_result.plane_designator & LONG_MIN)
 					{
 						plane3d_negate(&exit_collision->plane, &exit_collision->plane);
 					}
@@ -764,11 +762,11 @@ boolean collision_test_vector_exit(
 					exit_collision->material_type = collision_model_get_material_type(
 						instance.model,
 						result.bsp_result.material_index);
+					exit_collision->object_index = previous_collision->object_index;
 					exit_collision->region_index = result.region_index;
 					exit_collision->node_index = result.node_index;
 					exit_collision->bsp_index = result.bsp_index;
 					exit_collision->surface_index = result.bsp_result.surface_index;
-					exit_collision->object_index = previous_collision->object_index;
 					exit_collision->plane_designator = result.bsp_result.plane_designator;
 					exit_collision->flags = result.bsp_result.flags;
 					exit_collision->breakable_surface_index = result.bsp_result.breakable_surface_index;
@@ -781,9 +779,7 @@ boolean collision_test_vector_exit(
 
 	if (found)
 	{
-		exit_collision->point.x = vector->i * exit_collision->t + point->x;
-		exit_collision->point.y = vector->j * exit_collision->t + point->y;
-		exit_collision->point.z = vector->k * exit_collision->t + point->z;
+		COLLISION_POINT_FROM_LINE3D(point, vector, exit_collision->t, &exit_collision->point);
 	}
 
 	return found;
@@ -1573,7 +1569,7 @@ static boolean object_test_vector(
 				point,
 				vector,
 				&object->object.bounding_sphere_center,
-				object->object.bounding_sphere_radius))
+				(object->object.bounding_sphere_radius)))
 		{
 			if (TEST_FLAG(_object_mask_vehicle, object->object.type) &&
 				TEST_FLAG(flags, _collision_test_use_vehicle_physics_bit))
@@ -1624,6 +1620,7 @@ static boolean object_test_vector(
 					collision->material_type = (short)collision_model_get_material_type(
 						instance.model,
 						result.bsp_result.material_index);
+					collision->object_index = object_index;
 					collision->region_index = result.region_index;
 					collision->node_index = result.node_index;
 					collision->bsp_index = result.bsp_index;
@@ -1632,7 +1629,6 @@ static boolean object_test_vector(
 					collision->flags = result.bsp_result.flags;
 					collision->breakable_surface_index = result.bsp_result.breakable_surface_index;
 					collision->material_index = result.bsp_result.material_index;
-					collision->object_index = object_index;
 					hit = TRUE;
 				}
 			}

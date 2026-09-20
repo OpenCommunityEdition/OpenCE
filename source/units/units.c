@@ -81,7 +81,7 @@ symbols in this file:
 00198E40 0190:
 	_code_00198e40 (0000)
 00198FD0 00d0:
-	_code_00198fd0 (0000)
+	_unit_can_play_animation_impulse (0000)
 001990A0 00c0:
 	_unit_test_animation_impulse (0000)
 00199160 0080:
@@ -931,9 +931,9 @@ static short code_0019a640(
 static short code_00198e40(
 	short animation_impulse,
 	short *interpolation_frame_count);
-static boolean code_00198fd0(
+static boolean unit_can_play_animation_impulse(
 	long unit_index,
-	long animation_impulse);
+	short animation_impulse);
 
 static boolean code_00198170(
 	struct unit_animation *animation);
@@ -8298,9 +8298,9 @@ static short code_00198e40(
 
 	return index;
 }
-static boolean code_00198fd0(
+static boolean unit_can_play_animation_impulse(
 	long unit_index,
-	long animation_impulse)
+	short animation_impulse)
 {
 	struct unit_datum *unit = unit_get(unit_index);
 	boolean result = FALSE;
@@ -8343,7 +8343,7 @@ static boolean code_00198fd0(
 						&parent_unit_definition->unit.seats,
 						unit->unit.parent_seat_index,
 						struct unit_seat);
-					impulse_index = (short)animation_impulse;
+					impulse_index = animation_impulse;
 
 					if (impulse_index>=12 &&
 						impulse_index<=13)
@@ -8355,7 +8355,7 @@ static boolean code_00198fd0(
 		}
 		else
 		{
-			long impulse_index = (short)animation_impulse;
+			long impulse_index = animation_impulse;
 
 			if (impulse_index>=12 &&
 				impulse_index<=13)
@@ -8375,7 +8375,7 @@ static boolean code_00198fd0(
 
 boolean unit_test_animation_impulse(
 	long unit_index,
-	long animation_impulse)
+	short animation_impulse)
 {
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition;
@@ -8385,7 +8385,7 @@ boolean unit_test_animation_impulse(
 	short interpolation_frame_count;
 	short animation_type;
 
-	if (code_00198fd0(unit_index, animation_impulse))
+	if (unit_can_play_animation_impulse(unit_index, animation_impulse))
 	{
 		unit_definition = unit_definition_get(unit->definition_index);
 		animation_graph = animation_graph_definition_get(
@@ -8421,7 +8421,7 @@ boolean unit_test_animation_impulse(
 
 boolean unit_start_animation_impulse(
 	long unit_index,
-	long animation_impulse,
+	short animation_impulse,
 	real_vector2d *alignment_vector)
 {
 	struct unit_datum *unit = unit_get(unit_index);
@@ -8435,7 +8435,7 @@ boolean unit_start_animation_impulse(
 	long animation_graph_index;
 	boolean result = FALSE;
 
-	if (code_00198fd0(unit_index, animation_impulse))
+	if (unit_can_play_animation_impulse(unit_index, animation_impulse))
 	{
 		unit_definition = unit_definition_get(unit->definition_index);
 		animation_graph = animation_graph_definition_get(

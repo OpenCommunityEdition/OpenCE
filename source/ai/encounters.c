@@ -2175,8 +2175,8 @@ void encounter_create(
 		{
 			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 				&encounter_definition->squads, squad_index, struct squad_definition);
-			short initial_variant = 0;
-			short actor_count;
+			short initial_variant;
+			short count;
 			short actor_type;
 			short i;
 
@@ -2186,17 +2186,19 @@ void encounter_create(
 					continue;
 			}
 
+			initial_variant = 0;
+
 			switch (game_difficulty_level_get())
 			{
 			case _game_difficulty_level_easy:
 			case _game_difficulty_level_normal:
-				actor_count = squad_definition->min_count;
+				count = squad_definition->min_count;
 				break;
 			case _game_difficulty_level_hard:
-				actor_count = (squad_definition->max_count + squad_definition->min_count) / 2;
+				count = (squad_definition->max_count + squad_definition->min_count) / 2;
 				break;
 			case _game_difficulty_level_impossible:
-				actor_count = squad_definition->max_count;
+				count = squad_definition->max_count;
 				break;
 			default:
 				match_vassert("c:\\halo\\SOURCE\\ai\\encounters.c", 1730, FALSE, NULL);
@@ -2214,17 +2216,17 @@ void encounter_create(
 					if (actor_type == _actor_marine)
 					{
 						if (encounter->unique_leader_count == 0)
-							create_leader = encounter->original_count + actor_count >= 4;
+							create_leader = encounter->original_count + count >= 4;
 						else if (encounter->unique_leader_count == 1)
-							create_leader = encounter->original_count + actor_count >= 10;
-					}
+							create_leader = encounter->original_count + count >= 10;
 
-					if (ai_debug.print_placement)
-					{
-						console_printf(FALSE, "%s/%s: %d current %d leaders, create %d -> %s",
-							encounter_definition->name, squad_definition->name,
-							encounter->original_count, encounter->unique_leader_count, actor_count,
-							create_leader ? "new leader" : "no leader");
+						if (ai_debug.print_placement)
+						{
+							console_printf(FALSE, "%s/%s: %d current %d leaders, create %d -> %s",
+								encounter_definition->name, squad_definition->name,
+								encounter->original_count, encounter->unique_leader_count, count,
+								create_leader ? "new leader" : "no leader");
+						}
 					}
 
 					if (!create_leader)
@@ -2247,7 +2249,7 @@ void encounter_create(
 				break;
 			}
 
-			for (i = 0; i < actor_count; ++i)
+			for (i = 0; i < count; ++i)
 			{
 				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE);
 				initial_variant = 0;
@@ -3104,8 +3106,8 @@ static boolean encounter_test_rule(
 	else
 	{
 		original_count = encounter->original_count;
-		current_strength_fraction = encounter->current_strength_fraction;
 		current_count = encounter->current_count;
+		current_strength_fraction = encounter->current_strength_fraction;
 	}
 
 	if (original_count > 0)
@@ -3140,6 +3142,8 @@ static boolean encounter_test_rule(
 				result = current_count == 0;
 				break;
 			case _platoon_rule_never:
+				result = FALSE;
+				break;
 			default:
 				result = FALSE;
 				break;

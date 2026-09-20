@@ -879,8 +879,10 @@ __inline real_vector2d *rotate_vector2d(
 	real cosine,
 	real_vector2d *result)
 {
-	result->i = cosine*v->i - sine*v->j;
-	result->j = sine*v->i + cosine*v->j;
+	real j = sine*v->i + cosine*v->j;
+	real i = cosine*v->i - sine*v->j;
+	result->i = i;
+	result->j = j;
 	return result;
 }
 
@@ -1234,10 +1236,8 @@ __inline real triple_product3d(
 	real_vector3d const *b,
 	real_vector3d const *n)
 {
-	// TODO: doesn't match
-	return (n->i * ((b->k * a->j) - (b->j * a->k)))
-		 + (n->k * ((a->i * b->j) - (b->i * a->j)))
-		 + (n->j * ((b->i * a->k) - (a->i * b->k)));
+	real_vector3d c;
+	return dot_product3d(cross_product3d(a, b, &c), n);
 }
 
 __inline real_vector3d *add_vectors3d(
@@ -1719,16 +1719,10 @@ __inline boolean valid_real_vector3d_axes2(
 	real_vector3d const *forward,
 	real_vector3d const *up)
 {
-	boolean result = FALSE;
-	if (valid_real_normal3d(forward) && valid_real_normal3d(up))
-	{
-		real product = dot_product3d(forward, up);
-		if (valid_realcmp(product, 0.f))
-		{
-			result = TRUE;
-		}
-	}
-	return result;
+	return
+		valid_real_normal3d(forward) &&
+		valid_real_normal3d(up) &&
+		valid_realcmp(dot_product3d(forward, up), 0.f);
 }
 
 __inline boolean valid_real_vector3d_axes3(
