@@ -2999,17 +2999,17 @@ void actor_move_update(
 		actor_definition_get(actor->meta.definition_index);
 	short movement_type;
 	short override_facing;
-	boolean move_in_3d = FALSE;
 	boolean free_movement = FALSE;
+	boolean move_in_3d = FALSE;
 	boolean allow_all_moving_turns = FALSE;
-	boolean allow_jump = FALSE;
-	boolean force_stationary_facing = FALSE;
 	boolean clear_firing_positions = FALSE;
+	boolean force_stationary_facing = FALSE;
+	boolean allow_jump = FALSE;
 	boolean crouch;
 	real free_movement_distance_squared = 0.f;
 	real steering_maximum_angle = 0.f;
-	real oversteer_minimum_angle = 0.f;
 	real oversteer_maximum_angle = 0.f;
+	real oversteer_minimum_angle = 0.f;
 	real rotation_emergency_amount = 0.f;
 	real maximum_throttle = 1.f;
 
@@ -3311,7 +3311,7 @@ void actor_move_update(
 			&actor->input.position.body_position,
 			&actor->control.grenade_current_target,
 			&grenade_direction);
-		if (normalize3d(&grenade_direction) > 0.f)
+		if (normalize3d(&grenade_direction) != 0.f)
 		{
 			actor->control.desired_facing_vector = grenade_direction;
 			actor->control.free_facing_vector = FALSE;
@@ -3323,7 +3323,15 @@ void actor_move_update(
 			actor->control.free_facing_vector = TRUE;
 		}
 	}
-	else if (actor->emotions.moving_into_fire_timer <= 0)
+	else if (actor->emotions.moving_into_fire_timer > 0)
+	{
+		actor->control.moving = FALSE;
+		actor->control.free_facing_vector = TRUE;
+		crouch = TEST_FLAG(
+			definition->flags,
+			_actor_definition_crouch_in_line_of_fire_bit);
+	}
+	else
 	{
 		clear_firing_positions = TRUE;
 		if (actor->output.movement_type != _actor_movement_type_combat ||
@@ -3349,14 +3357,6 @@ void actor_move_update(
 			if (actor->control.moving_forced_by_aiming)
 				free_movement_distance_squared *= 4.f;
 		}
-	}
-	else
-	{
-		actor->control.moving = FALSE;
-		actor->control.free_facing_vector = TRUE;
-		crouch = TEST_FLAG(
-			definition->flags,
-			_actor_definition_crouch_in_line_of_fire_bit);
 	}
 
 	if (actor->control.moving && !actor->control.movement_complete)
