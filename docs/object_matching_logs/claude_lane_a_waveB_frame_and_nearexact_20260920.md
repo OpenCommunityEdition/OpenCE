@@ -197,6 +197,63 @@ mechanism is **refuted** - its residual is a three-instruction FP term
 transposition originating in `magnitude_squared3d` in `real_math.h`, i.e. a
 deferred header prerequisite.
 
+## Found, verified, NOT landed: a live NULL-deref in `_ai_debug_render_actor`
+
+This is a **correctness bug in our reconstruction**, target-proven, and it is
+also the `+12` frame cause on the portfolio's largest residual (24,976 bytes).
+I verified every part of it from January's bytes myself.
+
+`source/ai/ai_debug.c:3043` declares
+
+```c
+const char *control_flag_names[NUMBER_OF_UNIT_CONTROL_FLAGS] = { ...14 strings... };
+short flag_count = NUMBER_OF_UNIT_CONTROL_FLAGS;
+```
+
+`NUMBER_OF_UNIT_CONTROL_FLAGS` is **15** (`source/units/units.h:109`; the enum
+runs `crouch` .. `swap_weapons`), but only **14** names are given -
+`_unit_control_swap_weapons_bit` has none. So `control_flag_names[14]` is an
+implicit **NULL**, the loop runs `bit < 15`, and
+`strcat(temporary, control_flag_names[bit])` is reached with that NULL whenever
+the swap-weapons control bit is set. `flag_count` is left dead and the
+`"<unknown %d>"` arm is unreachable - the dead local is itself the tell that
+January used it as the *inner* bound.
+
+**January's bytes carry both constants, twice each:**
+
+    January   0x422c  cmp bx, 0xe      0x4278  cmp bx, 0xf
+              0x435c  cmp bx, 0xe      0x43a8  cmp bx, 0xf
+    ours      0x424c  cmp bx, 0xf      0x4298  cmp bx, 0xf     <- the 14 appears nowhere
+
+So January's source bounds the *name lookup* at `NUMBEROF(control_flag_names)`
+= 14 and the *loop* at `NUMBER_OF_UNIT_CONTROL_FLAGS` = 15. Restoring that -
+an unsized array plus `NUMBEROF`, which is the campaign's own house idiom -
+reproduces January's `cmp bx,0xe` / `cmp bx,0xf` pattern in both blocks
+(measured: our 0x423c/0x4288 and 0x436c/0x43b8) and:
+
+| | January | ours now | ours + fix |
+|---|---|---|---|
+| `sub esp` | `0x810` | `0x81c` (**+12**) | `0x80c` (**-4**) |
+| last non-pad byte | 0x6184 | 0x6190 | 0x6180 |
+| relocations | 1905 | 1905 | 1905 |
+| unit census | - | 58/2 | 58/2, no sibling lost |
+
+It also makes the three `char string[72]` sprintf buffers coalesce into a single
+frame object sharing `firing_decision_names`' base - one base, six `lea`s -
+exactly as January does, which is the mechanism behind the `+12`.
+
+**Why it is not landed.** The section becomes **24,960** instead of 24,976,
+because our jump table then needs no padding, so the gate row gains
+`size 24960!=24976` - it trades away key (3). That key was never real: the
+24,976 match is a *padding coincidence*, January's code ending at 0x5ffd with 12
+bytes of padding against ours at 0x600c with none. Surrendering a coincidence to
+fix a NULL-deref and move the frame from +12 to -4 is right on the merits, but
+it regresses a gate key on the portfolio's biggest prize, and that is the
+owner's call rather than a lane orchestrator's.
+
+The candidate is at `scratch/res/render-actor/FLAGCOUNT_candidate.c` and
+`CAND4.diff`. **One ruling releases it.**
+
 ## Held, not landed: `_ai_test_line_of_sight`
 
 An agent found, and proved from January's slot census, that January **never
