@@ -2925,10 +2925,11 @@ boolean weapon_update(
 
 		if (magazine_definition->rounds_recharged_per_second>0 && magazine->rounds_loaded<magazine_definition->rounds_loaded_maximum)
 		{
-			short rounds_recharged= magazine_definition->rounds_recharged_per_second;
+			short rounds_recharged= magazine_definition->rounds_recharged_per_second/TICKS_PER_SECOND;
+			short fractional_rounds_recharged= magazine_definition->rounds_recharged_per_second%TICKS_PER_SECOND;
 
-			magazine->rounds_loaded+= rounds_recharged/TICKS_PER_SECOND;
-			magazine->rounds_fractional_recharged+= rounds_recharged%TICKS_PER_SECOND;
+			magazine->rounds_loaded+= rounds_recharged;
+			magazine->rounds_fractional_recharged+= fractional_rounds_recharged;
 			if (magazine->rounds_fractional_recharged>=TICKS_PER_SECOND)
 			{
 				magazine->rounds_loaded++;
@@ -2971,7 +2972,6 @@ boolean weapon_update(
 	{
 		struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
 		struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
-		boolean trigger_down;
 
 		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit) && TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit))
 		{
@@ -2997,8 +2997,7 @@ boolean weapon_update(
 			triggers_down[trigger_index]= TEST_FLAG(trigger->flags, _weapon_trigger_toggled_bit);
 		}
 
-		trigger_down= triggers_down[trigger_index];
-		if (!trigger_down)
+		if (!triggers_down[trigger_index])
 		{
 			SET_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit, TRUE);
 		}
@@ -3038,7 +3037,7 @@ boolean weapon_update(
 				}
 			}
 
-			if (trigger_down && weapon_trigger_can_fire_again(weapon_index, trigger_index))
+			if (triggers_down[trigger_index] && weapon_trigger_can_fire_again(weapon_index, trigger_index))
 			{
 				weapon_trigger_begin_firing(weapon_index, trigger_index, FALSE);
 			}
@@ -3060,7 +3059,7 @@ boolean weapon_update(
 			break;
 
 		case _trigger_overloading:
-			if (!trigger_down)
+			if (!triggers_down[trigger_index])
 			{
 				weapon_trigger_begin_firing(weapon_index, trigger_index, TRUE);
 			}
@@ -3073,7 +3072,7 @@ boolean weapon_update(
 		case _trigger_charging:
 			if (trigger->state_timer)
 			{
-				if (!trigger_down)
+				if (!triggers_down[trigger_index])
 				{
 					if (trigger_index==0 && weapon_definition->weapon.triggers.count>1 && !TEST_FLAG(trigger->flags, _weapon_trigger_fired_before_charging_bit))
 					{
@@ -3098,7 +3097,7 @@ boolean weapon_update(
 			break;
 
 		case _trigger_charged:
-			if (trigger_down)
+			if (triggers_down[trigger_index])
 			{
 				weapon->weapon.overcharged= 1.0f-(trigger->state_timer*(1.0f/TICKS_PER_SECOND))/trigger_definition->charged_time;
 				if (trigger->state_timer)
@@ -3138,14 +3137,14 @@ boolean weapon_update(
 			break;
 
 		case _trigger_tracking:
-			if (!trigger_down || weapon->weapon.tracked_object_index==NONE)
+			if (!triggers_down[trigger_index] || weapon->weapon.tracked_object_index==NONE)
 			{
 				weapon_trigger_finish_tracking(weapon_index, trigger_index);
 			}
 			break;
 
 		case _trigger_locked:
-			if (!trigger_down)
+			if (!triggers_down[trigger_index])
 			{
 				weapon_trigger_idle(weapon_index, trigger_index);
 			}
@@ -3163,7 +3162,7 @@ boolean weapon_update(
 			break;
 		}
 
-		if (trigger_down)
+		if (triggers_down[trigger_index])
 		{
 			trigger->rate_of_fire+= trigger_definition->runtime_rate_of_fire_acceleration_time;
 			if (trigger->rate_of_fire>1.0f)
@@ -3194,7 +3193,7 @@ boolean weapon_update(
 			}
 		}
 
-		if (trigger->state==_trigger_spewing || trigger->state==_trigger_recovering || trigger_down)
+		if (trigger->state==_trigger_spewing || trigger->state==_trigger_recovering || triggers_down[trigger_index])
 		{
 			trigger->error+= trigger_definition->runtime_error_acceleration_time;
 			if (trigger->error>1.0f)

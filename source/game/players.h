@@ -254,12 +254,6 @@ boolean player_teleport_internal(
 	long source_unit_index,
 	real_point3d const *position);
 
-/* January's target is a one-instruction stub. Keep the authenticated ABI but
-   do not fabricate a C body until provenance explains that implementation. */
-boolean player_examine_nearby_unit(
-	long player_unit_index,
-	long nearby_unit_index);
-
 void players_update_before_game(
 	void);
 void players_update_after_game(

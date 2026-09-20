@@ -1076,6 +1076,7 @@ boolean action_charge_setup(
 		{
 			struct unit_datum *unit = unit_get(actor->meta.unit_index);
 
+			result = FALSE;
 			if (TEST_FLAG(unit->object.damage_flags, _object_melee_attack_inhibited_bit))
 			{
 				result = FALSE;
@@ -1091,7 +1092,6 @@ boolean action_charge_setup(
 				struct prop_datum *prop = prop_get(actor->target.target_prop_index);
 				boolean leap;
 
-				result = FALSE;
 				if (definition->berserk.melee_leap_range_upper_bound == 0.f ||
 					definition->berserk.melee_leap_chance == 0.f)
 				{

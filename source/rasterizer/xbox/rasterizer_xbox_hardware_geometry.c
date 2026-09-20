@@ -58,8 +58,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- constants */
 
@@ -67,24 +69,9 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void rasterizer_error(
-	long error_result,
-	char const *format,
-	...);
-
 void _ReadWriteBarrier(
 	void);
 #pragma intrinsic(_ReadWriteBarrier)
-
-extern D3DDevice *global_d3d_device;
-
-struct rasterizer_hardware_geometry_globals
-{
-	byte pad00[2];
-	short locked_vertex_buffer_count;
-};
-
-extern struct rasterizer_hardware_geometry_globals rasterizer_globals;
 
 /* ---------- globals */
 
@@ -135,6 +122,11 @@ boolean rasterizer_vertex_buffer_new(
 	void const *vertices,
 	long buffer_size)
 {
+	/* BUG: The January XDK CreateVertexBuffer failure returns without writing
+	 * the output pointer (0x5de713..0x5de719); the original caller then tests
+	 * that uninitialized output (January function +0xb3). This inherited
+	 * failure-path bug is preserved; the Unlock restoration does not add it.
+	 */
 	D3DVertexBuffer *d3d_vertex_buffer;
 	byte *locked_vertices;
 	boolean success;
@@ -178,36 +170,49 @@ boolean rasterizer_vertex_buffer_new(
 
 	if (vertices && success)
 	{
-		rasterizer_globals.locked_vertex_buffer_count = 2;
+		rasterizer_globals.current_lock_operation = _rasterizer_lock_vertexbuffer_new;
 		IDirect3DVertexBuffer8_Lock(
 			d3d_vertex_buffer,
 			0,
 			buffer_size,
 			&locked_vertices,
 			0);
-		rasterizer_globals.locked_vertex_buffer_count = 0;
+		rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
+
 		if (!locked_vertices)
-		{
 			success = FALSE;
+		if (!success)
+		{
 			locked_vertices = NULL;
 		}
 		else
 		{
 			csmemcpy(locked_vertices, vertices, buffer_size);
+			result = IDirect3DVertexBuffer8_Unlock(d3d_vertex_buffer);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DVertexBuffer8_Unlock(d3d_vertex_buffer)");
+			}
+
 			vertex_buffer->count = count;
-			vertex_buffer->base_address = (void *)vertices;
 			vertex_buffer->offset = 0;
-			vertex_buffer->type = vertex_type;
-			_ReadWriteBarrier();
+			vertex_buffer->base_address = (void *)vertices;
+			vertex_buffer->type = (short)vertex_type;
 			vertex_buffer->hardware_format = d3d_vertex_buffer;
-			return TRUE;
 		}
 	}
 
 	if (!success)
 	{
 		csmemset(vertex_buffer, 0, sizeof(*vertex_buffer));
-		error(2, "### ERROR failed to create vertex buffer hardware format");
+		error(_error_silent, "### ERROR failed to create vertex buffer hardware format");
 	}
 
 	return success;

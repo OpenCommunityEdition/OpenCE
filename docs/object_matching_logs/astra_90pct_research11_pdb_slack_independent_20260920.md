@@ -1,0 +1,13 @@
+> Research-only packet11: zero production change and zero exact credit. Latest validated production remains wave9.
+
+# Independent January PDB slack review
+
+**PASS for the stated bounded negative result.** Rerunning `carve_slack.py` reproduces **838 regions, 652,800 bytes, 16,643 nonzero bytes and zero plausible named records**. An independent directory parser and name carver in `review.py` reproduce those figures; `review.json` is the compact receipt. No compiler, source or configuration change occurred; exact credit is zero.
+
+The input SHA-256 is `8480f0c44fc7b5acba5775c02053d1a62c6794ab8d646661106985cbe46d7bc5`. Independent MSF2 parsing confirms 5,497 blocks of 1,024 bytes, 836 streams, valid disjoint live/TOC block ownership and exact directory consumption. The scanned regions do not overlap: two physical extents comprising 23 unreferenced blocks, 834 live-stream tails, one header tail and one TOC tail. This file has no trailer. Region hashes and nonzero-byte counts match the original bytes.
+
+The fifteen selected record IDs, length convention and packed layouts agree with [Microsoft's official cvinfo.h](https://raw.githubusercontent.com/microsoft/microsoft-pdb/master/include/cvinfo.h). Name offsets, including the four-byte record prefix, are register 8/10, BP-relative 10/12, register-relative 12/14 and procedure 37/39 for old/current type-index layouts. The old and ST variants use length-prefixed names; the selected modern variants use zero-terminated names. Procedure length and address offsets are correct. Scanning covers every possible starting byte within each selected region; the PE-range annotation does not filter hits.
+
+An independent walk of live record chains recovers the same **11,720 positive controls**: 2,761 GPROC, 303 LPROC, 7,027 BPREL, 1,612 REGISTER and 17 REGREL. These are the five ST forms; they do not constitute live-record validation of all fifteen variants or establish the existence of missing Halo metadata.
+
+“Unreferenced” means absent from current live-stream/TOC page lists, **not free or deleted-symbol storage**; allocation metadata can fall in that category. The scanner accepts only complete selected records with nonempty printable ASCII names wholly inside one chosen contiguous region. Fragmented records, records crossing separately classified regions, damaged/truncated records, non-ASCII names, other symbol/type forms and unused bytes inside live logical stream lengths are outside this result. A hypothetical hit would still need provenance. **Zero hits is not proof that missing metadata cannot exist.** No broader artifact search or source inference follows. Released.

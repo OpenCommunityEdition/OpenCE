@@ -1,0 +1,15 @@
+# Packet12 independent metadata closeout
+
+**PASS — released for commit. Zero gain: 0 functions / 0 meaningful bytes / 0 padded bytes.** Compared prepared metadata with packet11 `dc56bd8e213aa16579ec5cc00f5df08fc206bf01`. No new research, compiler invocation, build, test, staging action or rerun of the non-idempotent recorder occurred.
+
+All 293 atlas rows preserve **12,669 old JSON row fields**. All 293 CSV rows preserve every value in their **34 prior columns**. Schema 11 becomes 12; five named zero-credit tags and one CSV column are appended. Every older snapshot/research record and all eight admissions remain identical: **11,456 meaningful / 11,520 padded bytes**. Latest production remains wave9: **1,443,048 / 1,770,166 meaningful Halo bytes**, 7,289 functions and 150,102 bytes remaining to 90%. The current semantic report equals saved wave9 after-state.
+
+The actual accounting is **three source shapes and 22 compiler calls**: two AI-debug shapes/two calls, one placement implementation shape tested across 19 owner-header consumers, and one call for the fixed header-composition's first falsifier. Independent reviews add zero. The placement **193 meaningful / 208 padded-byte** strict scratch owner receives zero credit because Units loses `_unit_preprocess_node_orientations`. The fixed composition repeats that loss, stops at 189→188, and compiles none of its remaining 271 consumers. No combined placement/leaf gain is claimed.
+
+Fresh file hashing verifies **272 production C sources, 272 base objects and both headers** against the combined freeze; standalone's 19 pairs also match its own freeze. The protected diff and untracked inventory are empty for source, config, tools, build.ninja and objdiff.json. All 12 normalized report copies exactly match their scratch sources with the research-only preface. Old handoff/atlas text and rejection prose are preserved.
+
+Diagnostic claims correctly distinguish **3,567 controls / 5,198 known words**, with 1,565 controls covered and 2,002 having no known words, plus 274 residuals and 44 differing call sequences. The one final network hit is an actual longer January literal, not merely a symbol-label discrepancy; its known four-versus-five traversal veto remains and no network source probe occurred. The initial flawed scanner's scalar discovery survives only through separate manual primary evidence and is outside the final corrected scanner's coverage. No comparator/admission logic or general compiler law changes.
+
+The callback limitation is explicit: authentic long-returning placement is directly bound to the generic void callback in original evidence; the House21 review preserves that narrow original quirk. An explicit cast does **not** make an incompatible indirect call defined ISO C. Original cast text and same-revision source identity remain unknown. Isolated exactness is not a landing approval.
+
+No metadata mistakes found. Receipt: `scratch/astra-wave12/independent-cycle-review.json`; reproducible read-only audit: `independent-cycle-review.py`. This report is copied exactly to `docs/object_matching_logs/astra_90pct_research12_independent_20260920.md`. **RELEASED.**

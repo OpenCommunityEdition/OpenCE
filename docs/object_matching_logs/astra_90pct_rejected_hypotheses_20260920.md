@@ -156,3 +156,110 @@ The bitmap, perception, looking, collision and ai_debug wave2 packets give full 
 - Physics must snapshot after translation; the earlier broad candidate's opposite cross-call ordering was not equivalent. The force-add graph was already in an old broad rewrite; isolated evidence is not a new general law.
 - RTC statistics[192] is16 memory-report triples, not a larger shared counter owner. No duplicate layout or pressure correction is justified.
 - Gate/regression success verifies preservation only. Source fidelity and target extents are not coverage gain; do not package further zero-credit source cleanup as campaign advancement.
+
+## Research packet5 additions
+
+- Coherently narrowing the sound pitch-range parameter does not preserve its exact owner: long->short changes mov ESI to mov SI, adds an operand-size prefix and shifts both relocations. Both files restored, no consumer shape, no cast-deletion or prototype-mismatch retry.
+- Named lens-marker i/j/k fields are primary-type-backed but byte-inert, including all controls/data. The independent rasterizer_lights consumer is residual, not an exact control; the packet corrects that preliminary misstatement.
+- Equal direct-call multisets on 104/106 high-match functions do not prove all boundaries/arguments correct, but cannot support a broad missing-helper fix. Earlier cached family sizes are not current gain ceilings.
+- Current exact stopping-distances and collision-BSP vector controls supersede old residual labels. Mixed same-function operand ordering rejects uniform x87 operand reversal; the studied frame/j-k cases are outside M8's documented scope.
+- Later projectile RTC inventory includes branches absent from January. It is not a January declaration-order witness. No new source shape follows.
+- Debug-profile numeric switch/guessed enum donor remains inadmissible; fresh Ghidra and empty HCEA symbol queries do not supply enum identities. Whole-file donor import would also threaten inherited exact code.
+
+## Wave6 additions and one satisfied reopening criterion
+
+- January CG/instrumented variants are not alternative compiler witnesses for the measured residuals: 282 unambiguous extents, all instrumented-identical, and 28 CG detours exactly replaying original prefixes. One ambiguous name remains omitted. No source or private-name inference follows from instrumentation paths/strings.
+- The alias opportunity census still leaves only the old obstacle-path veto code-equal but unaccepted. Snapshot identity remains unproven; byte equality does not reopen its admission. Do not count already accepted historical near-hits.
+- ARGB has two authentic visibility probes, both restored: the owner becomes exact but the same screen-effect exact function regresses. The second probe legitimately preserves selected providers while removing three redundant copies; therefore surplus-copy removal alone does not cure the problem. Reopen only with new original context explaining both the converter owner and the screen-effect instruction schedule, not declaration/flag permutations.
+- Collision-debug raw camera copies, frame records and absent DIA locals do not establish the proposed buffer-size/source-scope change. No new compiler shape was justified. Existing exhausted spelling history still applies.
+- Hardware vertex park retired: first-party Unlock/result topology plus genuine unchanged XDK behavior supplies a new admissible mechanism. Independent review and full validation prove +354 meaningful bytes and no inherited losses. This does not admit the old whole-file donor or change the policy for behavioral helpers.
+- Triangle remains parked: one merged January error block and a materially different later DX9 device-null branch do not authenticate duplicate source failure reports. No fresh triangle compilation. Reopen only with new source-level branch evidence or a different supported mechanism.
+- Two tiny stock SDK no-op/constant-return copies are harmless, disclosed at zero extra credit, and do not uniquely name retained anonymous targets. No target metadata rewrite follows. The original CreateVertexBuffer failure bug is independently authenticated and unchanged; this is not permission to introduce UB in another residual.
+- The optional local-artifact question is closed by the user's exhaustive confirmation. Continue with available January publics/strings, Ghidra, DIA and cross-build evidence; no repeated search for byte-identical archives.
+
+## Packet7: exact scratch output is insufficient when a source requirement remains unproved
+
+- **Environment:** the old claim that no intensity factor is evidenced is superseded by fresh raw first-party code showing an initialized 1.0 local and six real uses. The proposed complete match nevertheless needs duplicate filter statements with no independent per-branch witness. One common-tail ablation isolates that requirement. Hold the entire candidate at zero credit. Reopen only with genuine branch/source evidence or an independently authenticated context correction closing the common tail; no further filter/declaration spelling sweep.
+- **Projection:** after authentic September19 context changes, the old bitmap/Decals losses no longer reproduce, but the full 272-consumer test loses `_unit_preprocess_node_orientations` through a two-load ordering change. Reject the leaf-face gain and restore the header. Reopen only with a concrete authentic context correction preserving this current falsifier and all consumers; no order/return/flag permutations or unrelated units-source rescue.
+- **Infection:** raw unoptimized code proves initialized dword flag manipulation before the control-packet clear, so that boolean lifetime is expressible in ordinary source. The one new shape still has 3,600 bytes/104 relocations versus 3,616/104 and differs in registers, branches and x87 clusters. No landing or additional pressure probe.
+- **Vehicles:** primary helper and RTC records support two in-place point_from_line2d calls and one shared branch accumulator. Both bounded shapes remain nonexact and unlanded. The naturally emitted helper copy has no credit and does not authorize an ownership exception or a new scalarization sweep.
+
+## Packet8: fixed owner reconciliation and authentic helper/branch probes rejected
+
+- Cone declaration at its fixed historical real_math.h location still loses the Decals reload order. One fixed composition with the authentic projection body preserves units but yields the identical Decals failure. Both restored; no further position/order/combination rescue. Typed aim setter remains an uncompiled proposal, not a new tested exact body.
+- Sound-listener's fresh raw graph and parameter/type records supply no missing use or valid layout change; its two-reload transposition remains. Do not repeat previously rejected declaration/loop/TU-order variations.
+- Avoidance's unchanged current fingerprints and fresh raw/RTC reread reproduce prior evidence. No new source mechanism or helper-ownership exemption is established.
+- Action-charge's later melee-first whole-arm topology is primary-supported and fixes one historical flag allocation, but leaves a reload and aggregate-copy/scheduling gaps. No second shape is justified; later added normalization and lead-fraction operations cannot be imported into January.
+- Damage's genuine collision_test_line helper spelling produces the same known best residual, plus a target-absent behavioral helper. Unreferenced emission does not make this behavioral body eligible for the narrow stock-XDK no-op/S_OK exception. No credit or further clamp/lifetime spelling sweep.
+- Current compiler hashes match the existing 9254.1 toolchain; 9210 is a known prior alternative, not new QFE evidence. Obsolete C2 profiler bucket labels are not live pass entries.
+
+## Wave9: weapons closure and HUD research
+
+- Weapons reopening criterion satisfied by separately stored and used short quotient/remainder outputs in the raw later body, combined with the already authenticated trigger-array context. One shape is fully exact and preserves all inherited owners and controls. This does not establish a general rule for scalar declarations or admit prior speculative variants.
+- Fresh HUD graph, typed locals, RTC and January relocation evidence add no distinct mechanism beyond the prior aggregate/flags/number-call/conversion history. Zero new shapes and no production changes; do not replay exhausted R3/distance or ARGB-header probes.
+
+## Packet10 additions: no production change
+
+- Actor-looking: primary-backed saved-major helper outputs compile identically. Do not repeat this paired return-assignment shape; a new mechanism must explain a remaining January difference.
+- Communication-event: primary-backed direct indexing, nineteen store roles/order and previous-entry diagnostic reads produce 8112/335, not January8064/336. The known typed/P2/refetch composition is prerequisite history, not newly discovered work. The genuine header replay is fully restored. Do not turn this result into a declaration, field-order or inlining sweep.
+- Projectile creation: fresh helper/RTC/DIA evidence confirms the already exhausted point-helper route. The archived exact function still emits an inadmissible48-byte point owner and predates the new weapon_update admission. No new probe or exception.
+- Perception refresh: distance and optional outputs already have their consumed uses. Direct byte comparison also finds two short JP destinations, beyond the argument-scheduling window; alignment diagnostics do not erase them for admission. Dead initializers and unproven scope changes are not new mechanisms.
+
+## Packet11 additions: no production change
+
+- Actor movement: current consumed float/byte/short outputs already match the available evidence. Point/blend, crouch, hover, flags and declaration variants are exhausted; fresh confirmation is not a reason to recompile them.
+- Biped movement: the 204-byte structure and flags are already represented. Full-width actor argument, UMG6 vector-copy direction, field/flag and radius variants are historical tests; do not replay them as new shapes.
+- January PDB slack: the bounded listed-record scan finds no complete named candidates. Do not repeat this same scan or infer recovered locals from administrative bytes. Reopen only with a materially different supported record/fragment recovery mechanism and clear provenance requirements.
+
+## Packet12 additions: real source facts, zero production gain
+
+- AI debug: selected-color text / blue clear-ray and purple output-throttle length1.0f are primary-backed consumer corrections. Two shapes preserve controls but remain nonexact; no default-arm, declaration-order or old marker-helper replay. Critical marker FSTP/reload operations remain identical despite shifted stack homes. Reopen only for a distinct primary-backed mechanism.
+- Weapon placement: the old HCEA-void claim is disproved by raw procedure records. The authentic long return yields a 193/208-byte strict scratch function, but its coherent real owner header regresses an inherited Units match. No false consumer-local prototype, header-only ABI mismatch or isolated body admission. Original generic-void callback binding is an authenticated quirk, not made language-defined by a cast.
+- Placement plus projection: one fixed composition of two authentic corrections produces the same Units regression and stops at its first gate. All272 source/object snapshots and both headers are restored. No further combination, ordering or declaration-position sweep without a new independent causal fact.
+- Argument locator: matching callees alone do not prove arguments. Preserve final coverage limits and unknown values. Initial stale-stack, partial-push and x87-store defects are fixed; initial output is not validated final output. The final scanner does not independently cover the AI length correction or swapped-color path joins.
+- Network close: actual January error literal contains the parenthetical omitted in current source. The existing five-iteration versus four-element traversal veto remains. Literal fidelity alone is not a full-function admission; no source probe made.
+- Perception and reload: available evidence confirms already-tested value webs and shapes. Do not rerun historical short-output, MIN/saved-total, desire-prop argument binding or aggregate/helper spelling variants without new provenance.
+
+## Wave13: setup source criterion satisfied; bounded scouts closed
+
+- action_charge_setup: the old repeated-store hold is resolved by fresh independent unoptimized instructions. The existing initializer is moved before both failure tests; one shape is fully exact and independently rebuilt, with no inherited runtime change outside setup. This does not license arbitrary duplicated statements or reopen perform's exhausted allocation variants.
+- Ordered call differences:44 excluded residuals are not44 missing-call fixes. Read the per-function census before testing; widget tails, HS discarded function lookup, sound deletion, teleport else duplication and observer zeroing were already probed or vetoed. Inlining, indirect-call opacity and decoding boundaries must be resolved before treating a call delta as source evidence.
+- Unwritten player stub: raw HCEA/DIA proves private void(long,long), correcting the old Boolean premise. Later dispatch invokes an empty body and ignores its result. January original name/linkage and authentic unreferenced emission are still missing; no public no-argument stand-in, synthetic linkage rewrite or unused-static emission trick.
+- Aliases: prior15rows, decals and one-wide remain accepted. The delta-only check adds no new source-owner evidence for obstacle snapshots, fog statics or helper selection. Do not replay their old source forms or relax comparison.
+
+## Packet14: evidence recovered without a full-match mechanism
+
+- Aiming blockage: unoptimized returned-word flow now authenticates the old vertical zero assignment. Do not repeat that proof. The January reciprocal lifetime remains unexplained; old body3b is not a new source shape or exact donor. A later point-operation call does not authorize a surplus helper owner.
+- Normalize2d: nine current exact controls, including both same-expression actor-looking validators, support the existing helper and consumed reciprocal. The historical all20-site claim is not a universal type/helper law. Reopen only for a new independently supported caller lifetime/use/type/call boundary that preserves these controls; no operand, scope, declaration or flag sweep.
+- Branch assignments: Bink query70 is the sole qualifying strict hold in the bounded remaining roster. Separate START/BACK assignment arms still need independent evidence. Bink draw909 is a different index/aggregate hold; converse248 is asm-only; sound619 has no strict donor; progress349 is a spill issue. Do not treat these as seven thousand recoverable bytes or replay obsolete accepted candidates.
+- ABI: raw hs_evaluate_begin_random return void and short/long/unsigned-char arguments agree with current source. No new signature probe follows. The other seven examined rows had explicit prior type evidence or no newly identified consumed-output mismatch. This is a bounded negative result, not proof that all residual signatures are correct.
+
+## Packet15: improved bounded diagnosis, no new source lead
+
+- The extended argument scan is complete for its declared scope. Its only hit is the already-authenticated network parenthetical; do not re-probe the literal while the four-versus-five array-bound hold remains. No new production change is justified by this run.
+- Exact controls establish covered representation consistency, not complete x86 soundness, source equivalence or ABI/branch-role identity. Unknown tail/indirect exits, spill reloads and unsupported FP arithmetic remain unknown. Do not add synthetic cleanup/no-return overrides merely to recover purple/circle positives.
+- Selected and real-witness coverage receipts predate the final full-result SHA. Preserve their version labels; final counts come from result.json and the independently bound review. The setup control's seven words reflect an earlier production admission, not this diagnostic's gain.
+- Biped physics: the four inspected output/argument boundaries expose no new source premise. The wave3 debug restoration is already present. Do not repeat 39 RTC records or remove the required best_collision_index != NONE guard to chase equality.
+
+## Packet16: current source boundaries and HUD qualification
+
+- Models, lightning/lens flares and the three player-control owners reproduce the documented frontiers. Do not replay the same helper visibility, operand, declaration, scope or argument spellings as new research.
+- HUD messaging: old normalized equality is historical, not a current source/admission proof. Fresh unoptimized x0,x1,y0,y1 rectangle stores do not authenticate the old24-order selected y0,x0,x1,y1. Buffer256/local/branch corroboration alone does not close this gap. Do not call a permutation-selected body independently authenticated by this capture.
+- HUD aliases: the existing objdiff-coff-shape route is conditional; no comparator rewrite is inherently required. Equal addresses alone and a parked alias class do not grant code credit. A current admissible source body, complete bytes/relocation geometry and independent static-owner binding remain necessary.
+- Public metadata is a lead locator. Do not call a PDB full-symbol merely from its extension, confuse announced prototype existence with a usable archive, or repeat the closed local-copy search.
+
+## Wave17: private player owner proved; data/topology holds retained
+
+- player_examine_nearby_unit: original earlier private-owner records plus anchored leaf correspondence, prior raw void(long,long) typing, authentic dispatch and natural emission satisfy the bounded source test. Only one meaningful byte is admitted. The old public/Boolean premise remains rejected; no forced-emission workaround or same-source claim is authorized.
+- Fog: the new MAP Static symbols tables contain function records only, not21private data declarations. Original function names do not prove the proposed storage partition.
+- Obstacle: public debug-flag names do not identify the held private snapshot owners; semantic veto remains.
+- Environment: September Xbox exposes the actual vector-test path but retains January's common filter tail. Identical optimized scheduling does not prove duplicated lexical statements; the old exact candidate remains held.
+- Public inputs: advertised external PDB identities and archive listings are not embedded type/local/line evidence. Preserve the August patched-filename caveat and the closed local archive question.
+
+## Packet18: original private-header evidence tested without gain
+
+- object_update: both original private identities/body/calls justify the linkage-only test. All150consumers produce no new function bytes or matches. Do not repeat via prototype order, padding declarations or compiler flags.
+- ai_conversation_new: complete original private bodies and HCEA type corroborate the single correction, but all21consumers remain byte-inert. No gain and no extra source-context variants.
+- Three private biped owners: current ABI and bodies preserved; only necessary snap forward declaration added. The23consumer test loses inherited unit_preprocess_node_orientations and gains nothing. Rejected/restored. Do not trade that exact control, copy later snap ABI or sweep private-prototype positions.
+- Private-declaration correction is not a transferable exactness law: two tests are byte-inert and one moves loads in an unfavorable direction. The wave17 collateral change did not predict a useful broader gain.
+- Earlier AI windows reproduce known call/lifetime/arithmetic boundaries. Newly original-authenticated path-renderer names are distinct evidence, not permission to replay the historical alias-based stub cleanup or change target metadata for credit.

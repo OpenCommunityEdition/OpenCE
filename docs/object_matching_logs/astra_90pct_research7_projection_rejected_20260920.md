@@ -1,0 +1,15 @@
+> Research only: no admission or retained source/header/configuration change.
+
+# Projection helper: current-context replay rejected
+
+One source shape was tested: replace only `real_math.h`'s semantically wrong x/y selection with the three-return body already authenticated by January's strict exact Decals helper. The proposed header is frozen in `real_math-proposed.h`; source, object and header fingerprints precede the test. No declaration, include, compiler option, pragma or local consumer adjustment was changed.
+
+This was a bounded current-context replay, not a new spelling. Older September4 tests lost a Decals caller; September14 P7 lost bitmap_copy when composed with P6. Since then, authentic September19 commit37d51331 changed three definitions in the same owner header: rotate_vector2d, triple_product3d and valid_real_vector3d_axes2. Those changes are actual source context, not an assertion that they must cure the old regression.
+
+The complete current Ninja dependency graph identifies 272 Halo C consumers of real_math.h. The frozen raw graph is ninja-deps.txt and its exact unit list is consumers.json. First-falsifier gates of bitmap_drawing and decals preserve all 7 and 30 strict controls. Leaf_map preserves16 and makes `_leaf_face_get_vertex3d` strict exact (168 meaningful /176 padded). These three objects were reused without another compiler invocation in the full consumer analysis.
+
+The complete 272-consumer test, with 6,258 inherited strict function controls, rejects the proposal: `_unit_preprocess_node_orientations` loses exactness. It still has585instructions, equal frame/size and the same relocations; the only true difference is the order of adjacent independent EDX/ECX stack loads at+0x269/+0x26c. units-before-after.alndiff.txt aligns the frozen before and candidate objects directly to avoid target-vs-defined-noncode annotation noise. No projection call occurs in this function; the unrelated inline body changes compilation context. This is a concrete dependency observation, not a proven general IR-allocation law or source-order recovery.
+
+All272consumer code-owner sets, full nondebug noncode-section fingerprints, COMMON inventories and complete point-helper sections remain unchanged. Only the one inherited exact regression was found. The full header is restored byte-for-byte; source/config diff against76dfc1fb is empty. No build/base object was written by the probe and no new gain is admitted. The genuine header defect remains a known limitation, with its faithful proposed body preserved for future evidence.
+
+Stop here: no further header-order, return-spelling, declaration, unrelated units-source or flag permutations. Reopen only with a concrete authenticated source/context change that preserves the currently failing units owner together with the leaf-map gain, followed by complete consumer coverage. The old bitmap/Decals failures no longer reproduce here, so the new precise falsifier supersedes those historical blockers for this context. No park or admission policy is changed.

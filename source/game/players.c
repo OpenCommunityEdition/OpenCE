@@ -2731,6 +2731,13 @@ static void player_set_action_result(
 	return;
 }
 
+static void player_examine_nearby_unit(
+	long player_index,
+	long unit_index)
+{
+	return;
+}
+
 static void player_examine_nearby_vehicle(
 	long player_index,
 	long vehicle_index)
@@ -3166,7 +3173,8 @@ static void player_examine_nearby_objects(
 				switch (object->object.type)
 				{
 				case _object_type_biped:
-					continue;
+					player_examine_nearby_unit(player_index, object_indices[object_number]);
+					break;
 
 				case _object_type_vehicle:
 					player_examine_nearby_vehicle(player_index, object_indices[object_number]);

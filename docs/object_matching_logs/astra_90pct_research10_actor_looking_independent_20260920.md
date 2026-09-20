@@ -1,0 +1,15 @@
+> Research-only packet10: zero production change and zero exact credit. Latest validated production remains wave9.
+
+# Independent review: packet10 actor-looking
+
+**CONFIRM_REJECT_BYTE_INERT_NO_EXACT_GAIN.** The saved-major-results shape has primary evidence and preserves behavior, but changes no runtime section and earns zero exact credit. Keep it research-only; no follow-up spelling/scope/type shape is justified. This review used no compiler invocation and respected the global compiler hold.
+
+I independently reconstructed the entire candidate source from the frozen baseline using only the two disclosed replacements. The existing `major_valid` starts FALSE. Each new assignment saves the result of the same helper call in a mutually exclusive existing branch after successful direction decoding. The helpers return initialized Boolean results. Both versions perform the same vector writes only on success and later test the same truth value; the address never escapes. No new local, helper, arithmetic, uninitialized read or lifetime change is introduced.
+
+Fresh direct reads of the supplied PE independently confirm the meaningful return/store/test flow: aim call `0x4609cb` → AL store `0x4609d3` → reload/test `0x4609d9/0x4609e0`; look call `0x460a45` → AL store `0x460a4d` → reload/test `0x460a53/0x460a5a`; both converge on the same saved byte tested again at `0x460a81/0x460a88`. Conditional branches guard the vector copies. The original January object independently has the two named helper calls at +0xacf and +0xb11 with compatible success/failure branches. This supports the narrow value-flow reconstruction; neither optimized January nor later debug records uniquely recovers original lexical syntax or authenticates the same source revision.
+
+Independent COFF comparison of the frozen baseline, fresh baseline and candidate proves every non-debug runtime section unchanged, including full normalized bytes and ordered relocation identities, flags, owner names/types/storage/offsets, COMDAT selection and COMMON. All **14 strict exact controls**, 33 function owners, 117 named runtime owner records and 84 noncode sections remain identical. COMMON is empty and no point_from_line3d owner is emitted. Current production source and base object still equal their frozen copies byte for byte.
+
+The target remains 4,720 padded bytes /159 relocations; both baseline and candidate remain 4,704/159 with normalized SHA256 `4bc222ca36d696b3a8bfebfb48c402e06df583ac82cac6fbd3f79d305adc9f7d`. No January exactness is claimed. The original secondary-validity allocation/lifetime boundary remains unresolved.
+
+Reproduction: `python scratch/astra-wave10/actor-looking-independent/review.py`. `review.json` contains independent measurements, primary instruction assertions, artifact hashes and all 14 control names; `raw-major-flow.asm` preserves the independently decoded bytes. Worker preparation.json is a historical precompile snapshot; worker summary.json and packet.md correctly provide the final rejection.

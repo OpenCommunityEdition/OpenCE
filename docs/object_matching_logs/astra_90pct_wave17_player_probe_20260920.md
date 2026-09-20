@@ -1,0 +1,19 @@
+> Frozen evidence/probe report; later admission is recorded only in the completed wave17 summary. The private player helper adds one meaningful byte; all other lanes earn zero credit.
+
+# Wave17 private player helper: one meaningful byte admitted
+
+The single source shape restores private `void player_examine_nearby_unit(long player_index, long unit_index)` with an empty explicit return and its genuine biped-dispatch call. The stale public Boolean declaration is removed from `players.h`. Ordinary VC7 emits the original RET plus15NOP bytes naturally: **1 meaningful /16 padded bytes**, zero relocations. No target metadata, compiler option, emission directive or comparator changes.
+
+New August/September2001 MAPs explicitly name the static helper in `players.obj`; September's five adjacent owner windows correspond to January. Prior raw HCEA records independently identify the private void(long,long) type, and later first-party dispatch supplies the real call and initialized operands. See the private-owner packet for raw offsets, hashes and revision limits. Original January lexical text and a complete same-source revision remain unverified.
+
+Before any header edit, root enumerated all73 consumers using both Ninja's actual dependency records and an independently resolved static include graph. Source/object/header fingerprints were frozen. The one-shape probe rebuilt all73 and restored the header afterward. Players improves66→67 strict exact; all2,752 inherited exact consumer functions survive. The only added code owner is the authenticated private helper. Source/header candidate hashes bind the independent approval and installed files.
+
+One already non-exact function, `rasterizer_frame_statistics_draw`, changes incidentally under the corrected header. Two plain global loads exchange registers/addends, and LEA exchanges base/index. Both temporary registers are overwritten before reuse; the computed sum is unchanged. An additional compile with the original header reproduces the frozen runtime object. Independent review approves this specific neutral delta at **zero credit**. Its4,165 meaningful /4,176 padded bytes remain unresolved; no frame-statistics source edit or spelling search was performed. The initial commentary's claim that every other function stayed unchanged was too broad; the preserved per-consumer receipt already records the delta.
+
+Independent source/ownership review covered all73 object pairs,3,335 inherited function sections and7,639 prior runtime sections. A fresh independent player rebuild reproduces the reviewed runtime output. Root's full production build rebuilt73 units, then compared every runtime object against the frozen baseline or the specifically reviewed candidate. The whole-tree accepted ledger and stable comparison,581-unit owner/data/COMMON/point census, parks/admission audits, fake scans and whitespace checks passed. Every earlier accepted record remains unchanged; all seven point emitters survive.
+
+Actual C compiler calls: **148** for one source shape—73 scratch consumers, one original-header control, one independent rebuild and73 production compiles. Full tools tests were not rerun because no tooling changed or new10K checkpoint was crossed; wave9's1,152passed/5skipped/26subtests remains the latest full suite.
+
+Final production: **1,443,979 /1,770,166 =81.5730841062%**,7,291 /7,574 Halo functions. Cumulative gain12,387meaningful /12,480padded /ten functions; gap149,171meaningful to90%. Residual pool283rows /326,187meaningful. Cumulative changed fuzzy extent54,503meaningful is entirely uncredited. No whole-object admission, park retirement or regression. This is a small authenticated recovery, not a broad compiler breakthrough.
+
+Authoritative receipts: `baseline.json`, `probe.json`, `../player-independent/review.json`, `../player-independent/rebuild.json`, `../production-rebuild-audit.json`, and `../summary.json`.
