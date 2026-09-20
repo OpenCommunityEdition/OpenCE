@@ -2251,8 +2251,8 @@ boolean ai_test_line_of_fire(
 
 			if (intersected)
 			{
-				blocking_prop_index = pills[pill_index].prop_index;
 				line_of_fire = FALSE;
+				blocking_prop_index = pills[pill_index].prop_index;
 				pills[pill_index].hit = TRUE;
 				break;
 			}
@@ -2544,7 +2544,6 @@ boolean ai_test_ballistic_line_of_fire(
 	real_vector3d arc_velocity;
 	real segment_start_time;
 	real segment_end_time;
-	real segment_time;
 	unsigned long collision_flags;
 	short pill_count;
 	short pill_index;
@@ -2604,12 +2603,14 @@ boolean ai_test_ballistic_line_of_fire(
 			ai_debug.ballistic_lineoffire_point_count++;
 		}
 
-		segment_time = segment_end_time - segment_start_time;
+		{
+			real segment_time = segment_end_time - segment_start_time;
 
-		end_point.x = arc_velocity.i * segment_time + point.x;
-		end_point.y = arc_velocity.j * segment_time + point.y;
-		end_point.z = segment_time * arc_velocity.k + point.z +
-			(segment_time * segment_time) * gravity * 0.5f;
+			end_point.x = arc_velocity.i * segment_time + point.x;
+			end_point.y = arc_velocity.j * segment_time + point.y;
+			end_point.z = (segment_time * arc_velocity.k + point.z) +
+				(segment_time * segment_time) * gravity * 0.5f;
+		}
 
 		{
 			real_vector3d segment_vector;
@@ -2652,7 +2653,7 @@ boolean ai_test_ballistic_line_of_fire(
 			break;
 
 		point = end_point;
-		arc_velocity.k = segment_time * gravity + arc_velocity.k;
+		arc_velocity.k = (segment_end_time - segment_start_time) * gravity + arc_velocity.k;
 		segment_start_time = segment_end_time;
 		segment_end_time += 6.0f;
 

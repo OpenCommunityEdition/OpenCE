@@ -573,9 +573,9 @@ static void actor_input_update(
 
 /* ---------- globals */
 
-struct data_array *swarm_data = NULL;
-struct data_array *swarm_component_data = NULL;
-struct data_array *actor_data = NULL;
+struct data_array *swarm_data;
+struct data_array *swarm_component_data;
+struct data_array *actor_data;
 long global_updating_actor_index = NONE;
 
 short const global_movement_animation_states[NUMBER_OF_ACTOR_MOVEMENT_TYPES] =

@@ -2091,19 +2091,15 @@
       "unit": "source/ai/actor_firing_position",
       "function": "_pre_evaluator_attack",
       "class": "unclassified",
-      "evidence": "First natural complete January-layout reconstruction of the attack firing-position pre-evaluator, using genuine actor/weapon access, project real/vector types, named evaluation categories and January diagnostics. The 1120-byte candidate is one relocation short of the 1120-byte target and remains fuzzy. No dead call, compiler pressure, forced inline or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md.",
+      "evidence": "First natural complete January-layout reconstruction of the attack firing-position pre-evaluator, using genuine actor/weapon access, project real/vector types, named evaluation categories and January diagnostics. The 1120-byte candidate is one relocation short of the 1120-byte target and remains fuzzy. No dead call, compiler pressure, forced inline or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md. 2026-09-20 Lane A re-baseline (zero exact credit): four independently re-verified levers land the MISSING RELOCATION, taking the candidate from 38 to January's 39 and objdiff from 93.621216 to 96.10909, with all 26 exact siblings preserved. (L1) evaluation = 20.0f * (distance_from_boundary / 2.0f) stops VC7 reassociating 0.5f*20.0f into 10.0f and restores the __real@41a00000 reference. (L2)/(L3) two initializers become statements: the store of zero to [ebp-0x1c] sits at +0x1d8 in January and +0x12d in ours, on opposite sides of call _actor_get_weapon_definition at +0x169, and a stack store cannot be sunk across a call, so the position IS January's statement order; nearest_distance_squared = REAL_MAX deliberately stays an initializer. (L4) an explicit if (distance_squared < nearest_distance_squared) replaces MIN(), because cseries.h MIN is ((a)>(b)?(b):(a)) and can only emit test ah,0x41 while January emits fcom / test ah,5 / jp, a strict less-than. Relocation addresses now agree exactly through +0x317 and shift only from +0x36b inside the one remaining window; bijection_walk reports genuine structural events, so a pure register bijection is excluded by measurement. Reopen with a source mechanism for that single window.",
       "measurements": {
         "target": {
           "size": 1120,
           "relocation_count": 39,
           "normalized_sha256": "7b38541b266185306cf06750f8e771df6b21326f143ee2c01259e94c5d63595b"
         },
-        "base": {
-          "size": 1120,
-          "relocation_count": 38,
-          "normalized_sha256": "0ce537b371ae59cdaa713342af23346c37187ab268e04f9c932af2fdcc41ed58"
-        },
-        "objdiff_percent": 93.621216
+        "base": { "size": 1120, "relocation_count": 39, "normalized_sha256": "48948f2586afaae971c958e06bf570f6c5ce0520fa458899307455e1515f86f9" },
+        "objdiff_percent": 96.10909
       }
     },
     {
@@ -2479,11 +2475,11 @@
       "unit": "source/ai/ai",
       "function": "_ai_test_line_of_fire",
       "class": "instruction-scheduling",
-      "evidence": "Complete typed line-of-fire pill test reconstructed from January code and relocations with HCEA as an independent semantic map. Target and candidate are both 336 padded bytes with all 10 relocations; remaining differences are ordinary local and branch scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "evidence": "Complete typed line-of-fire pill test reconstructed from January code and relocations with HCEA as an independent semantic map. Target and candidate are both 336 padded bytes with all 10 relocations; remaining differences are ordinary local and branch scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. 2026-09-20 Lane A re-baseline (zero exact credit): the store-order half of the old waveD lof2 candidate is landed on its own merits, WITHOUT the rejected bare call-site parentheses. Inside if (intersected), line_of_fire = FALSE; now precedes blocking_prop_index = pills[pill_index].prop_index;, matching January's store of zero to [ebp-4] at +0xd3, then [ebp-8] at +0xd7, then the hit byte at +0xda. The correspondence is deterministic and reversible - swapping the source swaps the emission - so VC7 is order-preserving for these two independent stores and January's order is therefore source-determined. objdiff 88.17 to 89.19643. The prior orchestrator's rejection of the parenthesising spelling for the fast_vector_intersects_sphere radius argument is UNCHANGED and binding; its reopening criterion (an attested or owner-approved parenthesising spelling, which would also unlock players, collisions and bipeds) is still unmet.",
       "measurements": {
         "target": { "size": 336, "relocation_count": 10, "normalized_sha256": "0aef44a538a12480aec2d0e85e44b434a56a3a3703ca0bc324a00dfdad2a3b3c" },
-        "base": { "size": 336, "relocation_count": 10, "normalized_sha256": "a2c988c9fb9cb73a850cc3b148527a6ed9891b5a4425d9eef7a4babc2851cf25" },
-        "objdiff_percent": 88.16964
+        "base": { "size": 336, "relocation_count": 10, "normalized_sha256": "490d9ab453b888bb8c5f662b3a1fd825f17ddda8042cc3d2333682c96d5977bd" },
+        "objdiff_percent": 89.19643
       }
     },
     {
@@ -2501,11 +2497,11 @@
       "unit": "source/ai/ai",
       "function": "_ai_test_ballistic_line_of_fire",
       "class": "instruction-scheduling",
-      "evidence": "Complete typed ballistic trajectory, world-collision, friendly-pill, and debug-recording reconstruction from January code/relocations and HCEA semantics. Target and candidate are both 944 padded bytes with all 49 relocations. Remaining differences are compiler-local x87 and independent instruction scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "evidence": "Complete typed ballistic trajectory, world-collision, friendly-pill, and debug-recording reconstruction from January code/relocations and HCEA semantics. Target and candidate are both 944 padded bytes with all 49 relocations. Remaining differences are compiler-local x87 and independent instruction scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. 2026-09-20 Lane A re-baseline (zero exact credit): the recorded 250K-lane w3c 'b5' shape is rebuilt from this baseline and landed. Three changes: block-scope segment_time to the coordinate statement; parenthesise the linear term of the z row as (segment_time * arc_velocity.k + point.z); spell the post-call velocity update as (segment_end_time - segment_start_time) * gravity + arc_velocity.k. Instruction counts become 296/296 (HEAD was 292/296) and objdiff rises 94.50 to 98.99645. It reproduces January's x87 structure for segment_time exactly: fsubr of the parameter home at +0x1e7, fst (store-and-keep) to a dead parameter home at +0x1f4, and a post-call fld from that same home at +0x2cc feeding fmul gravity / fadd / fstp. Surviving hunks: an ebx/edi reload transposition at +0x159, a collision_flags/segment_time parameter-home swap, one 3-versus-2 x87 hunk at +0x21a and a consequent 3-byte alignment pad. Reopen only with a spelling that materialises the second x87 copy the way January does; do not replay operand or declaration sweeps.",
       "measurements": {
         "target": { "size": 944, "relocation_count": 49, "normalized_sha256": "6c90076033e91f26356e42166cf4bb0a8d5a902ae35bc67db15aec19ee9982ac" },
-        "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "c8f5527aacb22c833089881ef848f5d4056908d6524c3be7ac4099325db85bce" },
-        "objdiff_percent": 94.5
+        "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "5c03c751c19c33cde8c6645c5fd39d505e2bca6bf161beb6e6126101f3fbcaa8" },
+        "objdiff_percent": 98.99645
       }
     },
     {

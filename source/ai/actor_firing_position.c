@@ -2694,7 +2694,7 @@ static void pre_evaluator_attack(
 				real lower_bound;
 				real upper_bound;
 				real distance_from_boundary;
-				real evaluation = 0.0f;
+				real evaluation;
 				struct weapon_definition *weapon;
 
 				if (actor->emotions.berserk)
@@ -2719,13 +2719,14 @@ static void pre_evaluator_attack(
 				{
 					distance_from_boundary = MIN(distance_from_boundary, distance_to_target - lower_bound);
 				}
+				evaluation = 0.0f;
 				if (distance_from_boundary > 2.0f)
 				{
 					evaluation = 20.0f;
 				}
 				else if (distance_from_boundary > 0.0f)
 				{
-					evaluation = distance_from_boundary * 0.5f * 20.0f;
+					evaluation = 20.0f * (distance_from_boundary / 2.0f);
 				}
 				firing_position_store_evaluation_debug(
 					evaluation_context,
@@ -2738,7 +2739,7 @@ static void pre_evaluator_attack(
 		if (evaluation_context->dangerous_enemy_attack_vector_count > 0)
 		{
 			real nearest_distance_squared = REAL_MAX;
-			real evaluation = 6.0f;
+			real evaluation;
 			short vector_index;
 
 			for (vector_index = 0; vector_index < evaluation_context->attack_vector_count; vector_index++)
@@ -2764,11 +2765,15 @@ static void pre_evaluator_attack(
 						scale_vector3d(&attack_vector->vector, -along, &projection);
 						add_vectors3d(&projection, &direction, &direction);
 						distance_squared = magnitude_squared3d(&direction);
-						nearest_distance_squared = MIN(nearest_distance_squared, distance_squared);
+						if (distance_squared < nearest_distance_squared)
+						{
+							nearest_distance_squared = distance_squared;
+						}
 					}
 				}
 			}
 
+			evaluation = 6.0f;
 			if (nearest_distance_squared < 3.5f * 3.5f)
 			{
 				evaluation = square_root(nearest_distance_squared) * 0.25f;
