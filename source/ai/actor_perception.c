@@ -6706,15 +6706,10 @@ void actor_perception_update(
 			}
 			else
 			{
-				real delta_x;
-				real delta_y;
-
 				if (prop->ticks_until_orphan == 0 ||
-					actor_perception_distance_squared2d(
-						&prop->last_perceived_body_position,
-						&prop->body_position,
-						delta_x,
-						delta_y) > 1.0f)
+					distance_squared2d(
+						(real_point2d const *)&prop->last_perceived_body_position,
+						(real_point2d const *)&prop->body_position) > 1.0f)
 				{
 					long orphan_prop_index = NONE;
 

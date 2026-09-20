@@ -2759,11 +2759,9 @@ static void pre_evaluator_attack(
 					along = dot_product3d(&direction, &attack_vector->vector);
 					if (along > 0.0f)
 					{
-						real_vector3d projection;
 						real distance_squared;
 
-						scale_vector3d(&attack_vector->vector, -along, &projection);
-						add_vectors3d(&projection, &direction, &direction);
+						point_from_line3d((real_point3d *)&direction, &attack_vector->vector, -along, (real_point3d *)&direction);
 						distance_squared = magnitude_squared3d(&direction);
 						if (distance_squared < nearest_distance_squared)
 						{

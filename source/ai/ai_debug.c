@@ -2159,7 +2159,7 @@ static void ai_debug_render_actor(
 			struct prop_datum *prop = prop_get(actor->target.target_prop_index);
 			real_argb_color const *target_color = global_real_argb_white;
 
-			switch (actor->target.target_type-1)
+			switch (actor->target.target_type)
 			{
 			case _actor_target_partial_enemy:
 				target_color = global_real_argb_grey;
@@ -3933,6 +3933,7 @@ static void code_0003a910(
 								struct collision_surface);
 							long edge_index = surface->first_edge_index;
 							long vertex_count = 0;
+							real scale;
 
 							do
 							{
@@ -3945,18 +3946,20 @@ static void code_0003a910(
 									edge->vertex_indices[next_index_belongs_to_surface],
 									struct collision_vertex);
 
-								centre.x += vertex->point.x;
-								centre.y += vertex->point.y;
-								centre.z += vertex->point.z;
+								add_vectors3d(
+									(real_vector3d const *)&centre,
+									(real_vector3d const *)&vertex->point,
+									(real_vector3d *)&centre);
 								vertex_count++;
 
 								edge_index = edge->edge_indices[next_index_belongs_to_surface];
 							}
 							while (edge_index!=surface->first_edge_index);
 
-							centre.x /= vertex_count;
-							centre.y /= vertex_count;
-							centre.z /= vertex_count;
+							scale = 1.0f / vertex_count;
+							centre.x *= scale;
+							centre.y *= scale;
+							centre.z *= scale;
 
 							point = &centre;
 						}

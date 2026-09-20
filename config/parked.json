@@ -2088,21 +2088,6 @@
       }
     },
     {
-      "unit": "source/ai/actor_firing_position",
-      "function": "_pre_evaluator_attack",
-      "class": "unclassified",
-      "evidence": "First natural complete January-layout reconstruction of the attack firing-position pre-evaluator, using genuine actor/weapon access, project real/vector types, named evaluation categories and January diagnostics. The 1120-byte candidate is one relocation short of the 1120-byte target and remains fuzzy. No dead call, compiler pressure, forced inline or exact credit is retained. See docs/object_matching_logs/hs_actor_owner_reconciliation_20260907.md. 2026-09-20 Lane A re-baseline (zero exact credit): four independently re-verified levers land the MISSING RELOCATION, taking the candidate from 38 to January's 39 and objdiff from 93.621216 to 96.10909, with all 26 exact siblings preserved. (L1) evaluation = 20.0f * (distance_from_boundary / 2.0f) stops VC7 reassociating 0.5f*20.0f into 10.0f and restores the __real@41a00000 reference. (L2)/(L3) two initializers become statements: the store of zero to [ebp-0x1c] sits at +0x1d8 in January and +0x12d in ours, on opposite sides of call _actor_get_weapon_definition at +0x169, and a stack store cannot be sunk across a call, so the position IS January's statement order; nearest_distance_squared = REAL_MAX deliberately stays an initializer. (L4) an explicit if (distance_squared < nearest_distance_squared) replaces MIN(), because cseries.h MIN is ((a)>(b)?(b):(a)) and can only emit test ah,0x41 while January emits fcom / test ah,5 / jp, a strict less-than. Relocation addresses now agree exactly through +0x317 and shift only from +0x36b inside the one remaining window; bijection_walk reports genuine structural events, so a pure register bijection is excluded by measurement. Reopen with a source mechanism for that single window.",
-      "measurements": {
-        "target": {
-          "size": 1120,
-          "relocation_count": 39,
-          "normalized_sha256": "7b38541b266185306cf06750f8e771df6b21326f143ee2c01259e94c5d63595b"
-        },
-        "base": { "size": 1120, "relocation_count": 39, "normalized_sha256": "48948f2586afaae971c958e06bf570f6c5ce0520fa458899307455e1515f86f9" },
-        "objdiff_percent": 96.10909
-      }
-    },
-    {
       "unit": "source/ai/path_obstacle_avoidance",
       "function": "_path_avoid_obstacles",
       "class": "register-allocation",
