@@ -2760,13 +2760,23 @@ void ai_scripting_migrate_and_speak(
 			global_scenario_get(),
 			target_name,
 			sizeof(target_name));
+		/* BUG (preserved for exact matching): the format has four %s conversions
+		 * but January supplies only three values, so the fourth conversion reads
+		 * past the end of the argument list. Evidence: January cleans 0x14 bytes
+		 * (five dwords) at this call site and loads speech_type only afterwards,
+		 * at +0x7d. The same defect survives unrepaired in the 2020 build.
+		 * Consequence: with January's prologue the fourth slot lands on the saved
+		 * EDI home, so vsprintf dereferences the caller's entry EDI as a char *.
+		 * The branch is reachable only when ai_debug.print_migration or
+		 * ai_debug.print_scripting is set, so no shipping configuration runs it.
+		 * A corrected build should pass speech_type as the fourth value.
+		 */
 		error(
 			_error_silent,
 			"%s: ai_migrate_and_speak %s %s %s",
 			hs_runtime_get_executing_thread_name(),
 			source_name,
-			target_name,
-			speech_type);
+			target_name);
 	}
 
 	if (_stricmp(speech_type, "advance") == 0)
