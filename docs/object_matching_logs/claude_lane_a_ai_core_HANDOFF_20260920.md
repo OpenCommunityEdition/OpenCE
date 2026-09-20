@@ -208,8 +208,12 @@ Owner decisions:
   form reads `specific_threats[9]`, one past a 9-element array — a real January
   off-by-one, with the layout **independently proven** by two exact functions
   (`action_fight` 6/6 reads `cumulative_threats[5]`; `_actor_combat_update`,
-  4,672 bytes exact, reads `cumulative_threats[_actor_threat_visible]`). Not
-  landed, given the binding precedents against unsafe reads. The one remaining
+  4,672 bytes exact, reads `cumulative_threats[_actor_threat_visible]`).
+  **OWNER RULING, 2026-09-20: do not land it while it remains fuzzy.** The read is
+  not admissible to buy a partial improvement - it must deliver strict exactness
+  before it can even be considered, and today it removes one of three real
+  differing regions and the function stays residual. Not landed;
+  `actor_perception.c` is unchanged by this lane. The one remaining
   region is the `!defensive_crouch`/`crouch` test order, where **two shapes were
   measured and both are worse** (1,696 bytes / 40 relocations against 1,664 / 38)
   because testing `defensive_crouch` first stops VC7 sharing the timer tail.
@@ -281,7 +285,7 @@ and a concrete reopening condition. Regenerate with
 
 | `actor_perception` | `_actor_perception_refresh` | 2412 | `residual 2416 [sha]` | parked - x87/int interleave |
 
-| `actor_perception` | `_actor_emotion_update` | 1654 | `residual 1664 [sha]` | OWNER DECISION |
+| `actor_perception` | `_actor_emotion_update` | 1654 | `residual 1664 [sha]` | OWNER RULED: not landed while fuzzy |
 
 | `actor_perception` | `_actor_perception_refresh_danger_zone` | 1472 | `residual 1472 [size 1504!=1472, sha]` | parked |
 
@@ -411,7 +415,7 @@ Total: 79657 meaningful bytes across 35 owners.
 
 
 
-**`_actor_emotion_update`** (actor_perception, 1654 B) — owner approval of January for (priority = NUMBER_OF_ACTOR_THREAT_TYPES; ...) - an out-of-bounds read of specific_threats[9], layout proven by two exact functions - PLUS a crouch-test order that preserves the shared timer tail (two shapes measured, both worse at 1696/40 against 1664/38)
+**`_actor_emotion_update`** (actor_perception, 1654 B) — OWNER RULING 2026-09-20: do not land the out-of-bounds read while the function remains fuzzy. It must deliver STRICT EXACT before it can be reconsidered; today it removes one of three real differing regions and the function stays residual. Reopen requires BOTH (1) a crouch-test order preserving the shared timer tail - two shapes measured, both worse at 1696/40 against 1664/38 - and (2) a demonstration that with that solved, for (priority = NUMBER_OF_ACTOR_THREAT_TYPES; ...) reaches strict exact.
 
 
 

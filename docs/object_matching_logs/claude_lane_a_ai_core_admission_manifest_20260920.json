@@ -3,7 +3,7 @@
   "worktree": "C:/halo-worktrees/claude-lane-a-ai-core-20260920",
   "branch": "claude/lane-a-ai-core-20260920",
   "baseline_commit": "6130661c9585fdb2785b3ff6bdb2ad0cfef0520c",
-  "tip_commit": "7356576d32be3508fe3a300b61015154042953ba",
+  "tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9",
   "portfolio": {
     "translation_units": [
       "source/ai/props.c",
@@ -77,8 +77,9 @@
       "evidence_basis": "January cleans 0x14 bytes (five dwords) at the error() call site and loads speech_type only afterwards at +0x7d, while the format literal read out of January .rdata is '%s: ai_migrate_and_speak %s %s %s' - four %s conversions for three values. Landed under the original-bug policy with a BUG (preserved for exact matching) comment recording the evidence, the runtime consequence (the fourth conversion slot is the saved-EDI home, so vsprintf dereferences the caller entry EDI as a char *) and the corrected form. The branch is reachable only under ai_debug.print_migration or print_scripting. The same defect survives unrepaired in the 2020 build. In-tree precedent for disclosing a UB-class January defect: source/bitmaps/bitmap_extract.c:2101 and source/ai/ai_script.c:1597.",
       "owner_ratification_required": true,
       "revert_cost": "single token - restore speech_type as the fourth argument",
-      "reviewer": "orchestrator, independently re-measured from build/split and build/base",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba",
+      "reviewer": "orchestrator, independently re-measured from build/split and build/base; PLUS a separate adversarial independent review by a reviewer who did not author the change - VERDICT CONFIRMED WITH CORRECTIONS, full text at scratch/review-ai-script/INDEPENDENT_REVIEW.md. The reviewer recompiled the committed source to rule out a stale build, wrote their own COFF walker to read the 34-byte .rdata literal directly (4 percent-signs, 4 %s), proved the literal has exactly ONE relocation in the object, verified the 2020 cross-build defect first-hand, re-derived the saved-EDI arithmetic, and compiled NINE lawful alternatives of which none gates exact. One real error was found and fixed: the claim that no shipping configuration runs the branch was an overstatement, because both gate flags are HaloScript external globals settable at runtime.",
+      "landing_commit": "9eca0524",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9",
       "owner_data_common_point_result": {
         "point_from_line3d_guard": "pass",
         "data_sections": "unchanged",
@@ -118,7 +119,8 @@
       "rejected_alternatives": "inlining the single-use evaluation of the maximum_firing_range block (measured inert, slot count stays 14)",
       "reopening_evidence_required": "January materialises all three components of direction to memory at 0x327-0x347 and takes the dot product in the order j,k,i; we leave direction.i on the x87 stack, take it k,j,i, and need two extra spill slots. Reopen with a source form in which direction genuinely escapes to something VC7 will not inline, and with the j,k,i term order. Do not hand-expand vector_from_points3d or dot_product3d.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "8110e554",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/ai",
@@ -149,7 +151,8 @@
       "rejected_alternatives": "operand and declaration sweeps (exhausted by prior campaigns)",
       "reopening_evidence_required": "a spelling that materialises the second x87 copy the way January does; one 3-versus-2 x87 hunk at +0x21a remains",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "8110e554",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/ai",
@@ -180,7 +183,8 @@
       "rejected_alternatives": "the bare call-site parentheses (pills[pill_index].width) of the old waveD lof2 candidate are NOT landed; that prior orchestrator rejection stands and its reopening criterion is unmet",
       "reopening_evidence_required": "an attested or owner-approved parenthesising spelling for fast_vector_intersects_sphere radius arguments",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "8110e554",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/actors",
@@ -196,7 +200,8 @@
       "rejected_alternatives": "none - this is a data-ownership correction, not a codegen probe",
       "reopening_evidence_required": "n/a; prerequisite for any future whole-object admission of actors.obj",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "8110e554",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/ai_communication",
@@ -227,7 +232,8 @@
       "rejected_alternatives": "writing the event is-reply player_rating as a 2.0f literal (moves relocations 319 -> 318 against 336 and instructions 2280 -> 2278 against 2353); the actor_talk_weight operand swap (completely byte-inert - VC7 canonicalises the byte-OR operand order)",
       "reopening_evidence_required": "the remaining 16 bytes and one relocation",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "4fa32b2c",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/ai_debug",
@@ -258,7 +264,8 @@
       "rejected_alternatives": "the accessor-binding of avoidance_data.avoidance_objects[...] (regions 1452 -> 1464); the actor->output.animation.alignment_vector component-assignment substitution (1452 -> 1476); their composition (size 24976 -> 24928, BREAKING the exact size match, regions 1452 -> 1472)",
       "reopening_evidence_required": "the frame: January sub esp,0x810 against our 0x81c. The slot census shows January touches 114 distinct objects and we touch 110, i.e. January OVERLAPS storage across disjoint lifetimes more than our source lets VC7 do. That is a lexical-scoping question, not an extra declaration.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "4fa32b2c",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/ai_communication",
@@ -289,7 +296,8 @@
       "rejected_alternatives": "writing the is-reply player_rating as a 2.0f literal (moves relocations 319 -> 318 against 336 and instructions 2280 -> 2278 against 2353)",
       "reopening_evidence_required": "the second print_allegiance block calls game_allegiance_get_incidents, declared in NO header in the tree - a DEFERRED HEADER PREREQUISITE for source/game/game_allegiance.h. It accounts for the remaining 208 bytes and 8 relocations.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "7356576d and 3e44bc78",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     },
     {
       "unit": "source/ai/actor_moving",
@@ -320,7 +328,8 @@
       "rejected_alternatives": "hand-expanding actor_move_transform_avoidance_vector at two call sites (manual inlining of an ordinary helper, forbidden by house rule 13 and named on this unit do-not-repeat list; it does fix test_avoidance_vector relocation count 17 -> 16 and shrinks that size gap 208 -> 16, but overshoots); rewriting TEST_FLAG(flags, crouch ? A : B) as (crouch && TEST_FLAG(A)) || (!crouch && TEST_FLAG(B)) - measured and DROPPED, because restoring the natural ternary gives 3120 bytes where the verbose form gives 3104",
       "reopening_evidence_required": "the remaining 16 bytes and 6 instructions",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
-      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+      "landing_commit": "e99467da",
+      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
     }
   ],
   "config_changes": {

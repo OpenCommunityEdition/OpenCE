@@ -198,9 +198,24 @@ independently proven by two exact functions (`action_fight` 6/6 reads
 `cumulative_threats[5]`; `_actor_combat_update`, 4,672 bytes exact, reads
 `cumulative_threats[_actor_threat_visible]`).
 
-**Not landed**, given the campaign's binding precedents against unsafe or
-indeterminate reads (`_ai_handle_editing`, `_ai_test_line_of_sight`). Recorded as
-an owner decision with complete byte evidence.
+**Not landed. OWNER RULING, 2026-09-20: "Do not land `_actor_emotion_update`'s
+out-of-bounds read while it remains fuzzy."**
+
+That qualifier is the operative part. The out-of-bounds read is not admissible to
+buy a partial improvement: it would have to deliver a strict exact match before it
+could even be considered, and today it does not - it removes one of three real
+differing regions and the function stays residual. The change is therefore not
+landed and `source/ai/actor_perception.c` is unchanged by this lane.
+
+**Reopening now requires BOTH, in this order:** (1) a source form for the
+`!defensive_crouch` / `crouch` test order that preserves the shared
+`defensive_crouch_timer` tail - two shapes are already measured and both are worse
+at 1,696 bytes / 40 relocations against January's 1,664 / 38 - and (2) a
+demonstration that with that solved, January's
+`for (priority = NUMBER_OF_ACTOR_THREAT_TYPES; ...)` takes the function to strict
+exact. Only then does the owner ruling get re-tested. This also aligns with the
+campaign's binding precedents against unsafe or indeterminate reads
+(`_ai_handle_editing`, `_ai_test_line_of_sight`).
 
 The remaining region is the `!defensive_crouch` / `crouch` test order at
 `actor_perception.c:3737`. **Two shapes measured and both are worse**, producing

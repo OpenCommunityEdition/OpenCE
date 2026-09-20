@@ -56,10 +56,15 @@ the pushed arguments.
 ## Why this is admitted as a preserved original defect
 
 This is Bungie's own source shape recovered from January's bytes, not a
-byte-steering construct. It is landed under the campaign's original-bug policy
-(`docs/matching_methodology.md`, house rule 24) with a `BUG (preserved for exact
-matching)` comment that states the evidence, the runtime consequence and the
-corrected form.
+byte-steering construct. It is landed under the **original-bug policy** in
+`docs/matching_methodology.md`, with a `BUG (preserved for exact matching)`
+comment that states the evidence, the runtime consequence and the corrected form.
+
+(An earlier draft of this report cited "house rule 24". The independent review
+found that citation dangling: `docs/campaign_house_rules.md` has **22** rules and
+no rule 24 exists in the repository. The governing text is the original-bug policy
+in the methodology document, quoted above. The lane brief that numbered it 24 is
+not part of the repo, so citing it here was unresolvable for a reader.)
 
 Supporting facts:
 
@@ -73,12 +78,20 @@ Supporting facts:
   over an out-of-bounds read. `source/ai/ai_script.c:1597` already ships a
   January diagnostic-argument defect **in this same file**. 54 `BUG` disclosures
   exist in the tree today.
-- **Blast radius is a debug-only branch.** The call sits inside
-  `if (ai_debug.print_migration || ai_debug.print_scripting)`, so no shipping
-  configuration executes it. This distinguishes it from the two cases the owner
-  previously excluded (`_dead_camera_update`'s uninitialized read and
-  `_compare_profile_sections`'s uninitialized return), which are on
-  always-executed paths.
+- **Blast radius is a debug-gated branch.** The call sits inside
+  `if (ai_debug.print_migration || ai_debug.print_scripting)`. Both flags default
+  to false, so ordinary gameplay does not reach it - but the independent review
+  established that they are exposed as the HaloScript external globals
+  `ai_print_migration` and `ai_print_scripting`
+  (`source/hs/hs_globals_external.c:1468,1470`), so a scenario script or the debug
+  console **can** reach this path at runtime. An earlier draft of this report said
+  "no shipping configuration executes it"; that was an overstatement and is struck.
+  It also drew a distinction from the two donors the owner previously excluded
+  (`_dead_camera_update`, `_compare_profile_sections`) on the grounds that those
+  are "on always-executed paths". The review found that reachability is **not**
+  the owner's stated reason - `astra_90pct_rejected_hypotheses_20260920.md`
+  frames those exclusions as a bar on replaying archived donors - so that
+  distinction is withdrawn too.
 - **The concrete effect is disclosed, not glossed.** From January's prologue
   (`push ebp / mov ebp,esp / sub esp,0x404 / push ebx / push esi / push edi`),
   `esp = ebp-0x410`; after the five pushes `esp = ebp-0x424`, so the fourth
@@ -86,19 +99,48 @@ Supporting facts:
   therefore dereferences the caller's entry EDI as a `char *`. The BUG comment
   says so explicitly.
 
-### Owner ratification
+### Owner ruling and independent review
 
-**This is the one item in Lane A that turns on a policy reading rather than on
-measurement, and it is flagged for the owner.** `astra_90pct_rejected_hypotheses_20260920.md`
-(Wave 6) says "this is not permission to introduce UB in another residual". That
-sentence was written about a different concession (two stock SDK no-op copies)
-and is not a blanket override of house rule 24, and the `bitmap_extract`
-precedent is directly on point — but the owner may read it more broadly.
+**OWNER RULING, 2026-09-20:** *"Accept the 214-byte ai_script match only with the
+documented target-proven BUG and independent review."* Both conditions are now met.
 
-If the owner declines, the revert is a **single token**: restore `speech_type` as
-the fourth argument. `ai_script` returns to `exact 115 residual 1` and the lane's
-strict total drops by exactly 214 meaningful / 224 padded bytes / 1 function.
-Nothing else in the lane depends on it.
+**Independent adversarial review** (a reviewer who did not author the change, and
+who was instructed to try to refute it):
+**VERDICT — CONFIRMED WITH CORRECTIONS.** Full text at
+`scratch/review-ai-script/INDEPENDENT_REVIEW.md`. The reviewer re-derived every
+claim from primary artifacts rather than taking any on trust, and independently:
+
+- reproduced `EXACT 224`, `116/116`, `sha equal`, `0 differing rows`, and closed a
+  gap the author had left — `gate.py --all` reads the already-built object, so the
+  reviewer recompiled the **committed** source through `gate.py --source` to prove
+  the build was not stale;
+- wrote their own COFF walker and read the literal out of January's `.rdata` as
+  34 raw bytes: `'%s: ai_migrate_and_speak %s %s %s'`, `%-signs: 4`, `%s count: 4`;
+- added two checks the author had not made: the literal has **exactly one**
+  relocation in the whole object, refuting "the four-`%s` literal belongs to some
+  other correct four-value site"; and the 2020 cross-build defect was verified
+  first-hand at VA `0x00948864`;
+- re-derived the saved-EDI arithmetic independently and confirmed it;
+- compiled **nine** lawful alternatives, none of which gates exact, and explained
+  why structurally: `error` is cdecl variadic, so four values always clean `0x18`.
+
+The reviewer found **one real error in the disclosure**, now fixed: the claim
+*"so no shipping configuration runs it"* is an unproven overstatement, because
+`ai_debug.print_migration` and `ai_debug.print_scripting` are exposed as the
+HaloScript external globals `ai_print_migration` / `ai_print_scripting`
+(`source/hs/hs_globals_external.c:1468,1470`) and are therefore settable at
+runtime by a scenario script or the debug console in the very build being matched.
+The BUG comment and this report have been corrected accordingly, and the match was
+re-verified afterwards: `EXACT 224`, `116/116`, `sha equal`, `0 differing rows`.
+
+The reviewer also noted that `fake_match_scan` is structurally incapable of
+clearing this case — none of its twelve rules examines variadic arity or format
+conversions — so a clean scan is explicitly **not** treated as clearance here.
+
+If the owner later declines after all, the revert is a **single token**: restore
+`speech_type` as the fourth argument. `ai_script` returns to
+`exact 115 residual 1` and the lane's strict total drops by exactly 214 meaningful
+/ 224 padded bytes / 1 function. Nothing else in the lane depends on it.
 
 ## Shapes refuted before landing this one
 
