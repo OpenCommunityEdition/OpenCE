@@ -13,13 +13,13 @@ the two diagnostics are complementary and the worked example below shows why.
 
 ## The three tiers
 
-Over all 661 non-exact functions on the board (582,597 padded bytes):
+Over all 423 non-exact functions on the board (379,925 padded bytes):
 
 | tier | meaning | functions | bytes |
 |---|---|---:|---:|
 | **S1** | the emitted **reference multiset** differs - a missing or extra program reference | 184 | 151,253 |
-| **S2** | references agree, the **real instruction count** differs | 317 | 313,792 |
-| **T** | both already agree; only here is "tie" the default reading | 160 | 117,552 |
+| **S2** | references agree, the **real instruction count** differs | 132 | 138,544 |
+| **T** | both already agree; only here is "tie" the default reading | 107 | 90,128 |
 
 Split by park status:
 
@@ -57,7 +57,7 @@ linear disassembler counts the table's dwords as instructions. Wherever a
 function relocates against itself or a `_jmptable` symbol, ignore `d-insn` and
 read the frame and the reference multiset instead.
 
-## The trap that makes this census easy to get wrong
+## Three traps that make this census easy to get wrong
 
 **Internal references are named differently by the two builds and are not a
 program difference.** Our build emits `$L#####` jump-table labels; January's
@@ -70,6 +70,9 @@ deficit** - on a function whose relocation count is **1,905 on both sides**.
 Correcting it moved 255 functions between tiers. Any future tool doing this must
 exclude, on both sides: `$L*`, `$SG*`, the function's own symbol, and
 `<function>_jmptable`.
+
+**Third: compare NORMALIZED bytes, not raw bytes.** See the correction note at
+the end - raw comparison pulled 238 already-exact functions into the census.
 
 ## The worked example: why you need both censuses
 
@@ -119,4 +122,22 @@ instruction at a different `[ebp-X]`.
 ## Provenance
 
 `scratch/orch/boardsplit.py`; full output at `scratch/orch/boardsplit.txt`.
-661 non-exact function pairs over 482 object pairs.
+423 non-exact function pairs over 482 object pairs.
+
+### Correction applied before publication
+
+The first version of this census compared **raw** section bytes. A function is
+exact when its **normalized** bytes match - the comparator zeroes the relocated
+field at every site - so comparing raw bodies calls a function non-exact
+whenever a relocated dword happens to hold a different link-time placeholder.
+That pulled **238 already-exact functions** into the census (661 -> 423) and
+inflated S2 (317 -> 132) and T (160 -> 107). S1 was unaffected, because a
+function with a genuine reference difference is non-exact either way, and so
+were all the parked totals, because a parked function is non-exact by
+construction.
+
+Caught by cross-checking Lane A's rows against its own `gate.py` census:
+`_actor_select_firing_position` (5,248 B) appeared here as a tie candidate while
+`gate.py` reports `source/ai/actor_firing_position` as `exact 26 residual 1`
+with `_pre_evaluator_attack` as the only residual. If a census disagrees with
+the gate, the census is wrong.
