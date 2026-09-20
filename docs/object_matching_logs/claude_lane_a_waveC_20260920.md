@@ -22,9 +22,10 @@ emphatic about that distinction and it is kept here.
 | `actor_moving` | `_actor_move_vector_avoidance` | hand-rolled cross-product math -> the existing `cross_product3d` helper | regions 236 -> 227, differing instruction lines 670 -> 626 |
 | `actor_perception` | `_prop_status_refresh` | three boolean stores put in `props.h` declaration order, plus the approved macro at its site | see below |
 | `actor_perception` | `_actor_perception_update` | the approved macro at its two sites | **real regions 14 -> 2** |
-| `ai_debug` | `_ai_debug_render_actor` | three target-proven reconstruction defects | frame `+12 -> -4`, real regions 544 -> 497 |
+| `actor_moving` | `_actor_move_update` | see below | size 3120 -> **3136 = target**, regions 142 -> 103 |
+| `ai_debug` | `_ai_debug_render_actor` | **four** target-proven reconstruction defects plus the NULL-deref fix | frame `+12 -> -4`, regions 252 -> 206 |
 
-## The flagship: three reconstruction defects, all proven from struct offsets
+## The flagship: four reconstruction defects, all proven from byte facts
 
 `_ai_debug_render_actor` is 24,976 bytes, a third of what was left in the
 portfolio. The agent decoded three genuine defects in our source, and each was
@@ -52,18 +53,43 @@ it; we read `[esi+0x5b0/5b4/5b8]` componentwise. `burst_initial_position`
 is `control.desired_aiming_vector` - a unit **direction**, and plotting a
 direction as a world point in a Burst Geometry block is simply wrong.
 
-Measured here independently: `sub esp` `0x81c -> 0x80c` against January's
-`0x810`, so the frame gap goes from **+12 to -4**; padded size **24976 = target**;
-relocations **1905 = target**; real regions **544 -> 497**; census 58/2 with no
-sibling lost.
+Measured independently: `sub esp` `0x81c -> 0x80c` against January's `0x810`,
+so the frame gap goes from **+12 to -4**; relocations **1905 = target** with
+identical identity; real instruction count 6625 -> 6628 against January's 6650
+(error 25 -> 22); divergent regions **252 -> 206**; census 58/2 with the entire
+per-function gate table byte-identical to pristine, diffed row by row.
 
-**This retires an open question.** The `control_flag_names` NULL-deref fix - an
-array sized `NUMBER_OF_UNIT_CONTROL_FLAGS` (15) with only 14 names, so
-`control_flag_names[14]` is an implicit NULL handed to `strcat` - had been held
-back because on its own it shrank the section to 24,960 and traded away the
-size key. With these three fixes the code length comes back and the section is
-24,976 again, so the NULL-deref fix now costs nothing on any key and needs no
-adjudication.
+**The seed I wrote for this agent was wrong, and it said so.** I had told it
+"January has 31 dword slots in [0x1,0x7c] and the candidate has 30 - diff the
+SETS". The set diff localises nothing, because both frames are **dense**:
+January occupies every 4-byte granule from 0x4 to 0x170 plus 0x180..0x1b0, the
+candidate every granule 0x4..0x16c plus 0x17c..0x1ac, and both "holes" are the
+interior of a 16-byte object reached only by index. There is no absent offset -
+January simply has one more granule.
+
+**A fourth defect: a duplicated call.** `ai_debug.c:3332-3339` wrote an
+`if`/`else` with an inner ternary, which made VC7 cross-jump two copies of the
+same five-argument `render_debug_vector` call and then peephole the inner
+ternary into a hoisted load plus `jne`. January emits three colour arms feeding
+ONE merged call. Spelling it as a single call with a nested ternary reproduces
+January's block instruction-for-instruction, drives the `je`/`jne` censuses to
+exact, and **removes a duplicated call from our source**. Its strip test is
+clean: the inner parentheses are byte-inert and kept only for readability.
+
+**This retires an open question - but not for the reason I first wrote.** The
+`control_flag_names` NULL-deref fix had been held back because on its own it
+shrank the section to 24,960 and traded away the size key. With the four defect
+fixes the section is 24,976 again.
+
+**CORRECTION, from the adversarial verifier and accepted here.** I first wrote
+that "the code length comes back". It does not. January's real code ends at
+0x5ffd with the jump table at 0x6000 and **12 bytes of trailing pad**; both
+pristine and the landing end their code at 0x6009 with the table at 0x600c and
+**zero** pad. The two sections are both 24,976 only because January's padding
+absorbs the difference - an arithmetic coincidence, and exactly the padding trap
+this lane has been warning about. **The landing stands on the defect fixes and
+on the region and instruction evidence, not on the padded-size argument.** Real
+code is still 12 bytes longer than January's.
 
 ## Held for an owner ruling
 

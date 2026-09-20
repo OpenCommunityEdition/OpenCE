@@ -1450,9 +1450,7 @@ static void actor_move_vector_avoidance(
 		object_get_origin(object_index, &avoidance_data.origin);
 		avoidance_data.forward = object->object.forward;
 		avoidance_data.up = object->object.up;
-		avoidance_data.left.i = object->object.up.j*object->object.forward.k - object->object.up.k*object->object.forward.j;
-		avoidance_data.left.j = object->object.up.k*object->object.forward.i - object->object.up.i*object->object.forward.k;
-		avoidance_data.left.k = object->object.up.i*object->object.forward.j - object->object.up.j*object->object.forward.i;
+		cross_product3d(&object->object.up, &object->object.forward, &avoidance_data.left);
 		avoidance_data.avoid_distance = 12.f;
 		avoidance_data.avoid_width = 1.f;
 		actor_move_avoidance_setup(&avoidance_data);
@@ -3070,15 +3068,13 @@ void actor_move_update(
 			? 0.3f
 			: 0.05f;
 
-		actor->control.vector_avoidance_rotation.i =
-			actor->control.vector_avoidance_rotation.i * (1.f - blend) +
-			avoidance_rotation.i * blend;
-		actor->control.vector_avoidance_rotation.j =
-			actor->control.vector_avoidance_rotation.j * (1.f - blend) +
-			avoidance_rotation.j * blend;
-		actor->control.vector_avoidance_rotation.k =
-			actor->control.vector_avoidance_rotation.k * (1.f - blend) +
-			avoidance_rotation.k * blend;
+		scale_vector3d(
+			&actor->control.vector_avoidance_rotation,
+			1.f - blend,
+			&actor->control.vector_avoidance_rotation);
+		actor->control.vector_avoidance_rotation.i += avoidance_rotation.i * blend;
+		actor->control.vector_avoidance_rotation.j += avoidance_rotation.j * blend;
+		actor->control.vector_avoidance_rotation.k += avoidance_rotation.k * blend;
 
 		if (magnitude_squared3d(&actor->control.vector_avoidance_rotation) <
 			_real_epsilon)
@@ -3153,7 +3149,7 @@ void actor_move_update(
 	actor->output.movement_type = movement_type;
 
 	override_facing = actor->orders.move.override_movement_facing;
-	if (actor->control.path.path.valid &&
+	if (actor_path_has_path(actor_index) &&
 		actor->control.path.destination_original_distance >=
 			definition->moving.stationary_moving_distance)
 	{
@@ -3173,15 +3169,15 @@ void actor_move_update(
 
 		steering_maximum_angle =
 			vehicle_definition->ai_steering_max_angle;
-		oversteer_minimum_angle =
-			vehicle_definition->ai_oversteer_angle_lower_bound;
-		oversteer_maximum_angle =
-			vehicle_definition->ai_oversteer_angle_upper_bound;
 		if (vehicle_definition->ai_steering_max_throttle > 0.f)
 		{
 			maximum_throttle =
 				vehicle_definition->ai_steering_max_throttle;
 		}
+		oversteer_minimum_angle =
+			vehicle_definition->ai_oversteer_angle_lower_bound;
+		oversteer_maximum_angle =
+			vehicle_definition->ai_oversteer_angle_upper_bound;
 
 		switch (actor->input.vehicle_driver_type)
 		{
@@ -3201,11 +3197,8 @@ void actor_move_update(
 				real_vector3d escape_direction;
 
 				allow_jump = TRUE;
-				set_real_vector3d(
-					&escape_direction,
-					vehicle->object.up.i,
-					vehicle->object.up.j,
-					0.f);
+				escape_direction = vehicle->object.up;
+				escape_direction.k = 0.f;
 				if (normalize3d(&escape_direction) > 0.f)
 				{
 					actor->control.moving = TRUE;
@@ -3434,7 +3427,6 @@ void actor_move_update(
 	actor->control.crouching = crouch;
 	actor_unit_control_crouch(actor_index, crouch);
 
-	actor = actor_get(actor_index);
 	if (!actor_move_animation_busy(actor_index) &&
 		actor->input.vehicle_index == NONE &&
 		!actor->input.in_midair &&
@@ -3525,13 +3517,13 @@ void actor_move_update(
 
 		if (actor->orders.move.jump_targeted)
 		{
-			actor->control.jump_target_horizontal_vel =
-				actor->orders.move.jump_target_horizontal_vel;
 			actor->control.jumping_targeted = TRUE;
-			actor->control.jump_target_vertical_vel =
-				actor->orders.move.jump_target_vertical_vel;
 			actor->control.jump_alignment_vector =
 				actor->orders.move.jump_alignment_vector;
+			actor->control.jump_target_horizontal_vel =
+				actor->orders.move.jump_target_horizontal_vel;
+			actor->control.jump_target_vertical_vel =
+				actor->orders.move.jump_target_vertical_vel;
 		}
 	}
 

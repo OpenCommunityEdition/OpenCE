@@ -3040,7 +3040,7 @@ static void ai_debug_render_actor(
 		{
 			short control_flag_bit;
 
-			const char *control_flag_names[NUMBER_OF_UNIT_CONTROL_FLAGS] =
+			const char *control_flag_names[] =
 			{
 				"crouch",
 				"jump",
@@ -3058,7 +3058,7 @@ static void ai_debug_render_actor(
 				"grenade"
 			};
 
-			short flag_count = NUMBER_OF_UNIT_CONTROL_FLAGS;
+			short flag_count = NUMBEROF(control_flag_names);
 			short count = 0;
 
 			strcpy(temporary, "");
@@ -3072,7 +3072,7 @@ static void ai_debug_render_actor(
 						strcat(temporary, " ");
 					}
 
-					if (control_flag_bit<NUMBER_OF_UNIT_CONTROL_FLAGS)
+					if (control_flag_bit<flag_count)
 					{
 						strcat(temporary, control_flag_names[control_flag_bit]);
 					}
@@ -3106,7 +3106,7 @@ static void ai_debug_render_actor(
 						csstrcat(temporary, " ");
 					}
 
-					if (control_flag_bit<NUMBER_OF_UNIT_CONTROL_FLAGS)
+					if (control_flag_bit<flag_count)
 					{
 						strcat(temporary, control_flag_names[control_flag_bit]);
 					}
@@ -3174,7 +3174,9 @@ static void ai_debug_render_actor(
 
 				point_from_line3d(&actor->input.position.body_position, global_up3d, 0.2f, &base_point);
 				
-				alignment_vector_3d = actor->control.current_fire_target_aim_vector;
+				alignment_vector_3d.i = actor->output.animation.alignment_vector.i;
+				alignment_vector_3d.j = actor->output.animation.alignment_vector.j;
+				alignment_vector_3d.k = 0.f;
 
 				render_debug_string_at_point(
 					TRUE,
@@ -3244,7 +3246,7 @@ static void ai_debug_render_actor(
 					}
 
 					point_from_line3d(&actor->input.position.body_position, global_up3d, 0.1f, &p0);
-					render_debug_vector(TRUE, &p0, &throttle_vector, 1.6f, global_real_argb_purple);
+					render_debug_vector(TRUE, &p0, &throttle_vector, 1.f, global_real_argb_purple);
 				}
 			}
 		}
@@ -3329,14 +3331,14 @@ static void ai_debug_render_actor(
 				render_debug_line(TRUE, &p0, &p2, global_real_argb_green);
 			}
 
-			if (actor_debug_info->field_138)
-			{
-				render_debug_vector(TRUE, &actor_debug_info->field_108, &actor_debug_info->field_12C, 2.f, actor_debug_info->field_139 ? global_real_argb_yellow : global_real_argb_purple);
-			}
-			else
-			{
-				render_debug_vector(TRUE, &actor_debug_info->field_108, &actor_debug_info->field_12C, 2.f, global_real_argb_white);
-			}
+			render_debug_vector(
+				TRUE,
+				&actor_debug_info->field_108,
+				&actor_debug_info->field_12C,
+				2.f,
+				actor_debug_info->field_138 ?
+					(actor_debug_info->field_139 ? global_real_argb_yellow : global_real_argb_purple) :
+					global_real_argb_white);
 		}
 
 		/* Vehicle avoidance */
@@ -3497,9 +3499,7 @@ static void ai_debug_render_actor(
 					global_real_argb_purple);
 			}
 
-			p1.x = actor->control.desired_aiming_vector.i;
-			p1.y = actor->control.desired_aiming_vector.j;
-			p1.z = actor->control.desired_aiming_vector.k;
+			p1 = actor->control.burst_origin;
 			p0 = p1;
 
 			p0.x = p1.x - 0.2f;
