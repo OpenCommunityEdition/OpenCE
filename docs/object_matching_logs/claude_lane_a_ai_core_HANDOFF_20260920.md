@@ -53,8 +53,18 @@ and 7,558 → **7,559**.
 Seven retained source corrections across six units. The largest:
 `_ai_communication_finished` moved from **912 bytes / 29 relocations / 305
 instructions to 1,568 / 86 / 482** against January's 1,584 / 87 / 484 — objdiff
-**42.12% → 91.44%**, gap **672 bytes and 58 relocations → 16 bytes and one
+**42.12% → 91.44%**, gap **672 bytes and 58 relocations → 18 real bytes and one
 relocation**. Full rows are in the admission manifest.
+
+The residual on that function was then chased to its mechanism under the owner's
+third directive and is **closed to further source probing**: nineteen shapes
+across five hypotheses, none landable, in
+`claude_lane_a_crossjump_ai_communication_finished_20260920.md`. Two numbers in
+the sentence above were wrong before that chase and are corrected here: the gap
+is **18 real bytes and 4 real instructions**, not the 16 and 2 that `gate.py`
+reports (both sides carry trailing padding — January one NOP, ours three), and
+it decomposes into **four** parts rather than two, one of which runs the other
+way. **A bare `1584` from this function is not a size match.**
 
 ## Commits, in order
 
@@ -391,7 +401,7 @@ Total: 79657 meaningful bytes across 35 owners.
 
 
 
-**`_ai_communication_finished`** (ai_communication, 1583 B) — the remaining 16 bytes and ONE relocation; identify the missing reference with relocdiff and compare the 87 January rows against our 86 by target identity
+**`_ai_communication_finished`** (ai_communication, 1583 B) — **CHASED AND CLOSED to source probing, 2026-09-20.** The missing reference is identified: one `_ai_communication_find_global_actor_to_talk` call site (January 2, ours 1; every other relocation row matches by target identity). It is a VC7 cross-jump *selection* difference — both builds emit two resolution blocks and merge a different pair — and the EBX/EDI swap is the same decision, not a second one. Nineteen shapes over five hypotheses all measured equal or worse. Reopen only on authoritative January source, a same-compiler donor emitting two call sites without a third resolution block, or a decoded rule for VC7's cross-jump candidate ordering. Do **not** replay dispatch-form, case-order, guard-spelling, declaration-order or `reply_actor_index` hoist probes. See `claude_lane_a_crossjump_ai_communication_finished_20260920.md`
 
 
 

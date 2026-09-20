@@ -3,7 +3,7 @@
   "worktree": "C:/halo-worktrees/claude-lane-a-ai-core-20260920",
   "branch": "claude/lane-a-ai-core-20260920",
   "baseline_commit": "6130661c9585fdb2785b3ff6bdb2ad0cfef0520c",
-  "tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9",
+  "tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0",
   "portfolio": {
     "translation_units": [
       "source/ai/props.c",
@@ -79,7 +79,7 @@
       "revert_cost": "single token - restore speech_type as the fourth argument",
       "reviewer": "orchestrator, independently re-measured from build/split and build/base; PLUS a separate adversarial independent review by a reviewer who did not author the change - VERDICT CONFIRMED WITH CORRECTIONS, full text at scratch/review-ai-script/INDEPENDENT_REVIEW.md. The reviewer recompiled the committed source to rule out a stale build, wrote their own COFF walker to read the 34-byte .rdata literal directly (4 percent-signs, 4 %s), proved the literal has exactly ONE relocation in the object, verified the 2020 cross-build defect first-hand, re-derived the saved-EDI arithmetic, and compiled NINE lawful alternatives of which none gates exact. One real error was found and fixed: the claim that no shipping configuration runs the branch was an overstatement, because both gate flags are HaloScript external globals settable at runtime.",
       "landing_commit": "9eca0524",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9",
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0",
       "owner_data_common_point_result": {
         "point_from_line3d_guard": "pass",
         "data_sections": "unchanged",
@@ -120,7 +120,7 @@
       "reopening_evidence_required": "January materialises all three components of direction to memory at 0x327-0x347 and takes the dot product in the order j,k,i; we leave direction.i on the x87 stack, take it k,j,i, and need two extra spill slots. Reopen with a source form in which direction genuinely escapes to something VC7 will not inline, and with the j,k,i term order. Do not hand-expand vector_from_points3d or dot_product3d.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "8110e554",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/ai",
@@ -152,7 +152,7 @@
       "reopening_evidence_required": "a spelling that materialises the second x87 copy the way January does; one 3-versus-2 x87 hunk at +0x21a remains",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "8110e554",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/ai",
@@ -184,7 +184,7 @@
       "reopening_evidence_required": "an attested or owner-approved parenthesising spelling for fast_vector_intersects_sphere radius arguments",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "8110e554",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/actors",
@@ -201,7 +201,7 @@
       "reopening_evidence_required": "n/a; prerequisite for any future whole-object admission of actors.obj",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "8110e554",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/ai_communication",
@@ -227,13 +227,13 @@
         }
       ],
       "unit_census_after": "== exact 44  residual 4  unwritten 0  (of 48 listed)",
-      "defect_corrected": "the entire missing January debug-trace graph is restored: 912 -> 1568 bytes, 29 -> 86 relocations, 305 -> 482 instructions against January 1584 / 87 / 484; objdiff 42.12 -> 91.44. The gap falls from 672 bytes and 58 relocations to 16 bytes and ONE relocation.",
+      "defect_corrected": "the entire missing January debug-trace graph is restored: 912 -> 1568 bytes, 29 -> 86 relocations, 305 -> 482 instructions against January 1584 / 87 / 484; objdiff 42.12 -> 91.44. The gap falls from 672 bytes and 58 relocations to 18 real bytes and ONE relocation. NOTE, corrected after the cross-jump chase: gate.py and divcount.py count trailing padding, so the honest gap is 18 real bytes and 4 real instructions, not the 16 and 2 those tools report (January ends its real code at 0x62f with one pad NOP, ours at 0x61d with three). A bare 1584 from this function is NOT a size match.",
       "why_more_authentic": "Found by a per-function string-literal relocation diff over all 34 residuals: this function referenced zero string literals where January references sixteen. January .rdata supplied the exact texts, its prologue the 0x650 frame and the [ebp-0x450] message buffer, and its call sites the asymmetric sprintf-then-csstrcat idiom. Every debug guard resolved to a real named field of the existing struct ai_debug_state (+143 print_communication, +132 communication_focus_enable, +133 communication_random_disabled, +100 communication_focus_vector), so no new type, header, name or declaration was needed. The assert is written in match_assert form with January file and the hex line literal 0x9E5 that is this file own convention.",
       "rejected_alternatives": "writing the event is-reply player_rating as a 2.0f literal (moves relocations 319 -> 318 against 336 and instructions 2280 -> 2278 against 2353); the actor_talk_weight operand swap (completely byte-inert - VC7 canonicalises the byte-OR operand order)",
-      "reopening_evidence_required": "the remaining 16 bytes and one relocation",
+      "reopening_evidence_required": "CHASED AND CLOSED to source probing on 2026-09-20 under the owner directive. Nineteen shapes over five hypotheses, none landable; the production body is unchanged. The single missing relocation is one _ai_communication_find_global_actor_to_talk call site, and it is a VC7 cross-jump SELECTION difference: both builds emit two resolution blocks and merge a different pair (January friend+preselected, ours enemy+friend), with the EBX/EDI swap being the same decision rather than a second one. The gap has four parts, not two, and the filter debug-string part runs the other way (our code is 7 bytes longer there). Reopen only on authoritative January source, a same-compiler donor emitting two call sites without a third resolution block, or a decoded rule for VC7 cross-jump candidate ordering. Do not replay dispatch-form, case-order, guard-spelling, declaration-order or reply_actor_index hoist probes. See docs/object_matching_logs/claude_lane_a_crossjump_ai_communication_finished_20260920.md.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "4fa32b2c",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/ai_debug",
@@ -265,7 +265,7 @@
       "reopening_evidence_required": "the frame: January sub esp,0x810 against our 0x81c. The slot census shows January touches 114 distinct objects and we touch 110, i.e. January OVERLAPS storage across disjoint lifetimes more than our source lets VC7 do. That is a lexical-scoping question, not an extra declaration.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "4fa32b2c",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/ai_communication",
@@ -297,7 +297,7 @@
       "reopening_evidence_required": "the second print_allegiance block calls game_allegiance_get_incidents, declared in NO header in the tree - a DEFERRED HEADER PREREQUISITE for source/game/game_allegiance.h. It accounts for the remaining 208 bytes and 8 relocations.",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "7356576d and 3e44bc78",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     },
     {
       "unit": "source/ai/actor_moving",
@@ -329,7 +329,7 @@
       "reopening_evidence_required": "the remaining 16 bytes and 6 instructions",
       "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
       "landing_commit": "e99467da",
-      "lane_tip_commit": "3e44bc7829e7e1107f007a2165418cad58bd0ed9"
+      "lane_tip_commit": "8fd76228b926e528d12b0955de8078833e1dabb0"
     }
   ],
   "config_changes": {

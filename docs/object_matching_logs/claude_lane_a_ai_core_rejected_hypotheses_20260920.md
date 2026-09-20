@@ -326,3 +326,90 @@ neither size, instruction count nor relocations.
   `actor_perception_desire_prop` call. **Byte-inert** (9 real regions both ways,
   769/769 instructions). Unlike `_pre_evaluator_attack` there is no intervening
   CALL, so the store-across-a-call law gives VC7 no reason to honour the split.
+
+### R19. The `_ai_communication_finished` cross-jump: five hypotheses, nineteen shapes, all refuted
+
+Run under the owner directive *"chase the cross-jump on
+`_ai_communication_finished`"*. Full mechanism, arithmetic and per-shape
+measurements in
+`docs/object_matching_logs/claude_lane_a_crossjump_ai_communication_finished_20260920.md`.
+Nothing landed; `source/ai/ai_communication.c` is unchanged by the chase. Floor
+= 1568 / 86 / 482, function-section sha1 `a8fcfe6782e01ed0`.
+
+Two corrections to this lane's own earlier record, both re-derived here from
+January's bytes:
+
+- **The gap is 18 real bytes and 4 real instructions, not 16 and 2.** Both
+  `gate.py` and `divcount.py` count trailing padding (January: one pad NOP after
+  0x62f; ours: three after 0x61d). **A bare `1584` from this function is not a
+  size match** — closing only the register half gives 1571 real bytes, which pads
+  to exactly 1584 with twelve code bytes still missing.
+- **The gap has four parts, not two, and one runs the other way.**
+  `0x000..0x1e9` identical; `0x1e9..call _datum_get` **+21 B / +6 insn / +1
+  reloc**; `call _datum_get..call eax` **+4 B** (a `jne` that is near in January
+  and short in ours); `call eax..end` **−7 B / −2 insn**, i.e. **our** code is
+  longer, because January cross-jumps the `"filter "` append into the
+  `"nobody "` block's `lea edx/push/call` trampoline while we merge only the
+  `call`. `21 + 4 − 7 = 18` and `6 + 0 − 2 = 4`.
+
+The whole relocation deficit is **one** missing
+`_ai_communication_find_global_actor_to_talk` call site; `_actor_data` is 3 and
+`_datum_get` is 2 on both sides. Both builds emit two resolution blocks and
+merge a *different pair*: January merges friend+preselected and keeps the enemy
+arm private; we merge enemy+friend back through the `call` itself and keep
+preselected private.
+
+**The EBX/EDI swap is not a second decision.** It flipped to January's
+assignment for free the moment one probe gave the enemy arm its own resolution,
+reproducing `mov ebx,[ebp+8]` at 0x9f, `xor edi,edi; mov di,[...]` at 0xdb and
+all three `mov edi,ebx` repairs at January's own offsets. It is also the
+*correct* codegen: `unit_index` coalesces into EDI because all three callees
+(`find_global_actor_to_talk`, `find_specific_actor_to_talk`,
+`look_secondary_at_unit`) take it there, and all three are byte-exact in our
+build. January declined the coalescing and paid three repairs.
+
+Refuted families — **do not replay any of these**:
+
+- **Enemy-arm private resolution (4 shapes).** Restores both call sites at
+  January's offsets but emits three resolution blocks instead of two
+  (`_actor_data` 4 vs 3): 1600 / 88 / 493. Hoisting `reply_actor_index` to fix
+  that merges friend+preselected correctly (`_actor_data` → 3) but inserts a
+  `mov edi,[ebp-0xc]` reload after each `datum_get` that breaks the enemy arm's
+  tail merge (`_datum_get` 3 vs 2): 1616 / 88 / 501. Seeding it with
+  `= preselected_reply_actor_index` and deleting the `else` **spills two frame
+  slots and destroys the exact frame**: 1648 / 88 / 503.
+- **EBX/EDI as an independent lever (5 shapes + control).** Every probe
+  byte-identical to the floor. Declaring `speech_priority` textually first made
+  VC7 hoist `mov edi,[ebp+8]` *into the middle of* the speech-priority
+  computation rather than give up EDI.
+- **Friend-guard spelling (5 shapes).** `!= NULL`, a named encounter local, and
+  the `?:`-hoisted form are all **byte-for-byte identical** to the floor: VC7
+  normalizes `a && a->f != NONE` and `(a ? a->f : NONE) != NONE` to the same IL.
+  Binding `owner_team_index` to a local moves the wrong way (1566 → 1560 real
+  bytes) by promoting `unit` into EBX and tightening the merge.
+- **Dispatch form and case order (5 shapes).** Case source order and case-body
+  braces are **byte-inert** for a compare-chain switch — VC7 lays the arms out
+  in descending case value regardless. The campaign's case-order law applies
+  only where a jump *table* exists. The `if`/`else if` chain that reaches size
+  1584 is a **coincidental-compensation trap**: instructions move 482 → 489/491
+  against a target of 484, relocations do not move, and it contradicts the
+  `switch` over the same enum at `source/ai/ai_communication.c:4557`.
+- **`reply_unit_index` data flow (5 shapes).** Hoists, symmetric datum binding,
+  declaration-order swaps and scope moves are all byte-identical to the floor
+  (and prove `reply_unit_index` never reaches a frame slot — it is in EBX on
+  every path). Inverting the outer test is the only byte-mover and is a
+  regression: regions 72 → 73 and `relocdiff` rows 58 → 65, because the three
+  `match_assert` string relocations the floor matches at January's exact
+  addresses (0x1be / 0x1c3 / 0x1c8) shift.
+
+No sibling was lost by any shape: the unit census stayed
+`exact 44 residual 4 unwritten 0` throughout and `fake_match_scan` reported zero
+findings on every nominated shape.
+
+**Reopening criterion.** Authoritative January source; or a same-compiler donor
+emitting two `call _ai_communication_find_global_actor_to_talk` sites *without* a
+third resolution block; or a decoded rule for VC7's cross-jump **candidate
+ordering** — what makes the backend prefer merging {enemy, friend} over
+{friend, preselected} when all three blocks are eligible. That rule would settle
+the `"filter "` divergence too, which is the same decision in the debug-string
+epilogue.
