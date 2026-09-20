@@ -312,26 +312,5 @@ class ParkedFunctionsTests(unittest.TestCase):
                 self.root, self.report_path, self.config_path, self.manifest_path
             )
 
-    def test_repository_manifest_keeps_known_circular_queue_tie(self):
-        project_root = Path(__file__).resolve().parents[1]
-        manifest = json.loads(
-            (project_root / "config" / "parked.json").read_text(encoding="utf-8")
-        )
-        matches = [
-            entry for entry in manifest["entries"]
-            if entry.get("unit") == "source/memory/circular_queue"
-            and entry.get("function") == "_circular_queue_dequeue_data"
-        ]
-
-        self.assertEqual(len(matches), 1)
-        self.assertEqual(matches[0]["class"], "register-allocation")
-        self.assertEqual(matches[0]["measurements"]["target"]["size"], 0x100)
-        self.assertEqual(matches[0]["measurements"]["base"]["size"], 0xF0)
-        self.assertEqual(
-            matches[0]["measurements"]["target"]["relocation_count"],
-            matches[0]["measurements"]["base"]["relocation_count"],
-        )
-
-
 if __name__ == "__main__":
     unittest.main()

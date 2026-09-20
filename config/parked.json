@@ -3049,25 +3049,6 @@
         "base": { "size": 304, "relocation_count": 25, "normalized_sha256": "124019ea872d584781a0c8424c9fbce31bc491ba51226808716bc6e4335a2062" },
         "objdiff_percent": 93.74227
       }
-    },
-    {
-      "unit": "source/memory/circular_queue",
-      "function": "_circular_queue_dequeue_data",
-      "class": "register-allocation",
-      "evidence": "January keeps the false return value live in BL from the prologue and assigns the queue/read-offset live ranges to EDI/EBX; the current build folds false into XOR AL,AL and assigns the same live ranges to EBX/EDI. Both builds have the same 12 relocation identities and call/control-flow sequence, while January's two-byte BL lifetime and register permutation make its padded body 0x100 versus 0xF0. Exhaustive legal-C attempts (explicit result locals, goto/early-return forms, union and char aliases, parameter/local register hints, declaration-order changes, and historical candidate replay) could not reproduce that private allocation choice without regressing the established call sequence.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 12,
-          "normalized_sha256": "2981341a22238a314c0f885d555149dc279257b6109242e674f38ccfb0ccd1f9"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 12,
-          "normalized_sha256": "40adf3be1fa79c0b9aaf6b169e37da2e59aa4e306efef68a9573b7aa7ec8dede"
-        },
-        "objdiff_percent": 93.947365
-      }
     }
   ]
 }
