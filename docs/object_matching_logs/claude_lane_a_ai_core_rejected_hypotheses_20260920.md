@@ -413,3 +413,113 @@ ordering** — what makes the backend prefer merging {enemy, friend} over
 {friend, preselected} when all three blocks are eligible. That rule would settle
 the `"filter "` divergence too, which is the same decision in the debug-string
 epilogue.
+
+### R20. Five residuals decoded by hand with the corrected region metric
+
+These were found by re-ranking the portfolio with `tools/campaign/real_regions.py`,
+which strips relocation-spelling, relocation-site, branch-immediate and
+padding-only noise from `alndiff`'s region count. The raw count systematically
+**overstates the closest functions**, so these five had all been ranked further
+away than they are. Full table in
+`claude_lane_a_residual_triage_20260920.md`; per-function notes in
+`scratch/orch/{fpia,pathrefresh,ball}/NOTES.md`.
+
+**No landing is proposed from any of them.** Every probe below was gated; none
+touched a production file; the whole-unit censuses never moved.
+
+#### `_actor_path_refresh` (1,440 B) - **0 real regions**, +12 code bytes
+
+Every instruction's text matches. The entire residual is **three branches at
+4 bytes each**: January encodes `jne 0x542` / `jp 0x542` / `jp 0x542` short to
+the NEAR copy of the return epilogue; we encode near to the FAR copy 0x267 bytes
+back. **Both copies of the epilogue exist in both builds** - this is not a
+missing or extra block, only which one the three `&&` short-circuit failure
+edges bind to. Source site is `source/ai/actor_moving.c:2064`, the
+`if (success && endpoint.target_radius > 0.f && distance < ... && ... < 0.5f)`
+guard; on every failure edge `success` is known TRUE, so the following
+`if (!success)` const-folds away and control goes straight to `return success`.
+
+Cross-jump target selection - but **not automatically unreachable**: the
+owner-approved `_actor_perception_refresh` landing closed exactly this class by
+giving an else-if arm its own resolution. That is the lever to try here.
+
+#### `_actor_look_idle_find_prop` (608 B) - **1 real region**
+
+    January  cmp ebx, dword ptr [_ai_debug+0x38]
+    ours     mov eax, dword ptr [_ai_debug+0x38] ; cmp ebx, eax
+
+The field is `ai_debug.selected_actor_index`, and the source is **already** the
+natural form `if (actor_index == ai_debug.selected_actor_index)` at both of its
+two sites (`actor_looking.c:728` and `:767`). The split appears exactly where the
+scheduler is filling an `fcos` latency gap - January fills it with one
+instruction, we fill it with two - so this is instruction selection under x87
+scheduling, not a source shape. Note the function is also **3 bytes short
+overall**, so a second, branch-width difference is hiding behind the
+normalisation; do not treat "1 real region" as "one byte from exact".
+
+#### `_actor_perception_friend_prop_is_attacking` (432 B) - **1 real region**
+
+    January  mov cl, byte ptr [ebx+0x1ec] ; test cl, cl ; jle 0x179
+    ours     mov al, byte ptr [ebx+0x1ec] ; test al, al ; jle 0x176
+
+`attacking` is spilled across `unit_get_aiming_vector` and reloaded into AL.
+January loads `known_enemies` into **CL**, which keeps AL live, so both early
+exits return AL directly at 0x179; we load into AL, destroying it, so both exits
+must jump to 0x176 and reload. The two differing branch displacements are a
+**consequence** of the register choice, not independent. Tails are byte-identical
+from 0x168.
+
+Probes, all measured:
+
+| shape | real regions | verdict |
+|---|---:|---|
+| nested `if (!attacking) { if (known_enemies > 0) {` | 3 raw / 1 real | **INERT**, byte-identical to the floor |
+| swap the `&&` operands | 9 | **WORSE** - reorders the tests; January tests `attacking` first, so our order was already right |
+| drop the `> 0` | 1 | INERT, and not proposed regardless: `jle` is a signed test, so it is a semantic change |
+
+The guard spelling is a **dead lever** here. Confirms again that `&&` and a
+nested `if` normalise to the same IL.
+
+#### `_ai_test_ballistic_line_of_fire` (944 B) - 8 real regions, NEW observation
+
+Five of the eight are a **parameter-slot role swap** that the previous wave did
+not record. The signature puts `origin` at `[ebp+0xc]` and `velocity` at
+`[ebp+0x14]`; both are copied out and their dead incoming slots are reused as
+scratch - and the two builds assign the reuses the other way round:
+
+    January  mov dword ptr [ebp+0xc], 0xc2b3     collision_flags -> origin's slot
+    ours     mov dword ptr [ebp+0x14], 0xc2b3    collision_flags -> velocity's slot
+    January  fst dword ptr [ebp+0x14]            x87 temp -> velocity's slot
+    ours     fst dword ptr [ebp+0xc]             x87 temp -> origin's slot
+
+The remaining three are one `mov ebx` scheduled a slot early and one x87 operand
+order (`fld [ebp+0x14]; fxch st(1); fmul [ebp-0x24]` against our
+`fld [ebp-0x24]; fmul st(1)`).
+
+| shape | real regions | verdict |
+|---|---:|---|
+| floor | 8 | - |
+| swap `point = *origin;` and `arc_velocity = *velocity;` | **15** | WORSE |
+| swap the `ai_debug.ballistic_lineoffire_start` / `_vector` assignments | **10** | WORSE |
+
+So the order in which the two parameters are consumed is **not** the handle on
+which dead slot each scratch value inherits. This belongs in the function's
+existing `instruction-scheduling` park as evidence, not as a new structural lead.
+
+#### `_actor_situation_update` (1,264 B) - **2 real regions**
+
+One five-instruction test block (`mov al,[edi+0x12f]; test; je; cmp word
+[edi+0x38],0; jne`) that January places **out of line** at 0x21b and returns
+from with a `jmp 0xeb`, and that we place **inline** at 0xe9. January therefore
+has one instruction MORE (363 against our 362). Block placement, and the
+"give the arm its own block" lever from `_actor_perception_refresh` is what to
+try. Not probed.
+
+#### Method note worth keeping
+
+Rank by REAL regions, never the raw `alndiff` count, and always read the
+**real code end** alongside it. `0 REAL` means every instruction's *text*
+matches - it does **not** mean exact, because normalising a branch immediate
+also hides a short-versus-near encoding difference, which is a real byte
+difference. `_actor_path_refresh` is the worked example: 0 real regions and
+still 12 bytes out.
