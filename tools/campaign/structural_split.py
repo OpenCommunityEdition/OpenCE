@@ -9,7 +9,10 @@ which explains the three tiers, what each does and does not prove, and the three
 traps that make a census like this lie.
 
 Tiers: S1 the emitted reference multiset differs; S2 references agree but the
-real instruction count differs; T both already agree. Only T makes "tie" the
+real instruction count differs; T both already agree. Validated against gate.py:
+on Lane A's eleven units this reports exactly 33 non-exact functions and gate.py
+reports exactly 33 residuals, with no disagreement in either direction. Run that
+check first if you extend this. Only T makes "tie" the
 default reading, and even S1 is not proof of source-reachability - the backend
 can delete a reference by itself (see the cross-jump on
 _ai_communication_finished).
@@ -85,24 +88,24 @@ def read(path):
             sy = syms[si] if si < len(syms) else None
             nm = sy[0] if sy else '?'
             tgts.append(nm)
-            sites.append(ra)
+            sites.append((ra, rt))
         body = d[sptr:sptr + rawsize] if sptr else b''
         # NORMALIZE exactly as the comparator does: zero the relocated field at
         # every site. Comparing RAW bodies calls a function non-exact whenever a
         # relocated dword happens to hold a different link-time placeholder, which
         # silently pulls already-EXACT functions into the tie tier.
         norm = bytearray(body)
-        for ra in sites:
+        for ra, _rt in sites:
             if ra + 4 <= len(norm):
                 norm[ra:ra + 4] = bytes(4)
-        bodies[s + 1] = (body, tgts, bytes(norm))
+        bodies[s + 1] = (body, tgts, bytes(norm), tuple(sites))
     out = {}
     for x in syms:
         if not x:
             continue
         nm, sn, cl, v = x
         if sn > 0 and v == 0 and sn in bodies and not nm.startswith('.') and nm not in out:
-            body, tgts, norm = bodies[sn]
+            body, tgts, norm, sites = bodies[sn]
             # INTERNAL references are named differently by the two builds and are
             # NOT a program difference: ours emits `$L#####` jump-table labels
             # where January's split object relocates the same entries against the
@@ -113,7 +116,7 @@ def read(path):
             internal = (nm, nm + '_jmptable')
             out[nm] = (body, [t for t in tgts
                               if t not in internal and not t.startswith('$L')
-                              and not t.startswith('$SG')], norm)
+                              and not t.startswith('$SG')], norm, sites)
     return out
 
 
@@ -146,13 +149,21 @@ for dirpath, _dirs, files in os.walk(SPLIT):
         if not ts:
             continue
         os_ = read(opath)
-        for fn, (tbody, trel, tnorm) in ts.items():
+        for fn, (tbody, trel, tnorm, tsites) in ts.items():
             got = os_.get(fn)
             if got is None:
                 continue
-            obody, orel, onorm = got
-            if tnorm == onorm and collections.Counter(trel) == collections.Counter(orel):
-                continue          # strictly exact on normalized bytes - skip
+            obody, orel, onorm, osites = got
+            # EXACT means what the comparator means: equal normalized bytes and
+            # an equal relocation (address, type) list. Relocation target NAMES
+            # are NOT part of the test, because the same address can be spelled
+            # against different symbols - January writes
+            # `_sense_ray_divergences+32` where we write `_sense_ray_angles-4`.
+            # The comparator resolves that; comparing names does not, and
+            # _actor_move_initialize (which gate.py reports EXACT) leaked into
+            # the structural tier until this test was fixed.
+            if tnorm == onorm and tsites == osites:
+                continue
             ti, tlen = real_code(tbody)
             oi, olen = real_code(obody)
             tc, oc = collections.Counter(trel), collections.Counter(orel)

@@ -13,13 +13,19 @@ the two diagnostics are complementary and the worked example below shows why.
 
 ## The three tiers
 
-Over all 423 non-exact functions on the board (379,925 padded bytes):
+Over all 300 non-exact functions on the board (333,973 padded bytes):
 
 | tier | meaning | functions | bytes |
 |---|---|---:|---:|
-| **S1** | the emitted **reference multiset** differs - a missing or extra program reference | 184 | 151,253 |
+| **S1** | the emitted **reference multiset** differs - a missing or extra program reference | 73 | 108,533 |
 | **S2** | references agree, the **real instruction count** differs | 132 | 138,544 |
-| **T** | both already agree; only here is "tie" the default reading | 107 | 90,128 |
+| **T** | both already agree; only here is "tie" the default reading | 95 | 86,896 |
+
+**Validated against the gate.** On Lane A's eleven translation units this census
+now reports exactly 33 non-exact functions and `gate.py` reports exactly 33
+residuals, with **no disagreement in either direction**. That check is what
+caught the two errors described at the end, and it is the check anyone extending
+this tool should run first.
 
 Split by park status:
 
@@ -27,7 +33,11 @@ Split by park status:
 |---|---:|---:|---|
 | S1 | 39 | 47,029 | 31 unclassified, 3 register-allocation, 3 tu-context, 2 scheduling |
 | S2 | 75 | 65,104 | 52 unclassified, 9 scheduling, 6 register-allocation, 6 tu-context, 2 private-convention |
-| T | 67 | 39,392 | 25 scheduling, 23 unclassified, 12 csplit-alias, 6 register-allocation, 1 private-convention |
+| T | 55 | 36,160 | 25 scheduling, 23 unclassified, 6 register-allocation, 1 private-convention |
+
+The twelve `csplit-relocation-alias` parks correctly vanish from this census
+once aliasing is resolved: those functions ARE exact after alias resolution,
+which is exactly what that park class records.
 
 **114 parked functions - 112,133 of the 151,525 parked bytes, 74% - are not
 tie-shaped.** They are parked as compiler ties over evidence that says our
@@ -57,7 +67,7 @@ linear disassembler counts the table's dwords as instructions. Wherever a
 function relocates against itself or a `_jmptable` symbol, ignore `d-insn` and
 read the frame and the reference multiset instead.
 
-## Three traps that make this census easy to get wrong
+## Four traps that make this census easy to get wrong
 
 **Internal references are named differently by the two builds and are not a
 program difference.** Our build emits `$L#####` jump-table labels; January's
@@ -70,6 +80,13 @@ deficit** - on a function whose relocation count is **1,905 on both sides**.
 Correcting it moved 255 functions between tiers. Any future tool doing this must
 exclude, on both sides: `$L*`, `$SG*`, the function's own symbol, and
 `<function>_jmptable`.
+
+**Fourth: a relocation's TARGET NAME is not its target.** The same address can
+be spelled against different symbols with different addends
+(`_sense_ray_divergences+32` versus `_sense_ray_angles-4`). Compare resolved
+addresses - or, as this tool now does, leave names out of the exactness test
+entirely and use the relocation (address, type) list, which is what the
+comparator effectively does.
 
 **Third: compare NORMALIZED bytes, not raw bytes.** See the correction note at
 the end - raw comparison pulled 238 already-exact functions into the census.
@@ -122,7 +139,20 @@ instruction at a different `[ebp-X]`.
 ## Provenance
 
 `scratch/orch/boardsplit.py`; full output at `scratch/orch/boardsplit.txt`.
-423 non-exact function pairs over 482 object pairs.
+300 non-exact function pairs over 482 object pairs.
+
+### Two corrections applied, both caught by disagreeing with the gate
+
+**Symbol aliasing (the larger of the two).** The same address can be spelled
+against different symbols: January writes `_sense_ray_divergences+32` where we
+write `_sense_ray_angles-4`. The comparator resolves that; comparing relocation
+target *names* does not. `_actor_move_initialize`, which `gate.py` reports
+**EXACT** and `relocdiff --allow-structural` reports as `sha equal, 0 differing
+rows`, leaked into the structural tier purely on name differences. Fixing the
+exactness test to be "equal normalized bytes **and** equal relocation
+(address, type) list" - names deliberately excluded, because the comparator
+resolves them - removed **123** more already-exact functions and cut S1 from 184
+to 73.
 
 ### Correction applied before publication
 
