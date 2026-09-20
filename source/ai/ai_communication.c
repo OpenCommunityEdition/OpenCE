@@ -6861,15 +6861,19 @@ void ai_communication_event(
 						break;
 
 					case _comm_look_direction_danger:
-						if (subject_actor_index != NONE &&
-							subject_actor->danger_zone.danger_type > _actor_danger_zone_none)
+						if (subject_actor_index != NONE)
 						{
-							match_assert(
-								"c:\\halo\\SOURCE\\ai\\ai_communication.c",
-								0x6B0,
-								subject_actor->danger_zone.object_index != NONE);
-							look_type = _ai_information_look_object;
-							look_unit_index = subject_actor->danger_zone.object_index;
+							struct actor_datum *subject_actor = actor_get(subject_actor_index);
+
+							if (subject_actor->danger_zone.danger_type > _actor_danger_zone_none)
+							{
+								match_assert(
+									"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+									0x6B0,
+									subject_actor->danger_zone.object_index != NONE);
+								look_type = _ai_information_look_object;
+								look_unit_index = subject_actor->danger_zone.object_index;
+							}
 						}
 						break;
 					}

@@ -4240,9 +4240,9 @@ void prop_status_refresh(
 				}
 			}
 
-			prop->fighting = fighting;
 			prop->noncombat = noncombat;
 			prop->in_combat = in_combat;
+			prop->fighting = fighting;
 
 			if (noticed)
 			{
@@ -4478,7 +4478,7 @@ void prop_status_refresh(
 					prop->dead,
 					prop->dead_ticks,
 					prop->suicide_radius,
-					prop->distance * prop->distance,
+					actor_perception_distance_squared(prop->distance),
 					0,
 					NULL))
 			{
@@ -6754,7 +6754,7 @@ void actor_perception_update(
 							prop->dead,
 							prop->dead_ticks,
 							prop->suicide_radius,
-							prop->distance * prop->distance,
+							actor_perception_distance_squared(prop->distance),
 							prop->required_ticks,
 							NULL))
 					{
@@ -6790,7 +6790,7 @@ void actor_perception_update(
 						prop->dead,
 						prop->dead_ticks,
 						prop->suicide_radius,
-						prop->distance * prop->distance,
+						actor_perception_distance_squared(prop->distance),
 						prop->required_ticks,
 						NULL))
 				{
