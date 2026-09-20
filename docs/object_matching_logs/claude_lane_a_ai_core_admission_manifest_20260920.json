@@ -1,0 +1,332 @@
+{
+  "lane": "Lane A - AI core",
+  "worktree": "C:/halo-worktrees/claude-lane-a-ai-core-20260920",
+  "branch": "claude/lane-a-ai-core-20260920",
+  "baseline_commit": "6130661c9585fdb2785b3ff6bdb2ad0cfef0520c",
+  "tip_commit": "7356576d32be3508fe3a300b61015154042953ba",
+  "portfolio": {
+    "translation_units": [
+      "source/ai/props.c",
+      "source/ai/ai_script.c",
+      "source/ai/encounters.c",
+      "source/ai/actor_firing_position.c",
+      "source/ai/ai.c",
+      "source/ai/actors.c",
+      "source/ai/actor_looking.c",
+      "source/ai/actor_moving.c",
+      "source/ai/ai_communication.c",
+      "source/ai/actor_perception.c",
+      "source/ai/ai_debug.c"
+    ],
+    "remaining_meaningful_bytes_at_baseline": 79657,
+    "residual_functions_at_baseline": 34,
+    "unwritten_functions_at_baseline": 0
+  },
+  "accounting": {
+    "new_strict_meaningful_bytes": 214,
+    "new_strict_padded_bytes": 224,
+    "new_strict_functions": 1,
+    "fuzzy_rows_at_zero_credit": 8,
+    "whole_object_completions": 0,
+    "regressions": 0,
+    "ledger_gained": [
+      "source/ai/ai_script:_ai_scripting_migrate_and_speak"
+    ],
+    "ledger_lost": []
+  },
+  "unit_census_after": {
+    "props": "== exact 16  residual 1  unwritten 0  (of 17 listed)",
+    "ai_script": "== exact 116  residual 0  unwritten 0  (of 116 listed)",
+    "encounters": "== exact 60  residual 1  unwritten 0  (of 61 listed)",
+    "actor_firing_position": "== exact 26  residual 1  unwritten 0  (of 27 listed)",
+    "ai": "== exact 43  residual 3  unwritten 0  (of 46 listed)",
+    "actors": "== exact 72  residual 4  unwritten 0  (of 76 listed)",
+    "actor_looking": "== exact 14  residual 2  unwritten 0  (of 16 listed)",
+    "actor_moving": "== exact 31  residual 5  unwritten 0  (of 36 listed)",
+    "ai_communication": "== exact 44  residual 4  unwritten 0  (of 48 listed)",
+    "actor_perception": "== exact 35  residual 9  unwritten 0  (of 44 listed)",
+    "ai_debug": "== exact 57  residual 3  unwritten 0  (of 60 listed)"
+  },
+  "exact_rows": [
+    {
+      "unit": "source/ai/ai_script",
+      "function": "_ai_scripting_migrate_and_speak",
+      "wave": "A1",
+      "meaningful_bytes": 214,
+      "padded_bytes": 224,
+      "target_section_key": "source/ai/ai_script::section:51",
+      "target": {
+        "size": 224,
+        "relocation_count": 16,
+        "normalized_sha256": "6fb5a427f629d9b8470851e22e67cee095122693df8eebef6e108316afc68521"
+      },
+      "candidate": {
+        "size": 224,
+        "relocation_count": 16,
+        "normalized_sha256": "6fb5a427f629d9b8470851e22e67cee095122693df8eebef6e108316afc68521"
+      },
+      "relocation_identity": {
+        "target_relocations": 16,
+        "candidate_relocations": 16,
+        "differing_rows": 0,
+        "normalized_bytes_equal": true
+      },
+      "verdict_before": "residual [sha]",
+      "verdict_after": "EXACT",
+      "unit_census_after": "== exact 116  residual 0  unwritten 0  (of 116 listed)",
+      "evidence_basis": "January cleans 0x14 bytes (five dwords) at the error() call site and loads speech_type only afterwards at +0x7d, while the format literal read out of January .rdata is '%s: ai_migrate_and_speak %s %s %s' - four %s conversions for three values. Landed under the original-bug policy with a BUG (preserved for exact matching) comment recording the evidence, the runtime consequence (the fourth conversion slot is the saved-EDI home, so vsprintf dereferences the caller entry EDI as a char *) and the corrected form. The branch is reachable only under ai_debug.print_migration or print_scripting. The same defect survives unrepaired in the 2020 build. In-tree precedent for disclosing a UB-class January defect: source/bitmaps/bitmap_extract.c:2101 and source/ai/ai_script.c:1597.",
+      "owner_ratification_required": true,
+      "revert_cost": "single token - restore speech_type as the fourth argument",
+      "reviewer": "orchestrator, independently re-measured from build/split and build/base",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba",
+      "owner_data_common_point_result": {
+        "point_from_line3d_guard": "pass",
+        "data_sections": "unchanged",
+        "common_symbols": "unchanged",
+        "linkage": "unchanged"
+      },
+      "exact_credit_meaningful_bytes": 214
+    }
+  ],
+  "fuzzy_rows": [
+    {
+      "unit": "source/ai/actor_firing_position",
+      "function": "_pre_evaluator_attack",
+      "wave": "A2",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 1120,
+        "gate_tag": "[sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 1120,
+          "relocation_count": 39,
+          "normalized_sha256": "7b38541b266185306cf06750f8e771df6b21326f143ee2c01259e94c5d63595b"
+        },
+        {
+          "size": 1120,
+          "relocation_count": 39,
+          "normalized_sha256": "48948f2586afaae971c958e06bf570f6c5ce0520fa458899307455e1515f86f9"
+        }
+      ],
+      "unit_census_after": "== exact 26  residual 1  unwritten 0  (of 27 listed)",
+      "defect_corrected": "missing relocation recovered: 38 -> 39, matching January",
+      "why_more_authentic": "L1 20.0f * (distance_from_boundary / 2.0f) stops VC7 reassociating 0.5f*20.0f into 10.0f and restores the __real@41a00000 reference. L2/L3 two initializers become statements because the zero store sits at +0x1d8 in January and +0x12d in ours, on opposite sides of call _actor_get_weapon_definition at +0x169, and a stack store cannot be sunk across a call. L4 an explicit strict < replaces MIN(), which cseries.h defines as ((a)>(b)?(b):(a)) and which can only emit test ah,0x41 where January emits fcom / test ah,5 / jp.",
+      "rejected_alternatives": "inlining the single-use evaluation of the maximum_firing_range block (measured inert, slot count stays 14)",
+      "reopening_evidence_required": "January materialises all three components of direction to memory at 0x327-0x347 and takes the dot product in the order j,k,i; we leave direction.i on the x87 stack, take it k,j,i, and need two extra spill slots. Reopen with a source form in which direction genuinely escapes to something VC7 will not inline, and with the j,k,i term order. Do not hand-expand vector_from_points3d or dot_product3d.",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_test_ballistic_line_of_fire",
+      "wave": "A2",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 944,
+        "gate_tag": "[sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 944,
+          "relocation_count": 49,
+          "normalized_sha256": "6c90076033e91f26356e42166cf4bb0a8d5a902ae35bc67db15aec19ee9982ac"
+        },
+        {
+          "size": 944,
+          "relocation_count": 49,
+          "normalized_sha256": "5c03c751c19c33cde8c6645c5fd39d505e2bca6bf161beb6e6126101f3fbcaa8"
+        }
+      ],
+      "unit_census_after": "== exact 43  residual 3  unwritten 0  (of 46 listed)",
+      "defect_corrected": "instruction count now equals January (292/296 -> 296/296); objdiff 94.5 -> 98.99645",
+      "why_more_authentic": "Reproduces January x87 structure for segment_time exactly: fsubr of the parameter home at +0x1e7, fst (store-and-keep) to a dead parameter home at +0x1f4, and a post-call fld from that same home at +0x2cc feeding fmul gravity / fadd / fstp. The later source subtraction is therefore not a duplicated computation in the emitted code - VC7 reloads the stored value, which is what January does.",
+      "rejected_alternatives": "operand and declaration sweeps (exhausted by prior campaigns)",
+      "reopening_evidence_required": "a spelling that materialises the second x87 copy the way January does; one 3-versus-2 x87 hunk at +0x21a remains",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/ai",
+      "function": "_ai_test_line_of_fire",
+      "wave": "A2",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 336,
+        "gate_tag": "[sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 336,
+          "relocation_count": 10,
+          "normalized_sha256": "0aef44a538a12480aec2d0e85e44b434a56a3a3703ca0bc324a00dfdad2a3b3c"
+        },
+        {
+          "size": 336,
+          "relocation_count": 10,
+          "normalized_sha256": "490d9ab453b888bb8c5f662b3a1fd825f17ddda8042cc3d2333682c96d5977bd"
+        }
+      ],
+      "unit_census_after": "== exact 43  residual 3  unwritten 0  (of 46 listed)",
+      "defect_corrected": "store order inside if (intersected) now matches January; objdiff 88.17 -> 89.19643",
+      "why_more_authentic": "January stores zero to [ebp-4] at +0xd3, then [ebp-8] at +0xd7, then the hit byte at +0xda. The correspondence is deterministic and reversible - swapping the source swaps the emission - so VC7 is order-preserving for these two independent stores and January order is source-determined.",
+      "rejected_alternatives": "the bare call-site parentheses (pills[pill_index].width) of the old waveD lof2 candidate are NOT landed; that prior orchestrator rejection stands and its reopening criterion is unmet",
+      "reopening_evidence_required": "an attested or owner-approved parenthesising spelling for fast_vector_intersects_sphere radius arguments",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/actors",
+      "function": "(data topology)",
+      "wave": "A2",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": "n/a (data-topology change)",
+      "final_target_vs_candidate": null,
+      "unit_census_after": "== exact 72  residual 4  unwritten 0  (of 76 listed)",
+      "defect_corrected": "a 12-byte .bss section January does not have is removed; the three data_array pointers become COMMON",
+      "why_more_authentic": "January defines _actor_data, _swarm_data and _swarm_component_data in the synthesized linker_common.obj (sections 209/210/211, storage class 2) and its own actors.obj references them as undefined - the COMMON model, i.e. tentative definitions. The three \"= NULL\" initializers were the only \"struct data_array *x = NULL;\" definitions in the entire source tree; the sibling encounters.c, which is 60/61 exact, already uses the tentative form.",
+      "rejected_alternatives": "none - this is a data-ownership correction, not a codegen probe",
+      "reopening_evidence_required": "n/a; prerequisite for any future whole-object admission of actors.obj",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_communication_finished",
+      "wave": "A3",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 1584,
+        "gate_tag": "[size 1568!=1584, relocs 86!=87, sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 1584,
+          "relocation_count": 87,
+          "normalized_sha256": "79de598402e5831bf7376d7471f92958b7ecf34ee356b0110ec16127875e524b"
+        },
+        {
+          "size": 1568,
+          "relocation_count": 86,
+          "normalized_sha256": "8a4b85701ff33941b10c4658dce58ded806211123ff0ba3fc09ddcba4c781485"
+        }
+      ],
+      "unit_census_after": "== exact 44  residual 4  unwritten 0  (of 48 listed)",
+      "defect_corrected": "the entire missing January debug-trace graph is restored: 912 -> 1568 bytes, 29 -> 86 relocations, 305 -> 482 instructions against January 1584 / 87 / 484; objdiff 42.12 -> 91.44. The gap falls from 672 bytes and 58 relocations to 16 bytes and ONE relocation.",
+      "why_more_authentic": "Found by a per-function string-literal relocation diff over all 34 residuals: this function referenced zero string literals where January references sixteen. January .rdata supplied the exact texts, its prologue the 0x650 frame and the [ebp-0x450] message buffer, and its call sites the asymmetric sprintf-then-csstrcat idiom. Every debug guard resolved to a real named field of the existing struct ai_debug_state (+143 print_communication, +132 communication_focus_enable, +133 communication_random_disabled, +100 communication_focus_vector), so no new type, header, name or declaration was needed. The assert is written in match_assert form with January file and the hex line literal 0x9E5 that is this file own convention.",
+      "rejected_alternatives": "writing the event is-reply player_rating as a 2.0f literal (moves relocations 319 -> 318 against 336 and instructions 2280 -> 2278 against 2353); the actor_talk_weight operand swap (completely byte-inert - VC7 canonicalises the byte-OR operand order)",
+      "reopening_evidence_required": "the remaining 16 bytes and one relocation",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/ai_debug",
+      "function": "_ai_debug_render_actor",
+      "wave": "A3",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 24976,
+        "gate_tag": "[sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 24976,
+          "relocation_count": 1905,
+          "normalized_sha256": "c236780ab71e93cb5f2a2270894caa3b17f2242c8a7009d8277d67ce35434bd7"
+        },
+        {
+          "size": 24976,
+          "relocation_count": 1905,
+          "normalized_sha256": "7cc3c5d0cf6dcedb2a3a65ffea69221f3b19f9f9926de885cfac787842974e6d"
+        }
+      ],
+      "unit_census_after": "== exact 57  residual 3  unwritten 0  (of 60 listed)",
+      "defect_corrected": "boolean tested with > 0 at ai_debug.c:2281 corrected to a plain boolean test; differing regions 1452 -> 1451",
+      "why_more_authentic": "has_approach_point is declared boolean at source/ai/actions.h:190; comparing a boolean with > 0 is unidiomatic",
+      "rejected_alternatives": "the accessor-binding of avoidance_data.avoidance_objects[...] (regions 1452 -> 1464); the actor->output.animation.alignment_vector component-assignment substitution (1452 -> 1476); their composition (size 24976 -> 24928, BREAKING the exact size match, regions 1452 -> 1472)",
+      "reopening_evidence_required": "the frame: January sub esp,0x810 against our 0x81c. The slot census shows January touches 114 distinct objects and we touch 110, i.e. January OVERLAPS storage across disjoint lifetimes more than our source lets VC7 do. That is a lexical-scoping question, not an extra declaration.",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/ai_communication",
+      "function": "_ai_communication_event",
+      "wave": "A5/A6",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 8064,
+        "gate_tag": "[size 7856!=8064, relocs 328!=336, sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 8064,
+          "relocation_count": 336,
+          "normalized_sha256": "7a16e8d71ff2a5b3d99c76a6059a65dac3bc1750abde8ce07b4210fe3224ad2c"
+        },
+        {
+          "size": 7856,
+          "relocation_count": 328,
+          "normalized_sha256": "6c86ab2fb3ea2ec252a63595abf8b53e1571a1f1a75111425835a989ae3a2233"
+        }
+      ],
+      "unit_census_after": "== exact 44  residual 4  unwritten 0  (of 48 listed)",
+      "defect_corrected": "the first of January two print_allegiance debug blocks is restored: 7776 -> 7856 bytes against January 8064 (gap 288 -> 208) and 319 -> 328 relocations against 336 (gap 17 -> 8). Wave A6 then removed three consumer-local prototypes (game_team_is_enemy, game_team_is_ally, game_allegiance_incident) that the genuine owner header now supplies - a house rule 9 correction, byte-inert.",
+      "why_more_authentic": "The restored block is instruction-for-instruction identical to January 0x329-0x379. Found by the same string-relocation audit as wave A3: January references seven strings we did not, plus _console_printf twice, _global_game_team_names twice and _ai_debug+149 twice. The push order proves the argument order (subject team first, cause team second), cross-checked against the game_allegiance_incident prototype below it. ai_debug.print_allegiance is a real named field of the existing struct ai_debug_state. The change adds #include \"game/game_allegiance.h\", the genuine owner header - house rule 9 satisfied, not circumvented; all three removed prototypes are declared there at lines 23, 26 and 38, and a /W3 compile reports no C4013.",
+      "rejected_alternatives": "writing the is-reply player_rating as a 2.0f literal (moves relocations 319 -> 318 against 336 and instructions 2280 -> 2278 against 2353)",
+      "reopening_evidence_required": "the second print_allegiance block calls game_allegiance_get_incidents, declared in NO header in the tree - a DEFERRED HEADER PREREQUISITE for source/game/game_allegiance.h. It accounts for the remaining 208 bytes and 8 relocations.",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    },
+    {
+      "unit": "source/ai/actor_moving",
+      "function": "_actor_move_update",
+      "wave": "A4",
+      "exact_credit_meaningful_bytes": 0,
+      "exact_credit_padded_bytes": 0,
+      "final_measurement": {
+        "verdict": "residual",
+        "padded": 3136,
+        "gate_tag": "[size 3120!=3136, sha]"
+      },
+      "final_target_vs_candidate": [
+        {
+          "size": 3136,
+          "relocation_count": 72,
+          "normalized_sha256": "ed110da6e891aea013b08551bc9de54482622f7d07fb90e2ca0b7769ac3ebf42"
+        },
+        {
+          "size": 3120,
+          "relocation_count": 72,
+          "normalized_sha256": "87b04feace01e15b5611d6e047165f3970f56f759fbc38757fc5531b5fe6ef2d"
+        }
+      ],
+      "unit_census_after": "== exact 31  residual 5  unwritten 0  (of 36 listed)",
+      "defect_corrected": "size 3088 -> 3120 against January 3136 (gap 48 -> 16); instructions 869 -> 882 against 888 (gap 19 -> 6)",
+      "why_more_authentic": "Three changes read off January: the initialized-declaration order its twelve-store prologue emits; the moving_into_fire_timer branch polarity with its arms swapped; and normalize3d(...) != 0.f in place of > 0.f.",
+      "rejected_alternatives": "hand-expanding actor_move_transform_avoidance_vector at two call sites (manual inlining of an ordinary helper, forbidden by house rule 13 and named on this unit do-not-repeat list; it does fix test_avoidance_vector relocation count 17 -> 16 and shrinks that size gap 208 -> 16, but overshoots); rewriting TEST_FLAG(flags, crouch ? A : B) as (crouch && TEST_FLAG(A)) || (!crouch && TEST_FLAG(B)) - measured and DROPPED, because restoring the natural ternary gives 3120 bytes where the verbose form gives 3104",
+      "reopening_evidence_required": "the remaining 16 bytes and 6 instructions",
+      "reviewer": "orchestrator, independently re-measured; worker self-reports were not taken on trust",
+      "source_commit": "7356576d32be3508fe3a300b61015154042953ba"
+    }
+  ],
+  "config_changes": {
+    "config/parked.json": "four entries re-baselined (measurements refreshed, evidence extended); none retired, none unrelated touched",
+    "config/config.json": "unchanged",
+    "config/symbols.json": "unchanged",
+    "headers": "unchanged - no header in the tree was edited"
+  }
+}

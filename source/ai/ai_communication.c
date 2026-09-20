@@ -1091,17 +1091,6 @@ void actor_iterator_new(
 	boolean active_only);
 struct actor_datum *actor_iterator_next(
 	struct actor_iterator *iterator);
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-boolean game_team_is_ally(
-	short team_index0,
-	short team_index1);
-boolean game_allegiance_incident(
-	short aggressor_team_index,
-	short victim_team_index,
-	short incident_type,
-	boolean *notify_immediately);
 static boolean ai_conversation_find_participant(
 	long conversation_index,
 	short participant_index,

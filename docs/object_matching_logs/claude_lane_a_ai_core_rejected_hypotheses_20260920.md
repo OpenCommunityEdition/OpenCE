@@ -188,9 +188,11 @@ hypothesis (16/16 relocations, 0 differing rows).
 ### R13. `_actor_emotion_update` — two condition-order shapes are worse, not inert
 
 January starts the threat scan at index 9 (`mov eax, 9`) where we start at 8;
-writing January's `for (priority = NUMBER_OF_ACTOR_THREAT_TYPES; ...)` equalises
-the instruction counts at 487/487 and collapses the divergence from 18
-`bijection_walk` events to one region. That form reads `specific_threats[9]`,
+writing January's `for (priority = NUMBER_OF_ACTOR_THREAT_TYPES; ...)` removes
+that divergence. Measured honestly, instruction counts are **already** 487/487 at
+production and the real differing regions go from **3 to 2** - the change buys one
+of three. (An earlier note claiming "18 bijection events to one region" was wrong;
+`bijection_walk` was counting the embedded jump table as instructions.) That form reads `specific_threats[9]`,
 one past a 9-element array — a real January off-by-one, with the layout
 independently proven by two exact functions (`action_fight` 6/6 reads
 `cumulative_threats[5]`; `_actor_combat_update`, 4,672 bytes exact, reads
@@ -233,3 +235,79 @@ store-across-a-call law cannot prove a statement order here.
 | `_ai_test_line_of_fire` | an attested or owner-approved parenthesising spelling for `fast_vector_intersects_sphere` radius arguments |
 | `_ai_test_line_of_sight` | owner reversal of the uninitialized-read policy **and** a shape producing frame 0x80 |
 | `_ai_communication_event` (second allegiance block) | a `game_allegiance_get_incidents` declaration in its genuine owner header `source/game/game_allegiance.h` — a deferred header prerequisite, not workable in this lane |
+
+---
+
+## Wave 2 and orchestrator additions
+
+### R15. `_encounter_create`'s 4-byte frame is a SPILL SLOT, not a declared local
+
+I inferred from the slot census that January holds a 4-byte object where we hold
+a 1-byte one, and read that as a type error. **That reading is refuted from
+January's own bytes.** `[ebp-0x14]` is a compiler spill slot for the `short`
+`actor_type`:
+
+- `0x183  mov dword ptr [ebp-0x14], ecx` — a **32-bit** store of the return of
+  `squad_get_actor_type`, which is `static short` (`encounters.c:2606`). A
+  declared `short` home would be `mov word ptr [ebp-0x14], ax`; a declared `long`
+  would need a `movsx ecx, ax` that January does not have.
+- `0x1a8  cmp word ptr [ebp-0x14], 7` — a **16-bit** compare, so the variable is
+  16-bit.
+- `0x223/0x226  mov ecx, [ebp-0x14]` then `cmp cx, 7` — the classic full-register
+  reload of a spill whose meaningful part is the low word.
+
+One declared variable cannot be both dword-written and word-compared. Moving
+`actor_type` to function scope was also measured **byte-identical, frame still
+`0x10`** — VC7 enregisters it regardless of declared scope.
+
+The real mechanism is a single register-allocation decision: January borrows `bl`
+for `create_leader` inside `case _unique_leader_type_normal` (`xor bl,bl` at
+`0x1a6`, `setge bl` at `0x1de`, reloading `ebx` from `[ebp-0xc]` at `0x220`),
+which forces `actor_type` to spill; we spill `create_leader` to `[ebp-1]` instead
+and `actor_type` keeps a callee-saved register.
+
+Measured inert and **not to be repeated**: `actor_type` declared last in the loop
+body; declared first; moved to function scope; and the inner-block carrier-scoping
+shape wrapping the whole `switch` with `short actor_type = squad_get_actor_type(...)`.
+One further shape moved code away from January and was discarded.
+
+**Reopen** only with an independently recovered source or donor showing a
+construct absent from the current body, or a proven VC7 lever controlling which
+callee-saved register the first-defined pointer takes.
+
+### R16. `_prop_get_active_by_unit_index` is a closed class-C coloring tie
+
+Nine mechanism-distinct probes across two waves all land on the **same normalized
+function sha**. Declaration scope is proven inert in *both* directions (widening
+and narrowing), and local-table membership is proven inert. The whole divergence
+is which of ECX/EDX holds the loop-carried next-index web, which forces one
+push/load transposition and a one-byte relocation drift.
+
+Do not re-derive: deleting the single-use `actor` local; declaring `prop_index`
+inside the loop body; a nested traversal block placing declarations at their
+definitions; and the six earlier probes. Note also that the object's own sibling
+`_prop_iterator_new` uses the named-local spelling for this idiom, so the
+production spelling is the better-corroborated one.
+
+### R17. `actor_perception` — all three wave-1 proposals rejected
+
+The file is **unchanged by this lane**. See N11 in the orchestrator record:
+the `NUMBER_OF_ACTOR_THREAT_TYPES` off-by-one is an owner decision that buys one
+of three regions; removing the `goto` scaffolding is byte-inert and moves away
+from this file's own established `goto done;` idiom; and
+`!(horizontal_aiming_magnitude > 0.0f)` merges one aligned region while moving
+neither size, instruction count nor relocations.
+
+### R18. Two further orchestrator probes, both refuted
+
+- **`_ai_test_ballistic_line_of_fire`**: hoisting `point = *origin;` and
+  `arc_velocity = *velocity;` above the `collision_flags` assignment, to make
+  `origin` die earlier and flip the parameter home VC7 reuses. Measured **11 → 43**
+  real differing regions and the instruction count falls from 296/296 to 293.
+  Decisively worse.
+- **`_actor_perception_refresh`**: splitting
+  `real distance_squared = prop->distance * prop->distance;` into an uninitialised
+  declaration plus a separate assignment before the
+  `actor_perception_desire_prop` call. **Byte-inert** (9 real regions both ways,
+  769/769 instructions). Unlike `_pre_evaluator_attack` there is no intervening
+  CALL, so the store-across-a-call law gives VC7 no reason to honour the split.
