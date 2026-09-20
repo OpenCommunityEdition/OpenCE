@@ -2278,7 +2278,7 @@ static void ai_debug_render_actor(
 			switch (actor->state.action)
 			{
 			case _actor_action_flee:
-				if (actor->state.action_data.flee.has_approach_point>0)
+				if (actor->state.action_data.flee.has_approach_point)
 				{
 					render_debug_sphere(TRUE, &actor->state.action_data.flee.approach_point, 0.25f, actor_action_debug_color(actor_index));
 				}

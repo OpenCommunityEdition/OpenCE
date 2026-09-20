@@ -4762,227 +4762,321 @@ void ai_communication_finished(
 	long preselected_reply_actor_index,
 	struct ai_information_packet *information)
 {
-	struct reply_usage const *reply;
-	short reply_table_index;
-
-	if (!ai_globals->dialogue_triggers_enabled ||
-		vocalization_type == NONE)
+	if (ai_globals->dialogue_triggers_enabled && vocalization_type != NONE)
 	{
-		return;
-	}
+		char consider_string[512];
+		char debug_string[1024];
+		struct reply_usage const *reply;
+		boolean communication_not_focused = FALSE;
+		boolean any_replies = FALSE;
+		short reply_table_index;
 
-	reply = global_reply_table;
-	reply_table_index = 0;
-	do
-	{
-		struct unit_datum *unit;
-		struct actor_datum *speaker_actor;
-		struct unit_datum *reply_unit;
-		long reply_unit_index;
-		short speech_priority;
-		boolean play_reply;
-
-		if (reply->original_vocalization_type != vocalization_type)
+		if (ai_debug.print_communication)
 		{
-			goto next_reply;
+			sprintf(
+				debug_string,
+				"REPLY %s: ",
+				dialogue_get_vocalization_name(vocalization_type, FALSE));
+		}
+		if (ai_debug.communication_focus_enable)
+		{
+			communication_not_focused = !BIT_VECTOR_TEST_FLAG(
+				ai_debug.communication_focus_vector,
+				vocalization_type);
 		}
 
-		unit = unit_get(unit_index);
-		speaker_actor = unit->unit.actor_index == NONE ?
-			NULL : actor_get(unit->unit.actor_index);
-		speech_priority =
-			communication_speech_priorities[reply->communication_priority];
-
-		if (reply->original_damage_category != NONE &&
-			reply->original_damage_category != information->damage_category)
+		for (reply = global_reply_table, reply_table_index = 0;
+			reply->original_vocalization_type != NONE;
+			reply++, reply_table_index++)
 		{
-			goto next_reply;
-		}
-		if (sound_scripted_dialog_is_playing() &&
-			!TEST_FLAG(reply->flags, _dialogue_usage_lookup_bit))
-		{
-			goto next_reply;
-		}
-
-		if (preselected_reply_actor_index != NONE)
-		{
-			reply_unit_index =
-				actor_get(preselected_reply_actor_index)->meta.unit_index;
-		}
-		else
-		{
-			long reply_actor_index = NONE;
-
-			switch (reply->protagonist_type)
+			if (reply->original_vocalization_type == vocalization_type)
 			{
-			case _comm_protagonist_friend:
-				if (!speaker_actor || speaker_actor->meta.encounter_index == NONE)
+				struct unit_datum *unit = unit_get(unit_index);
+				struct actor_datum *speaker_actor = unit->unit.actor_index == NONE ?
+					NULL :
+					actor_get(unit->unit.actor_index);
+				short speech_priority =
+					communication_speech_priorities[reply->communication_priority];
+				any_replies = TRUE;
+
+				if (ai_debug.print_communication)
 				{
-					reply_actor_index = ai_communication_find_global_actor_to_talk(
-						unit->object.owner_team_index,
-						_find_actor_mode_friend,
-						unit_index,
-						NONE,
-						9.0f,
-						NONE,
-						reply->communication_priority,
-						speech_priority,
-						reply->vocalization_type,
-						reply->animation_type,
-						0);
+					csstrcat(
+						debug_string,
+						csprintf(
+							temporary,
+							"%s:",
+							dialogue_get_vocalization_name(reply->vocalization_type, FALSE)));
+				}
+				if (ai_debug.communication_focus_enable &&
+					BIT_VECTOR_TEST_FLAG(
+						ai_debug.communication_focus_vector,
+						reply->vocalization_type))
+				{
+					communication_not_focused = FALSE;
+				}
+
+				if (reply->original_damage_category != NONE &&
+					reply->original_damage_category != information->damage_category)
+				{
+					if (ai_debug.print_communication)
+					{
+						csstrcat(debug_string, "wrong-dmg ");
+					}
+				}
+				else if (sound_scripted_dialog_is_playing() &&
+					!TEST_FLAG(reply->flags, _dialogue_usage_lookup_bit))
+				{
+					if (ai_debug.print_communication)
+					{
+						csstrcat(debug_string, "override-scripted ");
+					}
 				}
 				else
 				{
-					reply_actor_index = ai_communication_find_specific_actor_to_talk(
-						speaker_actor->meta.encounter_index,
-						unit_index,
-						NONE,
-						9.0f,
-						NONE,
-						reply->communication_priority,
-						speech_priority,
-						reply->vocalization_type,
-						reply->animation_type,
-						0);
-				}
-				break;
+					long reply_unit_index = NONE;
 
-			case _comm_protagonist_target:
-				if (unit_try_and_get(information->target_unit_index))
-				{
-					reply_unit_index = information->target_unit_index;
-				}
-				else
-				{
-					goto next_reply;
-				}
-				break;
+					if (preselected_reply_actor_index == NONE)
+					{
+						long reply_actor_index = NONE;
 
-			case _comm_protagonist_enemy:
-				reply_actor_index = ai_communication_find_global_actor_to_talk(
-					unit->object.owner_team_index,
-					_find_actor_mode_enemy,
-					unit_index,
-					NONE,
-					9.0f,
-					NONE,
-					reply->communication_priority,
-					speech_priority,
-					reply->vocalization_type,
-					reply->animation_type,
-					0);
-				break;
+						match_assert(
+							"c:\\halo\\SOURCE\\ai\\ai_communication.c",
+							0x9E5,
+							!reply_to_player);
+						switch (reply->protagonist_type)
+						{
+						case _comm_protagonist_friend:
+							if (speaker_actor && speaker_actor->meta.encounter_index != NONE)
+							{
+								reply_actor_index = ai_communication_find_specific_actor_to_talk(
+									DATUM_INDEX_TO_ABSOLUTE_INDEX(speaker_actor->meta.encounter_index),
+									unit_index,
+									NONE,
+									9.0f,
+									NONE,
+									reply->communication_priority,
+									speech_priority,
+									reply->vocalization_type,
+									reply->animation_type,
+									0);
+							}
+							else
+							{
+								reply_actor_index = ai_communication_find_global_actor_to_talk(
+									unit->object.owner_team_index,
+									_find_actor_mode_friend,
+									unit_index,
+									NONE,
+									9.0f,
+									NONE,
+									reply->communication_priority,
+									speech_priority,
+									reply->vocalization_type,
+									reply->animation_type,
+									0);
+							}
+							break;
 
-			default:
-				goto next_reply;
+						case _comm_protagonist_target:
+							if (unit_try_and_get(information->target_unit_index))
+							{
+								reply_unit_index = information->target_unit_index;
+							}
+							break;
+
+						case _comm_protagonist_enemy:
+							reply_actor_index = ai_communication_find_global_actor_to_talk(
+								unit->object.owner_team_index,
+								_find_actor_mode_enemy,
+								unit_index,
+								NONE,
+								9.0f,
+								NONE,
+								reply->communication_priority,
+								speech_priority,
+								reply->vocalization_type,
+								reply->animation_type,
+								0);
+							break;
+						}
+
+						if (reply_actor_index != NONE)
+						{
+							reply_unit_index = actor_get(reply_actor_index)->meta.unit_index;
+						}
+					}
+					else
+					{
+						reply_unit_index =
+							actor_get(preselected_reply_actor_index)->meta.unit_index;
+					}
+
+					if (reply_unit_index != NONE)
+					{
+						struct unit_datum *reply_unit = unit_get(reply_unit_index);
+
+						if (reply_unit->unit.player_index == NONE)
+						{
+							boolean play_reply = TRUE;
+
+							if (!reply_to_player)
+							{
+								if (reply->chance > 0.0f)
+								{
+									real random_value = real_seed_random(
+										get_global_random_seed_address());
+
+									if ((game_connection() != _game_connection_local ||
+										!ai_debug.communication_random_disabled) &&
+										!(random_value < reply->chance))
+									{
+										if (ai_debug.print_communication)
+										{
+											csstrcat(
+												debug_string,
+												csprintf(
+													temporary,
+													"rand %.2f>%.2f ",
+													random_value,
+													reply->chance));
+										}
+										play_reply = FALSE;
+									}
+								}
+								else
+								{
+									if (ai_debug.print_communication)
+									{
+										csstrcat(debug_string, "0-chance ");
+									}
+									play_reply = FALSE;
+								}
+							}
+
+							if (!play_reply)
+							{
+								if (ai_debug.print_communication)
+								{
+									csstrcat(debug_string, "rand-failed ");
+								}
+							}
+							else if (reply->reply_filter &&
+								!reply->reply_filter(
+									unit_index,
+									information,
+									reply_unit->unit.actor_index))
+							{
+								if (ai_debug.print_communication)
+								{
+									csstrcat(debug_string, "filter ");
+								}
+							}
+							else
+							{
+								short reply_vocalization_type = reply->vocalization_type;
+								long sound_definition_index = NONE;
+								real weight = 1.0f;
+								short delay_ticks = (short)(long)(reply->delay_time * TICKS_PER_SECOND);
+								short play_type = ai_communication_consider_speech(
+									reply_unit_index,
+									reply->communication_priority,
+									speech_priority,
+									delay_ticks,
+									FALSE,
+									FALSE,
+									&reply_vocalization_type,
+									&weight,
+									&sound_definition_index,
+									consider_string);
+
+								if (play_type > _unit_play_speech_none)
+								{
+									struct unit_speech_item speech;
+
+									speech.priority = speech_priority;
+									speech.vocalization_type = reply_vocalization_type;
+									speech.sound_definition_index = sound_definition_index;
+									speech.delay_time = delay_ticks;
+									speech.ai_notification_delay = (short)(long)(
+										communication_notification_delays[reply->communication_priority] *
+										TICKS_PER_SECOND);
+									speech.pause_time = 24;
+									speech.ai.target_unit_index = unit_index;
+									speech.ai.communication_type = NONE;
+									speech.ai.dialogue_type_index = NONE;
+									speech.ai.damage_category = NONE;
+									speech.ai.updated_dialogue_timers = TRUE;
+									speech.ai.look_priority = 0;
+									speech.ai.look_type = _ai_information_none;
+									speech.ai.information_type = _ai_information_none;
+									csmemset(&speech.ai.information_data, 0, sizeof(speech.ai.information_data));
+
+									unit_speak(reply_unit_index, play_type, &speech);
+									ai_communication_update_speech_timers(
+										reply_unit_index,
+										speech_priority,
+										reply_vocalization_type,
+										NONE,
+										reply_table_index);
+									ai_communication_look_secondary_at_unit(
+										reply_unit->unit.actor_index,
+										_secondary_look_communicating_prop,
+										communication_protagonist_default_look_priorities[
+											reply->communication_priority],
+										unit_index,
+										NONE);
+
+									if (ai_debug.print_communication)
+									{
+										csstrcat(
+											debug_string,
+											strupr(csprintf(
+												temporary,
+												">>%s<<",
+												dialogue_get_vocalization_name(speech.vocalization_type, TRUE))));
+									}
+									break;
+								}
+
+								if (ai_debug.print_communication)
+								{
+									csstrcat(
+										debug_string,
+										csprintf(
+											temporary,
+											"u-%s-%s ",
+											weight > 0.0f ? "dis" : "n/a",
+											consider_string));
+								}
+							}
+						}
+						else
+						{
+							if (ai_debug.print_communication)
+							{
+								csstrcat(debug_string, "playercant ");
+							}
+						}
+					}
+					else
+					{
+						if (ai_debug.print_communication)
+						{
+							csstrcat(debug_string, "nobody ");
+						}
+					}
+				}
 			}
-
-			if (reply->protagonist_type != _comm_protagonist_target)
-			{
-				if (reply_actor_index == NONE)
-				{
-					goto next_reply;
-				}
-
-				reply_unit_index = actor_get(reply_actor_index)->meta.unit_index;
-			}
 		}
 
-		if (reply_unit_index == NONE)
+		if (any_replies &&
+			ai_debug.print_communication &&
+			!communication_not_focused)
 		{
-			goto next_reply;
+			error(2, debug_string);
 		}
-
-		reply_unit = unit_get(reply_unit_index);
-		if (reply_unit->unit.player_index != NONE)
-		{
-			goto next_reply;
-		}
-
-		play_reply = reply_to_player;
-		if (!reply_to_player && reply->chance > 0.0f)
-		{
-			play_reply = real_seed_random(get_global_random_seed_address()) <
-				reply->chance;
-		}
-		if (!play_reply)
-		{
-			goto next_reply;
-		}
-
-		if (reply->reply_filter &&
-			!reply->reply_filter(
-				unit_index,
-				information,
-				reply_unit->unit.actor_index))
-		{
-			goto next_reply;
-		}
-
-		{
-			struct unit_speech_item speech;
-			short reply_vocalization_type = reply->vocalization_type;
-			short delay_ticks = (short)(long)(reply->delay_time * 30.0f);
-			real weight = 1.0f;
-			long sound_definition_index = NONE;
-			short play_type = ai_communication_consider_speech(
-				reply_unit_index,
-				reply->communication_priority,
-				speech_priority,
-				delay_ticks,
-				FALSE,
-				FALSE,
-				&reply_vocalization_type,
-				&weight,
-				&sound_definition_index,
-				NULL);
-
-			if (play_type <= _unit_play_speech_none)
-			{
-				goto next_reply;
-			}
-
-			csmemset(&speech, 0, sizeof(speech));
-			speech.priority = speech_priority;
-			speech.vocalization_type = reply_vocalization_type;
-			speech.sound_definition_index = sound_definition_index;
-			speech.delay_time = delay_ticks;
-			speech.ai_notification_delay = (short)(long)(
-				communication_notification_delays[reply->communication_priority] *
-				30.0f);
-			speech.pause_time = 24;
-			speech.ai.target_unit_index = unit_index;
-			speech.ai.communication_type = NONE;
-			speech.ai.dialogue_type_index = NONE;
-			speech.ai.damage_category = NONE;
-			speech.ai.updated_dialogue_timers = TRUE;
-			speech.ai.look_priority = 0;
-			speech.ai.look_type = _ai_information_none;
-			speech.ai.information_type = _ai_information_none;
-
-			unit_speak(reply_unit_index, play_type, &speech);
-			ai_communication_update_speech_timers(
-				reply_unit_index,
-				speech_priority,
-				NONE,
-				NONE,
-				reply_table_index);
-			ai_communication_look_secondary_at_unit(
-				reply_unit->unit.actor_index,
-				_secondary_look_communicating_prop,
-				communication_protagonist_default_look_priorities[
-					reply->communication_priority],
-				unit_index,
-				NONE);
-		}
-
-		return;
-
-		next_reply:
-		reply++;
-		reply_table_index = (short)(reply_table_index + 1);
 	}
-	while (reply->original_vocalization_type != NONE);
 
 	return;
 }
