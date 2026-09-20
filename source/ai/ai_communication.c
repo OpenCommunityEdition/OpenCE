@@ -558,6 +558,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "encounters.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "game/players.h"
 #include "main/console.h"
 #include "memory/data.h"
@@ -6045,6 +6046,17 @@ void ai_communication_event(
 			if (betrayal)
 			{
 				hostility = _comm_hostility_traitor;
+			}
+
+			if (ai_debug.print_allegiance)
+			{
+				console_printf(
+					FALSE,
+					"incident between teams %s and %s: %s, %s",
+					global_game_team_names[subject_team],
+					global_game_team_names[cause_team],
+					betrayal ? "betrayal" : "accident",
+					observed ? "observed" : "unobserved");
 			}
 
 			if (observed)
