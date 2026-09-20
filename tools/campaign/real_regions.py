@@ -28,6 +28,16 @@ CLOSEST, where the ratio is worst. Measured over the Lane A AI portfolio:
 A function reported at "12 regions" that is actually at 2 is a function a triage
 pass will wrongly deprioritise. Use this number, not the raw one, when ranking.
 
+CAVEAT, and it matters. Normalising a branch's immediate away also hides a
+SHORT versus NEAR encoding difference, which is a real byte difference even
+though the instruction text is the same. So `0 REAL regions` does NOT mean
+`exact` - it means every instruction's TEXT matches and the divergence is in
+encoding lengths or positions. `_actor_path_refresh` reads 0 REAL with one
+padding-only region: its content is identical, our encodings are about 12 bytes
+longer, and January's 12 trailing NOPs absorb the difference into the same
+section size. When you see `0 REAL` plus a padding-only region, the gap is
+encoding length - go and compare where real code ENDS on both sides.
+
 Usage:
     python tools/campaign/real_regions.py <unit> <function> [--ours-object OBJ]
     python tools/campaign/real_regions.py source/ai/ai_debug _code_00039990
@@ -42,11 +52,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 TARGET_SPELLING = re.compile(r'target=[^ ]+')
 ROW_PREFIX = re.compile(r'^\s*[TO]\s+[0-9a-f]+\s+')
+RELOC_SITE = re.compile(r'rel\+0x[0-9a-f]+')
+BRANCH_IMM = re.compile(r'\b(j[a-z]{1,3}|call|loop[a-z]*)\s+0x[0-9a-f]+')
+PAD = re.compile(r'^\s*[TO]\s+[0-9a-f]+\s+(nop|lea\s+e\wx, \[e\wx\]|int3)\s*$')
 
 
 def canonical(line):
-    """An instruction row with its address and relocation SPELLING removed."""
-    return ROW_PREFIX.sub('', TARGET_SPELLING.sub('', line)).strip()
+    """An instruction row stripped of everything that is an ADDRESS, not content.
+
+    Removed: the row's own address, the relocation-target spelling, the
+    relocation SITE address (`rel+0x...`, which shifts whenever anything
+    upstream changes length), and a branch or call's immediate target. What is
+    left is the instruction's actual text.
+    """
+    line = ROW_PREFIX.sub('', line)
+    line = TARGET_SPELLING.sub('', line)
+    line = RELOC_SITE.sub('', line)
+    line = BRANCH_IMM.sub(lambda m: m.group(1) + ' <target>', line)
+    return line.strip()
+
+
+def is_padding_only(rows):
+    """True if every row is a padding instruction (trailing alignment filler)."""
+    return bool(rows) and all(PAD.match(r) for r in rows)
 
 
 def main():
@@ -68,18 +96,22 @@ def main():
 
     header = out.splitlines()[0]
     blocks = out.split('--- ')[1:]
-    real = []
+    real, addressing, padding = [], 0, 0
     for b in blocks:
         rows = [l for l in b.splitlines()[1:] if l.strip().startswith(('T ', 'O '))]
         t = [l for l in rows if l.strip().startswith('T ')]
         o = [l for l in rows if l.strip().startswith('O ')]
+        if is_padding_only(t) and not o or is_padding_only(o) and not t:
+            padding += 1                  # trailing alignment filler on one side
+            continue
         if len(t) == len(o) and all(canonical(x) == canonical(y) for x, y in zip(t, o)):
-            continue                      # relocation-spelling only
+            addressing += 1               # relocation spelling / site / branch target
+            continue
         real.append(b)
 
     print(header)
-    print('regions: %d reported, %d REAL (%d were relocation-spelling only)'
-          % (len(blocks), len(real), len(blocks) - len(real)))
+    print('regions: %d reported, %d REAL  (%d addressing-only, %d padding-only)'
+          % (len(blocks), len(real), addressing, padding))
     if a.show:
         for b in real:
             print('--- ' + b.rstrip())
