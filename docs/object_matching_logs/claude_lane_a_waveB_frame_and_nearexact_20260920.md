@@ -15,10 +15,12 @@ near-exact rows.
 | unit | function | before | after | padded bytes |
 |---|---|---|---|---:|
 | `actor_firing_position` | `_pre_evaluator_attack` | residual | **EXACT** | 1,120 |
+| `actor_perception` | `_actor_perception_refresh` | residual | **EXACT** | 2,416 |
 | `ai_debug` | `_code_0003a910` | residual | **EXACT** | 704 |
 
 `source/ai/actor_firing_position` closes at **27/27 - the whole object**.
-`source/ai/ai_debug` goes 57/60 to 58/60.
+`source/ai/actor_perception` goes 35/44 to 36/44 and `source/ai/ai_debug`
+57/60 to 58/60.
 
 Two further changes landed at **explicitly zero credit** because they make the
 source more authentic without reaching exactness:
@@ -115,12 +117,22 @@ array bases 0x2b0/0x310/0x410/0x510/0x710/0x810 appear in the pristine build at
 exactly +0xc; the tuned buffer scrambles them). Matching `sub esp` is not
 matching the layout.
 
-## Held for an owner ruling: `_actor_perception_refresh` (2,416 bytes, EXACT)
+## `_actor_perception_refresh` - EXACT, 2,416 bytes, landed on an owner ruling
 
 This one **gates strictly EXACT** - `relocdiff` reports `sha equal`, the unit
 goes 35/9 to 36/8, and every other section in the object is byte-identical to
 the floor. It is the largest single win this wave found. **I have not landed
 it**, because it needs a decision that is the owner's, not mine.
+
+**OWNER RULING, 2026-09-20:** *"Land `_actor_perception_refresh` (+2,416) with a
+TU-private, descriptively named inferred macro and documented evidence."*
+Landed accordingly: the macro is translation-unit private (a `#define` in the
+`.c`, no header touched), named to match its sibling
+`actor_perception_distance_squared2d`, and carries a block comment that states
+plainly that it is **inferred from January's bytes and not attested in any
+surviving source**, reproduces the five-spelling table below, and explains why
+the byte evidence is itself the argument for a macro. The second hunk carries
+its own comment saying the two are required jointly.
 
 It requires two hunks, and neither works alone - I measured each in isolation
 and both are residual:
@@ -175,8 +187,9 @@ evidence unilaterally, and the owner has adjudicated this class before (the
 `ai_script` BUG, the `_actor_emotion_update` hold).
 
 The diff, all 76 gated shapes and my five-spelling table are at
-`scratch/res/perception-refresh/`. **2,416 meaningful bytes are waiting on one
-ruling.**
+`scratch/res/perception-refresh/`. Verified after landing: `EXACT 2416`,
+`relocdiff` `sha equal` with **0 differing rows**, unit census 35/9 to **36/8**,
+`fake_match_scan` 0 findings, no sibling lost.
 
 One adjacent result from the same agent, worth keeping either way: the seed's
 claim that `_ai_communication_get_player_rating` shares this interleave
@@ -305,14 +318,15 @@ parked functions carry the same kind of evidence.
 ## Verification, all reproduced after the landings
 
     ninja -j4 all_source progress semantic_progress       exit 0
-      halobetacache  1,446,010 / 1,770,166   (7,294 / 7,574)
-      overall        1,467,242               (7,561)
+      halobetacache  1,448,422 / 1,770,166   (7,295 / 7,574)
+      overall        1,469,654               (7,562)
       Validated parked compiler ties: 183
 
     stable_verdicts diff (pre-wave -> post-wave)
-      gained source/ai/actor_firing_position::section:27 _pre_evaluator_attack 1120
-      gained source/ai/ai_debug::section:53              _code_0003a910         704
-      gained 2, 1824 padded bytes; REGRESSIONS 0
+      gained source/ai/actor_firing_position::section:27 _pre_evaluator_attack     1120
+      gained source/ai/actor_perception::section:43      _actor_perception_refresh 2416
+      gained source/ai/ai_debug::section:53              _code_0003a910             704
+      gained 3, 4240 padded bytes; REGRESSIONS 0
 
     tools.parked_functions        183 active / 0 stale / 0 invalid
     audit_object_admission        0 contradicted / 0 revoked
@@ -320,7 +334,7 @@ parked functions carry the same kind of evidence.
                                   #pragma optimize pair), none introduced here
     git diff --check              clean
 
-**Net: +1,817 meaningful bytes, +2 functions, 0 regressions.** The two
+**Net: +4,229 meaningful bytes, +3 functions, 0 regressions.** The two
 zero-credit landings move no byte of the total and are booked as such - the
 verifiers were emphatic that the workflow header's "worth N meaningful bytes"
 is a residual's *potential*, not what a non-closing change realizes, and that

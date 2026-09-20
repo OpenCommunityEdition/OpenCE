@@ -396,6 +396,26 @@ enum
 #define actor_perception_audibility_combat_status(actor) \
 	((actor)->state.mode)
 
+/* INFERRED FROM JANUARY'S BYTES. This macro is not attested in any surviving
+ * header or source; it is reconstructed because January's object requires the
+ * canonical macro expansion ((a) * (a)) at the actor_perception_refresh call
+ * site, and no simpler spelling of the square reaches it. Measured, with the
+ * rest of the function held constant:
+ *
+ *     prop->distance * prop->distance          residual
+ *     (prop->distance) * (prop->distance)      residual
+ *     (prop->distance * prop->distance)        residual
+ *     bind a local first, (distance * distance)  residual
+ *     ((prop->distance) * (prop->distance))    EXACT
+ *
+ * A hand-written expression does not produce the doubly-parenthesised form;
+ * a correctly written macro produces it inevitably, so the byte evidence is
+ * itself the argument that a macro stood here. It is kept translation-unit
+ * private and named to match its sibling below.
+ */
+#define actor_perception_distance_squared(distance) \
+	((distance) * (distance))
+
 #define actor_perception_distance_squared2d(a, b, delta_x, delta_y) \
 	((delta_x) = (b)->x - (a)->x, \
 		(delta_y) = (b)->y - (a)->y, \
@@ -1296,7 +1316,17 @@ boolean actor_perception_desire_prop(
 			if (!enemy && actor->state.mode < 3)
 				maximum_distance_squared = 64.0f;
 
-			desire = distance_squared < maximum_distance_squared;
+			/* INFERRED FROM JANUARY'S BYTES: the explicit branch, not
+			 * `desire = distance_squared < maximum_distance_squared;`, is what
+			 * gives this else-if arm its own cross-jump resolution. It also
+			 * matches the three sibling arms above, which assign TRUE/FALSE
+			 * literals, and the branchy form used on this same variable in the
+			 * inactive-encounter block. Required jointly with the squared-distance
+			 * macro; neither reaches January alone. */
+			if (distance_squared < maximum_distance_squared)
+				desire = TRUE;
+			else
+				desire = FALSE;
 		}
 	}
 	else
@@ -5813,7 +5843,7 @@ void actor_perception_refresh(
 		if (prop->state < _prop_state_uninspected_orphan ||
 			prop->state > _prop_state_inspected_orphan)
 		{
-			real distance_squared = prop->distance * prop->distance;
+			real distance_squared = actor_perception_distance_squared(prop->distance);
 			boolean optional;
 			boolean desired =
 				actor_perception_desire_prop(
