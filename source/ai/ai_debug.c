@@ -1097,7 +1097,7 @@ static void ai_debug_render_actor(
 										temporary,
 										"%.3f",
 										actor_debug_info->avoid_t[i][j]),
-									global_real_argb_blue);
+									color);
 							}
 						}
 						else
@@ -1107,7 +1107,7 @@ static void ai_debug_render_actor(
 								&actor_debug_info->field_6358[i][j],
 								&actor_debug_info->field_6418[i][j],
 								1.f,
-								color);
+								global_real_argb_blue);
 
 							if (ai_debug.render_vector_avoidance_clear_time)
 							{
