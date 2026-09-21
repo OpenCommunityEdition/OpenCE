@@ -707,3 +707,98 @@ falling in from the preceding eight-argument `csstrcat`, one jumping back. Ours
 lays them out sequentially and falls through. This is one of the four parts of
 the previously logged 18-byte / 4-instruction gap, now localised to a specific
 pair of source statements rather than to the function as a whole.
+
+### R23. Wave E's four clean negatives, and the four reusable laws they produced
+
+Four targets returned no landing after **115 gated shapes** between them. All four
+bank ZERO bytes. Detail in `scratch/res5/{render-actor3,customize-unit,look-update2,spawn-from-unit}/NOTES.md`.
+
+| function | bytes | shapes | residual after decode |
+|---|---:|---:|---|
+| `_ai_debug_render_actor` | 24,976 | 4 | flying-axes family decoded; byte budget nets exactly zero |
+| `_actor_look_update` | 4,720 | 17 | 120 REAL to 96 register-blind; **no missing computation** |
+| `_actors_spawn_from_unit` | 672 | 56 | 16 B = 11 in one block + 5 of consequent alignment |
+| `_actor_customize_unit` | 640 | 38 | 43 REAL to **ONE** binary allocator decision |
+
+The pattern worth noting: in every one of the four, the *reported* region count
+badly overstated the residual, and a **register-blind structural diff** cut it
+down - 120 to 96, and 43 to 1. Run that normalisation before ranking a target.
+
+#### LAW: an if/else whose condition is a disjunction lays the ELSE arm out FIRST
+
+For `if (A || B) { X } else { Y }`, VC7 emits Y before X. Established in a lab
+across four variants and **confirmed in January's own bytes on
+`_actor_action_handle_evasion`**. It holds in both builds, independent of arm
+size and of which arm contains the call. Only a no-else `if`, a single-test
+`if/else`, a condition bound to a temp, or a duplicated arm gives the canonical
+order.
+
+This **retires the whole "the arms are the wrong way round" hypothesis family**.
+Corollary, separately measured: `if (A != NONE || B != NONE) {X} else {Y}` and
+`if (A == NONE && B == NONE) {Y} else {X}` emit the identical section, so the
+disjunction-versus-inverted-conjunction spelling is byte-inert. Do not spend a
+shape on it.
+
+#### LAW: the declaration-count oracle does NOT reach inside a function body
+
+Seventeen shapes on `_actor_look_update` establish that within a single function
+VC7's frame packing and register allocation are insensitive to declaration
+ORDER, to declaration GROUPING or count-per-statement, and to SCOPE DEPTH -
+three of them dumpfn-verified byte-identical to the floor. Separately, a TU-global
+numbering shift is not a codegen lever: changing COMDAT order and the internal
+label counter left the function byte-identical, which also refutes the standing
+"extra leading header-inline COMDATs perturb this function" theory.
+
+The declaration-count oracle remains real **across a shared header**; it simply
+does not apply within one function body. That boundary is now measured.
+
+#### `_actor_customize_unit`: a 21-byte residual accounted for byte-exactly
+
+The seed's "43 real regions" was an artefact of `real_regions.py` not normalising
+register names. Corrected for padding nops and register-blind, the true residual
+is **2 surplus instructions and 21 surplus bytes**, and every byte is attributed:
+three branches emitted NEAR not SHORT (+12), an entry spill (+3), a loop-init
+form (+2), three `mov esi,[ebp-4]` restores (+9), a loop-tail counter reload
+(+3), against -3 for holding a value in ebx and -5 for a byte-register choice.
+Sum = +21 = 659-638 exactly. Root cause is one binary allocator decision about
+the third callee-saved register in the change-colour loop.
+
+Twenty-six of its thirty-seven gated shapes are **byte-identical to the floor**,
+which is the headline negative: this function's IL is fully normalised over
+scope, loop form, guard form, macro expansion and declaration order. Also
+confirmed here: if/else ARM ORDER is byte-inert, so a sunk error block's
+placement is a register-allocation consequence; and a named temp versus nesting
+a call in an argument list is byte-inert.
+
+#### `_ai_debug_render_actor`: the wave-C header prerequisite is REFUTED
+
+The flying-axes family is decoded. January materialises each
+`actor->output.throttle` component ONCE and spills two of them into the SAME
+frame cell - a cell reused for two different values is a **compiler temp, not a
+named local**, so January's source has no extra locals and needs no header. Its
+phase order is TERM-major in source order, with the `.j`/`.k` partials
+accumulated in `throttle_vector`'s own slots while `.i` rides the x87 stack. Ours
+folds the throttle components as memory operands, reading each three times
+(displacement census 0x6e0/0x6e4/0x6e8: January 4/4/2, ours 12/12/6) and
+reassociates `a+b+c` into `(a+c)+b`.
+
+The construct that reproduces it is the codebase's own inline helpers, because an
+inline function's `real` parameter is ONE IL value - `scale_vector3d` followed by
+`point_from_line3d`. **That is a live lead, not a negative**, and it is the next
+thing to try on this function.
+
+Two further negatives banked here: operand order of multiplication is byte-inert
+(a swap of every product in both flying arms emitted a byte-identical section,
+confirming the standing law), and the whole-function immediate census has
+**zero** differing rows apart from x87 stack-register operands, so the wave-C
+constant fix holds and there is no second wrong literal to find.
+
+#### `_actors_spawn_from_unit`: 16 bytes, fully attributed
+
+The seed's branch-width hypothesis is refuted - branch widths match one for one.
+The 16 bytes are 11 in the encounter/squad selection block plus 5 of consequent
+loop-head alignment filler. The 11 decompose as +8 (we duplicate two stores in
+BOTH arms where January has one copy in the merge block - a tail merge), +5 (we
+materialise -1 twice where January materialises once), +2 (our merge compares
+read memory where January compares registers), -3 and -1. Every byte is
+accounted.
