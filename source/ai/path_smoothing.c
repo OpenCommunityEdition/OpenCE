@@ -111,56 +111,45 @@ static void find_tangent_point(
 {
 	real_vector2d center_to_point;
 	real distance_squared;
-	real tangent_length;
 	real inverse_distance_squared;
-	real_point2d tangent_points[2];
-	long cross_positive;
-	long tangent_point_index;
+	real tangent_length;
 
-	center_to_point.i = point->x - center->x;
-	center_to_point.j = point->y - center->y;
-	distance_squared = center_to_point.i*center_to_point.i;
-	distance_squared += center_to_point.j*center_to_point.j;
+	vector_from_points2d(center, point, &center_to_point);
+	distance_squared = magnitude_squared2d(&center_to_point);
 	inverse_distance_squared = radius / distance_squared;
 	tangent_length = distance_squared - radius*radius;
 
 	if (tangent_length > 0.0f)
 	{
-		real_vector2d point_to_tangent[2];
+		real_point2d tangent_points[2];
+		real_vector2d tangent_vectors[2];
 
-		tangent_length = (real)sqrt(tangent_length);
+		tangent_length = square_root(tangent_length);
 
-		tangent_points[0].x =
-			(center_to_point.i*radius + center_to_point.j*tangent_length)*inverse_distance_squared + center->x;
-		tangent_points[0].y =
-			(center_to_point.j*radius - center_to_point.i*tangent_length)*inverse_distance_squared + center->y;
-		tangent_points[1].x =
-			(center_to_point.i*radius - center_to_point.j*tangent_length)*inverse_distance_squared + center->x;
-		tangent_points[1].y =
-			(center_to_point.i*tangent_length + center_to_point.j*radius)*inverse_distance_squared + center->y;
+		set_real_point2d(
+			&tangent_points[0],
+			(center_to_point.i*radius + center_to_point.j*tangent_length)*inverse_distance_squared + center->x,
+			(center_to_point.j*radius - center_to_point.i*tangent_length)*inverse_distance_squared + center->y);
+		set_real_point2d(
+			&tangent_points[1],
+			(center_to_point.i*radius - center_to_point.j*tangent_length)*inverse_distance_squared + center->x,
+			(center_to_point.j*radius + center_to_point.i*tangent_length)*inverse_distance_squared + center->y);
 
-		point_to_tangent[0].i = tangent_points[0].x - point->x;
-		point_to_tangent[0].j = tangent_points[0].y - point->y;
-		point_to_tangent[1].i = tangent_points[1].x - point->x;
-		point_to_tangent[1].j = tangent_points[1].y - point->y;
-		cross_positive =
-			point_to_tangent[1].j*point_to_tangent[0].i -
-			point_to_tangent[1].i*point_to_tangent[0].j > 0.0f;
-		tangent_point_index = cross_positive != clockwise;
-		*tangent_point = tangent_points[tangent_point_index];
+		vector_from_points2d(point, &tangent_points[0], &tangent_vectors[0]);
+		vector_from_points2d(point, &tangent_points[1], &tangent_vectors[1]);
+
+		*tangent_point = tangent_points[(cross_product2d(&tangent_vectors[0], &tangent_vectors[1]) > 0.0f) != clockwise];
 	}
 	else
 	{
-		vector_from_points2d(
-			center,
-			point,
-			&center_to_point);
+		real_vector2d radius_vector;
 
-		if (normalize2d(&center_to_point) == 0.0f)
-			center_to_point = *global_left2d;
+		vector_from_points2d(center, point, &radius_vector);
 
-		tangent_point->x = center_to_point.i*radius + center->x;
-		tangent_point->y = center_to_point.j*radius + center->y;
+		if (normalize2d(&radius_vector) == 0.0f)
+			radius_vector = *global_left2d;
+
+		point_from_line2d(center, &radius_vector, radius, tangent_point);
 	}
 
 	return;
