@@ -6081,6 +6081,22 @@ void ai_communication_event(
 						subject_team,
 						broken);
 				}
+
+				if (ai_debug.print_allegiance && !broken)
+				{
+					short incident_threshold;
+					short incidents = game_allegiance_get_incidents(
+						cause_team,
+						subject_team,
+						&incident_threshold);
+
+					console_printf(
+						FALSE,
+						"allegiance %s, %d incidents (threshold %d)",
+						"still holds",
+						incidents,
+						incident_threshold == NONE ? 999 : incident_threshold);
+				}
 			}
 		}
 

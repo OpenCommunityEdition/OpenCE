@@ -26,6 +26,10 @@ boolean game_team_is_enemy(
 boolean game_team_is_ally(
 	short our_team_index,
 	short other_team_index);
+short game_allegiance_get_incidents(
+	short our_team_index,
+	short other_team_index,
+	short *incident_threshold);
 void game_allegiance_provoke(
 	short team_index0,
 	short team_index1);
