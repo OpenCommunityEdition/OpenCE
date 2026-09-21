@@ -2965,6 +2965,23 @@ real ai_communication_get_player_rating(
 	struct player_datum *player;
 	real_point3d position;
 	real_point3d player_position;
+	/* INFERRED FROM JANUARY'S BYTES - not attested in any surviving source.
+	 * Naming the two endpoints before the vector is taken is what fixes the
+	 * order in which the compiler squares the vector's components: an
+	 * address-of expression and a pointer value are different operand forms
+	 * to this compiler.  Measured on this function with everything else held
+	 * constant, squaring order of the components:
+	 *
+	 *     &player_position, &position          k j i   (the untouched source)
+	 *     player_head_position, &position      k j i
+	 *     &player_position, head_position      k j i
+	 *     player_head_position, head_position  k i j   <- this spelling
+	 *     any of the above plus &vector bound  k j i
+	 *
+	 * January squares them k, i, j.  Section size, relocation count,
+	 * instruction count and frame size are identical in all five. */
+	real_point3d const *head_position = &position;
+	real_point3d const *player_head_position = &player_position;
 	real_vector3d vector;
 	real_vector3d aiming_vector;
 	long closest_unit_index = NONE;
@@ -2983,7 +3000,7 @@ real ai_communication_get_player_rating(
 
 			any_players = TRUE;
 			unit_get_head_position(player->unit_index, &player_position);
-			vector_from_points3d(&player_position, &position, &vector);
+			vector_from_points3d(player_head_position, head_position, &vector);
 			distance_squared = magnitude_squared3d(&vector);
 			if (distance_squared <
 				communication_player_absolute_range * communication_player_absolute_range)
@@ -3019,8 +3036,8 @@ real ai_communication_get_player_rating(
 						_collision_user_ai_comms;
 
 					vector_from_points3d(
-						&player_position,
-						&position,
+						player_head_position,
+						head_position,
 						&line_of_sight_vector);
 					blocked = collision_test_vector(
 						FLAG(_collision_test_front_facing_surfaces_bit) |

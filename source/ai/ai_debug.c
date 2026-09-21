@@ -45,6 +45,24 @@ AI_DEBUG.C
 
 /* ---------- macros */
 
+/* INFERRED FROM JANUARY'S BYTES - not attested in any surviving source.
+ * The label for an attractor node is drawn 0.15 world units above the node's
+ * point.  January's bytes require the offset to be a parenthesised group at
+ * the call, which a bare `point_height+0.15f` argument does not produce; a
+ * whole-argument parenthesised SUM occurs nowhere else in the tree, so the
+ * group is expressed here as a named macro rather than as loose parentheses.
+ * Measured on _code_00039990 with everything else held constant:
+ *
+ *     point_height+0.15f                    residual [sha]
+ *     (point_height+0.15f)                  EXACT
+ *     ((point_height)+(0.15f))              EXACT
+ *     ai_debug_attractor_label_height(...)  EXACT   <- this spelling
+ *
+ * The macro also names what the 0.15f is, which the bare sum did not.
+ */
+#define ai_debug_attractor_label_height(height)		\
+	((height)+0.15f)
+
 #define actor_debug_print_threat(actor, threat_type, string, color)		\
 if (actor->situation.specific_threats[threat_type])						\
 {																		\
@@ -654,7 +672,11 @@ static void code_00039990(
 
 		render_debug_point(TRUE, &node->closest_point_to_attractor, 0.15f, attractor_color);
 
-		point_from_line3d(&point, global_up3d, point_height+0.15f, &point);
+		point_from_line3d(
+			&point,
+			global_up3d,
+			ai_debug_attractor_label_height(point_height),
+			&point);
 
 		render_debug_string_at_point(TRUE, &point,
 			csprintf(temporary, "%.1f", node->closest_distance_to_attractor),

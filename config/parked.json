@@ -2281,17 +2281,6 @@
       }
     },
     {
-      "unit": "source/ai/ai_communication",
-      "function": "_ai_communication_get_player_rating",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed player-rating reconstruction retained at 832 padded bytes and all 49 relocation identities on both sides. The only remaining normalized-code delta is x87 evaluation/scheduling; the semantic graph is independently supported by HCEA. No double substitution, raw layout, compiler steering, or fake dependency is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source or floating-point compiler-context evidence.",
-      "measurements": {
-        "target": { "size": 832, "relocation_count": 49, "normalized_sha256": "8f3cbdbbeb986ce027cd2510d2064c6e60dba0e4976726f131104e8172a38df4" },
-        "base": { "size": 832, "relocation_count": 49, "normalized_sha256": "72f4bcb844f45d84691f70d4ab447bb229e12b6241e99a092b8e614e94eaf8dc" },
-        "objdiff_percent": 99.98419
-      }
-    },
-    {
       "unit": "source/math/geometry",
       "function": "_convex_hull2d",
       "class": "unclassified",
