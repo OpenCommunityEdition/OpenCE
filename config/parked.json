@@ -1309,25 +1309,6 @@
       }
     },
     {
-      "unit": "source/game/game_engine_king",
-      "function": "_king_calculate_hill_state",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete team and free-for-all hill-control state machine in ordinary typed C from January disassembly and independent HaloCEA behavior. The retained function iterates player_data through the normal data iterator, uses the authenticated king_hill_state and multiplayer-sound enums, preserves the previous-controller rule, and updates the control timer without optimizer-only carriers. Target and candidate share the 448-byte padded envelope; target has 32 relocations and the candidate 30, while objdiff reports 81.507355 percent similarity. Fable's bounded experiments covered count declaration scope, local state consolidation, early-return and shared-tail forms; none produced a lawful easy closure, and alignment-aware disassembly still shows broad control-flow and register-allocation differences. The fail-closed classifier returns UNKNOWN, so the honest class is unclassified. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw datum cast, invented address name, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the two missing relocation sites and branch schedule.",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 32,
-          "normalized_sha256": "9c852f781c6a691a41f7c445091bea59a0738ebd49fd6ec16add6961cedb8817"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 30,
-          "normalized_sha256": "e9d7a30d3245b8ffd0d72b1271a341f0dd5b20ddd94e9029876f4676c5ed9ae3"
-        },
-        "objdiff_percent": 81.507355
-      }
-    },
-    {
       "unit": "source/game/game_engine_race",
       "function": "_race_engine_get_score",
       "class": "unclassified",
@@ -1477,25 +1458,6 @@
           "normalized_sha256": "34b872cd2ae1a72136400424c983c399b7a2f8fbc7a3f342d9ed968e90dd19b3"
         },
         "objdiff_percent": 87.124596
-      }
-    },
-    {
-      "unit": "source/units/biped_limp_noodle",
-      "function": "_biped_limp_noodle_relax_nodes_onto_environment",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the typed public relaxation wrapper from January disassembly and independent HCEA behavior. The retained ordinary C obtains the biped node-matrix block through the object-header API, snapshots every animation node position, invokes the reconstructed solver and exact orientation pass, saturates the iteration byte at CHAR_MAX, and returns whether relaxation was already complete. Target is 256 padded bytes and the candidate 240, with the same ordered nine-entry relocation target/type sequence although some relocation addresses drift; objdiff reports 89.82417 percent. At +0x1E January calls tag_get immediately, while VC7 first spills the biped pointer to [ebp-0x10], changing later register and loop allocation without changing the call topology. No register hint, volatile access, barrier, pragma, assembly, raw offset, false alias, fake dependency, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records, a natural same-compiler donor explaining the pointer lifetime, or a source-authentic semantic correction.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 9,
-          "normalized_sha256": "19128c623c5575500437c95cdfd0363c69fcbfdbf57f7972bbdcf1d2dffaf84f"
-        },
-        "base": {
-          "size": 240,
-          "relocation_count": 9,
-          "normalized_sha256": "d1b5db56b26dff8d5d6bafeeae5e1c0e202e19464ab0bf3dec48bea5e1e7ce18"
-        },
-        "objdiff_percent": 89.82417
       }
     },
     {
@@ -2936,28 +2898,6 @@
         "target": { "size": 432, "relocation_count": 6, "normalized_sha256": "2bdb31a0158b5a23314020bcccb8931e8bcc74c2b357d56305c687c16b91f949" },
         "base": { "size": 432, "relocation_count": 6, "normalized_sha256": "8bded9be55c3f53ba980619ea443350230675ee9dd6337b7ec675c14950d905e" },
         "objdiff_percent": 89.36364
-      }
-    },
-    {
-      "unit": "source/units/unit_dialogue",
-      "function": "_unit_describe_speech",
-      "class": "unclassified",
-      "evidence": "Complete January-authoritative, HCEA-cross-checked speech-description reconstruction retained from the 2026-09-12 packet. Target and candidate share the 272-byte extent and all 15 relocation identities but remain normalized-code residuals. The natural typed body receives zero credit and no register or branch-layout steering is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 15, "normalized_sha256": "7d9ee7e3b923460ae26a00c0612904b3106b6ed95c8c0491504d017841c1dc9c" },
-        "base": { "size": 272, "relocation_count": 15, "normalized_sha256": "2b01a81debf36cda38bd965419e48997b2a2bbeac2dd4041f6752591f481edaf" },
-        "objdiff_percent": 97.22727
-      }
-    },
-    {
-      "unit": "source/units/unit_dialogue",
-      "function": "_unit_make_damage_sound",
-      "class": "unclassified",
-      "evidence": "Complete January-authoritative, HCEA-cross-checked damage/death vocalization reconstruction retained from the 2026-09-12 packet. Target and candidate share the 784-byte extent and all 18 relocation identities, including January-only wounded-sound suppression, but remain normalized-code residuals. The natural typed body receives zero credit and no codegen pressure is admitted. See docs/object_matching_logs/unit_dialogue_obj_unwritten_speech_packet_20260912.md.",
-      "measurements": {
-        "target": { "size": 784, "relocation_count": 18, "normalized_sha256": "87952366bca787dc5174221b78335b6a9e91770433b8d76266bdb21d1bf65975" },
-        "base": { "size": 784, "relocation_count": 18, "normalized_sha256": "a72cd2b9285abc4fe3ed3a8f4de6c0606fe474c9e01a1049e16b3285f1497f01" },
-        "objdiff_percent": 81.60833
       }
     },
     {
