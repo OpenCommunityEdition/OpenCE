@@ -626,3 +626,84 @@ the floor"); `&&` versus nested `if`; operand swaps on a commutative `|`;
 declaration order and initialiser form; extra declaration counts (0 through 64
 tested on two of them - the declaration-count oracle does not reach these ties);
 and compiler flags, swept on three of them with no flag reaching any tie.
+
+### R22. Loop spelling is NOT a lever on this board - and "backward branch" is measurement trap #5
+
+Motivated by the standing law that VC7 unrolls a small constant-trip `for`/`while`
+but not a `do..while`, so a loop visible in January's bytes proves the spelling.
+That law makes loop SHAPE look like a promising source-reachable axis. It is not,
+and this is the measurement that closes it.
+
+`scratch/orch/loopshape.py` classifies every loop in every function of both
+builds as `DOWHILE` (conditional back-edge), `ROTATED` (conditional back-edge
+whose test is also the target of a forward branch from above) or `TOPTEST`
+(unconditional back-edge), and diffs the per-function multiset.
+
+#### The trap, found in my own tool
+
+The first run reported **43 divergences**. That number was wrong, because the
+classifier counted every backward branch as a loop. Two idioms already censused
+in this campaign emit backward branches that close no cycle at all:
+
+- a **hoisted block** ends in a backward `jmp` to its join;
+- a **cross-jump** binds backward to an earlier duplicate of a block.
+
+So the first run was largely re-detecting the hoist and cross-jump censuses
+under a new name. Adding a real cycle test - build the intra-function CFG and
+keep a back-edge `a -> t` only when `t` can reach `a` by forward control flow -
+removes **23 of the 43**, including every function whose residual was already
+known to be one of those two classes: `_actor_path_refresh`, `_actor_move_update`,
+`_actor_move_vector_avoidance`, `_actor_perception_aiming_vector_test_blockage`,
+`_actor_customize_unit`, `_actor_type_flood_desire_shamble`, `_structure_test_line2d`.
+
+**Record this as measurement trap #5: a backward branch is not a loop.** Any
+census that counts them will silently double-count the hoist and cross-jump
+populations.
+
+#### The corrected result
+
+    functions compared             7729
+    identical loop-shape multiset  7709   (99.74%)
+    DIVERGENT                        20   (6 in source/ai/, 4 in this lane's files)
+
+And the four in-lane divergences do not survive inspection as loop differences
+either. Each reduces to **one extra out-of-line block**, whose backward `jmp`
+happens to close a graph cycle because the block sits above its join:
+
+    _actor_emotion_unopposable_retreat  ours has one extra `0x129 jmp -> 0xc9`
+    _ai_communication_finished          January has one extra `0x3dd jmp -> 0x39e`
+    _actor_situation_update             January's known out-of-line block at 0x21b
+    _ai_communication_event             placement inside an 8,064 B structural residual
+
+`_actor_situation_update` is the cleanest proof that the cycle test is necessary
+but **not sufficient**: January and our build have the same 1,264 bytes and only
+2 REAL differing regions, yet January shows four cyclic back-edges to our one.
+Identical instructions placed differently create and destroy graph cycles. A
+static cycle test cannot separate a source loop from a placement-induced one.
+
+#### Verdict
+
+On the whole board, 7,709 of 7,729 functions agree on loop shape, and every
+in-scope exception is explained by block placement rather than by `while` versus
+`do..while`. **Do not spend a wave re-spelling a loop.** The unroller law
+remains true and useful as a *read* - a loop present in January's bytes proves
+the spelling - but it is not a *lever*, because our build already agrees
+essentially everywhere.
+
+#### One concrete observation banked from the sweep
+
+In `_ai_communication_finished` (1,584 B target, ours 1,568 - sixteen bytes
+short) January and our build lay out two guarded debug-string appends in
+opposite order:
+
+    JANUARY  39e  if (ai_debug.X) { push "rand-failed "; jmp <shared csstrcat tail> }
+             3bc  if (ai_debug.X) { csstrcat(buf, "0-chance "); }  jmp 0x39e
+    OURS     394  csstrcat(buf, "0-chance ")
+             3a8  if (ai_debug.X) { push "rand-failed "; jmp <shared tail> }
+
+January places the "0-chance " block AFTER the "rand-failed " guard and returns
+to it with a backward `jmp`, so the guard at 0x39e has two predecessors - one
+falling in from the preceding eight-argument `csstrcat`, one jumping back. Ours
+lays them out sequentially and falls through. This is one of the four parts of
+the previously logged 18-byte / 4-instruction gap, now localised to a specific
+pair of source statements rather than to the function as a whole.
