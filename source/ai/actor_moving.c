@@ -3107,9 +3107,7 @@ void actor_move_update(
 				real angle = square_root(angle_squared);
 				real inverse_angle = 1.f / angle;
 
-				rotation.i *= inverse_angle;
-				rotation.j *= inverse_angle;
-				rotation.k *= inverse_angle;
+				scale_vector3d(&rotation, inverse_angle, &rotation);
 				rotate_vector_about_axis(
 					&actor->control.moving_towards_vector,
 					&rotation,
@@ -3197,28 +3195,30 @@ void actor_move_update(
 				break;
 			}
 
-			if (vehicle->vehicle.hover < 0.7f &&
-				vehicle->object.up.k < 0.8f)
+			if (vehicle->vehicle.hover < 0.7f)
 			{
-				real_vector3d escape_direction;
-
 				allow_jump = TRUE;
-				escape_direction = vehicle->object.up;
-				escape_direction.k = 0.f;
-				if (normalize3d(&escape_direction) > 0.f)
+				if (vehicle->object.up.k < 0.8f)
 				{
-					actor->control.moving = TRUE;
-					scale_vector3d(
-						&escape_direction,
-						3.f,
-						&actor->control.moving_towards_vector);
+					real_vector3d escape_direction;
+
+					escape_direction = vehicle->object.up;
+					escape_direction.k = 0.f;
+					if (normalize3d(&escape_direction) > 0.f)
+					{
+						actor->control.moving = TRUE;
+						scale_vector3d(
+							&escape_direction,
+							3.f,
+							&actor->control.moving_towards_vector);
+					}
+					else
+					{
+						actor->control.moving = FALSE;
+					}
+					crouch = FALSE;
+					break;
 				}
-				else
-				{
-					actor->control.moving = FALSE;
-				}
-				crouch = FALSE;
-				break;
 			}
 
 			/* fall through */
