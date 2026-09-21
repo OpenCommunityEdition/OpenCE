@@ -1352,7 +1352,7 @@ boolean path_state_estimated_distance(
 	if (node_index != NONE)
 	{
 		struct path_node *node = path_get_node(state, node_index);
-		real distance = distance3d(end_point, &node->entry_point) +
+		real distance = distance3d(&node->entry_point, end_point) +
 			node->path_distance_from_origin;
 		real closest_approach_to_attractor;
 
@@ -1365,8 +1365,11 @@ boolean path_state_estimated_distance(
 				end_point,
 				&state->input.attractor_point,
 				&closest_point);
+			closest_approach_to_attractor = distance3d(
+				&state->input.attractor_point,
+				&closest_point);
 			closest_approach_to_attractor = MIN(
-				distance3d(&closest_point, &state->input.attractor_point),
+				closest_approach_to_attractor,
 				node->closest_approach_to_attractor);
 		}
 		else
@@ -1379,11 +1382,12 @@ boolean path_state_estimated_distance(
 			*closest_approach_to_attractor_reference = closest_approach_to_attractor;
 		}
 		*distance_reference = distance;
+		result = TRUE;
 
 		if (estimated_direction_reference)
 		{
-			short child_node_index = NONE;
 			short current_node_index = node_index;
+			short child_node_index = NONE;
 			real path_distance = 0.0f;
 			real_point3d const *direction_point;
 
@@ -1396,19 +1400,11 @@ boolean path_state_estimated_distance(
 			}
 			while (current_node_index != NONE);
 
-			if (child_node_index != NONE)
+			while (child_node_index != NONE && path_distance < 0.8f)
 			{
-				do
-				{
-					if (path_distance >= 0.8f)
-					{
-						break;
-					}
-					node = path_get_node(state, child_node_index);
-					path_distance += node->linear_distance_to_entry_point;
-					child_node_index = node->child_node_index;
-				}
-				while (child_node_index != NONE);
+				node = path_get_node(state, child_node_index);
+				path_distance += node->linear_distance_to_entry_point;
+				child_node_index = node->child_node_index;
 			}
 
 			direction_point = child_node_index == NONE ?
@@ -1419,8 +1415,6 @@ boolean path_state_estimated_distance(
 				estimated_direction_reference);
 			normalize3d(estimated_direction_reference);
 		}
-
-		result = TRUE;
 	}
 	else
 	{
@@ -1441,22 +1435,34 @@ boolean path_state_estimated_distance(
 static boolean path_state_traverse(
 	struct path_state *state)
 {
-	real pathfinding_radius = MAX(state->input.pathfinding_radius, 0.2f);
+	real pathfinding_radius = MAX(0.2f, state->input.pathfinding_radius);
 	struct path_edge edges[MAXIMUM_PATH_EDGES_PER_COLLISION_SURFACE];
 	boolean result = TRUE;
 	boolean reported_cost_overflow = FALSE;
-	short cheapest_node_index = path_heap_pop_cheapest_node(state);
 
-	while (cheapest_node_index != NONE)
+	while (TRUE)
 	{
-		struct path_node *cheapest_node = path_get_node(state, cheapest_node_index);
-		struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
-			&state->structure->collision_bsp,
-			0,
-			struct collision_bsp);
+		short cheapest_node_index = path_heap_pop_cheapest_node(state);
+		struct path_node *cheapest_node;
+		struct collision_bsp const *bsp;
 		short edge_count;
 		short edge_index;
 
+		if (cheapest_node_index == NONE)
+		{
+			if (state->debug &&
+				state->debug->path_traverse_result == _path_traverse_result_none)
+			{
+				state->debug->path_traverse_result = _path_traverse_result_exhausted_search;
+			}
+			break;
+		}
+
+		cheapest_node = path_get_node(state, cheapest_node_index);
+		bsp = TAG_BLOCK_GET_ELEMENT(
+			&state->structure->collision_bsp,
+			0,
+			struct collision_bsp);
 		match_assert(
 			"c:\\halo\\SOURCE\\ai\\path.c",
 			0x35D,
@@ -1466,14 +1472,14 @@ static boolean path_state_traverse(
 		{
 			if (cheapest_node->surface_index == state->destination.surface_index)
 			{
-				state->closest_point = state->destination.point;
 				state->closest_node_index = cheapest_node_index;
 				state->closest_distance = 0.0f;
+				state->closest_point = state->destination.point;
 				break;
 			}
 
 			if (cheapest_node->total_cost_estimate >
-				MAX(state->closest_distance, 5.0f) * 10.0f + state->closest_cost_estimate)
+				MAX(5.0f, state->closest_distance) * 10.0f + state->closest_cost_estimate)
 			{
 				if (state->debug &&
 					state->debug->path_traverse_result == _path_traverse_result_none)
@@ -1492,30 +1498,30 @@ static boolean path_state_traverse(
 		for (edge_index = 0; edge_index < edge_count; edge_index++)
 		{
 			struct path_edge const *edge = &edges[edge_index];
-			long adjacent_surface_index = edge->adjacent_surface_index;
 			boolean passable = TRUE;
+			long adjacent_surface_index = edge->adjacent_surface_index;
 			real_point3d entry_point;
 			real linear_distance;
 			real path_distance_from_origin;
 			real closest_approach_to_attractor;
+			real cost;
 			real cumulative_cost;
 			real total_cost_estimate;
-			real distance_to_destination = 0.0f;
+			real distance_to_destination;
 			long quantized_cost_estimate;
 			short new_node_index = NONE;
 			struct path_node *new_node;
 
-			if (adjacent_surface_index == cheapest_node->parent_node_surface_index ||
-				!TEST_FLAG(
-					edge->adjacent_pathfinding_surface,
-					_pathfinding_surface_walkable_bit))
+			if (adjacent_surface_index == cheapest_node->parent_node_surface_index)
+			{
+				passable = FALSE;
+			}
+			if (!TEST_FLAG(edge->adjacent_pathfinding_surface, _pathfinding_surface_walkable_bit))
 			{
 				passable = FALSE;
 			}
 			if (!state->input.ignore_broken_surfaces &&
-				TEST_FLAG(
-					edge->adjacent_pathfinding_surface,
-					_pathfinding_surface_breakable_bit) &&
+				TEST_FLAG(edge->adjacent_pathfinding_surface, _pathfinding_surface_breakable_bit) &&
 				surface_is_broken(state->structure, adjacent_surface_index))
 			{
 				passable = FALSE;
@@ -1532,58 +1538,48 @@ static boolean path_state_traverse(
 			if (state->destination_valid)
 			{
 				real edge_length_squared = magnitude_squared3d(&edge->edge_vector);
-				real diameter = pathfinding_radius * 2.0f;
 
 				if (edge_length_squared > 16.0f &&
-					edge_length_squared > diameter * diameter)
+					edge_length_squared > (2.0f * pathfinding_radius) * (2.0f * pathfinding_radius))
 				{
-					real t =
-						(edge->edge_vector.i *
-							(state->destination.point.x - edge->base_point.x) +
-						 edge->edge_vector.j *
-							(state->destination.point.y - edge->base_point.y) +
-						 edge->edge_vector.k *
-							(state->destination.point.z - edge->base_point.z)) /
-						edge_length_squared;
-					real margin = pathfinding_radius / square_root(edge_length_squared);
+					real edge_length = square_root(edge_length_squared);
+					real_vector3d edge_to_destination;
+					real t;
 
-					t = PIN(t, margin, 1.0f - margin);
-				entry_point.x = edge->base_point.x + t * edge->edge_vector.i;
-				entry_point.y = edge->base_point.y + t * edge->edge_vector.j;
-				entry_point.z = edge->base_point.z + t * edge->edge_vector.k;
+					vector_from_points3d(&edge->base_point, &state->destination.point, &edge_to_destination);
+					t = dot_product3d(&edge_to_destination, &edge->edge_vector) / magnitude_squared3d(&edge->edge_vector);
+					t = PIN(t, pathfinding_radius / edge_length, 1.0f - pathfinding_radius / edge_length);
+					entry_point.x = edge->base_point.x + t * edge->edge_vector.i;
+					entry_point.y = edge->base_point.y + t * edge->edge_vector.j;
+					entry_point.z = edge->base_point.z + t * edge->edge_vector.k;
 				}
 			}
 
-			linear_distance = distance3d(&entry_point, &cheapest_node->entry_point);
+			linear_distance = distance3d(&cheapest_node->entry_point, &entry_point);
 			path_distance_from_origin =
 				cheapest_node->path_distance_from_origin + linear_distance;
 			if (state->input.attractor_valid)
 			{
-				real distance_to_attractor;
-				real cost = path_attractor_weight(
+				cost = (path_attractor_weight(
 					state,
 					&cheapest_node->entry_point,
 					&entry_point,
-					&distance_to_attractor);
-
-				cumulative_cost = cheapest_node->cumulative_cost +
-					(cost + 1.0f) * linear_distance;
+					&closest_approach_to_attractor) + 1.0f) * linear_distance;
 				closest_approach_to_attractor = MIN(
 					cheapest_node->closest_approach_to_attractor,
-					distance_to_attractor);
+					closest_approach_to_attractor);
 			}
 			else
 			{
-				cumulative_cost = cheapest_node->cumulative_cost + linear_distance;
+				cost = linear_distance;
 				closest_approach_to_attractor = 0.0f;
 			}
+			cumulative_cost = cheapest_node->cumulative_cost + cost;
 
 			total_cost_estimate = cumulative_cost;
 			if (state->destination_valid)
 			{
-				distance_to_destination = distance3d(
-					&state->destination.point,
-					&entry_point);
+				distance_to_destination = distance3d(&entry_point, &state->destination.point);
 				total_cost_estimate += distance_to_destination;
 			}
 
@@ -1614,64 +1610,65 @@ static boolean path_state_traverse(
 
 			{
 				short hash_slot = (short)(
-					(adjacent_surface_index & PATH_HASH_KEY_MASK) << 3);
-				short node_index = state->hash_table[hash_slot];
+					(edge->adjacent_surface_index & PATH_HASH_KEY_MASK) << 3);
 
-				while (node_index != NONE)
+				while (TRUE)
 				{
-					struct path_node *node = path_get_node(
-						state,
-						node_index);
+					short node_index = state->hash_table[hash_slot];
 
-					if (node->surface_index == adjacent_surface_index)
+					if (node_index != NONE)
 					{
-						if (quantized_cost_estimate < node->quantized_cost_estimate)
-						{
-							short heap_location = node->heap_location;
+						struct path_node *node = path_get_node(state, node_index);
 
-							if (heap_location == NONE)
+						if (node->surface_index == adjacent_surface_index)
+						{
+							if (quantized_cost_estimate < node->quantized_cost_estimate)
 							{
-								error(
-									_error_silent,
-									"path_state_" "traverse: found a 'better' path to a closed node");
+								short heap_location = node->heap_location;
+
+								if (heap_location == NONE)
+								{
+									error(
+										_error_silent,
+										"path_state_" "traverse: found a 'better' path to a closed node");
+								}
+								else
+								{
+									new_node_index = node_index;
+									match_assert(
+										"c:\\halo\\SOURCE\\ai\\path.c",
+										0x423,
+										(heap_location >= 1) && (heap_location < state->heap_count));
+									match_assert(
+										"c:\\halo\\SOURCE\\ai\\path.c",
+										0x424,
+										state->heap[heap_location].node_index == node_index);
+									match_assert(
+										"c:\\halo\\SOURCE\\ai\\path.c",
+										0x425,
+										state->heap[heap_location].quantized_cost_estimate == node->quantized_cost_estimate);
+								}
 							}
-							else
-							{
-								match_assert(
-									"c:\\halo\\SOURCE\\ai\\path.c",
-									0x423,
-									(heap_location >= 1) && (heap_location < state->heap_count));
-								match_assert(
-									"c:\\halo\\SOURCE\\ai\\path.c",
-									0x424,
-									state->heap[heap_location].node_index == node_index);
-								match_assert(
-									"c:\\halo\\SOURCE\\ai\\path.c",
-									0x425,
-									state->heap[heap_location].quantized_cost_estimate == node->quantized_cost_estimate);
-								new_node_index = node_index;
-							}
+							break;
+						}
+
+						hash_slot = (short)((hash_slot + 1) & PATH_HASH_TABLE_MASK);
+					}
+					else
+					{
+						if (state->node_count < PATH_NODE_LIST_SIZE)
+						{
+							new_node_index = state->node_count++;
+							state->hash_table[hash_slot] = new_node_index;
+							state->node_list[new_node_index].heap_location = NONE;
+						}
+						else if (state->debug &&
+							state->debug->path_traverse_result == _path_traverse_result_none)
+						{
+							state->debug->path_traverse_result =
+								_path_traverse_result_overflowed_nodes;
 						}
 						break;
-					}
-
-					hash_slot = (short)((hash_slot + 1) & PATH_HASH_TABLE_MASK);
-					node_index = state->hash_table[hash_slot];
-				}
-
-				if (node_index == NONE)
-				{
-					if (state->node_count < PATH_NODE_LIST_SIZE)
-					{
-						new_node_index = state->node_count++;
-						state->hash_table[hash_slot] = new_node_index;
-						state->node_list[new_node_index].heap_location = NONE;
-					}
-					else if (state->debug &&
-						state->debug->path_traverse_result == _path_traverse_result_none)
-					{
-						state->debug->path_traverse_result =
-							_path_traverse_result_overflowed_nodes;
 					}
 				}
 			}
@@ -1684,7 +1681,7 @@ static boolean path_state_traverse(
 			new_node = path_get_node(state, new_node_index);
 			new_node->parent_node_index = cheapest_node_index;
 			new_node->parent_node_surface_index = cheapest_node->surface_index;
-			new_node->surface_index = adjacent_surface_index;
+			new_node->surface_index = edge->adjacent_surface_index;
 			new_node->entry_point = entry_point;
 			new_node->linear_distance_to_entry_point = linear_distance;
 			new_node->closest_approach_to_attractor = closest_approach_to_attractor;
@@ -1729,44 +1726,36 @@ static boolean path_state_traverse(
 
 			if (state->destination_valid)
 			{
+				real closest_distance = distance_to_destination;
 				real_point3d closest_point = new_node->entry_point;
 
 				if (distance_to_destination < 4.0f)
 				{
-					distance_to_destination = closest_available_point_on_surface(
+					closest_distance = closest_available_point_on_surface(
 						state->structure,
-						new_node->surface_index,
+						edge->adjacent_surface_index,
 						&state->destination.point,
 						&closest_point);
 				}
-				new_node->closest_distance_to_attractor = distance_to_destination;
+				new_node->closest_distance_to_attractor = closest_distance;
 				new_node->closest_point_to_attractor = closest_point;
 
-				if (distance_to_destination < state->closest_distance)
+				if (closest_distance < state->closest_distance)
 				{
-					state->closest_distance = distance_to_destination;
+					state->closest_distance = closest_distance;
 					state->closest_node_index = new_node_index;
 					state->closest_point = closest_point;
 					state->closest_cost_estimate = total_cost_estimate;
 				}
 			}
 		}
-
-		cheapest_node_index = path_heap_pop_cheapest_node(state);
 	}
 
-	if (cheapest_node_index == NONE && state->debug &&
-		state->debug->path_traverse_result == _path_traverse_result_none)
+	if (state->destination_valid)
 	{
-		state->debug->path_traverse_result = _path_traverse_result_exhausted_search;
+		result = state->closest_distance <= state->destination.target_radius;
 	}
-
-	if (state->destination_valid &&
-		state->closest_distance > state->destination.target_radius)
-	{
-		result = FALSE;
-	}
-	if (result && state->debug)
+	if (state->debug && result)
 	{
 		state->debug->path_traverse_result = _path_traverse_result_success;
 	}
