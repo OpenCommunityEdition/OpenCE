@@ -607,6 +607,13 @@ reproduce January the relaxer would have had to see a span at least 3 bytes
 longer than the final code - a late code-shrinking transformation our build does
 not perform. That is a closed-form impossibility argument for this site.
 
+> **CORRECTION (wave H, 2026-09-20):** the BASIS of this argument is refuted -
+> "the span alone decides the width" is false. Probe p0b in
+> `scratch/res8/branch-fixpoint/` flipped 18 branches whose spans and inner
+> branch widths stayed byte-identical; width decisions are non-local. The site
+> is still not reachable from source, but for that reason (chaotic, non-local
+> state) rather than because of a closed-form argument.
+
 #### Two campaign laws corrected by this wave
 
 - **Function-scope promotion changes the frame only when it creates a lifetime

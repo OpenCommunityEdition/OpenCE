@@ -1,3 +1,31 @@
+> **CORRECTION 2026-09-20 - the "shortening fixpoint" section below is WRONG.**
+>
+> Wave H's branch-fixpoint research (`scratch/res8/branch-fixpoint/NOTES.md`)
+> refutes it on every point:
+>
+> - **There are no seed branches.** The "span 128" figures were distances
+>   measured from the start of the NEAR form. The short `rel8` for those
+>   branches is 122-123, so they fit. All 27 of our near-but-fits branches fit
+>   on their own, with short displacements from 93 to 124.
+> - **It is not a fixpoint over the final layout.** No final-bytes model
+>   reproduces our object (the best gets 25-30 wrong), while a pessimistic
+>   relaxation reproduces all 526 of January's widths and its code end at
+>   0x6000. Our object looks as though it was emitted against an address
+>   estimate running roughly 12-38 bytes ahead of the final layout.
+> - **Width is non-local and chaotic.** Deleting one inline call flipped 29
+>   branches, 18 of them with byte-identical spans; across 330 single-statement
+>   deletions the near-but-fits count ranged from 0 to 32. Null edits are inert.
+> - **The frame is not "paying for the branch tax".** Padding the frame to
+>   January's 0x810 left the count at 27. The +39 measured when correcting the
+>   frame alone may be real, but the causal story attached to it here is not
+>   supported.
+>
+> Consequence: on this function **padded size (key 3) mostly measures this
+> noise**. Judge candidates by width-normalised code length
+> (`scratch/res8/branch-fixpoint/widthcensus.py`) instead. The colour-argument
+> fix below stands - it was verified from January's bytes independently of any
+> of this.
+
 # `_ai_debug_render_actor` re-baselined on correct source - 2026-09-20
 
 Owner ruling: *"Land it and re-baseline the fuzzy floor. Correct source outweighs
