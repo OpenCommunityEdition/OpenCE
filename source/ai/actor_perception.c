@@ -838,6 +838,20 @@ struct actor_perception_refresh_locals
 	unsigned long *cluster_pvs;
 };
 
+/* These two make the out-of-bounds read in actor_emotion_update analysable
+ * rather than merely undefined: specific_threats holds exactly
+ * NUMBER_OF_ACTOR_THREAT_TYPES elements, and cumulative_threats begins
+ * immediately after it, so specific_threats[NUMBER_OF_ACTOR_THREAT_TYPES] is
+ * cumulative_threats[_actor_threat_none] and nothing else. If either ever stops
+ * holding, that read stops being harmless and this file stops compiling. */
+typedef char actor_perception_specific_threats_size_assert[
+	sizeof(((struct actor_situation *)0)->specific_threats) ==
+		NUMBER_OF_ACTOR_THREAT_TYPES ? 1 : -1];
+typedef char actor_perception_threat_arrays_adjacent_assert[
+	offsetof(struct actor_situation, cumulative_threats) ==
+		offsetof(struct actor_situation, specific_threats) +
+			NUMBER_OF_ACTOR_THREAT_TYPES ? 1 : -1];
+
 typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
 typedef char actor_perception_actor_view_team_offset_assert[
@@ -3492,7 +3506,30 @@ void actor_emotion_update(
 		actor->emotions.forced_to_charge = TRUE;
 	}
 
-	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES - 1;
+	/* BUG (preserved for exact matching): the scan starts at
+	 * NUMBER_OF_ACTOR_THREAT_TYPES rather than NUMBER_OF_ACTOR_THREAT_TYPES-1,
+	 * so its first iteration reads specific_threats[9] - one element past the
+	 * end of the nine-element array, which is cumulative_threats[0].
+	 * Evidence: January emits `mov eax,9` at +0xf5, then the six-byte alignment
+	 * nop 8d 9b 00 00 00 00 (`lea ebx,[ebx]`, which touches neither EAX nor
+	 * memory), and falls into the loop head at +0x100, `movsx edx,ax` followed by
+	 * `cmp byte ptr [edx+esi+0x1ee],0`; the `dec eax` is at +0x10d, AFTER that
+	 * load. In the same object actor_situation_update increments
+	 * cumulative_threats for threat types 1..8 at esi+0x1f8..esi+0x1ff and
+	 * area_friends at esi+0x200, which fixes cumulative_threats at esi+0x1f7 and
+	 * so specific_threats at esi+0x1ee with exactly nine elements.
+	 * Layout is asserted, not assumed: see
+	 * actor_perception_specific_threats_size_assert and
+	 * actor_perception_threat_arrays_adjacent_assert above, which fail to compile
+	 * if the two arrays ever stop being adjacent or change length.
+	 * Consequence: none observable. cumulative_threats[_actor_threat_none] is the
+	 * one element of that array nothing ever writes - every write in the tree
+	 * uses _actor_threat_visible..._actor_threat_damaging_me, i.e. 1..8, and the
+	 * single variable-index use is a read-only csprintf argument in the
+	 * actor_debug_print_threat macro - so the stray byte is always zero, the
+	 * early-out is never taken on the stray iteration, and the scan falls through
+	 * to the intended starting index. */
+	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES;
 		priority > 0 &&
 			actor->situation.specific_threats[priority] <= 0;
 		priority--)
@@ -3758,43 +3795,36 @@ void actor_emotion_update(
 				crouch = TRUE;
 		}
 
-		if (actor->emotions.defensive_crouch)
+		if (actor->emotions.defensive_crouch && !crouch)
 		{
-			if (!crouch)
+			actor->emotions.defensive_crouch = FALSE;
+			if (definition->defensive.
+					defensive_crouch_min_stand_time > 0.0f)
 			{
-				actor->emotions.defensive_crouch = FALSE;
-				if (definition->defensive.
-						defensive_crouch_min_stand_time > 0.0f)
-				{
-					actor->emotions.defensive_crouch_timer =
-						(short)(definition->defensive.
-							defensive_crouch_min_stand_time *
-							30.0f);
-				}
-				else
-				{
-					actor->emotions.defensive_crouch_timer = 45;
-				}
+				actor->emotions.defensive_crouch_timer =
+					(short)(definition->defensive.
+						defensive_crouch_min_stand_time *
+						30.0f);
+			}
+			else
+			{
+				actor->emotions.defensive_crouch_timer = 45;
 			}
 		}
-
-		if (crouch)
+		else if (!actor->emotions.defensive_crouch && crouch)
 		{
-			if (!actor->emotions.defensive_crouch)
+			actor->emotions.defensive_crouch = TRUE;
+			if (definition->defensive.
+					defensive_crouch_min_crouch_time > 0.0f)
 			{
-				actor->emotions.defensive_crouch = TRUE;
-				if (definition->defensive.
-						defensive_crouch_min_crouch_time > 0.0f)
-				{
-					actor->emotions.defensive_crouch_timer =
-						(short)(definition->defensive.
-							defensive_crouch_min_crouch_time *
-							30.0f);
-				}
-				else
-				{
-					actor->emotions.defensive_crouch_timer = 45;
-				}
+				actor->emotions.defensive_crouch_timer =
+					(short)(definition->defensive.
+						defensive_crouch_min_crouch_time *
+						30.0f);
+			}
+			else
+			{
+				actor->emotions.defensive_crouch_timer = 45;
 			}
 		}
 	}
