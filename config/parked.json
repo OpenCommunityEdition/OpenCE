@@ -2447,17 +2447,6 @@
     },
     {
       "unit": "source/ai/ai",
-      "function": "_ai_test_line_of_fire",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed line-of-fire pill test reconstructed from January code and relocations with HCEA as an independent semantic map. Target and candidate are both 336 padded bytes with all 10 relocations; remaining differences are ordinary local and branch scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. 2026-09-20 Lane A re-baseline (zero exact credit): the store-order half of the old waveD lof2 candidate is landed on its own merits, WITHOUT the rejected bare call-site parentheses. Inside if (intersected), line_of_fire = FALSE; now precedes blocking_prop_index = pills[pill_index].prop_index;, matching January's store of zero to [ebp-4] at +0xd3, then [ebp-8] at +0xd7, then the hit byte at +0xda. The correspondence is deterministic and reversible - swapping the source swaps the emission - so VC7 is order-preserving for these two independent stores and January's order is therefore source-determined. objdiff 88.17 to 89.19643. The prior orchestrator's rejection of the parenthesising spelling for the fast_vector_intersects_sphere radius argument is UNCHANGED and binding; its reopening criterion (an attested or owner-approved parenthesising spelling, which would also unlock players, collisions and bipeds) is still unmet.",
-      "measurements": {
-        "target": { "size": 336, "relocation_count": 10, "normalized_sha256": "0aef44a538a12480aec2d0e85e44b434a56a3a3703ca0bc324a00dfdad2a3b3c" },
-        "base": { "size": 336, "relocation_count": 10, "normalized_sha256": "490d9ab453b888bb8c5f662b3a1fd825f17ddda8042cc3d2333682c96d5977bd" },
-        "objdiff_percent": 89.19643
-      }
-    },
-    {
-      "unit": "source/ai/ai",
       "function": "_ai_test_line_of_sight",
       "class": "instruction-scheduling",
       "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",

@@ -316,6 +316,19 @@ enum
 
 #define AI_SPATIAL_EFFECT_NEXT_INDEX(index) (((index) + 1) & (MAXIMUM_AI_SPATIAL_EFFECTS - 1))
 
+/* A spherical line of fire pill's width is the radius of its sphere.
+   The distinction is Bungie's own: real_math.h:409 names this callee's fourth
+   parameter `radius`, while vector_intersects_pill3d's fifth parameter at
+   real_math.h:536 is `pill_width`. The accessor records that distinction at the
+   one site where the sphere reading applies.
+   INFERRED FROM JANUARY'S BYTES, not attested: in January only the spherical
+   arm pushes the radius through the x87 (fld dword [ebp+eax-0x4e4] / push ecx /
+   fstp dword [esp]) while the pill arm integer copies the same field (mov edx,
+   dword [ebp+eax-0x4e4] / push edx). Spelling both arms as a bare field read
+   makes the two pushes identical, so VC7 hoists the common push above the je
+   and the function comes out six bytes short of January's 327. */
+#define LINE_OF_FIRE_PILL_SPHERE_RADIUS(pill) ((pill).width)
+
 /* ---------- structures */
 
 struct ai_spatial_effect
@@ -2237,7 +2250,7 @@ boolean ai_test_line_of_fire(
 					origin,
 					vector,
 					&pills[pill_index].base,
-					pills[pill_index].width);
+					LINE_OF_FIRE_PILL_SPHERE_RADIUS(pills[pill_index]));
 			}
 			else
 			{
