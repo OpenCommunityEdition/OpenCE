@@ -970,3 +970,91 @@ and the 12-byte frame in `_ai_test_line_of_sight`. **No wave-G agent spent
 shapes on a residual it had not first accounted for to the byte**, and the
 contrast with earlier waves' shape counts (50 shapes for zero movement on a
 144-byte function) is the argument for keeping the requirement.
+
+### R26. Wave H: four board-wide research questions, and what they settled
+
+Four research agents, eight attack agents, seven verifiers. Two closures landed
+(`_actor_emotion_unopposable_retreat` +1,264 by owner ruling on macro reuse, and
+nothing else exact), plus seven zero-credit correctness or fidelity landings.
+Separately, working alone during the wave, the lane's data went 64.8% -> 98.95%
+(+17,080 B); see `claude_lane_a_data_section_credit_20260920.md`.
+
+#### Research answer 1 - no more +8,400-style return-type errors exist
+
+A board-wide caller-side and callee-side detector for wrong declared return
+widths found **none** of the +8,400 kind, in the lane or board-wide. The
+caller-side detector as first specified was 100% false positives (98 of 98),
+which is worth knowing before anyone reuses it. One genuine lane mismatch
+remains: `ai_get_race_from_team_index` is declared `long` where January had
+`short`; fixing it makes its call site register-blind identical but banks ZERO
+bytes and needs a header edit at `source/ai/ai.h:114`. Out of lane: `hud_weapon.c`
+calls `weapon_prevents_grenade_throwing` through an implicit C4013 `int`
+declaration (January `test al,al`, ours `test eax,eax`) - a prototype in
+`items/weapons.h` fixes it at zero bytes. Neither is landed.
+
+A corrected law came out of it: the return-width law holds at 16 bits but is
+**inert at 8 bits** - `mov al,K` appears 275 times literal-only and 247 times
+variable-only in exact functions.
+
+#### Research answer 2 - branch width is NOT a steerable fixpoint
+
+Recorded in the correction banner on `claude_lane_a_render_actor_rebaseline_20260920.md`.
+In short: no seed branches exist, width is non-local and chaotic (one deleted
+call flipped 29 branches, 18 with byte-identical spans), January is fully
+self-consistent under a relaxation model while ours is not, and on
+`_ai_debug_render_actor` padded size mostly measures this noise. It also refuted
+the basis of the R21 closed-form argument for `_actor_look_idle_find_prop`.
+
+#### Research answer 3 - the single-exit lever has nothing to act on here
+
+An epilogue census found only two lane residuals whose epilogue count differs
+from January's, and both are consequences of something else (the -1 register
+pin in `_actor_create_for_unit` is one). The other 22 match January's exits.
+
+#### Research answer 4 - three stale conclusions, all now resolved
+
+1. **`_ai_test_line_of_sight`'s "no shape closes the frame gap" proof was
+   wrong** - every probe kept four separate objects. The real mechanism, found
+   by the attack agent: the TU-private `REAL_MATH_EXTERNAL_*` suppression macros
+   make `perpendicular` **address-exposed**, blocking liveness packing. With the
+   helper bodies visible, the HCEX-attested separate locals reproduce January's
+   frame exactly. That route emits a `_point_from_line3d` COMDAT and is dead
+   under the ownership ruling. A second route - reusing one `perpendicular`
+   object for left and down - also reaches frame 0x80 and size 1008, but it
+   contradicts the separate locals HCEX attests, so it is a compensating
+   spelling and is not landed.
+2. **LAW I was never applied to `actor_move_transform_avoidance_vector`.** VC7's
+   inliner prices a helper by its spelling, and a working dial exists: some
+   spellings inline it nowhere, one at two of three caller functions, one
+   everywhere. January inlines it at a specific subset of sites. **This is the
+   one open lever from wave H** (up to 4,896 B across `_actor_move_test_avoidance_vector`
+   and `_actor_move_vector_avoidance`, low confidence).
+3. `_ai_communication_event`'s header blocker was resolved mid-wave; the
+   function is now worked and landed at zero credit.
+
+#### Rulings applied this wave, with their measurements
+
+- **`_actor_look_update`**: owner admitted (a) the `__inline` specifier and (b)
+  the split tests, rejected (c). Ablation showed (a)+(b) alone ties every higher
+  key and improves REAL 120 -> 119; the plain edits only help jointly with (c).
+  COMDAT ownership audit: clean; csplit writes selection 1 for all 8,223
+  function COMDATs, so the flag carries no evidence.
+- **`_ai_communication_event`**: owner took the package minus the invented
+  `protagonist_invalid` flag and minus the unproven actor-arm polarity. A
+  controlled experiment proved the encounter-arm `enemy_alive` fix; the
+  actor-arm flip is byte-inert on the floor.
+- **`_actor_move_update`**: a variant that would have newly emitted
+  `_negate_vector3d`, which January's object does not define, was dropped under
+  the ownership ruling; the `allow_jump` defect fix landed, verified from
+  January's bytes at 0x562.
+
+#### `_actor_destination_update` - one allocator decision, decoded in C2.dll
+
+330 shapes, no landing. The whole residual is one decision in VC7's global
+register allocator: January gives eax to the `sx`/`next` web; we give it to the
+heavier step-pointer web, whose priority is 16 IL references x block weight 12 =
+192, against `next` at 144 and `sx` at 72. The agent decoded the allocator's
+order and cost rules live in C2.dll and built a per-web priority tool. Under
+January's own statement order step always outranks next, so reaching January
+needs an IL fact that leaves no trace in the final bytes. **The priority tool is
+reusable across every other register-decision residual in this lane.**
