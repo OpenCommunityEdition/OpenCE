@@ -144,3 +144,63 @@ lane. The largest: `effects/decals .bss` 30,930 B at 99.376%;
 `interface/ui_widget .data` 16,700 B at 99.377% and `.rdata` 7,880 B at 99.947%;
 `hs/hs_compile .rdata` 6,576 B; `cache/xbox_texture_cache .bss` 5,656 B. Flagged
 for separate work rather than done here, since it is outside this lane's scope.
+
+
+## UPDATE 2026-09-20 - re-examined after the board-wide data lane finished
+
+The board-wide data lane (branch `claude/data-section-credit-20260920`) closed
++119,772 data bytes using this finding, and brought back three methods this note
+did not use: January's OWN `cachebeta.pdb` public-symbol list for linkage, the
+literal-address law, and `.bss` layout ordering. All three were applied to this
+lane's remaining gaps. **None of the 406 bytes moves, but two of this note's
+diagnoses were wrong and are corrected here.**
+
+### Merge with that branch: clean
+
+The two branches touch exactly one common file, `config/symbols.json`, on
+different lines. `git merge-tree` reports no conflict. All 13 of the data lane's
+`symbols.json` lines name objects outside this lane (observer, director, decals,
+the teleporter game engine, rasterizer). Its header rename of the
+`bitmap_group` field `bitmap_data` -> `bitmaps` touches no Lane A file, and no
+Lane A file uses `bitmap_data`. A full ninja on the merged tree is still the
+right check before trusting the combination.
+
+### `ai_debug .data` (56 B) - the "three globals lack static" diagnosis was WRONG
+
+January's own PDB (`cachebeta.pdb`, DIA2Dump `-p`) settles linkage for all eight
+of `ai_debug`'s data globals, and it **vindicates our source**: the two debug
+arrays and `global_ai_debug_firing_position_color_count` are public; the other
+five - including `postcombat_type_strings` and the two squad globals - are
+absent from the publics, i.e. file-static, exactly as `ai_debug.c` declares
+them. So the source was already right. Adding `"static": true` for them in
+symbols.json was measured and **moved nothing** - the re-split changed only
+`ai_debug.obj` and no report row moved - so it was reverted rather than left in a
+file another lane has to merge.
+
+The real blocker is the **literal-address law**: objdiff matches a pointer to a
+string literal only when the literal sits at the same address in the combined
+`.rdata`. `postcombat_type_strings` is eleven pointers. Ten of its literals keep
+January's exact order and spacing, but January emits them FIRST in the object's
+`.rdata` (offset 0) while ours start at offset 288, behind other literals. The
+eleventh, `"none"`, is not defined in January's `ai_debug.obj` at all - the
+folded copy belongs to another object - so that pointer can never match. **The
+section therefore cannot reach 100% even with the order fixed, and earns zero
+data credit either way.** Not pursued.
+
+### `ai_debug .bss` (74 B) - still blocked on the name
+
+January's PDB lists the 2-byte slot at +72 as not public, so it is file-static,
+consistent with our `static short global_ai_debug_path_render_id = 0`. But no
+January public symbol, assert string or HCEA record names it, so the name still
+cannot be attested for symbols.json.
+
+### `ai_communication .data` (276 B) - still blocked
+
+It has no entry in `config/semantic_data_matches.json`, so it is not credited
+semantically either; the folded-literal attribution recorded above stands.
+
+### Corrected diagnosis, for the record
+
+The table earlier in this note lists `ai_debug .data` as "three private globals
+lack static: true". That is **wrong** - the true blocker is literal placement
+plus the folded `"none"`. Linkage was never the problem.
