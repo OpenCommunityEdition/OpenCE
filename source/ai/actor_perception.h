@@ -13,7 +13,7 @@ header included in hcex build.
 struct actor_position_data;
 union real_point3d;
 
-long actor_get_perception_knowledge(
+short actor_get_perception_knowledge(
 	long actor_index,
 	long prop_index);
 short actor_visibility_at_point(

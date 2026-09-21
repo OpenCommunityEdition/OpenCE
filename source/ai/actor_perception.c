@@ -1385,12 +1385,13 @@ void actor_perception_acknowledge(
 	return;
 }
 
-long actor_get_perception_knowledge(
+short actor_get_perception_knowledge(
 	long actor_index,
 	long prop_index)
 {
 	struct actor_perception_actor_view *actor =
 		(struct actor_perception_actor_view *)actor_get(actor_index);
+	short result;
 
 	if (prop_index != NONE)
 	{
@@ -1402,15 +1403,22 @@ long actor_get_perception_knowledge(
 #line 390 "source\\ai\\actor_perception.c"
 
 		if (prop->state >= 2 && prop->state <= 3)
-			return 3;
+		{
+			result = 3;
+			goto done;
+		}
 
 		if (prop->perception == 1 || prop->perception == 2)
-			return 3;
+		{
+			result = 3;
+			goto done;
+		}
 
 		if (!prop->enemy &&
 			(!prop->dead || actor->combat_status >= 3))
 		{
-			return 3;
+			result = 3;
+			goto done;
 		}
 
 		if (prop->orphan_prop_index != NONE)
@@ -1418,17 +1426,23 @@ long actor_get_perception_knowledge(
 			struct actor_perception_prop_view *orphan =
 				(struct actor_perception_prop_view *)prop_get(
 					prop->orphan_prop_index);
-			long result = (orphan->definitely_located != FALSE) + 2;
+			result = (orphan->definitely_located != FALSE) + 2;
 
-			if ((short)result != NONE)
-				return result;
+			if (result != NONE)
+				goto done;
 		}
 	}
 
 	if (actor->artificial_combat_status >= 2)
-		return 2;
+	{
+		result = 2;
+		goto done;
+	}
 
-	return actor->combat_status >= 3;
+	result = actor->combat_status >= 3;
+
+done:
+	return result;
 }
 
 void actor_get_vision_distances(
