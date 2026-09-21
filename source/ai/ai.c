@@ -503,7 +503,7 @@ extern struct ai_globals_data *ai_globals;
 
 static struct profile_section ai_update_section = { "ai_update", NONE, TRUE };
 
-static char *ai_sound_volume_names[NUMBER_OF_AI_SOUND_VOLUMES] =
+static char *ai_sound_volume_enum_strings[NUMBER_OF_AI_SOUND_VOLUMES] =
 {
 	"silent",
 	"medium",
@@ -515,7 +515,7 @@ static char *ai_sound_volume_names[NUMBER_OF_AI_SOUND_VOLUMES] =
 struct tag_enum_definition ai_sound_volume_enum =
 {
 	NUMBER_OF_AI_SOUND_VOLUMES,
-	ai_sound_volume_names,
+	ai_sound_volume_enum_strings,
 	NULL
 };
 
