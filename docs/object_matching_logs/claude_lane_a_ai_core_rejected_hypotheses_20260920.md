@@ -802,3 +802,105 @@ BOTH arms where January has one copy in the merge block - a tail merge), +5 (we
 materialise -1 twice where January materialises once), +2 (our merge compares
 read memory where January compares registers), -3 and -1. Every byte is
 accounted.
+
+### R24. Wave F: six negatives, every one reduced to a single named decision
+
+Six targets, **103 gated shapes**, no closure, zero bytes. What makes this wave
+different from earlier ones is that **every negative is now a byte-exact ledger**
+rather than a shrug. Detail in `scratch/res6/*/NOTES.md`.
+
+| function | bytes | shapes | the single decision it reduces to |
+|---|---:|---:|---|
+| `_ai_test_ballistic_line_of_fire` | 944 | 26 | which recycled dead-param slot the x87 temp gets |
+| `_prop_get_active_by_unit_index` | 144 | 50 | whether one `mov esi,ecx` is speculated above a branch |
+| `_actor_move_test_avoidance_vector` | 752 | 25 | the transform is inlined twice in January, not called |
+| `_ai_communication_finished` | 1,584 | 8 | a cross-jump pair choice, plus a hidden branch WIDTH |
+| `_actor_create_for_unit` | 624 | 7 | whether `-1` is PINNED in a register or rematerialised |
+| `_encounter_create` | 752 | 7 | whether `actor_type` is homed or enregistered |
+
+#### The method is now settled: register-blind FIRST, then byte attribution
+
+`real_regions.py` does not normalise register names and systematically
+overstates. Across the two waves the correction is large and consistent:
+
+    _encounter_create        43 REAL -> 16 -> 9 truly structural
+    _ai_communication_finished  34 REAL -> 15
+    _actor_look_update      120 REAL -> 96
+    _actor_customize_unit    43 REAL -> 1 allocator decision
+    _actor_create_for_unit   12 REAL -> 1 allocator decision
+
+Then attribute the surplus BYTES cause by cause until they sum exactly. Five
+functions across the two waves now have ledgers that close to the byte (+21, +8,
++16, +57/-57, 0). **A residual that does not close to the byte is not yet
+understood, and a shape spent before it does is a shape wasted.**
+
+`_prop_get_active_by_unit_index` is the instructive exception: register-blind
+changed *nothing*, because both builds already spell the cursor `ecx` and the
+saved copy `esi` at every site. Its byte attribution sums to ZERO surplus - 144
+= 144, real code ends at 0x8f on both sides - and the only differing bytes are
+the 2-byte `mov esi,ecx` and the `je rel8` that follows. Fifty shapes could not
+move it.
+
+#### TRAP #6: a branch-WIDTH delta is invisible to every instruction-level tool
+
+`_ai_communication_finished` carries +4 bytes at one site that is **the same
+instruction on both sides** (`jne` into the 0-chance block), differing only in
+encoded width. It never appears as a region in `real_regions.py` and never moves
+the instruction count, so every instruction-level tool reports that region as
+equal. Only a branch-width census finds it.
+
+Its full ledger, which closes exactly to the 16-byte gap: cross-jump pair choice
+plus EBX/EDI over 0x1e9..0x2d3 = +21 across 7 regions; the hidden width delta =
++4; our `"filter "` block carrying its own `lea`+`push` = -7; the
+rand-failed/0-chance placement = +25/-25 **net zero**; two pure-scheduling pairs
+= net zero; padding = -2. So the placement asymmetry recorded in R22 is real but
+**costs nothing**, and part (d) is refuted as source-reachable.
+
+#### LAW: recycled dead-parameter homes rank by DESCENDING REFERENCE COUNT
+
+A function's dead incoming parameter slots are reused as scratch. Which recycled
+object gets which slot is not arbitrary:
+
+> Recycled dead-parameter slots are handed out in **descending address order** to
+> the recycled objects ranked by **descending reference count**, ties broken
+> earlier-created-first.
+
+Measured on `_ai_test_ballistic_line_of_fire` from both sides:
+
+    floor    seg_end_time 6 -> +0x20 | collision_flags 3 -> +0x14 | x87 temp 2 -> +0x0c
+    JANUARY  seg_end_time 6 -> +0x20 | x87 temp       3 -> +0x14 | collision_flags 3 -> +0x0c
+
+The whole 944-byte residual is whether the x87 temp holding `segment_time` gets a
+**third** reference to its home slot, which lifts it above `collision_flags` in
+that ranking.
+
+Note the scope carefully. LAW F3 refuted "VC7 ranks frame objects by descending
+refs/size" for frame objects **in general**. This is a narrower and different
+population - *recycled dead-parameter homes* - and for that population a
+reference-count ranking does hold and is measured from both sides. The two are
+not in conflict; do not let this be read as reinstating F3.
+
+#### `_actor_create_for_unit`: the zero-register pin, again
+
+Register-blind makes the two bodies instruction-for-instruction identical except
+for how `NONE` is held. January **PINS** it (`or esi,-1`, then `cmp eax,esi` and
+`cmp [ebp+0x10],esi`, returning it at two epilogues); we **rematerialise**
+(`cmp eax,-1`, `cmp [ebp+0x10],-1`, `or eax,-1`). Two things follow from the pin
+rather than being separate causes: January's `push ebx` sinks to 0x24 after both
+guard branches, and because ebx is unsaved on the guard path January needs a
+**fifth** epilogue that does not `pop ebx` - five against our four. Ledger sums
+exactly to +8.
+
+This is the recurring zero-register pinning mechanism on a new function, and the
+function is **already parked with class `register-allocation`** - a park recorded
+long before this wave measured the same thing independently. Any shape that moved
+it would also have staled that park entry.
+
+#### `_encounter_create`: 57 bytes each way, netting zero
+
+Five of its sixteen register-blind regions are not differences at all: one
+`sub esp` consequence, three `[ebp-1]` versus `[ebp-2]` slot renumberings at
+identical encoded width, and two jump-table rows that are **trap #2/#4** -
+January's table relocates onto `_encounter_create+0x2c0`, ours onto `$L17058`,
+same seven bytes and same relocation type. True structural residual: nine
+regions, target-only 57 bytes against ours-only 57, net zero.
