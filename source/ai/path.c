@@ -1289,9 +1289,7 @@ void closest_point_to_attractor(
 	}
 	else
 	{
-		result->x = segment.i*t + p0->x;
-		result->y = segment.j*t + p0->y;
-		result->z = segment.k*t + p0->z;
+		point_from_line3d(p0, &segment, t, result);
 	}
 
 	return;
@@ -1400,14 +1398,15 @@ boolean path_state_estimated_distance(
 			}
 			while (current_node_index != NONE);
 
-			while (child_node_index != NONE && path_distance < 0.8f)
+			current_node_index = child_node_index;
+			while (current_node_index != NONE && path_distance < 0.8f)
 			{
-				node = path_get_node(state, child_node_index);
+				node = path_get_node(state, current_node_index);
 				path_distance += node->linear_distance_to_entry_point;
-				child_node_index = node->child_node_index;
+				current_node_index = node->child_node_index;
 			}
 
-			direction_point = child_node_index == NONE ?
+			direction_point = current_node_index == NONE ?
 				end_point : &node->entry_point;
 			vector_from_points3d(
 				&state->input.start_point,
@@ -1511,6 +1510,7 @@ static boolean path_state_traverse(
 			long quantized_cost_estimate;
 			short new_node_index = NONE;
 			struct path_node *new_node;
+			struct path_node previous_node_values;
 
 			if (adjacent_surface_index == cheapest_node->parent_node_surface_index)
 			{
@@ -1531,9 +1531,7 @@ static boolean path_state_traverse(
 				continue;
 			}
 
-			entry_point.x = edge->base_point.x + 0.5f * edge->edge_vector.i;
-			entry_point.y = edge->base_point.y + 0.5f * edge->edge_vector.j;
-			entry_point.z = edge->base_point.z + 0.5f * edge->edge_vector.k;
+			point_from_line3d(&edge->base_point, &edge->edge_vector, 0.5f, &entry_point);
 
 			if (state->destination_valid)
 			{
@@ -1549,9 +1547,7 @@ static boolean path_state_traverse(
 					vector_from_points3d(&edge->base_point, &state->destination.point, &edge_to_destination);
 					t = dot_product3d(&edge_to_destination, &edge->edge_vector) / magnitude_squared3d(&edge->edge_vector);
 					t = PIN(t, pathfinding_radius / edge_length, 1.0f - pathfinding_radius / edge_length);
-					entry_point.x = edge->base_point.x + t * edge->edge_vector.i;
-					entry_point.y = edge->base_point.y + t * edge->edge_vector.j;
-					entry_point.z = edge->base_point.z + t * edge->edge_vector.k;
+					point_from_line3d(&edge->base_point, &edge->edge_vector, t, &entry_point);
 				}
 			}
 
@@ -1679,6 +1675,7 @@ static boolean path_state_traverse(
 			}
 
 			new_node = path_get_node(state, new_node_index);
+			previous_node_values = *new_node;
 			new_node->parent_node_index = cheapest_node_index;
 			new_node->parent_node_surface_index = cheapest_node->surface_index;
 			new_node->surface_index = edge->adjacent_surface_index;
@@ -1693,14 +1690,17 @@ static boolean path_state_traverse(
 			new_node->last_render_id = NONE;
 			new_node->closest_distance_to_attractor = REAL_MAX;
 
-			bsp = TAG_BLOCK_GET_ELEMENT(
-				&state->structure->collision_bsp,
-				0,
-				struct collision_bsp);
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\path.c",
-				0x466,
-				(new_node->surface_index >= 0) && (new_node->surface_index < bsp->surfaces.count));
+			{
+				struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
+					&state->structure->collision_bsp,
+					0,
+					struct collision_bsp);
+
+				match_assert(
+					"c:\\halo\\SOURCE\\ai\\path.c",
+					0x466,
+					(new_node->surface_index >= 0) && (new_node->surface_index < bsp->surfaces.count));
+			}
 
 			if (new_node->heap_location == NONE)
 			{
@@ -1729,7 +1729,7 @@ static boolean path_state_traverse(
 				real closest_distance = distance_to_destination;
 				real_point3d closest_point = new_node->entry_point;
 
-				if (distance_to_destination < 4.0f)
+				if (closest_distance < 4.0f)
 				{
 					closest_distance = closest_available_point_on_surface(
 						state->structure,

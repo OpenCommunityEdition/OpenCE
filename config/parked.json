@@ -1868,25 +1868,6 @@
       }
     },
     {
-      "unit": "source/ai/path",
-      "function": "_closest_point_to_attractor",
-      "class": "unclassified",
-      "evidence": "First natural public reconstruction with genuine path.h ownership, normal four-argument January ABI, existing typed vector/dot/magnitude helpers and direct point-coordinate stores. January hex and later PDB/source corroborate the unusual p0-minus-attractor projection and fallback to p1; these are not silently corrected. The Fable static spelling and point_from_line3d call are not retained. Target208/2R versus candidate208/2R; real x87 multiply/add ordering differs, so this is not an all-input IEEE equivalence claim or exact credit. Root bounded target/first/ordinary execution covers103 scenarios in two precision modes,618 runs including the real weight caller, endpoints, degenerate segments, radius boundaries and assert/exit. An actual target-byte wrong-sign control is rejected. All6268 inherited strict functions survive and the50-consumer genuine header trial preserves runtime semantics apart from compiler-local labels. No compiler controls, declaration/arithmetic-order variants, representation casts or point_from_line3d COMDAT. Reopen only for authentic source/compiler-context evidence, not equivalent-spelling searches. See docs/object_matching_logs/path_obj_attractor_pair_natural_reconciliation_20260906.md and tools/audit/path_attractor_runtime.py.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 2,
-          "normalized_sha256": "5d7c8671785a09168d950e56cacc667c6c40bed2f7b6242aa27b34bdaf74483f"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 2,
-          "normalized_sha256": "d96eb8493bcb04e1293629a7c9b5d3735b8eb5f1b30ea2ff2ec5438376d389ab"
-        },
-        "objdiff_percent": 98.567566
-      }
-    },
-    {
       "unit": "source/ai/actor_firing_position",
       "function": "_pre_evaluator_attack",
       "class": "unclassified",
@@ -2481,36 +2462,6 @@
         "target": { "size": 1440, "relocation_count": 117, "normalized_sha256": "b32677fb6c4cc6bcd664b98bfc5cc962b68bdf65228a31759b52574becdf200b" },
         "base": { "size": 1440, "relocation_count": 118, "normalized_sha256": "5f8cfd1a03e2d4faddfd96d46f25ce9676ab650b4f12f4a8351bb5dc9f1bfba2" },
         "objdiff_percent": 62.50114
-      }
-    },
-    {
-      "unit": "source/ai/path",
-      "function": "_path_state_traverse",
-      "class": "unclassified",
-      "evidence": "Best reviewed natural A-star expand/relax reconstruction from the 2026-09-09 path packet, with semantics and private name independently corroborated by HCEA. The typed candidate preserves edge expansion, breakable/passable tests, cost and attractor calculations, hash lookup, heap relaxation, closest-node tracking, and debug outcomes. Target and candidate share the 2,096-byte envelope and the same 65-relocation destination multiset, but control order and scheduling differ materially. Zero exact credit; no exact-only branch, fake dependency, or raw access is retained. 2026-09-21 Lane B wave 2 (zero exact credit): body rewritten statement-for-statement from the first-party /Od build (halo_cache_symbols.exe fn 0x4c6a70: while(TRUE) with the pop at the top, three passable ifs, a cost local) with every structural fact confirmed against January's own bytes. Frame size and return count are now January's (was frame 0x85c vs 0x864 and 1 ret vs 2); aligned differing regions fell from 132 to 61 and objdiff from 64.6 to 98.6 percent. Padded size is now 2112 vs 2096. The remaining residue is confined to 0x10b-0x4cc: an edge-cursor bias and x87 ordering at the hand-expanded point_from_line3d sites. Those sites are a pre-existing consequence of the _point_from_line3d emission guard; January's path.obj neither defines nor references that symbol, so path stays in the owner's still-guarded all-inlined class. Reopen when the owner rules on header-inline COMDAT emission for all-inlined translation units, then replace the hand expansions with the real helper.",
-      "measurements": {
-        "target": { "size": 2096, "relocation_count": 65, "normalized_sha256": "3e33ddd8b81a7b51dc2886a3056a35dc11723632acde0244128e99383d585582" },
-        "base": { "size": 2112, "relocation_count": 65, "normalized_sha256": "a623b4bd85ca2d14878ddd420b38b2eed8dc38ff1cc290ca8215e9a53ff5fa92" },
-        "objdiff_percent": 98.57165
-      }
-    },
-    {
-      "unit": "source/ai/path",
-      "function": "_path_state_estimated_distance",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ai_bitmap_20260909.md. 2026-09-21 Lane B wave 2 (zero exact credit): structural changes each attested by January's bytes AND the first-party /Od build (fn 0x4c63b0): distance3d argument order, result = TRUE before the direction test, current/child initialiser order. Padded size is now equal (496 = 496, was 528), 191 vs 191 instructions with every offset aligned, objdiff 77.5 to 95.5 percent. The remaining difference is a three-register cycle, one slot choice and the result homing. Reopen with a decoded reason for the register cycle or new January-side evidence; do not replay argument-order or initialiser-order shapes.",
-      "measurements": {
-        "target": {
-          "size": 496,
-          "relocation_count": 13,
-          "normalized_sha256": "24719f50ab8c668f8155c5e89903def4b71a2d5b1479dd61f07b9e999e1298da"
-        },
-        "base": {
-          "size": 496,
-          "relocation_count": 13,
-          "normalized_sha256": "407e8d43ff9d1019b0f3cb7640c6db0940a3b2915bb0e8bdb7379f7fddaec80e"
-        },
-        "objdiff_percent": 95.494736
       }
     },
     {
