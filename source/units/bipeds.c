@@ -519,10 +519,10 @@ static void biped_update_physics(
 
 /* ---------- globals */
 
-boolean debug_biped_physics;
-boolean debug_biped_skip_update;
-boolean debug_biped_skip_collision;
-boolean debug_biped_limp_body_disable;
+boolean debug_biped_physics = FALSE;
+boolean debug_biped_skip_update = FALSE;
+boolean debug_biped_skip_collision = FALSE;
+boolean debug_biped_limp_body_disable = FALSE;
 boolean rider_ejection = TRUE;
 
 static struct profile_section biped_update_section = {"biped_update", NONE, TRUE};

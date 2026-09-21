@@ -442,7 +442,7 @@ void collision_debug_render(
 				match_assert(
 					"c:\\halo\\SOURCE\\physics\\collision_debug.c",
 					297,
-					count <= MAXIMUM_COLLISION_DEBUG_RESULTS);
+					count<=14);
 
 				memmove(&collisions[1], &collisions[0], count * sizeof(collisions[0]));
 				collisions[0].point = debug_point;

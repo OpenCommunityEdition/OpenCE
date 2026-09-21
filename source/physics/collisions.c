@@ -217,8 +217,8 @@ static real_vector3d collision_fix_pill_offsets[17] =
 };
 
 static struct collision_usage_times collision_usage_times;
-boolean debug_collision_skip_objects;
-boolean debug_collision_skip_vectors;
+boolean debug_collision_skip_objects = FALSE;
+boolean debug_collision_skip_vectors = FALSE;
 
 /* ---------- public code */
 

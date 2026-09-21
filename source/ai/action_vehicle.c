@@ -598,7 +598,7 @@ static boolean action_vehicle_find_destination(
 			real px = dx*t + entry_direction.i;
 			real py = dy*t + entry_direction.j;
 
-			if (py*py + px*px < 0.1225f)
+			if (py*py + px*px < 0.35f*0.35f)
 			{
 				use_entry_point = TRUE;
 			}

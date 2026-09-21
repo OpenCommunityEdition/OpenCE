@@ -397,7 +397,7 @@ boolean structure_test_line2d(
 			match_assert(
 				"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
 				316,
-				surface_index >= 0 && surface_index < structure->pathfinding_surfaces.count);
+				surface_index>=0 && surface_index<structure->pathfinding_surfaces.count);
 			scale = 1.0f / edge_count;
 			point_in_surface.x *= scale;
 			point_in_surface.y *= scale;
