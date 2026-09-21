@@ -589,16 +589,11 @@ long prop_get_active_by_unit_index(
 
 	actor = actor_get(actor_index);
 	next_prop_index = actor->meta.first_prop_index;
-	while (TRUE)
+	while (next_prop_index != NONE)
 	{
 		struct prop_datum *prop;
 
 		prop_index = next_prop_index;
-		if (next_prop_index == NONE)
-		{
-			return NONE;
-		}
-
 		prop = prop_get(next_prop_index);
 		next_prop_index = prop->next_prop_index;
 		if (prop->state >= _prop_state_unacknowledged &&
@@ -625,6 +620,8 @@ long prop_get_active_by_unit_index(
 
 		return prop_index;
 	}
+
+	return NONE;
 }
 
 long prop_get_base_by_unit_index(
