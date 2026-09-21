@@ -2473,8 +2473,7 @@ void actor_customize_unit(
 
 	if (actor_variant_definition->grenade_combat.grenade_type != NONE)
 	{
-		short grenade_count = seed_random_range(
-			get_global_random_seed_address(),
+		short grenade_count = random_range(
 			actor_variant_definition->items.grenades_lower_bound,
 			actor_variant_definition->items.grenades_upper_bound + 1);
 
