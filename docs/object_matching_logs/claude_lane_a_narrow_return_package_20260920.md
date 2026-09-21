@@ -1,3 +1,29 @@
+> **SUPERSEDED 2026-09-20 - THE CONCLUSION BELOW IS WRONG.**
+>
+> This document concluded that part (c) was PROVEN IMPOSSIBLE. It is not. The
+> package landed in `b3223f36` for **+8,400 strict bytes** with all three
+> functions EXACT.
+>
+> The error: the lab that produced the "return-register width is fixed by the
+> declared return type" law only ever tested `return <constant>;`. A board-wide
+> scan finds **122 narrow-returning functions in our own build that emit
+> `mov eax,imm` before `ret`**, including `_actor_visibility_at_point` in this
+> same object, which is EXACT.
+>
+> Corrected law: in a narrow-returning function `return <constant>;`
+> materialises at RETURN-SLOT width (`mov ax,K`), while a constant assigned to a
+> **single-exit accumulator** materialises at REGISTER width (`mov eax,K`). The
+> accumulator's own width is INERT - `short` and `long` both reach 38/6. The
+> declared RETURN TYPE is what flips callers to cleanup-first; the body rewrite
+> alone buys nothing.
+>
+> January's `mov eax,3` meant *single-exit accumulator*, not *wide return type* -
+> the single-exit idiom this campaign already knew January uses, and which this
+> file uses nine times.
+>
+> Everything below is retained as the record of how the wrong conclusion was
+> reached. The measurements in it are accurate; the inference from them is not.
+
 # The narrow-return package: approved, attempted in full, and PROVEN IMPOSSIBLE
 
 Worktree `C:\halo-worktrees\claude-lane-a-ai-core-20260920`, branch
