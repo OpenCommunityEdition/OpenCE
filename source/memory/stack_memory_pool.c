@@ -197,8 +197,8 @@ static boolean stack_memory_pool_valid_block(
 	struct stack_memory_pool *pool,
 	struct stack_memory_pool_block *block);
 static void stack_memory_pool_dispose_block(
-	struct stack_memory_pool_block *block,
-	struct stack_memory_pool *pool);
+	struct stack_memory_pool *pool,
+	struct stack_memory_pool_block *block);
 static void *stack_memory_pool_lock_block(
 	struct stack_memory_pool_block *block,
 	struct stack_memory_pool *pool);
@@ -284,7 +284,7 @@ void dispose_handle(
 	}
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 	block_size = block->size_and_flags&0x7FFFFFFF;
-	stack_memory_pool_dispose_block(block, pool);
+	stack_memory_pool_dispose_block(pool, block);
 	pool->bytes_used -= block_size;
 	pool->block_count--;
 	return;
@@ -379,7 +379,7 @@ void dispose_pointer(
 	}
 	match_assert("c:\\halo\\SOURCE\\memory\\stack_memory_pool.c", 0x22F, block);
 	block_size = block->size_and_flags&0x7FFFFFFF;
-	stack_memory_pool_dispose_block(block, pool);
+	stack_memory_pool_dispose_block(pool, block);
 	pool->bytes_used -= block_size;
 	pool->block_count--;
 	return;
@@ -929,8 +929,8 @@ static boolean stack_memory_pool_valid_block(
 }
 
 static void stack_memory_pool_dispose_block(
-	struct stack_memory_pool_block *block,
-	struct stack_memory_pool *pool)
+	struct stack_memory_pool *pool,
+	struct stack_memory_pool_block *block)
 {
 	long block_index;
 
@@ -985,142 +985,139 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 	char const *file,
 	unsigned long line)
 {
-	struct stack_memory_pool_block *free_space_in_pool_previous;
-	struct stack_memory_pool_block *block;
-	unsigned long aligned_block_size;
-	void *free_space;
+	struct stack_memory_pool_block *block = NULL;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 		0x342,
 		pool && pool->base_address);
 	if (
-		size <= 0 ||
-		size > 0x7FFFFFFF ||
-		size >= (unsigned long)pool->size)
+		size > 0 &&
+		size <= 0x7FFFFFFF &&
+		size < (unsigned long)pool->size)
+	{
+		struct stack_memory_pool_block *free_space_in_pool_previous = NULL;
+		void *free_space = NULL;
+		unsigned long free_space_at_end_of_pool;
+
+		size += sizeof(*block);
+		while (size%4)
+			size++;
+		free_space_at_end_of_pool = stack_memory_pool_free_space_at_end_of_pool(pool);
+		if (free_space_at_end_of_pool < size)
+		{
+			stack_memory_pool_compact(pool);
+			free_space_at_end_of_pool = stack_memory_pool_free_space_at_end_of_pool(pool);
+		}
+		if (free_space_at_end_of_pool < size)
+		{
+			free_space = stack_memory_pool_find_space_between_blocks(
+				pool,
+				size,
+				&free_space_in_pool_previous);
+		}
+		if (free_space_at_end_of_pool >= size || free_space)
+		{
+			if (pool->next_block_index == NONE)
+			{
+				long block_index;
+
+				block_index = stack_memory_pool_find_first_unused_memory_block(pool);
+				pool->next_block_index = block_index;
+				if (block_index == NONE)
+				{
+					display_assert(
+						"the memory pool has no more unsused master pointers; you need to use a bigger pool",
+						"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+						0x35F,
+						FALSE);
+				}
+			}
+			if (pool->next_block_index != NONE)
+			{
+				if (free_space)
+				{
+					pool->blocks[pool->next_block_index] = free_space;
+				}
+				else if (!pool->first_block)
+				{
+					pool->blocks[pool->next_block_index] =
+						(struct stack_memory_pool_block *)pool->base_address;
+				}
+				else
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+						0x370,
+						pool->last_block);
+					pool->blocks[pool->next_block_index] =
+						(struct stack_memory_pool_block *)((byte *)pool->last_block+memory_block_get_real_size(pool->last_block));
+				}
+
+				memory_block_set_size_and_index(
+					pool->next_block_index,
+					pool->blocks[pool->next_block_index],
+					size);
+				block = pool->blocks[pool->next_block_index];
+				block->handle = (void **)file;
+				block->lock_count = line;
+				if (!pool->first_block)
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+						0x37D,
+						(pool->last_block == NULL) && (pool->next_block_index == 0));
+					pool->last_block = block;
+					pool->first_block = block;
+					block->previous = NULL;
+					block->next = NULL;
+				}
+				else if (block < pool->first_block)
+				{
+					block->previous = NULL;
+					block->next = pool->first_block;
+					pool->first_block->previous = block;
+					pool->first_block = block;
+				}
+				else if (block > pool->last_block)
+				{
+					block->previous = pool->last_block;
+					block->next = NULL;
+					pool->last_block->next = block;
+					pool->last_block = block;
+				}
+				else
+				{
+					match_assert(
+						"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+						0x394,
+						free_space_in_pool_previous);
+					block->previous = free_space_in_pool_previous;
+					block->next = free_space_in_pool_previous->next;
+					free_space_in_pool_previous->next = block;
+					if (block->next)
+						block->next->previous = block;
+				}
+				stack_memory_pool_set_next_block_index(pool);
+			}
+		}
+		else
+		{
+			display_assert(
+				"allocation from memory pool failed; unable to find sufficient space in the pool",
+				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
+				0x39F,
+				FALSE);
+		}
+	}
+	else
 	{
 		display_assert(
 			"invalid size",
 			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
 			0x3A4,
 			FALSE);
-		return NULL;
 	}
-
-	aligned_block_size = size+sizeof(*block);
-	free_space_in_pool_previous = NULL;
-	free_space = NULL;
-	while (aligned_block_size&3)
-		aligned_block_size++;
-	if (stack_memory_pool_free_space_at_end_of_pool(pool) < aligned_block_size)
-	{
-		stack_memory_pool_compact(pool);
-		if (stack_memory_pool_free_space_at_end_of_pool(pool) < aligned_block_size)
-		{
-			free_space = stack_memory_pool_find_space_between_blocks(
-				pool,
-				aligned_block_size,
-				&free_space_in_pool_previous);
-			if (!free_space)
-			{
-				display_assert(
-					"allocation from memory pool failed; unable to find sufficient space in the pool",
-					"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-					0x39F,
-					FALSE);
-				return NULL;
-			}
-		}
-	}
-
-	if (pool->next_block_index == NONE)
-	{
-		long block_index;
-
-		block_index = stack_memory_pool_find_first_unused_memory_block(pool);
-		pool->next_block_index = block_index;
-		if (block_index == NONE)
-		{
-			display_assert(
-				"the memory pool has no more unsused master pointers; you need to use a bigger pool",
-				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-				0x35F,
-				FALSE);
-		}
-	}
-	if (pool->next_block_index == NONE)
-		return NULL;
-
-	if (free_space)
-	{
-		pool->blocks[pool->next_block_index] = free_space;
-	}
-	else if (!pool->first_block)
-	{
-		pool->blocks[pool->next_block_index] =
-			(struct stack_memory_pool_block *)pool->base_address;
-	}
-	else
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-			0x370,
-			pool->last_block);
-		pool->blocks[pool->next_block_index] =
-			(struct stack_memory_pool_block *)((byte *)pool->last_block+memory_block_get_real_size(pool->last_block));
-	}
-
-	memory_block_set_size_and_index(
-		pool->next_block_index,
-		pool->blocks[pool->next_block_index],
-		aligned_block_size);
-	block = pool->blocks[pool->next_block_index];
-	block->handle = (void **)file;
-	block->lock_count = line;
-	if (!pool->first_block)
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-			0x37D,
-			(pool->last_block == NULL) && (pool->next_block_index == 0));
-		pool->last_block = block;
-		pool->first_block = block;
-		block->previous = NULL;
-		block->next = NULL;
-	}
-	else if (block < pool->first_block)
-	{
-		block->previous = NULL;
-		block->next = pool->first_block;
-		pool->first_block->previous = block;
-		pool->first_block = block;
-	}
-	else
-	{
-		struct stack_memory_pool_block *last_block;
-
-		last_block = pool->last_block;
-		if (block > last_block)
-		{
-			block->next = NULL;
-			block->previous = last_block;
-			pool->last_block->next = block;
-			pool->last_block = block;
-		}
-		else
-		{
-			match_assert(
-				"c:\\halo\\SOURCE\\memory\\stack_memory_pool.c",
-				0x394,
-				free_space_in_pool_previous);
-			block->previous = free_space_in_pool_previous;
-			block->next = free_space_in_pool_previous->next;
-			free_space_in_pool_previous->next = block;
-			if (block->next)
-				block->next->previous = block;
-		}
-	}
-	stack_memory_pool_set_next_block_index(pool);
 	return block;
 }
 
@@ -1189,7 +1186,7 @@ static struct stack_memory_pool_block *stack_memory_pool_resize_block(
 						memory_block_get_user_address(new_block),
 						memory_block_get_user_address(reference),
 						memory_block_get_user_size(reference));
-					stack_memory_pool_dispose_block(reference, pool);
+					stack_memory_pool_dispose_block(pool, reference);
 				}
 			}
 		}

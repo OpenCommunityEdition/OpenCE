@@ -1922,15 +1922,15 @@ static void player_control_modify_desired_angles(
 				interpolate_scalar(
 					&player->desired_angles.pitch,
 					pitch_autolevel,
-					magnitude3d(&unit->object.translational_velocity) * error * 0.08f);
+					error * 0.08f * magnitude3d(&unit->object.translational_velocity));
 			}
 			else
 			{
 				interpolate_scalar(
 					&player->desired_angles.pitch,
 					pitch_autolevel,
-					magnitude3d(&unit->object.translational_velocity) *
-						constants->look_autolevel_scale * error);
+					error * constants->look_autolevel_scale *
+						magnitude3d(&unit->object.translational_velocity));
 			}
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\player_control.c",

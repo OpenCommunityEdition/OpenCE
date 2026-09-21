@@ -483,25 +483,6 @@
       }
     },
     {
-      "unit": "source/ai/action_converse",
-      "function": "_action_converse_perform",
-      "class": "register-allocation",
-      "evidence": "The gameplay inline-assembly transcription was removed under the house rule limiting sparse assembly to helper/math code. The retained ordinary-C reconstruction has the same 0x100 padded size and eight relocation identities as January. Five grounded C shapes were exhausted; the remaining packet difference is VC7 retaining the shared TRUE value in EBX/BL while the lawful source folds the four uses into immediate operands. The clean semantic C is therefore parked as a register-allocation residual rather than forcing exact bytes.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 8,
-          "normalized_sha256": "7a3fad8fb69307c132558b906832d4d31f0334734fc76d18fe773189b5a38d5d"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 8,
-          "normalized_sha256": "288862a662942eb5b03ee84809dbd6b6aea1c023d52915f2bc373192e7c212cb"
-        },
-        "objdiff_percent": 93.14815
-      }
-    },
-    {
       "unit": "source/cseries/cseries",
       "function": "_stristr",
       "class": "asm-implemented",
@@ -641,25 +622,6 @@
       }
     },
     {
-      "unit": "source/scenario/wind",
-      "function": "_wind_variance_initialize",
-      "class": "tu-context-optimization",
-      "evidence": "The retained ordinary-C reconstruction implements the HCEA-corroborated cyclic variance table directly: seed eight keyframes for each of three axes, then fill seven intermediate samples with uniform_cubic_spline_vector3d using the four wrapped neighbouring keyframes. January and the candidate share the seed-loop instruction/relocation topology apart from stack-home offsets, the same nine relocation destinations as a multiset, and the external wind_variance_initialize storage class. January emits a 0x38 frame and recomputes three wrapped-keyframe addresses inside the axis loop; VC7 hoists those typed array addresses and uses a 0x40 frame, producing 400 padded bytes versus January's 384. Unsigned word neighbour indices are retained because January's movzx sequence directly proves unsigned 16-bit values; the smaller signed-short candidate emits movsx and is structurally wrong. A pointer-induction refinement grew to 432 bytes and 10 relocations, while the earlier phase-union lifetime carrier was rejected as fake matching. The per-TU spline rename schedule follows the existing glow.c include precedent and leaves the canonical spline call unresolved, preventing the header's two target-absent inline COMDAT owners. The complete text-owner census is 10 versus 10 with no missing, surplus, or storage-class mismatch; all seven inherited exact wind functions and units.obj 189/189 remain strict exact. No union punning, volatile access, assembly, fake dependency, address-derived name, or nonsensical branch is retained. Reopen only for authoritative January source, a same-compiler donor with the target lifetime topology, or a natural loop/local spelling that prevents address hoisting without changing ownership.",
-      "measurements": {
-        "target": {
-          "size": 384,
-          "relocation_count": 9,
-          "normalized_sha256": "1d5cd879825797c62a8f525b3f47ac10ee86b61f82da861f5ae6e6db4afa41ff"
-        },
-        "base": {
-          "size": 400,
-          "relocation_count": 9,
-          "normalized_sha256": "75c381860540e026071ff2e96633e80efbc09849bb0dc828d3cc04dc2c522146"
-        },
-        "objdiff_percent": 60.99206
-      }
-    },
-    {
       "unit": "source/math/matrix_math",
       "function": "_matrix4x3_multiply",
       "class": "asm-implemented",
@@ -687,17 +649,6 @@
         "target": { "size": 288, "relocation_count": 5, "normalized_sha256": "7edcb9d4e87b0a5fe7d095bf5ba048614e46a9708e7d858889cbeb627aa0a0de" },
         "base": { "size": 288, "relocation_count": 5, "normalized_sha256": "ff9a7477deb2aa304240db075c9182d629f8b82c13cf4e4c48a51af1efc5170a" },
         "objdiff_percent": 94.7
-      }
-    },
-    {
-      "unit": "source/ai/actor_combat",
-      "function": "_actor_aim_projectile",
-      "class": "instruction-scheduling",
-      "evidence": "The retained ordinary C reconstructs the firing-state gate, acknowledged-prop target recovery, authenticated actor-debug snapshots, cached-point/vector selection, out-of-line normalize3d ownership, weapon-vector cone clamp, and burst-error output. The parameter name vector is proved by both January assertion literals and the actors.h owner declaration. Target and candidate both contain 720 padded bytes, 27 relocations, and 237 instructions. The meaningful code is identical except for the ordering of independent loads and stores while copying weapon_vector into the debug record at +0x274; all following offsets reconverge. Natural debug-field statement orders were tested, and the alternatives either move the boolean store earlier or enlarge the function. No alias carrier, volatile access, barrier, fake dependency, forced inline/noinline, assembly, or invented control flow is retained. Reopen only for authoritative January source/local ordering or a natural same-compiler aggregate-copy scheduling donor.",
-      "measurements": {
-        "target": { "size": 720, "relocation_count": 27, "normalized_sha256": "22aacf2cc27693354c5025ab0df43e759489116f19e4e3600ad74e4f1e8973ac" },
-        "base": { "size": 720, "relocation_count": 27, "normalized_sha256": "44113369d29436c6449ac416cc0a68340f752929938a3f099acd6fd10ab6101c" },
-        "objdiff_percent": 98.017395
       }
     },
     {
@@ -964,25 +915,6 @@
           "normalized_sha256": "e669dd203dc45dcf78821186c2ce2edced0cbc618417693fc4afc285f5c8623a"
         },
         "objdiff_percent": 86.03292
-      }
-    },
-    {
-      "unit": "source/ai/actions",
-      "function": "_actors_searching_same_position",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after retaining the complete bounded actor-search predicate in ordinary typed C and replaying all distinct historical Actions bodies. Target and candidate share the 320-byte padded envelope and all 14 relocation destinations in semantic order. The remaining packet is a closed register/lifetime allocation difference; prior predicate, declaration, iterator, and local-scope variants either compiled to this fixed point or disturbed more of the function. No volatile/register forcing, barrier, pragma, inline assembly, artificial dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January locals/source or a natural same-compiler register-allocation donor.",
-      "measurements": {
-        "target": {
-          "size": 320,
-          "relocation_count": 14,
-          "normalized_sha256": "0f8d4038344e6058a388fc236ba1a32a119bb69d13fa1b6c9f7b806c25071fb1"
-        },
-        "base": {
-          "size": 320,
-          "relocation_count": 14,
-          "normalized_sha256": "844a679f805ae87f3195ebaddccc8fe5fe9c8b5e507a5d09e895dfbba1baac62"
-        },
-        "objdiff_percent": 87.87611
       }
     },
     {
@@ -1271,25 +1203,6 @@
       }
     },
     {
-      "unit": "source/game/player_control",
-      "function": "_player_control_modify_desired_angles",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete desired-look update in ordinary typed C from January disassembly, PDB-authenticated private ownership, and the independent HaloCEA implementation. The retained body uses player_control_get, unit_get, unit_definition_get, and TAG_BLOCK_GET_ELEMENT; applies the seat-marker yaw arc, wraps yaw, derives and clamps camera pitch limits, autolevels against typed translational velocity, eases the persistent limits, and applies the requested pitch delta. The source uses real values and cseries PIN/angle helpers; the target-proven 2/pi scalar is expressed as the natural real literal 0.63661975f, eliminating the donor's wrong full-precision relocation. January and the candidate are both 1,584 padded bytes with the same 83 relocation identities; objdiff reports 99.59677 percent similarity. The fail-closed classifier proves independent-instruction-scheduling: the residual is one dependency-free else-arm schedule in which January materializes constants and the frame pointer between a velocity load and its x87 multiply while VC7 emits the multiply first. Six natural declaration/expression shapes were measured without changing that tie. No forced inline/noinline, barrier, volatile or register forcing, pragma, assembly, fake dependency, raw object/tag cast, invented address name, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the remaining schedule.",
-      "measurements": {
-        "target": {
-          "size": 1584,
-          "relocation_count": 83,
-          "normalized_sha256": "6e468bddb00f141c0c0018648fc4965e97ac383f6e688247adeab58281c6d4fb"
-        },
-        "base": {
-          "size": 1584,
-          "relocation_count": 83,
-          "normalized_sha256": "c61e9a2f2f5674737556d0890676ed566e69473ec0fe9f051738a4e9c1560afc"
-        },
-        "objdiff_percent": 99.59677
-      }
-    },
-    {
       "unit": "source/interface/virtual_keyboard",
       "function": "_virtual_keyboard_select",
       "class": "unclassified",
@@ -1306,25 +1219,6 @@
           "normalized_sha256": "025bd53f5f2169bb649702adf79e4603dd2a13ac0b5967aca9297e7e983565d9"
         },
         "objdiff_percent": 93.7518
-      }
-    },
-    {
-      "unit": "source/game/game_engine_race",
-      "function": "_race_engine_get_score",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed Race score getter from January disassembly and the independent later-Xbox HaloCEA implementation. The retained ordinary C returns the semantic team score for _get_score_team and otherwise combines the player's completed laps with the exact count_bits_32 population count of touched flags. January and the candidate are both 224 padded bytes with four relocations and objdiff reports 84.46 percent similarity. January keeps the lap bit vector in EDX, the lap count in EDI, and the inlined population count in ESI; VC7 selects an equivalent register permutation. Natural assignment-order and direct-expression probes reproduce the permutation, while a scoped bit-vector local prevents the target's helper unroll and shrinks the function to 96 bytes. The fail-closed classifier returns UNKNOWN, so no compiler recipe is claimed. No forced inline/noinline, volatile/register forcing, barrier, pragma, assembly, fake dependency, raw address, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor that explains the inlined-helper register allocation.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 4,
-          "normalized_sha256": "d4de45e4555836b0b784b385c6fe1a16eb949a3b107f3a16331d2c300d667db1"
-        },
-        "base": {
-          "size": 224,
-          "relocation_count": 4,
-          "normalized_sha256": "4f2137667212ade01aa3926e67a3ad0b3d726bec432a345a596e2e03a5948ce8"
-        },
-        "objdiff_percent": 84.45783
       }
     },
     {
@@ -2669,11 +2563,11 @@
           "normalized_sha256": "24719f50ab8c668f8155c5e89903def4b71a2d5b1479dd61f07b9e999e1298da"
         },
         "base": {
-          "size": 528,
+          "size": 496,
           "relocation_count": 13,
-          "normalized_sha256": "e286347823095bc8eb26bcf1768e6607851c2c8e2b1bc646d8636257e6444245"
+          "normalized_sha256": "407e8d43ff9d1019b0f3cb7640c6db0940a3b2915bb0e8bdb7379f7fddaec80e"
         },
-        "objdiff_percent": 77.47895
+        "objdiff_percent": 95.494736
       }
     },
     {

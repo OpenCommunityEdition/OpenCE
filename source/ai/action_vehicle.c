@@ -1058,8 +1058,8 @@ boolean action_vehicle_setup_impromptu(
 			actor_index,
 			vehicle_index,
 			FALSE,
-			attempt_distance,
-			continue_distance,
+			state_data->attempt_distance,
+			state_data->continue_distance,
 			FALSE,
 			FALSE))
 	{

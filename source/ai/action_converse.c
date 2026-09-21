@@ -96,13 +96,9 @@ void action_converse_begin(
 boolean action_converse_perform(
 	long actor_index)
 {
-	struct actor_datum *actor;
-	struct converse_state_data *state_data;
-	boolean true_value;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct converse_state_data *state_data = &actor->state.action_data.converse;
 
-	actor = actor_get(actor_index);
-	state_data = &actor->state.action_data.converse;
-	true_value = TRUE;
 	if (actor->meta.timeslice)
 	{
 		if (state_data->run_to_prop_index == NONE &&
@@ -111,42 +107,42 @@ boolean action_converse_perform(
 			state_data->run_to_prop_index = prop_get_base_by_unit_index(
 				actor_index,
 				state_data->run_to_unit_index,
-				true_value,
-				true_value);
+				TRUE,
+				TRUE);
 		}
 
-		if (state_data->run_to_prop_index != NONE)
+		if (state_data->run_to_prop_index == NONE)
+		{
+			state_data->failed = TRUE;
+		}
+		else
 		{
 			if (!state_data->in_range)
 			{
-				struct prop_datum *prop;
+				struct prop_datum *prop = prop_get(state_data->run_to_prop_index);
 
-				prop = prop_get(state_data->run_to_prop_index);
-				if ((prop->visibility >= _actor_perception_full &&
-					prop->distance < state_data->run_to_distance) ||
-					prop->distance < 0.7f)
+				if (prop->visibility >= _actor_perception_full &&
+					prop->distance < state_data->run_to_distance)
 				{
-					state_data->in_range = true_value;
+					state_data->in_range = TRUE;
+				}
+				else if (prop->distance < 0.7f)
+				{
+					state_data->in_range = TRUE;
 				}
 			}
 
 			if (state_data->in_range)
 			{
 				actor_move_halt(actor_index);
-				return state_data->failed;
 			}
-
-			if (!actor_move_to_prop(
+			else if (!actor_move_to_prop(
 				actor_index,
 				state_data->run_to_prop_index,
 				state_data->run_to_distance))
 			{
-				state_data->failed = true_value;
+				state_data->failed = TRUE;
 			}
-		}
-		else
-		{
-			state_data->failed = true_value;
 		}
 	}
 

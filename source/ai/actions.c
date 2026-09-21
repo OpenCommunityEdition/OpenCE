@@ -297,11 +297,14 @@ enum
 	_actor_animation_evade_right,
 };
 
+/* TU-local copy: no shared owner header declares it; actor_moving.c holds the other copy. */
 enum actor_evade_direction
 {
 	_actor_evade_left = 0,
 	_actor_evade_right,
-	_actor_evade_random = 4,
+	_actor_evade_forward,
+	_actor_evade_back,
+	_actor_evade_random,
 };
 
 enum
@@ -1145,10 +1148,13 @@ struct pursuit_location *actor_get_pursuit_location(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct pursuit_location *result = NULL;
 
-	if (actor->state.action == _actor_action_search ||
-		actor->state.action == _actor_action_uncover)
+	if (actor->state.action == _actor_action_search)
 	{
 		result = &actor->state.action_data.search.pursuit_location;
+	}
+	else if (actor->state.action == _actor_action_uncover)
+	{
+		result = &actor->state.action_data.uncover.pursuit_location;
 	}
 
 	return result;
@@ -2121,18 +2127,12 @@ boolean actors_searching_same_position(
 	long actor_index,
 	long other_actor_index)
 {
-	boolean result;
-	struct actor_datum *actor;
-	struct actor_datum *other_actor;
-	struct pursuit_location *location;
-	struct pursuit_location *other_location;
+	struct actor_datum *actor = actor_get(actor_index);
+	struct actor_datum *other_actor = actor_get(other_actor_index);
+	struct pursuit_location *location = actor_get_pursuit_location(actor_index);
+	struct pursuit_location *other_location = actor_get_pursuit_location(other_actor_index);
+	boolean result = FALSE;
 
-	actor = actor_get(actor_index);
-	other_actor = actor_get(other_actor_index);
-
-	location = actor_get_pursuit_location(actor_index);
-	other_location = actor_get_pursuit_location(other_actor_index);
-	result = FALSE;
 	if (location && other_location)
 	{
 		if (location->type == _pursuit_location_target &&
@@ -2143,32 +2143,26 @@ boolean actors_searching_same_position(
 			struct prop_datum *other_prop =
 				prop_try_and_get(other_actor->target.target_prop_index);
 
-			if (!prop || !other_prop)
-				goto result_exit;
-
-			if (!(distance_squared3d(
-				&prop->body_position,
-				&other_prop->body_position) < 0.7f * 0.7f))
-				return FALSE;
+			if (prop && other_prop)
+			{
+				result = distance_squared3d(
+					&prop->body_position,
+					&other_prop->body_position) < 0.7f * 0.7f;
+			}
 		}
 		else if (location->type == _pursuit_location_position &&
 			other_location->type == _pursuit_location_position)
 		{
-			return (boolean)(location->firing_position_index ==
-				other_location->firing_position_index);
+			result = location->firing_position_index ==
+				other_location->firing_position_index;
 		}
-		else
+		else if (location->type == _pursuit_location_undirected &&
+			other_location->type == _pursuit_location_undirected)
 		{
-			if (location->type != _pursuit_location_undirected)
-				goto result_exit;
-			if (other_location->type != _pursuit_location_undirected)
-				goto result_exit;
+			result = TRUE;
 		}
-
-		result = TRUE;
 	}
 
-result_exit:
 	return result;
 }
 
