@@ -1058,3 +1058,88 @@ order and cost rules live in C2.dll and built a per-web priority tool. Under
 January's own statement order step always outranks next, so reaching January
 needs an IL fact that leaves no trace in the final bytes. **The priority tool is
 reusable across every other register-decision residual in this lane.**
+
+### R27. Wave I: the allocator oracle, four closures, and the rulings behind them
+
+Two research agents, seven attack agents, four verifiers. **Four functions closed
+(+2,160 B) and two whole objects - `props` 17/17 and `encounters` 61/61.** Lane
+A is now 528 exact / 19 residual.
+
+| function | bytes | how | ruling |
+|---|---:|---|---|
+| `_actor_create_for_unit` | 624 | one return statement instead of five (single-exit law) | standing practice |
+| `_actor_customize_unit` | 640 | `random_range(lo, hi+1)` instead of spelling out `seed_random_range` | narrow `_random_range` exception |
+| `_prop_get_active_by_unit_index` | 144 | `prop_iterator` loop + single-exit result | admitted as proposed |
+| `_encounter_create` | 752 | single-case switch at the random-case site only | admitted, one site |
+| `_actors_spawn_from_unit` | (672) | hand-expanded `point_from_line3d` | **refused** - stays residual |
+
+#### The allocator oracle - validated, and then out-performed
+
+The wave-H decode of C2.dll's global integer allocator was generalised into a
+replay oracle and validated on all 524 exact lane functions: it reproduces the
+pop outcome and register of **6,638 of 6,646 webs**, 518 of 524 functions
+perfectly, with the chooser rule at 3,961/3,961. A compiler-in-the-loop "force"
+turns any allocator decision into a checkable counterfactual. It confirmed that
+`_actor_destination_update` is one decision from exact.
+
+**It is a diagnostic, not a search engine.** It classified six of eight targets
+UNDETERMINED and two UNREACHABLE by natural source - and the attack agents then
+closed four of them, including `_prop_get_active_by_unit_index`, which the oracle
+had called unreachable. In every closure the lever was a source-structure fact
+the oracle's model does not see (number of return statements, an inline
+helper's parameters, where an initialiser executes, a switch in place of an if).
+Use the oracle to explain a residual, never to rule one out.
+
+#### New VC7 laws from this wave
+
+- **Single-exit return split.** With ONE `return` statement, VC7 splits the
+  bottom return into one copy per incoming edge before webs are built. That gives
+  the return value's initialiser its own web, which is what produced January's
+  `-1` pin and fifth epilogue in `_actor_create_for_unit`. The flag carrying the
+  early-exit decision is threaded away completely; four spellings of it compile
+  to identical bytes, so the return-statement count, not the flag, is the lever.
+- **Constant web benefit gate.** A constant always becomes a candidate web, but
+  keeps a register only if its benefit field [W+0x40] > 0: each materialisation
+  costs 1, each use adds 1 only when its co-operand is in memory or spilled,
+  register compares and return copies add 0. `_actor_create_for_unit`'s `-1` sat
+  at benefit exactly 0, so it was rematerialised.
+- **Jump threading.** VC7's threader carries branch knowledge from `if` compares
+  but not from `switch` case edges, and does not thread an edge into a
+  switch-dispatch test. A semantically redundant re-test surviving in January's
+  bytes (here `cmp cx,7` at 0x226) is evidence of a switch-shaped test.
+- **Inline parameters raise block pressure.** Calling an `__inline` helper
+  instead of its expansion adds its parameters as IL values, which moved one web
+  from priority 53 to 65 in `_actor_customize_unit` and flipped the allocation.
+
+#### LEDGER - `_prop_get_active_by_unit_index`'s load-bearing declaration order
+
+Recorded here at the owner's direction instead of in a source comment. The fact
+that decides the match is invisible in January's bytes: the single-exit
+initialiser `long result = NONE` must EXECUTE AFTER the target-actor selection,
+so it is the last declaration. Its web and the `-1` constant then sit in the
+pre-loop join block that initialises the cursor, lifting the cursor web from
+priority 36 to 40, a tie with the state web that the [W+0x44] position
+tie-break gives to the cursor, so it takes ecx as in January. Declaring `result`
+first, as the sibling `prop_get_base_by_unit_index` does, is measured residual.
+This reverses R16 and props_obj.md's "do not repeat" on the combined predicate,
+which fails in the plain loop but is exact in the iterator loop.
+
+#### The narrow ownership exception, and its limits
+
+`_actor_customize_unit` newly defines a `_random_range` COMDAT, byte-identical to
+January's single copy, which the split credits to `action_obey.obj`. The owner
+admitted **that symbol only**. `_point_from_line3d` keeps its explicit guard, and
+manual expansion of a helper whose real call is barred stays refused - which is
+why `_actors_spawn_from_unit` (672 B, exact only via such an expansion) remains
+residual.
+
+#### Proven unreachable this wave
+
+- `_actor_move_test_avoidance_vector`: no natural spelling of
+  `actor_move_transform_avoidance_vector` inlines it at exactly January's sites;
+  the per-site inline dial is monotone. January inlines it at both
+  test_avoidance sites, calls it out of line in get_avoidance_direction and at
+  vector_avoidance's sharp-turn site.
+- `_actor_perception_friend_prop_is_attacking`: one global allocator decision -
+  the call-free region piece of the spilled `attacking` web must be coloured EAX -
+  with no natural source reaching it.
