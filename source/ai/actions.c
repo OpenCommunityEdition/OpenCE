@@ -3759,177 +3759,194 @@ boolean actor_action_try_to_evade(
 
 boolean actor_action_try_to_dive(
 	long actor_index,
-	short evade_direction,
-	real evade_distance,
-	real_vector2d *direction,
-	real ledge_avoidance_distance)
+	short escape_direction,
+	real dive_distance,
+	real_vector2d *alignment_vector,
+	real maximum_ledge_height)
 {
-	long local_actor_index = actor_index;
-	struct actor_datum *actor = actor_get(local_actor_index);
+	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_debug_info *debug_info =
-		&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(local_actor_index)];
-	boolean is_ledge = FALSE;
+		&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
+	boolean dive_off_ledge = FALSE;
 	byte collision_result[0x1C];
-	real alignment_j;
-	real alignment_i;
-	real scores[4];
+	real_vector2d evade_vector;
+	real_vector2d left_vector;
+	real animation_desire[4];
 	short best_animation;
+	short best_direction;
 	real best_score;
-	short best_animation_direction;
 	struct actor_dive_animation const *possibility;
 	boolean result;
 
 	debug_info->dive_decision_time = game_time_get();
 
-	if (actor->input.vehicle_index != NONE ||
-		!actor_move_try_evasion_direction(
-			local_actor_index,
-			direction,
-			evade_distance,
-			&evade_direction,
-			ledge_avoidance_distance,
-			&is_ledge,
+	if (actor->input.vehicle_index == NONE &&
+		actor_move_try_evasion_direction(
+			actor_index,
+			alignment_vector,
+			dive_distance,
+			&escape_direction,
+			maximum_ledge_height,
+			&dive_off_ledge,
 			collision_result))
 	{
-		debug_info->dive_decision = 1;
-		return FALSE;
-	}
-
-	switch (evade_direction)
-	{
-	case 0:
-		alignment_j = direction->i;
-		alignment_i = -direction->j;
-		break;
-
-	case 1:
-		alignment_i = direction->j;
-		alignment_j = -direction->i;
-		break;
-
-	case 2:
-		alignment_i = direction->i;
-		alignment_j = direction->j;
-		break;
-
-	case 3:
-		alignment_i = direction->i;
-		alignment_j = direction->j;
-		break;
-
-	default:
-		display_assert(
-			NULL,
-			"c:\\halo\\SOURCE\\ai\\actions.c",
-			3364,
-			TRUE);
-		system_exit(-1);
-	}
-
-	best_animation = NONE;
-	best_animation_direction = NONE;
-	best_score = -0.5f;
-	scores[2] = actor->input.facing_vector.j * alignment_j +
-		actor->input.facing_vector.i * alignment_i;
-	scores[0] = actor->input.facing_vector.i * alignment_j -
-		actor->input.facing_vector.j * alignment_i;
-	scores[3] = -scores[2];
-	scores[1] = -scores[0];
-
-	possibility = global_dive_animation_table;
-	do
-	{
-		match_assert(
-			"c:\\halo\\SOURCE\\ai\\actions.c",
-			3390,
-			(possibility->animation_direction >= 0) &&
-				(possibility->animation_direction < 4));
-
-		if (best_score <
-				scores[possibility->animation_direction] +
-					possibility->score_bias &&
-			unit_test_animation_impulse(
-				actor->meta.unit_index,
-				possibility->animation))
+		switch (escape_direction)
 		{
-			best_animation = possibility->animation;
-			best_animation_direction = possibility->animation_direction;
-			best_score = scores[possibility->animation_direction] +
-				possibility->score_bias;
-		}
-
-		possibility++;
-	}
-	while (possibility->animation != NONE);
-
-	if (best_animation == NONE)
-	{
-		debug_info->dive_decision = 2;
-		return FALSE;
-	}
-
-	{
-		real_vector2d output_direction;
-
-		switch (best_animation_direction)
-		{
-		case 0:
+		case _actor_evade_left:
 			set_real_vector2d(
-				&output_direction,
-				alignment_j,
-				-alignment_i);
+				&evade_vector,
+				-alignment_vector->j,
+				alignment_vector->i);
 			break;
 
-		case 1:
+		case _actor_evade_right:
 			set_real_vector2d(
-				&output_direction,
-				-alignment_j,
-				alignment_i);
+				&evade_vector,
+				alignment_vector->j,
+				-alignment_vector->i);
 			break;
 
-		case 2:
+		case _actor_evade_forward:
 			set_real_vector2d(
-				&output_direction,
-				alignment_i,
-				alignment_j);
+				&evade_vector,
+				alignment_vector->i,
+				alignment_vector->j);
 			break;
 
-		case 3:
+		case _actor_evade_back:
 			set_real_vector2d(
-				&output_direction,
-				alignment_i,
-				alignment_j);
+				&evade_vector,
+				alignment_vector->i,
+				alignment_vector->j);
 			break;
 
 		default:
-			display_assert(
-				NULL,
+			match_vassert(
 				"c:\\halo\\SOURCE\\ai\\actions.c",
-				3433,
-				TRUE);
-			system_exit(-1);
+				3364,
+				FALSE,
+				NULL);
 		}
 
-		result = actor_move_animation_impulse(
-			local_actor_index,
-			best_animation,
-			&output_direction);
+		best_animation = NONE;
+		best_direction = NONE;
+		best_score = -0.5f;
+		set_real_vector2d(
+			&left_vector,
+			-actor->input.facing_vector.j,
+			actor->input.facing_vector.i);
+		animation_desire[2] = dot_product2d(
+			&evade_vector,
+			(real_vector2d const *)&actor->input.facing_vector);
+		animation_desire[0] = dot_product2d(
+			&evade_vector,
+			&left_vector);
+		animation_desire[3] = -animation_desire[2];
+		animation_desire[1] = -animation_desire[0];
+
+		possibility = global_dive_animation_table;
+		do
+		{
+			match_assert(
+				"c:\\halo\\SOURCE\\ai\\actions.c",
+				3390,
+				(possibility->animation_direction >= 0) &&
+					(possibility->animation_direction < 4));
+
+			if (best_score <
+					animation_desire[possibility->animation_direction] +
+						possibility->score_bias &&
+				unit_test_animation_impulse(
+					actor->meta.unit_index,
+					possibility->animation))
+			{
+				best_animation = possibility->animation;
+				best_direction = possibility->animation_direction;
+				best_score = animation_desire[possibility->animation_direction] +
+					possibility->score_bias;
+			}
+
+			possibility++;
+		}
+		while (possibility->animation != NONE);
+
+		if (best_animation == NONE)
+		{
+			debug_info->dive_decision = _dive_no_animation;
+			result = FALSE;
+		}
+		else
+		{
+			real_vector2d animation_alignment_vector;
+
+			switch (best_direction)
+			{
+			case 0:
+				set_real_vector2d(
+					&animation_alignment_vector,
+					evade_vector.j,
+					-evade_vector.i);
+				break;
+
+			case 1:
+				set_real_vector2d(
+					&animation_alignment_vector,
+					-evade_vector.j,
+					evade_vector.i);
+				break;
+
+			case 2:
+				set_real_vector2d(
+					&animation_alignment_vector,
+					evade_vector.i,
+					evade_vector.j);
+				break;
+
+			case 3:
+				set_real_vector2d(
+					&animation_alignment_vector,
+					evade_vector.i,
+					evade_vector.j);
+				break;
+
+			default:
+				match_vassert(
+					"c:\\halo\\SOURCE\\ai\\actions.c",
+					3433,
+					FALSE,
+					NULL);
+			}
+
+			result = actor_move_animation_impulse(
+				actor_index,
+				best_animation,
+				&animation_alignment_vector);
+
+			if (result)
+			{
+				ai_communication_event(
+					_ai_communication_dive,
+					actor->meta.unit_index,
+					NONE,
+					NONE,
+					NONE,
+					NONE,
+					NULL);
+				debug_info->dive_decision = _dive_success;
+			}
+			else
+			{
+				debug_info->dive_decision = _dive_animation_failure;
+			}
+		}
+
 	}
-	if (result)
+	else
 	{
-		ai_communication_event(
-			44,
-			actor->meta.unit_index,
-			NONE,
-			NONE,
-			NONE,
-			NONE,
-			NULL);
-		debug_info->dive_decision = 4;
-		return result;
+		debug_info->dive_decision = _dive_cannot_move;
+		result = FALSE;
 	}
 
-	debug_info->dive_decision = 3;
 	return result;
 }
 

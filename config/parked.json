@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/ai/path_structure_bsp",
-      "function": "_structure_test_line2d",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete ordinary-C reconstruction from the dedicated path-structure BSP audit. It preserves the January recursive fallback and target-proven boundary behavior, uses the owning header and named path/collision flag bits, and contains no volatile, barrier, pragma, assembly, or fake dependency. Candidate and target both occupy 1,104 padded bytes with all 29 relocation identities; the remaining difference is the documented legal-C schedule fixed point. This is a zero-credit fuzzy park. Reopen only with authoritative January source or a natural same-compiler donor. See docs/object_matching_logs/path_structure_bsp_obj.md.",
-      "measurements": {
-        "target": {
-          "size": 1104,
-          "relocation_count": 29,
-          "normalized_sha256": "664912aede956fbb3bc49b4517a90d315d445777054a1823c0eafadd2a1f2bc0"
-        },
-        "base": {
-          "size": 1104,
-          "relocation_count": 29,
-          "normalized_sha256": "55ccd1c4c2cab82eb867a354392b848b9a1851bc29a4c0dab3f4e64aadaece83"
-        },
-        "objdiff_percent": 95.24156
-      }
-    },
-    {
       "unit": "source/main/main",
       "function": "_main_game_render",
       "class": "unclassified",
@@ -877,25 +858,6 @@
           "normalized_sha256": "80e7bf257e70635f1a9a668d895ab372d01671ab05db2a55b2db8afbb8866ac3"
         },
         "objdiff_percent": 96.54422
-      }
-    },
-    {
-      "unit": "source/ai/actions",
-      "function": "_actor_action_try_to_dive",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked after reconstructing the complete January dive eligibility, target selection, debug bookkeeping, and animation/action transition in ordinary typed C and exhausting the recorded declaration, aggregate-vector, scope, and linkage variants. The candidate retains all 29 semantic relocation destinations but is 704 padded bytes against January's 720. Static-linkage and aggregate/lifetime experiments could recover isolated allocation features only while perturbing broader code and were reverted. No forced inlining, volatile access, barrier, pragma, assembly, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January locals/source, the original translation-unit context, or a natural same-compiler donor that explains the remaining frame/allocation schedule.",
-      "measurements": {
-        "target": {
-          "size": 720,
-          "relocation_count": 29,
-          "normalized_sha256": "2548ce8b22f46d482056a0e7fce5078dfa8f2d4d5e064a9e1943c90b8147d990"
-        },
-        "base": {
-          "size": 720,
-          "relocation_count": 29,
-          "normalized_sha256": "e669dd203dc45dcf78821186c2ce2edced0cbc618417693fc4afc285f5c8623a"
-        },
-        "objdiff_percent": 86.03292
       }
     },
     {
