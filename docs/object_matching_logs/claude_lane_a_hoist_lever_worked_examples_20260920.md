@@ -66,14 +66,15 @@ the body into it.
     if (actor->state.combat_status >= _actor_combat_status_certain)
         ...
 
-January hoists the `else` arm, and **the hoisted block swallows the NEXT `if`'s
-test** (`cmp cx,4 ; jl`) - which is why it is a hoist and not a plain else. We
-reproduce it byte for byte.
+January hoists the `else` arm, and here the hoisted block also swallows the next
+`if`'s test (`cmp cx,4 ; jl`). We reproduce it byte for byte.
 
-Note the discrimination: the same function contains an immediately preceding
+The same function contains an immediately preceding
 `if (mode < _actor_mode_combat) timer = 0; else timer++;` which is **not**
-hoisted in either build. The idiom alone is not sufficient; the tail-merge with
-the following test is what carries it out of line.
+hoisted in either build, so the idiom alone is not sufficient. The tail-merge
+looked like the discriminator, but it is **not a necessary condition**: see the
+avoidance block below, which January hoists with no swallowed test at all. What
+separates a hoisted instance from a non-hoisted one is still open.
 
 ## Why this matters for the remaining divergences
 
@@ -98,9 +99,27 @@ Identical instructions, pure placement - and it is **the same source idiom as
 then-arm falls through into the join with no `jmp` at all, which is the whole
 point of the hoist.
 
-Our source in the avoidance function contains no `++` anywhere in its body, so
-the increment is currently spelled some other way. That is the first thing to
-test, and it is a source question, not a backend tie.
+The source site is `actor_moving.c:1718`, and it is **already spelled exactly
+like the worked example**:
+
+    if (actor->control.vector_avoidance_sharp_turn_timer == NONE)
+        actor->control.vector_avoidance_sharp_turn_timer = 0;
+    else
+        actor->control.vector_avoidance_sharp_turn_timer++;
+
+So the divergence is NOT the statement's spelling, and no re-spelling of these
+four lines should be spent. What differs is the surrounding layout. January's
+hoisted block sits at 0xce6-0xcf3, immediately before the landing site of the
+`jne` at 0xbbb that leaves the `else if (emergency_scale > 0.5f)` arm
+(`fcomp __real@3f000000` at 0xbb0, then `debug_info->field_653C = 5` at 0xbc1 -
+source line 1706-1708). On that arm `sharp_turn` is known TRUE, so VC7 has
+const-folded the following `if (sharp_turn)` and **duplicated the sharp-turn
+body into the specialized path**. The hoisted block is parked at the end of that
+duplicated path.
+
+So this instance is a consequence of path specialization, not of the four-line
+idiom, and the handle - if there is one - is upstream, in how the
+`sharp_turn = TRUE` arms are written.
 
 ## The correction this forces
 
@@ -114,7 +133,7 @@ nothing for a source-level assignment to express.
 
 In-scope work list, with the lever now attached:
 
-    _actor_move_vector_avoidance                   4,144 B  counter idiom, worked example in hand
+    _actor_move_vector_avoidance                   4,144 B  idiom already correct; gap is path specialization
     _actor_perception_aiming_vector_test_blockage    400 B  FP cascade, `mov ecx,1`
     _actor_look_update                             4,720 B  we hoist, January does not
     _actor_emotion_unopposable_retreat             1,264 B  we hoist, January does not
