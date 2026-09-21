@@ -3305,11 +3305,11 @@ void actor_move_update(
 		real_vector3d grenade_direction;
 
 		actor->control.moving = FALSE;
-		crouch = FALSE;
 		vector_from_points3d(
 			&actor->input.position.body_position,
 			&actor->control.grenade_current_target,
 			&grenade_direction);
+		crouch = FALSE;
 		if (normalize3d(&grenade_direction) != 0.f)
 		{
 			actor->control.desired_facing_vector = grenade_direction;
@@ -3348,11 +3348,11 @@ void actor_move_update(
 
 		if (TEST_FLAG(definition->flags, _actor_definition_flying_bit))
 		{
+			move_in_3d = TRUE;
 			free_movement = TRUE;
 			free_movement_distance_squared =
 				definition->moving.free_flying_sidestep_distance *
 				definition->moving.free_flying_sidestep_distance;
-			move_in_3d = TRUE;
 			if (actor->control.moving_forced_by_aiming)
 				free_movement_distance_squared *= 4.f;
 		}
