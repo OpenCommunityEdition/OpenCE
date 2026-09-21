@@ -48,6 +48,7 @@ symbols in this file:
 
 #include "actor_definitions.h"
 #include "actors.h"
+#include "ai_scenario_definitions.h"
 #include "actor_types.h"
 #include "props.h"
 
@@ -294,72 +295,69 @@ void infection_swarm_control(
 	short intermittent_action_member = NONE;
 	short member_index;
 
-	if (swarm->swarm_intermittent_action_timer < 1)
-	{
-		if (actor->state.action == _actor_action_search ||
-			actor->state.action == _actor_action_charge)
-		{
-			real cooldown = real_seed_random_range(
-				get_global_random_seed_address(),
-				6.f,
-				8.f) / swarm->unit_count * TICKS_PER_SECOND;
-
-			if (cooldown <= 6.f)
-				cooldown = 6.f;
-
-			swarm->swarm_intermittent_action_timer = (short)(long)cooldown;
-			intermittent_action_member = seed_random_range(
-				get_global_random_seed_address(),
-				0,
-				swarm->unit_count);
-		}
-	}
-	else
+	if (swarm->swarm_intermittent_action_timer > 0)
 	{
 		swarm->swarm_intermittent_action_timer--;
 	}
+	else
+	{
+		switch (actor->state.action)
+		{
+		case _actor_action_search:
+		case _actor_action_charge:
+			{
+				real cooldown = real_seed_random_range(
+					get_global_random_seed_address(),
+					6.f,
+					8.f) / swarm->unit_count * TICKS_PER_SECOND;
 
-	if (swarm->unit_count < 1)
-		return;
+				swarm->swarm_intermittent_action_timer = (short)MAX(cooldown, 6.f);
+				intermittent_action_member = seed_random_range(
+					get_global_random_seed_address(),
+					0,
+					swarm->unit_count);
+			}
+			break;
+		}
+	}
 
 	for (member_index = 0; member_index < swarm->unit_count; member_index++)
 	{
 		long unit_index = swarm->unit_indices[member_index];
-		struct biped_datum *biped = biped_get(unit_index);
+		struct unit_datum *unit = unit_get(unit_index);
 		struct swarm_component_datum *swarm_component = swarm_component_get(
 			swarm->component_indices[member_index]);
-		struct prop_datum *best_prop = NULL;
-		long movement_target_prop_index = NONE;
+		struct prop_datum *target_prop;
 		short movement_type = _swarm_movement_none;
-		char animation_state = _unit_animation_state_in_combat;
-		char aiming_speed = _unit_aiming_speed_casual;
+		long movement_target_prop_index = NONE;
+		short animation_state = _unit_animation_state_in_combat;
+		short aiming_speed = _unit_aiming_speed_casual;
+		boolean facing_target = FALSE;
 		boolean target_in_melee_range = FALSE;
 		boolean has_direction = FALSE;
-		boolean facing_target = FALSE;
 		boolean should_jump = FALSE;
 		boolean biped_airborne = FALSE;
 		real_vector3d up;
 		real_vector3d direction;
 
-		up = biped->object.up;
-		if (biped->object.type == _object_type_biped)
+		up = unit->object.up;
+		if (unit->object.type == _object_type_biped)
 		{
+			struct biped_datum *biped = (struct biped_datum *)unit;
+
 			if (biped->biped.support_surface_index != NONE)
 				up = biped->biped.ground_plane.n;
 			biped_airborne = TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
 		}
 
-		if (actor->state.combat_status < _actor_combat_status_definite)
-		{
-			swarm_component->combat_target_prop_index = NONE;
-		}
-		else
+		if (actor->state.combat_status >= _actor_combat_status_definite)
 		{
 			struct prop_iterator iterator;
+			real combat_range = variant->ranged_combat.combat_range_upper_bound;
+			struct prop_datum *best_prop = NULL;
+			long best_prop_index = NONE;
 			real best_score = 0.f;
 			real best_distance = 0.f;
-			long best_prop_index = NONE;
-			real combat_range = variant->ranged_combat.combat_range_upper_bound;
 			struct prop_datum *prop;
 
 			prop_iterator_new(&iterator, actor_index);
@@ -369,13 +367,14 @@ void infection_swarm_control(
 				{
 					real_vector3d delta;
 					real distance;
-					real score = 0.f;
+					real score;
 
 					vector_from_points3d(
 						&prop->body_position,
 						&swarm_component->position,
 						&delta);
 					distance = square_root(magnitude_squared3d(&delta));
+					score = 0.f;
 					if (distance < combat_range)
 						score = (1.f - distance / combat_range) * 10.f;
 
@@ -393,10 +392,10 @@ void infection_swarm_control(
 
 					if (score > best_score)
 					{
-						best_prop = prop;
-						best_prop_index = iterator.index;
 						best_score = score;
+						best_prop = prop;
 						best_distance = distance;
+						best_prop_index = iterator.index;
 					}
 				}
 			}
@@ -409,6 +408,12 @@ void infection_swarm_control(
 			{
 				target_in_melee_range = TRUE;
 			}
+			target_prop = best_prop;
+		}
+		else
+		{
+			swarm_component->combat_target_prop_index = NONE;
+			target_prop = NULL;
 		}
 
 		switch (actor->state.action)
@@ -421,17 +426,6 @@ void infection_swarm_control(
 		case _actor_action_alert:
 			movement_type = _swarm_movement_wander_noncombat;
 			animation_state = _unit_animation_state_alert;
-			break;
-
-		case _actor_action_flee:
-			animation_state = actor->state.action_data.flee.panic_type > _actor_panic_none
-				? _unit_animation_state_flee
-				: _unit_animation_state_in_combat;
-			if (actor->state.action_data.flee.flee_prop_index != NONE)
-			{
-				movement_type = _swarm_movement_away_from_prop;
-				movement_target_prop_index = actor->state.action_data.flee.flee_prop_index;
-			}
 			break;
 
 		case _actor_action_guard:
@@ -450,46 +444,71 @@ void infection_swarm_control(
 			{
 				movement_type = _swarm_movement_wander_combat;
 			}
+			animation_state = _unit_animation_state_in_combat;
+			break;
+
+		case _actor_action_flee:
+			animation_state = actor->state.action_data.flee.panic_type > _actor_panic_none
+				? _unit_animation_state_flee
+				: _unit_animation_state_in_combat;
+			if (actor->state.action_data.flee.flee_prop_index != NONE)
+			{
+				movement_type = _swarm_movement_away_from_prop;
+				movement_target_prop_index = actor->state.action_data.flee.flee_prop_index;
+			}
 			break;
 
 		case _actor_action_charge:
 		case _actor_action_obey:
+			animation_state = _unit_animation_state_in_combat;
 			if (actor->state.action == _actor_action_obey &&
 				TEST_FLAG(swarm_component->flags, _swarm_component_obey_bit))
 			{
 				movement_type = _swarm_movement_obey;
 			}
-			else if (swarm_component->combat_target_prop_index == NONE)
-			{
-				movement_type = _swarm_movement_wander_combat;
-			}
-			else
+			else if (swarm_component->combat_target_prop_index != NONE)
 			{
 				movement_target_prop_index = swarm_component->combat_target_prop_index;
 				aiming_speed = _unit_aiming_speed_alert;
-				movement_type = swarm_component->attack_delay_ticks
+				movement_type = swarm_component->attack_delay_ticks > 0
 					? _swarm_movement_away_from_prop
 					: _swarm_movement_towards_prop;
+			}
+			else
+			{
+				movement_type = _swarm_movement_wander_combat;
 			}
 			break;
 		}
 
-		if (biped->object.parent_object_index == NONE)
+		if (unit->object.parent_object_index == NONE)
 		{
 			swarm_component->attached_to_unit_ticks = 0;
-			if (swarm_component->attack_delay_ticks)
+			if (swarm_component->attack_delay_ticks > 0)
 				swarm_component->attack_delay_ticks--;
 		}
 		else
 		{
-			struct unit_datum *parent_unit = unit_get(biped->object.parent_object_index);
+			struct unit_datum *parent_unit = unit_get(unit->object.parent_object_index);
 			boolean parent_is_dead = TEST_FLAG(parent_unit->object.damage_flags, _object_dead_bit);
 			boolean detach = FALSE;
 
-			if (swarm_component->attached_to_unit_ticks != 255)
+			if (swarm_component->attached_to_unit_ticks < 255)
 				swarm_component->attached_to_unit_ticks++;
 
-			if (!parent_is_dead)
+			if (parent_is_dead)
+			{
+				if (parent_unit->unit.time_of_death != NONE &&
+					parent_unit->unit.time_of_death + 75 < game_time_get() &&
+					target_prop &&
+					target_prop->unit_index != unit->object.parent_object_index &&
+					target_prop->state >= _prop_state_becoming_unacknowledged &&
+					target_prop->state <= _prop_state_acknowledged)
+				{
+					detach = TRUE;
+				}
+			}
+			else
 			{
 				struct unit_definition *parent_definition = unit_definition_get(
 					parent_unit->definition_index);
@@ -503,15 +522,6 @@ void infection_swarm_control(
 					swarm_component->attack_delay_ticks = 45;
 					detach = TRUE;
 				}
-			}
-			else if (parent_unit->unit.time_of_death != NONE &&
-				parent_unit->unit.time_of_death + 75 < game_time_get() &&
-				best_prop &&
-				best_prop->unit_index != biped->object.parent_object_index &&
-				best_prop->state >= _prop_state_becoming_unacknowledged &&
-				best_prop->state <= _prop_state_acknowledged)
-			{
-				detach = TRUE;
 			}
 
 			if (detach)
@@ -530,11 +540,16 @@ void infection_swarm_control(
 			}
 		}
 
-		if (biped->object.parent_object_index == NONE)
+		if (unit->object.parent_object_index == NONE)
 		{
-			if (!biped_airborne)
+			if (biped_airborne)
 			{
-				if (swarm_component->ground_ticks != 255)
+				SET_FLAG(swarm_component->flags, _swarm_component_attached_to_unit_bit, FALSE);
+				swarm_component->ground_ticks = 0;
+			}
+			else
+			{
+				if (swarm_component->ground_ticks < 255)
 					swarm_component->ground_ticks++;
 
 				swarm_component->flags &= ~(FLAG(_swarm_component_attacking_in_melee_bit) |
@@ -552,12 +567,34 @@ void infection_swarm_control(
 						SET_FLAG(swarm_component->flags, _swarm_component_wander_bit, TRUE);
 					}
 
-					if (!swarm_component->wander.move_ticks)
+					if (swarm_component->wander.move_ticks > 0)
 					{
-						if (swarm_component->wander.pause_ticks)
+						swarm_component->wander.move_ticks--;
+						if (swarm_component->wander.move_ticks == 0)
+						{
+							swarm_component->wander.pause_ticks = (byte)infection_wander_pause_time(movement_type);
+						}
+						else
+						{
+							real angle_damping = swarm_component->wander.angle * -0.06666667f;
+							real angle = real_random_range(-0.020943951f, 0.020943951f) +
+								swarm_component->wander.angle +
+								angle_damping;
+
+							swarm_component->wander.angle = angle;
+							rotate_vector_about_axis(
+								&swarm_component->wander.vector,
+								&up,
+								sine(angle),
+								cosine(angle));
+						}
+					}
+					else
+					{
+						if (swarm_component->wander.pause_ticks > 0)
 							swarm_component->wander.pause_ticks--;
 
-						if (!swarm_component->wander.pause_ticks)
+						if (swarm_component->wander.pause_ticks == 0)
 						{
 							real_vector3d to_center;
 							real distance_squared;
@@ -569,43 +606,29 @@ void infection_swarm_control(
 								&swarm->swarm_center,
 								&to_center);
 							distance_squared = magnitude_squared3d(&to_center);
-							if (distance_squared >= 0.25f)
+							if (distance_squared < 0.25f)
 							{
-								real angle_range = 0.5f / square_root(distance_squared) * _pi;
-								angle = real_random_range(-angle_range, angle_range);
-								swarm_component->wander.vector = to_center;
+								angle = real_random_range(-_pi, _pi);
+								swarm_component->wander.vector = unit->object.forward;
+								rotate_vector_about_axis(
+									&swarm_component->wander.vector,
+									&up,
+									sine(angle),
+									cosine(angle));
 							}
 							else
 							{
-								angle = real_random_range(-_pi, _pi);
-								swarm_component->wander.vector = biped->object.forward;
+								real angle_range = 0.5f / square_root(distance_squared) * _pi;
+
+								angle = real_random_range(-angle_range, angle_range);
+								swarm_component->wander.vector = to_center;
+								rotate_vector_about_axis(
+									&swarm_component->wander.vector,
+									&up,
+									sine(angle),
+									cosine(angle));
 							}
-							rotate_vector_about_axis(
-								&swarm_component->wander.vector,
-								&up,
-								sine(angle),
-								cosine(angle));
 							swarm_component->wander.angle = 0.f;
-						}
-					}
-					else
-					{
-						swarm_component->wander.move_ticks--;
-						if (!swarm_component->wander.move_ticks)
-						{
-							swarm_component->wander.pause_ticks = (byte)infection_wander_pause_time(movement_type);
-						}
-						else
-						{
-							real angle = real_random_range(-0.020943952f, 0.020943952f) +
-								swarm_component->wander.angle * -0.06666667f +
-								swarm_component->wander.angle;
-							swarm_component->wander.angle = angle;
-							rotate_vector_about_axis(
-								&swarm_component->wander.vector,
-								&up,
-								sine(angle),
-								cosine(angle));
 						}
 					}
 
@@ -615,8 +638,8 @@ void infection_swarm_control(
 						swarm_component->wander.move_ticks || swarm_component->wander.pause_ticks);
 					if (swarm_component->wander.move_ticks)
 					{
-						direction = swarm_component->wander.vector;
 						has_direction = TRUE;
+						direction = swarm_component->wander.vector;
 					}
 					break;
 
@@ -624,6 +647,7 @@ void infection_swarm_control(
 				case _swarm_movement_away_from_prop:
 					{
 						struct prop_datum *movement_target = prop_get(movement_target_prop_index);
+
 						vector_from_points3d(
 							&swarm_component->position,
 							&movement_target->body_position,
@@ -647,20 +671,30 @@ void infection_swarm_control(
 						swarm_component->obey.simple_control_flags,
 						_obey_simple_directmovement_bit))
 					{
-						short facing = swarm_component->obey.directmovement.facing;
-
-						if (facing >= 2 && facing <= 3)
-							cross_product3d(&up, &swarm_component->obey.directmovement.vector, &direction);
-						else
-							direction = swarm_component->obey.directmovement.vector;
-
-						if (facing == 1 || facing == 3)
-						{
-							direction.i = -direction.i;
-							direction.j = -direction.j;
-							direction.k = -direction.k;
-						}
 						has_direction = TRUE;
+						switch (swarm_component->obey.directmovement.facing)
+						{
+						case _ai_atom_move_facing_left:
+						case _ai_atom_move_facing_right:
+							cross_product3d(&up, &swarm_component->obey.directmovement.vector, &direction);
+							if (swarm_component->obey.directmovement.facing == _ai_atom_move_facing_right)
+							{
+								direction.i = -direction.i;
+								direction.j = -direction.j;
+								direction.k = -direction.k;
+							}
+							break;
+
+						default:
+							direction = swarm_component->obey.directmovement.vector;
+							if (swarm_component->obey.directmovement.facing == _ai_atom_move_facing_backwards)
+							{
+								direction.i = -direction.i;
+								direction.j = -direction.j;
+								direction.k = -direction.k;
+							}
+							break;
+						}
 					}
 
 					if (TEST_FLAG(
@@ -670,7 +704,7 @@ void infection_swarm_control(
 						if (!TEST_FLAG(
 							swarm_component->obey.simple_control_flags,
 							_obey_simple_jump_jumped_bit) &&
-							swarm_component->obey.directmovement.facing == 0 &&
+							swarm_component->obey.directmovement.facing == _ai_atom_move_facing_forwards &&
 							!unit_is_busy(unit_index))
 						{
 							SET_FLAG(
@@ -682,123 +716,138 @@ void infection_swarm_control(
 								_obey_simple_jump_jumped_bit,
 								TRUE);
 						}
-						direction = biped->object.forward;
 						has_direction = TRUE;
+						direction = unit->object.forward;
 					}
 					break;
 				}
-
-				if (has_direction)
-				{
-					real facing_dot;
-					real_vector3d cross;
-
-					normalize3d(&direction);
-					facing_dot = dot_product3d(&up, &direction);
-					if (facing_dot > 0.9f)
-						facing_target = TRUE;
-
-					if (facing_dot >= -0.9f)
-					{
-						cross_product3d(&up, &direction, &cross);
-						cross_product3d(&cross, &up, &direction);
-						if (normalize3d(&direction) == 0.f)
-							direction = biped->object.forward;
-					}
-					else
-					{
-						direction = biped->object.forward;
-					}
-
-					if (movement_type != _swarm_movement_obey)
-					{
-						real_point3d probe;
-						real_vector3d right;
-						real separation = 0.f;
-						short neighbor_index;
-
-						probe.x = swarm_component->position.x - direction.i * 0.2f;
-						probe.y = swarm_component->position.y - direction.j * 0.2f;
-						probe.z = swarm_component->position.z - direction.k * 0.2f;
-						cross_product3d(&up, &direction, &right);
-
-						for (neighbor_index = 0;
-							neighbor_index < swarm->unit_count;
-							neighbor_index++)
-						{
-							if (neighbor_index != member_index)
-							{
-								struct swarm_component_datum *neighbor = swarm_component_get(
-									swarm->component_indices[neighbor_index]);
-								real_vector3d delta;
-								real distance_squared;
-
-								vector_from_points3d(&probe, &neighbor->position, &delta);
-								distance_squared = magnitude_squared3d(&delta);
-								if (distance_squared < 0.64000005f)
-								{
-									real forward_dot = dot_product3d(&delta, &direction) /
-										square_root(distance_squared);
-
-									if (forward_dot > 0.5f)
-									{
-										real weight = (forward_dot - 0.5f) * 0.5f;
-
-										if (dot_product3d(&delta, &right) <= 0.f)
-											separation += weight;
-										else
-											separation -= weight;
-									}
-								}
-							}
-						}
-
-						if (separation != 0.f)
-						{
-							real angle = MIN(MAX(separation, -1.f), 1.f) * (_pi / 2.f);
-							rotate_vector_about_axis(
-								&direction,
-								&up,
-								sine(angle),
-								cosine(angle));
-						}
-					}
-
-					{
-						real_vector3d right;
-
-						cross_product3d(&up, &direction, &right);
-						if (normalize3d(&right) != 0.f)
-							cross_product3d(&right, &up, &direction);
-						else
-							direction = biped->object.forward;
-					}
-				}
-			}
-			else
-			{
-				SET_FLAG(swarm_component->flags, _swarm_component_attached_to_unit_bit, FALSE);
-				swarm_component->ground_ticks = 0;
 			}
 		}
 
-		if (TEST_FLAG(swarm_component->flags, _swarm_component_obey_desire_jump_bit) ||
-			(has_direction &&
-				swarm_component->ground_ticks >= 45 &&
-				(member_index == intermittent_action_member ||
-					target_in_melee_range ||
-					facing_target)))
+		if (has_direction)
+		{
+			real facing_dot;
+
+			normalize3d(&direction);
+			facing_dot = dot_product3d(&up, &direction);
+			if (facing_dot > 0.9f)
+				facing_target = TRUE;
+
+			if (facing_dot < -0.9f)
+			{
+				direction = unit->object.forward;
+			}
+			else
+			{
+				real_vector3d cross;
+
+				cross_product3d(&up, &direction, &cross);
+				cross_product3d(&cross, &up, &direction);
+				if (normalize3d(&direction) == 0.f)
+					direction = unit->object.forward;
+			}
+
+			if (movement_type != _swarm_movement_obey)
+			{
+				real_point3d probe;
+				real_vector3d right;
+				real separation = 0.f;
+				short neighbor_index;
+
+				probe.x = swarm_component->position.x - direction.i * 0.2f;
+				probe.y = swarm_component->position.y - direction.j * 0.2f;
+				probe.z = swarm_component->position.z - direction.k * 0.2f;
+				cross_product3d(&up, &direction, &right);
+
+				for (neighbor_index = 0;
+					neighbor_index < swarm->unit_count;
+					neighbor_index++)
+				{
+					if (neighbor_index != member_index)
+					{
+						struct swarm_component_datum *neighbor = swarm_component_get(
+							swarm->component_indices[neighbor_index]);
+						real_vector3d delta;
+						real distance_squared;
+
+						vector_from_points3d(&probe, &neighbor->position, &delta);
+						distance_squared = magnitude_squared3d(&delta);
+						if (distance_squared < 0.64000005f)
+						{
+							real distance = square_root(distance_squared);
+							real forward_dot = dot_product3d(&delta, &direction) / distance;
+
+							if (forward_dot > 0.5f)
+							{
+								if (dot_product3d(&delta, &right) > 0.f)
+									separation -= (forward_dot - 0.5f) * 0.5f;
+								else
+									separation += (forward_dot - 0.5f) * 0.5f;
+							}
+						}
+					}
+				}
+
+				if (separation != 0.f)
+				{
+					real angle;
+
+					if (separation > 1.f)
+						angle = _pi / 2.f;
+					else if (separation < -1.f)
+						angle = -_pi / 2.f;
+					else
+						angle = separation * (_pi / 2.f);
+
+					rotate_vector_about_axis(
+						&direction,
+						&up,
+						sine(angle),
+						cosine(angle));
+				}
+			}
+
+			{
+				real_vector3d right;
+
+				cross_product3d(&up, &direction, &right);
+				if (normalize3d(&right) == 0.f)
+					direction = unit->object.forward;
+				else
+					cross_product3d(&right, &up, &direction);
+			}
+		}
+
+		if (TEST_FLAG(swarm_component->flags, _swarm_component_obey_desire_jump_bit))
 		{
 			should_jump = TRUE;
+		}
+		else if (has_direction && swarm_component->ground_ticks >= 45)
+		{
+			if (member_index == intermittent_action_member)
+			{
+				should_jump = TRUE;
+			}
+			else if (target_in_melee_range)
+			{
+				should_jump = TRUE;
+			}
+			else if (facing_target)
+			{
+				should_jump = TRUE;
+			}
 		}
 
 		if (TEST_FLAG(swarm_component->flags, _swarm_component_attached_to_unit_bit))
 		{
-			biped->unit.melee_attack_state = TEST_FLAG(
-				swarm_component->flags,
-				_swarm_component_attacking_in_melee_bit)
-				? _unit_melee_attack_continuous
-				: _unit_melee_attack_none;
+			if (TEST_FLAG(swarm_component->flags, _swarm_component_attacking_in_melee_bit))
+			{
+				unit->unit.melee_attack_state = _unit_melee_attack_continuous;
+			}
+			else
+			{
+				unit->unit.melee_attack_state = _unit_melee_attack_none;
+			}
 		}
 		else
 		{
@@ -808,41 +857,44 @@ void infection_swarm_control(
 				target_in_melee_range && !swarm_component->attack_delay_ticks);
 			if (TEST_FLAG(swarm_component->flags, _swarm_component_attacking_in_melee_bit))
 			{
+				struct biped_datum *biped = (struct biped_datum *)unit;
+
 				biped->unit.melee_attack_state = _unit_melee_attack_impact;
-				biped->biped.impact_target_object_index = best_prop
-					? best_prop->unit_index
-					: NONE;
+				biped->biped.impact_target_object_index = target_prop == NULL
+					? NONE
+					: target_prop->unit_index;
 			}
 			else
 			{
-				biped->unit.melee_attack_state = _unit_melee_attack_none;
+				unit->unit.melee_attack_state = _unit_melee_attack_none;
 			}
 		}
 
 		{
 			struct unit_control_data control;
-			real_vector3d facing;
+			unsigned long control_flags = 0;
 
+			SET_FLAG(control_flags, _unit_control_jump_bit, should_jump);
 			csmemset(&control, 0, sizeof(control));
 			control.weapon_index = NONE;
 			control.grenade_index = NONE;
 			control.zoom_level = NONE;
-			control.animation_state = animation_state;
-			control.aiming_speed = aiming_speed;
-			control.control_flags = should_jump ? FLAG(_unit_control_jump_bit) : 0;
+			control.control_flags = (word)control_flags;
+			control.primary_trigger = 0.f;
+			control.animation_state = (char)animation_state;
+			control.aiming_speed = (char)aiming_speed;
 			if (has_direction)
 			{
-				control.throttle.i = 1.f;
-				facing = direction;
+				set_real_vector3d(&control.throttle, 1.f, 0.f, 0.f);
+				control.facing_vector = direction;
 			}
 			else
 			{
 				control.throttle = *global_zero_vector3d;
-				facing = biped->object.forward;
+				control.facing_vector = unit->object.forward;
 			}
-			control.facing_vector = facing;
-			control.aiming_vector = facing;
-			control.looking_vector = facing;
+			control.aiming_vector = control.facing_vector;
+			control.looking_vector = control.facing_vector;
 			unit_control(unit_index, &control);
 		}
 	}
