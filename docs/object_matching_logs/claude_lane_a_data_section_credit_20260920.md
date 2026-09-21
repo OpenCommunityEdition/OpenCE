@@ -90,3 +90,57 @@ re-raising it.
 - The symbols.json items need **authenticated name provenance** under the lane
   brief, and symbols.json must be edited by line surgery only - its alias
   precedence at shared offsets has flipped 46 functions before. Not yet done.
+
+
+## RESULT - 2026-09-20: +17,080 lane data bytes, zero regressions
+
+| commit | change | data bytes |
+|---|---|---:|
+| `94c32737` | define and use `ai_script_squad_separator` | +3,920 |
+| `264ddd8a` | owner-approved header + the decoded allegiance block | +11,600 |
+| `b423909b` | name `ai_sound_volume_enum_strings` from HCEX | +1,560 |
+|  | **total** | **+17,080** |
+
+Board Data line: 2,360,994 -> **2,378,074**. Lane data goes from 25,000 / 38,566
+(64.8%) to **38,160 / 38,566 (98.95%)**. Every lane unit is now 100% except
+`ai_debug` (130 B) and `ai_communication .data` (276 B) - the 406 bytes below.
+
+### What remains, and why it stays
+
+- **`ai_debug .bss` (74 B) and `.data` (56 B)** - blocked on PROVENANCE. The fixes
+  are a name for `_global_ai_debug_path_render_id` and `"static": true` on three
+  globals, both symbols.json edits that the lane brief allows only with
+  authenticated provenance. **`ai_debug.obj` is absent from BOTH HCEA PDBs** - the
+  SHIP and the RELEASE_CACHE compiland lists - because it is debug-only code
+  compiled out of shipping configurations, and the symbol atlas covers code not
+  data. Nothing can attest these names, so they stay.
+- **`ai_communication .data` (276 B)** - blocked by splitter attribution of six
+  folded string literals; unreachable in C, as recorded above.
+
+## The method, for reuse
+
+1. Read `build/report.json`, not a symbol census. objdiff credits a data section
+   all-or-nothing, so find sections at 95-99.99%.
+2. Diff the section with `scratch/orch/secdiff.py`, which separates relocation
+   sites from content. **In every case in this lane the content was identical**;
+   the blocker was one of four things:
+   - an ABSENT small symbol (1 B `'/'` blocked 3,920 B);
+   - an absent string literal whose emitting code is missing (55 B blocked 11,600 B);
+   - a NAMING GAP - January's split has no name for an object, so a relocation is
+     spelled against the preceding symbol (trap #4 in data);
+   - folded COMDAT literals the splitter attributed elsewhere (unreachable).
+3. For a naming gap, get provenance from the HCEA PDB:
+   `DIA2Dump.exe -compiland "..\..\..\build\x360\SHIP\halo\<unit>.obj" HCEX.pdb`
+   lists every static with name, type and size. It found our name was wrong.
+4. Edit symbols.json by line surgery only, at an offset nothing occupies, then
+   hash all 833 split objects before and after the re-split to prove only the
+   intended one changed.
+
+## Board-wide: this is not a lane-specific finding
+
+Across the whole board, **43 data sections sit at 95-100% match and hold 109,111
+bytes that earn zero credit today**. 42 of them - 109,037 B - are outside this
+lane. The largest: `effects/decals .bss` 30,930 B at 99.376%;
+`interface/ui_widget .data` 16,700 B at 99.377% and `.rdata` 7,880 B at 99.947%;
+`hs/hs_compile .rdata` 6,576 B; `cache/xbox_texture_cache .bss` 5,656 B. Flagged
+for separate work rather than done here, since it is outside this lane's scope.
