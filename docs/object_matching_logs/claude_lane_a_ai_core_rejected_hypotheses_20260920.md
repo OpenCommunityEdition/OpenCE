@@ -904,3 +904,62 @@ identical encoded width, and two jump-table rows that are **trap #2/#4** -
 January's table relocates onto `_encounter_create+0x2c0`, ours onto `$L17058`,
 same seven bytes and same relocation type. True structural residual: nine
 regions, target-only 57 bytes against ours-only 57, net zero.
+
+### R25. Wave G: two closures, and a second uninitialised read that January also has
+
+Six targets, 51 gated shapes. **Two admitted closures** (`_actor_emotion_update`
++1,664 via the target-proven out-of-bounds read; the `_ai_debug_render_actor`
+colour fix, landed for correctness at zero credit) and three clean negatives.
+
+#### `_ai_test_line_of_sight` - the UB question answers itself, but keep the evidence
+
+The earlier uninitialised-read candidate was re-measured against the standing
+rule *"a UB shape is admissible only if it makes the function STRICT EXACT"*. It
+**does not**: 1024 against a target of 1008. So there is nothing to adjudicate
+and nothing was proposed.
+
+What is worth keeping is that **January's own bytes prove the uninitialised read
+is real**, independently of whether we ever reproduce it:
+
+    11a  mov [ebp-0xc], edx     <- the ONLY write to collision_fraction,
+                                   and it is on the collision-detected path
+    139  je  0x32f              <- the fog > 0.8f branch reaches
+                                   classify_collision_distance bypassing it
+    36f  fmul [ebp-0xc]
+    391  fsub [ebp-0xc]         <- both read it
+
+So on the clear-line-of-sight plus heavy-fog path, January scales the collision
+distance by whatever that stack slot happened to hold. **Our `1.0f` initialiser
+is the correct behaviour and costs exactly 7 bytes.** That is a deliberate
+divergence we are keeping, now recorded as such rather than as an unexplained
+gap. The function's 12-byte frame surplus is the structural half and remains
+open.
+
+#### `_actor_input_update` - 2,384 B, nothing found, and it is parked
+
+Seven shapes, no landing. The one measurable result is byte-neutral: shape S4
+takes it from 12 to 10 REAL regions without moving any ranked key. It is **not**
+proposed, because the function is already in `config/parked.json` and a
+byte-neutral region reduction is not worth staling a park entry and failing the
+build's PROGRESS gate for.
+
+#### `_actor_look_update` - 4,720 B, the frame-cell pairing lead did not pan out
+
+Three shapes against the decoded lead from wave E (January pairs
+`idle_major_vector` with `primary_vector` and `idle_minor_vector` at -0x58; we
+pair it with `secondary_vector` at -0x38). Frame cell sharing is decided by
+SCOPE, so the pairing looked source-reachable. It did not move. The function's
+five identified cause families and its nine `match_assert` line anchors remain
+the best map anyone has of it; the +16 span between line 1512 and line 1581 is
+still the biggest single target.
+
+#### Method note: the byte ledger requirement paid for itself
+
+Every agent this wave was required to produce a ledger that sums exactly before
+compiling a variant. Two did and both closed their function. The two that could
+not close theirs still produced ledgers that localised the remaining gap to a
+single named family - the branch-shortening fixpoint in `_ai_debug_render_actor`
+and the 12-byte frame in `_ai_test_line_of_sight`. **No wave-G agent spent
+shapes on a residual it had not first accounted for to the byte**, and the
+contrast with earlier waves' shape counts (50 shapes for zero movement on a
+144-byte function) is the argument for keeping the requirement.
