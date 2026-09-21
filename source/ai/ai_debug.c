@@ -2027,6 +2027,7 @@ static void ai_debug_render_actor(
 		{
 			if (actor->meta.unit_index!=NONE)
 			{
+				real_point3d *head_position = &actor->input.position.head_position;
 				real_point3d p0;
 				real_point3d p1;
 				real_vector3d forward;
@@ -2044,9 +2045,9 @@ static void ai_debug_render_actor(
 				point_from_line3d(&p1, global_up3d, 0.03f, &p1);
 				render_debug_line(TRUE, &p0, &p1, global_real_argb_cyan);
 				
-				p0.x = actor->input.position.head_position.x-global_up3d->i*0.04f;
-				p0.y = actor->input.position.head_position.y-global_up3d->j*0.04f;
-				p0.z = actor->input.position.head_position.z-global_up3d->k*0.04f;
+				p0.x = head_position->x-global_up3d->i*0.04f;
+				p0.y = head_position->y-global_up3d->j*0.04f;
+				p0.z = head_position->z-global_up3d->k*0.04f;
 				unit_get_facing_vector(actor->meta.unit_index, &forward);
 				
 				render_debug_vector(TRUE, &p0, &forward, 1.f, global_real_argb_red);

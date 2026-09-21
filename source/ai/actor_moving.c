@@ -1515,8 +1515,8 @@ static void actor_move_vector_avoidance(
 		{
 			short avoidance_types[NUMBEROF(avoid_ray_avoidance_weights)];
 			real avoidance_t[NUMBEROF(avoid_ray_avoidance_weights)];
-			real direction_weight = 0.f;
-			boolean obstructed = FALSE;
+			real direction_weight;
+			boolean obstructed;
 
 			for (ray_index = 0; ray_index < NUMBEROF(avoid_ray_avoidance_weights); ray_index++)
 			{
@@ -1536,15 +1536,12 @@ static void actor_move_vector_avoidance(
 				debug_info->avoid_t[direction_index][ray_index] = avoidance_t[ray_index];
 			}
 
+			direction_weight = 0.f;
+			obstructed = FALSE;
+
 			for (ray_index = NUMBEROF(avoid_ray_avoidance_weights) - 1; ray_index >= 0; ray_index--)
 			{
-				if (avoidance_types[ray_index] != _actor_vector_avoidance_clear)
-				{
-					direction_weight -=
-						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoidance_t[ray_index]), 1.f);
-					obstructed = TRUE;
-				}
-				else
+				if (avoidance_types[ray_index] == _actor_vector_avoidance_clear)
 				{
 					real clear_fraction = 1.f;
 
@@ -1566,17 +1563,26 @@ static void actor_move_vector_avoidance(
 					}
 					direction_weight += avoid_ray_avoidance_weights[ray_index]*clear_fraction;
 				}
+				else
+				{
+					direction_weight -=
+						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoidance_t[ray_index]), 1.f);
+					obstructed = TRUE;
+				}
 			}
 
-			weights[direction_index] += direction_weight;
-			weights[(direction_index + 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[0]*direction_weight;
-			weights[(direction_index + 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[1]*direction_weight;
-			weights[(direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[0]*direction_weight;
-			weights[(direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[1]*direction_weight;
+			{
+				short next_direction = (direction_index + 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short second_next_direction = (direction_index + 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short second_previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+
+				weights[direction_index] += direction_weight;
+				weights[next_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+				weights[previous_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+			}
 		}
 
 		debug_info->field_6551 = FALSE;
@@ -1736,7 +1742,8 @@ static void actor_move_vector_avoidance(
 				rotation.k = rotation_axis.k*rotation_angle;
 			}
 
-			emergency = MAX(PIN((2.f - movement_approximate_weight)*0.5f - 0.5f, 0.f, 1.f), emergency_scale);
+			emergency = PIN((2.f - movement_approximate_weight)*0.5f - 0.5f, 0.f, 1.f);
+			emergency = MAX(emergency, emergency_scale);
 			direction_chosen = TRUE;
 		}
 		else
@@ -1754,7 +1761,8 @@ static void actor_move_vector_avoidance(
 					{
 						real rotation_angle;
 
-						emergency = MAX(PIN(weight_difference/1.3f - 0.5f, 0.f, 1.f), emergency_scale);
+						emergency = PIN(weight_difference/1.3f - 0.5f, 0.f, 1.f);
+						emergency = MAX(emergency, emergency_scale);
 						rotation_angle = emergency*(_pi/3.f);
 						if (local_movement_direction.k*avoidance_directions[best_avoidance_direction].j -
 							local_movement_direction.j*avoidance_directions[best_avoidance_direction].k > 0.f)

@@ -6972,8 +6972,6 @@ void ai_communication_event(
 
 						if (weight > 0.0f)
 						{
-							struct ai_communication_possibility *possibility;
-
 							if (possibility_count >= MAXIMUM_COMMUNICATION_POSSIBILITIES)
 							{
 								error(
@@ -6985,32 +6983,30 @@ void ai_communication_event(
 								break;
 							}
 
-							possibility = &possibilities[possibility_count];
-							possibility->weight = weight;
-							possibility->interrupts =
+							possibilities[possibility_count].weight = weight;
+							possibilities[possibility_count].interrupts =
 								TEST_FLAG(usage->flags, _dialogue_usage_force_bit);
-							possibility->is_reply = is_reply;
-							possibility->vocalization_type = vocalization_type;
-							possibility->priority = speech_priority;
-							possibility->animation_type = usage->animation_type;
-							possibility->play_type = play_type;
-							possibility->delay_time = delay_time;
-							possibility->ai_delay_time = ai_delay_time;
-							possibility->protagonist_unit_index = protagonist_unit_index;
-							possibility->protagonist_actor_index = protagonist_actor_index;
-							possibility->recipient_unit_index = recipient_unit_index;
-							possibility->preselected_reply_actor_index = reply_actor_index;
-							possibility->protagonist_look_priority = protagonist_look_priority;
-							possibility->recipient_look_priority = recipient_look_priority;
-							possibility->look_type = look_type;
-							possibility->look_unit_index = look_unit_index;
-							possibility->sound_definition_index = sound_definition_index;
-							possibility->dialogue_type_index = dialogue_index;
-							if (possibility->interrupts)
+							possibilities[possibility_count].is_reply = is_reply;
+							possibilities[possibility_count].vocalization_type = vocalization_type;
+							possibilities[possibility_count].priority = speech_priority;
+							possibilities[possibility_count].animation_type = usage->animation_type;
+							possibilities[possibility_count].play_type = play_type;
+							possibilities[possibility_count].delay_time = delay_time;
+							possibilities[possibility_count].ai_delay_time = ai_delay_time;
+							possibilities[possibility_count].protagonist_unit_index = protagonist_unit_index;
+							possibilities[possibility_count].protagonist_actor_index = protagonist_actor_index;
+							possibilities[possibility_count].recipient_unit_index = recipient_unit_index;
+							possibilities[possibility_count].preselected_reply_actor_index = reply_actor_index;
+							possibilities[possibility_count].protagonist_look_priority = protagonist_look_priority;
+							possibilities[possibility_count].recipient_look_priority = recipient_look_priority;
+							possibilities[possibility_count].look_type = look_type;
+							possibilities[possibility_count].look_unit_index = look_unit_index;
+							possibilities[possibility_count].sound_definition_index = sound_definition_index;
+							possibilities[possibility_count].dialogue_type_index = dialogue_index;
+							if (possibilities[possibility_count].interrupts)
 							{
 								any_forced_possibility = TRUE;
 							}
-							possibility_count++;
 
 							if (ai_debug.print_communication)
 							{
@@ -7024,15 +7020,17 @@ void ai_communication_event(
 										team_string,
 										candidate_delay,
 										usage->weight,
-										possibility->interrupts ? "F" : "",
+										possibilities[possibility_count].interrupts ? "F" : "",
 										speech_weight,
 										player_rating,
 										is_reply ? "PLAYER" : "",
 										animation_weight,
 										repeat_rating,
 										reply_rating,
-										possibility->weight));
+										possibilities[possibility_count].weight));
 							}
+
+							possibility_count++;
 
 							total_possibility_weight += weight;
 							any_protagonist_considered = TRUE;
