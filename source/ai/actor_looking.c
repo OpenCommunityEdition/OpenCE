@@ -987,7 +987,15 @@ static boolean actor_look_find_random_vector(
 	return result;
 }
 
-boolean valid_real_normal2d(
+/* INFERRED: the __inline specifier is not attested in surviving source. Its
+ * sibling valid_real_normal3d is __inline in real_math.h, and four January
+ * objects reference this function, the shape of a shared inline whose single
+ * folded copy the splitter gave to this object. The call still stays out of
+ * line. Admitted by owner ruling (2026-09-20); on its own it is byte-inert in
+ * actor_look_update, and it changes this definition's COMDAT selection from
+ * no-duplicates to select-any, which csplit does not record for any function
+ * (it writes no-duplicates for all 8,223), so ownership is unchanged. */
+__inline boolean valid_real_normal2d(
 	real_vector2d const *normal)
 {
 	return valid_realcmp(magnitude_squared2d(normal), 1.0f);
@@ -1922,7 +1930,14 @@ update_facing:
 	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1737, &actor->output.aiming_vector);
 	match_assert_valid_real_normal3d("c:\\halo\\SOURCE\\ai\\actor_looking.c", 1738, &actor->output.looking_vector);
 
-	if (aiming_at_target || actor->orders.look.idle_look_type == _idle_look_combat)
+	/* Two separate tests rather than one disjunction: HCEX's line table puts
+	 * them on separate source lines, 1740 and 1745. Admitted by owner ruling
+	 * (2026-09-20). */
+	if (aiming_at_target)
+	{
+		actor->output.aiming_speed = _unit_aiming_speed_alert;
+	}
+	else if (actor->orders.look.idle_look_type == _idle_look_combat)
 	{
 		actor->output.aiming_speed = _unit_aiming_speed_alert;
 	}
