@@ -697,6 +697,8 @@ static short ai_scripting_command_list_status_internal(
 
 extern struct ai_script_globals_data *ai_globals;
 
+char const ai_script_squad_separator = '/';
+
 /* ---------- public code */
 
 void ai_script_initialize(
@@ -793,7 +795,7 @@ boolean ai_index_from_string(
 	}
 	else
 	{
-		separator = strrchr(ai_string, '/');
+		separator = strrchr(ai_string, ai_script_squad_separator);
 		if (!separator)
 		{
 			long encounter_index = scenario_get_encounter_by_name(scenario, ai_string);
