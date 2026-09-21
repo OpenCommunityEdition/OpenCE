@@ -100,3 +100,65 @@ genuine blocker in the portfolio - every other residual is reachable from source
 we are already allowed to edit - and it fixes a real omission in
 `game_allegiance.h` independently of this campaign. It should be bundled with
 the second missing block so the function can actually close, not landed alone.
+
+
+## UPDATE 2026-09-20 - the value was understated, now MEASURED
+
+The recommendation above - not worth landing alone, "banks zero bytes" - was
+**wrong**, because it counted code only. See
+`claude_lane_a_data_section_credit_20260920.md`: objdiff credits a data section
+all-or-nothing, and `ai_communication .rdata` (11,600 B) sits at 99.5% because of
+exactly the two string literals this block emits.
+
+Measured, not inferred, on a scratch candidate
+(`scratch/res8/allegiance-measure/cand.c`) that writes the decoded block. It uses
+a consumer-local prototype **purely to take the measurement**; that surrogate is
+forbidden for landing and is labelled so in the file.
+
+    .rdata    January 224 symbols
+              floor:        2 missing (55 B), 0 differing
+              measurement:  0 missing,        0 differing   <- COMPLETE
+
+    _ai_communication_event
+              floor:        [size 7968!=8064, relocs 330!=336]   96 B short
+              measurement:  [size 8048!=8064, relocs 335!=336]   16 B short
+
+    ai_communication unit census 45/3 before and after - no sibling lost
+
+The block, decoded from January's bytes (0x3c1-0x409) and reconstructed:
+
+    if (ai_debug.print_allegiance && !broken)
+    {
+        short incident_threshold;
+        short incidents = game_allegiance_get_incidents(
+            cause_team, subject_team, &incident_threshold);
+
+        console_printf(FALSE,
+            "allegiance %s, %d incidents (threshold %d)",
+            "still holds", incidents,
+            incident_threshold == NONE ? 999 : incident_threshold);
+    }
+
+It sits inside `if (observed)`, after the notify block, where `broken` is in
+scope - January tests `bl`, which holds `game_allegiance_incident`'s result. The
+argument order is fixed by January's own reuse of `[ebp-0x20]` (cause_team) for
+`game_team_is_enemy` at 0x40c.
+
+Only two objects in January's whole split tree mention
+`_game_allegiance_get_incidents`: `game_allegiance.obj`, which defines it, and
+`ai_communication.obj`, which calls it. So January's ai_communication genuinely
+made this call.
+
+### Blast radius facts for the ruling
+
+- **12 files** include `game_allegiance.h`: five in this lane (actors.c, ai.c,
+  ai_communication.c, ai_script.c, encounters.c) plus actor_stimulus.c and six
+  outside source/ai (aim_assist.c, game.c, game_allegiance.c, game_statistics.c,
+  motion_sensor.c, damage.c).
+- The header has **12 declarations**; this adds one. The recorded
+  declaration-count oracle found +2 safe and +4 breaking, so +1 is inside the
+  known-safe range - but header edits have regressed distant objects before, so
+  a full-board per-row diff is still required before landing.
+- This is a **genuine omission** from the owning header, not an invented
+  declaration: every sibling function of `game_allegiance.c` is declared there
+  in exactly this style.
