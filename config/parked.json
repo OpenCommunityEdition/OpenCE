@@ -2273,11 +2273,11 @@
       "unit": "source/ai/actor_perception",
       "function": "_actor_perception_aiming_vector_test_blockage",
       "class": "unclassified",
-      "evidence": "Best complete typed aiming-blockage reconstruction from January control flow and HCEA semantics. January is 400 padded bytes and canonical is 384; both have ten relocations. The size/code gap is not attributed to a proved compiler mechanism, so no tuning or exact claim is made. No raw offsets, object casts, fake anchors, or address-derived names are retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
+      "evidence": "Best complete typed aiming-blockage reconstruction from January control flow and HCEA semantics. 2026-09-20: the size gap is CLOSED and attributed. Both builds are now 400 padded bytes with ten relocations and the gate row is [sha] alone; REAL differing regions drop from 9 to 7. The decode: January does not use a result/blockage PAIR but ONE short carrier initialised to 0 whose live range VC7 splits three ways - esi for the initial 0 live across the vector_from_points3d call, ecx for the 2/1 assignments, and eax for the constant definitions that flow straight to the return. That is forced by running the return-width law backwards: in this short function a literal return 1; emits mov ax,1 and return 0; emits xor ax,ax, but January emits the 32-bit mov eax,1 and xor eax,eax, so January\u0027s constants are assignments to a short local whose register home is eax, not returned literals. Three source changes follow, each confirmed by isolated compile: the magnitude guard is spelled !(mag > 0.0f) rather than mag <= 0.0f (test ah,41h; jne against jnp), the k-range is an else-if chain whose else does blockage = 0; goto done; - this alone closed the 16 bytes - and the error-squared test is inverted. objdiff falls from 56.21528 to 54.791668, which is diagnostic only and never credit; the authoritative keys all improved or held. The function is still not exact, so it stays parked. No raw offsets, object casts, fake anchors, or address-derived names are retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
       "measurements": {
         "target": { "size": 400, "relocation_count": 10, "normalized_sha256": "a9a57924652aa5132cd73ed04e0134d620360c9b1d98a2a15db8c042541f356e" },
-        "base": { "size": 384, "relocation_count": 10, "normalized_sha256": "359b6287ff86416ebd421a998467953db2abb4c0203ea53b47381328b8789b1b" },
-        "objdiff_percent": 56.21528
+        "base": { "size": 400, "relocation_count": 10, "normalized_sha256": "fc5f1986b1e544036cf811a6a80c8023dabd3b9c1e5a520d5329cf4290ebae6d" },
+        "objdiff_percent": 54.791668
       }
     },
     {

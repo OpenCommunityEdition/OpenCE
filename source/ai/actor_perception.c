@@ -2049,8 +2049,7 @@ short actor_perception_aiming_vector_test_blockage(
 	real projection;
 	real friend_distance;
 	real horizontal_error_squared;
-	short blockage;
-	short result = 0;
+	short blockage = 0;
 
 	horizontal_aiming.i = aiming_vector->i;
 	horizontal_aiming.j = aiming_vector->j;
@@ -2067,7 +2066,7 @@ short actor_perception_aiming_vector_test_blockage(
 		horizontal_aiming_magnitude = 0.0f;
 	}
 
-	if (horizontal_aiming_magnitude <= 0.0f)
+	if (!(horizontal_aiming_magnitude > 0.0f))
 		goto done;
 
 	vector_from_points3d(origin, point, &friend_vector);
@@ -2101,31 +2100,29 @@ short actor_perception_aiming_vector_test_blockage(
 	{
 		blockage = 2;
 	}
+	else if (blockage_vector.k > -0.8f && blockage_vector.k < 1.2f)
+	{
+		blockage = 1;
+	}
 	else
 	{
-		if (blockage_vector.k <= -0.8f ||
-			blockage_vector.k >= 1.2f)
-		{
-			goto done;
-		}
-
-		blockage = 1;
+		blockage = 0;
+		goto done;
 	}
 
 	horizontal_error_squared =
 		blockage_vector.i * blockage_vector.i +
 		blockage_vector.j * blockage_vector.j;
-	if (horizontal_error_squared < 0.36f)
+	if (!(horizontal_error_squared < 0.36f))
 	{
-		result = blockage;
-		goto done;
+		if (horizontal_error_squared < 1.21f)
+			blockage = 1;
+		else
+			blockage = 0;
 	}
 
-	if (horizontal_error_squared < 1.21f)
-		result = 1;
-
 done:
-	return result;
+	return blockage;
 }
 
 real actor_compute_prop_target_weight(
@@ -2879,8 +2876,8 @@ consider_friend_emotion_target:
 			if (friend_actor->emotion_target_ticks != 0 &&
 				friend_actor->emotion_target_prop_index != NONE &&
 				(actor->last_emotion_target_time == NONE ||
-					actor->last_emotion_target_time <=
-						friend_actor->emotion_target_time))
+					friend_actor->emotion_target_time >=
+						actor->last_emotion_target_time))
 			{
 				struct actor_emotion_prop_view *friend_target_prop =
 					(struct actor_emotion_prop_view *)prop_get(
@@ -2968,7 +2965,7 @@ next_emotion_prop:
 
 			if (target_prop->player &&
 				definition->player_threshold > 0 &&
-				definition->player_threshold < threshold)
+				threshold > definition->player_threshold)
 			{
 				threshold = definition->player_threshold;
 			}
@@ -3055,11 +3052,13 @@ next_emotion_prop:
 			target_index < target_count;
 			target_index++)
 		{
-			if (targets[target_index].priority > best_priority &&
-				targets[target_index].prop_index != NONE)
+			struct actor_emotion_target *target = &targets[target_index];
+
+			if (target->priority > best_priority &&
+				target->prop_index != NONE)
 			{
-				best_priority = targets[target_index].priority;
-				best_prop_index = targets[target_index].prop_index;
+				best_priority = target->priority;
+				best_prop_index = target->prop_index;
 			}
 		}
 

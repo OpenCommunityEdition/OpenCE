@@ -2124,7 +2124,7 @@ void actor_destination_update(
 					if (step_vector.i*actor->input.facing_vector.i + step_vector.j*actor->input.facing_vector.j > 0.f &&
 						distance_along_step < 0.f)
 					{
-						real t = -distance_along_step;
+						double t = -distance_along_step;
 						real_vector2d offset;
 
 						offset.i = step_vector.i*t + to_step.i;
@@ -2211,12 +2211,10 @@ void actor_destination_update(
 			&actor->input.facing_vector,
 			distance,
 			&actor->control.moving_towards_vector);
-		actor->control.moving_towards_point.x =
-			actor->input.position.body_position.x + actor->control.moving_towards_vector.i;
-		actor->control.moving_towards_point.y =
-			actor->input.position.body_position.y + actor->control.moving_towards_vector.j;
-		actor->control.moving_towards_point.z =
-			actor->input.position.body_position.z + actor->control.moving_towards_vector.k;
+		add_vectors3d(
+			(real_vector3d const *)&actor->input.position.body_position,
+			&actor->control.moving_towards_vector,
+			(real_vector3d *)&actor->control.moving_towards_point);
 	}
 	else
 	{
@@ -3182,7 +3180,7 @@ void actor_move_update(
 		switch (actor->input.vehicle_driver_type)
 		{
 		case _actor_vehicle_driver_hovering_ground:
-			if (vehicle->vehicle.airborne_ticks)
+			if (vehicle->vehicle.airborne_ticks > 0)
 			{
 				allow_jump = TRUE;
 				actor->control.moving = FALSE;
