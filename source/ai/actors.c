@@ -2553,132 +2553,135 @@ long actor_create_for_unit(
 	long actor_index = NONE;
 	struct actor_datum *actor;
 
-	if (unit_index == NONE || actor_variant_definition_index == NONE)
+	if (unit_index != NONE && actor_variant_definition_index != NONE)
 	{
-		return actor_index;
-	}
+		boolean valid = TRUE;
 
-	if (swarm)
-	{
-		struct encounter_actor_iterator iterator;
-
-		encounter_actor_iterator_new(&iterator, encounter_index);
-		while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
+		if (swarm)
 		{
-			if (actor->meta.swarm &&
-				iterator.index != disallow_actor_index &&
-				actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM &&
-				actor->meta.variant_definition_index == actor_variant_definition_index &&
-				(allow_addition_to_other_squads || actor->meta.squad_index == squad_index))
+			struct encounter_actor_iterator iterator;
+
+			encounter_actor_iterator_new(&iterator, encounter_index);
+			while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
 			{
-				actor_index = iterator.index;
-				break;
-			}
-		}
-	}
-	else
-	{
-		struct biped_datum *biped = biped_try_and_get(unit_index);
-
-		if (!biped || TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
-		{
-			return actor_index;
-		}
-	}
-
-	if (actor_index == NONE)
-	{
-		boolean actor_is_swarm;
-
-		actor_index = actor_new(actor_variant_definition_index);
-		if (actor_index == NONE)
-		{
-			return actor_index;
-		}
-
-		actor = actor_get(actor_index);
-		if (encounter_index == NONE)
-		{
-			encounterless_attach_actor(actor_index);
-		}
-		else
-		{
-			struct encounter_datum *encounter = encounter_get(encounter_index);
-
-			if ((encounter_index & 0xFFFF0000) == 0)
-			{
-				encounter_index = DATUM_INDEX_NEW(
-					DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
-					encounter->identifier);
-			}
-			encounter_attach_actor(
-				actor_index,
-				encounter_index,
-				squad_index,
-				FALSE);
-		}
-
-		if (initially_braindead)
-		{
-			boolean active = actor->meta.active;
-
-			actor->state.mode = _actor_mode_braindead;
-			if (active)
-			{
-				actor_set_dormant(actor_index, FALSE);
+				if (actor->meta.swarm &&
+					iterator.index != disallow_actor_index &&
+					actor->meta.swarm_unit_count < MAXIMUM_NUMBER_OF_UNITS_PER_SWARM &&
+					actor->meta.variant_definition_index == actor_variant_definition_index &&
+					(allow_addition_to_other_squads || actor->meta.squad_index == squad_index))
+				{
+					actor_index = iterator.index;
+					break;
+				}
 			}
 		}
 		else
 		{
-			actor->state.mode = _actor_mode_alert;
-		}
+			struct biped_datum *biped = biped_try_and_get(unit_index);
 
-		actor->state.initial_state = initial_state;
-		actor->state.default_state = default_state;
-		if (default_state == NONE || default_state == 0)
-		{
-			actor->state.default_state = actor_action_get_default_state(initial_state);
-		}
-		actor->state.command_list_immediate = FALSE;
-		actor->state.command_list_delay_timer = 2;
-		actor->state.command_list_index = initial_command_list_index;
-		actor->state.noncombat_sequence_id = noncombat_sequence_id;
-
-		actor_is_swarm = actor->meta.swarm;
-		if (actor_is_swarm != actor_type_get_swarm(actor->meta.type))
-		{
-			char const *actor_description = actor_is_swarm ? "swarm" : "individual";
-
-			error(
-				_error_silent,
-				"%s actor variant %s cannot have type %s (swarm flag does not match)",
-				actor_description,
-				tag_name_strip_path(tag_get_name(actor_variant_definition_index)),
-				actor_type_get_name(actor->meta.type));
-			actor_delete(actor_index, FALSE);
-
-			return NONE;
-		}
-	}
-
-	if (swarm)
-	{
-		if (!actor_swarm_attach_unit(actor_index, unit_index))
-		{
-			actor = actor_get(actor_index);
-			if (actor->meta.swarm_unit_count == 0)
+			if (!biped || TEST_FLAG(biped->object.damage_flags, _object_dead_bit))
 			{
-				actor_delete(actor_index, FALSE);
+				valid = FALSE;
 			}
-			actor_index = NONE;
+		}
+
+		if (valid)
+		{
+			if (actor_index == NONE)
+			{
+				actor_index = actor_new(actor_variant_definition_index);
+				if (actor_index != NONE)
+				{
+					boolean actor_is_swarm;
+
+					actor = actor_get(actor_index);
+					if (encounter_index == NONE)
+					{
+						encounterless_attach_actor(actor_index);
+					}
+					else
+					{
+						struct encounter_datum *encounter = encounter_get(encounter_index);
+
+						if ((encounter_index & 0xFFFF0000) == 0)
+						{
+							encounter_index = DATUM_INDEX_NEW(
+								DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index),
+								encounter->identifier);
+						}
+						encounter_attach_actor(
+							actor_index,
+							encounter_index,
+							squad_index,
+							FALSE);
+					}
+
+					if (initially_braindead)
+					{
+						boolean active = actor->meta.active;
+
+						actor->state.mode = _actor_mode_braindead;
+						if (active)
+						{
+							actor_set_dormant(actor_index, FALSE);
+						}
+					}
+					else
+					{
+						actor->state.mode = _actor_mode_alert;
+					}
+
+					actor->state.initial_state = initial_state;
+					actor->state.default_state = default_state;
+					if (default_state == NONE || default_state == 0)
+					{
+						actor->state.default_state = actor_action_get_default_state(initial_state);
+					}
+					actor->state.command_list_immediate = FALSE;
+					actor->state.command_list_delay_timer = 2;
+					actor->state.command_list_index = initial_command_list_index;
+					actor->state.noncombat_sequence_id = noncombat_sequence_id;
+
+					actor_is_swarm = actor->meta.swarm;
+					if (actor_is_swarm != actor_type_get_swarm(actor->meta.type))
+					{
+						char const *actor_description = actor_is_swarm ? "swarm" : "individual";
+
+						error(
+							_error_silent,
+							"%s actor variant %s cannot have type %s (swarm flag does not match)",
+							actor_description,
+							tag_name_strip_path(tag_get_name(actor_variant_definition_index)),
+							actor_type_get_name(actor->meta.type));
+						actor_delete(actor_index, FALSE);
+						actor_index = NONE;
+					}
+				}
+			}
+
+			if (actor_index != NONE)
+			{
+				if (swarm)
+				{
+					if (!actor_swarm_attach_unit(actor_index, unit_index))
+					{
+						actor = actor_get(actor_index);
+						if (actor->meta.swarm_unit_count == 0)
+						{
+							actor_delete(actor_index, FALSE);
+						}
+						actor_index = NONE;
+					}
+				}
+				else
+				{
+					actor_attach_unit(actor_index, unit_index);
+				}
+
+				actor_verify_activation(actor_index);
+			}
 		}
 	}
-	else
-	{
-		actor_attach_unit(actor_index, unit_index);
-	}
-
-	actor_verify_activation(actor_index);
 
 	return actor_index;
 }

@@ -1386,25 +1386,6 @@
     },
     {
       "unit": "source/ai/actors",
-      "function": "_actor_create_for_unit",
-      "class": "register-allocation",
-      "evidence": "Fuzzy-parked after reconstructing actor creation and attachment in complete typed ordinary C. The function validates individual bipeds, reuses a compatible swarm actor, allocates and attaches new actors to encounters or the encounterless pool, initializes brain/default/command-list state, validates swarm type compatibility with January's exact diagnostic, attaches the unit, and verifies activation. Target and candidate share the 624-byte padded envelope and all 29 relocation identities; objdiff reports 93.40611 percent. Nearly the entire body is instruction-identical after the prologue; the residual is VC7 callee-saved register allocation and shrink wrapping around the early exits. Plausible declaration, comparison, and outer-block forms did not close it naturally. No register hint, volatile access, barrier, pragma, assembly, forced inline, fake dependency, or false alias is retained. Reopen only for authoritative January source/local records or a natural same-compiler allocation donor.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 29,
-          "normalized_sha256": "c57ee9f93e814f9fea670c9d0dbecc8f169bca56e8927152831246b0937c49f4"
-        },
-        "base": {
-          "size": 624,
-          "relocation_count": 29,
-          "normalized_sha256": "2671b840674c236181fee91624f136dfc81e1798a2789e58af203aee9e0cd7e6"
-        },
-        "objdiff_percent": 93.40611
-      }
-    },
-    {
-      "unit": "source/ai/actors",
       "function": "_actors_spawn_from_unit",
       "class": "instruction-scheduling",
       "evidence": "Fuzzy-parked after reconstructing the full typed spawn loop from January disassembly and independent HCEA semantics. The retained ordinary C inherits encounter/squad ownership, resolves actor tags through subsystem macros, creates each unit at the source origin with randomized facing and offset, settles bipeds, customizes and creates actors, emits January's exact failure warning and cleanup, verifies activation, and applies the randomized outward launch. Target and candidate share the 672-byte padded envelope and all 29 relocation identities. Objdiff reports 54.82266 percent because an early register-allocation shift makes its index-aligned score pessimistic; the major call, constant, placement, cleanup, activation, launch, and loop topology remains aligned. Bounded early-return, single-exit, loop, declaration, and vector-expression forms only traded VC7 callee-save/register and x87-stack schedules. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those schedules.",
