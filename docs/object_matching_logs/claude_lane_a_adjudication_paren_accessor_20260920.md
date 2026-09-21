@@ -1,6 +1,6 @@
-# Adjudication requested: the parenthesised accessor lever
+# The parenthesised accessor lever - ADMITTED
 
-Lane A, 2026-09-20. **Held, not landed.** The diff is complete and verified at
+Lane A, 2026-09-20. **RULED AND LANDED.** The diff is complete and verified at
 `scratch/res5/line-of-fire/LANDING.diff`; it is not in the production tree.
 
 ## What it is
@@ -93,3 +93,41 @@ if it is rejected they must not be attempted this way.
 
 Rule on the lever, not on this function. Either answer is workable and the lane
 continues regardless - this is 336 bytes, not a blocker.
+
+
+## RULING - 2026-09-20
+
+> Admit the named TU-private accessor macro with disclosure. It is semantically
+> meaningful and hygienically parenthesized; keep the equivalent collisions.c
+> precedent.
+
+Landed in `73c05198`. `_ai_test_line_of_fire` is EXACT; `source/ai/ai` goes
+44/2. The park entry is removed - **its own reopening criterion was "an attested
+or owner-approved parenthesising spelling", which this ruling satisfies** - and
+parks go 182 to 181 with the validator at 181 active, 0 stale, 0 invalid.
+`config/parked.json` was edited by line surgery and never re-serialized.
+
+`source/physics/collisions.c:1572` stands as ruled.
+
+### Consequences for other lanes
+
+The two further January callers that push a plain-lvalue radius through the x87
+are now **unblocked**. Both are outside this lane's eleven-file scope and have
+NOT been touched, measured or verified here:
+
+    source/game/players.c:3037   _player_examine_nearby_device   [size 160!=176]
+    source/units/bipeds.c:4029   _biped_update_moving            [size 4000!=4080]
+
+Whoever owns those files should measure them while the provenance is fresh. The
+admitted form is a **named** TU-private accessor with the inferred-from-bytes
+disclosure, not a naked paren; the ruling admits the macro, and the bare-paren
+precedent is kept rather than generalised.
+
+### What the ruling does NOT license
+
+The strip test still stands as the default. This is an exception granted on a
+specific showing, and a future packet needs the same showing to claim it: the
+decoration must be the conventional parenthesisation an accessor carries anyway
+and measurably idempotent rather than graded; every undecorated alternative must
+be measured and fail; and the name must carry meaning that first-party sources
+attest. Absent those, a decoration-only match remains a fake.
