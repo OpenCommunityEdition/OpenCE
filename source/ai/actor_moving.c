@@ -1423,6 +1423,7 @@ static void actor_move_vector_avoidance(
 	if (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
+		boolean direction_chosen = FALSE;
 		struct actor_debug_info *debug_info =
 			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
 		struct vector_avoidance_data avoidance_data;
@@ -1441,7 +1442,6 @@ static void actor_move_vector_avoidance(
 		short direction_index;
 		short ray_index;
 		boolean sharp_turn = FALSE;
-		boolean direction_chosen = FALSE;
 
 		debug_info->field_19C = game_time_get();
 		avoidance_data.structure = global_structure_bsp_get();
@@ -1585,8 +1585,8 @@ static void actor_move_vector_avoidance(
 			}
 		}
 
-		debug_info->field_6551 = FALSE;
 		angular_speed = magnitude3d(&object->object.angular_velocity);
+		debug_info->field_6551 = FALSE;
 		if (angular_speed > 0.02f)
 		{
 			real velocity_weight = MIN((angular_speed - 0.02f)*12.5f, 1.f)*0.8f;
@@ -1625,8 +1625,8 @@ static void actor_move_vector_avoidance(
 
 			debug_info->field_6554 = velocity_weight;
 			debug_info->field_6558 = angular_speed;
-			debug_info->avoidance_vector = velocity_direction;
 			debug_info->field_6551 = TRUE;
+			debug_info->avoidance_vector = velocity_direction;
 			debug_info->field_6568 = velocity_approximate_weight;
 		}
 
@@ -1649,8 +1649,8 @@ static void actor_move_vector_avoidance(
 		csmemcpy(debug_info->field_64D8, weights, sizeof(weights));
 
 		movement_vector = *movement_direction;
-		local_movement_direction = *global_zero_vector3d;
 		forward_dot = 1.f;
+		local_movement_direction = *global_zero_vector3d;
 		movement_direction_approximation = 0.f;
 		movement_approximate_weight = 0.f;
 		if (normalize3d(&movement_vector) > 0.f)
@@ -1690,8 +1690,8 @@ static void actor_move_vector_avoidance(
 		{
 			emergency_scale = MIN(1.f, maximum_sense_emergency/0.3f);
 		}
-		debug_info->sign_no_danger = weight_difference;
 		debug_info->field_6510 = forward_dot;
+		debug_info->sign_no_danger = weight_difference;
 
 		if (forward_dot < -0.2f)
 		{
@@ -1792,11 +1792,20 @@ static void actor_move_vector_avoidance(
 				real_vector3d perpendicular;
 				real rotation_angle = 0.f;
 
-				perpendicular.i = 0.f;
-				perpendicular.j = -avoidance_directions[best_avoidance_direction].k;
-				perpendicular.k = avoidance_directions[best_avoidance_direction].j;
-				actor_move_transform_avoidance_vector(&avoidance_data, &perpendicular, &rotation);
 				emergency = emergency_scale;
+
+				/* perpendicular has no forward component, so only its left and up
+				   components are accumulated (January has no forward-axis term and no
+				   call to actor_move_transform_avoidance_vector at this site) */
+				rotation = *global_zero_vector3d;
+				perpendicular.j = -avoidance_directions[best_avoidance_direction].k;
+				rotation.i += perpendicular.j*avoidance_data.left.i;
+				rotation.j += perpendicular.j*avoidance_data.left.j;
+				rotation.k += perpendicular.j*avoidance_data.left.k;
+				perpendicular.k = avoidance_directions[best_avoidance_direction].j;
+				rotation.i += perpendicular.k*avoidance_data.up.i;
+				rotation.j += perpendicular.k*avoidance_data.up.j;
+				rotation.k += perpendicular.k*avoidance_data.up.k;
 				if (normalize3d(&rotation) > 0.f)
 				{
 					rotation_angle = emergency*(_pi/3.f);
