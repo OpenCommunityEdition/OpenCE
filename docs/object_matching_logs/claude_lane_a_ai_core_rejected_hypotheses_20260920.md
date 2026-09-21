@@ -523,3 +523,106 @@ matches - it does **not** mean exact, because normalising a branch immediate
 also hides a short-versus-near encoding difference, which is a real byte
 difference. `_actor_path_refresh` is the worked example: 0 real regions and
 still 12 bytes out.
+
+### R21. Wave D's five clean negatives, and the three board-wide censuses they produced
+
+Five of wave D's ten targets returned no landing after heavy probing. Each is
+recorded here so the shapes are never re-spent. **All five bank ZERO bytes.**
+Per-function detail in `scratch/res4/{path-refresh,situation-update,talk-weight,idle-find-prop,friend-prop}/NOTES.md`.
+
+| function | bytes | shapes gated | best result | class |
+|---|---:|---:|---|---|
+| `_actor_path_refresh` | 1,440 | 23 | equals floor (0 REAL, +12 B) | cross-jump tie |
+| `_actor_situation_update` | 1,264 | 52 | equals floor (2 REAL) | block-placement tie |
+| `_ai_communication_actor_talk_weight` | 912 | 41 | equals floor (3 REAL) | scheduling + commutative canonicalisation |
+| `_actor_look_idle_find_prop` | 608 | 22 | equals floor (1 REAL, 3 B) | x87-shadow selection + relaxer anomaly |
+| `_actor_perception_friend_prop_is_attacking` | 432 | 23 + 10 flags | equals floor (1 REAL, 4 B) | return-block splitting / liveness |
+
+The uniform signature - *dozens of shapes, every one either byte-identical to the
+floor or strictly worse* - is what a backend tie looks like from the source side.
+Nothing here is a new lever; three of them produced one.
+
+#### Census 1: cross-jump duplicate binding (`scratch/res4/path-refresh/xjscan.py`)
+
+For every function in every split object, find each epilogue copy, then count the
+conditional branches that bind to an epilogue copy when a byte-identical copy
+exists EARLIER.
+
+    JANUARY 273 functions        OURS 275 functions
+    agree 269      January-only 4      ours-only 6
+
+**Binding to the later duplicate is the norm and our compiler reproduces it in
+269 of 275 opportunities.** All ten divergences are residual functions, and in
+nine of them the binding is a *consequence* of a large structural residual.
+`_actor_path_refresh` is the only function on the whole board where this binding
+is the SOLE difference - so there is no exact sibling to learn a source shape
+from, and the usual "find a closed example of the idiom" route is empty. Its
+entire residual is three branches at 4 bytes each (short-to-near), and twelve of
+the sixteen landable spellings left the body byte-identical while moving nothing.
+
+#### Census 2: hoisted-block placement (`oolblock.py` / `inlineblock.py` / `hoistdiff.py`)
+
+    functions compared             7729
+    identical hoisted-block count  7716   (99.83%)
+    January hoists more               9
+    we hoist more                     4
+
+Block placement is essentially deterministic and source-driven; the entire board
+contains **thirteen** placement divergences, every one a residual. The useful
+discrimination: **eight of the nine January-only hoists carry a SURVIVING VALUE
+out of the arm** (`xor bl,bl`, `mov eax,0`, `mov edi,0`, `mov eax,2`,
+`inc eax; mov [..],ax`, three pushes, flags to a shared join). That is exactly
+the class the owner-approved `_actor_perception_refresh` landing closed with
+`if (c) x = TRUE; else x = FALSE;`, and it is the reason the lever does NOT reach
+`_actor_situation_update` - alone among the nine, its hoisted block carries
+nothing at all, so there is no value for a source-level assignment to express.
+
+In-scope divergences for this lane:
+
+    JANUARY HOISTS, WE DO NOT
+      _actor_situation_update                        carries NOTHING - lever cannot reach it
+      _actor_move_vector_avoidance                   `inc eax; mov [ebx+0x5f0],ax`  <- VALUE
+      _actor_perception_aiming_vector_test_blockage  `mov ecx,1`                    <- VALUE
+    WE HOIST, JANUARY DOES NOT
+      _actor_look_update
+      _actor_emotion_unopposable_retreat
+
+This census is the wave's most actionable product: it converts "block placement"
+from a vague suspicion into a five-function work list with a lever attached.
+
+#### Census 3: branch relaxation (`scratch/res4/idle-find-prop/relaxval2.py`)
+
+Modelling VC7's relaxer as "shorten a branch if it fits, recomputing the layout
+to fixpoint" predicts the encoded width of essentially every branch:
+
+    JANUARY 11328 branches, 33 mismatches (0.29%)
+    OURS    11382 branches, 41 mismatches (0.36%)
+
+The anomalies are deterministic rather than random - ten AI-tree conditional
+anomalies reproduce at the IDENTICAL address in both builds. `_actor_look_idle_find_prop+0xdf`
+is the only AI-tree conditional anomaly January has that we do not, and the 125
+bytes of its span are **byte-identical between the builds**, so no source change
+inside the span can move the decision without also moving those bytes. To
+reproduce January the relaxer would have had to see a span at least 3 bytes
+longer than the final code - a late code-shrinking transformation our build does
+not perform. That is a closed-form impossibility argument for this site.
+
+#### Two campaign laws corrected by this wave
+
+- **Function-scope promotion changes the frame only when it creates a lifetime
+  overlap that block scope did not have.** Promoting `attacking` to function
+  scope in `_actor_perception_friend_prop_is_attacking` (p19) changed nothing,
+  because it overlaps nothing. The earlier unconditional phrasing overstates it.
+- **The `_ai_communication_actor_talk_weight` park reason was wrong.** Its third
+  region is not a slot pair and not scheduling; it is commutative-operand
+  canonicalisation, already fed the correct frame ranking. Regions 1 and 2 are
+  genuinely scheduling, confirmed by three independent sweeps.
+
+#### Do not re-spend
+
+Casts, parentheses and qualifiers anywhere in these five functions (repeatedly
+byte-identical - the STRIP TEST keeps returning "the plain spelling already IS
+the floor"); `&&` versus nested `if`; operand swaps on a commutative `|`;
+declaration order and initialiser form; extra declaration counts (0 through 64
+tested on two of them - the declaration-count oracle does not reach these ties);
+and compiler flags, swept on three of them with no flag reaching any tie.
