@@ -598,7 +598,7 @@ static boolean action_vehicle_find_destination(
 			real px = dx*t + entry_direction.i;
 			real py = dy*t + entry_direction.j;
 
-			if (py*py + px*px < 0.1225f)
+			if (py*py + px*px < 0.35f*0.35f)
 			{
 				use_entry_point = TRUE;
 			}
@@ -1058,8 +1058,8 @@ boolean action_vehicle_setup_impromptu(
 			actor_index,
 			vehicle_index,
 			FALSE,
-			attempt_distance,
-			continue_distance,
+			state_data->attempt_distance,
+			state_data->continue_distance,
 			FALSE,
 			FALSE))
 	{

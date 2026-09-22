@@ -722,9 +722,10 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 	struct biped_definition *definition = biped_definition_get(biped->definition_index);
 	struct animation_graph *animation_graph = animation_graph_definition_get(
 		definition->object.animation_graph.index);
+	struct object_datum *object = object_get(biped_index);
 	real_matrix4x3 *node_matrices = (real_matrix4x3 *)object_header_block_get(
 		biped_index,
-		&object_get(biped_index)->object.node_matrices);
+		&object->object.node_matrices);
 	boolean relaxation_complete =
 		biped->biped.limp_body_current_relaxation_iterations >=
 		biped->biped.limp_body_max_relaxation_iterations;

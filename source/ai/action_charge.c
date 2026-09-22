@@ -492,96 +492,8 @@ boolean action_charge_perform(
 		{
 			state_data->advancing = TRUE;
 		}
-		else if (state_data->goal != _charge_goal_melee &&
-			state_data->goal != _charge_goal_melee_leaping)
-		{
-			boolean stalking =
-				TEST_FLAG(definition->flags, _actor_definition_stalking_behavior_bit) &&
-				actor->state.combat_status >= _action_charge_combat_status_clear_line_of_sight &&
-				!actor->emotions.berserk;
-
-			state_data->goal = stalking ? _charge_goal_stalking : _charge_goal_close_range;
-			if (state_data->goal == _charge_goal_stalking)
-			{
-				state_data->stalking_currently_exposed =
-					(prop->line_of_sight == _ai_line_of_sight_clear || prop->line_of_sight == _ai_line_of_sight_occluded) &&
-					prop->quantized_facing <= _action_charge_prop_facing_central;
-				if (state_data->stalking_currently_exposed &&
-					TEST_FLAG(definition->flags, _actor_definition_stalking_freeze_when_exposed_bit))
-				{
-					state_data->advancing = FALSE;
-				}
-				else
-				{
-					state_data->advancing = TRUE;
-				}
-				if (state_data->stalking_currently_exposed)
-				{
-					state_data->stalking_discovery_timer++;
-				}
-
-				state_data->stalking_catch_target = FALSE;
-				if (!state_data->stalking_currently_exposed && prop->quantized_closing_speed <= _action_charge_prop_closing_speed_slow)
-				{
-					state_data->stalking_catch_target = TRUE;
-				}
-				else if (definition->defensive.stalking_max_distance > 0.f &&
-					prop->distance >= definition->defensive.stalking_max_distance)
-				{
-					state_data->stalking_catch_target = TRUE;
-				}
-			}
-			else if (actor_has_ranged_weapon(actor_index) && !actor->input.underwater)
-			{
-				real minimum_range;
-				real maximum_range;
-				struct weapon_definition *weapon;
-
-				if (actor->emotions.berserk)
-				{
-					minimum_range = firing_variant_definition->ranged_combat.berserk_firing_range_lower_bound;
-					maximum_range = firing_variant_definition->ranged_combat.berserk_firing_range_upper_bound;
-				}
-				else
-				{
-					minimum_range = firing_variant_definition->ranged_combat.combat_range_lower_bound;
-					maximum_range = firing_variant_definition->ranged_combat.combat_range_upper_bound;
-				}
-
-				weapon = actor_get_weapon_definition(actor_index);
-				if (weapon && weapon->weapon.ai_minimum_target_range > 0.f)
-				{
-					minimum_range = MAX(minimum_range, weapon->weapon.ai_minimum_target_range);
-				}
-
-				if (state_data->advancing)
-				{
-					if (prop->distance < minimum_range)
-					{
-						state_data->advancing = FALSE;
-					}
-				}
-				else
-				{
-					if (prop->distance > maximum_range)
-					{
-						state_data->advancing = TRUE;
-					}
-				}
-
-				if (prop->distance > 0.7f &&
-					prop->line_of_sight != _ai_line_of_sight_clear &&
-					prop->line_of_sight != _ai_line_of_sight_occluded)
-				{
-					state_data->advancing = TRUE;
-				}
-			}
-			else
-			{
-				state_data->advancing = TRUE;
-			}
-		}
-		else
+		else if (state_data->goal == _charge_goal_melee ||
+			state_data->goal == _charge_goal_melee_leaping)
 		{
 			real abort_range = REAL_MAX;
 			boolean check_range = TRUE;
@@ -652,6 +564,94 @@ boolean action_charge_perform(
 						state_data->goal = _charge_goal_melee;
 						state_data->leap_possible_if_at_range = TRUE;
 					}
+				}
+			}
+		}
+		else
+		{
+			boolean stalking =
+				TEST_FLAG(definition->flags, _actor_definition_stalking_behavior_bit) &&
+				actor->state.combat_status >= _action_charge_combat_status_clear_line_of_sight &&
+				!actor->emotions.berserk;
+
+			state_data->goal = stalking ? _charge_goal_stalking : _charge_goal_close_range;
+			if (state_data->goal == _charge_goal_stalking)
+			{
+				state_data->stalking_currently_exposed =
+					(prop->line_of_sight == _ai_line_of_sight_clear || prop->line_of_sight == _ai_line_of_sight_occluded) &&
+					prop->quantized_facing <= _action_charge_prop_facing_central;
+				if (state_data->stalking_currently_exposed &&
+					TEST_FLAG(definition->flags, _actor_definition_stalking_freeze_when_exposed_bit))
+				{
+					state_data->advancing = FALSE;
+				}
+				else
+				{
+					state_data->advancing = TRUE;
+				}
+				if (state_data->stalking_currently_exposed)
+				{
+					state_data->stalking_discovery_timer++;
+				}
+
+				state_data->stalking_catch_target = FALSE;
+				if (!state_data->stalking_currently_exposed && prop->quantized_closing_speed <= _action_charge_prop_closing_speed_slow)
+				{
+					state_data->stalking_catch_target = TRUE;
+				}
+				else if (definition->defensive.stalking_max_distance > 0.f &&
+					prop->distance >= definition->defensive.stalking_max_distance)
+				{
+					state_data->stalking_catch_target = TRUE;
+				}
+			}
+			else if (!actor_has_ranged_weapon(actor_index) || actor->input.underwater)
+			{
+				state_data->advancing = TRUE;
+			}
+			else
+			{
+				real minimum_range;
+				real maximum_range;
+				struct weapon_definition *weapon;
+
+				if (actor->emotions.berserk)
+				{
+					minimum_range = firing_variant_definition->ranged_combat.berserk_firing_range_lower_bound;
+					maximum_range = firing_variant_definition->ranged_combat.berserk_firing_range_upper_bound;
+				}
+				else
+				{
+					minimum_range = firing_variant_definition->ranged_combat.combat_range_lower_bound;
+					maximum_range = firing_variant_definition->ranged_combat.combat_range_upper_bound;
+				}
+
+				weapon = actor_get_weapon_definition(actor_index);
+				if (weapon && weapon->weapon.ai_minimum_target_range > 0.f)
+				{
+					minimum_range = MAX(minimum_range, weapon->weapon.ai_minimum_target_range);
+				}
+
+				if (state_data->advancing)
+				{
+					if (prop->distance < minimum_range)
+					{
+						state_data->advancing = FALSE;
+					}
+				}
+				else
+				{
+					if (prop->distance > maximum_range)
+					{
+						state_data->advancing = TRUE;
+					}
+				}
+
+				if (prop->distance > 0.7f &&
+					prop->line_of_sight != _ai_line_of_sight_clear &&
+					prop->line_of_sight != _ai_line_of_sight_occluded)
+				{
+					state_data->advancing = TRUE;
 				}
 			}
 		}
@@ -949,12 +949,16 @@ boolean action_charge_perform(
 					out_of_range = FALSE;
 				}
 
-				if (out_of_range &&
-					(state_data->unable_to_advance ||
-					!actor_path_has_path(actor_index) ||
-					actor->control.path.path.endpoint.target_radius > state_data->acceptable_target_range))
+				if (out_of_range)
 				{
-					unreachable = TRUE;
+					if (state_data->unable_to_advance || !actor_path_has_path(actor_index))
+					{
+						unreachable = TRUE;
+					}
+					else if (actor->control.path.path.endpoint.target_radius > state_data->acceptable_target_range)
+					{
+						unreachable = TRUE;
+					}
 				}
 
 				actor_perception_unreachable(actor_index, actor->target.target_prop_index, unreachable);

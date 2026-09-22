@@ -329,12 +329,12 @@ real player_look_zoomed_scale = 0.5f;
 static struct profile_section player_control_update_section = {"player_control_update", NONE, TRUE};
 
 static struct player_control_globals_data *player_control_globals;
-short debug_input_target;
-real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
-real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
-boolean controls_enable_crouch;
-boolean controls_enable_doubled_spin;
-boolean controls_swap_doubled_spin_state;
+short debug_input_target = 0;
+real player_look_yaw_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS] = {0};
+real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS] = {0};
+boolean controls_enable_crouch = FALSE;
+boolean controls_enable_doubled_spin = FALSE;
+boolean controls_swap_doubled_spin_state = FALSE;
 
 /* ---------- public code */
 
@@ -1922,15 +1922,15 @@ static void player_control_modify_desired_angles(
 				interpolate_scalar(
 					&player->desired_angles.pitch,
 					pitch_autolevel,
-					magnitude3d(&unit->object.translational_velocity) * error * 0.08f);
+					error * 0.08f * magnitude3d(&unit->object.translational_velocity));
 			}
 			else
 			{
 				interpolate_scalar(
 					&player->desired_angles.pitch,
 					pitch_autolevel,
-					magnitude3d(&unit->object.translational_velocity) *
-						constants->look_autolevel_scale * error);
+					error * constants->look_autolevel_scale *
+						magnitude3d(&unit->object.translational_velocity));
 			}
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\player_control.c",

@@ -1128,8 +1128,6 @@ long actor_aim_projectile(
 	{
 		struct actor_debug_info *actor_debug_info =
 			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
-		real_vector3d weapon_vector;
-		real alignment;
 
 		actor_debug_info->last_projectile_aiming_time = game_time_get();
 
@@ -1175,40 +1173,43 @@ long actor_aim_projectile(
 			vector);
 		actor_debug_info->field_70 = *vector;
 
-		actor_get_weapon_vector(actor_index, &weapon_vector);
-		alignment = dot_product3d(&weapon_vector, vector);
-		if (alignment < GRENADE_AIMING_ANGLE_COSINE)
 		{
-			real_vector3d rotation_axis;
-			boolean aiming_success = TRUE;
+			real_vector3d weapon_vector;
 
-			cross_product3d(&weapon_vector, vector, &rotation_axis);
-			if (normalize3d(&rotation_axis) == 0.0f)
+			actor_get_weapon_vector(actor_index, &weapon_vector);
+			if (dot_product3d(&weapon_vector, vector) < GRENADE_AIMING_ANGLE_COSINE)
 			{
-				perpendicular3d(&weapon_vector, &rotation_axis);
+				real_vector3d rotation_axis;
+				boolean aiming_success = TRUE;
+
+				cross_product3d(&weapon_vector, vector, &rotation_axis);
 				if (normalize3d(&rotation_axis) == 0.0f)
 				{
-					aiming_success = FALSE;
+					perpendicular3d(&weapon_vector, &rotation_axis);
+					if (normalize3d(&rotation_axis) == 0.0f)
+					{
+						aiming_success = FALSE;
+					}
 				}
-			}
 
-			*vector = weapon_vector;
-			if (aiming_success)
+				*vector = weapon_vector;
+				if (aiming_success)
+				{
+					rotate_vector_about_axis(
+						vector,
+						&rotation_axis,
+						GRENADE_AIMING_ANGLE_SINE,
+						GRENADE_AIMING_ANGLE_COSINE);
+				}
+
+				actor_debug_info->field_88 = TRUE;
+				actor_debug_info->field_98 = weapon_vector;
+				actor_debug_info->field_8C = *vector;
+			}
+			else
 			{
-				rotate_vector_about_axis(
-					vector,
-					&rotation_axis,
-					GRENADE_AIMING_ANGLE_SINE,
-					GRENADE_AIMING_ANGLE_COSINE);
+				actor_debug_info->field_88 = FALSE;
 			}
-
-			actor_debug_info->field_98 = weapon_vector;
-			actor_debug_info->field_88 = TRUE;
-			actor_debug_info->field_8C = *vector;
-		}
-		else
-		{
-			actor_debug_info->field_88 = FALSE;
 		}
 
 		*error_reference = actor->control.burst_error;

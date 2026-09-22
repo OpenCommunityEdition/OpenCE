@@ -1069,16 +1069,22 @@ long race_engine_get_score(
 	enum get_score_type score_type)
 {
 	struct player_datum *player = player_get(player_index);
-	long laps;
-	long flags_touched;
+	long score;
 
 	if (score_type == _get_score_team)
-		return race_globals.team_laps[player->team_index];
+	{
+		score = race_globals.team_laps[player->team_index];
+	}
+	else
+	{
+		long team_index = player->team_index;
+		long laps = player->statistics.multiplayer_statistics.race_statistics.laps;
+		long flags_touched = count_bits_32(race_globals.lap_bit_vector[team_index]);
 
-	laps = player->statistics.multiplayer_statistics.race_statistics.laps;
-	flags_touched = count_bits_32(race_globals.lap_bit_vector[player->team_index]);
+		score = laps * (MAXIMUM_RACE_FLAGS + 1) + flags_touched;
+	}
 
-	return laps * (MAXIMUM_RACE_FLAGS + 1) + flags_touched;
+	return score;
 }
 
 wchar_t *race_get_score_string(

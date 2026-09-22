@@ -964,87 +964,91 @@ static void update_alien_fighter_physics_new(
 
 	if (physics->powered_mass_points.count==2)
 	{
-		real_matrix3x3 actual, desired, difference;
+		real_vector3d magic_force;
+		real_vector3d magic_torque;
 		real_vector3d axis;
-		real_vector3d thrust;
-		real_vector3d scaled;
-		real_vector3d force;
-		real_vector3d torque;
-		real throttle, average, spin, maximum;
-
-		scale_vector3d(&vehicle->object.forward, vehicle->vehicle.speed, &torque);
-
-		if (vehicle->vehicle.speed>0.0f)
-			throttle = vehicle->vehicle.speed/definition->unknown2f8;
-		else
-			throttle = -(vehicle->vehicle.speed/definition->unknown2fc);
-
-		compute_acceleration(&torque, &vehicle->object.translational_velocity, &axis,
-			throttle*definition->unknown300, throttle*definition->unknown304);
-
-		scale_vector3d(&axis, physics->mass, &thrust);
-		scale_vector3d(&thrust, vehicle->unit.seat_power[0], &force);
-
-		matrix3x3_from_forward_and_up(&actual, &vehicle->object.forward,
-			&vehicle->object.up);
-
-		desired.forward = vehicle->unit.desired_facing_vector;
-
-		point_from_line3d(global_up3d, &desired.forward, -desired.forward.k, &desired.up);
-
-		if (normalize3d(&desired.up)==0.0f)
-			desired.up = *global_forward3d;
-
-		if (!unit_driven_by_ai(vehicle_index))
-			pitch_vectors(&desired.forward, &desired.up, sine(definition->unknown364),
-				cosine(definition->unknown364));
+		real_vector3d desired_angular_velocity;
+		real_vector3d angular_acceleration;
+		real spin;
+		real thrust_delta;
 
 		{
+			real_vector3d desired_velocity;
+			real_vector3d acceleration;
+			real throttle;
+
+			scale_vector3d(&vehicle->object.forward, vehicle->vehicle.speed, &desired_velocity);
+
+			if (vehicle->vehicle.speed>0.0f)
+				throttle = vehicle->vehicle.speed/definition->unknown2f8;
+			else
+				throttle = -(vehicle->vehicle.speed/definition->unknown2fc);
+
+			compute_acceleration(&desired_velocity, &vehicle->object.translational_velocity, &acceleration,
+				throttle*definition->unknown300, throttle*definition->unknown304);
+
+			scale_vector3d(&acceleration, physics->mass, &magic_force);
+			scale_vector3d(&magic_force, vehicle->unit.seat_power[0], &magic_force);
+		}
+
+		{
+			real_matrix3x3 current_rotation, desired_rotation, rotation;
+			real_quaternion rotation_quaternion;
+			real yaw;
 			real angle;
 
-			angle = (desired.forward.i*vehicle->object.translational_velocity.j-
-				desired.forward.j*vehicle->object.translational_velocity.i)/
+			matrix3x3_from_forward_and_up(&current_rotation, &vehicle->object.forward,
+				&vehicle->object.up);
+
+			desired_rotation.forward = vehicle->unit.desired_facing_vector;
+
+			point_from_line3d(global_up3d, &desired_rotation.forward, -desired_rotation.forward.k, &desired_rotation.up);
+
+			if (normalize3d(&desired_rotation.up)==0.0f)
+				desired_rotation.up = *global_forward3d;
+
+			if (!unit_driven_by_ai(vehicle_index))
+				pitch_vectors(&desired_rotation.forward, &desired_rotation.up, sine(definition->unknown364),
+					cosine(definition->unknown364));
+
+			yaw = (desired_rotation.forward.i*vehicle->object.translational_velocity.j-
+				desired_rotation.forward.j*vehicle->object.translational_velocity.i)/
 				definition->unknown2f8*definition->unknown308;
 
-			yaw_vectors(&desired.up, &desired.forward, sine(angle), cosine(angle));
+			yaw_vectors(&desired_rotation.up, &desired_rotation.forward, sine(yaw), cosine(yaw));
+
+			cross_product3d(&desired_rotation.up, &desired_rotation.forward, &desired_rotation.left);
+
+			matrix3x3_transpose(&current_rotation, &current_rotation);
+			matrix3x3_multiply(&desired_rotation, &current_rotation, &rotation);
+			matrix3x3_rotation_to_quaternion(&rotation, &rotation_quaternion);
+			quaternion_to_angle_and_vector(&rotation_quaternion, &angle, &axis);
+			scale_vector3d(&axis, (-angle)*definition->unknown314*(1.0f/_pi), &desired_angular_velocity);
 		}
 
-		cross_product3d(&desired.up, &desired.forward, &desired.left);
+		subtract_vectors3d(&desired_angular_velocity, &vehicle->object.angular_velocity, &angular_acceleration);
 
-		matrix3x3_transpose(&actual, &actual);
-		matrix3x3_multiply(&desired, &actual, &difference);
-		{
-			real_quaternion rotation;
-			real angle;
-
-			matrix3x3_rotation_to_quaternion(&difference, &rotation);
-			quaternion_to_angle_and_vector(&rotation, &angle, &desired.left);
-			scale_vector3d(&desired.left, (-angle)*definition->unknown314*(1.0f/_pi), &thrust);
-		}
-
-		subtract_vectors3d(&thrust, &vehicle->object.angular_velocity, &torque);
-
-		average = (physics->zz_moment+physics->yy_moment+physics->xx_moment)*(1.0f/3);
-
-		scale_vector3d(&torque, average, &torque);
-		scale_vector3d(&torque, vehicle->unit.seat_power[0], &torque);
+		scale_vector3d(&angular_acceleration,
+			(physics->zz_moment+physics->yy_moment+physics->xx_moment)*(1.0f/3), &magic_torque);
+		scale_vector3d(&magic_torque, vehicle->unit.seat_power[0], &magic_torque);
 
 		spin = magnitude3d(&vehicle->object.angular_velocity)/definition->unknown314;
 
 		if (spin>vehicle->vehicle.thrust)
 		{
-			maximum = PIN((1.0f-vehicle->vehicle.thrust)*
-				(1.0f-vehicle->vehicle.thrust)*0.2f, 0.01f, 0.05f);
-
-			vehicle->vehicle.thrust += MIN(spin-vehicle->vehicle.thrust, maximum);
+			thrust_delta = PIN((1.0f-vehicle->vehicle.thrust)*
+				(1.0f-vehicle->vehicle.thrust)*0.2f,
+				0.01f, 0.05f);
+			thrust_delta = MIN(spin-vehicle->vehicle.thrust, thrust_delta);
 		}
 		else
 		{
-			maximum = -MAX(vehicle->vehicle.thrust*vehicle->vehicle.thrust*0.05f,
+			thrust_delta = -MAX(vehicle->vehicle.thrust*vehicle->vehicle.thrust*0.05f,
 				0.005f);
-
-			vehicle->vehicle.thrust += MAX(spin-vehicle->vehicle.thrust, maximum);
+			thrust_delta = MAX(spin-vehicle->vehicle.thrust, thrust_delta);
 		}
+
+		vehicle->vehicle.thrust += thrust_delta;
 
 		state[0].antigrav_fraction = vehicle->unit.seat_power[0];
 		state[0].rotation = *global_identity_quaternion;
@@ -1052,7 +1056,7 @@ static void update_alien_fighter_physics_new(
 		state[1].antigrav_fraction = vehicle->unit.seat_power[0];
 		state[1].rotation = *global_identity_quaternion;
 
-		physics_update(vehicle_index, state, mass_points, &force, &torque);
+		physics_update(vehicle_index, state, mass_points, &magic_force, &magic_torque);
 	}
 	else
 	{
@@ -1245,10 +1249,11 @@ static void create_ghost_effect(
 	if (definition->effect.index!=NONE && vehicle->unit.seat_power[0]>0.0f)
 	{
 		struct object_marker markers[16];
-		long marker_count = object_get_marker_by_name(vehicle_index, "hover thrusters", markers, 15);
+		short hover_marker_count = object_get_marker_by_name(vehicle_index, "hover thrusters", markers, 15);
+		short jet_marker_count = 0;
 		short marker_index;
 
-		for (marker_index = 0; marker_index<marker_count; marker_index++)
+		for (marker_index = 0; marker_index<hover_marker_count+jet_marker_count; marker_index++)
 		{
 			struct object_marker *marker = &markers[marker_index];
 			struct collision_result collision;
@@ -1514,106 +1519,118 @@ static void update_human_plane_physics(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
 		definition->unit.object.physics.index);
-	real_matrix4x3 vehicle_rotation;
-	real_matrix4x3 desired_rotation;
-	real_matrix4x3 rotation;
-	real_quaternion quaternion;
-	real_vector3d facing;
-	real_vector3d ground;
-	real_vector3d axis;
-	real_vector3d force;
-	real_vector3d torque;
-	real throttle;
-	real factor;
-	real drive;
-	real lift;
-	real dot;
-	real yaw;
-	real scale;
-
 	if (TEST_FLAG(vehicle->vehicle.flags, 1))
 	{
 		csmemset(mass_points, 0,
 			physics->mass_points.count*sizeof(struct mass_point_datum));
-		create_pelican_effect(vehicle_index);
-
-		return;
 	}
-
-	throttle = PIN(vehicle->vehicle.speed, 0.0f, definition->unknown2f8)/
-		definition->unknown2f8;
-
-	if (TEST_FLAG(vehicle->vehicle.flags, 2))
-		factor = 0.25f;
-	else if (TEST_FLAG(vehicle->vehicle.flags, 3))
-		factor = 1.0f;
 	else
-		factor = 0.75f;
-
-	vehicle->vehicle.hover += PIN(factor*(1.0f-throttle*throttle)*
-		vehicle->unit.seat_power[0]-vehicle->vehicle.hover, -0.05f, 0.05f);
-
-	facing = vehicle->unit.desired_facing_vector;
-
-	vehicle->vehicle.thrust = throttle*throttle*vehicle->unit.seat_power[0];
-
-	ground.i = -(facing.k*facing.i);
-	ground.j = -(facing.k*facing.j);
-	ground.k = 1.0f-facing.k*facing.k;
-
-	if (normalize3d(&ground)==0.0f)
 	{
-		ground.i = 1.0f;
-		ground.j = 0.0f;
-		ground.k = 0.0f;
+		real_vector3d desired_forward;
+		real_vector3d desired_up;
+		real_vector3d force;
+		real_vector3d torque;
+		real throttle;
+		real factor;
+
+		throttle = PIN(vehicle->vehicle.speed, 0.0f, definition->unknown2f8)/
+			definition->unknown2f8;
+		throttle = throttle*throttle;
+
+		factor = !TEST_FLAG(vehicle->vehicle.flags, 2) ? (TEST_FLAG(vehicle->vehicle.flags, 3) ? 1.0f : 0.75f) : 0.25f;
+		factor *= 1.0f-throttle;
+		interpolate_scalar(&vehicle->vehicle.hover, factor*vehicle->unit.seat_power[0], 0.05f);
+
+		vehicle->vehicle.thrust = throttle*vehicle->unit.seat_power[0];
+
+		desired_forward = vehicle->unit.desired_facing_vector;
+
+		desired_up.i = -(desired_forward.k*desired_forward.i);
+		desired_up.j = -(desired_forward.k*desired_forward.j);
+		desired_up.k = 1.0f-desired_forward.k*desired_forward.k;
+
+		if (normalize3d(&desired_up)==0.0f)
+		{
+			desired_up.i = 1.0f;
+			desired_up.j = 0.0f;
+			desired_up.k = 0.0f;
+		}
+
+		{
+			real const drive_scale = 0.05f;
+			real const hover_lift_scale = 1.3f;
+			real const speed_lift_scale = 1.05f;
+			real dot;
+			real drive;
+			real lift;
+
+			dot = dot_product3d(&vehicle->object.translational_velocity, &vehicle->object.forward);
+
+			drive = (vehicle->vehicle.speed-dot)*vehicle->vehicle.thrust*physics->mass*drive_scale;
+			lift = ((real)fabs(dot/definition->unknown2f8)*speed_lift_scale+
+				vehicle->vehicle.hover*hover_lift_scale)*global_gravity;
+			lift *= physics->mass;
+
+			force.i = lift*vehicle->object.up.i+drive*vehicle->object.forward.i;
+			force.j = lift*vehicle->object.up.j+drive*vehicle->object.forward.j;
+			force.k = lift*vehicle->object.up.k+drive*vehicle->object.forward.k;
+		}
+
+		{
+			real const yaw_scale = _pi/2;
+			real_vector2d velocity;
+			real yaw;
+
+			{
+				real *destination = velocity.n;
+				real const *source = vehicle->object.translational_velocity.n;
+				short component_index;
+
+				for (component_index = 0; component_index<2; component_index++)
+					destination[component_index] = source[component_index];
+			}
+
+			yaw = (velocity.j*desired_forward.i-velocity.i*desired_forward.j)*yaw_scale/
+				(real)fabs(definition->unknown2f8);
+
+			yaw_vectors(&desired_up, &desired_forward, sine(yaw), cosine(yaw));
+		}
+
+		{
+			real const angle_scale = 1.0f/30;
+			real const torque_scale = 0.05f;
+			real_matrix4x3 vehicle_rotation;
+			real_matrix4x3 desired_rotation;
+			real_matrix4x3 rotation;
+			real_quaternion quaternion;
+			real_vector3d axis;
+			real_vector3d scaled;
+			real angle;
+			real scale;
+
+			matrix4x3_rotation_from_vectors(&vehicle_rotation, &vehicle->object.forward,
+				&vehicle->object.up);
+			matrix4x3_rotation_from_vectors(&desired_rotation, &desired_forward, &desired_up);
+			matrix4x3_inverse(&desired_rotation, &desired_rotation);
+			matrix4x3_multiply(&vehicle_rotation, &desired_rotation, &rotation);
+			matrix4x3_rotation_to_quaternion(&rotation, &quaternion);
+			quaternion_to_angle_and_vector(&quaternion, &angle, &axis);
+
+			scale_vector3d(&axis, angle*angle_scale, &scaled);
+
+			scale = physics->radius*physics->radius*physics->mass*torque_scale;
+
+			torque.i = (scaled.i-vehicle->object.angular_velocity.i)*scale;
+			torque.j = (scaled.j-vehicle->object.angular_velocity.j)*scale;
+			torque.k = (scaled.k-vehicle->object.angular_velocity.k)*scale;
+		}
+
+		scale_vector3d(&force, vehicle->unit.seat_power[0], &force);
+		scale_vector3d(&torque, vehicle->unit.seat_power[0], &torque);
+
+		physics_update(vehicle_index, NULL, mass_points, &force, &torque);
 	}
 
-	dot = dot_product3d(&vehicle->object.translational_velocity, &vehicle->object.forward);
-
-	drive = (vehicle->vehicle.speed-dot)*vehicle->vehicle.thrust*physics->mass*0.05f;
-	lift = ((real)fabs(dot/definition->unknown2f8)*1.05f+
-		vehicle->vehicle.hover*1.3f)*global_gravity*physics->mass;
-
-	force.i = lift*vehicle->object.up.i+drive*vehicle->object.forward.i;
-	force.j = lift*vehicle->object.up.j+drive*vehicle->object.forward.j;
-	force.k = lift*vehicle->object.up.k+drive*vehicle->object.forward.k;
-
-	yaw = (vehicle->object.translational_velocity.j*facing.i-
-		vehicle->object.translational_velocity.i*facing.j)*(_pi/2)/
-		(real)fabs(definition->unknown2f8);
-
-	yaw_vectors(&ground, &facing, sine(yaw), cosine(yaw));
-
-	{
-		real angle;
-		real_vector3d scaled;
-
-		matrix4x3_rotation_from_vectors(&vehicle_rotation, &vehicle->object.forward,
-			&vehicle->object.up);
-		matrix4x3_rotation_from_vectors(&desired_rotation, &facing, &ground);
-		matrix4x3_inverse(&desired_rotation, &desired_rotation);
-		matrix4x3_multiply(&vehicle_rotation, &desired_rotation, &rotation);
-		matrix4x3_rotation_to_quaternion(&rotation, &quaternion);
-		quaternion_to_angle_and_vector(&quaternion, &angle, &axis);
-
-		scale = physics->radius*physics->radius*physics->mass*0.05f;
-
-		scale_vector3d(&axis, angle*(1.0f/30), &scaled);
-
-		torque.i = (scaled.i-vehicle->object.angular_velocity.i)*scale;
-		torque.j = (scaled.j-vehicle->object.angular_velocity.j)*scale;
-		torque.k = (scaled.k-vehicle->object.angular_velocity.k)*scale;
-	}
-
-	force.i *= vehicle->unit.seat_power[0];
-	force.j *= vehicle->unit.seat_power[0];
-	force.k *= vehicle->unit.seat_power[0];
-
-	torque.i *= vehicle->unit.seat_power[0];
-	torque.j *= vehicle->unit.seat_power[0];
-	torque.k *= vehicle->unit.seat_power[0];
-
-	physics_update(vehicle_index, NULL, mass_points, &force, &torque);
 	create_pelican_effect(vehicle_index);
 
 	return;

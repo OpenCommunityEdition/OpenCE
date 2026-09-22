@@ -2023,7 +2023,7 @@ static void physics_update_old(
 	{
 		real_point3d new_position;
 		struct location new_location;
-		real_vector3d rotation_axis = object->object.angular_velocity;
+		real_vector3d rotation_axis;
 		real angular_speed;
 
 		new_position.x = object->object.position.x + object->object.translational_velocity.i;
@@ -2036,6 +2036,7 @@ static void physics_update_old(
 			&new_position);
 		object_translate(object_index, &new_position, &new_location);
 
+		rotation_axis = object->object.angular_velocity;
 		angular_speed = normalize3d(&rotation_axis);
 		if (angular_speed != 0.0f)
 		{

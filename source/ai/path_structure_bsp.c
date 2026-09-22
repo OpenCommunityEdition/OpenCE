@@ -245,105 +245,80 @@ boolean structure_test_line2d(
 	long p1_surface_index,
 	struct path_collision_result *result)
 {
-	struct collision_bsp const *bsp;
-	byte const *pathfinding_surfaces;
-	long const *breakable_surface_flags;
-	boolean recursed;
-	boolean reached_target;
-	long surface_index;
-	real_vector2d delta;
+	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
+	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	long const *breakable_surface_flags = (long const *)breakable_surface_flags_get();
+	long surface_index = p0_surface_index;
+	boolean recursed = FALSE;
+	real_vector2d p0p1;
 
-	bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
-	pathfinding_surfaces = structure->pathfinding_surfaces.address;
-	breakable_surface_flags = (long const *)breakable_surface_flags_get();
-	surface_index = p0_surface_index;
-	recursed = FALSE;
 	match_assert("c:\\halo\\SOURCE\\ai\\path_structure_bsp.c", 217, result);
 
-	delta.i = p1->x - p0->x;
-	delta.j = p1->y - p0->y;
+	vector_from_points2d(p0, p1, &p0p1);
 
-	for (;;)
+	while (TRUE)
 	{
-		struct collision_surface const *surface;
-		long edge_index;
-		short edge_count;
-		boolean crossed_any;
-		real_point3d point_in_surface;
+		struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct collision_surface);
+		long edge_index = surface->first_edge_index;
+		real_point3d point_in_surface = *global_origin3d;
+		short edge_count = 0;
+		boolean crossed_any = FALSE;
+		boolean reached_target = FALSE;
 
-		surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct collision_surface);
-		edge_index = surface->first_edge_index;
-		point_in_surface = *global_origin3d;
-		edge_count = 0;
-		crossed_any = FALSE;
-		reached_target = FALSE;
-
-		do
+		while (TRUE)
 		{
-			struct collision_edge const *edge;
-			boolean on_right_side;
-			struct collision_vertex const *vertex_a;
-			struct collision_vertex const *vertex_b;
-			real_vector2d a_to_p0;
-			real_vector2d edge_vector;
-			real_vector2d b_to_p1;
-			real_vector2d b_to_p0;
-
-			edge = TAG_BLOCK_GET_ELEMENT(&bsp->edges, edge_index, struct collision_edge);
-			on_right_side = surface_index == edge->surface_indices[1];
-			vertex_a = TAG_BLOCK_GET_ELEMENT(
+			struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(&bsp->edges, edge_index, struct collision_edge);
+			boolean on_right_side = surface_index == edge->surface_indices[1];
+			struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
 				&bsp->vertices,
 				edge->vertex_indices[!on_right_side],
 				struct collision_vertex);
-			vertex_b = TAG_BLOCK_GET_ELEMENT(
+			struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
 				&bsp->vertices,
 				edge->vertex_indices[on_right_side],
 				struct collision_vertex);
+			real_vector2d e0e1;
+			real_vector2d e0p1;
+			real_vector2d p0e0;
+			real_vector2d p0e1;
 
-			edge_vector.i = vertex_b->point.x - vertex_a->point.x;
-			edge_vector.j = vertex_b->point.y - vertex_a->point.y;
-			b_to_p1.i = p1->x - vertex_a->point.x;
-			b_to_p1.j = p1->y - vertex_a->point.y;
-			b_to_p0.i = vertex_a->point.x - p0->x;
-			b_to_p0.j = vertex_a->point.y - p0->y;
-			a_to_p0.i = vertex_b->point.x - p0->x;
-			a_to_p0.j = vertex_b->point.y - p0->y;
+			vector_from_points2d((real_point2d const *)&vertex0->point, (real_point2d const *)&vertex1->point, &e0e1);
+			vector_from_points2d((real_point2d const *)&vertex0->point, p1, &e0p1);
+			vector_from_points2d(p0, (real_point2d const *)&vertex0->point, &p0e0);
+			vector_from_points2d(p0, (real_point2d const *)&vertex1->point, &p0e1);
 
 			if (edge->surface_indices[!on_right_side] == p1_surface_index)
+			{
 				reached_target = TRUE;
+			}
 
-			point_in_surface.x += vertex_a->point.x;
-			point_in_surface.y += vertex_a->point.y;
-			point_in_surface.z += vertex_a->point.z;
+			point_in_surface.x += vertex0->point.x;
+			point_in_surface.y += vertex0->point.y;
+			point_in_surface.z += vertex0->point.z;
 			edge_count++;
 
-			if (cross_product2d(&edge_vector, &b_to_p1) > 0.0f)
+			if (cross_product2d(&e0e1, &e0p1) > 0.0f)
 			{
 				crossed_any = TRUE;
-				if (cross_product2d(&delta, &b_to_p0) > 0.0f &&
-					cross_product2d(&a_to_p0, &delta) > 0.0f)
+				if (cross_product2d(&p0p1, &p0e0) > 0.0f &&
+					cross_product2d(&p0e1, &p0p1) > 0.0f)
 				{
-					long neighbor_surface_index;
-					byte pathfinding_surface_flags;
-					boolean passable;
-
-					neighbor_surface_index = edge->surface_indices[!on_right_side];
-					pathfinding_surface_flags = pathfinding_surfaces[neighbor_surface_index];
-					passable = TEST_FLAG(
-						pathfinding_surface_flags,
+					long next_surface_index = edge->surface_indices[!on_right_side];
+					boolean passable = TEST_FLAG(
+						pathfinding_surfaces[next_surface_index],
 						_pathfinding_surface_walkable_bit);
+
 					if (!ignore_broken_surfaces &&
 						passable &&
 						TEST_FLAG(
-							pathfinding_surface_flags,
+							pathfinding_surfaces[next_surface_index],
 							_pathfinding_surface_breakable_bit))
 					{
-						struct collision_surface const *collision_surface;
-
-						collision_surface = TAG_BLOCK_GET_ELEMENT(
+						struct collision_surface const *collision_surface = TAG_BLOCK_GET_ELEMENT(
 							&bsp->surfaces,
-							neighbor_surface_index,
+							next_surface_index,
 							struct collision_surface);
+
 						match_assert(
 							"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
 							274,
@@ -355,27 +330,22 @@ boolean structure_test_line2d(
 
 					if (passable)
 					{
-						surface_index = neighbor_surface_index;
-						goto continue_outer;
+						surface_index = next_surface_index;
+						break;
 					}
-
+					else
 					{
-						real edge_length;
-						real t;
-						real_point2d hit_point;
+						real t = (cross_product2d(&e0e1, &p0e0) - magnitude2d(&e0e1) * (1.0f / 128.0f)) /
+							cross_product2d(&e0e1, &p0p1);
+						real_point2d p2d;
 
-						edge_length = magnitude2d(&edge_vector);
-						t = (cross_product2d(&edge_vector, &b_to_p0) -
-							edge_length * (1.0f / 128.0f)) /
-							cross_product2d(&edge_vector, &delta);
-						hit_point.x = delta.i * t + p0->x;
-						hit_point.y = delta.j * t + p0->y;
+						point_from_line2d(p0, &p0p1, t, &p2d);
 						collision_surface_project_point2d(
 							bsp,
 							surface_index,
 							_z,
 							TRUE,
-							&hit_point,
+							&p2d,
 							&result->point);
 						result->surface_index = surface_index;
 						result->edge_index = edge_index;
@@ -387,79 +357,86 @@ boolean structure_test_line2d(
 			}
 
 			edge_index = edge->edge_indices[on_right_side];
-		}
-		while (edge_index != surface->first_edge_index);
-
-		if (crossed_any)
-		{
-			real scale;
-
-			match_assert(
-				"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
-				316,
-				surface_index >= 0 && surface_index < structure->pathfinding_surfaces.count);
-			scale = 1.0f / edge_count;
-			point_in_surface.x *= scale;
-			point_in_surface.y *= scale;
-
-			if (!recursed && pathfinding_surfaces[surface_index])
+			if (edge_index == surface->first_edge_index)
 			{
-				struct path_collision_result p0_result;
-
-				if (!structure_test_line2d(
-					structure,
-					ignore_broken_surfaces,
-					(real_point2d const *)&point_in_surface,
-					surface_index,
-					p0,
-					NONE,
-					&p0_result))
+				if (crossed_any)
 				{
-					recursed = TRUE;
-					surface_index = p0_result.surface_index;
-					continue;
+					struct path_collision_result p0_result;
+
+					match_assert(
+						"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
+						316,
+						surface_index>=0 && surface_index<structure->pathfinding_surfaces.count);
+					point_in_surface.x /= edge_count;
+					point_in_surface.y /= edge_count;
+
+					if (!recursed &&
+						pathfinding_surfaces[surface_index] &&
+						!structure_test_line2d(
+							structure,
+							ignore_broken_surfaces,
+							(real_point2d const *)&point_in_surface,
+							surface_index,
+							p0,
+							NONE,
+							&p0_result))
+					{
+						recursed = TRUE;
+						surface_index = p0_result.surface_index;
+						break;
+					}
+					else
+					{
+						collision_surface_project_point2d(
+							bsp,
+							p0_surface_index,
+							_z,
+							TRUE,
+							p0,
+							&result->point);
+						result->surface_index = NONE;
+						result->edge_index = NONE;
+						result->collision = TRUE;
+						result->t = 0.0f;
+						return TRUE;
+					}
+				}
+				else
+				{
+					if (surface_index == p1_surface_index || reached_target || p1_surface_index == NONE)
+					{
+						collision_surface_project_point2d(
+							bsp,
+							surface_index,
+							_z,
+							TRUE,
+							p1,
+							&result->point);
+						result->surface_index = surface_index;
+						result->edge_index = NONE;
+						result->collision = FALSE;
+						result->t = 1.0f;
+						return FALSE;
+					}
+					else
+					{
+						collision_surface_project_point2d(
+							bsp,
+							p0_surface_index,
+							_z,
+							TRUE,
+							p0,
+							&result->point);
+						result->surface_index = NONE;
+						result->edge_index = NONE;
+						result->collision = TRUE;
+						result->t = 0.0f;
+						return TRUE;
+					}
 				}
 			}
-
-			goto blocked_at_start;
 		}
-
-		break;
-
-continue_outer:
-		;
 	}
-
-	if (surface_index == p1_surface_index || reached_target || p1_surface_index == NONE)
-	{
-		collision_surface_project_point2d(
-			bsp,
-			surface_index,
-			_z,
-			TRUE,
-			p1,
-			&result->point);
-		result->surface_index = surface_index;
-		result->edge_index = NONE;
-		result->collision = FALSE;
-		result->t = 1.0f;
-		return FALSE;
-	}
-
-blocked_at_start:
-	collision_surface_project_point2d(
-		bsp,
-		p0_surface_index,
-		_z,
-		TRUE,
-		p0,
-		&result->point);
-	result->surface_index = NONE;
-	result->edge_index = NONE;
-	result->collision = TRUE;
-	result->t = 0.0f;
-
-	return TRUE;
 }
 
 boolean clip_empty_interval_by_solid_interval(

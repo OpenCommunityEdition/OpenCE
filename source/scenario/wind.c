@@ -465,24 +465,24 @@ void wind_variance_initialize(
 
 	for (control_point_index = 0; control_point_index < 8; control_point_index++)
 	{
-		word previous_control_point =
-			(word)((control_point_index - 1) & 7);
-		word next_control_point =
-			(word)((control_point_index + 1) & 7);
-		word following_control_point =
-			(word)((control_point_index + 2) & 7);
-
 		for (sample_index = 1; sample_index < 8; sample_index++)
 		{
 			for (axis_index = 0; axis_index < 3; axis_index++)
 			{
+				word control_point_indices[4];
+
+				control_point_indices[0] = (control_point_index - 1) & 7;
+				control_point_indices[1] = control_point_index;
+				control_point_indices[2] = (control_point_index + 1) & 7;
+				control_point_indices[3] = (control_point_index + 2) & 7;
+
 				uniform_cubic_spline_vector3d(
 					&wind_globals.variance[axis_index][control_point_index * 8 + sample_index],
-					&wind_globals.variance[axis_index][previous_control_point * 8],
-					&wind_globals.variance[axis_index][control_point_index * 8],
-					&wind_globals.variance[axis_index][next_control_point * 8],
-					&wind_globals.variance[axis_index][following_control_point * 8],
-					(real)(control_point_index - 1),
+					&wind_globals.variance[axis_index][control_point_indices[0] * 8],
+					&wind_globals.variance[axis_index][control_point_indices[1] * 8],
+					&wind_globals.variance[axis_index][control_point_indices[2] * 8],
+					&wind_globals.variance[axis_index][control_point_indices[3] * 8],
+					(real)(control_point_indices[1] - 1),
 					1.f,
 					(real)sample_index * 0.125f + (real)control_point_index);
 			}

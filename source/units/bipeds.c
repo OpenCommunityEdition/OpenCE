@@ -519,10 +519,10 @@ static void biped_update_physics(
 
 /* ---------- globals */
 
-boolean debug_biped_physics;
-boolean debug_biped_skip_update;
-boolean debug_biped_skip_collision;
-boolean debug_biped_limp_body_disable;
+boolean debug_biped_physics = FALSE;
+boolean debug_biped_skip_update = FALSE;
+boolean debug_biped_skip_collision = FALSE;
+boolean debug_biped_limp_body_disable = FALSE;
 boolean rider_ejection = TRUE;
 
 static struct profile_section biped_update_section = {"biped_update", NONE, TRUE};
@@ -3656,7 +3656,7 @@ void biped_update_moving(
 			physics.movement_desired.j = dy * movement_scale;
 			physics.movement_desired.k *= movement_scale;
 
-			if (fabs(dyaw) >= 0.0001f)
+			if (!(fabs(dyaw) < _real_epsilon))
 			{
 				real_vector3d rotated_forward;
 				real sine_value = (real)sin(dyaw);
@@ -3857,10 +3857,10 @@ void biped_update_moving(
 		if (TEST_FLAG(biped->biped.flags, _biped_airborne_bit) &&
 			biped->biped.airborne_ticks < 22 &&
 			biped->unit.actor_index != NONE &&
-			actor_is_leaping((short)biped->unit.actor_index))
+			actor_is_leaping(biped->unit.actor_index))
 		{
-			physics.ground_tangential_angle = 0.5f;
 			physics.ground_tangential_velocity_max = 0.1f;
+			physics.ground_tangential_angle = 0.5f;
 		}
 
 		physics.movement_penalty = 0.f;
@@ -3898,7 +3898,7 @@ void biped_update_moving(
 			}
 		}
 
-		if (fabs(crouch_delta) > 0.01 &&
+		if (fabs(crouch_delta) > 0.01f &&
 			TEST_FLAG(biped->biped.flags, _biped_airborne_bit))
 		{
 			physics.crouch_velocity =

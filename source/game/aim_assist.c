@@ -559,6 +559,7 @@ long local_player_aim_assist(
 	real_euler_angles2d *target_angular_position,
 	real_euler_angles2d *target_angular_velocity)
 {
+	long target_index= NONE;
 	director_perspective perspective= director_get_perspective(local_player_index);
 
 	*autoaim_level= 0.f;
@@ -570,39 +571,44 @@ long local_player_aim_assist(
 	{
 		struct player_datum *player= player_get(local_player_get_player_index(local_player_index));
 		long aiming_unit_index= unit_get_aiming_unit_index(player->unit_index);
-		short zoom_level= player_control_get_zoom_level(local_player_index);
 		struct aim_assist_parameters parameters;
 
-		if (unit_get_aim_assist_parameters(aiming_unit_index, zoom_level, &parameters))
+		if (unit_get_aim_assist_parameters(aiming_unit_index, player_control_get_zoom_level(local_player_index), &parameters))
 		{
 			struct observer_result const *camera= observer_get_camera(local_player_index);
 			struct aim_assist_target target;
 
 			if (aim_assist(&parameters, &camera->position, &camera->forward, aiming_unit_index, player->team_index, &target))
 			{
-				real_vector3d aiming_velocity, target_velocity, relative_velocity;
-				real horizontal_distance_squared, horizontal_distance;
+				real_vector3d velocity, target_velocity, magnetism_velocity;
 
 				*autoaim_level= target.autoaim_level;
 				*magnetism_level= target.magnetism_level;
 				euler_angles2d_from_vector3d(target_angular_position, &target.vector);
 
-				object_get_velocities(player->unit_index, &aiming_velocity, NULL);
+				object_get_velocities(player->unit_index, &velocity, NULL);
 				object_get_velocities(target.object_index, &target_velocity, NULL);
+				subtract_vectors3d(&target_velocity, &velocity, &magnetism_velocity);
 
-				subtract_vectors3d(&target_velocity, &aiming_velocity, &relative_velocity);
-				horizontal_distance_squared= target.vector.i*target.vector.i + target.vector.j*target.vector.j;
-				horizontal_distance= square_root(horizontal_distance_squared);
-				target_angular_velocity->yaw= (target.vector.i*relative_velocity.j - target.vector.j*relative_velocity.i) /
-					horizontal_distance_squared;
-				target_angular_velocity->pitch= (relative_velocity.k*horizontal_distance -
-					(target.vector.i*relative_velocity.i + target.vector.j*relative_velocity.j)/horizontal_distance*target.vector.k) /
-					(target.vector.k*target.vector.k + horizontal_distance_squared);
+				{
+					real_vector3d const *relative_position= &target.vector;
+					real_vector3d const *relative_velocity= &magnetism_velocity;
+					real horizontal_distance_squared= relative_position->i*relative_position->i +
+						relative_position->j*relative_position->j;
+					real horizontal_distance= square_root(horizontal_distance_squared);
 
-				return target.object_index;
+					target_angular_velocity->yaw= (relative_position->i*relative_velocity->j -
+						relative_position->j*relative_velocity->i)/horizontal_distance_squared;
+					target_angular_velocity->pitch= (horizontal_distance*relative_velocity->k -
+						relative_position->k/horizontal_distance*(relative_position->i*relative_velocity->i +
+						relative_position->j*relative_velocity->j))/(relative_position->k*relative_position->k +
+						horizontal_distance_squared);
+				}
+
+				target_index= target.object_index;
 			}
 		}
 	}
 
-	return NONE;
+	return target_index;
 }

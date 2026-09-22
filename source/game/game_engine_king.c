@@ -847,6 +847,46 @@ void king_engine_update(
 	return;
 }
 
+/* ---------- engine table */
+
+struct game_engine king_engine =
+{
+	"king",
+	game_engine_king,
+	king_engine_dispose,
+	king_engine_initialize_for_new_map,
+	king_engine_dispose_from_old_map,
+	king_engine_player_added,
+	king_engine_game_ending,
+	king_engine_game_starting,
+	king_engine_statistics_append,
+	king_engine_handle_client_message,
+	king_engine_handle_server_message,
+	king_engine_pregame_post_rasterize,
+	king_engine_post_rasterize,
+	king_engine_player_update,
+	NULL,
+	NULL,
+	NULL,
+	king_engine_update,
+	king_get_score,
+	king_get_score_string,
+	king_get_score_header_string,
+	king_get_team_score_string,
+	NULL,
+	king_engine_player_damaged_player,
+	king_engine_player_killed_player,
+	king_engine_display_score,
+	NULL,
+	king_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	king_engine_goal_matches_player,
+	NULL,
+	NULL,
+	NULL,
+};
+
 /* ---------- private code */
 
 static void hill_points_to_2d(
@@ -982,31 +1022,31 @@ static boolean player_inside_hill(
 static void king_calculate_hill_state(
 	void)
 {
-	struct data_iterator iterator;
 	struct player_datum *player;
-	long player_count = 0;
 
 	if (game_engine_has_teams())
 	{
-		long enemy_count = 0;
+		struct data_iterator player_iterator;
+		long red_count = 0;
+		long blue_count = 0;
 
-		data_iterator_new(&iterator, player_data);
-		player = (struct player_datum *)data_iterator_next(&iterator);
+		data_iterator_new(&player_iterator, player_data);
+		player = (struct player_datum *)data_iterator_next(&player_iterator);
 		while (player)
 		{
-			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)])
 			{
 				if (player->team_index)
-					enemy_count++;
+					blue_count++;
 				else
-					player_count++;
+					red_count++;
 			}
-			player = (struct player_datum *)data_iterator_next(&iterator);
+			player = (struct player_datum *)data_iterator_next(&player_iterator);
 		}
 
-		if (enemy_count)
+		if (blue_count)
 		{
-			if (player_count)
+			if (red_count)
 			{
 				king_globals.hill_state = king_hill_contested;
 				if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
@@ -1020,40 +1060,38 @@ static void king_calculate_hill_state(
 				else
 					king_globals.hill_controlled_count = 0;
 				king_globals.hill_state = king_hill_controlled_blue;
-				if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
-					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 			}
 		}
-		else if (player_count)
+		else if (!red_count)
+		{
+			king_globals.hill_state = king_hill_uncontrolled;
+			king_globals.hill_controlled_count = 0;
+		}
+		else
 		{
 			if (king_globals.hill_state == king_hill_controlled_red)
 				king_globals.hill_controlled_count++;
 			else
 				king_globals.hill_controlled_count = 0;
 			king_globals.hill_state = king_hill_controlled_red;
-			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
-				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
-		}
-		else
-		{
-			king_globals.hill_state = king_hill_uncontrolled;
-			king_globals.hill_controlled_count = 0;
 		}
 	}
 	else
 	{
+		struct data_iterator player_iterator;
+		long player_count = 0;
 		long controller;
 
-		data_iterator_new(&iterator, player_data);
-		player = (struct player_datum *)data_iterator_next(&iterator);
+		data_iterator_new(&player_iterator, player_data);
+		player = (struct player_datum *)data_iterator_next(&player_iterator);
 		while (player)
 		{
-			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)])
 			{
-				controller = iterator.datum_index;
+				controller = player_iterator.datum_index;
 				player_count++;
 			}
-			player = (struct player_datum *)data_iterator_next(&iterator);
+			player = (struct player_datum *)data_iterator_next(&player_iterator);
 		}
 
 		if (player_count > 1)
@@ -1077,16 +1115,17 @@ static void king_calculate_hill_state(
 				king_globals.hill_previous_controller = controller;
 			}
 			king_globals.hill_state = king_hill_controlled;
-			if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
-				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 		}
 		else
 		{
+			king_globals.hill_previous_controller = NONE;
 			king_globals.hill_state = king_hill_uncontrolled;
 			king_globals.hill_controlled_count = 0;
-			king_globals.hill_previous_controller = NONE;
 		}
 	}
+
+	if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
+		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 
 	return;
 }

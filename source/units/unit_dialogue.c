@@ -488,18 +488,28 @@ char const *unit_describe_speech(
 
 	if (abbreviated)
 	{
+		boolean done = FALSE;
+
 		scan = sound_name;
-		while (TRUE)
+		while (!done)
 		{
-			if (!scan)
-				break;
-
-			scan = strchr(scan, '\\');
-			if (!scan)
-				break;
-
-			scan++;
-			sound_name = scan;
+			if (scan)
+			{
+				scan = strchr(scan, '\\');
+				if (scan)
+				{
+					scan++;
+					sound_name = scan;
+				}
+				else
+				{
+					done = TRUE;
+				}
+			}
+			else
+			{
+				done = TRUE;
+			}
 		}
 	}
 	else
@@ -725,145 +735,150 @@ boolean unit_make_damage_sound(
 
 	(void)shield_damage;
 
-	if (unit->unit.dialogue_index == NONE)
-		return spoke;
-
+	if (unit->unit.dialogue_index != NONE)
 	{
-	boolean took_body_damage = unit->object.recent_body_damage > 0.f;
-	boolean took_major_body_damage = unit->object.recent_body_damage >= 0.6f;
-	short vocalization_type = NONE;
-	short damage_category = _unit_dialogue_damage_category_none;
-	short unit_effect_type = NONE;
-	short unit_effect_volume = 0;
-	boolean involuntary_vocalization = FALSE;
+		short vocalization_type = NONE;
+		short damage_category = _unit_dialogue_damage_category_none;
+		boolean took_body_damage = unit->object.recent_body_damage > 0.f;
+		boolean took_major_body_damage = unit->object.recent_body_damage >= 0.6f;
+		short unit_effect_type = NONE;
+		short unit_effect_volume = 0;
+		boolean involuntary_vocalization = FALSE;
 
-	if (damage_data && damage_data->definition_index != NONE)
-	{
-		damage_category = damage_effect_definition_get(
-			damage_data->definition_index)->damage.category;
-	}
-
-	if (died)
-	{
-		long actor_index = unit->unit.swarm_actor_index;
-		boolean instantaneous = FALSE;
-		boolean severe;
-
-		if (actor_index == NONE)
-			actor_index = unit->unit.actor_index;
-
-		if (damage_data->definition_index != NONE)
+		if (damage_data && damage_data->definition_index != NONE)
 		{
-			instantaneous = damage_effect_definition_get(
-				damage_data->definition_index)->damage.instantaneous_acceleration >= 2.f;
+			damage_category = damage_effect_definition_get(
+				damage_data->definition_index)->damage.category;
 		}
 
-		if (actor_index != NONE)
+		if (died)
 		{
-			severe = actor_get(actor_index)->state.combat_status >=
-				_unit_dialogue_actor_combat_status_definite;
-		}
-		else
-		{
-			severe = unit->object.recent_body_damage > body_damage + 0.2f;
-		}
+			long actor_index = unit->unit.swarm_actor_index != NONE ?
+				unit->unit.swarm_actor_index :
+				unit->unit.actor_index;
+			boolean severe = FALSE;
+			boolean instantaneous = FALSE;
 
-		if (damage_category == _unit_dialogue_damage_category_falling)
-			vocalization_type = _vocalization_death_falling;
-		else if (damage_category == _unit_dialogue_damage_category_flame)
-			vocalization_type = _vocalization_death_agonizing;
-		else if (instantaneous)
-			vocalization_type = _vocalization_death_flying;
-		else if (severe)
-		{
-			vocalization_type = died_instantly ?
-				_vocalization_death_instant :
-				_vocalization_death_violent;
-		}
-		else
-		{
-			vocalization_type = _vocalization_death_quiet;
-		}
-
-		involuntary_vocalization = TRUE;
-		if (vocalization_type != _vocalization_death_quiet)
-		{
-			unit_effect_type = _unit_dialogue_ai_unit_effect_death_scream;
-			unit_effect_volume = vocalization_type == _vocalization_death_instant ? 4 : 1;
-		}
-	}
-	else if (unit->unit.speech.damage_major_timer == 0)
-	{
-		if (damage_category == _unit_dialogue_damage_category_falling)
-		{
-			involuntary_vocalization = TRUE;
-			vocalization_type = _vocalization_pain_falling;
-		}
-		else if (took_major_body_damage)
-		{
-			involuntary_vocalization = TRUE;
-			vocalization_type = _vocalization_pain_body_major;
-		}
-		else if (unit->unit.speech.damage_minor_timer == 0 &&
-			unit->unit.speech.damage_minor_sounds < 3 &&
-			(unit->unit.speech.current.priority == _unit_speech_none ||
-				real_seed_random(get_global_random_seed_address()) < 0.4f))
-		{
-			vocalization_type = took_body_damage ?
-				_vocalization_pain_body :
-				_vocalization_pain_shield;
-		}
-	}
-
-	if (vocalization_type != NONE)
-	{
-		long sound_definition_index = NONE;
-		short priority = died ?
-			_unit_speech_death :
-			(involuntary_vocalization ? _unit_speech_involuntary : _unit_speech_pain);
-		short play_type = unit_test_speech(
-			unit_index,
-			priority,
-			TRUE,
-			FALSE,
-			NULL,
-			&vocalization_type,
-			&sound_definition_index);
-
-		if (!ai_debug.disable_wounded_sounds &&
-			play_type > _unit_play_speech_none)
-		{
-			struct unit_speech_item speech_item;
-
-			csmemset(&speech_item, 0, sizeof(speech_item));
-			speech_item.priority = priority;
-			speech_item.vocalization_type = vocalization_type;
-			speech_item.sound_definition_index = sound_definition_index;
-			speech_item.pause_time = 7;
-			ai_communication_packet_new(&speech_item.ai);
-			unit_speak(unit_index, play_type, &speech_item);
-			spoke = TRUE;
-
-			if (took_major_body_damage)
+			if (damage_data->definition_index != NONE)
 			{
-				unit->unit.speech.damage_major_timer = 60;
+				instantaneous = damage_effect_definition_get(
+					damage_data->definition_index)->damage.instantaneous_acceleration >= 2.f;
+			}
+
+			if (actor_index != NONE)
+			{
+				struct actor_datum *actor = actor_get(actor_index);
+
+				severe = actor->state.combat_status >=
+					_unit_dialogue_actor_combat_status_definite;
+			}
+			else if (unit->object.recent_body_damage > body_damage + 0.2f)
+			{
+				severe = TRUE;
+			}
+
+			if (damage_category == _unit_dialogue_damage_category_falling)
+			{
+				vocalization_type = _vocalization_death_falling;
+			}
+			else if (damage_category == _unit_dialogue_damage_category_flame)
+			{
+				vocalization_type = _vocalization_death_agonizing;
+			}
+			else if (instantaneous)
+			{
+				vocalization_type = _vocalization_death_flying;
+			}
+			else if (!severe)
+			{
+				vocalization_type = _vocalization_death_quiet;
 			}
 			else
 			{
-				unit->unit.speech.damage_minor_sounds++;
-				unit->unit.speech.damage_minor_timer = 30;
-				unit->unit.speech.damage_minor_decay_timer = 22;
+				vocalization_type = died_instantly ?
+					_vocalization_death_instant :
+					_vocalization_death_violent;
+			}
+
+			involuntary_vocalization = TRUE;
+			if (vocalization_type != _vocalization_death_quiet)
+			{
+				unit_effect_type = _unit_dialogue_ai_unit_effect_death_scream;
+				unit_effect_volume = vocalization_type == _vocalization_death_instant ? 4 : 1;
 			}
 		}
-	}
+		else if (unit->unit.speech.damage_major_timer == 0)
+		{
+			if (damage_category == _unit_dialogue_damage_category_falling)
+			{
+				involuntary_vocalization = TRUE;
+				vocalization_type = _vocalization_pain_falling;
+			}
+			else if (took_major_body_damage)
+			{
+				involuntary_vocalization = TRUE;
+				vocalization_type = _vocalization_pain_body_major;
+			}
+			else if (unit->unit.speech.damage_minor_timer == 0 &&
+				unit->unit.speech.damage_minor_sounds < 3 &&
+				(unit->unit.speech.current.priority == _unit_speech_none ||
+					real_seed_random(get_global_random_seed_address()) < 0.4f))
+			{
+				vocalization_type = took_body_damage ?
+					_vocalization_pain_body :
+					_vocalization_pain_shield;
+			}
+		}
 
-	if (unit_effect_type != NONE)
-	{
-		ai_handle_unit_effect(
-			unit_index,
-			unit_effect_type,
-			unit_effect_volume);
-	}
+		if (vocalization_type != NONE)
+		{
+			long sound_definition_index = NONE;
+			short priority = died ?
+				_unit_speech_death :
+				(involuntary_vocalization ? _unit_speech_involuntary : _unit_speech_pain);
+			short play_type = unit_test_speech(
+				unit_index,
+				priority,
+				TRUE,
+				FALSE,
+				NULL,
+				&vocalization_type,
+				&sound_definition_index);
+
+			if (!ai_debug.disable_wounded_sounds &&
+				play_type > _unit_play_speech_none)
+			{
+				struct unit_speech_item speech_item;
+
+				csmemset(&speech_item, 0, sizeof(speech_item));
+				speech_item.priority = priority;
+				speech_item.vocalization_type = vocalization_type;
+				speech_item.sound_definition_index = sound_definition_index;
+				speech_item.pause_time = 7;
+				ai_communication_packet_new(&speech_item.ai);
+				unit_speak(unit_index, play_type, &speech_item);
+				spoke = TRUE;
+
+				if (took_major_body_damage)
+				{
+					unit->unit.speech.damage_major_timer = 60;
+				}
+				else
+				{
+					unit->unit.speech.damage_minor_sounds++;
+					unit->unit.speech.damage_minor_timer = 30;
+					unit->unit.speech.damage_minor_decay_timer = 22;
+				}
+			}
+		}
+
+		if (unit_effect_type != NONE)
+		{
+			ai_handle_unit_effect(
+				unit_index,
+				unit_effect_type,
+				unit_effect_volume);
+		}
 	}
 
 	return spoke;

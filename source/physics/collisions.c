@@ -217,8 +217,8 @@ static real_vector3d collision_fix_pill_offsets[17] =
 };
 
 static struct collision_usage_times collision_usage_times;
-boolean debug_collision_skip_objects;
-boolean debug_collision_skip_vectors;
+boolean debug_collision_skip_objects = FALSE;
+boolean debug_collision_skip_vectors = FALSE;
 
 /* ---------- public code */
 
@@ -1168,6 +1168,7 @@ short collision_move_point(
 	struct collision_plane *collisions)
 {
 	short collision_count = 0;
+	real_point3d position;
 	real_vector3d velocity = *old_velocity;
 	real_point3d clipped_position = *old_position;
 	real_vector3d clipped_velocity = *old_velocity;
@@ -1196,9 +1197,8 @@ short collision_move_point(
 
 		if (collision_features_test_vector(features, &clipped_position, &clipped_velocity, collision))
 		{
-			real_point3d position;
 			short new_clip_indices[3];
-			short new_clip_count = 0;
+			short new_clip_count;
 
 			collision_count++;
 			position = collision->point;
@@ -1220,7 +1220,8 @@ short collision_move_point(
 					collision->plane.d));
 			match_assert("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3D1, clip_count<3);
 
-			new_clip_indices[new_clip_count++] = collision_count - 1;
+			new_clip_count = 1;
+			new_clip_indices[0] = collision_count - 1;
 			clip_plane = collisions[new_clip_indices[0]].plane;
 			clip_velocity_to_plane(&velocity, &clip_plane, &clipped_velocity);
 			clip_position_to_plane(&position, &clip_plane, &clipped_position);
@@ -1237,25 +1238,29 @@ short collision_move_point(
 					match_assert_valid_real_point3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3E1, &clip_line_point);
 					match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3E2, &clip_line_vector);
 
-					new_clip_indices[new_clip_count++] = clip_indices[0];
+					new_clip_count = 2;
+					new_clip_indices[1] = clip_indices[0];
 					clip_velocity_to_line(&velocity, &clip_line_point, &clip_line_vector, &clipped_velocity);
 					clip_position_to_line(&position, &clip_line_point, &clip_line_vector, &clipped_position);
 
-					if (clip_count > 1 &&
-						dot_product3d(&clipped_velocity, &collisions[clip_indices[1]].plane.n) < -_real_epsilon &&
-						point_from_planes3d(
-							&collisions[new_clip_indices[0]].plane,
-							&collisions[new_clip_indices[1]].plane,
-							&collisions[clip_indices[1]].plane,
-							&clip_point))
+					if (clip_count > 1)
 					{
-						match_assert_valid_real_point3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3EE, &clip_point);
+						if (dot_product3d(&clipped_velocity, &collisions[clip_indices[1]].plane.n) < -_real_epsilon &&
+							point_from_planes3d(
+								&collisions[new_clip_indices[0]].plane,
+								&collisions[new_clip_indices[1]].plane,
+								&collisions[clip_indices[1]].plane,
+								&clip_point))
+						{
+							match_assert_valid_real_point3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3EE, &clip_point);
 
-						new_clip_indices[new_clip_count++] = clip_indices[1];
-						clipped_velocity.i = 0.0f;
-						clipped_velocity.j = 0.0f;
-						clipped_velocity.k = 0.0f;
-						clipped_position = clip_point;
+							new_clip_count = 3;
+							new_clip_indices[2] = clip_indices[1];
+							clipped_velocity.i = 0.0f;
+							clipped_velocity.j = 0.0f;
+							clipped_velocity.k = 0.0f;
+							clipped_position = clip_point;
+						}
 					}
 				}
 				else if (clip_count > 1 &&
@@ -1269,7 +1274,8 @@ short collision_move_point(
 					match_assert_valid_real_point3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3FE, &clip_line_point);
 					match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\physics\\collisions.c", 0x3FF, &clip_line_vector);
 
-					new_clip_indices[new_clip_count++] = clip_indices[1];
+					new_clip_count = 2;
+					new_clip_indices[1] = clip_indices[1];
 					clip_velocity_to_line(&velocity, &clip_line_point, &clip_line_vector, &clipped_velocity);
 					clip_position_to_line(&position, &clip_line_point, &clip_line_vector, &clipped_position);
 				}
@@ -1340,24 +1346,27 @@ short collision_move_point(
 	if (clip_count > 1 && collision_count < maximum_collision_count)
 	{
 		struct collision_plane *collision = &collisions[collision_count++];
-		struct collision_plane const *last_collision = &collisions[clip_indices[clip_count - 1]];
-		real minimum_k = 0.0f;
-		short steepest_clip_index = NONE;
+		real minimum_k;
+		short steepest_clip_index;
 		short clip_index;
 
-		collision->t = last_collision->t;
-		collision->point = last_collision->point;
+		collision->t = collisions[clip_indices[clip_count - 1]].t;
+		collision->point = collisions[clip_indices[clip_count - 1]].point;
 		collision->object_index = NONE;
 		collision->surface_index = NONE;
 		collision->flags = 0;
 		collision->breakable_surface_index = 0;
 		collision->material_index = NONE;
 
+		minimum_k = 0.0f;
+		steepest_clip_index = NONE;
 		for (clip_index = 0; clip_index < clip_count; clip_index++)
 		{
-			if (collisions[clip_indices[clip_index]].plane.n.k < minimum_k)
+			struct collision_plane const *clip_collision = &collisions[clip_indices[clip_index]];
+
+			if (clip_collision->plane.n.k < minimum_k)
 			{
-				minimum_k = collisions[clip_indices[clip_index]].plane.n.k;
+				minimum_k = clip_collision->plane.n.k;
 				steepest_clip_index = clip_index;
 			}
 		}

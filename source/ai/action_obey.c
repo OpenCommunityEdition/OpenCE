@@ -1258,18 +1258,12 @@ flush_order_effects:
 		}
 		else
 		{
-			real_vector2d facing;
 			real_vector2d alignment_vector;
 
-			facing.i = actor->input.facing_vector.i;
-			facing.j = actor->input.facing_vector.j;
-			if (normalize2d(&facing) == 0.f)
+			alignment_vector = *(real_vector2d const *)&actor->input.facing_vector;
+			if (normalize2d(&alignment_vector) == 0.f)
 			{
 				alignment_vector = *global_forward2d;
-			}
-			else
-			{
-				alignment_vector = facing;
 			}
 
 			actor->orders.move.jump = TRUE;
