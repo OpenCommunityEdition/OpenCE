@@ -1423,6 +1423,7 @@ static void actor_move_vector_avoidance(
 	if (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
+		boolean direction_chosen = FALSE;
 		struct actor_debug_info *debug_info =
 			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
 		struct vector_avoidance_data avoidance_data;
@@ -1441,7 +1442,6 @@ static void actor_move_vector_avoidance(
 		short direction_index;
 		short ray_index;
 		boolean sharp_turn = FALSE;
-		boolean direction_chosen = FALSE;
 
 		debug_info->field_19C = game_time_get();
 		avoidance_data.structure = global_structure_bsp_get();
@@ -1450,9 +1450,7 @@ static void actor_move_vector_avoidance(
 		object_get_origin(object_index, &avoidance_data.origin);
 		avoidance_data.forward = object->object.forward;
 		avoidance_data.up = object->object.up;
-		avoidance_data.left.i = object->object.up.j*object->object.forward.k - object->object.up.k*object->object.forward.j;
-		avoidance_data.left.j = object->object.up.k*object->object.forward.i - object->object.up.i*object->object.forward.k;
-		avoidance_data.left.k = object->object.up.i*object->object.forward.j - object->object.up.j*object->object.forward.i;
+		cross_product3d(&object->object.up, &object->object.forward, &avoidance_data.left);
 		avoidance_data.avoid_distance = 12.f;
 		avoidance_data.avoid_width = 1.f;
 		actor_move_avoidance_setup(&avoidance_data);
@@ -1517,8 +1515,8 @@ static void actor_move_vector_avoidance(
 		{
 			short avoidance_types[NUMBEROF(avoid_ray_avoidance_weights)];
 			real avoidance_t[NUMBEROF(avoid_ray_avoidance_weights)];
-			real direction_weight = 0.f;
-			boolean obstructed = FALSE;
+			real direction_weight;
+			boolean obstructed;
 
 			for (ray_index = 0; ray_index < NUMBEROF(avoid_ray_avoidance_weights); ray_index++)
 			{
@@ -1538,15 +1536,12 @@ static void actor_move_vector_avoidance(
 				debug_info->avoid_t[direction_index][ray_index] = avoidance_t[ray_index];
 			}
 
+			direction_weight = 0.f;
+			obstructed = FALSE;
+
 			for (ray_index = NUMBEROF(avoid_ray_avoidance_weights) - 1; ray_index >= 0; ray_index--)
 			{
-				if (avoidance_types[ray_index] != _actor_vector_avoidance_clear)
-				{
-					direction_weight -=
-						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoidance_t[ray_index]), 1.f);
-					obstructed = TRUE;
-				}
-				else
+				if (avoidance_types[ray_index] == _actor_vector_avoidance_clear)
 				{
 					real clear_fraction = 1.f;
 
@@ -1568,21 +1563,30 @@ static void actor_move_vector_avoidance(
 					}
 					direction_weight += avoid_ray_avoidance_weights[ray_index]*clear_fraction;
 				}
+				else
+				{
+					direction_weight -=
+						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoidance_t[ray_index]), 1.f);
+					obstructed = TRUE;
+				}
 			}
 
-			weights[direction_index] += direction_weight;
-			weights[(direction_index + 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[0]*direction_weight;
-			weights[(direction_index + 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[1]*direction_weight;
-			weights[(direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[0]*direction_weight;
-			weights[(direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS] +=
-				avoid_ray_adjacent_fractions[1]*direction_weight;
+			{
+				short next_direction = (direction_index + 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short second_next_direction = (direction_index + 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+				short second_previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
+
+				weights[direction_index] += direction_weight;
+				weights[next_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+				weights[previous_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+			}
 		}
 
-		debug_info->field_6551 = FALSE;
 		angular_speed = magnitude3d(&object->object.angular_velocity);
+		debug_info->field_6551 = FALSE;
 		if (angular_speed > 0.02f)
 		{
 			real velocity_weight = MIN((angular_speed - 0.02f)*12.5f, 1.f)*0.8f;
@@ -1621,8 +1625,8 @@ static void actor_move_vector_avoidance(
 
 			debug_info->field_6554 = velocity_weight;
 			debug_info->field_6558 = angular_speed;
-			debug_info->avoidance_vector = velocity_direction;
 			debug_info->field_6551 = TRUE;
+			debug_info->avoidance_vector = velocity_direction;
 			debug_info->field_6568 = velocity_approximate_weight;
 		}
 
@@ -1645,8 +1649,8 @@ static void actor_move_vector_avoidance(
 		csmemcpy(debug_info->field_64D8, weights, sizeof(weights));
 
 		movement_vector = *movement_direction;
-		local_movement_direction = *global_zero_vector3d;
 		forward_dot = 1.f;
+		local_movement_direction = *global_zero_vector3d;
 		movement_direction_approximation = 0.f;
 		movement_approximate_weight = 0.f;
 		if (normalize3d(&movement_vector) > 0.f)
@@ -1686,8 +1690,8 @@ static void actor_move_vector_avoidance(
 		{
 			emergency_scale = MIN(1.f, maximum_sense_emergency/0.3f);
 		}
-		debug_info->sign_no_danger = weight_difference;
 		debug_info->field_6510 = forward_dot;
+		debug_info->sign_no_danger = weight_difference;
 
 		if (forward_dot < -0.2f)
 		{
@@ -1738,7 +1742,8 @@ static void actor_move_vector_avoidance(
 				rotation.k = rotation_axis.k*rotation_angle;
 			}
 
-			emergency = MAX(PIN((2.f - movement_approximate_weight)*0.5f - 0.5f, 0.f, 1.f), emergency_scale);
+			emergency = PIN((2.f - movement_approximate_weight)*0.5f - 0.5f, 0.f, 1.f);
+			emergency = MAX(emergency, emergency_scale);
 			direction_chosen = TRUE;
 		}
 		else
@@ -1756,7 +1761,8 @@ static void actor_move_vector_avoidance(
 					{
 						real rotation_angle;
 
-						emergency = MAX(PIN(weight_difference/1.3f - 0.5f, 0.f, 1.f), emergency_scale);
+						emergency = PIN(weight_difference/1.3f - 0.5f, 0.f, 1.f);
+						emergency = MAX(emergency, emergency_scale);
 						rotation_angle = emergency*(_pi/3.f);
 						if (local_movement_direction.k*avoidance_directions[best_avoidance_direction].j -
 							local_movement_direction.j*avoidance_directions[best_avoidance_direction].k > 0.f)
@@ -1786,11 +1792,20 @@ static void actor_move_vector_avoidance(
 				real_vector3d perpendicular;
 				real rotation_angle = 0.f;
 
-				perpendicular.i = 0.f;
-				perpendicular.j = -avoidance_directions[best_avoidance_direction].k;
-				perpendicular.k = avoidance_directions[best_avoidance_direction].j;
-				actor_move_transform_avoidance_vector(&avoidance_data, &perpendicular, &rotation);
 				emergency = emergency_scale;
+
+				/* perpendicular has no forward component, so only its left and up
+				   components are accumulated (January has no forward-axis term and no
+				   call to actor_move_transform_avoidance_vector at this site) */
+				rotation = *global_zero_vector3d;
+				perpendicular.j = -avoidance_directions[best_avoidance_direction].k;
+				rotation.i += perpendicular.j*avoidance_data.left.i;
+				rotation.j += perpendicular.j*avoidance_data.left.j;
+				rotation.k += perpendicular.j*avoidance_data.left.k;
+				perpendicular.k = avoidance_directions[best_avoidance_direction].j;
+				rotation.i += perpendicular.k*avoidance_data.up.i;
+				rotation.j += perpendicular.k*avoidance_data.up.j;
+				rotation.k += perpendicular.k*avoidance_data.up.k;
 				if (normalize3d(&rotation) > 0.f)
 				{
 					rotation_angle = emergency*(_pi/3.f);
@@ -2126,7 +2141,7 @@ void actor_destination_update(
 					if (step_vector.i*actor->input.facing_vector.i + step_vector.j*actor->input.facing_vector.j > 0.f &&
 						distance_along_step < 0.f)
 					{
-						real t = -distance_along_step;
+						double t = -distance_along_step;
 						real_vector2d offset;
 
 						offset.i = step_vector.i*t + to_step.i;
@@ -2213,12 +2228,10 @@ void actor_destination_update(
 			&actor->input.facing_vector,
 			distance,
 			&actor->control.moving_towards_vector);
-		actor->control.moving_towards_point.x =
-			actor->input.position.body_position.x + actor->control.moving_towards_vector.i;
-		actor->control.moving_towards_point.y =
-			actor->input.position.body_position.y + actor->control.moving_towards_vector.j;
-		actor->control.moving_towards_point.z =
-			actor->input.position.body_position.z + actor->control.moving_towards_vector.k;
+		add_vectors3d(
+			(real_vector3d const *)&actor->input.position.body_position,
+			&actor->control.moving_towards_vector,
+			(real_vector3d *)&actor->control.moving_towards_point);
 	}
 	else
 	{
@@ -2999,17 +3012,17 @@ void actor_move_update(
 		actor_definition_get(actor->meta.definition_index);
 	short movement_type;
 	short override_facing;
-	boolean move_in_3d = FALSE;
 	boolean free_movement = FALSE;
+	boolean move_in_3d = FALSE;
 	boolean allow_all_moving_turns = FALSE;
-	boolean allow_jump = FALSE;
-	boolean force_stationary_facing = FALSE;
 	boolean clear_firing_positions = FALSE;
+	boolean force_stationary_facing = FALSE;
+	boolean allow_jump = FALSE;
 	boolean crouch;
 	real free_movement_distance_squared = 0.f;
 	real steering_maximum_angle = 0.f;
-	real oversteer_minimum_angle = 0.f;
 	real oversteer_maximum_angle = 0.f;
+	real oversteer_minimum_angle = 0.f;
 	real rotation_emergency_amount = 0.f;
 	real maximum_throttle = 1.f;
 
@@ -3070,15 +3083,13 @@ void actor_move_update(
 			? 0.3f
 			: 0.05f;
 
-		actor->control.vector_avoidance_rotation.i =
-			actor->control.vector_avoidance_rotation.i * (1.f - blend) +
-			avoidance_rotation.i * blend;
-		actor->control.vector_avoidance_rotation.j =
-			actor->control.vector_avoidance_rotation.j * (1.f - blend) +
-			avoidance_rotation.j * blend;
-		actor->control.vector_avoidance_rotation.k =
-			actor->control.vector_avoidance_rotation.k * (1.f - blend) +
-			avoidance_rotation.k * blend;
+		scale_vector3d(
+			&actor->control.vector_avoidance_rotation,
+			1.f - blend,
+			&actor->control.vector_avoidance_rotation);
+		actor->control.vector_avoidance_rotation.i += avoidance_rotation.i * blend;
+		actor->control.vector_avoidance_rotation.j += avoidance_rotation.j * blend;
+		actor->control.vector_avoidance_rotation.k += avoidance_rotation.k * blend;
 
 		if (magnitude_squared3d(&actor->control.vector_avoidance_rotation) <
 			_real_epsilon)
@@ -3105,9 +3116,7 @@ void actor_move_update(
 				real angle = square_root(angle_squared);
 				real inverse_angle = 1.f / angle;
 
-				rotation.i *= inverse_angle;
-				rotation.j *= inverse_angle;
-				rotation.k *= inverse_angle;
+				scale_vector3d(&rotation, inverse_angle, &rotation);
 				rotate_vector_about_axis(
 					&actor->control.moving_towards_vector,
 					&rotation,
@@ -3153,7 +3162,7 @@ void actor_move_update(
 	actor->output.movement_type = movement_type;
 
 	override_facing = actor->orders.move.override_movement_facing;
-	if (actor->control.path.path.valid &&
+	if (actor_path_has_path(actor_index) &&
 		actor->control.path.destination_original_distance >=
 			definition->moving.stationary_moving_distance)
 	{
@@ -3173,20 +3182,20 @@ void actor_move_update(
 
 		steering_maximum_angle =
 			vehicle_definition->ai_steering_max_angle;
-		oversteer_minimum_angle =
-			vehicle_definition->ai_oversteer_angle_lower_bound;
-		oversteer_maximum_angle =
-			vehicle_definition->ai_oversteer_angle_upper_bound;
 		if (vehicle_definition->ai_steering_max_throttle > 0.f)
 		{
 			maximum_throttle =
 				vehicle_definition->ai_steering_max_throttle;
 		}
+		oversteer_minimum_angle =
+			vehicle_definition->ai_oversteer_angle_lower_bound;
+		oversteer_maximum_angle =
+			vehicle_definition->ai_oversteer_angle_upper_bound;
 
 		switch (actor->input.vehicle_driver_type)
 		{
 		case _actor_vehicle_driver_hovering_ground:
-			if (vehicle->vehicle.airborne_ticks)
+			if (vehicle->vehicle.airborne_ticks > 0)
 			{
 				allow_jump = TRUE;
 				actor->control.moving = FALSE;
@@ -3195,31 +3204,30 @@ void actor_move_update(
 				break;
 			}
 
-			if (vehicle->vehicle.hover < 0.7f &&
-				vehicle->object.up.k < 0.8f)
+			if (vehicle->vehicle.hover < 0.7f)
 			{
-				real_vector3d escape_direction;
-
 				allow_jump = TRUE;
-				set_real_vector3d(
-					&escape_direction,
-					vehicle->object.up.i,
-					vehicle->object.up.j,
-					0.f);
-				if (normalize3d(&escape_direction) > 0.f)
+				if (vehicle->object.up.k < 0.8f)
 				{
-					actor->control.moving = TRUE;
-					scale_vector3d(
-						&escape_direction,
-						3.f,
-						&actor->control.moving_towards_vector);
+					real_vector3d escape_direction;
+
+					escape_direction = vehicle->object.up;
+					escape_direction.k = 0.f;
+					if (normalize3d(&escape_direction) > 0.f)
+					{
+						actor->control.moving = TRUE;
+						scale_vector3d(
+							&escape_direction,
+							3.f,
+							&actor->control.moving_towards_vector);
+					}
+					else
+					{
+						actor->control.moving = FALSE;
+					}
+					crouch = FALSE;
+					break;
 				}
-				else
-				{
-					actor->control.moving = FALSE;
-				}
-				crouch = FALSE;
-				break;
 			}
 
 			/* fall through */
@@ -3306,12 +3314,12 @@ void actor_move_update(
 		real_vector3d grenade_direction;
 
 		actor->control.moving = FALSE;
-		crouch = FALSE;
 		vector_from_points3d(
 			&actor->input.position.body_position,
 			&actor->control.grenade_current_target,
 			&grenade_direction);
-		if (normalize3d(&grenade_direction) > 0.f)
+		crouch = FALSE;
+		if (normalize3d(&grenade_direction) != 0.f)
 		{
 			actor->control.desired_facing_vector = grenade_direction;
 			actor->control.free_facing_vector = FALSE;
@@ -3323,7 +3331,15 @@ void actor_move_update(
 			actor->control.free_facing_vector = TRUE;
 		}
 	}
-	else if (actor->emotions.moving_into_fire_timer <= 0)
+	else if (actor->emotions.moving_into_fire_timer > 0)
+	{
+		actor->control.moving = FALSE;
+		actor->control.free_facing_vector = TRUE;
+		crouch = TEST_FLAG(
+			definition->flags,
+			_actor_definition_crouch_in_line_of_fire_bit);
+	}
+	else
 	{
 		clear_firing_positions = TRUE;
 		if (actor->output.movement_type != _actor_movement_type_combat ||
@@ -3341,22 +3357,14 @@ void actor_move_update(
 
 		if (TEST_FLAG(definition->flags, _actor_definition_flying_bit))
 		{
+			move_in_3d = TRUE;
 			free_movement = TRUE;
 			free_movement_distance_squared =
 				definition->moving.free_flying_sidestep_distance *
 				definition->moving.free_flying_sidestep_distance;
-			move_in_3d = TRUE;
 			if (actor->control.moving_forced_by_aiming)
 				free_movement_distance_squared *= 4.f;
 		}
-	}
-	else
-	{
-		actor->control.moving = FALSE;
-		actor->control.free_facing_vector = TRUE;
-		crouch = TEST_FLAG(
-			definition->flags,
-			_actor_definition_crouch_in_line_of_fire_bit);
 	}
 
 	if (actor->control.moving && !actor->control.movement_complete)
@@ -3434,7 +3442,6 @@ void actor_move_update(
 	actor->control.crouching = crouch;
 	actor_unit_control_crouch(actor_index, crouch);
 
-	actor = actor_get(actor_index);
 	if (!actor_move_animation_busy(actor_index) &&
 		actor->input.vehicle_index == NONE &&
 		!actor->input.in_midair &&
@@ -3525,13 +3532,13 @@ void actor_move_update(
 
 		if (actor->orders.move.jump_targeted)
 		{
-			actor->control.jump_target_horizontal_vel =
-				actor->orders.move.jump_target_horizontal_vel;
 			actor->control.jumping_targeted = TRUE;
-			actor->control.jump_target_vertical_vel =
-				actor->orders.move.jump_target_vertical_vel;
 			actor->control.jump_alignment_vector =
 				actor->orders.move.jump_alignment_vector;
+			actor->control.jump_target_horizontal_vel =
+				actor->orders.move.jump_target_horizontal_vel;
+			actor->control.jump_target_vertical_vel =
+				actor->orders.move.jump_target_vertical_vel;
 		}
 	}
 

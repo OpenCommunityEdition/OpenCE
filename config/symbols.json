@@ -21901,6 +21901,7 @@
 { "file_offset": 2845864, "flags": 0, "name": "_global_actor_type_names" },
 { "file_offset": 2845928, "flags": 0, "name": "_global_updating_actor_index" },
 { "file_offset": 2845936, "flags": 0, "name": "_ai_update_section" },
+{ "file_offset": 2847464, "flags": 0, "name": "_ai_sound_volume_enum_strings", "static": true },
 { "file_offset": 2847484, "flags": 0, "name": "_ai_sound_volume_enum" },
 { "file_offset": 2847496, "flags": 0, "name": "_global_communication_priority_names" },
 { "file_offset": 2847528, "flags": 0, "name": "_global_communication_team_names" },

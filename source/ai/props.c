@@ -572,59 +572,36 @@ long prop_get_active_by_unit_index(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
-	long swarm_actor_index = unit->unit.swarm_actor_index;
-	long target_actor_index;
-	long next_prop_index;
-	long prop_index;
-	struct actor_datum *actor;
+	long target_actor_index = unit->unit.swarm_actor_index != NONE ?
+		unit->unit.swarm_actor_index :
+		unit->unit.actor_index;
+	struct prop_iterator iterator;
+	struct prop_datum *prop;
+	long result = NONE;
 
-	if (swarm_actor_index != NONE)
+	prop_iterator_new(&iterator, actor_index);
+	while ((prop = prop_iterator_next(&iterator)) != NULL)
 	{
-		target_actor_index = swarm_actor_index;
-	}
-	else
-	{
-		target_actor_index = unit->unit.actor_index;
-	}
-
-	actor = actor_get(actor_index);
-	next_prop_index = actor->meta.first_prop_index;
-	while (TRUE)
-	{
-		struct prop_datum *prop;
-
-		prop_index = next_prop_index;
-		if (next_prop_index == NONE)
-		{
-			return NONE;
-		}
-
-		prop = prop_get(next_prop_index);
-		next_prop_index = prop->next_prop_index;
 		if (prop->state >= _prop_state_unacknowledged &&
 			prop->state <= _prop_state_becoming_acknowledged)
 		{
 			continue;
 		}
-		if (prop->unit_index == unit_index)
+		if (prop->unit_index == unit_index ||
+			(prop->swarm &&
+			 prop->actor_index != NONE &&
+			 prop->actor_index == target_actor_index))
 		{
-			return prop_index;
+			break;
 		}
-		if (!prop->swarm)
-		{
-			continue;
-		}
-		if (prop->actor_index == NONE)
-		{
-			continue;
-		}
-		if (prop->actor_index != target_actor_index)
-		{
-			continue;
-		}
-
-		return prop_index;
 	}
+
+	if (prop != NULL)
+	{
+		result = iterator.index;
+	}
+
+	return result;
 }
 
 long prop_get_base_by_unit_index(

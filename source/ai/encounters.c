@@ -2234,8 +2234,12 @@ void encounter_create(
 				}
 				// fall through
 			case _unique_leader_type_random:
-				if (actor_type == _actor_marine)
+				switch (actor_type)
+				{
+				case _actor_marine:
 					initial_variant = 100 + random_range(0, 2);
+					break;
+				}
 				break;
 			case _unique_leader_type_sergeant_johnson:
 				if (actor_type == _actor_marine)

@@ -45,6 +45,24 @@ AI_DEBUG.C
 
 /* ---------- macros */
 
+/* INFERRED FROM JANUARY'S BYTES - not attested in any surviving source.
+ * The label for an attractor node is drawn 0.15 world units above the node's
+ * point.  January's bytes require the offset to be a parenthesised group at
+ * the call, which a bare `point_height+0.15f` argument does not produce; a
+ * whole-argument parenthesised SUM occurs nowhere else in the tree, so the
+ * group is expressed here as a named macro rather than as loose parentheses.
+ * Measured on _code_00039990 with everything else held constant:
+ *
+ *     point_height+0.15f                    residual [sha]
+ *     (point_height+0.15f)                  EXACT
+ *     ((point_height)+(0.15f))              EXACT
+ *     ai_debug_attractor_label_height(...)  EXACT   <- this spelling
+ *
+ * The macro also names what the 0.15f is, which the bare sum did not.
+ */
+#define ai_debug_attractor_label_height(height)		\
+	((height)+0.15f)
+
 #define actor_debug_print_threat(actor, threat_type, string, color)		\
 if (actor->situation.specific_threats[threat_type])						\
 {																		\
@@ -654,7 +672,11 @@ static void code_00039990(
 
 		render_debug_point(TRUE, &node->closest_point_to_attractor, 0.15f, attractor_color);
 
-		point_from_line3d(&point, global_up3d, point_height+0.15f, &point);
+		point_from_line3d(
+			&point,
+			global_up3d,
+			ai_debug_attractor_label_height(point_height),
+			&point);
 
 		render_debug_string_at_point(TRUE, &point,
 			csprintf(temporary, "%.1f", node->closest_distance_to_attractor),
@@ -1075,7 +1097,7 @@ static void ai_debug_render_actor(
 										temporary,
 										"%.3f",
 										actor_debug_info->avoid_t[i][j]),
-									global_real_argb_blue);
+									color);
 							}
 						}
 						else
@@ -1085,7 +1107,7 @@ static void ai_debug_render_actor(
 								&actor_debug_info->field_6358[i][j],
 								&actor_debug_info->field_6418[i][j],
 								1.f,
-								color);
+								global_real_argb_blue);
 
 							if (ai_debug.render_vector_avoidance_clear_time)
 							{
@@ -1188,13 +1210,14 @@ static void ai_debug_render_actor(
 
 				for (avoidance_object_index = 0; avoidance_object_index<actor_debug_info->avoidance_data.avoidance_object_count; ++avoidance_object_index)
 				{
+					struct vehicle_avoidance_cylinder *cylinder = &actor_debug_info->avoidance_data.avoidance_objects[avoidance_object_index];
 					real_vector3d height;
-					set_real_vector3d(&height, 0.f, 0.f, actor_debug_info->avoidance_data.avoidance_objects[avoidance_object_index].height);
+					set_real_vector3d(&height, 0.f, 0.f, cylinder->height);
 					render_debug_pill(
 						TRUE,
-						&actor_debug_info->avoidance_data.avoidance_objects[avoidance_object_index].base,
+						&cylinder->base,
 						&height,
-						actor_debug_info->avoidance_data.avoidance_objects[avoidance_object_index].width,
+						cylinder->width,
 						global_real_argb_aqua);
 				}
 			}
@@ -2005,6 +2028,7 @@ static void ai_debug_render_actor(
 		{
 			if (actor->meta.unit_index!=NONE)
 			{
+				real_point3d *head_position = &actor->input.position.head_position;
 				real_point3d p0;
 				real_point3d p1;
 				real_vector3d forward;
@@ -2022,9 +2046,9 @@ static void ai_debug_render_actor(
 				point_from_line3d(&p1, global_up3d, 0.03f, &p1);
 				render_debug_line(TRUE, &p0, &p1, global_real_argb_cyan);
 				
-				p0.x = actor->input.position.head_position.x-global_up3d->i*0.04f;
-				p0.y = actor->input.position.head_position.y-global_up3d->j*0.04f;
-				p0.z = actor->input.position.head_position.z-global_up3d->k*0.04f;
+				p0.x = head_position->x-global_up3d->i*0.04f;
+				p0.y = head_position->y-global_up3d->j*0.04f;
+				p0.z = head_position->z-global_up3d->k*0.04f;
 				unit_get_facing_vector(actor->meta.unit_index, &forward);
 				
 				render_debug_vector(TRUE, &p0, &forward, 1.f, global_real_argb_red);
@@ -2046,24 +2070,17 @@ static void ai_debug_render_actor(
 						real_vector3d up;
 
 						biped_build_flying_axes(&forward, &left, &up);
-						throttle_vector.i = forward.i*actor->output.throttle.i +
-							left.i*actor->output.throttle.j + up.i*actor->output.throttle.k;
-						throttle_vector.j = forward.j*actor->output.throttle.i +
-							left.j*actor->output.throttle.j + up.j*actor->output.throttle.k;
-						throttle_vector.k = forward.k*actor->output.throttle.i +
-							left.k*actor->output.throttle.j + up.k*actor->output.throttle.k;
+						scale_vector3d(&forward, actor->output.throttle.i, &throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &left, actor->output.throttle.j, (real_point3d *)&throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &up, actor->output.throttle.k, (real_point3d *)&throttle_vector);
 					}
 					else
 					{
 						real_vector3d v;
 
 						set_real_vector3d(&v, -forward.j, forward.i, 0.f);
-						throttle_vector.i = forward.i*actor->output.throttle.i +
-							v.i*actor->output.throttle.j;
-						throttle_vector.j = forward.j*actor->output.throttle.i +
-							v.j*actor->output.throttle.j;
-						throttle_vector.k = forward.k*actor->output.throttle.i +
-							v.k*actor->output.throttle.j;
+						scale_vector3d(&forward, actor->output.throttle.i, &throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &v, actor->output.throttle.j, (real_point3d *)&throttle_vector);
 					}
 
 					point_from_line3d(&actor->input.position.body_position, global_up3d, 0.1f, &p0);
@@ -2081,14 +2098,9 @@ static void ai_debug_render_actor(
 			real_vector3d *gun_offset = NULL;
 			real_argb_color const *color = global_real_argb_red;
 			real_vector3d desired_facing = actor->input.aiming_vector;
-			real_vector2d desired_facing_horizontal;
 
-			desired_facing_horizontal.i = desired_facing.i;
-			desired_facing_horizontal.j = desired_facing.j;
-			if (normalize2d(&desired_facing_horizontal)>0.f)
+			if (normalize2d((real_vector2d *)&desired_facing)>0.f)
 			{
-				desired_facing.i = desired_facing_horizontal.i;
-				desired_facing.j = desired_facing_horizontal.j;
 				desired_facing.k = 0.f;
 			}
 			else
@@ -2159,7 +2171,7 @@ static void ai_debug_render_actor(
 			struct prop_datum *prop = prop_get(actor->target.target_prop_index);
 			real_argb_color const *target_color = global_real_argb_white;
 
-			switch (actor->target.target_type-1)
+			switch (actor->target.target_type)
 			{
 			case _actor_target_partial_enemy:
 				target_color = global_real_argb_grey;
@@ -2278,7 +2290,7 @@ static void ai_debug_render_actor(
 			switch (actor->state.action)
 			{
 			case _actor_action_flee:
-				if (actor->state.action_data.flee.has_approach_point>0)
+				if (actor->state.action_data.flee.has_approach_point)
 				{
 					render_debug_sphere(TRUE, &actor->state.action_data.flee.approach_point, 0.25f, actor_action_debug_color(actor_index));
 				}
@@ -3040,7 +3052,7 @@ static void ai_debug_render_actor(
 		{
 			short control_flag_bit;
 
-			const char *control_flag_names[NUMBER_OF_UNIT_CONTROL_FLAGS] =
+			const char *control_flag_names[] =
 			{
 				"crouch",
 				"jump",
@@ -3058,7 +3070,7 @@ static void ai_debug_render_actor(
 				"grenade"
 			};
 
-			short flag_count = NUMBER_OF_UNIT_CONTROL_FLAGS;
+			short flag_count = NUMBEROF(control_flag_names);
 			short count = 0;
 
 			strcpy(temporary, "");
@@ -3072,7 +3084,7 @@ static void ai_debug_render_actor(
 						strcat(temporary, " ");
 					}
 
-					if (control_flag_bit<NUMBER_OF_UNIT_CONTROL_FLAGS)
+					if (control_flag_bit<flag_count)
 					{
 						strcat(temporary, control_flag_names[control_flag_bit]);
 					}
@@ -3106,7 +3118,7 @@ static void ai_debug_render_actor(
 						csstrcat(temporary, " ");
 					}
 
-					if (control_flag_bit<NUMBER_OF_UNIT_CONTROL_FLAGS)
+					if (control_flag_bit<flag_count)
 					{
 						strcat(temporary, control_flag_names[control_flag_bit]);
 					}
@@ -3174,7 +3186,9 @@ static void ai_debug_render_actor(
 
 				point_from_line3d(&actor->input.position.body_position, global_up3d, 0.2f, &base_point);
 				
-				alignment_vector_3d = actor->control.current_fire_target_aim_vector;
+				alignment_vector_3d.i = actor->output.animation.alignment_vector.i;
+				alignment_vector_3d.j = actor->output.animation.alignment_vector.j;
+				alignment_vector_3d.k = 0.f;
 
 				render_debug_string_at_point(
 					TRUE,
@@ -3225,26 +3239,19 @@ static void ai_debug_render_actor(
 						real_vector3d up_vector;
 
 						biped_build_flying_axes(&facing_vector, &left_vector, &up_vector);
-						throttle_vector.i = facing_vector.i*actor->output.throttle.i +
-							left_vector.i*actor->output.throttle.j + up_vector.i*actor->output.throttle.k;
-						throttle_vector.j = facing_vector.j*actor->output.throttle.i +
-							left_vector.j*actor->output.throttle.j + up_vector.j*actor->output.throttle.k;
-						throttle_vector.k = facing_vector.k*actor->output.throttle.i +
-							left_vector.k*actor->output.throttle.j + up_vector.k*actor->output.throttle.k;
+						scale_vector3d(&facing_vector, actor->output.throttle.i, &throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &left_vector, actor->output.throttle.j, (real_point3d *)&throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &up_vector, actor->output.throttle.k, (real_point3d *)&throttle_vector);
 					}
 					else
 					{
 						set_real_vector3d(&right_facing_vector, -facing_vector.j, facing_vector.i, 0.f);
-						throttle_vector.i = facing_vector.i*actor->output.throttle.i +
-							right_facing_vector.i*actor->output.throttle.j;
-						throttle_vector.j = facing_vector.j*actor->output.throttle.i +
-							right_facing_vector.j*actor->output.throttle.j;
-						throttle_vector.k = facing_vector.k*actor->output.throttle.i +
-							right_facing_vector.k*actor->output.throttle.j;
+						scale_vector3d(&facing_vector, actor->output.throttle.i, &throttle_vector);
+						point_from_line3d((real_point3d *)&throttle_vector, &right_facing_vector, actor->output.throttle.j, (real_point3d *)&throttle_vector);
 					}
 
 					point_from_line3d(&actor->input.position.body_position, global_up3d, 0.1f, &p0);
-					render_debug_vector(TRUE, &p0, &throttle_vector, 1.6f, global_real_argb_purple);
+					render_debug_vector(TRUE, &p0, &throttle_vector, 1.f, global_real_argb_purple);
 				}
 			}
 		}
@@ -3329,14 +3336,14 @@ static void ai_debug_render_actor(
 				render_debug_line(TRUE, &p0, &p2, global_real_argb_green);
 			}
 
-			if (actor_debug_info->field_138)
-			{
-				render_debug_vector(TRUE, &actor_debug_info->field_108, &actor_debug_info->field_12C, 2.f, actor_debug_info->field_139 ? global_real_argb_yellow : global_real_argb_purple);
-			}
-			else
-			{
-				render_debug_vector(TRUE, &actor_debug_info->field_108, &actor_debug_info->field_12C, 2.f, global_real_argb_white);
-			}
+			render_debug_vector(
+				TRUE,
+				&actor_debug_info->field_108,
+				&actor_debug_info->field_12C,
+				2.f,
+				actor_debug_info->field_138 ?
+					(actor_debug_info->field_139 ? global_real_argb_yellow : global_real_argb_purple) :
+					global_real_argb_white);
 		}
 
 		/* Vehicle avoidance */
@@ -3357,7 +3364,7 @@ static void ai_debug_render_actor(
 			p1 = actor_debug_info->field_E4;
 			p0 = p1;
 
-			p0.x = p1.x - 0.2f;
+			p0.x = p0.x - 0.2f;
 			p1.x = p1.x + 0.2f;
 			render_debug_line(TRUE, &p0, &p1, global_real_argb_red);
 			
@@ -3403,7 +3410,7 @@ static void ai_debug_render_actor(
 				p1 = actor_debug_info->field_F8;
 				p0 = p1;
 				
-				p0.x = p1.x - 0.2f;
+				p0.x = p0.x - 0.2f;
 				p1.x = p1.x + 0.2f;
 				render_debug_line(TRUE, &p0, &p1, global_real_argb_blue);
 				
@@ -3433,7 +3440,7 @@ static void ai_debug_render_actor(
 			p1 = actor_debug_info->field_64;
 			p0 = p1;
 			
-			p0.x = p1.x - 0.2f;
+			p0.x = p0.x - 0.2f;
 			p1.x = p1.x + 0.2f;
 			render_debug_line(TRUE, &p0, &p1, global_real_argb_blue);
 			
@@ -3497,12 +3504,10 @@ static void ai_debug_render_actor(
 					global_real_argb_purple);
 			}
 
-			p1.x = actor->control.desired_aiming_vector.i;
-			p1.y = actor->control.desired_aiming_vector.j;
-			p1.z = actor->control.desired_aiming_vector.k;
+			p1 = actor->control.burst_origin;
 			p0 = p1;
 
-			p0.x = p1.x - 0.2f;
+			p0.x = p0.x - 0.2f;
 			p1.x = p1.x + 0.2f;
 			render_debug_line(TRUE, &p0, &p1, global_real_argb_blue);
 			
@@ -3563,8 +3568,7 @@ static void ai_debug_render_actor(
 			{
 				real_vector3d direction_vector[2][2];
 				real_point3d current_points[2][2][2];
-				real full_distance_reference[2];
-				real partial_distance_reference;
+				real distance_references[2]; /* [0] full, [1] partial: both filled by actor_get_vision_distances */
 
 				short side_index;
 				short ring_index;
@@ -3598,7 +3602,7 @@ static void ai_debug_render_actor(
 					}
 				}
 
-				actor_get_vision_distances(actor_index, max_distance, perception_factor, horizontal_angle, full_distance_reference, &partial_distance_reference);
+				actor_get_vision_distances(actor_index, max_distance, perception_factor, horizontal_angle, &distance_references[0], &distance_references[1]);
 			
 				for (side_index = 0; side_index < 2; ++side_index)
 				{
@@ -3609,7 +3613,7 @@ static void ai_debug_render_actor(
 							point_from_line3d(
 								&actor->input.position.head_position,
 								&direction_vector[ring_index][height_index],
-								full_distance_reference[side_index],
+								distance_references[side_index],
 								&current_points[side_index][ring_index][height_index]);
 
 							if (angle_itr>0.f || ring_index==0)
@@ -3757,7 +3761,7 @@ static void ai_debug_render_actor(
 				render_debug_line_offset(
 					TRUE,
 					&actor->input.position.body_position,
-					&actor->control.path.path.steps[actor->control.path.path.step_index].point,
+					&actor->control.path.path.steps[first_index].point,
 					color,
 					0.1f);
 
@@ -3788,50 +3792,49 @@ static void ai_debug_render_actor(
 					point_from_line3d(&actor->control.path.path.endpoint.point, global_up3d, 0.1f, &endpoint);
 					render_debug_sphere(TRUE, &endpoint, 0.15f, color);
 				}
+			}
 
-				if (actor_path_has_path(actor_index))
-				{
-					sprintf(
-						temporary,
-						"following path (%d/%d%s)",
-						actor->control.path.path.step_index,
-						actor->control.path.path.step_count,
-						actor_path_at_destination(actor_index) ? " (at destination)" : "");
-				}
-				else
-				{
-					strcpy(temporary, "no current path");
-				}
+			if (actor_path_has_path(actor_index))
+			{
+				sprintf(
+					temporary,
+					"following path (%d/%d%s)",
+					actor->control.path.path.step_index,
+					actor->control.path.path.step_count,
+					actor_path_at_destination(actor_index) ? " (at destination)" : "");
+			}
+			else
+			{
+				strcpy(temporary, "no current path");
+			}
 
-				if (actor->emotions.ignorant_of_broken_surfaces)
-				{
-					strcat(temporary, " [ignorant]");
-				}
+			if (actor->emotions.ignorant_of_broken_surfaces)
+			{
+				strcat(temporary, " [ignorant]");
+			}
 
-				render_debug_string_at_point(TRUE, ai_debug_drawstack(), temporary, global_real_argb_orange);
+			render_debug_string_at_point(TRUE, ai_debug_drawstack(), temporary, global_real_argb_orange);
+			
+			if (actor_debug_info->last_path_refresh==NONE || actor_debug_info->last_path_refresh+150 < game_time_get())
+			{
+				render_debug_string_at_point(TRUE, ai_debug_drawstack(), "not refreshing path", global_real_argb_blue);
+			}
+			else
+			{
+				render_debug_string_at_point(
+					TRUE,
+					ai_debug_drawstack(),
+					csprintf(temporary, "path refreshed (%d)", game_time_get()-actor_debug_info->last_path_refresh),
+					global_real_argb_blue);
 				
-				if (actor_debug_info->last_path_refresh==NONE || actor_debug_info->last_path_refresh+150 < game_time_get())
+				if (path && path->valid)
 				{
-					render_debug_string_at_point(TRUE, ai_debug_drawstack(), "not refreshing path", global_real_argb_blue);
+					ai_debug_render_path_storage(path);
 				}
 				else
 				{
-					render_debug_string_at_point(
-						TRUE,
-						ai_debug_drawstack(),
-						csprintf(temporary, "path refreshed (%d)", game_time_get()-actor_debug_info->last_path_refresh),
-						global_real_argb_blue);
-					
-					if (path && path->valid)
-					{
-						ai_debug_render_path_storage(path);
-					}
-					else
-					{
-						render_debug_string_at_point(TRUE, ai_debug_drawstack(), "path debugging not available", global_real_argb_red);
-					}
+					render_debug_string_at_point(TRUE, ai_debug_drawstack(), "path debugging not available", global_real_argb_red);
 				}
-
 			}
 		}
 
@@ -3933,6 +3936,7 @@ static void code_0003a910(
 								struct collision_surface);
 							long edge_index = surface->first_edge_index;
 							long vertex_count = 0;
+							real scale;
 
 							do
 							{
@@ -3945,18 +3949,20 @@ static void code_0003a910(
 									edge->vertex_indices[next_index_belongs_to_surface],
 									struct collision_vertex);
 
-								centre.x += vertex->point.x;
-								centre.y += vertex->point.y;
-								centre.z += vertex->point.z;
+								add_vectors3d(
+									(real_vector3d const *)&centre,
+									(real_vector3d const *)&vertex->point,
+									(real_vector3d *)&centre);
 								vertex_count++;
 
 								edge_index = edge->edge_indices[next_index_belongs_to_surface];
 							}
 							while (edge_index!=surface->first_edge_index);
 
-							centre.x /= vertex_count;
-							centre.y /= vertex_count;
-							centre.z /= vertex_count;
+							scale = 1.0f / vertex_count;
+							centre.x *= scale;
+							centre.y *= scale;
+							centre.z *= scale;
 
 							point = &centre;
 						}

@@ -316,6 +316,19 @@ enum
 
 #define AI_SPATIAL_EFFECT_NEXT_INDEX(index) (((index) + 1) & (MAXIMUM_AI_SPATIAL_EFFECTS - 1))
 
+/* A spherical line of fire pill's width is the radius of its sphere.
+   The distinction is Bungie's own: real_math.h:409 names this callee's fourth
+   parameter `radius`, while vector_intersects_pill3d's fifth parameter at
+   real_math.h:536 is `pill_width`. The accessor records that distinction at the
+   one site where the sphere reading applies.
+   INFERRED FROM JANUARY'S BYTES, not attested: in January only the spherical
+   arm pushes the radius through the x87 (fld dword [ebp+eax-0x4e4] / push ecx /
+   fstp dword [esp]) while the pill arm integer copies the same field (mov edx,
+   dword [ebp+eax-0x4e4] / push edx). Spelling both arms as a bare field read
+   makes the two pushes identical, so VC7 hoists the common push above the je
+   and the function comes out six bytes short of January's 327. */
+#define LINE_OF_FIRE_PILL_SPHERE_RADIUS(pill) ((pill).width)
+
 /* ---------- structures */
 
 struct ai_spatial_effect
@@ -490,7 +503,7 @@ extern struct ai_globals_data *ai_globals;
 
 static struct profile_section ai_update_section = { "ai_update", NONE, TRUE };
 
-static char *ai_sound_volume_names[NUMBER_OF_AI_SOUND_VOLUMES] =
+static char *ai_sound_volume_enum_strings[NUMBER_OF_AI_SOUND_VOLUMES] =
 {
 	"silent",
 	"medium",
@@ -502,7 +515,7 @@ static char *ai_sound_volume_names[NUMBER_OF_AI_SOUND_VOLUMES] =
 struct tag_enum_definition ai_sound_volume_enum =
 {
 	NUMBER_OF_AI_SOUND_VOLUMES,
-	ai_sound_volume_names,
+	ai_sound_volume_enum_strings,
 	NULL
 };
 
@@ -2237,7 +2250,7 @@ boolean ai_test_line_of_fire(
 					origin,
 					vector,
 					&pills[pill_index].base,
-					pills[pill_index].width);
+					LINE_OF_FIRE_PILL_SPHERE_RADIUS(pills[pill_index]));
 			}
 			else
 			{
@@ -2251,8 +2264,8 @@ boolean ai_test_line_of_fire(
 
 			if (intersected)
 			{
-				blocking_prop_index = pills[pill_index].prop_index;
 				line_of_fire = FALSE;
+				blocking_prop_index = pills[pill_index].prop_index;
 				pills[pill_index].hit = TRUE;
 				break;
 			}
@@ -2282,24 +2295,24 @@ boolean ai_test_line_of_fire(
 }
 
 short ai_test_line_of_sight(
-	real_point3d const *point0,
-	short cluster0,
-	real_point3d const *point1,
-	short cluster1,
+	real_point3d const *p0,
+	short p0_cluster_index,
+	real_point3d const *p1,
+	short p1_cluster_index,
 	short mode,
 	boolean test_line_of_fire,
 	long ignore_object_index,
 	boolean ignore_vehicles)
 {
 	struct collision_result collision;
-	real collision_fraction = 1.0f;
+	real collision_t = 1.0f;
 	unsigned long collision_flags;
 	boolean clear_line_of_sight;
 	boolean blocked;
 	short result;
 
 	if (ai_debug.render_lineofsight)
-		ai_debug_lineofsight(point0, cluster0, point1, cluster1);
+		ai_debug_lineofsight(p0, p0_cluster_index, p1, p1_cluster_index);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\ai.c",
@@ -2309,7 +2322,7 @@ short ai_test_line_of_sight(
 		_collision_user_ai_lineofsight;
 	ai_profile.meters[_ai_meter_line_of_sight].accumulator++;
 
-	if (cluster0 != NONE && cluster1 != NONE && !scenario_test_pvs(cluster0, cluster1))
+	if (p0_cluster_index != NONE && p1_cluster_index != NONE && !scenario_test_pvs(p0_cluster_index, p1_cluster_index))
 		goto obstructed;
 
 	collision_flags =
@@ -2339,11 +2352,11 @@ short ai_test_line_of_sight(
 		real_vector3d vector;
 
 		ai_profile.meters[_ai_meter_collisions].accumulator++;
-		vector_from_points3d(point0, point1, &vector);
+		vector_from_points3d(p0, p1, &vector);
 
 		if (!collision_test_vector(
 			collision_flags,
-			point0,
+			p0,
 			&vector,
 			ignore_object_index,
 			&collision))
@@ -2353,14 +2366,14 @@ short ai_test_line_of_sight(
 		else
 		{
 			clear_line_of_sight = FALSE;
-			collision_fraction = collision.t;
+			collision_t = collision.t;
 		}
 	}
 
 	{
 		real fog = scenario_fog_at_point(
 			&collision.start_location,
-			point0,
+			p0,
 			&collision.point);
 
 		if (fog > 0.8f)
@@ -2376,8 +2389,8 @@ short ai_test_line_of_sight(
 	{
 		real_vector3d perpendicular;
 
-		perpendicular.i = point0->y - point1->y;
-		perpendicular.j = point1->x - point0->x;
+		perpendicular.i = p0->y - p1->y;
+		perpendicular.j = p1->x - p0->x;
 		perpendicular.k = 0.0f;
 
 		if (normalize3d(&perpendicular) == 0.0f)
@@ -2385,23 +2398,23 @@ short ai_test_line_of_sight(
 
 		if (mode == _ai_line_of_sight_expand_source)
 		{
-			real_point3d right;
-			real_point3d left;
+			real_point3d p0a;
+			real_point3d p0b;
 
-			right.x = perpendicular.i * 0.25f + point0->x;
-			right.y = perpendicular.j * 0.25f + point0->y;
-			right.z = perpendicular.k * 0.25f + point0->z;
-			left.x = point0->x - perpendicular.i * 0.25f;
-			left.y = point0->y - perpendicular.j * 0.25f;
-			left.z = point0->z - perpendicular.k * 0.25f;
+			p0a.x = perpendicular.i * 0.25f + p0->x;
+			p0a.y = perpendicular.j * 0.25f + p0->y;
+			p0a.z = perpendicular.k * 0.25f + p0->z;
+			p0b.x = p0->x - perpendicular.i * 0.25f;
+			p0b.y = p0->y - perpendicular.j * 0.25f;
+			p0b.z = p0->z - perpendicular.k * 0.25f;
 
 			ai_profile.meters[_ai_meter_collisions].accumulator++;
 			if (clear_line_of_sight)
 			{
 				blocked = collision_test_line(
 					collision_flags,
-					&right,
-					point1,
+					&p0a,
+					p1,
 					ignore_object_index,
 					&collision);
 
@@ -2410,8 +2423,8 @@ short ai_test_line_of_sight(
 					ai_profile.meters[_ai_meter_collisions].accumulator++;
 					blocked = collision_test_line(
 						collision_flags,
-						&left,
-						point1,
+						&p0b,
+						p1,
 						ignore_object_index,
 						&collision);
 				}
@@ -2420,8 +2433,8 @@ short ai_test_line_of_sight(
 			{
 				blocked = !collision_test_line(
 					collision_flags,
-					&right,
-					point1,
+					&p0a,
+					p1,
 					ignore_object_index,
 					&collision);
 
@@ -2430,8 +2443,8 @@ short ai_test_line_of_sight(
 					ai_profile.meters[_ai_meter_collisions].accumulator++;
 					blocked = !collision_test_line(
 						collision_flags,
-						&left,
-						point1,
+						&p0b,
+						p1,
 						ignore_object_index,
 						&collision);
 				}
@@ -2439,22 +2452,22 @@ short ai_test_line_of_sight(
 		}
 		else
 		{
-			real_point3d right;
-			real_point3d left;
-			real_point3d down;
+			real_point3d p1a;
+			real_point3d p1b;
+			real_point3d p1c;
 
 			if (!clear_line_of_sight)
 				goto classify_collision_distance;
 
-			point_from_line3d(point1, &perpendicular, 0.1f, &right);
-			point_from_line3d(point1, &perpendicular, -0.1f, &left);
-			point_from_line3d(point1, global_down3d, 0.1f, &down);
+			point_from_line3d(p1, &perpendicular, 0.1f, &p1a);
+			point_from_line3d(p1, &perpendicular, -0.1f, &p1b);
+			point_from_line3d(p1, global_down3d, 0.1f, &p1c);
 
 			ai_profile.meters[_ai_meter_collisions].accumulator++;
 			blocked = collision_test_line(
 				collision_flags,
-				&right,
-				point0,
+				&p1a,
+				p0,
 				ignore_object_index,
 				&collision);
 
@@ -2463,8 +2476,8 @@ short ai_test_line_of_sight(
 				ai_profile.meters[_ai_meter_collisions].accumulator++;
 				blocked = collision_test_line(
 					collision_flags,
-					&left,
-					point0,
+					&p1b,
+					p0,
 					ignore_object_index,
 					&collision);
 			}
@@ -2474,8 +2487,8 @@ short ai_test_line_of_sight(
 				ai_profile.meters[_ai_meter_collisions].accumulator++;
 				blocked = collision_test_line(
 					collision_flags,
-					&down,
-					point0,
+					&p1c,
+					p0,
 					ignore_object_index,
 					&collision);
 			}
@@ -2494,19 +2507,19 @@ classify_visibility:
 
 classify_collision_distance:
 	{
-		real distance = distance3d(point0, point1);
+		real distance = distance3d(p0, p1);
 
 		if (distance < 1.0f)
 			goto obstructed;
 
-		if (distance * collision_fraction < 1.0f)
+		if (distance * collision_t < 1.0f)
 		{
 			result = _ai_line_of_sight_from_cover;
 			goto finish;
 		}
 
 		result = _ai_line_of_sight_to_cover;
-		if ((1.0f - collision_fraction) * distance < 4.0f)
+		if ((1.0f - collision_t) * distance < 4.0f)
 			goto finish;
 	}
 
@@ -2544,7 +2557,6 @@ boolean ai_test_ballistic_line_of_fire(
 	real_vector3d arc_velocity;
 	real segment_start_time;
 	real segment_end_time;
-	real segment_time;
 	unsigned long collision_flags;
 	short pill_count;
 	short pill_index;
@@ -2604,12 +2616,14 @@ boolean ai_test_ballistic_line_of_fire(
 			ai_debug.ballistic_lineoffire_point_count++;
 		}
 
-		segment_time = segment_end_time - segment_start_time;
+		{
+			real segment_time = segment_end_time - segment_start_time;
 
-		end_point.x = arc_velocity.i * segment_time + point.x;
-		end_point.y = arc_velocity.j * segment_time + point.y;
-		end_point.z = segment_time * arc_velocity.k + point.z +
-			(segment_time * segment_time) * gravity * 0.5f;
+			end_point.x = arc_velocity.i * segment_time + point.x;
+			end_point.y = arc_velocity.j * segment_time + point.y;
+			end_point.z = (segment_time * arc_velocity.k + point.z) +
+				(segment_time * segment_time) * gravity * 0.5f;
+		}
 
 		{
 			real_vector3d segment_vector;
@@ -2652,7 +2666,7 @@ boolean ai_test_ballistic_line_of_fire(
 			break;
 
 		point = end_point;
-		arc_velocity.k = segment_time * gravity + arc_velocity.k;
+		arc_velocity.k = (segment_end_time - segment_start_time) * gravity + arc_velocity.k;
 		segment_start_time = segment_end_time;
 		segment_end_time += 6.0f;
 

@@ -396,6 +396,44 @@ enum
 #define actor_perception_audibility_combat_status(actor) \
 	((actor)->state.mode)
 
+/* INFERRED FROM JANUARY'S BYTES. This macro is not attested in any surviving
+ * header or source; it is reconstructed because January's object requires the
+ * canonical macro expansion ((a) * (a)) at the actor_perception_refresh call
+ * site, and no simpler spelling of the square reaches it. Measured, with the
+ * rest of the function held constant:
+ *
+ *     prop->distance * prop->distance          residual
+ *     (prop->distance) * (prop->distance)      residual
+ *     (prop->distance * prop->distance)        residual
+ *     bind a local first, (distance * distance)  residual
+ *     ((prop->distance) * (prop->distance))    EXACT
+ *
+ * A hand-written expression does not produce the doubly-parenthesised form;
+ * a correctly written macro produces it inevitably, so the byte evidence is
+ * itself the argument that a macro stood here. It is kept translation-unit
+ * private and named to match its sibling below.
+ *
+ * actor_emotion_unopposable_retreat's friend-target square is a second use,
+ * and its evidence is WEAKER than at the site above. Measured with the rest
+ * of that function held constant, d being friend_target_prop->distance:
+ *
+ *     d * d                                    residual (size 1280)
+ *     (d * d)                                  residual (size 1280)
+ *     (d) * (d)                                EXACT
+ *     ((d) * (d))   this macro's expansion     EXACT
+ *
+ * Parenthesised operands are what January requires. Unlike the site above,
+ * the hand-written single-parenthesis form ALSO matches here, so this site on
+ * its own does not prove that a macro stood there. The macro is used here by
+ * owner ruling (2026-09-20) because it is the admitted spelling of this
+ * square. Mechanism: written as d * d, VC7 computes the product ahead of the
+ * target->count increment and folds the minimum-distance compare into an
+ * indexed operand; with parenthesised operands it places the increment first
+ * and compares through the bound target pointer, as January does.
+ */
+#define actor_perception_distance_squared(distance) \
+	((distance) * (distance))
+
 #define actor_perception_distance_squared2d(a, b, delta_x, delta_y) \
 	((delta_x) = (b)->x - (a)->x, \
 		(delta_y) = (b)->y - (a)->y, \
@@ -817,6 +855,20 @@ struct actor_perception_refresh_locals
 	byte __unknown031[3];
 	unsigned long *cluster_pvs;
 };
+
+/* These two make the out-of-bounds read in actor_emotion_update analysable
+ * rather than merely undefined: specific_threats holds exactly
+ * NUMBER_OF_ACTOR_THREAT_TYPES elements, and cumulative_threats begins
+ * immediately after it, so specific_threats[NUMBER_OF_ACTOR_THREAT_TYPES] is
+ * cumulative_threats[_actor_threat_none] and nothing else. If either ever stops
+ * holding, that read stops being harmless and this file stops compiling. */
+typedef char actor_perception_specific_threats_size_assert[
+	sizeof(((struct actor_situation *)0)->specific_threats) ==
+		NUMBER_OF_ACTOR_THREAT_TYPES ? 1 : -1];
+typedef char actor_perception_threat_arrays_adjacent_assert[
+	offsetof(struct actor_situation, cumulative_threats) ==
+		offsetof(struct actor_situation, specific_threats) +
+			NUMBER_OF_ACTOR_THREAT_TYPES ? 1 : -1];
 
 typedef char actor_perception_actor_view_target_prop_index_offset_assert[
 	offsetof(struct actor_perception_actor_view, target_prop_index) == 0x270 ? 1 : -1];
@@ -1296,7 +1348,17 @@ boolean actor_perception_desire_prop(
 			if (!enemy && actor->state.mode < 3)
 				maximum_distance_squared = 64.0f;
 
-			desire = distance_squared < maximum_distance_squared;
+			/* INFERRED FROM JANUARY'S BYTES: the explicit branch, not
+			 * `desire = distance_squared < maximum_distance_squared;`, is what
+			 * gives this else-if arm its own cross-jump resolution. It also
+			 * matches the three sibling arms above, which assign TRUE/FALSE
+			 * literals, and the branchy form used on this same variable in the
+			 * inactive-encounter block. Required jointly with the squared-distance
+			 * macro; neither reaches January alone. */
+			if (distance_squared < maximum_distance_squared)
+				desire = TRUE;
+			else
+				desire = FALSE;
 		}
 	}
 	else
@@ -1355,12 +1417,13 @@ void actor_perception_acknowledge(
 	return;
 }
 
-long actor_get_perception_knowledge(
+short actor_get_perception_knowledge(
 	long actor_index,
 	long prop_index)
 {
 	struct actor_perception_actor_view *actor =
 		(struct actor_perception_actor_view *)actor_get(actor_index);
+	short result;
 
 	if (prop_index != NONE)
 	{
@@ -1372,15 +1435,22 @@ long actor_get_perception_knowledge(
 #line 390 "source\\ai\\actor_perception.c"
 
 		if (prop->state >= 2 && prop->state <= 3)
-			return 3;
+		{
+			result = 3;
+			goto done;
+		}
 
 		if (prop->perception == 1 || prop->perception == 2)
-			return 3;
+		{
+			result = 3;
+			goto done;
+		}
 
 		if (!prop->enemy &&
 			(!prop->dead || actor->combat_status >= 3))
 		{
-			return 3;
+			result = 3;
+			goto done;
 		}
 
 		if (prop->orphan_prop_index != NONE)
@@ -1388,17 +1458,23 @@ long actor_get_perception_knowledge(
 			struct actor_perception_prop_view *orphan =
 				(struct actor_perception_prop_view *)prop_get(
 					prop->orphan_prop_index);
-			long result = (orphan->definitely_located != FALSE) + 2;
+			result = (orphan->definitely_located != FALSE) + 2;
 
-			if ((short)result != NONE)
-				return result;
+			if (result != NONE)
+				goto done;
 		}
 	}
 
 	if (actor->artificial_combat_status >= 2)
-		return 2;
+	{
+		result = 2;
+		goto done;
+	}
 
-	return actor->combat_status >= 3;
+	result = actor->combat_status >= 3;
+
+done:
+	return result;
 }
 
 void actor_get_vision_distances(
@@ -2005,8 +2081,7 @@ short actor_perception_aiming_vector_test_blockage(
 	real projection;
 	real friend_distance;
 	real horizontal_error_squared;
-	short blockage;
-	short result = 0;
+	short blockage = 0;
 
 	horizontal_aiming.i = aiming_vector->i;
 	horizontal_aiming.j = aiming_vector->j;
@@ -2023,7 +2098,7 @@ short actor_perception_aiming_vector_test_blockage(
 		horizontal_aiming_magnitude = 0.0f;
 	}
 
-	if (horizontal_aiming_magnitude <= 0.0f)
+	if (!(horizontal_aiming_magnitude > 0.0f))
 		goto done;
 
 	vector_from_points3d(origin, point, &friend_vector);
@@ -2057,31 +2132,29 @@ short actor_perception_aiming_vector_test_blockage(
 	{
 		blockage = 2;
 	}
+	else if (blockage_vector.k > -0.8f && blockage_vector.k < 1.2f)
+	{
+		blockage = 1;
+	}
 	else
 	{
-		if (blockage_vector.k <= -0.8f ||
-			blockage_vector.k >= 1.2f)
-		{
-			goto done;
-		}
-
-		blockage = 1;
+		blockage = 0;
+		goto done;
 	}
 
 	horizontal_error_squared =
 		blockage_vector.i * blockage_vector.i +
 		blockage_vector.j * blockage_vector.j;
-	if (horizontal_error_squared < 0.36f)
+	if (!(horizontal_error_squared < 0.36f))
 	{
-		result = blockage;
-		goto done;
+		if (horizontal_error_squared < 1.21f)
+			blockage = 1;
+		else
+			blockage = 0;
 	}
 
-	if (horizontal_error_squared < 1.21f)
-		result = 1;
-
 done:
-	return result;
+	return blockage;
 }
 
 real actor_compute_prop_target_weight(
@@ -2311,7 +2384,10 @@ static long actor_emotion_assess_unopposable_danger(
 		}
 		else if (prop->shooting)
 		{
-			priority = (prop->quantized_facing <= 1) + 2;
+			if (prop->quantized_facing <= 1)
+				priority = 3;
+			else
+				priority = 2;
 		}
 		else if (prop->visibility >= _actor_perception_full)
 		{
@@ -2770,8 +2846,8 @@ void actor_emotion_unopposable_retreat(
 {
 	struct actor_emotion_target targets[16];
 	struct actor_emotion_actor_view *actor;
-	struct prop_iterator iterator;
 	short target_count;
+	short target_index;
 	long target_prop_index;
 	struct actor_emotion_definition_view *definition;
 	struct actor_emotion_prop_view *prop;
@@ -2783,211 +2859,199 @@ void actor_emotion_unopposable_retreat(
 			actor_definition_get(actor->definition_index);
 	target_count = 0;
 
-	prop_iterator_new(&iterator, actor_index);
-	prop =
-		(struct actor_emotion_prop_view *)
-			prop_iterator_next(&iterator);
-	while (prop != NULL)
 	{
-		short priority =
-			(short)actor_emotion_assess_unopposable_danger(iterator.index);
+		struct prop_iterator iterator;
 
-		if (priority > 0)
-			goto add_direct_emotion_target;
-
-		goto consider_friend_emotion_target;
-
-add_direct_emotion_target:
+		prop_iterator_new(&iterator, actor_index);
+		while ((prop =
+			(struct actor_emotion_prop_view *)
+				prop_iterator_next(&iterator)) != NULL)
 		{
-			short target_index = (short)actor_emotion_get_unopposable_enemy(
-				targets,
-				prop->unit_index,
-				actor_index,
-				&target_count,
-				NUMBEROF(targets));
+			short priority =
+				(short)actor_emotion_assess_unopposable_danger(iterator.index);
 
-			if (target_index != NONE)
+			if (priority > 0)
 			{
-				struct actor_emotion_target *target =
-					&targets[target_index];
+				target_index = (short)actor_emotion_get_unopposable_enemy(
+					targets,
+					prop->unit_index,
+					actor_index,
+					&target_count,
+					NUMBEROF(targets));
 
-				if (target->priority < priority)
+				if (target_index != NONE)
 				{
-					target->prop_index = iterator.index;
-					target->unit_index = prop->unit_index;
-					target->prop = prop;
-					target->priority = priority;
+					struct actor_emotion_target *target =
+						&targets[target_index];
+
+					if (target->priority < priority)
+					{
+						target->prop_index = iterator.index;
+						target->unit_index = prop->unit_index;
+						target->prop = prop;
+						target->priority = priority;
+					}
 				}
 			}
-		}
-		goto next_emotion_prop;
-
-consider_friend_emotion_target:
-		if (prop->state >= _prop_state_becoming_unacknowledged &&
-			prop->state <= _prop_state_acknowledged &&
-			!prop->enemy &&
-			prop->actor_index != NONE &&
-			prop->distance < 8.0f)
-		{
-			struct actor_emotion_actor_view *friend_actor =
-				(struct actor_emotion_actor_view *)actor_get(prop->actor_index);
-
-			if (friend_actor->emotion_target_ticks != 0 &&
-				friend_actor->emotion_target_prop_index != NONE &&
-				(actor->last_emotion_target_time == NONE ||
-					actor->last_emotion_target_time <=
-						friend_actor->emotion_target_time))
+			else if (prop->state >= _prop_state_becoming_unacknowledged &&
+				prop->state <= _prop_state_acknowledged &&
+				!prop->enemy &&
+				prop->actor_index != NONE &&
+				prop->distance < 8.0f)
 			{
-				struct actor_emotion_prop_view *friend_target_prop =
-					(struct actor_emotion_prop_view *)prop_get(
-						friend_actor->emotion_target_prop_index);
+				struct actor_emotion_actor_view *friend_actor =
+					(struct actor_emotion_actor_view *)actor_get(prop->actor_index);
 
-				target_prop_index =
-					prop_get_active_by_unit_index(
-						actor_index,
-						friend_target_prop->unit_index);
-
-				if (target_prop_index != NONE)
+				if (friend_actor->emotion_target_ticks != 0 &&
+					friend_actor->emotion_target_prop_index != NONE &&
+					(actor->last_emotion_target_time == NONE ||
+						friend_actor->emotion_target_time >=
+							actor->last_emotion_target_time))
 				{
-					struct actor_emotion_prop_view *target_prop =
-						(struct actor_emotion_prop_view *)
-							prop_get(target_prop_index);
+					struct actor_emotion_prop_view *friend_target_prop =
+						(struct actor_emotion_prop_view *)prop_get(
+							friend_actor->emotion_target_prop_index);
 
-					if (target_prop->state >=
-							_prop_state_becoming_unacknowledged &&
-						target_prop->state <= _prop_state_acknowledged &&
-						target_prop->unopposable)
-					{
-						short target_index = (short)actor_emotion_get_unopposable_enemy(
-							targets,
-							friend_target_prop->unit_index,
+					target_prop_index =
+						prop_get_active_by_unit_index(
 							actor_index,
-							&target_count,
-							NUMBEROF(targets));
+							friend_target_prop->unit_index);
 
-						if (target_index != NONE)
+					if (target_prop_index != NONE)
+					{
+						struct actor_emotion_prop_view *target_prop =
+							(struct actor_emotion_prop_view *)
+								prop_get(target_prop_index);
+
+						if (target_prop->state >=
+								_prop_state_becoming_unacknowledged &&
+							target_prop->state <= _prop_state_acknowledged &&
+							target_prop->unopposable)
 						{
-							struct actor_emotion_target *target =
-								&targets[target_index];
-							real distance_squared =
-								friend_target_prop->distance *
-									friend_target_prop->distance;
+							target_index = (short)actor_emotion_get_unopposable_enemy(
+								targets,
+								friend_target_prop->unit_index,
+								actor_index,
+								&target_count,
+								NUMBEROF(targets));
 
-							target->count++;
-							if (distance_squared <
-								target->minimum_distance_squared)
+							if (target_index != NONE)
 							{
-								target->minimum_distance_squared =
-									distance_squared;
-								target->closest_unit_index =
-									prop->actor_index;
-							}
+								struct actor_emotion_target *target =
+									&targets[target_index];
+								real distance_squared =
+									actor_perception_distance_squared(
+										friend_target_prop->distance);
 
-							if (target->prop_index == NONE)
-							{
-								target->prop_index =
-									target_prop_index;
-								target->unit_index =
-									target_prop->unit_index;
-								target->prop = target_prop;
+								target->count++;
+								if (distance_squared <
+									target->minimum_distance_squared)
+								{
+									target->minimum_distance_squared =
+										distance_squared;
+									target->closest_unit_index =
+										prop->actor_index;
+								}
+
+								if (target->prop_index == NONE)
+								{
+									target->prop_index =
+										target_prop_index;
+									target->unit_index =
+										target_prop->unit_index;
+									target->prop = target_prop;
+								}
 							}
 						}
 					}
 				}
 			}
 		}
-
-next_emotion_prop:
-		prop =
-			(struct actor_emotion_prop_view *)
-				prop_iterator_next(&iterator);
 	}
 
-	if (target_count > 0)
+	for (target_index = 0;
+		target_index < target_count;
+		target_index++)
 	{
-		short target_index;
+		struct actor_emotion_target *target = &targets[target_index];
+		struct actor_emotion_prop_view *target_prop = target->prop;
+		short threshold = definition->normal_threshold;
+		boolean player_triggered = FALSE;
 
-		for (target_index = 0;
-			target_index < target_count;
-			target_index++)
+		if (target_prop->vehicle_gunner ||
+			target_prop->dangerous_vehicle_driver)
 		{
-			struct actor_emotion_target *target = &targets[target_index];
-			struct actor_emotion_prop_view *target_prop = target->prop;
-			short threshold = definition->normal_threshold;
-			boolean player_triggered = FALSE;
+			threshold = definition->vehicle_threshold;
+		}
 
-			if (target_prop->vehicle_gunner ||
-				target_prop->dangerous_vehicle_driver)
-			{
-				threshold = definition->vehicle_threshold;
-			}
+		if (target_prop->player &&
+			definition->player_threshold > 0 &&
+			threshold > definition->player_threshold)
+		{
+			threshold = definition->player_threshold;
+		}
 
-			if (target_prop->player &&
-				definition->player_threshold > 0 &&
-				definition->player_threshold < threshold)
-			{
-				threshold = definition->player_threshold;
-			}
-
-			if (threshold > 0 &&
-				target->priority >= threshold)
-			{
-				if (target_prop->player)
-					player_triggered = TRUE;
-				else
-					target_prop->emotion_trigger_ticks = 22;
-			}
-			else if (target_prop->player)
-			{
+		if (threshold > 0 &&
+			target->priority >= threshold)
+		{
+			if (target_prop->player)
+				player_triggered = TRUE;
+			else
 				target_prop->emotion_trigger_ticks = 22;
+		}
+		else if (target_prop->player)
+		{
+			target_prop->emotion_trigger_ticks = 22;
+		}
+
+		if (target_prop->emotion_trigger_ticks > 0)
+		{
+			if (target_prop->emotion_trigger_age == 0)
+			{
+				real upper_bound = definition->trigger_delay_upper;
+				real lower_bound = definition->trigger_delay_lower;
+
+				target_prop->emotion_trigger_threshold =
+					(short)(real_seed_random_range(
+						get_global_random_seed_address(),
+						lower_bound,
+						upper_bound) *
+						30.0f);
 			}
 
-			if (target_prop->emotion_trigger_ticks > 0)
-			{
-				if (target_prop->emotion_trigger_age == 0)
-				{
-					target_prop->emotion_trigger_threshold =
-						(short)(real_seed_random_range(
-							get_global_random_seed_address(),
-							definition->trigger_delay_lower,
-							definition->trigger_delay_upper) *
-							30.0f);
-				}
+			target_prop->emotion_trigger_ticks--;
+			target_prop->emotion_trigger_age++;
+		}
 
-				target_prop->emotion_trigger_ticks--;
-				target_prop->emotion_trigger_age++;
+		if (target_prop->dead_ticks >= 45 ||
+			target->priority >= 4)
+		{
+			if (target_prop->emotion_trigger_threshold > 0 &&
+				target_prop->emotion_trigger_age >=
+					target_prop->emotion_trigger_threshold)
+			{
+				target->priority =
+					MAX(target->priority, 7);
 			}
 
-			if (target_prop->dead_ticks >= 45 ||
-				target->priority >= 4)
+			if (player_triggered)
+				target->priority =
+					MAX(target->priority, 8);
+
+			if (definition->casualty_threshold > 0 &&
+				target_prop->unopposable_casualties >=
+					definition->casualty_threshold)
 			{
-				if (target_prop->emotion_trigger_threshold > 0 &&
-					target_prop->emotion_trigger_age >=
-						target_prop->emotion_trigger_threshold)
-				{
-					target->priority =
-						MAX(target->priority, 7);
-				}
+				target->priority =
+					MAX(target->priority, 9);
+			}
 
-				if (player_triggered)
-					target->priority =
-						MAX(target->priority, 8);
-
-				if (definition->casualty_threshold > 0 &&
-					target_prop->unopposable_casualties >=
-						definition->casualty_threshold)
-				{
-					target->priority =
-						MAX(target->priority, 9);
-				}
-
-				if (definition->friend_threshold > 0 &&
-					target->count >=
-						definition->friend_threshold)
-				{
-					target->priority =
-						MAX(target->priority, 6);
-				}
+			if (definition->friend_threshold > 0 &&
+				target->count >=
+					definition->friend_threshold)
+			{
+				target->priority =
+					MAX(target->priority, 6);
 			}
 		}
 	}
@@ -3005,27 +3069,31 @@ next_emotion_prop:
 	{
 		long best_prop_index = NONE;
 		short best_priority = 5;
-		short target_index;
 
 		for (target_index = 0;
 			target_index < target_count;
 			target_index++)
 		{
-			if (targets[target_index].priority > best_priority &&
-				targets[target_index].prop_index != NONE)
+			struct actor_emotion_target *target = &targets[target_index];
+
+			if (target->priority > best_priority &&
+				target->prop_index != NONE)
 			{
-				best_priority = targets[target_index].priority;
-				best_prop_index = targets[target_index].prop_index;
+				best_priority = target->priority;
+				best_prop_index = target->prop_index;
 			}
 		}
 
 		if (best_prop_index != NONE)
 		{
+			real upper_bound = definition->target_duration_upper;
+			real lower_bound = definition->target_duration_lower;
+
 			actor->emotion_target_ticks =
 				(short)(real_seed_random_range(
 					get_global_random_seed_address(),
-					definition->target_duration_lower,
-					definition->target_duration_upper) *
+					lower_bound,
+					upper_bound) *
 					30.0f);
 			actor->emotion_target_prop_index = best_prop_index;
 			actor->emotion_target_time = game_time_get();
@@ -3449,7 +3517,30 @@ void actor_emotion_update(
 		actor->emotions.forced_to_charge = TRUE;
 	}
 
-	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES - 1;
+	/* BUG (preserved for exact matching): the scan starts at
+	 * NUMBER_OF_ACTOR_THREAT_TYPES rather than NUMBER_OF_ACTOR_THREAT_TYPES-1,
+	 * so its first iteration reads specific_threats[9] - one element past the
+	 * end of the nine-element array, which is cumulative_threats[0].
+	 * Evidence: January emits `mov eax,9` at +0xf5, then the six-byte alignment
+	 * nop 8d 9b 00 00 00 00 (`lea ebx,[ebx]`, which touches neither EAX nor
+	 * memory), and falls into the loop head at +0x100, `movsx edx,ax` followed by
+	 * `cmp byte ptr [edx+esi+0x1ee],0`; the `dec eax` is at +0x10d, AFTER that
+	 * load. In the same object actor_situation_update increments
+	 * cumulative_threats for threat types 1..8 at esi+0x1f8..esi+0x1ff and
+	 * area_friends at esi+0x200, which fixes cumulative_threats at esi+0x1f7 and
+	 * so specific_threats at esi+0x1ee with exactly nine elements.
+	 * Layout is asserted, not assumed: see
+	 * actor_perception_specific_threats_size_assert and
+	 * actor_perception_threat_arrays_adjacent_assert above, which fail to compile
+	 * if the two arrays ever stop being adjacent or change length.
+	 * Consequence: none observable. cumulative_threats[_actor_threat_none] is the
+	 * one element of that array nothing ever writes - every write in the tree
+	 * uses _actor_threat_visible..._actor_threat_damaging_me, i.e. 1..8, and the
+	 * single variable-index use is a read-only csprintf argument in the
+	 * actor_debug_print_threat macro - so the stray byte is always zero, the
+	 * early-out is never taken on the stray iteration, and the scan falls through
+	 * to the intended starting index. */
+	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES;
 		priority > 0 &&
 			actor->situation.specific_threats[priority] <= 0;
 		priority--)
@@ -3715,43 +3806,36 @@ void actor_emotion_update(
 				crouch = TRUE;
 		}
 
-		if (actor->emotions.defensive_crouch)
+		if (actor->emotions.defensive_crouch && !crouch)
 		{
-			if (!crouch)
+			actor->emotions.defensive_crouch = FALSE;
+			if (definition->defensive.
+					defensive_crouch_min_stand_time > 0.0f)
 			{
-				actor->emotions.defensive_crouch = FALSE;
-				if (definition->defensive.
-						defensive_crouch_min_stand_time > 0.0f)
-				{
-					actor->emotions.defensive_crouch_timer =
-						(short)(definition->defensive.
-							defensive_crouch_min_stand_time *
-							30.0f);
-				}
-				else
-				{
-					actor->emotions.defensive_crouch_timer = 45;
-				}
+				actor->emotions.defensive_crouch_timer =
+					(short)(definition->defensive.
+						defensive_crouch_min_stand_time *
+						30.0f);
+			}
+			else
+			{
+				actor->emotions.defensive_crouch_timer = 45;
 			}
 		}
-
-		if (crouch)
+		else if (!actor->emotions.defensive_crouch && crouch)
 		{
-			if (!actor->emotions.defensive_crouch)
+			actor->emotions.defensive_crouch = TRUE;
+			if (definition->defensive.
+					defensive_crouch_min_crouch_time > 0.0f)
 			{
-				actor->emotions.defensive_crouch = TRUE;
-				if (definition->defensive.
-						defensive_crouch_min_crouch_time > 0.0f)
-				{
-					actor->emotions.defensive_crouch_timer =
-						(short)(definition->defensive.
-							defensive_crouch_min_crouch_time *
-							30.0f);
-				}
-				else
-				{
-					actor->emotions.defensive_crouch_timer = 45;
-				}
+				actor->emotions.defensive_crouch_timer =
+					(short)(definition->defensive.
+						defensive_crouch_min_crouch_time *
+						30.0f);
+			}
+			else
+			{
+				actor->emotions.defensive_crouch_timer = 45;
 			}
 		}
 	}
@@ -4210,9 +4294,9 @@ void prop_status_refresh(
 				}
 			}
 
-			prop->fighting = fighting;
 			prop->noncombat = noncombat;
 			prop->in_combat = in_combat;
+			prop->fighting = fighting;
 
 			if (noticed)
 			{
@@ -4448,7 +4532,7 @@ void prop_status_refresh(
 					prop->dead,
 					prop->dead_ticks,
 					prop->suicide_radius,
-					prop->distance * prop->distance,
+					actor_perception_distance_squared(prop->distance),
 					0,
 					NULL))
 			{
@@ -5813,7 +5897,7 @@ void actor_perception_refresh(
 		if (prop->state < _prop_state_uninspected_orphan ||
 			prop->state > _prop_state_inspected_orphan)
 		{
-			real distance_squared = prop->distance * prop->distance;
+			real distance_squared = actor_perception_distance_squared(prop->distance);
 			boolean optional;
 			boolean desired =
 				actor_perception_desire_prop(
@@ -6706,15 +6790,10 @@ void actor_perception_update(
 			}
 			else
 			{
-				real delta_x;
-				real delta_y;
-
 				if (prop->ticks_until_orphan == 0 ||
-					actor_perception_distance_squared2d(
-						&prop->last_perceived_body_position,
-						&prop->body_position,
-						delta_x,
-						delta_y) > 1.0f)
+					distance_squared2d(
+						(real_point2d const *)&prop->last_perceived_body_position,
+						(real_point2d const *)&prop->body_position) > 1.0f)
 				{
 					long orphan_prop_index = NONE;
 
@@ -6729,7 +6808,7 @@ void actor_perception_update(
 							prop->dead,
 							prop->dead_ticks,
 							prop->suicide_radius,
-							prop->distance * prop->distance,
+							actor_perception_distance_squared(prop->distance),
 							prop->required_ticks,
 							NULL))
 					{
@@ -6765,7 +6844,7 @@ void actor_perception_update(
 						prop->dead,
 						prop->dead_ticks,
 						prop->suicide_radius,
-						prop->distance * prop->distance,
+						actor_perception_distance_squared(prop->distance),
 						prop->required_ticks,
 						NULL))
 				{
