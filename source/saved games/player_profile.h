@@ -100,8 +100,7 @@ void player_profile_get_highest_completed_solo_level(
 	short *difficulty);
 word player_profile_number_of_available_primary_colors(
 	void);
-real_rgb_color *player_profile_get_rgb_color(
-	real_rgb_color *result,
+real_rgb_color player_profile_get_rgb_color(
 	long color_index);
 void player_profile_save_level_completed(
 	short local_player_index);
@@ -119,8 +118,7 @@ boolean player_profile_get_from_path(
 long player_profile_new(
 	short local_player_index,
 	wchar_t *name);
-real_argb_color *player_profile_get_argb_color(
-	real_argb_color *result,
+real_argb_color player_profile_get_argb_color(
 	long color_index);
 void player_profile_save_last_level_played(
 	short local_player_index);

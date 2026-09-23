@@ -326,8 +326,7 @@ word player_profile_number_of_available_primary_colors(
 	return NUMBER_OF_AVAILABLE_PRIMARY_COLORS;
 }
 
-real_rgb_color *player_profile_get_rgb_color(
-	real_rgb_color *result,
+real_rgb_color player_profile_get_rgb_color(
 	long color_index)
 {
 	long color;
@@ -341,9 +340,7 @@ real_rgb_color *player_profile_get_rgb_color(
 	rgb_color.red = ((color >> 16) & 0xFF) / 255.f;
 	rgb_color.green = ((color >> 8) & 0xFF) / 255.f;
 	rgb_color.blue = (color & 0xFF) / 255.f;
-	*result = rgb_color;
-
-	return result;
+	return rgb_color;
 }
 
 void player_profile_get_highest_completed_solo_level(
@@ -494,17 +491,17 @@ boolean player_profile_get(
 	return succeeded;
 }
 
-real_argb_color *player_profile_get_argb_color(
-	real_argb_color *result,
+real_argb_color player_profile_get_argb_color(
 	long color_index)
 {
 	real_argb_color argb_color;
+	real_rgb_color rgb_color;
 
-	argb_color.rgb = *player_profile_get_rgb_color(&argb_color.rgb, color_index);
+	rgb_color = player_profile_get_rgb_color(color_index);
 	argb_color.alpha = 1.f;
-	*result = argb_color;
+	argb_color.rgb = rgb_color;
 
-	return result;
+	return argb_color;
 }
 
 long player_profile_get_random_good_color(

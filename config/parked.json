@@ -155,25 +155,6 @@
     },
     {
       "unit": "source/saved games/player_profile",
-      "function": "_player_profile_get_argb_color",
-      "class": "unclassified",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 1,
-          "normalized_sha256": "733b6e189ab86d153c588b799a279fc40047a862d19155e00ce0dce17a3094c3"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 1,
-          "normalized_sha256": "7fec3375bf61f2ee4ddd844c9d83d3dc63a9215511cc95d2e8a6065f1992d3a8"
-        },
-        "objdiff_percent": 83.7
-      },
-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the typed project-color implementation and natural component stores; the x87 instruction schedule remains non-exact. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
-    },
-    {
-      "unit": "source/saved games/player_profile",
       "function": "_player_profile_create_default_profiles_on_disk",
       "class": "unclassified",
       "measurements": {

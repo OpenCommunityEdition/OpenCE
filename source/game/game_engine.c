@@ -5971,7 +5971,6 @@ real_rgb_color *game_engine_player_get_change_color(
 {
 	struct player_datum *player = player_get(player_index);
 	real_rgb_color result;
-	real_rgb_color profile_color;
 
 	if (global_variant.has_teams)
 	{
@@ -5987,7 +5986,7 @@ real_rgb_color *game_engine_player_get_change_color(
 		if (debug_player_color.value != NONE)
 			color_index = debug_player_color.value;
 
-		result = *player_profile_get_rgb_color(&profile_color, color_index);
+		result = player_profile_get_rgb_color(color_index);
 	}
 
 	*change_color = result;
