@@ -1407,10 +1407,7 @@ void hud_messaging_update(
 		local_player_index != NONE &&
 		game_engine_hud_draw_messages(local_player_get_player_index(local_player_index)))
 	{
-		long font_index = local_player_count() > 1 &&
-			hud_msg_def->multi_player_font.index != NONE
-				? hud_msg_def->multi_player_font.index
-				: hud_msg_def->single_player_font.index;
+		long font_index = hud_get_font_index();
 		boolean split_screen = local_player_count() > 1;
 		point2d screen_point;
 		struct font_header *font;
@@ -1422,11 +1419,7 @@ void hud_messaging_update(
 		boolean objective_active;
 		boolean help_active;
 		boolean state_active;
-		rectangle2d line_bounds;
-		rectangle2d line_cursor;
-		real_argb_color state_color;
-		real_argb_color text_color;
-		pixel32 pixel_color = 0;
+		short message_index;
 
 		hud_calculate_point(
 			local_player_index,
@@ -1436,12 +1429,12 @@ void hud_messaging_update(
 			local_player_count() > 1,
 			0.0f,
 			&screen_point);
-		font = font_definition_get(font_index);
 		line_top = screen_point.y;
+		font = font_definition_get(font_index);
 		if (split_screen)
 		{
 			line_height = font->leading_height + font->ascending_height;
-			line_top -= (short)split_screen_hud_message_offset;
+			line_top -= split_screen_hud_message_offset;
 		}
 		else
 		{
@@ -1461,9 +1454,12 @@ void hud_messaging_update(
 
 		if (objective_active || help_active || state_active)
 		{
+			struct hud_state_message_runtime_definition *state_message = &datum->state_message;
 			struct game_input_preferences preferences;
-			struct hud_message_text_definition *hud_messages;
-			struct hud_state_message_definition *message;
+			real_argb_color state_color;
+			pixel32 pixel_color;
+			rectangle2d line_bounds;
+			rectangle2d line_cursor;
 
 			input_abstraction_get_local_player_preferences(
 				local_player_index,
@@ -1472,13 +1468,14 @@ void hud_messaging_update(
 			{
 				struct hud_color_definition *objective_color =
 					&hud_globals->messaging.objective_color;
-				pixel32 flash_color = get_flash_color(
-					objective_color,
-					game_time_get() + hud_messaging_globals->objective.uptime -
-						objective_color->custom.objective.up_ticks -
-						objective_color->custom.objective.fade_ticks);
+				long objective_start_time = game_time_get() +
+					hud_messaging_globals->objective.uptime -
+					objective_color->custom.objective.up_ticks -
+					objective_color->custom.objective.fade_ticks;
 
-				pixel32_to_real_argb_color(flash_color, &state_color);
+				pixel32_to_real_argb_color(
+					get_flash_color(objective_color, objective_start_time),
+					&state_color);
 				state_color.alpha *= MIN(
 					(real)hud_messaging_globals->objective.uptime /
 						objective_color->custom.objective.fade_ticks,
@@ -1493,15 +1490,15 @@ void hud_messaging_update(
 						&hud_globals->messaging.color,
 						hud_messaging_globals->flash_start_time);
 				}
-				else if (TEST_FLAG(
+				else if (!TEST_FLAG(
 					hud_globals->messaging.color.flash_flags,
 					_hud_flash_reverse_colors_bit))
 				{
-					pixel_color = hud_globals->messaging.color.flash_color;
+					pixel_color = hud_globals->messaging.color.color;
 				}
 				else
 				{
-					pixel_color = hud_globals->messaging.color.color;
+					pixel_color = hud_globals->messaging.color.flash_color;
 				}
 				pixel32_to_real_argb_color(pixel_color, &state_color);
 			}
@@ -1511,11 +1508,11 @@ void hud_messaging_update(
 				pixel_color = real_argb_color_to_pixel32(&state_color);
 			}
 
-			line_bounds.y0 = line_top;
 			line_bounds.x0 = screen_point.x;
-			line_bounds.y1 = 5 * line_height + line_top;
 			line_bounds.x1 = render.camera.window_bounds.x1 -
 				render.camera.viewport_bounds.x0;
+			line_bounds.y0 = line_top;
+			line_bounds.y1 = line_top + 5 * line_height;
 			line_cursor = line_bounds;
 			draw_string_set_draw_mode(
 				font_index,
@@ -1538,6 +1535,8 @@ void hud_messaging_update(
 			}
 			else
 			{
+				struct hud_message_text_definition *hud_messages;
+				struct hud_state_message_definition *message;
 				word text_position;
 				short element_index;
 
@@ -1622,94 +1621,100 @@ void hud_messaging_update(
 						{
 							short icon_index = NONE;
 
-							if (element->data <= _icon_right_stick)
+							if (element->data > _icon_right_stick)
 							{
-								icon_index = element->data;
-							}
-							else if (element->data <= _icon_look)
-							{
-								if (element->data <= _icon_accept)
+								if (element->data <= _icon_look)
 								{
-									icon_index = preferences.game_control_to_xbox_buttons[
-										button_mappings[element->data - _icon_action]];
+									if (element->data <= _icon_accept)
+									{
+										icon_index = preferences.game_control_to_xbox_buttons[
+											button_mappings[element->data - _icon_action]];
+									}
+									else
+									{
+										icon_index = button_mappings[element->data - _icon_action];
+									}
+								}
+								else if (!hud_scripted_globals->show_hud_help_text)
+								{
+									short custom_index = element->data - _icon_custom_1;
+
+									match_vassert(
+										"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+										0x457,
+										custom_index < NUMBER_OF_HUD_CUSTOM_ICONS,
+										"custom_index<NUMBER_OF_HUD_CUSTOM_ICONS");
+									if (TEST_FLAG(state_message->is_text_flags, custom_index))
+									{
+										short string_index = state_message->info[custom_index].text.string_index;
+
+										if (string_index != NONE)
+										{
+											if (state_message->info[custom_index].text.uses_scenario_names)
+											{
+												match_vassert(
+													"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
+													0x460,
+													global_scenario_get()->custom_object_names.index != NONE,
+													"global_scenario_get()->custom_object_names.index!=NONE");
+												render_state_text(
+													&line_bounds,
+													&line_cursor,
+													unicode_string_list_get_string(
+														global_scenario_get()->custom_object_names.index,
+														string_index),
+													FALSE);
+											}
+											else
+											{
+												render_state_text(
+													&line_bounds,
+													&line_cursor,
+													unicode_string_list_get_string(
+														hud_globals->messaging.alternate_icon_text.index,
+														string_index),
+													FALSE);
+											}
+										}
+										else
+										{
+											render_state_text(
+												&line_bounds,
+												&line_cursor,
+												L"<unknown>",
+												FALSE);
+										}
+									}
+									else
+									{
+										struct icon_hud_element_definition const *icon =
+											state_message->info[custom_index].icon;
+
+										if (icon)
+										{
+											render_state_bitmap(
+												&line_bounds,
+												&line_cursor,
+												pixel_color,
+												icon);
+										}
+										else
+										{
+											error(
+												_error_silent,
+												"help message using old code. get latest code and tags.");
+										}
+									}
+									break;
 								}
 								else
 								{
-									icon_index = button_mappings[element->data - _icon_action];
+									error(_error_silent, "help text cannot use custom icons");
 								}
-							}
-							else if (hud_scripted_globals->show_hud_help_text)
-							{
-								error(_error_silent, "help text cannot use custom icons");
 							}
 							else
 							{
-								short custom_index = element->data - _icon_custom_1;
-
-								match_vassert(
-									"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
-									0x457,
-									custom_index < NUMBER_OF_HUD_CUSTOM_ICONS,
-									"custom_index<NUMBER_OF_HUD_CUSTOM_ICONS");
-								if (TEST_FLAG(datum->state_message.is_text_flags, custom_index))
-								{
-									short string_index = datum->state_message.info[custom_index].text.string_index;
-
-									if (string_index == NONE)
-									{
-										render_state_text(
-											&line_bounds,
-											&line_cursor,
-											L"<unknown>",
-											FALSE);
-									}
-									else if (datum->state_message.info[custom_index].text.uses_scenario_names)
-									{
-										match_vassert(
-											"c:\\halo\\SOURCE\\interface\\hud_messaging.c",
-											0x460,
-											global_scenario_get()->custom_object_names.index != NONE,
-											"global_scenario_get()->custom_object_names.index!=NONE");
-										render_state_text(
-											&line_bounds,
-											&line_cursor,
-											unicode_string_list_get_string(
-												global_scenario_get()->custom_object_names.index,
-												string_index),
-											FALSE);
-									}
-									else
-									{
-										render_state_text(
-											&line_bounds,
-											&line_cursor,
-											unicode_string_list_get_string(
-												hud_globals->messaging.alternate_icon_text.index,
-												string_index),
-											FALSE);
-									}
-								}
-								else
-								{
-									struct icon_hud_element_definition const *icon =
-										datum->state_message.info[custom_index].icon;
-
-									if (icon)
-									{
-										render_state_bitmap(
-											&line_bounds,
-											&line_cursor,
-											pixel_color,
-											icon);
-									}
-									else
-									{
-										error(
-											_error_silent,
-											"help message using old code. get latest code and tags.");
-									}
-								}
-								break;
+								icon_index = element->data;
 							}
 
 							if (icon_index < hud_globals->messaging.button_icons.count)
@@ -1725,6 +1730,7 @@ void hud_messaging_update(
 									struct icon_hud_element_definition);
 								if (TEST_FLAG(icon->flags, _hud_icon_use_text_bit))
 								{
+									real_argb_color text_color;
 									wchar_t const *icon_text;
 									rectangle2d text_bounds;
 
@@ -1816,13 +1822,13 @@ void hud_messaging_update(
 			if (split_screen)
 			{
 				line_top = (short)(
-					hud_msg_def->spacing * line_height +
-					screen_point.y - split_screen_hud_message_offset);
+					screen_point.y - split_screen_hud_message_offset +
+					hud_msg_def->spacing * line_height);
 			}
 			else
 			{
 				line_top = (short)(
-					hud_msg_def->spacing * line_height + screen_point.y);
+					screen_point.y + hud_msg_def->spacing * line_height);
 			}
 			maximum_message_count--;
 		}
@@ -1832,81 +1838,80 @@ void hud_messaging_update(
 			NUMBEROF(datum->messages),
 			sizeof(datum->messages[0]),
 			(int (__cdecl *)(void const *, void const *))compare_messages);
-		if (maximum_message_count > 0)
+		for (message_index = 0;
+			message_index < maximum_message_count;
+			message_index++)
 		{
-			wchar_t formatted[276];
-			short message_index;
+			struct hud_message_definition *message = &datum->messages[message_index];
+			long now;
+			long elapsed;
+			real_argb_color text_color;
+			rectangle2d message_bounds;
 
-			for (message_index = 0;
-				message_index < maximum_message_count;
-				message_index++)
+			if (!message->valid)
+				break;
+			now = game_time_get();
+			text_color = hud_msg_def->text_color;
+			elapsed = now - message->time;
+			if ((real)elapsed > hud_msg_def->up_time * TICKS_PER_SECOND)
 			{
-				struct hud_message_definition *message = &datum->messages[message_index];
-				long now;
-				long elapsed;
-				rectangle2d message_bounds;
+				real fade = PIN(
+					1.0f -
+						((real)elapsed - hud_msg_def->up_time * TICKS_PER_SECOND) /
+						(hud_msg_def->fade_time * TICKS_PER_SECOND),
+					0.0f,
+					1.0f);
+
+				text_color.alpha *= (real)pow((double)fade, 1.9f);
+			}
+
+			message_bounds = render.camera.window_bounds;
+			message_bounds.x0 = screen_point.x;
+			message_bounds.x1 = render.camera.window_bounds.x1 -
+				render.camera.viewport_bounds.x0;
+			message_bounds.y0 = line_top;
+			message_bounds.y1 = line_top + line_height;
+			line_top = (short)(hud_msg_def->spacing * line_height + line_top);
+			draw_string_set_draw_mode(
+				font_index,
+				NONE,
+				_text_justification_left,
+				0,
+				&text_color);
+
+			if (message->item_definition_index != NONE)
+			{
+				char message_offset;
+				struct item_definition *item;
+				short string_index;
 				wchar_t const *item_text;
 
-				if (!message->valid)
-					break;
-				now = game_time_get();
-				elapsed = now - message->time;
-				text_color = hud_msg_def->text_color;
-				if ((real)elapsed > hud_msg_def->up_time * TICKS_PER_SECOND)
+				if (message->message_offset == NONE)
+					message_offset = message->quantity > 1;
+				else
+					message_offset = message->message_offset;
+				item = item_definition_get(message->item_definition_index);
+				string_index = item->item.hud_message_index + message_offset;
+				item_text = hud_get_item_string(string_index);
+				if ((message->message_offset == NONE && message_offset) ||
+					message->quantity)
 				{
-					real fade = PIN(
-						1.0f -
-							((real)elapsed - hud_msg_def->up_time * TICKS_PER_SECOND) /
-							(hud_msg_def->fade_time * TICKS_PER_SECOND),
-						0.0f,
-						1.0f);
+					wchar_t formatted[256];
+					short value_scale = MAX(item->item.hud_message_value_scale, 1);
 
-					text_color.alpha *= (real)pow((double)fade, 1.9f);
-				}
-
-				message_bounds = render.camera.window_bounds;
-				message_bounds.y0 = line_top;
-				message_bounds.x0 = screen_point.x;
-				message_bounds.y1 = line_height + line_top;
-				message_bounds.x1 = render.camera.window_bounds.x1 -
-					render.camera.viewport_bounds.x0;
-				line_top = (short)(hud_msg_def->spacing * line_height + line_top);
-				draw_string_set_draw_mode(
-					font_index,
-					NONE,
-					_text_justification_left,
-					0,
-					&text_color);
-
-				if (message->item_definition_index == NONE)
-				{
+					usprintf(
+						formatted,
+						item_text,
+						message->quantity / value_scale);
 					rasterizer_draw_unicode_string(
 						&message_bounds,
 						NULL,
 						NULL,
 						0,
-						message->text);
+						formatted);
 				}
 				else
 				{
-					char message_offset = message->message_offset;
-					struct item_definition *item = item_definition_get(
-						message->item_definition_index);
-
-					if (message_offset == NONE)
-						message_offset = message->quantity > 1;
-					item_text = hud_get_item_string(
-						item->item.hud_message_index + message_offset);
-					if ((message->message_offset == NONE && message_offset) ||
-						message->quantity)
-					{
-						usprintf(
-							formatted,
-							item_text,
-							message->quantity /
-								MAX(item->item.hud_message_value_scale, 1));
-						item_text = formatted;
-					}
 					rasterizer_draw_unicode_string(
 						&message_bounds,
 						NULL,
@@ -1914,11 +1919,20 @@ void hud_messaging_update(
 						0,
 						item_text);
 				}
-				message->valid = (real)(now - message->time) <
-					(hud_msg_def->fade_time + hud_msg_def->up_time) * TICKS_PER_SECOND;
-				if (!message->valid)
-					message->time = NONE;
 			}
+			else
+			{
+				rasterizer_draw_unicode_string(
+					&message_bounds,
+					NULL,
+					NULL,
+					0,
+					message->text);
+			}
+			message->valid = (real)(now - message->time) <
+				(hud_msg_def->fade_time + hud_msg_def->up_time) * TICKS_PER_SECOND;
+			if (!message->valid)
+				message->time = NONE;
 		}
 	}
 

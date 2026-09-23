@@ -320,25 +320,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
-      "function": "_rasterizer_triangle_buffer_new",
-      "class": "instruction-scheduling",
-      "evidence": "Target and candidate have equal 0x160 padded size and all 24 relocation identities/addresses. The remaining eight normalized bytes are confined to the final four structure-field stores: the target reloads the hardware buffer into ECX before the offset/base stores, while VC7's current source reloads it into EAX after them. A preserved 160-case control-flow/barrier/field-order supersearch plus focused lifetime, alias, helper, qualifier, and initialization matrices found no legal-C form that changes only this schedule.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 24,
-          "normalized_sha256": "e90e066bbde0d04c87a43f665fcd7a131ff0e0d1c7a5354b82062ae5b822396c"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 24,
-          "normalized_sha256": "b0fdebbf1336f8336a37bb436ad10ea3ebbf9f105715dec74c87d16c283b457e"
-        },
-        "objdiff_percent": 98.203255
-      }
-    },
-    {
       "unit": "source/cseries/cseries",
       "function": "_stristr",
       "class": "asm-implemented",
@@ -385,17 +366,6 @@
         "target": { "size": 256, "relocation_count": 18, "normalized_sha256": "802ef4da9736bcaf8a616c56d03ba3e9322b229ad4b3814c60909462d7ebacf3" },
         "base": { "size": 256, "relocation_count": 18, "normalized_sha256": "af8e65f5d773f0fb1e635264e54d3e63fccee99c69b65364a72be56cdca323b4" },
         "objdiff_percent": 91.233765
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/thread_win32",
-      "function": "_get_mutex_from_pool",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference. The natural loop bound is &thread_globals.mutex_references[MAXIMUM_MUTEX_REFERENCES].in_use, one past the static thread_globals object at image address 3262248 with size 1544, so the resolved address lies 36 bytes inside the following external transport_address_string object at 3263792. csplit attributes relocation 2 to _transport_address_string+36; VC7 correctly emits the same address as _thread_globals+1580. Both resolve to 3263828. Target and candidate otherwise have the same 64-byte section, normalized bytes, three type-6 relocations at offsets 5/27/40, and resolved destinations 3262548/3263828/3262512. No false cross-module mutex declaration, raw overlay, manual address, or compiler control is retained.",
-      "measurements": {
-        "target": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
-        "base": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
-        "objdiff_percent": 100.0
       }
     },
     {
@@ -483,25 +453,6 @@
           "normalized_sha256": "1a9d49fc4eace03cb02268a6434f252b45496477fac007eba679c72e4b5c8d1c"
         },
         "objdiff_percent": 99.43569
-      }
-    },
-    {
-      "unit": "source/render/render_particles",
-      "function": "_render_particles",
-      "class": "register-allocation",
-      "evidence": "The retained ordinary-C reconstruction implements the complete January particle-render path with authenticated shared types and names: visibility and perspective filtering, the PDB-recorded single current_sprite_group pointer reused by the grouping and draw passes, sorted sprite batches, attached-object transforms, LOD/fade handling, named U/V mirror flags, and the original unguarded zero-by-zero secondary-map-radius division. Target and candidate share the 1168-byte padded envelope and all 39 relocation identities, addresses, types, destinations, and addends; objdiff reports 99.82228% for the function. The remaining 59 normalized positional differences are stack-slot/local-coloring choices. A two-shadow-pointer spelling reduced that count to 45, but contradicts the HCEA/PDB local record and is rejected as a less credible exactness-oriented source shape. The apparently idempotent detached-object sentinel write is retained because January directly stores -1 to particle_datum.object_index at function offset +0x2E3; removing it changes the function envelope and relocation positions. No volatile access, compiler barrier, forced inline/noinline, assembly, undefined behavior, fake dependency, inert branch, or nonsensical logic is retained. Both helper functions and the owned profile section remain strict exact. Reopen only for authoritative January source/local-variable records or a natural same-compiler lifetime donor that explains the remaining stack allocation while preserving the one-pointer topology.",
-      "measurements": {
-        "target": {
-          "size": 1168,
-          "relocation_count": 39,
-          "normalized_sha256": "97e541b16e87e1e09094430247df715ca41e4ecc679738f638d09e1bbfffcc4e"
-        },
-        "base": {
-          "size": 1168,
-          "relocation_count": 39,
-          "normalized_sha256": "8a7510241d251d090a30b22282d8569ad88fc8a4c0e94713687f2e0475db94f2"
-        },
-        "objdiff_percent": 99.82228
       }
     },
     {
@@ -600,44 +551,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/rasterizer_geometry",
-      "function": "_compress_real_vector3d_to_int32",
-      "class": "instruction-scheduling",
-      "evidence": "Equal 544-byte padded size, 38/38 relocations address-for-address identical, and 181/181 instructions. The sole divergence is the debug round-trip's aggregate copy: January issues all three dword loads from the returned pointer before any store, the candidate interleaves load and store per component. Two spellings bracket the target and neither reaches it - one local gives January's correct sub esp,0x10 frame with the interleaved copy, a separate decompressed local gives the grouped copy with a 12-byte-too-large frame. The one-local form is retained because a frame-size mismatch is structural. Measured inert: copying through a named pointer, that pointer scoped to an inner block, declaring v2 first, and combinations.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 38,
-          "normalized_sha256": "1bb3b5c9d4712b2fc2ec7e9dc9f3f8e791496a82595ca154ca76719067cd60a7"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 38,
-          "normalized_sha256": "e0b39fc94ba068043e045bae7c75a86a90a7853fe417e0bfe894324d4e6811e5"
-        },
-        "objdiff_percent": 96.34682
-      }
-    },
-    {
-      "unit": "source/rasterizer/rasterizer_geometry",
-      "function": "_compress_real_vector3d_to_int32_clamp",
-      "class": "instruction-scheduling",
-      "evidence": "Equal 512-byte padded size, 38/38 relocations address-for-address identical, and 164/164 instructions. Same single divergence and the same exhausted control set as its non-clamp twin above; the two share the round-trip block verbatim.",
-      "measurements": {
-        "target": {
-          "size": 512,
-          "relocation_count": 38,
-          "normalized_sha256": "ba84758e70f380dff5a1f53fc34fd72500d77f38cdef7529edeff8c5ccdffe3c"
-        },
-        "base": {
-          "size": 512,
-          "relocation_count": 38,
-          "normalized_sha256": "8983acf2b5bc6570cede768472facdfc4bd6d012eb30038ed0d53f04341fc3a5"
-        },
-        "objdiff_percent": 94.8
-      }
-    },
-    {
       "unit": "source/ai/actions",
       "function": "_actor_action_handle_vehicle_entry",
       "class": "register-allocation",
@@ -714,25 +627,6 @@
       }
     },
     {
-      "unit": "source/physics/collision_usage",
-      "function": "_collision_log_get_current_user",
-      "class": "csplit-relocation-alias",
-      "evidence": "Fuzzy-parked under the current house rule with the complete private user-selection helper retained in ordinary typed C and its semantic name recovered from historical Xbox donor source. The retained stack-top access is global_current_collision_users[global_current_collision_user_depth - 1], as independently proved by January's collision_usage_current+2974 relocation resolving two bytes before global_current_collision_users. Target and candidate share the 256-byte padded envelope and 23 relocations. After resolving that csplit alias, their instruction streams align for every instruction except the final successful return: January emits mov ax,si while VC7 emits movsx eax,si. Restoring the target assertion punctuation recovered the authentic owned strings. The independent PC machine-code lifts infer a short return, but neither has source or PDB type provenance; compiling that signature collapses January's separate NONE exits and shrinks the function to 240 bytes, so the Xbox donor's natural long-return topology is retained. Prior declaration, local-result, and return-shape experiments are documented as exhausted. No barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January prototype/local-lifetime evidence or a natural same-compiler donor that explains the narrow AX return without changing the rest of the function. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): Body replaced by the verified single-exit short-return form (law A3(c), C4244 at both callers). It is code-identical to January and differs only by the csplit negative-index relocation alias (_global_current_collision_users-2 == _collision_usage_current+2974). The park stays but its class changes from unclassified to csplit-relocation-alias. Base = the rebuilt object. The evidence text and objdiff_percent should be refreshed. Validate with tools/parked_functions.py, which must report ordinary-different and resolved-equal.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 23,
-          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 23,
-          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
-        },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
       "unit": "libs/libcmt/x10fout",
       "function": "_$I10_OUTPUT",
       "class": "tu-context-optimization",
@@ -806,25 +700,6 @@
           "normalized_sha256": "4b830e4a539a01c46bae3b186cd66658f81b4285953455a907518a348b9b7cc0"
         },
         "objdiff_percent": 99.35952
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_sharpen",
-      "class": "csplit-relocation-alias",
-      "evidence": "The natural typed dispatcher and lookup-table builder is byte-identical to January after correcting the semantic BSS ownership proved by table construction and use: bitmap_sharpen_negative_table begins at 3260160 and bitmap_sharpen_positive_table at 3260672. Ordinary COFF comparison differs only at two strength-reduced loop relocations because csplit anchors positive_table-2 as negative_table+510 and negative_table-2 as the preceding _bss_0031bed4+42. The fail-closed resolved-address scan proves both pairs resolve respectively to 3260670 and 3260158; all other bytes and all 23 relocations agree. The source retains direct semantic array indexing and MAX/PIN cseries macros rather than introducing an out-of-bounds alias or raw address merely to copy csplit's spelling.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 23,
-          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 23,
-          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
-        },
-        "objdiff_percent": 100.0
       }
     },
     {
@@ -1021,7 +896,7 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_lights",
       "function": "_rasterizer_sun_glow_draw",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the complete typed sun-glow renderer retained. January disassembly and strings establish the view-vector normalization, angular visibility falloff, billboard projection and clipping, two-stage downsample/convolution render-target work, Xbox render-state setup, and final immediate-mode quad. Target and candidate share the 2,352-byte padded envelope and 174 relocations; objdiff reports 95.815155 percent. The first meaningful divergence is the 0x98 versus 0xA4 local frame and the x87 dot/falloff schedule beginning near +0x69, followed by shifted but semantically equivalent local lifetimes throughout the billboard path. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler sun-glow donor explaining the local/x87 schedule.",
+      "evidence": "Fuzzy-parked under the current house rule with the complete typed sun-glow renderer retained. January disassembly and strings establish the view-vector normalization, angular visibility falloff, billboard projection and clipping, two-stage downsample/convolution render-target work, Xbox render-state setup, and final immediate-mode quad. Target and candidate share the 2,352-byte padded envelope and 174 relocations; objdiff reports 95.815155 percent. The first meaningful divergence is the 0x98 versus 0xA4 local frame and the x87 dot/falloff schedule beginning near +0x69, followed by shifted but semantically equivalent local lifetimes throughout the billboard path. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler sun-glow donor explaining the local/x87 schedule. Re-measured 2026-09-23 (structural lane batch 3): uncompress_int32_to_real_vector3d now returns real_vector3d by value (debug-build struct-return pattern at all 16 call sites, HCEX single parameter), so the lens-flare direction is assigned directly; size unchanged, fuzzy 95.815 -> 95.817.",
       "measurements": {
         "target": {
           "size": 2352,
@@ -1031,9 +906,9 @@
         "base": {
           "size": 2352,
           "relocation_count": 174,
-          "normalized_sha256": "dafe3a30c86a8480f266462aab566bcc259752c9b225fcb48a1efdc914209a2d"
+          "normalized_sha256": "dd0f3291088445bdba917e904238c47a2df4aaa9614e08665f482dccb4786654"
         },
-        "objdiff_percent": 95.815155
+        "objdiff_percent": 95.816666
       }
     },
     {
@@ -1053,25 +928,6 @@
           "normalized_sha256": "776ba88304402bf2ae995d27de02026f8a9a6655fe565c6385712bbf55c8d2ee"
         },
         "objdiff_percent": 96.43883
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
-      "function": "__rasterizer_environment_shadow_begin",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed January Xbox shadow-target setup from the target instruction and relocation topology, January's own assertion strings and debug-global bindings, and the independently named HaloCEA shadow state. The retained routine validates the matrix, color, and radius; installs the shadow render state and pixel shader; derives the two projected matrix rows and constant rows; selects the shadow target; initializes the typed shadow state; and accounts statistics. Target and candidate both occupy 944 padded bytes with all 73 relocation types and destinations, and objdiff reports 98.32 percent similarity. The first residual is January sinking five independent constant-row stores around the x87 projection block while VC7 sinks three, followed by an equivalent commutative dot-product schedule. Six ordinary-C sum spellings, declaration orders, constant-row placements, initialization forms, and include-set variants all returned to this fixed point or degraded it. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the backend store and x87 schedule.",
-      "measurements": {
-        "target": {
-          "size": 944,
-          "relocation_count": 73,
-          "normalized_sha256": "b6c4674070a5973fe1a47b27603e72d5688973dc6c5ca209fedb3fcf0e489df9"
-        },
-        "base": {
-          "size": 944,
-          "relocation_count": 73,
-          "normalized_sha256": "709c6800cb61db4110660fda4c3622669f7a0d60293514e8ca292ea4e90cab99"
-        },
-        "objdiff_percent": 98.32258
       }
     },
     {
@@ -1436,25 +1292,6 @@
       }
     },
     {
-      "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_path_avoid_obstacles",
-      "class": "register-allocation",
-      "evidence": "Best complete typed reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January is 1360 padded bytes and the natural candidate is 1312, with the same 49 relocation identities; January's boolean/register schedule is not reproduced by the ordinary source. The complete algorithm is retained as honest fuzzy work with no raw offsets, source pressure, nonsensical control flow or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 1360,
-          "relocation_count": 49,
-          "normalized_sha256": "ec47d37a5ccdd19d9d81026b7676d2a3fc7525416375f8d52257b65938ffe90b"
-        },
-        "base": {
-          "size": 1312,
-          "relocation_count": 49,
-          "normalized_sha256": "ebd074f70b98e427ea8e4304e5039f9d7bd1a58c6b22a4940466c1eb9789368d"
-        },
-        "objdiff_percent": 90.164444
-      }
-    },
-    {
       "unit": "source/camera/editor_flying_camera",
       "function": "_editor_camera_flying_update",
       "class": "unclassified",
@@ -1490,17 +1327,6 @@
           "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0"
         },
         "objdiff_percent": 61.451614
-      }
-    },
-    {
-      "unit": "source/ai/actor_perception",
-      "function": "_actor_perception_friend_prop_is_attacking",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed friend-attack predicate reconstructed from January and HCEA evidence. Target and candidate are both 432 padded bytes with all 16 relocations; the remaining delta is a compiler scheduling choice in otherwise complete logic. No fake dependency, raw object cast, volatile/register steering, or numeric enum substitution is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source or compiler-context evidence.",
-      "measurements": {
-        "target": { "size": 432, "relocation_count": 16, "normalized_sha256": "454bc3e478ad46e26eb67e05c8898945cf92782cfbd76123bee382c614f5a9c3" },
-        "base": { "size": 432, "relocation_count": 16, "normalized_sha256": "5c39b730aa08a1b8c9615ee8388452235e3378aeca2c6927df9949f42f9cb239" },
-        "objdiff_percent": 99.83108
       }
     },
     {
@@ -1600,17 +1426,6 @@
         "target": { "size": 1744, "relocation_count": 43, "normalized_sha256": "84720a5067d22512436bb45e9b948155fa08a828b9adf592a50c11ddd885596b" },
         "base": { "size": 2528, "relocation_count": 55, "normalized_sha256": "fb7bb3c6b7236d625348b35cdfa4175844acc230855ecc85e7ca966dd3b518e0" },
         "objdiff_percent": 49.07078
-      }
-    },
-    {
-      "unit": "source/interface/hud_messaging",
-      "function": "_hud_messaging_update",
-      "class": "unclassified",
-      "evidence": "Complete typed HUD renderer reconstructed from January control flow, strings, data and relocations, with the independent HCEA implementation as a semantic map. It covers objective/help/custom state messages, text and bitmap elements, button remapping, split-screen placement, timed item messages, fading and expiration. January is 2,928 padded bytes with 137 relocations; canonical is 2,880 with 136. The remaining delta is a VC7 load/register schedule around split-screen line placement, not known missing behavior. No compiler steering, raw offsets, fake dependency, undefined behavior, representation pun, forced inline or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/hud_messaging_obj_renderer_caller_closure_20260908.md.",
-      "measurements": {
-        "target": { "size": 2928, "relocation_count": 137, "normalized_sha256": "26a1376422e3742f9d65a8d83241919e1e370769a936ade9c9b859829d7d1b7b" },
-        "base": { "size": 2880, "relocation_count": 136, "normalized_sha256": "d5d32a3ce4d44e6e87ed3daa1d1ce28cf1a746bd53ae0b678bf7ec99a955d815" },
-        "objdiff_percent": 66.71034
       }
     },
     {
@@ -1959,50 +1774,6 @@
         "target": { "size": 304, "relocation_count": 25, "normalized_sha256": "9533beb1d4e9a53568bc1141902bf2b6de740161acc2225f7a1a9a24838fd276" },
         "base": { "size": 304, "relocation_count": 25, "normalized_sha256": "124019ea872d584781a0c8424c9fbce31bc491ba51226808716bc6e4335a2062" },
         "objdiff_percent": 93.74227
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_1wide_list_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 1152, "relocation_count": 70, "normalized_sha256": "c33a03c5370763cce87d6439786cd14c4e6297ae1e4069d83eb4b451b770bdd8" },
-        "base": { "size": 1152, "relocation_count": 70, "normalized_sha256": "c33a03c5370763cce87d6439786cd14c4e6297ae1e4069d83eb4b451b770bdd8" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_3wide_list_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 1232, "relocation_count": 71, "normalized_sha256": "00c90368ad7f0a0ea918ef5d4425050b17bfd917eced2a27dbac0dab47d6a9a9" },
-        "base": { "size": 1232, "relocation_count": 71, "normalized_sha256": "00c90368ad7f0a0ea918ef5d4425050b17bfd917eced2a27dbac0dab47d6a9a9" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_update_cache_for_nwide_list",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 13, "normalized_sha256": "5e8de72bb4e994b875b98b2d0691d7e016b860063a20195dea1a5ff76480e8b3" },
-        "base": { "size": 272, "relocation_count": 13, "normalized_sha256": "5e8de72bb4e994b875b98b2d0691d7e016b860063a20195dea1a5ff76480e8b3" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_splitscreen_pregame_status_screen_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: the same csplit address-attribution alias. local_player_controller_bitmap_frames occupies 24 bytes at image address 2584076 and the string literal 'invalid game_data_input_reference...' begins immediately after it at 2584100. Our natural expression resolves to 2584102, which VC7 emits as _local_player_controller_bitmap_frames+26 (two past the array's extent); csplit spells the same address as that string literal + 2. Both resolve to 2584102, proven through config/symbols.json. Code bytes, relocation count, offsets and types are identical; only this one symbol spelling differs. Zero credit. Reopen only on a change to csplit's relocation attribution or authentic January source for the expression.",
-      "measurements": {
-        "target": { "size": 1216, "relocation_count": 48, "normalized_sha256": "a494149278b8ee669720a11c0dc47b6415983d10252dbcd41b0c7a17581b8f12" },
-        "base": { "size": 1216, "relocation_count": 48, "normalized_sha256": "a494149278b8ee669720a11c0dc47b6415983d10252dbcd41b0c7a17581b8f12" },
-        "objdiff_percent": 100.0
       }
     },
     {

@@ -1406,7 +1406,7 @@ void weapon_magazine_finish_reload(
 	magazine->state_timer = 0;
 
 	if (magazine->rounds_total>0 &&
-		rounds_loaded<magazine_definition->rounds_loaded_maximum &&
+		magazine->rounds_loaded<magazine_definition->rounds_loaded_maximum &&
 		!TEST_FLAG(magazine_definition->flags, 0) &&
 		!(weapon->weapon.control_flags & 0x26))
 	{

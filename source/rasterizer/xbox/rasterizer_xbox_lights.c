@@ -201,7 +201,6 @@ void rasterizer_sun_glow_draw(
 	real_vector2d projected_axes;
 	real_point3d projected_center;
 	real_vector3d direction;
-	real_vector3d uncompressed_direction;
 	real intensity;
 	short viewport_width;
 	short viewport_height;
@@ -271,9 +270,7 @@ void rasterizer_sun_glow_draw(
 		vertex_constants,
 		5);
 
-	direction = *uncompress_int32_to_real_vector3d(
-		&uncompressed_direction,
-		parameters->compressed_direction);
+	direction = uncompress_int32_to_real_vector3d(parameters->compressed_direction);
 	occlusion_point.x = parameters->definition->occlusion_radius * direction.i +
 		parameters->position.x;
 	occlusion_point.y = parameters->definition->occlusion_radius * direction.j +

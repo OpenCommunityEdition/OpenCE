@@ -456,16 +456,13 @@ static real lens_flare_evaluate_corona_rotation_function(
 	real cosine = 1.0f;
 	real sine = 0.0f;
 	real rotation = 0.0f;
-	real_vector3d uncompressed_direction;
 	real_vector3d direction;
 	real_vector3d offset;
 
 #line 118 "c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c"
 	assert(lens_flare_parameters);
 
-	direction = *uncompress_int32_to_real_vector3d(
-		&uncompressed_direction,
-		lens_flare_parameters->compressed_direction);
+	direction = uncompress_int32_to_real_vector3d(lens_flare_parameters->compressed_direction);
 
 	switch (corona_rotation_function)
 	{
@@ -820,10 +817,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
 				lens_flare_submit_parameter_get(lens_flare_index);
 			struct lens_flare_definition *definition = lens_flare_parameters->definition;
-			real_vector3d uncompressed_direction;
-			real_vector3d direction = *uncompress_int32_to_real_vector3d(
-				&uncompressed_direction,
-				lens_flare_parameters->compressed_direction);
+			real_vector3d direction = uncompress_int32_to_real_vector3d(lens_flare_parameters->compressed_direction);
 
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)
@@ -893,10 +887,7 @@ void rasterizer_lens_flares_draw(
 			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
 				lens_flare_submit_parameter_get(lens_flare_index);
 			byte *occlusion_test_result = lens_flare_occlusion_test_results_get(lens_flare_parameters);
-			real_vector3d uncompressed_direction;
-			real_vector3d direction = *uncompress_int32_to_real_vector3d(
-				&uncompressed_direction,
-				lens_flare_parameters->compressed_direction);
+			real_vector3d direction = uncompress_int32_to_real_vector3d(lens_flare_parameters->compressed_direction);
 
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)

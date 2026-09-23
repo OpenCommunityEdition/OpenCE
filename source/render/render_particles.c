@@ -129,8 +129,7 @@ void render_particles(
 {
 	struct rendered_particle_datum rendered_particles[MAXIMUM_RENDERED_PARTICLES];
 	short group_particle_counts[MAXIMUM_RENDERED_PARTICLE_GROUPS];
-	long rendered_particle_count;
-	boolean previous_attached_to_first_person_weapon;
+	short rendered_particle_count;
 	struct build_sprite_data sprite_data;
 	real_point3d position;
 	real_vector3d direction;
@@ -168,7 +167,7 @@ void render_particles(
 					owned_by_local_player))
 			{
 				struct rendered_particle_datum *rendered_particle =
-					&rendered_particles[(short)rendered_particle_count++];
+					&rendered_particles[rendered_particle_count++];
 
 				rendered_particle->particle_index = (short)particle_index;
 				rendered_particle->definition_index =
@@ -183,28 +182,26 @@ void render_particles(
 			}
 		}
 
-		if ((short)rendered_particle_count > 0)
+		if (rendered_particle_count > 0)
 		{
 			short group_count = 0;
-			struct rendered_particle_datum *rendered_particle;
-			short *current_sprite_group;
 
 			qsort(
 				rendered_particles,
-				(short)rendered_particle_count,
+				rendered_particle_count,
 				sizeof(struct rendered_particle_datum),
 				compare_rendered_particles);
 
 			{
+				struct rendered_particle_datum *rendered_particle =
+					rendered_particles;
+				short *current_sprite_group;
 				short previous_definition_index = NONE;
 				short previous_cluster_index = NONE;
+				boolean previous_attached_to_first_person_weapon = FALSE;
 
-				previous_attached_to_first_person_weapon = FALSE;
-				rendered_particle = rendered_particles;
-				do
+				while (rendered_particle_count-- > 0)
 				{
-					rendered_particle_count--;
-
 					if (rendered_particle->definition_index ==
 							previous_definition_index &&
 						rendered_particle->cluster_index ==
@@ -221,35 +218,32 @@ void render_particles(
 
 						current_sprite_group =
 							&group_particle_counts[group_count++];
+						*current_sprite_group = 1;
 						previous_definition_index =
 							rendered_particle->definition_index;
 						previous_cluster_index =
 							rendered_particle->cluster_index;
-						*current_sprite_group = 1;
 						previous_attached_to_first_person_weapon =
 							rendered_particle->attached_to_first_person_weapon;
 					}
 
 					rendered_particle++;
 				}
-				while ((short)rendered_particle_count > 0);
 			}
 
-			rendered_particle = rendered_particles;
-			if (group_count > 0)
 			{
-				long groups_remaining = (word)group_count;
+				struct rendered_particle_datum *rendered_particle =
+					rendered_particles;
+				short group_index;
 
-				current_sprite_group = group_particle_counts;
-				do
+				for (group_index = 0; group_index < group_count; group_index++)
 				{
 					struct particle_definition *definition =
 						particle_definition_get(
 							rendered_particle->definition_index);
-					short particle_count = *current_sprite_group;
+					short particle_count = group_particle_counts[group_index];
 					real total_radius = 0.0f;
-					long built_particle_count = 0;
-					short particle_number;
+					short built_particle_count = 0;
 
 					build_sprites_begin(
 						&sprite_data,
@@ -260,9 +254,7 @@ void render_particles(
 							? FLAG(_build_sprites_first_person_bit)
 							: 0);
 
-					for (particle_number = 0;
-						particle_number < particle_count;
-						particle_number++, rendered_particle++)
+					while (particle_count-- > 0)
 					{
 						struct particle_datum *particle =
 							particle_get(rendered_particle->particle_index);
@@ -291,6 +283,7 @@ void render_particles(
 							else
 							{
 								particle_delete(rendered_particle->particle_index);
+								rendered_particle++;
 								continue;
 							}
 
@@ -386,6 +379,8 @@ void render_particles(
 									render.frame_index;
 							}
 						}
+
+						rendered_particle++;
 					}
 
 					/* BUG (original): a fully culled group divides zero by zero.
@@ -393,12 +388,9 @@ void render_particles(
 					 * built_particle_count is zero. */
 					((struct shader_effect_definition *)sprite_data.shader)->
 						secondary_map_radius =
-						total_radius / (short)built_particle_count;
+						total_radius / built_particle_count;
 					build_sprites_end(&sprite_data);
-
-					current_sprite_group++;
 				}
-				while (--groups_remaining != 0);
 			}
 		}
 	}

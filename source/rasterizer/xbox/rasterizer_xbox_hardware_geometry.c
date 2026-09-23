@@ -69,10 +69,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void _ReadWriteBarrier(
-	void);
-#pragma intrinsic(_ReadWriteBarrier)
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -243,6 +239,7 @@ boolean rasterizer_triangle_buffer_new(
 	long buffer_size;
 	long result;
 
+	success = TRUE;
 	buffer_size = 0;
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 115, triangle_buffer);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_geometry.c", 116, triangles);
@@ -266,73 +263,83 @@ boolean rasterizer_triangle_buffer_new(
 		break;
 	}
 
-	success = TRUE;
 	if (!global_d3d_device)
 	{
-		_ReadWriteBarrier();
 		success = FALSE;
-failure:
 		csmemset(triangle_buffer, 0, sizeof(*triangle_buffer));
-		error(2, "### ERROR failed to create triangle buffer hardware format");
-		return success;
-	}
-
-	result = IDirect3DDevice8_CreateIndexBuffer(
-		global_d3d_device,
-		buffer_size,
-		D3DUSAGE_WRITEONLY,
-		D3DFMT_INDEX16,
-		D3DPOOL_MANAGED,
-		&d3d_index_buffer);
-	if (result >= 0)
-	{
-		success = TRUE;
+		error(_error_silent, "### ERROR failed to create triangle buffer hardware format");
 	}
 	else
 	{
-		success = FALSE;
-		rasterizer_error(
-			result,
-			"IDirect3DDevice8_CreateIndexBuffer(global_d3d_device, buffer_size, RASTERIZER_STATIC_BUFFER_USAGE, D3DFMT_INDEX16, RASTERIZER_STATIC_BUFFER_POOL, &d3d_index_buffer)");
-	}
-	if (!d3d_index_buffer)
-	{
-		success = FALSE;
-		d3d_index_buffer = NULL;
-	}
-	if (!success)
-	{
-		d3d_index_buffer = NULL;
-	}
-	if (!success)
-		goto failure;
+		if (success)
+		{
+			result = IDirect3DDevice8_CreateIndexBuffer(
+				global_d3d_device,
+				buffer_size,
+				D3DUSAGE_WRITEONLY,
+				D3DFMT_INDEX16,
+				D3DPOOL_MANAGED,
+				&d3d_index_buffer);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DDevice8_CreateIndexBuffer(global_d3d_device, buffer_size, RASTERIZER_STATIC_BUFFER_USAGE, D3DFMT_INDEX16, RASTERIZER_STATIC_BUFFER_POOL, &d3d_index_buffer)");
+			}
+			if (!d3d_index_buffer)
+				success = FALSE;
+			if (!success)
+				d3d_index_buffer = NULL;
+		}
 
-	IDirect3DIndexBuffer8_Lock(
-		d3d_index_buffer,
-		0,
-		buffer_size,
-		&locked_triangles,
-		0);
-	if (!locked_triangles)
-	{
-		success = FALSE;
-	}
-	else
-	{
-		csmemcpy(
-			locked_triangles,
-			triangles,
-			buffer_size);
-		triangle_buffer->type = triangle_type;
-		triangle_buffer->count = count;
-		triangle_buffer->base_address = (void *)triangles;
-		_ReadWriteBarrier();
-		triangle_buffer->hardware_format = d3d_index_buffer;
-	}
-	if (!success)
-		goto failure;
+		if (success)
+		{
+			IDirect3DIndexBuffer8_Lock(
+				d3d_index_buffer,
+				0,
+				buffer_size,
+				&locked_triangles,
+				0);
+			if (!locked_triangles)
+				success = FALSE;
+			if (!success)
+				locked_triangles = NULL;
+		}
 
-	return TRUE;
+		if (success)
+		{
+			csmemcpy(locked_triangles, triangles, buffer_size);
+			result = IDirect3DIndexBuffer8_Unlock(d3d_index_buffer);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DIndexBuffer8_Unlock(d3d_index_buffer)");
+			}
+
+			triangle_buffer->type = triangle_type;
+			triangle_buffer->count = count;
+			triangle_buffer->base_address = (void *)triangles;
+			triangle_buffer->hardware_format = d3d_index_buffer;
+		}
+		else
+		{
+			csmemset(triangle_buffer, 0, sizeof(*triangle_buffer));
+			error(_error_silent, "### ERROR failed to create triangle buffer hardware format");
+		}
+	}
+
+	return success;
 }
 
 void rasterizer_triangle_buffer_delete(

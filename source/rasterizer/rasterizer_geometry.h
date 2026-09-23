@@ -61,8 +61,7 @@ struct triangle_buffer
 
 /* ---------- prototypes/RASTERIZER_GEOMETRY.C */
 
-union real_vector3d *uncompress_int32_to_real_vector3d(
-	union real_vector3d *result,
+union real_vector3d uncompress_int32_to_real_vector3d(
 	unsigned long compressed);
 
 byte compress_real_to_int8(
