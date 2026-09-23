@@ -77,6 +77,7 @@ symbols in this file:
 #include "bitmaps/bitmaps_mipmap.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_swizzle.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include <xtl.h>
 
 /* ---------- constants */

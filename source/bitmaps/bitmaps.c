@@ -237,6 +237,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "math/integer_math.h"
 #include "rasterizer/rasterizer_swizzle.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 
 /* ---------- constants */
 
@@ -301,11 +302,6 @@ enum
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-void rasterizer_bitmap_changed(
-	struct bitmap_data *bitmap);
-void rasterizer_bitmap_delete(
-	struct bitmap_data *bitmap);
 
 static boolean bitmap_format_type_valid_width(
 	short format,

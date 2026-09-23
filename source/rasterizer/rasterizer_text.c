@@ -69,7 +69,9 @@ symbols in this file:
 #include "bitmaps/bitmaps_internal.h"
 #include "math/integer_math.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include "rasterizer/rasterizer_text.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "render/render.h"
 #include "text/font_group.h"
 #include "text/unicode.h"
@@ -92,7 +94,6 @@ enum
 {
 	_rasterizer_target_render_primary = 0,
 	_shader_framebuffer_blend_function_alpha_blend = 0,
-	_rasterizer_debug_option_dynamic_screen_geometry = 0x22,
 };
 
 /* ---------- macros */
@@ -198,7 +199,6 @@ static void rasterizer_draw_character_with_dropshadow(
 
 /* ---------- globals */
 
-extern byte rasterizer_debug_options[];
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static struct hardware_character_cache hardware_character_cache;
@@ -356,7 +356,7 @@ rasterizer_draw_string(
 	short height_adjust,
 	char const *string)
 {
-	if (rasterizer_debug_options[_rasterizer_debug_option_dynamic_screen_geometry]
+	if (rasterizer_debug_options.dynamic_screen_geometry
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
@@ -439,7 +439,7 @@ rasterizer_draw_unicode_string(
 	short height_adjust,
 	wchar_t const *string)
 {
-	if (rasterizer_debug_options[_rasterizer_debug_option_dynamic_screen_geometry]
+	if (rasterizer_debug_options.dynamic_screen_geometry
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
