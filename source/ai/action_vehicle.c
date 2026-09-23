@@ -73,11 +73,7 @@ symbols in this file:
 #define distance3d distance3d_inline
 #define distance_squared2d distance_squared2d_inline
 #define negate_vector2d negate_vector2d_inline
-#define point_from_line2d point_from_line2d_inline
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "actions.h"
-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
-#undef point_from_line2d
 #undef negate_vector2d
 #undef distance_squared2d
 #undef distance3d
@@ -183,18 +179,6 @@ void object_get_bounding_sphere(
 	*radius = object->object.bounding_sphere_radius;
 
 	return;
-}
-
-real_point2d *point_from_line2d(
-	real_point2d const *p,
-	real_vector2d const *v,
-	real t,
-	real_point2d *result)
-{
-	result->x = t*v->i + p->x;
-	result->y = t*v->j + p->y;
-
-	return result;
 }
 
 real distance_squared2d(
@@ -543,195 +527,189 @@ static boolean action_vehicle_find_destination(
 		unit_definition_get(vehicle->definition_index);
 	struct actor_debug_info *debug =
 		&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
-	real_point3d chosen_point = *entry_point;
-	boolean use_entry_point =
+	real_point3d modified_destination = *entry_point;
+	boolean success = FALSE;
+	boolean ignore_hint =
 		ignore_hint_reference ? *ignore_hint_reference : FALSE;
 
 	if (!TEST_FLAG(
 		vehicle_definition->unit.flags,
 		_unit_has_entrance_points_inside_bounding_sphere_bit))
 	{
-		real_point3d const *actor_position;
-		real_point3d marker;
-		real approach_distance;
-		real_point3d anchor_point;
-		real_vector2d entry_direction;
-		real_vector2d anchor_to_marker;
+		real_point3d vehicle_center;
+		real_point3d target_point;
+		real_vector2d actor_to_vehicle;
+		real_vector2d actor_to_target_point;
+		real_vector2d target_point_to_vehicle;
+		real vehicle_radius;
+		real actor_to_target_point_distance_squared;
 
-		object_get_bounding_sphere(vehicle_index, &marker, &approach_distance);
+		object_get_bounding_sphere(vehicle_index, &vehicle_center, &vehicle_radius);
 		if (vehicle_definition->unit.ai_vehicle_avoidance_radius > 0.0f)
 		{
-			approach_distance = vehicle_definition->unit.ai_vehicle_avoidance_radius;
+			vehicle_radius = vehicle_definition->unit.ai_vehicle_avoidance_radius;
 		}
 
-		if (!use_entry_point)
+		if (!ignore_hint)
 		{
-			real dx = hint_point->x - marker.x;
-			real dy = hint_point->y - marker.y;
-			real dz = hint_point->z - marker.z;
-			real marker_distance = square_root(dx*dx + dz*dz + dy*dy);
+			real hint_distance = distance3d(&vehicle_center, hint_point);
 
-			if (marker_distance < 0.5f)
+			if (hint_distance < 0.5f)
 			{
-				use_entry_point = TRUE;
+				ignore_hint = TRUE;
 			}
-			else if (approach_distance < marker_distance + 0.3f)
+			else
 			{
-				approach_distance = marker_distance + 0.3f;
+				vehicle_radius = MAX(vehicle_radius, hint_distance + 0.3f);
 			}
 		}
 
-		anchor_point = use_entry_point ? *entry_point : *hint_point;
-		actor_position = &actor->input.position.body_position;
-		entry_direction.i =
-			anchor_point.x - actor_position->x;
-		entry_direction.j =
-			anchor_point.y - actor_position->y;
-		anchor_to_marker.i = marker.x - anchor_point.x;
-		anchor_to_marker.j = marker.y - anchor_point.y;
+		target_point = *(ignore_hint ? entry_point : hint_point);
+		vector_from_points2d(
+			(real_point2d const *)&actor->input.position.body_position,
+			(real_point2d const *)&vehicle_center,
+			&actor_to_vehicle);
+		vector_from_points2d(
+			(real_point2d const *)&actor->input.position.body_position,
+			(real_point2d const *)&target_point,
+			&actor_to_target_point);
+		vector_from_points2d(
+			(real_point2d const *)&target_point,
+			(real_point2d const *)&vehicle_center,
+			&target_point_to_vehicle);
 
-		if (!use_entry_point)
+		if (!ignore_hint)
 		{
-			real dx = hint_point->x - entry_point->x;
-			real dy = hint_point->y - entry_point->y;
-			real t = -(dx*entry_direction.i + dy*entry_direction.j);
-			real px = dx*t + entry_direction.i;
-			real py = dy*t + entry_direction.j;
+			real_vector2d perpendicular_vector_to_hint_line;
+			real_vector2d hint_direction;
 
-			if (py*py + px*px < 0.35f*0.35f)
+			vector_from_points2d(
+				(real_point2d const *)entry_point,
+				(real_point2d const *)hint_point,
+				&hint_direction);
+			point_from_line2d(
+				(real_point2d const *)&actor_to_target_point,
+				&hint_direction,
+				-dot_product2d(&actor_to_target_point, &hint_direction),
+				(real_point2d *)&perpendicular_vector_to_hint_line);
+			if (magnitude_squared2d(&perpendicular_vector_to_hint_line) < 0.35f*0.35f)
 			{
-				use_entry_point = TRUE;
+				ignore_hint = TRUE;
 			}
 		}
 
 		debug->last_vehicle_avoidance_time = game_time_get();
-		debug->field_C8 = *actor_position;
-		debug->field_D4 = marker;
-		debug->field_E0 = approach_distance;
-		debug->field_E4 = anchor_point;
+		debug->field_C8 = actor->input.position.body_position;
+		debug->field_D4 = vehicle_center;
+		debug->field_E0 = vehicle_radius;
+		debug->field_E4 = target_point;
 		debug->field_F0 = REAL_MAX;
 		debug->field_F4 = FALSE;
 
-		if (entry_direction.j*entry_direction.j +
-			entry_direction.i*entry_direction.i > 0.0f)
+		actor_to_target_point_distance_squared =
+			magnitude_squared2d(&actor_to_target_point);
+		if (actor_to_target_point_distance_squared > 0.0f)
 		{
-			boolean refined = FALSE;
-			real_vector2d perpendicular;
-			real marker_dx =
-				marker.x - actor_position->x;
-			real marker_dy =
-				marker.y - actor_position->y;
 			real t =
-				(entry_direction.j*marker_dy + entry_direction.i*marker_dx) /
-				(entry_direction.j*entry_direction.j +
-					entry_direction.i*entry_direction.i);
+				dot_product2d(&actor_to_target_point, &actor_to_vehicle) /
+				actor_to_target_point_distance_squared;
+			real_vector2d avoid_vehicle_direction;
+			boolean avoid_vehicle = FALSE;
 
 			debug->field_F0 = t;
 			if (t > 0.0f && t < 1.2f)
 			{
-				perpendicular2d(&entry_direction, &perpendicular);
-				if (perpendicular.j*marker_dy +
-					perpendicular.i*marker_dx > 0.0f)
+				perpendicular2d(&actor_to_target_point, &avoid_vehicle_direction);
+				if (dot_product2d(&actor_to_vehicle, &avoid_vehicle_direction) > 0.0f)
 				{
-					perpendicular.i = -perpendicular.i;
-					perpendicular.j = -perpendicular.j;
+					negate_vector2d(&avoid_vehicle_direction, &avoid_vehicle_direction);
 				}
-				refined = TRUE;
+				avoid_vehicle = TRUE;
 			}
-			else if (!use_entry_point)
+			else if (!ignore_hint)
 			{
-				perpendicular.i = -anchor_to_marker.i;
-				perpendicular.j = -anchor_to_marker.j;
-				refined = TRUE;
+				negate_vector2d(&target_point_to_vehicle, &avoid_vehicle_direction);
+				avoid_vehicle = TRUE;
 			}
 
-			if (refined && normalize2d(&perpendicular) > 0.0f)
+			if (avoid_vehicle && normalize2d(&avoid_vehicle_direction) > 0.0f)
 			{
-				real offset_distance = approach_distance*1.1f;
-				real_vector2d chosen_to_actor;
-				real dz;
+				real_vector3d vector_to_destination;
 				real distance_squared;
 
-				chosen_point.x = marker.x + perpendicular.i*offset_distance;
-				chosen_point.y = marker.y + perpendicular.j*offset_distance;
-				chosen_point.z = entry_point->z;
-				chosen_to_actor.i =
-					chosen_point.x - actor_position->x;
-				chosen_to_actor.j =
-					chosen_point.y - actor_position->y;
-				dz = entry_point->z - actor_position->z;
-				distance_squared =
-					chosen_to_actor.i*chosen_to_actor.i + dz*dz +
-					chosen_to_actor.j*chosen_to_actor.j;
+				point_from_line2d(
+					(real_point2d const *)&vehicle_center,
+					&avoid_vehicle_direction,
+					vehicle_radius*1.1f,
+					(real_point2d *)&modified_destination);
+				vector_from_points3d(
+					&actor->input.position.body_position,
+					&modified_destination,
+					&vector_to_destination);
+				distance_squared = magnitude_squared3d(&vector_to_destination);
 				if (distance_squared > 0.0001f && distance_squared < 4.0f)
 				{
+					real_vector3d tangential_offset_vector;
 					real distance = square_root(distance_squared);
-					real_vector2d second_perpendicular;
 
-					perpendicular2d(&anchor_to_marker, &second_perpendicular);
-					if (second_perpendicular.j*chosen_to_actor.j +
-						second_perpendicular.i*chosen_to_actor.i < 0.0f)
+					perpendicular2d(
+						&target_point_to_vehicle,
+						(real_vector2d *)&tangential_offset_vector);
+					if (dot_product2d(
+						(real_vector2d const *)&tangential_offset_vector,
+						(real_vector2d const *)&vector_to_destination) < 0.0f)
 					{
-						second_perpendicular.i = -second_perpendicular.i;
-						second_perpendicular.j = -second_perpendicular.j;
+						negate_vector2d(
+							(real_vector2d const *)&tangential_offset_vector,
+							(real_vector2d *)&tangential_offset_vector);
 					}
-					if (normalize2d(&second_perpendicular) > 0.0f)
+					tangential_offset_vector.k = 0.0f;
+					if (normalize2d((real_vector2d *)&tangential_offset_vector) > 0.0f)
 					{
-						real_vector3d offset;
-
-						offset.i = second_perpendicular.i;
-						offset.j = second_perpendicular.j;
-						offset.k = 0.0f;
 						point_from_line3d(
-							&chosen_point,
-							&offset,
+							&modified_destination,
+							&tangential_offset_vector,
 							2.0f - distance,
-							&chosen_point);
+							&modified_destination);
 					}
 				}
 
 				debug->field_F4 = TRUE;
-				debug->field_F8 = chosen_point;
+				debug->field_F8 = modified_destination;
 			}
 		}
 	}
 
 	if (ignore_hint_reference)
 	{
-		*ignore_hint_reference = use_entry_point;
+		*ignore_hint_reference = ignore_hint;
 	}
 
 	{
-		real_point3d test_point;
-		real_vector3d down_vector;
-		struct collision_bsp_test_vector_result collision;
+		struct collision_bsp *collision_bsp = global_collision_bsp_get();
+		struct collision_bsp_test_vector_result result;
+		real_point3d collision_origin;
+		real_vector3d collision_vector;
 
-		test_point.x = chosen_point.x + global_up3d->i;
-		test_point.y = chosen_point.y + global_up3d->j;
-		test_point.z = chosen_point.z + global_up3d->k;
-		down_vector.i = global_down3d->i*4.0f;
-		down_vector.j = global_down3d->j*4.0f;
-		down_vector.k = global_down3d->k*4.0f;
-		if (!collision_bsp_test_vector(
+		point_from_line3d(&modified_destination, global_up3d, 1.0f, &collision_origin);
+		scale_vector3d(global_down3d, 4.0f, &collision_vector);
+		if (collision_bsp_test_vector(
 			FLAG(_collision_test_front_facing_surfaces_bit),
-			global_collision_bsp_get(),
+			collision_bsp,
 			0,
 			NULL,
-			&test_point,
-			&down_vector,
+			&collision_origin,
+			&collision_vector,
 			REAL_MAX,
-			&collision))
+			&result))
 		{
-			return FALSE;
+			*surface_index_reference = result.surface_index;
+			point_from_line3d(&collision_origin, &collision_vector, result.t, destination_point);
+			success = TRUE;
 		}
-
-		destination_point->x = down_vector.i*collision.t + test_point.x;
-		destination_point->y = down_vector.j*collision.t + test_point.y;
-		destination_point->z = down_vector.k*collision.t + test_point.z;
-		*surface_index_reference = collision.surface_index;
 	}
 
-	return TRUE;
+	return success;
 }
 
 static short action_vehicle_find_impromptu_seat(
