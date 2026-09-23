@@ -1929,8 +1929,6 @@ void rasterizer_debug_model_vertices(
 			short node_index1;
 			real node_weight0;
 			real node_weight1;
-			real_vector3d decompressed_normal;
-			real_vector3d *decompressed_normal_result;
 			real_vector3d vertex_normal;
 			real_point3d point;
 			real_vector3d normal;
@@ -1946,8 +1944,7 @@ void rasterizer_debug_model_vertices(
 				real_vector3d node_normal1 = { 0.f, 0.f, 0.f };
 				long debug_vertex_index;
 
-			decompressed_normal_result = uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
-			vertex_normal = *decompressed_normal_result;
+			vertex_normal = uncompress_int32_to_real_vector3d(vertex->normal);
 			match_assert(
 				"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
 				878,

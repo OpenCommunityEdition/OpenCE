@@ -320,25 +320,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
-      "function": "_rasterizer_triangle_buffer_new",
-      "class": "instruction-scheduling",
-      "evidence": "Target and candidate have equal 0x160 padded size and all 24 relocation identities/addresses. The remaining eight normalized bytes are confined to the final four structure-field stores: the target reloads the hardware buffer into ECX before the offset/base stores, while VC7's current source reloads it into EAX after them. A preserved 160-case control-flow/barrier/field-order supersearch plus focused lifetime, alias, helper, qualifier, and initialization matrices found no legal-C form that changes only this schedule.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 24,
-          "normalized_sha256": "e90e066bbde0d04c87a43f665fcd7a131ff0e0d1c7a5354b82062ae5b822396c"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 24,
-          "normalized_sha256": "b0fdebbf1336f8336a37bb436ad10ea3ebbf9f105715dec74c87d16c283b457e"
-        },
-        "objdiff_percent": 98.203255
-      }
-    },
-    {
       "unit": "source/cseries/cseries",
       "function": "_stristr",
       "class": "asm-implemented",
@@ -567,44 +548,6 @@
           "normalized_sha256": "8199ac81b23a4607ed8191dbe2f95cb11da85761ecf353514714f8261562b55f"
         },
         "objdiff_percent": 95.0
-      }
-    },
-    {
-      "unit": "source/rasterizer/rasterizer_geometry",
-      "function": "_compress_real_vector3d_to_int32",
-      "class": "instruction-scheduling",
-      "evidence": "Equal 544-byte padded size, 38/38 relocations address-for-address identical, and 181/181 instructions. The sole divergence is the debug round-trip's aggregate copy: January issues all three dword loads from the returned pointer before any store, the candidate interleaves load and store per component. Two spellings bracket the target and neither reaches it - one local gives January's correct sub esp,0x10 frame with the interleaved copy, a separate decompressed local gives the grouped copy with a 12-byte-too-large frame. The one-local form is retained because a frame-size mismatch is structural. Measured inert: copying through a named pointer, that pointer scoped to an inner block, declaring v2 first, and combinations.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 38,
-          "normalized_sha256": "1bb3b5c9d4712b2fc2ec7e9dc9f3f8e791496a82595ca154ca76719067cd60a7"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 38,
-          "normalized_sha256": "e0b39fc94ba068043e045bae7c75a86a90a7853fe417e0bfe894324d4e6811e5"
-        },
-        "objdiff_percent": 96.34682
-      }
-    },
-    {
-      "unit": "source/rasterizer/rasterizer_geometry",
-      "function": "_compress_real_vector3d_to_int32_clamp",
-      "class": "instruction-scheduling",
-      "evidence": "Equal 512-byte padded size, 38/38 relocations address-for-address identical, and 164/164 instructions. Same single divergence and the same exhausted control set as its non-clamp twin above; the two share the round-trip block verbatim.",
-      "measurements": {
-        "target": {
-          "size": 512,
-          "relocation_count": 38,
-          "normalized_sha256": "ba84758e70f380dff5a1f53fc34fd72500d77f38cdef7529edeff8c5ccdffe3c"
-        },
-        "base": {
-          "size": 512,
-          "relocation_count": 38,
-          "normalized_sha256": "8983acf2b5bc6570cede768472facdfc4bd6d012eb30038ed0d53f04341fc3a5"
-        },
-        "objdiff_percent": 94.8
       }
     },
     {
@@ -953,7 +896,7 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_lights",
       "function": "_rasterizer_sun_glow_draw",
       "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the complete typed sun-glow renderer retained. January disassembly and strings establish the view-vector normalization, angular visibility falloff, billboard projection and clipping, two-stage downsample/convolution render-target work, Xbox render-state setup, and final immediate-mode quad. Target and candidate share the 2,352-byte padded envelope and 174 relocations; objdiff reports 95.815155 percent. The first meaningful divergence is the 0x98 versus 0xA4 local frame and the x87 dot/falloff schedule beginning near +0x69, followed by shifted but semantically equivalent local lifetimes throughout the billboard path. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler sun-glow donor explaining the local/x87 schedule.",
+      "evidence": "Fuzzy-parked under the current house rule with the complete typed sun-glow renderer retained. January disassembly and strings establish the view-vector normalization, angular visibility falloff, billboard projection and clipping, two-stage downsample/convolution render-target work, Xbox render-state setup, and final immediate-mode quad. Target and candidate share the 2,352-byte padded envelope and 174 relocations; objdiff reports 95.815155 percent. The first meaningful divergence is the 0x98 versus 0xA4 local frame and the x87 dot/falloff schedule beginning near +0x69, followed by shifted but semantically equivalent local lifetimes throughout the billboard path. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, handwritten assembly, raw offset, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler sun-glow donor explaining the local/x87 schedule. Re-measured 2026-09-23 (structural lane batch 3): uncompress_int32_to_real_vector3d now returns real_vector3d by value (debug-build struct-return pattern at all 16 call sites, HCEX single parameter), so the lens-flare direction is assigned directly; size unchanged, fuzzy 95.815 -> 95.817.",
       "measurements": {
         "target": {
           "size": 2352,
@@ -963,9 +906,9 @@
         "base": {
           "size": 2352,
           "relocation_count": 174,
-          "normalized_sha256": "dafe3a30c86a8480f266462aab566bcc259752c9b225fcb48a1efdc914209a2d"
+          "normalized_sha256": "dd0f3291088445bdba917e904238c47a2df4aaa9614e08665f482dccb4786654"
         },
-        "objdiff_percent": 95.815155
+        "objdiff_percent": 95.816666
       }
     },
     {

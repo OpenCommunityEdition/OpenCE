@@ -4,15 +4,15 @@
  "base": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
  "pushed": false,
  "summary": {
-  "functions_gained": 19,
-  "padded_bytes": 19456,
-  "code_bytes": 19312,
+  "functions_gained": 23,
+  "padded_bytes": 21088,
+  "code_bytes": 20902,
   "stable_regressions": 0,
   "by_category": {
    "source": {
-    "functions": 11,
-    "padded_bytes": 12640,
-    "code_bytes": 12560
+    "functions": 15,
+    "padded_bytes": 14272,
+    "code_bytes": 14150
    },
    "config-relocation-alias": {
     "functions": 8,
@@ -153,6 +153,33 @@
    "description": "sound fuzzy improvement with a real defect fix",
    "gate": "scratch/lane/gate_b5.txt: ninja PASS, gained 0, regressions 0, parks 112/0/0, pytest 1152/5/26",
    "functions": []
+  },
+  "b6": {
+   "category": "source",
+   "description": "wave 3 exacts + owner-header packet (by-value uncompress prototype, players_debug_render prototype)",
+   "gate": "scratch/lane/gate_b6.txt: ninja PASS, +4 fns / 1,632 padded, regressions 0 (incl. _rasterizer_frame_statistics_draw), parks 109/0/0, admission 48/0/10/0, pytest 1152/5/26",
+   "functions": [
+    {
+     "unit": "source/items/weapons",
+     "function": "_weapon_magazine_finish_reload",
+     "evidence": "/Od 0x6a4590 (and puppet twin 0x6a42d0) reads magazine->rounds_loaded (movsx ecx,[eax+8]) after the rounds_total>0 test, not the local"
+    },
+    {
+     "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+     "function": "_rasterizer_triangle_buffer_new",
+     "evidence": "/Od 0x7eaca0: IDirect3DIndexBuffer8_Unlock with HRESULT check after the copy (string at 0x7eaf86), staged success flags, report nested inside the device block; replaces production _ReadWriteBarrier/pragma/goto steering"
+    },
+    {
+     "unit": "source/rasterizer/rasterizer_geometry",
+     "function": "_compress_real_vector3d_to_int32",
+     "evidence": "uncompress_int32_to_real_vector3d returns real_vector3d by value: /Od struct-return copy pattern at all 16 call sites, HCEX single parameter unsigned long i; the hidden return buffer shares v2 slot (January grouped copy, sub esp 0x10)"
+    },
+    {
+     "unit": "source/rasterizer/rasterizer_geometry",
+     "function": "_compress_real_vector3d_to_int32_clamp",
+     "evidence": "same by-value law"
+    }
+   ]
   }
  },
  "functions": [
@@ -384,6 +411,54 @@
    "category": "config-relocation-alias",
    "was_parked": false,
    "evidence": "relocs.json 847565 -> _profile_graph_values-3 and 847576 -> _profile_graph_values-8 (values[index-1].enabled / .frame_value; csplit named the preceding _profile_graph_value_count); identical image addresses; scorer already credited",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/items/weapons",
+   "function": "_weapon_magazine_finish_reload",
+   "padded_bytes": 224,
+   "code_bytes": 209,
+   "before_status": "R",
+   "batch": "b6",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x6a4590 (and puppet twin 0x6a42d0) reads magazine->rounds_loaded (movsx ecx,[eax+8]) after the rounds_total>0 test, not the local",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_geometry",
+   "function": "_compress_real_vector3d_to_int32",
+   "padded_bytes": 544,
+   "code_bytes": 536,
+   "before_status": "R",
+   "batch": "b6",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "uncompress_int32_to_real_vector3d returns real_vector3d by value: /Od struct-return copy pattern at all 16 call sites, HCEX single parameter unsigned long i; the hidden return buffer shares v2 slot (January grouped copy, sub esp 0x10)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_geometry",
+   "function": "_compress_real_vector3d_to_int32_clamp",
+   "padded_bytes": 512,
+   "code_bytes": 508,
+   "before_status": "R",
+   "batch": "b6",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "same by-value law",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+   "function": "_rasterizer_triangle_buffer_new",
+   "padded_bytes": 352,
+   "code_bytes": 337,
+   "before_status": "R",
+   "batch": "b6",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "/Od 0x7eaca0: IDirect3DIndexBuffer8_Unlock with HRESULT check after the copy (string at 0x7eaf86), staged success flags, report nested inside the device block; replaces production _ReadWriteBarrier/pragma/goto steering",
    "new_definitions": []
   }
  ],

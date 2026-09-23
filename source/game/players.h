@@ -258,6 +258,8 @@ void players_update_before_game(
 	void);
 void players_update_after_game(
 	void);
+void players_debug_render(
+	void);
 void player_handle_powerup_equipment(
 	long player_index,
 	long equipment_index);

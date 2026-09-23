@@ -226,7 +226,6 @@ void rasterizer_geometry_uncompress_vertices(
 		{
 			struct environment_vertex_uncompressed *dst= (struct environment_vertex_uncompressed *)uncompressed;
 			struct environment_vertex_compressed const *src= (struct environment_vertex_compressed const *)compressed;
-			real_vector3d normal, binormal, tangent;
 			long index;
 
 			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 287, count*sizeof(struct environment_vertex_uncompressed)==uncompressed_size);
@@ -235,9 +234,9 @@ void rasterizer_geometry_uncompress_vertices(
 			for (index=0; index<count; index++, dst++, src++)
 			{
 				dst->position= src->position;
-				dst->normal= *uncompress_int32_to_real_vector3d(&normal, src->normal);
-				dst->binormal= *uncompress_int32_to_real_vector3d(&binormal, src->binormal);
-				dst->tangent= *uncompress_int32_to_real_vector3d(&tangent, src->tangent);
+				dst->normal= uncompress_int32_to_real_vector3d(src->normal);
+				dst->binormal= uncompress_int32_to_real_vector3d(src->binormal);
+				dst->tangent= uncompress_int32_to_real_vector3d(src->tangent);
 				dst->texcoord= src->texcoord;
 			}
 
@@ -248,7 +247,6 @@ void rasterizer_geometry_uncompress_vertices(
 		{
 			struct environment_lightmap_vertex_uncompressed *dst= (struct environment_lightmap_vertex_uncompressed *)uncompressed;
 			struct environment_lightmap_vertex_compressed const *src= (struct environment_lightmap_vertex_compressed const *)compressed;
-			real_vector3d incident_radiosity;
 			long index;
 
 			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 307, count*sizeof(struct environment_lightmap_vertex_uncompressed)==uncompressed_size);
@@ -256,7 +254,7 @@ void rasterizer_geometry_uncompress_vertices(
 
 			for (index=0; index<count; index++, dst++, src++)
 			{
-				dst->incident_radiosity= *uncompress_int32_to_real_vector3d(&incident_radiosity, src->incident_radiosity);
+				dst->incident_radiosity= uncompress_int32_to_real_vector3d(src->incident_radiosity);
 				dst->texcoord.x= ((real)src->lightmap_u * 2.0f + 1.0f) * (1.0f / 65535.0f);
 				dst->texcoord.y= ((real)src->lightmap_v * 2.0f + 1.0f) * (1.0f / 65535.0f);
 			}
@@ -268,7 +266,6 @@ void rasterizer_geometry_uncompress_vertices(
 		{
 			struct model_vertex_uncompressed *dst= (struct model_vertex_uncompressed *)uncompressed;
 			struct model_vertex_compressed const *src= (struct model_vertex_compressed const *)compressed;
-			real_vector3d normal, binormal, tangent;
 			long index;
 
 			match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 325, count*sizeof(struct model_vertex_uncompressed)==uncompressed_size);
@@ -277,9 +274,9 @@ void rasterizer_geometry_uncompress_vertices(
 			for (index=0; index<count; index++, dst++, src++)
 			{
 				dst->position= src->position;
-				dst->normal= *uncompress_int32_to_real_vector3d(&normal, src->normal);
-				dst->binormal= *uncompress_int32_to_real_vector3d(&binormal, src->binormal);
-				dst->tangent= *uncompress_int32_to_real_vector3d(&tangent, src->tangent);
+				dst->normal= uncompress_int32_to_real_vector3d(src->normal);
+				dst->binormal= uncompress_int32_to_real_vector3d(src->binormal);
+				dst->tangent= uncompress_int32_to_real_vector3d(src->tangent);
 				dst->texcoord.x= ((real)src->texcoord.x * 2.0f + 1.0f) * (1.0f / 65535.0f);
 				dst->texcoord.y= ((real)src->texcoord.y * 2.0f + 1.0f) * (1.0f / 65535.0f);
 				match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 341, src->nodes[0]%3==0);
@@ -324,12 +321,10 @@ void environment_vertex_compressed_get_normal(
 	struct environment_vertex_compressed const *vertex,
 	real_vector3d *normal)
 {
-	real_vector3d decompressed_normal;
-
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 450, vertex);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 451, normal);
 
-	*normal = *uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->normal);
+	*normal = uncompress_int32_to_real_vector3d(vertex->normal);
 
 	return;
 }
@@ -350,12 +345,10 @@ void environment_lightmap_vertex_compressed_get_incident_radiosity(
 	struct environment_lightmap_vertex_compressed const *vertex,
 	real_vector3d *normal)
 {
-	real_vector3d decompressed_normal;
-
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 474, vertex);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 475, normal);
 
-	*normal = *uncompress_int32_to_real_vector3d(&decompressed_normal, vertex->incident_radiosity);
+	*normal = uncompress_int32_to_real_vector3d(vertex->incident_radiosity);
 
 	return;
 }
@@ -423,7 +416,7 @@ unsigned long compress_real_vector3d_to_int32(
 	j = fast_ftol((real)floor(v->j * 1023.5f)) & 0x7ff;
 	k = fast_ftol((real)floor(v->k * 511.5f)) & 0x3ff;
 
-	v2 = *uncompress_int32_to_real_vector3d(&v2, ((k << 11) | j) << 11 | i);
+	v2 = uncompress_int32_to_real_vector3d(((k << 11) | j) << 11 | i);
 
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 92, fabs(v2.i - v->i)<0.01f);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 93, fabs(v2.j - v->j)<0.01f);
@@ -444,7 +437,7 @@ unsigned long compress_real_vector3d_to_int32_clamp(
 	j = fast_ftol((real)floor(PIN(v->j, -1.0f, 1.0f) * 1023.5f)) & 0x7ff;
 	k = fast_ftol((real)floor(PIN(v->k, -1.0f, 1.0f) * 511.5f)) & 0x3ff;
 
-	v2 = *uncompress_int32_to_real_vector3d(&v2, ((k << 11) | j) << 11 | i);
+	v2 = uncompress_int32_to_real_vector3d(((k << 11) | j) << 11 | i);
 
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 118, fabs(v2.i - v->i)<0.01f);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 119, fabs(v2.j - v->j)<0.01f);
@@ -541,8 +534,7 @@ void rasterizer_geometry_compress_vertices(
 
 /* ---------- private code */
 
-real_vector3d *uncompress_int32_to_real_vector3d(
-	real_vector3d *result,
+real_vector3d uncompress_int32_to_real_vector3d(
 	unsigned long compressed)
 {
 	real_vector3d v;
@@ -553,7 +545,5 @@ real_vector3d *uncompress_int32_to_real_vector3d(
 	compressed >>= 11;
 	v.k = ((real)(long)(compressed<<22) * (1.0f/2097152.0f) + 1.0f) * (1.0f/1023.0f);
 
-	*result = v;
-
-	return result;
+	return v;
 }
