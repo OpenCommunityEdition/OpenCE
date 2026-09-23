@@ -388,17 +388,6 @@
       }
     },
     {
-      "unit": "source/bungie_net/common/thread_win32",
-      "function": "_get_mutex_from_pool",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference. The natural loop bound is &thread_globals.mutex_references[MAXIMUM_MUTEX_REFERENCES].in_use, one past the static thread_globals object at image address 3262248 with size 1544, so the resolved address lies 36 bytes inside the following external transport_address_string object at 3263792. csplit attributes relocation 2 to _transport_address_string+36; VC7 correctly emits the same address as _thread_globals+1580. Both resolve to 3263828. Target and candidate otherwise have the same 64-byte section, normalized bytes, three type-6 relocations at offsets 5/27/40, and resolved destinations 3262548/3263828/3262512. No false cross-module mutex declaration, raw overlay, manual address, or compiler control is retained.",
-      "measurements": {
-        "target": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
-        "base": { "size": 64, "relocation_count": 3, "normalized_sha256": "3b67f561243fc178ef970c0e26668272cdfd5b49b5f94800b85cbeeb4e051c6f" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
       "unit": "libs/libcmt/stream",
       "function": "__getstream",
       "class": "unclassified",
@@ -714,25 +703,6 @@
       }
     },
     {
-      "unit": "source/physics/collision_usage",
-      "function": "_collision_log_get_current_user",
-      "class": "csplit-relocation-alias",
-      "evidence": "Fuzzy-parked under the current house rule with the complete private user-selection helper retained in ordinary typed C and its semantic name recovered from historical Xbox donor source. The retained stack-top access is global_current_collision_users[global_current_collision_user_depth - 1], as independently proved by January's collision_usage_current+2974 relocation resolving two bytes before global_current_collision_users. Target and candidate share the 256-byte padded envelope and 23 relocations. After resolving that csplit alias, their instruction streams align for every instruction except the final successful return: January emits mov ax,si while VC7 emits movsx eax,si. Restoring the target assertion punctuation recovered the authentic owned strings. The independent PC machine-code lifts infer a short return, but neither has source or PDB type provenance; compiling that signature collapses January's separate NONE exits and shrinks the function to 240 bytes, so the Xbox donor's natural long-return topology is retained. Prior declaration, local-result, and return-shape experiments are documented as exhausted. No barrier, volatile or register forcing, pragma, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. The fail-closed classifier returns UNKNOWN. Reopen only for authoritative January prototype/local-lifetime evidence or a natural same-compiler donor that explains the narrow AX return without changing the rest of the function. On September 14 (lane opus/150k-house-clean-20260914, wave w3b, adversarially verified): Body replaced by the verified single-exit short-return form (law A3(c), C4244 at both callers). It is code-identical to January and differs only by the csplit negative-index relocation alias (_global_current_collision_users-2 == _collision_usage_current+2974). The park stays but its class changes from unclassified to csplit-relocation-alias. Base = the rebuilt object. The evidence text and objdiff_percent should be refreshed. Validate with tools/parked_functions.py, which must report ordinary-different and resolved-equal.",
-      "measurements": {
-        "target": {
-          "size": 256,
-          "relocation_count": 23,
-          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
-        },
-        "base": {
-          "size": 256,
-          "relocation_count": 23,
-          "normalized_sha256": "fc370d7e130011908802a1d09d62cadaccb97dac976f7c5705341b7eb44d1cb3"
-        },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
       "unit": "libs/libcmt/x10fout",
       "function": "_$I10_OUTPUT",
       "class": "tu-context-optimization",
@@ -806,25 +776,6 @@
           "normalized_sha256": "4b830e4a539a01c46bae3b186cd66658f81b4285953455a907518a348b9b7cc0"
         },
         "objdiff_percent": 99.35952
-      }
-    },
-    {
-      "unit": "source/bitmaps/bitmap_utilities",
-      "function": "_bitmap_sharpen",
-      "class": "csplit-relocation-alias",
-      "evidence": "The natural typed dispatcher and lookup-table builder is byte-identical to January after correcting the semantic BSS ownership proved by table construction and use: bitmap_sharpen_negative_table begins at 3260160 and bitmap_sharpen_positive_table at 3260672. Ordinary COFF comparison differs only at two strength-reduced loop relocations because csplit anchors positive_table-2 as negative_table+510 and negative_table-2 as the preceding _bss_0031bed4+42. The fail-closed resolved-address scan proves both pairs resolve respectively to 3260670 and 3260158; all other bytes and all 23 relocations agree. The source retains direct semantic array indexing and MAX/PIN cseries macros rather than introducing an out-of-bounds alias or raw address merely to copy csplit's spelling.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 23,
-          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 23,
-          "normalized_sha256": "999f3191aca8d9e3ec7721de890a470569586b58b32cd1b8432b2be68fa1f750"
-        },
-        "objdiff_percent": 100.0
       }
     },
     {
@@ -1918,50 +1869,6 @@
         "target": { "size": 304, "relocation_count": 25, "normalized_sha256": "9533beb1d4e9a53568bc1141902bf2b6de740161acc2225f7a1a9a24838fd276" },
         "base": { "size": 304, "relocation_count": 25, "normalized_sha256": "124019ea872d584781a0c8424c9fbce31bc491ba51226808716bc6e4335a2062" },
         "objdiff_percent": 93.74227
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_1wide_list_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 1152, "relocation_count": 70, "normalized_sha256": "c33a03c5370763cce87d6439786cd14c4e6297ae1e4069d83eb4b451b770bdd8" },
-        "base": { "size": 1152, "relocation_count": 70, "normalized_sha256": "c33a03c5370763cce87d6439786cd14c4e6297ae1e4069d83eb4b451b770bdd8" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_3wide_list_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 1232, "relocation_count": 71, "normalized_sha256": "00c90368ad7f0a0ea918ef5d4425050b17bfd917eced2a27dbac0dab47d6a9a9" },
-        "base": { "size": 1232, "relocation_count": 71, "normalized_sha256": "00c90368ad7f0a0ea918ef5d4425050b17bfd917eced2a27dbac0dab47d6a9a9" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_player_profile_update_cache_for_nwide_list",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: an address-attribution alias in csplit's relocation naming, the same class as thread_win32::_get_mutex_from_pool. cached_player_profile holds three 52-byte entries at image address 5841376, so a natural bound of &cached_player_profile[NUMBER_OF_CACHED_PLAYER_PROFILES] resolves to 5841532, one byte past its extent. VC7 correctly emits that as _cached_player_profile+156; csplit attributes the address to the next image symbol and spells it _local_player_index_for_draw_string_and_hack_in_icons+0. Both resolve to 5841532, proven through config/symbols.json. Target and candidate have identical code bytes (the gate tag is [reloc-identity] with zero differing code regions), identical relocation count, and identical relocation offsets and types; only this one symbol spelling differs. No C source makes VC7 name the successor symbol, so there is no source lever. Zero credit. Reopen only if csplit's relocation attribution is changed to prefer the containing symbol for a one-past-the-end address, or if authentic January source shows a different bound.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 13, "normalized_sha256": "5e8de72bb4e994b875b98b2d0691d7e016b860063a20195dea1a5ff76480e8b3" },
-        "base": { "size": 272, "relocation_count": 13, "normalized_sha256": "5e8de72bb4e994b875b98b2d0691d7e016b860063a20195dea1a5ff76480e8b3" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/interface/ui_widget_game_data_input_functions",
-      "function": "_splitscreen_pregame_status_screen_update",
-      "class": "csplit-relocation-alias",
-      "evidence": "Not a code-generation difference: the same csplit address-attribution alias. local_player_controller_bitmap_frames occupies 24 bytes at image address 2584076 and the string literal 'invalid game_data_input_reference...' begins immediately after it at 2584100. Our natural expression resolves to 2584102, which VC7 emits as _local_player_controller_bitmap_frames+26 (two past the array's extent); csplit spells the same address as that string literal + 2. Both resolve to 2584102, proven through config/symbols.json. Code bytes, relocation count, offsets and types are identical; only this one symbol spelling differs. Zero credit. Reopen only on a change to csplit's relocation attribution or authentic January source for the expression.",
-      "measurements": {
-        "target": { "size": 1216, "relocation_count": 48, "normalized_sha256": "a494149278b8ee669720a11c0dc47b6415983d10252dbcd41b0c7a17581b8f12" },
-        "base": { "size": 1216, "relocation_count": 48, "normalized_sha256": "a494149278b8ee669720a11c0dc47b6415983d10252dbcd41b0c7a17581b8f12" },
-        "objdiff_percent": 100.0
       }
     }
   ]

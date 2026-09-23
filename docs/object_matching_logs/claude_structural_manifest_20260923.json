@@ -4,15 +4,20 @@
  "base": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
  "pushed": false,
  "summary": {
-  "functions_gained": 8,
-  "padded_bytes": 8512,
-  "code_bytes": 8459,
+  "functions_gained": 15,
+  "padded_bytes": 13056,
+  "code_bytes": 12945,
   "stable_regressions": 0,
   "by_category": {
    "source": {
     "functions": 8,
     "padded_bytes": 8512,
     "code_bytes": 8459
+   },
+   "config-relocation-alias": {
+    "functions": 7,
+    "padded_bytes": 4544,
+    "code_bytes": 4486
    }
   }
  },
@@ -64,6 +69,48 @@
      "unit": "source/interface/hud_messaging",
      "function": "_hud_messaging_update",
      "evidence": "Body from /Od 0x62cb90 (wchar_t formatted[256] = RTC 512 B buffer giving frame 0x2a0, hud_get_font_index call, block scoping, state_message pointer, branch order); plus relocs.json retarget of 805831/805856 from _global_hud_anchor_names+2 to _button_mappings-18 (same image address 3034170, one-before alias)"
+    }
+   ]
+  },
+  "b2": {
+   "category": "config-relocation-alias",
+   "description": "already-credited csplit relocation aliases, config only, no source change",
+   "gate": "scratch/lane/gate_b2.txt: ninja PASS, +7 fns / 4,544 padded, regressions 0, parks 114/0/0, admission 45/0/10/0, pytest 1152/5/26",
+   "functions": [
+    {
+     "unit": "source/physics/collision_usage",
+     "function": "_collision_log_get_current_user",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 1298630 -> _global_current_collision_users-2"
+    },
+    {
+     "unit": "source/bungie_net/common/thread_win32",
+     "function": "_get_mutex_from_pool",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 457851 -> _thread_globals+1580 (one-past-the-end loop bound)"
+    },
+    {
+     "unit": "source/bitmaps/bitmap_utilities",
+     "function": "_bitmap_sharpen",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 432699 -> _bitmap_sharpen_negative_table-2"
+    },
+    {
+     "unit": "source/interface/ui_widget_game_data_input_functions",
+     "function": "_player_profile_update_cache_for_nwide_list",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 929536/929593 -> _cached_player_profile+156 (cmp against the one-past-the-end pointer)"
+    },
+    {
+     "unit": "source/interface/ui_widget_game_data_input_functions",
+     "function": "_player_profile_3wide_list_update",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 933019 -> _cached_player_profile+156"
+    },
+    {
+     "unit": "source/interface/ui_widget_game_data_input_functions",
+     "function": "_player_profile_1wide_list_update",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 933897 -> _cached_player_profile+156"
+    },
+    {
+     "unit": "source/interface/ui_widget_game_data_input_functions",
+     "function": "_splitscreen_pregame_status_screen_update",
+     "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 924401 -> _local_player_controller_bitmap_frames+26 (interior of the following string)"
     }
    ]
   }
@@ -165,6 +212,90 @@
    "category": "source",
    "was_parked": false,
    "evidence": "/Od 0x66c190 list arm (type==spinner||type==column) && focused_child == parent; January overwrite (xor al,al) so = not |=; the redundant conjunct is literally in the /Od source",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/bitmaps/bitmap_utilities",
+   "function": "_bitmap_sharpen",
+   "padded_bytes": 352,
+   "code_bytes": 344,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 432699 -> _bitmap_sharpen_negative_table-2",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/bungie_net/common/thread_win32",
+   "function": "_get_mutex_from_pool",
+   "padded_bytes": 64,
+   "code_bytes": 59,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 457851 -> _thread_globals+1580 (one-past-the-end loop bound)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_1wide_list_update",
+   "padded_bytes": 1152,
+   "code_bytes": 1142,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 933897 -> _cached_player_profile+156",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_3wide_list_update",
+   "padded_bytes": 1232,
+   "code_bytes": 1222,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 933019 -> _cached_player_profile+156",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_update_cache_for_nwide_list",
+   "padded_bytes": 272,
+   "code_bytes": 268,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 929536/929593 -> _cached_player_profile+156 (cmp against the one-past-the-end pointer)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_splitscreen_pregame_status_screen_update",
+   "padded_bytes": 1216,
+   "code_bytes": 1208,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 924401 -> _local_player_controller_bitmap_frames+26 (interior of the following string)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/physics/collision_usage",
+   "function": "_collision_log_get_current_user",
+   "padded_bytes": 256,
+   "code_bytes": 243,
+   "before_status": "R",
+   "batch": "b2",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 1298630 -> _global_current_collision_users-2",
    "new_definitions": []
   }
  ]
