@@ -247,7 +247,6 @@ symbols in this file:
 /* ---------- headers */
 
 #define random_range random_range_inline
-#define vector_from_points2d vector_from_points2d_inline
 #include "cseries.h"
 #include "actions.h"
 
@@ -274,7 +273,6 @@ symbols in this file:
 #include "units/biped_definitions.h"
 #include "memory/data.h"
 #include "units/units.h"
-#undef vector_from_points2d
 #undef random_range
 
 /* ---------- constants */
@@ -1309,18 +1307,6 @@ short random_range(
 		lower_bound,
 		upper_bound);
 }
-
-real_vector2d *vector_from_points2d(
-	real_point2d const *a,
-	real_point2d const *b,
-	real_vector2d *result)
-{
-	result->i = b->x-a->x;
-	result->j = b->y-a->y;
-
-	return result;
-}
-
 
 /* ---------- private code */
 

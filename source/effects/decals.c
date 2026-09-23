@@ -219,7 +219,6 @@ symbols in this file:
 #define plane2d_from_points plane2d_from_points_inline
 #define plane3d_from_point_and_normal plane3d_from_point_and_normal_inline
 #define plane3d_negate plane3d_negate_inline
-#define plane3d_distance_to_point plane3d_distance_to_point_inline
 #define REAL_MATH_EXTERNAL_PROJECT_POINT3D
 #include "effects/decals.h"
 #include "cseries/cseries.h"
@@ -232,7 +231,6 @@ symbols in this file:
 #undef plane2d_from_points
 #undef plane3d_from_point_and_normal
 #undef plane3d_negate
-#undef plane3d_distance_to_point
 #undef REAL_MATH_EXTERNAL_PROJECT_POINT3D
 
 #include "cseries/errors.h"
@@ -928,16 +926,6 @@ real_plane3d *plane3d_negate(
 	plane->d = -p1->d;
 
 	return plane;
-}
-
-real plane3d_distance_to_point(
-	real_plane3d const *plane,
-	real_point3d const *point)
-{
-	return point->x * plane->n.i
-		+ point->y * plane->n.j
-		+ point->z * plane->n.k
-		- plane->d;
 }
 
 pixel32 real_a_rgb_color_to_pixel32(

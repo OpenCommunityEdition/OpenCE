@@ -22299,7 +22299,7 @@
 { "file_offset": 2845228, "flags": 0, "name": "_rdata_002b6a2c" },
 { "file_offset": 2845312, "flags": 0, "name": "___xri_a" },
 { "file_offset": 2845316, "flags": 0, "name": "___pmtinit" },
-{ "file_offset": 2845320, "flags": 0, "name": "_data_002b6a88" },
+{ "file_offset": 2845320, "flags": 0, "name": "_io_initialize_handles" },
 { "file_offset": 2845324, "flags": 0, "name": "___xri_z" },
 { "file_offset": 2845328, "flags": 0, "name": "___xc_a" },
 { "file_offset": 2845332, "flags": 0, "name": "_data_002b6a94" },

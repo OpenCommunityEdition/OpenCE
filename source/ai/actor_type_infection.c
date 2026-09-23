@@ -654,9 +654,7 @@ void infection_swarm_control(
 							&direction);
 						if (movement_type == _swarm_movement_away_from_prop)
 						{
-							direction.i = -direction.i;
-							direction.j = -direction.j;
-							direction.k = -direction.k;
+							negate_vector3d(&direction, &direction);
 						}
 						has_direction = TRUE;
 					}
@@ -679,9 +677,7 @@ void infection_swarm_control(
 							cross_product3d(&up, &swarm_component->obey.directmovement.vector, &direction);
 							if (swarm_component->obey.directmovement.facing == _ai_atom_move_facing_right)
 							{
-								direction.i = -direction.i;
-								direction.j = -direction.j;
-								direction.k = -direction.k;
+								negate_vector3d(&direction, &direction);
 							}
 							break;
 
@@ -689,9 +685,7 @@ void infection_swarm_control(
 							direction = swarm_component->obey.directmovement.vector;
 							if (swarm_component->obey.directmovement.facing == _ai_atom_move_facing_backwards)
 							{
-								direction.i = -direction.i;
-								direction.j = -direction.j;
-								direction.k = -direction.k;
+								negate_vector3d(&direction, &direction);
 							}
 							break;
 						}
@@ -754,9 +748,7 @@ void infection_swarm_control(
 				real separation = 0.f;
 				short neighbor_index;
 
-				probe.x = swarm_component->position.x - direction.i * 0.2f;
-				probe.y = swarm_component->position.y - direction.j * 0.2f;
-				probe.z = swarm_component->position.z - direction.k * 0.2f;
+				point_from_line3d(&swarm_component->position, &direction, -0.2f, &probe);
 				cross_product3d(&up, &direction, &right);
 
 				for (neighbor_index = 0;
@@ -879,10 +871,10 @@ void infection_swarm_control(
 			control.weapon_index = NONE;
 			control.grenade_index = NONE;
 			control.zoom_level = NONE;
-			control.control_flags = (word)control_flags;
+			control.control_flags = control_flags;
 			control.primary_trigger = 0.f;
-			control.animation_state = (char)animation_state;
-			control.aiming_speed = (char)aiming_speed;
+			control.animation_state = animation_state;
+			control.aiming_speed = aiming_speed;
 			if (has_direction)
 			{
 				set_real_vector3d(&control.throttle, 1.f, 0.f, 0.f);

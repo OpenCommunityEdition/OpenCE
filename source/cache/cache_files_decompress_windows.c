@@ -317,7 +317,7 @@ struct simple_decompressor_definition
 {
 	char src_name[260];
 	struct cache_file_header header;
-	unsigned long flags;
+	volatile unsigned long flags;
 	z_stream zlib_stream;
 	byte *zlib_buffer;
 	long zlib_buffer_size;
@@ -345,7 +345,7 @@ struct simple_decompressor_definition
 	long read_bytes_left;
 	long async_write_bytes_left;
 	long write_bytes_left;
-	real read_progress;
+	volatile real read_progress;
 	long current_write_offset;
 	long current_read_offset;
 	struct cache_copy_read_request *current_request;
@@ -430,7 +430,7 @@ static boolean cache_copy_stop_requested(
 static void cache_copy_yield(
 	void);
 static void cache_copy_set_flag(
-	long flag);
+	short flag);
 static long cache_copy_read_buffer_size(
 	void);
 static long cache_copy_write_buffer_size(
@@ -931,7 +931,7 @@ static void cache_copy_wait_for_async_io(
 }
 
 static void cache_copy_set_flag(
-	long flag)
+	short flag)
 {
 	SET_FLAG(global_self->flags, flag, TRUE);
 
@@ -1090,10 +1090,9 @@ static void CALLBACK cache_copy_FileIOCompletionRoutine(
 	unsigned long bytes_transferred,
 	OVERLAPPED *overlapped)
 {
-	struct simple_decompressor_definition *self = global_self;
-	long overlapped_index = overlapped - self->overlapped;
-	long *in_use_flags = self->overlapped_in_use_flags;
-	long *completed_flags = self->overlapped_completed_flags;
+	long *in_use_flags = global_self->overlapped_in_use_flags;
+	long *completed_flags = global_self->overlapped_completed_flags;
+	long overlapped_index = overlapped - global_self->overlapped;
 
 	if (!error_code)
 	{
