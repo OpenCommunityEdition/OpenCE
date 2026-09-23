@@ -1114,25 +1114,6 @@
     },
     {
       "unit": "source/hs/hs_runtime",
-      "function": "_hs_inspect_enum",
-      "class": "csplit-relocation-alias",
-      "evidence": "January and the retained ordinary typed inspector have the same 144-byte padded extent, 11 relocations, normalized instruction hash, and 100.0 percent objdiff score. The sole ordinary-comparison difference is csplit attribution of the same data address: January names the relocation as __hs_type_scenery_default+12912, while the rebuild names hs_enum_table-256. Whole-image address resolution proves those destinations identical, and the enum table access, range checks, assertions, and string formatting are otherwise byte-identical. The function and its exact 49-entry hs_type_inspectors owner table are source-static as supported by HCEX PDB evidence. No raw address, pointer pun, compiler steering, fake dependency, or nonsensical logic is retained.",
-      "measurements": {
-        "target": {
-          "size": 144,
-          "relocation_count": 11,
-          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
-        },
-        "base": {
-          "size": 144,
-          "relocation_count": 11,
-          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
-        },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
       "function": "_hs_evaluate_begin_random",
       "class": "private-register-convention",
       "evidence": "Fuzzy-parked after reconstructing the complete begin-random evaluator in ordinary typed C from January's instruction and relocation topology. Target and candidate share the 528-byte padded envelope and all 30 relocation identities; objdiff reports 99.89011 percent similarity. The residual is only four ModRM register-selection bytes in the random-child selection loop, with identical operations and control flow. Donor and reconciliation experiments exhausted natural declaration, initialization, and statement-order forms without moving this tie independently. No register or volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the private register assignment.",
@@ -1509,63 +1490,6 @@
           "normalized_sha256": "0687aab09e94dd30e99bd420e8c9339fd35a889970cce1220ca7502a23f52def"
         },
         "objdiff_percent": 99.25616
-      }
-    },
-    {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_enum",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (464), relocation count (43), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference is target __hs_type_scenery_default+12912 versus candidate _hs_enum_table-256; both resolve to image file offset 2493140. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 43,
-          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 43,
-          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_object_name",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (320), relocation count (26), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479850: target csplit string+58 equals candidate _hs_object_type_masks-86. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 320,
-          "relocation_count": 26,
-          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
-        },
-        "base": {
-          "size": 320,
-          "relocation_count": 26,
-          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_tag_reference",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (208), relocation count (11), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479852: target csplit string+60 equals candidate _hs_tag_reference_type_group_tags-96. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 11,
-          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 11,
-          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
-        },
-        "objdiff_percent": 100
       }
     },
     {
