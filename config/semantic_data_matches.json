@@ -157,5 +157,105 @@
       "relocation_count": 28,
       "normalized_sha256": "45c41730d038fd3f985f7ccfd8a7e04aa02e2db549ac941386e7cd04c1e1d8c1"
     }
+  },
+  {
+    "unit": "source/bitmaps/libtiff/tif_print",
+    "symbol": "_tif_print_rcsid",
+    "reason": "The 164-byte January and rebuilt libtiff data section has identical payload, flags and external owner, and all 18 relocations independently resolve to the same image destinations; objdiff undercredits its sole unmatched section.",
+    "measurements": {
+      "size": 164,
+      "relocation_count": 18,
+      "normalized_sha256": "a81bb4fa00f599a245c1e6b636a2a630629557f2c86f92e2960cf3e16ed94e23"
+    }
+  },
+  {
+    "unit": "source/memory/zlib/zutil",
+    "symbol": "_z_errmsg",
+    "reason": "The 44-byte January and rebuilt zlib error table has identical payload, flags and external owner, and all ten relocations independently resolve to the same image destinations; objdiff undercredits its sole unmatched section.",
+    "measurements": {
+      "size": 44,
+      "relocation_count": 10,
+      "normalized_sha256": "966ef500de11387122d16ed112b63eb8562f81fc0e67d6f8f4d190766cf1e6ae"
+    }
+  },
+  {
+    "unit": "source/memory/zlib/deflate",
+    "symbol": "?my_version@?1??deflateInit2_@@9@9",
+    "reason": "The four-byte January and rebuilt zlib version pointer has identical payload, flags and static owner; its relocation independently resolves to the same image destination despite objdiff's alias attribution.",
+    "measurements": {
+      "size": 4,
+      "relocation_count": 1,
+      "normalized_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    }
+  },
+  {
+    "unit": "source/networking/network_server_manager",
+    "symbol": "_network_game_server_memory_do_not_use_directly_in_use",
+    "reason": "January and rebuilt eight-byte BSS owner have identical extent, flags, external storage and section-relative layout with no relocations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 8,
+      "relocation_count": 0,
+      "normalized_sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc"
+    }
+  },
+  {
+    "unit": "source/game/game_engine_oddball",
+    "symbol": "_oddball_engine",
+    "reason": "January and rebuilt Oddball engine tables have identical 136-byte payload, flags and owner storage, with all 27 relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 27,
+      "normalized_sha256": "ffe1ef0aa827017276299f3a497655019d91f94374129c31634061500e5ae4b9"
+    }
+  },
+  {
+    "unit": "source/game/game_globals",
+    "symbol": "_global_material_type_strings",
+    "reason": "January and rebuilt material-name tables have identical 132-byte payload, flags and owner storage, with all 33 relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 132,
+      "relocation_count": 33,
+      "normalized_sha256": "115bad14f1c9f2c027a84de21b107015722cb76be8d0abf3760ad8e00d6c24a5"
+    }
+  },
+  {
+    "unit": "source/items/projectile_definitions",
+    "symbol": "_default_projectile_material_response",
+    "reason": "January and rebuilt projectile material tables have identical 160-byte payload, flags and owner storage, with all three relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 160,
+      "relocation_count": 3,
+      "normalized_sha256": "b71e2246c2d39831ad65f2b9570fecb59a1a0d743278b63cc125b118c148f6b9"
+    }
+  },
+  {
+    "unit": "source/memory/byte_swapping",
+    "symbol": "_byte_bs_codes",
+    "reason": "January and rebuilt byte-swap tables have identical 144-byte payload, flags and owner storage, with all eight relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 144,
+      "relocation_count": 8,
+      "normalized_sha256": "fc892f5c359e0165aa8cdbd745b191928baac3213935c79d8699cdcba32468d0"
+    }
+  },
+  {
+    "unit": "source/physics/collision_bsp_definitions",
+    "symbol": "_global_collision_bsp_definition_data",
+    "reason": "January and rebuilt collision BSP definition tables have identical 900-byte payload, flags and owner storage, with all 68 relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 900,
+      "relocation_count": 68,
+      "normalized_sha256": "3ed97b7cf09b09837ca36461d74c21909d34106d563a7b914aaffd7c51cf3e56"
+    }
+  },
+  {
+    "unit": "source/physics/collision_usage",
+    "symbol": "_global_collision_function_names",
+    "reason": "January and rebuilt collision function-name tables have identical 138-byte payload, flags and owner storage, with all 30 relocations independently resolving to the same image destinations; objdiff undercredits the sole unmatched data section.",
+    "measurements": {
+      "size": 138,
+      "relocation_count": 30,
+      "normalized_sha256": "804797955ced17a1f6b1e4b86c0a83a5d25fcb03fa846e690dae51ef13bc5c2f"
+    }
   }
 ]
