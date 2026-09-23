@@ -167,7 +167,8 @@ owner ruling admitting such a structure. Do not re-sweep declaration order,
 local scope within the /Od statement list, name counts, or helper spellings; all
 are measured.
 
-Scratch artifacts, local:
+Scratch artifacts, local to `C:\halo-worktrees\claude-aim-grenade-20260924`
+and **not** tracked in canonical:
 
 - `scratch/lane/actor_combat_T2_best.c` and `actor_aim_grenade_T2_best_fn.txt`:
   the best fuzzy candidate;
