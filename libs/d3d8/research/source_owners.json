@@ -1,0 +1,56 @@
+[
+  {
+    "module": "pixeljar",
+    "target": "_code_001e3fc0",
+    "candidate": "?LockSurface@PixelJar@D3D@@YGXPAUD3DPixelContainer@@W4_D3DCUBEMAP_FACES@@IKPAPAEPAK3@Z",
+    "evidence": "Private LockSurface: caller-connected locking graph, same 80 padded bytes and both ordered public call relocations; original callee-pop 20-byte private ABI. No callee renaming in comparator."
+  },
+  {
+    "module": "d3dbase",
+    "target": "_code_001d6fa0",
+    "candidate": "?Round@D3D@@YGKM@Z",
+    "evidence": "Original module PDB names D3D::Round; original scalar parameter, callee stack-pop, constant references, public FloatToLong relocation and complete section match the already-emitted authentic helper. Entry-name pairing only, no relocation renaming or equality changes. See continuation/private_owner_evidence.json."
+  },
+  {
+    "module": "state",
+    "target": "_code_001d9060",
+    "candidate": "?Round@D3D@@YGKM@Z",
+    "evidence": "Original module PDB names D3D::Round; original scalar parameter, callee stack-pop, constant references, public FloatToLong relocation and complete section match the already-emitted authentic helper. Entry-name pairing only, no relocation renaming or equality changes. See continuation/private_owner_evidence.json."
+  },
+  {
+    "module": "pshader",
+    "target": "_code_001dbc90",
+    "candidate": "?Float2UChar@D3D@@YGEM@Z",
+    "evidence": "Original module PDB names D3D::Float2UChar; original scalar parameter, callee stack-pop, constant references, public FloatToLong relocation and complete section match the already-emitted authentic helper. Entry-name pairing only, no relocation renaming or equality changes. See continuation/private_owner_evidence.json."
+  },
+  {
+    "module": "combiner",
+    "target": "_code_001e6000",
+    "candidate": "?nvKelvinACModulate@D3D@@YGJPAVCDevice@1@KK@Z",
+    "evidence": "Original combiner module PDB procedure at the PE-mapped file offset, original return/argument types and length. Entry-only name pairing; every relocation still checked by the unchanged comparator. See evidence/wave10/combiner_owner_proofs.json."
+  },
+  {
+    "module": "combiner",
+    "target": "_code_001e6350",
+    "candidate": "?nvKelvinACLerp@D3D@@YGJPAVCDevice@1@HH@Z",
+    "evidence": "Original combiner module PDB procedure at the PE-mapped file offset, original return/argument types and length. Entry-only name pairing; every relocation still checked by the unchanged comparator. See evidence/wave10/combiner_owner_proofs.json."
+  },
+  {
+    "module": "combiner",
+    "target": "_code_001e6890",
+    "candidate": "?nvKelvinCCModulate@D3D@@YGJPAVCDevice@1@KK@Z",
+    "evidence": "Original combiner module PDB procedure at the PE-mapped file offset, original return/argument types and length. Entry-only name pairing; every relocation still checked by the unchanged comparator. See evidence/wave10/combiner_owner_proofs.json."
+  },
+  {
+    "module": "combiner",
+    "target": "_code_001e6cd0",
+    "candidate": "?nvKelvinCCDotProduct@D3D@@YGJPAVCDevice@1@KK@Z",
+    "evidence": "Original combiner module PDB procedure at the PE-mapped file offset, original return/argument types and length. Entry-only name pairing; every relocation still checked by the unchanged comparator. See evidence/wave10/combiner_owner_proofs.json."
+  },
+  {
+    "module": "combiner",
+    "target": "_code_001e6d60",
+    "candidate": "?nvKelvinCCLerp@D3D@@YGJPAVCDevice@1@HH@Z",
+    "evidence": "Original combiner module PDB procedure at the PE-mapped file offset, original return/argument types and length. Entry-only name pairing; every relocation still checked by the unchanged comparator. See evidence/wave10/combiner_owner_proofs.json."
+  }
+]

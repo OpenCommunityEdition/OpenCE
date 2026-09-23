@@ -1,0 +1,43 @@
+{
+  "status": "primary_source_correlated_declarations; original-target kernel type records not recovered",
+  "source_repository": "XboxDev/nxdk",
+  "source_commit": "58427c078b4ccb0121f359b6b6c536b3b2914976",
+  "source_path": "lib/xboxkrnl/xboxkrnl.h",
+  "entries": [
+    {
+      "name": "HalRegisterShutdownNotification",
+      "return_type": "VOID",
+      "parameters": [
+        "PHAL_SHUTDOWN_REGISTRATION",
+        "BOOLEAN"
+      ],
+      "owner": "kernel_interrupt.h"
+    },
+    {
+      "name": "KeDisconnectInterrupt",
+      "return_type": "BOOLEAN",
+      "parameters": [
+        "PKINTERRUPT"
+      ],
+      "owner": "kernel_interrupt.h",
+      "correction": "initial new draft said void; corrected before final full replay. Caller discards the result and retains exact code."
+    },
+    {
+      "name": "AvGetSavedDataAddress",
+      "return_type": "PVOID",
+      "parameters": [],
+      "owner": "display_internal.h"
+    },
+    {
+      "name": "KeStallExecutionProcessor",
+      "return_type": "VOID",
+      "parameters": [
+        "ULONG"
+      ],
+      "owner": "kernel_gpu.h"
+    }
+  ],
+  "calling_convention": "32-bit stdcall, corroborated by original relocation import names and caller stack use",
+  "original_pdb_limit": "The diagnostic module scan did not recover named import type records; its failures/empty result are retained. NXDK corroboration is not claimed as the original SDK.",
+  "proprietary_assets_modified": false
+}

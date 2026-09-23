@@ -1,0 +1,28 @@
+{
+  "mpdac": {
+    "optimization": "/O1",
+    "evidence": "The January DacProgramGammaRamp is 65 unpadded bytes; /O2 produced 80 and differed, while /O1 reproduces all bytes. Output-matching hypothesis, not a recovered complete original command."
+  },
+  "mpmode": {
+    "optimization": "/O1",
+    "evidence": "Trial for size-optimized miniport code: target instruction forms and non-16-aligned section lengths. Must be validated function by function."
+  },
+  "mpcore": {
+    "optimization": "/O1",
+    "evidence": "Size-optimized miniport hypothesis from original odd-length sections and gamma/video-start control matches. Every section remains individually compared. Original CreateGrObject contains inlined zero-fill STOS instructions; /O1 /Oi reproduces its 155 bytes and preserves the eight other current exact methods. Ordinary header-defined OBJECTINFO::Init; no forced inline.",
+    "additional_flags": [
+      "/Oi"
+    ]
+  },
+  "mphal": {
+    "optimization": "/O1",
+    "evidence": "Original HAL methods use odd-sized unpadded code sections and size-optimized forms. Per-module hypothesis; count only complete comparator passes."
+  },
+  "block": {
+    "optimization": "/O1",
+    "evidence": "Target block sections have nonaligned sizes (60,14,1070,392,685). Pinned RXDK block.cpp has an explicit optimize-for-size directive. /O1 is a per-TU hypothesis; each complete target section must pass the unchanged comparator. No production optimizer pragma. Original ClearStateBlockFlags uses inline rep-stos for the 516-byte dirty array; /Oi requests genuine CRT intrinsics rather than substituting a fake loop.",
+    "additional_flags": [
+      "/Oi"
+    ]
+  }
+}

@@ -1,0 +1,942 @@
+[
+  {
+    "name": "AntiAliasing",
+    "byte_offset": 828,
+    "initial_value": 4294901760
+  },
+  {
+    "name": "Blend",
+    "byte_offset": 832,
+    "initial_value": 0
+  },
+  {
+    "name": "BlendColor",
+    "byte_offset": 836,
+    "initial_value": 0
+  },
+  {
+    "name": "BorderColor0",
+    "byte_offset": 840,
+    "initial_value": 0
+  },
+  {
+    "name": "BorderColor1",
+    "byte_offset": 844,
+    "initial_value": 0
+  },
+  {
+    "name": "BorderColor2",
+    "byte_offset": 848,
+    "initial_value": 0
+  },
+  {
+    "name": "BorderColor3",
+    "byte_offset": 852,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat00_1",
+    "byte_offset": 856,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat00_2",
+    "byte_offset": 860,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat00_3",
+    "byte_offset": 864,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat01_1",
+    "byte_offset": 868,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat01_2",
+    "byte_offset": 872,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat01_3",
+    "byte_offset": 876,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat10_1",
+    "byte_offset": 880,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat10_2",
+    "byte_offset": 884,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat10_3",
+    "byte_offset": 888,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat11_1",
+    "byte_offset": 892,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat11_2",
+    "byte_offset": 896,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpMat11_3",
+    "byte_offset": 900,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpOffset1",
+    "byte_offset": 904,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpOffset2",
+    "byte_offset": 908,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpOffset3",
+    "byte_offset": 912,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpScale1",
+    "byte_offset": 916,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpScale2",
+    "byte_offset": 920,
+    "initial_value": 0
+  },
+  {
+    "name": "BumpScale3",
+    "byte_offset": 924,
+    "initial_value": 0
+  },
+  {
+    "name": "ClearRectX",
+    "byte_offset": 928,
+    "initial_value": 268369920
+  },
+  {
+    "name": "ClearRectY",
+    "byte_offset": 932,
+    "initial_value": 268369920
+  },
+  {
+    "name": "ColorClearValue",
+    "byte_offset": 936,
+    "initial_value": 0
+  },
+  {
+    "name": "ColorKeyColor0",
+    "byte_offset": 940,
+    "initial_value": 0
+  },
+  {
+    "name": "ColorKeyColor1",
+    "byte_offset": 944,
+    "initial_value": 0
+  },
+  {
+    "name": "ColorKeyColor2",
+    "byte_offset": 948,
+    "initial_value": 0
+  },
+  {
+    "name": "ColorKeyColor3",
+    "byte_offset": 952,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_0",
+    "byte_offset": 956,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_1",
+    "byte_offset": 960,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_2",
+    "byte_offset": 964,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_3",
+    "byte_offset": 968,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_4",
+    "byte_offset": 972,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_5",
+    "byte_offset": 976,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_6",
+    "byte_offset": 980,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor0_7",
+    "byte_offset": 984,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_0",
+    "byte_offset": 988,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_1",
+    "byte_offset": 992,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_2",
+    "byte_offset": 996,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_3",
+    "byte_offset": 1000,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_4",
+    "byte_offset": 1004,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_5",
+    "byte_offset": 1008,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_6",
+    "byte_offset": 1012,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineFactor1_7",
+    "byte_offset": 1016,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI0",
+    "byte_offset": 1020,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI1",
+    "byte_offset": 1024,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI2",
+    "byte_offset": 1028,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI3",
+    "byte_offset": 1032,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI4",
+    "byte_offset": 1036,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI5",
+    "byte_offset": 1040,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI6",
+    "byte_offset": 1044,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaI7",
+    "byte_offset": 1048,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO0",
+    "byte_offset": 1052,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO1",
+    "byte_offset": 1056,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO2",
+    "byte_offset": 1060,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO3",
+    "byte_offset": 1064,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO4",
+    "byte_offset": 1068,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO5",
+    "byte_offset": 1072,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO6",
+    "byte_offset": 1076,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineAlphaO7",
+    "byte_offset": 1080,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI0",
+    "byte_offset": 1084,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI1",
+    "byte_offset": 1088,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI2",
+    "byte_offset": 1092,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI3",
+    "byte_offset": 1096,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI4",
+    "byte_offset": 1100,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI5",
+    "byte_offset": 1104,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI6",
+    "byte_offset": 1108,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorI7",
+    "byte_offset": 1112,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO0",
+    "byte_offset": 1116,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO1",
+    "byte_offset": 1120,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO2",
+    "byte_offset": 1124,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO3",
+    "byte_offset": 1128,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO4",
+    "byte_offset": 1132,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO5",
+    "byte_offset": 1136,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO6",
+    "byte_offset": 1140,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineColorO7",
+    "byte_offset": 1144,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineCtl",
+    "byte_offset": 1148,
+    "initial_value": 257
+  },
+  {
+    "name": "CombineSpecFog0",
+    "byte_offset": 1152,
+    "initial_value": 0
+  },
+  {
+    "name": "CombineSpecFog1",
+    "byte_offset": 1156,
+    "initial_value": 0
+  },
+  {
+    "name": "Control0",
+    "byte_offset": 1160,
+    "initial_value": 0
+  },
+  {
+    "name": "Control1",
+    "byte_offset": 1164,
+    "initial_value": 0
+  },
+  {
+    "name": "Control2",
+    "byte_offset": 1168,
+    "initial_value": 273
+  },
+  {
+    "name": "Control3",
+    "byte_offset": 1172,
+    "initial_value": 0
+  },
+  {
+    "name": "FogColor",
+    "byte_offset": 1176,
+    "initial_value": 0
+  },
+  {
+    "name": "FogParam0",
+    "byte_offset": 1180,
+    "initial_value": 0
+  },
+  {
+    "name": "FogParam1",
+    "byte_offset": 1184,
+    "initial_value": 0
+  },
+  {
+    "name": "PointSize",
+    "byte_offset": 1188,
+    "initial_value": 0
+  },
+  {
+    "name": "SetupRaster",
+    "byte_offset": 1192,
+    "initial_value": 1145044992
+  },
+  {
+    "name": "ShaderClipMode",
+    "byte_offset": 1196,
+    "initial_value": 0
+  },
+  {
+    "name": "ShaderCtl",
+    "byte_offset": 1200,
+    "initial_value": 0
+  },
+  {
+    "name": "ShaderProg",
+    "byte_offset": 1204,
+    "initial_value": 0
+  },
+  {
+    "name": "SemaphoreOffset",
+    "byte_offset": 1208,
+    "initial_value": 0
+  },
+  {
+    "name": "ShadowCtl",
+    "byte_offset": 1212,
+    "initial_value": 0
+  },
+  {
+    "name": "ShadowZSlopeThreshold",
+    "byte_offset": 1216,
+    "initial_value": 0
+  },
+  {
+    "name": "SpecFogFactor0",
+    "byte_offset": 1220,
+    "initial_value": 0
+  },
+  {
+    "name": "SpecFogFactor1",
+    "byte_offset": 1224,
+    "initial_value": 0
+  },
+  {
+    "name": "SurfaceClipX",
+    "byte_offset": 1228,
+    "initial_value": 0
+  },
+  {
+    "name": "SurfaceClipY",
+    "byte_offset": 1232,
+    "initial_value": 0
+  },
+  {
+    "name": "TexAddress0",
+    "byte_offset": 1236,
+    "initial_value": 197379
+  },
+  {
+    "name": "TexAddress1",
+    "byte_offset": 1240,
+    "initial_value": 197379
+  },
+  {
+    "name": "TexAddress2",
+    "byte_offset": 1244,
+    "initial_value": 197379
+  },
+  {
+    "name": "TexAddress3",
+    "byte_offset": 1248,
+    "initial_value": 197379
+  },
+  {
+    "name": "TexCtl0_0",
+    "byte_offset": 1252,
+    "initial_value": 0
+  },
+  {
+    "name": "TexCtl0_1",
+    "byte_offset": 1256,
+    "initial_value": 0
+  },
+  {
+    "name": "TexCtl0_2",
+    "byte_offset": 1260,
+    "initial_value": 0
+  },
+  {
+    "name": "TexCtl0_3",
+    "byte_offset": 1264,
+    "initial_value": 0
+  },
+  {
+    "name": "TexCtl1_0",
+    "byte_offset": 1268,
+    "initial_value": 524288
+  },
+  {
+    "name": "TexCtl1_1",
+    "byte_offset": 1272,
+    "initial_value": 524288
+  },
+  {
+    "name": "TexCtl1_2",
+    "byte_offset": 1276,
+    "initial_value": 524288
+  },
+  {
+    "name": "TexCtl1_3",
+    "byte_offset": 1280,
+    "initial_value": 524288
+  },
+  {
+    "name": "TexCtl2_0",
+    "byte_offset": 1284,
+    "initial_value": 0
+  },
+  {
+    "name": "TexCtl2_1",
+    "byte_offset": 1288,
+    "initial_value": 0
+  },
+  {
+    "name": "TexFilter0",
+    "byte_offset": 1292,
+    "initial_value": 16850944
+  },
+  {
+    "name": "TexFilter1",
+    "byte_offset": 1296,
+    "initial_value": 16850944
+  },
+  {
+    "name": "TexFilter2",
+    "byte_offset": 1300,
+    "initial_value": 16850944
+  },
+  {
+    "name": "TexFilter3",
+    "byte_offset": 1304,
+    "initial_value": 16850944
+  },
+  {
+    "name": "TexFormat0",
+    "byte_offset": 1308,
+    "initial_value": 67000
+  },
+  {
+    "name": "TexFormat1",
+    "byte_offset": 1312,
+    "initial_value": 67000
+  },
+  {
+    "name": "TexFormat2",
+    "byte_offset": 1316,
+    "initial_value": 67000
+  },
+  {
+    "name": "TexFormat3",
+    "byte_offset": 1320,
+    "initial_value": 67000
+  },
+  {
+    "name": "TexImageRect0",
+    "byte_offset": 1324,
+    "initial_value": 524296
+  },
+  {
+    "name": "TexImageRect1",
+    "byte_offset": 1328,
+    "initial_value": 524296
+  },
+  {
+    "name": "TexImageRect2",
+    "byte_offset": 1332,
+    "initial_value": 524296
+  },
+  {
+    "name": "TexImageRect3",
+    "byte_offset": 1336,
+    "initial_value": 524296
+  },
+  {
+    "name": "TexOffset0",
+    "byte_offset": 1340,
+    "initial_value": 0
+  },
+  {
+    "name": "TexOffset1",
+    "byte_offset": 1344,
+    "initial_value": 0
+  },
+  {
+    "name": "TexOffset2",
+    "byte_offset": 1348,
+    "initial_value": 0
+  },
+  {
+    "name": "TexOffset3",
+    "byte_offset": 1352,
+    "initial_value": 0
+  },
+  {
+    "name": "TexPalette0",
+    "byte_offset": 1356,
+    "initial_value": 0
+  },
+  {
+    "name": "TexPalette1",
+    "byte_offset": 1360,
+    "initial_value": 0
+  },
+  {
+    "name": "TexPalette2",
+    "byte_offset": 1364,
+    "initial_value": 0
+  },
+  {
+    "name": "TexPalette3",
+    "byte_offset": 1368,
+    "initial_value": 0
+  },
+  {
+    "name": "WindowClipX0",
+    "byte_offset": 1372,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX1",
+    "byte_offset": 1376,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX2",
+    "byte_offset": 1380,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX3",
+    "byte_offset": 1384,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX4",
+    "byte_offset": 1388,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX5",
+    "byte_offset": 1392,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX6",
+    "byte_offset": 1396,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipX7",
+    "byte_offset": 1400,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY0",
+    "byte_offset": 1404,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY1",
+    "byte_offset": 1408,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY2",
+    "byte_offset": 1412,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY3",
+    "byte_offset": 1416,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY4",
+    "byte_offset": 1420,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY5",
+    "byte_offset": 1424,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY6",
+    "byte_offset": 1428,
+    "initial_value": 134152192
+  },
+  {
+    "name": "WindowClipY7",
+    "byte_offset": 1432,
+    "initial_value": 134152192
+  },
+  {
+    "name": "ZCompressOcclude",
+    "byte_offset": 1436,
+    "initial_value": 0
+  },
+  {
+    "name": "ZStencilClearValue",
+    "byte_offset": 1440,
+    "initial_value": 0
+  },
+  {
+    "name": "ZClipMax",
+    "byte_offset": 1444,
+    "initial_value": 1266679807
+  },
+  {
+    "name": "ZClipMin",
+    "byte_offset": 1448,
+    "initial_value": 0
+  },
+  {
+    "name": "ContextDmaA",
+    "byte_offset": 1452,
+    "initial_value": 0
+  },
+  {
+    "name": "ContextDmaB",
+    "byte_offset": 1456,
+    "initial_value": 0
+  },
+  {
+    "name": "ContextDmaVtxA",
+    "byte_offset": 1460,
+    "initial_value": 0
+  },
+  {
+    "name": "ContextDmaVtxB",
+    "byte_offset": 1464,
+    "initial_value": 0
+  },
+  {
+    "name": "ZOffsetBias",
+    "byte_offset": 1468,
+    "initial_value": 0
+  },
+  {
+    "name": "ZOffsetFactor",
+    "byte_offset": 1472,
+    "initial_value": 0
+  },
+  {
+    "name": "Eyevec0",
+    "byte_offset": 1476,
+    "initial_value": 0
+  },
+  {
+    "name": "Eyevec1",
+    "byte_offset": 1480,
+    "initial_value": 0
+  },
+  {
+    "name": "Eyevec2",
+    "byte_offset": 1484,
+    "initial_value": 0
+  },
+  {
+    "name": "Shadow",
+    "byte_offset": 1488,
+    "initial_value": 0
+  },
+  {
+    "name": "FdData",
+    "byte_offset": 1492,
+    "initial_value": 0
+  },
+  {
+    "name": "FdSwatch",
+    "byte_offset": 1496,
+    "initial_value": 0
+  },
+  {
+    "name": "FdExtras",
+    "byte_offset": 1500,
+    "initial_value": 0
+  },
+  {
+    "name": "Emission0",
+    "byte_offset": 1504,
+    "initial_value": 0
+  },
+  {
+    "name": "Emission1",
+    "byte_offset": 1508,
+    "initial_value": 0
+  },
+  {
+    "name": "Emission2",
+    "byte_offset": 1512,
+    "initial_value": 0
+  },
+  {
+    "name": "SceneAmb0",
+    "byte_offset": 1516,
+    "initial_value": 0
+  },
+  {
+    "name": "SceneAmb1",
+    "byte_offset": 1520,
+    "initial_value": 0
+  },
+  {
+    "name": "SceneAmb2",
+    "byte_offset": 1524,
+    "initial_value": 0
+  },
+  {
+    "name": "ContextDmaGetState",
+    "byte_offset": 1528,
+    "initial_value": 0
+  },
+  {
+    "name": "BeginPatch0",
+    "byte_offset": 1532,
+    "initial_value": 1
+  },
+  {
+    "name": "BeginPatch1",
+    "byte_offset": 1536,
+    "initial_value": 0
+  },
+  {
+    "name": "BeginPatch2",
+    "byte_offset": 1540,
+    "initial_value": 16384
+  },
+  {
+    "name": "BeginPatch3",
+    "byte_offset": 1544,
+    "initial_value": 0
+  },
+  {
+    "name": "BeginCurve",
+    "byte_offset": 1548,
+    "initial_value": 0
+  },
+  {
+    "name": "BeginTrans0",
+    "byte_offset": 1552,
+    "initial_value": 1
+  },
+  {
+    "name": "BeginTrans1",
+    "byte_offset": 1556,
+    "initial_value": 0
+  },
+  {
+    "name": "Csv0_D",
+    "byte_offset": 1560,
+    "initial_value": 262144
+  },
+  {
+    "name": "Csv0_C",
+    "byte_offset": 1564,
+    "initial_value": 65536
+  },
+  {
+    "name": "Csv1_B",
+    "byte_offset": 1568,
+    "initial_value": 0
+  },
+  {
+    "name": "Csv1_A",
+    "byte_offset": 1572,
+    "initial_value": 0
+  },
+  {
+    "name": "CheopsOffset",
+    "byte_offset": 1576,
+    "initial_value": 0
+  }
+]
