@@ -114,10 +114,8 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries.h"
 #include "projectiles.h"
-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 #include "projectiles_callbacks.h"
 #include "projectile_definitions.h"
@@ -136,9 +134,7 @@ symbols in this file:
 #include "objects/objects.h"
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_usage.h"
-#define COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
 #include "physics/collisions.h"
-#undef COLLISIONS_EXTERNAL_COLLISION_TEST_LINE
 #include "physics/physics.h"
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
@@ -704,10 +700,6 @@ boolean projectile_update(
 {
 	struct projectile_runtime_datum *projectile;
 	struct projectile_definition const *definition;
-	struct collision_result collision;
-	real_point3d new_position;
-	real_vector3d new_velocity;
-	real_vector3d average_velocity;
 	real time_remaining;
 	short collision_count;
 	boolean flyby_sound_played;
@@ -736,8 +728,7 @@ boolean projectile_update(
 	switch (definition->projectile.detonation_timer_starts)
 	{
 	case _projectile_detonation_timer_starts_after_first_bounce:
-		detonation_timer_running = TEST_FLAG(projectile->projectile.flags, _projectile_stopped_after_collision_bit);
-		break;
+		detonation_timer_running = TEST_FLAG(projectile->projectile.flags, _projectile_collided_once_bit);
 
 	case _projectile_detonation_timer_starts_when_at_rest:
 		detonation_timer_running = TEST_FLAG(projectile->projectile.flags, _projectile_stopped_after_collision_bit);
@@ -775,22 +766,17 @@ boolean projectile_update(
 		!TEST_FLAG(projectile->object.flags, _object_at_rest_bit) &&
 		projectile->object.parent_object_index == NONE)
 	{
-		long ignore_object_index;
-		real speed;
-		real final_speed;
-		real average_speed;
+		real speed = magnitude3d(&projectile->object.translational_velocity);
+		real_vector3d new_velocity = projectile->object.translational_velocity;
+		real_point3d new_position;
+		struct collision_result collision;
+		boolean moved = FALSE;
 		real gravity_acceleration;
+		real final_speed = speed;
+		real average_speed = speed;
+		real_vector3d average_velocity = projectile->object.translational_velocity;
+		long ignore_object_index = projectile->projectile.ignore_object_index;
 		real distance_fraction;
-		real step_time;
-		boolean moved;
-
-		speed = magnitude3d(&projectile->object.translational_velocity);
-		final_speed = speed;
-		average_speed = speed;
-		new_velocity = projectile->object.translational_velocity;
-		average_velocity = projectile->object.translational_velocity;
-		moved = FALSE;
-		ignore_object_index = projectile->projectile.ignore_object_index;
 
 		match_assert_valid_real_vector3d(
 			"c:\\halo\\SOURCE\\items\\projectiles.c",
@@ -809,7 +795,6 @@ boolean projectile_update(
 			real_vector3d wander_direction;
 			real_vector3d target_vector;
 			real_vector3d rotation_axis;
-			long identifier;
 
 			if (TEST_FLAG(_object_mask_unit, target->object.type) &&
 				unit_get(projectile->projectile.target_object_index)->unit.player_index != NONE)
@@ -836,20 +821,17 @@ boolean projectile_update(
 
 			unit_get_center_of_mass(projectile->projectile.target_object_index, &target_point);
 
-			identifier = DATUM_INDEX_TO_IDENTIFIER(projectile_index);
 			set_real_euler_angles2d(
 				&wander_angles,
 				_pi - periodic_function_evaluate(
 					_periodic_function_wander,
-					((game_time_get() + 3 * identifier) & UNSIGNED_SHORT_MAX) * (1.0f / 90.0f)) * (_pi / 2.f),
+					((game_time_get() + 3 * DATUM_INDEX_TO_IDENTIFIER(projectile_index)) & UNSIGNED_SHORT_MAX) * (1.0f / 90.0f)) * (_pi / 2.f),
 				periodic_function_evaluate(
 					_periodic_function_wander,
-					((game_time_get() + 7 * identifier) & UNSIGNED_SHORT_MAX) * (1.0f / 90.0f)) * (_pi * 2.f));
+					((game_time_get() + 7 * DATUM_INDEX_TO_IDENTIFIER(projectile_index)) & UNSIGNED_SHORT_MAX) * (1.0f / 90.0f)) * (_pi * 2.f));
 			vector3d_from_euler_angles2d(&wander_direction, &wander_angles);
 
-			target_point.x += wander_direction.i * wander_scale;
-			target_point.y += wander_direction.j * wander_scale;
-			target_point.z += wander_direction.k * wander_scale;
+			point_from_line3d(&target_point, &wander_direction, wander_scale, &target_point);
 
 			vector_from_points3d(&projectile->object.position, &target_point, &target_vector);
 			cross_product3d(&projectile->object.translational_velocity, &target_vector, &rotation_axis);
@@ -875,12 +857,10 @@ boolean projectile_update(
 			if (speed > definition->projectile.final_velocity &&
 				projectile->projectile.deceleration != 0.0f)
 			{
-				real deceleration = time_remaining * projectile->projectile.deceleration;
-
-				final_speed = speed - deceleration;
+				final_speed = speed - projectile->projectile.deceleration * time_remaining;
 				if (final_speed <= definition->projectile.final_velocity)
 				{
-					real fraction = (speed - definition->projectile.final_velocity) / deceleration;
+					real fraction = (speed - definition->projectile.final_velocity) / (projectile->projectile.deceleration * time_remaining);
 
 					final_speed = definition->projectile.final_velocity * 0.99f;
 					average_speed = (final_speed + speed) * fraction * 0.5f +
@@ -892,7 +872,7 @@ boolean projectile_update(
 				}
 				else
 				{
-					average_speed = speed - deceleration * 0.5f;
+					average_speed = speed - projectile->projectile.deceleration * time_remaining * 0.5f;
 					scale_vector3d(&new_velocity, final_speed / speed, &new_velocity);
 					average_velocity.i = (new_velocity.i + projectile->object.translational_velocity.i) * 0.5f;
 					average_velocity.j = (new_velocity.j + projectile->object.translational_velocity.j) * 0.5f;
@@ -954,10 +934,7 @@ boolean projectile_update(
 			distance_fraction = 1.0f;
 		}
 
-		step_time = distance_fraction * time_remaining;
-		new_position.x = average_velocity.i * step_time + projectile->object.position.x;
-		new_position.y = average_velocity.j * step_time + projectile->object.position.y;
-		new_position.z = average_velocity.k * step_time + projectile->object.position.z;
+		point_from_line3d(&projectile->object.position, &average_velocity, distance_fraction * time_remaining, &new_position);
 
 		match_assert_valid_real_point3d(
 			"c:\\halo\\SOURCE\\items\\projectiles.c",
@@ -971,57 +948,46 @@ boolean projectile_update(
 		global_current_collision_users[global_current_collision_user_depth++] =
 			_collision_user_projectiles;
 
-		if (collision_count != MAXIMUM_PROJECTILE_COLLISIONS_PER_UPDATE)
+		if (collision_count != MAXIMUM_PROJECTILE_COLLISIONS_PER_UPDATE &&
+			projectile->projectile.action != _projectile_action_disappear &&
+			(moved = TRUE) &&
+			projectile_collision_test_line(projectile_index, &new_position, &collision))
 		{
-			if (projectile->projectile.action != _projectile_action_disappear)
+			time_remaining = 1.0f - collision.t;
+			new_velocity.k += gravity_acceleration * time_remaining;
+			if (final_speed != 0.0f)
 			{
-				moved = TRUE;
-				if (projectile_collision_test_line(projectile_index, &new_position, &collision))
-				{
-					time_remaining = 1.0f - collision.t;
-					new_velocity.k += gravity_acceleration * time_remaining;
-					if (final_speed != 0.0f)
-					{
-						real restored_speed = time_remaining * projectile->projectile.deceleration + final_speed;
+				real restored_speed = time_remaining * projectile->projectile.deceleration + final_speed;
 
-						restored_speed = MIN(restored_speed, speed);
-						scale_vector3d(&new_velocity, restored_speed / final_speed, &new_velocity);
-					}
-
-					if (collision.plane.n.k > 0.3f)
-						SET_FLAG(projectile->projectile.flags, _projectile_collided_once_bit, TRUE);
-
-					projectile->projectile.ignore_object_index = NONE;
-					projectile_collision(
-						projectile_index,
-						&collision,
-						&new_position,
-						&new_velocity,
-						time_remaining);
-					collision_count++;
-					ai_handle_spatial_effect(
-						projectile_index,
-						&collision.point,
-						_ai_spatial_effect_weapon_impact,
-						definition->projectile.impact_noise,
-						1);
-
-					if (TEST_FLAG(projectile->projectile.flags, _projectile_attached_bit))
-						moved = FALSE;
-				}
-				else
-				{
-					time_remaining = 0.0f;
-				}
+				restored_speed = MIN(restored_speed, speed);
+				scale_vector3d(&new_velocity, restored_speed / final_speed, &new_velocity);
 			}
-			else
-			{
-				time_remaining = 0.0f;
-			}
+
+			if (collision.plane.n.k > 0.3f)
+				SET_FLAG(projectile->projectile.flags, _projectile_collided_once_bit, TRUE);
+
+			projectile->projectile.ignore_object_index = NONE;
+			projectile_collision(
+				projectile_index,
+				&collision,
+				&new_position,
+				&new_velocity,
+				time_remaining);
+			collision_count++;
+			ai_handle_spatial_effect(
+				projectile_index,
+				&collision.point,
+				_ai_spatial_effect_weapon_impact,
+				definition->projectile.impact_noise,
+				1);
+
+			if (TEST_FLAG(projectile->projectile.flags, _projectile_attached_bit))
+				moved = FALSE;
 		}
 		else
 		{
-			projectile_set_action(projectile_index, _projectile_action_detonate);
+			if (collision_count == MAXIMUM_PROJECTILE_COLLISIONS_PER_UPDATE)
+				projectile_set_action(projectile_index, _projectile_action_detonate);
 			time_remaining = 0.0f;
 		}
 
@@ -1345,70 +1311,62 @@ static boolean projectile_collision_test_line(
 	real_point3d const *new_position,
 	struct collision_result *collision)
 {
-	struct projectile_runtime_datum *projectile;
-	struct projectile_definition const *definition;
-	real_point3d const *position;
-	real_vector3d vector;
+	struct projectile_runtime_datum *projectile = projectile_runtime_get(projectile_index);
+	struct projectile_definition const *definition = projectile_definition_get(projectile->definition_index);
 
-	projectile = projectile_runtime_get(projectile_index);
-	definition = projectile_definition_get(projectile->definition_index);
-	position = &projectile->object.position;
-
-	if (collision_test_vector(
+	if (collision_test_line(
 		_collision_test_for_projectiles_flags,
-		position,
-		vector_from_points3d(position, new_position, &vector),
+		&projectile->object.position,
+		new_position,
 		projectile->projectile.ignore_object_index,
 		collision))
 	{
 		return TRUE;
 	}
-
-	if (definition->projectile.collision_radius < _real_epsilon)
-		return FALSE;
-
+	else if (definition->projectile.collision_radius < _real_epsilon)
 	{
-		real_vector3d direction;
-		real_vector3d offset;
-		real_point3d right_start;
-		real_point3d right_end;
-		real_point3d left_start;
-		real_point3d left_end;
+		return FALSE;
+	}
+	else
+	{
+		real_vector3d forward;
+		real_vector3d left;
+		real_point3d p0_left;
+		real_point3d p1_left;
+		real_point3d p0_right;
+		real_point3d p1_right;
 
-		if (normalize3d(cross_product3d(global_up3d, vector_from_points3d(position, new_position, &direction), &offset)) == 0.0f)
-			offset = *global_left3d;
+		vector_from_points3d(&projectile->object.position, new_position, &forward);
+		if (normalize3d(cross_product3d(global_up3d, &forward, &left)) == 0.0f)
+		{
+			left = *global_left3d;
+		}
 
-		right_start.x = offset.i * definition->projectile.collision_radius + position->x;
-		right_start.y = offset.j * definition->projectile.collision_radius + position->y;
-		right_start.z = offset.k * definition->projectile.collision_radius + position->z;
-		right_end.x = offset.i * definition->projectile.collision_radius + new_position->x;
-		right_end.y = offset.j * definition->projectile.collision_radius + new_position->y;
-		right_end.z = offset.k * definition->projectile.collision_radius + new_position->z;
-		left_start.x = offset.i * -definition->projectile.collision_radius + position->x;
-		left_start.y = offset.j * -definition->projectile.collision_radius + position->y;
-		left_start.z = offset.k * -definition->projectile.collision_radius + position->z;
-		left_end.x = offset.i * -definition->projectile.collision_radius + new_position->x;
-		left_end.y = offset.j * -definition->projectile.collision_radius + new_position->y;
-		left_end.z = offset.k * -definition->projectile.collision_radius + new_position->z;
+		point_from_line3d(&projectile->object.position, &left, definition->projectile.collision_radius, &p0_left);
+		point_from_line3d(new_position, &left, definition->projectile.collision_radius, &p1_left);
+		point_from_line3d(&projectile->object.position, &left, -definition->projectile.collision_radius, &p0_right);
+		point_from_line3d(new_position, &left, -definition->projectile.collision_radius, &p1_right);
 
-		if (collision_test_vector(
+		if (collision_test_line(
 				_collision_test_for_projectiles_fat_flags,
-				&right_start,
-				vector_from_points3d(&right_start, &right_end, &offset),
+				&p0_left,
+				&p1_left,
 				projectile->projectile.ignore_object_index,
 				collision) ||
 			collision_test_line(
 				_collision_test_for_projectiles_fat_flags,
-				&left_start,
-				&left_end,
+				&p0_right,
+				&p1_right,
 				projectile->projectile.ignore_object_index,
 				collision))
 		{
 			return TRUE;
 		}
+		else
+		{
+			return FALSE;
+		}
 	}
-
-	return FALSE;
 }
 
 static void projectile_detonate(
@@ -1791,7 +1749,7 @@ static void projectile_collision(
 
 	speed_squared = magnitude_squared3d(new_velocity);
 	if (response != _projectile_material_response_attach &&
-		speed_squared < definition->projectile.minimum_velocity * definition->projectile.minimum_velocity)
+		magnitude_squared3d(new_velocity) < definition->projectile.minimum_velocity * definition->projectile.minimum_velocity)
 	{
 		projectile_set_action(projectile_index, _projectile_action_detonate);
 	}
@@ -1878,15 +1836,13 @@ static void projectile_collision(
 		if (collision->type == _collision_result_object &&
 			TEST_FLAG(definition->projectile.flags, _projectile_super_combining_explosion_bit))
 		{
-			struct object_datum *child;
-			long child_index;
+			long child_index = object_get(collision->object_index)->object.first_child_object_index;
 			short combining_projectile_count = 0;
 
-			for (child_index = object_get(collision->object_index)->object.first_child_object_index;
-				child_index != NONE;
-				child_index = child->object.next_object_index)
+			while (child_index != NONE)
 			{
-				child = object_get(child_index);
+				struct object_datum *child = object_get(child_index);
+
 				if (child->definition_index == projectile->definition_index &&
 					!TEST_FLAG(projectile_runtime_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
 				{
@@ -1902,13 +1858,15 @@ static void projectile_collision(
 					SET_FLAG(projectile->projectile.flags, _projectile_will_super_explode_bit, TRUE);
 					break;
 				}
+
+				child_index = child->object.next_object_index;
 			}
 		}
 
 		projectile->object.translational_velocity = *global_zero_vector3d;
 		projectile->object.angular_velocity = *global_zero_vector3d;
-		SET_FLAG(projectile->object.flags, _object_at_rest_bit, TRUE);
 		SET_FLAG(projectile->projectile.flags, _projectile_attached_bit, TRUE);
+		SET_FLAG(projectile->object.flags, _object_at_rest_bit, TRUE);
 		object_translate(projectile_index, new_position, &collision->location);
 		if (collision->type == _collision_result_object)
 			object_attach_to_node(collision->object_index, projectile_index, collision->node_index);

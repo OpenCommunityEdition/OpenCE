@@ -61,7 +61,6 @@ symbols in this file:
 #define valid_real_matrix4x3 items_valid_real_matrix4x3_inline
 #define valid_real_vector3d_axes3 items_valid_real_vector3d_axes3_inline
 #define object_get_type items_object_get_type_inline
-#define point_from_line3d items_point_from_line3d_inline
 #include "cseries.h"
 
 #include "cseries/profile.h"
@@ -81,7 +80,6 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "units/units.h"
 #undef object_get_type
-#undef point_from_line3d
 #undef valid_real_vector3d_axes3
 #undef valid_real_matrix4x3
 
@@ -108,48 +106,7 @@ enum
 
 /* ---------- structures */
 
-union item_update_scratch
-{
-	struct object_marker marker;
-	struct
-	{
-		byte pad[0x1C];
-		struct collision_result result;
-	} collision;
-};
-
-typedef char item_update_scratch_size_assert[
-	sizeof(union item_update_scratch) == 0x6C ? 1 : -1];
-
-union item_update_work
-{
-	real_matrix4x3 matrix;
-	struct
-	{
-		byte pad[8];
-		struct sound_location location;
-	} sound;
-};
-
-typedef char item_update_work_size_assert[
-	sizeof(union item_update_work) == sizeof(real_matrix4x3) ? 1 : -1];
-
-struct item_update_storage
-{
-	union item_update_scratch scratch;
-	union item_update_work work;
-};
-
-typedef char item_update_storage_size_assert[
-	sizeof(struct item_update_storage) == 0xA0 ? 1 : -1];
-
 /* ---------- prototypes */
-
-real_point3d *point_from_line3d(
-	real_point3d const *point,
-	real_vector3d const *vector,
-	real scale,
-	real_point3d *result);
 
 /* ---------- globals */
 
@@ -614,9 +571,6 @@ boolean item_update(
 {
 	struct item_datum *item;
 	struct item_definition *definition;
-	struct item_update_storage storage;
-	real_vector3d velocity;
-	real_point3d candidate;
 
 	item = item_get(item_index);
 	definition = item_definition_get(item->definition_index);
@@ -637,13 +591,15 @@ boolean item_update(
 				_item_definition_always_maintains_z_up_bit) &&
 			!(fabs(item->object.up.k - 1.f) < 0.0001f))
 		{
+			real_vector3d left;
+
 			item->object.up = *global_up3d;
 			cross_product3d(
 				&item->object.up,
 				&item->object.forward,
-				(real_vector3d *)&candidate);
+				&left);
 			cross_product3d(
-				(real_vector3d const *)&candidate,
+				&left,
 				&item->object.up,
 				&item->object.forward);
 			if (normalize3d(&item->object.forward) == 0.f)
@@ -654,35 +610,39 @@ boolean item_update(
 
 		if (!TEST_FLAG(item->object.flags, _object_at_rest_bit))
 		{
-			velocity = item->object.translational_velocity;
+			struct collision_result collision;
+			real_vector3d new_velocity;
+			real_point3d new_position;
+
+			new_velocity = item->object.translational_velocity;
 			if (!TEST_FLAG(
 					definition->item.flags,
 					_item_definition_antigravity_bit))
 			{
-				velocity.k -= global_gravity;
+				new_velocity.k -= global_gravity;
 			}
 
-			candidate.x = item->object.position.x + velocity.i;
-			candidate.y = item->object.position.y + velocity.j;
-			candidate.z = item->object.position.z + velocity.k;
+			new_position.x = item->object.position.x + new_velocity.i;
+			new_position.y = item->object.position.y + new_velocity.j;
+			new_position.z = item->object.position.z + new_velocity.k;
 
 			if (collision_test_line(
 					ITEM_UPDATE_COLLISION_TEST_FLAGS,
 					&item->object.position,
-					&candidate,
+					&new_position,
 					item->item.ignore_object_index,
-					&storage.scratch.collision.result))
+					&collision))
 			{
-				struct collision_result *collision;
 				long impulse_sound_index;
 				real impact_scale;
 
-				collision = &storage.scratch.collision.result;
-				candidate.x += collision->plane.n.i * 0.05f;
-				candidate.y += collision->plane.n.j * 0.05f;
-				candidate.z += collision->plane.n.k * 0.05f;
+				point_from_line3d(
+					&new_position,
+					&collision.plane.n,
+					0.05f,
+					&new_position);
 
-				impact_scale = magnitude3d(&velocity);
+				impact_scale = magnitude3d(&new_velocity);
 				impact_scale /= item_maximum_impact_velocity;
 				if (impact_scale < 0.f)
 				{
@@ -694,58 +654,53 @@ boolean item_update(
 				}
 
 				if (definition->item.material_effects.index != NONE &&
-					material_effect_visible(&collision->point))
+					material_effect_visible(&collision.point))
 				{
 					material_effect_new(
 						definition->item.material_effects.index,
 						8,
-						collision->material_type,
-						&collision->point,
-						&collision->plane.n,
-						&collision->location,
+						collision.material_type,
+						&collision.point,
+						&collision.plane.n,
+						&collision.location,
 						impact_scale);
 				}
 
 				impulse_sound_index = definition->item.collision_sound.index;
 				if (impulse_sound_index != NONE)
 				{
-					storage.work.sound.location.position = candidate;
-					storage.work.sound.location.forward = collision->plane.n;
-					storage.work.sound.location.translational_velocity =
-						*global_zero_vector3d;
-					storage.work.sound.location.game_location = item->object.location;
+					struct sound_location location;
+
+					location.position = new_position;
+					location.forward = collision.plane.n;
+					location.translational_velocity = *global_zero_vector3d;
+					location.game_location = item->object.location;
 					unattached_impulse_sound_new(
 						impulse_sound_index,
-						&storage.work.sound.location,
+						&location,
 						impact_scale);
 				}
 
-				if ((collision->type == _collision_result_structure ||
-					(collision->type == _collision_result_object &&
+				if ((collision.type == _collision_result_structure ||
+					(collision.type == _collision_result_object &&
 						TEST_FLAG(
 							_object_mask_scenery | _object_mask_device,
-							object_get_type(collision->object_index)))) &&
-					collision->plane.n.k > 0.7071f &&
-					-(collision->plane.n.k * velocity.k +
-						(collision->plane.n.j * velocity.j +
-							collision->plane.n.i * velocity.i)) < 0.05f)
+							object_get_type(collision.object_index)))) &&
+					collision.plane.n.k > 0.7071f &&
+					-dot_product3d(&collision.plane.n, &new_velocity) < 0.05f)
 				{
-					real angular_dot;
-
-					candidate = collision->point;
+					new_position = collision.point;
 					item_align_to_normal_and_point(
 						item_index,
-						&collision->plane.n,
-						&collision->point,
-						&candidate);
-					velocity.i = velocity.j = velocity.k = 0.f;
-					angular_dot =
-						item->object.angular_velocity.i * collision->plane.n.i +
-						(collision->plane.n.j * item->object.angular_velocity.j +
-							item->object.angular_velocity.k * collision->plane.n.k);
+						&collision.plane.n,
+						&collision.point,
+						&new_position);
+					new_velocity.i = new_velocity.j = new_velocity.k = 0.f;
 					scale_vector3d(
-						&collision->plane.n,
-						angular_dot,
+						&collision.plane.n,
+						dot_product3d(
+							&item->object.angular_velocity,
+							&collision.plane.n),
 						&item->object.angular_velocity);
 
 					if (!game_engine_running() &&
@@ -755,29 +710,29 @@ boolean item_update(
 					}
 
 					SET_FLAG(item->object.flags, _object_at_rest_bit, TRUE);
-					switch (collision->type)
+					switch (collision.type)
 					{
 					case _collision_result_structure:
 						SET_FLAG(item->item.flags, _item_on_structure_bit, TRUE);
 						item->item.rested_surface_index =
-							(short)collision->surface_index;
+							(short)collision.surface_index;
 						item->item.bsp_index =
 							global_structure_bsp_index_get();
 						break;
 
 					case _collision_result_object:
 					{
-						real_matrix4x3 const *support_matrix;
+						real_matrix4x3 const *node_matrix;
 
 						SET_FLAG(item->item.flags, _item_on_object_bit, TRUE);
-						support_matrix = object_get_node_matrix(
-							collision->object_index,
-							0);
 						item->item.item_on_rest_object_index =
-							collision->object_index;
+							collision.object_index;
+						node_matrix = object_get_node_matrix(
+							collision.object_index,
+							0);
 						matrix4x3_inverse_transform_point(
-							support_matrix,
-							&collision->point,
+							node_matrix,
+							&collision.point,
 							&item->item.item_rest_object_offset);
 						break;
 					}
@@ -790,7 +745,7 @@ boolean item_update(
 						break;
 					}
 
-					item->item.rotation_axis = collision->plane.n;
+					item->item.rotation_axis = collision.plane.n;
 					item_adjust_for_angular_velocity_change(item_index);
 					item->item.ignore_object_index = NONE;
 				}
@@ -798,52 +753,51 @@ boolean item_update(
 				{
 					real reflection;
 
-					reflection =
-						collision->plane.n.i * velocity.i * -1.4f -
-						collision->plane.n.j * velocity.j * 1.4f -
-						collision->plane.n.k * velocity.k * 1.4f;
-					if (collision->type != _collision_result_structure)
+					reflection = -1.4f * dot_product3d(
+						&collision.plane.n,
+						&new_velocity);
+					if (collision.type != _collision_result_structure)
 					{
 						reflection = MIN(1.5f, reflection);
 					}
-					candidate.x = collision->point.x;
-					velocity.i = collision->plane.n.i * reflection + velocity.i;
-					candidate.y = collision->point.y;
-					candidate.z = collision->point.z;
-					velocity.j = collision->plane.n.j * reflection + velocity.j;
-					velocity.k = reflection * collision->plane.n.k + velocity.k;
+					new_position = collision.point;
+					new_velocity.i += collision.plane.n.i * reflection;
+					new_velocity.j += collision.plane.n.j * reflection;
+					new_velocity.k += collision.plane.n.k * reflection;
 					if (collision_test_point(
 							ITEM_UPDATE_COLLISION_TEST_FLAGS,
-							&candidate,
+							&new_position,
 							item_index))
 					{
 						point_from_line3d(
-							&collision->point,
-							&collision->plane.n,
+							&collision.point,
+							&collision.plane.n,
 							0.05f,
-							&candidate);
+							&new_position);
 					}
 					collision_test_point(
 						ITEM_UPDATE_COLLISION_TEST_FLAGS,
-						&candidate,
+						&new_position,
 						item_index);
 				}
 			}
 
-			item->object.translational_velocity = velocity;
+			item->object.translational_velocity = new_velocity;
 			object_translate(
 				item_index,
-				&candidate,
-				&storage.scratch.collision.result.location);
+				&new_position,
+				&collision.location);
 		}
 		else if (!TEST_FLAG(
 			definition->item.flags,
 			_item_definition_antigravity_bit))
 		{
+			struct object_marker marker;
+
 			object_get_marker_by_name(
 				item_index,
 				"ground point",
-				&storage.scratch.marker,
+				&marker,
 				1);
 
 			if (TEST_FLAG(item->item.flags, _item_on_structure_bit) &&
@@ -862,15 +816,17 @@ boolean item_update(
 					!breakable_surface_extant(
 						surface->breakable_surface_index))
 				{
+					real_vector3d gravity;
+
 					scale_vector3d(
 						global_down3d,
 						global_gravity,
-						(real_vector3d *)&candidate);
+						&gravity);
 					SET_FLAG(item->item.flags, _item_on_structure_bit, FALSE);
 					item->item.rested_surface_index = NONE;
 					item_accelerate(
 						item_index,
-						(real_vector3d const *)&candidate,
+						&gravity,
 						FALSE);
 				}
 			}
@@ -878,31 +834,34 @@ boolean item_update(
 			{
 				if (object_try_and_get(item->item.item_on_rest_object_index))
 				{
-					real_matrix4x3 const *support_matrix;
+					real_matrix4x3 const *node_matrix;
+					real_point3d origin;
 
-					support_matrix = object_get_node_matrix(
+					node_matrix = object_get_node_matrix(
 						item->item.item_on_rest_object_index,
 						0);
 					matrix4x3_transform_point(
-						support_matrix,
+						node_matrix,
 						&item->item.item_rest_object_offset,
-						&candidate);
+						&origin);
 					item_align_to_normal_and_point(
 						item_index,
 						&item->item.rotation_axis,
-						&candidate,
+						&origin,
 						NULL);
 				}
 				else
 				{
+					real_vector3d gravity;
+
 					scale_vector3d(
 						global_down3d,
 						global_gravity,
-						(real_vector3d *)&candidate);
+						&gravity);
 					SET_FLAG(item->item.flags, _item_on_object_bit, FALSE);
 					item_accelerate(
 						item_index,
-						(real_vector3d const *)&candidate,
+						&gravity,
 						FALSE);
 				}
 			}
@@ -917,11 +876,14 @@ boolean item_update(
 				item->item.flags,
 				_item_has_nonzero_angular_velocity_bit))
 		{
+			struct object_marker marker;
+			real_vector3d left;
+
 			if (!TEST_FLAG(item->object.flags, _object_at_rest_bit) ||
 				!object_get_marker_by_name(
 					item_index,
 					"ground point",
-					&storage.scratch.marker,
+					&marker,
 					1))
 			{
 				rotate_vector_about_axis(
@@ -937,41 +899,43 @@ boolean item_update(
 			}
 			else
 			{
-				storage.work.matrix = storage.scratch.marker.matrix;
+				real_matrix4x3 ground_point_matrix;
+
+				ground_point_matrix = marker.matrix;
 				rotate_vector_about_axis(
-					&storage.work.matrix.forward,
+					&ground_point_matrix.forward,
 					&item->item.rotation_axis,
 					item->item.rotation_sine,
 					item->item.rotation_cosine);
 				rotate_vector_about_axis(
-					&storage.work.matrix.up,
+					&ground_point_matrix.up,
 					&item->item.rotation_axis,
 					item->item.rotation_sine,
 					item->item.rotation_cosine);
 				cross_product3d(
-					&storage.work.matrix.up,
-					&storage.work.matrix.forward,
-					&storage.work.matrix.left);
+					&ground_point_matrix.up,
+					&ground_point_matrix.forward,
+					&ground_point_matrix.left);
 				cross_product3d(
-					&storage.work.matrix.left,
-					&storage.work.matrix.up,
-					&storage.work.matrix.forward);
-				normalize3d(&storage.work.matrix.forward);
-				normalize3d(&storage.work.matrix.left);
-				normalize3d(&storage.work.matrix.up);
+					&ground_point_matrix.left,
+					&ground_point_matrix.up,
+					&ground_point_matrix.forward);
+				normalize3d(&ground_point_matrix.forward);
+				normalize3d(&ground_point_matrix.left);
+				normalize3d(&ground_point_matrix.up);
 				object_align_marker_to_matrix(
 					object_get(item_index),
-					&storage.scratch.marker,
-					&storage.work.matrix);
+					&marker,
+					&ground_point_matrix);
 			}
 
 			normalize3d(&item->object.up);
 			cross_product3d(
 				&item->object.up,
 				&item->object.forward,
-				(real_vector3d *)&candidate);
+				&left);
 			cross_product3d(
-				(real_vector3d const *)&candidate,
+				&left,
 				&item->object.up,
 				&item->object.forward);
 			normalize3d(&item->object.forward);
