@@ -714,25 +714,6 @@
       }
     },
     {
-      "unit": "source/structures/structure_detail_objects",
-      "function": "_structure_detail_objects_initialize",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after restoring the HCEA-authenticated allocation and default normal initialization in ordinary typed C and preserving the three exact relocation destinations. Target and candidate share the 80-byte padded envelope and differ only in the schedule of the independent stack cleanup and global runtime-data store: January restores the three game_state_malloc arguments before publishing the allocation, while VC7 publishes the allocation first and then adjusts ESP. The direct-global, declaration-order, assignment-order, aggregate-initializer, and temporary-pointer source families either return to this fixed point or enlarge the function and relocation set; the direct-global spelling specifically grows to 96 bytes and six relocations. No barrier, volatile access, pragma, assembly, fake dependency, inert expression, or nonsensical branch is retained. Reopen only for authoritative January locals/source or a natural same-compiler scheduling donor.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "99e687328f033302450f35257d1339d168279f9876fcd14b9180ddaa52f618d5"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "46c693d13661a9d71dd5516590b0c9d7c29e22dc1cc38eea6ff94d60c88ddd82"
-        },
-        "objdiff_percent": 76.36364
-      }
-    },
-    {
       "unit": "source/physics/collision_usage",
       "function": "_collision_log_get_current_user",
       "class": "csplit-relocation-alias",
