@@ -143,7 +143,7 @@ static void object_compute_change_colors(long object_index);
 
 /* ---------- globals */
 
-const struct object_memory_release_function object_memory_release_procs[3] =
+static const struct object_memory_release_function object_memory_release_procs[3] =
 {
 	{ NULL, ai_release_inactive_swarms },
 	{ ai_find_inactive_encounters, ai_release_inactive_encounters },
@@ -3572,7 +3572,7 @@ boolean object_force_inside_bsp(
 	return result;
 }
 
-boolean object_update(
+static boolean object_update(
 	long object_index)
 {
 	struct object_header_datum *header = object_header_get(object_index);
