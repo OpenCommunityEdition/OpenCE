@@ -30,6 +30,15 @@ User-confirmed 2026-09-07. Apply these to reconciliation and new reconstruction.
     Check the complete TU and affected callers; conversion instructions and
     widths must agree. Existing usage is recorded in `config/config.json`.
 
+Rule 6 has a later, narrow owner-approved exception for folded header-inline
+helpers (see `docs/object_matching_logs/claude_lane_b_HANDOFF_20260920.md`,
+section 3). A translation unit may emit a shared-header `__inline` COMDAT,
+including `_point_from_line3d`, only when the emitted copy is byte-identical
+to January's selected copy, its caller is strictly exact, the full ownership
+and build sweep has zero regressions, and the selected-provider link passes.
+January's per-object folded survivor is not an absolute emission boundary.
+Do not hand-expand or hand-copy the helper to evade this check.
+
 ## Batch workflow
 
 Reconcile coherent multi-object or owner/family packets, normally several
