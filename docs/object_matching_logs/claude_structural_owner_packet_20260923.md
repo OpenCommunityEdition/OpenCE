@@ -40,11 +40,25 @@ contribs.json module 140 owns the region, and a single aggregate gives 276 of
 278 relocations. The split's names are descriptive (no HCEX compiland).
 Rows blocked on this decision: 13,104 B in total.
 
+Measured remodel (shadow tree, not landed): in `action_charge.c`, delete the
+`#define point_from_line3d point_from_line3d_inline` / `#undef` pair and the
+hand-written `point_from_line3d` body. That is a hand-expanded copy of the
+`real_math.h` inline, which rule 13 disallows anyway. action_charge.obj then
+emits `_point_from_line3d` from the header inline as a SELECT_ANY COMDAT.
+Its row list is unchanged: 21 exact, `_action_charge_perform` with the same
+`[size 3216!=3248, sha]` tag, and the `_point_from_line3d` row stays EXACT.
+An object that emits the helper (items.obj) then links cleanly against it
+(`provider_link` PASS where production gives LNK2005). The same treatment
+would apply to `actor_combat.c` (`_cross_product2d`, `_add_vectors3d`),
+`geometry.c` (`_vector_intersect_plane3d`) and the other NODUP providers.
+
 **Decision:** (a) keep the NODUP provider model, so these rows stay held; or
-(b) authorise an investigation that remodels provider TUs to emit their
-selected copies as ordinary header-inline SELECT_ANY COMDATs. That needs its
-own whole-board sweep and a check that section comparison ignores selection;
-it is not measured yet.
+(b) let me replace the providers' hand-written helper copies with the real
+header inlines (one provider at a time, each with a whole-board sweep). That
+makes the owner-approved emitters link-clean: the vehicles fighter, the
+actor_perception danger-zone body and the actor_moving pfl package all sit in
+ruling 1's 17 objects. Rows outside the 17 (limp noodle, infection, physics,
+collision_debug) would still need ruling 1 widened.
 
 ## 2. PDB-typed `volatile` (cache_files_decompress_windows, 2,176 B)
 
@@ -110,7 +124,26 @@ call names the uninitialised variable, which the earlier rejections lacked.
 first class? Then decide the rest one by one. Each would land with the
 methodology's `BUG (preserved for exact matching)` comment.
 
-## 5. Recommend rejecting
+## 5. Aggregate 3D→2D view copies under the per-site rule-24 admission
+
+The 2026-09-21 admission requires a byte-inert cast (the function stays
+exact with the cast deleted). An aggregate copy such as
+`fixed2d = *(real_vector2d const *)&actor->control.fixed_stationary_facing_vector;`
+has no castless form except a field-by-field copy, so the test becomes
+"does the field copy also match?" Where it does, the field copy lands
+with no cast. Where only the aggregate copy matches, the cast is
+load-bearing:
+
+| Function | Bytes | Field copy |
+|---|---|---|
+| `_actor_look_update` | 4,720 | not exact (the `fixed2d` copy alone is load-bearing) |
+| `_actor_perception_aiming_vector_test_blockage` | 400 | not measured (worker: /Od 0x4620dd shows the aggregate copy) |
+| `_update_alien_scout_physics` | 2,464 | frame fix needs 6 casts; also needs inline `_point_from_line3d` |
+
+**Decision:** does a /Od-attested aggregate view copy qualify when the
+field-copy spelling does not match?
+
+## 6. Recommend rejecting
 
 `_network_connection_connect` (288 B): exact only with a redundant
 `success = TRUE;` attested by January's block layout alone (the 2020 build

@@ -301,8 +301,9 @@ boolean _rasterizer_environment_shadow_begin(
 	real object_bounding_radius,
 	real *shadow_volume_bounding_radius)
 {
-	real vertex_constants[5][4];
+	boolean success = TRUE;
 	real inverse_radius;
+	real vsh_constants__screenproj[20];
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
@@ -360,38 +361,34 @@ boolean _rasterizer_environment_shadow_begin(
 
 		inverse_radius = 1.0f / object_bounding_radius;
 
-		vertex_constants[0][0] = shadow_matrix->forward.i * inverse_radius;
-		vertex_constants[0][1] = shadow_matrix->forward.j * inverse_radius;
-		vertex_constants[0][2] = shadow_matrix->forward.k * inverse_radius;
-		vertex_constants[0][3] =
-			-(shadow_matrix->forward.i * shadow_matrix->position.x +
-			shadow_matrix->forward.j * shadow_matrix->position.y +
-			shadow_matrix->forward.k * shadow_matrix->position.z) *
-			inverse_radius;
-		vertex_constants[1][0] = shadow_matrix->left.i * inverse_radius;
-		vertex_constants[1][1] = shadow_matrix->left.j * inverse_radius;
-		vertex_constants[1][2] = shadow_matrix->left.k * inverse_radius;
-		vertex_constants[1][3] =
-			-(shadow_matrix->left.i * shadow_matrix->position.x +
-			shadow_matrix->left.j * shadow_matrix->position.y +
-			shadow_matrix->left.k * shadow_matrix->position.z) *
-			inverse_radius;
-		vertex_constants[2][0] = 0.0f;
-		vertex_constants[2][1] = 0.0f;
-		vertex_constants[2][2] = 0.0f;
-		vertex_constants[2][3] = 0.5f;
-		vertex_constants[3][0] = 0.0f;
-		vertex_constants[3][1] = 0.0f;
-		vertex_constants[3][2] = 0.0f;
-		vertex_constants[3][3] = 1.0f;
-		vertex_constants[4][0] = 0.0f;
-		vertex_constants[4][1] = 0.0f;
-		vertex_constants[4][2] = 0.0f;
-		vertex_constants[4][3] = 0.0f;
+		vsh_constants__screenproj[0] = inverse_radius * shadow_matrix->forward.i;
+		vsh_constants__screenproj[1] = inverse_radius * shadow_matrix->forward.j;
+		vsh_constants__screenproj[2] = inverse_radius * shadow_matrix->forward.k;
+		vsh_constants__screenproj[3] = -inverse_radius * dot_product3d(
+			&shadow_matrix->forward,
+			(real_vector3d const *)&shadow_matrix->position);
+		vsh_constants__screenproj[4] = inverse_radius * shadow_matrix->left.i;
+		vsh_constants__screenproj[5] = inverse_radius * shadow_matrix->left.j;
+		vsh_constants__screenproj[6] = inverse_radius * shadow_matrix->left.k;
+		vsh_constants__screenproj[7] = -inverse_radius * dot_product3d(
+			&shadow_matrix->left,
+			(real_vector3d const *)&shadow_matrix->position);
+		vsh_constants__screenproj[8] = 0.0f;
+		vsh_constants__screenproj[9] = 0.0f;
+		vsh_constants__screenproj[10] = 0.0f;
+		vsh_constants__screenproj[11] = 0.5f;
+		vsh_constants__screenproj[12] = 0.0f;
+		vsh_constants__screenproj[13] = 0.0f;
+		vsh_constants__screenproj[14] = 0.0f;
+		vsh_constants__screenproj[15] = 1.0f;
+		vsh_constants__screenproj[16] = 0.0f;
+		vsh_constants__screenproj[17] = 0.0f;
+		vsh_constants__screenproj[18] = 0.0f;
+		vsh_constants__screenproj[19] = 0.0f;
 		IDirect3DDevice8_SetVertexShaderConstant(
 			global_d3d_device,
 			-68,
-			vertex_constants,
+			vsh_constants__screenproj,
 			5);
 
 		rasterizer_set_target(
@@ -423,7 +420,7 @@ boolean _rasterizer_environment_shadow_begin(
 		}
 	}
 
-	return TRUE;
+	return success;
 }
 
 void _rasterizer_environment_shadow_model_begin(

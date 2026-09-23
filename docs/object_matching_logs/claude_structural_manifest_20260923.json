@@ -4,15 +4,15 @@
  "base": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
  "pushed": false,
  "summary": {
-  "functions_gained": 15,
-  "padded_bytes": 13056,
-  "code_bytes": 12945,
+  "functions_gained": 18,
+  "padded_bytes": 17184,
+  "code_bytes": 17046,
   "stable_regressions": 0,
   "by_category": {
    "source": {
-    "functions": 8,
-    "padded_bytes": 8512,
-    "code_bytes": 8459
+    "functions": 11,
+    "padded_bytes": 12640,
+    "code_bytes": 12560
    },
    "config-relocation-alias": {
     "functions": 7,
@@ -111,6 +111,28 @@
      "unit": "source/interface/ui_widget_game_data_input_functions",
      "function": "_splitscreen_pregame_status_screen_update",
      "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 924401 -> _local_player_controller_bitmap_frames+26 (interior of the following string)"
+    }
+   ]
+  },
+  "b3": {
+   "category": "source",
+   "description": "wave 2 verified exacts",
+   "gate": "scratch/lane/gate_b3.txt: ninja PASS, +3 fns / 4,128 padded, regressions 0, parks 112/0/0, admission 47/0/10/0, provider link PASS, 2 disclosed per-site casts, pytest 1152/5/26",
+   "functions": [
+    {
+     "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+     "function": "_rasterizer_active_camouflage_draw",
+     "evidence": "/Od 0x7cd9c0 lerps written as one expression (1-p)*base + p*hyper in refraction, distance, tint order with no normal local; texture-animation vertex constants as a block-scoped aggregate initializer (runtime aggregate initializers already appear in exact real_math.c:417 and objects.c:3201); disjoint blocks let both constant arrays share one slot"
+    },
+    {
+     "unit": "source/render/render_particles",
+     "function": "_render_particles",
+     "evidence": "/Od 0x84f800: draw pass indexes group_particle_counts[group_index] with a short for loop; inner while (particle_count-- > 0) with rendered_particle++ at the body end and before the delete-path continue (/Od 0x84fda4, 0x85010e); semantics reviewed equal"
+    },
+    {
+     "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+     "function": "__rasterizer_environment_shadow_begin",
+     "evidence": "/Od 0x80d870: boolean success = TRUE returned once; rows 0/1 w = -inverse_radius * dot_product3d(&m->forward, &m->position); HCEX names the array vsh_constants__screenproj[20]. Two per-site rule-24 casts (see cast_admissions): /Od dot_product3d calls at 0x80db50 and 0x80dbc2, byte-inert (deleting them keeps the function exact), point/vector share layout"
     }
    ]
   }
@@ -297,6 +319,112 @@
    "was_parked": true,
    "evidence": "relocs.json retarget of a csplit neighbour-symbol alias to the owning symbol with the addend VC7 emits; identical image address; semantic scorer already credited the row (objdiff progress unchanged): 1298630 -> _global_current_collision_users-2",
    "new_definitions": []
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+   "function": "_rasterizer_active_camouflage_draw",
+   "padded_bytes": 2016,
+   "code_bytes": 2014,
+   "before_status": "R",
+   "batch": "b3",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x7cd9c0 lerps written as one expression (1-p)*base + p*hyper in refraction, distance, tint order with no normal local; texture-animation vertex constants as a block-scoped aggregate initializer (runtime aggregate initializers already appear in exact real_math.c:417 and objects.c:3201); disjoint blocks let both constant arrays share one slot",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+   "function": "__rasterizer_environment_shadow_begin",
+   "padded_bytes": 944,
+   "code_bytes": 933,
+   "before_status": "R",
+   "batch": "b3",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "/Od 0x80d870: boolean success = TRUE returned once; rows 0/1 w = -inverse_radius * dot_product3d(&m->forward, &m->position); HCEX names the array vsh_constants__screenproj[20]. Two per-site rule-24 casts (see cast_admissions): /Od dot_product3d calls at 0x80db50 and 0x80dbc2, byte-inert (deleting them keeps the function exact), point/vector share layout",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/render/render_particles",
+   "function": "_render_particles",
+   "padded_bytes": 1168,
+   "code_bytes": 1154,
+   "before_status": "R",
+   "batch": "b3",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "/Od 0x84f800: draw pass indexes group_particle_counts[group_index] with a short for loop; inner while (particle_count-- > 0) with rendered_particle++ at the body end and before the delete-path continue (/Od 0x84fda4, 0x85010e); semantics reviewed equal",
+   "new_definitions": []
   }
- ]
+ ],
+ "rejected_trials": [
+  {
+   "unit": "source/physics/collisions",
+   "function": "_collision_move_point",
+   "kind": "refuted-header-proposal",
+   "detail": "Worker proposal: real_math.h __inline valid_real_plane3d + delete matrix_math.c definition + collisions.c site. Worker's shadow-header instrument reported 20/20; the real full build in a shadow worktree gained nothing (collisions stays [sha]) and regressed _bitmap_copy and _rasterizer_frame_statistics_draw. Not landed."
+  },
+  {
+   "unit": "source/ai/action_charge",
+   "function": "_action_charge_perform",
+   "kind": "fake-matching-probe",
+   "detail": "Harvested Lane B probe (_gate_72692.c) is exact 22/22 only with seven dummy m8_probe_N locals and __inline on the TU's helper copies; stripped of them it returns to [size 3216!=3248]. Rejected."
+  },
+  {
+   "unit": "source/ai/actor_looking",
+   "function": "_actor_look_update",
+   "kind": "load-bearing-punning-cast",
+   "detail": "Harvested Lane A probe exact only with aggregate (real_vector2d const *) view copies; the field-copy spelling is not exact, so the cast is not byte-inert (owner rule-24 condition). Held for the owner (packet item 5)."
+  },
+  {
+   "unit": "source/effects/weather_particle_systems",
+   "function": "_weather_particle_update_physics",
+   "kind": "link-and-placeholder",
+   "detail": "Harvested probe exact 20/20 but newly defines NODUP-class _point_from_line3d (link FAIL), adds a punning cast and a placeholder dead local. Rejected."
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_leaf_map_leaf_spans_polygon",
+   "kind": "link-fail",
+   "detail": "Harvested probe exact 25/25 but newly defines _distance3d, _magnitude3d and _point_from_line3d, all NODUP-provider conflicts (LNK2005). Held."
+  },
+  {
+   "unit": "source/rasterizer/xbox/rasterizer_xbox_environment",
+   "function": "__rasterizer_environment_lightmap_draw",
+   "kind": "owner-held-P7",
+   "detail": "Worker variant exact via duplicated stage-0 filter calls justified by a lab law (R-order fastcall setup), reopening the owner's P7 hold without first-party /Od attestation of the duplication. Held for an explicit owner ruling."
+  },
+  {
+   "unit": "source/interface/hud_weapon",
+   "function": "_hud_update_weapon_local_player",
+   "kind": "unreachable-uninitialised-read",
+   "detail": "Exact only when the default case leaves result unassigned after match_assert(!\"unreachable\") -> system_exit; same class as Lane D's held _effect_allowed_by_environment. Held for the owner."
+  },
+  {
+   "unit": "source/units/biped_limp_noodle, source/ai/actor_type_infection, source/units/vehicles",
+   "function": "held Lane B bodies (7,920 B)",
+   "kind": "link-fail",
+   "detail": "Still strict exact on this tree; each newly defines NODUP-class helpers (_point_from_line3d, _vector_intersect_plane3d, _cross_product2d) and fails the selected-provider link. Held (owner packet item 1)."
+  },
+  {
+   "unit": "source/physics/collision_debug",
+   "function": "_collision_debug_render",
+   "kind": "link-fail+bss-split",
+   "detail": "Exact against a scratch re-split only with NODUP-class _point_from_line3d/_scale_vector3d/_add_vectors3d emission plus a descriptive-name .bss split. Held."
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_geometry",
+   "function": "_compress_real_vector3d_to_int32, _compress_real_vector3d_to_int32_clamp",
+   "kind": "header-count-tie-regression",
+   "detail": "uncompress_int32_to_real_vector3d returning real_vector3d by value (/Od struct-return pattern at 16 call sites, HCEX single parameter) makes both rows exact (+1,056 B) but flips _rasterizer_frame_statistics_draw (4,176 B: two field loads at +0x1aa/+0x1b6 swap) whether the prototype stays in rasterizer_geometry.h or moves to rasterizer_geometry_compression.h. Not landed; held pending recovery of the declaration that keeps frame_statistics stable."
+  }
+ ],
+ "cast_admissions": {
+  "source/rasterizer/xbox/rasterizer_xbox_shadows": {
+   "extra": 2,
+   "function": "__rasterizer_environment_shadow_begin",
+   "sites": "(real_vector3d const *)&shadow_matrix->position passed to dot_product3d, rows 0 and 1",
+   "evidence": "per-site rule-24 admission (owner 2026-09-21): /Od 0x80d870 calls dot_product3d (0x42dd80) at 0x80db50 and 0x80dbc2 with the matrix position; deleting both casts (C4133 only) leaves the function strict exact; real_point3d and real_vector3d share the 3-real layout; strict exact; disclosed in the batch commit"
+  }
+ }
 }

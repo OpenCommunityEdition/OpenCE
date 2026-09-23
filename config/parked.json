@@ -475,25 +475,6 @@
       }
     },
     {
-      "unit": "source/render/render_particles",
-      "function": "_render_particles",
-      "class": "register-allocation",
-      "evidence": "The retained ordinary-C reconstruction implements the complete January particle-render path with authenticated shared types and names: visibility and perspective filtering, the PDB-recorded single current_sprite_group pointer reused by the grouping and draw passes, sorted sprite batches, attached-object transforms, LOD/fade handling, named U/V mirror flags, and the original unguarded zero-by-zero secondary-map-radius division. Target and candidate share the 1168-byte padded envelope and all 39 relocation identities, addresses, types, destinations, and addends; objdiff reports 99.82228% for the function. The remaining 59 normalized positional differences are stack-slot/local-coloring choices. A two-shadow-pointer spelling reduced that count to 45, but contradicts the HCEA/PDB local record and is rejected as a less credible exactness-oriented source shape. The apparently idempotent detached-object sentinel write is retained because January directly stores -1 to particle_datum.object_index at function offset +0x2E3; removing it changes the function envelope and relocation positions. No volatile access, compiler barrier, forced inline/noinline, assembly, undefined behavior, fake dependency, inert branch, or nonsensical logic is retained. Both helper functions and the owned profile section remain strict exact. Reopen only for authoritative January source/local-variable records or a natural same-compiler lifetime donor that explains the remaining stack allocation while preserving the one-pointer topology.",
-      "measurements": {
-        "target": {
-          "size": 1168,
-          "relocation_count": 39,
-          "normalized_sha256": "97e541b16e87e1e09094430247df715ca41e4ecc679738f638d09e1bbfffcc4e"
-        },
-        "base": {
-          "size": 1168,
-          "relocation_count": 39,
-          "normalized_sha256": "8a7510241d251d090a30b22282d8569ad88fc8a4c0e94713687f2e0475db94f2"
-        },
-        "objdiff_percent": 99.82228
-      }
-    },
-    {
       "unit": "source/objects/widgets/light_volumes",
       "function": "_light_volume_render",
       "class": "tu-context-optimization",
@@ -1004,25 +985,6 @@
           "normalized_sha256": "776ba88304402bf2ae995d27de02026f8a9a6655fe565c6385712bbf55c8d2ee"
         },
         "objdiff_percent": 96.43883
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
-      "function": "__rasterizer_environment_shadow_begin",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after reconstructing the complete typed January Xbox shadow-target setup from the target instruction and relocation topology, January's own assertion strings and debug-global bindings, and the independently named HaloCEA shadow state. The retained routine validates the matrix, color, and radius; installs the shadow render state and pixel shader; derives the two projected matrix rows and constant rows; selects the shadow target; initializes the typed shadow state; and accounts statistics. Target and candidate both occupy 944 padded bytes with all 73 relocation types and destinations, and objdiff reports 98.32 percent similarity. The first residual is January sinking five independent constant-row stores around the x87 projection block while VC7 sinks three, followed by an equivalent commutative dot-product schedule. Six ordinary-C sum spellings, declaration orders, constant-row placements, initialization forms, and include-set variants all returned to this fixed point or degraded it. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the backend store and x87 schedule.",
-      "measurements": {
-        "target": {
-          "size": 944,
-          "relocation_count": 73,
-          "normalized_sha256": "b6c4674070a5973fe1a47b27603e72d5688973dc6c5ca209fedb3fcf0e489df9"
-        },
-        "base": {
-          "size": 944,
-          "relocation_count": 73,
-          "normalized_sha256": "709c6800cb61db4110660fda4c3622669f7a0d60293514e8ca292ea4e90cab99"
-        },
-        "objdiff_percent": 98.32258
       }
     },
     {

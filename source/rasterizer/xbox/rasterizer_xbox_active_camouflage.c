@@ -507,12 +507,6 @@ void rasterizer_active_camouflage_draw(
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
 	{
 		struct shader_model_definition *model;
-		real_vector4d vertex_constants[3];
-		real_rgb_color tint_color;
-		real detail_map_v_scale;
-		real distance_falloff;
-		real refraction_amount;
-		real normal;
 
 		model = (struct shader_model_definition *)shader_get_and_verify_type(
 			group->shader,
@@ -612,35 +606,31 @@ void rasterizer_active_camouflage_draw(
 				rasterizer_transparent_geometry_get_primary_vertex_type(group),
 				0);
 
-			detail_map_v_scale = model->model.detail_map_v_scale*model->model.detail_map_scale;
-			vertex_constants[0].i = model->model.detail_map_scale;
-			vertex_constants[0].j = detail_map_v_scale;
-			vertex_constants[0].k = 1.0f;
-			vertex_constants[0].l = 1.0f;
-			vertex_constants[1].i = 1.0f;
-			vertex_constants[1].j = 0.0f;
-			vertex_constants[1].k = 0.0f;
-			vertex_constants[1].l = 0.0f;
-			vertex_constants[2].i = 0.0f;
-			vertex_constants[2].j = 1.0f;
-			vertex_constants[2].k = 0.0f;
-			vertex_constants[2].l = 0.0f;
-			shader_texture_animation_evaluate(
-				&model->model.texture_animation,
-				group->animation,
-				model->model.map_u_scale*group->model_base_map_scale.i,
-				model->model.map_v_scale*group->model_base_map_scale.j,
-				0.0f,
-				0.0f,
-				0.0f,
-				global_frame_parameters.game_time_sec,
-				&vertex_constants[1],
-				&vertex_constants[2]);
-			IDirect3DDevice8_SetVertexShaderConstant(
-				global_d3d_device,
-				-84,
-				vertex_constants,
-				NUMBEROF(vertex_constants));
+			{
+				real_vector4d vertex_constants[3] =
+				{
+					{model->model.detail_map_scale, model->model.detail_map_v_scale*model->model.detail_map_scale, 1.0f, 1.0f},
+					{1.0f, 0.0f, 0.0f, 0.0f},
+					{0.0f, 1.0f, 0.0f, 0.0f}
+				};
+
+				shader_texture_animation_evaluate(
+					&model->model.texture_animation,
+					group->animation,
+					model->model.map_u_scale*group->model_base_map_scale.i,
+					model->model.map_v_scale*group->model_base_map_scale.j,
+					0.0f,
+					0.0f,
+					0.0f,
+					global_frame_parameters.game_time_sec,
+					&vertex_constants[1],
+					&vertex_constants[2]);
+				IDirect3DDevice8_SetVertexShaderConstant(
+					global_d3d_device,
+					-84,
+					vertex_constants,
+					NUMBEROF(vertex_constants));
+			}
 
 			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
 			pixel_shader.texture_modes = PS_TEXTUREMODES(
@@ -816,36 +806,42 @@ void rasterizer_active_camouflage_draw(
 			rasterizer_transparent_geometry_get_primary_vertex_type(group),
 			0);
 
-		/* blend the normal and hyper-stealth parameters by the effect parameter */
-		normal = 1.0f - group->effect.parameter;
-		distance_falloff = normal*global_rasterizer_data->active_camouflage_distance_falloff;
-		distance_falloff += global_rasterizer_data->active_camouflage_hyper_stealth_distance_falloff*group->effect.parameter;
-		tint_color.red = normal*global_rasterizer_data->active_camouflage_tint_color.red;
-		tint_color.red += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.red*group->effect.parameter;
-		tint_color.green = normal*global_rasterizer_data->active_camouflage_tint_color.green;
-		tint_color.green += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.green*group->effect.parameter;
-		tint_color.blue = normal*global_rasterizer_data->active_camouflage_tint_color.blue;
-		tint_color.blue += global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.blue*group->effect.parameter;
-		refraction_amount = normal*global_rasterizer_data->active_camouflage_refraction_amount;
-		refraction_amount += global_rasterizer_data->active_camouflage_hyper_stealth_refraction_amount*group->effect.parameter;
+		{
+			real_vector4d vertex_constants[3];
+			real_rgb_color tint_color;
+			real distance_falloff;
+			real refraction_amount;
 
-		vertex_constants[0].i = refraction_amount*group->effect.intensity;
-		vertex_constants[0].j = distance_falloff;
-		vertex_constants[0].k = (real)ACTIVE_CAMOUFLAGE_SCREEN_WIDTH;
-		vertex_constants[0].l = (real)ACTIVE_CAMOUFLAGE_SCREEN_HEIGHT;
-		vertex_constants[1].i = 0.0f;
-		vertex_constants[1].j = 0.0f;
-		vertex_constants[1].k = 0.0f;
-		vertex_constants[1].l = 0.0f;
-		vertex_constants[2].i = tint_color.red;
-		vertex_constants[2].j = tint_color.green;
-		vertex_constants[2].k = tint_color.blue;
-		vertex_constants[2].l = 0.0f;
-		IDirect3DDevice8_SetVertexShaderConstant(
-			global_d3d_device,
-			-84,
-			vertex_constants,
-			NUMBEROF(vertex_constants));
+			/* blend the normal and hyper-stealth parameters by the effect parameter */
+			refraction_amount = (1.0f - group->effect.parameter)*global_rasterizer_data->active_camouflage_refraction_amount +
+				group->effect.parameter*global_rasterizer_data->active_camouflage_hyper_stealth_refraction_amount;
+			distance_falloff = (1.0f - group->effect.parameter)*global_rasterizer_data->active_camouflage_distance_falloff +
+				group->effect.parameter*global_rasterizer_data->active_camouflage_hyper_stealth_distance_falloff;
+			tint_color.red = (1.0f - group->effect.parameter)*global_rasterizer_data->active_camouflage_tint_color.red +
+				group->effect.parameter*global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.red;
+			tint_color.green = (1.0f - group->effect.parameter)*global_rasterizer_data->active_camouflage_tint_color.green +
+				group->effect.parameter*global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.green;
+			tint_color.blue = (1.0f - group->effect.parameter)*global_rasterizer_data->active_camouflage_tint_color.blue +
+				group->effect.parameter*global_rasterizer_data->active_camouflage_hyper_stealth_tint_color.blue;
+
+			vertex_constants[0].i = refraction_amount*group->effect.intensity;
+			vertex_constants[0].j = distance_falloff;
+			vertex_constants[0].k = (real)ACTIVE_CAMOUFLAGE_SCREEN_WIDTH;
+			vertex_constants[0].l = (real)ACTIVE_CAMOUFLAGE_SCREEN_HEIGHT;
+			vertex_constants[1].i = 0.0f;
+			vertex_constants[1].j = 0.0f;
+			vertex_constants[1].k = 0.0f;
+			vertex_constants[1].l = 0.0f;
+			vertex_constants[2].i = tint_color.red;
+			vertex_constants[2].j = tint_color.green;
+			vertex_constants[2].k = tint_color.blue;
+			vertex_constants[2].l = 0.0f;
+			IDirect3DDevice8_SetVertexShaderConstant(
+				global_d3d_device,
+				-84,
+				vertex_constants,
+				NUMBEROF(vertex_constants));
+		}
 
 		csmemset(&pixel_shader, 0, sizeof(pixel_shader));
 		pixel_shader.texture_modes = PS_TEXTUREMODES(
