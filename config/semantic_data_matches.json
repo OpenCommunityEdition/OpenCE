@@ -317,5 +317,45 @@
       "relocation_count": 3,
       "normalized_sha256": "6d9398e131ef72b9a6ffc2321c22d27a3e2db1a458385b77b08ba0657a56c74f"
     }
+  },
+  {
+    "unit": "source/ai/ai_scenario_definitions",
+    "symbol": "_global_ai_default_state_names",
+    "reason": "January and rebuilt 48-byte AI default-state name table (sole .data section) have identical normalized payload and flags (c0300040), a PDB-public external owner at offset 0, and all 12 relocations resolve to the same image addresses. The whole object otherwise matches: 4/4 functions strict exact, every January-owned section and symbol equal, and all candidate-only literals pair-link with their selected providers in both orders. objdiff 3.3.1 misreads the identical '$' literal names.",
+    "measurements": {
+      "size": 48,
+      "relocation_count": 12,
+      "normalized_sha256": "17b0761f87b081d5cf10757ccc89f12be355c70e2e29df288b65b30710dcbcd1"
+    }
+  },
+  {
+    "unit": "source/ai/ai_profile",
+    "symbol": "_global_ai_meter_definitions",
+    "reason": "January and rebuilt 236-byte AI meter/profile-name .data section (sole data section; _ai_profile_render_spray_names static at +224 on both sides) have identical normalized payload and flags (c0400040), and all 10 relocations resolve to the same image addresses. The whole object otherwise matches: 23/23 functions strict exact, every January-owned section and symbol equal and consistent with cachebeta.pdb publics, and candidate-only literals pair-link with their selected providers in both orders.",
+    "measurements": {
+      "size": 236,
+      "relocation_count": 10,
+      "normalized_sha256": "3a69a8b8a83037c3277fa86c09c7aa4e9b9da8b480e3facb87275548ee4c88b8"
+    }
+  },
+  {
+    "unit": "source/shaders/shader_definitions",
+    "symbol": "_global_shader_effect_additive",
+    "reason": "January and rebuilt 364-byte shader-effect .data section (the additive and alpha-blended effect definitions, the latter at +184 on both sides) have identical normalized payload and flags (c0400040), and both relocations resolve to the same image addresses. The whole object otherwise matches: 1/1 function strict exact, every January-owned section and symbol equal and consistent with cachebeta.pdb publics, and candidate-only literals pair-link with their selected providers in both orders.",
+    "measurements": {
+      "size": 364,
+      "relocation_count": 2,
+      "normalized_sha256": "8bbb21a994d2ec5051de3ea76497f648469fe42d5f6aa7da85f3b598bf16bcd0"
+    }
+  },
+  {
+    "unit": "source/units/dialogue_definitions",
+    "symbol": "_dialogue_vocalization_type_name",
+    "reason": "January and rebuilt 1,672-byte dialogue .data section have identical normalized payload and flags (c0400040), and all 418 relocations resolve to the same image addresses. The whole object otherwise matches: 2/2 functions strict exact, all 298 January symbols equal in section, offset and storage and consistent with cachebeta.pdb publics, and all candidate-only literals pair-link with their selected providers in both orders.",
+    "measurements": {
+      "size": 1672,
+      "relocation_count": 418,
+      "normalized_sha256": "256984cb62bc879971463ff0ff7567042dc95d8b0fb2bc676f246c2293c77ae8"
+    }
   }
 ]
