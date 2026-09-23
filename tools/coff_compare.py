@@ -237,10 +237,10 @@ def _defined_noncode_destination(obj, source_section_number, target, addend):
         and item["type"] != 0x20
     ]
     if not anchors:
-        # Compiler-generated local data such as an SEH scope table has no
-        # external owner.  Admit a static owner only for the unambiguous
-        # whole-section case; producer-specific names are still compared via
-        # the relocation-normalized destination proof below.
+        # A csplit section may expose only its first file-static while MSVC
+        # exposes every later static.  A unique named static at offset zero
+        # anchors the whole section in either representation.  Other statics
+        # at nonzero offsets do not make that section origin ambiguous.
         statics = [
             item for item in obj["symbols"]
             if item["section"] == target_section_number
@@ -248,8 +248,9 @@ def _defined_noncode_destination(obj, source_section_number, target, addend):
             and item["type"] != 0x20
             and not item["name"].startswith(".")
         ]
-        if len(statics) == 1 and statics[0]["value"] == 0:
-            anchors = statics
+        starts = [item for item in statics if item["value"] == 0]
+        if len(starts) == 1:
+            anchors = starts
         else:
             return None
 

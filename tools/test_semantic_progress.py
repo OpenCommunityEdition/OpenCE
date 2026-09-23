@@ -636,6 +636,30 @@ class SemanticDataProgressTests(unittest.TestCase):
         self.assertEqual(
             self.report["units"][0]["measures"]["matched_data"], 24)
 
+    def test_grouped_raw_sections_credit_reported_unpadded_span(self):
+        first = b"1234567"
+        second = b"abcdefghijkl"
+        self.target_path.write_bytes(self._group_object(first, second))
+        self.base_path.write_bytes(self._group_object(first, second))
+        self.manifest_path.write_text(json.dumps([{
+            "unit": "data_unit",
+            "group": "raw-sections",
+            "credit_raw_size": True,
+            "members": [
+                self._group_member("_first", first, 0x40301040, 8),
+                self._group_member("_second", second, 0x40401040, 16),
+            ],
+        }]), encoding="utf-8")
+        self.report["units"][0]["measures"] = self._measures(19, 0)
+        self.report["units"][0]["sections"] = [{
+            "name": ".rdata", "size": 19, "fuzzy_match_percent": 50.0,
+        }]
+
+        notes = self._apply()
+
+        self.assertEqual(notes, ["data_unit:raw-sections (+19 data bytes)"])
+        self.assertEqual(self.report["units"][0]["measures"]["matched_data"], 19)
+
     def test_grouped_data_member_change_refuses_credit(self):
         first = b"1234567"
         second = b"abcdefghijkl"

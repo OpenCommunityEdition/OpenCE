@@ -683,6 +683,9 @@ def apply_semantic_data_matches(
         members = entry.get("members")
         if members:
             section_label = entry.get("group", "data-section-group")
+            credit_size_key = (
+                "size" if entry.get("credit_raw_size", False)
+                else "padded_size")
             target = load(project_root / config_unit["target_path"])
             base = load(project_root / config_unit["base_path"])
             credited_size = 0
@@ -751,10 +754,10 @@ def apply_semantic_data_matches(
                     raise SemanticProgressError(
                         f"semantic data group member snapshot changed: "
                         f"{unit_name}:{target_symbol}")
-                credited_size += target_snapshot["padded_size"]
+                credited_size += target_snapshot[credit_size_key]
                 grouped_sections[target_snapshot["section"]] = (
                     grouped_sections.get(target_snapshot["section"], 0)
-                    + target_snapshot["padded_size"])
+                    + target_snapshot[credit_size_key])
 
             unmatched_sections = {}
             for report_section in report_unit.get("sections", []):

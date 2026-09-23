@@ -131,49 +131,17 @@ enum editor_camera_persisted_camera_slot
 
 /* ---------- structures */
 
-struct editor_camera_focus
+struct editor_camera_focus_definition
 {
 	real_point3d position;
 	real_euler_angles2d angles;
 };
 
-struct editor_camera_persisted_camera
+struct persisted_camera_data
 {
-	struct flying_camera camera;
+	struct flying_camera camera_data;
 	boolean saved;
 };
-
-struct editor_camera_globals
-{
-	boolean scripted;
-	boolean use_roll;
-	boolean initialized;
-	byte _unknown03;
-	struct editor_camera_focus focus;
-	struct flying_camera *camera;
-	boolean reset_all;
-	byte _unknown1d[3];
-	real_vector3d unit_offset;
-	short mode;
-	byte _unknown2e[4];
-	boolean last_scripted;
-	byte _unknown33[5];
-	struct editor_camera_persisted_camera persisted_cameras[NUMBER_OF_EDITOR_CAMERA_PERSISTED_CAMERA_SLOTS];
-	unsigned long speed_step;
-};
-
-typedef char editor_camera_globals_unit_offset_offset_assert[
-	offsetof(struct editor_camera_globals, unit_offset) == 0x20 ? 1 : -1];
-typedef char editor_camera_globals_mode_offset_assert[
-	offsetof(struct editor_camera_globals, mode) == 0x2C ? 1 : -1];
-typedef char editor_camera_globals_last_scripted_offset_assert[
-	offsetof(struct editor_camera_globals, last_scripted) == 0x32 ? 1 : -1];
-typedef char editor_camera_globals_persisted_cameras_offset_assert[
-	offsetof(struct editor_camera_globals, persisted_cameras) == 0x38 ? 1 : -1];
-typedef char editor_camera_globals_speed_step_offset_assert[
-	offsetof(struct editor_camera_globals, speed_step) == 0x78 ? 1 : -1];
-typedef char editor_camera_globals_size_assert[
-	sizeof(struct editor_camera_globals) == 0x7C ? 1 : -1];
 
 struct editor_camera_player_starting_location
 {
@@ -213,10 +181,25 @@ static void translate_orbiting_to_flying(
 
 /* January kept these as file-scope scalars and arrays; VC7 hoists loads of
    non-address-taken statics across pointer stores where it reloads aggregates.
-   The speed scalar keeps external linkage as the authenticated data anchor. */
+   The .data and .bss statics follow the definition order and names recorded for
+   this translation unit in the HCEX PDB; January's .bss offsets (+0x00 .. +0x78)
+   and its camera_mode assertion text agree. The speed scalar is the .data
+   anchor; is_scripted is a private .bss anchor as in January. The 124-byte
+   .bss reserves local_player_index at +0x30. */
 real editor_camera_speed = 1.f;
 static long unit_focus = NONE;
-struct editor_camera_globals editor_camera_globals = { 0 };
+static boolean is_scripted = FALSE;
+static boolean use_roll = FALSE;
+static boolean initialized = FALSE;
+static struct editor_camera_focus_definition editor_camera_focus = { 0 };
+static struct flying_camera *editor_camera = NULL;
+static boolean reset_all = FALSE;
+static real_vector3d unit_offset = { 0 };
+static short camera_mode = _editor_camera_mode_flying;
+static short local_player_index = 0;
+static boolean last_scripted = FALSE;
+static struct persisted_camera_data persisted_cameras[NUMBER_OF_EDITOR_CAMERA_PERSISTED_CAMERA_SLOTS] = { 0 };
+static unsigned long speed_step = 0;
 long const editor_camera_speed_steps[NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS] = { 1, 5, 20, 40, 60 };
 static real const orbiting_camera_field_of_view = DEGREES_TO_RADIANS(70.f);
 static real const orbiting_camera_scale = 1.f;
@@ -259,7 +242,7 @@ void editor_camera_new(
 {
 	real_vector3d forward;
 
-	if (!editor_camera_globals.initialized)
+	if (!initialized)
 	{
 		if (global_scenario_get()->players.count &&
 			global_scenario_get()->players.address)
@@ -270,32 +253,32 @@ void editor_camera_new(
 					0,
 					struct editor_camera_player_starting_location);
 
-			editor_camera_globals.focus.position = starting_location->position;
-			editor_camera_globals.focus.angles.yaw = starting_location->facing;
+			editor_camera_focus.position = starting_location->position;
+			editor_camera_focus.angles.yaw = starting_location->facing;
 		}
 		else
 		{
 			csmemset(
-				&editor_camera_globals.focus,
+				&editor_camera_focus,
 				0,
-				sizeof(editor_camera_globals.focus));
+				sizeof(editor_camera_focus));
 		}
 	}
 
-	editor_camera_globals.initialized = TRUE;
+	initialized = TRUE;
 	vector3d_from_euler_angles2d(
 		&forward,
-		&editor_camera_globals.focus.angles);
+		&editor_camera_focus.angles);
 	flying_camera_new_from_point_and_vector(
 		camera,
-		&editor_camera_globals.focus.position,
+		&editor_camera_focus.position,
 		&forward);
 
 	if (!local_player_index)
-		editor_camera_globals.camera = camera;
-	if (editor_camera_globals.mode)
+		editor_camera = camera;
+	if (camera_mode)
 	{
-		translate_funcs[editor_camera_globals.mode][_translate_to](
+		translate_funcs[camera_mode][_translate_to](
 			camera);
 	}
 
@@ -309,8 +292,8 @@ void editor_camera_get_focus(
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 120, position);
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 121, angles);
 
-	*position = editor_camera_globals.focus.position;
-	*angles = editor_camera_globals.focus.angles;
+	*position = editor_camera_focus.position;
+	*angles = editor_camera_focus.angles;
 
 	return;
 }
@@ -322,8 +305,8 @@ void editor_camera_set_focus(
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 129, position);
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 130, angles);
 
-	editor_camera_globals.focus.position = *position;
-	editor_camera_globals.focus.angles = *angles;
+	editor_camera_focus.position = *position;
+	editor_camera_focus.angles = *angles;
 
 	return;
 }
@@ -338,8 +321,8 @@ void editor_camera_move_to_point(
 
 	vector3d_from_euler_angles2d(
 		&forward,
-		&editor_camera_globals.camera->facing);
-	camera = editor_camera_globals.camera;
+		&editor_camera->facing);
+	camera = editor_camera;
 	camera->position.x = point->x - forward.i * 2.5f;
 	camera->position.y = point->y - forward.j * 2.5f;
 	camera->position.z = point->z - forward.k * 2.5f;
@@ -356,11 +339,11 @@ void editor_camera_set_position(
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 148, point);
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 149, angles);
 
-	camera = editor_camera_globals.camera;
+	camera = editor_camera;
 	if (!camera)
 	{
 		editor_camera_set_focus(point, angles);
-		editor_camera_globals.initialized = TRUE;
+		initialized = TRUE;
 	}
 	else
 	{
@@ -379,7 +362,7 @@ void editor_camera_set_position_and_roll(
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 169, point);
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 170, angles);
 
-	if (editor_camera_globals.camera)
+	if (editor_camera)
 	{
 		real_matrix4x3 rotation;
 		real_vector3d facing;
@@ -387,20 +370,20 @@ void editor_camera_set_position_and_roll(
 		real_vector3d up;
 		real_vector3d roll_reference;
 
-		editor_camera_globals.camera->position = *point;
+		editor_camera->position = *point;
 		matrix4x3_rotation_from_angles(
 			&rotation,
 			angles->yaw,
 			angles->pitch,
 			angles->roll);
 		euler_angles2d_from_vector3d(
-			&editor_camera_globals.camera->facing,
+			&editor_camera->facing,
 			&rotation.forward);
 		vector3d_from_euler_angles2d(
 			&facing,
-			&editor_camera_globals.camera->facing);
+			&editor_camera->facing);
 
-		up_angles = editor_camera_globals.camera->facing;
+		up_angles = editor_camera->facing;
 		up_angles.pitch += _pi / 2.f;
 		vector3d_from_euler_angles2d(
 			&up,
@@ -412,14 +395,14 @@ void editor_camera_set_position_and_roll(
 			&rotation.up,
 			&roll_reference);
 		normalize3d(&roll_reference);
-		editor_camera_globals.camera->roll = angle_between_vectors3d(&up, &rotation.up) *
+		editor_camera->roll = angle_between_vectors3d(&up, &rotation.up) *
 			dot_product3d(&roll_reference, &facing);
 
 		if (unit_focus != NONE)
 		{
-			editor_camera_globals.unit_offset.i = point->x;
-			editor_camera_globals.unit_offset.j = point->y;
-			editor_camera_globals.unit_offset.k = point->z;
+			unit_offset.i = point->x;
+			unit_offset.j = point->y;
+			unit_offset.k = point->z;
 		}
 	}
 	else
@@ -429,10 +412,10 @@ void editor_camera_set_position_and_roll(
 		focus_angles.yaw = angles->yaw;
 		focus_angles.pitch = angles->pitch;
 		editor_camera_set_focus(point, &focus_angles);
-		editor_camera_globals.initialized = TRUE;
+		initialized = TRUE;
 	}
 
-	editor_camera_globals.reset_all = TRUE;
+	reset_all = TRUE;
 
 	return;
 }
@@ -440,7 +423,7 @@ void editor_camera_set_position_and_roll(
 void editor_camera_set_unit_focus(
 	long unit_index)
 {
-	struct flying_camera *camera = editor_camera_globals.camera;
+	struct flying_camera *camera = editor_camera;
 
 	unit_focus = unit_index;
 	if (!camera)
@@ -453,11 +436,11 @@ void editor_camera_set_unit_focus(
 		vector_from_points3d(
 			&unit->object.bounding_sphere_center,
 			&camera->position,
-			&editor_camera_globals.unit_offset);
+			&unit_offset);
 	}
 	else
 	{
-		editor_camera_globals.unit_offset = *global_zero_vector3d;
+		unit_offset = *global_zero_vector3d;
 	}
 
 	return;
@@ -466,10 +449,9 @@ void editor_camera_set_unit_focus(
 void editor_camera_bump_speed(
 	void)
 {
-	editor_camera_globals.speed_step =
-		(editor_camera_globals.speed_step + 1) % NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS;
+	speed_step = (speed_step + 1) % NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS;
 	editor_camera_speed =
-		(real)editor_camera_speed_steps[editor_camera_globals.speed_step];
+		(real)editor_camera_speed_steps[speed_step];
 	terminal_printf(
 		global_real_argb_white,
 		"speed is now x%f",
@@ -487,11 +469,11 @@ long editor_camera_get_speed(
 boolean editor_camera_use_roll(
 	boolean new_use_roll)
 {
-	boolean previous_use_roll = editor_camera_globals.use_roll;
+	boolean previous_use_roll = use_roll;
 
-	editor_camera_globals.use_roll = new_use_roll;
-	if (!new_use_roll && editor_camera_globals.camera)
-		editor_camera_globals.camera->roll = 0.0f;
+	use_roll = new_use_roll;
+	if (!new_use_roll && editor_camera)
+		editor_camera->roll = 0.0f;
 
 	return previous_use_roll;
 }
@@ -505,35 +487,35 @@ long editor_camera_get_unit_focus(
 short editor_camera_get_mode(
 	void)
 {
-	return editor_camera_globals.mode;
+	return camera_mode;
 }
 
 boolean editor_camera_get_scripted(
 	void)
 {
-	return editor_camera_globals.scripted;
+	return is_scripted;
 }
 
 real editor_camera_get_field_of_view(
 	void)
 {
-	return editor_camera_field_of_view[editor_camera_globals.mode];
+	return editor_camera_field_of_view[camera_mode];
 }
 
 void editor_camera_set_mode(
 	short mode)
 {
-	if (editor_camera_globals.camera && editor_camera_globals.mode != mode)
+	if (editor_camera && camera_mode != mode)
 	{
-		if (editor_camera_globals.mode)
+		if (camera_mode)
 		{
 			match_dassert(
 				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
 				302,
-				translate_funcs[editor_camera_globals.mode][_translate_from],
+				translate_funcs[camera_mode][_translate_from],
 				"translate_funcs[camera_mode][_translate_from]");
-			translate_funcs[editor_camera_globals.mode][_translate_from](
-				editor_camera_globals.camera);
+			translate_funcs[camera_mode][_translate_from](
+				editor_camera);
 		}
 		if (mode)
 		{
@@ -543,11 +525,11 @@ void editor_camera_set_mode(
 				translate_funcs[mode][_translate_to],
 				"translate_funcs[mode][_translate_to]");
 			translate_funcs[mode][_translate_to](
-				editor_camera_globals.camera);
+				editor_camera);
 		}
 	}
 
-	editor_camera_globals.mode = mode;
+	camera_mode = mode;
 	console_printf(FALSE, mode_names[mode]);
 
 	return;
@@ -561,10 +543,10 @@ void editor_camera_update(
 	match_dassert(
 		"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
 		340,
-		update_funcs[editor_camera_globals.mode],
+		update_funcs[camera_mode],
 		"update_funcs[camera_mode]");
 
-	if (editor_camera_globals.scripted)
+	if (is_scripted)
 	{
 		if (!controls->active)
 		{
@@ -572,25 +554,25 @@ void editor_camera_update(
 			return;
 		}
 
-		editor_camera_globals.camera->position = editor_custom_render->camera.position;
+		editor_camera->position = editor_custom_render->camera.position;
 		euler_angles2d_from_vector3d(
-			&editor_camera_globals.camera->facing,
+			&editor_camera->facing,
 			&editor_custom_render->camera.forward);
 		editor_camera_set_unit_focus(unit_focus);
-		if (editor_camera_globals.mode)
+		if (camera_mode)
 		{
 			match_dassert(
 				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
 				356,
-				translate_funcs[editor_camera_globals.mode][_translate_from],
+				translate_funcs[camera_mode][_translate_from],
 				"translate_funcs[camera_mode][_translate_from]");
-			translate_funcs[editor_camera_globals.mode][_translate_to](
-				editor_camera_globals.camera);
+			translate_funcs[camera_mode][_translate_to](
+				editor_camera);
 		}
 	}
 
-	update_funcs[editor_camera_globals.mode](camera, controls, result);
-	if (editor_camera_globals.scripted)
+	update_funcs[camera_mode](camera, controls, result);
+	if (is_scripted)
 	{
 		long flags = result->flags;
 
@@ -610,15 +592,15 @@ void editor_camera_set_scripted(
 	{
 		real_euler_angles2d angles;
 
-		if (editor_camera_globals.mode)
+		if (camera_mode)
 		{
 			match_dassert(
 				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
 				387,
-				translate_funcs[editor_camera_globals.mode][_translate_from],
+				translate_funcs[camera_mode][_translate_from],
 				"translate_funcs[camera_mode][_translate_from]");
-			translate_funcs[editor_camera_globals.mode][_translate_from](
-				editor_camera_globals.camera);
+			translate_funcs[camera_mode][_translate_from](
+				editor_camera);
 		}
 
 		euler_angles2d_from_vector3d(
@@ -630,15 +612,8 @@ void editor_camera_set_scripted(
 
 		if (unit_focus != NONE)
 		{
-			real_point3d relative_position;
-
-			set_real_point3d(
-				&relative_position,
-				editor_camera_globals.unit_offset.i,
-				editor_camera_globals.unit_offset.j,
-				editor_camera_globals.unit_offset.k);
 			scripted_camera_set_camera_point_relative(
-				&relative_position,
+				(real_point3d const *)&unit_offset,
 				&editor_custom_render->camera.forward,
 				&editor_custom_render->camera.up,
 				DEGREES_TO_RADIANS(70.f),
@@ -658,25 +633,25 @@ void editor_camera_set_scripted(
 	}
 	else
 	{
-		editor_camera_globals.camera->position = editor_custom_render->camera.position;
+		editor_camera->position = editor_custom_render->camera.position;
 		euler_angles2d_from_vector3d(
-			&editor_camera_globals.camera->facing,
+			&editor_camera->facing,
 			&editor_custom_render->camera.forward);
 		editor_camera_set_unit_focus(unit_focus);
-		if (editor_camera_globals.mode)
+		if (camera_mode)
 		{
 			match_dassert(
 				"c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
 				414,
-				translate_funcs[editor_camera_globals.mode][_translate_from],
+				translate_funcs[camera_mode][_translate_from],
 				"translate_funcs[camera_mode][_translate_from]");
-			translate_funcs[editor_camera_globals.mode][_translate_to](
-				editor_camera_globals.camera);
+			translate_funcs[camera_mode][_translate_to](
+				editor_camera);
 		}
 	}
 
-	editor_camera_globals.last_scripted = editor_camera_globals.scripted;
-	editor_camera_globals.scripted = scripted;
+	last_scripted = is_scripted;
+	is_scripted = scripted;
 	console_printf(
 		FALSE,
 		"%s scripted camera mode",
@@ -707,7 +682,7 @@ static void editor_camera_flying_update(
 			camera->facing.pitch + controls->facing_delta.pitch,
 			-1.56765485f,
 			1.56765485f);
-		if (editor_camera_globals.use_roll)
+		if (use_roll)
 			camera->roll += controls->facing_delta.roll;
 		else
 			camera->roll = 0.f;
@@ -746,19 +721,23 @@ static void editor_camera_flying_update(
 	{
 		struct object_datum *unit;
 
-		editor_camera_globals.unit_offset.i += translation.i;
-		editor_camera_globals.unit_offset.j += translation.j;
-		editor_camera_globals.unit_offset.k += translation.k;
+		unit_offset.i += translation.i;
+		unit_offset.j += translation.j;
+		unit_offset.k += translation.k;
 		unit = object_get(unit_focus);
-		position.x = editor_camera_globals.unit_offset.i + unit->object.bounding_sphere_center.x;
-		position.y = editor_camera_globals.unit_offset.j + unit->object.bounding_sphere_center.y;
-		position.z = editor_camera_globals.unit_offset.k + unit->object.bounding_sphere_center.z;
+		point_from_line3d(
+			&unit->object.bounding_sphere_center,
+			&unit_offset,
+			1.f,
+			&position);
 	}
 	else
 	{
-		position.x = translation.i + camera->position.x;
-		position.y = translation.j + camera->position.y;
-		position.z = translation.k + camera->position.z;
+		point_from_line3d(
+			&camera->position,
+			&translation,
+			1.f,
+			&position);
 	}
 	camera->position = position;
 	result->position = position;
@@ -897,8 +876,8 @@ static void editor_camera_orbiting_update(
 static void translate_orbiting_to_flying(
 	struct flying_camera *camera)
 {
-	editor_camera_globals.persisted_cameras[_editor_camera_persisted_orbiting].camera = *camera;
-	editor_camera_globals.persisted_cameras[_editor_camera_persisted_orbiting].saved = TRUE;
+	persisted_cameras[_editor_camera_persisted_orbiting].camera_data = *camera;
+	persisted_cameras[_editor_camera_persisted_orbiting].saved = TRUE;
 
 	camera->position = editor_custom_render->camera.position;
 	euler_angles2d_from_vector3d(
@@ -912,11 +891,11 @@ static void translate_orbiting_to_flying(
 static void translate_flying_to_orbiting(
 	struct flying_camera *camera)
 {
-	editor_camera_globals.persisted_cameras[_editor_camera_persisted_flying].camera = *camera;
+	persisted_cameras[_editor_camera_persisted_flying].camera_data = *camera;
 
-	if (editor_camera_globals.persisted_cameras[_editor_camera_persisted_orbiting].saved)
+	if (persisted_cameras[_editor_camera_persisted_orbiting].saved)
 	{
-		*camera = editor_camera_globals.persisted_cameras[_editor_camera_persisted_orbiting].camera;
+		*camera = persisted_cameras[_editor_camera_persisted_orbiting].camera_data;
 	}
 	else
 	{

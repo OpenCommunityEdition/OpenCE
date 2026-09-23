@@ -77,6 +77,49 @@ class TestCoffCompare(unittest.TestCase):
             coff_compare.section_info(anchor, "func"),
             coff_compare.section_info(local, "func")))
 
+    def test_static_section_origin_survives_later_static_symbols(self):
+        """A file-static section origin identifies later local destinations."""
+        origin = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_state", "value": 0, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        detailed = origin + [
+            {"name": "_later_state", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        left = _build_code_data(origin, [(0x10, 1, 6, 8)])
+        right = _build_code_data(detailed, [(0x10, 2, 6, 0)])
+        self.assertTrue(coff_compare.section_infos_equal(
+            coff_compare.section_info(left, "func"),
+            coff_compare.section_info(right, "func")))
+
+        wrong = _build_code_data(detailed, [(0x10, 2, 6, 4)])
+        self.assertFalse(coff_compare.section_infos_equal(
+            coff_compare.section_info(left, "func"),
+            coff_compare.section_info(wrong, "func")))
+
+    def test_static_section_origin_rejects_ambiguous_zero_aliases(self):
+        """Two file-statics at offset zero do not define a unique origin."""
+        origin = [
+            {"name": "func", "value": 0, "section": 1,
+             "type": 0x20, "storage": 2, "aux_count": 0},
+            {"name": "_state", "value": 0, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        ambiguous = origin + [
+            {"name": "_alias", "value": 0, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+            {"name": "_later_state", "value": 8, "section": 2,
+             "type": 0, "storage": 3, "aux_count": 0},
+        ]
+        left = _build_code_data(origin, [(0x10, 1, 6, 8)])
+        right = _build_code_data(ambiguous, [(0x10, 3, 6, 0)])
+        self.assertFalse(coff_compare.section_infos_equal(
+            coff_compare.section_info(left, "func"),
+            coff_compare.section_info(right, "func")))
+
     def test_defined_noncode_different_offset_refuses(self):
         """Different resolved offsets in the same section remain unequal."""
         anchor_symbols = [

@@ -88,6 +88,49 @@
     }
   },
   {
+    "unit": "source/camera/editor_flying_camera",
+    "group": "camera-static-sections",
+    "allow_incomplete_unit": true,
+    "credit_raw_size": true,
+    "reason": "January and the rebuilt object have identical 124-byte private .bss and 52-byte .data payloads, flags, alignments, and owner storage. The nine .data relocations resolve to the same image destinations. HCEX names the separate file statics and their definition order; the January .bss offsets corroborate their exact layout. Objdiff undercredits the two sections after the authentic private-state split. Credit raw sizes because its report scores .bss as 124 bytes, not the 128-byte alignment-derived padded extent. The remaining camera code function stays residual.",
+    "members": [
+      {
+        "symbol": "_is_scripted",
+        "measurements": {
+          "target": {
+            "section": ".bss", "size": 124, "padded_size": 128,
+            "flags": 3225419904, "relocation_count": 0,
+            "normalized_sha256": "7b8ec8dd836b564f0c85ad088fc744de820345204e154bc1503e04e9d6fdd9f1",
+            "owner": { "value": 0, "type": 0, "storage": 3 }
+          },
+          "base": {
+            "section": ".bss", "size": 124, "padded_size": 128,
+            "flags": 3225419904, "relocation_count": 0,
+            "normalized_sha256": "7b8ec8dd836b564f0c85ad088fc744de820345204e154bc1503e04e9d6fdd9f1",
+            "owner": { "value": 0, "type": 0, "storage": 3 }
+          }
+        }
+      },
+      {
+        "symbol": "_editor_camera_speed",
+        "measurements": {
+          "target": {
+            "section": ".data", "size": 52, "padded_size": 52,
+            "flags": 3224371264, "relocation_count": 9,
+            "normalized_sha256": "22486dfe6b955caf557fcbca418621432912c2d3012afd4e6031fe22b880d07b",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          },
+          "base": {
+            "section": ".data", "size": 52, "padded_size": 52,
+            "flags": 3224371264, "relocation_count": 9,
+            "normalized_sha256": "22486dfe6b955caf557fcbca418621432912c2d3012afd4e6031fe22b880d07b",
+            "owner": { "value": 0, "type": 0, "storage": 2 }
+          }
+        }
+      }
+    ]
+  },
+  {
     "unit": "source/units/unit_dialogue",
     "symbol": "_global_speech_priority_names",
     "reason": "January and the rebuilt 44-byte speech-name table have identical payload, 11 relocation sites and types, and independently resolved literal destinations; objdiff undercredits the table because the executable split assigns nine folded SELECT_ANY strings to other objects",
