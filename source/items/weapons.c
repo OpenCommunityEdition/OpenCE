@@ -2200,7 +2200,7 @@ static void trigger_create_projectiles(
 			long player_index= unit->unit.player_index;
 			long actor_index= unit->unit.actor_index;
 			boolean adjust_origin;
-			boolean use_aiming_vector= TRUE;
+			boolean use_aiming_vector;
 
 			if (unit->unit.gunner_object_index!=NONE)
 			{
@@ -2211,6 +2211,7 @@ static void trigger_create_projectiles(
 			}
 
 			adjust_origin= TEST_FLAG(unit_definition->unit.flags, _unit_fires_from_camera_bit);
+			use_aiming_vector= TRUE;
 			if (actor_index!=NONE && actor_firing_blindly(actor_index))
 			{
 				use_aiming_vector= FALSE;
@@ -2226,9 +2227,6 @@ static void trigger_create_projectiles(
 			{
 				real_vector3d right;
 				real_vector3d up;
-				real forward_offset;
-				real right_offset;
-				real up_offset;
 
 				cross_product3d(global_up3d, &forward, &right);
 				if (normalize3d(&right)==0.0f)
@@ -2238,18 +2236,21 @@ static void trigger_create_projectiles(
 				cross_product3d(&forward, &right, &up);
 				normalize3d(&up);
 
-				forward_offset= trigger_definition->first_person_weapon_offset.x;
-				right_offset= trigger_definition->first_person_weapon_offset.y;
-				up_offset= trigger_definition->first_person_weapon_offset.z;
-				origin.x+= forward.i*forward_offset;
-				origin.y+= forward.j*forward_offset;
-				origin.z+= forward.k*forward_offset;
-				origin.x+= right.i*right_offset;
-				origin.y+= right.j*right_offset;
-				origin.z+= right.k*right_offset;
-				origin.x+= up.i*up_offset;
-				origin.y+= up.j*up_offset;
-				origin.z+= up.k*up_offset;
+				point_from_line3d(
+					&origin,
+					&forward,
+					trigger_definition->first_person_weapon_offset.x,
+					&origin);
+				point_from_line3d(
+					&origin,
+					&right,
+					trigger_definition->first_person_weapon_offset.y,
+					&origin);
+				point_from_line3d(
+					&origin,
+					&up,
+					trigger_definition->first_person_weapon_offset.z,
+					&origin);
 
 				target_object_index= player_aim_projectile(player_index, &origin, &forward);
 			}
@@ -2334,14 +2335,10 @@ static void trigger_create_projectiles(
 				projectile_distribute(&data.forward, &data.up, trigger_definition->projectile_distribution_function, trigger_definition->projectile_distribution_angle, projectile_index, projectile_count);
 				scale_vector3d(&data.forward, velocity, &data.translational_velocity);
 
-				if (unit && unit->unit.player_index!=NONE)
+				inside_bsp= unit && unit->unit.player_index!=NONE;
+				if (inside_bsp)
 				{
-					inside_bsp= TRUE;
 					SET_FLAG(data.flags, _new_object_never_automatically_delete_bit, TRUE);
-				}
-				else
-				{
-					inside_bsp= FALSE;
 				}
 
 				projectile_object_index= object_new(&data);
