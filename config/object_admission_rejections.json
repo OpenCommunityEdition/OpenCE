@@ -2,6 +2,30 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/objects/objects",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_point_in_sphere, _real_random, _signed_angular_difference, _valid_real_vector3d, _valid_real_vector3d_axes2",
+      "reason": "All January target functions and owned data now match, but five candidate-only shared helpers conflict with hand-written no-duplicates providers in path_obstacles, action_charge, player_control and bored_camera. Exact target bytes and the corrected private symbols do not establish safe whole-object linkage.",
+      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+      "reopen": "Replace the conflicting hand-written providers with genuine shared-header uses, retain every exact caller, and prove compatible ordinary provider links in both orders before admitting the object. Do not credit the candidate-only copies."
+    },
+    {
+      "unit": "source/hs/hs_scenario_definitions",
+      "class": "source-layout-incomplete",
+      "symbol": ".data",
+      "reason": "January's data section has 8-byte alignment while the rebuilt section has 4-byte alignment. The current definitions force their layout with invented aggregates, pack/align directives and a padding member; identical payload alone does not authenticate the object.",
+      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+      "reopen": "Recover the genuine separate January data definitions and their natural alignment, including the static byte-swap owner, without fabricated aggregates or padding; preserve target code and data bytes across a full sweep."
+    },
+    {
+      "unit": "source/hs/hs_globals_external",
+      "class": "source-layout-incomplete",
+      "symbol": "_hs_external_global_definitions",
+      "reason": "The rebuilt data is byte-identical, but it is one invented 442-element array where January had 442 separately named file-static global definitions. The later build does not independently authenticate all January names or this aggregate source shape.",
+      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+      "reopen": "Recover and verify the January per-global names and ownership from first-party evidence, replace the aggregate with authentic separate definitions, and preserve every exact function and data relocation before whole-object admission."
+    },
+    {
       "unit": "source/structures/leaf_map",
       "class": "candidate-only-comdat-owner",
       "symbol": "_distance3d",
