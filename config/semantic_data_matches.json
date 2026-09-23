@@ -257,5 +257,25 @@
       "relocation_count": 30,
       "normalized_sha256": "804797955ced17a1f6b1e4b86c0a83a5d25fcb03fa846e690dae51ef13bc5c2f"
     }
+  },
+  {
+    "unit": "source/render/render_particles",
+    "symbol": "_render_particles_section",
+    "reason": "The January and rebuilt render-particles profile-section owners have equal 1528-byte payload, section flags and external storage, and their sole relocation independently resolves to the same image string; objdiff undercredits the complete section. All three target functions are strict exact, and base-only SELECT_ANY literals have byte-identical January-selected providers with passing ordinary pair links.",
+    "measurements": {
+      "size": 1528,
+      "relocation_count": 1,
+      "normalized_sha256": "806638334fff1341360b4dec7db0987871f376bc3999e26ff4bcd3a1755d2955"
+    }
+  },
+  {
+    "unit": "source/bitmaps/bitmaps",
+    "symbol": "_global_vector_palette",
+    "reason": "January and rebuilt 1116-byte palette data have equal payload, section flags, owner storage and offsets, and all 21 relocations resolve to the same image destinations. All 34 target functions are strict exact; the sole extra fast_ftol COMDAT is byte-identical to its selected January provider and pair-links in either order.",
+    "measurements": {
+      "size": 1116,
+      "relocation_count": 21,
+      "normalized_sha256": "443063631e6958ff5026be3038f8785d61eee4073cb01b8eaa4fdfcc3b620002"
+    }
   }
 ]
