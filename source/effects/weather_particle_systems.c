@@ -952,34 +952,28 @@ static void weather_particle_update_physics(
 		particle->acceleration.j = random_direction.j*type_definition->acceleration_turning_rate + inverse_turning_rate*particle->acceleration.j;
 		particle->acceleration.k = random_direction.k*type_definition->acceleration_turning_rate + inverse_turning_rate*particle->acceleration.k;
 		scale_vector3d(&particle->acceleration, magnitude, &particle->acceleration);
-		particle->velocity.i+= system->time_delta_sec*particle->acceleration.i;
-		particle->velocity.j+= system->time_delta_sec*particle->acceleration.j;
-		particle->velocity.k+= system->time_delta_sec*particle->acceleration.k;
+		point_from_line3d((real_point3d *)&particle->velocity, &particle->acceleration, system->time_delta_sec, (real_point3d *)&particle->velocity);
 	}
-
-	flags = system->under_water ?
-		FLAG(_point_physics_ignore_position_bit)|FLAG(_point_physics_ignore_position_under_water_bit)|FLAG(_point_physics_force_no_collisions_bit) :
-		FLAG(_point_physics_ignore_position_bit)|FLAG(_point_physics_force_no_collisions_bit);
-	point_physics_update(
-		flags,
-		point_physics_definition_get(type_definition->physics.index),
-		&system->location,
-		system->weather_palette_index,
-		&particle->position,
-		&particle->velocity,
-		NULL,
-		NULL,
-		NULL,
-		particle->radius,
-		system->time_delta_sec);
 
 	{
 		unsigned long seed = particle_index;
-		real_vector3d *jitter = seed_random_direction3d(&seed, &random_direction);
 
-		particle->position.x+= jitter->i*0.001f;
-		particle->position.y+= jitter->j*0.001f;
-		particle->position.z+= jitter->k*0.001f;
+		flags = system->under_water ?
+			FLAG(_point_physics_ignore_position_bit)|FLAG(_point_physics_ignore_position_under_water_bit)|FLAG(_point_physics_force_no_collisions_bit) :
+			FLAG(_point_physics_ignore_position_bit)|FLAG(_point_physics_force_no_collisions_bit);
+		point_physics_update(
+			flags,
+			point_physics_definition_get(type_definition->physics.index),
+			&system->location,
+			system->weather_palette_index,
+			&particle->position,
+			&particle->velocity,
+			NULL,
+			NULL,
+			NULL,
+			particle->radius,
+			system->time_delta_sec);
+		point_from_line3d(&particle->position, seed_random_direction3d(&seed, &random_direction), 0.001f, &particle->position);
 	}
 	weather_particle_system_wrap_point(type->box_width, &particle->position, &particle->position);
 
