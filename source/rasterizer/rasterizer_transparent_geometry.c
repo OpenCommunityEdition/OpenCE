@@ -85,8 +85,11 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "rasterizer.h"
+#include "rasterizer_debug_options.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_transparent_geometry.h"
+#include "rasterizer/xbox/rasterizer_xbox_internal.h"
+#include "rasterizer/xbox/rasterizer_xbox_state.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 
@@ -144,39 +147,7 @@ typedef char transparent_geometry_group_sorted_index_offset_assert[
 typedef char transparent_geometry_group_cortana_hack_offset_assert[
 	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D ? 1 : -1];
 
-struct rasterizer_transparent_geometry_debug_options
-{
-	byte pad00[0x88];
-	boolean field_88;
-	byte pad89[3];
-};
-
-struct rasterizer_transparent_geometry_window_parameters
-{
-	short rasterizer_target;
-	short window_index;
-};
-
 /* ---------- prototypes */
-
-short rasterizer_transparent_geometry_get_group_presorted_index(
-	struct transparent_geometry_group const *group);
-void rasterizer_set_stencil_mode(
-	long stencil_mode);
-static void rasterizer_sort_internal(
-	struct transparent_geometry_group *group);
-int __cdecl group_sorted_indices_cmpfn(
-	void const *group_index1_pointer,
-	void const *group_index2_pointer);
-void rasterizer_sort_external(
-	void);
-void rasterizer_profile_begin(
-	short profile);
-void rasterizer_profile_end(
-	short profile);
-void rasterizer_set_frustum_z(
-	real z_near,
-	real z_far);
 
 /* ---------- globals */
 
@@ -190,8 +161,7 @@ static long transparent_geometry_group_count2 = 0;
 static short *transparent_geometry_group_sorted_indices = NULL;
 static short transparent_geometry_next_group_sorted_index = 0;
 
-extern struct rasterizer_transparent_geometry_debug_options rasterizer_debug_options;
-extern struct rasterizer_transparent_geometry_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -573,12 +543,12 @@ void rasterizer_transparent_geometry_draw(
 			transparent_geometry_group_index = 0;
 			if (global_window_parameters.window_index != NONE)
 			{
-				rasterizer_debug_options.field_88 = TRUE;
+				rasterizer_debug_options.transparent_pixel_counter_active = TRUE;
 			}
 		}
 
 		rasterizer_transparent_geometry_groups_begin();
-		rasterizer_debug_options.field_88 = FALSE;
+		rasterizer_debug_options.transparent_pixel_counter_active = FALSE;
 		while (transparent_geometry_group_index < transparent_geometry_group_count)
 		{
 			struct transparent_geometry_group *group =
@@ -631,10 +601,10 @@ void rasterizer_transparent_geometry_draw(
 
 		if (!water && global_window_parameters.window_index != NONE)
 		{
-			rasterizer_debug_options.field_88 = TRUE;
+			rasterizer_debug_options.transparent_pixel_counter_active = TRUE;
 		}
 		rasterizer_transparent_geometry_groups_end();
-		rasterizer_debug_options.field_88 = FALSE;
+		rasterizer_debug_options.transparent_pixel_counter_active = FALSE;
 		if (first_person_flag)
 		{
 			rasterizer_set_frustum_z(0.0f, 0.0f);

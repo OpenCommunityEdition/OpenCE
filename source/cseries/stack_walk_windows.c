@@ -109,6 +109,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#define NOD3D
+#define NODSOUND
 #include "cseries_windows.h"
 #include "errors.h"
 
@@ -188,8 +190,8 @@ struct _stack_walk_globals stack_walk_globals =
 	FALSE
 };
 
-static unsigned long walk_up_current_frame;
 static unsigned long *old_ebp;
+static unsigned long walk_up_current_frame;
 
 /* ---------- public code */
 
@@ -242,7 +244,7 @@ char *symbol_name_from_address(
 	unsigned long fake_address,
 	struct debug_symbol_table *symbol_table)
 {
-	static char symbol_buffer[0x4000];
+	static char symbol_buffer[0x4000] = { 0 };
 	unsigned long address = stack_walk_globals.fixup + fake_address;
 
 	csstrcpy(symbol_buffer, "<unknown>");

@@ -76,5 +76,15 @@
         }
       }
     ]
+  },
+  {
+    "unit": "source/units/unit_dialogue",
+    "symbol": "_global_speech_priority_names",
+    "reason": "January and the rebuilt 44-byte speech-name table have identical payload, 11 relocation sites and types, and independently resolved literal destinations; objdiff undercredits the table because the executable split assigns nine folded SELECT_ANY strings to other objects",
+    "measurements": {
+      "size": 44,
+      "relocation_count": 11,
+      "normalized_sha256": "85759b3811ff7dc47b03792ac85317be51431a3f9e01dcafce317ed736a391b0"
+    }
   }
 ]

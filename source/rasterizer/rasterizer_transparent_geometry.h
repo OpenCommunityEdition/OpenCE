@@ -22,6 +22,8 @@ void rasterizer_transparent_geometry_groups_begin(
 	void);
 void rasterizer_transparent_geometry_groups_end(
 	void);
+void rasterizer_sort_external(
+	void);
 struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
 	void);
 struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(

@@ -572,62 +572,71 @@ long player_aim_projectile(
 		"c:\\halo\\SOURCE\\game\\aim_assist.c",
 		79,
 		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
-	global_current_collision_users[global_current_collision_user_depth++]= _collision_user_aim_assist;
+	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_aim_assist;
 
 	if (unit_get_aim_assist_parameters(aiming_unit_index, unit_get_zoom_level(aiming_unit_index), &parameters))
 	{
 		real_point3d camera_position;
-		real_vector3d camera_forward;
-		real_vector3d autoaim_vector;
+		real_vector3d camera_direction;
+		real_vector3d target_direction;
+		real_vector3d collision_direction;
 		real autoaim_level;
-		real_vector3d aim_vector;
-		real_vector3d vector;
 
-		director_camera_deterministic(player->unit_index, &camera_position, &camera_forward);
-		autoaim_vector= *direction;
+		director_camera_deterministic(player->unit_index, &camera_position, &camera_direction);
+		target_direction= *direction;
 		autoaim_level= 0.f;
 
 		{
 			struct aim_assist_target target;
 
-			if (aim_assist(&parameters, &camera_position, &camera_forward, player->unit_index,
-				player->team_index, &target))
+			if (aim_assist(&parameters, &camera_position, &camera_direction, player->unit_index, player->team_index, &target))
 			{
-				vector_from_points3d(position, &target.position, &autoaim_vector);
-				if (normalize3d(&autoaim_vector)==0.f)
+				vector_from_points3d(position, &target.position, &target_direction);
+				if (normalize3d(&target_direction)==0.f)
 				{
-					autoaim_vector= *direction;
+					target_direction= *direction;
 				}
+
 				autoaim_level= target.autoaim_level;
 				target_object_index= target.object_index;
 			}
 		}
 
+		/* Trace from the camera at the aiming unit's distance along the camera direction. */
 		{
-			real distance= distance3d(&unit_get(aiming_unit_index)->object.position, &camera_position);
-			real_vector3d camera_direction= camera_forward;
-
-			normalize3d(&camera_direction);
-			scale_vector3d(&camera_direction, distance, &camera_direction);
-			add_vectors3d(&camera_position, &camera_direction, &camera_position);
-		}
-
-		{
+			real_vector3d camera_vector;
 			struct collision_result collision;
+			real_vector3d camera_to_unit;
+			real_vector3d camera_displacement;
+			struct unit_datum *unit= unit_get(aiming_unit_index);
+			real camera_to_unit_distance;
 
-			scale_vector3d(&camera_forward, 128.f, &vector);
-			collision_test_vector(_collision_test_for_projectiles_flags, &camera_position, &vector,
+			vector_from_points3d(&unit->object.position, &camera_position, &camera_to_unit);
+			camera_to_unit_distance= magnitude3d(&camera_to_unit);
+			camera_displacement= camera_direction;
+			normalize3d(&camera_displacement);
+			scale_vector3d(&camera_displacement, camera_to_unit_distance, &camera_displacement);
+			set_real_point3d(&camera_position, camera_position.x + camera_displacement.i,
+				camera_position.y + camera_displacement.j, camera_position.z + camera_displacement.k);
+			scale_vector3d(&camera_direction, 128.f, &camera_vector);
+			collision_test_vector(_collision_test_for_projectiles_flags, &camera_position, &camera_vector,
 				player->unit_index, &collision);
-			vector_from_points3d(position, &collision.point, &aim_vector);
-			if (normalize3d(&aim_vector)==0.f)
+
+			vector_from_points3d(position, &collision.point, &collision_direction);
+			if (normalize3d(&collision_direction)==0.f)
 			{
-				aim_vector= *direction;
+				collision_direction= *direction;
 			}
 		}
 
-		fast_normals_interpolate(&aim_vector, &autoaim_vector, autoaim_level, &vector);
-		pin_normal_to_cone3d(&vector, direction, sine(parameters.deviation_angle),
-			cosine(parameters.deviation_angle), direction);
+		/* Blend toward the autoaim target, then pin inside the deviation cone. */
+		{
+			real_vector3d desired_direction;
+
+			fast_normals_interpolate(&collision_direction, &target_direction, autoaim_level, &desired_direction);
+			pin_normal_to_cone3d(&desired_direction, direction, sine(parameters.deviation_angle),
+				cosine(parameters.deviation_angle), direction);
+		}
 	}
 
 	match_assert(
