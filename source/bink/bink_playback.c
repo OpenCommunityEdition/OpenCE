@@ -675,26 +675,13 @@ void code_001b5850(
 static void bink_draw_frame(
 	void)
 {
-	char string[4096];
-	BINKSUMMARY summary;
 	struct dynamic_screen_vertex vertices[4];
-	BINKREALTIME realtime;
-	short tab_stops[6]= { 250 };
-	point2d cursor= { 0, 0 };
-	rectangle2d bounds;
-	short top;
-	short left;
-	short bottom;
-	short right;
+	rectangle2d screen_bounds;
 	short vertex_index;
-	long corner_index= 1;
 
 	if (TEST_FLAG(bink_globals.flags, _bink_playback_full_screen_bit))
 	{
-		top= rasterizer_globals.reserved04.screen_bounds.y0;
-		left= rasterizer_globals.reserved04.screen_bounds.x0;
-		bottom= rasterizer_globals.reserved04.screen_bounds.y1;
-		right= rasterizer_globals.reserved04.screen_bounds.x1;
+		screen_bounds= rasterizer_globals.reserved04.screen_bounds;
 	}
 	else
 	{
@@ -703,30 +690,36 @@ static void bink_draw_frame(
 		short screen_height= rasterizer_globals.reserved04.screen_bounds.y1-
 			rasterizer_globals.reserved04.screen_bounds.y0;
 
-		left= (short)((screen_width-bink_globals.width)/2);
-		right= (short)((screen_width+bink_globals.width)/2);
-		top= (short)((screen_height-bink_globals.height)/2);
-		bottom= (short)((screen_height+bink_globals.height)/2);
+		screen_bounds.x0= (short)((screen_width-bink_globals.width)/2);
+		screen_bounds.x1= (short)((screen_width+bink_globals.width)/2);
+		screen_bounds.y0= (short)((screen_height-bink_globals.height)/2);
+		screen_bounds.y1= (short)((screen_height+bink_globals.height)/2);
 	}
 
-	for (vertex_index= 0; vertex_index<NUMBEROF(vertices); vertex_index++)
+	for (vertex_index= 0; vertex_index<4; vertex_index++)
 	{
-		boolean use_right= TEST_FLAG(corner_index, 1);
-		boolean use_bottom= vertex_index>1;
-		struct dynamic_screen_vertex *vertex= &vertices[vertex_index];
+		real u= ((vertex_index+1)&2) ? (real)bink_globals.width : 0.0f;
+		real v= vertex_index>1 ? (real)bink_globals.height : 0.0f;
+		real x= ((vertex_index+1)&2) ? (real)screen_bounds.x1 : (real)screen_bounds.x0;
+		real y= vertex_index>1 ? (real)screen_bounds.y1 : (real)screen_bounds.y0;
 
-		vertex->texture_coordinates.x= use_right ? (real)bink_globals.width : 0.0f;
-		vertex->texture_coordinates.y= use_bottom ? (real)bink_globals.height : 0.0f;
-		vertex->position.x= use_right ? (real)right : (real)left;
-		vertex->position.y= use_bottom ? (real)bottom : (real)top;
-		vertex->color= (pixel32)NONE;
-		corner_index++;
+		vertices[vertex_index].position.x= x;
+		vertices[vertex_index].position.y= y;
+		vertices[vertex_index].texture_coordinates.x= u;
+		vertices[vertex_index].texture_coordinates.y= v;
+		vertices[vertex_index].color= (pixel32)NONE;
 	}
 
 	rasterizer_psuedo_dynamic_screen_quad_draw(&bink_globals.screen_geometry, vertices);
 
 	if (debug_bink)
 	{
+		char string[4096];
+		BINKSUMMARY summary;
+		BINKREALTIME realtime;
+		short tab_stops[6]= { 250, 0, 0, 0, 0, 0 };
+		point2d cursor= { 0, 0 };
+		rectangle2d bounds;
 		real reciprocal_frame_count;
 
 		BinkGetRealtime(bink_globals.bink, &realtime, 0);
@@ -760,7 +753,7 @@ static void bink_draw_frame(
 		rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
 
 		bounds.y0= (short)(cursor.y+31);
-		if (bink_globals.rendered_frame_count-bink_globals.frame_count_at_last_summary>28)
+		if (bink_globals.rendered_frame_count-bink_globals.frame_count_at_last_summary>=29)
 		{
 			BinkGetSummary(bink_globals.bink, &summary);
 			bink_globals.skipped_frames= summary.SkippedFrames-bink_globals.total_skipped_frames;

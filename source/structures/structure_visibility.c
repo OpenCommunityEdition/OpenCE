@@ -852,20 +852,16 @@ static short portal_hull_from_points(
 	struct portal_hull *result)
 {
 	struct structure_bsp *structure = global_structure_bsp_get();
-	real camera_distance;
 	real facing;
-	real_point3d view_space[MAXIMUM_PORTAL_HULL_VERTICES];
-	short source_index;
+	real_point3d viewer_points[MAXIMUM_PORTAL_HULL_VERTICES];
+	short vertex_index;
+	short first_vertex_index;
 	short terminator;
 	short output_index;
-	short vertex_index;
+	short hull_result;
 
 	result->vertex_count = 0;
-	camera_distance =
-		camera->position.x * plane->n.i +
-		camera->position.y * plane->n.j +
-		camera->position.z * plane->n.k - plane->d;
-	facing = camera_distance * winding;
+	facing = plane3d_distance_to_point(plane, &camera->position) * winding;
 
 	if (camera->mirrored)
 	{
@@ -874,65 +870,67 @@ static short portal_hull_from_points(
 
 	if (fabs(facing) < 0.1f)
 	{
-		return _portal_hull_from_portal_degenerate;
+		hull_result = _portal_hull_from_portal_degenerate;
 	}
-	if (facing <= 0.0f)
+	else if (facing > 0.0f)
 	{
-		return _portal_hull_from_portal_discarded;
-	}
+		for (vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+		{
+			matrix4x3_transform_point(
+				&frustum->world_to_view,
+				&vertices[vertex_index],
+				&viewer_points[vertex_index]);
+		}
 
-	for (vertex_index = 0; vertex_index < vertex_count; vertex_index++)
-	{
-		matrix4x3_transform_point(
-			&frustum->world_to_view,
-			&vertices[vertex_index],
-			&view_space[vertex_index]);
-	}
+		result->vertex_count = convex_polygon3d_clip_to_plane(
+			vertex_count,
+			viewer_points,
+			&screen_plane,
+			MAXIMUM_PORTAL_HULL_VERTICES,
+			viewer_points,
+			NULL,
+			0.0001f,
+			TRUE);
+		match_assert(
+			"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
+			0x485,
+			result->vertex_count!=NONE);
 
-	result->vertex_count = convex_polygon3d_clip_to_plane(
-		vertex_count,
-		view_space,
-		&screen_plane,
-		MAXIMUM_PORTAL_HULL_VERTICES,
-		view_space,
-		NULL,
-		0.0001f,
-		TRUE);
-	match_assert(
-		"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
-		0x485,
-		result->vertex_count!=NONE);
+		if (winding == 1)
+		{
+			first_vertex_index = 0;
+			terminator = result->vertex_count;
+		}
+		else
+		{
+			first_vertex_index = result->vertex_count - 1;
+			terminator = NONE;
+		}
 
-	if (winding == 1)
-	{
-		source_index = 0;
-		terminator = result->vertex_count;
+		for (output_index = 0, vertex_index = first_vertex_index;
+			vertex_index != terminator;
+			vertex_index += winding, output_index++)
+		{
+			real ooz = -1.0f / viewer_points[vertex_index].z;
+
+			match_assert(
+				"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
+				0x497,
+				ooz>0.f);
+			result->vertices[output_index].x = viewer_points[vertex_index].x * ooz;
+			result->vertices[output_index].y = viewer_points[vertex_index].y * ooz;
+		}
+
+		hull_result = result->vertex_count >= NUMBER_OF_VERTICES_PER_TRIANGLE
+			? _portal_hull_from_portal_succeeded
+			: _portal_hull_from_portal_discarded;
 	}
 	else
 	{
-		source_index = result->vertex_count - 1;
-		terminator = NONE;
+		hull_result = _portal_hull_from_portal_discarded;
 	}
 
-	output_index = 0;
-	while (source_index != terminator)
-	{
-		real ooz = -1.0f / view_space[source_index].z;
-
-		match_assert(
-			"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
-			0x497,
-			ooz>0.f);
-		result->vertices[output_index].x = view_space[source_index].x * ooz;
-		result->vertices[output_index].y = view_space[source_index].y * ooz;
-		output_index++;
-		source_index += winding;
-	}
-
-	(void)structure;
-	return result->vertex_count < NUMBER_OF_VERTICES_PER_TRIANGLE
-		? _portal_hull_from_portal_discarded
-		: _portal_hull_from_portal_succeeded;
+	return hull_result;
 }
 
 static short portal_hull_from_portal(

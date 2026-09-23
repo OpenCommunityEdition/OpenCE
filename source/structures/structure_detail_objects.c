@@ -142,18 +142,6 @@ struct detail_object_global_runtime_data
 	struct detail_object_runtime_data local_player_data[2];
 	real_vector4d default_z_reference_vector;
 };
-typedef struct detail_object_global_runtime_data detail_object_global_runtime_data_type;
-
-struct detail_object_globals
-{
-	boolean enabled;
-	byte pad01[3];
-	struct detail_object_global_runtime_data *runtime_data;
-	boolean fudge_vector;
-	byte pad09[3];
-	real fudge_offset;
-	real final_offset;
-};
 
 struct structure_detail_object_data
 {
@@ -187,8 +175,6 @@ typedef char detail_object_runtime_data_size[
 	sizeof(struct detail_object_runtime_data) == 0x5210 ? 1 : -1];
 typedef char detail_object_global_runtime_data_size[
 	sizeof(struct detail_object_global_runtime_data) == 0xA430 ? 1 : -1];
-typedef char detail_object_globals_size[
-	sizeof(struct detail_object_globals) == 0x14 ? 1 : -1];
 typedef char structure_detail_object_data_size[
 	sizeof(struct structure_detail_object_data) == 0x40 ? 1 : -1];
 typedef char detail_object_size[
@@ -218,26 +204,26 @@ static struct detail_object_cell_definition *get_upper_bound_cell(
 
 /* ---------- globals */
 
-struct detail_object_globals debug_detail_objects = { 0 };
+boolean debug_detail_objects = FALSE;
 
-#define detail_object_global_runtime_data debug_detail_objects.runtime_data
+static struct detail_object_global_runtime_data *detail_object_global_runtime_data = NULL;
+static boolean fudge_vector = FALSE;
+static real fudge_offset = 0.0f;
+static real final_offset = 0.0f;
 
 /* ---------- public code */
 
 void structure_detail_objects_initialize(
 	void)
 {
-	detail_object_global_runtime_data_type *runtime_data =
-		(detail_object_global_runtime_data_type *)game_state_malloc(
-			"structure detail objects",
-			NULL,
-			sizeof(*runtime_data));
-
-	runtime_data->default_z_reference_vector.i = 0.0f;
-	runtime_data->default_z_reference_vector.j = 0.0f;
-	runtime_data->default_z_reference_vector.k = 1.0f;
-	detail_object_global_runtime_data = runtime_data;
-	runtime_data->default_z_reference_vector.l = 0.0f;
+	detail_object_global_runtime_data = game_state_malloc(
+		"structure detail objects",
+		NULL,
+		sizeof(*detail_object_global_runtime_data));
+	detail_object_global_runtime_data->default_z_reference_vector.i = 0.0f;
+	detail_object_global_runtime_data->default_z_reference_vector.j = 0.0f;
+	detail_object_global_runtime_data->default_z_reference_vector.k = 1.0f;
+	detail_object_global_runtime_data->default_z_reference_vector.l = 0.0f;
 
 	return;
 }
@@ -257,7 +243,7 @@ void structure_detail_objects_dispose(
 void structure_detail_objects_flush(
 	void)
 {
-	debug_detail_objects.runtime_data->local_player_data[0].cell_coordinate.initialized = FALSE;
+	detail_object_global_runtime_data->local_player_data[0].cell_coordinate.initialized = FALSE;
 
 	return;
 }
@@ -265,9 +251,9 @@ void structure_detail_objects_flush(
 void detail_object_offset(
 	real offset)
 {
-	debug_detail_objects.final_offset = offset;
-	debug_detail_objects.fudge_vector = TRUE;
-	debug_detail_objects.fudge_offset = offset - debug_detail_objects.fudge_offset;
+	final_offset = offset;
+	fudge_vector = TRUE;
+	fudge_offset = offset - fudge_offset;
 
 	return;
 }
@@ -535,7 +521,7 @@ void render_debug_detail_objects(
 {
 	if (local_player_count() == 1 &&
 		render.local_player_index != NONE &&
-		debug_detail_objects.enabled)
+		debug_detail_objects)
 	{
 		struct structure_detail_object_data *detail_object_data;
 		struct detail_object_runtime_data *local_player_data;
@@ -552,7 +538,7 @@ void render_debug_detail_objects(
 		}
 
 		local_player_data = get_local_player_datum(0);
-		if (debug_detail_objects.enabled)
+		if (debug_detail_objects)
 		{
 			struct detail_object_view_data *view_data = &get_local_player_datum(0)->view_data;
 			short layer_index;
@@ -568,10 +554,10 @@ void render_debug_detail_objects(
 					boolean clipped = FALSE;
 					long detail_object_index;
 
-					if (debug_detail_objects.fudge_vector)
+					if (fudge_vector)
 					{
 						cell->z_reference_vector->l +=
-							debug_detail_objects.fudge_offset * 0.125f;
+							fudge_offset * 0.125f;
 					}
 					for (detail_object_index = 0;
 						detail_object_index < cell->detail_object_count;
@@ -636,8 +622,8 @@ void render_debug_detail_objects(
 			}
 		}
 
-		debug_detail_objects.fudge_vector = FALSE;
-		debug_detail_objects.fudge_offset = debug_detail_objects.final_offset;
+		fudge_vector = FALSE;
+		fudge_offset = final_offset;
 	}
 
 	return;

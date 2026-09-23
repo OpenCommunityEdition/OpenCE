@@ -2512,10 +2512,9 @@ static boolean channel_queue_packet(
 					if (channel->sample_offset)
 					{
 						channel->playing_permutation= channel->queued_permutation;
+						packet.dwMaxSize= remaining_size;
 						channel->queued_permutation= NULL;
 						channel->sample_offset= 0;
-
-						packet.dwMaxSize= remaining_size;
 
 						if (channel->state==_sound_channel_queued)
 						{
@@ -2527,9 +2526,9 @@ static boolean channel_queue_packet(
 						long block_size= SOUND_COMPRESSED_BLOCK_SIZE*
 							(TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) ? 2 : 1);
 
-						packet.dwMaxSize= MAX(remaining_size/block_size/2, 1)*block_size;
+						channel->sample_offset= MAX(remaining_size/block_size/2, 1)*block_size;
 
-						channel->sample_offset= packet.dwMaxSize;
+						packet.dwMaxSize= channel->sample_offset;
 					}
 				}
 				else

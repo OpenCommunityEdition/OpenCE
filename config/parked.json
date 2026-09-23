@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/main/main",
-      "function": "_main_game_render",
-      "class": "unclassified",
-      "evidence": "Best complete natural render-dispatch reconstruction retained after removing the inadmissible _ReadWriteBarrier experiment. It is readable ordinary C with authentic subsystem calls and no barrier, volatile, pragma, assembly, or fake dependency. The candidate is 464 versus 448 target padded bytes with 29 versus 28 relocations and scores 94.666664% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor explaining the extra call/relocation and schedule. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 28,
-          "normalized_sha256": "049052197c4b50b38b734ed982558cd27d4c999e6ee05897e02c99804c696a2b"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 29,
-          "normalized_sha256": "311d0f3787d9da53e6141d95ea4a0f60d8c0efd8bc82b65d8ee1b16b7f5a1952"
-        },
-        "objdiff_percent": 94.666664
-      }
-    },
-    {
       "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum",
       "class": "unclassified",
@@ -293,60 +274,11 @@
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_poll_endpoint_set",
       "class": "unclassified",
-      "evidence": "Complete natural January endpoint-set poll reconstructed with its real typed comparator: compact holes, rebuild stock XDK fd_set, clear cached readability, select with word timeout times MILLISECONDS_PER_SECOND, and mark ready endpoints. Correct owner headers provide the endpoint layout and Winsock error API. January's negative select-result branch is preserved without manufacturing its redundant subsequent comparison; its unguarded all-NULL tail compaction is target-proven and explicitly documented as an original defect, not claimed safe. Established short return ABI is retained. Target560B/16relocs versus candidate512B/16; natural allocation/control-flow differences remain. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. No compiler controls, false types, fake branches or spelling search. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "evidence": "Complete natural January endpoint-set poll reconstructed with its real typed comparator: compact holes, rebuild stock XDK fd_set, clear cached readability, select with word timeout times MILLISECONDS_PER_SECOND, and mark ready endpoints. Correct owner headers provide the endpoint layout and Winsock error API. January's negative select-result branch is preserved without manufacturing its redundant subsequent comparison; its unguarded all-NULL tail compaction is target-proven and explicitly documented as an original defect, not claimed safe. Established short return ABI is retained. Target560B/16relocs versus candidate512B/16; natural allocation/control-flow differences remain. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. No compiler controls, false types, fake branches or spelling search. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md. Re-measured 2026-09-23 (Lane D refresh): single-exit result local and per-use set->ep_array[endpoint_index] reloads (the shape January uses in add_endpoint_to_set) bring the body to the target's 560-byte size; the remaining difference is the SOCKET_ERROR tail compare (13 spellings tried, none exact). No /Od body exists for this Xbox path.",
       "measurements": {
         "target": {"size": 560, "relocation_count": 16, "normalized_sha256": "4a0375522c8a3ff103c5dad92342325f3a41658e90dead5cdcd60d92a8f79f4b"},
-        "base": {"size": 512, "relocation_count": 16, "normalized_sha256": "c605635cb9ce7070a69e80e0b8943c998279fb64fab139b41bdeb8cecb2572a2"},
-        "objdiff_percent": 72.26966
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
-      "function": "_add_endpoint_to_set",
-      "class": "unclassified",
-      "evidence": "Natural typed add caller reconstructed with the genuine private next-index helper, stock XDK FD_SET and semantic SET_FLAG. The helper is newly strict at56 meaningful/64 padded bytes and preserves January's documented one-past-capacity defect. January duplicates instruction-identical FD_SET blocks behind a listening-bit test; the retained source deliberately uses one natural FD_SET rather than an inert branch invented for matching. Target336B/13relocs versus candidate240B/13. Established short return ABI is retained; full-EAX materialization alone does not prove a different C type. All12 inherited exacts and nonce park unchanged, no extra code/COMMON/no point_from_line3d, no compiler controls or fake dependency. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
-      "measurements": {
-        "target": {"size": 336, "relocation_count": 13, "normalized_sha256": "4e3ad84da528b844823d85558c2b994dd8680fbc92b1a456f1f1147a44d91807"},
-        "base": {"size": 240, "relocation_count": 13, "normalized_sha256": "d7e631f5948455759368b6908fb1ddf9f24fe91fc234521cb6f62a1686a2e091"},
-        "objdiff_percent": 55.7094
-      }
-    },
-    {
-      "unit": "source/sound/game_sound",
-      "function": "_update_potentially_audible_looping_sound",
-      "class": "unclassified",
-      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906. Ordinary typed C implements the genuine attached/unattached looping-sound state machine, spatial source transforms, six-argument start/loop/stop refresh API, and pool deletion path. January itself writes the final frame field after datum deletion; the fixed data-pool storage lifetime was checked, not inferred from donor output. Proper owning APIs, semantic flags, project types and natural private linkage are retained. Target619 meaningful/624 padded versus candidate640 padded, both25 relocations, objdiff83.65909 percent. The honest residual receives no exact credit. No forced inline, point_from_line3d COMDAT, fake lifetime, shadow layout, optimizer control or assembly is introduced. Reopen only for authoritative source/type/control-flow or compiler-context evidence. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 25,
-          "normalized_sha256": "8fe3a4a813d3a2a8e45a5ce10b8cbd71274a8553f11e8d43ca65fa95c63dd7dc"
-        },
-        "base": {
-          "size": 640,
-          "relocation_count": 25,
-          "normalized_sha256": "6763e595e2871c3e463903bf82b44fee905a82540356e0752a4e9d2d9102527b"
-        },
-        "objdiff_percent": 83.65909
-      }
-    },
-    {
-      "unit": "source/sound/game_sound",
-      "function": "_game_sound_update",
-      "class": "unclassified",
-      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906 with the correct owning game_sound_update(real dt) prototype and pointer-valued Scenario sound-environment output. January game_frame pushes dt even though this body does not read it. The real caller computes PAS, selects background sound, services attached/unattached sources and advances the update index; it naturally retains the three private PAS helpers, including the newly strict location_potentially_audible. Target453 meaningful/464 padded and candidate464 padded, both31 relocations, objdiff97.91391 percent. Proper owner APIs and all inherited strict exacts are preserved after the full header rebuild. No exact caller credit or whole-object completion is claimed; compute_sound_obstruction remains unwritten. Reopen only for authentic source/type/compiler-context evidence, not declaration shuffling or equivalent-spelling searches. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 31,
-          "normalized_sha256": "d0c2dc1708f1dbee75a025bb0a2317afdcd65682faf8c301ceb879cdddeabf92"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 31,
-          "normalized_sha256": "df019d7cb404727618914dfa2f9cf20897ebca95c66207dd28b758246cf2fb72"
-        },
-        "objdiff_percent": 97.91391
+        "base": {"size": 560, "relocation_count": 16, "normalized_sha256": "9d3107ab7fad24e0717363451d4934edf5df22eb6cd360f0a3b7ab1b1f45ed61"},
+        "objdiff_percent": 98.53933
       }
     },
     {
@@ -442,36 +374,6 @@
           "normalized_sha256": "719469460357f06cde7f452e16e02ba79ac639e85e0fad244f8e01cb7bd5efcd"
         },
         "objdiff_percent": 99.96377
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/prime_numbers",
-      "function": "_primegen",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the source-credibility rule after the E1-E27 ordinary-C corpus, the Stian and Pastudan sieve donors, the January symbol atlas, compatible VC7 builds, and the later donor-lifetime packet were exhausted. The retained coherent sieve has the target 352-byte padded envelope, all 12 relocation destinations/types in order, three strict-exact siblings, and all 72 owned rdata bytes exact. January keeps odd_count in EBX and num_primes in ESI while assigning three distinct stack lifetimes; the available compiler instead emits a two-slot frame for the natural source. A pre-allocation k initialization improves the score to 91.14815% but creates the third slot by a different, explicitly non-original lifetime route, so it is rejected. A separate statement move can manufacture exact bytes but has no credible source rationale and is also rejected. The production source therefore remains the simplest donor-consistent C. Reopen only for authoritative local-variable provenance, an original-source donor with the same simultaneous allocation, or a verified compatible compiler/QFE that naturally emits it.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 12,
-          "normalized_sha256": "2428a7a00be6ab6f96efe9dda273d824a0cc9829aeeb2dd5f4c9b35b2b7992b1"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 12,
-          "normalized_sha256": "66e1c7859e354a6bf7caccb70b260e99d516be6a94837571ecc60dd5b43edda6"
-        },
-        "objdiff_percent": 81.614815
-      }
-    },
-    {
-      "unit": "source/sound/ima_adpcm",
-      "function": "_decompress_ima_adpcm_audio_data",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after the historical source census and the focused statement/declaration-order experiments recorded in the two IMA ADPCM ledgers. The retained ordinary C implements the coherent Bungie IMA decompressor with the exact 416-byte padded envelope and the same two table destinations. January stores decremented input_data_size before materializing sample_count * 2, while VC7 schedules the materialization first; the resulting packet shifts the step-size-table relocations from +178/+275 to +181/+277. Attempts to perturb this schedule either did not move it or regressed the surrounding loop. No volatile access, barrier, pragma, inline assembly, fake dependency, dead branch, or manual byte logic is retained. Reopen only for authoritative source/local ordering or a natural same-compiler donor.",
-      "measurements": {
-        "target": { "size": 416, "relocation_count": 2, "normalized_sha256": "c308b60091d47921aeb30f63188ec5317c64aa9fa52b9e53721774ecd34176f9" },
-        "base": { "size": 416, "relocation_count": 2, "normalized_sha256": "92f27a5e493fd0e401a7ee0c7c823e3040bddfdd6100cccb5b4f673be630d882" },
-        "objdiff_percent": 80.8125
       }
     },
     {
@@ -736,25 +638,6 @@
       }
     },
     {
-      "unit": "source/main/main",
-      "function": "_compute_subframe_counts",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the HCEA-authenticated subframe-count algorithm together with its authentic compute_window_bounds caller and January's line-1308 num_players>0 assertion. The real caller makes VC7 retain the helper naturally and recover January's private convention: num_players arrives in EBX and only the two result pointers are stack arguments. Target and candidate have the same 112-byte padded envelope and all four relocation identities at the same addresses. The residual is confined to one loop-termination spelling: January materializes vertical*horizontal<num_players with setl/test/je, while the direct ordinary-C predicate emits cmp/jge. Bounded boolean-temporary, predicate-polarity, while/do-while, and product-local spellings did not recover that instruction choice without degrading the otherwise exact body. No public prototype, forced linkage, volatile access, compiler barrier, assembly, fake dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the materialized boolean.",
-      "measurements": {
-        "target": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "d5b5047a8d0a783c6ec4e08a1f96d2df2346801a8a8e8364f8faa50ab6e139de"
-        },
-        "base": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "edd705dfff90e3b299dca140e8b7558db363d700e2a276ef89b21011be641136"
-        },
-        "objdiff_percent": 94.347824
-      }
-    },
-    {
       "unit": "source/ai/actions",
       "function": "_actor_action_handle_vehicle_entry",
       "class": "register-allocation",
@@ -793,25 +676,6 @@
       }
     },
     {
-      "unit": "source/items/items",
-      "function": "_item_update",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January item-update state machine as ordinary typed C. The audit covered every Items ledger, complete repository history, 1,554 registered worktrees collapsing to five source blobs, HCEA, Stian's January-shaped reconstruction, Pastudan, and Marathon; no exact source or stronger complete candidate exists. The retained e02971df lineage was reconciled with semantic private/global names, the Items-owned prototype, cseries real types and flag macros, correct collision enums, and the existing January point_from_line3d inline schedule. Target and candidate have the same 2,352-byte padded envelope, 110 relocation identities in order, the exact 0xC8 frame, no unwritten blocks, and behavior-complete collision, rest-support, acceleration, interpolation, and lifetime cleanup paths; the freshly regenerated campaign report records 95.414246 percent similarity. Remaining aligned differences are bounded C2 scheduling choices in early candidate/collision setup, two sound-location stores, angular-dot grouping, flag read/modify/write selection, support-index and rotation-axis copies, the final bounce x87 multiply, and cosine-load placement; after rested-item validation the meaningful tail is instruction-for-instruction equivalent modulo a seven-byte accumulated offset, with seven target-envelope padding NOPs. The repository classifier returns UNKNOWN and therefore this entry fails closed as unclassified. Natural probes of support-store placement, support-index lifetime, vector helper use, angular expression grouping, rotation-axis copies, clamp/bounce spelling, and declaration order either reproduced the same object or worsened size/score and were inverse-restored. No register/volatile hint, compiler barrier, pragma, assembly, fake dependency, undefined behavior, raw offset, address-derived identifier, forced inline, or nonsensical exactness control is retained. Reopen only for authenticated January source or local-variable records, or a natural same-compiler donor that explains all remaining scheduling windows together.",
-      "measurements": {
-        "target": {
-          "size": 2352,
-          "relocation_count": 110,
-          "normalized_sha256": "78237a8528e5d6a858b7aced1df0d8037225ec19da1b3b625c74c900d8ee8b02"
-        },
-        "base": {
-          "size": 2352,
-          "relocation_count": 110,
-          "normalized_sha256": "3daa5a96ffd38c2e133967126ca722610b145121e9690eb92a76f5a026b736f5"
-        },
-        "objdiff_percent": 95.414246
-      }
-    },
-    {
       "unit": "source/interface/hud_nav_points",
       "function": "_custom_render_nav_point",
       "class": "instruction-scheduling",
@@ -847,25 +711,6 @@
           "normalized_sha256": "8ae719b831e3e4705e309f751bbe7567e5ba96cb62d0dbc23278205dc7ccb5d3"
         },
         "objdiff_percent": 86.260506
-      }
-    },
-    {
-      "unit": "source/structures/structure_detail_objects",
-      "function": "_structure_detail_objects_initialize",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after restoring the HCEA-authenticated allocation and default normal initialization in ordinary typed C and preserving the three exact relocation destinations. Target and candidate share the 80-byte padded envelope and differ only in the schedule of the independent stack cleanup and global runtime-data store: January restores the three game_state_malloc arguments before publishing the allocation, while VC7 publishes the allocation first and then adjusts ESP. The direct-global, declaration-order, assignment-order, aggregate-initializer, and temporary-pointer source families either return to this fixed point or enlarge the function and relocation set; the direct-global spelling specifically grows to 96 bytes and six relocations. No barrier, volatile access, pragma, assembly, fake dependency, inert expression, or nonsensical branch is retained. Reopen only for authoritative January locals/source or a natural same-compiler scheduling donor.",
-      "measurements": {
-        "target": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "99e687328f033302450f35257d1339d168279f9876fcd14b9180ddaa52f618d5"
-        },
-        "base": {
-          "size": 80,
-          "relocation_count": 3,
-          "normalized_sha256": "46c693d13661a9d71dd5516590b0c9d7c29e22dc1cc38eea6ff94d60c88ddd82"
-        },
-        "objdiff_percent": 76.36364
       }
     },
     {
@@ -1135,25 +980,6 @@
       }
     },
     {
-      "unit": "source/structures/structure_visibility",
-      "function": "_portal_hull_from_points",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete portal projection helper from January's projection calls, assertion strings, loop shape, and return topology, with HaloCEA providing the authenticated private name and behavior. The retained typed C projects each real_point3d through the current camera/frustum, rejects a hull only when every point is behind the screen plane, computes the 2D convex hull, and returns January's three-state result. Target is 480 padded bytes and the candidate 464, with all 16 relocation identities preserved; objdiff reports 85.31645 percent. The remaining 16-byte gap spans VC7 local/register and floating-point scheduling, with no unique source recipe proved, so the entry is unclassified. No representation pun, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or geometric distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 16,
-          "normalized_sha256": "5d359f8240cd82db678d5851249806a2530dddb8ab29ef0aba1edf1beaa5b633"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 16,
-          "normalized_sha256": "004a86dfae5e2df2c0c60a4d98e0f845725354a5dfc8d133f14a03833571924d"
-        },
-        "objdiff_percent": 85.31645
-      }
-    },
-    {
       "unit": "source/text/draw_string",
       "function": "_bitmap_draw_string",
       "class": "unclassified",
@@ -1170,25 +996,6 @@
           "normalized_sha256": "ad3d0d63e2c82c1ee6789c401e3062340c96831eb3dbb7e9f63845da47aafe8b"
         },
         "objdiff_percent": 51.18261
-      }
-    },
-    {
-      "unit": "source/text/draw_string",
-      "function": "_parse_string",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the full HCEA narrow-string parser with January's typed result codes, control escapes, style/color/justification updates, word-boundary handling, localization lookup, and assertion topology. Target and candidate share the 624-byte padded envelope; January has 30 relocations, candidate 29, and objdiff reports 27.615385 percent. Short result comparisons, continue-based escape handling, and alternate style-switch forms were measured; the retained form best preserves the independent-source semantics while the remaining gap is a whole-function CFG/allocation choice. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler parser donor. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the body was re-measured as the coupled prerequisite of the exact draw_string / draw_string_partial / draw_unicode_string reopens: January stack ABI, result!=NONE assert and result switch, long next_character width (624 bytes, 30 relocations), still fuzzy. See docs/object_matching_logs/draw_string_obj_opus5_100k_waveD_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 30,
-          "normalized_sha256": "f80225b7f49eeafe4a68d6094b4ec238747e5af312947588c11ab8529dfcb304"
-        },
-        "base": {
-          "size": 624,
-          "relocation_count": 30,
-          "normalized_sha256": "b68bfa11d9b3797e6fe3aad3556d2abf6544eebbd2e58b024609a707c8a8a7a2"
-        },
-        "objdiff_percent": 80.61539
       }
     },
     {
@@ -1288,25 +1095,6 @@
     },
     {
       "unit": "source/hs/hs_runtime",
-      "function": "_hs_inspect_enum",
-      "class": "csplit-relocation-alias",
-      "evidence": "January and the retained ordinary typed inspector have the same 144-byte padded extent, 11 relocations, normalized instruction hash, and 100.0 percent objdiff score. The sole ordinary-comparison difference is csplit attribution of the same data address: January names the relocation as __hs_type_scenery_default+12912, while the rebuild names hs_enum_table-256. Whole-image address resolution proves those destinations identical, and the enum table access, range checks, assertions, and string formatting are otherwise byte-identical. The function and its exact 49-entry hs_type_inspectors owner table are source-static as supported by HCEX PDB evidence. No raw address, pointer pun, compiler steering, fake dependency, or nonsensical logic is retained.",
-      "measurements": {
-        "target": {
-          "size": 144,
-          "relocation_count": 11,
-          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
-        },
-        "base": {
-          "size": 144,
-          "relocation_count": 11,
-          "normalized_sha256": "a941037b633bbe666daf47a9644bdb3da452a7227109aa86c013312570f01454"
-        },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
       "function": "_hs_evaluate_begin_random",
       "class": "private-register-convention",
       "evidence": "Fuzzy-parked after reconstructing the complete begin-random evaluator in ordinary typed C from January's instruction and relocation topology. Target and candidate share the 528-byte padded envelope and all 30 relocation identities; objdiff reports 99.89011 percent similarity. The residual is only four ModRM register-selection bytes in the random-child selection loop, with identical operations and control flow. Donor and reconciliation experiments exhausted natural declaration, initialization, and statement-order forms without moving this tie independently. No register or volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the private register assignment.",
@@ -1322,25 +1110,6 @@
           "normalized_sha256": "c10e869c67180ba3040bc35040e0e9a4329b841c05599c61583c5114a84b5cf1"
         },
         "objdiff_percent": 99.89011
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_global_reconcile_read",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after restoring the complete external-global reconciliation switch in ordinary typed C, using the corrected January hs_type enum order and the matching named default globals. Target and candidate both occupy 1408 padded bytes and carry the same 86 relocation identities; objdiff reports 92.30703 percent similarity. The residual begins with an equivalent prologue scheduling choice: January preserves the designator and pushes the masked index before loading hs_global_data, while VC7 loads that independent global first; the case logic and fallback destinations remain aligned. Bounded natural local-order and control-flow variants did not close the schedule. No shifted enum compensation, raw address, volatile or register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the prologue lifetime schedule.",
-      "measurements": {
-        "target": {
-          "size": 1408,
-          "relocation_count": 86,
-          "normalized_sha256": "c65c8235c5484ea157c046421679547b0fbfe63831fc6f07e43030cfc0f453ee"
-        },
-        "base": {
-          "size": 1408,
-          "relocation_count": 86,
-          "normalized_sha256": "6de0dd79e98a7bc9b653af1fc9ec3991f4b5bffc4f7de2ef5a71ac610301ec25"
-        },
-        "objdiff_percent": 92.30703
       }
     },
     {
@@ -1705,82 +1474,6 @@
       }
     },
     {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_enum",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (464), relocation count (43), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference is target __hs_type_scenery_default+12912 versus candidate _hs_enum_table-256; both resolve to image file offset 2493140. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 43,
-          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 43,
-          "normalized_sha256": "6d5a6ec9dfca19aeabff7f7b48941ab226301531966c86beb8165eb4cbf70db1"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_object_name",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (320), relocation count (26), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479850: target csplit string+58 equals candidate _hs_object_type_masks-86. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 320,
-          "relocation_count": 26,
-          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
-        },
-        "base": {
-          "size": 320,
-          "relocation_count": 26,
-          "normalized_sha256": "8328bb587dd8eecd7fcfefb54794728f56fd653e10bf3a8f4d2fea86605b6710"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_compile",
-      "function": "_hs_parse_tag_reference",
-      "class": "csplit-relocation-alias",
-      "evidence": "Code bytes, padded size (208), relocation count (11), relocation offsets/types, and normalized SHA-256 are identical. The sole symbolic identity difference resolves to image file offset 2479852: target csplit string+60 equals candidate _hs_tag_reference_type_group_tags-96. Zero strict-exact credit; accept only through the canonical relocation-address validator.",
-      "measurements": {
-        "target": {
-          "size": 208,
-          "relocation_count": 11,
-          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
-        },
-        "base": {
-          "size": 208,
-          "relocation_count": 11,
-          "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
-        },
-        "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_global_reconcile_write",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete house-rule-compliant reconstruction retained from Opus commit 0973b18e6 and freshly reconciled against canonical headers. The natural typed switch writes every supported external HS global through its named definition and preserves the real-valued temporary used by January's shared switch blocks. Target is 400 padded bytes; the candidate is 416 padded bytes. Both have 47 relocations to the same semantic callees, data and switch destinations, but instruction offsets and normalized bytes differ after the candidate's longer entry schedule. It is required by three newly exact HS runtime owners and receives zero exact credit. No inequality workaround, BSS split, foreign type duplicate, raw offset, forced inline, volatile/register steering, representation pun, assembly, or nonsensical branch is retained. See docs/object_matching_logs/hs_runtime_interface_leaf_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 47,
-          "normalized_sha256": "2970ab42df38836052877705d5ead641c4ff94b5d55807c7b3049f03bbe01ab4"
-        },
-        "base": {
-          "size": 416,
-          "relocation_count": 47,
-          "normalized_sha256": "2dab6c4ec4e33d061b84bab1219522b4c8c229ea2f423c07038e6bf880eca663"
-        },
-        "objdiff_percent": 68.44203
-      }
-    },
-    {
       "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
@@ -1797,44 +1490,6 @@
           "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0"
         },
         "objdiff_percent": 61.451614
-      }
-    },
-    {
-      "unit": "source/sound/sound_manager",
-      "function": "_sound_refresh_looping",
-      "class": "tu-context-optimization",
-      "evidence": "Best complete ordinary-C refresh graph retained with zero exact credit. January is 1,136 padded bytes with 43 relocations; canonical is 1,088 with 42. Target-backed datum validation calls, the named sound_inaudible_fade_out_time constant, and the source-authentic `loop` assertion spelling are preserved. The remaining missing relocation is a compiler-merged duplicate fade-call tail; HCEA cache-release logic is intentionally absent because January has none of its dependencies. No compiler steering, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_small_looping_graph_20260908.md. 2026-09-15 (next-150K lane wave n3a): re-baselined at ZERO strict credit and strictly closer than 1088/42. The recorded criterion's premise - that the missing relocation was a compiler-merged duplicate fade-call tail - is REFUTED by the census: it was a source defect. Deleting the fade_in_time phi local recovers January's fourth _sound_start_fade relocation, so the relocation count is now exact at 43/43 and the size moves 1088 -> 1120 toward January's 1136; alndiff regions drop 74 -> 37. The row stays parked and fuzzy [sha].",
-      "measurements": {
-        "target": {
-          "size": 1136,
-          "relocation_count": 43,
-          "normalized_sha256": "22e6f76584244a8861a4c646d88eb7c301fa5cdc1fc8d98849e505c2d3a391db"
-        },
-        "base": {
-          "size": 1120,
-          "relocation_count": 43,
-          "normalized_sha256": "86e26bb3e59f759070492aaa2b2071ff5f9e2db818be0898a711ffe2501ba9e6"
-        },
-        "objdiff_percent": 97.800545
-      }
-    },
-    {
-      "unit": "source/bink/bink_playback",
-      "function": "_bink_draw_frame",
-      "class": "unclassified",
-      "evidence": "Complete typed best-known reconstruction retained with zero exact credit. It restores January's texture quad, debug timing text, periodic Bink summary collection, and skipped-frame/blit diagnostics using the Bink 1.0p ABI and corroborating HaloCEA semantics. Target and candidate share the 912-byte padded envelope; January has 59 relocations and canonical has 61, with the remaining difference concentrated in screen-bound load scheduling and an eight-byte stack-frame delta. The target-static owner is modeled as a static C definition. No raw-address replay, opcode transcription, compiler steering, fake dependency, undefined behavior, or nonsensical branch is retained. The unresolved `debug_bink` owner remains a plainly documented external declaration until its proper header is identified. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 912,
-          "relocation_count": 59,
-          "normalized_sha256": "24aa7c5023629b6b863f6028dc0f1d55396a2083472edfd6e45e48866e726910"
-        },
-        "base": {
-          "size": 912,
-          "relocation_count": 61,
-          "normalized_sha256": "54104cacd763706fac4823bab62bd97ad1a20ecfb838239ad87e3c9ea3cb48d9"
-        },
-        "objdiff_percent": 79.409256
       }
     },
     {
@@ -1982,17 +1637,6 @@
     },
     {
       "unit": "source/sound/sound_manager",
-      "function": "_update_channel_for_impulse_sound",
-      "class": "unclassified",
-      "evidence": "Complete typed impulse-channel property/queue/update body retained under its corrected semantic target name. January and canonical are both 528 padded bytes with all 29 relocations; normalized code still differs through ordinary scheduling. January bodies, callers and HCEA names independently prove the target symbol rotation. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
-      "measurements": {
-        "target": { "size": 528, "relocation_count": 29, "normalized_sha256": "b700f26596f466e5771d4f875b0d3a9354600ee13b4dd1553cde0c48d45d8202" },
-        "base": { "size": 528, "relocation_count": 29, "normalized_sha256": "2d81b0f86a90351a964320970505552d0b323a95a871e75b9d8a4e50cf29eeb4" },
-        "objdiff_percent": 94.03593
-      }
-    },
-    {
-      "unit": "source/sound/sound_manager",
       "function": "_sound_set_definition_end",
       "class": "unclassified",
       "evidence": "Complete queued-end-definition transition retained under its corrected semantic target name. January and canonical are both 208 padded bytes with all nine relocations; the code hash remains different. It uses the now-exact bounded channel-summary builder and the typed instance-limit flow. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
@@ -2000,17 +1644,6 @@
         "target": { "size": 208, "relocation_count": 9, "normalized_sha256": "06f507e27039b2a39192271221e6c7b703aee4d5ae45becdac84f3543095ec13" },
         "base": { "size": 208, "relocation_count": 9, "normalized_sha256": "4f5a03ed0532981c792521f1ce7cdcc47eef5a3ee2d038caf65f57b1987675d9" },
         "objdiff_percent": 91.884056
-      }
-    },
-    {
-      "unit": "source/sound/sound_manager",
-      "function": "_sound_find_like_channel",
-      "class": "unclassified",
-      "evidence": "Complete typed best-channel selector for a supplied channel list. Target and canonical are both 272 padded bytes with all 16 relocations and 97.15909 percent similarity; the remaining normalized difference is not assigned a speculative mechanism. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "240a72742e0bdcb19f5bbf684bcffaefcf37a483a9fc59393cf4a6d0c36984b3" },
-        "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "a695dfa283a53aeabb3923c2186b6690ff2b319205588ba7cebefce9b7c91c56" },
-        "objdiff_percent": 97.15909
       }
     },
     {
@@ -2044,61 +1677,6 @@
         "target": { "size": 944, "relocation_count": 49, "normalized_sha256": "6c90076033e91f26356e42166cf4bb0a8d5a902ae35bc67db15aec19ee9982ac" },
         "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "ea5eb3a40fbddb9d60f2bcbfeaf6a207f59a2bafe156cff1cc65aee0406692ae" },
         "objdiff_percent": 99.05674
-      }
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "function": "_node_stack_read",
-      "class": "csplit-relocation-alias",
-      "evidence": "Natural typed stack accessor. Target and canonical have identical 64-byte code sections, seven relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x3A; both resolve to January image address 4982956. The split boundary lands four bytes before the authenticated leaf_map_globals owner. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
-      "measurements": {
-        "target": { "size": 64, "relocation_count": 7, "normalized_sha256": "6173baeea5403235db6ff471e0e0f140e6c1e31a32019a34825979294eb363f9" },
-        "base": { "size": 64, "relocation_count": 7, "normalized_sha256": "6173baeea5403235db6ff471e0e0f140e6c1e31a32019a34825979294eb363f9" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "function": "_find_like_crossing",
-      "class": "csplit-relocation-alias",
-      "evidence": "Same-build symbols authenticate the private name and the complete typed stack-plane search. Target and canonical have identical 160-byte code sections, nine relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x50; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
-      "measurements": {
-        "target": { "size": 160, "relocation_count": 9, "normalized_sha256": "663e3657f92949f904f1b44dacbe89442c7a655d7325f245e9d13ba59b54b74b" },
-        "base": { "size": 160, "relocation_count": 9, "normalized_sha256": "663e3657f92949f904f1b44dacbe89442c7a655d7325f245e9d13ba59b54b74b" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "function": "_leaf_map_build_leaf_face_for_leaf_on_node",
-      "class": "csplit-relocation-alias",
-      "evidence": "Same-build symbols authenticate this private caller and the complete typed BSP-plane clipping body. Target and canonical have identical 608-byte code sections, 30 relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0xA4; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
-      "measurements": {
-        "target": { "size": 608, "relocation_count": 30, "normalized_sha256": "52640cd38559b34cede1057294be7ca6099a445067f11eb96d699b065e063bb1" },
-        "base": { "size": 608, "relocation_count": 30, "normalized_sha256": "52640cd38559b34cede1057294be7ca6099a445067f11eb96d699b065e063bb1" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "function": "_leaf_map_build_leaf_faces_for_leaf",
-      "class": "csplit-relocation-alias",
-      "evidence": "Same-build symbols authenticate this private stack-walk caller. Target and canonical have identical 112-byte code sections, nine relocations, and normalized SHA-256. The sole symbolic mismatch is target _faked_xbox_command_line+4 versus canonical _leaf_map_globals-4 at relocation offset 0x48; both resolve to January image address 4982956. Zero strict-exact credit; accept only through the canonical resolved-address validator. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md.",
-      "measurements": {
-        "target": { "size": 112, "relocation_count": 9, "normalized_sha256": "10e5a7b3ba4c61f4128829f463ba33e0b441098b9011e68497c2c64fc0b9a31c" },
-        "base": { "size": 112, "relocation_count": 9, "normalized_sha256": "10e5a7b3ba4c61f4128829f463ba33e0b441098b9011e68497c2c64fc0b9a31c" },
-        "objdiff_percent": 100.0
-      }
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "function": "_leaf_map_build_portals_from_leaf",
-      "class": "csplit-relocation-alias",
-      "evidence": "Best complete ordinary-C recursive portal traversal retained from the interrupted Opus Leaf Map graph. Same-build symbols authenticate the private name; January's branch, relocation and assertion topology plus the independent HCEA lift support the behavior. Natural signed designator comparisons are retained without source-pressure rewrites. Target is 480 padded bytes and canonical is 432, both with 17 relocations; objdiff reports 63.948864 percent. No precise natural source-level mechanism is proved. Zero exact credit. See docs/object_matching_logs/leaf_map_obj_private_graph_reconciliation_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1 Batch B, adversarially verified) the body became resolved-address identical to January (480/17): the inline frequency law explains the 48-byte inlined map_leaf_find_face_on_node, the HCEA-corroborated flattened gate topology and the jns-proven LONG_MIN designator tests are reproduced. The single remaining difference is a csplit relocation alias at +0x6a (_faked_xbox_command_line+4 in the split vs _leaf_map_globals-4 in the candidate, both image address 4982956), so the class is csplit-relocation-alias. See docs/object_matching_logs/leaf_map_obj_opus5_150k_w1_20260914.md.",
-      "measurements": {
-        "target": { "size": 480, "relocation_count": 17, "normalized_sha256": "d50628a74d0b5faa208698ae864a472891a40d442d219bd01dd148adb640fe81" },
-        "base": { "size": 480, "relocation_count": 17, "normalized_sha256": "d50628a74d0b5faa208698ae864a472891a40d442d219bd01dd148adb640fe81" },
-        "objdiff_percent": 100.0
       }
     },
     {
@@ -2252,25 +1830,6 @@
           "normalized_sha256": "a8adaa33cd572e879ba65d3b5c042368b8d5d29e90739dc418b65cadb1652474"
         },
         "objdiff_percent": 70.925
-      }
-    },
-    {
-      "unit": "source/structures/structures",
-      "function": "_structure_get_planar_fog",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. 2026-09-15 (next-150K lane wave n1): re-measured after adding the discarded fog-plane lookup that January provably executes. relocdiff shows January owns four _tag_block_get_element_with_size relocations (@0x75, @0xb0, @0xfd, @0x16d) where the parked body owned three; the missing 15th relocation is exactly that discarded lookup. Both structural tags now close: size 448/448 and relocations 15/15 (was 416/14), and alndiff is 154 vs 154 instructions with the whole residual confined to one 4-slot EDX/ECX register-naming window. Zero strict credit; the row stays parked and fuzzy [sha].",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 15,
-          "normalized_sha256": "a5aa0f690e82204d70cb108e143047be76871fd5cf1a979119ce80e8163c097b"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 15,
-          "normalized_sha256": "7e308d0bf30135a5dcfeb73442f3f7a61b25bb0281c6cbd45868eaa0ce1d9869"
-        },
-        "objdiff_percent": 99.76351
       }
     },
     {

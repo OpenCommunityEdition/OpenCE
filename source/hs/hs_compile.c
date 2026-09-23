@@ -2023,148 +2023,162 @@ static boolean hs_add_script(
 	long expression_index)
 {
 	boolean result = FALSE;
-	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
-	long script_type_expression_index = hs_syntax_get(expression->data)->next_node_index;
+	long script_type_expression_index = hs_syntax_get(hs_syntax_get(expression_index)->data)->next_node_index;
 
 	if (script_type_expression_index != NONE)
 	{
-		char const *script_type_name = hs_compile_globals.compiled_source + hs_syntax_get(script_type_expression_index)->source_offset;
+		struct hs_syntax_node *script_type_expression = hs_syntax_get(script_type_expression_index);
 		short script_type = string_list_find(
-			script_type_name,
+			hs_compile_globals.compiled_source + script_type_expression->source_offset,
 			NUMBER_OF_HS_SCRIPT_TYPES,
 			hs_script_type_names);
 
 		if (script_type != NONE)
 		{
 			short return_type;
-			long name_expression_index;
+			long name_expression_index = NONE;
 			long body_expression_index;
 
 			if (script_type == _hs_script_static || script_type == _hs_script_stub)
 			{
 				long return_type_expression_index = hs_syntax_get(script_type_expression_index)->next_node_index;
-				char const *return_type_name;
 
-				if (return_type_expression_index == NONE)
+				if (return_type_expression_index != NONE)
+				{
+					struct hs_syntax_node *return_type_expression = hs_syntax_get(return_type_expression_index);
+
+					return_type = string_list_find(
+						hs_compile_globals.compiled_source + return_type_expression->source_offset,
+						NUMBER_OF_HS_TYPES,
+						hs_type_names);
+					name_expression_index = hs_syntax_get(return_type_expression_index)->next_node_index;
+					if (hs_type_valid(return_type))
+					{
+						result = TRUE;
+					}
+					else
+					{
+						hs_compile_globals.error = "this is not a valid return type.";
+						hs_compile_globals.error_offset = hs_syntax_get(return_type_expression_index)->source_offset;
+					}
+				}
+				else
 				{
 					hs_compile_globals.error = "i expected (script local <type> <name> <expression(s)>).";
 					hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
-					goto done;
-				}
-
-				return_type_name = hs_compile_globals.compiled_source + hs_syntax_get(return_type_expression_index)->source_offset;
-				return_type = string_list_find(return_type_name, NUMBER_OF_HS_TYPES, hs_type_names);
-				name_expression_index = hs_syntax_get(return_type_expression_index)->next_node_index;
-				if (!hs_type_valid(return_type))
-				{
-					hs_compile_globals.error = "this is not a valid return type.";
-					hs_compile_globals.error_offset = hs_syntax_get(return_type_expression_index)->source_offset;
-					goto done;
 				}
 			}
 			else
 			{
 				return_type = _hs_type_void;
 				name_expression_index = hs_syntax_get(script_type_expression_index)->next_node_index;
+				result = TRUE;
 			}
 
-			if (name_expression_index != NONE &&
-				(body_expression_index = hs_syntax_get(name_expression_index)->next_node_index) != NONE)
+			if (result)
 			{
-				char const *script_name = hs_compile_globals.compiled_source + hs_syntax_get(name_expression_index)->source_offset;
-
-				if (strlen(script_name) > 0 && strlen(script_name) <= TAG_STRING_LENGTH)
+				result = FALSE;
+				if (name_expression_index != NONE &&
+					(body_expression_index = hs_syntax_get(name_expression_index)->next_node_index) != NONE)
 				{
-					struct tag_block *scripts = &global_scenario_get()->hs_scripts;
-					short script_index = hs_find_script_by_name(script_name);
-					struct hs_script *script;
-					long root_expression_index;
-					long begin_expression_index;
+					struct hs_syntax_node *name_expression = hs_syntax_get(name_expression_index);
+					char const *script_name = hs_compile_globals.compiled_source + name_expression->source_offset;
 
-					if (script_index == NONE)
+					if (strlen(script_name) > 0 && strlen(script_name) <= TAG_STRING_LENGTH)
 					{
-						script_index = (short)tag_block_add_element(scripts);
+						struct scenario *scenario = global_scenario_get();
+						long script_index = hs_find_script_by_name(script_name);
+
 						if (script_index == NONE)
 						{
-							hs_compile_globals.error = "i couldn't allocate a script.";
-							hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
-							goto done;
-						}
-					}
-					else
-					{
-						struct hs_script *existing_script = TAG_BLOCK_GET_ELEMENT(
-							scripts,
-							script_index,
-							struct hs_script);
-
-						if (existing_script->script_type != _hs_script_stub ||
-							existing_script->return_type != return_type ||
-							script_type != _hs_script_static)
-						{
-							if (existing_script->script_type == _hs_script_static &&
-								existing_script->return_type == return_type &&
-								script_type == _hs_script_stub)
+							script_index = tag_block_add_element(&scenario->hs_scripts);
+							if (script_index == NONE)
 							{
-								result = TRUE;
-								goto done;
+								hs_compile_globals.error = "i couldn't allocate a script.";
+								hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 							}
-
-							hs_compile_globals.error = "only static scripts of the same type can override stub scripts.";
-							hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
-							goto done;
 						}
-					}
-
-					script = TAG_BLOCK_GET_ELEMENT(
-						scripts,
-						script_index,
-						struct hs_script);
-					root_expression_index = datum_new(hs_syntax_data);
-					begin_expression_index = datum_new(hs_syntax_data);
-					if (root_expression_index != NONE && begin_expression_index != NONE)
-					{
-						struct hs_syntax_node *root_expression = hs_syntax_get(root_expression_index);
-						struct hs_syntax_node *begin_expression = hs_syntax_get(begin_expression_index);
-
-						root_expression->data = begin_expression_index;
-						root_expression->next_node_index = NONE;
-						root_expression->source_offset = hs_syntax_get(expression_index)->source_offset;
-						root_expression->flags = 0;
-						begin_expression->next_node_index = body_expression_index;
-						begin_expression->source_offset = NONE;
-						begin_expression->function_index = _hs_function_begin;
-						begin_expression->flags = FLAG(_hs_syntax_node_primitive_bit);
-						begin_expression->type = _hs_function_name;
-						if (hs_parse(root_expression_index, return_type))
+						else
 						{
-							strcpy(script->name, script_name);
-							script->return_type = return_type;
-							script->script_type = script_type;
-							script->root_expression_index = root_expression_index;
-							result = TRUE;
+							struct hs_script *existing_script = TAG_BLOCK_GET_ELEMENT(
+								&scenario->hs_scripts,
+								script_index,
+								struct hs_script);
+
+							if (existing_script->script_type != _hs_script_stub ||
+								existing_script->return_type != return_type ||
+								script_type != _hs_script_static)
+							{
+								if (existing_script->script_type == _hs_script_static &&
+									existing_script->return_type == return_type &&
+									script_type == _hs_script_stub)
+								{
+									/* the static script already replaced this stub */
+									result = TRUE;
+								}
+								else
+								{
+									hs_compile_globals.error = "only static scripts of the same type can override stub scripts.";
+									hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
+								}
+								script_index = NONE;
+							}
+						}
+
+						if (script_index != NONE)
+						{
+							struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+								&scenario->hs_scripts,
+								script_index,
+								struct hs_script);
+							long root_expression_index = datum_new(hs_syntax_data);
+							long begin_expression_index = datum_new(hs_syntax_data);
+
+							if (root_expression_index != NONE && begin_expression_index != NONE)
+							{
+								struct hs_syntax_node *root_expression = hs_syntax_get(root_expression_index);
+								struct hs_syntax_node *begin_expression = hs_syntax_get(begin_expression_index);
+
+								root_expression->data = begin_expression_index;
+								root_expression->next_node_index = NONE;
+								root_expression->source_offset = hs_syntax_get(expression_index)->source_offset;
+								root_expression->flags = 0;
+								begin_expression->next_node_index = body_expression_index;
+								begin_expression->source_offset = NONE;
+								begin_expression->function_index = _hs_function_begin;
+								begin_expression->flags = FLAG(_hs_syntax_node_primitive_bit);
+								begin_expression->type = _hs_function_name;
+								if (hs_parse(root_expression_index, return_type))
+								{
+									strcpy(script->name, script_name);
+									script->return_type = return_type;
+									script->script_type = script_type;
+									script->root_expression_index = root_expression_index;
+									result = TRUE;
+								}
+							}
+							else
+							{
+								hs_compile_globals.error = "i couldn't allocate a syntax node.";
+							}
 						}
 					}
 					else
 					{
-						hs_compile_globals.error = "i couldn't allocate a syntax node.";
+						hs_compile_globals.error = "i expected a script name less than 32 characters.";
+						hs_compile_globals.error_offset = hs_syntax_get(name_expression_index)->source_offset;
 					}
 				}
 				else
 				{
-					hs_compile_globals.error = "i expected a script name less than 32 characters.";
-					hs_compile_globals.error_offset = hs_syntax_get(name_expression_index)->source_offset;
+					if (script_type == _hs_script_static)
+						hs_compile_globals.error = "i expected (script static <type> <name> <expression(s)>)";
+					else if (script_type == _hs_script_stub)
+						hs_compile_globals.error = "i expected (script stub <type> <name> <expression(s)>)";
+					else
+						hs_compile_globals.error = "i expected (script <type> <name> <expression(s)>)";
+					hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 				}
-			}
-			else
-			{
-				if (script_type == _hs_script_static)
-					hs_compile_globals.error = "i expected (script static <type> <name> <expression(s)>)";
-				else if (script_type == _hs_script_stub)
-					hs_compile_globals.error = "i expected (script stub <type> <name> <expression(s)>)";
-				else
-					hs_compile_globals.error = "i expected (script <type> <name> <expression(s)>)";
-				hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 			}
 		}
 		else
@@ -2179,7 +2193,6 @@ static boolean hs_add_script(
 		hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 	}
 
-done:
 	return result;
 }
 

@@ -812,35 +812,42 @@ static void contrail_add_points(
 
 		if (marker_count > 0)
 		{
-		real point_velocity = contrail_scale_random_value(
-			contrail->density,
-			definition->point_velocity_lower_bound,
-			definition->point_velocity_upper_bound,
-			definition->scale_flags,
-			_contrail_scales_point_velocity_bit);
-		real point_velocity_cone_angle = definition->point_velocity_cone_angle;
-		real point_inherited_velocity_fraction;
-		short marker_index;
+			real point_velocity = contrail_scale_random_value(
+				contrail->density,
+				definition->point_velocity_lower_bound,
+				definition->point_velocity_upper_bound,
+				definition->scale_flags,
+				_contrail_scales_point_velocity_bit);
+			real point_velocity_cone_angle = contrail_scale_value(
+				contrail->density,
+				definition->point_velocity_cone_angle,
+				definition->scale_flags,
+				_contrail_scales_point_velocity_cone_angle_bit);
+			real point_inherited_velocity_fraction = contrail_scale_value(
+				contrail->density,
+				definition->point_inherited_velocity_fraction,
+				definition->scale_flags,
+				_contrail_scales_inherited_velocity_fraction_bit);
+			short marker_index;
 
-		if (TEST_FLAG(definition->scale_flags, _contrail_scales_point_velocity_cone_angle_bit))
-			point_velocity_cone_angle = point_velocity_cone_angle * contrail->density;
-
-		point_inherited_velocity_fraction = definition->point_inherited_velocity_fraction;
-		if (TEST_FLAG(definition->scale_flags, _contrail_scales_inherited_velocity_fraction_bit))
-			point_inherited_velocity_fraction = point_inherited_velocity_fraction * contrail->density;
-
-		for (marker_index = 0; marker_index < marker_count; marker_index++)
-		{
-			struct object_marker *marker = &markers[marker_index];
-			struct contrail_point_datum *previous_contrail_point;
-			short new_contrail_point_count;
-			short contrail_point_index;
-
-			if (contrail->first_contrail_point_indices[marker_index] != NONE)
+			for (marker_index = 0; marker_index < marker_count; marker_index++)
 			{
-				previous_contrail_point = contrail_point_get(
-					contrail->first_contrail_point_indices[marker_index]);
-				new_contrail_point_count = contrail_point_count;
+				struct object_marker *marker = &markers[marker_index];
+				struct contrail_point_datum *previous_contrail_point;
+				short new_contrail_point_count;
+				short contrail_point_index;
+
+				if (contrail->first_contrail_point_indices[marker_index] != NONE)
+				{
+					previous_contrail_point = contrail_point_get(
+						contrail->first_contrail_point_indices[marker_index]);
+					new_contrail_point_count = contrail_point_count;
+				}
+				else
+				{
+					previous_contrail_point = NULL;
+					new_contrail_point_count = 1;
+				}
 
 				if (previous_contrail_point &&
 					!csmemcmp(
@@ -851,91 +858,85 @@ static void contrail_add_points(
 				{
 					continue;
 				}
-			}
-			else
-			{
-				previous_contrail_point = NULL;
-				new_contrail_point_count = 1;
-			}
 
-			for (contrail_point_index = 1;
-				contrail_point_index <= new_contrail_point_count;
-				contrail_point_index++)
-			{
-				long new_contrail_point_index = datum_new(contrail_point_data);
-
-				if (new_contrail_point_index != NONE)
+				for (contrail_point_index = 1;
+					contrail_point_index <= new_contrail_point_count;
+					contrail_point_index++)
 				{
-					struct contrail_point_datum *contrail_point =
-						contrail_point_get(new_contrail_point_index);
-					real_vector3d direction;
-					real_vector3d object_velocity;
+					long new_contrail_point_index = datum_new(contrail_point_data);
 
-					contrail_point->time = 0.0f;
-					contrail_point->delta = 0.0f;
-					contrail_point->flags = FLAG(_contrail_point_new_bit) |
-						FLAG(_contrail_point_transitioning_bit);
-					contrail_point->state_index = NONE;
-					contrail_point->density = contrail->density;
-					local_random_vector_in_cone3d_inline(
-						&marker->matrix.forward,
-						0.0f,
-						point_velocity_cone_angle,
-						&direction);
-					contrail_point->position = marker->matrix.position;
-					scenario_location_from_point(
-						&contrail_point->location,
-						&contrail_point->position);
-					object_get_velocities(contrail->object_index, &object_velocity, NULL);
-					contrail_point->velocity.i = point_inherited_velocity_fraction *
-						object_velocity.i + direction.i * point_velocity;
-					contrail_point->velocity.j = point_inherited_velocity_fraction *
-						object_velocity.j + direction.j * point_velocity;
-					contrail_point->velocity.k = point_inherited_velocity_fraction *
-						object_velocity.k + direction.k * point_velocity;
-
-					if (contrail_point_index < new_contrail_point_count)
+					if (new_contrail_point_index != NONE)
 					{
-						real t = (real)contrail_point_index / new_contrail_point_count;
-						real one_minus_t = 1.0f - t;
-						real_point3d position;
+						struct contrail_point_datum *contrail_point =
+							contrail_point_get(new_contrail_point_index);
+						real_vector3d direction;
+						real_vector3d object_velocity;
 
-						match_assert_valid_real(
-							"c:\\halo\\SOURCE\\effects\\contrails.c",
-							471,
-							t);
-
-						contrail_point->density = one_minus_t * previous_contrail_point->density +
-							t * contrail_point->density;
-
-						position.x = one_minus_t * previous_contrail_point->position.x +
-							t * contrail_point->position.x;
-						position.y = one_minus_t * previous_contrail_point->position.y +
-							t * contrail_point->position.y;
-						position.z = one_minus_t * previous_contrail_point->position.z +
-							t * contrail_point->position.z;
-						scenario_location_from_line(
+						contrail_point->time = 0.0f;
+						contrail_point->delta = 0.0f;
+						contrail_point->flags = FLAG(_contrail_point_new_bit) |
+							FLAG(_contrail_point_transitioning_bit);
+						contrail_point->state_index = NONE;
+						contrail_point->density = contrail->density;
+						local_random_vector_in_cone3d_inline(
+							&marker->matrix.forward,
+							0.0f,
+							point_velocity_cone_angle,
+							&direction);
+						contrail_point->position = marker->matrix.position;
+						scenario_location_from_point(
 							&contrail_point->location,
-							&contrail_point->location,
-							&contrail_point->position,
-							&position);
-						contrail_point->position = position;
+							&contrail_point->position);
+						object_get_velocities(contrail->object_index, &object_velocity, NULL);
+						contrail_point->velocity.i = point_inherited_velocity_fraction *
+							object_velocity.i + direction.i * point_velocity;
+						contrail_point->velocity.j = point_inherited_velocity_fraction *
+							object_velocity.j + direction.j * point_velocity;
+						contrail_point->velocity.k = point_inherited_velocity_fraction *
+							object_velocity.k + direction.k * point_velocity;
 
-						contrail_point->velocity.i = one_minus_t * previous_contrail_point->velocity.i +
-							t * contrail_point->velocity.i;
-						contrail_point->velocity.j = one_minus_t * previous_contrail_point->velocity.j +
-							t * contrail_point->velocity.j;
-						contrail_point->velocity.k = one_minus_t * previous_contrail_point->velocity.k +
-							t * contrail_point->velocity.k;
+						if (contrail_point_index < new_contrail_point_count)
+						{
+							real t = (real)contrail_point_index / new_contrail_point_count;
+							real one_minus_t = 1.0f - t;
+							real_point3d interpolated_position;
+
+							match_assert_valid_real(
+								"c:\\halo\\SOURCE\\effects\\contrails.c",
+								471,
+								t);
+
+							contrail_point->density = one_minus_t * previous_contrail_point->density +
+								t * contrail_point->density;
+
+							interpolated_position.x = one_minus_t * previous_contrail_point->position.x +
+								t * contrail_point->position.x;
+							interpolated_position.y = one_minus_t * previous_contrail_point->position.y +
+								t * contrail_point->position.y;
+							interpolated_position.z = one_minus_t * previous_contrail_point->position.z +
+								t * contrail_point->position.z;
+							scenario_location_from_line(
+								&contrail_point->location,
+								&contrail_point->location,
+								&contrail_point->position,
+								&interpolated_position);
+							contrail_point->position = interpolated_position;
+
+							contrail_point->velocity.i = one_minus_t * previous_contrail_point->velocity.i +
+								t * contrail_point->velocity.i;
+							contrail_point->velocity.j = one_minus_t * previous_contrail_point->velocity.j +
+								t * contrail_point->velocity.j;
+							contrail_point->velocity.k = one_minus_t * previous_contrail_point->velocity.k +
+								t * contrail_point->velocity.k;
+						}
+
+						contrail_point->next_contrail_point_index =
+							contrail->first_contrail_point_indices[marker_index];
+						contrail->contrail_point_counts[marker_index]++;
+						contrail->first_contrail_point_indices[marker_index] = new_contrail_point_index;
 					}
-
-					contrail_point->next_contrail_point_index =
-						contrail->first_contrail_point_indices[marker_index];
-					contrail->contrail_point_counts[marker_index]++;
-					contrail->first_contrail_point_indices[marker_index] = new_contrail_point_index;
 				}
 			}
-		}
 		}
 	}
 
