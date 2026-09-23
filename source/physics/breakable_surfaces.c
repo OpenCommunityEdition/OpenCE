@@ -26,20 +26,6 @@ BREAKABLE_SURFACES.C
 #include "structures/structure_bsp_definitions.h"
 #include "tag_files/tag_groups.h"
 
-/* Preserve January's in-TU scalar expansion without selecting the external
-   point_from_line3d COMDAT for this object. */
-#define BREAKABLE_SURFACE_POINT_FROM_LINE3D(point, vector, distance, result) \
-	do \
-	{ \
-		real_point3d *line_result = (result); \
-		real line_distance = (distance); \
-		real_vector3d const *line_vector = (vector); \
-		real_point3d const *line_point = (point); \
-		line_result->x = line_vector->i * line_distance + line_point->x; \
-		line_result->y = line_vector->j * line_distance + line_point->y; \
-		line_result->z = line_vector->k * line_distance + line_point->z; \
-	} while (0)
-
 /* ---------- structures */
 
 struct breakable_surface_globals
@@ -333,16 +319,7 @@ static void breakable_surface_effect(
 			surface_vertex_index = 0;
 
 			breakable_surface_get_plane_from_designator(&collision_bsp->bsp3d, surface->plane_designator, &surface_plane);
-			{
-				real i = fabs(surface_plane.n.i);
-				real j = fabs(surface_plane.n.j);
-				real k = fabs(surface_plane.n.k);
-
-				if (!(k >= j) || !(k >= i))
-					projection_axis = j >= i;
-				else
-					projection_axis = _z;
-			}
+			projection_axis = projection_from_vector3d(&surface_plane.n);
 			projection_sign = projection_sign_from_vector3d(&surface_plane.n, projection_axis);
 			
 			do
@@ -492,8 +469,8 @@ static void breakable_surface_effect(
 								jitter.x = real_local_random_range(-0.75f, 0.75f);
 								jitter.y = real_local_random_range(-0.75f, 0.75f);
 
-								BREAKABLE_SURFACE_POINT_FROM_LINE3D(&position, &s_plane.n, ((real)s_index + jitter.x) * particle_effect->density, &position);
-								BREAKABLE_SURFACE_POINT_FROM_LINE3D(&position, &t_plane.n, ((real)t_index + jitter.y) * particle_effect->density, &position);
+								point_from_line3d(&position, &s_plane.n, ((real)s_index + jitter.x) * particle_effect->density, &position);
+								point_from_line3d(&position, &t_plane.n, ((real)t_index + jitter.y) * particle_effect->density, &position);
 							}
 
 							project_point3d(&position, projection_axis, projection_sign, &position_2d_test);
@@ -521,7 +498,7 @@ static void breakable_surface_effect(
 
 									factor *= breaking_effect->outward_velocity;
 
-									BREAKABLE_SURFACE_POINT_FROM_LINE3D((real_point3d *)&velocity, &outward_vector, factor, (real_point3d *)&velocity);
+									point_from_line3d((real_point3d *)&velocity, &outward_vector, factor, (real_point3d *)&velocity);
 								}
 
 								if (breaking_effect->forward_radius > 0.0f)
@@ -535,7 +512,7 @@ static void breakable_surface_effect(
 
 									factor *= breaking_effect->forward_velocity;
 
-									BREAKABLE_SURFACE_POINT_FROM_LINE3D((real_point3d *)&velocity, &damage_data->direction, factor, (real_point3d *)&velocity);
+									point_from_line3d((real_point3d *)&velocity, &damage_data->direction, factor, (real_point3d *)&velocity);
 								}
 
 								if (particle_effect->velocity_scale_upper_bound > 0.0f)

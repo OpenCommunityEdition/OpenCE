@@ -212,7 +212,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define projection_from_vector3d projection_from_vector3d_inline
 #define projection_sign_from_vector3d projection_sign_from_vector3d_inline
 #define project_point2d project_point2d_inline
 #define triple_product3d triple_product3d_inline
@@ -224,7 +223,6 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
-#undef projection_from_vector3d
 #undef projection_sign_from_vector3d
 #undef project_point2d
 #undef triple_product3d
@@ -820,27 +818,6 @@ static void decal_sprite_get_bounds(
 		- sprite->bounds.y0) * height_scale;
 
 	return;
-}
-
-short projection_from_vector3d(
-	real_vector3d const *n)
-{
-	real i = fabs(n->i);
-	real j = fabs(n->j);
-	real k = fabs(n->k);
-
-	if (k >= j && k >= i)
-	{
-		return _z;
-	}
-	else if (j >= i)
-	{
-		return _y;
-	}
-	else
-	{
-		return _x;
-	}
 }
 
 boolean projection_sign_from_vector3d(
