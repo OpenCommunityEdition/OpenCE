@@ -4,9 +4,9 @@
  "base": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
  "pushed": false,
  "summary": {
-  "functions_gained": 18,
-  "padded_bytes": 17184,
-  "code_bytes": 17046,
+  "functions_gained": 19,
+  "padded_bytes": 19456,
+  "code_bytes": 19312,
   "stable_regressions": 0,
   "by_category": {
    "source": {
@@ -15,9 +15,9 @@
     "code_bytes": 12560
    },
    "config-relocation-alias": {
-    "functions": 7,
-    "padded_bytes": 4544,
-    "code_bytes": 4486
+    "functions": 8,
+    "padded_bytes": 6816,
+    "code_bytes": 6752
    }
   }
  },
@@ -133,6 +133,18 @@
      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
      "function": "__rasterizer_environment_shadow_begin",
      "evidence": "/Od 0x80d870: boolean success = TRUE returned once; rows 0/1 w = -inverse_radius * dot_product3d(&m->forward, &m->position); HCEX names the array vsh_constants__screenproj[20]. Two per-site rule-24 casts (see cast_admissions): /Od dot_product3d calls at 0x80db50 and 0x80dbc2, byte-inert (deleting them keeps the function exact), point/vector share layout"
+    }
+   ]
+  },
+  "b4": {
+   "category": "config-relocation-alias",
+   "description": "already-credited csplit alias (wave 2 interface worker diagnosis)",
+   "gate": "scratch/lane/gate_b4.txt: ninja PASS, +1 fn / 2,272 padded, regressions 0, parks 112/0/0, pytest 1152/5/26",
+   "functions": [
+    {
+     "unit": "source/interface/interface",
+     "function": "_render_debug_profile",
+     "evidence": "relocs.json 847565 -> _profile_graph_values-3 and 847576 -> _profile_graph_values-8 (values[index-1].enabled / .frame_value; csplit named the preceding _profile_graph_value_count); identical image addresses; scorer already credited"
     }
    ]
   }
@@ -354,6 +366,18 @@
    "category": "source",
    "was_parked": true,
    "evidence": "/Od 0x84f800: draw pass indexes group_particle_counts[group_index] with a short for loop; inner while (particle_count-- > 0) with rendered_particle++ at the body end and before the delete-path continue (/Od 0x84fda4, 0x85010e); semantics reviewed equal",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/interface",
+   "function": "_render_debug_profile",
+   "padded_bytes": 2272,
+   "code_bytes": 2266,
+   "before_status": "R",
+   "batch": "b4",
+   "category": "config-relocation-alias",
+   "was_parked": false,
+   "evidence": "relocs.json 847565 -> _profile_graph_values-3 and 847576 -> _profile_graph_values-8 (values[index-1].enabled / .frame_value; csplit named the preceding _profile_graph_value_count); identical image addresses; scorer already credited",
    "new_definitions": []
   }
  ],
