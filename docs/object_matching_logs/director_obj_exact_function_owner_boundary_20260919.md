@@ -47,3 +47,25 @@ Authenticate source/header topology that suppresses the surplus helper owners
 or prove disposal against compatible rebuilt canonical owners with an ordinary
 link, then reconcile the COMMON/`.bss` global ownership without source-shaping
 constructs. Preserve every exact Director function while doing so.
+
+## Resolution on 2026-09-24
+
+The historical blockers above are resolved at canonical `b0992d0e`; the
+September 19 status is not current. Director still gates 28/28 strict exact.
+All 57 January-owned code and non-code symbols match the rebuilt object in
+storage class, section, offset, normalized bytes and relocations. Its `.bss`
+is now the same 1,002-byte section, with `_director_globals` at 0,
+`_director_camera_switch_fast` at 1000 and private `_hyper_key_down` at 1001.
+
+The only extra code COMDATs are genuine shared-header inlines
+`_dot_product3d` (32 bytes) and `_cross_product3d` (64 bytes). Each is
+byte-identical to January's selected ActionCharge or ActionObey copy.
+Ordinary VC7 partial links of the rebuilt Director with each rebuilt provider,
+in both input orders and as a combined three-object link, produce no duplicate
+definition error. Eight extra literal/data COMDATs are likewise identical to
+their January selected providers and pass two-order provider links. The partial
+links have expected unresolved imports because unrelated objects are omitted;
+they establish provider compatibility, not a complete executable link.
+The source fake-match scan has zero leads. Both stale admission rejections are
+retired and Director is admitted as `Matching`, with zero newly matched code
+bytes because its 28 functions were already credited.

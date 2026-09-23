@@ -90,22 +90,6 @@
       "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
     },
     {
-      "unit": "source/camera/director",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_dot_product3d, _cross_product3d",
-      "reason": "All target functions now compare strict exact, but the rebuilt translation unit emits select-any _dot_product3d and _cross_product3d helper copies absent from the January Director split. January's selected helper owners are no-duplicates and mixed target/candidate link probes fail with duplicate-definition errors.",
-      "evidence": "docs/object_matching_logs/director_obj_exact_function_owner_boundary_20260919.md",
-      "reopen": "Remove only after authentic source/header topology prevents the surplus helper copies or an ordinary compatible canonical-owner link proves their safe disposal without forced inline/noinline, pragmas, or other matching-only constructs."
-    },
-    {
-      "unit": "source/camera/director",
-      "class": "bss-symbol-layout-mismatch",
-      "symbol": ".bss",
-      "reason": "The rebuilt Director globals use COMMON ownership where the January split records .bss ownership, so exact target-function bytes alone cannot certify equivalent object storage and linked addresses.",
-      "evidence": "docs/object_matching_logs/director_obj_exact_function_owner_boundary_20260919.md",
-      "reopen": "Reconcile the Director global COMMON/.bss ownership through authentic declarations and source topology without custom sections, fake aggregates, pragmas, or other matching-only constructs."
-    },
-    {
       "unit": "source/physics/collision_features",
       "class": "candidate-only-comdat-owner",
       "symbol": "_projection_from_vector3d",

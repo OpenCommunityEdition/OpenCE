@@ -1,6 +1,6 @@
 # Halo-only object-closure batch (2026-09-24)
 
-This batch starts at canonical `89230ef2` on `jonas/exact-pilots` and excludes all thirteen translation units reserved for the active Claude data/ownership lane. It admits nine Halo-owned objects; it does not count library objects, fuzzy bodies, or candidate-only inline helpers as January code.
+This batch starts at canonical `89230ef2` on `jonas/exact-pilots` and excludes all thirteen translation units reserved for the active Claude data/ownership lane. It admits ten Halo-owned objects; it does not count library objects, fuzzy bodies, or candidate-only inline helpers as January code.
 
 | Object | Strict target functions | Admission evidence |
 | --- | ---: | --- |
@@ -13,21 +13,22 @@ This batch starts at canonical `89230ef2` on `jonas/exact-pilots` and excludes a
 | `source/tool/error_geometry` | 17/17 | Items' genuine validator provider removes the prior duplicate-owner veto. All 57 target non-code owners and selected inline providers match; ordinary pair links pass. |
 | `source/effects/particle_systems` | 25/25 | The shared `local_random_direction3d` inline replaces a hand-written Effects copy while preserving its exact caller. Target code/data and provider-pair links pass. |
 | `source/effects/contrails` | 19/19 | Shared random-range and cone helpers replace two hand-written copies. Five private symbols are marked private in January's split metadata; all target non-code owners and selected providers match, with successful two-order links. |
+| `source/camera/director` | 28/28 | All 57 January target owners match the rebuilt COFF, including 1,002-byte BSS and the three globals' offsets/storage classes. Its genuine shared-header inline `_dot_product3d` and `_cross_product3d` copies are byte-identical to January's selected providers. Both-order VC7 partial links with rebuilt ActionCharge and ActionObey, including a three-object link, have no duplicate-definition errors. Eight extra literal COMDATs also match their January selected providers and pass two-order provider links. The two September 19 rejection premises are resolved; no source edit was needed. |
 
 ## Board result
 
 | Measure | Before | After | Delta |
 | --- | ---: | ---: | ---: |
-| Conservatively complete objects | 459/833 | 468/833 | +9 |
-| Halo complete objects | 341/468 | 350/468 | +9 |
+| Conservatively complete objects | 459/833 | 469/833 | +10 |
+| Halo complete objects | 341/468 | 351/468 | +10 |
 | Strict exact functions | 7,585/8,245 | 7,585/8,245 | 0, no regression |
 | Halo meaningful exact code | 1,549,953/1,770,166 | 1,549,953/1,770,166 | 0 |
 | Credited data | 2,564,059 | 2,568,800 | +4,741 |
 
-The newly credited data is Cheats 3,201, Items 1,528, HUD 4, and Particles' eight-byte bounds. Other pinned data sections were already credited; their pins document strict identity rather than claim duplicate new bytes.
+The newly credited data is Cheats 3,201, Items 1,528, HUD 4, and Particles' eight-byte bounds. Director and other pinned data sections were already credited; their pins document strict identity rather than claim duplicate new bytes. The Director link probes deliberately omit unrelated objects, so their expected unresolved externals do not demonstrate a complete executable link; they do demonstrate compatible duplicate-owner disposal with rebuilt canonical providers.
 
 Verification: full `ninja` succeeds; the rename-stable 8,245-function sweep gains and loses zero functions; all 103 parks remain valid; the admission audit has no new contradiction (thirteen inherited contradictions remain in Claude's reserved scope); `python -m pytest -q tools` passes 1,154 tests, five skips and 26 subtests; modified C files have zero fake-match scan leads; `git diff --check` passes. Pair-link probes were run in both orders for the admitted units' surplus shared-header/SDK providers. No header, compiler-option, `point_from_line3d` guard, or Claude-reserved file was changed.
 
 ## Held, not counted
 
-An additional tenth object was sought but not falsely admitted. `bitmap_drawing` has an unidentified, unreferenced 16-byte January data prefix; manufacturing an unused global from its bytes would violate the source standard. `path_obstacle_avoidance` is 24/24 strict but its historical BSS relabel lacks authenticated private identities. `render_debug`, `model_animations`, `actor_firing_position`, `game_engine`, and several other otherwise code-exact units emit helper copies incompatible with January's selected provider. `rasterizer_xbox_dynavobgeom` has unresolved shared-type ownership. Previously parked one-function residuals retain their zero-credit holds. The ninth-object batch should stay local under the standing requirement of at least 10,000 newly exact code bytes before pushing.
+Other tempting objects were not falsely admitted. `bitmap_drawing` has an unidentified, unreferenced 16-byte January data prefix; manufacturing an unused global from its bytes would violate the source standard. `path_obstacle_avoidance` is 24/24 strict but its historical BSS relabel lacks authenticated private identities. `render_debug`, `model_animations`, `actor_firing_position`, `game_engine`, and several other otherwise code-exact units emit helper copies incompatible with January's selected provider. `rasterizer_xbox_dynavobgeom` has unresolved shared-type ownership. Previously parked one-function residuals retain their zero-credit holds. This ten-object batch should stay local under the standing requirement of at least 10,000 newly exact code bytes before pushing.
