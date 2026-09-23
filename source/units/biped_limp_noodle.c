@@ -54,7 +54,7 @@ enum
 
 /* ---------- macros */
 
-#define realcmp(a, b) (fabs((a) - (b)) < _real_epsilon)
+
 
 /* ---------- structures */
 

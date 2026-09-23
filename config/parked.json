@@ -1170,17 +1170,6 @@
       }
     },
     {
-      "unit": "source/math/geometry",
-      "function": "_convex_hull2d",
-      "class": "unclassified",
-      "evidence": "Complete typed two-dimensional convex-hull reconstruction retained in ordinary C. Target and candidate are both 784 padded bytes with all 25 relocations, but normalized code still differs and no unique compiler mechanism is established. Project real types, named epsilon constants, and genuine geometry helpers are used; no source-shape tuning or pointer punning is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
-      "measurements": {
-        "target": { "size": 784, "relocation_count": 25, "normalized_sha256": "49124afa1d48d20fe6b36cd5c98861de7d27d9ec0109cf7d8dba8812c5464e77" },
-        "base": { "size": 784, "relocation_count": 25, "normalized_sha256": "69edf34ce23f4b2d7a21c0f537f0a09f638dfddb5c70c141713fb4f090f60796" },
-        "objdiff_percent": 86.43651
-      }
-    },
-    {
       "unit": "source/physics/physics",
       "function": "_compute_ground_plane",
       "class": "instruction-scheduling",

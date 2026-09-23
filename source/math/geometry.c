@@ -742,22 +742,19 @@ short convex_hull2d(
 
 		for (index = 0; index < vertex_count; index++)
 		{
-			real_point2d const *point = points + index;
-
-			if (point->y < minimum_y - _real_epsilon ||
-				(point->y < minimum_y && point->x < minimum_x + _real_epsilon) ||
-				(point->y < minimum_y + _real_epsilon && point->x < minimum_x - _real_epsilon))
+			if (points[index].y < minimum_y - _real_epsilon ||
+				(points[index].y < minimum_y && points[index].x < minimum_x + _real_epsilon) ||
+				(points[index].y < minimum_y + _real_epsilon && points[index].x < minimum_x - _real_epsilon))
 			{
-				minimum_x = point->x;
+				minimum_x = points[index].x;
 				current_index = index;
-				minimum_y = point->y;
+				minimum_y = points[index].y;
 			}
 		}
 
 		do
 		{
 			real minimum_angle_increment = REAL_MAX;
-			real_point2d const *current;
 
 			if (hull_count >= vertex_count)
 			{
@@ -784,15 +781,12 @@ short convex_hull2d(
 			}
 
 			hull_indices[hull_count++] = current_index;
-			current = points + current_index;
 
 			for (index = 0; index < vertex_count; index++)
 			{
-				real_point2d const *point = points + index;
-
-				if (point->x != current->x || point->y != current->y)
+				if (points[index].x != points[current_index].x || points[index].y != points[current_index].y)
 				{
-					real angle_increment = arctangent(point->y - current->y, point->x - current->x) - accumulated_angle;
+					real angle_increment = arctangent(points[index].y - points[current_index].y, points[index].x - points[current_index].x) - accumulated_angle;
 
 					while (angle_increment < -_real_epsilon)
 					{
@@ -811,16 +805,14 @@ short convex_hull2d(
 
 			if (!nondegenerate)
 			{
-				real_point2d const *start = points + hull_indices[0];
-				real_point2d const *best = points + best_index;
-
-				nondegenerate = !(fabs(best->x - start->x) < _real_epsilon && fabs(best->y - start->y) < _real_epsilon);
+				nondegenerate = !(realcmp(points[best_index].x, points[hull_indices[0]].x) &&
+					realcmp(points[best_index].y, points[hull_indices[0]].y));
 			}
 		}
 		while (best_index != hull_indices[0] &&
 			!(nondegenerate &&
-				fabs(points[best_index].x - points[hull_indices[0]].x) < _real_epsilon &&
-				fabs(points[best_index].y - points[hull_indices[0]].y) < _real_epsilon));
+				realcmp(points[best_index].x, points[hull_indices[0]].x) &&
+				realcmp(points[best_index].y, points[hull_indices[0]].y)));
 	}
 
 	return hull_count;

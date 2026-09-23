@@ -25,7 +25,7 @@ file has inline function assertions.
 
 #define DEGREES_TO_RADIANS(angle) ((real)(((real)angle) * ((real)M_PI) / 180.f))
 #define RADIANS_TO_DEGREES(angle) ((real)(((real)angle) * 180.f / ((real)M_PI)))
-
+#define realcmp(a, b) (fabs((a) - (b)) < _real_epsilon)
 #define assert_valid_real(v)				\
 vassert(									\
 	valid_real(v),							\

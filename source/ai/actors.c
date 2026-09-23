@@ -465,7 +465,7 @@ enum
 #define actor_attached_threat_get(index) \
 	((struct projectile_datum *)object_get(index))
 
-#define realcmp(a, b) (fabs((a) - (b)) < _real_epsilon)
+
 
 #define prop_orphaned(prop) \
 	((prop)->state >= _prop_state_uninspected_orphan && \

@@ -231,9 +231,9 @@ enum
 /* ---------- macros */
 
 #define ACTOR_LOOKING_DEBUG_PRINTING_ENABLED() (ai_debug.print_secondary_looking)
-/* TU-local copy of the real_math.h comparison macro (also copied in actors.c,
- * matrix_math.c and biped_limp_noodle.c). */
-#define realcmp(a, b) (fabs((a) - (b)) < _real_epsilon)
+
+
+
 
 /* ---------- structures */
 
