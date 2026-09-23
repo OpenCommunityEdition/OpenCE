@@ -1,0 +1,171 @@
+{
+ "lane": "claude structural 40K lane (2026-09-23)",
+ "branch": "claude/structural-40k-20260923",
+ "base": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
+ "pushed": false,
+ "summary": {
+  "functions_gained": 8,
+  "padded_bytes": 8512,
+  "code_bytes": 8459,
+  "stable_regressions": 0,
+  "by_category": {
+   "source": {
+    "functions": 8,
+    "padded_bytes": 8512,
+    "code_bytes": 8459
+   }
+  }
+ },
+ "batches": {
+  "b1": {
+   "category": "source",
+   "description": "held-work harvest + wave 1 verified exacts",
+   "gate": "scratch/lane/gate_b1.txt: ninja PASS, +8 fns / 8,512 padded, regressions 0, parks 121/0/0, admission 45/0/10/0, provider link PASS all units, casts unchanged, fake scan unchanged, pytest 1152/5/26",
+   "functions": [
+    {
+     "unit": "source/game/aim_assist",
+     "function": "_player_aim_projectile",
+     "evidence": "Lane B /Od-attested body (set_real_point3d call at /Od 0x58a09c with x+i,y+j,z+k args); prototype now in focused real_math_cones.h; replaces a point/vector add_vectors3d use; drops surplus _add_vectors3d/_distance3d, adds coalesce-class _set_real_point3d (byte-identical to January, link PASS)",
+     "new_definitions": [
+      "_set_real_point3d"
+     ]
+    },
+    {
+     "unit": "source/ai/path_obstacle_avoidance",
+     "function": "_path_avoid_obstacles",
+     "evidence": "Lane B single-exit body; its only blocker (_debug_path/_debug_obstacles static relabel) landed canonically in 4f4c8502; semantics equal (breaks replace early returns, tail is return result)"
+    },
+    {
+     "unit": "source/ai/actor_perception",
+     "function": "_actor_perception_friend_prop_is_attacking",
+     "evidence": "/Od 0x472cb0: single boolean result, explicit swarm arm store, while ((prop = next) != NULL) loop; single-exit law"
+    },
+    {
+     "unit": "source/ai/actor_perception",
+     "function": "_actor_situation_update",
+     "evidence": "/Od 0x478d33..0x478ddc statement order: visible-reachable increment first, visible threat counted inside the (visible || shooting&&clear) block with priority = MAX(priority, visible)"
+    },
+    {
+     "unit": "source/interface/ui_widget",
+     "function": "_display_error",
+     "evidence": "/Od 0x65f2e0 shape: widget_name NULL + if(widget_name) body, unconditional range assert, ui_widgets_set_fade_value call, top_widget_tag_index local, jump-table case order; semantics reviewed equal"
+    },
+    {
+     "unit": "source/interface/ui_widget",
+     "function": "_widget_instance_text_box_is_focused",
+     "evidence": "/Od 0x66c190 list arm (type==spinner||type==column) && focused_child == parent; January overwrite (xor al,al) so = not |=; the redundant conjunct is literally in the /Od source"
+    },
+    {
+     "unit": "source/interface/hud_weapon",
+     "function": "_render_grenade_hud",
+     "evidence": "/Od 0x639122..0x639128 stores unit->parent into its own local [ebp-0x10] before unit_try_and_get"
+    },
+    {
+     "unit": "source/interface/hud_messaging",
+     "function": "_hud_messaging_update",
+     "evidence": "Body from /Od 0x62cb90 (wchar_t formatted[256] = RTC 512 B buffer giving frame 0x2a0, hud_get_font_index call, block scoping, state_message pointer, branch order); plus relocs.json retarget of 805831/805856 from _global_hud_anchor_names+2 to _button_mappings-18 (same image address 3034170, one-before alias)"
+    }
+   ]
+  }
+ },
+ "functions": [
+  {
+   "unit": "source/ai/actor_perception",
+   "function": "_actor_perception_friend_prop_is_attacking",
+   "padded_bytes": 432,
+   "code_bytes": 430,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "/Od 0x472cb0: single boolean result, explicit swarm arm store, while ((prop = next) != NULL) loop; single-exit law",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/ai/actor_perception",
+   "function": "_actor_situation_update",
+   "padded_bytes": 1264,
+   "code_bytes": 1262,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x478d33..0x478ddc statement order: visible-reachable increment first, visible threat counted inside the (visible || shooting&&clear) block with priority = MAX(priority, visible)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/ai/path_obstacle_avoidance",
+   "function": "_path_avoid_obstacles",
+   "padded_bytes": 1360,
+   "code_bytes": 1345,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "Lane B single-exit body; its only blocker (_debug_path/_debug_obstacles static relabel) landed canonically in 4f4c8502; semantics equal (breaks replace early returns, tail is return result)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/game/aim_assist",
+   "function": "_player_aim_projectile",
+   "padded_bytes": 832,
+   "code_bytes": 820,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "Lane B /Od-attested body (set_real_point3d call at /Od 0x58a09c with x+i,y+j,z+k args); prototype now in focused real_math_cones.h; replaces a point/vector add_vectors3d use; drops surplus _add_vectors3d/_distance3d, adds coalesce-class _set_real_point3d (byte-identical to January, link PASS)",
+   "new_definitions": [
+    "_set_real_point3d"
+   ]
+  },
+  {
+   "unit": "source/interface/hud_messaging",
+   "function": "_hud_messaging_update",
+   "padded_bytes": 2928,
+   "code_bytes": 2922,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": true,
+   "evidence": "Body from /Od 0x62cb90 (wchar_t formatted[256] = RTC 512 B buffer giving frame 0x2a0, hud_get_font_index call, block scoping, state_message pointer, branch order); plus relocs.json retarget of 805831/805856 from _global_hud_anchor_names+2 to _button_mappings-18 (same image address 3034170, one-before alias)",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/hud_weapon",
+   "function": "_render_grenade_hud",
+   "padded_bytes": 736,
+   "code_bytes": 723,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x639122..0x639128 stores unit->parent into its own local [ebp-0x10] before unit_try_and_get",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "function": "_display_error",
+   "padded_bytes": 896,
+   "code_bytes": 896,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x65f2e0 shape: widget_name NULL + if(widget_name) body, unconditional range assert, ui_widgets_set_fade_value call, top_widget_tag_index local, jump-table case order; semantics reviewed equal",
+   "new_definitions": []
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "function": "_widget_instance_text_box_is_focused",
+   "padded_bytes": 64,
+   "code_bytes": 61,
+   "before_status": "R",
+   "batch": "b1",
+   "category": "source",
+   "was_parked": false,
+   "evidence": "/Od 0x66c190 list arm (type==spinner||type==column) && focused_child == parent; January overwrite (xor al,al) so = not |=; the redundant conjunct is literally in the /Od source",
+   "new_definitions": []
+  }
+ ]
+}

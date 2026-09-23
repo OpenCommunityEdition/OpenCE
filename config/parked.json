@@ -1436,25 +1436,6 @@
       }
     },
     {
-      "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_path_avoid_obstacles",
-      "class": "register-allocation",
-      "evidence": "Best complete typed reconstruction from the Fable obstacle-search graph after canonical owner reconciliation. January is 1360 padded bytes and the natural candidate is 1312, with the same 49 relocation identities; January's boolean/register schedule is not reproduced by the ordinary source. The complete algorithm is retained as honest fuzzy work with no raw offsets, source pressure, nonsensical control flow or exact credit. See docs/object_matching_logs/path_obstacle_avoidance_obj_fable_owner_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 1360,
-          "relocation_count": 49,
-          "normalized_sha256": "ec47d37a5ccdd19d9d81026b7676d2a3fc7525416375f8d52257b65938ffe90b"
-        },
-        "base": {
-          "size": 1312,
-          "relocation_count": 49,
-          "normalized_sha256": "ebd074f70b98e427ea8e4304e5039f9d7bd1a58c6b22a4940466c1eb9789368d"
-        },
-        "objdiff_percent": 90.164444
-      }
-    },
-    {
       "unit": "source/camera/editor_flying_camera",
       "function": "_editor_camera_flying_update",
       "class": "unclassified",
@@ -1490,17 +1471,6 @@
           "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0"
         },
         "objdiff_percent": 61.451614
-      }
-    },
-    {
-      "unit": "source/ai/actor_perception",
-      "function": "_actor_perception_friend_prop_is_attacking",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed friend-attack predicate reconstructed from January and HCEA evidence. Target and candidate are both 432 padded bytes with all 16 relocations; the remaining delta is a compiler scheduling choice in otherwise complete logic. No fake dependency, raw object cast, volatile/register steering, or numeric enum substitution is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md; reopen only for authentic source or compiler-context evidence.",
-      "measurements": {
-        "target": { "size": 432, "relocation_count": 16, "normalized_sha256": "454bc3e478ad46e26eb67e05c8898945cf92782cfbd76123bee382c614f5a9c3" },
-        "base": { "size": 432, "relocation_count": 16, "normalized_sha256": "5c39b730aa08a1b8c9615ee8388452235e3378aeca2c6927df9949f42f9cb239" },
-        "objdiff_percent": 99.83108
       }
     },
     {
@@ -1600,17 +1570,6 @@
         "target": { "size": 1744, "relocation_count": 43, "normalized_sha256": "84720a5067d22512436bb45e9b948155fa08a828b9adf592a50c11ddd885596b" },
         "base": { "size": 2528, "relocation_count": 55, "normalized_sha256": "fb7bb3c6b7236d625348b35cdfa4175844acc230855ecc85e7ca966dd3b518e0" },
         "objdiff_percent": 49.07078
-      }
-    },
-    {
-      "unit": "source/interface/hud_messaging",
-      "function": "_hud_messaging_update",
-      "class": "unclassified",
-      "evidence": "Complete typed HUD renderer reconstructed from January control flow, strings, data and relocations, with the independent HCEA implementation as a semantic map. It covers objective/help/custom state messages, text and bitmap elements, button remapping, split-screen placement, timed item messages, fading and expiration. January is 2,928 padded bytes with 137 relocations; canonical is 2,880 with 136. The remaining delta is a VC7 load/register schedule around split-screen line placement, not known missing behavior. No compiler steering, raw offsets, fake dependency, undefined behavior, representation pun, forced inline or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/hud_messaging_obj_renderer_caller_closure_20260908.md.",
-      "measurements": {
-        "target": { "size": 2928, "relocation_count": 137, "normalized_sha256": "26a1376422e3742f9d65a8d83241919e1e370769a936ade9c9b859829d7d1b7b" },
-        "base": { "size": 2880, "relocation_count": 136, "normalized_sha256": "d5d32a3ce4d44e6e87ed3daa1d1ce28cf1a746bd53ae0b678bf7ec99a955d815" },
-        "objdiff_percent": 66.71034
       }
     },
     {

@@ -1778,20 +1778,20 @@ void actor_situation_update(
 				short priority = _actor_threat_none;
 
 				actor->situation.known_enemies++;
-				if (visible)
+				if (visible && prop->unreachable_ticks == 0)
 				{
-					if (prop->unreachable_ticks == 0)
-					{
-						actor->situation.visible_reachable_enemies++;
-					}
-
-					actor->situation.cumulative_threats[_actor_threat_visible]++;
-					priority = _actor_threat_visible;
+					actor->situation.visible_reachable_enemies++;
 				}
 
 				if (visible ||
 					(prop->shooting && prop->line_of_sight == _ai_line_of_sight_clear))
 				{
+					if (visible)
+					{
+						actor->situation.cumulative_threats[_actor_threat_visible]++;
+						priority = MAX(priority, _actor_threat_visible);
+					}
+
 					if (prop->currently_damaging_me)
 					{
 						actor->situation.cumulative_threats[_actor_threat_damaging_me]++;
@@ -2010,6 +2010,7 @@ boolean actor_perception_friend_prop_is_attacking(
 {
 	struct actor_datum *actor = actor_get(actor_index);
 	struct prop_datum *friend_prop = prop_get(friend_prop_index);
+	boolean attacking = FALSE;
 
 #line 4710 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 	vassert(
@@ -2017,55 +2018,48 @@ boolean actor_perception_friend_prop_is_attacking(
 		"prop_acknowledged(friend_prop) && !friend_prop->enemy && !friend_prop->dead");
 #line 610 "source\\ai\\actor_perception.c"
 
-	if (!friend_prop->swarm)
+	if (friend_prop->swarm)
 	{
-		if (friend_prop->player)
+		attacking = FALSE;
+	}
+	else if (friend_prop->player)
+	{
+		attacking = friend_prop->shooting;
+		unit_get_aiming_vector(friend_prop->unit_index, attack_vector);
+		if (!attacking && actor->situation.known_enemies > 0)
 		{
-			boolean attacking = friend_prop->shooting;
+			struct prop_iterator iterator;
+			struct prop_datum *prop;
 
-			unit_get_aiming_vector(friend_prop->unit_index, attack_vector);
-			if (!attacking && actor->situation.known_enemies > 0)
+			prop_iterator_new(&iterator, actor_index);
+			while ((prop = prop_iterator_next(&iterator)) != NULL)
 			{
-				struct prop_iterator iterator;
-				struct prop_datum *prop;
-
-				prop_iterator_new(&iterator, actor_index);
-				prop = prop_iterator_next(&iterator);
-				while (prop != NULL)
+				if (prop_acknowledged(prop) && prop->enemy)
 				{
-					if (prop_acknowledged(prop) && prop->enemy)
+					real_vector3d friend_to_enemy;
+
+					vector_from_points3d(
+						&friend_prop->body_position,
+						&prop->body_position,
+						&friend_to_enemy);
+					if (normalize3d(&friend_to_enemy) > 0.0f &&
+						dot_product3d(attack_vector, &friend_to_enemy) > 0.5f)
 					{
-						real_vector3d friend_to_enemy;
-
-						vector_from_points3d(
-							&friend_prop->body_position,
-							&prop->body_position,
-							&friend_to_enemy);
-						if (normalize3d(&friend_to_enemy) > 0.0f &&
-							dot_product3d(
-								&friend_to_enemy,
-								attack_vector) > 0.5f)
-						{
-							return TRUE;
-						}
+						attacking = TRUE;
+						break;
 					}
-
-					prop = prop_iterator_next(&iterator);
 				}
 			}
-
-			return attacking;
-		}
-
-		if (friend_prop->actor_index != NONE)
-		{
-			return actor_attacking_target(
-				friend_prop->actor_index,
-				attack_vector);
 		}
 	}
+	else if (friend_prop->actor_index != NONE)
+	{
+		attacking = actor_attacking_target(
+			friend_prop->actor_index,
+			attack_vector);
+	}
 
-	return FALSE;
+	return attacking;
 }
 
 short actor_perception_aiming_vector_test_blockage(

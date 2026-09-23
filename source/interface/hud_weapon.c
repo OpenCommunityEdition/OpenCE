@@ -586,6 +586,7 @@ static void render_grenade_hud(
 	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
 	struct unit_datum *unit;
 	long weapon_index;
+	long parent_index;
 	struct unit_datum *parent_unit;
 	short grenade_type;
 	struct game_globals_grenade *grenade;
@@ -611,7 +612,8 @@ static void render_grenade_hud(
 		goto finished;
 	}
 
-	parent_unit = unit_try_and_get(unit->object.parent_object_index);
+	parent_index = unit->object.parent_object_index;
+	parent_unit = unit_try_and_get(parent_index);
 	if (parent_unit &&
 		(parent_unit->unit.driver_object_index == unit_index ||
 			parent_unit->unit.gunner_object_index == unit_index))

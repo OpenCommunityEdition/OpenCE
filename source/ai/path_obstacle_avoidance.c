@@ -931,8 +931,8 @@ boolean path_avoid_obstacles(
 	boolean result= TRUE;
 	struct obstacles local_obstacles;
 	struct obstacle_path local_obstacle_path;
-	struct path_step steps[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
-	real_point3d previous_point;
+	struct path_step temporary_steps[MAXIMUM_OBSTACLE_AVOIDANCE_STEPS];
+	real_point3d last_step_end_point;
 	long previous_surface_index;
 	short step_index;
 
@@ -944,18 +944,21 @@ boolean path_avoid_obstacles(
 
 	for (step_index= 0; step_index<input_step_count; ++step_index)
 	{
+		struct obstacles *obstacles= &local_obstacles;
 		struct obstacle_path *obstacle_path= &local_obstacle_path;
-		boolean finishing= step_index==input_step_count-1 && *steps_finish_path;
+		boolean last_step= step_index==input_step_count-1;
+		boolean finishing= last_step && *steps_finish_path;
 		real_point3d const *start_point;
 		long start_surface_index;
-		struct path_step const *input_step;
 		real_point3d const *goal_point;
 		long goal_surface_index;
-		real_vector3d direction;
+		real_vector3d movement_direction;
+		boolean compute_obstacles;
+		boolean path_found;
 
 		if (step_index>0)
 		{
-			start_point= &previous_point;
+			start_point= &last_step_end_point;
 			start_surface_index= previous_surface_index;
 		}
 		else
@@ -964,67 +967,51 @@ boolean path_avoid_obstacles(
 			start_surface_index= state->input.start_surface_index;
 		}
 
-		input_step= &input_steps[step_index];
-		goal_surface_index= input_step->surface_index;
-		goal_point= &input_step->point;
-		vector_from_points3d(start_point, goal_point, &direction);
-		normalize3d(&direction);
+		goal_point= &input_steps[step_index].point;
+		goal_surface_index= input_steps[step_index].surface_index;
+		vector_from_points3d(start_point, goal_point, &movement_direction);
+		normalize3d(&movement_direction);
 
+		compute_obstacles= TRUE;
+		if (state->debug)
 		{
-			struct obstacles *obstacles= &local_obstacles;
-
-			if (state->debug)
+			obstacles= &state->debug->avoidance_obstacles[step_index];
+			obstacle_path= &state->debug->avoidance_paths[step_index];
+			if (state->debug->use_stored_obstacles && step_index<state->debug->avoidance_path_count)
 			{
-				obstacles= &state->debug->avoidance_obstacles[step_index];
-				obstacle_path= &state->debug->avoidance_paths[step_index];
-			}
-
-			if (!state->debug || !state->debug->use_stored_obstacles || step_index>=state->debug->avoidance_path_count)
-			{
-				obstacles_new(obstacles);
-				obstacles_get_discs_in_sphere(obstacles, start_point, 4.f, &direction,
-					state->input.ignore_source_object_index, state->input.ignore_target_object_index);
-				if (state->input.attractor_valid)
-				{
-					obstacles_add_disc(obstacles, state->input.attractor_object_index, FLAG(_disc_optional_bit),
-						&state->input.attractor_point, state->input.attractor_radius);
-				}
-				obstacles_recompute(obstacles, radius);
-				if (state->debug && !state->debug->use_stored_obstacles)
-				{
-					state->debug->avoidance_path_count+= 1;
-				}
-			}
-
-			/* the search is planar: only x and y of the 3d points are read */
-			if (!path_find(obstacle_path, state->input.ignore_broken_surfaces, obstacles, radius,
-					(real_point2d const *)start_point, start_surface_index,
-					(real_point2d const *)goal_point, goal_surface_index, finishing, FALSE) &&
-				!(obstacles->disc_optional_count>0 &&
-					path_find(obstacle_path, state->input.ignore_broken_surfaces, obstacles, radius,
-						(real_point2d const *)start_point, start_surface_index,
-						(real_point2d const *)goal_point, goal_surface_index, finishing, TRUE)))
-			{
-				if (debug_obstacle_path_on_failure)
-				{
-					error(_error_silent, "obstacle path failure!");
-					debug_obstacle_path_on_failure= FALSE;
-					debug_obstacle_path= TRUE;
-					debug_obstacle_path_start_point= *start_point;
-					debug_obstacle_path_start_surface_index= start_surface_index;
-					debug_obstacle_path_goal_point= *goal_point;
-					debug_obstacle_path_goal_surface_index= goal_surface_index;
-					debug_obstacle_path_radius= radius;
-					debug_obstacle_path_finishing= finishing;
-					debug_ignore_broken_surfaces= state->input.ignore_broken_surfaces;
-					debug_obstacles= *obstacles;
-					debug_path= *obstacle_path;
-				}
-
-				return FALSE;
+				compute_obstacles= FALSE;
 			}
 		}
 
+		if (compute_obstacles)
+		{
+			obstacles_new(obstacles);
+			obstacles_get_discs_in_sphere(obstacles, start_point, 4.f, &movement_direction,
+				state->input.ignore_source_object_index, state->input.ignore_target_object_index);
+			if (state->input.attractor_valid)
+			{
+				obstacles_add_disc(obstacles, state->input.attractor_object_index, FLAG(_disc_optional_bit),
+					&state->input.attractor_point, state->input.attractor_radius);
+			}
+			obstacles_recompute(obstacles, radius);
+			if (state->debug && !state->debug->use_stored_obstacles)
+			{
+				state->debug->avoidance_path_count+= 1;
+			}
+		}
+
+		/* the search is planar: only x and y of the 3d points are read */
+		path_found= path_find(obstacle_path, state->input.ignore_broken_surfaces, obstacles, radius,
+			(real_point2d const *)start_point, start_surface_index,
+			(real_point2d const *)goal_point, goal_surface_index, finishing, FALSE);
+		if (!path_found && obstacles->disc_optional_count>0)
+		{
+			path_found= path_find(obstacle_path, state->input.ignore_broken_surfaces, obstacles, radius,
+				(real_point2d const *)start_point, start_surface_index,
+				(real_point2d const *)goal_point, goal_surface_index, finishing, TRUE);
+		}
+
+		if (path_found)
 		{
 			boolean overflow= FALSE;
 			short step_count= 0;
@@ -1034,7 +1021,7 @@ boolean path_avoid_obstacles(
 
 			if (obstacle_path->goal_found_exactly)
 			{
-				previous_point= *goal_point;
+				last_step_end_point= *goal_point;
 				previous_surface_index= goal_surface_index;
 			}
 			else
@@ -1042,14 +1029,14 @@ boolean path_avoid_obstacles(
 				struct obstacle_path_step *goal_step= path_get_step(obstacle_path, obstacle_path->goal_step_index);
 
 				previous_surface_index= goal_step->surface_index;
-				collision_surface_project_point2d(bsp, goal_step->surface_index, _z, TRUE, &goal_step->point, &previous_point);
+				collision_surface_project_point2d(bsp, previous_surface_index, _z, TRUE, &goal_step->point, &last_step_end_point);
 			}
 
 			obstacle_step_index= obstacle_path->goal_step_index;
 			while (obstacle_step_index!=0)
 			{
+				struct path_step *avoided_step= &temporary_steps[step_count++];
 				struct obstacle_path_step *obstacle_step= path_get_step(obstacle_path, obstacle_step_index);
-				struct path_step *avoided_step= &steps[step_count++];
 
 				avoided_step->surface_index= obstacle_step->surface_index;
 				collision_surface_project_point2d(bsp, obstacle_step->surface_index, _z, TRUE, &obstacle_step->point, &avoided_step->point);
@@ -1069,23 +1056,41 @@ boolean path_avoid_obstacles(
 			avoided_count= *avoided_step_count;
 			for (i= step_count-1; i>=0; --i)
 			{
-				if (avoided_count<MAXIMUM_SMOOTHED_PATH_STEPS)
-				{
-					avoided_steps[avoided_count++]= steps[i];
-				}
-				else
+				if (avoided_count>=MAXIMUM_SMOOTHED_PATH_STEPS)
 				{
 					overflow= TRUE;
 					break;
 				}
+				avoided_steps[avoided_count++]= temporary_steps[i];
 			}
 			*avoided_step_count= avoided_count;
 
 			if (overflow)
 			{
 				*steps_finish_path= FALSE;
-				return TRUE;
+				break;
 			}
+		}
+		else
+		{
+			if (debug_obstacle_path_on_failure)
+			{
+				error(_error_silent, "obstacle path failure!");
+				debug_obstacle_path_on_failure= FALSE;
+				debug_obstacle_path= TRUE;
+				debug_obstacle_path_start_point= *start_point;
+				debug_obstacle_path_start_surface_index= start_surface_index;
+				debug_obstacle_path_goal_point= *goal_point;
+				debug_obstacle_path_goal_surface_index= goal_surface_index;
+				debug_obstacle_path_radius= radius;
+				debug_obstacle_path_finishing= finishing;
+				debug_ignore_broken_surfaces= state->input.ignore_broken_surfaces;
+				debug_obstacles= *obstacles;
+				debug_path= *obstacle_path;
+			}
+
+			result= FALSE;
+			break;
 		}
 	}
 

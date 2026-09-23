@@ -4137,16 +4137,11 @@ void display_error(
 	if (cinematic_in_progress())
 	{
 		if (local_player_index == NONE)
-		{
 			local_player_index = 0;
-		}
-		else
-		{
-			match_assert(
-				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
-				2077,
-				local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		}
+		match_assert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+			2077,
+			local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 		if (widget_globals.deferred_cinematic_errors[local_player_index].error_code == NONE)
 		{
 			widget_globals.deferred_cinematic_errors[local_player_index].error_code = error_code;
@@ -4160,18 +4155,21 @@ void display_error(
 	}
 	else
 	{
-		char const *widget_name;
-		short error_local_player_index = NONE;
-		short local_player_count = 0;
+		char const *widget_name = NULL;
+		short error_local_player_index;
+		short local_player_count;
 		short widget_stack;
 		boolean first_local_player = TRUE;
 		struct widget_instance *top_widget;
+		long top_widget_tag_index;
 		struct widget_instance *widget;
 
 		if (local_player_index != NONE)
 		{
 			short index;
 
+			local_player_count = 0;
+			error_local_player_index = NONE;
 			for (index = local_player_get_next(NONE); index != NONE; index = local_player_get_next(index))
 			{
 				if (index == local_player_index)
@@ -4182,6 +4180,11 @@ void display_error(
 				}
 				local_player_count++;
 			}
+		}
+		else
+		{
+			error_local_player_index = NONE;
+			local_player_count = 0;
 		}
 		if (error_local_player_index == NONE && !we_are_at_the_main_menu)
 			local_player_index = NONE;
@@ -4204,9 +4207,14 @@ void display_error(
 				widget_name = modal
 					? "ui\\shell\\error\\error_modal_halfscreen"
 					: "ui\\shell\\error\\error_nonmodal_halfscreen";
-
-				break;
 			}
+			else
+			{
+				widget_name = modal
+					? "ui\\shell\\error\\error_modal_qtrscreen"
+					: "ui\\shell\\error\\error_nonmodal_qtrscreen";
+			}
+			break;
 		case 4:
 			widget_name = modal
 				? "ui\\shell\\error\\error_modal_qtrscreen"
@@ -4218,43 +4226,40 @@ void display_error(
 				2161,
 				FALSE,
 				"invalid local player count");
-
-			return;
+			break;
 		}
-		if (local_player_index == NONE)
+		if (widget_name)
 		{
-			widget_stack = 0;
-		}
-		else
-		{
-			widget_stack = local_player_index;
+			widget_stack = local_player_index == NONE ? 0 : local_player_index;
 			match_assert(
 				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 				2168,
 				(widget_stack>=0) && (widget_stack<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
-		}
-		if (transition_to_game_in_progress())
-		{
-			error(_error_silent, "aborting to the main menu root, for safety's sake");
-			main_screen_shell_load();
-			main_defer_map_map_change();
-			widget_globals.fade_to_black = -1.0f;
-		}
-		top_widget = widget_globals.active_widgets[widget_stack];
-		if (top_widget && top_widget->widget_is_error_dialog == TRUE)
-		{
-			error(_error_silent, "there is already an error message displayed for this local player index");
-		}
-		else
-		{
-			widget = ui_widget_load_by_name_or_tag(
-				widget_name,
-				NONE,
-				NULL,
-				local_player_index,
-				top_widget ? top_widget->definition_tag_index : NONE,
-				NONE,
-				NONE);
+			if (transition_to_game_in_progress())
+			{
+				error(_error_silent, "aborting to the main menu root, for safety's sake");
+				main_screen_shell_load();
+				main_defer_map_map_change();
+				ui_widgets_set_fade_value(-1.0f);
+			}
+			top_widget = widget_globals.active_widgets[widget_stack];
+			top_widget_tag_index = top_widget ? top_widget->definition_tag_index : NONE;
+			if (top_widget && top_widget->widget_is_error_dialog == TRUE)
+			{
+				error(_error_silent, "there is already an error message displayed for this local player index");
+				widget = NULL;
+			}
+			else
+			{
+				widget = ui_widget_load_by_name_or_tag(
+					widget_name,
+					NONE,
+					NULL,
+					local_player_index,
+					top_widget_tag_index,
+					NONE,
+					NONE);
+			}
 			if (widget)
 			{
 				struct widget_instance *text_box;
@@ -4270,12 +4275,12 @@ void display_error(
 					2208,
 					text_box->type == _ui_widget_type_text_box,
 					"expected a text box widget in the error widget");
-				text_box->parameters.text_box.string_list_index = MIN(MAX(0, error_code), NUMBER_OF_ERROR_CODES - 1);
+				text_box->parameters.text_box.string_list_index = PIN(error_code, 0, NUMBER_OF_ERROR_CODES - 1);
 				widget->widget_is_error_dialog = TRUE;
 				if (!widget->pause_game_time)
 				{
 					widget->pause_game_time = pause_game_time;
-					if (pause_game_time == TRUE)
+					if (widget->pause_game_time == TRUE)
 					{
 						match_vassert(
 							"c:\\halo\\SOURCE\\interface\\ui_widget.c",
@@ -4294,9 +4299,12 @@ void display_error(
 				}
 				switch (error_code)
 				{
+				case _error_controller_unplugged_start_to_continue:
+					widget->milliseconds_to_auto_close = 0;
+					widget->auto_close_fade_time = 0;
+					break;
 				case _error_controller_unplugged:
 					widget->close_if_local_player_controller_present = TRUE;
-				case _error_controller_unplugged_start_to_continue:
 					widget->milliseconds_to_auto_close = 0;
 					widget->auto_close_fade_time = 0;
 					break;
@@ -4304,11 +4312,12 @@ void display_error(
 					widget->close_if_local_player_controller_present = FALSE;
 					break;
 				}
-
-				return;
+			}
+			else
+			{
+				error(_error_silent, "failed to display error message");
 			}
 		}
-		error(_error_silent, "failed to display error message");
 	}
 
 	return;
@@ -4733,15 +4742,9 @@ static boolean widget_instance_text_box_is_focused(
 			{
 				if (ancestor->focused_child != parent)
 					break;
-				if (ancestor->type == _ui_widget_type_spinner_list ||
-					ancestor->type == _ui_widget_type_column_list)
-				{
-					focused = TRUE;
-				}
-				else
-				{
-					focused = FALSE;
-				}
+				focused = (ancestor->type == _ui_widget_type_spinner_list ||
+					ancestor->type == _ui_widget_type_column_list) &&
+					ancestor->focused_child == parent;
 			}
 			parent = ancestor;
 		}
