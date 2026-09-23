@@ -103,9 +103,11 @@ symbols in this file:
 #include "render/render_cameras.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include <stddef.h>
 #include <xtl.h>
 #include "rasterizer_xbox.h"
+#include "rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
@@ -165,39 +167,10 @@ enum
 
 /* ---------- structures */
 
-struct rasterizer_screen_effect_debug_options
-{
-	byte reserved00[0x47];
-	boolean screen_flashes;
-	boolean screen_effects;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 typedef char rasterizer_screen_effect_debug_options_flashes_offset_assert[
-	offsetof(struct rasterizer_screen_effect_debug_options, screen_flashes) == 0x47 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options_definition, screen_flashes) == 0x47 ? 1 : -1];
 typedef char rasterizer_screen_effect_debug_options_effects_offset_assert[
-	offsetof(struct rasterizer_screen_effect_debug_options, screen_effects) == 0x48 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options_definition, screen_effects) == 0x48 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_mask_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, convolution_mask) == 0x08 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_tint_offset_assert[
@@ -219,7 +192,6 @@ typedef char rasterizer_screen_effect_pixel_shader_size_assert[
 
 /* ---------- globals */
 
-extern struct rasterizer_screen_effect_debug_options rasterizer_debug_options;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- private code */

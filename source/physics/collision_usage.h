@@ -8,6 +8,7 @@ header included in hcex build.
 #define __COLLISION_USAGE_H
 #pragma once
 
+#include "cseries/cseries.h"
 #include <xtl.h>
 
 /* ---------- constants */
@@ -63,10 +64,12 @@ enum
 
 /* ---------- prototypes/COLLISION_USAGE.C */
 
-void collision_log_initialize(void);
-void collision_log_dispose(void);
-void collision_log_enable(bool);
-void collision_log_render(void);
+void collision_log_initialize(
+	void);
+void collision_log_enable(
+	boolean enable);
+void collision_log_render(
+	void);
 void collision_log_start_time(
 	LARGE_INTEGER *start_time);
 void collision_log_end_time(
@@ -76,10 +79,12 @@ void collision_log_usage(
 	short collision_function);
 void collision_log_display(
 	char *buffer);
-void collision_log_begin_period(short);
+void collision_log_begin_period(
+	short time_period);
 void collision_log_continue_period(
 	short time_period);
-void collision_log_end_period(void);
+void collision_log_end_period(
+	void);
 
 /* ---------- globals */
 
