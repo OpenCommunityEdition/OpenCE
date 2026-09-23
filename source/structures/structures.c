@@ -590,54 +590,42 @@ void render_debug_fog_planes(
 			&structure->fog_planes,
 			cluster->fog_reference & SHORT_MAX,
 			struct structure_fog_plane_render);
-		long vertex_count = fog_plane->vertices.count;
+		short vertex_index;
 
-		if (vertex_count > 0)
+		for (vertex_index = 0;
+			vertex_index < fog_plane->vertices.count;
+			vertex_index++)
 		{
-			short vertex_index = 0;
+			short next_vertex_index = (short)((vertex_index + 1) % fog_plane->vertices.count);
+			real_point3d *point0 = TAG_BLOCK_GET_ELEMENT(
+				&fog_plane->vertices,
+				vertex_index,
+				real_point3d);
+			real_point3d *point1 = TAG_BLOCK_GET_ELEMENT(
+				&fog_plane->vertices,
+				next_vertex_index,
+				real_point3d);
+			real_point3d offset_point0;
+			real_point3d offset_point1;
 
-			do
-			{
-				short next_vertex_index = (short)((vertex_index + 1) % vertex_count);
-				real_point3d *point0 = TAG_BLOCK_GET_ELEMENT(
-					&fog_plane->vertices,
-					vertex_index,
-					real_point3d);
-				real_point3d *point1 = TAG_BLOCK_GET_ELEMENT(
-					&fog_plane->vertices,
-					next_vertex_index,
-					real_point3d);
-				real offset = -render.fog.planar_maximum_distance;
-				real_point3d offset_point0;
-				real_point3d offset_point1;
+			point_from_line3d(point0, &fog_plane->plane.n, -render.fog.planar_maximum_distance, &offset_point0);
+			point_from_line3d(point1, &fog_plane->plane.n, -render.fog.planar_maximum_distance, &offset_point1);
 
-				offset_point0.x = point0->x + fog_plane->plane.n.i * offset;
-				offset_point0.y = point0->y + fog_plane->plane.n.j * offset;
-				offset_point0.z = point0->z + fog_plane->plane.n.k * offset;
-				offset_point1.x = point1->x + fog_plane->plane.n.i * offset;
-				offset_point1.y = point1->y + fog_plane->plane.n.j * offset;
-				offset_point1.z = point1->z + fog_plane->plane.n.k * offset;
-
-				rasterizer_debug_line(point0, point1, global_real_argb_white);
-				rasterizer_debug_line(
-					&offset_point0,
-					&offset_point1,
-					global_real_argb_black);
-				rasterizer_debug_line_shaded(
-					point0,
-					&offset_point0,
-					global_real_argb_white,
-					global_real_argb_black);
-				rasterizer_debug_line_shaded(
-					point1,
-					&offset_point1,
-					global_real_argb_white,
-					global_real_argb_black);
-
-				vertex_count = fog_plane->vertices.count;
-				vertex_index++;
-			}
-			while (vertex_index < vertex_count);
+			rasterizer_debug_line(point0, point1, global_real_argb_white);
+			rasterizer_debug_line(
+				&offset_point0,
+				&offset_point1,
+				global_real_argb_black);
+			rasterizer_debug_line_shaded(
+				point0,
+				&offset_point0,
+				global_real_argb_white,
+				global_real_argb_black);
+			rasterizer_debug_line_shaded(
+				point1,
+				&offset_point1,
+				global_real_argb_white,
+				global_real_argb_black);
 		}
 	}
 
