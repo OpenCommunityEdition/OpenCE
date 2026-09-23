@@ -151,3 +151,21 @@ has no such path). It fails the strip test, so I recommend rejecting it.
 
 Measurements: `scratch/owner/variants_measured.json`; variant sources are in
 the Lane D worktree paths listed there.
+
+## 7. Items this lane held (strict exact on a variant, not landed)
+
+| Function | Bytes | Why held | Variant |
+|---|---|---|---|
+| `__rasterizer_environment_lightmap_draw` | 4,016 | Reopens the P7 hold. The duplicated stage-0 filter calls rest on a lab law (R-order fastcall setup occurs at only 4 of 448 January sites), not on first-party attestation of the duplication. | `scratch/lane/w/rasterizer__xbox__rasterizer_xbox_environment/candidate.c` |
+| `_breakable_surface_effect` | 4,032 | Needs `_point_from_line3d` and `_projection_from_vector3d` emission (breakable_surfaces is outside the 17 objects; NODUP providers). The /Od and HCEX shape is otherwise exact 12/12. | `.../physics__breakable_surfaces/v1_genuine_helpers.c` |
+| `_hud_update_weapon_local_player` | 1,472 | The default case leaves `result` unassigned after `match_assert(!"unreachable")`. The read happens only if `system_exit` returns (same class as `_effect_allowed_by_environment`). /Od is identical. | `.../interface__hud_weapon/candidate.c` |
+| `_actor_action_handle_vehicle_entry` | 960 | Needs a TU-private `((d) * (d))` squaring macro. That extends the 2026-09-20 actor_perception ruling to actions.c. The plain `d*d` spelling fails the strip test. | `.../ai__actions/candidate.c` |
+| `_poll_endpoint_set` | 560 | January tests `< 0` and `== SOCKET_ERROR` (the -1 compare is in its bytes). Exact only when that condition is first stored in a named boolean; plain `||` fails the strip test, and no /Od body attests the boolean. | `.../bungie_net__network__transport_endpoint_set_winsock/candidate.c` |
+| `_transport_initialize` | 416 | Explicit zero field stores after the `= { sizeof }` initializer (rejected in Lane D as redundant). New measurement: VC7 keeps such stores, and January's bytes show them, so they are source statements. Necessary but not sufficient. | same unit |
+| `_actor_look_update` | 4,720 | Load-bearing aggregate `(real_vector2d const *)` view copy (see section 5). | harvested Lane A probe |
+
+Fidelity only (no code credit): decals' `.bss` order matches January if
+`decal_points2d_temp` becomes a static local of `decal_clip_to_surface`
+(HCEA lists it as one). That needs a paired symbols.json rename to a
+function-static name whose scope ordinal is not attested for January, so
+it is left for the owner.

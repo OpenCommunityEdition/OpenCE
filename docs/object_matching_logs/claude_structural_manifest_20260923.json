@@ -543,5 +543,89 @@
    "measure": "exact-equal instructions 6181 -> 6472 of 6662 (worker alndiff); frame 0x810, 114/114 slots, 1905/1905 relocation multiset",
    "evidence": "textbuffer[1024] and tempbuf[80] per /Od RTC and January slots; vision-cone nest 1 reuses ring_index/height_index (shared slot [ebp-0x44]); paths block uses one block-scoped offset_point; fixes a real defect: vertical sine/cosine arrays were swapped in the headspace i/j/k (January bytes)"
   }
- ]
+ ],
+ "baseline": {
+  "commit": "ea84554a0ad9cde225efa240b14a811fd639c9ba",
+  "halo_code": "1524233/1770166",
+  "functions": "7388/7574",
+  "stable_exact": 7537,
+  "parks": "124/0/0",
+  "admission": "42/0/10/0",
+  "pytest": "1152/5/26"
+ },
+ "final": {
+  "commit": "see git log",
+  "halo_code": "1538383/1770166",
+  "functions": "7403/7574",
+  "stable_exact": 7560,
+  "parks": "109/0/0",
+  "admission": "48/0/10/0",
+  "pytest": "1152/5/26",
+  "stable_regressions": 0
+ },
+ "waves": [
+  {
+   "wave": 1,
+   "units": 24,
+   "agents": 24,
+   "subagent_tokens": 7728655
+  },
+  {
+   "wave": 2,
+   "units": 18,
+   "agents": 18,
+   "subagent_tokens": 3963417
+  },
+  {
+   "wave": 3,
+   "units": 22,
+   "agents": 22,
+   "subagent_tokens": 4561043
+  },
+  {
+   "wave": "harvest",
+   "detail": "local gate over 119 finished-work files + 1,032 bounded probe variants from Lane A/B/C/D scratch; 34 + 104 leads, all re-verified by hand"
+  }
+ ],
+ "fuzzy_leads_not_landed": [
+  {
+   "unit": "source/camera/observer",
+   "function": "_observer_update_positions",
+   "note": "size/relocs/frame equal, 6 insns differ; not landed: changes pointers passed to observer_apply_rotational_displacement and drops a csmemset - needs semantic review",
+   "file": "scratch/lane/w/camera__observer/candidate.c"
+  },
+  {
+   "unit": "source/main/main",
+   "function": "_main_update_time/_main_frame_rate_debug",
+   "note": "3 blocks / 5 rows left; not landed: >= -> > change and dropped requested_rate assignment need review",
+   "file": "scratch/lane/w/main__main/candidate.c"
+  },
+  {
+   "unit": "source/objects/widgets/flags",
+   "function": "_flag_update",
+   "note": "390/390 insns, slot displacements only",
+   "file": "scratch/lane/w/objects__widgets__flags/candidate.c"
+  },
+  {
+   "unit": "source/interface/ui_widget",
+   "function": "_ui_check_for_pause_game",
+   "note": "uses ui_widgets_active(); control flow reorders pause handling - review before landing",
+   "file": "scratch/lane/w/interface__ui_widget/candidate.c"
+  },
+  {
+   "unit": "source/ai/ai_communication",
+   "function": "_ai_communication_event",
+   "note": "74 regions (was 97); needs allegiance_incident_type enum moved into game_allegiance.h (header sweep)",
+   "file": "scratch/lane/w/ai__ai_communication/candidate.c"
+  }
+ ],
+ "tools": {
+  "scratch/lane/provider_link.py": "selected-provider duplicate-definition link check (VC7 Link.Exe, both orders, --baseline for new surplus only)",
+  "scratch/lane/comdat_selection.py": "COMDAT selection census of helper providers (NODUP vs ANY)",
+  "scratch/lane/harvest.py": "re-gate other lanes scratch candidates against the current tree",
+  "scratch/lane/batch_gate.py": "per-batch gate: ninja, stable diff, parks, admission, fake/cast/provider-link per unit, pytest, diff --check",
+  "scratch/lane/make_packets.py": "per-unit worker packets",
+  "scratch/lane/manifest.py": "this manifest",
+  "scratch/lane/splice.py": "revert named functions to production"
+ }
 }
