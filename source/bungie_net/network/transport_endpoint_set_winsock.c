@@ -497,6 +497,7 @@ short poll_endpoint_set(
 	struct transport_endpoint_set *set,
 	word timeout)
 {
+	short result = _transport_error_none;
 	struct timeval timeout_value;
 	fd_set readable_sockets;
 	long endpoint_index = 0;
@@ -528,26 +529,20 @@ short poll_endpoint_set(
 		}
 
 		FD_ZERO(&set->sockets);
-		for (endpoint_index = 0;
-			endpoint_index <= set->last_endpoint_index;
-			endpoint_index++)
+		while (endpoint_index <= set->last_endpoint_index)
 		{
-			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
-
-			FD_SET(endpoint->socket, &set->sockets);
-			SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, FALSE);
+			FD_SET(set->ep_array[endpoint_index]->socket, &set->sockets);
+			SET_FLAG(set->ep_array[endpoint_index]->flags, _transport_endpoint_readable_bit, FALSE);
+			endpoint_index++;
 		}
 		set->needs_compaction = FALSE;
 	}
 	else
 	{
-		for (endpoint_index = 0;
-			endpoint_index <= set->last_endpoint_index;
-			endpoint_index++)
+		while (endpoint_index <= set->last_endpoint_index)
 		{
-			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
-
-			SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, FALSE);
+			SET_FLAG(set->ep_array[endpoint_index]->flags, _transport_endpoint_readable_bit, FALSE);
+			endpoint_index++;
 		}
 	}
 
@@ -564,31 +559,34 @@ short poll_endpoint_set(
 			endpoint_index <= set->last_endpoint_index;
 			endpoint_index++)
 		{
-			struct transport_endpoint *endpoint = set->ep_array[endpoint_index];
-
-			if (endpoint->socket == INVALID_SOCKET)
+			if (set->ep_array[endpoint_index]->socket == INVALID_SOCKET)
 			{
-				return _transport_error_bad_endpoint;
+				result = _transport_error_bad_endpoint;
+				break;
 			}
-			if (FD_ISSET(endpoint->socket, &readable_sockets))
+			if (FD_ISSET(set->ep_array[endpoint_index]->socket, &readable_sockets))
 			{
-				SET_FLAG(endpoint->flags, _transport_endpoint_readable_bit, TRUE);
+				SET_FLAG(set->ep_array[endpoint_index]->flags, _transport_endpoint_readable_bit, TRUE);
 			}
 		}
-		return _transport_error_none;
 	}
-	if (select_result < 0)
+	else if (select_result < 0)
 	{
 		winsock_error_to_string(WSAGetLastError());
-		return _transport_error_poll_error;
+		result = _transport_error_poll_error;
 	}
-	return _transport_result_poll_timeout;
+	else
+	{
+		result = _transport_result_poll_timeout;
+	}
+	return result;
 }
 
 short add_endpoint_to_set(
 	struct transport_endpoint *ep,
 	struct transport_endpoint_set *set)
 {
+	short result = _transport_error_none;
 	long endpoint_index;
 
 	match_assert(
@@ -601,16 +599,26 @@ short add_endpoint_to_set(
 		transport_initialized);
 
 	endpoint_index = transport_endpoint_set_get_next_index(set);
-	if (endpoint_index < 0)
+	if (endpoint_index >= 0)
 	{
-		return _transport_error_endpoint_set_full;
+		set->ep_array[endpoint_index] = ep;
+		/* the listening test with two identical FD_SET arms is original: January and the first-party debug build both have it */
+		if (TEST_FLAG(ep->flags, _transport_endpoint_listening_bit))
+		{
+			FD_SET(set->ep_array[endpoint_index]->socket, &set->sockets);
+		}
+		else
+		{
+			FD_SET(set->ep_array[endpoint_index]->socket, &set->sockets);
+		}
+		set->last_endpoint_index++;
+		SET_FLAG(ep->flags, _transport_endpoint_in_set_bit, TRUE);
 	}
-
-	set->ep_array[endpoint_index] = ep;
-	FD_SET(ep->socket, &set->sockets);
-	set->last_endpoint_index++;
-	SET_FLAG(ep->flags, _transport_endpoint_in_set_bit, TRUE);
-	return _transport_error_none;
+	else
+	{
+		result = _transport_error_endpoint_set_full;
+	}
+	return result;
 }
 
 short remove_endpoint_from_set(

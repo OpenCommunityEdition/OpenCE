@@ -67,28 +67,17 @@ static int compare_ulongs_descending(
 
 	return left_value > right_value ? -1 : 0;
 }
-/* NonMatching foundation: this source preserves the January count model,
- * including an in-bounds trailing slot for prime 2. */
+
 unsigned long *primegen(
 	unsigned long maximum,
 	unsigned long *num_primes)
 {
-	unsigned long *primes;
-	unsigned long odd_count;
-	unsigned long total_count;
-	unsigned long sqrt_max;
+	unsigned long *primes = NULL;
+	unsigned long odd_count = (maximum & 1) ? (maximum >> 1) : ((maximum >> 1) - 1);
+	unsigned long scan_count = 0;
 	unsigned long i;
-	unsigned long scan_count;
-	unsigned long sieve_count;
 	unsigned long j;
-	unsigned long k;
-	unsigned long m;
-
-	odd_count = maximum >> 1;
-	if (!(maximum & 1))
-		odd_count--;
-	i = 0;
-	scan_count = 0;
+	unsigned long sqrt_max;
 
 	match_assert("c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c", 61, num_primes);
 
@@ -99,8 +88,7 @@ unsigned long *primegen(
 		return NULL;
 	}
 
-	total_count = odd_count + 1;
-	*num_primes = total_count;
+	*num_primes = odd_count + 1;
 	primes = match_malloc(
 		"c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c",
 		71,
@@ -108,49 +96,50 @@ unsigned long *primegen(
 
 	if (primes)
 	{
-		sqrt_max = (unsigned long)sqrt((double)maximum);
-		k = 3;
+		i = 0;
+		j = 3;
+		sqrt_max = (unsigned long)sqrt(maximum);
 
 		while (i < odd_count)
 		{
-			primes[i] = k;
-			k += 2;
+			primes[i] = j;
+			i++;
+			j += 2;
+		}
+
+		while (scan_count < odd_count)
+		{
+			if (primes[scan_count] > sqrt_max)
+				break;
+
+			scan_count++;
+		}
+
+		i = 0;
+		while (i < scan_count)
+		{
+			if (primes[i])
+			{
+				j = i + 1;
+				while (j < odd_count)
+				{
+					if (primes[j] && !(primes[j] % primes[i]))
+					{
+						primes[j] = 0;
+						(*num_primes)--;
+					}
+
+					j++;
+				}
+			}
+
 			i++;
 		}
 
-		while (scan_count < odd_count && primes[scan_count] <= sqrt_max)
-			scan_count++;
-
-		if (scan_count)
-		{
-			m = 1;
-			j = 0;
-			sieve_count = scan_count;
-
-			while (sieve_count)
-			{
-				if (primes[j])
-				{
-					for (k = m; k < odd_count; k++)
-					{
-						if (primes[k] && !(primes[k] % primes[j]))
-						{
-							primes[k] = 0;
-							(*num_primes)--;
-						}
-					}
-				}
-
-				m++;
-				j++;
-				sieve_count--;
-			}
-		}
-
 		primes[odd_count] = 2;
-		qsort(primes, total_count, sizeof(*primes), compare_ulongs_descending);
+		qsort(primes, odd_count + 1, sizeof(*primes), compare_ulongs_descending);
 
-		if (*num_primes < total_count)
+		if (*num_primes < odd_count + 1)
 		{
 			primes = match_realloc(
 				"c:\\halo\\SOURCE\\bungie_net\\common\\prime_numbers.c",

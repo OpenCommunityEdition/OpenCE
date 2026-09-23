@@ -340,10 +340,9 @@ void stack_walk_with_context(
 
 		for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
 		{
-			unsigned long routine_address = routine_addresses[frame_number];
+			unsigned long routine_address = routine_addresses[frame_number] + *(long *)(routine_addresses[frame_number] - sizeof(long));
 			char const *symbol_name;
 
-			routine_address += *(long *)(routine_address - sizeof(long));
 			if (stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names)
 			{
 				symbol_name = symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table);
@@ -360,6 +359,10 @@ void stack_walk_with_context(
 	if (context_pointer)
 	{
 		unsigned long instruction = *(unsigned long *)context_pointer->Eip;
+		unsigned long instruction_byte0 = instruction & 0xFF;
+		unsigned long instruction_byte1 = (instruction >> 8) & 0xFF;
+		unsigned long instruction_byte2 = (instruction >> 16) & 0xFF;
+		unsigned long instruction_byte3 = (instruction >> 24) & 0xFF;
 		char const *symbol_name;
 
 		error(_error_silent, "EAX: 0x%08lX", context_pointer->Eax);
@@ -384,32 +387,34 @@ void stack_walk_with_context(
 			_error_silent,
 			"EIP: 0x%08lX, %02lX %02lX %02lX %02lX %s",
 			context_pointer->Eip,
-			instruction & 0xFF,
-			(instruction >> 8) & 0xFF,
-			(instruction >> 16) & 0xFF,
-			instruction >> 24,
+			instruction_byte0,
+			instruction_byte1,
+			instruction_byte2,
+			instruction_byte3,
 			symbol_name);
 	}
 
 	for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
 	{
-		unsigned long routine_address = routine_addresses[frame_number];
-
-		if (error_stream)
+		if (!error_stream)
 		{
-			char const *symbol_name = stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
-				? symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table)
-				: "?????";
-
-			fprintf(error_stream, "%08lX %s\n", routine_address, symbol_name);
+			error(
+				_error_silent,
+				"%08lX %s",
+				routine_addresses[frame_number],
+				stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
+					? symbol_name_from_address(routine_addresses[frame_number], &stack_walk_globals.symbol_table)
+					: "?????");
 		}
 		else
 		{
-			char const *symbol_name = stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
-				? symbol_name_from_address(routine_address, &stack_walk_globals.symbol_table)
-				: "?????";
-
-			error(_error_silent, "%08lX %s", routine_address, symbol_name);
+			fprintf(
+				error_stream,
+				"%08lX %s\n",
+				routine_addresses[frame_number],
+				stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names
+					? symbol_name_from_address(routine_addresses[frame_number], &stack_walk_globals.symbol_table)
+					: "?????");
 		}
 	}
 
@@ -739,12 +744,7 @@ static int symbol_sort_proc(
 static boolean is_valid_ebp(
 	void)
 {
-	if ((walk_up_current_frame & (sizeof(unsigned long) - 1)) != 0 || walk_up_current_frame < (unsigned long)old_ebp)
-	{
-		return FALSE;
-	}
-
-	return TRUE;
+	return 0==(walk_up_current_frame & (sizeof(unsigned long) - 1)) && walk_up_current_frame >= (unsigned long)old_ebp;
 }
 
 static unsigned long walk_up(
@@ -754,10 +754,8 @@ static unsigned long walk_up(
 
 	if (walk_up_current_frame)
 	{
-		unsigned long *frame = (unsigned long *)walk_up_current_frame;
-
-		routine_address = frame[1];
-		walk_up_current_frame = frame[0];
+		routine_address = ((unsigned long *)walk_up_current_frame)[1];
+		walk_up_current_frame = ((unsigned long *)walk_up_current_frame)[0];
 		if (!is_valid_ebp())
 		{
 			walk_up_current_frame = 0;
@@ -790,17 +788,18 @@ static void walk_stack_context(
 		walk_up_current_frame = 0;
 	}
 
-	for (level = 1; level < ignore_levels; level++)
+	if (ignore_levels)
 	{
-		walk_up();
+		while (--ignore_levels)
+		{
+			walk_up();
+		}
 	}
 
 	for (level = 0; level < number_of_levels; level++)
 	{
-		unsigned long routine_address = walk_up();
-
-		routine_addresses[level] = routine_address;
-		if (!routine_address)
+		routine_addresses[level] = walk_up();
+		if (!routine_addresses[level])
 		{
 			break;
 		}
@@ -826,17 +825,18 @@ static void walk_stack(
 		walk_up_current_frame = 0;
 	}
 
-	for (level = 1; level < ignore_levels; level++)
+	if (ignore_levels)
 	{
-		walk_up();
+		while (--ignore_levels)
+		{
+			walk_up();
+		}
 	}
 
 	for (level = 0; level < number_of_levels; level++)
 	{
-		unsigned long routine_address = walk_up();
-
-		routine_addresses[level] = routine_address;
-		if (!routine_address)
+		routine_addresses[level] = walk_up();
+		if (!routine_addresses[level])
 		{
 			break;
 		}

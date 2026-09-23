@@ -1303,24 +1303,25 @@ static void compute_subframe_counts(
 {
 	long horizontal = 1;
 	long vertical = 1;
+	boolean split_horizontally = TRUE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\main\\main.c",
 		1308,
 		num_players>0);
-	if (num_players>1)
+	while (horizontal*vertical<num_players)
 	{
-		do
+		boolean add_column = split_horizontally ? horizontal<vertical : horizontal<=vertical;
+
+		if (add_column)
 		{
-			if (horizontal<vertical)
-				horizontal++;
-			else
-			{
-				horizontal = 1;
-				vertical++;
-			}
+			horizontal++;
 		}
-		while (vertical*horizontal<num_players);
+		else
+		{
+			horizontal = 1;
+			vertical++;
+		}
 	}
 
 	*horizontal_count = horizontal;
@@ -2896,7 +2897,7 @@ void main_game_render(
 	struct observer_result const *observer;
 	long player_window_count;
 	long window_count;
-	long last_local_player_index;
+	short last_local_player_index;
 
 	lock_global_random_seed();
 	collision_log_continue_period(TRUE);
@@ -2904,12 +2905,7 @@ void main_game_render(
 	force_single_screen = game_engine_force_single_screen();
 	last_local_player_index = NONE;
 
-	if (local_player_count() < 1)
-		window_count = 1;
-	else if (local_player_count() > MAXIMUM_LOCAL_PLAYERS)
-		window_count = MAXIMUM_LOCAL_PLAYERS;
-	else
-		window_count = local_player_count();
+	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
 	player_window_count = window_count;
 	if (force_single_screen || cinematic_in_progress())
 	{
@@ -2927,27 +2923,31 @@ void main_game_render(
 			player_window_count,
 			&window->rasterizer_camera.viewport_bounds,
 			&window->rasterizer_camera.window_bounds);
-		if (force_single_screen || window_index >= window_count)
+		if (force_single_screen)
 		{
 			window->local_player_index = NONE;
 		}
+		else if (window_index < window_count)
+		{
+			if (!rasterizer_debug_options.force_all_player_views_to_default_player ||
+				last_local_player_index == NONE)
+			{
+				if (game_connection() == _game_connection_film_playback)
+				{
+					last_local_player_index = 0;
+				}
+				else
+				{
+					last_local_player_index = local_player_get_next(last_local_player_index);
+				}
+			}
+
+			window->local_player_index = last_local_player_index;
+			observer = observer_get_camera(window->local_player_index);
+		}
 		else
 		{
-			if (rasterizer_debug_options.force_all_player_views_to_default_player &&
-				(short)last_local_player_index != NONE)
-			{
-				goto assign_player_camera;
-			}
-			if (main_globals.connection == _game_connection_film_playback)
-			{
-				last_local_player_index = 0;
-				goto assign_player_camera;
-			}
-			last_local_player_index = local_player_get_next(last_local_player_index);
-
-		assign_player_camera:
-			window->local_player_index = (short)last_local_player_index;
-			observer = observer_get_camera(last_local_player_index);
+			window->local_player_index = NONE;
 		}
 
 		set_window_camera_values(window, observer);

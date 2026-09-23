@@ -2,25 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/main/main",
-      "function": "_main_game_render",
-      "class": "unclassified",
-      "evidence": "Best complete natural render-dispatch reconstruction retained after removing the inadmissible _ReadWriteBarrier experiment. It is readable ordinary C with authentic subsystem calls and no barrier, volatile, pragma, assembly, or fake dependency. The candidate is 464 versus 448 target padded bytes with 29 versus 28 relocations and scores 94.666664% objdiff. This is zero-credit fuzzy source. Reopen only with authoritative January source or a natural same-compiler donor explaining the extra call/relocation and schedule. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 28,
-          "normalized_sha256": "049052197c4b50b38b734ed982558cd27d4c999e6ee05897e02c99804c696a2b"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 29,
-          "normalized_sha256": "311d0f3787d9da53e6141d95ea4a0f60d8c0efd8bc82b65d8ee1b16b7f5a1952"
-        },
-        "objdiff_percent": 94.666664
-      }
-    },
-    {
       "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum",
       "class": "unclassified",
@@ -293,22 +274,11 @@
       "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
       "function": "_poll_endpoint_set",
       "class": "unclassified",
-      "evidence": "Complete natural January endpoint-set poll reconstructed with its real typed comparator: compact holes, rebuild stock XDK fd_set, clear cached readability, select with word timeout times MILLISECONDS_PER_SECOND, and mark ready endpoints. Correct owner headers provide the endpoint layout and Winsock error API. January's negative select-result branch is preserved without manufacturing its redundant subsequent comparison; its unguarded all-NULL tail compaction is target-proven and explicitly documented as an original defect, not claimed safe. Established short return ABI is retained. Target560B/16relocs versus candidate512B/16; natural allocation/control-flow differences remain. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. No compiler controls, false types, fake branches or spelling search. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
+      "evidence": "Complete natural January endpoint-set poll reconstructed with its real typed comparator: compact holes, rebuild stock XDK fd_set, clear cached readability, select with word timeout times MILLISECONDS_PER_SECOND, and mark ready endpoints. Correct owner headers provide the endpoint layout and Winsock error API. January's negative select-result branch is preserved without manufacturing its redundant subsequent comparison; its unguarded all-NULL tail compaction is target-proven and explicitly documented as an original defect, not claimed safe. Established short return ABI is retained. Target560B/16relocs versus candidate512B/16; natural allocation/control-flow differences remain. All inherited exact owners and nonce park unchanged, no extra code/COMMON/no point_from_line3d. No compiler controls, false types, fake branches or spelling search. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md. Re-measured 2026-09-23 (Lane D refresh): single-exit result local and per-use set->ep_array[endpoint_index] reloads (the shape January uses in add_endpoint_to_set) bring the body to the target's 560-byte size; the remaining difference is the SOCKET_ERROR tail compare (13 spellings tried, none exact). No /Od body exists for this Xbox path.",
       "measurements": {
         "target": {"size": 560, "relocation_count": 16, "normalized_sha256": "4a0375522c8a3ff103c5dad92342325f3a41658e90dead5cdcd60d92a8f79f4b"},
-        "base": {"size": 512, "relocation_count": 16, "normalized_sha256": "c605635cb9ce7070a69e80e0b8943c998279fb64fab139b41bdeb8cecb2572a2"},
-        "objdiff_percent": 72.26966
-      }
-    },
-    {
-      "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
-      "function": "_add_endpoint_to_set",
-      "class": "unclassified",
-      "evidence": "Natural typed add caller reconstructed with the genuine private next-index helper, stock XDK FD_SET and semantic SET_FLAG. The helper is newly strict at56 meaningful/64 padded bytes and preserves January's documented one-past-capacity defect. January duplicates instruction-identical FD_SET blocks behind a listening-bit test; the retained source deliberately uses one natural FD_SET rather than an inert branch invented for matching. Target336B/13relocs versus candidate240B/13. Established short return ABI is retained; full-EAX materialization alone does not prove a different C type. All12 inherited exacts and nonce park unchanged, no extra code/COMMON/no point_from_line3d, no compiler controls or fake dependency. Reopen only for authentic source/type/compiler-context evidence. See docs/object_matching_logs/transport_endpoint_set_winsock_obj_set_operations_cluster_20260904.md.",
-      "measurements": {
-        "target": {"size": 336, "relocation_count": 13, "normalized_sha256": "4e3ad84da528b844823d85558c2b994dd8680fbc92b1a456f1f1147a44d91807"},
-        "base": {"size": 240, "relocation_count": 13, "normalized_sha256": "d7e631f5948455759368b6908fb1ddf9f24fe91fc234521cb6f62a1686a2e091"},
-        "objdiff_percent": 55.7094
+        "base": {"size": 560, "relocation_count": 16, "normalized_sha256": "9d3107ab7fad24e0717363451d4934edf5df22eb6cd360f0a3b7ab1b1f45ed61"},
+        "objdiff_percent": 98.53933
       }
     },
     {
@@ -404,25 +374,6 @@
           "normalized_sha256": "719469460357f06cde7f452e16e02ba79ac639e85e0fad244f8e01cb7bd5efcd"
         },
         "objdiff_percent": 99.96377
-      }
-    },
-    {
-      "unit": "source/bungie_net/common/prime_numbers",
-      "function": "_primegen",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the source-credibility rule after the E1-E27 ordinary-C corpus, the Stian and Pastudan sieve donors, the January symbol atlas, compatible VC7 builds, and the later donor-lifetime packet were exhausted. The retained coherent sieve has the target 352-byte padded envelope, all 12 relocation destinations/types in order, three strict-exact siblings, and all 72 owned rdata bytes exact. January keeps odd_count in EBX and num_primes in ESI while assigning three distinct stack lifetimes; the available compiler instead emits a two-slot frame for the natural source. A pre-allocation k initialization improves the score to 91.14815% but creates the third slot by a different, explicitly non-original lifetime route, so it is rejected. A separate statement move can manufacture exact bytes but has no credible source rationale and is also rejected. The production source therefore remains the simplest donor-consistent C. Reopen only for authoritative local-variable provenance, an original-source donor with the same simultaneous allocation, or a verified compatible compiler/QFE that naturally emits it.",
-      "measurements": {
-        "target": {
-          "size": 352,
-          "relocation_count": 12,
-          "normalized_sha256": "2428a7a00be6ab6f96efe9dda273d824a0cc9829aeeb2dd5f4c9b35b2b7992b1"
-        },
-        "base": {
-          "size": 352,
-          "relocation_count": 12,
-          "normalized_sha256": "66e1c7859e354a6bf7caccb70b260e99d516be6a94837571ecc60dd5b43edda6"
-        },
-        "objdiff_percent": 81.614815
       }
     },
     {
@@ -684,25 +635,6 @@
           "normalized_sha256": "8983acf2b5bc6570cede768472facdfc4bd6d012eb30038ed0d53f04341fc3a5"
         },
         "objdiff_percent": 94.8
-      }
-    },
-    {
-      "unit": "source/main/main",
-      "function": "_compute_subframe_counts",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the HCEA-authenticated subframe-count algorithm together with its authentic compute_window_bounds caller and January's line-1308 num_players>0 assertion. The real caller makes VC7 retain the helper naturally and recover January's private convention: num_players arrives in EBX and only the two result pointers are stack arguments. Target and candidate have the same 112-byte padded envelope and all four relocation identities at the same addresses. The residual is confined to one loop-termination spelling: January materializes vertical*horizontal<num_players with setl/test/je, while the direct ordinary-C predicate emits cmp/jge. Bounded boolean-temporary, predicate-polarity, while/do-while, and product-local spellings did not recover that instruction choice without degrading the otherwise exact body. No public prototype, forced linkage, volatile access, compiler barrier, assembly, fake dependency, inert expression, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the materialized boolean.",
-      "measurements": {
-        "target": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "d5b5047a8d0a783c6ec4e08a1f96d2df2346801a8a8e8364f8faa50ab6e139de"
-        },
-        "base": {
-          "size": 112,
-          "relocation_count": 4,
-          "normalized_sha256": "edd705dfff90e3b299dca140e8b7558db363d700e2a276ef89b21011be641136"
-        },
-        "objdiff_percent": 94.347824
       }
     },
     {
@@ -1083,25 +1015,6 @@
           "normalized_sha256": "ad3d0d63e2c82c1ee6789c401e3062340c96831eb3dbb7e9f63845da47aafe8b"
         },
         "objdiff_percent": 51.18261
-      }
-    },
-    {
-      "unit": "source/text/draw_string",
-      "function": "_parse_string",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the full HCEA narrow-string parser with January's typed result codes, control escapes, style/color/justification updates, word-boundary handling, localization lookup, and assertion topology. Target and candidate share the 624-byte padded envelope; January has 30 relocations, candidate 29, and objdiff reports 27.615385 percent. Short result comparisons, continue-based escape handling, and alternate style-switch forms were measured; the retained form best preserves the independent-source semantics while the remaining gap is a whole-function CFG/allocation choice. The fail-closed classifier returns UNKNOWN with class unclassified and confidence NONE. No volatile/register forcing, barrier, pragma, assembly, raw offset, representation punning, fake dependency, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler parser donor. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the body was re-measured as the coupled prerequisite of the exact draw_string / draw_string_partial / draw_unicode_string reopens: January stack ABI, result!=NONE assert and result switch, long next_character width (624 bytes, 30 relocations), still fuzzy. See docs/object_matching_logs/draw_string_obj_opus5_100k_waveD_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 30,
-          "normalized_sha256": "f80225b7f49eeafe4a68d6094b4ec238747e5af312947588c11ab8529dfcb304"
-        },
-        "base": {
-          "size": 624,
-          "relocation_count": 30,
-          "normalized_sha256": "b68bfa11d9b3797e6fe3aad3556d2abf6544eebbd2e58b024609a707c8a8a7a2"
-        },
-        "objdiff_percent": 80.61539
       }
     },
     {
@@ -1672,25 +1585,6 @@
           "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0"
         },
         "objdiff_percent": 61.451614
-      }
-    },
-    {
-      "unit": "source/bink/bink_playback",
-      "function": "_bink_draw_frame",
-      "class": "unclassified",
-      "evidence": "Complete typed best-known reconstruction retained with zero exact credit. It restores January's texture quad, debug timing text, periodic Bink summary collection, and skipped-frame/blit diagnostics using the Bink 1.0p ABI and corroborating HaloCEA semantics. Target and candidate share the 912-byte padded envelope; January has 59 relocations and canonical has 61, with the remaining difference concentrated in screen-bound load scheduling and an eight-byte stack-frame delta. The target-static owner is modeled as a static C definition. No raw-address replay, opcode transcription, compiler steering, fake dependency, undefined behavior, or nonsensical branch is retained. The unresolved `debug_bink` owner remains a plainly documented external declaration until its proper header is identified. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 912,
-          "relocation_count": 59,
-          "normalized_sha256": "24aa7c5023629b6b863f6028dc0f1d55396a2083472edfd6e45e48866e726910"
-        },
-        "base": {
-          "size": 912,
-          "relocation_count": 61,
-          "normalized_sha256": "54104cacd763706fac4823bab62bd97ad1a20ecfb838239ad87e3c9ea3cb48d9"
-        },
-        "objdiff_percent": 79.409256
       }
     },
     {

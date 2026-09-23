@@ -213,8 +213,8 @@ struct parse_string_state
 /* ---------- prototypes */
 
 static struct font_header *styled_font_get(
-	short style,
-	long font_index);
+	long font_index,
+	short style);
 static void parse_string_new(
 	struct parse_string_state *state,
 	char const *string,
@@ -602,8 +602,8 @@ static void bitmap_draw_character(
 }
 
 static struct font_header *styled_font_get(
-	short style,
-	long font_index)
+	long font_index,
+	short style)
 {
 	long styled_font_index;
 
@@ -646,7 +646,7 @@ static void parse_string_new(
 	packed_color = (packed_color << 8) | (long)(color->green * 255.f);
 	packed_color = (packed_color << 8) | (long)(color->blue * 255.f);
 	state->color = packed_color;
-	state->font_header = styled_font_get(style, font_index);
+	state->font_header = styled_font_get(font_index, style);
 
 	return;
 }
@@ -702,8 +702,8 @@ static short parse_string(
 					char *cannot_end_words = string_list_get_string(draw_string_globals.localization_string_list_index, _string_index_cannot_end_words);
 					char *cannot_begin_words = string_list_get_string(draw_string_globals.localization_string_list_index, _string_index_cannot_begin_words);
 
-					if (((!(character & 0xFF00) && character_in_pattern(character, can_end_words)) ||
-						((character & 0xFF00) && !character_in_pattern(character, cannot_end_words))) &&
+					if (((character & 0xFF00) || character_in_pattern(character, can_end_words)) &&
+						(!(character & 0xFF00) || !character_in_pattern(character, cannot_end_words)) &&
 						!character_in_pattern(next_character, cannot_begin_words))
 					{
 						result = _parsed_end_of_word;
@@ -718,7 +718,7 @@ static short parse_string(
 			break;
 
 		case _parsed_style_change:
-			state->font_header = styled_font_get(state->style, state->base_font_index);
+			state->font_header = styled_font_get(state->base_font_index, state->style);
 			break;
 		}
 	}
@@ -1388,8 +1388,8 @@ void draw_string_compute_bounds(
 	draw_string_globals.text_bounds.x1 = SHORT_MIN;
 
 	draw_string_globals.last_font_header = styled_font_get(
-		draw_string_globals.style,
-		draw_string_globals.font_index);
+		draw_string_globals.font_index,
+		draw_string_globals.style);
 	draw_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
 
 	cursor_bounds->x0 = cursor.x;
@@ -1421,8 +1421,8 @@ void draw_unicode_string_compute_bounds(
 	draw_string_globals.text_bounds.x1 = SHORT_MIN;
 
 	draw_string_globals.last_font_header = styled_font_get(
-		draw_string_globals.style,
-		draw_string_globals.font_index);
+		draw_string_globals.font_index,
+		draw_string_globals.style);
 	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
 
 	cursor_bounds->x0 = cursor.x;
