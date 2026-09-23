@@ -985,6 +985,8 @@ void structure_get_planar_fog(
 				fog->runtime_flags,
 				_render_fog_runtime_screen_use_sky_interpolator_bit,
 				TRUE);
+			fog->fog_definition_flags = definition->flags;
+			fog->screen = &definition->screen;
 		}
 		else
 		{
@@ -1009,7 +1011,7 @@ void structure_get_planar_fog(
 			if (TEST_FLAG((word)cluster->fog_reference, SHORT_BITS - 1))
 			{
 				real offset;
-				real_vector3d offset_vector;
+				real_vector3d vector_offset;
 
 				TAG_BLOCK_GET_ELEMENT(
 					&structure->fog_planes,
@@ -1021,15 +1023,13 @@ void structure_get_planar_fog(
 				offset = definition->animation_distance * 0.0f;
 
 				fog->plane.d += offset;
-				offset_vector.i = fog->plane.n.i * offset;
-				offset_vector.j = fog->plane.n.j * offset;
-				offset_vector.k = fog->plane.n.k * offset;
-				structure_render_set_fog_offset(&offset_vector);
+				scale_vector3d(&fog->plane.n, offset, &vector_offset);
+				structure_render_set_fog_offset(&vector_offset);
 			}
-		}
 
-		fog->fog_definition_flags = definition->flags;
-		fog->screen = &definition->screen;
+			fog->fog_definition_flags = definition->flags;
+			fog->screen = &definition->screen;
+		}
 	}
 
 	return;

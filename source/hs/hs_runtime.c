@@ -2642,8 +2642,15 @@ static void hs_global_reconcile_read(
 
 	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
 	{
-		global = datum_get(hs_global_data,
-			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+		long global_index;
+
+		/* the general external/internal index test, repeated inside the external arm, is original (the debug build keeps it) */
+		if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator);
+		else
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator)+
+				hs_external_global_count;
+		global = datum_get(hs_global_data, global_index);
 		external = hs_global_external_get(
 			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
 
@@ -2749,11 +2756,6 @@ static void hs_global_reconcile_read(
 				? *(long *)external->address
 				: _hs_type_sound_default;
 			break;
-		case _hs_type_looping_sound:
-			global->value.long_integer = external->address
-				? *(long *)external->address
-				: _hs_type_looping_sound_default;
-			break;
 		case _hs_type_effect:
 			global->value.long_integer = external->address
 				? *(long *)external->address
@@ -2763,6 +2765,11 @@ static void hs_global_reconcile_read(
 			global->value.long_integer = external->address
 				? *(long *)external->address
 				: _hs_type_damage_default;
+			break;
+		case _hs_type_looping_sound:
+			global->value.long_integer = external->address
+				? *(long *)external->address
+				: _hs_type_looping_sound_default;
 			break;
 		case _hs_type_animation_graph:
 			global->value.long_integer = external->address
@@ -2863,8 +2870,15 @@ static void hs_global_reconcile_write(
 
 	if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
 	{
-		global = datum_get(hs_global_data,
-			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
+		long global_index;
+
+		/* the general external/internal index test, repeated inside the external arm, is original (the debug build keeps it) */
+		if (HS_GLOBAL_DESIGNATOR_IS_EXTERNAL(global_designator))
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator);
+		else
+			global_index = HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator)+
+				hs_external_global_count;
+		global = datum_get(hs_global_data, global_index);
 		external = hs_global_external_get(
 			HS_GLOBAL_DESIGNATOR_TO_INDEX(global_designator));
 

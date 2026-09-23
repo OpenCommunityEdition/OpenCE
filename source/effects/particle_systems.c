@@ -802,16 +802,26 @@ void particle_system_update_particle_default(
 		&type_definition->particle_states,
 		particle->state_index,
 		struct particle_system_type_particle_state);
+	struct particle_system_type_particle_state_interpolated_variables variables;
+	real *variable;
+	real const *type_variable;
+	real const *multiplier;
+	real const *state_variable;
 	struct point_physics_definition *physics;
 	struct point_physics_definition interpolated_physics;
-	real radius;
 	unsigned long collision_flags;
 
 	if (particle->transition_state_index == NONE)
 	{
-		radius = state_definition->variables.radius*
-			type->variables.particle_state_multipliers.radius*
-			type_definition->variables.radius;
+		for (variable = &variables.radius,
+				type_variable = &type_definition->variables.radius,
+				multiplier = &type->variables.particle_state_multipliers.radius,
+				state_variable = &state_definition->variables.radius;
+			variable < &variables.radius + sizeof(variables)/sizeof(real);
+			variable++, type_variable++, multiplier++, state_variable++)
+		{
+			*variable = *type_variable * *multiplier * *state_variable;
+		}
 		physics = point_physics_definition_get(state_definition->point_physics.index);
 	}
 	else
@@ -820,7 +830,9 @@ void particle_system_update_particle_default(
 			&type_definition->particle_states,
 			particle->transition_state_index,
 			struct particle_system_type_particle_state);
+		real const *transition_state_variable;
 		real t = particle->time_left_in_state/particle->state_length;
+		real inverse_t;
 
 		if (t < 0.0f)
 		{
@@ -831,10 +843,17 @@ void particle_system_update_particle_default(
 			t = 1.0f;
 		}
 
-		radius = (state_definition->variables.radius*t +
-			transition_state_definition->variables.radius*(1.0f - t))*
-			type->variables.particle_state_multipliers.radius*
-			type_definition->variables.radius;
+		inverse_t = 1.0f - t;
+		for (variable = &variables.radius,
+				type_variable = &type_definition->variables.radius,
+				multiplier = &type->variables.particle_state_multipliers.radius,
+				state_variable = &state_definition->variables.radius,
+				transition_state_variable = &transition_state_definition->variables.radius;
+			variable < &variables.radius + sizeof(variables)/sizeof(real);
+			variable++, type_variable++, multiplier++, state_variable++, transition_state_variable++)
+		{
+			*variable = *type_variable * *multiplier * (*state_variable*t + *transition_state_variable*inverse_t);
+		}
 		physics = point_physics_definition_interpolate(
 			point_physics_definition_get(state_definition->point_physics.index),
 			point_physics_definition_get(transition_state_definition->point_physics.index),
@@ -852,7 +871,7 @@ void particle_system_update_particle_default(
 		NULL,
 		NULL,
 		NULL,
-		radius,
+		variables.radius,
 		delta_time);
 
 	if ((TEST_FLAG(collision_flags, _point_physics_in_air_bit) &&
@@ -942,15 +961,18 @@ void particle_system_new_particle_jet(
 		&type_definition->physics_constants,
 		_jet_type_definition_physics_constant_rotates_up,
 		struct particle_system_physics_constant)->k;
-	real spread_scale = spread_fraction*(velocity*seconds_per_tick);
-	real directed_scale = (1.0f - spread_fraction)*(velocity*seconds_per_tick);
-	real_vector3d random_direction;
+	real spread_scale;
+	real directed_scale;
+	real_vector3d spread;
 
-	local_random_direction3d(&random_direction);
+	velocity *= seconds_per_tick;
+	spread_scale = velocity*spread_fraction;
+	directed_scale = (1.0f - spread_fraction)*velocity;
+	local_random_direction3d(&spread);
 
-	particle->velocity.i = directed_scale*marker->matrix.forward.i + random_direction.i*spread_scale + system->velocity.i;
-	particle->velocity.j = directed_scale*marker->matrix.forward.j + random_direction.j*spread_scale + system->velocity.j;
-	particle->velocity.k = directed_scale*marker->matrix.forward.k + random_direction.k*spread_scale + system->velocity.k;
+	particle->velocity.i = directed_scale*marker->matrix.forward.i + spread.i*spread_scale + system->velocity.i;
+	particle->velocity.j = directed_scale*marker->matrix.forward.j + spread.j*spread_scale + system->velocity.j;
+	particle->velocity.k = directed_scale*marker->matrix.forward.k + spread.k*spread_scale + system->velocity.k;
 	particle->position = marker->matrix.position;
 
 	if (rotates_up)
@@ -1335,263 +1357,259 @@ static void particle_system_render(
 			type_index,
 			struct particle_system_type);
 		struct particle_type *type = &system->types[type_index];
-		short particle_index;
 
-		if (type->state_index == NONE ||
-			TEST_FLAG(type_definition->flags, _particle_system_type_disabled_bit))
+		if (type->state_index != NONE &&
+			!TEST_FLAG(type_definition->flags, _particle_system_type_disabled_bit))
 		{
-			continue;
-		}
+			short particle_index = (short)type->first_particle_index;
+			struct build_sprite_data sprite_data;
 
-		particle_index = (short)type->first_particle_index;
-		while (particle_index != NONE)
-		{
-			struct ps_particle_datum *particle = ps_particle_get(particle_index);
-
-			if (particle->valid && render_location_visible(&particle->location))
+			while (particle_index != NONE)
 			{
-				struct particle_system_type_particle_state *state_definition = TAG_BLOCK_GET_ELEMENT(
-					&type_definition->particle_states,
-					particle->state_index,
-					struct particle_system_type_particle_state);
-				struct shader_effect_definition const *transition_shader = NULL;
-				real_point3d view_position;
-				real_vector3d view_axis;
-				struct particle_system_type_particle_state *transition_state_definition;
-				real state_weight;
-				real transition_weight;
-				real scale;
-				real_argb_color interpolated_color;
-				struct bitmap_group *bitmap;
-				short sequence_index;
-				struct bitmap_group_sequence *sequence;
-				short sprite_index;
-				struct build_sprite_data sprite_data;
+				struct ps_particle_datum *particle = ps_particle_get(particle_index);
 
-				matrix4x3_transform_point(
-					&render.frustum.world_to_view,
-					&particle->position,
-					&view_position);
-				matrix4x3_transform_normal(
-					&render.frustum.world_to_view,
-					&particle->axis,
-					&view_axis);
-
-				if (particle->transition_state_index == NONE)
+				if (particle->valid && render_location_visible(&particle->location))
 				{
-					transition_state_definition = NULL;
-					scale = particle->randomized_variables.scale*
-						type->variables.particle_state_randomized_multipliers.scale;
-					interpolated_color.alpha = particle->randomized_variables.color.alpha*
-						type->variables.particle_state_randomized_multipliers.color.alpha;
-					interpolated_color.red = particle->randomized_variables.color.red*
-						type->variables.particle_state_randomized_multipliers.color.red;
-					interpolated_color.green = particle->randomized_variables.color.green*
-						type->variables.particle_state_randomized_multipliers.color.green;
-					interpolated_color.blue = particle->randomized_variables.color.blue*
-						type->variables.particle_state_randomized_multipliers.color.blue;
-					state_weight = 1.0f;
-					transition_weight = 0.0f;
-				}
-				else
-				{
-					struct shader_effect_definition const *shader = &state_definition->shader;
-
-					transition_state_definition = TAG_BLOCK_GET_ELEMENT(
+					real_point3d position_viewer_space;
+					real_vector3d axis_viewer_space;
+					real state_weight;
+					real transition_weight;
+					struct particle_system_type_particle_state *state_definition = TAG_BLOCK_GET_ELEMENT(
 						&type_definition->particle_states,
-						particle->transition_state_index,
+						particle->state_index,
 						struct particle_system_type_particle_state);
-					transition_shader = &transition_state_definition->shader;
-					state_weight = particle->time_left_in_state/particle->state_length;
-					if (state_weight < 0.0f)
-						state_weight = 0.0f;
-					else if (state_weight > 1.0f)
-						state_weight = 1.0f;
+					struct particle_system_type_particle_state *transition_state_definition;
+					real scale;
+					real_argb_color color;
+					short sprite_index;
+					struct shader_effect_definition const *shader = &state_definition->shader;
+					struct shader_effect_definition const *transition_shader = NULL;
+					struct bitmap_group *bitmap;
+					short sequence_index;
+					struct bitmap_group_sequence *sequence;
 
-					transition_weight = 1.0f - state_weight;
-					scale = (particle->transition_randomized_variables.scale*transition_weight +
-						particle->randomized_variables.scale*state_weight)*
-						type->variables.particle_state_randomized_multipliers.scale;
-					interpolated_color.alpha =
-						(particle->transition_randomized_variables.color.alpha*transition_weight +
-							particle->randomized_variables.color.alpha*state_weight)*
-						type->variables.particle_state_randomized_multipliers.color.alpha;
-					interpolated_color.red =
-						(particle->transition_randomized_variables.color.red*transition_weight +
-							particle->randomized_variables.color.red*state_weight)*
-						type->variables.particle_state_randomized_multipliers.color.red;
-					interpolated_color.green =
-						(particle->transition_randomized_variables.color.green*transition_weight +
-							particle->randomized_variables.color.green*state_weight)*
-						type->variables.particle_state_randomized_multipliers.color.green;
-					interpolated_color.blue =
-						(particle->transition_randomized_variables.color.blue*transition_weight +
-							particle->randomized_variables.color.blue*state_weight)*
-						type->variables.particle_state_randomized_multipliers.color.blue;
-					if (shader &&
-						transition_shader &&
-						shader->framebuffer_blend_function == transition_shader->framebuffer_blend_function &&
-						shader->primary_map_flags == transition_shader->primary_map_flags &&
-						state_definition->sequence_index == transition_state_definition->sequence_index)
+					matrix4x3_transform_point(
+						&render.frustum.world_to_view,
+						&particle->position,
+						&position_viewer_space);
+					matrix4x3_transform_normal(
+						&render.frustum.world_to_view,
+						&particle->axis,
+						&axis_viewer_space);
+
+					if (particle->transition_state_index == NONE)
 					{
+						transition_state_definition = NULL;
 						state_weight = 1.0f;
 						transition_weight = 0.0f;
-					}
-				}
-
-				bitmap = bitmap_group_get(state_definition->bitmaps.index);
-				if (type_definition->complex_sprite_render_mode ==
-					_particle_system_type_complex_sprite_render_mode_rotational)
-				{
-					sequence_index = state_definition->sequence_index + 1;
-				}
-				else
-				{
-					sequence_index = state_definition->sequence_index;
-				}
-				sequence = TAG_BLOCK_GET_ELEMENT(
-					&bitmap->sequences,
-					sequence_index,
-					struct bitmap_group_sequence);
-
-				if (particle->sprite_index == -1.0f)
-				{
-					particle->sprite_index = (real)seed_random_range(
-						get_global_local_random_seed_address(),
-						0,
-						(short)sequence->sprites.count);
-					sprite_index = (short)particle->sprite_index;
-				}
-				else
-				{
-					sprite_index = (short)particle->sprite_index % sequence->sprites.count;
-					if (sprite_index < 0)
-						sprite_index += (short)sequence->sprites.count;
-				}
-
-				if (state_weight > 0.01f)
-				{
-					real_argb_color color = interpolated_color;
-
-					if (!state_definition->shader.framebuffer_blend_function)
-					{
-						color.red *= system->lighting.red;
-						color.green *= system->lighting.green;
-						color.blue *= system->lighting.blue;
-					}
-
-					build_sprites_begin(
-						&sprite_data,
-						2,
-						state_definition->bitmaps.index,
-						&state_definition->shader,
-						0);
-					if (type_definition->complex_sprite_render_mode ==
-						_particle_system_type_complex_sprite_render_mode_rotational)
-					{
-						unsigned long flags = FLAG(_build_sprite_rotational_viewer_space_bit);
-
-						if (TEST_FLAG(type_definition->flags, _particle_system_type_rotational_sprites_animate_sideways_bit))
-						{
-							SET_FLAG(flags, _build_sprite_rotational_sideways_rotation_animates_bit, TRUE);
-						}
-
-						build_sprite_rotational(
-							&sprite_data,
-							flags,
-							state_definition->sequence_index,
-							sprite_index,
-							&view_position,
-							&view_axis,
-							particle->rotation,
-							scale,
-							&color,
-							state_weight);
+						scale = particle->randomized_variables.scale*
+							type->variables.particle_state_randomized_multipliers.scale;
+						color.alpha = particle->randomized_variables.color.alpha*
+							type->variables.particle_state_randomized_multipliers.color.alpha;
+						color.red = particle->randomized_variables.color.red*
+							type->variables.particle_state_randomized_multipliers.color.red;
+						color.green = particle->randomized_variables.color.green*
+							type->variables.particle_state_randomized_multipliers.color.green;
+						color.blue = particle->randomized_variables.color.blue*
+							type->variables.particle_state_randomized_multipliers.color.blue;
 					}
 					else
 					{
-						build_sprite(
-							&sprite_data,
-							type_definition->sprite_render_mode,
-							state_definition->sequence_index,
-							sprite_index,
-							&view_position,
-							&view_axis,
-							particle->rotation,
-							scale,
-							&color,
-							state_weight,
-							FLAG(_build_sprite_viewer_space_bit));
+						transition_state_definition = TAG_BLOCK_GET_ELEMENT(
+							&type_definition->particle_states,
+							particle->transition_state_index,
+							struct particle_system_type_particle_state);
+						transition_shader = &transition_state_definition->shader;
+						state_weight = particle->time_left_in_state/particle->state_length;
+						if (state_weight < 0.0f)
+							state_weight = 0.0f;
+						else if (state_weight > 1.0f)
+							state_weight = 1.0f;
+
+						transition_weight = 1.0f - state_weight;
+						scale = (particle->transition_randomized_variables.scale*transition_weight +
+							particle->randomized_variables.scale*state_weight)*
+							type->variables.particle_state_randomized_multipliers.scale;
+						color.alpha =
+							(particle->transition_randomized_variables.color.alpha*transition_weight +
+								particle->randomized_variables.color.alpha*state_weight)*
+							type->variables.particle_state_randomized_multipliers.color.alpha;
+						color.red =
+							(particle->transition_randomized_variables.color.red*transition_weight +
+								particle->randomized_variables.color.red*state_weight)*
+							type->variables.particle_state_randomized_multipliers.color.red;
+						color.green =
+							(particle->transition_randomized_variables.color.green*transition_weight +
+								particle->randomized_variables.color.green*state_weight)*
+							type->variables.particle_state_randomized_multipliers.color.green;
+						color.blue =
+							(particle->transition_randomized_variables.color.blue*transition_weight +
+								particle->randomized_variables.color.blue*state_weight)*
+							type->variables.particle_state_randomized_multipliers.color.blue;
+						if (shader &&
+							transition_shader &&
+							shader->framebuffer_blend_function == transition_shader->framebuffer_blend_function &&
+							shader->primary_map_flags == transition_shader->primary_map_flags &&
+							state_definition->sequence_index == transition_state_definition->sequence_index)
+						{
+							state_weight = 1.0f;
+							transition_weight = 0.0f;
+						}
 					}
 
-					((struct shader_effect_definition *)sprite_data.shader)->secondary_map_radius =
-						state_definition->variables.radius;
-					build_sprites_end(&sprite_data);
-				}
-
-				if (transition_weight > 0.01f)
-				{
-					real_argb_color color = interpolated_color;
-
-					if (!state_definition->shader.framebuffer_blend_function)
-					{
-						color.red *= system->lighting.red;
-						color.green *= system->lighting.green;
-						color.blue *= system->lighting.blue;
-					}
-
-					build_sprites_begin(
-						&sprite_data,
-						2,
-						transition_state_definition->bitmaps.index,
-						transition_shader,
-						0);
-					view_position.z += 0.001f;
+					bitmap = bitmap_group_get(state_definition->bitmaps.index);
 					if (type_definition->complex_sprite_render_mode ==
 						_particle_system_type_complex_sprite_render_mode_rotational)
 					{
-						unsigned long flags = FLAG(_build_sprite_rotational_viewer_space_bit);
-
-						if (TEST_FLAG(type_definition->flags, _particle_system_type_rotational_sprites_animate_sideways_bit))
-						{
-							SET_FLAG(flags, _build_sprite_rotational_sideways_rotation_animates_bit, TRUE);
-						}
-
-						build_sprite_rotational(
-							&sprite_data,
-							flags,
-							transition_state_definition->sequence_index,
-							sprite_index,
-							&view_position,
-							&view_axis,
-							particle->rotation,
-							scale,
-							&color,
-							transition_weight);
+						sequence_index = state_definition->sequence_index + 1;
 					}
 					else
 					{
-						build_sprite(
-							&sprite_data,
-							type_definition->sprite_render_mode,
-							transition_state_definition->sequence_index,
-							sprite_index,
-							&view_position,
-							&view_axis,
-							particle->rotation,
-							scale,
-							&color,
-							transition_weight,
-							FLAG(_build_sprite_viewer_space_bit));
+						sequence_index = state_definition->sequence_index;
+					}
+					sequence = TAG_BLOCK_GET_ELEMENT(
+						&bitmap->sequences,
+						sequence_index,
+						struct bitmap_group_sequence);
+
+					if (particle->sprite_index == -1.0f)
+					{
+						particle->sprite_index = (real)local_random_range(
+							0,
+							(short)sequence->sprites.count);
+						sprite_index = (short)particle->sprite_index;
+					}
+					else
+					{
+						sprite_index = (short)particle->sprite_index % sequence->sprites.count;
+						if (sprite_index < 0)
+							sprite_index += (short)sequence->sprites.count;
 					}
 
-					((struct shader_effect_definition *)sprite_data.shader)->secondary_map_radius =
-						state_definition->variables.radius;
-					build_sprites_end(&sprite_data);
+					if (state_weight > 0.01f)
+					{
+						real_argb_color lit_color = color;
+
+						if (!state_definition->shader.framebuffer_blend_function)
+						{
+							lit_color.red *= system->lighting.red;
+							lit_color.green *= system->lighting.green;
+							lit_color.blue *= system->lighting.blue;
+						}
+
+						build_sprites_begin(
+							&sprite_data,
+							2,
+							state_definition->bitmaps.index,
+							shader,
+							0);
+						if (type_definition->complex_sprite_render_mode ==
+							_particle_system_type_complex_sprite_render_mode_rotational)
+						{
+							unsigned long flags = FLAG(_build_sprite_rotational_viewer_space_bit);
+
+							if (TEST_FLAG(type_definition->flags, _particle_system_type_rotational_sprites_animate_sideways_bit))
+							{
+								SET_FLAG(flags, _build_sprite_rotational_sideways_rotation_animates_bit, TRUE);
+							}
+
+							build_sprite_rotational(
+								&sprite_data,
+								flags,
+								state_definition->sequence_index,
+								sprite_index,
+								&position_viewer_space,
+								&axis_viewer_space,
+								particle->rotation,
+								scale,
+								&lit_color,
+								state_weight);
+						}
+						else
+						{
+							build_sprite(
+								&sprite_data,
+								type_definition->sprite_render_mode,
+								state_definition->sequence_index,
+								sprite_index,
+								&position_viewer_space,
+								&axis_viewer_space,
+								particle->rotation,
+								scale,
+								&lit_color,
+								state_weight,
+								FLAG(_build_sprite_viewer_space_bit));
+						}
+
+						((struct shader_effect_definition *)sprite_data.shader)->secondary_map_radius =
+							state_definition->variables.radius;
+						build_sprites_end(&sprite_data);
+					}
+
+					if (transition_weight > 0.01f)
+					{
+						real_argb_color lit_color = color;
+
+						if (!state_definition->shader.framebuffer_blend_function)
+						{
+							lit_color.red *= system->lighting.red;
+							lit_color.green *= system->lighting.green;
+							lit_color.blue *= system->lighting.blue;
+						}
+
+						build_sprites_begin(
+							&sprite_data,
+							2,
+							transition_state_definition->bitmaps.index,
+							transition_shader,
+							0);
+						position_viewer_space.z += 0.001f;
+						if (type_definition->complex_sprite_render_mode ==
+							_particle_system_type_complex_sprite_render_mode_rotational)
+						{
+							unsigned long flags = FLAG(_build_sprite_rotational_viewer_space_bit);
+
+							if (TEST_FLAG(type_definition->flags, _particle_system_type_rotational_sprites_animate_sideways_bit))
+							{
+								SET_FLAG(flags, _build_sprite_rotational_sideways_rotation_animates_bit, TRUE);
+							}
+
+							build_sprite_rotational(
+								&sprite_data,
+								flags,
+								transition_state_definition->sequence_index,
+								sprite_index,
+								&position_viewer_space,
+								&axis_viewer_space,
+								particle->rotation,
+								scale,
+								&lit_color,
+								transition_weight);
+						}
+						else
+						{
+							build_sprite(
+								&sprite_data,
+								type_definition->sprite_render_mode,
+								transition_state_definition->sequence_index,
+								sprite_index,
+								&position_viewer_space,
+								&axis_viewer_space,
+								particle->rotation,
+								scale,
+								&lit_color,
+								transition_weight,
+								FLAG(_build_sprite_viewer_space_bit));
+						}
+
+						((struct shader_effect_definition *)sprite_data.shader)->secondary_map_radius =
+							state_definition->variables.radius;
+						build_sprites_end(&sprite_data);
+					}
 				}
+
+				particle_index = (short)particle->next_particle_index;
 			}
-
-			particle_index = (short)particle->next_particle_index;
 		}
 	}
 

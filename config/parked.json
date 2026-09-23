@@ -1067,25 +1067,6 @@
       }
     },
     {
-      "unit": "source/structures/structure_visibility",
-      "function": "_portal_hull_from_points",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the complete portal projection helper from January's projection calls, assertion strings, loop shape, and return topology, with HaloCEA providing the authenticated private name and behavior. The retained typed C projects each real_point3d through the current camera/frustum, rejects a hull only when every point is behind the screen plane, computes the 2D convex hull, and returns January's three-state result. Target is 480 padded bytes and the candidate 464, with all 16 relocation identities preserved; objdiff reports 85.31645 percent. The remaining 16-byte gap spans VC7 local/register and floating-point scheduling, with no unique source recipe proved, so the entry is unclassified. No representation pun, volatile/register forcing, pragma, assembly, fake dependency, forced inline, or geometric distortion is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
-      "measurements": {
-        "target": {
-          "size": 480,
-          "relocation_count": 16,
-          "normalized_sha256": "5d359f8240cd82db678d5851249806a2530dddb8ab29ef0aba1edf1beaa5b633"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 16,
-          "normalized_sha256": "004a86dfae5e2df2c0c60a4d98e0f845725354a5dfc8d133f14a03833571924d"
-        },
-        "objdiff_percent": 85.31645
-      }
-    },
-    {
       "unit": "source/text/draw_string",
       "function": "_bitmap_draw_string",
       "class": "unclassified",
@@ -1254,25 +1235,6 @@
           "normalized_sha256": "c10e869c67180ba3040bc35040e0e9a4329b841c05599c61583c5114a84b5cf1"
         },
         "objdiff_percent": 99.89011
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_global_reconcile_read",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after restoring the complete external-global reconciliation switch in ordinary typed C, using the corrected January hs_type enum order and the matching named default globals. Target and candidate both occupy 1408 padded bytes and carry the same 86 relocation identities; objdiff reports 92.30703 percent similarity. The residual begins with an equivalent prologue scheduling choice: January preserves the designator and pushes the masked index before loading hs_global_data, while VC7 loads that independent global first; the case logic and fallback destinations remain aligned. Bounded natural local-order and control-flow variants did not close the schedule. No shifted enum compensation, raw address, volatile or register forcing, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical logic is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the prologue lifetime schedule.",
-      "measurements": {
-        "target": {
-          "size": 1408,
-          "relocation_count": 86,
-          "normalized_sha256": "c65c8235c5484ea157c046421679547b0fbfe63831fc6f07e43030cfc0f453ee"
-        },
-        "base": {
-          "size": 1408,
-          "relocation_count": 86,
-          "normalized_sha256": "6de0dd79e98a7bc9b653af1fc9ec3991f4b5bffc4f7de2ef5a71ac610301ec25"
-        },
-        "objdiff_percent": 92.30703
       }
     },
     {
@@ -1691,25 +1653,6 @@
           "normalized_sha256": "2d1c09cc00e5c911dd12e1a555e5c702767613e2f4a030b13b9cdd5c25d28df1"
         },
         "objdiff_percent": 100
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_global_reconcile_write",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete house-rule-compliant reconstruction retained from Opus commit 0973b18e6 and freshly reconciled against canonical headers. The natural typed switch writes every supported external HS global through its named definition and preserves the real-valued temporary used by January's shared switch blocks. Target is 400 padded bytes; the candidate is 416 padded bytes. Both have 47 relocations to the same semantic callees, data and switch destinations, but instruction offsets and normalized bytes differ after the candidate's longer entry schedule. It is required by three newly exact HS runtime owners and receives zero exact credit. No inequality workaround, BSS split, foreign type duplicate, raw offset, forced inline, volatile/register steering, representation pun, assembly, or nonsensical branch is retained. See docs/object_matching_logs/hs_runtime_interface_leaf_reconciliation_20260908.md.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 47,
-          "normalized_sha256": "2970ab42df38836052877705d5ead641c4ff94b5d55807c7b3049f03bbe01ab4"
-        },
-        "base": {
-          "size": 416,
-          "relocation_count": 47,
-          "normalized_sha256": "2dab6c4ec4e33d061b84bab1219522b4c8c229ea2f423c07038e6bf880eca663"
-        },
-        "objdiff_percent": 68.44203
       }
     },
     {
@@ -2143,25 +2086,6 @@
           "normalized_sha256": "a8adaa33cd572e879ba65d3b5c042368b8d5d29e90739dc418b65cadb1652474"
         },
         "objdiff_percent": 70.925
-      }
-    },
-    {
-      "unit": "source/structures/structures",
-      "function": "_structure_get_planar_fog",
-      "class": "unclassified",
-      "evidence": "Best reviewed house-rule-compliant natural reconstruction retained from the 2026-09-09 reconciliation. Current canonical target/base COFF measurements remain non-identical; objdiff similarity is diagnostic only. This is a fuzzy research waypoint with zero exact-function and zero exact-byte credit. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. 2026-09-15 (next-150K lane wave n1): re-measured after adding the discarded fog-plane lookup that January provably executes. relocdiff shows January owns four _tag_block_get_element_with_size relocations (@0x75, @0xb0, @0xfd, @0x16d) where the parked body owned three; the missing 15th relocation is exactly that discarded lookup. Both structural tags now close: size 448/448 and relocations 15/15 (was 416/14), and alndiff is 154 vs 154 instructions with the whole residual confined to one 4-slot EDX/ECX register-naming window. Zero strict credit; the row stays parked and fuzzy [sha].",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 15,
-          "normalized_sha256": "a5aa0f690e82204d70cb108e143047be76871fd5cf1a979119ce80e8163c097b"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 15,
-          "normalized_sha256": "7e308d0bf30135a5dcfeb73442f3f7a61b25bb0281c6cbd45868eaa0ce1d9869"
-        },
-        "objdiff_percent": 99.76351
       }
     },
     {
