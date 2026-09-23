@@ -186,7 +186,21 @@ static void build_sprite_compute_basis(
 extern boolean debug_sprites;
 extern struct build_sprite_globals_data build_sprite_globals;
 
-static real const one_over_full_circle = 1.f / (2.f*_pi);
+static char *sprite_render_orientation_names[NUMBER_OF_BUILD_SPRITE_ORIENTATIONS] =
+{
+	"screen facing",
+	"parallel to direction",
+	"perpendicular to direction",
+};
+
+struct tag_enum_definition global_sprite_render_orientations_enum =
+{
+	NUMBER_OF_BUILD_SPRITE_ORIENTATIONS,
+	sprite_render_orientation_names,
+	NULL,
+};
+
+real const one_over_full_circle = 1.f / (2.f*_pi);
 
 static boolean build_sprite_vertex_allocation_failure_reported;
 
@@ -380,7 +394,7 @@ void build_sprite(
 					sprite_index));
 
 			bitmap = TAG_BLOCK_GET_ELEMENT(
-				&bitmap_group->bitmap_data,
+				&bitmap_group->bitmaps,
 				sprite->bitmap_index,
 				struct bitmap_data);
 			group_index = build_sprite_get_group(data, bitmap);
@@ -582,6 +596,7 @@ void build_sprite_rotational(
 {
 	real_point3d transformed_origin;
 	real_vector3d transformed_axis_of_rotation;
+	real const quarter_circle = _pi/2;
 	real fraction;
 	real angle;
 	real sprite_rotation;
@@ -606,8 +621,8 @@ void build_sprite_rotational(
 
 	angle = angle_between_vectors3d(
 		(real_vector3d const *)&transformed_origin,
-		&transformed_axis_of_rotation) - _pi/2;
-	fraction = angle*angle/((_pi/2)*(_pi/2));
+		&transformed_axis_of_rotation) - quarter_circle;
+	fraction = angle*angle/(quarter_circle*quarter_circle);
 	fraction = PIN(fraction, 0.f, 1.f);
 
 	if (fraction>0.05f)

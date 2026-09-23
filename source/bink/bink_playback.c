@@ -297,12 +297,6 @@ struct bink_playback_globals
 	long memory_pool_size;
 };
 
-struct bink_playback_saved_state
-{
-	unsigned long available_memory_kilobytes;
-	boolean frame_rate_throttle;
-};
-
 typedef void *(__stdcall *rad_memory_allocate_proc)(
 	unsigned long size);
 typedef void (__stdcall *rad_memory_free_proc)(
@@ -326,8 +320,6 @@ typedef char bink_playback_globals_screen_geometry_offset_assert[
 	offsetof(struct bink_playback_globals, screen_geometry) == 0x40 ? 1 : -1];
 typedef char bink_playback_globals_memory_pool_base_offset_assert[
 	offsetof(struct bink_playback_globals, memory_pool_base) == 0xCC ? 1 : -1];
-typedef char bink_playback_saved_state_frame_rate_throttle_offset_assert[
-	offsetof(struct bink_playback_saved_state, frame_rate_throttle) == 4 ? 1 : -1];
 typedef char bink_summary_size_assert[
 	sizeof(BINKSUMMARY) == 0x7C ? 1 : -1];
 typedef char bink_summary_skipped_frames_offset_assert[
@@ -405,18 +397,19 @@ static void bink_playback_idle(
 
 /* ---------- globals */
 
-extern struct bink_playback_globals bink_globals;
-extern struct bink_playback_saved_state bink_saved_state;
-extern boolean debug_bink;
+static unsigned long bink_available_memory_kilobytes= NONE;
+static boolean bink_saved_frame_rate_throttle= TRUE;
 
 /* January .bss +0x00: the allocation table handed to bink */
-extern void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS];
+void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS] = { 0 };
 /* January .bss +0x40: the bitmap the rasterizer draws the movie frame from */
-extern struct bitmap_data bink_bitmap;
+struct bitmap_data bink_bitmap = { 0 };
 /* January .bss +0x70: the hand-built linear texture over the frame buffer */
-extern D3DBaseTexture bink_texture;
+D3DBaseTexture bink_texture = { 0 };
+boolean debug_bink = FALSE;
+struct bink_playback_globals bink_globals = { 0 };
 /* January .bss +0x160: entries used in bink_pointer_blocks */
-extern long bink_pointer_block_count;
+long bink_pointer_block_count = 0;
 
 /* ---------- public code */
 
@@ -471,7 +464,7 @@ void bink_playback_stop(
 	if (TEST_FLAG(bink_globals.flags, _bink_playback_return_to_main_menu_when_finished_bit))
 		main_menu_load();
 
-	saved_frame_rate_throttle = bink_saved_state.frame_rate_throttle;
+	saved_frame_rate_throttle = bink_saved_frame_rate_throttle;
 	bink_globals.flags = 0;
 	global_frame_rate_throttle = saved_frame_rate_throttle;
 	attract_mode_reset_timer();
@@ -637,7 +630,7 @@ void bink_playback_start(
 
 			bink_decompress_video_frame();
 
-			bink_saved_state.frame_rate_throttle= global_frame_rate_throttle;
+			bink_saved_frame_rate_throttle= global_frame_rate_throttle;
 			bink_globals.total_skipped_frames= 0;
 			bink_globals.total_skipped_blits= 0;
 			bink_globals.frame_count_at_last_summary= 0;
@@ -819,7 +812,7 @@ static void bink_get_memory_available(
 	csmemset(&status, 0, sizeof(status));
 	status.dwLength= sizeof(status);
 	GlobalMemoryStatus(&status);
-	bink_saved_state.available_memory_kilobytes= status.dwAvailPhys/1024;
+	bink_available_memory_kilobytes= status.dwAvailPhys/1024;
 
 	return;
 }

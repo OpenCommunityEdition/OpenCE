@@ -46,7 +46,19 @@ if (profile_global_enable && section.active)	\
 
 /* ---------- structures */
 
-struct profile_frame_iterator;
+union point2d;
+union real_argb_color;
+
+struct profile_frame_iterator
+{
+	short current_buffer_index;
+	short next_buffer_index;
+};
+
+struct profile_frame_info
+{
+	__int64 vertical_blank_index;
+};
 
 struct profile_section
 {
@@ -138,6 +150,22 @@ void profile_lapsed_frames(
 	char const *reason);
 void profile_lapsed_msec(
 	long msec);
+void profile_frame_iterator_new(
+	struct profile_frame_iterator *iterator);
+boolean profile_frame_iterator_next(
+	struct profile_frame_iterator *iterator,
+	struct profile_frame_info *info);
+void profile_frame_get_messages(
+	struct profile_frame_iterator *iterator,
+	short *message_count,
+	short maximum_message_count,
+	char **messages,
+	union point2d *locations,
+	union real_argb_color const **colors);
+long profile_frame_get_stalls(
+	struct profile_frame_iterator *iterator,
+	short *stall_index,
+	real *stall_msec);
 short profile_find_frame_value(
 	const char *name,
 	short *section_index_reference);
@@ -166,6 +194,8 @@ extern boolean profile_timebase_ticks;
 extern boolean profile_global_enable;
 extern boolean profile_dump_frames;
 extern boolean profile_dump_lost_frames;
+extern boolean profile_display;
+extern boolean profile_graph;
 
 /* ---------- public code */
 

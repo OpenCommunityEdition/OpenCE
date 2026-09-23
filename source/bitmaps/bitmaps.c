@@ -1079,11 +1079,11 @@ pixel32 bitmap_2d_get_pixel(
 	short mipmap_index;
 	short width;
 	short height;
-	long unwrapped_x;
-	long unwrapped_y;
 	short x;
 	short y;
 	void *mipmap_address;
+	long offset;
+	pixel32 pixel;
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x261, bitmap);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x262, bitmap->type==_bitmap_type_2d);
@@ -1091,128 +1091,134 @@ pixel32 bitmap_2d_get_pixel(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x264, point);
 	match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x265, lod>=0.0f && lod<=1.0f, "lod>=0.0f && lod<=1.0f");
 
-	if (!bitmap->base_address)
+	if (bitmap->base_address)
 	{
-		return (pixel32)NONE;
-	}
-
-	if (lod < 1.0f && (short)bitmap->mipmap_count > 0)
-	{
-		mipmap_index = (short)fast_ftol((1.0f - lod) * (short)bitmap->mipmap_count);
-		match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x26F, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
-	}
-	else
-	{
-		mipmap_index = 0;
-	}
-
-	width = bitmap_mipmap_get_width(bitmap, mipmap_index);
-	height = bitmap_mipmap_get_height(bitmap, mipmap_index);
-	unwrapped_x = fast_ftol((real)width * point->x - 0.5f);
-	if ((width & (width - 1)) == 0)
-	{
-		x = (short)(unwrapped_x & (width - 1));
-	}
-	else
-	{
-		x = (short)(((unwrapped_x % width) + width) % width);
-	}
-	unwrapped_y = fast_ftol((real)height * point->y - 0.5f);
-	if ((height & (height - 1)) == 0)
-	{
-		y = (short)(unwrapped_y & (height - 1));
-	}
-	else
-	{
-		y = (short)(((unwrapped_y % height) + height) % height);
-	}
-
-	mipmap_address = bitmap_mipmap_address(bitmap, mipmap_index);
-	if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
-	{
-		short bytes_per_block = (short)(S3TC_BLOCK_PIXELS * bitmap_format_get_bits_per_pixel(bitmap->format) / CHAR_BITS);
-		byte *block_address = (byte *)mipmap_address + (y / 4 * width / 4 + x / 4) * bytes_per_block;
-		pixel32 pixel;
-
-		match_vassert(
-			"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
-			0x2A0,
-			block_address >= (byte *)bitmap->base_address,
-			csprintf(
-				temporary,
-				"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address start (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
-				(byte *)bitmap->base_address - block_address,
-				bitmap->width,
-				bitmap->height,
-				(short)bitmap->mipmap_count,
-				unwrapped_x % width,
-				unwrapped_y % height,
-				mipmap_index));
-		match_vassert(
-			"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
-			0x2A9,
-			block_address < (byte *)bitmap->base_address + bitmap->pixel_data_size,
-			csprintf(
-				temporary,
-				"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address end (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
-				block_address - ((byte *)bitmap->base_address + bitmap->pixel_data_size),
-				bitmap->width,
-				bitmap->height,
-				(short)bitmap->mipmap_count,
-				unwrapped_x % width,
-				unwrapped_y % height,
-				mipmap_index));
-
-		switch (bitmap->format)
+		if (lod < 1.0f && (short)bitmap->mipmap_count > 0)
 		{
-		case _bitmap_format_dxt1:
-			DecodeBlockRGB__single_pixel(
-				(struct s3tc_block_rgb const *)block_address,
-				(struct s3tc_color *)&pixel,
-				x & 3,
-				y & 3);
-			break;
-
-		case _bitmap_format_dxt3:
-			DecodeBlockAlpha4__single_pixel(
-				(struct s3tc_block_alpha4 const *)block_address,
-				(struct s3tc_color *)&pixel,
-				x & 3,
-				y & 3);
-			break;
-
-		case _bitmap_format_dxt5:
-			DecodeBlockAlpha3__single_pixel(
-				(struct s3tc_block_alpha3 const *)block_address,
-				(struct s3tc_color *)&pixel,
-				x & 3,
-				y & 3);
-			break;
-
-		default:
-			match_vassert(
-				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
-				0x2B7,
-				FALSE,
-				"### ERROR unsupported bitmap format");
-			break;
+			mipmap_index = (short)fast_ftol((1.0f - lod) * (short)bitmap->mipmap_count);
+			match_vassert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x26F, mipmap_index>=0 && mipmap_index<=(short)bitmap->mipmap_count, "mipmap_index>=0 && mipmap_index<=bitmap->mipmap_count");
+		}
+		else
+		{
+			mipmap_index = 0;
 		}
 
-		return pixel;
+		width = bitmap_mipmap_get_width(bitmap, mipmap_index);
+		height = bitmap_mipmap_get_height(bitmap, mipmap_index);
+		if ((width & (width - 1)) == 0)
+		{
+			x = (short)(fast_ftol((real)width * point->x - 0.5f) & (width - 1));
+		}
+		else
+		{
+			x = (short)(((fast_ftol((real)width * point->x - 0.5f) % width) + width) % width);
+		}
+		if ((height & (height - 1)) == 0)
+		{
+			y = (short)(fast_ftol((real)height * point->y - 0.5f) & (height - 1));
+		}
+		else
+		{
+			y = (short)(((fast_ftol((real)height * point->y - 0.5f) % height) + height) % height);
+		}
+
+		mipmap_address = bitmap_mipmap_address(bitmap, mipmap_index);
+		if (TEST_FLAG(bitmap->flags, _bitmap_compressed_bit))
+		{
+			short bytes_per_block = S3TC_BLOCK_PIXELS * bitmap_format_get_bits_per_pixel(bitmap->format) / CHAR_BITS;
+			short block_x = x / 4;
+			short block_y = y / 4;
+			byte *block_address = (byte *)mipmap_address + (block_y * width / 4 + block_x) * bytes_per_block;
+
+			x &= 3;
+			y &= 3;
+
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+				0x2A0,
+				block_address >= (byte *)bitmap->base_address,
+				csprintf(
+					temporary,
+					"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address start (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
+					(byte *)bitmap->base_address - block_address,
+					bitmap->width,
+					bitmap->height,
+					(short)bitmap->mipmap_count,
+					fast_ftol((real)width * point->x - 0.5f) % width,
+					fast_ftol((real)height * point->y - 0.5f) % height,
+					mipmap_index));
+			match_vassert(
+				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+				0x2A9,
+				block_address < (byte *)bitmap->base_address + bitmap->pixel_data_size,
+				csprintf(
+					temporary,
+					"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address end (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
+					block_address - ((byte *)bitmap->base_address + bitmap->pixel_data_size),
+					bitmap->width,
+					bitmap->height,
+					(short)bitmap->mipmap_count,
+					fast_ftol((real)width * point->x - 0.5f) % width,
+					fast_ftol((real)height * point->y - 0.5f) % height,
+					mipmap_index));
+
+			switch (bitmap->format)
+			{
+			case _bitmap_format_dxt1:
+				DecodeBlockRGB__single_pixel(
+					(struct s3tc_block_rgb const *)block_address,
+					(struct s3tc_color *)&pixel,
+					x,
+					y);
+				break;
+
+			case _bitmap_format_dxt3:
+				DecodeBlockAlpha4__single_pixel(
+					(struct s3tc_block_alpha4 const *)block_address,
+					(struct s3tc_color *)&pixel,
+					x,
+					y);
+				break;
+
+			case _bitmap_format_dxt5:
+				DecodeBlockAlpha3__single_pixel(
+					(struct s3tc_block_alpha3 const *)block_address,
+					(struct s3tc_color *)&pixel,
+					x,
+					y);
+				break;
+
+			default:
+				match_vassert(
+					"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+					0x2B7,
+					FALSE,
+					"### ERROR unsupported bitmap format");
+				break;
+			}
+
+			return pixel;
+		}
+
+		if (TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit))
+		{
+			long result[2];
+
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C1, x>=0 && x<4096);
+			match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C2, y>=0 && y<4096);
+			bitmap_swizzle_vector2d(width, height, x, y, result);
+
+			offset = result[0] | result[1];
+		}
+		else
+		{
+			offset = y * width + x;
+		}
+
+		return bitmap_format_to_a8r8g8b8(bitmap->format, mipmap_address, offset);
 	}
 
-	if (TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit))
-	{
-		long result[2];
-
-		match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C1, x>=0 && x<4096);
-		match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmaps.c", 0x2C2, y>=0 && y<4096);
-		bitmap_swizzle_vector2d(width, height, x, y, result);
-
-		return bitmap_format_to_a8r8g8b8(bitmap->format, mipmap_address, result[0] | result[1]);
-	}
-
-	return bitmap_format_to_a8r8g8b8(bitmap->format, mipmap_address, y * width + x);
+	return (pixel32)NONE;
 }
 
 boolean bitmap_verify(

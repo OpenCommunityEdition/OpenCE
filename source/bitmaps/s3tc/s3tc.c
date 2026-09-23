@@ -114,9 +114,14 @@ static void ColorToFcolor(
 	struct s3tc_color *pcolor,
 	struct s3tc_fcolor *pfcolor)
 {
-	pfcolor->rgba[0] = pcolor->rgba[0] * wtPrimary[0] * (1.0f / 255.0f);
-	pfcolor->rgba[1] = pcolor->rgba[1] * wtPrimary[1] * (1.0f / 255.0f);
-	pfcolor->rgba[2] = pcolor->rgba[2] * wtPrimary[2] * (1.0f / 255.0f);
+	real value;
+	long channel;
+
+	for (channel = 0; channel < 3; ++channel)
+	{
+		value = pcolor->rgba[channel];
+		pfcolor->rgba[channel] = value * wtPrimary[channel] * (1.0f / 255.0f);
+	}
 
 	return;
 }
@@ -151,20 +156,26 @@ static void RGBToColor(
 	struct s3tc_color *pcolor)
 {
 	word rgb = *prgb;
-	byte c;
-	struct s3tc_color color = { 0 };
+	/* color.rgba[S3TC_ALPHA] is deliberately left unwritten, as January leaves
+	   it: January stores only three bytes of this local and copies all four out.
+	   Both callers, DecodeBlockRGB and DecodeBlockRGB__single_pixel, assign the
+	   alpha of every colour on the line immediately after calling this, so the
+	   indeterminate byte is never read. Initialising it - either with = { 0 } or
+	   with an explicit store before or after the channels - returns both this
+	   function and DecodeBlockRGB to residual. */
+	struct s3tc_color color;
 
-	c = (byte)(rgb << 3);
-	c |= c >> 5;
-	color.rgba[0] = c;
+	color.rgba[0] = (byte)rgb;
 	rgb >>= 5;
-	c = (byte)(rgb << 2);
-	c |= c >> 6;
-	color.rgba[1] = c;
+	color.rgba[1] = (byte)rgb;
 	rgb >>= 6;
-	c = (byte)(rgb << 3);
-	c |= c >> 5;
-	color.rgba[2] = c;
+	color.rgba[2] = (byte)rgb;
+	color.rgba[0] <<= 3;
+	color.rgba[1] <<= 2;
+	color.rgba[2] <<= 3;
+	color.rgba[0] |= color.rgba[0] >> 5;
+	color.rgba[1] |= color.rgba[1] >> 6;
+	color.rgba[2] |= color.rgba[2] >> 5;
 	*pcolor = color;
 
 	return;
@@ -799,7 +810,6 @@ void DecodeBlockAlpha3__single_pixel(
 {
 	word alpha[8];
 	unsigned long bitmap;
-	long shift;
 
 	DecodeBlockRGB__single_pixel(&source->rgb, color, u, v);
 
@@ -832,7 +842,8 @@ void DecodeBlockAlpha3__single_pixel(
 		bitmap |= source->alpha_bitmap[1];
 		bitmap <<= 8;
 		bitmap |= source->alpha_bitmap[0];
-		shift = 3 * (4 * v + u);
+		bitmap >>= 3 * (4 * v + u);
+		color->rgba[S3TC_ALPHA] = (byte)alpha[bitmap & 7];
 	}
 	else
 	{
@@ -841,10 +852,9 @@ void DecodeBlockAlpha3__single_pixel(
 		bitmap |= source->alpha_bitmap[4];
 		bitmap <<= 8;
 		bitmap |= source->alpha_bitmap[3];
-		shift = 3 * (4 * (v - 2) + u);
+		bitmap >>= 3 * (4 * (v - 2) + u);
+		color->rgba[S3TC_ALPHA] = (byte)alpha[bitmap & 7];
 	}
-
-	color->rgba[S3TC_ALPHA] = (byte)alpha[(bitmap >> shift) & 7];
 
 	return;
 }

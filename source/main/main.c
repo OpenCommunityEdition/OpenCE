@@ -2034,10 +2034,10 @@ static void main_frame_rate_debug(
 		SET_FLAG(
 			global_screenshot_count.framerate_flags,
 			sample_index,
-			main_globals.seconds_elapsed > 0.036);
+			main_globals.seconds_elapsed > 1.08/TICKS_PER_SECOND);
 
 		sample_index = (char)(
-			(sample_index + 1) % NUMBEROF(global_screenshot_count.framerate_samples));
+			(sample_index + 1) % (long)NUMBEROF(global_screenshot_count.framerate_samples));
 		global_screenshot_count.framerate_sample_index = sample_index;
 		global_screenshot_count.framerate_reset = TRUE;
 

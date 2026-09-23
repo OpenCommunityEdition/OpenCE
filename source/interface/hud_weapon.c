@@ -723,14 +723,8 @@ static void hud_update_weapon_local_player(
 	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
 	struct player_datum *player;
 	struct unit_datum *unit;
-	short player_local_index;
 	struct crosshair_hud_state *crosshair;
-	struct weapon_hud_interface_definition *definitions[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH];
 	struct weapon_hud_interface_definition *root_definition;
-	unsigned long valid_crosshair_types;
-	short definition_count;
-	short crosshair_index;
-	unsigned long render_flags = 0;
 
 	csmemset(
 		stack_buffer,
@@ -741,8 +735,7 @@ static void hud_update_weapon_local_player(
 	if (!unit)
 		goto finished;
 
-	player_local_index = player->local_player_index;
-	crosshair = get_crosshair_state(player_local_index);
+	crosshair = get_crosshair_state(player->local_player_index);
 	root_definition = weapon_hud_interface_definition_get(hud_index);
 	if (weapon_index != NONE)
 	{
@@ -750,264 +743,267 @@ static void hud_update_weapon_local_player(
 		(void)weapon_definition_get(weapon->definition_index);
 	}
 
-	definitions[0] = root_definition;
-	csmemset(
-		&definitions[1],
-		0,
-		(MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH - 1) * sizeof(*definitions));
-	valid_crosshair_types = root_definition->valid_crosshair_types_flags;
-	if (weapon_index != get_hud_state(local_player_index)->last_weapon_index &&
-		weapon_index == NONE)
 	{
-		csmemset(crosshair, 0, sizeof(*crosshair));
-	}
+		struct weapon_hud_interface_definition *weapon_hud_hierarchy[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] =
+			{ root_definition };
+		long weapon_hud_indices[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { hud_index };
+		unsigned long valid_crosshair_types = weapon_hud_hierarchy[0]->valid_crosshair_types_flags;
+		unsigned long render_flags = 0;
+		short definition_count = 1;
+		short crosshair_index;
 
-	definition_count = 1;
-	do
-	{
-		long child_index = definitions[definition_count - 1]->parent_hud.index;
-
-		if (child_index == NONE)
-			break;
-		definitions[definition_count] = weapon_hud_interface_definition_get(child_index);
-		valid_crosshair_types |= definitions[definition_count]->valid_crosshair_types_flags;
-		definition_count++;
-	}
-	while (definition_count < MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH);
-
-	if (definition_count == MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH)
-	{
-		error(
-			_error_silent,
-			"too many levels in current weapon HUD hierarchy");
-	}
-
-	for (crosshair_index = 0;
-		crosshair_index < NUMBER_OF_CROSSHAIR_STATES;
-		crosshair_index++)
-	{
-		unsigned long crosshair_flag = FLAG(crosshair_index);
-		short result;
-
-		if (!TEST_FLAG(valid_crosshair_types, crosshair_index))
-			continue;
-
-		switch (crosshair_index)
+		if (weapon_index != get_hud_state(local_player_index)->last_weapon_index &&
+			weapon_index == NONE)
 		{
-		case _crosshair_state_aim:
-			result = weapon_index == NONE ?
-				FALSE :
-				player_control_get_autoaim_level(player_local_index) == 1.0f;
-			break;
+			csmemset(crosshair, 0, sizeof(*crosshair));
+		}
 
-		case _crosshair_state_zoom:
-			result = player_control_get_zoom_level(player_local_index) == NONE ?
-				1 :
-				player_control_get_zoom_level(player_local_index) + 2;
-			break;
+		do
+		{
+			if (weapon_hud_hierarchy[definition_count - 1]->parent_hud.index == NONE)
+				break;
+			weapon_hud_indices[definition_count] =
+				weapon_hud_hierarchy[definition_count - 1]->parent_hud.index;
+			weapon_hud_hierarchy[definition_count] = weapon_hud_interface_definition_get(
+				weapon_hud_indices[definition_count]);
+			valid_crosshair_types |= weapon_hud_hierarchy[definition_count]->valid_crosshair_types_flags;
+			definition_count++;
+		}
+		while (definition_count < MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH);
 
-		case _crosshair_state_charge:
-			result = FALSE;
-			break;
+		if (definition_count == MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH)
+		{
+			error(
+				_error_silent,
+				"too many levels in current weapon hud hierarchy");
+		}
 
-		case _crosshair_state_flash_ammo:
-			if (weapon_state->magazines[0].rounds_remaining)
+		for (crosshair_index = 0;
+			crosshair_index < NUMBER_OF_CROSSHAIR_STATES;
+			crosshair_index++)
+		{
+			short result;
+
+			if (!TEST_FLAG(valid_crosshair_types, crosshair_index))
+				continue;
+
+			switch (crosshair_index)
 			{
-				result = weapon_state->magazines[0].rounds_loaded <=
-					root_definition->flash_cutoffs.loaded_ammo;
-			}
-			else
-			{
+			case _crosshair_state_aim:
+				result = weapon_index == NONE ?
+					FALSE :
+					player_control_get_autoaim_level(player->local_player_index) == 1.0f;
+				break;
+
+			case _crosshair_state_zoom:
+				result = player_control_get_zoom_level(player->local_player_index) == NONE ?
+					1 :
+					player_control_get_zoom_level(player->local_player_index) + 2;
+				break;
+
+			case _crosshair_state_charge:
 				result = FALSE;
-			}
-			break;
+				break;
 
-		case _crosshair_state_flash_heat:
-			result = weapon_state->heat * 100.0f >=
-				(real)root_definition->flash_cutoffs.heat;
-			break;
+			case _crosshair_state_flash_ammo:
+				if (weapon_state->magazines[0].rounds_remaining)
+				{
+					result = weapon_state->magazines[0].rounds_loaded <=
+						root_definition->flash_cutoffs.loaded_ammo;
+				}
+				else
+				{
+					result = FALSE;
+				}
+				break;
 
-		case _crosshair_state_flash_total_ammo:
-			result = weapon_state->magazines[0].rounds_remaining <=
-					root_definition->flash_cutoffs.total_ammo &&
-				!weapon_state->magazines[0].reloading;
-			break;
+			case _crosshair_state_flash_heat:
+				result = weapon_state->heat * 100.0f >=
+					(real)root_definition->flash_cutoffs.heat;
+				break;
 
-		case _crosshair_state_flash_total_battery:
-			result = weapon_state->age < 1.0f &&
-				(1.0f - weapon_state->age) * 100.0f <=
-					(real)root_definition->flash_cutoffs.age;
-			break;
+			case _crosshair_state_flash_total_ammo:
+				result = weapon_state->magazines[0].rounds_remaining <=
+						root_definition->flash_cutoffs.total_ammo &&
+					!weapon_state->magazines[0].reloading;
+				break;
 
-		case _crosshair_state_reload:
-			result = weapon_state->magazines[0].reloading;
-			break;
+			case _crosshair_state_flash_total_battery:
+				result = weapon_state->age < 1.0f &&
+					(1.0f - weapon_state->age) * 100.0f <=
+						(real)root_definition->flash_cutoffs.age;
+				break;
 
-		case _crosshair_state_fired_with_no_ammo:
-			if (!weapon_state->magazines[0].rounds_loaded &&
-				!weapon_state->magazines[0].rounds_remaining &&
-				TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+			case _crosshair_state_reload:
+				result = weapon_state->magazines[0].reloading;
+				break;
+
+			case _crosshair_state_fired_with_no_ammo:
+				if (!weapon_state->magazines[0].rounds_loaded &&
+					!weapon_state->magazines[0].rounds_remaining &&
+					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+				{
+					result = TRUE;
+				}
+				else
+				{
+					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+				}
+				break;
+
+			case _crosshair_state_threw_with_no_grenade:
 			{
-				result = TRUE;
-			}
-			else
-			{
-				result = crosshair->states[crosshair_index].value.reference_data != NONE;
-			}
-			break;
+				boolean no_grenades = TRUE;
+				short grenade_type;
 
-		case _crosshair_state_threw_with_no_grenade:
-		{
-			boolean no_grenades = TRUE;
-			short grenade_type;
+				for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
+				{
+					if (unit->unit.grenade_counts[grenade_type])
+						no_grenades = FALSE;
+				}
+				if (no_grenades &&
+					!unit->unit.grenade_throw_state &&
+					TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit))
+				{
+					result = TRUE;
+				}
+				else
+				{
+					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+				}
+				break;
+			}
 
-			for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
-			{
-				if (unit->unit.grenade_counts[grenade_type])
-					no_grenades = FALSE;
-			}
-			if (no_grenades &&
-				!unit->unit.grenade_throw_state &&
-				TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit))
-			{
-				result = TRUE;
-			}
-			else
-			{
-				result = crosshair->states[crosshair_index].value.reference_data != NONE;
-			}
-			break;
-		}
+			case _crosshair_state_flash_ammo_none_for_reload:
+				result = !weapon_state->magazines[0].rounds_remaining &&
+					weapon_state->magazines[0].rounds_loaded &&
+					weapon_state->magazines[0].rounds_loaded <=
+						root_definition->flash_cutoffs.loaded_ammo;
+				break;
 
-		case _crosshair_state_flash_ammo_none_for_reload:
-			result = !weapon_state->magazines[0].rounds_remaining &&
-				weapon_state->magazines[0].rounds_loaded &&
-				weapon_state->magazines[0].rounds_loaded <=
-					root_definition->flash_cutoffs.loaded_ammo;
-			break;
+			case _crosshair_state_flash_secondary_ammo:
+				if (weapon_state->magazines[1].rounds_remaining)
+				{
+					result = weapon_state->magazines[1].rounds_loaded <=
+						root_definition->flash_cutoffs.loaded_ammo;
+				}
+				else
+				{
+					result = FALSE;
+				}
+				break;
 
-		case _crosshair_state_flash_secondary_ammo:
-			if (weapon_state->magazines[1].rounds_remaining)
-			{
-				result = weapon_state->magazines[1].rounds_loaded <=
-					root_definition->flash_cutoffs.loaded_ammo;
-			}
-			else
-			{
+			case _crosshair_state_flash_secondary_total_ammo:
+				result = weapon_state->magazines[1].rounds_remaining <=
+						root_definition->flash_cutoffs.total_ammo &&
+					!weapon_state->magazines[1].reloading;
+				break;
+
+			case _crosshair_state_secondary_reload:
+				result = weapon_state->magazines[1].reloading;
+				break;
+
+			case _crosshair_state_fired_secondary_with_no_ammo:
+				if (!weapon_state->magazines[1].rounds_loaded &&
+					!weapon_state->magazines[1].rounds_remaining &&
+					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
+				{
+					result = TRUE;
+				}
+				else
+				{
+					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+				}
+				break;
+
+			case _crosshair_state_flash_secondary_ammo_none_for_reload:
+				result = !weapon_state->magazines[1].rounds_remaining &&
+					weapon_state->magazines[1].rounds_loaded &&
+					weapon_state->magazines[1].rounds_loaded <=
+						root_definition->flash_cutoffs.loaded_ammo;
+				break;
+
+			case _crosshair_state_primary_trigger_ready:
+				result = weapon_state->magazines[0].can_fire;
+				break;
+
+			case _crosshair_state_secondary_trigger_ready:
+				result = weapon_state->magazines[1].can_fire;
+				break;
+
+			case _crosshair_state_flash_fired_battery_depleted:
+				if (weapon_state->age == 1.0f &&
+					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+				{
+					result = TRUE;
+				}
+				else
+				{
+					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+				}
+				break;
+
+			default:
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+					0x16E,
+					!"unreachable");
 				result = FALSE;
+				break;
 			}
-			break;
 
-		case _crosshair_state_flash_secondary_total_ammo:
-			result = weapon_state->magazines[1].rounds_remaining <=
-					root_definition->flash_cutoffs.total_ammo &&
-				!weapon_state->magazines[1].reloading;
-			break;
-
-		case _crosshair_state_secondary_reload:
-			result = weapon_state->magazines[1].reloading;
-			break;
-
-		case _crosshair_state_fired_secondary_with_no_ammo:
-			if (!weapon_state->magazines[1].rounds_loaded &&
-				!weapon_state->magazines[1].rounds_remaining &&
-				TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
+			SET_FLAG(
+				render_flags,
+				crosshair_index,
+				result > 0 || crosshair_index == _crosshair_state_aim);
+			switch (crosshair_index)
 			{
-				result = TRUE;
+			case _crosshair_state_aim:
+				crosshair->states[crosshair_index].value.reference_data = result;
+				break;
+
+			case _crosshair_state_zoom:
+				crosshair->states[crosshair_index].value.reference_data = result - 1;
+				break;
+
+			case _crosshair_state_charge:
+			case _crosshair_state_flash_ammo:
+			case _crosshair_state_flash_heat:
+			case _crosshair_state_flash_total_ammo:
+			case _crosshair_state_flash_total_battery:
+			case _crosshair_state_reload:
+			case _crosshair_state_fired_with_no_ammo:
+			case _crosshair_state_threw_with_no_grenade:
+			case _crosshair_state_flash_ammo_none_for_reload:
+			case _crosshair_state_flash_secondary_ammo:
+			case _crosshair_state_flash_secondary_total_ammo:
+			case _crosshair_state_secondary_reload:
+			case _crosshair_state_fired_secondary_with_no_ammo:
+			case _crosshair_state_flash_secondary_ammo_none_for_reload:
+			case _crosshair_state_primary_trigger_ready:
+			case _crosshair_state_secondary_trigger_ready:
+			case _crosshair_state_flash_fired_battery_depleted:
+				if (!result)
+				{
+					crosshair->states[crosshair_index].value.reference_data = NONE;
+				}
+				else if (crosshair->states[crosshair_index].value.reference_data == NONE)
+				{
+					crosshair->states[crosshair_index].value.reference_data = game_time_get();
+				}
+				break;
+
+			default:
+				match_assert(
+					"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+					0x197,
+					!"unreachable");
+				break;
 			}
-			else
-			{
-				result = crosshair->states[crosshair_index].value.reference_data != NONE;
-			}
-			break;
-
-		case _crosshair_state_flash_secondary_ammo_none_for_reload:
-			result = !weapon_state->magazines[1].rounds_remaining &&
-				weapon_state->magazines[1].rounds_loaded &&
-				weapon_state->magazines[1].rounds_loaded <=
-					root_definition->flash_cutoffs.loaded_ammo;
-			break;
-
-		case _crosshair_state_primary_trigger_ready:
-			result = weapon_state->magazines[0].can_fire;
-			break;
-
-		case _crosshair_state_secondary_trigger_ready:
-			result = weapon_state->magazines[1].can_fire;
-			break;
-
-		case _crosshair_state_flash_fired_battery_depleted:
-			if (weapon_state->age == 1.0f &&
-				TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
-			{
-				result = TRUE;
-			}
-			else
-			{
-				result = crosshair->states[crosshair_index].value.reference_data != NONE;
-			}
-			break;
-
-		default:
-			match_assert(
-				"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
-				0x16E,
-				!"unreachable");
-			result = FALSE;
-			break;
 		}
 
-		SET_FLAG(
-			render_flags,
-			crosshair_index,
-			result > 0 || crosshair_index == _crosshair_state_aim);
-		switch (crosshair_index)
-		{
-		case _crosshair_state_aim:
-			crosshair->states[crosshair_index].value.reference_data = result;
-			break;
-
-		case _crosshair_state_zoom:
-			crosshair->states[crosshair_index].value.reference_data = result - 1;
-			break;
-
-		case _crosshair_state_charge:
-		case _crosshair_state_flash_ammo:
-		case _crosshair_state_flash_heat:
-		case _crosshair_state_flash_total_ammo:
-		case _crosshair_state_flash_total_battery:
-		case _crosshair_state_reload:
-		case _crosshair_state_fired_with_no_ammo:
-		case _crosshair_state_threw_with_no_grenade:
-		case _crosshair_state_flash_ammo_none_for_reload:
-		case _crosshair_state_flash_secondary_ammo:
-		case _crosshair_state_flash_secondary_total_ammo:
-		case _crosshair_state_secondary_reload:
-		case _crosshair_state_fired_secondary_with_no_ammo:
-		case _crosshair_state_flash_secondary_ammo_none_for_reload:
-		case _crosshair_state_primary_trigger_ready:
-		case _crosshair_state_secondary_trigger_ready:
-		case _crosshair_state_flash_fired_battery_depleted:
-			if (!result)
-			{
-				crosshair->states[crosshair_index].value.reference_data = NONE;
-			}
-			else if (crosshair->states[crosshair_index].value.reference_data == NONE)
-			{
-				crosshair->states[crosshair_index].value.reference_data = game_time_get();
-			}
-			break;
-
-		default:
-			match_assert(
-				"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
-				0x197,
-				!"unreachable");
-			break;
-		}
+		crosshair->render_flags = render_flags;
 	}
-
-	crosshair->render_flags = render_flags;
 
 finished:
 	hud_weapon_stack_buffer_check(0x19E);
@@ -1250,7 +1246,7 @@ static void crosshairs_draw(
 								{
 									struct bitmap_group *bitmap_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
 									struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
-										&bitmap_group->bitmap_data,
+										&bitmap_group->bitmaps,
 										sequence ?
 											TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
 											item->sequence_index,
@@ -1870,86 +1866,79 @@ void hud_update_weapon(
 		local_player_index != NONE;
 		local_player_index = local_player_get_next(local_player_index))
 	{
-		long player_index = local_player_get_player_index(local_player_index);
+		long unit_index = local_player_get_player_index(local_player_index) == NONE ?
+			NONE :
+			player_get(local_player_get_player_index(local_player_index))->unit_index;
 
-		if (player_index != NONE)
+		if (unit_index != NONE)
 		{
-			struct player_datum *player = player_get(
-				local_player_get_player_index(local_player_index));
-			long unit_index = player->unit_index;
+			long weapon_index = unit_inventory_get_weapon(
+				unit_index,
+				unit_get(unit_index)->unit.current_weapon_index);
+			boolean clear_to_default = FALSE;
 
-			if (unit_index != NONE)
+			if (weapon_index == NONE)
 			{
 				struct unit_datum *unit = unit_get(unit_index);
-				long weapon_index = unit_inventory_get_weapon(
-					unit_index,
-					unit->unit.current_weapon_index);
-				boolean clear_to_default = FALSE;
 
-				if (weapon_index == NONE)
+				if (unit->object.parent_object_index != NONE &&
+					unit->unit.parent_seat_index != NONE)
 				{
-					unit = unit_get(unit_index);
-					if (unit->object.parent_object_index != NONE &&
-						unit->unit.parent_seat_index != NONE)
-					{
-						struct unit_datum *parent = unit_get(
-							unit->object.parent_object_index);
-						struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
-							&unit_definition_get(parent->definition_index)->unit.seats,
-							unit->unit.parent_seat_index,
-							struct unit_seat);
+					struct unit_datum *parent = unit_get(
+						unit->object.parent_object_index);
+					struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+						&unit_definition_get(parent->definition_index)->unit.seats,
+						unit->unit.parent_seat_index,
+						struct unit_seat);
 
-						if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
-						{
-							weapon_index = unit_inventory_get_weapon(
-								unit->object.parent_object_index,
-								parent->unit.current_weapon_index);
-						}
-						else
-						{
-							clear_to_default = TRUE;
-						}
+					if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+					{
+						weapon_index = unit_inventory_get_weapon(
+							unit->object.parent_object_index,
+							unit_get(unit->object.parent_object_index)->unit.current_weapon_index);
+					}
+					else
+					{
+						clear_to_default = TRUE;
 					}
 				}
+			}
 
-				if (weapon_index != NONE)
+			if (weapon_index != NONE)
+			{
+				struct weapon_datum *weapon = weapon_get(weapon_index);
+				struct weapon_definition *definition = weapon_definition_get(
+					weapon->definition_index);
+				struct weapon_interface_state weapon_state;
+
+				weapon_build_weapon_interface_state(
+					weapon_index,
+					&weapon_state);
+				if (definition->weapon.interface_definition.hud_interface.index != NONE)
 				{
-					struct weapon_datum *weapon = weapon_get(weapon_index);
-					struct weapon_definition *definition = weapon_definition_get(
-						weapon->definition_index);
-					struct weapon_interface_state weapon_state;
-					long hud_index;
+					long hud_index =
+						definition->weapon.interface_definition.hud_interface.index;
 
-					weapon_build_weapon_interface_state(
-						weapon_index,
-						&weapon_state);
-					hud_index = definition->weapon.interface_definition.hud_interface.index;
-					if (hud_index != NONE)
-					{
-						hud_update_weapon_local_player(
-							local_player_index,
-							weapon_index,
-							hud_index,
-							&weapon_state);
-					}
-				}
-				else if (!clear_to_default && !unit_get_weapon_count(unit_index))
-				{
-					struct weapon_interface_state weapon_state;
-
-					csmemset(
-						&weapon_state,
-						0,
-						sizeof(weapon_state));
 					hud_update_weapon_local_player(
 						local_player_index,
-						NONE,
-						hud_globals->defaults.default_weapon_hud.index,
+						weapon_index,
+						hud_index,
 						&weapon_state);
 				}
-
-				get_hud_state(local_player_index)->last_weapon_index = weapon_index;
 			}
+			else if (!clear_to_default && !unit_get_weapon_count(unit_index))
+			{
+				struct weapon_interface_state weapon_state = { 0 };
+				long hud_index = hud_globals->defaults.default_weapon_hud.index;
+
+				hud_update_weapon_local_player(
+					local_player_index,
+					NONE,
+					hud_index,
+					&weapon_state);
+			}
+
+			get_hud_state(local_player_index)->last_weapon_index = weapon_index;
 		}
 	}
 

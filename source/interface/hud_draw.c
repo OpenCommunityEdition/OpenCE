@@ -490,7 +490,7 @@ void hud_retrieve_bitmap_and_bounding_rect(
 					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite);
 
 				*bitmap = TAG_BLOCK_GET_ELEMENT(
-					&group->bitmap_data, sprite->bitmap_index, struct bitmap_data);
+					&group->bitmaps, sprite->bitmap_index, struct bitmap_data);
 			}
 			else
 			{

@@ -180,15 +180,15 @@ void rasterizer_set_frustum_z(
 
 /* ---------- globals */
 
-static short transparent_geometry_group_index;
+static short transparent_geometry_group_index = 0;
 static unsigned long transparent_geometry_group_pending_flags[
-	BIT_VECTOR_SIZE_IN_LONGS(RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)];
-static struct transparent_geometry_group *transparent_geometry_groups;
-static struct transparent_geometry_group *transparent_geometry_groups2;
-static long transparent_geometry_group_count;
-static long transparent_geometry_group_count2;
-static short *transparent_geometry_group_sorted_indices;
-static short transparent_geometry_next_group_sorted_index;
+	BIT_VECTOR_SIZE_IN_LONGS(RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)] = { 0 };
+static struct transparent_geometry_group *transparent_geometry_groups = NULL;
+static struct transparent_geometry_group *transparent_geometry_groups2 = NULL;
+static long transparent_geometry_group_count = 0;
+static long transparent_geometry_group_count2 = 0;
+static short *transparent_geometry_group_sorted_indices = NULL;
+static short transparent_geometry_next_group_sorted_index = 0;
 
 extern struct rasterizer_transparent_geometry_debug_options rasterizer_debug_options;
 extern struct rasterizer_transparent_geometry_window_parameters global_window_parameters;

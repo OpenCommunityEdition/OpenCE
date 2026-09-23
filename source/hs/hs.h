@@ -237,9 +237,9 @@ void hs_compile(
 
 /* ---------- globals */
 
-extern word hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES];
-extern tag hs_tag_reference_type_group_tags[];
-extern struct hs_enum_definition hs_enum_table[NUMBER_OF_HS_TYPES];
+extern word const hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES];
+extern tag const hs_tag_reference_type_group_tags[];
+extern struct hs_enum_definition const hs_enum_table[];
 extern char const *hs_type_names[NUMBER_OF_HS_TYPES];
 extern char const *hs_script_type_names[];
 extern boolean debug_trigger_volumes;

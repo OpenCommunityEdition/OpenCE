@@ -238,22 +238,49 @@ symbols in this file:
 
 enum
 {
-	_bitmap_type_2d = 0,
+	_bitmap_type_2d,
 	_bitmap_type_3d,
 	_bitmap_type_cube_map,
+	NUMBER_OF_BITMAP_TYPES,
 };
 
 enum
 {
-	_bitmap_format_a8r8g8b8 = 11,
-	_bitmap_format_dxt1 = 14,
+	_bitmap_format_a8,
+	_bitmap_format_y8,
+	_bitmap_format_ay8,
+	_bitmap_format_a8y8,
+	_bitmap_format_unused1,
+	_bitmap_format_unused2,
+	_bitmap_format_r5g6b5,
+	_bitmap_format_unused3,
+	_bitmap_format_a1r5g5b5,
+	_bitmap_format_a4r4g4b4,
+	_bitmap_format_x8r8g8b8,
+	_bitmap_format_a8r8g8b8,
+	_bitmap_format_unused4,
+	_bitmap_format_unused5,
+	_bitmap_format_dxt1,
 	_bitmap_format_dxt3,
 	_bitmap_format_dxt5,
+	_bitmap_format_p8_bump,
+	NUMBER_OF_BITMAP_FORMATS,
+
+	FIRST_COMPRESSED_BITMAP_FORMAT = _bitmap_format_dxt1,
+	LAST_COMPRESSED_BITMAP_FORMAT = _bitmap_format_dxt5,
 };
 
 enum
 {
-	_bitmap_compressed_bit = 1,
+	_bitmap_has_power_of_two_dimensions_bit,
+	_bitmap_compressed_bit,
+	_bitmap_palettized_bit,
+	_bitmap_swizzled_bit,
+	_bitmap_linear_bit,
+	_bitmap_v16u16_bit,
+	_bitmap_allocated_bit,
+	_bitmap_cached_bit,
+	NUMBER_OF_BITMAP_FLAGS,
 };
 
 enum
@@ -300,10 +327,6 @@ static struct bitmap_data *bitmap_cm_shrink(
 	short scale,
 	short alpha_bias,
 	boolean ignore_transparent_pixels);
-static void bitmap_2d_smooth(
-	struct bitmap_data *bitmap,
-	short filter_size,
-	short const *filter_coefficients);
 static void bitmap_3d_smooth(
 	struct bitmap_data *bitmap,
 	short filter_size,
@@ -383,9 +406,9 @@ static void bitmap_cm_vector_map(
 /* ---------- globals */
 
 real const oo_unsigned_short_max = 1.0f / UNSIGNED_SHORT_MAX;
-short bitmap_sharpen_negative_table[256];
-short bitmap_sharpen_positive_table[256];
-short bitmap_smooth_filter_coefficients[MAXIMUM_FILTER_SIZE];
+short bitmap_sharpen_negative_table[256]= {0};
+short bitmap_sharpen_positive_table[256]= {0};
+short bitmap_smooth_filter_coefficients[MAXIMUM_FILTER_SIZE]= {0};
 
 /* ---------- public code */
 
@@ -791,6 +814,11 @@ void bitmap_fade(
 	return;
 }
 
+static void bitmap_2d_smooth(
+	struct bitmap_data *bitmap,
+	short filter_size,
+	short const *filter_coefficients);
+
 void bitmap_smooth(
 	struct bitmap_data *bitmap,
 	real filter_size)
@@ -994,9 +1022,9 @@ static void bitmap_3d_smooth(
 
 	if (bitmap->width >= filter_size &&
 		bitmap->height >= filter_size &&
-		(short)bitmap->depth >= filter_size)
+		bitmap->depth >= filter_size)
 	{
-		short z;
+		short x, y, z;
 
 		pixel_data_size = bitmap_get_pixel_data_size(bitmap);
 		source_pixels = bitmap_mipmap_address(bitmap, 0);
@@ -1006,14 +1034,10 @@ static void bitmap_3d_smooth(
 			pixel_data_size);
 		if (temporary_pixels)
 		{
-			for (z = 0; z < (short)bitmap->depth; z++)
+			for (z = 0; z < bitmap->depth; z++)
 			{
-				short y;
-
 				for (y = 0; y < bitmap->height; y++)
 				{
-					short x;
-
 					for (x = 0; x < bitmap->width; x++)
 					{
 						long alpha = 0;
@@ -1028,9 +1052,9 @@ static void bitmap_3d_smooth(
 						{
 							short source_x =
 								(short)((bitmap->width + filter_index + x) % bitmap->width);
-							short coefficient = filter_coefficients[filter_index + filter_size];
 							pixel32 pixel = source_pixels[
 								(bitmap->height * z + y) * bitmap->width + source_x];
+							short coefficient = filter_coefficients[filter_index + filter_size];
 
 							alpha += (pixel >> 24) * coefficient;
 							red += ((pixel >> 16) & 0xFF) * coefficient;
@@ -1038,28 +1062,19 @@ static void bitmap_3d_smooth(
 							blue += (pixel & 0xFF) * coefficient;
 						}
 
-						{
-							long rounding = 1 << (2 * filter_size - 1);
-							short shift = 2 * filter_size;
-
-							temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
-								((((rounding + alpha) >> shift) << 24) |
-								(((rounding + red) >> shift) << 16) |
-								(((rounding + green) >> shift) << 8) |
-								((rounding + blue) >> shift));
-						}
+						temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+							((((alpha + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 24) |
+							(((red + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 16) |
+							(((green + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 8) |
+							((blue + (1 << (2 * filter_size - 1))) >> (2 * filter_size)));
 					}
 				}
 			}
 
-			for (z = 0; z < (short)bitmap->depth; z++)
+			for (z = 0; z < bitmap->depth; z++)
 			{
-				short y;
-
 				for (y = 0; y < bitmap->height; y++)
 				{
-					short x;
-
 					for (x = 0; x < bitmap->width; x++)
 					{
 						long alpha = 0;
@@ -1074,9 +1089,9 @@ static void bitmap_3d_smooth(
 						{
 							short source_y =
 								(short)((bitmap->height + filter_index + y) % bitmap->height);
-							short coefficient = filter_coefficients[filter_index + filter_size];
 							pixel32 pixel = temporary_pixels[
 								(bitmap->height * z + source_y) * bitmap->width + x];
+							short coefficient = filter_coefficients[filter_index + filter_size];
 
 							alpha += (pixel >> 24) * coefficient;
 							red += ((pixel >> 16) & 0xFF) * coefficient;
@@ -1084,28 +1099,19 @@ static void bitmap_3d_smooth(
 							blue += (pixel & 0xFF) * coefficient;
 						}
 
-						{
-							long rounding = 1 << (2 * filter_size - 1);
-							short shift = 2 * filter_size;
-
-							source_pixels[(bitmap->height * z + y) * bitmap->width + x] =
-								((((rounding + alpha) >> shift) << 24) |
-								(((rounding + red) >> shift) << 16) |
-								(((rounding + green) >> shift) << 8) |
-								((rounding + blue) >> shift));
-						}
+						source_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+							((((alpha + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 24) |
+							(((red + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 16) |
+							(((green + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 8) |
+							((blue + (1 << (2 * filter_size - 1))) >> (2 * filter_size)));
 					}
 				}
 			}
 
-			for (z = 0; z < (short)bitmap->depth; z++)
+			for (z = 0; z < bitmap->depth; z++)
 			{
-				short y;
-
 				for (y = 0; y < bitmap->height; y++)
 				{
-					short x;
-
 					for (x = 0; x < bitmap->width; x++)
 					{
 						long alpha = 0;
@@ -1119,10 +1125,10 @@ static void bitmap_3d_smooth(
 							filter_index++)
 						{
 							short source_z =
-								(short)(((short)bitmap->depth + filter_index + z) % (short)bitmap->depth);
-							short coefficient = filter_coefficients[filter_index + filter_size];
+								(short)((bitmap->depth + filter_index + z) % bitmap->depth);
 							pixel32 pixel = source_pixels[
 								(bitmap->height * source_z + y) * bitmap->width + x];
+							short coefficient = filter_coefficients[filter_index + filter_size];
 
 							alpha += (pixel >> 24) * coefficient;
 							red += ((pixel >> 16) & 0xFF) * coefficient;
@@ -1130,16 +1136,11 @@ static void bitmap_3d_smooth(
 							blue += (pixel & 0xFF) * coefficient;
 						}
 
-						{
-							long rounding = 1 << (2 * filter_size - 1);
-							short shift = 2 * filter_size;
-
-							temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
-								((((rounding + alpha) >> shift) << 24) |
-								(((rounding + red) >> shift) << 16) |
-								(((rounding + green) >> shift) << 8) |
-								((rounding + blue) >> shift));
-						}
+						temporary_pixels[(bitmap->height * z + y) * bitmap->width + x] =
+							((((alpha + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 24) |
+							(((red + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 16) |
+							(((green + (1 << (2 * filter_size - 1))) >> (2 * filter_size)) << 8) |
+							((blue + (1 << (2 * filter_size - 1))) >> (2 * filter_size)));
 					}
 				}
 			}

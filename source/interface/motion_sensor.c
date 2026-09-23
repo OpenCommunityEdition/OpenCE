@@ -275,10 +275,10 @@ real scale[] =
 	1.1f
 };
 
-long next_vertex_index;
+long next_vertex_index= {0};
 static struct motion_sensor_globals_definition *motion_sensor_globals;
 static real sweep_theta;
-boolean debug_motion_sensor_draw_all_units;
+boolean debug_motion_sensor_draw_all_units= {0};
 
 extern struct motion_sensor_hud_globals *hud_globals;
 extern short blip_player_index;
@@ -1063,12 +1063,12 @@ static void render_blip(
 	real radius)
 {
 	real_point2d blip_position = *point;
-	real sine_yaw;
-	real cosine_yaw;
+	real_rgb_color const *blip_color;
 	real distance_squared;
 	real distance;
 	real mapped_distance;
-	real pulse_scale = 1.0f;
+	real distance_scale;
+	real pulse_scale;
 	real blip_draw_size;
 
 	match_assert(
@@ -1076,55 +1076,58 @@ static void render_blip(
 		410,
 		_blip_type_none != blip_type);
 
-	sine_yaw = sine(-sensor->yaw);
-	cosine_yaw = cosine(-sensor->yaw);
 	rotate_vector2d(
 		(real_vector2d const *)&blip_position,
-		sine_yaw,
-		cosine_yaw,
+		sine(-sensor->yaw),
+		cosine(-sensor->yaw),
 		(real_vector2d *)&blip_position);
 
 	distance_squared = magnitude_squared2d((real_vector2d const *)&blip_position);
-	if (distance_squared >=
+	if (distance_squared <
 		hud_globals->defaults.motion_sensor_range *
 			hud_globals->defaults.motion_sensor_range)
 	{
-		return;
-	}
+		distance = square_root(distance_squared);
+		if (distance < 0.015625f)
+			distance = 0.015625f;
 
-	distance = square_root(distance_squared);
-	if (distance < 0.015625f)
-		distance = 0.015625f;
-
-	scale_vector2d(
-		(real_vector2d const *)&blip_position,
-		1.0f / distance,
-		(real_vector2d *)&blip_position);
-	mapped_distance =
-		hud_globals->defaults.motion_sensor_range *
-		power(
+		scale_vector2d(
+			(real_vector2d const *)&blip_position,
+			1.0f / distance,
+			(real_vector2d *)&blip_position);
+		distance_scale = (real)pow(
 			distance / hud_globals->defaults.motion_sensor_range,
-			0.7f);
-	scale_vector2d(
-		(real_vector2d const *)&blip_position,
-		mapped_distance * relative_scale,
-		(real_vector2d *)&blip_position);
+			0.7);
+		mapped_distance =
+			hud_globals->defaults.motion_sensor_range * distance_scale;
+		scale_vector2d(
+			(real_vector2d const *)&blip_position,
+			mapped_distance,
+			(real_vector2d *)&blip_position);
+		scale_vector2d(
+			(real_vector2d const *)&blip_position,
+			relative_scale,
+			(real_vector2d *)&blip_position);
 
-	if (blip_type == _blip_type_custom)
-	{
-		pulse_scale = (real)(
-			(sin((real)game_time_get() * 0.10471976f) + 1.0) *
-				(1.0 / 3.0) +
-			1.0);
+		blip_color = &blip_colors[blip_type];
+		pulse_scale = 1.0f;
+		blip_draw_size = blip_size_get(blip_size_type);
+		if (blip_type == _blip_type_custom)
+		{
+			pulse_scale = (real)(
+				(sin((real)game_time_get() * 0.104719733f) + 1.0) *
+					(1.0 / 3.0) +
+				1.0);
+		}
+
+		blip_draw_size += pulse_scale * radius;
+		rasterizer_hud_motion_sensor_blip_draw(
+			&blip_position,
+			fade,
+			blip_draw_size,
+			blip_color,
+			(boolean)(blip_type == _blip_type_custom));
 	}
-
-	blip_draw_size = blip_size_get(blip_size_type) + pulse_scale * radius;
-	rasterizer_hud_motion_sensor_blip_draw(
-		&blip_position,
-		fade,
-		blip_draw_size,
-		&blip_colors[blip_type],
-		(boolean)(blip_type == _blip_type_custom));
 
 	return;
 }

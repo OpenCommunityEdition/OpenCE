@@ -363,7 +363,6 @@ struct rasterizer_environment_globals
 	boolean lightmap_missing;
 	byte reservedAD[0x3];
 	real specular_light_brightness;
-	boolean warned;
 };
 
 struct pixel_shader_definition
@@ -571,10 +570,11 @@ static void rasterizer_environment_specular_spot_light_begin(
 
 extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
+static boolean warned = FALSE;
 extern struct pixel_shader_definition pixel_shader;
 extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
-extern short specular_light_vertex_shader_permutation_index;
+short specular_light_vertex_shader_permutation_index= NONE;
 
 /* ---------- public code */
 
@@ -3292,10 +3292,10 @@ void _rasterizer_environment_transparent_geometry_submit(
 					triangle_count);
 		}
 		}
-		else if (!rasterizer_environment_globals.warned)
+		else if (!warned)
 		{
 			error(_error_silent, "### ERROR too many transparent geometry groups");
-			rasterizer_environment_globals.warned = TRUE;
+			warned = TRUE;
 		}
 	}
 	(void)offset;

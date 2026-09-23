@@ -151,6 +151,17 @@ enum
 	MAXIMUM_PORTAL_VERTICES = 64
 };
 
+/* ---------- declaration that belongs in tag_files/tag_groups.h
+   _tag_field_real_point2d is a shared tag-system constant, not leaf_map's own;
+   it is held here because this lane may not edit shared headers.  Same
+   precedent as bitmaps/bitmap_group.c.
+   ---------- */
+
+enum
+{
+	_tag_field_real_point2d = 16,
+};
+
 enum projected_plane_result
 {
 	_projected_plane_empty,
@@ -260,12 +271,145 @@ static struct leaf_map_polygon global_leaf_face_polygon =
 	}
 };
 
+static struct tag_field map_leaf_face_vertex_block_fields[2] =
+{
+	{ _tag_field_real_point2d, 0, "vertex*", NULL },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+static struct tag_block_definition map_leaf_face_vertex_block =
+{
+	"map_leaf_face_vertex_block",
+	0,
+	MAXIMUM_LEAF_FACE_VERTICES,
+	sizeof(real_point2d),
+	NULL,
+	map_leaf_face_vertex_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static struct tag_field map_leaf_portal_index_block_fields[2] =
+{
+	{ _tag_field_long_integer, 0, "portal index*", NULL },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+static struct tag_block_definition map_leaf_portal_index_block =
+{
+	"map_leaf_portal_index_block",
+	0,
+	256,
+	sizeof(long),
+	NULL,
+	map_leaf_portal_index_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static struct tag_field map_leaf_face_block_fields[3] =
+{
+	{ _tag_field_long_integer, 0, "node index*", NULL },
+	{ _tag_field_block, 0, "vertices*", &map_leaf_face_vertex_block },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+static struct tag_block_definition map_leaf_face_block =
+{
+	"map_leaf_face_block",
+	0,
+	256,
+	sizeof(struct map_leaf_face),
+	NULL,
+	map_leaf_face_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static struct tag_field global_map_leaf_block_fields[3] =
+{
+	{ _tag_field_block, 0, "faces*", &map_leaf_face_block },
+	{ _tag_field_block, 0, "portal indices*", &map_leaf_portal_index_block },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+struct tag_block_definition global_map_leaf_block =
+{
+	"global_map_leaf_block",
+	0,
+	0x10000,
+	sizeof(struct map_leaf),
+	NULL,
+	global_map_leaf_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static struct tag_field leaf_portal_vertex_block_fields[2] =
+{
+	{ _tag_field_real_point3d, 0, "point*", NULL },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+static struct tag_block_definition leaf_portal_vertex_block =
+{
+	"leaf_portal_vertex_block",
+	0,
+	MAXIMUM_PORTAL_VERTICES,
+	sizeof(real_point3d),
+	NULL,
+	leaf_portal_vertex_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static struct tag_field global_leaf_portal_block_fields[5] =
+{
+	{ _tag_field_long_integer, 0, "plane index*", NULL },
+	{ _tag_field_long_integer, 0, "back leaf index*", NULL },
+	{ _tag_field_long_integer, 0, "front leaf index*", NULL },
+	{ _tag_field_block, 0, "vertices*", &leaf_portal_vertex_block },
+	{ _tag_field_terminator, 0, NULL, NULL },
+};
+
+struct tag_block_definition global_leaf_portal_block =
+{
+	"global_leaf_portal_block",
+	0,
+	0x80000,
+	sizeof(struct leaf_portal),
+	NULL,
+	global_leaf_portal_block_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
 static struct
 {
 	long node_stack[MAXIMUM_NODE_STACK_COUNT];
 	short node_stack_count;
 	char const *error;
 } leaf_map_globals;
+
+static short portal_count = 0;
 
 /* ---------- public code */
 
@@ -836,19 +980,11 @@ static short intersect_planes3d(
 
 	if (length != 0.f)
 	{
-		real_point3d projected_normal = {{
-			projected_plane.n.i,
-			projected_plane.n.j,
-			projected_plane.n.k}};
-		real_point2d projected_result;
-
 		project_point3d(
-			&projected_normal,
+			(real_point3d const *)&projected_plane.n,
 			projection,
 			projection_sign_from_vector3d(&reference_plane->n, projection),
-			&projected_result);
-		result->n.i = projected_result.x;
-		result->n.j = projected_result.y;
+			(real_point2d *)&result->n);
 		result->d = projected_plane.d / length;
 
 		return _projected_plane_valid;

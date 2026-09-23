@@ -80,7 +80,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "errors.h"
@@ -100,7 +99,6 @@ symbols in this file:
 #include "objects/widgets/widget_types.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 /* ---------- constants */
 
@@ -956,7 +954,7 @@ void rasterizer_lens_flares_draw(
 						lens_flare_parameters)*definition->corona_rotation_function_scale;
 					screen_rotation = (real)atan2(
 						dot_product3d(&global_window_parameters.view_to_world.forward, &camera_offset),
-						dot_product3d(&global_window_parameters.view_to_world.left, &camera_offset))*(180.0f/_pi);
+						dot_product3d(&global_window_parameters.view_to_world.left, &camera_offset))*(180.0f/((real)M_PI));
 
 					cosine_scale = 1.0f/
 						(definition->runtime_cosine_falloff_angle-definition->runtime_cosine_cutoff_angle);
@@ -1031,7 +1029,7 @@ void rasterizer_lens_flares_draw(
 										match_assert(
 											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 											651,
-											reflection->animation_period != 0.0f);
+											reflection->animation_period!=0.0f);
 
 										animation_time = periodic_function_evaluate(
 											reflection->animation_function,
@@ -1055,19 +1053,19 @@ void rasterizer_lens_flares_draw(
 										match_assert(
 											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 											667,
-											animation_color.alpha >= 0.0f && animation_color.alpha <= 1.0f);
+											animation_color.alpha>=0.0f && animation_color.alpha<=1.0f);
 										match_assert(
 											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 											668,
-											animation_color.red >= 0.0f && animation_color.red <= 1.0f);
+											animation_color.red >=0.0f && animation_color.red <=1.0f);
 										match_assert(
 											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 											669,
-											animation_color.green >= 0.0f && animation_color.green <= 1.0f);
+											animation_color.green>=0.0f && animation_color.green<=1.0f);
 										match_assert(
 											"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 											670,
-											animation_color.blue >= 0.0f && animation_color.blue <= 1.0f);
+											animation_color.blue >=0.0f && animation_color.blue <=1.0f);
 
 										color.alpha *= animation_color.alpha;
 										color.red *= animation_color.red;

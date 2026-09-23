@@ -185,6 +185,15 @@ static boolean director_update_controls(
 
 /* ---------- globals */
 
+char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
+{
+	"following",
+	"orbiting",
+	"flying",
+	"editor",
+	"first person"
+};
+
 short const director_game_camera_modes[3] =
 {
 	_camera_first_person,
@@ -205,15 +214,6 @@ real const friction = 5.f;
 real const acceleration_scale = 25.f;
 real const genius_boy = 1.3f;
 
-char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
-{
-	"following",
-	"orbiting",
-	"flying",
-	"editor",
-	"first person"
-};
-
 struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
 {
 	{ 5, 4, NONE, { 0, 0 }, 0.15f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } },
@@ -222,8 +222,9 @@ struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
 	{ 3, 2, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } }
 };
 
-struct director_globals director_globals;
-boolean director_camera_switch_fast;
+struct director_globals director_globals = {0};
+boolean director_camera_switch_fast = FALSE;
+static boolean hyper_key_down = FALSE;
 
 /* ---------- public code */
 

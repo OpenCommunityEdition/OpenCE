@@ -77,7 +77,7 @@ void _byte_swap_data(
 
 /* ---------- globals */
 
-byte_swap_code byte_bs_codes[] = { _begin_bs_array, 1, 1, _end_bs_array };
+static byte_swap_code byte_bs_codes[] = { _begin_bs_array, 1, 1, _end_bs_array };
 struct byte_swap_definition byte_bs_definition =
 {
 	"byte",

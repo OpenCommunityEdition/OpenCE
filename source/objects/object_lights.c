@@ -489,7 +489,7 @@ static real_vector3d const lightmap_sample_raycast_sideways[NUMBER_OF_LIGHTMAP_S
 	{ 0.0f, 10.0f, 0.0f },
 };
 
-static struct profile_section lights_section = { "lights", NONE, TRUE };
+static struct profile_section lights_section = { "render_lights", NONE, TRUE };
 
 real object_light_ambient_base = 0.03f;
 real object_light_ambient_scale = 0.4f;
@@ -500,9 +500,9 @@ extern boolean debug_lights;
 extern boolean debug_object_lights;
 extern struct data_array *light_data;
 extern struct cluster_partition light_cluster_partition;
-extern struct lights_game_globals *lights_game_globals;
+struct lights_game_globals *lights_game_globals = NULL;
 extern short debug_rasterizer_light_count;
-static struct lights_globals lights_globals;
+struct lights_globals lights_globals;
 
 /* ---------- public code */
 
@@ -1270,7 +1270,7 @@ void light_particle(
 				struct bitmap_data *diffuse_bitmap = bitmap_group_try_and_get_bitmap(
 					shader_environment->base_map.index,
 					(short)(material->permutation_index
-						% bitmap_group_get(shader_environment->base_map.index)->bitmap_data.count));
+						% bitmap_group_get(shader_environment->base_map.index)->bitmaps.count));
 				struct structure_surface const *surface = NULL;
 
 				if (lightmap_bitmap
@@ -2168,7 +2168,7 @@ boolean lights_distant_lighting_at_point(
 					struct bitmap_data *diffuse_bitmap = bitmap_group_try_and_get_bitmap(
 						shader_environment->base_map.index,
 						(short)(material->permutation_index
-							% bitmap_group_get(shader_environment->base_map.index)->bitmap_data.count));
+							% bitmap_group_get(shader_environment->base_map.index)->bitmaps.count));
 
 					if (lightmap_bitmap != NULL
 						&& diffuse_bitmap != NULL

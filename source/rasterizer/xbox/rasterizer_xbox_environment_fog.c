@@ -396,43 +396,6 @@ struct transparent_geometry_group
 	byte pad9E[2];
 };
 
-struct rasterizer_environment_fog_screen_globals
-{
-	short cached_node_matrix_count;
-	word pad002;
-	real_matrix4x3 const *cached_node_matrices;
-	real_matrix4x3 previous_camera_matrix[MAXIMUM_WINDOWS];
-	boolean local_environment_fog_screen_model_flag;
-	boolean local_environment_fog_screen_flag;
-	byte reserved0DA[2];
-	word local_fog_screen_layer_bitmap_indices[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS];
-	real_rgb_color local_fog_screen_layer_colors[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS];
-	real local_fog_eye_density;
-	short local_fog_pass;
-	byte reserved11A[6];
-	struct rasterizer_environment_fog_screen_window windows[MAXIMUM_WINDOWS];
-	struct transparent_geometry_group *opaque_model_submit_parameters;
-	long opaque_model_count;
-	boolean fog_screen_active[MAXIMUM_WINDOWS];
-	byte reserved25C[4];
-	unsigned __int64 last_frame_index[MAXIMUM_WINDOWS];
-	short atmosphere_dominant_warning_count;
-	boolean reported_bad_animation_index;
-	byte pad283;
-	struct rasterizer_model_begin_parameters const *model;
-	boolean model_parameters_cached;
-	byte pad289[3];
-	struct render_lighting const *cached_lighting;
-	struct render_animation const *cached_animation;
-	boolean reported_too_many_opaque_models;
-};
-
-typedef char rasterizer_environment_fog_screen_globals_windows_offset_assert[
-	offsetof(struct rasterizer_environment_fog_screen_globals, windows) == 0x120 ? 1 : -1];
-typedef char rasterizer_environment_fog_screen_globals_warning_offset_assert[
-	offsetof(
-		struct rasterizer_environment_fog_screen_globals,
-		atmosphere_dominant_warning_count) == 0x280 ? 1 : -1];
 typedef char rasterizer_environment_fog_window_parameters_fog_offset_assert[
 	offsetof(struct rasterizer_window_begin_parameters, fog) == 0x1E8 ? 1 : -1];
 typedef char rasterizer_environment_fog_window_parameters_field_of_view_offset_assert[
@@ -459,33 +422,30 @@ typedef char rasterizer_environment_fog_transparent_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
 typedef char rasterizer_environment_fog_transparent_group_map_scale_offset_assert[
 	offsetof(struct transparent_geometry_group, model_base_map_scale) == 0x3C ? 1 : -1];
-typedef char rasterizer_environment_fog_screen_globals_model_offset_assert[
-	offsetof(struct rasterizer_environment_fog_screen_globals, model) == 0x284 ? 1 : -1];
-typedef char rasterizer_environment_fog_screen_globals_previous_camera_offset_assert[
-	offsetof(
-		struct rasterizer_environment_fog_screen_globals,
-		previous_camera_matrix) == 0x8 ? 1 : -1];
-typedef char rasterizer_environment_fog_screen_globals_bad_animation_offset_assert[
-	offsetof(
-		struct rasterizer_environment_fog_screen_globals,
-		reported_bad_animation_index) == 0x282 ? 1 : -1];
-typedef char rasterizer_environment_fog_screen_globals_end_offset_assert[
-	offsetof(
-		struct rasterizer_environment_fog_screen_globals,
-		reported_too_many_opaque_models) == 0x294 ? 1 : -1];
-
-/* January's assertions name these file-scope values.  They occupy fields in
- * the single private BSS owner recovered for this translation unit. */
-#define local_fog_eye_density rasterizer_environment_fog_screen_globals.local_fog_eye_density
-#define local_fog_pass rasterizer_environment_fog_screen_globals.local_fog_pass
-#define local_environment_fog_screen_flag rasterizer_environment_fog_screen_globals.local_environment_fog_screen_flag
-#define local_environment_fog_screen_model_flag rasterizer_environment_fog_screen_globals.local_environment_fog_screen_model_flag
-#define local_fog_screen_layer_bitmap_indices rasterizer_environment_fog_screen_globals.local_fog_screen_layer_bitmap_indices
-#define local_fog_screen_layer_colors rasterizer_environment_fog_screen_globals.local_fog_screen_layer_colors
 
 /* ---------- globals */
 
-static struct rasterizer_environment_fog_screen_globals rasterizer_environment_fog_screen_globals = { 0 };
+static short cached_node_matrix_count = 0;
+static real_matrix4x3 const *cached_node_matrices = NULL;
+static real_matrix4x3 previous_camera_matrix[MAXIMUM_WINDOWS] = {0};
+static boolean local_environment_fog_screen_model_flag = FALSE;
+static boolean local_environment_fog_screen_flag = FALSE;
+static word local_fog_screen_layer_bitmap_indices[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS] = {0};
+static real_rgb_color local_fog_screen_layer_colors[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS] = {0};
+static real local_fog_eye_density = 0.0f;
+static short local_fog_pass = 0;
+static struct rasterizer_environment_fog_screen_window windows[MAXIMUM_WINDOWS] = {0};
+static struct transparent_geometry_group *opaque_model_submit_parameters = NULL;
+static long opaque_model_count = 0;
+static boolean fog_screen_active[MAXIMUM_WINDOWS] = {0};
+static unsigned __int64 last_frame_index[MAXIMUM_WINDOWS] = {0};
+static short atmosphere_dominant_warning_count = 0;
+static boolean reported_bad_animation_index = FALSE;
+static struct rasterizer_model_begin_parameters const *model = NULL;
+static boolean model_parameters_cached = FALSE;
+static struct render_lighting const *cached_lighting = NULL;
+static struct render_animation const *cached_animation = NULL;
+static boolean reported_too_many_opaque_models = FALSE;
 static boolean local_fog_screen_first_time = TRUE;
 
 extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
@@ -504,14 +464,14 @@ boolean rasterizer_environment_fog_screen_initialize(
 {
 	boolean result = TRUE;
 
-	rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters =
+	opaque_model_submit_parameters =
 		debug_malloc(
 			0x5000,
 			FALSE,
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
 			0xF8);
-	rasterizer_environment_fog_screen_globals.opaque_model_count = 0;
-	if (!rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters)
+	opaque_model_count = 0;
+	if (!opaque_model_submit_parameters)
 	{
 		error(
 			_error_silent,
@@ -531,7 +491,7 @@ void rasterizer_environment_fog_screen_window_end(
 void rasterizer_environment_fog_screen_window_begin(
 	void)
 {
-	rasterizer_environment_fog_screen_globals.opaque_model_count = 0;
+	opaque_model_count = 0;
 
 	return;
 }
@@ -539,10 +499,10 @@ void rasterizer_environment_fog_screen_window_begin(
 void rasterizer_environment_fog_screen_dispose(
 	void)
 {
-	if (rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters)
+	if (opaque_model_submit_parameters)
 	{
 		debug_free(
-			rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters,
+			opaque_model_submit_parameters,
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
 			0x117);
 	}
@@ -580,8 +540,8 @@ boolean rasterizer_environment_fog_screen_model_begin(
 					&camera_relative),
 				&global_window_parameters.camera.forward) < screen->far_distance)
 			{
-				rasterizer_environment_fog_screen_globals.model = parameters;
-				rasterizer_environment_fog_screen_globals.model_parameters_cached = FALSE;
+				model = parameters;
+				model_parameters_cached = FALSE;
 				result = TRUE;
 				if (rasterizer_debug_options.statistics_mode ==
 					_rasterizer_statistics_mode_enabled)
@@ -607,48 +567,44 @@ void rasterizer_environment_fog_screen_model_submit(
 	if (rasterizer_debug_options.draw_environment_fog_screen &&
 		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal)
 	{
-		if (rasterizer_environment_fog_screen_globals.opaque_model_count <
+		if (opaque_model_count <
 			MAXIMUM_ENVIRONMENT_FOG_SCREEN_OPAQUE_MODELS)
 		{
 			struct transparent_geometry_group *group =
-				&rasterizer_environment_fog_screen_globals.opaque_model_submit_parameters[
-					rasterizer_environment_fog_screen_globals.opaque_model_count++];
+				&opaque_model_submit_parameters[
+					opaque_model_count++];
 
 			group->shader = shader;
-			group->triangle_buffer = triangle_buffer;
 			group->shader_permutation_index = shader_permutation_index;
 			group->dynamic_triangle_buffer_index = dynamic_triangle_buffer_index;
-			group->vertex_buffer = vertex_buffer;
+			group->triangle_buffer = triangle_buffer;
 			group->triangle_count = triangle_count;
 			group->first_triangle_index = 0;
 			group->dynamic_vertex_buffer_index = dynamic_vertex_buffer_index;
+			group->vertex_buffer = vertex_buffer;
+			group->model_base_map_scale = model->base_map_scale;
+			if (!model_parameters_cached)
 			{
-				struct rasterizer_model_begin_parameters const *model =
-					rasterizer_environment_fog_screen_globals.model;
-				group->model_base_map_scale = model->base_map_scale;
-				if (!rasterizer_environment_fog_screen_globals.model_parameters_cached)
-				{
-					rasterizer_environment_fog_screen_globals.cached_node_matrices =
-						rasterizer_memory_alloc_const(
-							model->skinning.node_matrices,
-							model->skinning.node_matrix_count * sizeof(real_matrix4x3));
-					rasterizer_environment_fog_screen_globals.cached_node_matrix_count =
-						rasterizer_environment_fog_screen_globals.model->skinning.node_matrix_count;
-					rasterizer_environment_fog_screen_globals.model_parameters_cached = TRUE;
-				}
+				cached_node_matrices =
+					rasterizer_memory_alloc_const(
+						model->skinning.node_matrices,
+						model->skinning.node_matrix_count * sizeof(real_matrix4x3));
+				cached_node_matrix_count =
+					model->skinning.node_matrix_count;
+				model_parameters_cached = TRUE;
 			}
-			group->node_matrices = rasterizer_environment_fog_screen_globals.cached_node_matrices;
-			group->node_matrix_count = rasterizer_environment_fog_screen_globals.cached_node_matrix_count;
-			group->lighting = rasterizer_environment_fog_screen_globals.cached_lighting;
-			group->animation = rasterizer_environment_fog_screen_globals.cached_animation;
+			group->node_matrices = cached_node_matrices;
+			group->node_matrix_count = cached_node_matrix_count;
+			group->lighting = cached_lighting;
+			group->animation = cached_animation;
 		}
-		else if (!rasterizer_environment_fog_screen_globals.reported_too_many_opaque_models)
+		else if (!reported_too_many_opaque_models)
 		{
 			error(
 				_error_silent,
 				"### ERROR too many opaque model groups obscuring fog screen (max=#%d)",
 				MAXIMUM_ENVIRONMENT_FOG_SCREEN_OPAQUE_MODELS);
-			rasterizer_environment_fog_screen_globals.reported_too_many_opaque_models = TRUE;
+			reported_too_many_opaque_models = TRUE;
 		}
 	}
 
@@ -658,7 +614,7 @@ void rasterizer_environment_fog_screen_model_submit(
 void rasterizer_environment_fog_screen_model_end(
 	void)
 {
-	rasterizer_environment_fog_screen_globals.model = 0;
+	model = 0;
 
 	return;
 }
@@ -710,13 +666,13 @@ void _rasterizer_environment_fog_begin(
 		{
 			atmospheric_eye_density = 1.0f;
 			if (distance < -0.3f &&
-				rasterizer_environment_fog_screen_globals.atmosphere_dominant_warning_count <
+				atmosphere_dominant_warning_count <
 					MAXIMUM_ATMOSPHERE_DOMINANT_WARNINGS)
 			{
 				error(
 					_error_silent,
 					"### WARNING camera went below atmosphere-dominant fog plane");
-				rasterizer_environment_fog_screen_globals.atmosphere_dominant_warning_count++;
+				atmosphere_dominant_warning_count++;
 			}
 		}
 
@@ -871,9 +827,9 @@ static boolean rasterizer_environment_fog_screen_active(
 	{
 		struct fog_screen const *screen;
 
-		rasterizer_environment_fog_screen_globals.fog_screen_active[window_index] = FALSE;
+		fog_screen_active[window_index] = FALSE;
 		if (rasterizer_globals.fps_accumulation_frame_index !=
-			rasterizer_environment_fog_screen_globals.last_frame_index[window_index])
+			last_frame_index[window_index])
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
@@ -912,10 +868,10 @@ static boolean rasterizer_environment_fog_screen_active(
 						? global_window_parameters.fog.screen_external_intensity
 						: PIN((distance - z) / (base_z - z), 0.0f, 1.0f);
 				if (local_fog_eye_density > 0.0f)
-					rasterizer_environment_fog_screen_globals.fog_screen_active[window_index] = TRUE;
+					fog_screen_active[window_index] = TRUE;
 			}
 		}
-		active = rasterizer_environment_fog_screen_globals.fog_screen_active[window_index];
+		active = fog_screen_active[window_index];
 	}
 	else
 	{
@@ -931,7 +887,7 @@ void _rasterizer_environment_fog_screen_wind_get_vector(
 	real_vector3d *wind_vector)
 {
 	struct rasterizer_environment_fog_screen_wind *wind =
-		&rasterizer_environment_fog_screen_globals.windows[window_index].wind;
+		&windows[window_index].wind;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
@@ -1037,7 +993,7 @@ void _rasterizer_environment_fog_screen_begin(
 	if (rasterizer_environment_fog_screen_active())
 	{
 		struct rasterizer_environment_fog_screen_window *window =
-			&rasterizer_environment_fog_screen_globals.windows[
+			&windows[
 				global_window_parameters.window_index];
 		struct fog_screen const *screen = global_window_parameters.fog.screen;
 
@@ -1049,7 +1005,7 @@ void _rasterizer_environment_fog_screen_begin(
 		if (pass == 0)
 		{
 			real_matrix4x3 *previous_camera_matrix =
-				&rasterizer_environment_fog_screen_globals.previous_camera_matrix[
+				&previous_camera_matrix[
 					global_window_parameters.window_index];
 			real_matrix4x3 wind_matrix = *global_identity4x3;
 			real screen_constants[5][4];
@@ -1073,13 +1029,13 @@ void _rasterizer_environment_fog_screen_begin(
 				for (window_index = 0; window_index < MAXIMUM_WINDOWS; window_index++)
 				{
 					csmemset(
-						&rasterizer_environment_fog_screen_globals.windows[window_index],
+						&windows[window_index],
 						0,
 						sizeof(struct rasterizer_environment_fog_screen_window));
 					for (layer = 0; layer < screen->layer_count; layer++)
 					{
 						struct rasterizer_environment_fog_screen_layer *layer_state =
-							&rasterizer_environment_fog_screen_globals.windows[window_index].
+							&windows[window_index].
 								layers[layer];
 
 						layer_state->v = real_local_random();
@@ -1087,10 +1043,10 @@ void _rasterizer_environment_fog_screen_begin(
 					}
 					/* January copies the first matrix-sized camera bytes here verbatim. */
 					csmemcpy(
-						&rasterizer_environment_fog_screen_globals.previous_camera_matrix[
+						&previous_camera_matrix[
 							window_index],
 						&global_window_parameters.camera,
-						sizeof(rasterizer_environment_fog_screen_globals.previous_camera_matrix[
+						sizeof(previous_camera_matrix[
 							window_index]));
 				}
 				local_fog_screen_first_time = FALSE;
@@ -1107,7 +1063,7 @@ void _rasterizer_environment_fog_screen_begin(
 			matrix4x3_multiply(&wind_matrix, &matrix, &matrix);
 			matrix4x3_multiply(&global_window_parameters.frustum.world_to_view, &matrix, &matrix);
 			csmemcpy(
-				&rasterizer_environment_fog_screen_globals.previous_camera_matrix[
+				&previous_camera_matrix[
 					global_window_parameters.window_index],
 				&global_window_parameters.frustum.world_to_view,
 				sizeof(real_matrix4x3));
@@ -1213,21 +1169,20 @@ void _rasterizer_environment_fog_screen_begin(
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
 					653,
-					bitmap_group && bitmap_group->bitmap_data.count>0);
+					bitmap_group && bitmap_group->bitmaps.count>0);
 
 				if (screen->animation_period != 0.0f)
 				{
 					short animation_index;
-					real t = bitmap_group->bitmap_data.count * phase[layer] +
+					real t = bitmap_group->bitmaps.count * phase[layer] +
 						global_frame_parameters.game_time_sec / screen->animation_period;
 					real animation_time = (real)PIN(t - floor(t), 0.0, 1.0);
 
 					animation_times[layer] = animation_time;
-					animation_index = (short)(fast_ftol((real)floor(t)) % bitmap_group->bitmap_data.count);
+					animation_index = (short)(fast_ftol((real)floor(t)) % bitmap_group->bitmaps.count);
 					if (animation_index < 0)
 					{
-						if (!rasterizer_environment_fog_screen_globals.
-							reported_bad_animation_index)
+						if (!reported_bad_animation_index)
 						{
 							long game_time_bits;
 							long animation_period_bits;
@@ -1287,22 +1242,21 @@ void _rasterizer_environment_fog_screen_begin(
 								"\tanimation_time=%f[%x]",
 								animation_time,
 								animation_time_bits);
-							rasterizer_environment_fog_screen_globals.
-								reported_bad_animation_index = TRUE;
+							reported_bad_animation_index = TRUE;
 						}
 						animation_index = 0;
 					}
 					match_assert(
 						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
 						682,
-						animation_index>=0 && animation_index<bitmap_group->bitmap_data.count);
+						animation_index>=0 && animation_index<bitmap_group->bitmaps.count);
 					local_fog_screen_layer_bitmap_indices[layer] = animation_index;
 				}
 				else
 				{
 					animation_times[layer] = 0.0f;
 					local_fog_screen_layer_bitmap_indices[layer] =
-						(short)(layer % bitmap_group->bitmap_data.count);
+						(short)(layer % bitmap_group->bitmaps.count);
 				}
 			}
 
@@ -1375,7 +1329,7 @@ void _rasterizer_environment_fog_screen_begin(
 			local_environment_fog_screen_model_flag = !TEST_FLAG(
 				global_window_parameters.fog.screen->flags,
 				_fog_screen_no_model_multipass_bit) &&
-				rasterizer_environment_fog_screen_globals.opaque_model_count > 0;
+				opaque_model_count > 0;
 		}
 		if (local_environment_fog_screen_flag || local_environment_fog_screen_model_flag)
 		{
@@ -1396,7 +1350,7 @@ void _rasterizer_environment_fog_screen_begin(
 					clear_z_buffer = (TEST_FLAG(
 						screen->flags,
 						_fog_screen_no_model_multipass_bit) &&
-						rasterizer_environment_fog_screen_globals.opaque_model_count > 0) ||
+						opaque_model_count > 0) ||
 						(rasterizer_water_get_visibility_for_window() &&
 							rasterizer_debug_options.draw_water);
 				}
@@ -1498,12 +1452,11 @@ void _rasterizer_environment_fog_screen_begin(
 				short group_index;
 
 				for (group_index = 0;
-					group_index < rasterizer_environment_fog_screen_globals.opaque_model_count;
+					group_index < opaque_model_count;
 					group_index++)
 				{
 					struct transparent_geometry_group *group =
-						&rasterizer_environment_fog_screen_globals.
-							opaque_model_submit_parameters[group_index];
+						&opaque_model_submit_parameters[group_index];
 					struct rasterizer_model_skinning_parameters skinning;
 
 					if (group->shader->base.type == _shader_type_transparent_chicago &&
@@ -1679,7 +1632,7 @@ void _rasterizer_environment_fog_screen_end(
 	{
 		struct fog_screen const *screen = global_window_parameters.fog.screen;
 		struct rasterizer_environment_fog_screen_window *window =
-			&rasterizer_environment_fog_screen_globals.windows[
+			&windows[
 				global_window_parameters.window_index];
 		boolean fog_screen_drawn = local_environment_fog_screen_flag ||
 			local_environment_fog_screen_model_flag;

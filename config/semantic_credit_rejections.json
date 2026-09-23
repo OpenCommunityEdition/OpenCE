@@ -1,24 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {
-      "unit": "source/ai/path_obstacle_avoidance",
-      "function": "_render_debug_obstacle_path",
-      "code_bytes": 224,
-      "target": {
-        "normalized_sha256": "9dbeaee9e3fc7da77a427e8192dff7f2c6cf1419dce7f8c3baa9f4ef1d6094ce",
-        "padded_bytes": 224,
-        "relocations": 28,
-        "relocation_sha256": "6d5d0368d78f8beea954287abefbdc55bdcd0d2f8096f842c481e0ebf45bd52a"
-      },
-      "candidate": {
-        "normalized_sha256": "9dbeaee9e3fc7da77a427e8192dff7f2c6cf1419dce7f8c3baa9f4ef1d6094ce",
-        "padded_bytes": 224,
-        "relocations": 28,
-        "relocation_sha256": "4bd6c15596890d7a19f5da108d4045f74fcceba9e99206fa1d40f12c4d7fc6aa"
-      },
-      "reason": "The function has identical normalized instructions and relocation positions/types, but January owns the obstacle snapshot as _current_traverse_index+0x1538 and the coherent source owns it as debug_obstacles; January likewise labels the path storage _current_traverse_index while the source correctly owns debug_path. Renaming semantic globals to split artifacts or spelling raw BSS offsets would violate the source-authenticity and global-naming house rules, so relocation-shape equality cannot receive exact credit.",
-      "evidence": "docs/object_matching_logs/unwritten_leaf_transport_path_reconciliation_20260913.md#coherent-obstacle-path-reconstruction-zero-exact-credit"
-    }
-  ]
+  "entries": []
 }

@@ -184,7 +184,6 @@ struct rasterizer_frame_statistics_private_globals_definition
 {
 	real profile_times[NUMBER_OF_RASTERIZER_PROFILES][MAXIMUM_PROFILE_ACCUMULATION_COUNT];
 	word *temp_buffer;
-	byte reserved744[4];
 	unsigned __int64 fps_accumulation_time;
 	unsigned __int64 fps_accumulation_frame_index;
 	FILE *profile_log_file;
@@ -223,7 +222,7 @@ static boolean eat_my_shorts(
 
 /* ---------- globals */
 
-extern struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals;
+struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals= {0};
 
 /* the FPS sample count and the profile-log accumulators are separate file-scope statics, not
    members of the private record: get_fps reloads fps_sample_count from memory after the
@@ -342,6 +341,10 @@ static boolean eat_my_shorts(
 	{
 		return TRUE;
 	}
+	else if (first < second)
+	{
+		return FALSE;
+	}
 
 	return FALSE;
 }
@@ -360,7 +363,32 @@ long rasterizer_frame_statistics_count_static_vertices(
 		}
 		else if (triangle_buffer->type == _triangle_buffer_type_triangles)
 		{
-			vertex_count = vertex_buffer->count;
+			if (vertex_buffer)
+			{
+				vertex_count = vertex_buffer->count;
+			}
+			else
+			{
+				long index_count = triangle_buffer->count * NUMBER_OF_VERTICES_PER_TRIANGLE;
+				long index;
+				word last_vertex_index = (word)NONE;
+
+				memcpy(
+					rasterizer_frame_statistics_temp_buffer,
+					triangle_buffer->base_address,
+					sizeof(word) * triangle_buffer->count * NUMBER_OF_VERTICES_PER_TRIANGLE);
+				qsort_2byte(rasterizer_frame_statistics_temp_buffer, index_count, eat_my_shorts);
+				for (index = 0; index < index_count; index++)
+				{
+					word vertex_index = rasterizer_frame_statistics_temp_buffer[index];
+
+					if (last_vertex_index != vertex_index)
+					{
+						last_vertex_index = vertex_index;
+						vertex_count++;
+					}
+				}
+			}
 		}
 	}
 
@@ -399,9 +427,11 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 			qsort_2byte(rasterizer_frame_statistics_temp_buffer, index_count, eat_my_shorts);
 			for (index = 0; index < index_count; index++)
 			{
-				if (last_vertex_index != rasterizer_frame_statistics_temp_buffer[index])
+				word vertex_index = rasterizer_frame_statistics_temp_buffer[index];
+
+				if (last_vertex_index != vertex_index)
 				{
-					last_vertex_index = rasterizer_frame_statistics_temp_buffer[index];
+					last_vertex_index = vertex_index;
 					vertex_count++;
 				}
 			}
@@ -433,6 +463,8 @@ void rasterizer_frame_statistics_draw(
 	{
 		char string[STATISTICS_TEXT_BUFFER_SIZE];
 		point2d cursor = { 0, 0 };
+		short height_adjust = -4;
+		short line_advance = -1;
 		short left = rasterizer_globals.reserved04.frame_bounds.x0;
 		short tab_stops[NUMBER_OF_STATISTICS_TAB_STOPS] = { 100, 200, 300, 400, 500, 600 };
 		real_argb_color data_color = { 1.0f, 0.66f, 1.0f, 0.66f };
@@ -506,8 +538,8 @@ void rasterizer_frame_statistics_draw(
 		tab_stops[0] = left;
 		draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
 		draw_string_set_color(&header_color);
-		rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-		bounds.y0 = cursor.y - 1;
+		rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+		bounds.y0 = cursor.y + line_advance;
 
 		if (rasterizer_debug_options.fps_accumulation)
 		{
@@ -537,8 +569,8 @@ void rasterizer_frame_statistics_draw(
 		tab_stops[0] = left;
 		draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
 		draw_string_set_color(&data_color);
-		rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-		bounds.y0 = cursor.y - 1;
+		rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+		bounds.y0 = cursor.y + line_advance;
 
 		if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_objects)
 		{
@@ -551,21 +583,21 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.normal_object_count,
 				rasterizer_frame_statistics.fast_object_count,
 				rasterizer_frame_statistics.scenery_object_count);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tskinning|t%d|n|tlighting|t%d|n|tvertex shaders|t%d|n",
 				rasterizer_frame_statistics.model_skinning_constant_bytes,
 				rasterizer_frame_statistics.model_lighting_constant_bytes,
 				rasterizer_frame_statistics.model_vertex_shader_work_accumulated);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tlocal_player_count|t%d|n|tmain_get_window_count|t%d|n",
 				local_player_count(),
 				main_get_window_count());
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 		}
 		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_geometry)
 		{
@@ -573,8 +605,8 @@ void rasterizer_frame_statistics_draw(
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
 			draw_string_set_color(&header_color);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|ttotal|t%d|t%d|t%d|n",
 				total_vertices,
@@ -583,8 +615,8 @@ void rasterizer_frame_statistics_draw(
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
 			draw_string_set_color(&data_color);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tenvironment|t%d|t%d|t%d",
 				environment_vertices,
@@ -592,8 +624,8 @@ void rasterizer_frame_statistics_draw(
 				environment_primitives);
 			tab_stops[0] = left + 25;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tlightmaps|t%d|t%d|t%d|n|tshadows (%d)|t%d|t%d|t%d|n|tlights|t%d|t%d|t%d|n|ttextures|t%d|t%d|t%d|n|tlights specular|t%d|t%d|t%d|n|tlightmaps specular|t%d|t%d|t%d|n|tlightmaps ref.mask|t%d|t%d|t%d|n|treflections|t%d|t%d|t%d|n|ttransparent|t%d|t%d/%d|t%d|n|tfog|t%d|t%d|t%d|n",
 				rasterizer_frame_statistics.lightmap_dynamic_vertex_count,
@@ -630,8 +662,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.environment_fog_dynamic_draw_count);
 			tab_stops[0] = left + 50;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tmodel shadows (%d)|t%d|t%d|t%d",
 				rasterizer_frame_statistics.model_shadow_count,
@@ -640,8 +672,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.model_shadow_draw_count);
 			tab_stops[0] = left + 25;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tmodels (%d)|t%d|t%d|t%d",
 				rasterizer_frame_statistics.model_count,
@@ -650,8 +682,8 @@ void rasterizer_frame_statistics_draw(
 				model_primitives);
 			tab_stops[0] = left + 25;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tsolid|t%d|t%d|t%d|n|ttransparent|t%d|t%d/%d|t%d|n",
 				rasterizer_frame_statistics.model_vertex_count,
@@ -663,8 +695,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.transparent_model_submit_count);
 			tab_stops[0] = left + 50;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tdecals|t%d|t%d|t%d|n",
 				rasterizer_frame_statistics.decal_vertex_count,
@@ -672,8 +704,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.decal_draw_count);
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tdynamic geometry|t%d/%d|t%d/%d|n",
 				rasterizer_frame_statistics.dynamic_vertex_count,
@@ -682,16 +714,16 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_frame_statistics.dynamic_triangle_buffer_count);
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|t%d dynamic lights|n|t%d lens flares|n",
 				rasterizer_frame_statistics.dynamic_light_count,
 				rasterizer_frame_statistics.lens_flare_count);
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 		}
 		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_profile)
 		{
@@ -706,8 +738,8 @@ void rasterizer_frame_statistics_draw(
 			draw_string_set_tab_stops(tab_stops, 4);
 			draw_string_set_color(&header_color);
 			cursor.y -= 30;
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 			draw_string_set_color(&data_color);
 
 			for (profile = 0; profile < NUMBER_OF_RASTERIZER_PROFILES; profile++)
@@ -727,8 +759,8 @@ void rasterizer_frame_statistics_draw(
 						rasterizer_profile_get_string(profile));
 				}
 
-				rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-				bounds.y0 = cursor.y - 1;
+				rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+				bounds.y0 = cursor.y + line_advance;
 			}
 
 			sprintf(string, "|ttotal|t%.2f|t%d|n",
@@ -736,8 +768,8 @@ void rasterizer_frame_statistics_draw(
 				rasterizer_profile_query_pushbuffer(NUMBER_OF_RASTERIZER_PROFILES));
 			draw_string_set_color(global_real_argb_yellow);
 			bounds.y0 += 4;
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 		}
 		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_memory)
 		{
@@ -773,8 +805,8 @@ void rasterizer_frame_statistics_draw(
 			sprintf(string, "|tallocation|tmemory usage (bytes)");
 			draw_string_set_tab_stops(tab_stops, 3);
 			draw_string_set_color(&header_color);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 			draw_string_set_color(&data_color);
 
 			for (report_index = 0; report_index < NUMBER_OF_MEMORY_USAGE_REPORTS; report_index++)
@@ -782,27 +814,27 @@ void rasterizer_frame_statistics_draw(
 				sprintf(string, "|t%s|t%d",
 					memory_usage[report_index].name,
 					memory_usage[report_index].allocation);
-				rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-				bounds.y0 = cursor.y - 1;
+				rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+				bounds.y0 = cursor.y + line_advance;
 				total_allocation += memory_usage[report_index].allocation;
 				total_unique_allocation +=
 					memory_usage[report_index].allocation - memory_usage[report_index].shared;
 			}
 
 			sprintf(string, "|n|ttotal|t%d (%d)", total_allocation, total_unique_allocation);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			GlobalMemoryStatus(&memory_status);
 			draw_string_set_color(&header_color);
 
 			sprintf(string, "|n|tsystem total|t%dKb", memory_status.dwTotalPhys >> 10);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			sprintf(string, "|tsystem available|t%dKb", memory_status.dwAvailPhys >> 10);
-			rasterizer_draw_string(&bounds, NULL, &cursor, -4, string);
-			bounds.y0 = cursor.y - 1;
+			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
+			bounds.y0 = cursor.y + line_advance;
 
 			draw_string_set_color(&data_color);
 		}

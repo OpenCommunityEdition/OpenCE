@@ -20,7 +20,12 @@ header included in hcex build.
 /* ---------- structures */
 
 struct effect_vector_field;
-struct effects_information;
+struct effects_information
+{
+	short effect_count;
+	short location_count;
+	short active_effect_count;
+};
 
 /* ---------- prototypes/EFFECTS.C */
 

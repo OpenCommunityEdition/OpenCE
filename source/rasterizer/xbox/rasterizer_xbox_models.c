@@ -206,11 +206,6 @@ enum
 	NUMBER_OF_MODEL_VERTEX_SHADER_PERMUTATIONS
 };
 
-/* ---------- macros */
-
-#define local_parameters rasterizer_models_globals.parameters
-#define local_model_effect_type rasterizer_models_globals.model_effect_type
-
 /* ---------- structures */
 
 struct rasterizer_debug_options
@@ -357,25 +352,6 @@ struct transparent_geometry_group
 	byte pad9E[2];
 };
 
-struct rasterizer_models_globals
-{
-	struct render_animation const *transparent_geometry_cached_animation;
-	struct render_lighting const *transparent_geometry_cached_lighting;
-	short transparent_geometry_cached_node_matrix_count;
-	word pad0A;
-	real_matrix4x3 const *transparent_geometry_cached_node_matrices;
-	struct transparent_geometry_group immediate_transparent_geometry_group;
-	struct rasterizer_model_begin_parameters const *parameters;
-	boolean local_parameters_queued_flag;
-	byte reservedB5[3];
-	short model_effect_type;
-	boolean local_sky_flag;
-	boolean local_planar_fog_flag;
-	boolean local_environment_fog_screen_flag;
-	boolean local_do_not_change_z_stencil_states;
-	boolean local_reported_too_many_transparent_geometry_groups;
-};
-
 struct rasterizer_models_frame_statistics
 {
 	byte reserved000[0x14];
@@ -499,24 +475,6 @@ typedef char verify_rasterizer_model_parameters_lighting_offset[
 typedef char verify_rasterizer_model_parameters_effect_offset[
 	offsetof(struct rasterizer_model_begin_parameters, effect) == 0x8C
 		? 1 : -1];
-typedef char verify_rasterizer_models_sky_offset[
-	offsetof(struct rasterizer_models_globals, local_sky_flag) == 0xBA
-		? 1 : -1];
-typedef char verify_rasterizer_models_parameters_offset[
-	offsetof(struct rasterizer_models_globals, parameters) == 0xB0
-		? 1 : -1];
-typedef char verify_rasterizer_models_effect_type_offset[
-	offsetof(
-		struct rasterizer_models_globals,
-		model_effect_type) == 0xB8 ? 1 : -1];
-typedef char verify_rasterizer_models_environment_fog_screen_offset[
-	offsetof(
-		struct rasterizer_models_globals,
-		local_environment_fog_screen_flag) == 0xBC ? 1 : -1];
-typedef char verify_rasterizer_models_do_not_change_states_offset[
-	offsetof(
-		struct rasterizer_models_globals,
-		local_do_not_change_z_stencil_states) == 0xBD ? 1 : -1];
 typedef char verify_rasterizer_models_window_fog_offset[
 	offsetof(struct rasterizer_window_begin_parameters, fog) == 0x1E8
 		? 1 : -1];
@@ -554,10 +512,6 @@ typedef char verify_transparent_geometry_group_plane_offset[
 typedef char verify_transparent_geometry_group_cortana_hack_offset[
 	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D
 		? 1 : -1];
-typedef char verify_rasterizer_models_immediate_group_offset[
-	offsetof(
-		struct rasterizer_models_globals,
-		immediate_transparent_geometry_group) == 0x10 ? 1 : -1];
 typedef char verify_rasterizer_models_statistics_transparent_offset[
 	offsetof(
 		struct rasterizer_models_frame_statistics,
@@ -669,7 +623,19 @@ typedef char verify_shader_model_reflection_cube_map_offset[
 /* ---------- globals */
 
 extern struct rasterizer_debug_options rasterizer_debug_options;
-static struct rasterizer_models_globals rasterizer_models_globals;
+static struct render_animation const *transparent_geometry_cached_animation = NULL;
+static struct render_lighting const *transparent_geometry_cached_lighting = NULL;
+static short transparent_geometry_cached_node_matrix_count = 0;
+static real_matrix4x3 const *transparent_geometry_cached_node_matrices = NULL;
+static struct transparent_geometry_group immediate_transparent_geometry_group = {0};
+static struct rasterizer_model_begin_parameters const *local_parameters = NULL;
+static boolean local_parameters_queued_flag = FALSE;
+static short local_model_effect_type = 0;
+static boolean local_sky_flag = FALSE;
+static boolean local_planar_fog_flag = FALSE;
+static boolean local_environment_fog_screen_flag = FALSE;
+static boolean local_do_not_change_z_stencil_states = FALSE;
+static boolean local_reported_too_many_transparent_geometry_groups = FALSE;
 static boolean local_pixel_shader_dirty_flag = TRUE;
 extern boolean rasterizer_model_cortana_hack;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
@@ -702,7 +668,7 @@ void _rasterizer_models_begin(
 	if (rasterizer_debug_options.draw_models)
 	{
 		local_pixel_shader_dirty_flag = TRUE;
-		rasterizer_models_globals.local_sky_flag = sky;
+		local_sky_flag = sky;
 		if (sky)
 		{
 			rasterizer_profile_begin(_rasterizer_profile_model_sky);
@@ -721,7 +687,7 @@ void _rasterizer_models_end(
 {
 	if (rasterizer_debug_options.draw_models)
 	{
-		if (rasterizer_models_globals.local_sky_flag)
+		if (local_sky_flag)
 		{
 			rasterizer_profile_end(_rasterizer_profile_model_sky);
 		}
@@ -743,14 +709,14 @@ void _rasterizer_model_end(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
 			1491,
 			local_parameters);
-		if (rasterizer_models_globals.local_environment_fog_screen_flag)
+		if (local_environment_fog_screen_flag)
 		{
 			rasterizer_environment_fog_screen_model_end();
 		}
 		if (TEST_FLAG(
 				local_parameters->geometry_flags,
 				_rasterizer_geometry_first_person_bit) &&
-			!rasterizer_models_globals.local_do_not_change_z_stencil_states)
+			!local_do_not_change_z_stencil_states)
 		{
 			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
 			rasterizer_set_frustum_z(0.0f, 0.0f);
@@ -787,8 +753,8 @@ void _rasterizer_model_begin(
 		}
 
 		local_parameters = parameters;
-		rasterizer_models_globals.local_parameters_queued_flag = FALSE;
-		rasterizer_models_globals.local_do_not_change_z_stencil_states =
+		local_parameters_queued_flag = FALSE;
+		local_do_not_change_z_stencil_states =
 			do_not_change_z_stencil_states;
 
 		if (rasterizer_debug_options.active_camouflage &&
@@ -796,13 +762,13 @@ void _rasterizer_model_begin(
 			parameters->effect.type == _render_model_effect_type_active_camouflage &&
 			parameters->effect.intensity > 0.0f)
 		{
-			rasterizer_models_globals.model_effect_type =
+			local_model_effect_type =
 				_render_model_effect_type_active_camouflage;
 		}
 		else if (parameters->effect.type ==
 			_render_model_effect_type_modifier)
 		{
-			rasterizer_models_globals.model_effect_type =
+			local_model_effect_type =
 				_render_model_effect_type_modifier;
 		}
 		else
@@ -817,7 +783,7 @@ void _rasterizer_model_begin(
 				skinning_work;
 			rasterizer_frame_statistics.lighting_work_accumulated +=
 				rasterizer_frame_statistics.lighting_work - lighting_work;
-			rasterizer_models_globals.model_effect_type = _render_model_effect_type_none;
+			local_model_effect_type = _render_model_effect_type_none;
 		}
 
 		camera_plane_distance =
@@ -828,7 +794,7 @@ void _rasterizer_model_begin(
 			global_window_parameters.camera.position.z *
 				global_window_parameters.fog.plane.n.k -
 			global_window_parameters.fog.plane.d;
-		rasterizer_models_globals.local_planar_fog_flag =
+		local_planar_fog_flag =
 			global_window_parameters.fog.planar_mode &&
 			!TEST_FLAG(
 				parameters->geometry_flags,
@@ -838,14 +804,14 @@ void _rasterizer_model_begin(
 				_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit) ||
 			camera_plane_distance < 0.0f);
 
-		if (!rasterizer_models_globals.local_sky_flag &&
+		if (!local_sky_flag &&
 			rasterizer_environment_fog_screen_model_begin(parameters))
 		{
-			rasterizer_models_globals.local_environment_fog_screen_flag = TRUE;
+			local_environment_fog_screen_flag = TRUE;
 		}
 		else
 		{
-			rasterizer_models_globals.local_environment_fog_screen_flag = FALSE;
+			local_environment_fog_screen_flag = FALSE;
 		}
 
 		if (rasterizer_debug_options.statistics_mode ==
@@ -1389,7 +1355,7 @@ void rasterizer_model_draw_environment_shader(
 				shader_environment->environment.flags,
 				_shader_environment_true_atmospheric_fog_bit))
 		{
-			if (rasterizer_models_globals.local_planar_fog_flag)
+			if (local_planar_fog_flag)
 			{
 				vertex_shader_permutation =
 					_model_vertex_shader_permutation_planar_fog;
@@ -2151,7 +2117,7 @@ void _rasterizer_model_draw(
 						shader_model->model.flags,
 						_shader_model_true_atmospheric_fog_bit))
 				{
-					if (rasterizer_models_globals.local_planar_fog_flag)
+					if (local_planar_fog_flag)
 					{
 						vertex_shader_permutation =
 							_model_vertex_shader_permutation_planar_fog;
@@ -2549,7 +2515,7 @@ void _rasterizer_model_draw(
 				}
 			}
 
-			if (rasterizer_models_globals.local_environment_fog_screen_flag)
+			if (local_environment_fog_screen_flag)
 			{
 				rasterizer_environment_fog_screen_model_submit(
 					shader,
@@ -2604,7 +2570,7 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 					_shader_type_model))->model.flags,
 				_shader_model_alpha_blended_decal_bit);
 
-		if (rasterizer_models_globals.model_effect_type!=_render_model_effect_type_active_camouflage ||
+		if (local_model_effect_type!=_render_model_effect_type_active_camouflage ||
 			(shader &&
 			shader->base.type==_shader_type_model &&
 			((struct shader_model_definition *)shader_get_and_verify_type(
@@ -2637,8 +2603,8 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 				1304,
 				local_parameters);
 
-			geometry_flags = local_parameters->geometry_flags;
 			group = NULL;
+			geometry_flags = local_parameters->geometry_flags;
 
 			if (submit_decals)
 			{
@@ -2658,14 +2624,14 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 						geometry_flags,
 						_rasterizer_geometry_no_queue_bit))
 				{
-					group = &rasterizer_models_globals.immediate_transparent_geometry_group;
+					group = &immediate_transparent_geometry_group;
 					group->sorted_index = NONE;
 				}
 			}
 
 			if (!group)
 			{
-				if (rasterizer_models_globals.model_effect_type==
+				if (local_model_effect_type==
 						_render_model_effect_type_active_camouflage &&
 					shader->base.type!=_shader_type_model)
 				{
@@ -2724,22 +2690,19 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 				group->dynamic_vertex_buffer_index = dynamic_vertex_buffer_index;
 				group->vertex_buffer = vertex_buffer;
 				group->lightmap = NULL;
-				relative_centroid.i = group->centroid.x -
-					global_window_parameters.camera.position.x;
-				relative_centroid.j = group->centroid.y -
-					global_window_parameters.camera.position.y;
-				relative_centroid.k = group->centroid.z -
-					global_window_parameters.camera.position.z;
-				group->z_sort = -(
-					global_window_parameters.camera.forward.k*relative_centroid.k +
-					global_window_parameters.camera.forward.j*relative_centroid.j +
-					global_window_parameters.camera.forward.i*relative_centroid.i);
+				vector_from_points3d(
+					&global_window_parameters.camera.position,
+					&group->centroid,
+					&relative_centroid);
+				group->z_sort = -dot_product3d(
+					&global_window_parameters.camera.forward,
+					&relative_centroid);
 				group->plane = plane;
 				group->model_base_map_scale.i = local_parameters->base_map_scale.i;
 				group->model_base_map_scale.j = local_parameters->base_map_scale.j;
 				group->previous_group_presorted_index = NONE;
 				group->next_group_presorted_index = NONE;
-				if (rasterizer_models_globals.model_effect_type==
+				if (local_model_effect_type==
 						_render_model_effect_type_active_camouflage &&
 					shader->base.type!=_shader_type_model)
 				{
@@ -2774,31 +2737,31 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 				}
 				else
 				{
-					if (!rasterizer_models_globals.local_parameters_queued_flag)
+					if (!local_parameters_queued_flag)
 					{
-						rasterizer_models_globals.transparent_geometry_cached_node_matrices =
+						transparent_geometry_cached_node_matrices =
 							rasterizer_memory_alloc_const(
 								local_parameters->skinning.node_matrices,
 								local_parameters->skinning.node_matrix_count*
 									sizeof(real_matrix4x3));
-						rasterizer_models_globals.transparent_geometry_cached_node_matrix_count =
+						transparent_geometry_cached_node_matrix_count =
 							local_parameters->skinning.node_matrix_count;
-						rasterizer_models_globals.transparent_geometry_cached_lighting =
+						transparent_geometry_cached_lighting =
 							rasterizer_memory_alloc_const(
 								&local_parameters->lighting,
 								sizeof(struct render_lighting));
-						rasterizer_models_globals.transparent_geometry_cached_animation =
+						transparent_geometry_cached_animation =
 							rasterizer_memory_alloc_const(
 								&local_parameters->animation,
 								sizeof(struct render_animation));
-						rasterizer_models_globals.local_parameters_queued_flag = TRUE;
+						local_parameters_queued_flag = TRUE;
 					}
 
-					group->node_matrices = rasterizer_models_globals.transparent_geometry_cached_node_matrices;
+					group->node_matrices = transparent_geometry_cached_node_matrices;
 					group->node_matrix_count =
-						rasterizer_models_globals.transparent_geometry_cached_node_matrix_count;
-					group->lighting = rasterizer_models_globals.transparent_geometry_cached_lighting;
-					group->animation = rasterizer_models_globals.transparent_geometry_cached_animation;
+						transparent_geometry_cached_node_matrix_count;
+					group->lighting = transparent_geometry_cached_lighting;
+					group->animation = transparent_geometry_cached_animation;
 				}
 
 				if (rasterizer_debug_options.statistics_mode==
@@ -2819,19 +2782,19 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 							vertex_buffer);
 				}
 			}
-			else if (!rasterizer_models_globals.local_reported_too_many_transparent_geometry_groups)
+			else if (!local_reported_too_many_transparent_geometry_groups)
 			{
 				error(
 					_error_silent,
 					"### ERROR too many transparent geometry groups");
-				rasterizer_models_globals.local_reported_too_many_transparent_geometry_groups = TRUE;
+				local_reported_too_many_transparent_geometry_groups = TRUE;
 			}
 		}
 		else if (sort_filth)
 		{
+			sort_filth->group_index = NONE;
 			sort_filth->previous_group_presorted_index_reference = NULL;
 			sort_filth->next_group_presorted_index_reference = NULL;
-			sort_filth->group_index = NONE;
 		}
 	}
 

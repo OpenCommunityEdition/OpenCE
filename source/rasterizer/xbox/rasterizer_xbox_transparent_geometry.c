@@ -1935,7 +1935,7 @@ void rasterizer_transparent_geometry_group_draw(
 										&shader_transparent_generic->generic.maps,
 										0,
 										struct shader_transparent_generic_map)->map.index);
-								short frame_count = (short)bitmap_group->bitmap_data.count;
+								short frame_count = (short)bitmap_group->bitmaps.count;
 								short function_index = frame_count == 8 ? 3 : 0;
 								short counter_limit = shader_transparent_generic->generic.numeric_counter_limit;
 								short counter_value = PIN(fast_ftol(floor(counter_limit*
@@ -2424,7 +2424,7 @@ void rasterizer_transparent_geometry_group_draw(
 										struct shader_transparent_chicago_map);
 								struct bitmap_group const *bitmap_group =
 									bitmap_group_get(map->map.index);
-								short frame_count = (short)bitmap_group->bitmap_data.count;
+								short frame_count = (short)bitmap_group->bitmaps.count;
 
 								if (TEST_FLAG(shader_transparent_chicago->chicago.extra_flags,
 									_shader_transparent_chicago_extra_flag_numeric_countdown_timer_bit))

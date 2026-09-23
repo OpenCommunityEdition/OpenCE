@@ -827,7 +827,7 @@ struct rasterizer_xbox_d3d_globals
 	D3DSurface *global_d3d_surface_render_primary_copy; /* +2212 */
 };
 
-struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals;
+struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals = { 0 };
 
 #define node_matrix_constants rasterizer_xbox_d3d_globals.node_matrix_constants
 #define d3d rasterizer_xbox_d3d_globals.d3d
@@ -853,13 +853,13 @@ struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals;
 #define global_d3d_texture_render_primary_copy rasterizer_xbox_d3d_globals.global_d3d_texture_render_primary_copy
 #define global_d3d_surface_render_primary_copy rasterizer_xbox_d3d_globals.global_d3d_surface_render_primary_copy
 
-D3DDevice *global_d3d_device;
+D3DDevice *global_d3d_device = NULL;
 
 /* the shared 256-entry palette; January's own
  * IDirect3DDevice8_CreatePalette(global_d3d_device, D3DPALETTE_256,
  * &d3d_palette) error string names it, and csplit anchors it on
  * _global_d3d_device + 4. */
-D3DPalette *d3d_palette;
+D3DPalette *d3d_palette = NULL;
 
 /* owned by another object; named by this object's own
  * D3DDevice_GetDeviceCaps() call site. */
@@ -869,8 +869,8 @@ extern D3DCAPS8 global_d3d_caps;
  * is the only symbol csplit knows there, so the split still anchors their
  * relocations on `_global_d3d_device + 8` / `+ 12` (image 0x0045E8D8 and
  * 0x0045E8DC).  symbols.json names for those two addresses close the gap. */
-static boolean suppress_window_begin_end;
-static short previous_window_index;
+static boolean suppress_window_begin_end = FALSE;
+static short previous_window_index = 0;
 
 struct rasterizer_hardware_state_cache rasterizer_state_cache =
 {
@@ -1413,7 +1413,7 @@ boolean rasterizer_set_texture_non_blocking(
 		usage != _bitmap_usage_bump_map) &&
 		bitmap_definition_index != NONE)
 	{
-		long bitmap_count = bitmap_group_get(bitmap_definition_index)->bitmap_data.count;
+		long bitmap_count = bitmap_group_get(bitmap_definition_index)->bitmaps.count;
 
 		if (bitmap_count > 0)
 		{
@@ -2044,7 +2044,7 @@ boolean rasterizer_set_texture_direct(
 		stage>=0 && stage<RASTERIZER_MAXIMUM_TEXTURE_STAGES);
 	if (bitmap_group_index != NONE)
 	{
-		long bitmap_count = bitmap_group_get(bitmap_group_index)->bitmap_data.count;
+		long bitmap_count = bitmap_group_get(bitmap_group_index)->bitmaps.count;
 
 		if (bitmap_count > 0)
 		{
@@ -2085,7 +2085,7 @@ boolean rasterizer_set_texture_direct_non_blocking(
 		stage>=0 && stage<RASTERIZER_MAXIMUM_TEXTURE_STAGES);
 	if (bitmap_group_index != NONE)
 	{
-		long bitmap_count = bitmap_group_get(bitmap_group_index)->bitmap_data.count;
+		long bitmap_count = bitmap_group_get(bitmap_group_index)->bitmaps.count;
 
 		if (bitmap_count > 0)
 			bitmap = bitmap_group_try_and_get_bitmap(
@@ -2137,7 +2137,7 @@ union point2d *rasterizer_set_texture(
 		usage != _bitmap_usage_bump_map) &&
 		bitmap_definition_index != NONE)
 	{
-		long bitmap_count = bitmap_group_get(bitmap_definition_index)->bitmap_data.count;
+		long bitmap_count = bitmap_group_get(bitmap_definition_index)->bitmaps.count;
 
 		if (bitmap_count > 0)
 		{

@@ -142,7 +142,7 @@ static HANDLE game_state_open_persistent_storage(
 
 /* ---------- globals */
 
-extern struct xbox_game_state_globals_prefix xbox_game_state_globals;
+struct xbox_game_state_globals_prefix xbox_game_state_globals = { 0 };
 
 /* ---------- public code */
 

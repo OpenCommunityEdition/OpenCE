@@ -936,7 +936,7 @@ void compute_sound_obstruction(
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\game_sound.c",
 		887,
-		source->spatialization_mode == _sound_spatialization_mode_absolute);
+		source->spatialization_mode==_sound_spatialization_mode_absolute);
 	source->obstruction = 0.6f;
 	source->occlusion = 1.0f;
 

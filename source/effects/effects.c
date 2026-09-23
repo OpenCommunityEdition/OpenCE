@@ -321,13 +321,6 @@ struct effect_datum_header
 	word flags;
 };
 
-struct effects_information
-{
-	short effect_count;
-	short location_count;
-	short active_effect_count;
-};
-
 struct effect_vector_field
 {
 	void *user_data;
@@ -664,7 +657,7 @@ extern struct data_array *effect_location_data;
 
 boolean effects_corpse_nonviolent = TRUE;
 
-boolean debug_effects_nonviolent;
+boolean debug_effects_nonviolent = FALSE;
 
 /* the effect marker list the effect_new_*_from_markers entry points hand to
 effect_marker_list_get_markers_by_name (January's own name for this static is unrecovered) */

@@ -1452,7 +1452,7 @@ static boolean ui_check_for_pause_game(
 
 /* ---------- globals */
 
-extern struct ui_widget_bss_prefix ui_widget_globals_storage;
+static struct ui_widget_bss_prefix ui_widget_globals_storage;
 
 #define string_data ui_widget_globals_storage.string_data
 #define widget_globals ui_widget_globals_storage.widget_globals
@@ -1461,6 +1461,10 @@ extern struct ui_widget_bss_prefix ui_widget_globals_storage;
 extern real_argb_color ui_plasma_effect_color;
 extern struct hud_globals_definition *hud_globals;
 extern short local_player_index_for_draw_string_and_hack_in_icons;
+
+/* January defines this and never references it, as we do not */
+real const _one_over_255 = 1.0f / 255.0f;
+real const SECONDS_PER_MILLISECOND = 0.001f;
 
 static struct stack_memory_pool_medium __medium_widget_memory_pool =
 {
@@ -1579,8 +1583,6 @@ static char button_mappings[_icon_custom_1 - _icon_action] =
 	_icon_left_stick,	/* move */
 	_icon_right_stick	/* look */
 };
-
-real const SECONDS_PER_MILLISECOND = 0.001f;
 
 real global_ui_white_red = 0.8f;
 real global_ui_white_green = 0.8f;
@@ -1753,7 +1755,7 @@ void draw_bitmap_in_rect(
 		{
 			struct bitmap_data *plasma_bitmap = TAG_BLOCK_GET_ELEMENT(
 				&bitmap_group_get(
-					interface_get_tag_index(_interface_bitmap_iface_map3))->bitmap_data,
+					interface_get_tag_index(_interface_bitmap_iface_map3))->bitmaps,
 				0,
 				struct bitmap_data);
 			long time = system_milliseconds();

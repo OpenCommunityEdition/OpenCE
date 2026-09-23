@@ -311,6 +311,12 @@ static void animation_get_keyframe_scale(
 /* ---------- globals */
 
 boolean hs_model_animation_compression_enabled = TRUE;
+long hs_model_animation_data_compressed_size = 0;
+long hs_model_animation_data_uncompressed_size = 0;
+long hs_model_animation_data_compression_savings_in_bytes = 0;
+long hs_model_animation_data_compression_savings_in_bytes_at_import = 0;
+real hs_model_animation_data_compression_savings_in_percent = 0.f;
+long hs_model_animation_bullshit[4] = { 0 };
 
 /* ---------- public code */
 

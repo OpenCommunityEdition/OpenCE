@@ -742,7 +742,7 @@ void _rasterizer_detail_objects_draw(
 						type_definition->sequence_index,
 						struct detail_object_bitmap_group_sequence);
 					bitmap_data = TAG_BLOCK_GET_ELEMENT(
-						&state.bitmap->bitmap_data,
+						&state.bitmap->bitmaps,
 						type_sequence->first_bitmap_index,
 						struct bitmap_data);
 					range = type_definition->far_fade_distance -
@@ -787,7 +787,7 @@ void _rasterizer_detail_objects_draw(
 									(short)sprite_index,
 									struct detail_object_bitmap_group_sprite);
 								TAG_BLOCK_GET_ELEMENT(
-									&state.bitmap->bitmap_data,
+									&state.bitmap->bitmaps,
 									sprite->bitmap_index,
 									struct bitmap_data);
 								constants = frame_data[(short)frame_count];

@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 UNIT = "source/rasterizer/rasterizer_lights"
 FUNCTION = "_rasterizer_lights_begin_for_new_frame"
 TARGET = ROOT / ("build/split/" + UNIT + ".obj")
+JANUARY_HELPER_OWNER = ROOT / "build/split/source/ai/action_charge.obj"
 COMPILER = ROOT / "xbox/bin/vc7/CL.Exe"
 EXACT_SHA = "ba6000638ca4648f9c8be2129eb56614787733165ab716dc580fa0647dc7bfe0"
 
@@ -94,19 +95,29 @@ def prepare_body(obj):
 @pytest.fixture(scope="module")
 def bodies(tmp_path_factory):
     pytest.importorskip("unicorn")
-    if not TARGET.is_file() or not COMPILER.is_file():
+    if not TARGET.is_file() or not JANUARY_HELPER_OWNER.is_file() or not COMPILER.is_file():
         pytest.skip("locally supplied January object/VC7 compiler is unavailable")
     source = ROOT / (UNIT + ".c")
     before = source.read_bytes()
     output = tmp_path_factory.mktemp("lights-frame") / "rebuilt.obj"
     result = subprocess.run(
         [sys.executable, "-B", "tools/campaign/gate.py", UNIT,
-         "--fn", FUNCTION, "--forbid-emitted-symbol", "_point_from_line3d",
-         "--out", str(output)], cwd=ROOT, capture_output=True, text=True,
+         # The emitted-symbol guard is not applied here: this object is
+         # owner-cleared to emit the _point_from_line3d COMDAT, because
+         # January's own rasterizer_lights.obj references it out of line.
+         "--fn", FUNCTION, "--out", str(output)], cwd=ROOT, capture_output=True, text=True,
         env=dict(os.environ, HALO_CL=str(COMPILER), PYTHONDONTWRITEBYTECODE="1"))
     assert result.returncode == 0, result.stdout + result.stderr
     assert source.read_bytes() == before
     target, rebuilt = cc.load(TARGET), cc.load(output)
+    january_helper_owner = cc.load(JANUARY_HELPER_OWNER)
+    january_reference = [symbol for symbol in target["symbols"]
+                         if symbol["name"] == "_point_from_line3d"]
+    assert len(january_reference) == 1 and january_reference[0]["section"] == 0
+    assert cc.section_infos_equal(
+        cc.section_info(january_helper_owner, "_point_from_line3d"),
+        cc.section_info(rebuilt, "_point_from_line3d")), (
+            "newly emitted inline helper differs from January's folded copy")
     assert cc.section_infos_equal(
         cc.section_info(target, FUNCTION), cc.section_info(rebuilt, FUNCTION)), (
             "January frame body or ordered relocation identities differ")

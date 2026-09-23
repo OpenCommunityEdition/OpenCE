@@ -438,14 +438,14 @@ void rasterizer_screen_effect_set_video(
 			cinematic_screen_effect_globals->parameters.video_overbright_mode = video_overbright_mode;
 			cinematic_screen_effect_globals->parameters.video_scanline_map = TAG_BLOCK_GET_ELEMENT(
 				&bitmap_group_get(
-					global_rasterizer_data->screen_effect_video_scanline_map.index)->bitmap_data,
+					global_rasterizer_data->screen_effect_video_scanline_map.index)->bitmaps,
 				0,
 				struct bitmap_data);
 			cinematic_screen_effect_globals->parameters.video_noise_intensity = video_noise_intensity;
 			cinematic_screen_effect_globals->parameters.video_noise_map_scale = 1.0f;
 			cinematic_screen_effect_globals->parameters.video_noise_map = TAG_BLOCK_GET_ELEMENT(
 				&bitmap_group_get(
-					global_rasterizer_data->screen_effect_video_noise_map.index)->bitmap_data,
+					global_rasterizer_data->screen_effect_video_noise_map.index)->bitmaps,
 				0,
 				struct bitmap_data);
 		}

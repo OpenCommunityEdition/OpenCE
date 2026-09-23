@@ -481,14 +481,14 @@ extern struct data_array *global_decal_data;
 
 boolean decals_enabled= TRUE;
 static real_point2d decal_points2d_temp[2][12];
-static boolean decal_locked_count_reported;
-static boolean decal_insert_locked_count_reported;
 static struct decal_globals *decal_globals;
-static struct decal_geometry decal_geometry;
-static boolean decals_unlock_locked_count_reported;
-static boolean decals_unlock_permanent_count_reported;
-static boolean decal_delete_locked_reported;
-static boolean decal_delete_permanent_reported;
+static struct decal_geometry decal_geometry = {0};
+static boolean decal_locked_count_reported = FALSE;
+static boolean decal_insert_locked_count_reported = FALSE;
+static boolean decals_unlock_locked_count_reported = FALSE;
+static boolean decals_unlock_permanent_count_reported = FALSE;
+static boolean decal_delete_locked_reported = FALSE;
+static boolean decal_delete_permanent_reported = FALSE;
 
 struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] =
 {
@@ -796,7 +796,7 @@ static void decal_sprite_get_bounds(
 		sprite_index,
 		struct bitmap_group_sprite);
 	bitmap = TAG_BLOCK_GET_ELEMENT(
-		&bitmap_group_definition->bitmap_data,
+		&bitmap_group_definition->bitmaps,
 		sprite->bitmap_index,
 		struct bitmap_data);
 
@@ -1900,7 +1900,7 @@ void decal_new_from_collision(
 			if (TEST_FLAG(definition->flags, _decal_definition_preserve_aspect_bit))
 			{
 				struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
-					&bitmap_group->bitmap_data,
+					&bitmap_group->bitmaps,
 					0,
 					struct bitmap_data);
 
@@ -1918,7 +1918,7 @@ void decal_new_from_collision(
 		if (!permanent)
 		{
 			if (!_texture_cache_bitmap_get_hardware_format(
-				TAG_BLOCK_GET_ELEMENT(&bitmap_group->bitmap_data, bitmap_index, struct bitmap_data),
+				TAG_BLOCK_GET_ELEMENT(&bitmap_group->bitmaps, bitmap_index, struct bitmap_data),
 				FALSE,
 				TRUE))
 			{

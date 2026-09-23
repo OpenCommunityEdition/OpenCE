@@ -161,7 +161,7 @@ struct model_vertex_compressed
 
 /* ---------- globals */
 
-static short const rasterizer_vertex_type_sizes[NUMBER_OF_RASTERIZER_VERTEX_TYPES]=
+static short const rasterizer_vertex_type_sizes[]=
 {
 	56,
 	32,
@@ -175,6 +175,7 @@ static short const rasterizer_vertex_type_sizes[NUMBER_OF_RASTERIZER_VERTEX_TYPE
 	16,
 	16,
 	8,
+	0,
 };
 
 /* ---------- public code */

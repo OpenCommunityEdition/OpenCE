@@ -98,8 +98,8 @@ symbols in this file:
 
 struct system_memory_information
 {
-	unsigned long available_physical_memory;
-	unsigned long total_physical_memory;
+	long available_physical_memory;
+	long total_physical_memory;
 };
 
 /* ---------- globals */

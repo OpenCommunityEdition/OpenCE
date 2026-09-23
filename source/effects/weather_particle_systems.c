@@ -306,9 +306,11 @@ static void weather_particle_system_render(
 
 /* ---------- globals */
 
+static real const one_over_char_max = 1.f/255.f;
+
 boolean weather = TRUE;
 
-struct weather_particle_system_globals weather_particle_system_globals;
+struct weather_particle_system_globals weather_particle_system_globals = { 0 };
 
 /* ---------- public code */
 

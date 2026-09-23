@@ -2807,7 +2807,6 @@ symbols in this file:
 
 enum
 {
-	hs_function_table_count = 418,
 	scenario_starting_profile_size = 0x68,
 	scenario_conversation_definition_size = 0x74,
 	scenario_cutscene_flag_size = 0x5C,
@@ -3367,7 +3366,7 @@ typedef void (*hs_token_enumerator)(
 
 struct hs_function_table_storage
 {
-	struct hs_function_definition *functions[418];
+	struct hs_function_definition const *functions[418];
 	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
@@ -4423,6 +4422,8452 @@ extern short hs_external_global_count;
 extern struct hs_external_global_definition *hs_external_globals[];
 extern char const *hs_script_type_names[];
 extern char const *hs_type_names[];
+
+/* ---------- structures */
+
+struct hs_function_definition_with_1_parameter
+{
+	struct hs_function_definition definition;
+	short parameter_types[1];
+};
+
+struct hs_function_definition_with_2_parameters
+{
+	struct hs_function_definition definition;
+	short parameter_types[2];
+};
+
+struct hs_function_definition_with_3_parameters
+{
+	struct hs_function_definition definition;
+	short parameter_types[3];
+};
+
+struct hs_function_definition_with_4_parameters
+{
+	struct hs_function_definition definition;
+	short parameter_types[4];
+};
+
+struct hs_function_definition_with_5_parameters
+{
+	struct hs_function_definition definition;
+	short parameter_types[5];
+};
+
+struct hs_function_definition_with_6_parameters
+{
+	struct hs_function_definition definition;
+	short parameter_types[6];
+};
+
+/* ---------- prototypes */
+
+void ai_debug_sound_point_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_debug_speak_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_debug_speak_list_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_debug_teleport_to_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_debug_vocalize_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_globals_ai_active_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_globals_dialogue_triggers_enabled_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_globals_grenades_enabled_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_profile_change_render_spray_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_allegiance_broken_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_allegiance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_allegiance_remove_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_allow_charge_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_allow_dormant_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_attach_free_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_attach_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_attach_units_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_attack_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_automatic_migration_target_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_berserk_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_braindead_by_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_braindead_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_command_list_advance_by_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_command_list_advance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_command_list_by_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_command_list_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_command_list_status_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_conversation_advance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_conversation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_conversation_line_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_conversation_status_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_conversation_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_defend_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_deselect_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_detach_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_detach_units_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_erase_all_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_erase_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_exit_vehicle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_follow_distance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_follow_target_ai_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_follow_target_disable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_follow_target_players_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_follow_target_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_force_active_by_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_force_active_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_free_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_free_units_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_go_to_vehicle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_go_to_vehicle_override_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_going_to_vehicle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_ignore_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_is_attacking_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_kill_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_kill_silent_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_link_activation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_living_count_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_living_fraction_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_look_at_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_magically_see_encounter_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_magically_see_players_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_magically_see_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_magically_see_units_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_maneuver_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_maneuver_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_migrate_and_speak_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_migrate_by_unit_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_migrate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_nonswarm_count_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_place_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_playfight_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_prefer_target_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_reconnect_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_renew_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_retreat_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_select_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_blind_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_current_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_deaf_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_respawn_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_return_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_set_team_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_spawn_actor_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_status_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_stop_looking_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_strength_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_swarm_count_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_teleport_starting_location_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_teleport_starting_location_if_unsupported_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_timer_expire_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_timer_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_try_to_fight_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_try_to_fight_nothing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_try_to_fight_player_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_encounter_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_enterable_actor_type_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_enterable_actors_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_enterable_disable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_enterable_distance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ai_scripting_vehicle_enterable_team_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void attract_mode_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void breakable_surfaces_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void breakable_surfaces_reset_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_active_camouflage_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_active_camouflage_local_player_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_all_powerups_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_all_vehicles_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_all_weapons_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheat_teleport_to_camera_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cheats_load_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_set_title_delayed_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_set_title_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_show_letterbox_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_skip_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_skip_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void cinematic_suppress_bsp_object_creation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_dump_memory_by_file_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_dump_memory_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_dump_memory_for_file_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_player_teleport_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_pvs_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_sound_classes_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_sound_classes_set_distances_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void debug_sound_classes_set_wet_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_get_position_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_get_power_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_group_change_only_once_more_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_group_get_value_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_group_set_actual_value_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_group_set_desired_value_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_one_sided_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_operates_automatically_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_set_actual_position_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_set_desired_position_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_set_never_appears_locked_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void device_set_power_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void director_load_camera_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void director_save_camera_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void director_script_camera_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void display_scenario_help_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void enumerate_memory_units_test_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void errors_overflow_suppression_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_all_quiet_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_difficulty_level_get_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_difficulty_level_get_ignore_easy_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_is_cooperative_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_safe_to_save_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_safe_to_speak_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_set_game_variant_from_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_state_reverted_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_time_get_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void game_time_set_speed_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void garbage_collect_now_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void global_structure_bsp_index_get_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_damage_new_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_damage_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_doc_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_effect_new_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_effect_new_from_object_marker_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_arithmetic(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_begin(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_begin_random(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_debug_string(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_equality(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_if(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_inequality(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_inspect(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_logical(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_object_cast_up(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_set(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_sleep(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_evaluate_sleep_until(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_help_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_not_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_create_anew_containing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_create_anew_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_create_containing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_create_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_destroy_all_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_destroy_containing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_destroy_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_list_get_element_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_set_facing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_set_permutation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_set_shield_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_object_teleport_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_objects_can_see_flag_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_objects_can_see_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_objects_delete_by_definition_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_objects_predict_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_players_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_print_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_recompile_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_sound_get_gain_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_sound_set_gain_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_teleport_players_not_in_trigger_volume_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_trigger_volume_test_objects_all_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_trigger_volume_test_objects_any_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_activate_team_nav_point_with_flag_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_activate_team_nav_point_with_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_deactivate_team_nav_point_with_flag_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_deactivate_team_nav_point_with_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_unit_activate_nav_point_with_flag_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_unit_activate_nav_point_with_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_unit_deactivate_nav_point_with_flag_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hud_unit_deactivate_nav_point_with_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void lights_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_crash_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_load_core_at_startup_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_load_core_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_load_core_name_at_startup_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_load_core_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_lost_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_print_version_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_reset_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_revert_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_cancel_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_core_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_core_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_map_no_timeout_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_map_nonsafe_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_save_map_safe_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_saving_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_set_difficulty_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_set_game_connection_to_film_playback_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_set_map_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_set_multiplayer_map_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_skip_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void main_won_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void network_game_client_request_immediate_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void numeric_countdown_timer_get_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void numeric_countdown_timer_restart_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void numeric_countdown_timer_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void numeric_countdown_timer_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_beautify_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_can_take_damage_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_cannot_take_damage_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_definition_predict_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_list_count_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_list_from_ai_reference_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_pvs_activate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_pvs_clear_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_pvs_set_camera_point_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_pvs_set_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_scripting_set_collideable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_set_melee_attack_inhibited_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void object_set_ranged_attack_inhibited_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void objects_dump_memory_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void objects_scripting_attach_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void objects_scripting_detach_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void objects_scripting_set_scale_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player0_joystick_set_is_normal_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player0_look_invert_pitch_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player0_look_pitch_is_inverted_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_add_equipment_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_accept_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_action_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_back_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_grenade_trigger_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_jump_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_look_relative_all_directions_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_look_relative_down_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_look_relative_left_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_look_relative_right_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_look_relative_up_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_move_relative_all_directions_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_primary_trigger_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_reset_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_control_action_test_zoom_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_effect_screen_fade_in_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_effect_screen_fade_out_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_input_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_ui_activate_all_solo_levels_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void player_ui_fast_setup_network_server_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void players_unzoom_all_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void profile_dump_to_file_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void profile_graph_toggle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void profile_initialize_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void profile_sections_activate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void profile_sections_deactivate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void radiosity_debug_point_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void radiosity_save_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void radiosity_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void random_range_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_decals_flush_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_fps_accumulate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_lights_reset_for_new_map_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_model_ambient_reflection_tint_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_set_convolution_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_set_filter_desaturation_tint_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_set_filter_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_set_video_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_screen_effect_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_script_screen_effect_set_value_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void rasterizer_set_near_clip_distance_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void real_random_range_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void recorded_animation_get_time_left_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void recorded_animation_kill_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void recorded_animation_play_and_delete_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void recorded_animation_play_and_hover_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void recorded_animation_play_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void render_effects_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void saved_game_files_delete_all_custom_profiles_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scenario_switch_structure_bsp_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scenario_trigger_volume_test_object_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scenery_animation_start_at_frame_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scenery_animation_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scenery_get_animation_time_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_set_absolute_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_set_animation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_set_dead_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_set_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_set_first_person_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_camera_time_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_foley_predict_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_blink_health_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_blink_motion_sensor_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_blink_shield_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_get_timer_ticks_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_messages_clear_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_pause_timer_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_restart_flashing_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_flashing_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_objective_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_state_message_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_timer_position_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_timer_time_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_set_timer_warning_cutoff_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_show_crosshair_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_show_health_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_show_motion_sensor_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_show_shield_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_show_timer_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_time_code_reset_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_time_code_show_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_hud_time_code_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_looping_sound_set_alternate_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_looping_sound_set_scale_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_looping_sound_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_looping_sound_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_control_set_camera_control_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_effect_set_rotation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_effect_set_rumble_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_effect_set_translation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_effect_start_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_player_effect_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_show_hud_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_show_hud_help_text_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_sound_new_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_sound_stop_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripted_sound_time_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripting_magic_melee_attack_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void scripting_set_magic_base_seat_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void sound_cache_flush_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void sound_class_set_gain_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void sound_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void structure_lens_flares_place_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void tag_groups_dump_memory_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void terminal_clear_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void texture_cache_flush_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void ui_widget_debug_show_path_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_aim_without_turning_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_close_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_custom_animation_at_frame_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_get_current_flashlight_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_get_custom_animation_time_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_is_playing_custom_animation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_kill_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_kill_silent_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_open_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_can_blink_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_doesnt_drop_items_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_enter_vehicle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_exit_vehicle_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_get_grenade_count_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_get_health_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_get_shield_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_has_weapon_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_has_weapon_readied_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_impervious_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_set_current_vitality_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_set_emotion_animation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_set_maximum_vitality_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_set_seat_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_start_user_animation_list_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_suspended_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_unit_driver_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_unit_gunner_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_unit_riders_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_vehicle_test_seat_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_scripting_vehicle_test_seat_list_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_set_desired_flashlight_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_set_emotion_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_set_enterable_by_player_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_solo_player_integrated_night_vision_is_active_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_start_user_animation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void unit_stop_custom_animation_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void units_scripting_set_current_vitality_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void units_scripting_set_maximum_vitality_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void units_set_desired_flashlight_state_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void vehicle_hover_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void vehicle_scripting_load_magic_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void vehicle_scripting_unload_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void xbox_set_machine_name_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize);
+void hs_enumerate_special_form_names(
+	void);
+void hs_enumerate_script_type_names(
+	void);
+void hs_enumerate_type_names(
+	void);
+void hs_enumerate_function_names(
+	void);
+void hs_enumerate_script_names(
+	void);
+void hs_enumerate_variable_names(
+	void);
+void hs_enumerate_ai_names(
+	void);
+void hs_enumerate_ai_command_list_names(
+	void);
+void hs_enumerate_starting_profile_names(
+	void);
+void hs_enumerate_conversation_names(
+	void);
+void hs_enumerate_object_names(
+	void);
+void hs_enumerate_trigger_volume_names(
+	void);
+void hs_enumerate_cutscene_flag_names(
+	void);
+void hs_enumerate_cutscene_camera_point_names(
+	void);
+void hs_enumerate_cutscene_title_names(
+	void);
+void hs_enumerate_cutscene_recording_names(
+	void);
+void hs_enumerate_navpoints(
+	void);
+void hs_enumerate_hud_messages(
+	void);
+
+extern char const *global_game_difficulty_level_names[];
+extern char const *global_game_team_names[];
+extern char const *global_actor_type_names[];
+extern char const *global_hud_anchor_names[];
+
+/* ---------- globals */
+
+char const *hs_type_names[NUMBER_OF_HS_TYPES]=
+{
+	"unparsed",
+	"special form",
+	"function name",
+	"passthrough",
+	"void",
+	"boolean",
+	"real",
+	"short",
+	"long",
+	"string",
+	"script",
+	"trigger_volume",
+	"cutscene_flag",
+	"cutscene_camera_point",
+	"cutscene_title",
+	"cutscene_recording",
+	"device_group",
+	"ai",
+	"ai_command_list",
+	"starting_profile",
+	"conversation",
+	"navpoint",
+	"hud_message",
+	"object_list",
+	"sound",
+	"effect",
+	"damage",
+	"looping_sound",
+	"animation_graph",
+	"actor_variant",
+	"damage_effect",
+	"object_definition",
+	"game_difficulty",
+	"team",
+	"ai_default_state",
+	"actor_type",
+	"hud_corner",
+	"object",
+	"unit",
+	"vehicle",
+	"weapon",
+	"device",
+	"scenery",
+	"object_name",
+	"unit_name",
+	"vehicle_name",
+	"weapon_name",
+	"device_name",
+	"scenery_name",
+};
+
+char const *hs_script_type_names[]=
+{
+	"startup",
+	"dormant",
+	"continuous",
+	"static",
+	"stub",
+};
+
+word const hs_object_type_masks[NUMBER_OF_HS_OBJECT_TYPES]=
+{
+	0xFFFF,
+	0x0003,
+	0x0002,
+	0x0004,
+	0x0380,
+	0x0040,
+};
+
+tag const hs_tag_reference_type_group_tags[]=
+{
+	'snd!',
+	'effe',
+	'jpt!',
+	'lsnd',
+	'antr',
+	'actv',
+	'jpt!',
+	'obje',
+};
+
+short const hs_type_sizes[NUMBER_OF_HS_TYPES]=
+{
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
+	4,
+	2,
+	4,
+	4,
+	4,
+	2,
+	2,
+	2,
+	2,
+	2,
+	2,
+	4,
+	2,
+	2,
+	2,
+	2,
+	2,
+	4,
+	4,
+	4,
+	4,
+	4,
+	4,
+	4,
+	4,
+	4,
+	2,
+	2,
+	2,
+	2,
+	2,
+	4,
+	4,
+	4,
+	4,
+	4,
+	4,
+	2,
+	2,
+	2,
+	2,
+	2,
+	2,
+};
+
+static boolean const _hs_type_boolean_default= FALSE;
+static real const _hs_type_real_default= 0.0f;
+static short const _hs_type_short_integer_default= 0;
+static long const _hs_type_long_integer_default= 0;
+static char const *_hs_type_string_default= "";
+static short const _hs_type_script_default= NONE;
+static short const _hs_type_trigger_volume_default= NONE;
+static short const _hs_type_cutscene_flag_default= NONE;
+static short const _hs_type_cutscene_camera_point_default= NONE;
+static short const _hs_type_cutscene_title_default= NONE;
+static short const _hs_type_cutscene_recording_default= NONE;
+static short const _hs_type_device_group_default= NONE;
+static long const _hs_type_ai_default= NONE;
+static short const _hs_type_ai_command_list_default= NONE;
+static short const _hs_type_starting_profile_default= NONE;
+static short const _hs_type_conversation_default= NONE;
+static short const _hs_type_navpoint_default= NONE;
+static short const _hs_type_hud_message_default= NONE;
+static long const _hs_type_object_list_default= NONE;
+static long const _hs_type_sound_default= NONE;
+static long const _hs_type_looping_sound_default= NONE;
+static long const _hs_type_effect_default= NONE;
+static long const _hs_type_damage_default= NONE;
+static long const _hs_type_animation_graph_default= NONE;
+static long const _hs_type_actor_variant_default= NONE;
+static long const _hs_type_damage_effect_default= NONE;
+static long const _hs_type_object_definition_default= NONE;
+static short const _hs_type_enum_game_difficulty_default= NONE;
+static short const _hs_type_enum_team_default= NONE;
+static short const _hs_type_enum_ai_default_state_default= NONE;
+static short const _hs_type_enum_actor_type_default= NONE;
+static short const _hs_type_enum_hud_corner_default= NONE;
+static short const _hs_type_object_name_default= NONE;
+static long const _hs_type_object_default= NONE;
+static long const _hs_type_unit_default= NONE;
+static long const _hs_type_vehicle_default= NONE;
+static long const _hs_type_weapon_default= NONE;
+static long const _hs_type_device_default= NONE;
+static long const _hs_type_scenery_default= NONE;
+
+static struct hs_function_definition const hs_begin_definition=
+{
+	_hs_passthrough,
+	0,
+	"begin",
+	hs_parse_begin,
+	hs_evaluate_begin,
+	"returns the last expression in a sequence after evaluating the sequence in order.",
+	"<expression(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_begin_random_definition=
+{
+	_hs_passthrough,
+	0,
+	"begin_random",
+	hs_parse_begin,
+	hs_evaluate_begin_random,
+	"evaluates the sequence of expressions in random order and returns the last value evaluated.",
+	"<expression(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_if_definition=
+{
+	_hs_passthrough,
+	0,
+	"if",
+	hs_parse_if,
+	hs_evaluate_if,
+	"returns one of two values based on the value of a condition.",
+	"<boolean> <then> [<else>]",
+	0,
+};
+
+static struct hs_function_definition const hs_cond_definition=
+{
+	_hs_passthrough,
+	0,
+	"cond",
+	hs_parse_cond,
+	NULL,
+	"returns the value associated with the first true condition.",
+	"(<boolean1> <result1>) [(<boolean2> <result2>) [...]]",
+	0,
+};
+
+static struct hs_function_definition const hs_set_definition=
+{
+	_hs_passthrough,
+	0,
+	"set",
+	hs_parse_set,
+	hs_evaluate_set,
+	"set the value of a global variable.",
+	"<variable name> <expression>",
+	0,
+};
+
+static struct hs_function_definition const hs_and_definition=
+{
+	_hs_type_boolean,
+	0,
+	"and",
+	hs_parse_logical,
+	hs_evaluate_logical,
+	"returns true if all specified expressions are true.",
+	"<boolean(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_or_definition=
+{
+	_hs_type_boolean,
+	0,
+	"or",
+	hs_parse_logical,
+	hs_evaluate_logical,
+	"returns true if any specified expressions are true.",
+	"<boolean(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_plus_definition=
+{
+	_hs_type_real,
+	0,
+	"+",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the sum of all specified expressions.",
+	"<number(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_minus_definition=
+{
+	_hs_type_real,
+	0,
+	"-",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the difference of two expressions.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_times_definition=
+{
+	_hs_type_real,
+	0,
+	"*",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the product of all specified expressions.",
+	"<number(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_divide_definition=
+{
+	_hs_type_real,
+	0,
+	"/",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the quotient of two expressions.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_min_definition=
+{
+	_hs_type_real,
+	0,
+	"min",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the minimum of all specified expressions.",
+	"<number(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_max_definition=
+{
+	_hs_type_real,
+	0,
+	"max",
+	hs_parse_arithmetic,
+	hs_evaluate_arithmetic,
+	"returns the maximum of all specified expressions.",
+	"<number(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_equal_definition=
+{
+	_hs_type_boolean,
+	0,
+	"=",
+	hs_parse_equality,
+	hs_evaluate_equality,
+	"returns true if two expressions are equal",
+	"<expression> <expression>",
+	0,
+};
+
+static struct hs_function_definition const hs_not_equal_definition=
+{
+	_hs_type_boolean,
+	0,
+	"!=",
+	hs_parse_equality,
+	hs_evaluate_equality,
+	"returns true if two expressions are not equal",
+	"<expression> <expression>",
+	0,
+};
+
+static struct hs_function_definition const hs_gt_definition=
+{
+	_hs_type_boolean,
+	0,
+	">",
+	hs_parse_inequality,
+	hs_evaluate_inequality,
+	"returns true if the first number is larger than the second.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_lt_definition=
+{
+	_hs_type_boolean,
+	0,
+	"<",
+	hs_parse_inequality,
+	hs_evaluate_inequality,
+	"returns true if the first number is smaller than the second.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_gte_definition=
+{
+	_hs_type_boolean,
+	0,
+	">=",
+	hs_parse_inequality,
+	hs_evaluate_inequality,
+	"returns true if the first number is larger than or equal to the second.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_lte_definition=
+{
+	_hs_type_boolean,
+	0,
+	"<=",
+	hs_parse_inequality,
+	hs_evaluate_inequality,
+	"returns true if the first number is smaller than or equal to the second.",
+	"<number> <number>",
+	0,
+};
+
+static struct hs_function_definition const hs_sleep_definition=
+{
+	_hs_type_void,
+	0,
+	"sleep",
+	hs_parse_sleep,
+	hs_evaluate_sleep,
+	"pauses execution of this script (or, optionally, another script) for the specified number of ticks.",
+	"<short> [<script>]",
+	0,
+};
+
+static struct hs_function_definition const hs_sleep_until_definition=
+{
+	_hs_type_void,
+	0,
+	"sleep_until",
+	hs_parse_sleep_until,
+	hs_evaluate_sleep_until,
+	"pauses execution of this script until the specified condition is true, checking once per second unless a different number of ticks is specified.",
+	"<boolean> [<short>]",
+	0,
+};
+
+static struct hs_function_definition const hs_wake_definition=
+{
+	_hs_type_void,
+	0,
+	"wake",
+	hs_parse_wake,
+	hs_evaluate_wake,
+	"wakes a sleeping script in the next update.",
+	"<script name>",
+	0,
+};
+
+static struct hs_function_definition const hs_inspect_definition=
+{
+	_hs_type_void,
+	0,
+	"inspect",
+	hs_parse_inspect,
+	hs_evaluate_inspect,
+	"prints the value of an expression to the screen for debugging purposes.",
+	"<expression>",
+	0,
+};
+
+static struct hs_function_definition const hs_unit_definition=
+{
+	_hs_type_unit,
+	0,
+	"unit",
+	hs_parse_object_cast_up,
+	hs_evaluate_object_cast_up,
+	"converts an object to a unit.",
+	"<object>",
+	0,
+};
+
+static struct hs_function_definition const hs_ai_debug_communication_suppress_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_debug_communication_suppress",
+	hs_parse_debug_string,
+	hs_evaluate_debug_string,
+	"suppresses (or stops suppressing) a set of AI communication types.",
+	"<string(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_ai_debug_communication_ignore_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_debug_communication_ignore",
+	hs_parse_debug_string,
+	hs_evaluate_debug_string,
+	"ignores (or stops ignoring) a set of AI communication types when printing out communications.",
+	"<string(s)>",
+	0,
+};
+
+static struct hs_function_definition const hs_ai_debug_communication_focus_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_debug_communication_focus",
+	hs_parse_debug_string,
+	hs_evaluate_debug_string,
+	"focuses (or stops focusing) a set of unit vocalization types.",
+	"<string(s)>",
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_not_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"not",
+		hs_macro_function_parse,
+		hs_not_evaluate,
+		"returns the opposite of the expression.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_print_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"print",
+		hs_macro_function_parse,
+		hs_print_evaluate,
+		"prints a string to the console.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_players_definition=
+{
+	_hs_type_object_list,
+	0,
+	"players",
+	hs_macro_function_parse,
+	hs_players_evaluate,
+	"returns a list of the players",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_volume_teleport_players_not_inside_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"volume_teleport_players_not_inside",
+		hs_macro_function_parse,
+		hs_teleport_players_not_in_trigger_volume_evaluate,
+		"moves all players outside a specified trigger volume to a specified flag.",
+		NULL,
+		2,
+		{ _hs_type_trigger_volume },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_volume_test_object_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"volume_test_object",
+		hs_macro_function_parse,
+		scenario_trigger_volume_test_object_evaluate,
+		"returns true if the specified object is within the specified volume.",
+		NULL,
+		2,
+		{ _hs_type_trigger_volume },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_volume_test_objects_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"volume_test_objects",
+		hs_macro_function_parse,
+		hs_trigger_volume_test_objects_any_evaluate,
+		"returns true if any of the specified objects are within the specified volume.",
+		NULL,
+		2,
+		{ _hs_type_trigger_volume },
+	},
+	{ _hs_type_object_list },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_volume_test_objects_all_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"volume_test_objects_all",
+		hs_macro_function_parse,
+		hs_trigger_volume_test_objects_all_evaluate,
+		"returns true if any of the specified objects are within the specified volume.",
+		NULL,
+		2,
+		{ _hs_type_trigger_volume },
+	},
+	{ _hs_type_object_list },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_create_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_create",
+		hs_macro_function_parse,
+		hs_object_create_evaluate,
+		"creates an object from the scenario.",
+		NULL,
+		1,
+		{ _hs_type_object_name },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_destroy_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_destroy",
+		hs_macro_function_parse,
+		hs_object_destroy_evaluate,
+		"destroys an object.",
+		NULL,
+		1,
+		{ _hs_type_object },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_create_anew_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_create_anew",
+		hs_macro_function_parse,
+		hs_object_create_anew_evaluate,
+		"creates an object, destroying it first if it already exists.",
+		NULL,
+		1,
+		{ _hs_type_object_name },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_create_containing_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_create_containing",
+		hs_macro_function_parse,
+		hs_object_create_containing_evaluate,
+		"creates all objects from the scenario whose names contain the given substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_create_anew_containing_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_create_anew_containing",
+		hs_macro_function_parse,
+		hs_object_create_anew_containing_evaluate,
+		"creates anew all objects from the scenario whose names contain the given substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_destroy_containing_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_destroy_containing",
+		hs_macro_function_parse,
+		hs_object_destroy_containing_evaluate,
+		"destroys all objects from the scenario whose names contain the given substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_object_destroy_all_definition=
+{
+	_hs_type_void,
+	0,
+	"object_destroy_all",
+	hs_macro_function_parse,
+	hs_object_destroy_all_evaluate,
+	"destroys all non player objects.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_teleport_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_teleport",
+		hs_macro_function_parse,
+		hs_object_teleport_evaluate,
+		"moves the specified object to the specified flag.",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_set_facing_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_facing",
+		hs_macro_function_parse,
+		hs_object_set_facing_evaluate,
+		"turns the specified object in the direction of the specified flag.",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_set_shield_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_shield",
+		hs_macro_function_parse,
+		hs_object_set_shield_evaluate,
+		"sets the shield vitality of the specified object (between 0 and 1).",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_object_set_permutation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_permutation",
+		hs_macro_function_parse,
+		hs_object_set_permutation_evaluate,
+		"sets the desired region (use \"\" for all regions) to the permutation with the given name, e.g. (object_set_permutation flood \"right arm\" ~damaged)",
+		NULL,
+		3,
+		{ _hs_type_object },
+	},
+	{ _hs_type_string, _hs_type_string },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_list_get_definition=
+{
+	{
+		_hs_type_object,
+		0,
+		"list_get",
+		hs_macro_function_parse,
+		hs_object_list_get_element_evaluate,
+		"returns an item in an object list.",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_list_count_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"list_count",
+		hs_macro_function_parse,
+		object_list_count_evaluate,
+		"returns the number of objects in a list",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_effect_new_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"effect_new",
+		hs_macro_function_parse,
+		hs_effect_new_evaluate,
+		"starts the specified effect at the specified flag.",
+		NULL,
+		2,
+		{ _hs_type_effect },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_effect_new_on_object_marker_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"effect_new_on_object_marker",
+		hs_macro_function_parse,
+		hs_effect_new_from_object_marker_evaluate,
+		"starts the specified effect on the specified object at the specified marker.",
+		NULL,
+		3,
+		{ _hs_type_effect },
+	},
+	{ _hs_type_object, _hs_type_string },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_damage_new_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"damage_new",
+		hs_macro_function_parse,
+		hs_damage_new_evaluate,
+		"causes the specified damage at the specified flag.",
+		NULL,
+		2,
+		{ _hs_type_damage },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_damage_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"damage_object",
+		hs_macro_function_parse,
+		hs_damage_object_evaluate,
+		"causes the specified damage at the specified object.",
+		NULL,
+		2,
+		{ _hs_type_damage },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_objects_can_see_object_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"objects_can_see_object",
+		hs_macro_function_parse,
+		hs_objects_can_see_object_evaluate,
+		"returns true if any of the specified units are looking within the specified number of degrees of the object.",
+		NULL,
+		3,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_object, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_objects_can_see_flag_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"objects_can_see_flag",
+		hs_macro_function_parse,
+		hs_objects_can_see_flag_evaluate,
+		"returns true if any of the specified units are looking within the specified number of degrees of the flag.",
+		NULL,
+		3,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_cutscene_flag, _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_objects_delete_by_definition_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"objects_delete_by_definition",
+		hs_macro_function_parse,
+		hs_objects_delete_by_definition_evaluate,
+		"deletes all objects of type <definition>",
+		NULL,
+		1,
+		{ _hs_type_object_definition },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_sound_set_gain_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_set_gain",
+		hs_macro_function_parse,
+		hs_sound_set_gain_evaluate,
+		"absolutely do not use this",
+		NULL,
+		2,
+		{ _hs_type_string },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_get_gain_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"sound_get_gain",
+		hs_macro_function_parse,
+		hs_sound_get_gain_evaluate,
+		"absolutely do not use this either",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_script_recompile_definition=
+{
+	_hs_type_void,
+	0,
+	"script_recompile",
+	hs_macro_function_parse,
+	hs_recompile_evaluate,
+	"recompiles scripts.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_script_doc_definition=
+{
+	_hs_type_void,
+	0,
+	"script_doc",
+	hs_macro_function_parse,
+	hs_doc_evaluate,
+	"saves a file called hs_doc.txt with parameters for all script commands.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_help_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"help",
+		hs_macro_function_parse,
+		hs_help_evaluate,
+		"prints a description of the named function.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_random_range_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"random_range",
+		hs_macro_function_parse,
+		random_range_evaluate,
+		"returns a random value in the range [lower bound, upper bound)",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_real_random_range_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"real_random_range",
+		hs_macro_function_parse,
+		real_random_range_evaluate,
+		"returns a random value in the range [lower bound, upper bound)",
+		NULL,
+		2,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_numeric_countdown_timer_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"numeric_countdown_timer_set",
+		hs_macro_function_parse,
+		numeric_countdown_timer_set_evaluate,
+		"<milliseconds>, <auto_start>",
+		NULL,
+		2,
+		{ _hs_type_long_integer },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_numeric_countdown_timer_get_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"numeric_countdown_timer_get",
+		hs_macro_function_parse,
+		numeric_countdown_timer_get_evaluate,
+		"<digit_index>",
+		NULL,
+		1,
+		{ _hs_type_short_integer },
+	},
+};
+
+static struct hs_function_definition const hs_numeric_countdown_timer_stop_definition=
+{
+	_hs_type_void,
+	0,
+	"numeric_countdown_timer_stop",
+	hs_macro_function_parse,
+	numeric_countdown_timer_stop_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_numeric_countdown_timer_restart_definition=
+{
+	_hs_type_void,
+	0,
+	"numeric_countdown_timer_restart",
+	hs_macro_function_parse,
+	numeric_countdown_timer_restart_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_breakable_surfaces_enable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"breakable_surfaces_enable",
+		hs_macro_function_parse,
+		breakable_surfaces_enable_evaluate,
+		"enables or disables breakability of all breakable surfaces on level",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_recording_play_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"recording_play",
+		hs_macro_function_parse,
+		recorded_animation_play_evaluate,
+		"make the specified unit run the specified cutscene recording.",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_cutscene_recording },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_recording_play_and_delete_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"recording_play_and_delete",
+		hs_macro_function_parse,
+		recorded_animation_play_and_delete_evaluate,
+		"make the specified unit run the specified cutscene recording, deletes the unit when the animation finishes.",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_cutscene_recording },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_recording_play_and_hover_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"recording_play_and_hover",
+		hs_macro_function_parse,
+		recorded_animation_play_and_hover_evaluate,
+		"make the specified vehicle run the specified cutscene recording, hovers the vehicle when the animation finishes.",
+		NULL,
+		2,
+		{ _hs_type_vehicle },
+	},
+	{ _hs_type_cutscene_recording },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_recording_kill_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"recording_kill",
+		hs_macro_function_parse,
+		recorded_animation_kill_evaluate,
+		"kill the specified unit's cutscene recording.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_recording_time_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"recording_time",
+		hs_macro_function_parse,
+		recorded_animation_get_time_left_evaluate,
+		"return the time remaining in the specified unit's cutscene recording.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_set_ranged_attack_inhibited_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_ranged_attack_inhibited",
+		hs_macro_function_parse,
+		object_set_ranged_attack_inhibited_evaluate,
+		"FALSE prevents object from using ranged attack",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_set_melee_attack_inhibited_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_melee_attack_inhibited",
+		hs_macro_function_parse,
+		object_set_melee_attack_inhibited_evaluate,
+		"FALSE prevents object from using melee attack",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition const hs_objects_dump_memory_definition=
+{
+	_hs_type_void,
+	0,
+	"objects_dump_memory",
+	hs_macro_function_parse,
+	objects_dump_memory_evaluate,
+	"debugs object memory usage",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_set_collideable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_collideable",
+		hs_macro_function_parse,
+		object_scripting_set_collideable_evaluate,
+		"FALSE prevents any object from colliding with the given object",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_object_set_scale_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_set_scale",
+		hs_macro_function_parse,
+		objects_scripting_set_scale_evaluate,
+		"sets the scale for a given object and interpolates over the given number of frames to achieve that scale",
+		NULL,
+		3,
+		{ _hs_type_object },
+	},
+	{ _hs_type_real, _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_objects_attach_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"objects_attach",
+		hs_macro_function_parse,
+		objects_scripting_attach_evaluate,
+		"attaches the second object to the first; both strings can be empty",
+		NULL,
+		4,
+		{ _hs_type_object },
+	},
+	{ _hs_type_string, _hs_type_object, _hs_type_string },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_objects_detach_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"objects_detach",
+		hs_macro_function_parse,
+		objects_scripting_detach_evaluate,
+		"detaches from the given parent object the given child object",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition const hs_garbage_collect_now_definition=
+{
+	_hs_type_void,
+	0,
+	"garbage_collect_now",
+	hs_macro_function_parse,
+	garbage_collect_now_evaluate,
+	"causes all garbage objects except those visible to a player to be collected immediately",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_cannot_take_damage_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_cannot_take_damage",
+		hs_macro_function_parse,
+		object_cannot_take_damage_evaluate,
+		"prevents an object from taking damage",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_can_take_damage_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_can_take_damage",
+		hs_macro_function_parse,
+		object_can_take_damage_evaluate,
+		"allows an object to take damage again",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_object_beautify_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_beautify",
+		hs_macro_function_parse,
+		object_beautify_evaluate,
+		"makes an object pretty for the remainder of the levels' cutscenes.",
+		NULL,
+		2,
+		{ _hs_type_object },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_objects_predict_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"objects_predict",
+		hs_macro_function_parse,
+		hs_objects_predict_evaluate,
+		"loads textures necessary to draw a objects that are about to come on-screen.",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_type_predict_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_type_predict",
+		hs_macro_function_parse,
+		object_definition_predict_evaluate,
+		"loads textures necessary to draw an object that's about to come on-screen.",
+		NULL,
+		1,
+		{ _hs_type_object_definition },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_pvs_set_object",
+		hs_macro_function_parse,
+		object_pvs_set_object_evaluate,
+		"sets the specified object as the special place that activates everything it sees.",
+		NULL,
+		1,
+		{ _hs_type_object },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_camera_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_pvs_set_camera",
+		hs_macro_function_parse,
+		object_pvs_set_camera_point_evaluate,
+		"sets the specified cutscene camera point as the special place that activates everything it sees.",
+		NULL,
+		1,
+		{ _hs_type_cutscene_camera_point },
+	},
+};
+
+static struct hs_function_definition const hs_object_pvs_clear_definition=
+{
+	_hs_type_void,
+	0,
+	"object_pvs_clear",
+	hs_macro_function_parse,
+	object_pvs_clear_evaluate,
+	"removes the special place that activates everything it sees.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_object_pvs_activate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"object_pvs_activate",
+		hs_macro_function_parse,
+		object_pvs_activate_evaluate,
+		"just another (old) name for object_pvs_set_object.",
+		NULL,
+		1,
+		{ _hs_type_object },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_render_lights_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"render_lights",
+		hs_macro_function_parse,
+		lights_enable_evaluate,
+		"enables/disables dynamic lights",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_scenery_get_animation_time_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"scenery_get_animation_time",
+		hs_macro_function_parse,
+		scenery_get_animation_time_evaluate,
+		"returns the number of ticks remaining in a custom animation (or zero, if the animation is over).",
+		NULL,
+		1,
+		{ _hs_type_scenery },
+	},
+};
+
+static struct hs_function_definition_with_3_parameters const hs_scenery_animation_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"scenery_animation_start",
+		hs_macro_function_parse,
+		scenery_animation_start_evaluate,
+		"starts a custom animation playing on a piece of scenery",
+		NULL,
+		3,
+		{ _hs_type_scenery },
+	},
+	{ _hs_type_animation_graph, _hs_type_string },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_scenery_animation_start_at_frame_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"scenery_animation_start_at_frame",
+		hs_macro_function_parse,
+		scenery_animation_start_at_frame_evaluate,
+		"starts a custom animation playing on a piece of scenery at a specific frame",
+		NULL,
+		4,
+		{ _hs_type_scenery },
+	},
+	{ _hs_type_animation_graph, _hs_type_string, _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_render_effects_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"render_effects",
+		hs_macro_function_parse,
+		render_effects_evaluate,
+		"",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_can_blink_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_can_blink",
+		hs_macro_function_parse,
+		unit_scripting_can_blink_evaluate,
+		"allows a unit to blink or not (units never blink when they are dead)",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_open_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_open",
+		hs_macro_function_parse,
+		unit_open_evaluate,
+		"opens the hatches on the given unit",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_close_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_close",
+		hs_macro_function_parse,
+		unit_close_evaluate,
+		"closes the hatches on a given unit",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_kill_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_kill",
+		hs_macro_function_parse,
+		unit_kill_evaluate,
+		"kills a given unit, no saving throw",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_kill_silent_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_kill_silent",
+		hs_macro_function_parse,
+		unit_kill_silent_evaluate,
+		"kills a given unit silently (doesn't make them play their normal death animation or sound)",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_get_custom_animation_time_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"unit_get_custom_animation_time",
+		hs_macro_function_parse,
+		unit_get_custom_animation_time_evaluate,
+		"returns the number of ticks remaining in a unit's custom animation (or zero, if the animation is over).",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_stop_custom_animation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_stop_custom_animation",
+		hs_macro_function_parse,
+		unit_stop_custom_animation_evaluate,
+		"stops the custom animation running on the given unit.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_4_parameters const hs_custom_animation_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"custom_animation",
+		hs_macro_function_parse,
+		unit_start_user_animation_evaluate,
+		"starts a custom animation playing on a unit (interpolates into animation if last parameter is TRUE)",
+		NULL,
+		4,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_custom_animation_list_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"custom_animation_list",
+		hs_macro_function_parse,
+		unit_scripting_start_user_animation_list_evaluate,
+		"starts a custom animation playing on a unit list (interpolates into animation if last parameter is TRUE)",
+		NULL,
+		4,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_5_parameters const hs_unit_custom_animation_at_frame_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"unit_custom_animation_at_frame",
+		hs_macro_function_parse,
+		unit_custom_animation_at_frame_evaluate,
+		"starts a custom animation playing on a unit at a specific frame index(interpolates into animation if next to last parameter is TRUE)",
+		NULL,
+		5,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean, _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_is_playing_custom_animation_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"unit_is_playing_custom_animation",
+		hs_macro_function_parse,
+		unit_is_playing_custom_animation_evaluate,
+		"returns TRUE if the given unit is still playing a custom animation",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_aim_without_turning_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_aim_without_turning",
+		hs_macro_function_parse,
+		unit_aim_without_turning_evaluate,
+		"allows a unit to aim in place without turning",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_emotion",
+		hs_macro_function_parse,
+		unit_set_emotion_evaluate,
+		"sets a unit's facial expression (-1 is none, other values depend on unit)",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_set_enterable_by_player_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_enterable_by_player",
+		hs_macro_function_parse,
+		unit_set_enterable_by_player_evaluate,
+		"can be used to prevent the player from entering a vehicle",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_unit_enter_vehicle_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_enter_vehicle",
+		hs_macro_function_parse,
+		unit_scripting_enter_vehicle_evaluate,
+		"puts the specified unit in the specified vehicle (in the named seat)",
+		NULL,
+		3,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_vehicle, _hs_type_string },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_vehicle_test_seat_list_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"vehicle_test_seat_list",
+		hs_macro_function_parse,
+		unit_scripting_vehicle_test_seat_list_evaluate,
+		"tests whether the named seat has an object in the object list",
+		NULL,
+		3,
+		{ _hs_type_vehicle },
+	},
+	{ _hs_type_string, _hs_type_object_list },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_vehicle_test_seat_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"vehicle_test_seat",
+		hs_macro_function_parse,
+		unit_scripting_vehicle_test_seat_evaluate,
+		"tests whether the named seat has a specified unit in it",
+		NULL,
+		3,
+		{ _hs_type_vehicle },
+	},
+	{ _hs_type_string, _hs_type_unit },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion_animation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_emotion_animation",
+		hs_macro_function_parse,
+		unit_scripting_set_emotion_animation_evaluate,
+		"sets the emotion animation to be used for the given unit",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_string },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_exit_vehicle_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_exit_vehicle",
+		hs_macro_function_parse,
+		unit_scripting_exit_vehicle_evaluate,
+		"makes a unit exit its vehicle",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_3_parameters const hs_unit_set_maximum_vitality_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_maximum_vitality",
+		hs_macro_function_parse,
+		unit_scripting_set_maximum_vitality_evaluate,
+		"sets a unit's maximum body and shield vitality",
+		NULL,
+		3,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_units_set_maximum_vitality_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"units_set_maximum_vitality",
+		hs_macro_function_parse,
+		units_scripting_set_maximum_vitality_evaluate,
+		"sets a group of units' maximum body and shield vitality",
+		NULL,
+		3,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_unit_set_current_vitality_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_current_vitality",
+		hs_macro_function_parse,
+		unit_scripting_set_current_vitality_evaluate,
+		"sets a unit's current body and shield vitality",
+		NULL,
+		3,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_units_set_current_vitality_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"units_set_current_vitality",
+		hs_macro_function_parse,
+		units_scripting_set_current_vitality_evaluate,
+		"sets a group of units' current body and shield vitality",
+		NULL,
+		3,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_vehicle_load_magic_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"vehicle_load_magic",
+		hs_macro_function_parse,
+		vehicle_scripting_load_magic_evaluate,
+		"makes a list of units (named or by encounter) magically get into a vehicle, in the substring-specified seats (e.g. CD-passenger... empty string matches all seats)",
+		NULL,
+		3,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_string, _hs_type_object_list },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_vehicle_unload_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"vehicle_unload",
+		hs_macro_function_parse,
+		vehicle_scripting_unload_evaluate,
+		"makes units get out of a vehicle from the substring-specified seats (e.g. CD-passenger... empty string matches all seats)",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_string },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_magic_seat_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"magic_seat_name",
+		hs_macro_function_parse,
+		scripting_set_magic_base_seat_evaluate,
+		"all units controlled by the player will assume the given seat name (valid values are 'asleep', 'alert', 'stand', 'crouch' and 'flee')",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_set_seat_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_seat",
+		hs_macro_function_parse,
+		unit_scripting_set_seat_evaluate,
+		"this unit will assume the named seat",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_string },
+};
+
+static struct hs_function_definition const hs_magic_melee_attack_definition=
+{
+	_hs_type_void,
+	0,
+	"magic_melee_attack",
+	hs_macro_function_parse,
+	scripting_magic_melee_attack_evaluate,
+	"causes player's unit to start a melee attack",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_vehicle_riders_definition=
+{
+	{
+		_hs_type_object_list,
+		0,
+		"vehicle_riders",
+		hs_macro_function_parse,
+		unit_scripting_unit_riders_evaluate,
+		"returns a list of all riders in a vehicle",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_vehicle_driver_definition=
+{
+	{
+		_hs_type_unit,
+		0,
+		"vehicle_driver",
+		hs_macro_function_parse,
+		unit_scripting_unit_driver_evaluate,
+		"returns the driver of a vehicle",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_vehicle_gunner_definition=
+{
+	{
+		_hs_type_unit,
+		0,
+		"vehicle_gunner",
+		hs_macro_function_parse,
+		unit_scripting_unit_gunner_evaluate,
+		"returns the gunner of a vehicle",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_get_health_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"unit_get_health",
+		hs_macro_function_parse,
+		unit_scripting_get_health_evaluate,
+		"returns the health [0,1] of the unit, returns -1 if the unit does not exists",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_get_shield_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"unit_get_shield",
+		hs_macro_function_parse,
+		unit_scripting_get_shield_evaluate,
+		"returns the shield [0,1] of the unit, returns -1 if the unit does not exists",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_get_total_grenade_count_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"unit_get_total_grenade_count",
+		hs_macro_function_parse,
+		unit_scripting_get_grenade_count_evaluate,
+		"returns the total number of grenades for the given unit, 0 if it does not exist",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"unit_has_weapon",
+		hs_macro_function_parse,
+		unit_scripting_has_weapon_evaluate,
+		"returns TRUE if the <unit> has <object> as a weapon, FALSE otherwise",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_object_definition },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_readied_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"unit_has_weapon_readied",
+		hs_macro_function_parse,
+		unit_scripting_has_weapon_readied_evaluate,
+		"returns TRUE if the <unit> has <object> as the primary weapon, FALSE otherwise",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_object_definition },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_doesnt_drop_items_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_doesnt_drop_items",
+		hs_macro_function_parse,
+		unit_scripting_doesnt_drop_items_evaluate,
+		"prevents any of the given units from dropping weapons or grenades when they die",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_impervious_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_impervious",
+		hs_macro_function_parse,
+		unit_scripting_impervious_evaluate,
+		"prevents any of the given units from being knocked around or playing ping animations",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_suspended_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_suspended",
+		hs_macro_function_parse,
+		unit_scripting_suspended_evaluate,
+		"stops gravity from working on the given unit",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition const hs_unit_solo_player_integrated_night_vision_is_active_definition=
+{
+	_hs_type_boolean,
+	0,
+	"unit_solo_player_integrated_night_vision_is_active",
+	hs_macro_function_parse,
+	unit_solo_player_integrated_night_vision_is_active_evaluate,
+	"returns whether the night-vision mode could be activated via the flashlight button",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_units_set_desired_flashlight_state_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"units_set_desired_flashlight_state",
+		hs_macro_function_parse,
+		units_set_desired_flashlight_state_evaluate,
+		"sets the units' desired flashlight state",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_unit_set_desired_flashlight_state_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"unit_set_desired_flashlight_state",
+		hs_macro_function_parse,
+		unit_set_desired_flashlight_state_evaluate,
+		"sets the unit's desired flashlight state",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_unit_get_current_flashlight_state_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"unit_get_current_flashlight_state",
+		hs_macro_function_parse,
+		unit_get_current_flashlight_state_evaluate,
+		"gets the unit's current flashlight state",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_set_never_appears_locked_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_set_never_appears_locked",
+		hs_macro_function_parse,
+		device_set_never_appears_locked_evaluate,
+		"changes a machine's never_appears_locked flag, but only if paul is a bastard",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_set_power_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_set_power",
+		hs_macro_function_parse,
+		device_set_power_evaluate,
+		"immediately sets the power of a named device to the given value",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_device_get_power_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"device_get_power",
+		hs_macro_function_parse,
+		device_get_power_evaluate,
+		"gets the current power of a named device",
+		NULL,
+		1,
+		{ _hs_type_device },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_set_position_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"device_set_position",
+		hs_macro_function_parse,
+		device_set_desired_position_evaluate,
+		"set the desired position of the given device (used for devices without explicit device groups)",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_device_get_position_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"device_get_position",
+		hs_macro_function_parse,
+		device_get_position_evaluate,
+		"gets the current position of the given device (used for devices without explicit device groups)",
+		NULL,
+		1,
+		{ _hs_type_device },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_set_position_immediate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_set_position_immediate",
+		hs_macro_function_parse,
+		device_set_actual_position_evaluate,
+		"instantaneously changes the position of the given device (used for devices without explicit device groups",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_device_group_get_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"device_group_get",
+		hs_macro_function_parse,
+		device_group_get_value_evaluate,
+		"returns the desired value of the specified device group.",
+		NULL,
+		1,
+		{ _hs_type_device_group },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_group_set_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"device_group_set",
+		hs_macro_function_parse,
+		device_group_set_desired_value_evaluate,
+		"changes the desired value of the specified device group.",
+		NULL,
+		2,
+		{ _hs_type_device_group },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_group_set_immediate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_group_set_immediate",
+		hs_macro_function_parse,
+		device_group_set_actual_value_evaluate,
+		"instantaneously changes the value of the specified device group.",
+		NULL,
+		2,
+		{ _hs_type_device_group },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_one_sided_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_one_sided_set",
+		hs_macro_function_parse,
+		device_one_sided_set_evaluate,
+		"TRUE makes the given device one-sided (only able to be opened from one direction), FALSE makes it two-sided",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_operates_automatically_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_operates_automatically_set",
+		hs_macro_function_parse,
+		device_operates_automatically_set_evaluate,
+		"TRUE makes the given device open automatically when any biped is nearby, FALSE makes it not",
+		NULL,
+		2,
+		{ _hs_type_device },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_device_group_change_only_once_more_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"device_group_change_only_once_more_set",
+		hs_macro_function_parse,
+		device_group_change_only_once_more_set_evaluate,
+		"TRUE allows a device to change states only once",
+		NULL,
+		2,
+		{ _hs_type_device_group },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition const hs_breakable_surfaces_reset_definition=
+{
+	_hs_type_void,
+	0,
+	"breakable_surfaces_reset",
+	hs_macro_function_parse,
+	breakable_surfaces_reset_evaluate,
+	"restores all breakable surfaces",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cheat_all_powerups_definition=
+{
+	_hs_type_void,
+	0,
+	"cheat_all_powerups",
+	hs_macro_function_parse,
+	cheat_all_powerups_evaluate,
+	"drops all powerups near player",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cheat_all_weapons_definition=
+{
+	_hs_type_void,
+	0,
+	"cheat_all_weapons",
+	hs_macro_function_parse,
+	cheat_all_weapons_evaluate,
+	"drops all weapons near player",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cheat_all_vehicles_definition=
+{
+	_hs_type_void,
+	0,
+	"cheat_all_vehicles",
+	hs_macro_function_parse,
+	cheat_all_vehicles_evaluate,
+	"drops all vehicles on player",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cheat_teleport_to_camera_definition=
+{
+	_hs_type_void,
+	0,
+	"cheat_teleport_to_camera",
+	hs_macro_function_parse,
+	cheat_teleport_to_camera_evaluate,
+	"teleports player to camera location",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cheat_active_camouflage_definition=
+{
+	_hs_type_void,
+	0,
+	"cheat_active_camouflage",
+	hs_macro_function_parse,
+	cheat_active_camouflage_evaluate,
+	"gives the player active camouflage",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cheat_active_camouflage_local_player_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cheat_active_camouflage_local_player",
+		hs_macro_function_parse,
+		cheat_active_camouflage_local_player_evaluate,
+		"gives the player active camouflage",
+		NULL,
+		1,
+		{ _hs_type_short_integer },
+	},
+};
+
+static struct hs_function_definition const hs_cheats_load_definition=
+{
+	_hs_type_void,
+	0,
+	"cheats_load",
+	hs_macro_function_parse,
+	cheats_load_evaluate,
+	"reloads the cheats.txt file",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai",
+		hs_macro_function_parse,
+		ai_globals_ai_active_evaluate,
+		"turns all AI on or off.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_dialogue_triggers_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_dialogue_triggers",
+		hs_macro_function_parse,
+		ai_globals_dialogue_triggers_enabled_evaluate,
+		"turns impromptu dialogue on or off.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_grenades_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_grenades",
+		hs_macro_function_parse,
+		ai_globals_grenades_enabled_evaluate,
+		"turns grenade inventory on or off.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_free_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_free",
+		hs_macro_function_parse,
+		ai_scripting_free_evaluate,
+		"removes a group of actors from their encounter and sets them free",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_free_units_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_free_units",
+		hs_macro_function_parse,
+		ai_scripting_free_units_evaluate,
+		"removes a set of units from their encounter (if any) and sets them free",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_attach_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_attach",
+		hs_macro_function_parse,
+		ai_scripting_attach_unit_evaluate,
+		"attaches the specified unit to the specified encounter.",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_attach_units_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_attach_units",
+		hs_macro_function_parse,
+		ai_scripting_attach_units_evaluate,
+		"attaches the specified list of units to the specified encounter.",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_attach_free_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_attach_free",
+		hs_macro_function_parse,
+		ai_scripting_attach_free_evaluate,
+		"attaches a unit to a newly created free actor of the specified type",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_actor_variant },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_detach_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_detach",
+		hs_macro_function_parse,
+		ai_scripting_detach_unit_evaluate,
+		"detaches the specified unit from all AI.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_detach_units_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_detach_units",
+		hs_macro_function_parse,
+		ai_scripting_detach_units_evaluate,
+		"detaches the specified list of units from all AI.",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_place_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_place",
+		hs_macro_function_parse,
+		ai_scripting_place_evaluate,
+		"places the specified encounter on the map.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_kill_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_kill",
+		hs_macro_function_parse,
+		ai_scripting_kill_evaluate,
+		"instantly kills the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_kill_silent_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_kill_silent",
+		hs_macro_function_parse,
+		ai_scripting_kill_silent_evaluate,
+		"instantly and silently (no animation or sound played) kills the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_erase_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_erase",
+		hs_macro_function_parse,
+		ai_scripting_erase_evaluate,
+		"erases the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition const hs_ai_erase_all_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_erase_all",
+	hs_macro_function_parse,
+	ai_scripting_erase_all_evaluate,
+	"erases all AI.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_select_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_select",
+		hs_macro_function_parse,
+		ai_scripting_select_evaluate,
+		"selects the specified encounter.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition const hs_ai_deselect_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_deselect",
+	hs_macro_function_parse,
+	ai_scripting_deselect_evaluate,
+	"clears the selected encounter.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_spawn_actor_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_spawn_actor",
+		hs_macro_function_parse,
+		ai_scripting_spawn_actor_evaluate,
+		"spawns a single actor in the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_respawn_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_respawn",
+		hs_macro_function_parse,
+		ai_scripting_set_respawn_evaluate,
+		"enables or disables respawning in the specified encounter.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_deaf_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_deaf",
+		hs_macro_function_parse,
+		ai_scripting_set_deaf_evaluate,
+		"enables or disables hearing for actors in the specified encounter.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_blind_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_blind",
+		hs_macro_function_parse,
+		ai_scripting_set_blind_evaluate,
+		"enables or disables sight for actors in the specified encounter.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_encounter_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_magically_see_encounter",
+		hs_macro_function_parse,
+		ai_scripting_magically_see_encounter_evaluate,
+		"makes one encounter magically aware of another.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_magically_see_players_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_magically_see_players",
+		hs_macro_function_parse,
+		ai_scripting_magically_see_players_evaluate,
+		"makes an encounter magically aware of nearby players.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_magically_see_unit",
+		hs_macro_function_parse,
+		ai_scripting_magically_see_unit_evaluate,
+		"makes an encounter magically aware of the specified unit.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_unit },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_units_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_magically_see_units",
+		hs_macro_function_parse,
+		ai_scripting_magically_see_units_evaluate,
+		"makes an encounter magically aware of the specified set of units.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_object_list },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_timer_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_timer_start",
+		hs_macro_function_parse,
+		ai_scripting_timer_start_evaluate,
+		"makes a squad's delay timer start counting.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_timer_expire_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_timer_expire",
+		hs_macro_function_parse,
+		ai_scripting_timer_expire_evaluate,
+		"makes a squad's delay timer expire and releases them to enter combat.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_attack_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_attack",
+		hs_macro_function_parse,
+		ai_scripting_attack_evaluate,
+		"makes the specified platoon(s) go into the attacking state.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_defend_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_defend",
+		hs_macro_function_parse,
+		ai_scripting_defend_evaluate,
+		"makes the specified platoon(s) go into the defending state.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_retreat_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_retreat",
+		hs_macro_function_parse,
+		ai_scripting_retreat_evaluate,
+		"makes all squads in the specified platoon(s) maneuver to their designated maneuver squads.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_maneuver_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_maneuver",
+		hs_macro_function_parse,
+		ai_scripting_maneuver_evaluate,
+		"makes all squads in the specified platoon(s) maneuver to their designated maneuver squads.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_maneuver_enable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_maneuver_enable",
+		hs_macro_function_parse,
+		ai_scripting_maneuver_enable_evaluate,
+		"enables or disables the maneuver/retreat rule for an encounter or platoon. the rule will still trigger, but none of the actors will be given the order to change squads.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_migrate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_migrate",
+		hs_macro_function_parse,
+		ai_scripting_migrate_evaluate,
+		"makes all or part of an encounter move to another encounter.",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_ai_migrate_and_speak_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_migrate_and_speak",
+		hs_macro_function_parse,
+		ai_scripting_migrate_and_speak_evaluate,
+		"makes all or part of an encounter move to another encounter, and say their 'advance' or 'retreat' speech lines.",
+		NULL,
+		3,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai, _hs_type_string },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_migrate_by_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_migrate_by_unit",
+		hs_macro_function_parse,
+		ai_scripting_migrate_by_unit_evaluate,
+		"makes a named vehicle or group of units move to another encounter.",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_allegiance",
+		hs_macro_function_parse,
+		ai_scripting_allegiance_evaluate,
+		"creates an allegiance between two teams.",
+		NULL,
+		2,
+		{ _hs_type_enum_team },
+	},
+	{ _hs_type_enum_team },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_remove_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_allegiance_remove",
+		hs_macro_function_parse,
+		ai_scripting_allegiance_remove_evaluate,
+		"destroys an allegiance between two teams.",
+		NULL,
+		2,
+		{ _hs_type_enum_team },
+	},
+	{ _hs_type_enum_team },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_go_to_vehicle",
+		hs_macro_function_parse,
+		ai_scripting_go_to_vehicle_evaluate,
+		"tells a group of actors to get into a vehicle, in the substring-specified seats (e.g. passenger for pelican)... does not interrupt any actors who are already going to vehicles",
+		NULL,
+		3,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_unit, _hs_type_string },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle_override_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_go_to_vehicle_override",
+		hs_macro_function_parse,
+		ai_scripting_go_to_vehicle_override_evaluate,
+		"tells a group of actors to get into a vehicle, in the substring-specified seats (e.g. passenger for pelican)... NB: any actors who are already going to vehicles will stop and go to this one instead!",
+		NULL,
+		3,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_unit, _hs_type_string },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_exit_vehicle_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_exit_vehicle",
+		hs_macro_function_parse,
+		ai_scripting_exit_vehicle_evaluate,
+		"tells a group of actors to get out of any vehicles that they are in",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_braindead_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_braindead",
+		hs_macro_function_parse,
+		ai_scripting_braindead_evaluate,
+		"makes a group of actors braindead, or restores them to life (in their initial state)",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_braindead_by_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_braindead_by_unit",
+		hs_macro_function_parse,
+		ai_scripting_braindead_by_unit_evaluate,
+		"makes a list of objects braindead, or restores them to life. if you pass in a vehicle index, it makes all actors in that vehicle braindead (including any built-in guns)",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_disregard_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_disregard",
+		hs_macro_function_parse,
+		ai_scripting_ignore_evaluate,
+		"if TRUE, forces all actors to completely disregard the specified units, otherwise lets them acknowledge the units again",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_prefer_target_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_prefer_target",
+		hs_macro_function_parse,
+		ai_scripting_prefer_target_evaluate,
+		"if TRUE, *ALL* enemies will prefer to attack the specified units. if FALSE, removes the preference.",
+		NULL,
+		2,
+		{ _hs_type_object_list },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_starting_location_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_teleport_to_starting_location",
+		hs_macro_function_parse,
+		ai_scripting_teleport_starting_location_evaluate,
+		"teleports a group of actors to the starting locations of their current squad(s)",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_starting_location_if_unsupported_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_teleport_to_starting_location_if_unsupported",
+		hs_macro_function_parse,
+		ai_scripting_teleport_starting_location_if_unsupported_evaluate,
+		"teleports a group of actors to the starting locations of their current squad(s), only if they are not supported by solid ground (i.e. if they are falling after switching BSPs)",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_renew_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_renew",
+		hs_macro_function_parse,
+		ai_scripting_renew_evaluate,
+		"refreshes the health and grenade count of a group of actors, so they are as good as new",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_nothing_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_try_to_fight_nothing",
+		hs_macro_function_parse,
+		ai_scripting_try_to_fight_nothing_evaluate,
+		"removes the preferential target setting from a group of actors",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_try_to_fight_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_try_to_fight",
+		hs_macro_function_parse,
+		ai_scripting_try_to_fight_evaluate,
+		"causes a group of actors to preferentially target another group of actors",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_player_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_try_to_fight_player",
+		hs_macro_function_parse,
+		ai_scripting_try_to_fight_player_evaluate,
+		"causes a group of actors to preferentially target the player",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_command_list_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_command_list",
+		hs_macro_function_parse,
+		ai_scripting_command_list_evaluate,
+		"tells a group of actors to begin executing the specified command list",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai_command_list },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_command_list_by_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_command_list_by_unit",
+		hs_macro_function_parse,
+		ai_scripting_command_list_by_unit_evaluate,
+		"tells a named unit to begin executing the specified command list",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_ai_command_list },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_command_list_advance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_command_list_advance",
+		hs_macro_function_parse,
+		ai_scripting_command_list_advance_evaluate,
+		"tells a group of actors that are running a command list that they may advance further along the list (if they are waiting for a stimulus)",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_command_list_advance_by_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_command_list_advance_by_unit",
+		hs_macro_function_parse,
+		ai_scripting_command_list_advance_by_unit_evaluate,
+		"just like ai_command_list_advance but operates upon a unit instead",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_force_active_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_force_active",
+		hs_macro_function_parse,
+		ai_scripting_force_active_evaluate,
+		"forces an encounter to remain active (i.e. not freeze in place) even if there are no players nearby",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_force_active_by_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_force_active_by_unit",
+		hs_macro_function_parse,
+		ai_scripting_force_active_by_unit_evaluate,
+		"forces a named actor that is NOT in an encounter to remain active (i.e. not freeze in place) even if there are no players nearby",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_return_state_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_return_state",
+		hs_macro_function_parse,
+		ai_scripting_set_return_state_evaluate,
+		"sets the state that a group of actors will return to when they have nothing to do",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_enum_ai_default_state },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_current_state_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_current_state",
+		hs_macro_function_parse,
+		ai_scripting_set_current_state_evaluate,
+		"sets the current state of a group of actors. WARNING: may have unpredictable results on actors that are in combat",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_enum_ai_default_state },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_playfight_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_playfight",
+		hs_macro_function_parse,
+		ai_scripting_playfight_evaluate,
+		"sets an encounter to be playfighting or not",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition const hs_ai_reconnect_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_reconnect",
+	hs_macro_function_parse,
+	ai_scripting_reconnect_evaluate,
+	"reconnects all AI information to the current structure bsp (use this after you create encounters or command lists in sapien, or place new firing points or command list points)",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_encounter_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_encounter",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_encounter_evaluate,
+		"sets a vehicle to 'belong' to a particular encounter/squad. any actors who get into the vehicle will be placed in this squad. NB: vehicles potentially drivable by multiple teams need their own encounter!",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_distance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_enterable_distance",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_enterable_distance_evaluate,
+		"sets a vehicle as being impulsively enterable for actors within a certain distance",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_team_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_enterable_team",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_enterable_team_evaluate,
+		"sets a vehicle as being impulsively enterable for actors on a certain team",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_enum_team },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_actor_type_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_enterable_actor_type",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_enterable_actor_type_evaluate,
+		"sets a vehicle as being impulsively enterable for actors of a certain type (grunt, elite, marine etc)",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_enum_actor_type },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_actors_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_enterable_actors",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_enterable_actors_evaluate,
+		"sets a vehicle as being impulsively enterable for a certain encounter/squad of actors",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_vehicle_enterable_disable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_vehicle_enterable_disable",
+		hs_macro_function_parse,
+		ai_scripting_vehicle_enterable_disable_evaluate,
+		"disables actors from impulsively getting into a vehicle (this is the default state for newly placed vehicles)",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_look_at_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_look_at_object",
+		hs_macro_function_parse,
+		ai_scripting_look_at_object_evaluate,
+		"tells an actor to look at an object until further notice",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_stop_looking_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_stop_looking",
+		hs_macro_function_parse,
+		ai_scripting_stop_looking_evaluate,
+		"tells an actor to stop looking at whatever it's looking at",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_automatic_migration_target_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_automatic_migration_target",
+		hs_macro_function_parse,
+		ai_scripting_automatic_migration_target_evaluate,
+		"enables or disables a squad as being an automatic migration target",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_disable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_follow_target_disable",
+		hs_macro_function_parse,
+		ai_scripting_follow_target_disable_evaluate,
+		"turns off following for an encounter",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_players_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_follow_target_players",
+		hs_macro_function_parse,
+		ai_scripting_follow_target_players_evaluate,
+		"sets the follow target for an encounter to be the closest player",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_follow_target_unit_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_follow_target_unit",
+		hs_macro_function_parse,
+		ai_scripting_follow_target_unit_evaluate,
+		"sets the follow target for an encounter to be a specific unit",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_unit },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_follow_target_ai_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_follow_target_ai",
+		hs_macro_function_parse,
+		ai_scripting_follow_target_ai_evaluate,
+		"sets the follow target for an encounter to be a group of AI (encounter, squad or platoon)",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_follow_distance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_follow_distance",
+		hs_macro_function_parse,
+		ai_scripting_follow_distance_evaluate,
+		"sets the distance threshold which will cause squads to migrate when following someone",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_conversation_stop_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_conversation_stop",
+		hs_macro_function_parse,
+		ai_scripting_conversation_stop_evaluate,
+		"stops a conversation from playing or trying to play",
+		NULL,
+		1,
+		{ _hs_type_conversation },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_conversation_advance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_conversation_advance",
+		hs_macro_function_parse,
+		ai_scripting_conversation_advance_evaluate,
+		"tells a conversation that it may advance",
+		NULL,
+		1,
+		{ _hs_type_conversation },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_link_activation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_link_activation",
+		hs_macro_function_parse,
+		ai_scripting_link_activation_evaluate,
+		"links the first encounter so that it will be made active whenever it detects that the second encounter is active",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_ai },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_berserk_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_berserk",
+		hs_macro_function_parse,
+		ai_scripting_berserk_evaluate,
+		"forces a group of actors to start or stop berserking",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_set_team_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_set_team",
+		hs_macro_function_parse,
+		ai_scripting_set_team_evaluate,
+		"makes an encounter change to a new team",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_enum_team },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_allow_charge_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_allow_charge",
+		hs_macro_function_parse,
+		ai_scripting_allow_charge_evaluate,
+		"either enables or disables charging behavior for a group of actors",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_allow_dormant_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_allow_dormant",
+		hs_macro_function_parse,
+		ai_scripting_allow_dormant_evaluate,
+		"either enables or disables automatic dormancy for a group of actors",
+		NULL,
+		2,
+		{ _hs_type_ai },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_is_attacking_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"ai_is_attacking",
+		hs_macro_function_parse,
+		ai_scripting_is_attacking_evaluate,
+		"returns whether a platoon is in the attacking mode (or if an encounter is specified, returns whether any platoon in that encounter is attacking)",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_command_list_status_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_command_list_status",
+		hs_macro_function_parse,
+		ai_scripting_command_list_status_evaluate,
+		"gets the status of a number of units running command lists: 0 = none, 1 = finished command list, 2 = waiting for stimulus, 3 = running command list",
+		NULL,
+		1,
+		{ _hs_type_object_list },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_going_to_vehicle_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_going_to_vehicle",
+		hs_macro_function_parse,
+		ai_scripting_going_to_vehicle_evaluate,
+		"return the number of actors that are still trying to get into the specified vehicle",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_living_count_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_living_count",
+		hs_macro_function_parse,
+		ai_scripting_living_count_evaluate,
+		"return the number of living actors in the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_living_fraction_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"ai_living_fraction",
+		hs_macro_function_parse,
+		ai_scripting_living_fraction_evaluate,
+		"return the fraction [0-1] of living actors in the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_strength_definition=
+{
+	{
+		_hs_type_real,
+		0,
+		"ai_strength",
+		hs_macro_function_parse,
+		ai_scripting_strength_evaluate,
+		"return the current strength (average body vitality from 0-1) of the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_swarm_count_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_swarm_count",
+		hs_macro_function_parse,
+		ai_scripting_swarm_count_evaluate,
+		"return the number of swarm actors in the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_nonswarm_count_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_nonswarm_count",
+		hs_macro_function_parse,
+		ai_scripting_nonswarm_count_evaluate,
+		"return the number of non-swarm actors in the specified encounter and/or squad.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_actors_definition=
+{
+	{
+		_hs_type_object_list,
+		0,
+		"ai_actors",
+		hs_macro_function_parse,
+		object_list_from_ai_reference_evaluate,
+		"converts an ai reference to an object list.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_status_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_status",
+		hs_macro_function_parse,
+		ai_scripting_status_evaluate,
+		"returns the most severe combat status of a group of actors (0=inactive, 1=noncombat, 2=guarding, 3=search/suspicious, 4=definite enemy(heard or magic awareness), 5=visible enemy, 6=engaging in combat.",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_conversation_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"ai_conversation",
+		hs_macro_function_parse,
+		ai_scripting_conversation_evaluate,
+		"tries to add an entry to the list of conversations waiting to play. returns FALSE if the required units could not be found to play the conversation, or if the player is too far away and the 'delay' flag is not set.",
+		NULL,
+		1,
+		{ _hs_type_conversation },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_conversation_line_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_conversation_line",
+		hs_macro_function_parse,
+		ai_scripting_conversation_line_evaluate,
+		"returns which line the conversation is currently playing, or 999 if the conversation is not currently playing",
+		NULL,
+		1,
+		{ _hs_type_conversation },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_conversation_status_definition=
+{
+	{
+		_hs_type_short_integer,
+		0,
+		"ai_conversation_status",
+		hs_macro_function_parse,
+		ai_scripting_conversation_status_evaluate,
+		"returns the status of a conversation (0=none, 1=trying to begin, 2=waiting for guys to get in position, 3=playing, 4=waiting to advance, 5=could not begin, 6=finished successfully, 7=aborted midway",
+		NULL,
+		1,
+		{ _hs_type_conversation },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_broken_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"ai_allegiance_broken",
+		hs_macro_function_parse,
+		ai_scripting_allegiance_broken_evaluate,
+		"returns whether two teams have an allegiance that is currently broken by traitorous behavior",
+		NULL,
+		2,
+		{ _hs_type_enum_team },
+	},
+	{ _hs_type_enum_team },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_camera_control_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_control",
+		hs_macro_function_parse,
+		director_script_camera_evaluate,
+		"toggles script control of the camera.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_camera_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_set",
+		hs_macro_function_parse,
+		scripted_camera_set_absolute_evaluate,
+		"moves the camera to the specified camera point over the specified number of ticks.",
+		NULL,
+		2,
+		{ _hs_type_cutscene_camera_point },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_camera_set_relative_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_set_relative",
+		hs_macro_function_parse,
+		scripted_camera_set_evaluate,
+		"moves the camera to the specified camera point over the specified number of ticks (position is relative to the specified object).",
+		NULL,
+		3,
+		{ _hs_type_cutscene_camera_point },
+	},
+	{ _hs_type_short_integer, _hs_type_object },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_camera_set_animation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_set_animation",
+		hs_macro_function_parse,
+		scripted_camera_set_animation_evaluate,
+		"begins a prerecorded camera animation.",
+		NULL,
+		2,
+		{ _hs_type_animation_graph },
+	},
+	{ _hs_type_string },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_camera_set_first_person_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_set_first_person",
+		hs_macro_function_parse,
+		scripted_camera_set_first_person_evaluate,
+		"makes the scripted camera follow a unit.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_camera_set_dead_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"camera_set_dead",
+		hs_macro_function_parse,
+		scripted_camera_set_dead_evaluate,
+		"makes the scripted camera zoom out around a unit as if it were dead.",
+		NULL,
+		1,
+		{ _hs_type_unit },
+	},
+};
+
+static struct hs_function_definition const hs_camera_time_definition=
+{
+	_hs_type_short_integer,
+	0,
+	"camera_time",
+	hs_macro_function_parse,
+	scripted_camera_time_evaluate,
+	"returns the number of ticks remaining in the current camera interpolation.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_debug_camera_save_definition=
+{
+	_hs_type_void,
+	0,
+	"debug_camera_save",
+	hs_macro_function_parse,
+	director_save_camera_evaluate,
+	"saves the camera position and facing.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_debug_camera_load_definition=
+{
+	_hs_type_void,
+	0,
+	"debug_camera_load",
+	hs_macro_function_parse,
+	director_load_camera_evaluate,
+	"loads the saved camera position and facing.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_game_speed_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"game_speed",
+		hs_macro_function_parse,
+		game_time_set_speed_evaluate,
+		"changes the game speed.",
+		NULL,
+		1,
+		{ _hs_type_real },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_game_variant_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"game_variant",
+		hs_macro_function_parse,
+		game_set_game_variant_from_name_evaluate,
+		"set the game engine",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_game_time_definition=
+{
+	_hs_type_long_integer,
+	0,
+	"game_time",
+	hs_macro_function_parse,
+	game_time_get_evaluate,
+	"gets ticks elapsed since the start of the game.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_difficulty_get_definition=
+{
+	_hs_type_enum_game_difficulty,
+	0,
+	"game_difficulty_get",
+	hs_macro_function_parse,
+	game_difficulty_level_get_ignore_easy_evaluate,
+	"returns the current difficulty setting, but lies to you and will never return easy, instead returning normal",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_difficulty_get_real_definition=
+{
+	_hs_type_enum_game_difficulty,
+	0,
+	"game_difficulty_get_real",
+	hs_macro_function_parse,
+	game_difficulty_level_get_evaluate,
+	"returns the actual current difficulty setting without lying",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_players_unzoom_all_definition=
+{
+	_hs_type_void,
+	0,
+	"players_unzoom_all",
+	hs_macro_function_parse,
+	players_unzoom_all_evaluate,
+	"resets zoom levels on all players",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_player_enable_input_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_enable_input",
+		hs_macro_function_parse,
+		player_input_enable_evaluate,
+		"toggle player input. the player can still free-look, but nothing else.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_player_camera_control_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"player_camera_control",
+		hs_macro_function_parse,
+		scripted_player_control_set_camera_control_evaluate,
+		"enables/disables camera control globally",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_player_action_test_reset_definition=
+{
+	_hs_type_void,
+	0,
+	"player_action_test_reset",
+	hs_macro_function_parse,
+	player_control_action_test_reset_evaluate,
+	"resets the player action test state so that all tests will return false.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_jump_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_jump",
+	hs_macro_function_parse,
+	player_control_action_test_jump_evaluate,
+	"returns true if any player has jumped since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_primary_trigger_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_primary_trigger",
+	hs_macro_function_parse,
+	player_control_action_test_primary_trigger_evaluate,
+	"returns true if any player has used primary trigger since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_grenade_trigger_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_grenade_trigger",
+	hs_macro_function_parse,
+	player_control_action_test_grenade_trigger_evaluate,
+	"returns true if any player has used grenade trigger since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_zoom_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_zoom",
+	hs_macro_function_parse,
+	player_control_action_test_zoom_evaluate,
+	"returns true if any player has hit the zoom button since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_action_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_action",
+	hs_macro_function_parse,
+	player_control_action_test_action_evaluate,
+	"returns true if any player has hit the action key since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_accept_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_accept",
+	hs_macro_function_parse,
+	player_control_action_test_accept_evaluate,
+	"returns true if any player has hit accept since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_back_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_back",
+	hs_macro_function_parse,
+	player_control_action_test_back_evaluate,
+	"returns true if any player has hit the back key since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_look_relative_up_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_look_relative_up",
+	hs_macro_function_parse,
+	player_control_action_test_look_relative_up_evaluate,
+	"returns true if any player has looked up since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_look_relative_down_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_look_relative_down",
+	hs_macro_function_parse,
+	player_control_action_test_look_relative_down_evaluate,
+	"returns true if any player has looked down since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_look_relative_left_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_look_relative_left",
+	hs_macro_function_parse,
+	player_control_action_test_look_relative_left_evaluate,
+	"returns true if any player has looked left since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_look_relative_right_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_look_relative_right",
+	hs_macro_function_parse,
+	player_control_action_test_look_relative_right_evaluate,
+	"returns true if any player has looked right since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_look_relative_all_directions_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_look_relative_all_directions",
+	hs_macro_function_parse,
+	player_control_action_test_look_relative_all_directions_evaluate,
+	"returns true if any player has looked up, down, left, and right since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player_action_test_move_relative_all_directions_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player_action_test_move_relative_all_directions",
+	hs_macro_function_parse,
+	player_control_action_test_move_relative_all_directions_evaluate,
+	"returns true if any player has moved forward, backward, left, and right since the last call to (player_action_test_reset).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_3_parameters const hs_player_add_equipment_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_add_equipment",
+		hs_macro_function_parse,
+		player_add_equipment_evaluate,
+		"adds/resets the player's health, shield, and inventory (weapons and grenades) to the named profile. resets if third parameter is true, adds if false.",
+		NULL,
+		3,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_starting_profile, _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_debug_teleport_player_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_teleport_player",
+		hs_macro_function_parse,
+		debug_player_teleport_evaluate,
+		"",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition const hs_map_reset_definition=
+{
+	_hs_type_void,
+	0,
+	"map_reset",
+	hs_macro_function_parse,
+	main_reset_map_evaluate,
+	"starts the map from the beginning.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_map_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"map_name",
+		hs_macro_function_parse,
+		main_set_map_name_evaluate,
+		"changes the name of the solo player map.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_multiplayer_map_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"multiplayer_map_name",
+		hs_macro_function_parse,
+		main_set_multiplayer_map_name_evaluate,
+		"changes the name of the multiplayer map",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_game_difficulty_set_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"game_difficulty_set",
+		hs_macro_function_parse,
+		main_set_difficulty_evaluate,
+		"changes the difficulty setting for the next map to be loaded.",
+		NULL,
+		1,
+		{ _hs_type_enum_game_difficulty },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_crash_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"crash",
+		hs_macro_function_parse,
+		main_crash_evaluate,
+		"crashes (for debugging).",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_switch_bsp_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"switch_bsp",
+		hs_macro_function_parse,
+		scenario_switch_structure_bsp_evaluate,
+		"takes off your condom and changes to a different structure bsp",
+		NULL,
+		1,
+		{ _hs_type_short_integer },
+	},
+};
+
+static struct hs_function_definition const hs_structure_bsp_index_definition=
+{
+	_hs_type_short_integer,
+	0,
+	"structure_bsp_index",
+	hs_macro_function_parse,
+	global_structure_bsp_index_get_evaluate,
+	"returns the current structure bsp index",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_version_definition=
+{
+	_hs_type_void,
+	0,
+	"version",
+	hs_macro_function_parse,
+	main_print_version_evaluate,
+	"prints the build version.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_playback_definition=
+{
+	_hs_type_void,
+	0,
+	"playback",
+	hs_macro_function_parse,
+	main_set_game_connection_to_film_playback_evaluate,
+	"starts game in film playback mode",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_texture_cache_flush_definition=
+{
+	_hs_type_void,
+	0,
+	"texture_cache_flush",
+	hs_macro_function_parse,
+	texture_cache_flush_evaluate,
+	"don't make me kick your ass",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_sound_cache_flush_definition=
+{
+	_hs_type_void,
+	0,
+	"sound_cache_flush",
+	hs_macro_function_parse,
+	sound_cache_flush_evaluate,
+	"i'm a rebel!",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_debug_memory_definition=
+{
+	_hs_type_void,
+	0,
+	"debug_memory",
+	hs_macro_function_parse,
+	debug_dump_memory_evaluate,
+	"dumps memory leaks.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_debug_memory_by_file_definition=
+{
+	_hs_type_void,
+	0,
+	"debug_memory_by_file",
+	hs_macro_function_parse,
+	debug_dump_memory_by_file_evaluate,
+	"dumps memory leaks by source file.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_debug_memory_for_file_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_memory_for_file",
+		hs_macro_function_parse,
+		debug_dump_memory_for_file_evaluate,
+		"dumps memory leaks from the specified source file.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_debug_tags_definition=
+{
+	_hs_type_void,
+	0,
+	"debug_tags",
+	hs_macro_function_parse,
+	tag_groups_dump_memory_evaluate,
+	"writes all memory being used by tag files into tag_dump.txt",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_profile_reset_definition=
+{
+	_hs_type_void,
+	0,
+	"profile_reset",
+	hs_macro_function_parse,
+	profile_initialize_evaluate,
+	"resets profiling data.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_profile_dump_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"profile_dump",
+		hs_macro_function_parse,
+		profile_dump_to_file_evaluate,
+		"dumps profile based on a substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_profile_activate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"profile_activate",
+		hs_macro_function_parse,
+		profile_sections_activate_evaluate,
+		"activates profile sections based on a substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_profile_deactivate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"profile_deactivate",
+		hs_macro_function_parse,
+		profile_sections_deactivate_evaluate,
+		"deactivates profile sections based on a substring.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_profile_graph_toggle_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"profile_graph_toggle",
+		hs_macro_function_parse,
+		profile_graph_toggle_evaluate,
+		"enables or disables profile graph display of a particular value.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_debug_pvs_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_pvs",
+		hs_macro_function_parse,
+		debug_pvs_evaluate,
+		"displays the current pvs.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_radiosity_start_definition=
+{
+	_hs_type_void,
+	0,
+	"radiosity_start",
+	hs_macro_function_parse,
+	radiosity_start_evaluate,
+	"starts radiosity computation.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_radiosity_save_definition=
+{
+	_hs_type_void,
+	0,
+	"radiosity_save",
+	hs_macro_function_parse,
+	radiosity_save_evaluate,
+	"saves radiosity solution.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_radiosity_debug_point_definition=
+{
+	_hs_type_void,
+	0,
+	"radiosity_debug_point",
+	hs_macro_function_parse,
+	radiosity_debug_point_evaluate,
+	"tests sun occlusion at a point.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_ai_lines_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_lines",
+	hs_macro_function_parse,
+	ai_profile_change_render_spray_evaluate,
+	"cycles through AI line-spray modes",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_ai_debug_sound_point_set_definition=
+{
+	_hs_type_void,
+	0,
+	"ai_debug_sound_point_set",
+	hs_macro_function_parse,
+	ai_debug_sound_point_set_evaluate,
+	"drops the AI debugging sound point at the camera location",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_ai_debug_vocalize_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_debug_vocalize",
+		hs_macro_function_parse,
+		ai_debug_vocalize_evaluate,
+		"makes the selected AI vocalize",
+		NULL,
+		2,
+		{ _hs_type_string },
+	},
+	{ _hs_type_string },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_debug_teleport_to_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_debug_teleport_to",
+		hs_macro_function_parse,
+		ai_debug_teleport_to_evaluate,
+		"teleports all players to the specified encounter",
+		NULL,
+		1,
+		{ _hs_type_ai },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_debug_speak",
+		hs_macro_function_parse,
+		ai_debug_speak_evaluate,
+		"makes the currently selected AI speak a vocalization (e.g. ai_speak \"pain minor\")",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_list_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ai_debug_speak_list",
+		hs_macro_function_parse,
+		ai_debug_speak_list_evaluate,
+		"makes the currently selected AI speak a list of vocalizations (e.g. ai_speak_list \"involuntary\")",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_4_parameters const hs_fade_in_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"fade_in",
+		hs_macro_function_parse,
+		player_effect_screen_fade_in_evaluate,
+		"does a screen fade in from a particular color",
+		NULL,
+		4,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real, _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_fade_out_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"fade_out",
+		hs_macro_function_parse,
+		player_effect_screen_fade_out_evaluate,
+		"does a screen fade out to a particular color",
+		NULL,
+		4,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real, _hs_type_short_integer },
+};
+
+static struct hs_function_definition const hs_cinematic_start_definition=
+{
+	_hs_type_void,
+	0,
+	"cinematic_start",
+	hs_macro_function_parse,
+	cinematic_start_evaluate,
+	"initializes game to start a cinematic (interruptive) cutscene",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cinematic_stop_definition=
+{
+	_hs_type_void,
+	0,
+	"cinematic_stop",
+	hs_macro_function_parse,
+	cinematic_stop_evaluate,
+	"initializes the game to end a cinematic (interruptive) cutscene",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cinematic_skip_start_internal_definition=
+{
+	_hs_type_void,
+	0,
+	"cinematic_skip_start_internal",
+	hs_macro_function_parse,
+	cinematic_skip_start_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_cinematic_skip_stop_internal_definition=
+{
+	_hs_type_void,
+	0,
+	"cinematic_skip_stop_internal",
+	hs_macro_function_parse,
+	cinematic_skip_stop_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cinematic_show_letterbox_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_show_letterbox",
+		hs_macro_function_parse,
+		cinematic_show_letterbox_evaluate,
+		"sets or removes the letterbox bars",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cinematic_set_title_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_set_title",
+		hs_macro_function_parse,
+		cinematic_set_title_evaluate,
+		"activates the chapter title",
+		NULL,
+		1,
+		{ _hs_type_cutscene_title },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_cinematic_set_title_delayed_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_set_title_delayed",
+		hs_macro_function_parse,
+		cinematic_set_title_delayed_evaluate,
+		"activates the chapter title, delayed by <real> seconds",
+		NULL,
+		2,
+		{ _hs_type_cutscene_title },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cinematic_suppress_bsp_object_creation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_suppress_bsp_object_creation",
+		hs_macro_function_parse,
+		cinematic_suppress_bsp_object_creation_evaluate,
+		"suppresses or enables the automatic creation of objects during cutscenes due to a bsp switch",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_attract_mode_start_definition=
+{
+	_hs_type_void,
+	0,
+	"attract_mode_start",
+	hs_macro_function_parse,
+	attract_mode_start_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_won_definition=
+{
+	_hs_type_void,
+	0,
+	"game_won",
+	hs_macro_function_parse,
+	main_won_map_evaluate,
+	"causes the player to successfully finish the current level and move to the next",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_lost_definition=
+{
+	_hs_type_void,
+	0,
+	"game_lost",
+	hs_macro_function_parse,
+	main_lost_map_evaluate,
+	"causes the player to revert to his previous saved game",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_safe_to_save_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_safe_to_save",
+	hs_macro_function_parse,
+	game_safe_to_save_evaluate,
+	"returns FALSE if it would be a bad idea to save the player's game right now",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_all_quiet_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_all_quiet",
+	hs_macro_function_parse,
+	game_all_quiet_evaluate,
+	"returns FALSE if there are bad guys around, projectiles in the air, etc.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_safe_to_speak_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_safe_to_speak",
+	hs_macro_function_parse,
+	game_safe_to_speak_evaluate,
+	"returns FALSE if it would be a bad idea to save the player's game right now",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_is_cooperative_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_is_cooperative",
+	hs_macro_function_parse,
+	game_is_cooperative_evaluate,
+	"returns TRUE if the game is cooperative",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_save_definition=
+{
+	_hs_type_void,
+	0,
+	"game_save",
+	hs_macro_function_parse,
+	main_save_map_safe_evaluate,
+	"checks to see if it is safe to save game, then saves (gives up after 8 seconds)",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_save_cancel_definition=
+{
+	_hs_type_void,
+	0,
+	"game_save_cancel",
+	hs_macro_function_parse,
+	main_save_cancel_evaluate,
+	"cancels any pending game_save, timeout or not",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_save_no_timeout_definition=
+{
+	_hs_type_void,
+	0,
+	"game_save_no_timeout",
+	hs_macro_function_parse,
+	main_save_map_no_timeout_evaluate,
+	"checks to see if it is safe to save game, then saves (this version never gives up)",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_save_totally_unsafe_definition=
+{
+	_hs_type_void,
+	0,
+	"game_save_totally_unsafe",
+	hs_macro_function_parse,
+	main_save_map_nonsafe_evaluate,
+	"disregards player's current situation",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_saving_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_saving",
+	hs_macro_function_parse,
+	main_saving_map_evaluate,
+	"checks to see if the game is trying to save the map.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_game_revert_definition=
+{
+	_hs_type_void,
+	0,
+	"game_revert",
+	hs_macro_function_parse,
+	main_revert_map_evaluate,
+	"reverts to last saved game, if any (for testing, the first bastard that does this to me gets it in the head)",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_core_load_definition=
+{
+	_hs_type_void,
+	0,
+	"core_load",
+	hs_macro_function_parse,
+	main_load_core_evaluate,
+	"loads debug game state from core\\core.bin",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_core_load_at_startup_definition=
+{
+	_hs_type_void,
+	0,
+	"core_load_at_startup",
+	hs_macro_function_parse,
+	main_load_core_at_startup_evaluate,
+	"loads debug game state from core\\core.bin as soon as the map is initialized",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_core_load_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"core_load_name",
+		hs_macro_function_parse,
+		main_load_core_name_evaluate,
+		"loads debug game state from core\\<path>",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_core_load_name_at_startup_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"core_load_name_at_startup",
+		hs_macro_function_parse,
+		main_load_core_name_at_startup_evaluate,
+		"loads debug game state from core\\<path> as soon as the map is initialized",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const hs_core_save_definition=
+{
+	_hs_type_void,
+	0,
+	"core_save",
+	hs_macro_function_parse,
+	main_save_core_evaluate,
+	"saves debug game state to core\\core.bin",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_core_save_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"core_save_name",
+		hs_macro_function_parse,
+		main_save_core_name_evaluate,
+		"saves debug game state to core\\<path>",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_game_skip_ticks_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"game_skip_ticks",
+		hs_macro_function_parse,
+		main_skip_evaluate,
+		"skips <short> amount of game ticks. ONLY USE IN CUTSCENES!!!",
+		NULL,
+		1,
+		{ _hs_type_short_integer },
+	},
+};
+
+static struct hs_function_definition const hs_game_reverted_definition=
+{
+	_hs_type_boolean,
+	0,
+	"game_reverted",
+	hs_macro_function_parse,
+	game_state_reverted_evaluate,
+	"don't use this for anything, you black-hearted bastards.",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_3_parameters const hs_sound_impulse_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_impulse_start",
+		hs_macro_function_parse,
+		scripted_sound_new_evaluate,
+		"plays an impulse sound from the specified source object (or \"none\"), with the specified scale.",
+		NULL,
+		3,
+		{ _hs_type_sound },
+	},
+	{ _hs_type_object, _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_impulse_time_definition=
+{
+	{
+		_hs_type_long_integer,
+		0,
+		"sound_impulse_time",
+		hs_macro_function_parse,
+		scripted_sound_time_evaluate,
+		"returns the time remaining for the specified impulse sound.",
+		NULL,
+		1,
+		{ _hs_type_sound },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_impulse_stop_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_impulse_stop",
+		hs_macro_function_parse,
+		scripted_sound_stop_evaluate,
+		"stops the specified impulse sound.",
+		NULL,
+		1,
+		{ _hs_type_sound },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_looping_predict_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_looping_predict",
+		hs_macro_function_parse,
+		scripted_foley_predict_evaluate,
+		"your mom.",
+		NULL,
+		1,
+		{ _hs_type_looping_sound },
+	},
+};
+
+static struct hs_function_definition_with_3_parameters const hs_sound_looping_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_looping_start",
+		hs_macro_function_parse,
+		scripted_looping_sound_start_evaluate,
+		"plays a looping sound from the specified source object (or \"none\"), with the specified scale.",
+		NULL,
+		3,
+		{ _hs_type_looping_sound },
+	},
+	{ _hs_type_object, _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_looping_stop_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_looping_stop",
+		hs_macro_function_parse,
+		scripted_looping_sound_stop_evaluate,
+		"stops the specified looping sound.",
+		NULL,
+		1,
+		{ _hs_type_looping_sound },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_sound_looping_set_scale_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_looping_set_scale",
+		hs_macro_function_parse,
+		scripted_looping_sound_set_scale_evaluate,
+		"changes the scale of the sound (which should affect the volume) within the range 0 to 1.",
+		NULL,
+		2,
+		{ _hs_type_looping_sound },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_sound_looping_set_alternate_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_looping_set_alternate",
+		hs_macro_function_parse,
+		scripted_looping_sound_set_alternate_evaluate,
+		"enables or disables the alternate loop/alternate end for a looping sound.",
+		NULL,
+		2,
+		{ _hs_type_looping_sound },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_debug_sounds_enable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_sounds_enable",
+		hs_macro_function_parse,
+		debug_sound_classes_enable_evaluate,
+		"enables or disabled all sound classes matching the substring.",
+		NULL,
+		2,
+		{ _hs_type_string },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_debug_sounds_distances_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_sounds_distances",
+		hs_macro_function_parse,
+		debug_sound_classes_set_distances_evaluate,
+		"changes the minimum and maximum distances for all sound classes matching the substring.",
+		NULL,
+		3,
+		{ _hs_type_string },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_debug_sounds_wet_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"debug_sounds_wet",
+		hs_macro_function_parse,
+		debug_sound_classes_set_wet_evaluate,
+		"changes the reverb level for all sound classes matching the substring.",
+		NULL,
+		2,
+		{ _hs_type_string },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_sound_class_set_gain_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_class_set_gain",
+		hs_macro_function_parse,
+		sound_class_set_gain_evaluate,
+		"changes the gain on the specified sound class(es) to the specified game over the specified number of ticks.",
+		NULL,
+		3,
+		{ _hs_type_string },
+	},
+	{ _hs_type_real, _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_sound_enable_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sound_enable",
+		hs_macro_function_parse,
+		sound_enable_evaluate,
+		"enables or disables all sound.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_vehicle_hover_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"vehicle_hover",
+		hs_macro_function_parse,
+		vehicle_hover_evaluate,
+		"stops the vehicle from running real physics and runs fake hovering physics instead.",
+		NULL,
+		2,
+		{ _hs_type_vehicle },
+	},
+	{ _hs_type_boolean },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_show_hud_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"show_hud",
+		hs_macro_function_parse,
+		scripted_show_hud_evaluate,
+		"shows or hides the hud",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_show_hud_help_text_definition=
+{
+	{
+		_hs_type_boolean,
+		0,
+		"show_hud_help_text",
+		hs_macro_function_parse,
+		scripted_show_hud_help_text_evaluate,
+		"shows or hides the hud help text",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_enable_hud_help_flash_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"enable_hud_help_flash",
+		hs_macro_function_parse,
+		scripted_hud_set_flashing_state_evaluate,
+		"starts/stops the help text flashing",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_hud_help_flash_restart_definition=
+{
+	_hs_type_void,
+	0,
+	"hud_help_flash_restart",
+	hs_macro_function_parse,
+	scripted_hud_restart_flashing_evaluate,
+	"resets the timer for the help text flashing",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_4_parameters const hs_activate_nav_point_flag_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"activate_nav_point_flag",
+		hs_macro_function_parse,
+		hud_unit_activate_nav_point_with_flag_evaluate,
+		"activates a nav point type <string> attached to (local) player <unit> anchored to a flag with a vertical offset <real>. If the player is not local to the machine, this will fail",
+		NULL,
+		4,
+		{ _hs_type_navpoint },
+	},
+	{ _hs_type_unit, _hs_type_cutscene_flag, _hs_type_real },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_activate_nav_point_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"activate_nav_point_object",
+		hs_macro_function_parse,
+		hud_unit_activate_nav_point_with_object_evaluate,
+		"activates a nav point type <string> attached to (local) player <unit> anchored to an object with a vertical offset <real>. If the player is not local to the machine, this will fail",
+		NULL,
+		4,
+		{ _hs_type_navpoint },
+	},
+	{ _hs_type_unit, _hs_type_object, _hs_type_real },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_activate_team_nav_point_flag_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"activate_team_nav_point_flag",
+		hs_macro_function_parse,
+		hud_activate_team_nav_point_with_flag_evaluate,
+		"activates a nav point type <string> attached to a team anchored to a flag with a vertical offset <real>. If the player is not local to the machine, this will fail",
+		NULL,
+		4,
+		{ _hs_type_navpoint },
+	},
+	{ _hs_type_enum_team, _hs_type_cutscene_flag, _hs_type_real },
+};
+
+static struct hs_function_definition_with_4_parameters const hs_activate_team_nav_point_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"activate_team_nav_point_object",
+		hs_macro_function_parse,
+		hud_activate_team_nav_point_with_object_evaluate,
+		"activates a nav point type <string> attached to a team anchored to an object with a vertical offset <real>. If the player is not local to the machine, this will fail",
+		NULL,
+		4,
+		{ _hs_type_navpoint },
+	},
+	{ _hs_type_enum_team, _hs_type_object, _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_point_flag_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"deactivate_nav_point_flag",
+		hs_macro_function_parse,
+		hud_unit_deactivate_nav_point_with_flag_evaluate,
+		"deactivates a nav point type attached to a player <unit> anchored to a flag",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_point_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"deactivate_nav_point_object",
+		hs_macro_function_parse,
+		hud_unit_deactivate_nav_point_with_object_evaluate,
+		"deactivates a nav point type attached to a player <unit> anchored to an object",
+		NULL,
+		2,
+		{ _hs_type_unit },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_deactivate_team_nav_point_flag_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"deactivate_team_nav_point_flag",
+		hs_macro_function_parse,
+		hud_deactivate_team_nav_point_with_flag_evaluate,
+		"deactivates a nav point type attached to a team anchored to a flag",
+		NULL,
+		2,
+		{ _hs_type_enum_team },
+	},
+	{ _hs_type_cutscene_flag },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_deactivate_team_nav_point_object_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"deactivate_team_nav_point_object",
+		hs_macro_function_parse,
+		hud_deactivate_team_nav_point_with_object_evaluate,
+		"deactivates a nav point type attached to a team anchored to an object",
+		NULL,
+		2,
+		{ _hs_type_enum_team },
+	},
+	{ _hs_type_object },
+};
+
+static struct hs_function_definition const hs_cls_definition=
+{
+	_hs_type_void,
+	0,
+	"cls",
+	hs_macro_function_parse,
+	terminal_clear_evaluate,
+	"clears console text from the screen",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_error_overflow_suppression_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"error_overflow_suppression",
+		hs_macro_function_parse,
+		errors_overflow_suppression_enable_evaluate,
+		"enables or disables the suppression of error spamming",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_structure_lens_flares_place_definition=
+{
+	_hs_type_void,
+	0,
+	"structure_lens_flares_place",
+	hs_macro_function_parse,
+	structure_lens_flares_place_evaluate,
+	"places lens flares in the structure bsp",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_3_parameters const hs_player_effect_set_max_translation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_effect_set_max_translation",
+		hs_macro_function_parse,
+		scripted_player_effect_set_translation_evaluate,
+		"<x> <y> <z>",
+		NULL,
+		3,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_player_effect_set_max_rotation_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_effect_set_max_rotation",
+		hs_macro_function_parse,
+		scripted_player_effect_set_rotation_evaluate,
+		"<yaw> <pitch> <roll>",
+		NULL,
+		3,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_player_effect_set_max_rumble_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_effect_set_max_rumble",
+		hs_macro_function_parse,
+		scripted_player_effect_set_rumble_evaluate,
+		"<left> <right>",
+		NULL,
+		2,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_player_effect_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_effect_start",
+		hs_macro_function_parse,
+		scripted_player_effect_start_evaluate,
+		"<max_intensity> <attack time>",
+		NULL,
+		2,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_player_effect_stop_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player_effect_stop",
+		hs_macro_function_parse,
+		scripted_player_effect_stop_evaluate,
+		"<decay>",
+		NULL,
+		1,
+		{ _hs_type_real },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_show_health_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_show_health",
+		hs_macro_function_parse,
+		scripted_hud_show_health_evaluate,
+		"hides/shows the health panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_blink_health_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_blink_health",
+		hs_macro_function_parse,
+		scripted_hud_blink_health_evaluate,
+		"starts/stops manual blinking of the health panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_show_shield_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_show_shield",
+		hs_macro_function_parse,
+		scripted_hud_show_shield_evaluate,
+		"hides/shows the shield panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_blink_shield_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_blink_shield",
+		hs_macro_function_parse,
+		scripted_hud_blink_shield_evaluate,
+		"starts/stops manual blinking of the shield panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_show_motion_sensor_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_show_motion_sensor",
+		hs_macro_function_parse,
+		scripted_hud_show_motion_sensor_evaluate,
+		"hides/shows the motion sensor panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_blink_motion_sensor_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_blink_motion_sensor",
+		hs_macro_function_parse,
+		scripted_hud_blink_motion_sensor_evaluate,
+		"starts/stops manual blinking of the motion sensor panel",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_show_crosshair_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_show_crosshair",
+		hs_macro_function_parse,
+		scripted_hud_show_crosshair_evaluate,
+		"hides/shows the weapon crosshair",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_hud_clear_messages_definition=
+{
+	_hs_type_void,
+	0,
+	"hud_clear_messages",
+	hs_macro_function_parse,
+	scripted_hud_messages_clear_evaluate,
+	"clears all non-state messages on the hud",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_set_help_text_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_set_help_text",
+		hs_macro_function_parse,
+		scripted_hud_set_state_message_evaluate,
+		"displays <message> as the help text",
+		NULL,
+		1,
+		{ _hs_type_hud_message },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_hud_set_objective_text_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_set_objective_text",
+		hs_macro_function_parse,
+		scripted_hud_set_objective_evaluate,
+		"sets <message> as the current objective",
+		NULL,
+		1,
+		{ _hs_type_hud_message },
+	},
+};
+
+static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_time_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_set_timer_time",
+		hs_macro_function_parse,
+		scripted_hud_set_timer_time_evaluate,
+		"sets the time for the timer to <short> minutes and <short> seconds, and starts and displays timer",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_warning_time_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_set_timer_warning_time",
+		hs_macro_function_parse,
+		scripted_hud_set_timer_warning_cutoff_evaluate,
+		"sets the warning time for the timer to <short> minutes and <short> seconds",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_hud_set_timer_position_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"hud_set_timer_position",
+		hs_macro_function_parse,
+		scripted_hud_set_timer_position_evaluate,
+		"sets the timer upper left position to (x, y)=>(<short>, <short>)",
+		NULL,
+		3,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer, _hs_type_enum_hud_corner },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_show_hud_timer_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"show_hud_timer",
+		hs_macro_function_parse,
+		scripted_hud_show_timer_evaluate,
+		"displays the hud timer",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_pause_hud_timer_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"pause_hud_timer",
+		hs_macro_function_parse,
+		scripted_hud_pause_timer_evaluate,
+		"pauses or unpauses the hud timer",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_hud_get_timer_ticks_definition=
+{
+	_hs_type_short_integer,
+	0,
+	"hud_get_timer_ticks",
+	hs_macro_function_parse,
+	scripted_hud_get_timer_ticks_evaluate,
+	"returns the ticks left on the hud timer",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_time_code_show_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"time_code_show",
+		hs_macro_function_parse,
+		scripted_hud_time_code_show_evaluate,
+		"shows the time code timer",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_time_code_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"time_code_start",
+		hs_macro_function_parse,
+		scripted_hud_time_code_start_evaluate,
+		"starts/stops the time code timer",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_time_code_reset_definition=
+{
+	_hs_type_void,
+	0,
+	"time_code_reset",
+	hs_macro_function_parse,
+	scripted_hud_time_code_reset_evaluate,
+	"resets the time code timer",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_rasterizer_decals_flush_definition=
+{
+	_hs_type_void,
+	0,
+	"rasterizer_decals_flush",
+	hs_macro_function_parse,
+	rasterizer_decals_flush_evaluate,
+	"flush all decals",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_rasterizer_fps_accumulate_definition=
+{
+	_hs_type_void,
+	0,
+	"rasterizer_fps_accumulate",
+	hs_macro_function_parse,
+	rasterizer_fps_accumulate_evaluate,
+	"average fps",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_4_parameters const hs_rasterizer_model_ambient_reflection_tint_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"rasterizer_model_ambient_reflection_tint",
+		hs_macro_function_parse,
+		rasterizer_model_ambient_reflection_tint_evaluate,
+		"",
+		NULL,
+		4,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition const hs_rasterizer_lights_reset_for_new_map_definition=
+{
+	_hs_type_void,
+	0,
+	"rasterizer_lights_reset_for_new_map",
+	hs_macro_function_parse,
+	rasterizer_lights_reset_for_new_map_evaluate,
+	"",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_2_parameters const hs_script_screen_effect_set_value_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"script_screen_effect_set_value",
+		hs_macro_function_parse,
+		rasterizer_script_screen_effect_set_value_evaluate,
+		"sets a screen effect script value",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cinematic_screen_effect_start_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_screen_effect_start",
+		hs_macro_function_parse,
+		rasterizer_screen_effect_start_evaluate,
+		"starts screen effect; pass TRUE to clear",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_5_parameters const hs_cinematic_screen_effect_set_convolution_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_screen_effect_set_convolution",
+		hs_macro_function_parse,
+		rasterizer_screen_effect_set_convolution_evaluate,
+		"sets the convolution effect",
+		NULL,
+		5,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_short_integer, _hs_type_real, _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_6_parameters const hs_cinematic_screen_effect_set_filter_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_screen_effect_set_filter",
+		hs_macro_function_parse,
+		rasterizer_screen_effect_set_filter_evaluate,
+		"sets the filter effect",
+		NULL,
+		6,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real, _hs_type_real, _hs_type_boolean, _hs_type_real },
+};
+
+static struct hs_function_definition_with_3_parameters const hs_cinematic_screen_effect_set_filter_desaturation_tint_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_screen_effect_set_filter_desaturation_tint",
+		hs_macro_function_parse,
+		rasterizer_screen_effect_set_filter_desaturation_tint_evaluate,
+		"sets the desaturation filter tint color",
+		NULL,
+		3,
+		{ _hs_type_real },
+	},
+	{ _hs_type_real, _hs_type_real },
+};
+
+static struct hs_function_definition_with_2_parameters const hs_cinematic_screen_effect_set_video_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_screen_effect_set_video",
+		hs_macro_function_parse,
+		rasterizer_screen_effect_set_video_evaluate,
+		"sets the video effect: <noise intensity[0,1]>, <overbright: 0=none, 1=2x, 2=4x>",
+		NULL,
+		2,
+		{ _hs_type_short_integer },
+	},
+	{ _hs_type_real },
+};
+
+static struct hs_function_definition const hs_cinematic_screen_effect_stop_definition=
+{
+	_hs_type_void,
+	0,
+	"cinematic_screen_effect_stop",
+	hs_macro_function_parse,
+	rasterizer_screen_effect_stop_evaluate,
+	"returns control of the screen effects to the rest of the game",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_cinematic_set_near_clip_distance_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"cinematic_set_near_clip_distance",
+		hs_macro_function_parse,
+		rasterizer_set_near_clip_distance_evaluate,
+		"",
+		NULL,
+		1,
+		{ _hs_type_real },
+	},
+};
+
+static struct hs_function_definition const hs_enumerate_memory_units_definition=
+{
+	_hs_type_void,
+	0,
+	"enumerate_memory_units",
+	hs_macro_function_parse,
+	enumerate_memory_units_test_evaluate,
+	"enumerate memory units",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_delete_save_game_files_definition=
+{
+	_hs_type_void,
+	0,
+	"delete_save_game_files",
+	hs_macro_function_parse,
+	saved_game_files_delete_all_custom_profiles_evaluate,
+	"delete all custom profile files",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_fast_setup_network_server_definition=
+{
+	_hs_type_void,
+	0,
+	"fast_setup_network_server",
+	hs_macro_function_parse,
+	player_ui_fast_setup_network_server_evaluate,
+	"for zach's multiplayer testing",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_profile_unlock_solo_levels_definition=
+{
+	_hs_type_void,
+	0,
+	"profile_unlock_solo_levels",
+	hs_macro_function_parse,
+	player_ui_activate_all_solo_levels_evaluate,
+	"unlocks all the solo player levels for player 1's profile",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_player0_look_invert_pitch_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"player0_look_invert_pitch",
+		hs_macro_function_parse,
+		player0_look_invert_pitch_evaluate,
+		"invert player0's look",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition const hs_player0_look_pitch_is_inverted_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player0_look_pitch_is_inverted",
+	hs_macro_function_parse,
+	player0_look_pitch_is_inverted_evaluate,
+	"returns TRUE if player0's look pitch is inverted",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition const hs_player0_joystick_set_is_normal_definition=
+{
+	_hs_type_boolean,
+	0,
+	"player0_joystick_set_is_normal",
+	hs_macro_function_parse,
+	player0_joystick_set_is_normal_evaluate,
+	"returns TRUE if player0 is using the normal joystick set",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_ui_widget_show_path_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"ui_widget_show_path",
+		hs_macro_function_parse,
+		ui_widget_debug_show_path_evaluate,
+		"blah blah",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+static struct hs_function_definition_with_1_parameter const hs_display_scenario_help_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"display_scenario_help",
+		hs_macro_function_parse,
+		display_scenario_help_evaluate,
+		"display in-game help dialog",
+		NULL,
+		1,
+		{ _hs_type_short_integer },
+	},
+};
+
+static struct hs_function_definition const hs_network_game_start_now_definition=
+{
+	_hs_type_void,
+	0,
+	"network_game_start_now",
+	hs_macro_function_parse,
+	network_game_client_request_immediate_start_evaluate,
+	"another one for zach",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const hs_xbox_set_machine_name_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"xbox_set_machine_name",
+		hs_macro_function_parse,
+		xbox_set_machine_name_evaluate,
+		"YAHSFFZ",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static long const hs_function_table_count= 418;
+
+struct hs_enum_definition const hs_enum_table[]=
+{
+	{ 4, 0, global_game_difficulty_level_names },
+	{ 10, 0, global_game_team_names },
+	{ 12, 0, global_ai_default_state_names },
+	{ 16, 0, global_actor_type_names },
+	{ 5, 0, global_hud_anchor_names },
+};
+
+struct hs_function_table_storage hs_function_table=
+{
+	{
+		&hs_begin_definition,
+		&hs_begin_random_definition,
+		&hs_if_definition,
+		&hs_cond_definition,
+		&hs_set_definition,
+		&hs_and_definition,
+		&hs_or_definition,
+		&hs_plus_definition,
+		&hs_minus_definition,
+		&hs_times_definition,
+		&hs_divide_definition,
+		&hs_min_definition,
+		&hs_max_definition,
+		&hs_equal_definition,
+		&hs_not_equal_definition,
+		&hs_gt_definition,
+		&hs_lt_definition,
+		&hs_gte_definition,
+		&hs_lte_definition,
+		&hs_sleep_definition,
+		&hs_sleep_until_definition,
+		&hs_wake_definition,
+		&hs_inspect_definition,
+		&hs_unit_definition,
+		&hs_ai_debug_communication_suppress_definition,
+		&hs_ai_debug_communication_ignore_definition,
+		&hs_ai_debug_communication_focus_definition,
+		&hs_not_definition.definition,
+		&hs_print_definition.definition,
+		&hs_players_definition,
+		&hs_volume_teleport_players_not_inside_definition.definition,
+		&hs_volume_test_object_definition.definition,
+		&hs_volume_test_objects_definition.definition,
+		&hs_volume_test_objects_all_definition.definition,
+		&hs_object_teleport_definition.definition,
+		&hs_object_set_facing_definition.definition,
+		&hs_object_set_shield_definition.definition,
+		&hs_object_set_permutation_definition.definition,
+		&hs_object_create_definition.definition,
+		&hs_object_destroy_definition.definition,
+		&hs_object_create_anew_definition.definition,
+		&hs_object_create_containing_definition.definition,
+		&hs_object_create_anew_containing_definition.definition,
+		&hs_object_destroy_containing_definition.definition,
+		&hs_object_destroy_all_definition,
+		&hs_list_get_definition.definition,
+		&hs_list_count_definition.definition,
+		&hs_effect_new_definition.definition,
+		&hs_effect_new_on_object_marker_definition.definition,
+		&hs_damage_new_definition.definition,
+		&hs_damage_object_definition.definition,
+		&hs_objects_can_see_object_definition.definition,
+		&hs_objects_can_see_flag_definition.definition,
+		&hs_objects_delete_by_definition_definition.definition,
+		&hs_sound_set_gain_definition.definition,
+		&hs_sound_get_gain_definition.definition,
+		&hs_script_recompile_definition,
+		&hs_script_doc_definition,
+		&hs_help_definition.definition,
+		&hs_random_range_definition.definition,
+		&hs_real_random_range_definition.definition,
+		&hs_numeric_countdown_timer_set_definition.definition,
+		&hs_numeric_countdown_timer_get_definition.definition,
+		&hs_numeric_countdown_timer_stop_definition,
+		&hs_numeric_countdown_timer_restart_definition,
+		&hs_breakable_surfaces_enable_definition.definition,
+		&hs_recording_play_definition.definition,
+		&hs_recording_play_and_delete_definition.definition,
+		&hs_recording_play_and_hover_definition.definition,
+		&hs_recording_kill_definition.definition,
+		&hs_recording_time_definition.definition,
+		&hs_object_set_ranged_attack_inhibited_definition.definition,
+		&hs_object_set_melee_attack_inhibited_definition.definition,
+		&hs_objects_dump_memory_definition,
+		&hs_object_set_collideable_definition.definition,
+		&hs_object_set_scale_definition.definition,
+		&hs_objects_attach_definition.definition,
+		&hs_objects_detach_definition.definition,
+		&hs_garbage_collect_now_definition,
+		&hs_object_cannot_take_damage_definition.definition,
+		&hs_object_can_take_damage_definition.definition,
+		&hs_object_beautify_definition.definition,
+		&hs_objects_predict_definition.definition,
+		&hs_object_type_predict_definition.definition,
+		&hs_object_pvs_activate_definition.definition,
+		&hs_object_pvs_set_object_definition.definition,
+		&hs_object_pvs_set_camera_definition.definition,
+		&hs_object_pvs_clear_definition,
+		&hs_render_lights_definition.definition,
+		&hs_scenery_get_animation_time_definition.definition,
+		&hs_scenery_animation_start_definition.definition,
+		&hs_scenery_animation_start_at_frame_definition.definition,
+		&hs_render_effects_definition.definition,
+		&hs_unit_can_blink_definition.definition,
+		&hs_unit_open_definition.definition,
+		&hs_unit_close_definition.definition,
+		&hs_unit_kill_definition.definition,
+		&hs_unit_kill_silent_definition.definition,
+		&hs_unit_get_custom_animation_time_definition.definition,
+		&hs_unit_stop_custom_animation_definition.definition,
+		&hs_unit_custom_animation_at_frame_definition.definition,
+		&hs_custom_animation_definition.definition,
+		&hs_custom_animation_list_definition.definition,
+		&hs_unit_is_playing_custom_animation_definition.definition,
+		&hs_unit_aim_without_turning_definition.definition,
+		&hs_unit_set_emotion_definition.definition,
+		&hs_unit_set_enterable_by_player_definition.definition,
+		&hs_unit_enter_vehicle_definition.definition,
+		&hs_vehicle_test_seat_list_definition.definition,
+		&hs_vehicle_test_seat_definition.definition,
+		&hs_unit_set_emotion_animation_definition.definition,
+		&hs_unit_exit_vehicle_definition.definition,
+		&hs_unit_set_maximum_vitality_definition.definition,
+		&hs_units_set_maximum_vitality_definition.definition,
+		&hs_unit_set_current_vitality_definition.definition,
+		&hs_units_set_current_vitality_definition.definition,
+		&hs_vehicle_load_magic_definition.definition,
+		&hs_vehicle_unload_definition.definition,
+		&hs_magic_seat_name_definition.definition,
+		&hs_unit_set_seat_definition.definition,
+		&hs_magic_melee_attack_definition,
+		&hs_vehicle_riders_definition.definition,
+		&hs_vehicle_driver_definition.definition,
+		&hs_vehicle_gunner_definition.definition,
+		&hs_unit_get_health_definition.definition,
+		&hs_unit_get_shield_definition.definition,
+		&hs_unit_get_total_grenade_count_definition.definition,
+		&hs_unit_has_weapon_definition.definition,
+		&hs_unit_has_weapon_readied_definition.definition,
+		&hs_unit_doesnt_drop_items_definition.definition,
+		&hs_unit_impervious_definition.definition,
+		&hs_unit_suspended_definition.definition,
+		&hs_unit_solo_player_integrated_night_vision_is_active_definition,
+		&hs_units_set_desired_flashlight_state_definition.definition,
+		&hs_unit_set_desired_flashlight_state_definition.definition,
+		&hs_unit_get_current_flashlight_state_definition.definition,
+		&hs_device_set_never_appears_locked_definition.definition,
+		&hs_device_get_power_definition.definition,
+		&hs_device_set_power_definition.definition,
+		&hs_device_set_position_definition.definition,
+		&hs_device_get_position_definition.definition,
+		&hs_device_set_position_immediate_definition.definition,
+		&hs_device_group_get_definition.definition,
+		&hs_device_group_set_definition.definition,
+		&hs_device_group_set_immediate_definition.definition,
+		&hs_device_one_sided_set_definition.definition,
+		&hs_device_operates_automatically_set_definition.definition,
+		&hs_device_group_change_only_once_more_set_definition.definition,
+		&hs_breakable_surfaces_reset_definition,
+		&hs_cheat_all_powerups_definition,
+		&hs_cheat_all_weapons_definition,
+		&hs_cheat_all_vehicles_definition,
+		&hs_cheat_teleport_to_camera_definition,
+		&hs_cheat_active_camouflage_definition,
+		&hs_cheat_active_camouflage_local_player_definition.definition,
+		&hs_cheats_load_definition,
+		&hs_ai_free_definition.definition,
+		&hs_ai_free_units_definition.definition,
+		&hs_ai_attach_definition.definition,
+		&hs_ai_attach_free_definition.definition,
+		&hs_ai_detach_definition.definition,
+		&hs_ai_place_definition.definition,
+		&hs_ai_kill_definition.definition,
+		&hs_ai_kill_silent_definition.definition,
+		&hs_ai_erase_definition.definition,
+		&hs_ai_erase_all_definition,
+		&hs_ai_select_definition.definition,
+		&hs_ai_deselect_definition,
+		&hs_ai_spawn_actor_definition.definition,
+		&hs_ai_set_respawn_definition.definition,
+		&hs_ai_set_deaf_definition.definition,
+		&hs_ai_set_blind_definition.definition,
+		&hs_ai_magically_see_encounter_definition.definition,
+		&hs_ai_magically_see_players_definition.definition,
+		&hs_ai_magically_see_unit_definition.definition,
+		&hs_ai_timer_start_definition.definition,
+		&hs_ai_timer_expire_definition.definition,
+		&hs_ai_attack_definition.definition,
+		&hs_ai_defend_definition.definition,
+		&hs_ai_retreat_definition.definition,
+		&hs_ai_maneuver_definition.definition,
+		&hs_ai_maneuver_enable_definition.definition,
+		&hs_ai_migrate_definition.definition,
+		&hs_ai_migrate_and_speak_definition.definition,
+		&hs_ai_migrate_by_unit_definition.definition,
+		&hs_ai_allegiance_definition.definition,
+		&hs_ai_allegiance_remove_definition.definition,
+		&hs_ai_living_count_definition.definition,
+		&hs_ai_living_fraction_definition.definition,
+		&hs_ai_strength_definition.definition,
+		&hs_ai_swarm_count_definition.definition,
+		&hs_ai_nonswarm_count_definition.definition,
+		&hs_ai_actors_definition.definition,
+		&hs_ai_go_to_vehicle_definition.definition,
+		&hs_ai_go_to_vehicle_override_definition.definition,
+		&hs_ai_going_to_vehicle_definition.definition,
+		&hs_ai_exit_vehicle_definition.definition,
+		&hs_ai_braindead_definition.definition,
+		&hs_ai_braindead_by_unit_definition.definition,
+		&hs_ai_disregard_definition.definition,
+		&hs_ai_prefer_target_definition.definition,
+		&hs_ai_teleport_to_starting_location_definition.definition,
+		&hs_ai_teleport_to_starting_location_if_unsupported_definition.definition,
+		&hs_ai_renew_definition.definition,
+		&hs_ai_try_to_fight_nothing_definition.definition,
+		&hs_ai_try_to_fight_definition.definition,
+		&hs_ai_try_to_fight_player_definition.definition,
+		&hs_ai_command_list_definition.definition,
+		&hs_ai_command_list_by_unit_definition.definition,
+		&hs_ai_command_list_advance_definition.definition,
+		&hs_ai_command_list_advance_by_unit_definition.definition,
+		&hs_ai_command_list_status_definition.definition,
+		&hs_ai_is_attacking_definition.definition,
+		&hs_ai_force_active_definition.definition,
+		&hs_ai_force_active_by_unit_definition.definition,
+		&hs_ai_set_return_state_definition.definition,
+		&hs_ai_set_current_state_definition.definition,
+		&hs_ai_playfight_definition.definition,
+		&hs_ai_status_definition.definition,
+		&hs_ai_reconnect_definition,
+		&hs_ai_vehicle_encounter_definition.definition,
+		&hs_ai_vehicle_enterable_distance_definition.definition,
+		&hs_ai_vehicle_enterable_team_definition.definition,
+		&hs_ai_vehicle_enterable_actor_type_definition.definition,
+		&hs_ai_vehicle_enterable_actors_definition.definition,
+		&hs_ai_vehicle_enterable_disable_definition.definition,
+		&hs_ai_look_at_object_definition.definition,
+		&hs_ai_stop_looking_definition.definition,
+		&hs_ai_automatic_migration_target_definition.definition,
+		&hs_ai_follow_target_disable_definition.definition,
+		&hs_ai_follow_target_players_definition.definition,
+		&hs_ai_follow_target_unit_definition.definition,
+		&hs_ai_follow_target_ai_definition.definition,
+		&hs_ai_follow_distance_definition.definition,
+		&hs_ai_conversation_definition.definition,
+		&hs_ai_conversation_stop_definition.definition,
+		&hs_ai_conversation_advance_definition.definition,
+		&hs_ai_conversation_line_definition.definition,
+		&hs_ai_conversation_status_definition.definition,
+		&hs_ai_link_activation_definition.definition,
+		&hs_ai_berserk_definition.definition,
+		&hs_ai_set_team_definition.definition,
+		&hs_ai_allow_charge_definition.definition,
+		&hs_ai_allow_dormant_definition.definition,
+		&hs_ai_allegiance_broken_definition.definition,
+		&hs_camera_control_definition.definition,
+		&hs_camera_set_definition.definition,
+		&hs_camera_set_relative_definition.definition,
+		&hs_camera_set_animation_definition.definition,
+		&hs_camera_set_first_person_definition.definition,
+		&hs_camera_set_dead_definition.definition,
+		&hs_camera_time_definition,
+		&hs_debug_camera_load_definition,
+		&hs_debug_camera_save_definition,
+		&hs_game_speed_definition.definition,
+		&hs_game_time_definition,
+		&hs_game_variant_definition.definition,
+		&hs_game_difficulty_get_definition,
+		&hs_game_difficulty_get_real_definition,
+		&hs_map_reset_definition,
+		&hs_map_name_definition.definition,
+		&hs_multiplayer_map_name_definition.definition,
+		&hs_game_difficulty_set_definition.definition,
+		&hs_crash_definition.definition,
+		&hs_switch_bsp_definition.definition,
+		&hs_structure_bsp_index_definition,
+		&hs_version_definition,
+		&hs_playback_definition,
+		&hs_texture_cache_flush_definition,
+		&hs_sound_cache_flush_definition,
+		&hs_debug_memory_definition,
+		&hs_debug_memory_by_file_definition,
+		&hs_debug_memory_for_file_definition.definition,
+		&hs_debug_tags_definition,
+		&hs_profile_reset_definition,
+		&hs_profile_dump_definition.definition,
+		&hs_profile_activate_definition.definition,
+		&hs_profile_deactivate_definition.definition,
+		&hs_profile_graph_toggle_definition.definition,
+		&hs_debug_pvs_definition.definition,
+		&hs_radiosity_start_definition,
+		&hs_radiosity_save_definition,
+		&hs_radiosity_debug_point_definition,
+		&hs_ai_definition.definition,
+		&hs_ai_dialogue_triggers_definition.definition,
+		&hs_ai_grenades_definition.definition,
+		&hs_ai_lines_definition,
+		&hs_ai_debug_sound_point_set_definition,
+		&hs_ai_debug_vocalize_definition.definition,
+		&hs_ai_debug_teleport_to_definition.definition,
+		&hs_ai_debug_speak_definition.definition,
+		&hs_ai_debug_speak_list_definition.definition,
+		&hs_fade_in_definition.definition,
+		&hs_fade_out_definition.definition,
+		&hs_cinematic_start_definition,
+		&hs_cinematic_stop_definition,
+		&hs_cinematic_skip_start_internal_definition,
+		&hs_cinematic_skip_stop_internal_definition,
+		&hs_cinematic_show_letterbox_definition.definition,
+		&hs_cinematic_set_title_definition.definition,
+		&hs_cinematic_set_title_delayed_definition.definition,
+		&hs_cinematic_suppress_bsp_object_creation_definition.definition,
+		&hs_attract_mode_start_definition,
+		&hs_game_won_definition,
+		&hs_game_lost_definition,
+		&hs_game_safe_to_save_definition,
+		&hs_game_all_quiet_definition,
+		&hs_game_safe_to_speak_definition,
+		&hs_game_is_cooperative_definition,
+		&hs_game_save_definition,
+		&hs_game_save_cancel_definition,
+		&hs_game_save_no_timeout_definition,
+		&hs_game_save_totally_unsafe_definition,
+		&hs_game_saving_definition,
+		&hs_game_revert_definition,
+		&hs_game_reverted_definition,
+		&hs_core_save_definition,
+		&hs_core_save_name_definition.definition,
+		&hs_core_load_definition,
+		&hs_core_load_at_startup_definition,
+		&hs_core_load_name_definition.definition,
+		&hs_core_load_name_at_startup_definition.definition,
+		&hs_game_skip_ticks_definition.definition,
+		&hs_sound_impulse_start_definition.definition,
+		&hs_sound_impulse_time_definition.definition,
+		&hs_sound_impulse_stop_definition.definition,
+		&hs_sound_looping_predict_definition.definition,
+		&hs_sound_looping_start_definition.definition,
+		&hs_sound_looping_stop_definition.definition,
+		&hs_sound_looping_set_scale_definition.definition,
+		&hs_sound_looping_set_alternate_definition.definition,
+		&hs_debug_sounds_enable_definition.definition,
+		&hs_debug_sounds_distances_definition.definition,
+		&hs_debug_sounds_wet_definition.definition,
+		&hs_sound_enable_definition.definition,
+		&hs_sound_class_set_gain_definition.definition,
+		&hs_vehicle_hover_definition.definition,
+		&hs_players_unzoom_all_definition,
+		&hs_player_enable_input_definition.definition,
+		&hs_player_camera_control_definition.definition,
+		&hs_player_action_test_reset_definition,
+		&hs_player_action_test_jump_definition,
+		&hs_player_action_test_primary_trigger_definition,
+		&hs_player_action_test_grenade_trigger_definition,
+		&hs_player_action_test_zoom_definition,
+		&hs_player_action_test_action_definition,
+		&hs_player_action_test_accept_definition,
+		&hs_player_action_test_back_definition,
+		&hs_player_action_test_look_relative_up_definition,
+		&hs_player_action_test_look_relative_down_definition,
+		&hs_player_action_test_look_relative_left_definition,
+		&hs_player_action_test_look_relative_right_definition,
+		&hs_player_action_test_look_relative_all_directions_definition,
+		&hs_player_action_test_move_relative_all_directions_definition,
+		&hs_player_add_equipment_definition.definition,
+		&hs_debug_teleport_player_definition.definition,
+		&hs_show_hud_definition.definition,
+		&hs_show_hud_help_text_definition.definition,
+		&hs_enable_hud_help_flash_definition.definition,
+		&hs_hud_help_flash_restart_definition,
+		&hs_activate_nav_point_flag_definition.definition,
+		&hs_activate_nav_point_object_definition.definition,
+		&hs_activate_team_nav_point_flag_definition.definition,
+		&hs_activate_team_nav_point_object_definition.definition,
+		&hs_deactivate_nav_point_flag_definition.definition,
+		&hs_deactivate_nav_point_object_definition.definition,
+		&hs_deactivate_team_nav_point_flag_definition.definition,
+		&hs_deactivate_team_nav_point_object_definition.definition,
+		&hs_cls_definition,
+		&hs_error_overflow_suppression_definition.definition,
+		&hs_structure_lens_flares_place_definition,
+		&hs_player_effect_set_max_translation_definition.definition,
+		&hs_player_effect_set_max_rotation_definition.definition,
+		&hs_player_effect_set_max_rumble_definition.definition,
+		&hs_player_effect_start_definition.definition,
+		&hs_player_effect_stop_definition.definition,
+		&hs_hud_show_health_definition.definition,
+		&hs_hud_blink_health_definition.definition,
+		&hs_hud_show_shield_definition.definition,
+		&hs_hud_blink_shield_definition.definition,
+		&hs_hud_show_motion_sensor_definition.definition,
+		&hs_hud_blink_motion_sensor_definition.definition,
+		&hs_hud_show_crosshair_definition.definition,
+		&hs_hud_clear_messages_definition,
+		&hs_hud_set_help_text_definition.definition,
+		&hs_hud_set_objective_text_definition.definition,
+		&hs_hud_set_timer_time_definition.definition,
+		&hs_hud_set_timer_warning_time_definition.definition,
+		&hs_hud_set_timer_position_definition.definition,
+		&hs_show_hud_timer_definition.definition,
+		&hs_pause_hud_timer_definition.definition,
+		&hs_hud_get_timer_ticks_definition,
+		&hs_time_code_show_definition.definition,
+		&hs_time_code_start_definition.definition,
+		&hs_time_code_reset_definition,
+		&hs_rasterizer_decals_flush_definition,
+		&hs_rasterizer_fps_accumulate_definition,
+		&hs_rasterizer_model_ambient_reflection_tint_definition.definition,
+		&hs_rasterizer_lights_reset_for_new_map_definition,
+		&hs_script_screen_effect_set_value_definition.definition,
+		&hs_cinematic_screen_effect_start_definition.definition,
+		&hs_cinematic_screen_effect_set_convolution_definition.definition,
+		&hs_cinematic_screen_effect_set_filter_definition.definition,
+		&hs_cinematic_screen_effect_set_filter_desaturation_tint_definition.definition,
+		&hs_cinematic_screen_effect_set_video_definition.definition,
+		&hs_cinematic_screen_effect_stop_definition,
+		&hs_cinematic_set_near_clip_distance_definition.definition,
+		&hs_enumerate_memory_units_definition,
+		&hs_delete_save_game_files_definition,
+		&hs_fast_setup_network_server_definition,
+		&hs_profile_unlock_solo_levels_definition,
+		&hs_player0_look_invert_pitch_definition.definition,
+		&hs_player0_look_pitch_is_inverted_definition,
+		&hs_player0_joystick_set_is_normal_definition,
+		&hs_ui_widget_show_path_definition.definition,
+		&hs_display_scenario_help_definition.definition,
+		&hs_network_game_start_now_definition,
+		&hs_xbox_set_machine_name_definition.definition,
+	},
+	{
+		"hs_update",
+		NONE,
+		TRUE,
+	},
+	{
+		hs_enumerate_special_form_names,
+		hs_enumerate_script_type_names,
+		hs_enumerate_type_names,
+		hs_enumerate_function_names,
+		hs_enumerate_script_names,
+		hs_enumerate_variable_names,
+		hs_enumerate_ai_names,
+		hs_enumerate_ai_command_list_names,
+		hs_enumerate_starting_profile_names,
+		hs_enumerate_conversation_names,
+		hs_enumerate_object_names,
+		hs_enumerate_trigger_volume_names,
+		hs_enumerate_cutscene_flag_names,
+		hs_enumerate_cutscene_camera_point_names,
+		hs_enumerate_cutscene_title_names,
+		hs_enumerate_cutscene_recording_names,
+		hs_enumerate_navpoints,
+		hs_enumerate_hud_messages,
+	},
+};
 
 /* ---------- public code */
 

@@ -901,7 +901,7 @@ static short portal_hull_from_points(
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 		0x485,
-		result->vertex_count != NONE);
+		result->vertex_count!=NONE);
 
 	if (winding == 1)
 	{
@@ -917,14 +917,14 @@ static short portal_hull_from_points(
 	output_index = 0;
 	while (source_index != terminator)
 	{
-		real one_over_z = -1.0f / view_space[source_index].z;
+		real ooz = -1.0f / view_space[source_index].z;
 
 		match_assert(
 			"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 			0x497,
-			one_over_z > 0.0f);
-		result->vertices[output_index].x = view_space[source_index].x * one_over_z;
-		result->vertices[output_index].y = view_space[source_index].y * one_over_z;
+			ooz>0.f);
+		result->vertices[output_index].x = view_space[source_index].x * ooz;
+		result->vertices[output_index].y = view_space[source_index].y * ooz;
 		output_index++;
 		source_index += winding;
 	}

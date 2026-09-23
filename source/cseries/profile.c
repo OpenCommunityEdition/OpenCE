@@ -373,17 +373,6 @@ struct profile_frame
 	byte __unknown1124[4];
 };
 
-struct profile_frame_iterator
-{
-	short current_buffer_index;
-	short next_buffer_index;
-};
-
-struct profile_frame_info
-{
-	__int64 vertical_blank_index;
-};
-
 struct profile_globals
 {
 	__int64 timebase_frequency;
@@ -625,7 +614,12 @@ void profile_rasterizer_stalls(
 }
 
 void profile_frame_get_messages(
-	struct profile_frame_iterator *iterator)
+	struct profile_frame_iterator *iterator,
+	short *message_count,
+	short maximum_message_count,
+	char **messages,
+	union point2d *locations,
+	union real_argb_color const **colors)
 {
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1463, iterator);
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 1464, (iterator->current_buffer_index >= 0) && (iterator->current_buffer_index < profile_globals.current_frame_history_count));

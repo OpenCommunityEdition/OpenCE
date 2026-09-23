@@ -56,7 +56,7 @@ void predicted_resources_precache(
 		case _predicted_resource_bitmap:
 			_texture_cache_bitmap_get_hardware_format(
 				TAG_BLOCK_GET_ELEMENT(
-					&bitmap_group_get(predicted_resource->tag_index)->bitmap_data,
+					&bitmap_group_get(predicted_resource->tag_index)->bitmaps,
 					predicted_resource->resource_index,
 					struct bitmap_data),
 				FALSE,

@@ -160,6 +160,8 @@ static void file_error(
 
 /* ---------- globals */
 
+static char drive_path[]= "?:\\";
+
 static struct find_files_state find_files_globals =
 {
 	0,

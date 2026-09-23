@@ -192,7 +192,7 @@ void sound_cache_delete_block_proc(
 extern short assertion_count;
 extern boolean debug_sound_cache;
 extern boolean debug_sound_reference_counts;
-extern struct xbox_sound_cache_globals xbox_sound_cache_globals;
+struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
 
 /* ---------- public code */
 

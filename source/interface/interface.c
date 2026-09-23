@@ -70,10 +70,15 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
+#include "ai/ai_profile.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/color_table_group.h"
 #include "camera/director.h"
+#include "cseries/profile.h"
 #include "cutscene/cinematics.h"
+#include "effects/effects.h"
+#include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
 #include "game/player_control.h"
@@ -86,11 +91,14 @@ symbols in this file:
 #include "main/main.h"
 #include "main/main_runtime.h"
 #include "math/real_math.h"
+#include "objects/objects.h"
+#include "physics/collision_usage.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "render/render.h"
+#include "render/render_cameras_internal.h"
 #include "scenario/scenario.h"
 #include "text/draw_string.h"
 #include "units/unit_definitions.h"
@@ -262,6 +270,12 @@ typedef char hud_screen_effect_definition_desaturation_flags_offset_assert[
 typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
 
+struct system_memory_information
+{
+	long available_physical_memory;
+	long total_physical_memory;
+};
+
 struct profile_value
 {
 	char name[256];
@@ -303,6 +317,12 @@ void interface_splitscreen_render(
 	void);
 void render_debug_profile(
 	void);
+static void render_debug_profile_stall_tick(
+	short stall_type,
+	real_rectangle2d const *bounds,
+	real *below_position,
+	real x,
+	real scale);
 /* ---------- globals */
 
 extern struct interface_hud_globals_definition *hud_globals;
@@ -690,7 +710,7 @@ void interface_draw_screen(
 				if (mask_tag_index != NONE)
 				{
 					parameters.convolution_mask = TAG_BLOCK_GET_ELEMENT(
-						&bitmap_group_get(mask_tag_index)->bitmap_data,
+						&bitmap_group_get(mask_tag_index)->bitmaps,
 						0,
 						struct bitmap_data);
 					parameters.filter_light_enhancement_uses_convolution_mask =
@@ -881,6 +901,428 @@ void profile_graph_toggle(
 }
 
 /* ---------- private code */
+
+static void render_debug_profile_stall_tick(
+	short stall_type,
+	real_rectangle2d const *bounds,
+	real *below_position,
+	real x,
+	real scale)
+{
+	real_argb_color const *color;
+	real_point3d point0;
+	real_point3d point1;
+
+	/* January's stall labels are preserved numerically: the original enum names
+	 * are not recoverable from the available profile producer or symbols. */
+	switch (stall_type)
+	{
+		case 1:
+			color = global_real_argb_blue;
+			break;
+
+		case 2:
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+		case 16:
+		case 17:
+		case 18:
+		case 19:
+			color = global_real_argb_yellow;
+			break;
+
+		case 21:
+			color = global_real_argb_green;
+			break;
+
+		case 26:
+			color = global_real_argb_pink;
+			break;
+
+		default:
+			color = global_real_argb_white;
+			break;
+	}
+
+	point0.x = x*scale;
+	point0.y = (bounds->y0 - (bounds->y1 - bounds->y0)*(*below_position))*scale;
+	point0.z = -scale;
+	*below_position += 0.03f;
+	point1.x = x*scale;
+	point1.y = (bounds->y0 - (bounds->y1 - bounds->y0)*(*below_position))*scale;
+	point1.z = -scale;
+	*below_position += 0.01f;
+
+	matrix4x3_transform_point(&render.frustum.view_to_world, &point0, &point0);
+	matrix4x3_transform_point(&render.frustum.view_to_world, &point1, &point1);
+	rasterizer_debug_immediate_line(&point0, &point1, &color->rgb, NULL);
+
+	return;
+}
+
+void render_debug_profile(
+	void)
+{
+	if (profile_display)
+	{
+		char buffer[8192];
+
+		interface_set_bitmap_text_draw_mode(
+			_interface_font_terminal,
+			NONE,
+			0,
+			0,
+			_interface_color_table_dialog,
+			0);
+
+		{
+			struct objects_information objects_information;
+			struct effects_information effects_information;
+			struct system_memory_information memory_information;
+
+			objects_information_get(&objects_information);
+			system_memory_information_get(&memory_information);
+			effects_information_get(&effects_information);
+
+			csstrcpy(buffer, "");
+			sprintf(buffer+csstrlen(buffer), "% 6.1fk free of % 6.1fk total|n",
+				memory_information.available_physical_memory/1024.0f,
+				memory_information.total_physical_memory/1024.0f);
+			sprintf(buffer+csstrlen(buffer), "% 5d active of % 5d objects (% 3.1f%% used)|n",
+				objects_information.active_object_count,
+				objects_information.object_count,
+				objects_information.used_memory*100.0f);
+			sprintf(buffer+csstrlen(buffer), "% 5d active of % 5d effects (%5d locations)|n",
+				effects_information.active_effect_count,
+				effects_information.effect_count,
+				effects_information.location_count);
+			sprintf(buffer+csstrlen(buffer), "% 5d particles|n",
+				particle_data->actual_count);
+
+			ai_profile_display(buffer);
+			collision_log_display(buffer);
+			rasterizer_draw_string(NULL, NULL, NULL, 0, buffer);
+		}
+
+		{
+			short tab_stops[4];
+
+			tab_stops[0] = 300;
+			tab_stops[1] = 380;
+			tab_stops[2] = 460;
+			tab_stops[3] = 540;
+			sprintf(buffer, "|n|n|n|n|n|n");
+			profile_dump(
+				NULL,
+				_profile_sort_mode_total_time,
+				_profile_dump_format_mode_screen,
+				10,
+				buffer+csstrlen(buffer));
+			draw_string_set_tab_stops(tab_stops, 4);
+			rasterizer_draw_string(NULL, NULL, NULL, 0, buffer);
+			draw_string_set_tab_stops(tab_stops, 0);
+		}
+	}
+
+	if (profile_graph)
+	{
+		real_rectangle2d screen_clip_bounds;
+		real_rectangle2d graph_bounds;
+		real_rectangle2d graph_screen_bounds;
+
+		render_frustum_get_projection_bounds(&render.frustum, &screen_clip_bounds);
+
+		graph_bounds.x0 = screen_clip_bounds.x0 - 0.1f;
+		graph_bounds.x1 = screen_clip_bounds.x1 + 0.1f;
+		graph_bounds.y0 = screen_clip_bounds.y1 + 0.1f;
+		graph_bounds.y1 = screen_clip_bounds.y0 - 0.1f;
+
+		graph_screen_bounds.x0 = rasterizer_globals.reserved04.screen_bounds.x1 -
+			(rasterizer_globals.reserved04.screen_bounds.x1 -
+				rasterizer_globals.reserved04.screen_bounds.x0)*0.1f;
+		graph_screen_bounds.x1 = rasterizer_globals.reserved04.screen_bounds.x0 +
+			(rasterizer_globals.reserved04.screen_bounds.x1 -
+				rasterizer_globals.reserved04.screen_bounds.x0)*0.1f;
+		graph_screen_bounds.y0 = rasterizer_globals.reserved04.screen_bounds.y1 -
+			(rasterizer_globals.reserved04.screen_bounds.y1 -
+				rasterizer_globals.reserved04.screen_bounds.y0)*0.1f;
+		graph_screen_bounds.y1 = rasterizer_globals.reserved04.screen_bounds.y0 +
+			(rasterizer_globals.reserved04.screen_bounds.y1 -
+				rasterizer_globals.reserved04.screen_bounds.y0)*0.1f;
+
+		if (profile_graph)
+		{
+			short graph_value_index;
+
+			for (graph_value_index = 0;
+				graph_value_index < profile_graph_value_count;
+				graph_value_index++)
+			{
+				struct profile_value *graph_value =
+					&profile_graph_values[graph_value_index];
+
+				graph_value->frame_value = profile_find_frame_value(
+					graph_value->name,
+					&graph_value->section_index);
+			}
+		}
+
+		if (profile_graph)
+		{
+			struct profile_frame_iterator iterator;
+			struct profile_frame_info frame_info;
+			__int64 base_vertical_blank_index =
+				rasterizer_globals.vertical_blank_index;
+
+			{
+				point2d drawingbuf[MAXIMUM_PROFILE_VALUES][512];
+				short drawingbuf_counts[MAXIMUM_PROFILE_VALUES];
+				real current_values[MAXIMUM_PROFILE_VALUES];
+				real last_values[MAXIMUM_PROFILE_VALUES];
+				point2d current_screen_points[MAXIMUM_PROFILE_VALUES];
+				point2d last_screen_points[MAXIMUM_PROFILE_VALUES];
+				/* The /Od RTC descriptors attest both January locals. Their values
+				 * are retained and copied, although no later graph path reads them. */
+				real_point3d current_world_points[MAXIMUM_PROFILE_VALUES];
+				real_point3d last_world_points[MAXIMUM_PROFILE_VALUES];
+				boolean first_frame = TRUE;
+
+				{
+					real_point3d point0;
+					real_point3d point1;
+
+					point0.x = graph_bounds.x0*0.1f;
+					point0.y = graph_bounds.y0*0.1f;
+					point0.z = -0.1f;
+					point1.x = graph_bounds.x1*0.1f;
+					point1.y = graph_bounds.y0*0.1f;
+					point1.z = -0.1f;
+					rasterizer_debug_immediate_line(
+						&point0,
+						&point1,
+						&global_real_argb_white->rgb,
+						NULL);
+				}
+
+				csmemset(drawingbuf_counts, 0, sizeof(drawingbuf_counts));
+
+				rasterizer_debug_immediate_begin_screenspace();
+				profile_frame_iterator_new(&iterator);
+				while (profile_frame_iterator_next(&iterator, &frame_info))
+				{
+					real frame_seconds = (real)(base_vertical_blank_index -
+						frame_info.vertical_blank_index)*(1.0f/60.0f);
+
+					if (frame_seconds < 10.0f)
+					{
+						real graph_screen_x = graph_screen_bounds.x0 +
+							(graph_screen_bounds.x1 - graph_screen_bounds.x0)*
+								frame_seconds*0.1f;
+						real graph_x = graph_bounds.x0 +
+							(graph_bounds.x1 - graph_bounds.x0)*frame_seconds*0.1f;
+						short index;
+
+						for (index = 0; index < profile_graph_value_count; index++)
+						{
+							struct profile_value *graph_value =
+								&profile_graph_values[index];
+							boolean overlapping;
+							real value;
+							point2d screenspace_point;
+							real_point3d view_point;
+							real_point3d world_point;
+
+							if (graph_value->frame_value == NONE)
+								continue;
+
+							value = profile_frame_get_value(
+								&iterator,
+								graph_value->frame_value,
+								graph_value->section_index);
+							overlapping = FALSE;
+
+							if (value < 0.0f)
+								value = 0.0f;
+							else if (value > 100.0f)
+								value = 100.0f;
+
+							if (graph_value->subtract_previous &&
+								index > 0 &&
+								profile_graph_values[index-1].enabled &&
+								profile_graph_values[index-1].frame_value != NONE &&
+								!first_frame)
+							{
+								if (fabs(value - current_values[index-1]) < 0.1f &&
+									fabs(last_values[index] - last_values[index-1]) < 0.1f)
+								{
+									overlapping = TRUE;
+								}
+							}
+
+							screenspace_point.x = (short)graph_screen_x;
+							screenspace_point.y = (short)(graph_screen_bounds.y0 +
+								(graph_screen_bounds.y1 - graph_screen_bounds.y0)*
+									(value*0.01f));
+
+							view_point.x = graph_x*0.1f;
+							view_point.y = (graph_bounds.y0 +
+								(graph_bounds.y1 - graph_bounds.y0)*(value*0.01f))*0.1f;
+							view_point.z = -0.1f;
+							matrix4x3_transform_point(
+								&render.frustum.view_to_world,
+								&view_point,
+								&world_point);
+
+							if (graph_value->enabled && !first_frame && !overlapping)
+							{
+								if (!drawingbuf_counts[index])
+								{
+									drawingbuf[index][0] = last_screen_points[index];
+									drawingbuf_counts[index] = 1;
+								}
+
+								match_assert(
+									"c:\\halo\\SOURCE\\interface\\interface.c",
+									704,
+									drawingbuf_counts[index] < 512);
+
+								drawingbuf[index][drawingbuf_counts[index]++] =
+									screenspace_point;
+							}
+							else if (drawingbuf_counts[index] > 0)
+							{
+								rasterizer_debug_immediate_linestrip_screenspace(
+									drawingbuf[index],
+									drawingbuf_counts[index],
+									&(*graph_value->color)->rgb);
+								drawingbuf_counts[index] = 0;
+							}
+
+							current_values[index] = value;
+							current_screen_points[index] = screenspace_point;
+							current_world_points[index] = world_point;
+						}
+					}
+
+					csmemcpy(last_values, current_values, sizeof(last_values));
+					csmemcpy(last_screen_points, current_screen_points,
+						sizeof(last_screen_points));
+					csmemcpy(last_world_points, current_world_points,
+						sizeof(last_world_points));
+					first_frame = FALSE;
+				}
+
+				{
+					short index;
+
+					for (index = 0; index < profile_graph_value_count; index++)
+					{
+						if (drawingbuf_counts[index] > 0)
+						{
+							rasterizer_debug_immediate_linestrip_screenspace(
+								drawingbuf[index],
+								drawingbuf_counts[index],
+								&(*profile_graph_values[index].color)->rgb);
+							drawingbuf_counts[index] = 0;
+						}
+					}
+				}
+
+				rasterizer_debug_immediate_end_screenspace();
+			}
+
+			rasterizer_debug_immediate_begin();
+			profile_frame_iterator_new(&iterator);
+			while (profile_frame_iterator_next(&iterator, &frame_info))
+			{
+				real frame_seconds = (real)(base_vertical_blank_index -
+					frame_info.vertical_blank_index)*(1.0f/60.0f);
+
+				if (frame_seconds < 10.0f)
+				{
+					char message_strings[48][256];
+					char *message_stringptrs[48];
+					point2d message_locations[48];
+					real_argb_color const *message_colors[48];
+					short message_count;
+					short largest_stall_type;
+					real largest_stall_msec;
+					long stall_count;
+					short message_index;
+					real graph_x = graph_bounds.x0 +
+						(graph_bounds.x1 - graph_bounds.x0)*frame_seconds*0.1f;
+
+					for (message_index = 0; message_index < 48; message_index++)
+					{
+						message_stringptrs[message_index] =
+							message_strings[message_index];
+					}
+
+					message_count = 0;
+					profile_frame_get_messages(
+						&iterator,
+						&message_count,
+						48,
+						message_stringptrs,
+						message_locations,
+						message_colors);
+
+					largest_stall_type = 0;
+					largest_stall_msec = 0.0f;
+					stall_count = profile_frame_get_stalls(
+						&iterator,
+						&largest_stall_type,
+						&largest_stall_msec);
+
+					if (stall_count)
+					{
+						real below_position = 0.01f;
+						short stall_type;
+
+						if (TEST_FLAG(stall_count, largest_stall_type))
+						{
+							render_debug_profile_stall_tick(
+								largest_stall_type,
+								&graph_bounds,
+								&below_position,
+								graph_x,
+								0.1f);
+							stall_count &= ~FLAG(largest_stall_type);
+						}
+
+						for (stall_type = 0; stall_type < 27; stall_type++)
+						{
+							if (TEST_FLAG(stall_count, stall_type))
+							{
+								render_debug_profile_stall_tick(
+									stall_type,
+									&graph_bounds,
+									&below_position,
+									graph_x,
+									0.1f);
+							}
+						}
+					}
+				}
+			}
+
+			rasterizer_debug_immediate_end();
+		}
+	}
+
+	return;
+}
 
 void interface_splitscreen_render(
 	void)

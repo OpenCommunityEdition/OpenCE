@@ -153,8 +153,8 @@ real_point3d *point_from_line3d(
 
 /* ---------- globals */
 
-real const item_maximum_impact_velocity = 0.1f;
 struct profile_section item_update_section = { "item_update", NONE, TRUE };
+real const item_maximum_impact_velocity = 0.1f;
 
 /* ---------- public code */
 

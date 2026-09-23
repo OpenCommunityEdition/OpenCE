@@ -1337,7 +1337,7 @@ boolean network_server_close_client_connection(
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x1F9,
-		server_connection->flags&FLAG(_connection_create_server_bit));
+		server_connection->flags & FLAG(_connection_create_server_bit));
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x1FA,
@@ -1359,7 +1359,7 @@ boolean network_server_close_client_connection(
 			{
 				error(
 					_error_silent,
-					"failed to remove a client endpoint from the server's endpoint set");
+					"failed to remove a client endpoint from the server's endpoint set (maybe it was already removed)");
 			}
 
 			network_connection_delete(server->client_list[client_index]);

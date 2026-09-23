@@ -289,13 +289,14 @@ static void observer_pass_time(
 
 /* ---------- globals */
 
-static real const observer_maximum_accelerations[NUMBER_OF_OBSERVER_COMMAND_PARAMETERS] =
+static real const observer_maximum_accelerations[] =
 {
 	1500.f,
 	1500.f,
 	100000.f,
 	100000.f,
-	100000.f
+	100000.f,
+	1.f/30.f
 };
 
 static real const sine_region_angle = 0.174f;
@@ -876,12 +877,12 @@ static void observer_update_positions(
 	short value_index;
 	short parameter_index;
 
-	for (value_index = 0; value_index < NUMBER_OF_OBSERVER_VELOCITIES; value_index++)
+	for (parameter_index = 0; parameter_index < NUMBER_OF_OBSERVER_VELOCITIES; parameter_index++)
 	{
 		match_assert_valid_real(
 			"c:\\halo\\SOURCE\\camera\\observer.c",
 			0x2F4,
-			observer->velocities.n[value_index]);
+			observer->velocities.n[parameter_index]);
 	}
 	csmemset(displacement, 0, sizeof(displacement));
 

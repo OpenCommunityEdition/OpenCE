@@ -280,7 +280,7 @@ void lightning_submit(
 				1) > 0)
 		{
 			struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
-				&bitmap_group_get(definition->map.index)->bitmap_data,
+				&bitmap_group_get(definition->map.index)->bitmaps,
 				0,
 				struct bitmap_data);
 

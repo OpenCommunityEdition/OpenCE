@@ -365,7 +365,7 @@ static void object_destroy_region(
 
 extern boolean debug_damage;
 
-struct damage_globals damage_globals;
+struct damage_globals damage_globals = { 0 };
 
 /* ---------- public code */
 

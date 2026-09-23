@@ -201,11 +201,11 @@ enum
 
 /* ---------- globals */
 
-boolean debug_no_frustum_clip;
-boolean render_camera_debug_this_fucking_frustum;
-real previous_projection_coefficients[4];
-static real render_camera_warning_values[MAXIMUM_RENDER_CAMERA_WARNING_CONDITIONS];
-static boolean render_camera_warnings_initialized;
+real previous_projection_coefficients[4]= {0};
+static real render_camera_warning_values[MAXIMUM_RENDER_CAMERA_WARNING_CONDITIONS]= {0};
+static boolean render_camera_warnings_initialized= {0};
+boolean debug_no_frustum_clip= {0};
+boolean render_camera_debug_this_fucking_frustum= {0};
 
 /* ---------- private prototypes */
 
@@ -894,15 +894,18 @@ short render_frustum_sphere_visible(
 	real distance5;
 	real negative_radius;
 
-	if (frustum->world_bounds.x1 < point->x - radius ||
-		frustum->world_bounds.y1 < point->y - radius ||
-		frustum->world_bounds.z1 < point->z - radius ||
-		frustum->world_bounds.x0 > point->x + radius ||
-		frustum->world_bounds.y0 > point->y + radius ||
-		frustum->world_bounds.z0 > point->z + radius)
-	{
+	if (frustum->world_bounds.x1 < point->x - radius)
 		return 0;
-	}
+	if (frustum->world_bounds.y1 < point->y - radius)
+		return 0;
+	if (frustum->world_bounds.z1 < point->z - radius)
+		return 0;
+	if (frustum->world_bounds.x0 > point->x + radius)
+		return 0;
+	if (frustum->world_bounds.y0 > point->y + radius)
+		return 0;
+	if (frustum->world_bounds.z0 > point->z + radius)
+		return 0;
 
 	distance0 = plane3d_distance_to_point(&frustum->world_planes[0], point);
 	if (distance0 > radius)
@@ -920,29 +923,19 @@ short render_frustum_sphere_visible(
 		return 0;
 	distance5 = plane3d_distance_to_point(&frustum->world_planes[5], point);
 	if (distance5 > radius)
-	{
 		return 0;
-	}
-	else
+
+	negative_radius = -radius;
+	if (distance0 < negative_radius &&
+		distance1 < negative_radius &&
+		distance2 < negative_radius &&
+		distance3 < negative_radius &&
+		distance5 < negative_radius)
 	{
-		short result;
-
-		negative_radius = -radius;
-		if (distance0 < negative_radius &&
-			distance1 < negative_radius &&
-			distance2 < negative_radius &&
-			distance3 < negative_radius &&
-			distance5 < negative_radius)
-		{
-			result = 2;
-		}
-		else
-		{
-			result = 1;
-		}
-
-		return result;
+		return 2;
 	}
+
+	return 1;
 }
 
 void render_camera_debug_frustum(
@@ -1019,16 +1012,17 @@ void render_camera_mirror(
 		if (fabs(dot_product3d(&plane.n, &camera->forward)) < 0.0125f)
 		{
 			real_point3d point_on_plane;
+			real_vector3d const *normal = &plane.n;
 			real_vector3d const *forward = &camera->forward;
 			real distance_to_plane =
 				-plane3d_distance_to_point(&plane, &camera->position);
 
-			point_on_plane.x = plane.n.i * distance_to_plane + camera->position.x;
-			point_on_plane.y = plane.n.j * distance_to_plane + camera->position.y;
-			point_on_plane.z = plane.n.k * distance_to_plane + camera->position.z;
-			adjusted_normal.i = plane.n.i + forward->i * 0.005859375f;
-			adjusted_normal.j = plane.n.j + forward->j * 0.005859375f;
-			adjusted_normal.k = plane.n.k + forward->k * 0.005859375f;
+			point_on_plane.x = normal->i * distance_to_plane + camera->position.x;
+			point_on_plane.y = normal->j * distance_to_plane + camera->position.y;
+			point_on_plane.z = normal->k * distance_to_plane + camera->position.z;
+			adjusted_normal.i = normal->i + forward->i * 0.005859375f;
+			adjusted_normal.j = normal->j + forward->j * 0.005859375f;
+			adjusted_normal.k = normal->k + forward->k * 0.005859375f;
 			normalize3d(&adjusted_normal);
 			plane3d_from_point_and_normal(
 				&adjusted_plane,

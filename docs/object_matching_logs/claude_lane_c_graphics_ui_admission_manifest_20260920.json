@@ -1,0 +1,379 @@
+{
+ "status": "archival-interim-only; see claude_lane_c_canonical_reconciliation_20260922.md",
+ "lane": "C (graphics/UI)",
+ "branch": "claude/lane-c-graphics-ui-20260920",
+ "frozen_base": "6130661c9585fdb2785b3ff6bdb2ad0cfef0520c",
+ "units": [
+  "source/bitmaps/bitmap_group",
+  "source/bitmaps/bitmap_utilities",
+  "source/bitmaps/bitmaps",
+  "source/bitmaps/s3tc/s3tc",
+  "source/interface/first_person_weapons",
+  "source/interface/hud",
+  "source/interface/hud_draw",
+  "source/interface/hud_messaging",
+  "source/interface/hud_nav_points",
+  "source/interface/hud_weapon",
+  "source/interface/interface",
+  "source/interface/motion_sensor",
+  "source/interface/progress_bar",
+  "source/interface/ui_widget",
+  "source/interface/ui_widget_game_data_input_functions",
+  "source/interface/virtual_keyboard",
+  "source/rasterizer/rasterizer_frame_statistics",
+  "source/rasterizer/rasterizer_geometry",
+  "source/rasterizer/rasterizer_lights",
+  "source/rasterizer/xbox/rasterizer_xbox_active_camouflage",
+  "source/rasterizer/xbox/rasterizer_xbox_environment",
+  "source/rasterizer/xbox/rasterizer_xbox_environment_fog",
+  "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps",
+  "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+  "source/rasterizer/xbox/rasterizer_xbox_lights",
+  "source/rasterizer/xbox/rasterizer_xbox_models",
+  "source/rasterizer/xbox/rasterizer_xbox_shadows",
+  "source/render/render_cameras",
+  "source/render/render_particles",
+  "source/render/render_sprite"
+ ],
+ "totals": {
+  "baseline_strict_functions": 697,
+  "final_strict_functions": 705,
+  "strict_function_gain": 8,
+  "baseline_meaningful_bytes": 156512,
+  "final_meaningful_bytes": 160175,
+  "new_meaningful_bytes": 3663,
+  "baseline_padded_bytes": 157680,
+  "final_padded_bytes": 161408,
+  "new_padded_bytes": 3728,
+  "exact_regressions": 0
+ },
+ "functions": [
+  {
+   "unit": "source/bitmaps/bitmap_utilities",
+   "function": "_bitmap_sharpen",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 352,
+    "tag": "[reloc-identity]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 352,
+    "meaningful_bytes": 344,
+    "relocations": null,
+    "normalized_sha256": null,
+    "tag": "[reloc-identity]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": []
+  },
+  {
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_DecodeBlockAlpha3__single_pixel",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 432,
+    "tag": "[size 448!=432, sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 432,
+    "meaningful_bytes": 432,
+    "relocations": 1,
+    "normalized_sha256": "b869ae2d8e5be4b6efe4fef80b120931dfc7da90d6d9c21a03a60b019f8e6ba5",
+    "tag": "[size 448!=432, sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "b2fe8e80 Use January's loop form in ColorToFcolor",
+    "71d6e77a Bind ColorToFcolor's byte-to-real conversion to a named local",
+    "9450f2f1 Restore RGBToColor's in-place channel expansion",
+    "fed1f953 Close DecodeBlockAlpha3__single_pixel by dropping the shared shift local"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_DecodeBlockRGB",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 448,
+    "tag": "[size 384!=448, relocs 3!=2, sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 448,
+    "meaningful_bytes": 435,
+    "relocations": 2,
+    "normalized_sha256": "fea1c6a895d8bbee78184c8fc8b615b008c32a49e61881ea0024c78e926b3529",
+    "tag": "[size 384!=448, relocs 3!=2, sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "b2fe8e80 Use January's loop form in ColorToFcolor",
+    "71d6e77a Bind ColorToFcolor's byte-to-real conversion to a named local",
+    "9450f2f1 Restore RGBToColor's in-place channel expansion",
+    "fed1f953 Close DecodeBlockAlpha3__single_pixel by dropping the shared shift local"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_Quantize",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 528,
+    "tag": "[sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 528,
+    "meaningful_bytes": 517,
+    "relocations": 30,
+    "normalized_sha256": "01a6d9b9fd4dd740422a1ced163db15fea206d97a106b0471381584fce23e591",
+    "tag": "[sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "b2fe8e80 Use January's loop form in ColorToFcolor",
+    "71d6e77a Bind ColorToFcolor's byte-to-real conversion to a named local",
+    "9450f2f1 Restore RGBToColor's in-place channel expansion",
+    "fed1f953 Close DecodeBlockAlpha3__single_pixel by dropping the shared shift local"
+   ]
+  },
+  {
+   "unit": "source/bitmaps/s3tc/s3tc",
+   "function": "_RGBToColor",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 96,
+    "tag": "[sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 96,
+    "meaningful_bytes": 81,
+    "relocations": 0,
+    "normalized_sha256": "ca5bedfcc8216c56321d66212d39b53e22e075af0592c03f107014ba342e40c7",
+    "tag": "[sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "b2fe8e80 Use January's loop form in ColorToFcolor",
+    "71d6e77a Bind ColorToFcolor's byte-to-real conversion to a named local",
+    "9450f2f1 Restore RGBToColor's in-place channel expansion",
+    "fed1f953 Close DecodeBlockAlpha3__single_pixel by dropping the shared shift local"
+   ]
+  },
+  {
+   "unit": "source/interface/hud",
+   "function": "_hud_show_action_response",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 1744,
+    "tag": "[sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 1744,
+    "meaningful_bytes": 1744,
+    "relocations": 120,
+    "normalized_sha256": "bfe1022d2e8f59dc3220b33c497fed91681596b485f4cb2b9339454fe27ec317",
+    "tag": "[sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "35637582 Bind the weapon and parent-unit lookups in hud_show_action_response"
+   ]
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_1wide_list_update",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 1152,
+    "tag": "[reloc-identity]",
+    "parked": false
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 1152,
+    "meaningful_bytes": 1142,
+    "relocations": null,
+    "normalized_sha256": null,
+    "tag": "[reloc-identity]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_3wide_list_update",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 1232,
+    "tag": "[reloc-identity]",
+    "parked": false
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 1232,
+    "meaningful_bytes": 1222,
+    "relocations": null,
+    "normalized_sha256": null,
+    "tag": "[reloc-identity]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_player_profile_update_cache_for_nwide_list",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 272,
+    "tag": "[reloc-identity]",
+    "parked": false
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 272,
+    "meaningful_bytes": 268,
+    "relocations": null,
+    "normalized_sha256": null,
+    "tag": "[reloc-identity]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": []
+  },
+  {
+   "unit": "source/interface/ui_widget_game_data_input_functions",
+   "function": "_splitscreen_pregame_status_screen_update",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 1216,
+    "tag": "[reloc-identity]",
+    "parked": false
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 1216,
+    "meaningful_bytes": 1208,
+    "relocations": null,
+    "normalized_sha256": null,
+    "tag": "[reloc-identity]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": []
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_frame_statistics",
+   "function": "_eat_my_shorts",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 32,
+    "tag": "[size 16!=32, sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 32,
+    "meaningful_bytes": 21,
+    "relocations": 0,
+    "normalized_sha256": "272173574597a002350643c155ed196ad630c283059b477e0743dbf755f77f6e",
+    "tag": "[size 16!=32, sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "13315d5b Restore eat_my_shorts' three-way comparator shape"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_lights",
+   "function": "_rasterizer_lens_flares_submit_occlusion_tests",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 400,
+    "tag": "[sha]",
+    "parked": true
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 400,
+    "meaningful_bytes": 385,
+    "relocations": 22,
+    "normalized_sha256": "1c79f999dc13e23a8c403b87948660413ea7a09a495a32d890c3abc3a5086612",
+    "tag": "[sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "4dcb1b96 Restore January's one-entry overrun in rasterizer_lights_reset_for_new_map",
+    "a224e887 Restore the natural point_from_line3d inline schedule in rasterizer_lights"
+   ]
+  },
+  {
+   "unit": "source/rasterizer/rasterizer_lights",
+   "function": "_rasterizer_lights_reset_for_new_map",
+   "before": {
+    "status": "residual",
+    "padded_bytes": 48,
+    "tag": "[sha]",
+    "parked": false
+   },
+   "after": {
+    "status": "EXACT",
+    "padded_bytes": 48,
+    "meaningful_bytes": 48,
+    "relocations": 5,
+    "normalized_sha256": "4f9cb4ce3bec8de638c72949310c64a671911c460348728ddc088c7d9377e290",
+    "tag": "[sha]"
+   },
+   "newly_exact": true,
+   "lost_exact": false,
+   "commits": [
+    "4dcb1b96 Restore January's one-entry overrun in rasterizer_lights_reset_for_new_map",
+    "a224e887 Restore the natural point_from_line3d inline schedule in rasterizer_lights"
+   ]
+  }
+ ],
+ "commits": {
+  "source/bitmaps/s3tc/s3tc": [
+   "b2fe8e80 Use January's loop form in ColorToFcolor",
+   "71d6e77a Bind ColorToFcolor's byte-to-real conversion to a named local",
+   "9450f2f1 Restore RGBToColor's in-place channel expansion",
+   "fed1f953 Close DecodeBlockAlpha3__single_pixel by dropping the shared shift local"
+  ],
+  "source/interface/hud": [
+   "35637582 Bind the weapon and parent-unit lookups in hud_show_action_response"
+  ],
+  "source/interface/motion_sensor": [
+   "013d2892 Start render_blip's pulse_scale at the branch, not the declaration"
+  ],
+  "source/rasterizer/rasterizer_frame_statistics": [
+   "13315d5b Restore eat_my_shorts' three-way comparator shape"
+  ],
+  "source/rasterizer/rasterizer_lights": [
+   "4dcb1b96 Restore January's one-entry overrun in rasterizer_lights_reset_for_new_map",
+   "a224e887 Restore the natural point_from_line3d inline schedule in rasterizer_lights"
+  ],
+  "source/render/render_sprite": [
+   "c33ce296 Restore render_sprite's orientation enum, linkage and quarter-circle constant"
+  ]
+ }
+}

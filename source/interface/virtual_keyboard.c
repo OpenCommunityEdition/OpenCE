@@ -342,7 +342,7 @@ static rectangle2d keyboard_rect[NUMBER_OF_VIRTUAL_KEYS] =
 	{ 286, 208, 318, 400 }, /* space */
 };
 
-struct virtual_keyboard_globals virtual_keyboard_globals;
+struct virtual_keyboard_globals virtual_keyboard_globals= {0};
 
 /* ---------- public code */
 
@@ -1143,7 +1143,7 @@ static boolean virtual_keyboard_select(
 static void virtual_keyboard_process_internal(
 	void)
 {
-	static unsigned long time_of_last_tab;
+	static unsigned long time_of_last_tab= {0};
 	unsigned long time = system_milliseconds();
 	struct event_record event;
 	long action = NONE;

@@ -384,9 +384,9 @@ static const long bitmap_d3d_format_tables
  * listing's cached bitmaps */
 static struct bitmap_data *texture_cache_debug_bitmaps[XBOX_TEXTURE_CACHE_PAGE_COUNT];
 static struct xbox_texture_cache_globals xbox_texture_cache_globals;
-struct texture_cache_debug_options texture_cache_debug_options;
-boolean debug_texture_cache;
-static unsigned long texture_cache_last_failure_time;
+struct texture_cache_debug_options texture_cache_debug_options = {0};
+boolean debug_texture_cache = FALSE;
+static unsigned long texture_cache_last_failure_time = 0;
 extern D3DDevice global_d3d_device;
 
 /* ---------- public code */

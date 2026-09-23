@@ -263,6 +263,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "ai/ai_debug_scripting.h"
+#include "ai/ai_script.h"
 #include "hs/hs.h"
 #include "hs/hs_library_internal_runtime.h"
 #include "hs/object_lists.h"
@@ -543,7 +544,6 @@ static void hs_global_reconcile_write(
 
 /* ---------- globals */
 
-extern hs_typecasting_procedure typecasting_procedures[NUMBER_OF_HS_TYPES][NUMBER_OF_HS_TYPES];
 extern struct data_array *hs_global_data;
 extern struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
@@ -602,6 +602,93 @@ static hs_inspection_procedure hs_type_inspectors[NUMBER_OF_HS_TYPES] =
 	NULL,
 	NULL,
 	NULL,
+};
+hs_typecasting_procedure typecasting_procedures[NUMBER_OF_HS_TYPES][NUMBER_OF_HS_TYPES] =
+{
+	{ NULL }, /* unparsed */
+	{ NULL }, /* special_form */
+	{ NULL }, /* function_name */
+	{ NULL }, /* passthrough */
+	{ /* void */
+		NULL, NULL, NULL, NULL,
+		NULL,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+		hs_data_to_void, hs_data_to_void, hs_data_to_void, hs_data_to_void,
+	},
+	{ /* boolean */
+		NULL, NULL, NULL, NULL,
+		NULL, NULL,
+		hs_long_to_boolean,
+		hs_short_to_boolean,
+		hs_long_to_boolean,
+		hs_string_to_boolean,
+	},
+	{ /* real */
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL,
+		hs_short_to_real,
+		hs_long_to_real,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL,
+		hs_enum_to_real, hs_enum_to_real, hs_enum_to_real, hs_enum_to_real,
+	},
+	{ /* short_integer */
+		NULL, NULL, NULL, NULL,
+		NULL, NULL,
+		hs_real_to_short,
+		NULL,
+		hs_long_to_short,
+	},
+	{ /* long_integer */
+		NULL, NULL, NULL, NULL,
+		NULL, NULL,
+		hs_real_to_long,
+		NULL,
+		hs_long_to_short,
+	},
+	{ NULL }, /* string */
+	{ NULL }, /* script */
+	{ NULL }, /* trigger_volume */
+	{ NULL }, /* cutscene_flag */
+	{ NULL }, /* cutscene_camera_point */
+	{ NULL }, /* cutscene_title */
+	{ NULL }, /* cutscene_recording */
+	{ NULL }, /* device_group */
+	{ NULL }, /* ai */
+	{ NULL }, /* ai_command_list */
+	{ NULL }, /* starting_profile */
+	{ NULL }, /* conversation */
+	{ NULL }, /* navpoint */
+	{ NULL }, /* hud_message */
+	{ /* object_list */
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		object_list_from_ai_reference,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL,
+		NULL,
+		hs_object_to_object_list, hs_object_to_object_list, hs_object_to_object_list, hs_object_to_object_list,
+		hs_object_to_object_list,
+		hs_object_name_to_object_list, hs_object_name_to_object_list, hs_object_name_to_object_list, hs_object_name_to_object_list,
+		hs_object_name_to_object_list, hs_object_name_to_object_list,
+	},
 };
 static struct hs_runtime_globals hs_runtime_globals;
 

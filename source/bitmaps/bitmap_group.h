@@ -91,7 +91,7 @@ struct bitmap_group
 	short sprite_spacing;
 	unsigned short unused;
 	struct tag_block sequences;
-	struct tag_block bitmap_data;
+	struct tag_block bitmaps;
 };
 
 /* ---------- prototypes/BITMAP_GROUP.C */

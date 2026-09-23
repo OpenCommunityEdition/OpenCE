@@ -499,8 +499,10 @@ static void hud_show_action_response(
 		if (weapon != NULL)
 		{
 			struct icon_hud_element_definition const *icon = NULL;
-			long hud_interface_index = weapon_definition_get(
-				weapon->definition_index)->weapon.interface_definition.hud_interface.index;
+			struct weapon_definition *weapon_definition = weapon_definition_get(
+				weapon->definition_index);
+			long hud_interface_index =
+				weapon_definition->weapon.interface_definition.hud_interface.index;
 
 			if (hud_interface_index != NONE)
 			{
@@ -540,8 +542,10 @@ static void hud_show_action_response(
 		if (weapon != NULL)
 		{
 			struct icon_hud_element_definition const *icon = NULL;
-			long hud_interface_index = weapon_definition_get(
-				weapon->definition_index)->weapon.interface_definition.hud_interface.index;
+			struct weapon_definition *weapon_definition = weapon_definition_get(
+				weapon->definition_index);
+			long hud_interface_index =
+				weapon_definition->weapon.interface_definition.hud_interface.index;
 
 			if (hud_interface_index != NONE)
 			{
@@ -638,9 +642,11 @@ static void hud_show_action_response(
 			if (unit->object.parent_object_index != NONE &&
 				unit->unit.parent_seat_index != NONE)
 			{
+				struct unit_datum *parent_unit = unit_get(
+					unit->object.parent_object_index);
 				struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
 					&unit_definition_get(
-						unit_get(unit->object.parent_object_index)->definition_index)->unit.seats,
+						parent_unit->definition_index)->unit.seats,
 					unit->unit.parent_seat_index,
 					struct unit_seat);
 

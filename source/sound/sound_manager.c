@@ -733,7 +733,7 @@ struct sound_platform_definition *platform_definitions[2] =
 static struct profile_section sound_render_section =
 	{"sound_render", NONE, TRUE};
 real sound_fade_exponent = 2.5f;
-struct sound_manager_globals sound_manager_globals;
+struct sound_manager_globals sound_manager_globals = { 0 };
 
 /* ---------- public code */
 

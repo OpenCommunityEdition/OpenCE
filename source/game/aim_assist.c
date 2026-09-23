@@ -52,6 +52,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "game/player_control.h"
 #include "game/players.h"
+#include "math/real_math_cones.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -550,6 +551,95 @@ boolean aim_assist(
 	}
 
 	return FALSE;
+}
+
+long player_aim_projectile(
+	long player_index,
+	real_point3d const *position,
+	real_vector3d *direction)
+{
+	long target_object_index= NONE;
+	struct player_datum *player= player_get(player_index);
+	long aiming_unit_index= unit_get_aiming_unit_index(player->unit_index);
+	struct aim_assist_parameters parameters;
+
+	match_assert_valid_real_normal3d(
+		"c:\\halo\\SOURCE\\game\\aim_assist.c",
+		77,
+		direction);
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\aim_assist.c",
+		79,
+		global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++]= _collision_user_aim_assist;
+
+	if (unit_get_aim_assist_parameters(aiming_unit_index, unit_get_zoom_level(aiming_unit_index), &parameters))
+	{
+		real_point3d camera_position;
+		real_vector3d camera_forward;
+		real_vector3d autoaim_vector;
+		real autoaim_level;
+		real_vector3d aim_vector;
+		real_vector3d vector;
+
+		director_camera_deterministic(player->unit_index, &camera_position, &camera_forward);
+		autoaim_vector= *direction;
+		autoaim_level= 0.f;
+
+		{
+			struct aim_assist_target target;
+
+			if (aim_assist(&parameters, &camera_position, &camera_forward, player->unit_index,
+				player->team_index, &target))
+			{
+				vector_from_points3d(position, &target.position, &autoaim_vector);
+				if (normalize3d(&autoaim_vector)==0.f)
+				{
+					autoaim_vector= *direction;
+				}
+				autoaim_level= target.autoaim_level;
+				target_object_index= target.object_index;
+			}
+		}
+
+		{
+			real distance= distance3d(&unit_get(aiming_unit_index)->object.position, &camera_position);
+			real_vector3d camera_direction= camera_forward;
+
+			normalize3d(&camera_direction);
+			scale_vector3d(&camera_direction, distance, &camera_direction);
+			add_vectors3d(&camera_position, &camera_direction, &camera_position);
+		}
+
+		{
+			struct collision_result collision;
+
+			scale_vector3d(&camera_forward, 128.f, &vector);
+			collision_test_vector(_collision_test_for_projectiles_flags, &camera_position, &vector,
+				player->unit_index, &collision);
+			vector_from_points3d(position, &collision.point, &aim_vector);
+			if (normalize3d(&aim_vector)==0.f)
+			{
+				aim_vector= *direction;
+			}
+		}
+
+		fast_normals_interpolate(&aim_vector, &autoaim_vector, autoaim_level, &vector);
+		pin_normal_to_cone3d(&vector, direction, sine(parameters.deviation_angle),
+			cosine(parameters.deviation_angle), direction);
+	}
+
+	match_assert(
+		"c:\\halo\\SOURCE\\game\\aim_assist.c",
+		140,
+		global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	player->aim_assist_unit_index= target_object_index;
+	player->aim_assist_timestamp= game_time_get();
+
+	return target_object_index;
 }
 
 long local_player_aim_assist(

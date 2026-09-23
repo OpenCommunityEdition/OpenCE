@@ -202,8 +202,8 @@ extern byte rasterizer_debug_options[];
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static struct hardware_character_cache hardware_character_cache;
-static pixel32 global_shadow_color;
-static short rasterizer_text_unused;
+static pixel32 global_shadow_color = 0;
+static short rasterizer_text_unused = 0;
 static short magic_number= 12;
 
 /* ---------- public code */

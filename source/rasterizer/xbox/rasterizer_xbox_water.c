@@ -221,8 +221,8 @@ typedef char verify_pixel_shader_definition_size[
 
 /* ---------- globals */
 
-boolean water_needs_update_flag;
-boolean water_visible_for_window_flag;
+boolean water_needs_update_flag = FALSE;
+boolean water_visible_for_window_flag = FALSE;
 
 extern struct rasterizer_water_debug_options rasterizer_debug_options;
 extern struct rasterizer_window_begin_parameters global_window_parameters;

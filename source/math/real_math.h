@@ -15,7 +15,7 @@ file has inline function assertions.
 /* ---------- constants */
 
 #define _real_epsilon 0.0001f
-#define _pi ((real)M_PI)
+#define _pi ((real)3.14159265358979323846f)
 
 #define REAL_MIN -3.4028235e38f
 #define REAL_MAX 3.4028235e38f
@@ -23,8 +23,8 @@ file has inline function assertions.
 
 /* ---------- macros */
 
-#define DEGREES_TO_RADIANS(angle) ((real)(((real)angle) * _pi / 180.f))
-#define RADIANS_TO_DEGREES(angle) ((real)(((real)angle) * 180.f / _pi))
+#define DEGREES_TO_RADIANS(angle) ((real)(((real)angle) * ((real)M_PI) / 180.f))
+#define RADIANS_TO_DEGREES(angle) ((real)(((real)angle) * 180.f / ((real)M_PI)))
 
 #define assert_valid_real(v)				\
 vassert(									\
@@ -973,13 +973,17 @@ __inline short projection_from_vector3d(
 	real j = fabs(n->j);
 	real k = fabs(n->k);
 
-	if (k < j || k < i)
+	if (k >= j && k >= i)
 	{
-		return j < i;
+		return _z;
+	}
+	else if (j >= i)
+	{
+		return _y;
 	}
 	else
 	{
-		return _z;
+		return _x;
 	}
 }
 

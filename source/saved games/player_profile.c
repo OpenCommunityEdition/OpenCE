@@ -219,7 +219,7 @@ long player_profile_primary_colors[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
 	0x00F5999E,
 };
 
-extern struct player_profile_runtime_globals player_profile_globals;
+struct player_profile_runtime_globals player_profile_globals = { 0 };
 
 /* ---------- public code */
 

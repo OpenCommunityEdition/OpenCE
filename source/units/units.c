@@ -979,8 +979,6 @@ void first_person_weapon_message_from_unit(
 	short message_type);
 void weapon_stop_reload(
 	long weapon_index);
-boolean weapon_prevents_grenade_throwing(
-	long weapon_index);
 
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
 static void unit_ready_desired_weapon(

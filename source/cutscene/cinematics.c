@@ -133,7 +133,7 @@ void draw_quad(
 /* ---------- globals */
 
 extern struct hud_global_data *hud_globals;
-struct cinematic_global_data *cinematic_globals;
+struct cinematic_global_data *cinematic_globals = NULL;
 
 /* ---------- public code */
 
@@ -532,7 +532,7 @@ void draw_quad(
 			struct game_globals_rasterizer_data)
 		: NULL;
 	map = TAG_BLOCK_GET_ELEMENT(
-		&bitmap_group_get(rasterizer_data->default_textures[0].index)->bitmap_data,
+		&bitmap_group_get(rasterizer_data->default_textures[0].index)->bitmaps,
 		1,
 		struct bitmap_data);
 

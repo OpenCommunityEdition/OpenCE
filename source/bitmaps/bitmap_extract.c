@@ -470,7 +470,7 @@ boolean bitmaps_extract(
 	}
 
 	if (!result ||
-		!tag_block_resize(&group->bitmap_data, 0) ||
+		!tag_block_resize(&group->bitmaps, 0) ||
 		!tag_block_resize(&group->sequences, 0) ||
 		!tag_data_resize(&group->pixel_data, 0))
 	{
@@ -1780,7 +1780,7 @@ static short extract_add_bitmap(
 	{
 		working_bitmap = bitmap_clone(bitmap);
 		destination_bitmap = TAG_BLOCK_GET_ELEMENT(
-			&extract_data.group->bitmap_data,
+			&extract_data.group->bitmaps,
 			bitmap_index,
 			struct bitmap_data);
 

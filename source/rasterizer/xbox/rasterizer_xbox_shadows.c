@@ -228,8 +228,6 @@ struct rasterizer_environment_shadows_globals
 	real object_bounding_radius;
 	real_matrix4x3 shadow_matrix;
 	struct rasterizer_model_begin_parameters const *local_parameters;
-	boolean shadow_setup;
-	boolean shadow_used;
 };
 
 typedef char verify_rasterizer_shadows_draw_shadows_offset[
@@ -244,9 +242,6 @@ typedef char verify_rasterizer_shadows_local_parameters_offset[
 	offsetof(
 		struct rasterizer_environment_shadows_globals,
 		local_parameters) == 0x44 ? 1 : -1];
-typedef char verify_rasterizer_shadows_shadow_used_offset[
-	offsetof(struct rasterizer_environment_shadows_globals, shadow_used) == 0x49
-		? 1 : -1];
 typedef char verify_rasterizer_shadows_model_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
 typedef char verify_rasterizer_shadows_model_base_map_scale_offset[
@@ -283,6 +278,9 @@ static boolean shadow_restored = TRUE;
 
 static struct rasterizer_environment_shadows_globals
 	rasterizer_environment_shadows_globals = { 0 };
+
+static boolean shadow_setup = FALSE;
+static boolean shadow_used = FALSE;
 
 #define local_parameters rasterizer_environment_shadows_globals.local_parameters
 
@@ -326,11 +324,11 @@ boolean _rasterizer_environment_shadow_begin(
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
 			155,
-			shadow_color->red >= 0.0f && shadow_color->red <= 1.0f);
+			shadow_color->red >=0.0f && shadow_color->red <=1.0f);
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
 			156,
-			shadow_color->green >= 0.0f && shadow_color->green <= 1.0f);
+			shadow_color->green>=0.0f && shadow_color->green<=1.0f);
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
 			157,
@@ -338,7 +336,7 @@ boolean _rasterizer_environment_shadow_begin(
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
 			158,
-			object_bounding_radius > 0.0f);
+			object_bounding_radius>0.0f);
 
 		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_CULLMODE, D3DCULL_CCW);
 		IDirect3DDevice8_SetRenderState(
@@ -414,8 +412,8 @@ boolean _rasterizer_environment_shadow_begin(
 		}
 
 		local_parameters = 0;
-		rasterizer_environment_shadows_globals.shadow_setup = FALSE;
-		rasterizer_environment_shadows_globals.shadow_used = FALSE;
+		shadow_setup = FALSE;
+		shadow_used = FALSE;
 		shadow_restored = FALSE;
 
 		if (rasterizer_debug_options.statistics_mode ==
@@ -448,7 +446,7 @@ void _rasterizer_environment_shadow_model_begin(
 		rasterizer_set_model_skinning(&parameters->skinning);
 
 		local_parameters = parameters;
-		rasterizer_environment_shadows_globals.shadow_used = TRUE;
+		shadow_used = TRUE;
 
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)
@@ -628,7 +626,7 @@ void _rasterizer_environment_shadow_end(
 			_rasterizer_target_render_primary &&
 		rasterizer_debug_options.draw_environment_shadows)
 	{
-		if (!rasterizer_environment_shadows_globals.shadow_used)
+		if (!shadow_used)
 		{
 			error(
 				_error_silent,
@@ -673,7 +671,7 @@ void _rasterizer_environment_shadow_draw(
 			_rasterizer_target_render_primary &&
 		rasterizer_debug_options.draw_environment_shadows)
 	{
-		if (!rasterizer_environment_shadows_globals.shadow_setup)
+		if (!shadow_setup)
 		{
 			if (rasterizer_debug_options.shadows_convolution)
 			{
@@ -941,7 +939,7 @@ void _rasterizer_environment_shadow_draw(
 				shadow_restored = TRUE;
 			}
 
-			rasterizer_environment_shadows_globals.shadow_setup = TRUE;
+			shadow_setup = TRUE;
 		}
 
 		rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);

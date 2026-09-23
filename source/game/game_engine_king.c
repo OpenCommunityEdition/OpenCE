@@ -847,45 +847,6 @@ void king_engine_update(
 	return;
 }
 
-/* ---------- engine table */
-
-struct game_engine king_engine =
-{
-	"king",
-	game_engine_king,
-	king_engine_dispose,
-	king_engine_initialize_for_new_map,
-	king_engine_dispose_from_old_map,
-	king_engine_player_added,
-	king_engine_game_ending,
-	king_engine_game_starting,
-	king_engine_statistics_append,
-	king_engine_handle_client_message,
-	king_engine_handle_server_message,
-	king_engine_pregame_post_rasterize,
-	king_engine_post_rasterize,
-	king_engine_player_update,
-	NULL,
-	NULL,
-	NULL,
-	king_engine_update,
-	king_get_score,
-	king_get_score_string,
-	king_get_score_header_string,
-	king_get_team_score_string,
-	NULL,
-	king_engine_player_damaged_player,
-	king_engine_player_killed_player,
-	king_engine_display_score,
-	NULL,
-	king_engine_prespawn_player_update,
-	NULL,
-	NULL,
-	king_engine_goal_matches_player,
-	NULL,
-	NULL,
-	NULL,
-};
 
 /* ---------- private code */
 
@@ -1149,3 +1110,43 @@ static long find_next_hill(
 	 * undefined. The caller expects maps to provide at least two hill ids. */
 	return next_hill_id;
 }
+
+/* ---------- engine table */
+
+struct game_engine king_engine =
+{
+	"king",
+	game_engine_king,
+	king_engine_dispose,
+	king_engine_initialize_for_new_map,
+	king_engine_dispose_from_old_map,
+	king_engine_player_added,
+	king_engine_game_ending,
+	king_engine_game_starting,
+	king_engine_statistics_append,
+	king_engine_handle_client_message,
+	king_engine_handle_server_message,
+	king_engine_pregame_post_rasterize,
+	king_engine_post_rasterize,
+	king_engine_player_update,
+	NULL,
+	NULL,
+	NULL,
+	king_engine_update,
+	king_get_score,
+	king_get_score_string,
+	king_get_score_header_string,
+	king_get_team_score_string,
+	NULL,
+	king_engine_player_damaged_player,
+	king_engine_player_killed_player,
+	king_engine_display_score,
+	NULL,
+	king_engine_prespawn_player_update,
+	NULL,
+	NULL,
+	king_engine_goal_matches_player,
+	NULL,
+	NULL,
+	NULL,
+};
