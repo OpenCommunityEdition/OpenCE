@@ -2004,6 +2004,25 @@
         "base": { "size": 1216, "relocation_count": 48, "normalized_sha256": "a494149278b8ee669720a11c0dc47b6415983d10252dbcd41b0c7a17581b8f12" },
         "objdiff_percent": 100.0
       }
+    },
+    {
+      "unit": "libs/libcmt/llshr",
+      "function": "__allshr",
+      "class": "asm-implemented",
+      "evidence": "Authenticated vendor MASM arithmetic helper: XDK 3911 libcmt.lib member has .file ..\\i386\\llshr.asm and Microsoft Macro Assembler 6.15.8803 CodeView identity. The project now assembles readable x86 instructions with an explicit ordinary .text SEGMENT ALIGN(16), reproducing January's 33-byte no-relocation helper and COFF flags without copying binary bytes or forcing C section metadata. Physical whole-object matching is real, but an assembly transcription matches by construction and is excluded from meaningful reconstructed-C code credit. See docs/object_matching_logs/libcmt_llshr_obj_20260923.md.",
+      "measurements": {
+        "target": {
+          "size": 33,
+          "relocation_count": 0,
+          "normalized_sha256": "f028a2bb21a2463601e9046f5105991b09f90af85bae56b363c014dafc609ea6"
+        },
+        "base": {
+          "size": 33,
+          "relocation_count": 0,
+          "normalized_sha256": "f028a2bb21a2463601e9046f5105991b09f90af85bae56b363c014dafc609ea6"
+        },
+        "objdiff_percent": 100.0
+      }
     }
   ]
 }

@@ -111,7 +111,7 @@ struct rterrmsgs {
 
 /* runtime error messages */
 
-struct rterrmsgs data_00319950[] = {
+static struct rterrmsgs rterrs[] = {
 
         /* 2 */
         { _RT_FLOAT, _RT_FLOAT_TXT },
@@ -177,7 +177,6 @@ struct rterrmsgs data_00319950[] = {
 
 /* number of elements in rterrs[] */
 
-#define rterrs data_00319950
 #define _RTERRCNT   ( sizeof(rterrs) / sizeof(struct rterrmsgs) )
 
 /* For C, _FF_DBGMSG is inactive, so _adbgmsg is
@@ -225,6 +224,7 @@ void __cdecl _FF_MSGBANNER (
                 _adbgmsg(); /* call __FF_DBGMSG for FORTRAN */
             _NMSG_WRITE(_RT_BANNER); /* run-time error message banner */
         }
+        return;
 }
 
 
@@ -341,6 +341,7 @@ void __cdecl _NMSG_WRITE (
 #endif // XBOX
 
         }
+        return;
 }
 
 

@@ -41,7 +41,7 @@ The exact non-code inventory is:
 
 | Owner | Bytes | Relocs | Normalized SHA-256 |
 |---|---:|---:|---|
-| `_data_00319950` | 144 | 18 | `25298d4d1ea85dfa6a4696577658216429876d7b7b59ed245667db872d9d79d2` |
+| `_rterrs` (private; correct original name restored 2026-09-23) | 144 | 18 | `25298d4d1ea85dfa6a4696577658216429876d7b7b59ed245667db872d9d79d2` |
 | `__adbgmsg` | 4 | 0 | `df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119` |
 
 All seventeen target-owned string COMDATs compare strict-equal individually,
@@ -58,12 +58,15 @@ target-owned data credit.
 | E00 | Compile the authenticated source with its private Microsoft includes unchanged | The repository does not contain `cruntime.h`, `internal.h`, `rterr.h`, or the private startup headers | Rejected as unavailable build context, not a source-shape failure |
 | E01 | Replace only unavailable private includes with standard types, declarations, and the named runtime-message constants | The host/desktop branch remained selected and referenced APIs absent from the Xbox object | Rejected; the original TU's Xbox preprocessor context was still missing |
 | E02 | Restore the source's `_XBOX` context while retaining the natural `rterrs` table name | All code and string payloads reached the January shape, but the table owner was `_rterrs` rather than the split target's `_data_00319950` | Near result; ownership spelling remained strict-nonexact |
-| E03 | Name the table `data_00319950` and retain readable source references through `#define rterrs data_00319950` | All three functions, table, BSS, seventeen owned strings, and every relocation identity/addend are strict-exact | Accepted |
+| E03 | Name the table `data_00319950` and retain readable source references through `#define rterrs data_00319950` | Matched against the earlier incomplete symbol atlas | Superseded: the fake public name violates the project's naming rule |
+| E04 (2026-09-23) | Restore authentic `static struct rterrmsgs rterrs[]` and add the XDK-confirmed `_rterrs` private symbol at executable file offset 3250512 before re-splitting | All three functions, 144-byte table, BSS, and target-owned strings strict exact without semantic waiver | Accepted |
 
-The final name is not a byte-forcing trick. `data_00319950` is the target's
-existing csplit owner and ordinary C decoration naturally emits
-`_data_00319950`. The source-level `rterrs` alias preserves the authenticated
-algorithm and readable intent.
+The former `data_00319950` spelling was a csplit placeholder, not Microsoft's
+original name. The authentic XDK object names the table `_rterrs`, storage
+class 3 (private), at `.data+0`. January's original symbol atlas lacked that
+private record. The 2026-09-23 correction restored `static rterrs` in source,
+added the one authenticated private symbol to `config/symbols.json`, and
+re-split. This recovers proper ownership rather than steering code generation.
 
 ## Strict verification
 
@@ -72,6 +75,12 @@ XDK 3911 CL `13.00.9254.1` compiles the unit under the unchanged libcmt flags
 functions, both named data owners, and all seventeen target-owned strings
 reports `all_equal: true`. This includes exact normalized bytes, relocation
 addresses/types/destinations/addends, section flags, and owner storage.
+The fresh 2026-09-23 direct comparison reports `section_infos_equal` true
+for all three code functions, `_rterrs` (144 bytes, 18 relocations), and
+`__adbgmsg` (4 BSS bytes); the gate reports 3/3 exact functions. There is no
+semantic-data exception for this unit.
+The two `void` functions now end with explicit `return;` under the project
+house rule; a fresh gate still reports all three functions exact.
 
 The candidate's compiler directives and debug records are discardable
 metadata, not runtime ownership. The final forced object rebuild, full Halo
@@ -97,7 +106,12 @@ states the safe corrected form: guard the array access with
 `tblindx < _RTERRCNT`. The exact build deliberately does not silently repair
 the shipped behavior.
 
-## Final gates
+## Historical gates and current recheck
+
+The following older figures record an earlier lane. The 2026-09-23
+private-name correction passed a fresh full campaign build and test run; the
+current batch-level measurements are in
+`library_five_object_batch_20260923.md`.
 
 - Forced `crt0msg.obj` rebuild: passed under unchanged `/O1 /Gy`.
 - Hardened whole-object comparison: all three functions, the 144-byte table,
@@ -106,9 +120,9 @@ the shipped behavior.
 - Semantic audit after rebasing onto the current campaign: 458 units, 3,575
   functions evaluated, 3,491 accepted exact,
   and zero unit errors.
-- Progress/admission: `crt0msg.obj` is credited as one complete object; its
+- Progress/admission: `crt0msg.obj` is eligible for one complete object; its
   three functions contribute 120 code bytes and its table contributes 144
-  data bytes through a hash-pinned, fail-closed semantic-data entry.
+  exact data bytes by direct comparison after the symbol-atlas correction.
 - Tooling unit tests: 179/179 passed.
 - Configuration JSON parsing and `git diff --check`: passed.
 - Current-canonical full rebuild/progress revalidation passed: 357/833 objects

@@ -5,6 +5,7 @@ import json
 import math
 import os
 import platform
+import shutil
 import sys
 from enum import Enum
 from pathlib import Path
@@ -55,6 +56,7 @@ class Object:
         self.status = completed
         self.options: Dict[str, Any] = {
             "cflags": None,
+            "asmflags": None,
             "include_dirs": None,
             "defines": None,
         }
@@ -84,6 +86,7 @@ class ProjectConfig:
         self.objects: Optional[List[Object]] = None
         self.options: Dict[str, Any] = {
             "cflags": None,
+            "asmflags": None,
             "include_dirs": None,
             "headers": None,
             "defines": None,
@@ -122,6 +125,7 @@ class SolutionConfig:
 
         # Tooling
         self.ninja_path: Optional[Path] = None  # If None, use system PATH
+        self.ml_path: Optional[Path] = None  # Microsoft Macro Assembler for .asm units
         self.csplit_tag: Optional[str] = None  # Git tag
         self.csplit_path: Optional[Path] = None  # If None, download
         self.objdiff_tag: Optional[str] = None  # Git tag
@@ -186,6 +190,29 @@ class SolutionConfig:
 def is_windows() -> bool:
     return os.name == "nt"
 
+def find_masm() -> Optional[Path]:
+    """Find the installed 32-bit MASM without fixing a host path in config."""
+    on_path = shutil.which("ml.exe")
+    if on_path:
+        return Path(on_path)
+    if not is_windows():
+        return None
+    vc_tools = os.environ.get("VCToolsInstallDir")
+    if vc_tools:
+        candidate = Path(vc_tools) / "bin" / "Hostx64" / "x86" / "ml.exe"
+        if candidate.is_file():
+            return candidate
+    candidates: List[Path] = []
+    for var in ("ProgramFiles", "ProgramFiles(x86)"):
+        root = os.environ.get(var)
+        if root:
+            candidates.extend(
+                (Path(root) / "Microsoft Visual Studio").glob(
+                    "*/*/VC/Tools/MSVC/*/bin/Hostx64/x86/ml.exe"
+                )
+            )
+    return sorted(candidates, reverse=True)[0] if candidates else None
+
 # On Windows, we need this to use && in commands
 CHAIN = "cmd /c " if is_windows() else ""
 # Native executable extension
@@ -211,7 +238,12 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     python_lib = Path(os.path.relpath(__file__))
     python_lib_dir = python_lib.parent
     n.comment("The arguments passed to configure.py, for rerunning it.")
-    n.variable("configure_args", sys.argv[1:])
+    # Ninja replays this command through the shell. Keep paths to external
+    # tool executables intact when their installation directory has spaces.
+    n.variable(
+        "configure_args",
+        [f'"{arg}"' if any(ch.isspace() for ch in arg) else arg for arg in sys.argv[1:]],
+    )
     n.variable("python", f'"{sys.executable}"')
     n.newline()
     
@@ -309,6 +341,15 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
         description="CL $out",
         deps="msvc",
     )
+    # Genuine vendor-assembly CRT helpers need MASM's ordinary aligned .text
+    # section. A naked C/inline-asm wrapper emits different COFF flags.
+    ml_path = sln.ml_path or find_masm()
+    ml = f'"{ml_path}"' if ml_path else "ml.exe"
+    n.rule(
+        name="ml",
+        command=f"{wrapper_cmd}{ml} /nologo /c /coff $asmflags /Fo$out $in",
+        description="ML $out",
+    )
     n.newline()
     
     ###
@@ -327,17 +368,26 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             split_object_targets.append(obj.split_obj_path)
             if obj.status != ObjectStatus.Missing:
                 proj_base_object_targets.append(obj.base_obj_path)
-                cflags: List[str] = []
-                cflags.extend(obj.options["cflags"])
-                cflags.extend([f"/D{define}" for define in obj.options["defines"]])
-                cflags.extend([f"/I\"{path}\"" for path in obj.options["include_dirs"]])
-                n.build(
-                    outputs=obj.base_obj_path,
-                    rule="cl",
-                    variables={"cflags": cflags},
-                    inputs=obj.file_path,
-                    implicit=wrapper_implicit
-                )
+                if obj.file_path.suffix.lower() == ".asm":
+                    n.build(
+                        outputs=obj.base_obj_path,
+                        rule="ml",
+                        variables={"asmflags": obj.options.get("asmflags") or []},
+                        inputs=obj.file_path,
+                        implicit=wrapper_implicit,
+                    )
+                else:
+                    cflags: List[str] = []
+                    cflags.extend(obj.options["cflags"])
+                    cflags.extend([f"/D{define}" for define in obj.options["defines"]])
+                    cflags.extend([f"/I\"{path}\"" for path in obj.options["include_dirs"]])
+                    n.build(
+                        outputs=obj.base_obj_path,
+                        rule="cl",
+                        variables={"cflags": cflags},
+                        inputs=obj.file_path,
+                        implicit=wrapper_implicit,
+                    )
         base_object_targets.extend(proj_base_object_targets)
         n.build(
             outputs=f"{proj.name}_build",
@@ -514,6 +564,7 @@ def generate_objdiff_config(sln: SolutionConfig) -> None:
             "*.cpp",
             "*.cxx",
             "*.c++",
+            "*.asm",
             "*.h",
             "*.hh",
             "*.hp",
@@ -588,9 +639,13 @@ def generate_solution(sln: SolutionConfig) -> None:
         vc_proj.add_build_params(str(vc_config), vc_params)
         
         vc_sources: List[Path] = []
+        vc_asm_sources: List[Path] = []
         for obj in proj.resolve(sln).values():
             if obj.status != ObjectStatus.Missing:
-                vc_sources.append(relative_root / obj.file_path)
+                if obj.file_path.suffix.lower() == ".asm":
+                    vc_asm_sources.append(relative_root / obj.file_path)
+                else:
+                    vc_sources.append(relative_root / obj.file_path)
         vc_proj.add_sources(vc_sources)
         
         vc_headers: List[Path] = [relative_root / header for header in proj.options["headers"] or []]
@@ -599,7 +654,7 @@ def generate_solution(sln: SolutionConfig) -> None:
         vc_extras: List[Path] = [
             relative_root / sln.config_dir / "config.json",
             relative_root / sln.config_dir / "symbols.json",
-        ]
+        ] + vc_asm_sources
         vc_proj.add_extra_files(vc_extras)
         
         vc_proj.write()

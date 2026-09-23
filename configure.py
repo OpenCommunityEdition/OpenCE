@@ -59,6 +59,12 @@ parser.add_argument(
     type=Path,
     help="path to ninja binary (optional)",
 )
+parser.add_argument(
+    "--ml",
+    metavar="BINARY",
+    type=Path,
+    help="path to Microsoft Macro Assembler for authentic CRT .asm units",
+)
 if not is_windows():
     parser.add_argument(
         "--wrapper",
@@ -115,6 +121,7 @@ sln.baserom = build_config["baserom"]
 sln.objdiff_path = args.objdiff
 sln.csplit_path = args.csplit
 sln.ninja_path = args.ninja
+sln.ml_path = args.ml
 if not is_windows():
     sln.wrapper = args.wrapper
 

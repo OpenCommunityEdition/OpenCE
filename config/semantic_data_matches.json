@@ -78,6 +78,16 @@
     ]
   },
   {
+    "unit": "libs/libcmt/crt0msg",
+    "symbol": "_rterrs",
+    "reason": "The first-party XDK names the private runtime-error table rterrs. January and the rebuilt object have identical 144-byte data, all 18 relocation sites and types, and independently resolved string destinations; objdiff undercredits the aggregate despite exact COFF section comparison.",
+    "measurements": {
+      "size": 144,
+      "relocation_count": 18,
+      "normalized_sha256": "25298d4d1ea85dfa6a4696577658216429876d7b7b59ed245667db872d9d79d2"
+    }
+  },
+  {
     "unit": "source/units/unit_dialogue",
     "symbol": "_global_speech_priority_names",
     "reason": "January and the rebuilt 44-byte speech-name table have identical payload, 11 relocation sites and types, and independently resolved literal destinations; objdiff undercredits the table because the executable split assigns nine folded SELECT_ANY strings to other objects",
