@@ -1,0 +1,1264 @@
+{
+ "lane": "Claude Lane D refresh 20260922",
+ "worktree": "C:/halo-worktrees/claude-lane-d-refresh-20260922",
+ "branch": "claude/lane-d-refresh-20260922",
+ "base": "fe77cd542f80de4dfd05ad35e86fe65b41d603c3",
+ "contains_reconciliation": "4f4c85021db48dae61252d8e1301c60e1c2cc138",
+ "pushed": false,
+ "summary": {
+  "base": "fe77cd542f80de4dfd05ad35e86fe65b41d603c3",
+  "functions_gained": 44,
+  "padded_bytes_gained": 28896,
+  "code_bytes_gained": 28605,
+  "by_category": {
+   "source": {
+    "functions": 33,
+    "padded_bytes": 25824,
+    "code_bytes": 25600
+   },
+   "config-relocation-alias": {
+    "functions": 10,
+    "padded_bytes": 2992,
+    "code_bytes": 2939
+   },
+   "source+symbols-static-split": {
+    "functions": 1,
+    "padded_bytes": 80,
+    "code_bytes": 66
+   }
+  },
+  "regressions": 0
+ },
+ "objdiff_progress": {
+  "halo_code_before": 1498567,
+  "halo_code_after": 1524233,
+  "halo_code_total": 1770166,
+  "functions_before": 7354,
+  "functions_after": 7388,
+  "note": "config relocation-alias rows were already accepted by the semantic scorer, so they add strict verdicts without moving progress"
+ },
+ "fuzzy_zero_credit": [
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "function": "_poll_endpoint_set",
+   "objdiff_before": 72.26966,
+   "objdiff_after": 98.53933,
+   "park": "re-measured in place (p4)"
+  }
+ ],
+ "data_only_or_scorer_gains": {
+  "bytes": 0,
+  "note": "no data section changed credit; structure_detail_objects data was already 100% and stays 100% after the static split"
+ },
+ "linker_common": "zero credit, untouched",
+ "whole_object_completions": [
+  "source/bungie_net/common/prime_numbers",
+  "source/cseries/stack_walk_windows",
+  "source/effects/contrails",
+  "source/effects/particle_systems",
+  "source/items/items",
+  "source/sound/game_sound",
+  "source/sound/ima_adpcm",
+  "source/sound/sound_dsound_xbox",
+  "source/structures/structure_detail_objects",
+  "source/structures/structure_visibility"
+ ],
+ "comdat_admissions": [
+  {
+   "object": "source/items/items",
+   "symbol": "_point_from_line3d",
+   "basis": "January items.obj references it out of line (owner ruling); byte-identical to action_charge folded copy"
+  },
+  {
+   "object": "source/items/projectiles",
+   "symbol": "_point_from_line3d",
+   "basis": "January projectiles.obj references it out of line; byte-identical"
+  },
+  {
+   "object": "source/items/projectiles",
+   "symbol": "_collision_test_line",
+   "basis": "January projectiles.obj references it out of line; byte-identical to action_charge copy"
+  },
+  {
+   "object": "source/sound/game_sound",
+   "symbol": "_vector_from_points3d",
+   "basis": "all-inlined class; byte-identical to action_alert copy; 75 production objects already emit it"
+  },
+  {
+   "object": "source/structures/structures",
+   "symbol": "_scale_vector3d",
+   "basis": "all-inlined class; byte-identical to action_charge copy; 61 production objects already emit it"
+  },
+  {
+   "object": "source/effects/particle_systems",
+   "symbol": "_local_random_range",
+   "basis": "all-inlined class; byte-identical to contrails copy"
+  },
+  {
+   "object": "source/structures/structure_visibility",
+   "symbol": "_plane3d_distance_to_point",
+   "basis": "all-inlined class; byte-identical to decals copy; 19 production objects already emit it"
+  }
+ ],
+ "orchestrator_adjudications": [
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "function": "_add_endpoint_to_set",
+   "lead": "fake_match_scan identical-branches",
+   "ruling": "accepted: debug build 0x50a5a0 tests ep->flags&2 then expands FD_SET twice into set->sockets; January bytes carry the test; commented in source"
+  }
+ ],
+ "gates": {
+  "before": {
+   "stable_exact": 7493,
+   "parks_active": 151,
+   "admission": "51/0/10/0",
+   "pytest": "1152 passed, 5 skipped, 26 subtests"
+  },
+  "after": {
+   "stable_exact": 7537,
+   "parks_active": 124,
+   "parks_stale": 0,
+   "parks_invalid": 0,
+   "admission": "61/0/10/0",
+   "pytest": "1152 passed, 5 skipped, 26 subtests",
+   "stable_regressions": 0,
+   "ninja": "PASS",
+   "git_diff_check": "clean"
+  }
+ },
+ "packets": {
+  "p1": "6099e659e27315a21479eb4a9974c3fd06c153a7",
+  "p2": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+  "p3": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+  "p4": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+  "p5": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+  "p6": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+  "p7": "a9e23674b64853ee5b24f4e6f43587d0abe05ef1"
+ },
+ "functions": [
+  {
+   "unit": "source/items/items",
+   "function": "_item_update",
+   "padded_bytes": 2352,
+   "code_bytes": 2352,
+   "before_status": "R",
+   "packet": "p1",
+   "commit": "6099e659e27315a21479eb4a9974c3fd06c153a7",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": [
+    "_point_from_line3d"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_collision",
+   "padded_bytes": 2928,
+   "code_bytes": 2928,
+   "before_status": "R",
+   "packet": "p1",
+   "commit": "6099e659e27315a21479eb4a9974c3fd06c153a7",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_point_from_line3d",
+    "_collision_test_line"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_collision_test_line",
+   "padded_bytes": 512,
+   "code_bytes": 498,
+   "before_status": "R",
+   "packet": "p1",
+   "commit": "6099e659e27315a21479eb4a9974c3fd06c153a7",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_point_from_line3d",
+    "_collision_test_line"
+   ]
+  },
+  {
+   "unit": "source/items/projectiles",
+   "function": "_projectile_update",
+   "padded_bytes": 4064,
+   "code_bytes": 4055,
+   "before_status": "R",
+   "packet": "p1",
+   "commit": "6099e659e27315a21479eb4a9974c3fd06c153a7",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_point_from_line3d",
+    "_collision_test_line"
+   ]
+  },
+  {
+   "unit": "source/sound/game_sound",
+   "function": "_compute_sound_obstruction",
+   "padded_bytes": 512,
+   "code_bytes": 498,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_vector_from_points3d"
+   ]
+  },
+  {
+   "unit": "source/sound/game_sound",
+   "function": "_game_sound_update",
+   "padded_bytes": 464,
+   "code_bytes": 453,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": [
+    "_vector_from_points3d"
+   ]
+  },
+  {
+   "unit": "source/sound/game_sound",
+   "function": "_update_potentially_audible_looping_sound",
+   "padded_bytes": 624,
+   "code_bytes": 619,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": [
+    "_vector_from_points3d"
+   ]
+  },
+  {
+   "unit": "source/sound/ima_adpcm",
+   "function": "_decompress_ima_adpcm_audio_data",
+   "padded_bytes": 416,
+   "code_bytes": 404,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/sound/sound_dsound_xbox",
+   "function": "_channel_queue_packet",
+   "padded_bytes": 640,
+   "code_bytes": 630,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_refresh_listener",
+   "padded_bytes": 496,
+   "code_bytes": 484,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_sound_find_like_channel",
+   "padded_bytes": 272,
+   "code_bytes": 269,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_sound_refresh_looping",
+   "padded_bytes": 1136,
+   "code_bytes": 1124,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "function": "_update_channel_for_impulse_sound",
+   "padded_bytes": 528,
+   "code_bytes": 525,
+   "before_status": "R",
+   "packet": "p2",
+   "commit": "22e62492a8c8f108bfcdc5dab995168847ea1fb2",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/effects/contrails",
+   "function": "_contrail_add_points",
+   "padded_bytes": 960,
+   "code_bytes": 945,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_new_particle_jet",
+   "padded_bytes": 368,
+   "code_bytes": 365,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_local_random_range"
+   ]
+  },
+  {
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_render",
+   "padded_bytes": 1360,
+   "code_bytes": 1346,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_local_random_range"
+   ]
+  },
+  {
+   "unit": "source/effects/particle_systems",
+   "function": "_particle_system_update_particle_default",
+   "padded_bytes": 400,
+   "code_bytes": 392,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": [
+    "_local_random_range"
+   ]
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "function": "_hs_add_script",
+   "padded_bytes": 1072,
+   "code_bytes": 1069,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "function": "_hs_global_reconcile_read",
+   "padded_bytes": 1408,
+   "code_bytes": 1405,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "function": "_hs_global_reconcile_write",
+   "padded_bytes": 400,
+   "code_bytes": 400,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "function": "_portal_hull_from_points",
+   "padded_bytes": 480,
+   "code_bytes": 468,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": [
+    "_plane3d_distance_to_point"
+   ]
+  },
+  {
+   "unit": "source/structures/structures",
+   "function": "_structure_get_planar_fog",
+   "padded_bytes": 448,
+   "code_bytes": 442,
+   "before_status": "R",
+   "packet": "p3",
+   "commit": "0a571b339808ad9ed50bb585544585ff1eddfd80",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": [
+    "_scale_vector3d"
+   ]
+  },
+  {
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_draw_frame",
+   "padded_bytes": 912,
+   "code_bytes": 909,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/bungie_net/common/prime_numbers",
+   "function": "_primegen",
+   "padded_bytes": 352,
+   "code_bytes": 340,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "function": "_add_endpoint_to_set",
+   "padded_bytes": 336,
+   "code_bytes": 336,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_is_valid_ebp",
+   "padded_bytes": 32,
+   "code_bytes": 31,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_stack_walk_with_context",
+   "padded_bytes": 688,
+   "code_bytes": 681,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_walk_stack",
+   "padded_bytes": 208,
+   "code_bytes": 204,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_walk_stack_context",
+   "padded_bytes": 208,
+   "code_bytes": 196,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/cseries/stack_walk_windows",
+   "function": "_walk_up",
+   "padded_bytes": 64,
+   "code_bytes": 55,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/main/main",
+   "function": "_compute_subframe_counts",
+   "padded_bytes": 112,
+   "code_bytes": 107,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/main/main",
+   "function": "_main_game_render",
+   "padded_bytes": 448,
+   "code_bytes": 446,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/text/draw_string",
+   "function": "_parse_string",
+   "padded_bytes": 624,
+   "code_bytes": 624,
+   "before_status": "R",
+   "packet": "p4",
+   "commit": "dc58693c9f8ce7d33cc7a8d11f86eb71aa28ac99",
+   "category": "source",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_find_like_crossing",
+   "padded_bytes": 160,
+   "code_bytes": 159,
+   "before_status": "R",
+   "packet": "p5",
+   "commit": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_leaf_map_build_leaf_face_for_leaf_on_node",
+   "padded_bytes": 608,
+   "code_bytes": 601,
+   "before_status": "R",
+   "packet": "p5",
+   "commit": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_leaf_map_build_leaf_faces_for_leaf",
+   "padded_bytes": 112,
+   "code_bytes": 102,
+   "before_status": "R",
+   "packet": "p5",
+   "commit": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_leaf_map_build_portals_from_leaf",
+   "padded_bytes": 480,
+   "code_bytes": 476,
+   "before_status": "R",
+   "packet": "p5",
+   "commit": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "function": "_node_stack_read",
+   "padded_bytes": 64,
+   "code_bytes": 63,
+   "before_status": "R",
+   "packet": "p5",
+   "commit": "1b439d04fb9003256e45a3e81cb64a1d237fec6d",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/effects/decals",
+   "function": "_render_debug_decals",
+   "padded_bytes": 432,
+   "code_bytes": 427,
+   "before_status": "R",
+   "packet": "p6",
+   "commit": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+   "category": "config-relocation-alias",
+   "was_parked": false,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "function": "_hs_parse_enum",
+   "padded_bytes": 464,
+   "code_bytes": 459,
+   "before_status": "R",
+   "packet": "p6",
+   "commit": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "function": "_hs_parse_object_name",
+   "padded_bytes": 320,
+   "code_bytes": 307,
+   "before_status": "R",
+   "packet": "p6",
+   "commit": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "function": "_hs_parse_tag_reference",
+   "padded_bytes": 208,
+   "code_bytes": 206,
+   "before_status": "R",
+   "packet": "p6",
+   "commit": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "function": "_hs_inspect_enum",
+   "padded_bytes": 144,
+   "code_bytes": 139,
+   "before_status": "R",
+   "packet": "p6",
+   "commit": "790960276d9d4f7e7b2b08e479718a93edf68aeb",
+   "category": "config-relocation-alias",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  },
+  {
+   "unit": "source/structures/structure_detail_objects",
+   "function": "_structure_detail_objects_initialize",
+   "padded_bytes": 80,
+   "code_bytes": 66,
+   "before_status": "R",
+   "packet": "p7",
+   "commit": "a9e23674b64853ee5b24f4e6f43587d0abe05ef1",
+   "category": "source+symbols-static-split",
+   "was_parked": true,
+   "new_comdats_in_object": []
+  }
+ ],
+ "ruling_queue": [
+  {
+   "unit": "source/camera/dead_camera",
+   "symbol": "_dead_camera_update",
+   "padded": 1248,
+   "class": "authentic-bug-uninitialized-read",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/camera__dead_camera/candidate.c",
+   "evidence": "Drops the invented `next_unit_index = (long)result` fallback; January never initialises next_unit_index, so the no-next-player path tests an indeterminate value. Brief: never introduce UB to shape bytes; hold genuine January bugs for the owner.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_winsock",
+   "symbol": "_connect_endpoint_process@4",
+   "padded": 304,
+   "class": "authentic-bug-uninitialized-read",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/bungie_net__network__transport_endpoint_winsock/candidate.c",
+   "evidence": "Removes `thread = NULL`; January homes thread in the dead input_pointer slot (store only after take_mutex succeeds, reload on the failure path), so the mutex-failure path passes an unassigned pointer to connection_thread_list_mark_for_disposal.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_connection_connect",
+   "padded": 288,
+   "class": "layout-only-redundant-assignment",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/networking__network_connection/candidate.c",
+   "evidence": "Single-exit body is exact only with a semantically redundant `success = TRUE;` in the unreliable arm. The async arm's identical idiom is value-attested (mov al,1), but the unreliable arm is attested only by January's block layout; the 2020 /Od build has no unreliable path. Strip test fails without it.",
+   "group": "H layout-only redundant assignment"
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_hull2d",
+   "padded": 784,
+   "class": "macro-placement-realcmp",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/math__geometry/candidate.c",
+   "evidence": "Exact only with the realcmp macro expansion `(fabs((a)-(b))<_real_epsilon)`; the plain fabs spelling, unused #defines and blank-line padding all fail (land/geo_A1_defs_unused.c, geo_A2_blank3.c, geo_stripped_only.c). realcmp is a genuine Bungie macro (January assert strings: `realcmp(determinant, 0.0f)`, `realcmp(plane3d_distance_to_point(&plane, &rotate_to_position), 0.f)`), currently defined TU-locally in actors.c and actor_looking.c. Needs a ruling on its owner header (real_math.h) or a TU-local definition.",
+   "group": "D realcmp macro family placement"
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_polygon2d_clip_to_plane",
+   "padded": 1008,
+   "class": "macro-placement-realcmp+rule24-cast",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/math__geometry/candidate.c",
+   "evidence": "Needs realcmp_epsilon (as above) plus plane2d_distance_to_point written `dot_product2d((real_vector2d *)point, &plane->n) - plane->d` (reverting that line alone loses the row). The same point->vector cast is the owner header's own idiom (real_math.h plane3d_distance_to_point, plane2d_from_points) but is a new site under rule 24.",
+   "group": "D realcmp macro family placement"
+  },
+  {
+   "unit": "source/camera/editor_flying_camera",
+   "symbol": "_editor_camera_update",
+   "padded": 304,
+   "class": "held-bss-static-split (owner HELD 20260915; new evidence)",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/camera__editor_flying_camera/candidate.c + cfg/symbols.json",
+   "evidence": "Full static split of the invented editor_camera_globals aggregate into 12 HCEX-named file statics (HCEX_Release.pdb RELEASE_CACHE compiland is new evidence; no external-anchor compromise). Needs the symbols.json 1->12 line change landed together.",
+   "group": "G held .bss static split and rule-24 casts"
+  },
+  {
+   "unit": "source/camera/editor_flying_camera",
+   "symbol": "_editor_camera_set_scripted",
+   "padded": 432,
+   "class": "held-bss-static-split + rule24-cast",
+   "exact_under_ruling": true,
+   "candidate": "same as _editor_camera_update",
+   "evidence": "Split plus `(real_point3d const *)&unit_offset` (debug build 0x527de0 pushes &unit_offset directly; same cast in exact items.c _item_align_to_normal_and_point).",
+   "group": "G held .bss static split and rule-24 casts"
+  },
+  {
+   "unit": "source/items/weapons",
+   "symbol": "_trigger_create_projectiles",
+   "padded": 1824,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/items__weapons/",
+   "evidence": "candidate.c makes two changes, both attested by the /Od build (fn 0x69fc70). (1) use_aiming_vector=TRUE becomes its own statement after adjust_origin. /Od stores adjust_origin at 0x69ff0f and sets use_aiming_vector=1 at 0x69ff15; January matches (T 0x1cc, then T 0x1d2 mov byte [ebp-0x5c],1). (2) inside_bsp = unit && unit->unit.player_index!=NONE; if (inside_bsp) SET_FLAG(...), as at /Od 0x6a054b. With these the size matches (1824) but the function is still fuzzy. cand_pfl.c adds three point_from_line3d(&origin,&forward|&right|&up, first_person_weapon_offset.x|y|z, &origin) calls. /Od makes three real calls to fn 0x42e0d0 (result = v*t + p) at 0x6a0051, 0x6a007f and 0x6a00ad. Result: EXACT. Removing either of the two statement edits breaks it.",
+   "blocker": "The exact variant makes this TU newly emit _point_from_line3d, and the worker brief forbids that here. January's weapons.obj neither defines nor references it, so this is the all-inlined-TU class that owner ruling 5 admits under conditions. Conditions verified here: the helper is a genuine real_math.h __inline; our 48-byte body is byte-identical to January's single folded copy in action_charge.obj (558bec8b4d0cd94510d809...5dc390); the caller is strict EXACT; and no other weapons row regresses. The board-wide build and sweep are still owed. Reopen with an explicit owner ruling that this TU may emit it.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/items/weapons",
+   "symbol": "_weapon_place",
+   "padded": 208,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/items__weapons/",
+   "evidence": "cand_place.c changes the definition to `long weapon_place(...)` and ends it with `return weapon_index;`. Only weapons.c changes; no header is touched, since weapon_place has no header prototype. Evidence: January T 0xac `mov eax, ebx`, where EBX is saved only to hold the incoming index. The /Od function 0x6a5e60 ends with `mov eax,[ebp+8]` at 0x6a6046, which is `return weapon_index`. HCEA raw TPI LF_PROCEDURE 0x708b0 returns 0x12 (long), per the research12 log. Result: EXACT, with no symbol change.",
+   "blocker": "The previous root rejection happened only because the proposed weapons.h prototype cost Units a function. This form needs no header, so that cause does not apply. It remains a return-ABI question: object_types.c keeps its void facade, which already mismatches on the parameter type. I measured changing that facade to long in a scratch copy: object_types stays 31/31 exact and every non-debug section is byte-identical. The recorded reopen criterion is an owner return-ABI ruling.",
+   "group": "F return ABI"
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "symbol": "_hs_parse_set",
+   "padded": 560,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/hs__hs_compile/",
+   "evidence": "No source change landed. I re-measured on this baseline: a diagnostic copy passing the raw type words `variable_expression->type` and `hs_syntax_get(expression_index)->type` to the two %s specifiers gates EXACT 560 with every other row unchanged. January @0xe2-0xeb pushes movsx'd shorts and has no _hs_type_names relocation.",
+   "blocker": "The one remaining difference is undefined behaviour: shorts are passed where the format expects %s (R12, owner-held). No defined spelling fits January's bytes: the format literal is identical and no table load exists. The /Od 2020 build (0x5fd06e-0x5fd081) indexes hs_type_names[], which is consistent with a later fix. That is no new evidence for a defined form, so the row reopens only on an explicit owner ruling.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "symbol": "_hs_parse_boolean",
+   "padded": 304,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/hs__hs_compile/",
+   "evidence": "No source change landed. A diagnostic copy with an unconditional `expression->boolean_value = value;` gates EXACT 304 with every other row unchanged. January @0xea `mov cl,[ebp-1]` loads a slot that nothing ever writes and stores it on the rejection path. Defined C cannot produce that load.",
+   "blocker": "This is an original uninitialised read (owner-held). New primary evidence: /Od 0x5f6dd0 stores `expression->boolean_value = value` once, unconditionally, after the if-chain (0x5f6f1d), and adds `value = FALSE` in the error arm (0x5f6eff), which January lacks. That contradicts the premise of the 2026-09-02 semantic review that the original stored the node only on success and returned early. It meets the playbook's corroboration gate, but landing still needs an explicit owner ruling.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/structures/structures",
+   "symbol": "_render_debug_fog_planes",
+   "padded": 352,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/structures__structures/",
+   "evidence": "No change in candidate.c. /Od at 0x8a03b0 calls point_from_line3d (fn 0x42e0d0, body `result->x = v->i*t + p->x ...`) twice with -render.fog.planar_maximum_distance. The RTC descriptor names the results offset_vertex and next_offset_vertex. ruling_fog_planes.c is candidate.c with that helper body (rotated for loop, /Od names). It gates `== exact 16  residual 1`. This row goes EXACT and no other row moves.",
+   "blocker": "This lane forbids this TU from newly emitting _point_from_line3d. January's structures.obj neither defines nor references it, so it is the all-inlined class. Writing the components out by hand does not work: VC7 reuses the products across the two points (CSE), giving frame 0x28 vs 0x20 and 135 vs 122 insns. I found no admissible form without the helper. Reopen: an owner ruling that admits the _point_from_line3d COMDAT for structures.obj. The exact body is ready in ruling_fog_planes.c.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "symbol": "_render_debug_trigger_volumes",
+   "padded": 1088,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/hs__hs_runtime/",
+   "evidence": "none kept. /Od fn 0x606c80's RTC table gives the local names: matrix, local_extent, world_extent, corner[4], sides[2], color, center, ray, result. It uses point_from_line3d at 5 sites. I read the live C2 frame table (Lane C tool, copied into my work dir). Our frame keys ((1000*refs)/size) equal the emitted reference counts and sort correctly.",
+   "blocker": "January's layout is not sorted by the reference counts in its own bytes (sides 1125 sits above local_extent 1166; points 562 sits above three 750 spills). C2's quicksort (read at 0x1079c2d9) is correct, so January's layout-time counts differ in a way the bytes do not show. Fixing the 4 x87 instructions also needs point_from_line3d, which emits the forbidden _point_from_line3d COMDAT even when every site inlines. That needs an owner ruling.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "symbol": "_update_channel_for_looping_sound",
+   "padded": 1360,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/sound__sound_manager/",
+   "evidence": "Behaviour fix: January 0x3ce `jne 0x406` lands on the waiting-flag test, so the condition is `if (next_def != NONE && (!pp || pp->next == NONE)) {...} else if (!waiting)`. The nested form skipped the permutation advance; /Od 0x89a5d4 agrees. /Od 0x89a575 also shows an outer type check, then a `short channel_state` block local tested as `state != queued || waiting || (state == queued && ...)`. That reproduces January's `xor eax,eax` before channel_get_state. The redundant `state == queued` term is flagged for review: it is /Od-attested and only this spelling produces the xor.",
+   "blocker": "One pair left at 0x2ea: January `xor ecx,ecx; mov cx,[edi+0x8e]` against our movzx. VC7 emits that only for a short prototype parameter (lab t1). With a local header copy that makes the third parameter of sound_definition_find_pitch_range_by_pitch short, the row is EXACT and the whole object is 65/65. The owner previously ruled this an ABI lie, so it is blocked on that ruling. There is no in-file lever.",
+   "group": "J semantic dispute / unresolved (fuzzy)"
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "symbol": "_sound_set_definition_end",
+   "padded": 208,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/sound__sound_manager/",
+   "evidence": "Only cleanup: the decorative `(word)` cast on the find_pitch_range argument is removed. Strip test: the row list is unchanged, and the plain spelling is what a corrected prototype needs.",
+   "blocker": "The only difference is at 0x3c: January `xor eax,eax; mov ax,[esi+0x8e]` against our movzx, which is the 16-bit parameter fingerprint. The short-prototype header lab makes it EXACT. A coherent short definition regresses the owner by 1 byte (astra research5), and the short-header/long-definition form was ruled an ABI lie. Blocked on an owner ruling.",
+   "group": "J semantic dispute / unresolved (fuzzy)"
+  },
+  {
+   "unit": "source/structures/structure_lens_flares",
+   "symbol": "_build_structure_lens_flares",
+   "padded": 4336,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/structures__structure_lens_flares/",
+   "evidence": "Nothing landed; candidate.c stays production. New /Od evidence (fn 0x8a3e80): real point_from_line3d calls at the grid s term (0x8a5173), grid t term (0x8a51bc) and marker search (0x8a551e). Production hand-expands all three. The centroid is written `centroid.x /= hull_count` (divss, 0x8a49c5). No s_temp in the RTC names. Witness scratch/lane_d/w/structures__structure_lens_flares/ruling_a7.c applies these: the three helper calls, s_plane written directly, /Od for-loops, and `origin.x /= hull_count`. That removes the whole N group. Differing aligned blocks/lines go from 13/26 to 6/8. Relocation multiset is 156/156 with 0 differing rows. This is a fuzzy gain only; no credit.",
+   "blocker": "Two blockers remain. (1) Policy: the worker brief bans _point_from_line3d in this TU. The refresh brief bans hand expansions, and /Od attests three real calls. Without the helper, h1/h2/b1 score 16-21 blocks, so production's invented s_temp copy is what holds it at 13. (2) Ties A (0xe28, s-count store vs fld t.j) and B (0xe6a, push ebx vs fadd origin.x) are int/FP interleave ties. Fable decoded them as DAG-creation-order ties. On ruling_a7 the name-count oracle (N=0..44), M8 dead locals (D=0..9) and January definition order all left the bytes unchanged. Reopen only with an owner ruling on the helper plus a source lever for A/B.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/effects/effects",
+   "symbol": "_effect_generate_part",
+   "padded": 992,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/effects__effects/",
+   "evidence": "Four changes. (1) Light and sound arms use `designator == NONE ? NONE : designator & (FLAG(bit)-1)`: January has `jne; mov eax,-1; jmp; and eax,0x7fff`, and /Od 0x56f046/0x56f154 has a ternary temp. (2) `damage.epicenter` is assigned before `damage.origin`: the first January copy goes to +0x28, same as /Od. (3) `get_global_random_seed_address()` is passed directly and the `seed` local is removed (/Od passes it inline). (4) Ruling file only: `real_local_random_range(lower, upper)` for the decal radius. January homes both reals at [ebp-8]/[ebp-4], giving frame 0xb8, and /Od calls 0x521410. With all four, alndiff shows every instruction identical except `push _temporary`.",
+   "blocker": "The only remaining byte is `push _temporary`. January and the 2020 /Od build (0x56f280, add esp,0xc) both call csprintf with 3 arguments: csprintf(\"effect %s has a bad part %s\", tag_get_name(..), part->reference.name). That is an authentic Bungie bug: the format literal is passed as the buffer. The owner has already rejected it as unsafe. The new evidence is that a second first-party build has the same call. ruling_part_csprintf.c is strict EXACT and changes no other row.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/effects/effects",
+   "symbol": "_effect_allowed_by_environment",
+   "padded": 128,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/effects__effects/",
+   "evidence": "No change in candidate.c. New evidence: the /Od 2020 function 0x56e4f0 has an /RTC uninitialised-use check on `allowed` ([ebp-2] flag, then _RTC_UninitUse(\"allowed\")). So the authentic source reads `allowed` uninitialised on the default path after the fatal assert. HCEA's local is also `unsigned char allowed`. ruling_env_uninit.c declares `boolean allowed;` and has vacuum assign FALSE. That makes the row EXACT with no other row lost.",
+   "blocker": "The read of an uninitialised local is only reachable if system_exit(-1) returns. That is still UB-class under the owner rules, so this needs an explicit owner ruling. I re-measured five safe bodies (s1-s6) against the corrected caller. All of them get inlined into generate_particles and lose _effect_update, and s3/s6 also lose _effect_generate_parts. No safe natural body reproduces January's out-of-line call.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/effects/effects",
+   "symbol": "_effect_generate_particles",
+   "padded": 1888,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/effects__effects/",
+   "evidence": "Ruling path only (gp_ruling_body.txt), based on 2020 /Od topology. The inner loop becomes `short n = count_delta; while (n-- > 0)`, which gives January's hoisted movzx trip count ([ebp-0xcc]) and removes the per-instance guard. `if (count_delta > 0) { long location_datum_index = ..; instance = get_next(..); }` fixes the store order. A ternary sets node_index. A `real tint_fraction` local matches January's [ebp-4] and /Od's [ebp-0x110]. local_random_direction3d() and real_local_random() are byte-neutral.",
+   "blocker": "This depends on the env ruling. Without it the env helper gets inlined and _effect_update regresses (gp_only.c). With the ruling, one 5-instruction difference remains in the attached arm. January stores data.object_index between `cmp ax,-1` and `jne` and reloads instance into eax. Putting object_index first, as /Od does, flips instance into ebx (1936). About 14 shapes failed; parked.",
+   "group": "J semantic dispute / unresolved (fuzzy)"
+  },
+  {
+   "unit": "source/tool/connected_geometry",
+   "symbol": "_connected_geometry_find_or_add_edge",
+   "padded": 240,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/tool__connected_geometry/",
+   "evidence": "New evidence from the /Od build, fn 0x8bb620: an RTCu shadow byte guards the read of [ebp-1] and calls _RTC_UninitUse(\"direction\"). So Bungie declared `boolean direction;` with no initializer. /Od also shows a for loop, else-if, and a single ternary return `edge_index==NONE ? NONE : ...`, with the triangle-add failure setting edge_index = NONE. With the tail `(direction ? edge_index | LONG_MIN : edge_index & LONG_MAX)` the block order (set, NONE, clear) matches January. The `(e&LONG_MAX)|(d?LONG_MIN:0)` spelling gives neg/sbb and regresses add_triangle. candidate.c keeps `= TRUE`, so it differs from January only by `mov byte [ebp-1],1`. The invented enum is removed; that is inert.",
+   "blocker": "Needs an owner ruling to leave `direction` uninitialised, as in candidate_ruling_direction.c (which carries a BUG comment). January reads it uninitialised only when edges.count < 0, which a valid dynamic array never has. The playbook's three conditions are met: January's bytes prove the read, the independent /Od RTC build corroborates it, and every defined alternative (=TRUE, =FALSE, assignment before the loop) costs exactly one store. With a YES ruling the row is EXACT, worth 240 B.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/tool/connected_geometry",
+   "symbol": "_connected_geometry_find_or_add_vertex",
+   "padded": 192,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/tool__connected_geometry/",
+   "evidence": "January loads point->y and point->z before the getter call and spills them on x87. I measured that VC7 does this only when the subtraction operands are parenthesised FP nodes: `fabs((a)-(b))`. Plain spellings go call-first (176 B): /Od-literal, nested, (real) cast, n[i], (*p).y, assignment-in-expression. A (double) cast spills a qword instead. The /Od topology (for loop, one && conjunction, getters inline, struct copy) written through a TU-local `#define realcmp_epsilon(a, b, epsilon) (fabs((a)-(b))<(epsilon))` matches exactly. That macro text is already in production at sound_dsound_xbox.c:61.",
+   "blocker": "The macro is the load-bearing construct and fails the strip test: the plain spelling gives 176 B. Bungie's `realcmp(a,b)` is attested by assert strings in actors, matrix_math and biped_limp_noodle, but it uses _real_epsilon (the 0.0001f constant), while this function uses 0.001f. No January string attests a variant that takes an epsilon. The owner needs to rule whether an epsilon-taking realcmp is admissible Bungie idiom. There are TU-local realcmp copies in 5 files. Worth 192 B.",
+   "group": "D realcmp macro family placement"
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_hull2d_perimeter",
+   "padded": 96,
+   "class": "needs-header",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/math__geometry/",
+   "evidence": "No .c change. /Od 0x443e70 shows distance2d = square_root(distance_squared2d(a, b)). action_vehicle's January-folded distance3d copy is already square_root(distance_squared3d(a, b)). Probes that proved this is not a count or spelling issue: 7 dead-local counts, 8 TU dummy counts, subscript, helper, named-local and loop variants.",
+   "blocker": "Needs the real_math.h distance2d body edit, which I may not make. Board-wide shadow probe (447 units, fresh compiles): the only effects are GAINED _convex_hull2d_perimeter and the NEW COMDAT above. The actor_moving caller _actor_move_avoidance_setup stays EXACT. Nothing lost.",
+   "group": "E header change (owner header, blast-radius sweep)"
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_hull3d_expand",
+   "padded": 1808,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/math__geometry/",
+   "evidence": "/Od 0x6bbbd0 attests all of this: the plane3d_distance_to_point helper in both surface loops; pointers formed before their checks at three sites (surface0/surface1 before the range-check `return FALSE`, vertex-loop edge before assert 2098, horizon edge before assert 2167); and a closing block using new_vertex/first_new_edge/last_new_edge pointer locals with previous_new_edge_index. With the w3 n4a body plus this closing block the function is STRICT EXACT.",
+   "blocker": "Exact only with the pointer-before-check form that the 20260908 root rejected as abstract-C UB. Moving pointer formation after the checks breaks the match: u1 T=184, u2 T=97, u3 size 1824, u4 T=61. New evidence for the owner: first-party /Od shows exactly this form at all three sites. File: scratch/lane_d/w/math__geometry/ruling_expand.c.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_polygon3d_clip_to_plane",
+   "padded": 1120,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/math__geometry/",
+   "evidence": "None in candidate.c. /Od 0x6bd8a0 (same line span as January, 84 lines) gives point_from_line3d(point,&vector,PIN(t,0,1),&result[result_count++]), a named `t`, and the w3 q2 single-exit tail. Adding realcmp_epsilon and removing the redundant outer parens of real_math.h plane3d_distance_to_point (shadow header) makes it EXACT (C2). Best admissible without those: q2 plus macro, 39 lines.",
+   "blocker": "Two blockers:\n(1) An owner ruling on _point_from_line3d emission; the /Od-attested source uses it.\n(2) The plane3d_distance_to_point paren removal is not landable: the board probe loses _decals_delete_permanent_from_cluster, _item_accelerate and _rasterizer_frame_statistics_draw, and gains _bsp3d_test_sphere_recursive and _compute_ground_plane.\nFiles: C2.c, shadowP3v3/.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "symbol": "_cache_copy_set_flag",
+   "padded": 48,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cache__cache_files_decompress_windows/",
+   "evidence": "Parameter changed from `long flag` to `short flag` in the prototype and the definition. /Od fn 0x5164c0 (its 6 callers match January's 6 call sites) reads `movsx ecx, word ptr [ebp+8]`, so the parameter is signed 16-bit, and the body is SET_FLAG(global_self->flags, flag, TRUE). This needs the PDB-typed `volatile unsigned long flags` (see the thread row). Without the volatile, the short parameter alone changes nothing (y1 run: 41/5).",
+   "blocker": "The owner rejected volatile on 20260914 (w3b). New evidence: in HCEX.pdb and HCEX_Release.pdb, the type record for simple_decompressor_definition has member `flags` as `volatile unsigned long`. This row needs a ruling on whether a qualifier proven by the PDB type counts as source rather than steering.",
+   "group": "C PDB-typed volatile member (rejected 20260914; new HCEX type evidence)"
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "symbol": "_cache_copy_FileIOCompletionRoutine@12",
+   "padded": 496,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cache__cache_files_decompress_windows/",
+   "evidence": "Removed the `self` local. The locals are now declared in the order `long *in_use_flags = global_self->overlapped_in_use_flags; long *completed_flags = ...; long overlapped_index = overlapped - global_self->overlapped;`. /Od fn 0x512ff0 shows no self slot, the slots [ebp-4]/[ebp-8]/[ebp-0xc] in that order, and the division done after both pointers. Needs the volatile flags too: with volatile + short but the old local order the row is still [sha]; the new order gets it to EXACT.",
+   "blocker": "Same owner ruling on the PDB-attested `volatile unsigned long flags`. Without it the row stays [size 480!=496] even with the /Od local order (y1).",
+   "group": "C PDB-typed volatile member (rejected 20260914; new HCEX type evidence)"
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "symbol": "_cache_copy_issue_read",
+   "padded": 320,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cache__cache_files_decompress_windows/",
+   "evidence": "No change to the function body. It becomes EXACT once the struct member is declared `volatile unsigned long flags` as the HCEA PDB type record gives it (x1 run: volatile alone reaches 44/2). The inlined set_flag load/or/store at +0x904 is how a volatile field compiles, not a register tie.",
+   "blocker": "Owner ruling on the volatile qualifier proven by the PDB type (w3b rejection, 20260914).",
+   "group": "C PDB-typed volatile member (rejected 20260914; new HCEX type evidence)"
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "symbol": "_cache_copy_issue_write",
+   "padded": 320,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cache__cache_files_decompress_windows/",
+   "evidence": "No change to the function body. It becomes EXACT with the PDB-typed `volatile unsigned long flags` member (x1 run: volatile alone).",
+   "blocker": "Owner ruling on the volatile qualifier proven by the PDB type.",
+   "group": "C PDB-typed volatile member (rejected 20260914; new HCEX type evidence)"
+  },
+  {
+   "unit": "source/cache/cache_files_decompress_windows",
+   "symbol": "_simple_cache_copy_thread@4",
+   "padded": 992,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cache__cache_files_decompress_windows/",
+   "evidence": "No change to the function body. It becomes EXACT with the PDB-typed `volatile unsigned long flags` member (x1 run: volatile alone). New evidence: DIA2Dump -type simple_decompressor_definition on HCEX.pdb gives `this+0x908 ... volatile unsigned long, flags` and `this+0xAA4 ... volatile float, read_progress`, and HCEX_Release.pdb agrees. These are first-party type records, not a reconstruction. Offsets are +4 against January only because the 2011 src_name is char[0x105]. candidate_ruling.c also carries `volatile real read_progress`, which changes no bytes, so the whole PDB type is copied as written.",
+   "blocker": "Owner ruling needed. Precedents: production cache_files_windows.c already uses `volatile boolean` for its overlapped-I/O completion flags, and flags is written from the I/O completion routine and read across threads. Minimal alternative: x3_vol_short_od.c, the same without the read_progress qualifier, also gates 46/0.",
+   "group": "C PDB-typed volatile member (rejected 20260914; new HCEX type evidence)"
+  },
+  {
+   "unit": "source/objects/widgets/glow",
+   "symbol": "_get_particle_world_position",
+   "padded": 1744,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/objects__widgets__glow/",
+   "evidence": "No source change. The n3a ledger (20260915) already measured this row. Its v3 probe used January's frame (sub esp,0xc4) and exact 43-relocation census and filled sides[0..3] the cheapest defined way. It still came out 592 B over. So no defined-C body can reach 1744/43. The precondition branch was refuted: the call sites guard > 1, January's assert is number_of_markers > 1, and there are dedicated case 2/3 arms. Point-to-vector casts are already admitted. I found no new primary evidence, so I spent no shapes.",
+   "blocker": "An exact match needs two original defects reproduced. First, sides[0..3] is never written on the 2- and 3-marker paths but is read by the third nonuniform_cubic_spline_vector3d call. Second, on the 3-marker parent_marker_index==1 path the midpoint knot is stored into knots[2], so knots[1] is read unwritten (January +0x5C6 stores to [ebp-8], +0x5D2 reads [ebp-0xc]). Both are indeterminate reads, which is undefined behaviour and inadmissible. The owner declined this ruling (opus5_next150_HANDOFF_20260915 section 2) and I found no later ruling. Reopen only on an owner ruling admitting both /* BUG preserved */ defects. The strict-exact 25/25 candidate is recorded in the n3a ledger (scratch/workers/n3_glow/owner_candidate_n3a.c, not present in this worktree).",
+   "group": "J semantic dispute / unresolved (fuzzy)"
+  },
+  {
+   "unit": "source/objects/widgets/lightning",
+   "symbol": "_lightning_submit",
+   "padded": 2576,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/objects__widgets__lightning/",
+   "evidence": "No landed change. /Od fn 0x79d1c0 (0x79df14..0x79df2e) shows the axis fallback as one pointer load plus three integer mov pairs. That is an aggregate copy. v0c.c `up = *(real_vector3d const *)global_z_axis3d;` closes the axis packet: the register ties and the nop / mov edi,edi pad. /Od also calls point_from_line3d (fn 0x42e0d0, v*t+p) with -width. That gives identical bytes and newly emits the _point_from_line3d COMDAT, so it is both inert and forbidden. All 576 vertex-1 x vertex-2 store orders gave no exact match (/Od order P,C,TX,TY hoists the color store). A measurement-only sweep of 0..48 dummy declarations was also inert.",
+   "blocker": "Two packets remain. (1) The global_z_axis3d copy register packet needs the owner's ruling on the cast. It is /Od-attested, and the same `(real_vector3d const *)` cast on a real_point3d already appears in EXACT _machine_update (device_machines.c:341), plus the aggregate `*(real_vector3d *)&...position =` in EXACT _track_loop_impulse_sound. (2) With the cast, only one transposition is left: January reloads vertex_index (`mov ecx,[ebp-8]`) before the vertex-2 `fstp [esi+0xc]` texture.x store; ours reloads after it. Statement order (576 orders), point_from_line3d, -width, and declaration count are all measured inert. Reopen only with an oracle-proven VC7 scheduler rule.",
+   "group": "G held .bss static split and rule-24 casts"
+  },
+  {
+   "unit": "source/camera/editor_flying_camera",
+   "symbol": "_editor_camera_flying_update",
+   "padded": 1408,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/camera__editor_flying_camera/",
+   "evidence": "The split fixes the use_roll load placement. Against the split target: the /Od-attested form point_from_line3d(&unit->object.bounding_sphere_center,&unit_offset,1.f,&position) (odbuild 0x525f20) is EXACT but emits the forbidden _point_from_line3d. add_vectors3d(&unit_offset,(real_vector3d const *)&center,(real_vector3d *)&position) is also EXACT but emits _add_vectors3d and its casts are not /Od-attested at this site. I kept neither.",
+   "blocker": "January inlines the helper with a lazily materialised center pointer, and only a helper call reproduces that. The /Od build attests point_from_line3d, which the lane forbids in this TU. Reopen with an owner ruling on _point_from_line3d for this object, or an admission of the add_vectors3d casts. Either form closes it once the config change lands (both are split_fly_*.c).",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/camera/editor_flying_camera",
+   "symbol": "_editor_camera_set_position_and_roll",
+   "padded": 432,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/camera__editor_flying_camera/",
+   "evidence": "None kept. January passes the angles pointer (edi) directly to editor_camera_set_focus, so it needs a (real_euler_angles2d const *) cast. No exact function has that cast, and the /Od build lacks this function. With the split and the cast it reaches 432/30 [sha]. I also tried the HCEX_Release local names and order (diff, matrix, forward, up, hack_angles; 96 bytes, matching sub esp,0x60). The same three x87 operand-order blocks remained, so declaration order had no effect.",
+   "blocker": "Needs an owner ruling on the euler3d->euler2d prefix cast. After that, three x87 load-order blocks remain: cross_product3d i-term second product (January fld matrix.up.j; fmul up.k) and dot_product3d j/k terms (January loads diff first). Local declaration order had no effect, and w1/w3 found the argument swap and a named dot local had none either. Reopen only with a source/type fact that predicts an IL-local count change.",
+   "group": "G held .bss static split and rule-24 casts"
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "symbol": "_leaf_map_get_leaf_bounds",
+   "padded": 784,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/structures__leaf_map/",
+   "evidence": "The P7 projection_from_vector3d header change has landed, so only the radius tail was left. /Od fn 0x89eeb0 has an RTC descriptor naming the locals bounds(24), maximum(12) and point(12). It stores bounds.x1/y1/z1 into maximum, then calls distance3d(center,&maximum) (0x42dc50). Shape: `real_point3d maximum;` replaces the half_* scalars, followed by maximum.x/y/z = bounds.x1/y1/z1 and `*radius = distance3d(center, &maximum);`. It is strict EXACT at 784 bytes, and the full row diff is clean. Changing the center-sum operand order is byte-inert, so the production spelling is kept.",
+   "blocker": "Strict EXACT, but this admission rule fails for the new _distance3d COMDAT: 'byte-identical to January's folded copy'. Our body sums the squares in a different x87 order from the January copy in action_vehicle.obj. It does match the body that 18 production objects already emit. _magnitude3d is identical to January's action_charge copy. /Od attests the real distance3d call, so hand-expanding it would be inadmissible. A shadow header using distance3d = square_root(distance_squared3d(a,b)) makes both COMDATs January-identical, but a 559-unit sweep shows it costs object_lights _find_point_lights_for_object_in_cluster (560 bytes). Owner ruling needed.",
+   "group": "E header change (owner header, blast-radius sweep)"
+  },
+  {
+   "unit": "source/structures/leaf_map",
+   "symbol": "_leaf_map_leaf_spans_polygon",
+   "padded": 656,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/structures__leaf_map/",
+   "evidence": "No change in candidate.c. The only difference is the association of distance0: we compute (x+z)+y where January computes (x+y)+z, 3 instructions at 0x14c. /Od fn 0x89f680 has RTC names vertex0/vertex1/edge/intersection_point/intersection_point2d and a real call point_from_line3d(&vertex0,&edge,t,&intersection_point). Five admissible shapes were all inert: no node local, no next-index local, both removed together, /Od declaration order with block scoping, and /Od order at loop scope. pS4.c uses the /Od-attested point_from_line3d call in place of the production hand expansion and is strict EXACT at 656 bytes.",
+   "blocker": "The only closure is the /Od-attested point_from_line3d call, which newly emits _point_from_line3d. The brief forbids that COMDAT in this TU, even though our body is byte-identical to January's folded copy (action_charge.obj, 48 bytes) and the caller is strict exact. That meets the other owner-ruling-5 conditions apart from the brief's TU guard. Note that production's current hand expansion (with a comment saying it avoids the COMDAT) is itself a helper hand-expanded to evade ownership. Owner ruling needed; the probe is scratch/lane_d/w/structures__leaf_map/pS4.c.",
+   "group": "E header change (owner header, blast-radius sweep)"
+  },
+  {
+   "unit": "source/effects/weather_particle_systems",
+   "symbol": "_weather_particle_system_render",
+   "padded": 1680,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/effects__weather_particle_systems/",
+   "evidence": "Changes follow the /Od build (0x57fb00) and January's bytes: bounds built by chain assignment (x0=y0=z0=0; x1=y1=z1=box_width; then +=), replacing the invented box_width block local; far_clip_distance and fade_out_end locals; box_delta offset vector; box_position pointer; occluded flag; box_count=1 before the bounds; explicit camera_to_position subtraction (the /Od build has no vector_from_points3d call); explicit particle plane distances (the helper form gets the j-term operand order wrong under all 8 shifts and both argument orders); w*(2.f*r); one dead `short X = 0;` in type-loop scope (/Od [ebp-0x24]). Removing any one of these breaks the match (abl/). The transform helper keeps the production explicit form, so no punning cast is needed.",
+   "blocker": "Strict EXACT. The one element that needs an owner ruling is the dead `short = 0` local. The /Od build shows it at type-loop scope ([ebp-0x24], stored once, never read). January's bytes need exactly one more initialized local declared before the particle loop. It must have an initializer: an uninitialized declaration does not match. Its name cannot be recovered, because HCEA only lists locals that survive optimization. The candidate uses the placeholder `unused_count`. Without it (fac/f_H.c) there are 4 rows off: 0x2a7/0x2ad/0x2b4 and 0x40c.",
+   "group": "I placeholder dead local"
+  },
+  {
+   "unit": "source/effects/weather_particle_systems",
+   "symbol": "_weather_particle_update_physics",
+   "padded": 688,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/effects__weather_particle_systems/",
+   "evidence": "No change landed; candidate.c keeps the production body. I re-measured the w1 body (point_from_line3d inlined for both the velocity integration and the jitter) on the current tree as phys_w1.c. Without the guard it gates `== exact 20 residual 0`, so this function is strict EXACT.",
+   "blocker": "Blocked by lane policy. With the guard, the w1 body fails FORBIDDEN-EMITTED-SYMBOL _point_from_line3d (a 48-byte COMDAT). This TU is not one of the 17 January objects that reference it out-of-line. Every spelling without the COMDAT still misses, including the explicit forms. The w1 body also uses (real_point3d *)&particle->velocity casts, citing precedents units.c:11133 and real_math.c:2567. Reopen when the owner admits this TU's _point_from_line3d COMDAT, or when a header mechanism inlines it without emitting it. Then land phys_w1.c's body.",
+   "group": "B _point_from_line3d emission where January does not reference it"
+  },
+  {
+   "unit": "source/effects/player_effects",
+   "symbol": "_player_effect_get_camera_effect_matrix",
+   "padded": 1312,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/effects__player_effects/",
+   "evidence": "Nothing landed. New /Od evidence (0x57ba70, which odbuild misses because of the aligned-frame prologue): RTC names impulse_matrix, axis and shake_matrix. It has no rotation, translation, duration or source locals. It calls set_real_point3d, cross_product3d, scale_vector3d(&effect->direction, scale*translation, &impulse_matrix.position) and point_from_line3d. I checked each helper's body. I rebuilt the function to that shape (scratch cmgen.py, g_rnd0.c) and reached 1312 [sha] with only 4 differing instructions.",
+   "blocker": "(1) An exclusive-or remains. set_real_point3d makes the scripted translation exact but flips two operand loads in the inlined cross_product3d; direct stores fix the cross product but break the translation. 70+ natural toggles and oracle locals could not satisfy both. (2) Admissibility: the 4-instruction form uses a (real_vector3d *)&impulse_matrix.position cast and hand-expands point_from_line3d, which /Od shows as a real call but which this TU may not emit. The owner must rule on both.",
+   "group": "G held .bss static split and rule-24 casts"
+  },
+  {
+   "unit": "source/text/draw_string",
+   "symbol": "_bitmap_draw_string",
+   "padded": 304,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/text__draw_string/",
+   "evidence": "None. I re-read January's bytes. After `test ebx,ebx; jne 0x94`, the NULL-bounds arm reads [ebx], [2], [4] and [6] with no relocations and clips them through MAX(0,..)/MIN(bitmap,..) into set_rectangle2d. That is a real NULL dereference of `bounds` in the original code.",
+   "blocker": "An exact match requires reproducing January's NULL `bounds` dereference, which is undefined behaviour and forbidden by the hard rules. The reopen needs an owner ruling that admits a UB-preserving `BUG (original)` body, or authoritative source showing a safe expression that compiles to absolute reads at 0..6. Nothing new has turned up.",
+   "group": "J semantic dispute / unresolved (fuzzy)"
+  },
+  {
+   "unit": "source/saved games/player_profile",
+   "symbol": "_player_profile_get_argb_color",
+   "padded": 80,
+   "class": "needs-header",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/saved games__player_profile/",
+   "evidence": "Both functions return by value: `real_rgb_color player_profile_get_rgb_color(long color_index)` ends in `return rgb_color;`, and argb is `rgb_color = player_profile_get_rgb_color(color_index); argb_color.alpha = 1.f; argb_color.rgb = rgb_color; return argb_color;`. Evidence: in the /Od build, 0x85bf60 and 0x85b8e0 both use a hidden [ebp+8] result, and the argb RTC names argb_color (16) and rgb_color (12) in this statement order. January's bytes match only this form. 16 pointer-API spellings (a1 to a12 here, plus n5 v0 to v3) all fail. The strip test (no rgb_color local) fails too. Precedent: get_ui_rgb_white and get_ui_argb_white in ui_widget.h return by value and are EXACT. get_rgb_color stays EXACT.",
+   "blocker": "Needs changes to player_profile.h and to the caller in game_engine.c (see header_proposals). I compiled all 10 TUs that include player_profile.h against the override header. Every row list is identical except this row, which becomes EXACT. The edited caller _game_engine_player_get_change_color stays EXACT. The /Od caller (0x5a1f60) has no profile_color local, which supports dropping it.",
+   "group": "E header change (owner header, blast-radius sweep)"
+  },
+  {
+   "unit": "source/saved games/player_profile",
+   "symbol": "_player_profile_new",
+   "padded": 464,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/saved games__player_profile/",
+   "evidence": "Two changes. First, `if (!(file_set_position(&file,0) && file_write(&file,sizeof(block),block))) { error; delete; player_profile_index = NONE; }` followed by `saved_game_file_close(&file, player_profile_index);`, with a BUG comment. Second, `byte block[SAVED_GAME_FILE_BLOCK_SIZE] = {0};` with `(struct player_profile *)block` and `(XCALCSIG_SIGNATURE *)(block + sizeof(struct player_profile))`. New evidence: the /Od build at 0x85d0c0 has exactly this close-after-NONE order, and its RTC `block` is a byte array with the byte-store-plus-memset `= {0}`. The sibling playlist_profile_new is EXACT in production at fe77cd54 with the same NONE close and the same byte-block casts.",
+   "blocker": "Needs an owner ruling. The 2026-09-09 review rejected saved_game_file_close(&file, NONE). Two new facts bear on that ruling: the /Od build shows the same order, and the canonical tree already accepts the identical construct in playlist_profile.c. The punning cast `(struct player_profile *)block` also needs approval. `(struct game_variant *)block` is already in an EXACT sibling, and the XCALCSIG cast is already in EXACT functions.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/saved games/player_profile",
+   "symbol": "_player_profile_create_default_profiles_on_disk",
+   "padded": 288,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/saved games__player_profile/",
+   "evidence": "Uninitialised `byte block[SAVED_GAME_FILE_BLOCK_SIZE]` with `build_default_profile((struct player_profile *)block, i)` and the XCALCSIG checksum cast. The condition becomes `if (file_create && file_open && file_set_position) { succeeded = file_write(...); if (!file_close) error }`. New evidence: the /Od build at 0x85acf0 has this exact topology, the uninitialised 8192-byte `block`, and the close inside the folded condition. The sibling playlist_profile write_thread_proc is EXACT in production and writes an uninitialised byte block.",
+   "blocker": "Needs an owner ruling on two things the 2026-09-09 review rejected: serialising uninitialised padding, and leaving the file unclosed when the seek fails. The first-party /Od build and the canonical sibling both contain these constructs. Also needs approval of the `(struct player_profile *)block` cast.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/saved games/player_profile",
+   "symbol": "_player_profile_write_thread_proc@4",
+   "padded": 352,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/saved games__player_profile/",
+   "evidence": "In candidate.c (admissible, fuzzy-neutral): I moved `if (failed) delete_enumerated_saved_game_file(...)` after the open if/else. The /Od build (0x8596d0) tests `failed` after the else arm. This explains the old +0x10b je-target byte: the /FAsc listing showed the canonical release_mutex $L block sitting after the else arm. In r3.c I also use an uninitialised byte block with csmemcpy and the XCALCSIG cast (the sibling playlist form), which makes the row EXACT.",
+   "blocker": "The only remaining gap is the 12-instruction `= {0}` fill (384 vs 352). Closing it needs the owner ruling that allows an uninitialised serialised block. The /Od build at 0x8596d0 attests that block, and the EXACT sibling playlist_profile_write_thread_proc@4 already uses it.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/saved games/saved_game_files",
+   "symbol": "_saved_game_files_enumerate_available_to_local_player_index",
+   "padded": 368,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/saved games__saved_game_files/",
+   "evidence": "None landed. New /Od evidence (PC fn 0x8646c0) zeroes the accumulator twice: once at its declaration (0x8646e6) and again after number_of_entries=count(...) (0x864769). In January, xor edi,edi at 0x94 is at that second position, right after the home store at 0x91. The second zeroing is redundant, which suggests the declaration initialiser was a later fix. Probe 1 used the /Od shape (initialiser plus the inner =0). It stays residual: the zero is pinned in the prologue and the failure path stores esi. Probe 2 (probe_ub_ruling.c) keeps only the inner assignment and drops the initialiser. It is strict EXACT (46/46) with no regressions and no new symbols.",
+   "blocker": "January's bytes show the declaration initialiser was absent. On the mutex-failure path, 0x156 mov dx,[ebp+8] stores an indeterminate stack home into *number_of_profiles. The only exact form is the /Od-attested inner `number_of_available_profiles = 0;` with no initialiser, and the house rules prohibit that uninitialised read. Reopen: an owner ruling under the original-bug policy. Measured proposal: scratch/lane_d/w/saved_games__saved_game_files/probe_ub_ruling.c.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/networking/network_connection",
+   "symbol": "_network_server_close_client_connection",
+   "padded": 320,
+   "class": "needs-ruling",
+   "exact_under_ruling": false,
+   "candidate": "scratch/lane_d/w/networking__network_connection/",
+   "evidence": "Not placed in candidate.c. New evidence from the 2020 /Od build: fn 0x746dd0 loops `cmp [ebp-0xc],0x11` over client_list@0x9b4. Every other client_list loop there (delete 0x744290, idle_server 0x7455f0) uses 0x10, while the endpoint-set capacity check uses 0x11. So Bungie's close loop uses the capacity bound (N+1), in both builds and only in this function. Using `client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS + 1` (the TU's existing capacity spelling) makes the row EXACT. The full gate is `== exact 22 residual 1`, with only this row changed. Variant file: scratch/lane_d/w/networking__network_connection/variant_close_capacity.c.",
+   "blocker": "The authentic bound reads client_list[4]. That is past the end of the 4-entry array and overlaps allow_client_connections at 0x4C in the proven 0x50 layout. The rules say no undefined behaviour, and a prior veto rejected this read as nonsensical. The new /Od evidence undercuts that premise: it is a real Bungie off-by-one that survived about 18 years. Owner must decide whether an attested source bug that reads out of bounds is admissible. HCEA's PDB has no function or type records for this compiland.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  },
+  {
+   "unit": "source/cseries/profile",
+   "symbol": "_compare_profile_sections",
+   "padded": 288,
+   "class": "needs-ruling",
+   "exact_under_ruling": true,
+   "candidate": "scratch/lane_d/w/cseries__profile/",
+   "evidence": "`int result = 0;` becomes `int result;`, and I added an explicit `else result = 0;` arm in both the average-time and total-time modes. The default arm is unchanged. I also added a comment-only BUG disclosure. NEW evidence: /Od+RTC fn 0x551e50 is this comparator (csstrcmp call, !\"unreachable\", fields 0x5c8/0x5e0). Its /RTCu shadow byte [ebp-0x15] is cleared at entry and set at every store to [ebp-4]. The single epilogue calls 0x92db80 (confirmed _RTC_UninitUse by its 'being used without being initialized' strings) with the literal \"result\". So the original declares result uninitialised, sets it to 0 in both third arms, falls through the assert, and has one `return result;`.",
+   "blocker": "The match is strict EXACT (288 bytes, relocdiff 8/8 with 0 differing rows), but it is the class the owner excluded: 'the uninitialized return of _compare_profile_sections' (astra_90pct_rejected_hypotheses item 8). The new fact is first-party: the /Od /RTCu instrumentation names `result` as a local that can be read uninitialised, so this is the authentic spelling, not a donor artifact. That meets the park's reopen criterion ('authentic original-source evidence'), but only the owner can lift item 8. A side measurement also compiled exact without the first/second locals (the /Od frame of 0x3c has no slot for them), so they make no byte difference.",
+   "group": "A authentic January bug / UB (owner original-bug policy)"
+  }
+ ],
+ "rejected_trials": [
+  {
+   "unit": "source/sound/sound_manager",
+   "symbol": "_update_channel_for_looping_sound",
+   "kind": "semantic-change",
+   "detail": "Worker rewrite collapsed `if (next_def != NONE) { if (!pp || pp->next == NONE) ... } else if (!waiting)` into `if (next_def != NONE && (...)) ... else if (!waiting)`, which runs the permutation advance when a next definition exists but the chain continues. Fuzzy only; reverted to baseline (the worker reads January 0x3ce as supporting the new form; owner may re-check)."
+  },
+  {
+   "unit": "source/sound/sound_manager",
+   "symbol": "_sound_set_definition_end / _update_channel_for_looping_sound",
+   "kind": "semantic-change",
+   "detail": "Removing `(word)` on the pitch_range_index argument passes -1 instead of 65535 for NONE through the `long` parameter of sound_definition_find_pitch_range_by_pitch. Not landed."
+  },
+  {
+   "unit": "source/hs/hs_compile",
+   "symbol": "_hs_compile_postprocess",
+   "kind": "bare-discarded-call",
+   "detail": "Discarded `hs_function_get(expression->function_index);` statement (fuzzy 704->720 size only). The debug build stores ->name into a dead local instead; not landed."
+  },
+  {
+   "unit": "source/bungie_net/network/transport_endpoint_set_winsock",
+   "symbol": "_transport_initialize",
+   "kind": "redundant-stores",
+   "detail": "Explicit zero stores to fields of a `= { 0 }` struct (fuzzy only). Not landed."
+  },
+  {
+   "unit": "source/hs/hs_runtime",
+   "symbol": "_hs_global_reconcile_read/_write",
+   "kind": "invented-name",
+   "detail": "Worker used an invented macro HS_GLOBAL_DESIGNATOR_TO_DATUM_INDEX; landed instead with the file's existing if/else index idiom (same bytes)."
+  },
+  {
+   "unit": "source/structures/structure_visibility",
+   "symbol": "_portal_hull_from_points",
+   "kind": "bare-discarded-call",
+   "detail": "Worker wrote `global_structure_bsp_get();` as a bare statement; the debug build stores the result in an unused local, which is what landed (same bytes)."
+  },
+  {
+   "unit": "source/math/geometry",
+   "symbol": "_convex_hull2d / _convex_polygon2d_clip_to_plane",
+   "kind": "strip-test",
+   "detail": "Plain fabs spellings, unused macro definitions and 3-line padding all lose both rows; held for the realcmp ruling."
+  },
+  {
+   "unit": "source/camera/dead_camera",
+   "symbol": "_dead_camera_new",
+   "kind": "fuzzy-only",
+   "detail": "Sound improvement but zero credit and coupled to the held UB candidate; not landed."
+  }
+ ],
+ "out_of_scope_recommendations": [
+  {
+   "kind": "config relocation alias (same class as p5/p6)",
+   "rows": [
+    "source/physics/collision_usage:_collision_log_get_current_user",
+    "source/interface/ui_widget_game_data_input_functions:_splitscreen_pregame_status_screen_update",
+    "source/interface/ui_widget_game_data_input_functions:_player_profile_update_cache_for_nwide_list",
+    "source/interface/ui_widget_game_data_input_functions:_player_profile_3wide_list_update",
+    "source/interface/ui_widget_game_data_input_functions:_player_profile_1wide_list_update",
+    "source/interface/interface:_render_debug_profile",
+    "source/bungie_net/common/thread_win32:_get_mutex_from_pool",
+    "source/bitmaps/bitmap_utilities:_bitmap_sharpen",
+    "libs/libcmt/stream:__getstream"
+   ],
+   "note": "semantic report ordinary_only rows outside the Lane D allowlist; not touched; check each relocation delta before retargeting"
+  }
+ ]
+}
