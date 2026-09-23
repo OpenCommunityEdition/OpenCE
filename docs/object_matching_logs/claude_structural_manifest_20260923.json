@@ -147,6 +147,12 @@
      "evidence": "relocs.json 847565 -> _profile_graph_values-3 and 847576 -> _profile_graph_values-8 (values[index-1].enabled / .frame_value; csplit named the preceding _profile_graph_value_count); identical image addresses; scorer already credited"
     }
    ]
+  },
+  "b5": {
+   "category": "fuzzy-zero-credit",
+   "description": "sound fuzzy improvement with a real defect fix",
+   "gate": "scratch/lane/gate_b5.txt: ninja PASS, gained 0, regressions 0, parks 112/0/0, pytest 1152/5/26",
+   "functions": []
   }
  },
  "functions": [
@@ -450,5 +456,17 @@
    "sites": "(real_vector3d const *)&shadow_matrix->position passed to dot_product3d, rows 0 and 1",
    "evidence": "per-site rule-24 admission (owner 2026-09-21): /Od 0x80d870 calls dot_product3d (0x42dd80) at 0x80db50 and 0x80dbc2 with the matrix position; deleting both casts (C4133 only) leaves the function strict exact; real_point3d and real_vector3d share the 3-real layout; strict exact; disclosed in the batch commit"
   }
- }
+ },
+ "fuzzy_landed": [
+  {
+   "batch": "b5",
+   "unit": "source/ai/ai_debug",
+   "function": "_ai_debug_render_actor",
+   "padded_bytes": 24976,
+   "credit": 0,
+   "objdiff_percent_after": 98.45655,
+   "measure": "exact-equal instructions 6181 -> 6472 of 6662 (worker alndiff); frame 0x810, 114/114 slots, 1905/1905 relocation multiset",
+   "evidence": "textbuffer[1024] and tempbuf[80] per /Od RTC and January slots; vision-cone nest 1 reuses ring_index/height_index (shared slot [ebp-0x44]); paths block uses one block-scoped offset_point; fixes a real defect: vertical sine/cosine arrays were swapped in the headspace i/j/k (January bytes)"
+  }
+ ]
 }

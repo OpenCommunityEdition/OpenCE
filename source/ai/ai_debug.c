@@ -2410,41 +2410,41 @@ static void ai_debug_render_actor(
 				}
 				else
 				{
-					char buffer[256];
+					char textbuffer[1024];
 
-					strcpy(buffer, "");
+					strcpy(textbuffer, "");
 
 					if (actor->state.action_data.vehicle.currently_correct_facing)
 					{
-						strcat(buffer, "facing-ok ");
+						strcat(textbuffer, "facing-ok ");
 					}
 					
 					if (actor->state.action_data.vehicle.currently_within_range)
 					{
-						strcat(buffer, "range-ok ");
+						strcat(textbuffer, "range-ok ");
 					}
 
 					if (actor->state.action_data.vehicle.fake_entry_potential_timer>0)
 					{
-						strcat(buffer, csprintf(temporary, "fake-entry %d ", actor->state.action_data.vehicle.fake_entry_potential_timer));
+						strcat(textbuffer, csprintf(temporary, "fake-entry %d ", actor->state.action_data.vehicle.fake_entry_potential_timer));
 					}
 
 					if (actor_path_has_path(actor_index))
 					{
 						if (actor_path_at_destination(actor_index))
 						{
-							strcat(buffer, "destination-");
+							strcat(textbuffer, "destination-");
 						}
 
-						strcat(buffer, "moving ");
+						strcat(textbuffer, "moving ");
 					}
 
 					if (actor->state.action_data.vehicle.lock_facing)
 					{
-						strcat(buffer, "locked ");
+						strcat(textbuffer, "locked ");
 					}
 
-					render_debug_string_at_point(TRUE, ai_debug_drawstack(), buffer, global_real_argb_darkgreen);
+					render_debug_string_at_point(TRUE, ai_debug_drawstack(), textbuffer, global_real_argb_darkgreen);
 				}
 
 				render_debug_line(
@@ -3090,10 +3090,10 @@ static void ai_debug_render_actor(
 					}
 					else
 					{
-						char string[72];
+						char tempbuf[80];
 
-						sprintf(string, "<unknown %d>", control_flag_bit);
-						strcat(temporary, string);
+						sprintf(tempbuf, "<unknown %d>", control_flag_bit);
+						strcat(temporary, tempbuf);
 					}
 
 					++count;
@@ -3124,10 +3124,10 @@ static void ai_debug_render_actor(
 					}
 					else
 					{
-						char string[72];
+						char tempbuf[80];
 
-						sprintf(string, "<unknown %d>", control_flag_bit);
-						strcat(temporary, string);
+						sprintf(tempbuf, "<unknown %d>", control_flag_bit);
+						strcat(temporary, tempbuf);
 					}
 
 					++count;
@@ -3136,10 +3136,10 @@ static void ai_debug_render_actor(
 
 			if (count>0)
 			{
-				char string[72];
+				char tempbuf[80];
 
-				sprintf(string, ": persistent %d", actor->output.persistent_control_ticks);
-				strcat(temporary, string);
+				sprintf(tempbuf, ": persistent %d", actor->output.persistent_control_ticks);
+				strcat(temporary, tempbuf);
 	
 				render_debug_string_at_point(TRUE, ai_debug_drawstack(), temporary, global_real_argb_orange);
 			}
@@ -3586,19 +3586,19 @@ static void ai_debug_render_actor(
 				cosine_vertical_angle[1] = cosine(DEGREES_TO_RADIANS(45));
 				sine_vertical_angle[1] = -sine(DEGREES_TO_RADIANS(45));
 
-				for (side_index = 0; side_index<2; ++side_index)
+				for (ring_index = 0; ring_index<2; ++ring_index)
 				{
-					for (ring_index = 0; ring_index<2; ++ring_index)
+					for (height_index = 0; height_index<2; ++height_index)
 					{
 						real_vector3d headspace_vector;
-						headspace_vector.i = cosine_horizontal_angle * sine_vertical_angle[ring_index];
-						headspace_vector.j = sine_horizontal_angle * sine_vertical_angle[ring_index] * ((real)(side_index==0 ? 1 : -1));
-						headspace_vector.k = cosine_vertical_angle[ring_index];
+						headspace_vector.i = cosine_horizontal_angle * cosine_vertical_angle[height_index];
+						headspace_vector.j = sine_horizontal_angle * cosine_vertical_angle[height_index] * ((real)(ring_index==0 ? 1 : -1));
+						headspace_vector.k = sine_vertical_angle[height_index];
 
-						direction_vector[side_index][ring_index] = *global_zero_vector3d;
-						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_vector, headspace_vector.i, (real_point3d *)&direction_vector[side_index][ring_index]);
-						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_left_vector, headspace_vector.j, (real_point3d *)&direction_vector[side_index][ring_index]);
-						point_from_line3d((real_point3d *)&direction_vector[side_index][ring_index], &actor->input.looking_up_vector, headspace_vector.k, (real_point3d *)&direction_vector[side_index][ring_index]);
+						direction_vector[ring_index][height_index] = *global_zero_vector3d;
+						point_from_line3d((real_point3d *)&direction_vector[ring_index][height_index], &actor->input.looking_vector, headspace_vector.i, (real_point3d *)&direction_vector[ring_index][height_index]);
+						point_from_line3d((real_point3d *)&direction_vector[ring_index][height_index], &actor->input.looking_left_vector, headspace_vector.j, (real_point3d *)&direction_vector[ring_index][height_index]);
+						point_from_line3d((real_point3d *)&direction_vector[ring_index][height_index], &actor->input.looking_up_vector, headspace_vector.k, (real_point3d *)&direction_vector[ring_index][height_index]);
 					}
 				}
 
@@ -3746,6 +3746,7 @@ static void ai_debug_render_actor(
 				short step_index;
 				short first_index;
 				real_argb_color const *color;
+				real_point3d offset_point;
 
 				if (actor->control.path.at_destination)
 				{
@@ -3770,8 +3771,6 @@ static void ai_debug_render_actor(
 					step_index<actor->control.path.path.step_count;
 					++step_index)
 				{
-					real_point3d position;
-
 					if (step_index>first_index)
 					{
 						render_debug_line_offset(
@@ -3782,16 +3781,12 @@ static void ai_debug_render_actor(
 							0.1f);
 					}
 						
-					point_from_line3d(&actor->control.path.path.steps[step_index].point, global_up3d, 0.1f, &position);
-					render_debug_tick(TRUE, &position, global_up3d, 0.02, color);
+					point_from_line3d(&actor->control.path.path.steps[step_index].point, global_up3d, 0.1f, &offset_point);
+					render_debug_tick(TRUE, &offset_point, global_up3d, 0.02, color);
 				}
 
-				{
-					real_point3d endpoint;
-
-					point_from_line3d(&actor->control.path.path.endpoint.point, global_up3d, 0.1f, &endpoint);
-					render_debug_sphere(TRUE, &endpoint, 0.15f, color);
-				}
+				point_from_line3d(&actor->control.path.path.endpoint.point, global_up3d, 0.1f, &offset_point);
+				render_debug_sphere(TRUE, &offset_point, 0.15f, color);
 			}
 
 			if (actor_path_has_path(actor_index))
