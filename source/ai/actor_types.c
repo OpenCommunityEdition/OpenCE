@@ -3,7 +3,7 @@ ACTOR_TYPES.C
 
 symbols in this file:
 00028C10 0140:
-	_code_00028c10 (0000)
+	_actor_type_definition_get (0000)
 00028D50 0020:
 	_actor_types_initialize (0000)
 00028D70 0010:
@@ -65,7 +65,7 @@ symbols in this file:
 00246814 001d:
 	??_C@_0BN@JJKIIINM@actor_type_definition?9?$DOswarm?$AA@ (0000)
 002B6C68 0080:
-	_data_002b6c68 (0000)
+	_actor_type_definitions (0000)
 	_global_actor_type_names (0040)
 */
 
@@ -80,13 +80,12 @@ symbols in this file:
 
 /* ---------- macros */
 
-#define actor_type_definitions data_002b6c68
 
 /* ---------- structures */
 
 /* ---------- prototypes */
 
-static struct actor_type_definition *code_00028c10(
+static struct actor_type_definition *actor_type_definition_get(
 	short actor_type);
 
 /* ---------- globals */
@@ -104,7 +103,7 @@ extern struct actor_type_definition actor_type_carrier;
 extern struct actor_type_definition actor_type_sentinel;
 extern struct actor_type_definition actor_type_mounted_weapon;
 
-struct actor_type_definition *data_002b6c68[NUMBER_OF_ACTOR_TYPES] =
+static struct actor_type_definition *actor_type_definitions[NUMBER_OF_ACTOR_TYPES] =
 {
 	&actor_type_elite,
 	&actor_type_jackal,
@@ -152,7 +151,7 @@ void actor_types_initialize(
 	short actor_type;
 
 	for (actor_type = 0; actor_type < NUMBER_OF_ACTOR_TYPES; actor_type++)
-		code_00028c10(actor_type);
+		actor_type_definition_get(actor_type);
 
 	return;
 }
@@ -160,49 +159,49 @@ void actor_types_initialize(
 const char *actor_type_get_name(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->name;
+	return actor_type_definition_get(actor_type)->name;
 }
 
 short actor_type_get_race(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->race;
+	return actor_type_definition_get(actor_type)->race;
 }
 
 short actor_type_get_when_to_search_at_target(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->when_to_search_at_target;
+	return actor_type_definition_get(actor_type)->when_to_search_at_target;
 }
 
 short actor_type_get_when_to_pursue(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->when_to_pursue;
+	return actor_type_definition_get(actor_type)->when_to_pursue;
 }
 
 short actor_type_get_when_to_search_pursuit(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->when_to_search_pursuit;
+	return actor_type_definition_get(actor_type)->when_to_search_pursuit;
 }
 
 byte actor_type_get_pursuit_controller(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->pursuit_controller;
+	return actor_type_definition_get(actor_type)->pursuit_controller;
 }
 
 boolean actor_type_get_swarm(
 	short actor_type)
 {
-	return code_00028c10(actor_type)->swarm;
+	return actor_type_definition_get(actor_type)->swarm;
 }
 
 void actor_type_initialize(
 	long actor_index)
 {
-	struct actor_type_definition *actor_type_definition = code_00028c10(actor_get(actor_index)->meta.type);
+	struct actor_type_definition *actor_type_definition = actor_type_definition_get(actor_get(actor_index)->meta.type);
 
 	if (actor_type_definition->initialize)
 		actor_type_definition->initialize(actor_index);
@@ -213,7 +212,7 @@ void actor_type_initialize(
 void actor_type_decide_action(
 	long actor_index)
 {
-	struct actor_type_definition *actor_type_definition = code_00028c10(actor_get(actor_index)->meta.type);
+	struct actor_type_definition *actor_type_definition = actor_type_definition_get(actor_get(actor_index)->meta.type);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 129, actor_type_definition->decide_action);
 	actor_type_definition->decide_action(actor_index);
@@ -224,7 +223,7 @@ void actor_type_decide_action(
 void actor_type_swarm_control(
 	long actor_index)
 {
-	struct actor_type_definition *actor_type_definition = code_00028c10(actor_get(actor_index)->meta.type);
+	struct actor_type_definition *actor_type_definition = actor_type_definition_get(actor_get(actor_index)->meta.type);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 141, actor_type_definition->swarm);
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 142, actor_type_definition->swarm_control);
@@ -239,7 +238,7 @@ void actor_type_swarm_aim_jump(
 	real jump_magnitude,
 	real_vector3d *jump_velocity)
 {
-	struct actor_type_definition *actor_type_definition = code_00028c10(actor_get(actor_index)->meta.type);
+	struct actor_type_definition *actor_type_definition = actor_type_definition_get(actor_get(actor_index)->meta.type);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 157, actor_type_definition->swarm);
 	if (actor_type_definition->swarm_aim_jump)
@@ -256,7 +255,7 @@ void actor_type_swarm_aim_jump(
 
 /* ---------- private code */
 
-static struct actor_type_definition *code_00028c10(
+static struct actor_type_definition *actor_type_definition_get(
 	short actor_type)
 {
 	match_assert("c:\\halo\\source\\ai\\actor_type_definitions.h", 46, actor_type>=0 && actor_type<NUMBER_OF_ACTOR_TYPES);

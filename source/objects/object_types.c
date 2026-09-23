@@ -117,7 +117,7 @@ symbols in this file:
 	_placeholder_data_definition (0960)
 	_object_type_definitions (0a00)
 00456E98 0002:
-	_bss_00456e98 (0000)
+	_processed_bsp_flags (0000)
 */
 
 /* ---------- headers */
@@ -543,7 +543,7 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 extern struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
 #pragma bss_seg(".bss")
-word bss_00456e98;
+static word processed_bsp_flags;
 #pragma bss_seg()
 
 typedef char verify_object_type_definition_size[
@@ -696,7 +696,7 @@ void object_types_initialize_for_new_map(
 	void)
 {
 	struct object_type_definition *definition = first_object_type_definition;
-	bss_00456e98 = 0;
+	processed_bsp_flags = 0;
 
 	while (definition)
 	{
@@ -1123,7 +1123,7 @@ void object_types_place_objects(
 					scenario,
 					object_type);
 
-				if (!TEST_FLAG(bss_00456e98, global_structure_bsp_index))
+				if (!TEST_FLAG(processed_bsp_flags, global_structure_bsp_index))
 				{
 					short scenario_datum_index;
 
@@ -1200,7 +1200,7 @@ void object_types_place_objects(
 			}
 		}
 
-		bss_00456e98 |= FLAG(global_structure_bsp_index);
+		processed_bsp_flags |= FLAG(global_structure_bsp_index);
 	}
 
 	return;

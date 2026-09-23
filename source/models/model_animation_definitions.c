@@ -298,7 +298,7 @@ typedef char verify_animation_list_size[
 typedef char verify_animation_list_animations_offset[
 	offsetof(struct animation_list, animations) == 0x04 ? 1 : -1];
 
-struct animation_list_entry weapon_type_animation_list_entries[] =
+static struct animation_list_entry weapon_type_animation_list_entries[] =
 {
 	{ "reload-1", _animation_replacement },
 	{ "reload-2", _animation_replacement },
@@ -314,7 +314,7 @@ struct animation_list_entry weapon_type_animation_list_entries[] =
 
 struct animation_list weapon_type_animation_list = { NUMBEROF(weapon_type_animation_list_entries), weapon_type_animation_list_entries };
 
-struct animation_list_entry weapon_class_animation_list_entries[] =
+static struct animation_list_entry weapon_class_animation_list_entries[] =
 {
 	{ "idle", _animation_base },
 	{ "gesture", _animation_base },
@@ -384,7 +384,7 @@ char *damage_part_strings[] =
 	"r-arm", "r-hand", "r-leg", "r-foot",
 };
 
-struct animation_list_entry unit_seat_animation_list_entries[] =
+static struct animation_list_entry unit_seat_animation_list_entries[] =
 {
 	{ "airborne-dead", _animation_base },
 	{ "landing-dead", _animation_base },
@@ -420,7 +420,7 @@ struct animation_list_entry unit_seat_animation_list_entries[] =
 
 struct animation_list unit_seat_animation_list = { NUMBEROF(unit_seat_animation_list_entries), unit_seat_animation_list_entries };
 
-struct animation_list_entry first_person_weapon_animation_list_entries[] =
+static struct animation_list_entry first_person_weapon_animation_list_entries[] =
 {
 	{ "idle", _animation_base },
 	{ "posing", _animation_base },
@@ -454,7 +454,7 @@ struct animation_list_entry first_person_weapon_animation_list_entries[] =
 
 struct animation_list first_person_weapon_animation_list = { NUMBEROF(first_person_weapon_animation_list_entries), first_person_weapon_animation_list_entries };
 
-struct animation_list_entry weapon_animation_list_entries[] =
+static struct animation_list_entry weapon_animation_list_entries[] =
 {
 	{ "idle", _animation_base },
 	{ "ready", _animation_base },
@@ -471,7 +471,7 @@ struct animation_list_entry weapon_animation_list_entries[] =
 
 struct animation_list weapon_animation_list = { NUMBEROF(weapon_animation_list_entries), weapon_animation_list_entries };
 
-struct animation_list_entry vehicle_animation_list_entries[] =
+static struct animation_list_entry vehicle_animation_list_entries[] =
 {
 	{ "steering", _animation_overlay },
 	{ "roll", _animation_overlay },
@@ -485,7 +485,7 @@ struct animation_list_entry vehicle_animation_list_entries[] =
 
 struct animation_list vehicle_animation_list = { NUMBEROF(vehicle_animation_list_entries), vehicle_animation_list_entries };
 
-struct animation_list_entry device_animation_list_entries[] =
+static struct animation_list_entry device_animation_list_entries[] =
 {
 	{ "position", _animation_overlay },
 	{ "power", _animation_overlay },

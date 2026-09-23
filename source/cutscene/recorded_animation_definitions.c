@@ -42,7 +42,7 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void byte_swap_recording(
+static void byte_swap_recording(
 	struct recorded_animation_definition const *animation,
 	void *stream,
 	long stream_size);
@@ -118,7 +118,7 @@ short scenario_get_animation_by_name(struct scenario const *scenario, char const
 
 /* ---------- private code */
 
-void byte_swap_recording(
+static void byte_swap_recording(
 	struct recorded_animation_definition const *animation,
 	void *stream,
 	long stream_size)

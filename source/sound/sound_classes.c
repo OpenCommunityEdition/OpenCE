@@ -11,7 +11,7 @@ symbols in this file:
 001B84B0 0010:
 	_sound_classes_dispose (0000)
 001B84C0 0070:
-	_code_001b84c0 (0000)
+	_sound_class_datum_get (0000)
 001B8530 0050:
 	_debug_sound_classes_enable (0000)
 001B8580 0050:
@@ -267,7 +267,7 @@ void sound_classes_dispose(
 	return;
 }
 
-static struct sound_class_runtime *code_001b84c0(
+static struct sound_class_runtime *sound_class_datum_get(
 	short index)
 {
 	match_assert(
@@ -285,7 +285,7 @@ static struct sound_class_runtime *code_001b84c0(
 real sound_class_get_gain(
 	short index)
 {
-	return code_001b84c0(index)->current_gain;
+	return sound_class_datum_get(index)->current_gain;
 }
 
 void debug_sound_classes_enable(
@@ -343,7 +343,7 @@ void sound_classes_initialize_for_new_map(
 
 	for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
 	{
-		struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+		struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
 
 		sound_class->current_gain = 1.f;
 		sound_class->target_gain = 1.f;
@@ -362,7 +362,7 @@ void sound_classes_update(
 
 		for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
 		{
-			struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+			struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
 			if (sound_class->interpolation_ticks > ticks)
 			{
 				sound_class->current_gain =
@@ -421,7 +421,7 @@ void sound_class_set_gain(
 	{
 		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
 		{
-			struct sound_class_runtime *sound_class = code_001b84c0(class_index);
+			struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
 
 			sound_class->target_gain = PIN(gain, 0.f, 1.f);
 			sound_class->interpolation_ticks =

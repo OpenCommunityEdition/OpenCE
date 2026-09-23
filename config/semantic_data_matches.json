@@ -357,5 +357,55 @@
       "relocation_count": 418,
       "normalized_sha256": "256984cb62bc879971463ff0ff7567042dc95d8b0fb2bc676f246c2293c77ae8"
     }
+  },
+  {
+    "unit": "source/ai/actor_types",
+    "symbol": "_global_actor_type_names",
+    "reason": "January and rebuilt 128-byte actor-type .data section (the static actor_type_definitions table at +0 and the public global_actor_type_names at +64) have identical normalized payload and flags (c0400040), and all 32 relocations resolve to the same image addresses. Ownership was corrected first: cachebeta.pdb publics prove actor_type_definitions and its accessor actor_type_definition_get file-static. January's own assert strings name actor_type_definitions; the Halo CE atlas names the accessor at the same 0x140-byte span. All 13 functions are strict exact and every January-owned section and symbol matches.",
+    "measurements": {
+      "size": 128,
+      "relocation_count": 32,
+      "normalized_sha256": "38723a2e5e8a17aa7950dc008209944e898f69a7bd10a23c839d341e935fd5ca"
+    }
+  },
+  {
+    "unit": "source/cutscene/recorded_animation_definitions",
+    "symbol": "_recorded_animation_event_stream_data",
+    "reason": "January and rebuilt 180-byte recorded-animation tag .data section have identical normalized payload and flags (c0400040), and all 11 relocations resolve to the same image addresses. Ownership was corrected first: byte_swap_recording is absent from cachebeta.pdb publics and referenced by no other January object, so it is file-static. Both functions are strict exact and every January-owned section and symbol matches.",
+    "measurements": {
+      "size": 180,
+      "relocation_count": 11,
+      "normalized_sha256": "c83e71991a0ac6309173102325bf6a194d27d5d80cdc9a395ed954c80bae3d5d"
+    }
+  },
+  {
+    "unit": "source/models/model_animation_definitions",
+    "symbol": "_weapon_type_animation_list",
+    "reason": "January and rebuilt 1,288-byte animation-list .data section have identical normalized payload and flags (c0400040), and all 170 relocations resolve to the same image addresses. Ownership was corrected first: the seven *_animation_list_entries arrays are absent from cachebeta.pdb publics and referenced by no other January object, so they are file-static beside their public animation_list wrappers. All three functions are strict exact and all 139 January symbols match.",
+    "measurements": {
+      "size": 1288,
+      "relocation_count": 170,
+      "normalized_sha256": "76f074030d3cb6940a74673504f664555bd5d02087282c01338c8b83fe3d1654"
+    }
+  },
+  {
+    "unit": "source/sound/sound_classes",
+    "symbol": "_sound_classes",
+    "reason": "January and rebuilt 2,452-byte sound-class .data section have identical normalized payload and flags (c0400040), and all 51 relocations resolve to the same image addresses. Ownership was corrected first: the static accessor at 0x1b84c0 is absent from cachebeta.pdb publics and is named sound_class_datum_get by the Halo CE atlas, anchored on six already-exact sound_classes symbols. All 12 functions are strict exact and every January-owned section and symbol matches.",
+    "measurements": {
+      "size": 2452,
+      "relocation_count": 51,
+      "normalized_sha256": "1ae64de7abb95c40952d3aacf88c68232070d4c19906bf32dfc8877bd6725abc"
+    }
+  },
+  {
+    "unit": "source/objects/object_types",
+    "symbol": "_object_data_definition",
+    "reason": "January and rebuilt 2,608-byte object-type tag .data section have identical normalized payload and flags (c0400040), and all 190 relocations resolve to the same image addresses. Ownership was corrected first: HCEX.pdb names the sole object_types file static processed_bsp_flags (unsigned short), absent from cachebeta.pdb publics. All 31 functions are strict exact and all 66 January symbols match. All eight candidate-only helper COMDATs are byte-identical to January's selected copies and pair-link in both orders; items' hand-written valid_real_matrix4x3/valid_real_vector3d_axes3 NODUP providers were replaced by the genuine real_math.h inlines.",
+    "measurements": {
+      "size": 2608,
+      "relocation_count": 190,
+      "normalized_sha256": "205043014fcdf8e45147d168ae70e43cda7814dfc63f1c1dade93f2c0f9f4341"
+    }
   }
 ]
