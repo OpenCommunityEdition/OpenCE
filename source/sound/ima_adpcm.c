@@ -197,10 +197,6 @@ long compress_ima_adpcm_audio_data(
 	return result;
 }
 
-/* NonMatching: the coherent decompressor preserves the 416-byte envelope and
-   both table relocations; January schedules the decremented input-size store
-   before materializing sample_count*2, shifting the remaining instruction
-   packet without changing the algorithm. */
 long decompress_ima_adpcm_audio_data(
 	struct bungie_ima_adpcm_header const *input_header,
 	long input_data_size,
@@ -210,12 +206,14 @@ long decompress_ima_adpcm_audio_data(
 {
 	long sample_count = input_header->sample_count;
 	char const *input = (char const *)(input_header + 1);
-	long result = sample_count * sizeof(short);
+	long result;
+	long remaining_sample_count;
 	long sample;
 	short step_size_index;
 	boolean read_high_nibble;
 
 	input_data_size -= sizeof(struct bungie_ima_adpcm_header);
+	result = sample_count * sizeof(short);
 
 	if (output_samples)
 	{
@@ -230,9 +228,9 @@ long decompress_ima_adpcm_audio_data(
 
 			sample = state->sample;
 			step_size_index = state->step_size_index;
-			input += state->sample_index>>1;
 			input_data_size -= state->sample_index>>1;
-			result = state->sample_count - state->sample_index;
+			input += state->sample_index>>1;
+			remaining_sample_count = state->sample_count - state->sample_index;
 			read_high_nibble = !(state->sample_index&1);
 		}
 		else
@@ -240,12 +238,12 @@ long decompress_ima_adpcm_audio_data(
 			sample = input_header->initial_sample;
 			step_size_index = 0;
 			read_high_nibble = TRUE;
-			result = sample_count;
+			remaining_sample_count = sample_count;
 		}
 
-		while (result && output_sample_count && input_data_size)
+		while (remaining_sample_count && output_sample_count && input_data_size)
 		{
-			char code = *input;
+			char code;
 			long step_size = step_size_table[step_size_index];
 			long temporary_step_size;
 			long sample_difference = step_size>>3;
@@ -253,9 +251,12 @@ long decompress_ima_adpcm_audio_data(
 
 			if (read_high_nibble)
 			{
-				code >>= 4;
+				code = (*input>>4)&0xF;
 			}
-			code &= 0xF;
+			else
+			{
+				code = *input&0xF;
+			}
 
 			temporary_step_size = step_size;
 			do
@@ -290,7 +291,7 @@ long decompress_ima_adpcm_audio_data(
 			}
 
 			output_samples++;
-			result--;
+			remaining_sample_count--;
 			output_sample_count--;
 			if (state)
 			{
@@ -303,6 +304,8 @@ long decompress_ima_adpcm_audio_data(
 			state->sample = (short)sample;
 			state->step_size_index = step_size_index;
 		}
+
+		result = remaining_sample_count;
 	}
 
 	return result;

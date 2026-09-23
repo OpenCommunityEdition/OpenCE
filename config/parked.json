@@ -312,44 +312,6 @@
       }
     },
     {
-      "unit": "source/sound/game_sound",
-      "function": "_update_potentially_audible_looping_sound",
-      "class": "unclassified",
-      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906. Ordinary typed C implements the genuine attached/unattached looping-sound state machine, spatial source transforms, six-argument start/loop/stop refresh API, and pool deletion path. January itself writes the final frame field after datum deletion; the fixed data-pool storage lifetime was checked, not inferred from donor output. Proper owning APIs, semantic flags, project types and natural private linkage are retained. Target619 meaningful/624 padded versus candidate640 padded, both25 relocations, objdiff83.65909 percent. The honest residual receives no exact credit. No forced inline, point_from_line3d COMDAT, fake lifetime, shadow layout, optimizer control or assembly is introduced. Reopen only for authoritative source/type/control-flow or compiler-context evidence. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 624,
-          "relocation_count": 25,
-          "normalized_sha256": "8fe3a4a813d3a2a8e45a5ce10b8cbd71274a8553f11e8d43ca65fa95c63dd7dc"
-        },
-        "base": {
-          "size": 640,
-          "relocation_count": 25,
-          "normalized_sha256": "6763e595e2871c3e463903bf82b44fee905a82540356e0752a4e9d2d9102527b"
-        },
-        "objdiff_percent": 83.65909
-      }
-    },
-    {
-      "unit": "source/sound/game_sound",
-      "function": "_game_sound_update",
-      "class": "unclassified",
-      "evidence": "Reconciled preserved Opus PAS caller packet 9d60117aa onto canonical 18238d906 with the correct owning game_sound_update(real dt) prototype and pointer-valued Scenario sound-environment output. January game_frame pushes dt even though this body does not read it. The real caller computes PAS, selects background sound, services attached/unattached sources and advances the update index; it naturally retains the three private PAS helpers, including the newly strict location_potentially_audible. Target453 meaningful/464 padded and candidate464 padded, both31 relocations, objdiff97.91391 percent. Proper owner APIs and all inherited strict exacts are preserved after the full header rebuild. No exact caller credit or whole-object completion is claimed; compute_sound_obstruction remains unwritten. Reopen only for authentic source/type/compiler-context evidence, not declaration shuffling or equivalent-spelling searches. See docs/object_matching_logs/game_sound_obj_pas_current_context_integration_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 464,
-          "relocation_count": 31,
-          "normalized_sha256": "d0c2dc1708f1dbee75a025bb0a2317afdcd65682faf8c301ceb879cdddeabf92"
-        },
-        "base": {
-          "size": 464,
-          "relocation_count": 31,
-          "normalized_sha256": "df019d7cb404727618914dfa2f9cf20897ebca95c66207dd28b758246cf2fb72"
-        },
-        "objdiff_percent": 97.91391
-      }
-    },
-    {
       "unit": "source/tag_files/files_windows",
       "function": "_file_get_size",
       "class": "unclassified",
@@ -461,17 +423,6 @@
           "normalized_sha256": "66e1c7859e354a6bf7caccb70b260e99d516be6a94837571ecc60dd5b43edda6"
         },
         "objdiff_percent": 81.614815
-      }
-    },
-    {
-      "unit": "source/sound/ima_adpcm",
-      "function": "_decompress_ima_adpcm_audio_data",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after the historical source census and the focused statement/declaration-order experiments recorded in the two IMA ADPCM ledgers. The retained ordinary C implements the coherent Bungie IMA decompressor with the exact 416-byte padded envelope and the same two table destinations. January stores decremented input_data_size before materializing sample_count * 2, while VC7 schedules the materialization first; the resulting packet shifts the step-size-table relocations from +178/+275 to +181/+277. Attempts to perturb this schedule either did not move it or regressed the surrounding loop. No volatile access, barrier, pragma, inline assembly, fake dependency, dead branch, or manual byte logic is retained. Reopen only for authoritative source/local ordering or a natural same-compiler donor.",
-      "measurements": {
-        "target": { "size": 416, "relocation_count": 2, "normalized_sha256": "c308b60091d47921aeb30f63188ec5317c64aa9fa52b9e53721774ecd34176f9" },
-        "base": { "size": 416, "relocation_count": 2, "normalized_sha256": "92f27a5e493fd0e401a7ee0c7c823e3040bddfdd6100cccb5b4f673be630d882" },
-        "objdiff_percent": 80.8125
       }
     },
     {
@@ -1781,25 +1732,6 @@
       }
     },
     {
-      "unit": "source/sound/sound_manager",
-      "function": "_sound_refresh_looping",
-      "class": "tu-context-optimization",
-      "evidence": "Best complete ordinary-C refresh graph retained with zero exact credit. January is 1,136 padded bytes with 43 relocations; canonical is 1,088 with 42. Target-backed datum validation calls, the named sound_inaudible_fade_out_time constant, and the source-authentic `loop` assertion spelling are preserved. The remaining missing relocation is a compiler-merged duplicate fade-call tail; HCEA cache-release logic is intentionally absent because January has none of its dependencies. No compiler steering, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_small_looping_graph_20260908.md. 2026-09-15 (next-150K lane wave n3a): re-baselined at ZERO strict credit and strictly closer than 1088/42. The recorded criterion's premise - that the missing relocation was a compiler-merged duplicate fade-call tail - is REFUTED by the census: it was a source defect. Deleting the fade_in_time phi local recovers January's fourth _sound_start_fade relocation, so the relocation count is now exact at 43/43 and the size moves 1088 -> 1120 toward January's 1136; alndiff regions drop 74 -> 37. The row stays parked and fuzzy [sha].",
-      "measurements": {
-        "target": {
-          "size": 1136,
-          "relocation_count": 43,
-          "normalized_sha256": "22e6f76584244a8861a4c646d88eb7c301fa5cdc1fc8d98849e505c2d3a391db"
-        },
-        "base": {
-          "size": 1120,
-          "relocation_count": 43,
-          "normalized_sha256": "86e26bb3e59f759070492aaa2b2071ff5f9e2db818be0898a711ffe2501ba9e6"
-        },
-        "objdiff_percent": 97.800545
-      }
-    },
-    {
       "unit": "source/bink/bink_playback",
       "function": "_bink_draw_frame",
       "class": "unclassified",
@@ -1963,17 +1895,6 @@
     },
     {
       "unit": "source/sound/sound_manager",
-      "function": "_update_channel_for_impulse_sound",
-      "class": "unclassified",
-      "evidence": "Complete typed impulse-channel property/queue/update body retained under its corrected semantic target name. January and canonical are both 528 padded bytes with all 29 relocations; normalized code still differs through ordinary scheduling. January bodies, callers and HCEA names independently prove the target symbol rotation. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
-      "measurements": {
-        "target": { "size": 528, "relocation_count": 29, "normalized_sha256": "b700f26596f466e5771d4f875b0d3a9354600ee13b4dd1553cde0c48d45d8202" },
-        "base": { "size": 528, "relocation_count": 29, "normalized_sha256": "2d81b0f86a90351a964320970505552d0b323a95a871e75b9d8a4e50cf29eeb4" },
-        "objdiff_percent": 94.03593
-      }
-    },
-    {
-      "unit": "source/sound/sound_manager",
       "function": "_sound_set_definition_end",
       "class": "unclassified",
       "evidence": "Complete queued-end-definition transition retained under its corrected semantic target name. January and canonical are both 208 padded bytes with all nine relocations; the code hash remains different. It uses the now-exact bounded channel-summary builder and the typed instance-limit flow. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
@@ -1981,17 +1902,6 @@
         "target": { "size": 208, "relocation_count": 9, "normalized_sha256": "06f507e27039b2a39192271221e6c7b703aee4d5ae45becdac84f3543095ec13" },
         "base": { "size": 208, "relocation_count": 9, "normalized_sha256": "4f5a03ed0532981c792521f1ce7cdcc47eef5a3ee2d038caf65f57b1987675d9" },
         "objdiff_percent": 91.884056
-      }
-    },
-    {
-      "unit": "source/sound/sound_manager",
-      "function": "_sound_find_like_channel",
-      "class": "unclassified",
-      "evidence": "Complete typed best-channel selector for a supplied channel list. Target and canonical are both 272 padded bytes with all 16 relocations and 97.15909 percent similarity; the remaining normalized difference is not assigned a speculative mechanism. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
-      "measurements": {
-        "target": { "size": 272, "relocation_count": 16, "normalized_sha256": "240a72742e0bdcb19f5bbf684bcffaefcf37a483a9fc59393cf4a6d0c36984b3" },
-        "base": { "size": 272, "relocation_count": 16, "normalized_sha256": "a695dfa283a53aeabb3923c2186b6690ff2b319205588ba7cebefce9b7c91c56" },
-        "objdiff_percent": 97.15909
       }
     },
     {
