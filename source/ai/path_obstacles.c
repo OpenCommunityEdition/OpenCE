@@ -62,7 +62,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define set_real_point2d set_real_point2d_inline
 #define rotate_vector2d rotate_vector2d_inline
 #define project_point3d project_point3d_inline
 #define distance_squared2d distance_squared2d_inline
@@ -77,7 +76,6 @@ symbols in this file:
 #include "physics/collision_model_definitions.h"
 #include "physics/collisions.h"
 #include "render/render_debug.h"
-#undef set_real_point2d
 #undef rotate_vector2d
 #undef project_point3d
 #undef distance_squared2d
@@ -152,16 +150,6 @@ void obstacles_new(
 	return;
 }
 
-real_point2d *set_real_point2d(
-	real_point2d *p,
-	real x,
-	real y)
-{
-	p->x = x;
-	p->y = y;
-	return p;
-}
-
 real_vector2d *rotate_vector2d(
 	real_vector2d const *vector,
 	real sine,
@@ -185,7 +173,7 @@ real_point2d *project_point3d(
 	match_assert("..\\math\\real_math.h", 859, projection>=_x && projection<=_z);
 	match_assert("..\\math\\real_math.h", 860, ~(sign&~1));
 
-	set_real_point2d_inline(
+	set_real_point2d(
 		p2d,
 		p3d->n[global_projection3d_mappings[projection][sign][0]],
 		p3d->n[global_projection3d_mappings[projection][sign][1]]);

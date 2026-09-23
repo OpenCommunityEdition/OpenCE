@@ -97,7 +97,7 @@ struct aim_assist_target
 __inline real compute_attenuation(
 	real variable,
 	real maximum);
-static real compute_composite_attenuation(
+real compute_composite_attenuation(
 	real distance,
 	real maximum_distance,
 	real angle,
@@ -172,7 +172,7 @@ __inline real compute_attenuation(
 	return (maximum - variable) / (maximum - half_maximum);
 }
 
-static real compute_composite_attenuation(
+real compute_composite_attenuation(
 	real distance,
 	real maximum_distance,
 	real angle,

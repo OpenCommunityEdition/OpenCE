@@ -204,7 +204,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define arccosine arccosine_inline
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
@@ -237,7 +236,6 @@ symbols in this file:
 #include "physics/collision_model_definitions.h"
 #undef PATH_EXTERNAL_FLEE_ROUTINES
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
-#undef arccosine
 
 /* ---------- constants */
 
@@ -1078,12 +1076,6 @@ boolean actor_path_3d_available(
 		*avoidance_distance_reference = avoidance_distance;
 
 	return available;
-}
-
-real arccosine(
-	real x)
-{
-	return acos(x);
 }
 
 /* ---------- private code */
@@ -2736,7 +2728,7 @@ static void actor_move_calculate_movement(
 		}
 		else
 		{
-			angle = acos(facing_dot);
+			angle = arccosine(facing_dot);
 		}
 
 		steering_angle = angle;
