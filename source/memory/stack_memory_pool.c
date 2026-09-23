@@ -134,8 +134,8 @@ struct stack_memory_pool_block
 	long slot_index;
 	struct stack_memory_pool_block *previous;
 	struct stack_memory_pool_block *next;
-	void **handle;
-	long lock_count;
+	char const *file;
+	unsigned long line;
 	unsigned long header_signature;
 	byte data[1];
 };
@@ -1059,8 +1059,8 @@ static struct stack_memory_pool_block *stack_memory_pool_allocate(
 					pool->blocks[pool->next_block_index],
 					size);
 				block = pool->blocks[pool->next_block_index];
-				block->handle = (void **)file;
-				block->lock_count = line;
+				block->file = file;
+				block->line = line;
 				if (!pool->first_block)
 				{
 					match_assert(
