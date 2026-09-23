@@ -619,11 +619,7 @@ boolean leaf_map_leaf_spans_polygon(
 
 				vector_from_points3d(&point0, &point1, &delta);
 				intersection_t= vector_intersect_plane3d(&point0, &delta, plane);
-				/* Preserve January's scalar expansion without emitting a
-				 * point_from_line3d COMDAT. */
-				intersection.x= delta.i*intersection_t + point0.x;
-				intersection.y= delta.j*intersection_t + point0.y;
-				intersection.z= delta.k*intersection_t + point0.z;
+				point_from_line3d(&point0, &delta, intersection_t, &intersection);
 				project_point3d(&intersection, projection, sign, &point);
 
 				if (convex_hull2d_test_point(vertex_count, vertices, &point, 0.05f))
@@ -645,7 +641,7 @@ void leaf_map_get_leaf_bounds(
 {
 	struct map_leaf *leaf = TAG_BLOCK_GET_ELEMENT(&leaf_map->leaves, leaf_index & LONG_MAX, struct map_leaf);
 	real_rectangle3d bounds = *global_null_rectangle3d;
-	real half_width, half_height, half_depth;
+	real_point3d corner;
 
 	if (leaf->portal_designators.count != 0)
 	{
@@ -746,11 +742,11 @@ void leaf_map_get_leaf_bounds(
 	center->y = (bounds.y1 + bounds.y0) * 0.5f;
 	center->z = (bounds.z1 + bounds.z0) * 0.5f;
 
-	half_width = bounds.x1 - center->x;
-	half_height = bounds.y1 - center->y;
-	half_depth = bounds.z1 - center->z;
+	corner.x = bounds.x1;
+	corner.y = bounds.y1;
+	corner.z = bounds.z1;
 
-	*radius = square_root(half_width * half_width + half_height * half_height + half_depth * half_depth);
+	*radius = distance3d(center, &corner);
 
 	return;
 }

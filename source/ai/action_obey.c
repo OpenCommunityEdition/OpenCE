@@ -246,7 +246,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define random_range random_range_inline
 #include "cseries.h"
 #include "actions.h"
 
@@ -273,7 +272,6 @@ symbols in this file:
 #include "units/biped_definitions.h"
 #include "memory/data.h"
 #include "units/units.h"
-#undef random_range
 
 /* ---------- constants */
 
@@ -1296,16 +1294,6 @@ flush_order_effects:
 	}
 
 	return;
-}
-
-short random_range(
-	short lower_bound,
-	short upper_bound)
-{
-	return seed_random_range(
-		get_global_random_seed_address(),
-		lower_bound,
-		upper_bound);
 }
 
 /* ---------- private code */

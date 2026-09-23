@@ -96,5 +96,65 @@
       "relocation_count": 11,
       "normalized_sha256": "85759b3811ff7dc47b03792ac85317be51431a3f9e01dcafce317ed736a391b0"
     }
+  },
+  {
+    "unit": "source/game/game_allegiance",
+    "symbol": "_global_game_team_names",
+    "reason": "The 40-byte January and rebuilt team-name tables have identical normalized payload, owner storage and flags, and all ten relocations resolve independently to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 40,
+      "relocation_count": 10,
+      "normalized_sha256": "2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"
+    }
+  },
+  {
+    "unit": "source/game/game_engine_slayer",
+    "symbol": "_slayer_engine",
+    "reason": "The 136-byte January and rebuilt engine tables have identical normalized payload, external owner storage and section flags, and all 24 relocations resolve independently to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 24,
+      "normalized_sha256": "cd47b29508fea4e4c11451792c17f629a9ad240b3c3df5c889c0d416c378bc78"
+    }
+  },
+  {
+    "unit": "source/interface/hud_definitions",
+    "symbol": "_global_hud_anchor_names",
+    "reason": "The 20-byte January and rebuilt HUD anchor-name tables have identical normalized payload, owner storage and flags, and all five relocations resolve independently to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 20,
+      "relocation_count": 5,
+      "normalized_sha256": "de47c9b27eb8d300dbb5f2c353e632c393262cf06340c4fa7f1b40c4cbd36f90"
+    }
+  },
+  {
+    "unit": "source/structures/leaf_map",
+    "symbol": "_leaf_map_initialize_section",
+    "reason": "January and rebuilt profile-section data have identical 2512-byte payload, section flags and static owner, with all 28 relocations independently resolving to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 2512,
+      "relocation_count": 28,
+      "normalized_sha256": "34570fc43b6cae2795503a6a62861e9a42ce856cb74d895ba7fa6174f1bda68b"
+    }
+  },
+  {
+    "unit": "source/game/game_engine_race",
+    "symbol": "_race_engine",
+    "reason": "January and rebuilt race-engine tables have identical 136-byte payload, section flags and external owner, with all 25 relocations independently resolving to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 25,
+      "normalized_sha256": "97a4c632a978acafd20933da4504d8ec3fdf3c5afd2f78934bced57dc8f746f4"
+    }
+  },
+  {
+    "unit": "source/game/game_engine_ctf",
+    "symbol": "_ctf_engine",
+    "reason": "January and rebuilt CTF-engine tables have identical 136-byte payload, section flags and external owner, with all 28 relocations independently resolving to the same image destinations; objdiff undercredits this sole unmatched section.",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 28,
+      "normalized_sha256": "45c41730d038fd3f985f7ccfd8a7e04aa02e2db549ac941386e7cd04c1e1d8c1"
+    }
   }
 ]
