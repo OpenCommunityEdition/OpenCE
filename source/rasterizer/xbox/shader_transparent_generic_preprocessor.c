@@ -7,6 +7,7 @@ SHADER_TRANSPARENT_GENERIC_PREPROCESSOR.C
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
 

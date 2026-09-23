@@ -41,6 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "cseries/errors.h"
 #include "real_math.h"
 /* The January object retains out-of-line copies of the D3D inline wrappers.
@@ -163,8 +164,6 @@ void rasterizer_set_vertex_shader_permutation(
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *pixel_shader_definition);
 
-unsigned long real_argb_color_to_pixel32(
-	real_argb_color const *color);
 
 /* ---------- globals */
 

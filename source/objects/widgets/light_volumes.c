@@ -37,6 +37,7 @@ symbols in this file:
 #include "objects/widgets/light_volumes.h"
 
 #include "bitmaps/bitmaps.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"

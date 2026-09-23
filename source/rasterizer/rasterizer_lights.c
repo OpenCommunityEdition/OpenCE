@@ -85,6 +85,7 @@ symbols in this file:
 #include "errors.h"
 #include "bitmaps/bitmaps.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "math/periodic_functions.h"
 #include "objects/widgets/widget_types.h"
 #include "render.h"

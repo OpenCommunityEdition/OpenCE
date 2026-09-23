@@ -647,6 +647,7 @@ struct widget_instance;
 #include "interface/attract_mode.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/interface.h"
 #include "interface/player_ui.h"
 #include "interface/progress_bar.h"

@@ -64,6 +64,7 @@ symbols in this file:
 #include "cseries.h"
 #include "errors.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "rasterizer.h"
 #include "rasterizer_debug.h"
 #include "rasterizer_geometry.h"

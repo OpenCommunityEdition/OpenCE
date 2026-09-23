@@ -79,6 +79,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"

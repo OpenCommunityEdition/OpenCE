@@ -126,6 +126,7 @@ symbols in this file:
 #include "game/players.h"
 #include "input/input_abstraction.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"

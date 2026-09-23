@@ -30,6 +30,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
+#include "bitmaps/bitmap_color_conversion.h"
 #include "math/periodic_functions.h"
 #include "objects/object_definitions.h"
 #include "objects/objects.h"

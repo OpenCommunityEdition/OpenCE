@@ -14,6 +14,7 @@ file has inline function assertions.
 #include "bitmaps/bitmaps.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"
+#include "effects/particles.h"
 
 /* ---------- constants */
 
@@ -39,6 +40,102 @@ file has inline function assertions.
 /* ---------- globals */
 
 /* ---------- public code */
+
+__inline pixel32 real_argb_color_to_pixel32(
+	real_argb_color const *color)
+{
+	real scale = 255.0f;
+	pixel32 result;
+
+	match_vassert(
+		"..\\bitmaps\\bitmaps_inlines.h",
+		89,
+		valid_real_argb_color(color),
+		csprintf(
+			temporary,
+			"%s: assert_valid_real_argb_color(%f, %f, %f, %f)",
+			"color",
+			color->alpha,
+			color->red,
+			color->green,
+			color->blue));
+
+	{
+		long alpha;
+		long red;
+		long green;
+		long blue;
+
+		__asm
+		{
+			mov		edx, color
+			fld		dword ptr [edx]
+			fld		dword ptr [edx+4]
+			fld		dword ptr [edx+8]
+			fld		dword ptr [edx+12]
+			fld		scale
+			fmul	st(4), st
+			fmul	st(3), st
+			fmul	st(2), st
+			fmulp	st(1), st
+			fistp	blue
+			fistp	green
+			fistp	red
+			fistp	alpha
+			mov		edx, blue
+			mov		ebx, green
+			mov		ecx, red
+			mov		eax, alpha
+			shl		ebx, 8
+			shl		ecx, 16
+			shl		eax, 24
+			or		edx, ebx
+			or		edx, ecx
+			or		edx, eax
+			mov		result, edx
+		}
+	}
+
+	{
+		pixel32 verify;
+
+		__asm
+		{
+			mov		edx, color
+			fld		dword ptr [edx]
+			fld		dword ptr [edx+4]
+			fld		dword ptr [edx+8]
+			fld		dword ptr [edx+12]
+			fld		scale
+			fmul	st(4), st
+			fmul	st(3), st
+			fmul	st(2), st
+			fmulp	st(1), st
+			fistp	verify
+			and		verify, 0FFh
+			mov		edx, verify
+			fistp	verify
+			and		verify, 0FFh
+			shl		verify, 8
+			or		edx, verify
+			fistp	verify
+			and		verify, 0FFh
+			shl		verify, 16
+			or		edx, verify
+			fistp	verify
+			shl		verify, 24
+			or		edx, verify
+			mov		verify, edx
+		}
+
+		match_assert(
+			"..\\bitmaps\\bitmaps_inlines.h",
+			188,
+			verify == result);
+	}
+
+	return result;
+}
 
 __inline pixel32 real_rgb_color_to_pixel32(
 	real_rgb_color const *color)
