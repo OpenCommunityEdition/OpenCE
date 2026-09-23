@@ -95,16 +95,6 @@ enum collision_surface_flags
 
 /* ---------- structures */
 
-struct collision_debug_spray_cache
-{
-	real_vector3d normals[COLLISION_DEBUG_SPRAY_COUNT];
-	real_point3d points[COLLISION_DEBUG_SPRAY_COUNT];
-	unsigned long hit_flags[BIT_VECTOR_SIZE_IN_LONGS(COLLISION_DEBUG_SPRAY_COUNT)];
-};
-
-typedef char collision_debug_spray_cache_size_assert[
-	sizeof(struct collision_debug_spray_cache) == 0x7118 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* ---------- globals */
@@ -152,7 +142,9 @@ boolean collision_debug_flag_objects = TRUE;
 real collision_debug_length = 100.0f;
 long collision_debug_ignore_object_index = NONE;
 
-static struct collision_debug_spray_cache collision_debug_spray_globals = { 0 };
+static real_vector3d collision_debug_spray_normals[COLLISION_DEBUG_SPRAY_ROWS][COLLISION_DEBUG_SPRAY_COLUMNS] = { 0 };
+static real_point3d collision_debug_spray_points[COLLISION_DEBUG_SPRAY_ROWS][COLLISION_DEBUG_SPRAY_COLUMNS] = { 0 };
+static unsigned long collision_debug_spray_hit_flags[BIT_VECTOR_SIZE_IN_LONGS(COLLISION_DEBUG_SPRAY_COUNT)] = { 0 };
 real collision_debug_width = 0.0f;
 real collision_debug_height = 0.0f;
 boolean collision_debug_phantom_bsp = FALSE;
@@ -163,8 +155,6 @@ boolean collision_debug_phantom_bsp_found = FALSE;
 void collision_debug_render(
 	void)
 {
-	char buffer[1000];
-
 	match_assert(
 		"c:\\halo\\SOURCE\\physics\\collision_debug.c",
 		76,
@@ -175,11 +165,12 @@ void collision_debug_render(
 	{
 		unsigned long flags;
 		real length;
-		real_point3d debug_point;
-		real_vector3d debug_vector;
+		real_point3d point;
+		real_vector3d vector;
 		long ignore_object_index;
 
-		flags = collision_debug_flag_front_facing_surfaces != FALSE;
+		flags = 0;
+		SET_FLAG(flags, _collision_test_front_facing_surfaces_bit, collision_debug_flag_front_facing_surfaces);
 		SET_FLAG(flags, _collision_test_back_facing_surfaces_bit, collision_debug_flag_back_facing_surfaces);
 		SET_FLAG(flags, _collision_test_ignore_two_sided_surfaces_bit, collision_debug_flag_ignore_two_sided_surfaces);
 		SET_FLAG(flags, _collision_test_ignore_invisible_surfaces_bit, collision_debug_flag_ignore_invisible_surfaces);
@@ -206,48 +197,41 @@ void collision_debug_render(
 
 		if (!collision_debug_repeat)
 		{
-			long player_index = local_player_get_player_index(render.local_player_index);
-
-			if (player_index == NONE)
-				collision_debug_ignore_object_index = NONE;
-			else
-				collision_debug_ignore_object_index = player_get(local_player_get_player_index(render.local_player_index))->unit_index;
-
+			collision_debug_ignore_object_index = local_player_get_player_index(render.local_player_index) == NONE
+				? NONE
+				: player_get(local_player_get_player_index(render.local_player_index))->unit_index;
 			collision_debug_point = render.camera.position;
 			collision_debug_vector = render.camera.forward;
 		}
 
 		length = (real)fabs(collision_debug_length);
-		debug_point = collision_debug_point;
-		debug_vector.i = collision_debug_vector.i * length;
-		debug_vector.j = collision_debug_vector.j * length;
-		debug_vector.k = collision_debug_vector.k * length;
+		point = collision_debug_point;
+		vector = collision_debug_vector;
+		scale_vector3d(&vector, length, &vector);
 		ignore_object_index = collision_debug_ignore_object_index;
 
 		if (collision_debug_phantom_bsp)
 		{
-			struct collision_bsp_test_vector_result collision;
+			struct collision_bsp_test_vector_result vector_result;
 
 			if (collision_bsp_test_vector(
 				flags,
 				global_collision_bsp_get(),
 				MAXIMUM_BREAKABLE_SURFACES_PER_MAP,
 				breakable_surface_flags_get(),
-				&debug_point,
-				&debug_vector,
+				&point,
+				&vector,
 				1.0f,
-				&collision))
+				&vector_result))
 			{
-				real_point3d point;
+				real_point3d collision_point;
 				struct collision_feature_list features;
 
-				point.x = debug_point.x + debug_vector.i * collision.t;
-				point.y = debug_point.y + debug_vector.j * collision.t;
-				point.z = debug_point.z + debug_vector.k * collision.t;
+				point_from_line3d(&point, &vector, vector_result.t, &collision_point);
 
 				if (!collision_get_features_in_sphere(
 					flags,
-					&point,
+					&collision_point,
 					0.01f,
 					0.0f,
 					0.01f,
@@ -255,7 +239,7 @@ void collision_debug_render(
 					&features))
 				{
 					collision_debug_phantom_bsp_found = TRUE;
-					collision_debug_phantom_bsp_point = point;
+					collision_debug_phantom_bsp_point = collision_point;
 				}
 			}
 
@@ -264,8 +248,8 @@ void collision_debug_render(
 				real yaw;
 				real pitch;
 				real roll;
-				real_matrix4x3 rotation;
-				real_point3d points[8];
+				real_matrix4x3 rotation_matrix;
+				real_point3d rotated_points[8];
 				short point_index;
 
 				yaw = (real)fmod((real)game_time_get() * 0.104719758f, 6.2831854820251465);
@@ -277,33 +261,31 @@ void collision_debug_render(
 					&collision_debug_phantom_bsp_point,
 					"phantom bsp",
 					global_real_argb_pink);
-				matrix4x3_rotation_from_angles(&rotation, yaw, pitch, roll);
+				matrix4x3_rotation_from_angles(&rotation_matrix, yaw, pitch, roll);
 
-				for (point_index = 0; point_index < NUMBEROF(points); point_index++)
+				for (point_index = 0; point_index < NUMBEROF(rotated_points); point_index++)
 				{
-					real_vector3d transformed;
+					real_vector3d cube_vector;
 
 					matrix4x3_transform_vector(
-						&rotation,
+						&rotation_matrix,
 						(real_vector3d const *)&collision_debug_cube_vertices[point_index],
-						&transformed);
-					points[point_index].x = collision_debug_phantom_bsp_point.x + transformed.i * 0.15f;
-					points[point_index].y = collision_debug_phantom_bsp_point.y + transformed.j * 0.15f;
-					points[point_index].z = collision_debug_phantom_bsp_point.z + transformed.k * 0.15f;
+						&cube_vector);
+					point_from_line3d(&collision_debug_phantom_bsp_point, &cube_vector, 0.15f, &rotated_points[point_index]);
 				}
 
-				render_debug_line(TRUE, &points[0], &points[1], global_real_argb_pink);
-				render_debug_line(TRUE, &points[1], &points[3], global_real_argb_pink);
-				render_debug_line(TRUE, &points[3], &points[2], global_real_argb_pink);
-				render_debug_line(TRUE, &points[2], &points[0], global_real_argb_pink);
-				render_debug_line(TRUE, &points[4], &points[5], global_real_argb_pink);
-				render_debug_line(TRUE, &points[5], &points[7], global_real_argb_pink);
-				render_debug_line(TRUE, &points[7], &points[6], global_real_argb_pink);
-				render_debug_line(TRUE, &points[6], &points[4], global_real_argb_pink);
-				render_debug_line(TRUE, &points[0], &points[4], global_real_argb_pink);
-				render_debug_line(TRUE, &points[1], &points[5], global_real_argb_pink);
-				render_debug_line(TRUE, &points[2], &points[6], global_real_argb_pink);
-				render_debug_line(TRUE, &points[3], &points[7], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[0], &rotated_points[1], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[1], &rotated_points[3], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[3], &rotated_points[2], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[2], &rotated_points[0], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[4], &rotated_points[5], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[5], &rotated_points[7], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[7], &rotated_points[6], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[6], &rotated_points[4], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[0], &rotated_points[4], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[1], &rotated_points[5], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[2], &rotated_points[6], global_real_argb_pink);
+				render_debug_line(TRUE, &rotated_points[3], &rotated_points[7], global_real_argb_pink);
 			}
 		}
 
@@ -311,36 +293,35 @@ void collision_debug_render(
 		{
 			if (collision_debug_length <= 0.0f)
 			{
-				debug_point.x += debug_vector.i;
-				debug_point.y += debug_vector.j;
-				debug_point.z += debug_vector.k;
+				add_vectors3d((real_vector3d const *)&point, &vector, (real_vector3d *)&point);
 
 				if (collision_debug_width <= 0.0f)
 				{
-					if (collision_test_point(flags, &debug_point, ignore_object_index))
-						render_debug_point(TRUE, &debug_point, 0.1f, global_real_argb_red);
+					if (collision_test_point(flags, &point, ignore_object_index))
+						render_debug_point(TRUE, &point, 0.1f, global_real_argb_red);
 					else
-						render_debug_point(TRUE, &debug_point, 0.1f, global_real_argb_green);
+						render_debug_point(TRUE, &point, 0.1f, global_real_argb_green);
 				}
 				else
 				{
-					if (collision_test_sphere(&debug_point, collision_debug_width, ignore_object_index))
-						render_debug_sphere(TRUE, &debug_point, collision_debug_width, global_real_argb_red);
+					if (collision_test_sphere(&point, collision_debug_width, ignore_object_index))
+						render_debug_sphere(TRUE, &point, collision_debug_width, global_real_argb_red);
 					else
-						render_debug_sphere(TRUE, &debug_point, collision_debug_width, global_real_argb_green);
+						render_debug_sphere(TRUE, &point, collision_debug_width, global_real_argb_green);
 				}
 			}
 			else if (collision_debug_width <= 0.0f)
 			{
 				struct collision_result collision;
 
-				if (collision_test_vector(flags, &debug_point, &debug_vector, ignore_object_index, &collision))
+				if (collision_test_vector(flags, &point, &vector, ignore_object_index, &collision))
 				{
 					struct collision_bsp *bsp = NULL;
 					real_matrix4x3 const *matrix = NULL;
 					struct collision_surface const *surface = NULL;
+					char textstring[2048];
 
-					render_debug_vector(TRUE, &debug_point, &debug_vector, collision.t, global_real_argb_red);
+					render_debug_vector(TRUE, &point, &vector, collision.t, global_real_argb_red);
 					render_debug_point(TRUE, &collision.point, 0.125f, global_real_argb_red);
 					render_debug_vector(TRUE, &collision.point, &collision.plane.n, 0.25f, global_real_argb_red);
 
@@ -368,17 +349,12 @@ void collision_debug_render(
 						surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, collision.surface_index, struct collision_surface);
 						render_debug_collision_surface(bsp, collision.surface_index, matrix, global_real_argb_red);
 
-						/*
-						 * Original January bug: the destination is 1000 bytes, but the
-						 * historical call advertises 2048. Preserve it for byte matching.
-						 * A safe non-matching build should pass sizeof(buffer) instead.
-						 */
 						_snprintf(
-							buffer,
-							2048,
+							textstring,
+							sizeof(textstring),
 							"plane #%d%s|nsurface #%d%s%s%s%s|n%s|n%f degrees",
 							surface->plane_designator & LONG_MAX,
-							surface->plane_designator < 0 ? " negated" : "",
+							surface->plane_designator & LONG_MIN ? " negated" : "",
 							collision.surface_index,
 							TEST_FLAG(collision.flags, _collision_surface_two_sided_bit) ? " two-sided" : "",
 							TEST_FLAG(collision.flags, _collision_surface_invisible_bit) ? " invisible" : "",
@@ -386,71 +362,68 @@ void collision_debug_render(
 							TEST_FLAG(collision.flags, _collision_surface_breakable_bit) ? " breakable" : "",
 							material_get_name(collision.material_type),
 							(real)acos(collision.plane.n.k) * 57.295776f);
-						render_debug_string(TRUE, buffer);
+						render_debug_string(TRUE, textstring);
 					}
 				}
 				else
 				{
-					real_point3d endpoint;
-					endpoint.x = debug_point.x + debug_vector.i;
-					endpoint.y = debug_point.y + debug_vector.j;
-					endpoint.z = debug_point.z + debug_vector.k;
-					render_debug_line(TRUE, &debug_point, &endpoint, global_real_argb_green);
-					render_debug_point(TRUE, &endpoint, 0.125f, global_real_argb_green);
+					render_debug_line(TRUE, &point, &collision.point, global_real_argb_green);
+					render_debug_point(TRUE, &collision.point, 0.125f, global_real_argb_green);
 				}
 			}
 			else
 			{
 				short count;
 				short collision_index;
-				real_point3d clipped_position;
-				real_vector3d clipped_velocity;
+				real_point3d position = point;
+				real_vector3d velocity = vector;
+				real_point3d new_position;
+				real_vector3d new_velocity;
 				struct collision_plane collisions[MAXIMUM_COLLISION_DEBUG_PATH_POINTS];
 
-				clipped_position = debug_point;
-				clipped_velocity = debug_vector;
-
-				if (collision_debug_height > 0.0f)
+				if (collision_debug_height <= 0.0f)
 				{
-					count = collision_move_pill(
+					count = collision_move_sphere(
 						flags,
-						&debug_point,
-						&debug_vector,
-						collision_debug_height,
+						&position,
+						&velocity,
 						collision_debug_width,
 						ignore_object_index,
-						&clipped_position,
-						&clipped_velocity,
+						&new_position,
+						&new_velocity,
 						MAXIMUM_COLLISION_DEBUG_RESULTS,
 						collisions);
 				}
 				else
 				{
-					count = collision_move_sphere(
+					count = collision_move_pill(
 						flags,
-						&debug_point,
-						&debug_vector,
+						&position,
+						&velocity,
+						collision_debug_height,
 						collision_debug_width,
 						ignore_object_index,
-						&clipped_position,
-						&clipped_velocity,
+						&new_position,
+						&new_velocity,
 						MAXIMUM_COLLISION_DEBUG_RESULTS,
 						collisions);
 				}
 
-				render_debug_vector(TRUE, &debug_point, &debug_vector, 1.0f, global_real_argb_blue);
+				render_debug_vector(TRUE, &position, &velocity, 1.0f, global_real_argb_blue);
 				match_assert(
 					"c:\\halo\\SOURCE\\physics\\collision_debug.c",
 					297,
 					count<=14);
 
 				memmove(&collisions[1], &collisions[0], count * sizeof(collisions[0]));
-				collisions[0].point = debug_point;
+				collisions[0].point = position;
 				memset(&collisions[0].plane, 0, sizeof(collisions[0].plane));
-				collisions[count + 1].point = clipped_position;
-				memset(&collisions[count + 1].plane, 0, sizeof(collisions[0].plane));
+				count++;
+				collisions[count].point = new_position;
+				memset(&collisions[count].plane, 0, sizeof(collisions[count].plane));
+				count++;
 
-				for (collision_index = 0; collision_index < count + 2; collision_index++)
+				for (collision_index = 0; collision_index < count; collision_index++)
 				{
 					render_debug_point(TRUE, &collisions[collision_index].point, 0.0625f, global_real_argb_red);
 					if (collision_index > 0)
@@ -458,7 +431,7 @@ void collision_debug_render(
 					render_debug_vector(TRUE, &collisions[collision_index].point, &collisions[collision_index].plane.n, 0.125f, global_real_argb_red);
 				}
 
-				render_debug_vector(TRUE, &clipped_position, &clipped_velocity, 1.0f, global_real_argb_green);
+				render_debug_vector(TRUE, &new_position, &new_velocity, 1.0f, global_real_argb_green);
 			}
 		}
 
@@ -466,24 +439,21 @@ void collision_debug_render(
 		{
 			if (collision_debug_length <= 0.0f)
 			{
-				real_point3d point;
-				real minimum_x = render.camera.position.x + render.camera.forward.i + render.camera.forward.i - 0.125f;
-				real maximum_x = render.camera.position.x + render.camera.forward.i + render.camera.forward.i + 0.125f;
-				real minimum_y = render.camera.position.y + render.camera.forward.j + render.camera.forward.j - 0.125f;
-				real maximum_y = render.camera.position.y + render.camera.forward.j + render.camera.forward.j + 0.125f;
-				real minimum_z = render.camera.position.z + render.camera.forward.k + render.camera.forward.k - 0.125f;
-				real maximum_z = render.camera.position.z + render.camera.forward.k + render.camera.forward.k + 0.125f;
+				real_point3d o;
+				real_point3d p;
 
-				for (point.z = minimum_z; point.z < maximum_z; point.z += 0.0625f)
+				point_from_line3d(&render.camera.position, &render.camera.forward, 2.0f, &o);
+				for (p.z = o.z - 0.125f; p.z <= o.z + 0.125f; p.z += 0.0625f)
 				{
-					for (point.y = minimum_y; point.y < maximum_y; point.y += 0.0625f)
+					for (p.y = o.y - 0.125f; p.y <= o.y + 0.125f; p.y += 0.0625f)
 					{
-						for (point.x = minimum_x; point.x < maximum_x; point.x += 0.0625f)
+						for (p.x = o.x - 0.125f; p.x <= o.x + 0.125f; p.x += 0.0625f)
 						{
-							real_argb_color const *color = collision_test_point(flags, &point, NONE)
-								? global_real_argb_red
-								: global_real_argb_green;
-							render_debug_point(TRUE, &point, 0.03125f, color);
+							render_debug_point(
+								TRUE,
+								&p,
+								0.0625f,
+								collision_test_point(flags, &p, NONE) ? global_real_argb_red : global_real_argb_green);
 						}
 					}
 				}
@@ -492,98 +462,82 @@ void collision_debug_render(
 			{
 				if (!collision_debug_repeat)
 				{
-					long row;
-					long column;
-					long spray_index;
-					long rows_remaining;
-					long columns_remaining;
-					real_rectangle2d projection_bounds;
-					real_vector3d horizontal_step;
-					real_vector3d vertical_step;
-					real_vector3d base_vector;
+					real_vector3d i;
+					real_vector3d j;
+					real_vector3d k;
+					short row;
+					short column;
 
-					render_frustum_get_projection_bounds(&render.frustum, &projection_bounds);
-					horizontal_step.i = (projection_bounds.x1 - projection_bounds.x0) * collision_debug_length * 0.025f;
-					horizontal_step.j = 0.0f;
-					horizontal_step.k = 0.0f;
-					vertical_step.i = 0.0f;
-					vertical_step.j = (projection_bounds.y1 - projection_bounds.y0) * collision_debug_length * (1.0f / 30.0f);
-					vertical_step.k = 0.0f;
-					base_vector.i = projection_bounds.x0 * collision_debug_length;
-					base_vector.j = projection_bounds.y0 * collision_debug_length;
-					base_vector.k = -collision_debug_length;
-
-					matrix4x3_transform_vector(&render.frustum.view_to_world, &horizontal_step, &horizontal_step);
-					matrix4x3_transform_vector(&render.frustum.view_to_world, &vertical_step, &vertical_step);
-					matrix4x3_transform_vector(&render.frustum.view_to_world, &base_vector, &base_vector);
-
-					row = 0;
-					rows_remaining = COLLISION_DEBUG_SPRAY_ROWS;
-					do
 					{
-						spray_index = row * COLLISION_DEBUG_SPRAY_COLUMNS;
-						column = 0;
-						columns_remaining = COLLISION_DEBUG_SPRAY_COLUMNS;
-						do
+						real_rectangle2d bounds;
+
+						render_frustum_get_projection_bounds(&render.frustum, &bounds);
+						set_real_vector3d(
+							&i,
+							(bounds.x1 - bounds.x0) * collision_debug_length / COLLISION_DEBUG_SPRAY_COLUMNS,
+							0.0f,
+							0.0f);
+						set_real_vector3d(
+							&j,
+							0.0f,
+							(bounds.y1 - bounds.y0) * collision_debug_length / COLLISION_DEBUG_SPRAY_ROWS,
+							0.0f);
+						set_real_vector3d(
+							&k,
+							bounds.x0 * collision_debug_length,
+							bounds.y0 * collision_debug_length,
+							-collision_debug_length);
+					}
+
+					matrix4x3_transform_vector(&render.frustum.view_to_world, &i, &i);
+					matrix4x3_transform_vector(&render.frustum.view_to_world, &j, &j);
+					matrix4x3_transform_vector(&render.frustum.view_to_world, &k, &k);
+
+					for (row = 0; row < COLLISION_DEBUG_SPRAY_ROWS; row++)
+					{
+						for (column = 0; column < COLLISION_DEBUG_SPRAY_COLUMNS; column++)
 						{
-							boolean hit;
 							struct collision_result collision;
-							real_vector3d direction;
+							real_vector3d v;
 
-							direction.i = base_vector.i + horizontal_step.i * column + vertical_step.i * row;
-							direction.j = base_vector.j + horizontal_step.j * column + vertical_step.j * row;
-							direction.k = base_vector.k + horizontal_step.k * column + vertical_step.k * row;
+							v.i = i.i * column + j.i * row + k.i;
+							v.j = i.j * column + j.j * row + k.j;
+							v.k = i.k * column + j.k * row + k.k;
 
-							hit = collision_test_vector(flags, &render.camera.position, &direction, ignore_object_index, &collision);
-							if (hit)
+							if (collision_test_vector(flags, &render.camera.position, &v, ignore_object_index, &collision))
 							{
-								BIT_VECTOR_SET_FLAG(collision_debug_spray_globals.hit_flags, spray_index, TRUE);
-								collision_debug_spray_globals.points[spray_index] = collision.point;
-								collision_debug_spray_globals.normals[spray_index] = collision.plane.n;
+								BIT_VECTOR_SET_FLAG(collision_debug_spray_hit_flags, row * COLLISION_DEBUG_SPRAY_COLUMNS + column, TRUE);
+								collision_debug_spray_points[row][column] = collision.point;
+								collision_debug_spray_normals[row][column] = collision.plane.n;
 							}
 							else
 							{
-								BIT_VECTOR_SET_FLAG(collision_debug_spray_globals.hit_flags, spray_index, FALSE);
+								BIT_VECTOR_SET_FLAG(collision_debug_spray_hit_flags, row * COLLISION_DEBUG_SPRAY_COLUMNS + column, FALSE);
 							}
-
-							column++;
-							spray_index++;
-						} while (--columns_remaining);
-
-						row++;
-					} while (--rows_remaining);
+						}
+					}
 				}
 
 				{
-					long row;
-					long spray_index;
-					long rows_remaining;
-					long columns_remaining;
+					short row;
+					short column;
 
-					row = 0;
-					rows_remaining = COLLISION_DEBUG_SPRAY_ROWS;
-					do
+					for (row = 0; row < COLLISION_DEBUG_SPRAY_ROWS; row++)
 					{
-						spray_index = row * COLLISION_DEBUG_SPRAY_COLUMNS;
-						columns_remaining = COLLISION_DEBUG_SPRAY_COLUMNS;
-						do
+						for (column = 0; column < COLLISION_DEBUG_SPRAY_COLUMNS; column++)
 						{
-							if (BIT_VECTOR_TEST_FLAG(collision_debug_spray_globals.hit_flags, spray_index))
+							if (BIT_VECTOR_TEST_FLAG(collision_debug_spray_hit_flags, row * COLLISION_DEBUG_SPRAY_COLUMNS + column))
 							{
-								render_debug_point(TRUE, &collision_debug_spray_globals.points[spray_index], 0.03125f, global_real_argb_red);
+								render_debug_point(TRUE, &collision_debug_spray_points[row][column], 0.03125f, global_real_argb_red);
 								render_debug_vector(
 									TRUE,
-									&collision_debug_spray_globals.points[spray_index],
-									&collision_debug_spray_globals.normals[spray_index],
+									&collision_debug_spray_points[row][column],
+									&collision_debug_spray_normals[row][column],
 									0.0625f,
 									global_real_argb_red);
 							}
-
-							spray_index++;
-						} while (--columns_remaining);
-
-						row++;
-					} while (--rows_remaining);
+						}
+					}
 				}
 			}
 		}
@@ -591,12 +545,11 @@ void collision_debug_render(
 		if (collision_debug_features)
 		{
 			real radius;
-			real_point3d center;
+			real_point3d test_center;
 			struct collision_feature_list features;
 
-			center.x = collision_debug_point.x + collision_debug_vector.i * 0.5f;
-			center.y = collision_debug_point.y + collision_debug_vector.j * 0.5f;
-			center.z = collision_debug_point.z + collision_debug_vector.k * 0.5f + collision_debug_height * 0.5f;
+			point_from_line3d(&collision_debug_point, &collision_debug_vector, 0.5f, &test_center);
+			test_center.z += collision_debug_height * 0.5f;
 			radius = (real)sqrt(
 				collision_debug_vector.i * collision_debug_vector.i
 				+ collision_debug_vector.j * collision_debug_vector.j
@@ -606,7 +559,7 @@ void collision_debug_render(
 
 			if (collision_get_features_in_sphere(
 				flags,
-				&center,
+				&test_center,
 				radius,
 				collision_debug_height,
 				collision_debug_width,
