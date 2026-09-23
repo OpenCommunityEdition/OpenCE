@@ -277,5 +277,45 @@
       "relocation_count": 21,
       "normalized_sha256": "443063631e6958ff5026be3038f8785d61eee4073cb01b8eaa4fdfcc3b620002"
     }
+  },
+  {
+    "unit": "source/game/cheats",
+    "symbol": "_cheat_strings",
+    "reason": "January and rebuilt cheats BSS have equal 3201-byte extent, section flags, external owner, zero relocations and matching section-relative symbol layout. The two private function names come from the first-party HCEA SHIP PDB; the string array has a descriptive inferred name, and the trailing unreferenced byte is disclosed as name-unknown rather than credited as a separate owner. All 14 target functions are strict exact and candidate-only providers pass bounded links in both orders.",
+    "measurements": {
+      "size": 3201,
+      "relocation_count": 0,
+      "normalized_sha256": "76d6c353527d212ec3799ea375f945e3ae3760257bd2ef5a75441090df0ddfac"
+    }
+  },
+  {
+    "unit": "source/items/items",
+    "symbol": "_item_update_section",
+    "reason": "January and rebuilt item-update profile owners have equal 1528-byte payload, section flags, external owner and one resolved image relocation. All 18 target functions and eight target-owned noncode symbols are strict exact. The only former link conflict was the hand-written add_vectors3d provider in ActorCombat; its genuine shared-header inline now emits the same code as SELECT_ANY without changing any ActorCombat function or park. All 42 candidate-only helper/literal copies equal their January-selected providers and 26 ordinary provider-pair links pass in both orders.",
+    "measurements": {
+      "size": 1528,
+      "relocation_count": 1,
+      "normalized_sha256": "806638334fff1341360b4dec7db0987871f376bc3999e26ff4bcd3a1755d2955"
+    }
+  },
+  {
+    "unit": "source/interface/hud",
+    "symbol": "_default_string",
+    "reason": "January and rebuilt HUD own the same four-byte external data pointer, section flags and relocation destination: the two-zero-byte string selected from GameEngine. All 22 target functions are strict exact. Five candidate-only genuine shared-header inline helpers match their January-selected copies byte-for-byte and ordinary provider-pair links pass in both orders, so these folded copies receive no separate credit.",
+    "measurements": {
+      "size": 4,
+      "relocation_count": 1,
+      "normalized_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    }
+  },
+  {
+    "unit": "source/effects/particles",
+    "symbol": "_particles_update_section",
+    "reason": "January and rebuilt particles own the same 1536-byte static data section with three image-equivalent relocations, flags and payload. Its eight-byte collision-scale bounds also have identical payload, flags and the external linkage January requires. All 20 target functions are strict exact; genuine shared-header helper providers now link in both orders after removing duplicate hand-written bodies from DebugMemory, Contrails and BoredCamera. Candidate-only folded helper copies receive no separate credit.",
+    "measurements": {
+      "size": 1536,
+      "relocation_count": 3,
+      "normalized_sha256": "6d9398e131ef72b9a6ffc2321c22d27a3e2db1a458385b77b08ba0657a56c74f"
+    }
   }
 ]

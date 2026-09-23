@@ -222,15 +222,15 @@ static boolean eat_my_shorts(
 
 /* ---------- globals */
 
-struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals= {0};
+static struct rasterizer_frame_statistics_private_globals_definition rasterizer_frame_statistics_private_globals = {0};
 
 /* the FPS sample count and the profile-log accumulators are separate file-scope statics, not
    members of the private record: get_fps reloads fps_sample_count from memory after the
    sample-shift loop, which VC7 only does when the loop's array stores cannot alias it */
-static short fps_sample_count;
-static short profile_accumulation_index;
-static real profile_accumulated_time;
-static long profile_accumulated_pushbuffer_size;
+static short fps_sample_count = 0;
+static short profile_accumulation_index = 0;
+static real profile_accumulated_time = 0.0f;
+static long profile_accumulated_pushbuffer_size = 0;
 
 char const *profile_log_path = "d:\\r-prof.txt";
 

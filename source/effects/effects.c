@@ -139,7 +139,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define local_random_direction3d local_random_direction3d_inline
 #define real_local_random real_local_random_inline
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
@@ -173,7 +172,6 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/bipeds.h"
 #include "units/units.h"
-#undef local_random_direction3d
 #undef real_local_random
 
 /* ---------- constants */
@@ -1405,14 +1403,6 @@ real real_local_random(
 	return result;
 }
 
-real_vector3d *local_random_direction3d(
-	real_vector3d *direction)
-{
-	return seed_random_direction3d(
-		get_global_local_random_seed_address(),
-		direction);
-}
-
 /* ---------- private code */
 
 
@@ -2019,9 +2009,7 @@ static void effect_generate_particles(
 					particles->scale_b_flags,
 					_effect_particle_distribution_radius_bit);
 
-				seed_random_direction3d(
-					get_global_local_random_seed_address(),
-					&random_direction);
+				local_random_direction3d(&random_direction);
 				matrix4x3_transform_vector(
 					&instance->matrix,
 					&particles->offset,

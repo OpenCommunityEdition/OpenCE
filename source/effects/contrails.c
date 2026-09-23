@@ -66,8 +66,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define local_random_range local_random_range_inline
-#define local_random_vector_in_cone3d local_random_vector_in_cone3d_inline
 #include "effects/contrails.h"
 
 #include "bitmaps/bitmap_group.h"
@@ -78,8 +76,6 @@ symbols in this file:
 #include "physics/point_physics.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
-#undef local_random_range
-#undef local_random_vector_in_cone3d
 
 /* ---------- constants */
 
@@ -300,30 +296,6 @@ void contrails_reconnect_to_structure_bsp(
 	}
 
 	return;
-}
-
-short local_random_range(
-	short lower_bound,
-	short upper_bound)
-{
-	return seed_random_range(
-		get_global_local_random_seed_address(),
-		lower_bound,
-		upper_bound);
-}
-
-real_vector3d *local_random_vector_in_cone3d(
-	const real_vector3d *axis,
-	real inner_cone_angle,
-	real outer_cone_angle,
-	real_vector3d *result)
-{
-	return seed_random_vector_in_cone3d(
-		get_global_local_random_seed_address(),
-		axis,
-		inner_cone_angle,
-		outer_cone_angle,
-		result);
 }
 
 long contrail_new(
@@ -747,7 +719,7 @@ static void contrail_next_frame(
 			sequence_index,
 			struct bitmap_group_sequence)->bitmap_count)
 	{
-		contrail->sequence_index = local_random_range_inline(
+		contrail->sequence_index = local_random_range(
 			definition->first_sequence_index,
 			definition->sequence_count + definition->first_sequence_index);
 		contrail->frame_index = 0;
@@ -878,7 +850,7 @@ static void contrail_add_points(
 							FLAG(_contrail_point_transitioning_bit);
 						contrail_point->state_index = NONE;
 						contrail_point->density = contrail->density;
-						local_random_vector_in_cone3d_inline(
+						local_random_vector_in_cone3d(
 							&marker->matrix.forward,
 							0.0f,
 							point_velocity_cone_angle,

@@ -205,7 +205,7 @@ static boolean particle_update_physics(
 /* ---------- globals */
 
 // {upper, lower} bounds of the collision speed that scales a particle collision effect
-static real const particle_collision_effect_scale_bounds[2] = {1.5f, 0.5f};
+real const particle_collision_effect_scale_bounds[2] = {1.5f, 0.5f};
 
 static struct profile_section particles_update_section = {"particles_update", NONE, TRUE};
 

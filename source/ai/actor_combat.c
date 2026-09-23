@@ -129,7 +129,6 @@ symbols in this file:
 #define cross_product2d cross_product2d_inline
 #define normalize2d normalize2d_inline
 #define normalize3d normalize3d_inline
-#define add_vectors3d add_vectors3d_inline
 #define point_from_line3d actor_combat_point_from_line3d_inline
 #define vector_from_points3d actor_combat_vector_from_points3d_inline
 #define magnitude_squared3d actor_combat_magnitude_squared3d_inline
@@ -166,7 +165,6 @@ symbols in this file:
 #undef magnitude_squared3d
 #undef vector_from_points3d
 #undef point_from_line3d
-#undef add_vectors3d
 #undef normalize3d
 #undef normalize2d
 #undef cross_product2d
@@ -527,18 +525,6 @@ real cross_product2d(
 	real_vector2d const *b)
 {
 	return a->i*b->j - a->j*b->i;
-}
-
-real_vector3d *add_vectors3d(
-	real_vector3d const *a,
-	real_vector3d const *b,
-	real_vector3d *result)
-{
-	result->i = a->i+b->i;
-	result->j = a->j+b->j;
-	result->k = a->k+b->k;
-
-	return result;
 }
 
 static void actor_combat_find_nearby_target(

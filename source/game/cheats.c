@@ -15,7 +15,7 @@ symbols in this file:
 00094DD0 0060:
 	_cheat_active_camouflage_local_player (0000)
 00094E30 0060:
-	_code_00094e30 (0000)
+	_cheat_player_index (0000)
 00094E90 0010:
 	_cheats_initialize_for_new_map (0000)
 00094EA0 00b0:
@@ -23,7 +23,7 @@ symbols in this file:
 00094F50 0050:
 	_cheat_active_camouflage (0000)
 00094FA0 0150:
-	_code_00094fa0 (0000)
+	_cheat_objects (0000)
 000950F0 00d0:
 	_cheat_all_weapons (0000)
 000951C0 0050:
@@ -43,7 +43,7 @@ symbols in this file:
 0025AD14 0004:
 	__real@3ec90fdb (0000)
 0043D808 0c81:
-	_bss_0043d808 (0000)
+	_cheat_strings (0000)
 */
 
 /* ---------- headers */
@@ -87,15 +87,17 @@ enum
 
 /* ---------- globals */
 
-char bss_0043d808[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
-static boolean bss_0043e488 = FALSE;
+char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
+/* January emits this otherwise unreferenced byte after cheat_strings.
+ * Its original name and purpose are unknown; the name is descriptive only. */
+static boolean cheats_unused_flag = FALSE;
 
 /* ---------- code */
 
 void cheats_initialize(
 	void)
 {
-	csmemset(bss_0043d808, 0, sizeof(bss_0043d808));
+	csmemset(cheat_strings, 0, sizeof(cheat_strings));
 
 	return;
 }
@@ -131,15 +133,15 @@ void cheats_update(
 
 				for (button_index = 0; button_index<MAXIMUM_CHEATS; button_index++)
 				{
-					if (bss_0043d808[button_index][0] && gamepad->buttons[button_index]>0)
+					if (cheat_strings[button_index][0] && gamepad->buttons[button_index]>0)
 					{
 						director_inhibit_input(local_player_index);
 
 						if (gamepad->buttons[button_index]==1)
 						{
-							console_printf(FALSE, bss_0043d808[button_index]);
-							if (!hs_compile_and_evaluate(bss_0043d808[button_index]))
-								bss_0043d808[button_index][0] = 0;
+							console_printf(FALSE, cheat_strings[button_index]);
+							if (!hs_compile_and_evaluate(cheat_strings[button_index]))
+								cheat_strings[button_index][0] = 0;
 						}
 					}
 				}
@@ -161,15 +163,15 @@ void cheats_load(
 
 		for (cheat_index = 0; cheat_index<MAXIMUM_CHEATS; cheat_index++)
 		{
-			if (!fgets(bss_0043d808[cheat_index], MAXIMUM_CHEAT_LENGTH-1, file))
+			if (!fgets(cheat_strings[cheat_index], MAXIMUM_CHEAT_LENGTH-1, file))
 				break;
 
-			csstrtok(bss_0043d808[cheat_index], "\r\n\t;");
+			csstrtok(cheat_strings[cheat_index], "\r\n\t;");
 
 			if ((cheat_index==_gamepad_binary_button_back || cheat_index==_gamepad_binary_button_start)
-				&& bss_0043d808[cheat_index][0])
+				&& cheat_strings[cheat_index][0])
 			{
-				bss_0043d808[cheat_index][0] = 0;
+				cheat_strings[cheat_index][0] = 0;
 				error(2, "Cannot execute cheats attached to the back or start button");
 			}
 		}
@@ -202,7 +204,7 @@ void cheat_active_camouflage_local_player(
 	return;
 }
 
-static long code_00094e30(
+static long cheat_player_index(
 	void)
 {
 	struct data_iterator iterator;
@@ -233,7 +235,7 @@ void cheats_initialize_for_new_map(
 void cheat_teleport_to_camera(
 	void)
 {
-	long player_index = code_00094e30();
+	long player_index = cheat_player_index();
 
 	if (player_index!=NONE)
 	{
@@ -267,7 +269,7 @@ void cheat_teleport_to_camera(
 void cheat_active_camouflage(
 	void)
 {
-	long player_index = code_00094e30();
+	long player_index = cheat_player_index();
 
 	if (player_index!=NONE)
 	{
@@ -283,11 +285,11 @@ void cheat_active_camouflage(
 	return;
 }
 
-static void code_00094fa0(
+static void cheat_objects(
 	struct tag_reference *references,
 	short reference_count)
 {
-	long player_index = code_00094e30();
+	long player_index = cheat_player_index();
 
 	if (player_index!=NONE)
 	{
@@ -332,7 +334,7 @@ void cheat_all_weapons(
 
 	if (TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->weapon_list, 0, struct tag_reference))
 	{
-		code_00094fa0(
+		cheat_objects(
 			TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->weapon_list, 0, struct tag_reference),
 			(short)globals->weapon_list.count);
 	}
@@ -352,7 +354,7 @@ void cheat_all_weapons(
 			reference_count++;
 		}
 
-		code_00094fa0(references, reference_count);
+		cheat_objects(references, reference_count);
 	}
 
 	return;
@@ -363,7 +365,7 @@ void cheat_all_powerups(
 {
 	struct game_globals *globals = scenario_get_game_globals();
 
-	code_00094fa0(
+	cheat_objects(
 		TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->cheat_powerups, 0, struct tag_reference),
 		(short)globals->cheat_powerups.count);
 
@@ -377,7 +379,7 @@ void cheat_all_vehicles(
 
 	if (globals->multiplayer_information.count)
 	{
-		code_00094fa0(
+		cheat_objects(
 			TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
 				struct game_globals_multiplayer_information)->vehicles.address,
 			(short)TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,

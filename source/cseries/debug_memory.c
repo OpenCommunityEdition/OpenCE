@@ -99,6 +99,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries_windows.h"
 #include "errors.h"
+#include "math/real_math.h"
 #include "memory/crc.h"
 
 /* ---------- constants */
@@ -596,12 +597,6 @@ void *debug_realloc(
 }
 
 /* ---------- private code */
-
-word local_random(
-	void)
-{
-	return seed_random(get_global_local_random_seed_address());
-}
 
 unsigned long debug_memory_header_checksum(
 	struct debug_memory_header const *header)

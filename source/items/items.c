@@ -58,8 +58,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define valid_real_matrix4x3 items_valid_real_matrix4x3_inline
-#define valid_real_vector3d_axes3 items_valid_real_vector3d_axes3_inline
 #define object_get_type items_object_get_type_inline
 #include "cseries.h"
 
@@ -80,8 +78,6 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "units/units.h"
 #undef object_get_type
-#undef valid_real_vector3d_axes3
-#undef valid_real_matrix4x3
 
 /* ---------- constants */
 
@@ -322,29 +318,6 @@ static void item_adjust_for_angular_velocity_change(
 	}
 
 	return;
-}
-
-boolean valid_real_vector3d_axes3(
-	real_vector3d const *forward,
-	real_vector3d const *left,
-	real_vector3d const *up)
-{
-	return
-		valid_real_normal3d(forward) &&
-		valid_real_normal3d(left) &&
-		valid_real_normal3d(up) &&
-		valid_realcmp(dot_product3d(forward, left), 0.f) &&
-		valid_realcmp(dot_product3d(left, up), 0.f) &&
-		valid_realcmp(dot_product3d(up, forward), 0.f);
-}
-
-boolean valid_real_matrix4x3(
-	real_matrix4x3 const *matrix)
-{
-	return
-		valid_real(matrix->scale) &&
-		valid_real_vector3d_axes3(&matrix->forward, &matrix->left, &matrix->up) &&
-		valid_real_point3d(&matrix->position);
 }
 
 void item_accelerate(

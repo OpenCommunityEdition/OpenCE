@@ -227,46 +227,46 @@ static void dsound_error(
 	...);
 static void channel_stop(
 	short index);
-static boolean channel_finish_stopping(
+static boolean dsound_channel_stopped(
 	short index);
-static void dsound_record_error(
+static void interrupt_time_error(
 	HRESULT *result,
 	char const *message);
-static boolean channel_queue_packet(
+static boolean dsound_channel_queue_packet(
 	short index);
-static void channel_submit_packets(
+static void dsound_channel_fill(
 	short index);
-static void channel_queue_sound(
+static void dsound_channel_queue_sound(
 	short index,
 	struct sound_permutation *sound);
-static void channel_set_i3dl2_source(
+static void dsound_channel_set_I3DL2_properties(
 	short index);
-static void channel_set_properties(
+static void dsound_channel_set_properties(
 	short channel_index,
 	struct platform_sound_channel_properties const *properties,
 	boolean gain_only);
-static void channel_set_location(
+static void dsound_channel_set_location(
 	short channel_index,
 	boolean spatialized,
 	struct sound_location const *location,
 	real occlusion,
 	real obstruction,
 	boolean attenuate_direct_path);
-static boolean channel_new(
+static boolean dsound_initialize_channel(
 	short channel_index,
 	short type_flags);
-static void CALLBACK channel_packet_callback(
+static void CALLBACK dsound_channel_callback(
 	void *stream_context,
 	void *packet_context,
 	unsigned long status);
 static boolean virtual_channel_new(
 	short virtual_channel_index,
 	short type_index);
-static boolean create_inanity_channel(
+static boolean dsound_fix_rear_speakers(
 	void);
-static void virtual_channel_acquire_channel(
+static void dsound_virtual_remap(
 	short virtual_channel_index);
-static short virtual_channel_get_channel_index(
+static short dsound_virtual_touch(
 	short virtual_channel_index);
 static struct sound_channel *channel_get(
 	short index);
@@ -1541,7 +1541,7 @@ void dsound_set_paused(
 
 			if (channel->stopping)
 			{
-				while (!channel_finish_stopping(index))
+				while (!dsound_channel_stopped(index))
 					;
 			}
 		}
@@ -1586,7 +1586,7 @@ void dsound_set_paused(
 
 			if (channel->state!=_sound_channel_idle)
 			{
-				channel_submit_packets(index);
+				dsound_channel_fill(index);
 			}
 		}
 	}
@@ -1612,7 +1612,7 @@ void dsound_flush(
 
 		if (channel->stopping)
 		{
-			while (!channel_finish_stopping(index))
+			while (!dsound_channel_stopped(index))
 				;
 		}
 
@@ -1828,11 +1828,11 @@ boolean dsound_initialize(
 						{
 							dsound_globals.actual_channel_count++;
 
-							success= success && channel_new(channel_index++, sound_channel_type_flags[type_index]);
+							success= success && dsound_initialize_channel(channel_index++, sound_channel_type_flags[type_index]);
 						}
 					}
 
-					success= success && create_inanity_channel();
+					success= success && dsound_fix_rear_speakers();
 				}
 				else
 				{
@@ -1874,11 +1874,11 @@ void dsound_virtual_set_location(
 	real obstruction,
 	boolean attenuate_direct_path)
 {
-	short channel_index= virtual_channel_get_channel_index(virtual_channel_index);
+	short channel_index= dsound_virtual_touch(virtual_channel_index);
 
 	if (channel_index!=NONE)
 	{
-		channel_set_location(
+		dsound_channel_set_location(
 			channel_index,
 			spatialized,
 			location,
@@ -1895,11 +1895,11 @@ void dsound_virtual_set_properties(
 	struct platform_sound_channel_properties const *properties,
 	boolean gain_only)
 {
-	short channel_index= virtual_channel_get_channel_index(virtual_channel_index);
+	short channel_index= dsound_virtual_touch(virtual_channel_index);
 
 	if (channel_index!=NONE)
 	{
-		channel_set_properties(channel_index, properties, gain_only);
+		dsound_channel_set_properties(channel_index, properties, gain_only);
 	}
 
 	return;
@@ -1909,11 +1909,11 @@ void dsound_virtual_queue_sound(
 	short virtual_channel_index,
 	struct sound_permutation *sound)
 {
-	short channel_index= virtual_channel_get_channel_index(virtual_channel_index);
+	short channel_index= dsound_virtual_touch(virtual_channel_index);
 
 	if (channel_index!=NONE)
 	{
-		channel_queue_sound(channel_index, sound);
+		dsound_channel_queue_sound(channel_index, sound);
 	}
 
 	return;
@@ -1921,7 +1921,7 @@ void dsound_virtual_queue_sound(
 
 /* ---------- private code */
 
-static void channel_set_i3dl2_source(
+static void dsound_channel_set_I3DL2_properties(
 	short index)
 {
 	struct sound_channel *channel= channel_get(index);
@@ -1984,7 +1984,7 @@ static boolean virtual_channel_new(
 	return TRUE;
 }
 
-static boolean create_inanity_channel(
+static boolean dsound_fix_rear_speakers(
 	void)
 {
 	boolean success= FALSE;
@@ -2042,7 +2042,7 @@ static boolean create_inanity_channel(
 	return success;
 }
 
-static boolean channel_new(
+static boolean dsound_initialize_channel(
 	short channel_index,
 	short type_flags)
 {
@@ -2090,7 +2090,7 @@ static boolean channel_new(
 
 	stream_desc.lpwfxFormat= &wave_format.wfx;
 	stream_desc.dwFlags= 0;
-	stream_desc.lpfnCallback= channel_packet_callback;
+	stream_desc.lpfnCallback= dsound_channel_callback;
 	stream_desc.lpvContext= (LPVOID)channel_index;
 
 	if (TEST_FLAG(type_flags, _sound_channel_3d_bit))
@@ -2113,7 +2113,7 @@ static boolean channel_new(
 			csmemset(&location, 0, sizeof(location));
 			location.forward= *global_forward3d;
 
-			channel_set_location(channel_index, FALSE, &location, 0.f, 0.f, FALSE);
+			dsound_channel_set_location(channel_index, FALSE, &location, 0.f, 0.f, FALSE);
 		}
 		else
 		{
@@ -2167,7 +2167,7 @@ static boolean channel_new(
 		properties.minimum_distance= 1.f;
 		properties.maximum_distance= 1.f;
 
-		channel_set_properties(channel_index, &properties, FALSE);
+		dsound_channel_set_properties(channel_index, &properties, FALSE);
 	}
 	else
 	{
@@ -2177,7 +2177,7 @@ static boolean channel_new(
 	return success;
 }
 
-static void CALLBACK channel_packet_callback(
+static void CALLBACK dsound_channel_callback(
 	void *stream_context,
 	void *packet_context,
 	unsigned long status)
@@ -2202,32 +2202,32 @@ static void CALLBACK channel_packet_callback(
 				}
 				else if (status!=XMEDIAPACKET_STATUS_FLUSHED)
 				{
-					channel_submit_packets(channel_index);
+					dsound_channel_fill(channel_index);
 				}
 			}
 		}
 		else if (status==XMEDIAPACKET_STATUS_FAILURE)
 		{
-			dsound_record_error(NULL, "status is failure.");
+			interrupt_time_error(NULL, "status is failure.");
 		}
 		else if (status==XMEDIAPACKET_STATUS_PENDING)
 		{
-			dsound_record_error(NULL, "status is pending.");
+			interrupt_time_error(NULL, "status is pending.");
 		}
 		else
 		{
-			dsound_record_error(NULL, "status is undefined.");
+			interrupt_time_error(NULL, "status is undefined.");
 		}
 	}
 	else
 	{
-		dsound_record_error(NULL, "trying to queue sound to invalid channel.");
+		interrupt_time_error(NULL, "trying to queue sound to invalid channel.");
 	}
 
 	return;
 }
 
-static void channel_set_location(
+static void dsound_channel_set_location(
 	short channel_index,
 	boolean spatialized,
 	struct sound_location const *location,
@@ -2334,13 +2334,13 @@ static void channel_set_location(
 		channel->obstruction= obstruction;
 		channel->attenuate_direct_path= attenuate_direct_path;
 
-		channel_set_i3dl2_source(channel_index);
+		dsound_channel_set_I3DL2_properties(channel_index);
 	}
 
 	return;
 }
 
-static void channel_set_properties(
+static void dsound_channel_set_properties(
 	short channel_index,
 	struct platform_sound_channel_properties const *properties,
 	boolean gain_only)
@@ -2467,7 +2467,7 @@ static void channel_set_properties(
 			{
 				channel->reverb_attenuation= properties->reverb_attenuation;
 
-				channel_set_i3dl2_source(channel_index);
+				dsound_channel_set_I3DL2_properties(channel_index);
 			}
 		}
 	}
@@ -2475,7 +2475,7 @@ static void channel_set_properties(
 	return;
 }
 
-static boolean channel_queue_packet(
+static boolean dsound_channel_queue_packet(
 	short index)
 {
 	struct sound_channel *channel= channel_get(index);
@@ -2554,7 +2554,7 @@ static boolean channel_queue_packet(
 					}
 					else
 					{
-						dsound_record_error(&result, "couldn't queue sound packet.");
+						interrupt_time_error(&result, "couldn't queue sound packet.");
 					}
 				}
 			}
@@ -2566,23 +2566,23 @@ static boolean channel_queue_packet(
 					channel->playing_permutation->name,
 					channel->playing_permutation->cache_base_address);
 
-				dsound_record_error(NULL, temporary);
+				interrupt_time_error(NULL, temporary);
 			}
 		}
 		else
 		{
-			dsound_record_error(NULL, "trying to queue sound but samples is null.");
+			interrupt_time_error(NULL, "trying to queue sound but samples is null.");
 		}
 	}
 	else
 	{
-		dsound_record_error(NULL, "trying to queue sound but sound is null.");
+		interrupt_time_error(NULL, "trying to queue sound but sound is null.");
 	}
 
 	return queued;
 }
 
-static void channel_submit_packets(
+static void dsound_channel_fill(
 	short index)
 {
 	struct sound_channel *channel= channel_get(index);
@@ -2594,7 +2594,7 @@ static void channel_submit_packets(
 
 		if (result<0)
 		{
-			dsound_record_error(&result, "couldn't get channel status.");
+			interrupt_time_error(&result, "couldn't get channel status.");
 			break;
 		}
 
@@ -2603,7 +2603,7 @@ static void channel_submit_packets(
 			break;
 		}
 
-		if (!channel_queue_packet(index))
+		if (!dsound_channel_queue_packet(index))
 		{
 			break;
 		}
@@ -2612,7 +2612,7 @@ static void channel_submit_packets(
 	return;
 }
 
-static void channel_queue_sound(
+static void dsound_channel_queue_sound(
 	short index,
 	struct sound_permutation *sound)
 {
@@ -2645,7 +2645,7 @@ static void channel_queue_sound(
 				dsound_error(result, "couldn't commit deferred settings.");
 			}
 
-			channel_submit_packets(index);
+			dsound_channel_fill(index);
 			break;
 		}
 
@@ -2670,7 +2670,7 @@ static void channel_queue_sound(
 	return;
 }
 
-static void dsound_record_error(
+static void interrupt_time_error(
 	HRESULT *result,
 	char const *message)
 {
@@ -2687,7 +2687,7 @@ static void dsound_record_error(
 	return;
 }
 
-static void virtual_channel_acquire_channel(
+static void dsound_virtual_remap(
 	short virtual_channel_index)
 {
 	struct sound_virtual_channel *vchannel= virtual_channel_get(virtual_channel_index);
@@ -2714,7 +2714,7 @@ static void virtual_channel_acquire_channel(
 		}
 
 		if (channel->virtual_channel_index==NONE &&
-			(!channel->stopping || channel_finish_stopping(channel_index)))
+			(!channel->stopping || dsound_channel_stopped(channel_index)))
 		{
 			vchannel->channel_index= channel_index;
 		}
@@ -2735,14 +2735,14 @@ static void virtual_channel_acquire_channel(
 	return;
 }
 
-static short virtual_channel_get_channel_index(
+static short dsound_virtual_touch(
 	short virtual_channel_index)
 {
 	struct sound_virtual_channel *vchannel= virtual_channel_get(virtual_channel_index);
 
 	if (vchannel->channel_index==NONE)
 	{
-		virtual_channel_acquire_channel(virtual_channel_index);
+		dsound_virtual_remap(virtual_channel_index);
 	}
 
 	match_assert(
@@ -2759,7 +2759,7 @@ static short virtual_channel_get_channel_index(
 	return vchannel->channel_index;
 }
 
-static boolean channel_finish_stopping(
+static boolean dsound_channel_stopped(
 	short index)
 {
 	struct sound_channel *channel= channel_get(index);

@@ -36,10 +36,8 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define valid_real_vector3d valid_real_vector3d_inline
 #define valid_real_vector3d_axes2 valid_real_vector3d_axes2_inline
 #define valid_real_normal3d valid_real_normal3d_inline
-#define real_local_random_range real_local_random_range_inline
 #include "bored_camera.h"
 #include "camera/static_camera.h"
 #include "cseries/cseries_windows.h"
@@ -47,10 +45,8 @@ symbols in this file:
 #include "math/real_math.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
-#undef real_local_random_range
 #undef valid_real_normal3d
 #undef valid_real_vector3d_axes2
-#undef valid_real_vector3d
 #include "observer.h"
 
 /* ---------- constants */
@@ -83,8 +79,6 @@ float real_seed_random_range(
 	float upper_bound);
 long player_control_get_aiming_unit_index(
 	short local_player_index);
-boolean valid_real_vector3d(
-	real_vector3d const *v);
 boolean valid_real_normal3d(
 	real_vector3d const *v);
 boolean valid_real_vector3d_axes2(
@@ -95,9 +89,6 @@ static long bored_camera_shot_threshold_milliseconds(
 	long boredom_count);
 static long bored_camera_shot_duration_milliseconds(
 	long boredom_count);
-float real_local_random_range(
-	float lower_bound,
-	float upper_bound);
 
 /* ---------- globals */
 
@@ -251,22 +242,6 @@ boolean is_still_bored(
 	void)
 {
 	return FALSE;
-}
-
-float real_local_random_range(
-	float lower_bound,
-	float upper_bound)
-{
-	return real_seed_random_range(
-		get_global_local_random_seed_address(),
-		lower_bound,
-		upper_bound);
-}
-
-boolean valid_real_vector3d(
-	real_vector3d const *v)
-{
-	return valid_real(v->i) && valid_real(v->j) && valid_real(v->k);
 }
 
 boolean valid_real_vector3d_axes2(
