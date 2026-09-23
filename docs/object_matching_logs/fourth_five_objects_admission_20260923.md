@@ -1,5 +1,15 @@
 # Five Halo object admissions and one CRT draft (2026-09-23)
 
+**2026-09-24 correction:** `biped_limp_noodle`'s six exact target
+functions and the newly matched code bytes remain valid, but its whole-object
+`Matching` label was withdrawn. It emits a candidate-only `_distance3d` COMDAT
+incompatible with January's selected ActionVehicle provider. The original
+bounded link probes below did not include that provider. See
+`claude_object_closure_canonical_reconciliation_20260924.md` for the
+board-wide provider census and failed shared-header repair. The historical
+five-object admission claim below is superseded; four of those five remain
+whole-object complete.
+
 ## Credited result
 
 Five Halo-owned units moved from `NonMatching` to `Matching` only after guarded function comparisons, target-owned data/owner checks, and ordinary selected-provider link checks:

@@ -2,6 +2,22 @@
   "version": 1,
   "entries": [
     {
+      "unit": "source/structures/leaf_map",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_distance3d",
+      "reason": "All 25 target functions and target-owned data sections are exact, including two newly closed callers. But the real shared-header distance3d use emits a candidate-only 64-byte SELECT_ANY copy whose instruction SHA differs from January's selected ActionVehicle NODUP copy. Ordinary LeafMap/ActionVehicle links fail with LNK2005 in both orders. A global source-body correction makes the copies identical but loses two inherited exact functions and stales a parked function, so it was rejected. The exact callers and verified data retain their separate credit; whole-object completion does not.",
+      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
+      "reopen": "Recover a genuine shared distance3d source/header spelling and inline schedule that yields January's selected COMDAT without any exact sibling loss or stale park; verify all real_math.h consumers and ordinary links. Do not suppress emission, force inline, or attribute candidate-only helper bytes to LeafMap."
+    },
+    {
+      "unit": "source/units/biped_limp_noodle",
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_distance3d",
+      "reason": "All six target functions remain strict exact, but this Matching label also emitted the same candidate-only 64-byte SELECT_ANY distance3d copy that differs from January's selected ActionVehicle NODUP provider. Ordinary link compatibility is not established; the global real_math.h correction fails the whole-board no-regression and parked-function gates. Function credit remains; whole-object completion is held.",
+      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
+      "reopen": "Use the same authentic, board-wide no-regression provider repair as LeafMap and prove ordinary selected-provider links in both orders before restoring Matching."
+    },
+    {
       "unit": "source/tool/error_geometry",
       "class": "candidate-only-comdat-owner",
       "symbol": "_set_real_point3d",

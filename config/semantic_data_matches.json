@@ -130,6 +130,7 @@
   {
     "unit": "source/structures/leaf_map",
     "symbol": "_leaf_map_initialize_section",
+    "allow_incomplete_unit": true,
     "reason": "January and rebuilt profile-section data have identical 2512-byte payload, section flags and static owner, with all 28 relocations independently resolving to the same image destinations; objdiff undercredits this sole unmatched section.",
     "measurements": {
       "size": 2512,
