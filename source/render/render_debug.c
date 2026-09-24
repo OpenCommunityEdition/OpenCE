@@ -132,9 +132,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_ARCTANGENT
-#define REAL_MATH_EXTERNAL_DOT_PRODUCT3D
-#define REAL_MATH_EXTERNAL_PLANE3D_DISTANCE_TO_POINT
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "ai/ai_profile.h"
@@ -166,6 +163,7 @@ symbols in this file:
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
 #include "units/bipeds.h"
+#include "units/vehicle_datum.h"
 #include "units/vehicles.h"
 
 /* ---------- constants */
@@ -196,9 +194,6 @@ enum
 };
 
 /* ---------- macros */
-
-#define vehicle_runtime_try_and_get(index) \
-	((struct vehicle_runtime_datum *)object_try_and_get_and_verify_type((index), _object_mask_vehicle))
 
 /* ---------- structures */
 
@@ -267,26 +262,6 @@ struct render_debug_globals_definition
 	boolean string_overflow_reported;
 };
 
-struct render_debug_vehicle_data
-{
-	word flags;
-	short unknown426;
-	byte unknown428[4];
-	real speed;
-	real slide;
-	real turn;
-	byte unknown438[0x40];
-	long stuck;
-};
-
-struct vehicle_runtime_datum
-{
-	long definition_index;
-	struct _object_datum object;
-	struct _unit_datum unit;
-	struct render_debug_vehicle_data vehicle;
-};
-
 typedef char render_debug_cache_entry_size_check[
 	sizeof(struct render_debug_cache_entry) == 0x38 ? 1 : -1];
 typedef char render_debug_globals_size_check[
@@ -305,14 +280,6 @@ typedef char render_debug_globals_entry_overflow_offset_check[
 	offsetof(struct render_debug_globals_definition, entry_overflow_reported) == 0x740A ? 1 : -1];
 typedef char render_debug_globals_string_overflow_offset_check[
 	offsetof(struct render_debug_globals_definition, string_overflow_reported) == 0x740B ? 1 : -1];
-typedef char render_debug_vehicle_speed_offset_check[
-	offsetof(struct vehicle_runtime_datum, vehicle.speed) == 0x42C ? 1 : -1];
-typedef char render_debug_vehicle_slide_offset_check[
-	offsetof(struct vehicle_runtime_datum, vehicle.slide) == 0x430 ? 1 : -1];
-typedef char render_debug_vehicle_turn_offset_check[
-	offsetof(struct vehicle_runtime_datum, vehicle.turn) == 0x434 ? 1 : -1];
-typedef char render_debug_vehicle_stuck_offset_check[
-	offsetof(struct vehicle_runtime_datum, vehicle.stuck) == 0x478 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -353,12 +320,12 @@ static void render_debug_structure_decals(
 
 /* ---------- globals */
 
-extern boolean debug_bsp;
-extern boolean debug_camera;
-extern boolean debug_input;
-extern boolean debug_permanent_decals;
-extern boolean debug_player;
-extern boolean debug_structure;
+boolean debug_bsp;
+boolean debug_camera;
+boolean debug_input;
+boolean debug_permanent_decals;
+boolean debug_player;
+boolean debug_structure;
 
 static struct render_debug_globals_definition render_debug_globals;
 
@@ -498,30 +465,14 @@ void render_debug_box_outline(
 		real_point3d points[8];
 		short index;
 
-		points[0].x = bounds->x0;
-		points[0].y = bounds->y0;
-		points[0].z = bounds->z0;
-		points[1].x = bounds->x1;
-		points[1].y = bounds->y0;
-		points[1].z = bounds->z0;
-		points[2].x = bounds->x1;
-		points[2].y = bounds->y1;
-		points[2].z = bounds->z0;
-		points[3].x = bounds->x0;
-		points[3].y = bounds->y1;
-		points[3].z = bounds->z0;
-		points[4].x = bounds->x0;
-		points[4].y = bounds->y0;
-		points[4].z = bounds->z1;
-		points[5].x = bounds->x1;
-		points[5].y = bounds->y0;
-		points[5].z = bounds->z1;
-		points[6].x = bounds->x1;
-		points[6].y = bounds->y1;
-		points[6].z = bounds->z1;
-		points[7].x = bounds->x0;
-		points[7].y = bounds->y1;
-		points[7].z = bounds->z1;
+		set_real_point3d(&points[0], bounds->x0, bounds->y0, bounds->z0);
+		set_real_point3d(&points[1], bounds->x1, bounds->y0, bounds->z0);
+		set_real_point3d(&points[2], bounds->x1, bounds->y1, bounds->z0);
+		set_real_point3d(&points[3], bounds->x0, bounds->y1, bounds->z0);
+		set_real_point3d(&points[4], bounds->x0, bounds->y0, bounds->z1);
+		set_real_point3d(&points[5], bounds->x1, bounds->y0, bounds->z1);
+		set_real_point3d(&points[6], bounds->x1, bounds->y1, bounds->z1);
+		set_real_point3d(&points[7], bounds->x0, bounds->y1, bounds->z1);
 
 		render_debug_polygon_edges(
 			&points[0],
@@ -795,9 +746,7 @@ void render_debug_vector(
 		390,
 		color);
 
-	end_point.x = point->x + size*vector->i;
-	end_point.y = point->y + size*vector->j;
-	end_point.z = point->z + size*vector->k;
+	point_from_line3d(point, vector, size, &end_point);
 
 	render_debug_line(
 		immediate,
@@ -817,15 +766,9 @@ void render_debug_tick(
 {
 	real_point3d point0;
 	real_point3d point1;
-	real negative_tick_size;
 
-	point0.x = point->x + tick_size*tick_vector->i;
-	point0.y = point->y + tick_size*tick_vector->j;
-	point0.z = point->z + tick_size*tick_vector->k;
-	negative_tick_size = -tick_size;
-	point1.x = point->x + negative_tick_size*tick_vector->i;
-	point1.y = point->y + negative_tick_size*tick_vector->j;
-	point1.z = point->z + negative_tick_size*tick_vector->k;
+	point_from_line3d(point, tick_vector, tick_size, &point0);
+	point_from_line3d(point, tick_vector, -tick_size, &point1);
 
 	render_debug_line(
 		immediate,
@@ -846,12 +789,8 @@ void render_debug_line_offset(
 	real_point3d point0;
 	real_point3d point1;
 
-	point0.x = p0->x + offset*global_up3d->i;
-	point0.y = p0->y + offset*global_up3d->j;
-	point0.z = p0->z + offset*global_up3d->k;
-	point1.x = p1->x + offset*global_up3d->i;
-	point1.y = p1->y + offset*global_up3d->j;
-	point1.z = p1->z + offset*global_up3d->k;
+	point_from_line3d(p0, global_up3d, offset, &point0);
+	point_from_line3d(p1, global_up3d, offset, &point1);
 
 	render_debug_line(
 		immediate,
@@ -1104,30 +1043,14 @@ void render_debug_box(
 	{
 		real_point3d points[8];
 
-		points[0].x = bounds->x0;
-		points[0].y = bounds->y0;
-		points[0].z = bounds->z0;
-		points[1].x = bounds->x1;
-		points[1].y = bounds->y0;
-		points[1].z = bounds->z0;
-		points[2].x = bounds->x0;
-		points[2].y = bounds->y0;
-		points[2].z = bounds->z1;
-		points[3].x = bounds->x1;
-		points[3].y = bounds->y0;
-		points[3].z = bounds->z1;
-		points[4].x = bounds->x0;
-		points[4].y = bounds->y1;
-		points[4].z = bounds->z1;
-		points[5].x = bounds->x1;
-		points[5].y = bounds->y1;
-		points[5].z = bounds->z1;
-		points[6].x = bounds->x0;
-		points[6].y = bounds->y1;
-		points[6].z = bounds->z0;
-		points[7].x = bounds->x1;
-		points[7].y = bounds->y1;
-		points[7].z = bounds->z0;
+		set_real_point3d(&points[0], bounds->x0, bounds->y0, bounds->z0);
+		set_real_point3d(&points[1], bounds->x1, bounds->y0, bounds->z0);
+		set_real_point3d(&points[2], bounds->x0, bounds->y0, bounds->z1);
+		set_real_point3d(&points[3], bounds->x1, bounds->y0, bounds->z1);
+		set_real_point3d(&points[4], bounds->x0, bounds->y1, bounds->z1);
+		set_real_point3d(&points[5], bounds->x1, bounds->y1, bounds->z1);
+		set_real_point3d(&points[6], bounds->x0, bounds->y1, bounds->z0);
+		set_real_point3d(&points[7], bounds->x1, bounds->y1, bounds->z0);
 
 		render_debug_quadrilateral(
 			TRUE, &points[0], &points[2], &points[4], &points[6], color);
@@ -1340,7 +1263,7 @@ static void render_debug_camera(
 				collision.point.x,
 				collision.point.y,
 				collision.point.z,
-				(real)atan2(render.camera.forward.j, render.camera.forward.i) * 57.29578f,
+				arctangent(render.camera.forward.j, render.camera.forward.i) * 57.29578f,
 				collision.surface_index);
 		}
 
@@ -1414,7 +1337,7 @@ static void render_debug_player(
 
 			if (biped->object.parent_object_index != NONE && biped->unit.parent_seat_index != NONE)
 			{
-				struct vehicle_runtime_datum *vehicle = vehicle_runtime_try_and_get(
+				struct vehicle_datum *vehicle = vehicle_datum_try_and_get(
 					biped->object.parent_object_index);
 				char text[MAXIMUM_RENDER_DEBUG_PLAYER_TEXT_LENGTH + 1];
 
@@ -1424,7 +1347,7 @@ static void render_debug_player(
 					vehicle->vehicle.speed,
 					vehicle->vehicle.slide,
 					vehicle->vehicle.turn,
-					vehicle->vehicle.stuck ? "|nstuck!" : "");
+					vehicle->vehicle.stuck_mass_point_flags ? "|nstuck!" : "");
 				render_debug_string(
 					TRUE,
 					text);
@@ -1491,12 +1414,7 @@ static void render_debug_bsp(
 				&bsp->planes,
 				node->plane_designator,
 				real_plane3d);
-			real_point3d const *point = &render.camera.position;
-			boolean side =
-				point->x*plane->n.i +
-				point->y*plane->n.j +
-				point->z*plane->n.k -
-				plane->d >= 0.0f;
+			boolean side = plane3d_distance_to_point(plane, &render.camera.position) >= 0.0f;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\render\\render_debug.c",
@@ -1800,18 +1718,10 @@ void render_debug_box2d_outline(
 	{
 		real_point3d points[4];
 
-		points[0].x = bounds->x0;
-		points[0].y = bounds->y0;
-		points[0].z = -1.0f;
-		points[1].x = bounds->x1;
-		points[1].y = bounds->y0;
-		points[1].z = -1.0f;
-		points[2].x = bounds->x1;
-		points[2].y = bounds->y1;
-		points[2].z = -1.0f;
-		points[3].x = bounds->x0;
-		points[3].y = bounds->y1;
-		points[3].z = -1.0f;
+		set_real_point3d(&points[0], bounds->x0, bounds->y0, -1.0f);
+		set_real_point3d(&points[1], bounds->x1, bounds->y0, -1.0f);
+		set_real_point3d(&points[2], bounds->x1, bounds->y1, -1.0f);
+		set_real_point3d(&points[3], bounds->x0, bounds->y1, -1.0f);
 
 		matrix4x3_transform_point(
 			&render.frustum.view_to_world,
@@ -1973,8 +1883,7 @@ void render_debug_vector2d(
 		272,
 		color);
 
-	end_point.x = point->x + size*vector->i;
-	end_point.y = point->y + size*vector->j;
+	point_from_line2d(point, vector, size, &end_point);
 
 	render_debug_line2d(
 		immediate,
@@ -2099,12 +2008,8 @@ static void build_pill_points(
 		{
 			real_point2d const *circle_point = &points[index];
 
-			top_points[index].x = circle_point->x;
-			top_points[index].y = circle_point->y;
-			top_points[index].z = height_magnitude;
-			bottom_points[index].x = circle_point->x;
-			bottom_points[index].y = circle_point->y;
-			bottom_points[index].z = 0.f;
+			set_real_point3d(&top_points[index], circle_point->x, circle_point->y, height_magnitude);
+			set_real_point3d(&bottom_points[index], circle_point->x, circle_point->y, 0.f);
 			matrix4x3_transform_point(&matrix, &top_points[index], &top_points[index]);
 			matrix4x3_transform_point(&matrix, &bottom_points[index], &bottom_points[index]);
 		}
@@ -2117,18 +2022,10 @@ static void build_pill_points(
 			real_point2d const *top_circle_point = &points[index];
 			real_point2d const *bottom_circle_point = &points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2];
 
-			top_yz_points[index].x = 0.f;
-			top_yz_points[index].y = top_circle_point->x;
-			top_yz_points[index].z = height_magnitude + top_circle_point->y;
-			bottom_yz_points[index].x = 0.f;
-			bottom_yz_points[index].y = bottom_circle_point->x;
-			bottom_yz_points[index].z = bottom_circle_point->y;
-			top_xz_points[index].x = top_circle_point->x;
-			top_xz_points[index].y = 0.f;
-			top_xz_points[index].z = height_magnitude + top_circle_point->y;
-			bottom_xz_points[index].x = bottom_circle_point->x;
-			bottom_xz_points[index].y = 0.f;
-			bottom_xz_points[index].z = bottom_circle_point->y;
+			set_real_point3d(&top_yz_points[index], 0.f, top_circle_point->x, height_magnitude + top_circle_point->y);
+			set_real_point3d(&bottom_yz_points[index], 0.f, bottom_circle_point->x, bottom_circle_point->y);
+			set_real_point3d(&top_xz_points[index], top_circle_point->x, 0.f, height_magnitude + top_circle_point->y);
+			set_real_point3d(&bottom_xz_points[index], bottom_circle_point->x, 0.f, bottom_circle_point->y);
 			matrix4x3_transform_point(&matrix, &top_yz_points[index], &top_yz_points[index]);
 			matrix4x3_transform_point(&matrix, &bottom_yz_points[index], &bottom_yz_points[index]);
 			matrix4x3_transform_point(&matrix, &top_xz_points[index], &top_xz_points[index]);

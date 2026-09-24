@@ -19,8 +19,6 @@ struct render_lighting;
 
 /* ---------- prototypes/OBJECT_LIGHTS.C */
 
-boolean should_render_lights(
-	void);
 void lights_preprocess_scene(
 	void);
 void lights_render_diffuse(

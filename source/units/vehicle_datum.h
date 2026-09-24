@@ -16,6 +16,7 @@ Private runtime vehicle datum ownership shared by vehicles.c and physics.c.
 /* ---------- macros */
 
 #define vehicle_datum_get(index) ((struct vehicle_datum *)object_get_and_verify_type((index), _object_mask_vehicle))
+#define vehicle_datum_try_and_get(index) ((struct vehicle_datum *)object_try_and_get_and_verify_type((index), _object_mask_vehicle))
 
 /* ---------- structures */
 
