@@ -3,13 +3,13 @@ HUD_UNIT.C
 
 symbols in this file:
 000C6590 0010:
-	_code_000c6590 (0000)
+	_unit_hud_outline_mapper_tick (0000)
 000C65A0 0010:
-	_code_000c65a0 (0000)
+	_unit_hud_shield_meter_mapper_tick (0000)
 000C65B0 0010:
 	_unit_hud_shield_meter_mapper_init (0000)
 000C65C0 0040:
-	_code_000c65c0 (0000)
+	_initialize_hud_state (0000)
 000C6600 0070:
 	_get_hud_state (0000)
 000C6670 0040:
@@ -59,7 +59,7 @@ symbols in this file:
 002702D8 001d:
 	??_C@_0BN@NPOPPJAG@old_local_player_index?$CB?$DNNONE?$AA@ (0000)
 002E4C68 0004:
-	_data_002e4c68 (0000)
+	?overcharge_count@?1??hud_render_unit_interface@@9@9 (0000)
 00453AC0 0004:
 	_unit_hud_globals (0000)
 */
@@ -111,12 +111,6 @@ enum hud_damage_indicator_direction
 	_hud_damage_indicator_right,
 
 	NUMBER_OF_HUD_DAMAGE_INDICATOR_DIRECTIONS
-};
-
-enum
-{
-	STACK_BUFFER_LENGTH = 0x80,
-	STACK_BUFFER_FILL = 0x62626262,
 };
 
 /* ---------- macros */
@@ -266,19 +260,21 @@ static struct unit_hud_globals *unit_hud_globals = NULL;
 extern struct hud_scripted_globals *hud_scripted_globals;
 extern struct hud_globals_definition *hud_globals;
 
+/* ---------- private code */
+
+static void unit_hud_outline_mapper_tick(
+	void)
+{
+	return;
+}
+
+static void unit_hud_shield_meter_mapper_tick(
+	void)
+{
+	return;
+}
+
 /* ---------- public code */
-
-void code_000c6590(
-	void)
-{
-	return;
-}
-
-void code_000c65a0(
-	void)
-{
-	return;
-}
 
 void unit_hud_shield_meter_mapper_init(
 	void)
@@ -358,27 +354,8 @@ void hud_initialize_unit_interface_for_new_map(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		match_assert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x106,
-			local_player_index>=0 &&
-				local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
-		match_assert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x107,
-			unit_hud_globals);
-
-		hud_state = &unit_hud_globals->hud_states[local_player_index];
-		csmemset(
-			hud_state->auxilary_flash_time,
-			NONE,
-			sizeof(hud_state->auxilary_flash_time));
-		hud_state->last_body_vitality = -1.0f;
-		hud_state->last_shield_vitality = -1.0f;
-		hud_state->last_health_flash_time = NONE;
-		hud_state->last_motion_sensor_flash_time = NONE;
-		hud_state->fade_time = -1.0f;
-		hud_state->last_unit_index = NONE;
+		hud_state = get_hud_state(local_player_index);
+		initialize_hud_state(hud_state);
 		hud_state->sound_flags = 0;
 		csmemset(
 			hud_state->last_sound_handles,
@@ -628,38 +605,36 @@ static void hud_update_unit_local_player(
 				if (game_time_get() - hud_state->last_shield_hit_time < 15)
 				{
 					hud_state->fade_time = 0.0f;
-					goto update_finished;
-				}
-
-				hud_state->last_shield_vitality = unit->object.shield_vitality;
-				hud_state->fade_time +=
-					(real)(game_time_get() - hud_state->last_shield_hit_time) *
-					(1.0f / TICKS_PER_SECOND);
-			}
-			else
-			{
-				if (hud_state->last_shield_vitality < unit->object.shield_vitality)
-				{
-					hud_state->last_shield_vitality = unit->object.shield_vitality;
-					hud_state->fade_time = -1.0f;
 				}
 				else
 				{
 					hud_state->last_shield_vitality = unit->object.shield_vitality;
-					if (hud_state->fade_time > 0.0f)
-					{
-						hud_state->fade_time +=
-							(real)(game_time_get() - hud_state->last_shield_hit_time) *
-							(1.0f / TICKS_PER_SECOND);
-					}
+					hud_state->fade_time +=
+						(real)(game_time_get() - hud_state->last_shield_hit_time) *
+						(1.0f / TICKS_PER_SECOND);
+					hud_state->last_shield_hit_time = game_time_get();
 				}
 			}
-
-			hud_state->last_shield_hit_time = game_time_get();
+			else if (hud_state->last_shield_vitality < unit->object.shield_vitality)
+			{
+				hud_state->last_shield_vitality = unit->object.shield_vitality;
+				hud_state->fade_time = -1.0f;
+				hud_state->last_shield_hit_time = game_time_get();
+			}
+			else
+			{
+				hud_state->last_shield_vitality = unit->object.shield_vitality;
+				if (hud_state->fade_time > 0.0f)
+				{
+					hud_state->fade_time +=
+						(real)(game_time_get() - hud_state->last_shield_hit_time) *
+						(1.0f / TICKS_PER_SECOND);
+				}
+				hud_state->last_shield_hit_time = game_time_get();
+			}
 		}
 	}
 
-update_finished:
 	if (cinematic_in_progress())
 	{
 		long player_index = local_player_get_player_index(local_player_index);
@@ -672,34 +647,7 @@ update_finished:
 		}
 	}
 
-	{
-		short corrupt_index;
-		short buffer_index;
-
-		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
-		{
-			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
-				goto corrupt_stack_found;
-		}
-
-		corrupt_index = NONE;
-		goto stack_buffer_checked;
-
-corrupt_stack_found:
-		corrupt_index = buffer_index;
-
-stack_buffer_checked:
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x201,
-			return_eip == get_return_eip(),
-			"corrupt return address!");
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x201,
-			corrupt_index == NONE,
-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
-	}
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_unit.c", 0x201);
 
 	return;
 }
@@ -889,6 +837,9 @@ void hud_render_unit_interface(
 		"c:\\halo\\SOURCE\\interface\\hud_unit.c",
 		0x209,
 		player->local_player_index==render.local_player_index);
+
+	unit_hud_shield_meter_mapper_tick();
+	unit_hud_outline_mapper_tick();
 
 	if (player->local_player_index == render.local_player_index &&
 		player->unit_index != NONE)
@@ -1439,34 +1390,7 @@ void hud_render_unit_interface(
 		}
 	}
 
-	{
-		short corrupt_index;
-		short buffer_index;
-
-		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
-		{
-			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
-				goto corrupt_stack_found;
-		}
-
-		corrupt_index = NONE;
-		goto stack_buffer_checked;
-
-corrupt_stack_found:
-		corrupt_index = buffer_index;
-
-stack_buffer_checked:
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x3C9,
-			return_eip == get_return_eip(),
-			"corrupt return address!");
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
-			0x3C9,
-			corrupt_index == NONE,
-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
-	}
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_unit.c", 0x3C9);
 
 	return;
 }
