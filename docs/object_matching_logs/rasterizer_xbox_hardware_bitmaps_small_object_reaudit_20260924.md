@@ -30,3 +30,25 @@ VC7 construct that keeps the no-device arm's return distinct during
 cross-jump selection, yet yields the same final epilogue bytes. Do not spend
 more generic polarity, `goto`, split-return, declaration or block-layout
 permutations, and do not byte-patch or grant a comparator exception.
+
+## Independent October-build and compiler-mode check
+
+The October 12, 2001 prototype's `2276betaP.xbe` (SHA-256
+`a3402b021833dd2a3c368786f239480d68a6394bdf540569fab18340a83ab827`)
+contains the same constructor tail at raw offset `0x1584bb`, including the
+identical prefix `test bl,bl; jne +0x16`. The short branch selects the first
+return epilogue in both October and January. This is not an artifact of
+January csplit or a one-build branch decision.
+
+January's `cachebeta.pdb` compiland reports C, VC7 13.0.9254 QFE 0, no debug
+information, no LTCG and no `/GS` for this object. The matching October PDB
+is not available locally: all 96 local `cachebeta.pdb` copies have the same
+January SHA-256. The later `/Od`/DX9 source graph remains a different version
+and cannot choose January's return binding.
+
+A bounded whole-TU flag lab retained 18/19 exact, with the same one-byte
+residual, under `/QIfist`, `/Ox`, `/Ot`, `/Op`, `/Ob1` and `/Ob2`.
+`/Ow` regressed one exact sibling; `/O1` and `/Os` regressed all 19.
+An alternate local VC7 13.00.9210 compiler also produced 18/19 and the
+same branch displacement. There is no admissible compiler-mode adjustment
+from these controls. No production source or matching configuration changed.
