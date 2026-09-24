@@ -309,7 +309,7 @@ long playlist_profile_new(
 				&variant,
 				sizeof(struct game_variant));
 			SET_FLAG(
-				((struct game_variant *)block)->unknown64,
+				((struct game_variant *)block)->flags,
 				_game_variant_is_system_default_bit,
 				FALSE);
 			game_engine_variant_cleanup((struct game_variant *)block);
@@ -317,7 +317,7 @@ long playlist_profile_new(
 				(wchar_t *)block,
 				name,
 				MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
-			((struct game_variant *)block)->unknown16 = 0;
+			((struct game_variant *)block)->human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
 			saved_game_file_generate_checksum(
 				block,
 				PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE,
@@ -513,8 +513,8 @@ static void playlist_profile_create_default_profiles_on_disk(
 				(wchar_t *)block,
 				display_name,
 				MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
-			((struct game_variant *)block)->unknown16 = 0;
-			((struct game_variant *)block)->unknown64 |= (short)(profile_index << 8);
+			((struct game_variant *)block)->human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
+			((struct game_variant *)block)->flags |= (short)(profile_index << 8);
 			saved_game_file_generate_checksum(
 				block,
 				PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE,
@@ -611,12 +611,12 @@ static boolean playlist_profile_read(
 						error(
 							_error_silent,
 							"checksum failed on playlist profile file, sanitizing memory resident version...");
-						default_variant.unknown64 = 0;
+						default_variant.flags = 0;
 						ustrncpy(
 							(wchar_t *)&default_variant,
 							saved_game_file_get_display_name(playlist_profile_index),
 							MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
-						default_variant.unknown16 = 0;
+						default_variant.human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
 						csmemcpy(
 							variant,
 							&default_variant,
@@ -656,12 +656,12 @@ static boolean playlist_profile_read(
 		error(
 			_error_silent,
 			"checksum failed on playlist profile file, sanitizing memory resident version...");
-		default_variant.unknown64 = 0;
+		default_variant.flags = 0;
 		ustrncpy(
 			(wchar_t *)&default_variant,
 			saved_game_file_get_display_name(playlist_profile_index),
 			MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
-		default_variant.unknown16 = 0;
+		default_variant.human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
 		csmemcpy(
 			variant,
 			&default_variant,

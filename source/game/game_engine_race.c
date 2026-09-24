@@ -199,10 +199,6 @@ enum multiplayer_game_text
 
 /* ---------- macros */
 
-#define race_variant_laps_to_win unknown40
-#define race_variant_vehicles unknown48
-#define race_variant_race_type unknown4C.value
-#define race_variant_team_scoring unknown50
 
 /* ---------- structures */
 
@@ -323,7 +319,7 @@ static long race_get_vehicle_to_spawn(
 		struct game_globals_vehicle);
 	long vehicle_definition_index = NONE;
 
-	switch (game_engine_get_variant()->race_variant_vehicles)
+	switch (game_engine_get_variant()->universal_variant.vehicle_set)
 	{
 	case _game_engine_vehicles_default:
 		if (vehicle_number == 0)
@@ -462,7 +458,7 @@ static void race_complete_lap(
 	game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
 	player->statistics.multiplayer_statistics.race_statistics.last_lap_time = (short)lap_time;
 
-	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+	if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 	{
 		game_show_score_you_ally_enemy(
 			player_index,
@@ -488,7 +484,7 @@ static void race_complete_lap(
 	else if (lap_time < player->statistics.multiplayer_statistics.race_statistics.best_lap_time)
 	{
 		player->statistics.multiplayer_statistics.race_statistics.best_lap_time = (short)lap_time;
-		if (game_engine_get_variant()->race_variant_race_type != _race_type_flag_rally)
+		if (game_engine_get_variant()->game_engine_variant.race.race_type != _race_type_flag_rally)
 		{
 			game_show_score_extended(
 				player_index,
@@ -502,7 +498,7 @@ static void race_complete_lap(
 
 	team_score = player->statistics.multiplayer_statistics.race_statistics.laps;
 	data_iterator_new(&iterator, player_data);
-	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_sum)
+	if (game_engine_get_variant()->game_engine_variant.race.team_scoring == _race_team_scoring_sum)
 		team_score = 0;
 	while ((team_player = data_iterator_next(&iterator)))
 	{
@@ -510,7 +506,7 @@ static void race_complete_lap(
 		{
 			long laps = team_player->statistics.multiplayer_statistics.race_statistics.laps;
 
-			switch (game_engine_get_variant()->race_variant_team_scoring)
+			switch (game_engine_get_variant()->game_engine_variant.race.team_scoring)
 			{
 			case _race_team_scoring_minimum:
 				team_score = MIN(team_score, laps);
@@ -533,7 +529,7 @@ static void race_complete_lap(
 
 	if (team_score > race_globals.team_laps[player->team_index])
 		race_globals.team_laps[player->team_index] = team_score;
-	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->race_variant_laps_to_win)
+	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->universal_variant.score_to_win)
 		game_engine_end_game();
 
 	return;
@@ -554,11 +550,11 @@ static boolean can_touch_team(
 		can_touch = FALSE;
 	}
 	else if (player->statistics.multiplayer_statistics.race_statistics.laps >=
-		game_engine_get_variant()->race_variant_laps_to_win)
+		game_engine_get_variant()->universal_variant.score_to_win)
 	{
 		can_touch = FALSE;
 	}
-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 	{
 		can_touch = race_globals.rally_flag == team_index;
 	}
@@ -570,7 +566,7 @@ static boolean can_touch_team(
 	{
 		can_touch = FALSE;
 	}
-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
+	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_normal)
 	{
 		long itr;
 
@@ -662,15 +658,14 @@ static void race_touch_flag(
 
 		if (race_globals.first_flag[absolute_player_index] == NONE)
 		{
-			match_vassert(
+			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
 				0x2D4,
-				_race_type_normal != game_engine_get_variant()->race_variant_race_type,
-				"_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type");
+				_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type);
 			race_globals.first_flag[absolute_player_index] = flag->team_index;
 		}
 
-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 		{
 			race_complete_lap(player_index);
 			race_globals.rally_flag = new_rally_flag(race_globals.rally_flag);
@@ -708,7 +703,7 @@ static boolean race_team_can_win_game(
 {
 	boolean can_win = TRUE;
 
-	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_minimum)
+	if (game_engine_get_variant()->game_engine_variant.race.team_scoring == _race_team_scoring_minimum)
 	{
 		struct data_iterator iterator;
 		struct player_datum *player;
@@ -718,7 +713,7 @@ static boolean race_team_can_win_game(
 		{
 			if (player->team_index == team_index &&
 				player->statistics.multiplayer_statistics.race_statistics.laps <
-					game_engine_get_variant()->race_variant_laps_to_win &&
+					game_engine_get_variant()->universal_variant.score_to_win &&
 				(game_engine_player_is_out_of_lives(iterator.datum_index) ||
 					player->quit_out_of_game))
 			{
@@ -752,7 +747,7 @@ static void build_player_speeds(
 		long laps_behind = maximum_laps -
 			player->statistics.multiplayer_statistics.race_statistics.laps;
 
-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 			laps_behind /= 3;
 
 		if (laps_behind >= 2)
@@ -936,7 +931,7 @@ boolean race_engine_display_score(
 		break;
 
 	case _race_message_show_score:
-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 		{
 			if (other_player->statistics.multiplayer_statistics.race_statistics.laps == 1)
 			{
@@ -975,7 +970,7 @@ boolean race_engine_display_score(
 			}
 		}
 		else if (other_player->statistics.multiplayer_statistics.race_statistics.laps + 1 >
-			game_engine_get_variant()->race_variant_laps_to_win)
+			game_engine_get_variant()->universal_variant.score_to_win)
 		{
 			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 			if (string_list_index != NONE)
@@ -1009,7 +1004,7 @@ boolean race_engine_display_score(
 				string,
 				get_place_name(game_engine_get_place(player_index, _get_score_team)),
 				other_player->statistics.multiplayer_statistics.race_statistics.laps + 1,
-				game_engine_get_variant()->race_variant_laps_to_win);
+				game_engine_get_variant()->universal_variant.score_to_win);
 		}
 		break;
 
@@ -1106,7 +1101,7 @@ wchar_t *race_get_score_header_string(
 	wchar_t *string)
 {
 	short string_index =
-		game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally ?
+		game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally ?
 			178 : 25;
 	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 	wchar_t *header_string;
@@ -1336,7 +1331,7 @@ void race_engine_update(
 
 		if (race_globals.vehicles_have_been_added)
 		{
-			switch (game_engine_get_variant()->race_variant_vehicles)
+			switch (game_engine_get_variant()->universal_variant.vehicle_set)
 			{
 			case _game_engine_vehicles_default:
 				game_engine_play_multiplayer_sound(_multiplayer_sound_warthog);
@@ -1414,11 +1409,11 @@ boolean race_engine_initialize_for_new_map(
 		}
 	}
 
-	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
+	if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
 	{
 		race_globals.rally_flag = new_rally_flag(NONE);
 	}
-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
+	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_normal)
 	{
 		for (itr = 0; itr < MULTIPLAYER_MAXIMUM_PLAYERS; itr++)
 			race_globals.first_flag[itr] = lowest_flag_index;
