@@ -446,7 +446,7 @@ static boolean weapon_set_state(
 	short new_state,
 	boolean immediate);
 
-void weapon_magazine_finish_reload(
+static void weapon_magazine_finish_reload(
 	long weapon_index,
 	short magazine_index);
 static void weapon_magazine_start_reload(
@@ -1379,7 +1379,7 @@ void weapon_owner_update(
 	return;
 }
 
-void weapon_magazine_finish_reload(
+static void weapon_magazine_finish_reload(
 	long weapon_index,
 	short magazine_index)
 {

@@ -117,9 +117,17 @@ symbols in this file:
 00292370 001e:
 	??_C@_0BO@KDABKJGE@profile?5not?5completed?5?$CIquery?$CJ?$AA@ (0000)
 0030CF00 0084:
-	_rasterizer_profile_globals (0000)
+	_rasterizer_profile_performance_counter_frequency (0000)
+	_rasterizer_profile_globals (0008)
 00465E28 0462:
-	_bss_00465e28 (0000)
+	_rasterizer_profile_callback_elapsed_times (0000)
+	_rasterizer_profile_callback_end_times (0080)
+	_rasterizer_profile_elapsed_state (0100)
+	_rasterizer_profile_start_times (0350)
+	_rasterizer_profile_frame_state (0438)
+	_local_profile_enable (0450)
+	_rasterizer_profile_state (0454)
+	_rasterizer_profile_error_count (0460)
 */
 
 /* ---------- headers */
@@ -225,9 +233,9 @@ static boolean rasterizer_profile_active(
 	void);
 
 static void rasterizer_profile_check(
-	const char *message,
+	boolean condition,
 	short profile,
-	boolean condition);
+	const char *message);
 static void rasterizer_profile_callback(
 	unsigned long context);
 static void rasterizer_profile_frame_callback(
@@ -322,17 +330,17 @@ void rasterizer_profile_frame_begin(
 		global_d3d_device);
 
 	rasterizer_profile_check(
-		"callback recieved invalid context",
+		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context),
 		NONE,
-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context));
+		"callback recieved invalid context");
 	rasterizer_profile_check(
-		"begin out-of-synch",
+		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch),
 		NONE,
-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch));
+		"begin out-of-synch");
 	rasterizer_profile_check(
-		"end out-of-synch",
+		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch),
 		NONE,
-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch));
+		"end out-of-synch");
 
 	rasterizer_profile_state.callback_errors = 0;
 
@@ -401,13 +409,13 @@ void rasterizer_profile_begin(
 			global_d3d_device);
 
 		rasterizer_profile_check(
-			"profile duplication within frame (begin)",
+			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
 			profile,
-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
+			"profile duplication within frame (begin)");
 		rasterizer_profile_check(
-			"profile begin/end pairing incorrect (begin)",
+			rasterizer_profile_globals.active_profile_index==NONE,
 			profile,
-			rasterizer_profile_globals.active_profile_index==NONE);
+			"profile begin/end pairing incorrect (begin)");
 
 		D3DDevice_InsertCallback(D3DCALLBACK_READ, rasterizer_profile_callback, profile|FLAG(_rasterizer_profile_callback_begin_bit));
 		rasterizer_profile_globals.active_profile_index = profile;
@@ -437,13 +445,13 @@ void rasterizer_profile_end(
 			global_d3d_device);
 
 		rasterizer_profile_check(
-			"profile duplication within frame (end)",
+			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
 			profile,
-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
+			"profile duplication within frame (end)");
 		rasterizer_profile_check(
-			"profile begin/end pairing incorrect (end)",
+			rasterizer_profile_globals.active_profile_index==profile,
 			profile,
-			rasterizer_profile_globals.active_profile_index==profile);
+			"profile begin/end pairing incorrect (end)");
 
 		D3DDevice_InsertCallback(D3DCALLBACK_WRITE, rasterizer_profile_callback, profile);
 		rasterizer_profile_elapsed_state.pushbuffer_elapsed_times[profile] = 0;
@@ -498,9 +506,9 @@ real rasterizer_profile_query(
 				profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
 
 			rasterizer_profile_check(
-				"profile not completed (query)",
+				rasterizer_profile_globals.active_profile_index==NONE,
 				profile,
-				rasterizer_profile_globals.active_profile_index==NONE);
+				"profile not completed (query)");
 
 			if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
 			{
@@ -541,9 +549,9 @@ long rasterizer_profile_query_pushbuffer(
 			profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
 
 		rasterizer_profile_check(
-			"profile not completed (query)",
+			rasterizer_profile_globals.active_profile_index==NONE,
 			profile,
-			rasterizer_profile_globals.active_profile_index==NONE);
+			"profile not completed (query)");
 
 		if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
 		{
@@ -602,9 +610,9 @@ static boolean rasterizer_profile_active(
 }
 
 static void rasterizer_profile_check(
-	const char *message,
+	boolean condition,
 	short profile,
-	boolean condition)
+	const char *message)
 {
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
@@ -623,11 +631,12 @@ static void rasterizer_profile_check(
 		}
 		else
 		{
-			/*
-			January passes the same two varargs in both branches. The NONE value
-			therefore becomes this format's first argument; retain that target-
-			proven rare-path defect instead of disguising it as a clean rewrite.
-			*/
+			/* BUG (preserved for exact matching): January pushes the same two
+			 * varargs (profile, message) in both branches (target push and
+			 * relocation order; the later /Od build at 0x8004c0 does the same), so
+			 * this format's %s consumes the NONE profile value, not the message.
+			 * A corrected build should pass only message here.
+			 */
 			error(
 				_error_silent,
 				"### PROFILE: %s -- tell Bernie!",

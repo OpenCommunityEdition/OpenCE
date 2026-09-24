@@ -401,15 +401,15 @@ static unsigned long bink_available_memory_kilobytes= NONE;
 static boolean bink_saved_frame_rate_throttle= TRUE;
 
 /* January .bss +0x00: the allocation table handed to bink */
-void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS] = { 0 };
+static void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS] = { 0 };
 /* January .bss +0x40: the bitmap the rasterizer draws the movie frame from */
-struct bitmap_data bink_bitmap = { 0 };
+static struct bitmap_data bink_bitmap = { 0 };
 /* January .bss +0x70: the hand-built linear texture over the frame buffer */
-D3DBaseTexture bink_texture = { 0 };
+static D3DBaseTexture bink_texture = { 0 };
 boolean debug_bink = FALSE;
 struct bink_playback_globals bink_globals = { 0 };
 /* January .bss +0x160: entries used in bink_pointer_blocks */
-long bink_pointer_block_count = 0;
+static long bink_pointer_block_count = 0;
 
 /* ---------- public code */
 

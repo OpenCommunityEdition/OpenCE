@@ -82,6 +82,8 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include <xtl.h>
 
+#include "rasterizer/xbox/rasterizer_xbox.h"
+
 /* ---------- constants */
 
 enum
@@ -258,40 +260,12 @@ typedef char detail_object_view_data_size_assert[
 
 /* ---------- prototypes */
 
-void rasterizer_error(
-	long error_result,
-	char const *format,
-	...);
-
-void rasterizer_profile_end(
-	short profile);
-
-void rasterizer_profile_begin(
-	short profile);
-
 short main_get_window_count(
 	void);
 
-void rasterizer_set_pixel_shader(
-	struct pixel_shader_definition const *definition);
-
-void rasterizer_set_texture(
-	short stage,
-	short bitmap_type,
-	short bitmap_index,
-	long bitmap_definition_index,
-	short bitmap_sequence_index);
-
-void rasterizer_set_vertex_shader_permutation(
-	short vertex_shader_index,
-	short vertex_type,
-	short permutation_index);
-
 /* ---------- globals */
 
-extern D3DDevice *global_d3d_device;
 extern struct detail_objects_debug_options rasterizer_debug_options;
-extern struct pixel_shader_definition pixel_shader;
 D3DVertexBuffer *bss_0045e904 = NULL;
 
 #define local_d3d_vertex_buffer bss_0045e904
@@ -397,7 +371,7 @@ boolean rasterizer_detail_objects_initialize(
 void _rasterizer_detail_objects_begin(
 	void)
 {
-	rasterizer_profile_begin(21);
+	rasterizer_profile_begin(_rasterizer_profile_detail_objects);
 	if (!rasterizer_debug_options.detail_objects)
 	{
 		return;
@@ -920,7 +894,7 @@ void _rasterizer_detail_objects_draw(
 void _rasterizer_detail_objects_end(
 	void)
 {
-	rasterizer_profile_end(21);
+	rasterizer_profile_end(_rasterizer_profile_detail_objects);
 	return;
 }
 

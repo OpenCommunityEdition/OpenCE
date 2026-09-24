@@ -406,6 +406,8 @@ typedef char verify_lights_globals_size[
 
 /* ---------- prototypes */
 
+static boolean should_render_lights(
+	void);
 static void light_marker_begin(
 	void);
 static void light_marker_end(
@@ -414,10 +416,10 @@ static boolean light_unmarked(
 	long light_index);
 static boolean light_mark(
 	long light_index);
-long cluster_get_first_light(
+static long cluster_get_first_light(
 	long *reference_index,
 	short cluster_index);
-long cluster_get_next_light(
+static long cluster_get_next_light(
 	long *reference_index);
 static void find_point_lights_for_object_in_cluster(
 	long object_index,
@@ -640,7 +642,7 @@ void sample_diffuse_texture(
 	return;
 }
 
-boolean should_render_lights(
+static boolean should_render_lights(
 	void)
 {
 	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
@@ -1481,7 +1483,7 @@ static void render_debug_light(
 
 /* ---------- private code */
 
-real light_attenuation(
+static real light_attenuation(
 	real radius,
 	real distance)
 {
@@ -1512,7 +1514,7 @@ static void brighten_real_rgb_color(
 	return;
 }
 
-long cluster_get_first_light(
+static long cluster_get_first_light(
 	long *reference_index,
 	short cluster_index)
 {
@@ -1522,7 +1524,7 @@ long cluster_get_first_light(
 		cluster_index);
 }
 
-long cluster_get_next_light(
+static long cluster_get_next_light(
 	long *reference_index)
 {
 	return cluster_partition_get_next_datum(
@@ -1634,7 +1636,7 @@ void lights_render_diffuse(
 	short light_index;
 
 	rasterizer_environment_diffuse_lights_begin();
-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+	if (should_render_lights())
 	{
 		for (light_index = 0;
 			light_index < lights_globals.scene_point_light_count;
@@ -1689,7 +1691,7 @@ void lights_render_specular(
 	short light_index;
 
 	rasterizer_environment_specular_lights_begin();
-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+	if (should_render_lights())
 	{
 		for (light_index = 0;
 			light_index < lights_globals.scene_point_light_count;
