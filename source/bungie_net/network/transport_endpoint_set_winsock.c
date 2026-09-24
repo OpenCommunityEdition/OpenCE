@@ -5,7 +5,7 @@ symbols in this file:
 00070420 0010:
 	_net_startup_debug (0000)
 00070430 0040:
-	_transport_endpoint_set_get_next_index (0000)
+	_get_next_available_set_array_index (0000)
 00070470 0080:
 	_transport_push_key (0000)
 000704F0 0040:
@@ -35,7 +35,7 @@ symbols in this file:
 00070A80 0090:
 	_delete_endpoint_set (0000)
 00070B10 0030:
-	_transport_endpoint_set_compare_entries (0000)
+	_poll_ep_array_compare_proc (0000)
 00070B40 0230:
 	_poll_endpoint_set (0000)
 00070D70 0150:
@@ -154,9 +154,9 @@ typedef char transport_endpoint_set_size_assert[
 
 /* ---------- prototypes */
 
-static long transport_endpoint_set_get_next_index(
+static long get_next_available_set_array_index(
 	struct transport_endpoint_set *set);
-static int __cdecl transport_endpoint_set_compare_entries(
+static int __cdecl poll_ep_array_compare_proc(
 	void const *a,
 	void const *b);
 
@@ -179,7 +179,7 @@ void net_startup_debug(
 	return;
 }
 
-static long transport_endpoint_set_get_next_index(
+static long get_next_available_set_array_index(
 	struct transport_endpoint_set *set)
 {
 	match_assert(
@@ -473,7 +473,7 @@ short delete_endpoint_set(
 
 /* ---------- private code */
 
-static int __cdecl transport_endpoint_set_compare_entries(
+static int __cdecl poll_ep_array_compare_proc(
 	void const *a,
 	void const *b)
 {
@@ -521,7 +521,7 @@ short poll_endpoint_set(
 			set->ep_array,
 			set->last_endpoint_index + 1,
 			sizeof(*set->ep_array),
-			transport_endpoint_set_compare_entries);
+			poll_ep_array_compare_proc);
 		/* January has no lower-bound guard when every entry has been removed. */
 		while (!set->ep_array[set->last_endpoint_index])
 		{
@@ -598,7 +598,7 @@ short add_endpoint_to_set(
 		0x230,
 		transport_initialized);
 
-	endpoint_index = transport_endpoint_set_get_next_index(set);
+	endpoint_index = get_next_available_set_array_index(set);
 	if (endpoint_index >= 0)
 	{
 		set->ep_array[endpoint_index] = ep;

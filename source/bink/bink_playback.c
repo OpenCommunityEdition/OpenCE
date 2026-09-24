@@ -43,7 +43,7 @@ symbols in this file:
 001B5E00 0030:
 	_bink_playback_dispose (0000)
 001B5E30 00a0:
-	_code_001b5e30 (0000)
+	_bink_playback_update__internal (0000)
 001B5ED0 0060:
 	_bink_playback_render (0000)
 001B5F30 0430:
@@ -392,7 +392,7 @@ static void bink_free_texture_cache(
 	void);
 static void bink_decompress_video_frame(
 	void);
-static void bink_playback_idle(
+static void bink_playback_update__internal(
 	void);
 
 /* ---------- globals */
@@ -503,7 +503,7 @@ skip_decode:
 	bink_globals.rendered_frame_count++;
 
 	if (!global_frame_rate_throttle)
-		bink_playback_idle();
+		bink_playback_update__internal();
 
 	return;
 }
@@ -659,7 +659,7 @@ void bink_playback_update(
 	void)
 {
 	if (global_frame_rate_throttle)
-		bink_playback_idle();
+		bink_playback_update__internal();
 
 	return;
 }
@@ -974,7 +974,7 @@ static void bink_decompress_video_frame(
 	return;
 }
 
-static void bink_playback_idle(
+static void bink_playback_update__internal(
 	void)
 {
 	if (bink_globals.initialized && bink_globals.bink)

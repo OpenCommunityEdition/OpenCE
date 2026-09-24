@@ -588,6 +588,8 @@ static boolean hs_get_parameter_indices(
 	short parameter_count,
 	long *parameter_indices,
 	long expression_index);
+static void hs_compile_finish(
+	void);
 static long hs_find_string_constant(
 	char const *string);
 static boolean character_in_list(
@@ -631,9 +633,9 @@ extern struct data_array *hs_syntax_data;
 
 static struct hs_compile_globals hs_compile_globals;
 
-static char const whitespace_characters[2] = { ' ', '\t' };
-static char const eol_characters[2] = { '\n', '\r' };
-static hs_primitive_parser const hs_type_primitive_parsers[NUMBER_OF_HS_TYPES] =
+char const whitespace_characters[2] = { ' ', '\t' };
+char const eol_characters[2] = { '\n', '\r' };
+hs_primitive_parser const hs_type_primitive_parsers[NUMBER_OF_HS_TYPES] =
 {
 	NULL,
 	NULL,
@@ -1079,7 +1081,7 @@ void hs_compile(
 	return;
 }
 
-void hs_compile_finish(
+static void hs_compile_finish(
 	void)
 {
 	struct scenario *scenario = global_scenario_get();

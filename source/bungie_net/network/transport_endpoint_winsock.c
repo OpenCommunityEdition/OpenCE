@@ -3,9 +3,9 @@ TRANSPORT_ENDPOINT_WINSOCK.C
 
 symbols in this file:
 00071300 0060:
-	_connection_thread_list_add (0000)
+	_add_connect_thread (0000)
 00071360 0040:
-	_connection_thread_list_mark_for_disposal (0000)
+	_mark_connection_thread_as_terminated (0000)
 000713A0 0040:
 	_connection_thread_list_maintenance (0000)
 000713E0 0080:
@@ -33,7 +33,7 @@ symbols in this file:
 00071980 0620:
 	_winsock_error_to_string (0000)
 00071FA0 0130:
-	_create_endpoint_socket (0000)
+	_create_socket (0000)
 000720D0 0170:
 	_get_endpoint_address (0000)
 00072240 0110:
@@ -45,7 +45,7 @@ symbols in this file:
 00072670 0080:
 	_disconnect_endpoint (0000)
 000726F0 0130:
-	_connect_endpoint_process@4 (0000)
+	_connect_async_thread_proc@4 (0000)
 00072820 0150:
 	_connect_endpoint_async (0000)
 00072970 00a0:
@@ -330,15 +330,15 @@ struct transport_endpoint_winsock_globals
 
 /* ---------- prototypes */
 
-static SOCKET create_endpoint_socket(
+static SOCKET create_socket(
 	int address_family,
 	int socket_type,
 	int protocol);
-static boolean connection_thread_list_add(
+static boolean add_connect_thread(
 	struct thread_reference *thread);
-static void connection_thread_list_mark_for_disposal(
+static void mark_connection_thread_as_terminated(
 	struct thread_reference *thread);
-static unsigned long __stdcall connect_endpoint_process(
+static unsigned long __stdcall connect_async_thread_proc(
 	void *input_pointer);
 static void connection_thread_list_maintenance(
 	void);
@@ -349,7 +349,7 @@ static struct transport_endpoint_winsock_globals transport_endpoint_globals = {0
 
 /* ---------- public code */
 
-static boolean connection_thread_list_add(
+static boolean add_connect_thread(
 	struct thread_reference *thread)
 {
 	long endpoint_thread_index = 0;
@@ -373,7 +373,7 @@ static boolean connection_thread_list_add(
 	return endpoint_thread_index != NONE;
 }
 
-static void connection_thread_list_mark_for_disposal(
+static void mark_connection_thread_as_terminated(
 	struct thread_reference *thread)
 {
 	long endpoint_thread_index;
@@ -1137,7 +1137,7 @@ short bind_endpoint(
 
 		if (error == _transport_error_none)
 		{
-			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
+			ep->socket = create_socket(AF_INET, socket_type, IPPROTO_IP);
 			if (ep->socket == INVALID_SOCKET)
 			{
 				error = _transport_error_unknown;
@@ -1199,7 +1199,7 @@ short connect_endpoint(
 
 		if (ep->socket == INVALID_SOCKET)
 		{
-			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
+			ep->socket = create_socket(AF_INET, socket_type, IPPROTO_IP);
 		}
 
 		socket_address.sin_addr.s_addr = SWAP4(address->address.long_words[0]);
@@ -1265,7 +1265,7 @@ short connect_endpoint(
 	return result;
 }
 
-static unsigned long __stdcall connect_endpoint_process(
+static unsigned long __stdcall connect_async_thread_proc(
 	void *input_pointer)
 {
 	struct connect_process_input *input = input_pointer;
@@ -1304,7 +1304,7 @@ static unsigned long __stdcall connect_endpoint_process(
 
 	if (thread)
 	{
-		connection_thread_list_mark_for_disposal(thread);
+		mark_connection_thread_as_terminated(thread);
 	}
 
 	return error;
@@ -1337,9 +1337,9 @@ short connect_endpoint_async(
 		input->cancelled = FALSE;
 
 		if (create_mutex(&input->mutex) &&
-			create_thread(2, connect_endpoint_process, input, &input->thread))
+			create_thread(2, connect_async_thread_proc, input, &input->thread))
 		{
-			if (connection_thread_list_add(input->thread))
+			if (add_connect_thread(input->thread))
 			{
 				result = _transport_result_connect_in_progress;
 				*process_ref_ptr = input;
@@ -1502,7 +1502,7 @@ long read_from_endpoint(
 			0x37C,
 			ep->type == _transport_type_udp);
 
-		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, 0);
+		ep->socket = create_socket(AF_INET, SOCK_DGRAM, 0);
 		if (ep->socket != INVALID_SOCKET)
 		{
 			struct transport_address bind_address = {0};
@@ -1599,7 +1599,7 @@ long write_to_endpoint(
 			0x3C6,
 			ep->type == _transport_type_udp);
 
-		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+		ep->socket = create_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 	}
 
 	if (ep->socket != INVALID_SOCKET)
@@ -1670,7 +1670,7 @@ short reject_endpoint(
 
 /* ---------- private code */
 
-static SOCKET create_endpoint_socket(
+static SOCKET create_socket(
 	int address_family,
 	int socket_type,
 	int protocol)

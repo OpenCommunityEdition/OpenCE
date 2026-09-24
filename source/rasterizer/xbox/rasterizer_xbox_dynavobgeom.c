@@ -33,7 +33,7 @@ symbols in this file:
 0014EE80 0270:
 	__rasterizer_dynamic_unlit_geometry_draw (0000)
 0014F0F0 0040:
-	_rasterizer_screen_geometry_submit_vertex (0000)
+	_submit_screen_vertex (0000)
 0014F130 0b90:
 	__rasterizer_psuedo_dynamic_screen_quad_draw (0000)
 0028FBDC 0010:
@@ -231,7 +231,7 @@ typedef char rasterizer_dynamic_geometry_camera_offset_assert[
 	offsetof(struct rasterizer_window_begin_parameters, camera) == 0x8 ? 1 : -1];
 /* ---------- prototypes */
 
-static void rasterizer_screen_geometry_submit_vertex(
+static void submit_screen_vertex(
 	struct dynamic_screen_vertex const *vertex);
 
 /* ---------- globals */
@@ -652,7 +652,7 @@ void _rasterizer_psuedo_dynamic_screen_quad_draw(
 	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
 	for (vertex_index = 0; vertex_index < NUMBER_OF_VERTICES_PER_QUADRILATERAL; vertex_index++)
 	{
-		rasterizer_screen_geometry_submit_vertex(&vertices[vertex_index]);
+		submit_screen_vertex(&vertices[vertex_index]);
 	}
 	IDirect3DDevice8_End(global_d3d_device);
 
@@ -833,7 +833,7 @@ void _rasterizer_dynamic_screen_geometry_add_multitexture_params_to_base(
 
 /* ---------- private code */
 
-static void rasterizer_screen_geometry_submit_vertex(
+static void submit_screen_vertex(
 	struct dynamic_screen_vertex const *vertex)
 {
 	IDirect3DDevice8_SetVertexDataColor(

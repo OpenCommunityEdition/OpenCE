@@ -51,7 +51,7 @@ AI_DEBUG.C
  * the call, which a bare `point_height+0.15f` argument does not produce; a
  * whole-argument parenthesised SUM occurs nowhere else in the tree, so the
  * group is expressed here as a named macro rather than as loose parentheses.
- * Measured on _code_00039990 with everything else held constant:
+ * Measured on _ai_debug_render_path_node with everything else held constant:
  *
  *     point_height+0.15f                    residual [sha]
  *     (point_height+0.15f)                  EXACT
@@ -161,13 +161,6 @@ static void ai_debug_highlight_unit(
 	boolean render_exclusive,
 	union real_argb_color const *color);
 
-static void ai_debug_render_path_nodes(
-	struct path_state *path_state,
-	boolean bsp_access_allowed,
-	boolean render_all_nodes,
-	boolean render_polygons,
-	boolean render_costs,
-	boolean render_closest);
 static void ai_debug_render_surface(
 	struct structure_bsp const *structure_bsp,
 	long surface_index,
@@ -180,45 +173,45 @@ static void ai_debug_render_actor(
 	long *history_start_time);
 static void ai_debug_render_path_storage(
 	struct path_debug_storage *path);
-static void code_00037890(
+static void ai_debug_render_path_line(
 	real_point3d const *start,
 	real_argb_color const *color,
 	short step_count,
 	struct path_step *steps);
 
-static void code_00037af0(
+static void ai_debug_render_lineoffire(
 	void);
-static void code_00037bc0(
+static void ai_debug_render_ballistic_lineoffire(
 	void);
-static void code_00037fa0(
+static void ai_debug_render_lineofsight(
 	void);
-static void code_000383d0(
+static void ai_debug_render_aiming_validity(
 	void);
-static void code_00038de0(
+static void ai_debug_render_idle_look(
 	void);
-static void code_00038f30(
+static void ai_debug_render_spatial_effects(
 	void);
-static void code_00039e10(
+static void ai_debug_select_this_actor(
 	void);
-static long code_00038280(
+static long ai_debug_get_this_actor(
 	void);
-static void code_00039e80(
+static void ai_debug_render_speech(
 	void);
-static void code_0003a2e0(
+static void ai_debug_render_vehicles_enterable(
 	void);
-static void code_0003af00(
+static void ai_debug_render_path(
 	void);
-static void code_000386a0(
+static void ai_debug_speech_update(
 	void);
-static void code_00039060(
+static void ai_debug_path_storage_update(
 	void);
-static void code_00041120(
+static void ai_debug_render_paths_failed(
 	void);
-static void code_000411d0(
+static void ai_debug_render_all_actors(
 	boolean render_inactive_actors);
 static void ai_debug_render_encounter(
 	long encounter_index);
-static void code_00039990(
+static void ai_debug_render_path_node(
 	struct path_node *node,
 	real_point3d const *previous_point,
 	struct structure_bsp const *structure_bsp,
@@ -231,7 +224,7 @@ static void code_00039990(
 	real_argb_color const *weight_color,
 	real_argb_color const *cost_color,
 	real_argb_color const *attractor_color);
-static void code_0003a910(
+static void ai_debug_render_path_nodes(
 	struct path_state *state,
 	boolean render_surfaces,
 	boolean render_all_nodes,
@@ -478,24 +471,24 @@ void ai_debug_render(
 
 		if (ai_debug.select_this_actor)
 		{
-			code_00039e10();
+			ai_debug_select_this_actor();
 		}
 
 		if (ai_debug.render)
 		{
 			if (ai_debug.render_lineoffire)
 			{
-				code_00037af0();
+				ai_debug_render_lineoffire();
 			}
 
 			if (ai_debug.render_lineofsight)
 			{
-				code_00037fa0();
+				ai_debug_render_lineofsight();
 			}
 
 			if (ai_debug.render_ballistic_lineoffire)
 			{
-				code_00037bc0();
+				ai_debug_render_ballistic_lineoffire();
 			}
 
 			if (ai_debug.selected_squad_index!=NONE)
@@ -510,42 +503,42 @@ void ai_debug_render(
 
 			if (ai_debug.path)
 			{
-				code_0003af00();
+				ai_debug_render_path();
 			}
 
 			if (ai_debug.render_paths_failed)
 			{
-				code_00041120();
+				ai_debug_render_paths_failed();
 			}
 
 			if (ai_debug.render_aiming_validity)
 			{
-				code_000383d0();
+				ai_debug_render_aiming_validity();
 			}
 
 			if (ai_debug.render_all_actors)
 			{
-				code_000411d0(ai_debug.render_inactive_actors);
+				ai_debug_render_all_actors(ai_debug.render_inactive_actors);
 			}
 
 			if (ai_debug.render_speech || ai_debug.print_speech || ai_debug.render_dialogue_variants)
 			{
-				code_00039e80();
+				ai_debug_render_speech();
 			}
 
 			if (ai_debug.render_idle_look)
 			{
-				code_00038de0();
+				ai_debug_render_idle_look();
 			}
 
 			if (ai_debug.render_spatial_effects)
 			{
-				code_00038f30();
+				ai_debug_render_spatial_effects();
 			}
 
 			if (ai_debug.render_vehicles_enterable)
 			{
-				code_0003a2e0();
+				ai_debug_render_vehicles_enterable();
 			}
 		}
 	}
@@ -587,7 +580,7 @@ static real_point3d *ai_debug_drawstack(
 	return &global_ai_debug_drawstack_last_position;
 }
 
-static void code_00039990(
+static void ai_debug_render_path_node(
 	struct path_node *node,
 	real_point3d const *previous_point,
 	struct structure_bsp const *structure_bsp,
@@ -751,27 +744,6 @@ static void ai_debug_highlight_unit(
 			render_debug_point(TRUE, &base, 1.8f * width, color);
 		}
 	}
-
-	return;
-}
-
-/* Render the path-node overlays selected by the caller. */
-static void ai_debug_render_path_nodes(
-	struct path_state *path_state,
-	boolean bsp_access_allowed,
-	boolean render_all_nodes,
-	boolean render_polygons,
-	boolean render_costs,
-	boolean render_closest)
-{
-	real_argb_color const *attractor_distance_color;
-	real_argb_color const *closest_color;
-	real_point3d temp_point2;
-	real_argb_color const *polygon_color;
-	real_argb_color const *cost_color;
-	real_argb_color const *attractor_weight_color;
-	real_point3d temp_point;
-	static short current_traverse_index;
 
 	return;
 }
@@ -3851,7 +3823,8 @@ static void ai_debug_render_actor(
 	return;
 }
 
-static void code_0003a910(
+/* Render the path-node overlays selected by the caller. */
+static void ai_debug_render_path_nodes(
 	struct path_state *state,
 	boolean render_surfaces,
 	boolean render_all_nodes,
@@ -3880,7 +3853,7 @@ static void code_0003a910(
 		{
 			node = path_get_node(state, node_index);
 
-			code_00039990(node,
+			ai_debug_render_path_node(node,
 				previous_node==NULL ? &state->destination.point : &previous_node->entry_point,
 				state->structure, render_surfaces, state, previous_node,
 				global_real_argb_red, polygon_color, distance_color, weight_color,
@@ -3972,7 +3945,7 @@ static void code_0003a910(
 						point = &node->entry_point;
 					}
 
-					code_00039990(node, point,
+					ai_debug_render_path_node(node, point,
 						state->structure, render_surfaces, state, previous_node,
 						global_real_argb_blue, polygon_color, distance_color, weight_color,
 						cost_color, closest_color);
@@ -4070,19 +4043,19 @@ static void ai_debug_render_path_storage(
 
 		if (ai_debug.render_paths_raw)
 		{
-			code_00037890(&path->path_state.input.start_point, global_real_argb_red,
+			ai_debug_render_path_line(&path->path_state.input.start_point, global_real_argb_red,
 				path->raw_step_count, path->raw_steps);
 		}
 
 		if (ai_debug.render_paths_smoothed)
 		{
-			code_00037890(&path->path_state.input.start_point, global_real_argb_green,
+			ai_debug_render_path_line(&path->path_state.input.start_point, global_real_argb_green,
 				path->smoothed_step_count, path->smoothed_steps);
 		}
 
 		if (ai_debug.render_paths_avoided)
 		{
-			code_00037890(&path->path_state.input.start_point, global_real_argb_blue,
+			ai_debug_render_path_line(&path->path_state.input.start_point, global_real_argb_blue,
 				path->avoided_step_count, path->avoided_steps);
 		}
 
@@ -4105,7 +4078,7 @@ static void ai_debug_render_path_storage(
 
 		if (ai_debug.render_paths_nodes)
 		{
-			code_0003a910(&path->path_state, matching_bsp,
+			ai_debug_render_path_nodes(&path->path_state, matching_bsp,
 				ai_debug.render_paths_nodes_all, ai_debug.render_paths_nodes_polygons,
 				ai_debug.render_paths_nodes_costs, ai_debug.render_paths_nodes_closest);
 		}
@@ -4200,7 +4173,7 @@ void ai_debug_idle_look_addprop(
 	return;
 }
 
-static void code_00038ad0(
+static void ai_debug_communication_toggle_bits(
 	long name_count,
 	char const **names,
 	unsigned long *vector,
@@ -4267,7 +4240,7 @@ void ai_debug_communication_suppress(
 	long name_count,
 	char const **names)
 {
-	code_00038ad0(name_count, names, ai_debug.communication_suppress_vector,
+	ai_debug_communication_toggle_bits(name_count, names, ai_debug.communication_suppress_vector,
 		NUMBER_OF_AI_DEBUG_COMMUNICATION_TYPES, ai_communication_get_type_by_name);
 
 	return;
@@ -4277,7 +4250,7 @@ void ai_debug_communication_ignore(
 	long name_count,
 	char const **names)
 {
-	code_00038ad0(name_count, names, ai_debug.communication_ignore_vector,
+	ai_debug_communication_toggle_bits(name_count, names, ai_debug.communication_ignore_vector,
 		NUMBER_OF_AI_DEBUG_COMMUNICATION_TYPES, ai_communication_get_type_by_name);
 
 	return;
@@ -4287,13 +4260,13 @@ void ai_debug_communication_focus(
 	long name_count,
 	char const **names)
 {
-	code_00038ad0(name_count, names, ai_debug.communication_focus_vector,
+	ai_debug_communication_toggle_bits(name_count, names, ai_debug.communication_focus_vector,
 		NUMBER_OF_AI_DEBUG_VOCALIZATION_TYPES, dialogue_get_vocalization_type_by_name);
 
 	return;
 }
 
-static short code_00037dd0(
+static short ai_debug_lineofsight_findpoint(
 	real_point3d const *point,
 	short key)
 {
@@ -4341,7 +4314,7 @@ static short code_00037dd0(
 	return (short)index;
 }
 
-static long code_00037ee0(
+static long ai_debug_lineofsight_storeray(
 	short start_index,
 	short end_index)
 {
@@ -4397,7 +4370,7 @@ void ai_debug_lineofsight(
 	real_point3d const *end,
 	short end_key)
 {
-	code_00037ee0(code_00037dd0(start, start_key), code_00037dd0(end, end_key));
+	ai_debug_lineofsight_storeray(ai_debug_lineofsight_findpoint(start, start_key), ai_debug_lineofsight_findpoint(end, end_key));
 
 	return;
 }
@@ -4838,9 +4811,9 @@ void ai_debug_update(
 		ai_debug.fix_actor_variants = FALSE;
 	}
 
-	code_000386a0();
+	ai_debug_speech_update();
 
-	code_00039060();
+	ai_debug_path_storage_update();
 
 	return;
 }
@@ -5061,7 +5034,7 @@ struct path_debug_storage *ai_debug_get_path_storage(
 	return NULL;
 }
 
-static void code_00037af0(
+static void ai_debug_render_lineoffire(
 	void)
 {
 	if (ai_debug.lineoffire_valid)
@@ -5095,7 +5068,7 @@ static void code_00037af0(
 	return;
 }
 
-static void code_00037bc0(
+static void ai_debug_render_ballistic_lineoffire(
 	void)
 {
 	if (ai_debug.ballistic_lineoffire_valid)
@@ -5140,7 +5113,7 @@ static void code_00037bc0(
 	return;
 }
 
-static void code_00037fa0(
+static void ai_debug_render_lineofsight(
 	void)
 {
 	long index;
@@ -5193,7 +5166,7 @@ static void code_00037fa0(
 	return;
 }
 
-static void code_000383d0(
+static void ai_debug_render_aiming_validity(
 	void)
 {
 	if (ai_debug.field_859F4!=ai_debug.selected_actor_index)
@@ -5267,7 +5240,7 @@ static void code_000383d0(
 	return;
 }
 
-static void code_00038de0(
+static void ai_debug_render_idle_look(
 	void)
 {
 	if (ai_debug.idle_look_valid)
@@ -5312,7 +5285,7 @@ static void code_00038de0(
 	return;
 }
 
-static void code_00038f30(
+static void ai_debug_render_spatial_effects(
 	void)
 {
 	long time = game_time_get();
@@ -5358,10 +5331,10 @@ static void code_00038f30(
 	return;
 }
 
-static void code_00039e10(
+static void ai_debug_select_this_actor(
 	void)
 {
-	long actor_index = code_00038280();
+	long actor_index = ai_debug_get_this_actor();
 
 	if (actor_index!=NONE)
 	{
@@ -5383,7 +5356,7 @@ static void code_00039e10(
 	return;
 }
 
-static void code_00039e80(
+static void ai_debug_render_speech(
 	void)
 {
 	struct object_iterator iterator;
@@ -5512,7 +5485,7 @@ static void code_00039e80(
 	return;
 }
 
-static void code_0003a2e0(
+static void ai_debug_render_vehicles_enterable(
 	void)
 {
 	/* Every loop below shares this index, including the inner loops, so the
@@ -5608,7 +5581,7 @@ static void code_0003a2e0(
 	return;
 }
 
-static void code_0003af00(
+static void ai_debug_render_path(
 	void)
 {
 	if (ai_debug.path_start_valid && ai_debug.path_end_valid && !ai_debug.field_608A8)
@@ -5645,7 +5618,7 @@ static void code_0003af00(
 	return;
 }
 
-static void code_00041120(
+static void ai_debug_render_paths_failed(
 	void)
 {
 	short index;
@@ -5674,7 +5647,7 @@ static void code_00041120(
 	return;
 }
 
-static void code_000411d0(
+static void ai_debug_render_all_actors(
 	boolean render_inactive_actors)
 {
 	struct actor_iterator iterator;
@@ -6007,7 +5980,7 @@ default_firing_position_colors:
 	return;
 }
 
-static void code_000386a0(
+static void ai_debug_speech_update(
 	void)
 {
 	struct unit_datum *unit;
@@ -6137,7 +6110,7 @@ static void code_000386a0(
 	return;
 }
 
-static void code_00039060(
+static void ai_debug_path_storage_update(
 	void)
 {
 	short index;
@@ -6175,7 +6148,7 @@ static void code_00039060(
 	return;
 }
 
-static void code_00037890(
+static void ai_debug_render_path_line(
 	real_point3d const *start,
 	real_argb_color const *color,
 	short step_count,
@@ -6201,7 +6174,7 @@ static void code_00037890(
 	return;
 }
 
-static long code_00038280(
+static long ai_debug_get_this_actor(
 	void)
 {
 	long actor_index = NONE;

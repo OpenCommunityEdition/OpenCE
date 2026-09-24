@@ -35,7 +35,7 @@ void progress_bar_enable(
 	boolean enabled);
 void progress_bar_display(
 	real progress);
-boolean progress_bar_screen_initialized(
+boolean progress_bar_is_stuff_ready(
 	void);
 
 /* ---------- globals */

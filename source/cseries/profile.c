@@ -5,11 +5,11 @@ symbols in this file:
 0007DCA0 0080:
 	_profile_initialize (0000)
 0007DD20 0160:
-	_profile_sections_update (0000)
+	_profile_internal_step (0000)
 0007DE80 0020:
 	_profile_rasterizer_stats (0000)
 0007DEA0 0040:
-	_profile_timesection_subtract (0000)
+	_profile_timesection_inherit (0000)
 0007DEE0 0010:
 	_profile_seconds_elapsed (0000)
 0007DEF0 0040:
@@ -23,11 +23,11 @@ symbols in this file:
 0007E130 00a0:
 	_profile_exit_private (0000)
 0007E1D0 0610:
-	_profile_frame_build_string (0000)
+	_profile_describe_frame (0000)
 0007E7E0 0010:
-	_code_0007e7e0 (0000)
+	_profile_timesection_begin (0000)
 0007E7F0 0050:
-	_code_0007e7f0 (0000)
+	_profile_timesection_end (0000)
 0007E840 0120:
 	_compare_profile_sections (0000)
 0007E960 0360:
@@ -35,13 +35,13 @@ symbols in this file:
 0007ECC0 0080:
 	_profile_dump_to_file (0000)
 0007ED40 0080:
-	_profile_frame_dump (0000)
+	_profile_dump_frame (0000)
 0007EDC0 0040:
-	_profile_framedump_flush (0000)
+	_profile_dump_frame_stop (0000)
 0007EE00 0030:
-	_code_0007ee00 (0000)
+	_string_has_prefix (0000)
 0007EE30 00a0:
-	_code_0007ee30 (0000)
+	_profile_sections_activation (0000)
 0007EED0 0020:
 	_profile_sections_activate (0000)
 0007EEF0 0020:
@@ -63,9 +63,9 @@ symbols in this file:
 0007F930 0090:
 	_profile_rasterizer_stalls (0000)
 0007F9C0 0030:
-	_code_0007f9c0 (0000)
+	_profile_timesection_begin_now (0000)
 0007F9F0 0060:
-	_code_0007f9f0 (0000)
+	_profile_timesection_end_now (0000)
 0007FA50 0090:
 	_profile_tick_start (0000)
 0007FAE0 00a0:
@@ -393,38 +393,38 @@ struct profile_globals
 
 /* ---------- prototypes */
 
-static void profile_timesection_subtract(
+static void profile_timesection_inherit(
 	struct profile_timer *parent_timesection,
 	struct profile_timer *child_timesection);
-static void profile_frame_build_string(
+static void profile_describe_frame(
 	struct profile_frame *frame,
 	char *string,
 	short maximum_length);
-static void profile_frame_dump(
+static void profile_dump_frame(
 	struct profile_frame *frame);
-static void profile_sections_update(
+static void profile_internal_step(
 	void);
 void find_profile_section(
 	struct profile_section *section);
-static void profile_framedump_flush(
+static void profile_dump_frame_stop(
 	void);
-static void profile_sections_set_active(
+static void profile_sections_activation(
 	const char *name,
 	boolean active);
 int compare_profile_sections(
 	void const *section0,
 	void const *section1);
-static boolean string_starts_with(
+static boolean string_has_prefix(
 	char const *string,
 	char const *prefix);
-static void profile_timer_start(
+static void profile_timesection_begin_now(
 	struct profile_timer *timer);
-static void profile_timer_start_at(
+static void profile_timesection_begin(
 	struct profile_timer *timer,
 	__int64 start);
-static void profile_timer_end(
+static void profile_timesection_end_now(
 	struct profile_timer *timer);
-static void profile_timer_end_at(
+static void profile_timesection_end(
 	struct profile_timer *timer,
 	__int64 end);
 
@@ -604,8 +604,8 @@ void profile_rasterizer_stalls(
 	long unused,
 	__int64 stall_timebase)
 {
-	profile_timer_start_at(&profile_globals.current_frame.stall, 0);
-	profile_timer_end_at(&profile_globals.current_frame.stall, stall_timebase);
+	profile_timesection_begin(&profile_globals.current_frame.stall, 0);
+	profile_timesection_end(&profile_globals.current_frame.stall, stall_timebase);
 	profile_globals.current_frame.stall_count = stall_count;
 	profile_globals.current_frame.stall_index = stall_index;
 	profile_globals.current_frame.stall_msec = (real)(stall_ticks*1000.0f/profile_globals.timebase_frequency);
@@ -968,7 +968,7 @@ real profile_frame_get_value(
 void profile_sections_activate(
 	const char *name)
 {
-	profile_sections_set_active(name, TRUE);
+	profile_sections_activation(name, TRUE);
 
 	return;
 }
@@ -976,7 +976,7 @@ void profile_sections_activate(
 void profile_sections_deactivate(
 	const char *name)
 {
-	profile_sections_set_active(name, FALSE);
+	profile_sections_activation(name, FALSE);
 
 	return;
 }
@@ -1078,7 +1078,7 @@ void profile_frame_start(
 {
 	if (!profile_timebase_ticks)
 	{
-		profile_sections_update();
+		profile_internal_step();
 	}
 
 	csmemset(&profile_globals.current_frame, 0, sizeof(profile_globals.current_frame));
@@ -1086,7 +1086,7 @@ void profile_frame_start(
 	profile_globals.current_frame.frame_index = render.frame_index;
 	profile_globals.current_frame.vertical_blank_index = rasterizer_globals.vertical_blank_index;
 	profile_globals.current_frame.game_tick_count = 0;
-	profile_timer_start(&profile_globals.current_frame.frame);
+	profile_timesection_begin_now(&profile_globals.current_frame.frame);
 
 	return;
 }
@@ -1098,7 +1098,7 @@ void profile_tick_start(
 
 	if (profile_timebase_ticks)
 	{
-		profile_sections_update();
+		profile_internal_step();
 	}
 
 	if (profile_globals.current_frame.game_tick_count<MAXIMUM_GAME_TICKS_PER_FRAME)
@@ -1112,7 +1112,7 @@ void profile_tick_start(
 		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
 
 	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
-	profile_timer_start(timer);
+	profile_timesection_begin_now(timer);
 
 	return;
 }
@@ -1126,7 +1126,7 @@ void profile_tick_end(
 		(profile_globals.current_frame.game_tick_count > 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
 
 	timer = &profile_globals.current_frame.game_ticks[profile_globals.current_frame.game_tick_count-1];
-	profile_timer_end(timer);
+	profile_timesection_end_now(timer);
 
 	return;
 }
@@ -1148,7 +1148,7 @@ void profile_render_window_start(
 		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
 
 	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
-	profile_timer_start(timer);
+	profile_timesection_begin_now(timer);
 
 	return;
 }
@@ -1162,7 +1162,7 @@ void profile_render_window_end(
 		(profile_globals.current_frame.window_count > 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
 
 	timer = &profile_globals.current_frame.windows[profile_globals.current_frame.window_count-1];
-	profile_timer_end(timer);
+	profile_timesection_end_now(timer);
 
 	return;
 }
@@ -1171,7 +1171,7 @@ void profile_render_start(
 	void)
 {
 	profile_globals.current_frame.window_count = 0;
-	profile_timer_start(&profile_globals.current_frame.render);
+	profile_timesection_begin_now(&profile_globals.current_frame.render);
 
 	return;
 }
@@ -1179,7 +1179,7 @@ void profile_render_start(
 void profile_render_end(
 	void)
 {
-	profile_timer_end(&profile_globals.current_frame.render);
+	profile_timesection_end_now(&profile_globals.current_frame.render);
 
 	return;
 }
@@ -1187,7 +1187,7 @@ void profile_render_end(
 void profile_texture_start(
 	void)
 {
-	profile_timer_start(&profile_globals.current_frame.texture);
+	profile_timesection_begin_now(&profile_globals.current_frame.texture);
 
 	return;
 }
@@ -1195,7 +1195,7 @@ void profile_texture_start(
 void profile_texture_end(
 	void)
 {
-	profile_timer_end(&profile_globals.current_frame.texture);
+	profile_timesection_end_now(&profile_globals.current_frame.texture);
 
 	return;
 }
@@ -1203,7 +1203,7 @@ void profile_texture_end(
 void profile_idle_start(
 	void)
 {
-	profile_timer_start(&profile_globals.current_frame.idle);
+	profile_timesection_begin_now(&profile_globals.current_frame.idle);
 
 	return;
 }
@@ -1211,7 +1211,7 @@ void profile_idle_start(
 void profile_idle_end(
 	void)
 {
-	profile_timer_end(&profile_globals.current_frame.idle);
+	profile_timesection_end_now(&profile_globals.current_frame.idle);
 
 	return;
 }
@@ -1264,7 +1264,7 @@ void profile_exit_private(
 	return;
 }
 
-static void profile_timesection_subtract(
+static void profile_timesection_inherit(
 	struct profile_timer *parent_timesection,
 	struct profile_timer *child_timesection)
 {
@@ -1277,7 +1277,7 @@ static void profile_timesection_subtract(
 	return;
 }
 
-static void profile_frame_build_string(
+static void profile_describe_frame(
 	struct profile_frame *frame,
 	char *string,
 	short maximum_length)
@@ -1417,7 +1417,7 @@ static void profile_frame_build_string(
 	return;
 }
 
-static void profile_frame_dump(
+static void profile_dump_frame(
 	struct profile_frame *frame)
 {
 	char buffer[0x200];
@@ -1431,7 +1431,7 @@ static void profile_frame_dump(
 	{
 		frame->dumped = TRUE;
 
-		profile_frame_build_string(frame, buffer, sizeof(buffer));
+		profile_describe_frame(frame, buffer, sizeof(buffer));
 
 		fprintf(profile_globals.framedump_file, "%s\r\n", buffer);
 
@@ -1450,27 +1450,27 @@ void profile_frame_end(
 	short window_index;
 	short frame_index;
 
-	profile_timer_end(&profile_globals.current_frame.frame);
+	profile_timesection_end_now(&profile_globals.current_frame.frame);
 
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 448,
 		(profile_globals.current_frame.game_tick_count >= 0) && (profile_globals.current_frame.game_tick_count <= MAXIMUM_GAME_TICKS_PER_FRAME));
 
 	for (game_tick_index = 0; game_tick_index<profile_globals.current_frame.game_tick_count; game_tick_index++)
 	{
-		profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.game_ticks[game_tick_index]);
+		profile_timesection_inherit(&profile_globals.current_frame.frame, &profile_globals.current_frame.game_ticks[game_tick_index]);
 	}
 
 	match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 454,
 		(profile_globals.current_frame.window_count >= 0) && (profile_globals.current_frame.window_count <= MAXIMUM_WINDOWS));
 
-	profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.render);
+	profile_timesection_inherit(&profile_globals.current_frame.frame, &profile_globals.current_frame.render);
 
 	for (window_index = 0; window_index<profile_globals.current_frame.window_count; window_index++)
 	{
-		profile_timesection_subtract(&profile_globals.current_frame.render, &profile_globals.current_frame.windows[window_index]);
+		profile_timesection_inherit(&profile_globals.current_frame.render, &profile_globals.current_frame.windows[window_index]);
 	}
 
-	profile_timesection_subtract(&profile_globals.current_frame.frame, &profile_globals.current_frame.idle);
+	profile_timesection_inherit(&profile_globals.current_frame.frame, &profile_globals.current_frame.idle);
 
 	profile_globals.frames[profile_globals.current_frame_history_index] = profile_globals.current_frame;
 
@@ -1487,7 +1487,7 @@ void profile_frame_end(
 
 		if (profile_dump_lost_frames && !profile_dump_frames && profile_globals.lost_frame_count>3)
 		{
-			profile_framedump_flush();
+			profile_dump_frame_stop();
 		}
 	}
 
@@ -1499,7 +1499,7 @@ void profile_frame_end(
 		{
 			if (frame_index<profile_globals.current_frame_history_count)
 			{
-				profile_frame_dump(&profile_globals.frames[frame_index]);
+				profile_dump_frame(&profile_globals.frames[frame_index]);
 			}
 
 			frame_index = (frame_index+1)%MAXIMUM_PROFILE_FRAMES;
@@ -1513,7 +1513,7 @@ void profile_frame_end(
 
 /* ---------- private code */
 
-static void profile_timer_start_at(
+static void profile_timesection_begin(
 	struct profile_timer *timer,
 	__int64 start)
 {
@@ -1522,7 +1522,7 @@ static void profile_timer_start_at(
 	return;
 }
 
-static void profile_timer_end_at(
+static void profile_timesection_end(
 	struct profile_timer *timer,
 	__int64 end)
 {
@@ -1536,7 +1536,7 @@ static void profile_timer_end_at(
 	return;
 }
 
-static boolean string_starts_with(
+static boolean string_has_prefix(
 	char const *string,
 	char const *prefix)
 {
@@ -1557,7 +1557,7 @@ static boolean string_starts_with(
 	return result;
 }
 
-static void profile_timer_start(
+static void profile_timesection_begin_now(
 	struct profile_timer *timer)
 {
 	__int64 timebase;
@@ -1568,7 +1568,7 @@ static void profile_timer_start(
 	return;
 }
 
-static void profile_timer_end(
+static void profile_timesection_end_now(
 	struct profile_timer *timer)
 {
 	__int64 timebase;
@@ -1639,7 +1639,7 @@ int compare_profile_sections(
 	return result;
 }
 
-static void profile_sections_update(
+static void profile_internal_step(
 	void)
 {
 	if (profile_global_enable)
@@ -1719,7 +1719,7 @@ void find_profile_section(
 	return;
 }
 
-static void profile_framedump_flush(
+static void profile_dump_frame_stop(
 	void)
 {
 	if (profile_globals.framedump_flush_pending)
@@ -1736,7 +1736,7 @@ static void profile_framedump_flush(
 	return;
 }
 
-static void profile_sections_set_active(
+static void profile_sections_activation(
 	const char *name,
 	boolean active)
 {
@@ -1752,7 +1752,7 @@ static void profile_sections_set_active(
 		{
 			if (prefix)
 			{
-				if (!string_starts_with(section->name, name+1))
+				if (!string_has_prefix(section->name, name+1))
 					goto next_section;
 			}
 			else if (!strstr(section->name, name))

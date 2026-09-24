@@ -21,9 +21,9 @@ symbols in this file:
 00117EF0 0040:
 	_network_connection_going_stale (0000)
 00117F30 0200:
-	_network_connection_read_unreliable (0000)
+	_network_client_unreliable_connection_read (0000)
 00118130 0440:
-	_network_connection_notify_traffic_event (0000)
+	_network_connection_log_traffic_event (0000)
 00118570 0010:
 	_network_connection_keep_alive (0000)
 00118580 00d0:
@@ -33,9 +33,9 @@ symbols in this file:
 00118980 0140:
 	_network_server_close_client_connection (0000)
 00118AC0 0080:
-	_network_connection_new_serverside_client (0000)
+	_network_connection_create_client_from_endpoint (0000)
 00118B40 01e0:
-	_network_connection_read_reliable (0000)
+	_network_client_reliable_connection_read (0000)
 00118D20 01e0:
 	_network_connection_idle_client_reliable_endpoint (0000)
 00118F00 0240:
@@ -272,23 +272,23 @@ struct network_server_connection
 
 /* ---------- prototypes */
 
-static boolean network_connection_read_reliable(
+static boolean network_client_reliable_connection_read(
 	struct network_connection *connection,
 	void *message,
 	word *buffer_size,
 	struct transport_address *source_address);
-static struct network_connection *network_connection_new_serverside_client(
+static struct network_connection *network_connection_create_client_from_endpoint(
 	struct transport_endpoint *reliable_endpoint);
 static boolean network_connection_idle_client_reliable_endpoint(
 	struct network_connection *connection);
 static boolean network_connection_idle_server_reliable_endpoint(
 	struct network_server_connection *connection,
 	struct network_connection **new_client_connection);
-static void network_connection_notify_traffic_event(
+static void network_connection_log_traffic_event(
 	enum network_connection_traffic_event event,
 	long amount,
 	struct network_connection *connection);
-static boolean network_connection_read_unreliable(
+static boolean network_client_unreliable_connection_read(
 	struct network_connection *connection,
 	void *message,
 	word *buffer_size,
@@ -320,7 +320,7 @@ boolean network_connection_connected(
 		(boolean)endpoint_connected(connection->reliable_endpoint);
 }
 
-static void network_connection_notify_traffic_event(
+static void network_connection_log_traffic_event(
 	enum network_connection_traffic_event event,
 	long amount,
 	struct network_connection *connection)
@@ -630,7 +630,7 @@ boolean network_connection_going_stale(
 	return TEST_FLAG(connection->flags, _connection_going_stale_bit);
 }
 
-static boolean network_connection_read_unreliable(
+static boolean network_client_unreliable_connection_read(
 	struct network_connection *connection,
 	void *message,
 	word *buffer_size,
@@ -728,7 +728,7 @@ void network_connection_delete(
 
 	if (connection)
 	{
-		network_connection_notify_traffic_event(
+		network_connection_log_traffic_event(
 			_network_connection_traffic_event_close,
 			TRUE,
 			connection);
@@ -857,7 +857,7 @@ boolean network_connection_write(
 			message,
 			buffer_size,
 			dest_address);
-		network_connection_notify_traffic_event(
+		network_connection_log_traffic_event(
 			_network_connection_traffic_event_datagram_sent,
 			buffer_size,
 			connection);
@@ -889,11 +889,11 @@ boolean network_connection_write(
 		if (bytes_written > 0)
 		{
 			result = TRUE;
-			network_connection_notify_traffic_event(
+			network_connection_log_traffic_event(
 				_network_connection_traffic_event_stream_bytes_sent,
 				bytes_written,
 				connection);
-			network_connection_notify_traffic_event(
+			network_connection_log_traffic_event(
 				_network_connection_traffic_event_stream_message_sent,
 				TRUE,
 				connection);
@@ -921,7 +921,7 @@ boolean network_connection_write(
 					connection->unreliable_endpoint,
 					message,
 					buffer_size);
-				network_connection_notify_traffic_event(
+				network_connection_log_traffic_event(
 					_network_connection_traffic_event_datagram_sent,
 					buffer_size,
 					connection);
@@ -934,7 +934,7 @@ boolean network_connection_write(
 				message,
 				buffer_size,
 				dest_address);
-			network_connection_notify_traffic_event(
+			network_connection_log_traffic_event(
 				_network_connection_traffic_event_datagram_sent,
 				buffer_size,
 				connection);
@@ -953,7 +953,7 @@ boolean network_connection_write(
 	return success;
 }
 
-static struct network_connection *network_connection_new_serverside_client(
+static struct network_connection *network_connection_create_client_from_endpoint(
 	struct transport_endpoint *reliable_endpoint)
 {
 	struct network_connection *connection;
@@ -981,7 +981,7 @@ static struct network_connection *network_connection_new_serverside_client(
 			return NULL;
 		}
 
-		network_connection_notify_traffic_event(
+		network_connection_log_traffic_event(
 			_network_connection_traffic_event_open,
 			TRUE,
 			connection);
@@ -1046,7 +1046,7 @@ static boolean network_connection_idle_client_reliable_endpoint(
 		}
 
 		connection->last_keep_alive_time = system_milliseconds();
-		network_connection_notify_traffic_event(
+		network_connection_log_traffic_event(
 			_network_connection_traffic_event_stream_bytes_received,
 			bytes_read,
 			connection);
@@ -1204,7 +1204,7 @@ struct network_connection *network_connection_new(
 		}
 		else
 		{
-			network_connection_notify_traffic_event(
+			network_connection_log_traffic_event(
 				_network_connection_traffic_event_open,
 				TRUE,
 				connection);
@@ -1214,7 +1214,7 @@ struct network_connection *network_connection_new(
 	return connection;
 }
 
-static boolean network_connection_read_reliable(
+static boolean network_client_reliable_connection_read(
 	struct network_connection *connection,
 	void *message,
 	word *buffer_size,
@@ -1301,7 +1301,7 @@ boolean network_connection_read(
 
 	if (TEST_FLAG(connection->flags, _connection_create_server_bit))
 	{
-		return network_connection_read_unreliable(connection, buffer, buffer_size, source_address);
+		return network_client_unreliable_connection_read(connection, buffer, buffer_size, source_address);
 	}
 
 	match_assert(
@@ -1310,10 +1310,10 @@ boolean network_connection_read(
 		connection->flags&FLAG(_connection_create_clientside_client_bit) ||
 		connection->flags&FLAG(_connection_create_serverside_client_bit));
 
-	result = network_connection_read_reliable(connection, buffer, buffer_size, source_address);
+	result = network_client_reliable_connection_read(connection, buffer, buffer_size, source_address);
 	if (!result && TEST_FLAG(connection->flags, _connection_create_clientside_client_bit))
 	{
-		result = network_connection_read_unreliable(connection, buffer, buffer_size, source_address);
+		result = network_client_unreliable_connection_read(connection, buffer, buffer_size, source_address);
 	}
 
 	return result;
@@ -1451,7 +1451,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 						if (accepted_endpoint &&
 							set_endpoint_blocking(accepted_endpoint, FALSE) == _transport_error_none)
 						{
-							client_connection = network_connection_new_serverside_client(accepted_endpoint);
+							client_connection = network_connection_create_client_from_endpoint(accepted_endpoint);
 						}
 						if (client_connection)
 						{
@@ -1624,7 +1624,7 @@ boolean network_connection_idle(
 						memset(&source_address, 0, sizeof(source_address));
 						source_address.address_length = IPV4_ADDRESS_LENGTH;
 					}
-					network_connection_notify_traffic_event(
+					network_connection_log_traffic_event(
 						_network_connection_traffic_event_datagram_received,
 						buffer_size,
 						connection);
@@ -1639,7 +1639,7 @@ boolean network_connection_idle(
 					&source_address);
 				if (buffer_size > 0)
 				{
-					network_connection_notify_traffic_event(
+					network_connection_log_traffic_event(
 						_network_connection_traffic_event_datagram_received,
 						buffer_size,
 						connection);

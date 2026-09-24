@@ -549,11 +549,11 @@ symbols in this file:
 000B1460 0040:
 	_code_000b1460 (0000)
 000B14A0 0020:
-	_code_000b14a0 (0000)
+	_radiosity_hack_start_evaluate (0000)
 000B14C0 0020:
-	_code_000b14c0 (0000)
+	_radiosity_hack_save_evaluate (0000)
 000B14E0 0020:
-	_code_000b14e0 (0000)
+	_radiosity_hack_find_point_evaluate (0000)
 000B1500 0020:
 	_code_000b1500 (0000)
 000B1520 0020:
@@ -5591,15 +5591,15 @@ static void profile_sections_deactivate_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
-static void radiosity_debug_point_evaluate(
+static void radiosity_hack_find_point_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
-static void radiosity_save_evaluate(
+static void radiosity_hack_save_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
-static void radiosity_start_evaluate(
+static void radiosity_hack_start_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize);
@@ -10770,7 +10770,7 @@ static struct hs_function_definition const hs_radiosity_start_definition=
 	0,
 	"radiosity_start",
 	hs_macro_function_parse,
-	radiosity_start_evaluate,
+	radiosity_hack_start_evaluate,
 	"starts radiosity computation.",
 	NULL,
 	0,
@@ -10782,7 +10782,7 @@ static struct hs_function_definition const hs_radiosity_save_definition=
 	0,
 	"radiosity_save",
 	hs_macro_function_parse,
-	radiosity_save_evaluate,
+	radiosity_hack_save_evaluate,
 	"saves radiosity solution.",
 	NULL,
 	0,
@@ -10794,7 +10794,7 @@ static struct hs_function_definition const hs_radiosity_debug_point_definition=
 	0,
 	"radiosity_debug_point",
 	hs_macro_function_parse,
-	radiosity_debug_point_evaluate,
+	radiosity_hack_find_point_evaluate,
 	"tests sun occlusion at a point.",
 	NULL,
 	0,
@@ -13869,9 +13869,9 @@ HS_EVALUATE_NO_ARGUMENTS(player_ui_activate_all_solo_levels_evaluate, player_ui_
 HS_EVALUATE_NO_ARGUMENTS(network_game_client_request_immediate_start_evaluate, network_game_client_request_immediate_start)
 HS_EVALUATE_NO_ARGUMENTS(hs_doc_evaluate, hs_doc)
 HS_EVALUATE_NO_OP(tag_groups_dump_memory_evaluate)
-HS_EVALUATE_NO_OP(radiosity_start_evaluate)
-HS_EVALUATE_NO_OP(radiosity_save_evaluate)
-HS_EVALUATE_NO_OP(radiosity_debug_point_evaluate)
+HS_EVALUATE_NO_OP(radiosity_hack_start_evaluate)
+HS_EVALUATE_NO_OP(radiosity_hack_save_evaluate)
+HS_EVALUATE_NO_OP(radiosity_hack_find_point_evaluate)
 HS_EVALUATE_RETURN_LONG(hs_players_evaluate, hs_players)
 HS_EVALUATE_RETURN_LONG(game_time_get_evaluate, game_time_get)
 HS_EVALUATE_RETURN_SHORT(scripted_camera_time_evaluate, scripted_camera_time)

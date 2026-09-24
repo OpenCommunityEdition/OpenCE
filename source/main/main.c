@@ -27,7 +27,7 @@ symbols in this file:
 000EF890 0010:
 	_main_get_difficulty (0000)
 000EF8A0 0040:
-	_code_000ef8a0 (0000)
+	_sort_desired_local_player_controllers (0000)
 000EF8E0 01d0:
 	_code_000ef8e0 (0000)
 000EFAB0 0020:
@@ -667,7 +667,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 
 /* ---------- prototypes */
 
-static long sort_controllers_ascending(
+static long sort_desired_local_player_controllers(
 	short const *a,
 	short const *b);
 static void main_setup_connection(
@@ -827,7 +827,7 @@ static void create_local_players(
 			desired_controllers,
 			MAXIMUM_GAMEPADS,
 			sizeof(*desired_controllers),
-			(int (__cdecl *)(void const *, void const *))sort_controllers_ascending);
+			(int (__cdecl *)(void const *, void const *))sort_desired_local_player_controllers);
 		for (i = 0; i < player_spawn_count; i++)
 		{
 			gamepad_index = desired_controllers[i];
@@ -1549,7 +1549,7 @@ void main_set_difficulty(
 	return;
 }
 
-static long sort_controllers_ascending(
+static long sort_desired_local_player_controllers(
 	short const *a,
 	short const *b)
 {

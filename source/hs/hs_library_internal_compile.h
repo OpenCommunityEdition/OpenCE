@@ -29,8 +29,6 @@ long hs_compile_expression(
 boolean hs_compile_postprocess(
 	char const **error_message,
 	char const **error_source);
-void hs_compile_finish(
-	void);
 boolean hs_parse_sleep(
 	short function_index,
 	long expression_index);
