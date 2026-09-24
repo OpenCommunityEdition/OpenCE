@@ -7,6 +7,8 @@ BOOL WINAPI IsResourceSetInDevice(
     D3DResource *resource);
 void WINAPI BlockOnResource(
     D3DResource *resource);
+void *WINAPI GetVideoAddress(
+    DWORD address);
 BYTE *WINAPI GetDataFromResource(
     D3DResource *resource);
 void WINAPI InternalAddRef(

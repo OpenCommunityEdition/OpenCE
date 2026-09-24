@@ -6,6 +6,7 @@
 #include "resource_internal.h"
 #include "pixeljar.h"
 #include "kernel_memory.h"
+#include "memory_internal.h"
 #pragma code_seg("D3D")
 namespace D3D
 {
@@ -71,7 +72,7 @@ void WINAPI CleanPrivateData(
 BYTE *WINAPI GetDataFromResource(
     D3DResource *resource)
 {
-    return (BYTE *)(resource->Data | 0x80000000UL);
+    return (BYTE *)XMETAL_MapToContiguousAddress(resource->Data);
 }
 void WINAPI DestroyResource(
     D3DResource *resource)
@@ -86,19 +87,19 @@ void WINAPI DestroyResource(
     {
         if (resource->Common & D3DSURFACE_OWNSMEMORY)
         {
-            MmFreeContiguousMemory((void *)(resource->Data | 0x80000000UL));
+            FreeContiguousMemory(XMETAL_MapToContiguousAddress(resource->Data));
         }
     }
     else if (type == D3DCOMMON_TYPE_PUSHBUFFER)
     {
         if (!(resource->Common & D3DPUSHBUFFER_RUN_USING_CPU_COPY))
         {
-            MmFreeContiguousMemory((void *)resource->Data);
+            FreeContiguousMemory((void *)resource->Data);
         }
     }
     else if (type != D3DCOMMON_TYPE_INDEXBUFFER && type != D3DCOMMON_TYPE_FIXUP)
     {
-        MmFreeContiguousMemory((void *)(resource->Data | 0x80000000UL));
+        FreeContiguousMemory(XMETAL_MapToContiguousAddress(resource->Data));
     }
     LocalFree(resource);
     return;
@@ -272,7 +273,7 @@ void WINAPI D3DResource_Register(
     }
     else
     {
-        resource->Data = (DWORD)memory & 0x03ffffffUL;
+        resource->Data = XMETAL_MapToPhysicalOffset(memory);
     }
     return;
 }
@@ -357,4 +358,14 @@ void WINAPI D3DResource_FreePrivateData(
         node = node->pNext;
     }
     return;
+}
+
+namespace D3D
+{
+/* Original externally linked video-address conversion, not an emission shim. */
+void *WINAPI GetVideoAddress(
+    DWORD address)
+{
+    return XMETAL_MapToVideoAddress(address);
+}
 }

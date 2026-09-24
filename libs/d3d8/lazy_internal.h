@@ -26,6 +26,7 @@ enum
     LAZY_POINT_SIZE_METHOD = 0x43c
 };
 extern const D3DVECTOR g_EyeDirection;
+extern const DWORD g_MinFilter[2][3];
 DWORD WINAPI GetColorMaterial(
     void);
 void WINAPI LazySetShaderStageProgram(
@@ -77,7 +78,7 @@ __inline void WINAPI StoreFloat(
     memcpy(word, &value, sizeof(value));
     return;
 }
-__inline float WINAPI Floatify(
+static __inline float WINAPI Floatify(
     DWORD word)
 {
     float value;

@@ -5,6 +5,7 @@
  * NV2A FIFO packet operations. The method word and data words are GPU
  * commands, never native x86 instruction bytes. */
 #include "device_layout.h"
+#include "xmetal_internal.h"
 extern "C" DWORD *WINAPI XMETAL_StartPush(
     _XMETAL_PushBuffer *buffer);
 extern "C" DWORD *WINAPI XMETAL_StartPushCount(
@@ -40,40 +41,98 @@ __inline DWORD *CDevice::StartPush(
 __inline void CDevice::EndPush(
     DWORD *put)
 {
-    m_Pusher.m_pPut = put;
+    XMETAL_EndPush(&m_Pusher, put);
     return;
 }
-__inline void WINAPI PushCount(
+static __inline void WINAPI PushCount(
     DWORD *push,
     DWORD method,
     DWORD count)
 {
-    push[0] = method + (count << 18);
+    XMETAL_PushCount(push, method, count);
     return;
 }
-__inline void WINAPI Push1(
+static __inline void WINAPI Push1(
     DWORD *push,
     DWORD method,
     DWORD value)
 {
-    push[0] = method + (1 << 18);
-    push[1] = value;
+    XMETAL_Push1(push, method, value);
     return;
 }
-__inline void WINAPI Push2(
+static __inline void WINAPI Push2(
     DWORD *push,
     DWORD method,
     DWORD first,
     DWORD second)
 {
-    push[0] = method + (2 << 18);
+    XMETAL_Push2(push, method, first, second);
+    return;
+}
+/* January's eight hardware FIFO subchannels, authenticated by the original PDB. */
+enum SubChannel
+{
+    SUBCH_3D = 0,
+    SUBCH_SW = 1,
+    SUBCH_MEMCOPY = 2,
+    SUBCH_RECTCOPY = 3,
+    SUBCH_RECTCOPYSURFACES = 4,
+    SUBCH_UNUSED0 = 5,
+    SUBCH_UNUSED1 = 6,
+    SUBCH_UNUSED2 = 7
+};
+static __inline void WINAPI PushCount(
+    DWORD *push,
+    SubChannel subchannel,
+    DWORD method,
+    DWORD count)
+{
+    push[0] = method + ((subchannel + (count << 5)) << 13);
+    return;
+}
+static __inline void WINAPI Push1(
+    DWORD *push,
+    SubChannel subchannel,
+    DWORD method,
+    DWORD value)
+{
+    push[0] = method + ((subchannel + (1 << 5)) << 13);
+    push[1] = value;
+    return;
+}
+static __inline void WINAPI Push3(
+    DWORD *push,
+    SubChannel subchannel,
+    DWORD method,
+    DWORD first,
+    DWORD second,
+    DWORD third)
+{
+    push[0] = method + ((subchannel + (3 << 5)) << 13);
     push[1] = first;
     push[2] = second;
+    push[3] = third;
+    return;
+}
+static __inline void WINAPI Push4(
+    DWORD *push,
+    SubChannel subchannel,
+    DWORD method,
+    DWORD first,
+    DWORD second,
+    DWORD third,
+    DWORD fourth)
+{
+    push[0] = method + ((subchannel + (4 << 5)) << 13);
+    push[1] = first;
+    push[2] = second;
+    push[3] = third;
+    push[4] = fourth;
     return;
 }
 /* NV2A matrix packets have sixteen transposed words, or twelve words of
  * an already-computed inverse. Copies preserve the float representation. */
-__inline void WINAPI PushMatrixTransposed(
+static __inline void WINAPI PushMatrixTransposed(
     DWORD *push,
     DWORD method,
     const D3DMATRIX *matrix)
@@ -81,7 +140,7 @@ __inline void WINAPI PushMatrixTransposed(
     DumpMatrixTransposed(push, method + (16 << 18), matrix);
     return;
 }
-__inline void WINAPI PushInverseModelViewMatrix(
+static __inline void WINAPI PushInverseModelViewMatrix(
     DWORD *push,
     DWORD method,
     const D3DMATRIX *matrix)
@@ -90,7 +149,7 @@ __inline void WINAPI PushInverseModelViewMatrix(
     memcpy(push + 1, matrix, 12 * sizeof(DWORD));
     return;
 }
-__inline DWORD WINAPI SwapRgb(
+static __inline DWORD WINAPI SwapRgb(
     DWORD color)
 {
     return (color & 0xff00ff00UL) | ((color & 0xff) << 16) | ((color >> 16) & 0xff);
@@ -122,7 +181,7 @@ enum
     NV097_SET_CULL_FACE_V_FRONT = 0x404,
     NV097_SET_CULL_FACE_V_BACK = 0x405
 };
-__inline void WINAPI Push4f(
+static __inline void WINAPI Push4f(
     DWORD *push,
     DWORD method,
     float x,

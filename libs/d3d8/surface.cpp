@@ -2,6 +2,7 @@
 #include "resource_internal.h"
 #include "kernel_memory.h"
 #include "surface_internal.h"
+#include "memory_internal.h"
 #pragma code_seg("D3D")
 void WINAPI D3DSurface_GetDesc(
     D3DSurface *surface,
@@ -48,7 +49,7 @@ HRESULT WINAPI CreateSurfaceOfTexture(
 {
     D3DSurface *surface = (D3DSurface *)LocalAlloc(LMEM_ZEROINIT, sizeof(*surface));
     if (!surface) return E_OUTOFMEMORY;
-    surface->Data = (DWORD)data & 0x03ffffff;
+    surface->Data = XMETAL_MapToPhysicalOffset(data);
     surface->Common = 0x01050001;
     surface->Format = format;
     surface->Size = size;
@@ -66,7 +67,7 @@ HRESULT WINAPI CreateVolumeOfTexture(
 {
     D3DVolume *volume = (D3DVolume *)LocalAlloc(LMEM_ZEROINIT, sizeof(*volume));
     if (!volume) return E_OUTOFMEMORY;
-    volume->Data = (DWORD)data & 0x03ffffff;
+    volume->Data = XMETAL_MapToPhysicalOffset(data);
     volume->Common = 0x01050001;
     volume->Format = format;
     volume->Size = 0;
@@ -88,14 +89,13 @@ HRESULT WINAPI CreateStandAloneSurface(
         renderTarget, false, false, &encodedFormat, &encodedSize);
     D3DSurface *surface = (D3DSurface *)LocalAlloc(LMEM_ZEROINIT, sizeof(*surface));
     if (!surface) return E_OUTOFMEMORY;
-    void *memory = MmAllocateContiguousMemoryEx(allocationSize, 0, 0x03ffb000, 64,
-        PAGE_READWRITE | PAGE_WRITECOMBINE);
+    void *memory = D3D::AllocateContiguousMemory(allocationSize, 64);
     if (!memory)
     {
         LocalFree(surface);
         return E_OUTOFMEMORY;
     }
-    surface->Data = (DWORD)memory & 0x03ffffff;
+    surface->Data = XMETAL_MapToPhysicalOffset(memory);
     surface->Common = 0x81050001;
     surface->Format = encodedFormat;
     surface->Size = encodedSize;
@@ -114,10 +114,10 @@ void WINAPI InitializeSurface(
     DWORD size,
     void *memory)
 {
-    surface->Data = (DWORD)memory & 0x03ffffff;
-    surface->Size = size;
+    surface->Data = XMETAL_MapToPhysicalOffset(memory);
     surface->Common = D3DCOMMON_D3DCREATED | D3DCOMMON_TYPE_SURFACE | 1;
     surface->Format = format;
+    surface->Size = size;
     surface->Parent = NULL;
     surface->Lock = 0;
     return;
@@ -133,16 +133,14 @@ HRESULT WINAPI CreateSurfaceWithContiguousHeader(
         format, 0, true, false, false, &encodedFormat, &encodedSize);
     /* The original allocation reserves an aligned 64-byte header prefix.
      * The returned surface occupies only the first sizeof(D3DSurface) bytes. */
-    D3DSurface *surface = (D3DSurface *)MmAllocateContiguousMemoryEx(
-        allocationSize + SURFACE_CONTIGUOUS_HEADER_BYTES, 0, 0x03ffb000,
-        D3DSURFACE_ALIGNMENT, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    D3DSurface *surface = (D3DSurface *)D3D::AllocateContiguousMemory(allocationSize + SURFACE_CONTIGUOUS_HEADER_BYTES, D3DSURFACE_ALIGNMENT);
     if (!surface)
     {
         return E_OUTOFMEMORY;
     }
     void *pixels = (BYTE *)surface + SURFACE_CONTIGUOUS_HEADER_BYTES;
     surface->Common = D3DCOMMON_D3DCREATED | D3DCOMMON_TYPE_SURFACE | D3DSURFACE_OWNSMEMORY | 1;
-    surface->Data = (DWORD)pixels & 0x03ffffff;
+    surface->Data = XMETAL_MapToPhysicalOffset(pixels);
     surface->Format = encodedFormat;
     surface->Size = encodedSize;
     surface->Parent = NULL;

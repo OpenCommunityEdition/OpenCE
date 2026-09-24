@@ -28,9 +28,9 @@ int CMiniport::MapRegisters(
      * registers: volatility is required for the actual device transaction. */
     _HWREG *base = (_HWREG *)0xfd000000UL;
     m_RegisterBase = base;
-    WriteGpuRegister(base, 0x1804, ReadGpuRegister(base, 0x1804) | 4);
-    WriteGpuRegister(base, 0x600140, 0);
-    WriteGpuRegister(base, 0x9140, 0);
+    REG_WR32(base, 0x1804, REG_RD32(base, 0x1804) | 4);
+    REG_WR32(base, 0x600140, 0);
+    REG_WR32(base, 0x9140, 0);
     return TRUE;
 }
 
@@ -38,8 +38,8 @@ void CMiniport::TmrDelay(
     DWORD nanoseconds)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    DWORD start = ReadGpuRegister(base, 0x9400);
-    while (ReadGpuRegister(base, 0x9400) - start < nanoseconds)
+    DWORD start = REG_RD32(base, 0x9400);
+    while (REG_RD32(base, 0x9400) - start < nanoseconds)
     {
     }
     return;
@@ -65,9 +65,9 @@ int CMiniport::GetGeneralInfo(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    m_GenInfo.ChipId = (ReadGpuRegister(base, 0x1800) >> 16) & 0xfffc;
-    m_GenInfo.MaskRevision = ReadGpuRegister(base, 0x1808) & 0xff;
-    m_GenInfo.VideoRamSize = ReadGpuRegister(base, 0x10020c);
+    m_GenInfo.ChipId = (REG_RD32(base, 0x1800) >> 16) & 0xfffc;
+    m_GenInfo.MaskRevision = REG_RD32(base, 0x1808) & 0xff;
+    m_GenInfo.VideoRamSize = REG_RD32(base, 0x10020c);
     m_GenInfo.CrystalFreq = 16666666;
     return TRUE;
 }
@@ -191,11 +191,11 @@ int CMiniport::CreateCtxDmaObject(
     case ADDR_AGPMEM: flags |= 0x30000; break;
     case ADDR_SYSMEM: flags |= 0x20000; break;
     }
-    WriteGpuRegister(base, 0x700008 + (instance << 4), page);
-    WriteGpuRegister(base, 0x70000c + (instance << 4), page);
+    REG_WR32(base, 0x700008 + (instance << 4), page);
+    REG_WR32(base, 0x70000c + (instance << 4), page);
     flags |= 0x8000;
-    WriteGpuRegister(base, (0x70000 + instance) << 4, flags);
-    WriteGpuRegister(base, 0x700004 + (instance << 4), limit);
+    REG_WR32(base, (0x70000 + instance) << 4, flags);
+    REG_WR32(base, 0x700004 + (instance << 4), limit);
     object->Init();
     object->Engine = 0;
     object->Handle = handle;
@@ -211,8 +211,8 @@ int CMiniport::InitEngines(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    WriteGpuRegister(base, 0x1830, 0);
-    WriteGpuRegister(base, 0x180c, 0xf800);
+    REG_WR32(base, 0x1830, 0);
+    REG_WR32(base, 0x180c, 0xf800);
     HalMcControlInit();
     m_GenInfo.ChipIntrEn0 = 1;
 
@@ -236,9 +236,9 @@ int CMiniport::InitEngines(
         numerator /= 2;
         denominator /= 2;
     }
-    WriteGpuRegister(base, 0x9200, (numerator + 1) / 2);
-    WriteGpuRegister(base, 0x9210, (denominator + 1) / 2);
-    WriteGpuRegister(base, 0x9420, 0xffffffffUL);
+    REG_WR32(base, 0x9200, (numerator + 1) / 2);
+    REG_WR32(base, 0x9210, (denominator + 1) / 2);
+    REG_WR32(base, 0x9420, 0xffffffffUL);
     HalFbControlInit();
     HalDacControlInit();
     InitGammaRamp(0);
@@ -258,23 +258,23 @@ void CMiniport::TilingUpdateIdle(
     DWORD *savedPush)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    while (!(ReadGpuRegister(base, 0x3214) & 0x10) ||
-           !(ReadGpuRegister(base, 0x2400) & 0x10) ||
-            (ReadGpuRegister(base, 0x3220) & 0x10))
+    while (!(REG_RD32(base, 0x3214) & 0x10) ||
+           !(REG_RD32(base, 0x2400) & 0x10) ||
+            (REG_RD32(base, 0x3220) & 0x10))
     {
         ServiceFifoInterrupt();
-        if (ReadGpuRegister(base, 0x400100))
+        if (REG_RD32(base, 0x400100))
         {
             ServiceGrInterrupt();
         }
-        if (ReadGpuRegister(base, 0x100) & 0x1000000)
+        if (REG_RD32(base, 0x100) & 0x1000000)
         {
             VBlank();
         }
     }
-    *savedPush = ReadGpuRegister(base, 0x3220);
-    WriteGpuRegister(base, 0x3220, 0);
-    while (ReadGpuRegister(base, 0x3220) & 0x10)
+    *savedPush = REG_RD32(base, 0x3220);
+    REG_WR32(base, 0x3220, 0);
+    while (REG_RD32(base, 0x3220) & 0x10)
     {
     }
     return;
@@ -292,62 +292,62 @@ void CMiniport::ShutdownEngines(
     {
         DestroyTile(tile, TRUE);
     }
-    WriteGpuRegister(base, 0x2044, 0);
+    REG_WR32(base, 0x2044, 0);
     // Shutdown has its own drain sequence: unlike TilingUpdateIdle it does not
     // retain the DMA push register for resuming later. This separation is also
     // present in the pinned mpcore reference, not manual helper expansion.
-    while (!(ReadGpuRegister(base, 0x3214) & 0x10) ||
-           !(ReadGpuRegister(base, 0x2400) & 0x10) ||
-            (ReadGpuRegister(base, 0x3220) & 0x10))
+    while (!(REG_RD32(base, 0x3214) & 0x10) ||
+           !(REG_RD32(base, 0x2400) & 0x10) ||
+            (REG_RD32(base, 0x3220) & 0x10))
     {
         ServiceFifoInterrupt();
-        if (ReadGpuRegister(base, 0x400100))
+        if (REG_RD32(base, 0x400100))
         {
             ServiceGrInterrupt();
         }
-        if (ReadGpuRegister(base, 0x100) & 0x1000000)
+        if (REG_RD32(base, 0x100) & 0x1000000)
         {
             VBlank();
         }
     }
-    WriteGpuRegister(base, 0x3220, 0);
-    while (ReadGpuRegister(base, 0x3220) & 0x10)
+    REG_WR32(base, 0x3220, 0);
+    while (REG_RD32(base, 0x3220) & 0x10)
     {
     }
-    WriteGpuRegister(base, 0x2500, 0);
-    WriteGpuRegister(base, 0x3000, 0);
-    WriteGpuRegister(base, 0x3050, 0);
-    WriteGpuRegister(base, 0x3200, 0);
-    WriteGpuRegister(base, 0x3250, 0);
+    REG_WR32(base, 0x2500, 0);
+    REG_WR32(base, 0x3000, 0);
+    REG_WR32(base, 0x3050, 0);
+    REG_WR32(base, 0x3200, 0);
+    REG_WR32(base, 0x3250, 0);
     HalFifoContextSwitch(1);
-    WriteGpuRegister(base, 0x3210, 0);
-    WriteGpuRegister(base, 0x3270, 0);
+    REG_WR32(base, 0x3210, 0);
+    REG_WR32(base, 0x3270, 0);
 
-    DWORD fifoReassign = ReadGpuRegister(base, 0x2500);
-    DWORD fifoPush = ReadGpuRegister(base, 0x3200);
-    DWORD fifoPull = ReadGpuRegister(base, 0x3250);
-    WriteGpuRegister(base, 0x2500, 0);
-    WriteGpuRegister(base, 0x3200, 0);
-    WriteGpuRegister(base, 0x3250, 0);
+    DWORD fifoReassign = REG_RD32(base, 0x2500);
+    DWORD fifoPush = REG_RD32(base, 0x3200);
+    DWORD fifoPull = REG_RD32(base, 0x3250);
+    REG_WR32(base, 0x2500, 0);
+    REG_WR32(base, 0x3200, 0);
+    REG_WR32(base, 0x3250, 0);
     for (DWORD channel = 0; channel < 2; ++channel)
     {
         if (m_HalInfo.FifoInUse)
         {
-            WriteGpuRegister(base, m_HalInfo.FifoContextAddr1 + channel * 64 + 4,
-                ReadGpuRegister(base, m_HalInfo.FifoContextAddr1 + channel * 64));
-            WriteGpuRegister(base, m_HalInfo.FifoContextAddr1 + channel * 64 + 16, 0);
+            REG_WR32(base, m_HalInfo.FifoContextAddr1 + channel * 64 + 4,
+                REG_RD32(base, m_HalInfo.FifoContextAddr1 + channel * 64));
+            REG_WR32(base, m_HalInfo.FifoContextAddr1 + channel * 64 + 16, 0);
         }
     }
-    WriteGpuRegister(base, 0x3250, fifoPull);
-    WriteGpuRegister(base, 0x3200, fifoPush);
-    WriteGpuRegister(base, 0x2500, fifoReassign);
-    WriteGpuRegister(base, 0x2508, 0);
-    WriteGpuRegister(base, 0x2140, 0);
+    REG_WR32(base, 0x3250, fifoPull);
+    REG_WR32(base, 0x3200, fifoPush);
+    REG_WR32(base, 0x2500, fifoReassign);
+    REG_WR32(base, 0x2508, 0);
+    REG_WR32(base, 0x2140, 0);
     HalGrLoadChannelContext(2);
-    WriteGpuRegister(base, 0x100200, m_HalInfo.FbSave0);
-    WriteGpuRegister(base, 0x100204, m_HalInfo.FbSave1);
-    WriteGpuRegister(base, 0x200, m_HalInfo.McSave);
-    WriteGpuRegister(base, 0x140, m_HalInfo.McSaveIntrEn0);
+    REG_WR32(base, 0x100200, m_HalInfo.FbSave0);
+    REG_WR32(base, 0x100204, m_HalInfo.FbSave1);
+    REG_WR32(base, 0x200, m_HalInfo.McSave);
+    REG_WR32(base, 0x140, m_HalInfo.McSaveIntrEn0);
     HalRegisterShutdownNotification(
         &m_ShutdownRegistration, FALSE);
     KeDisconnectInterrupt(&m_InterruptObject);
@@ -375,32 +375,32 @@ int CMiniport::CreateTile(
     do
     {
         HalGrIdle();
-        WriteGpuRegister(base, 0x100244 + tile * 16, offset + size - 1);
-        WriteGpuRegister(base, 0x100248 + tile * 16, pitch);
-        WriteGpuRegister(base, 0x400904 + tile * 16, offset + size - 1);
-        WriteGpuRegister(base, 0x400908 + tile * 16, pitch);
+        REG_WR32(base, 0x100244 + tile * 16, offset + size - 1);
+        REG_WR32(base, 0x100248 + tile * 16, pitch);
+        REG_WR32(base, 0x400904 + tile * 16, offset + size - 1);
+        REG_WR32(base, 0x400908 + tile * 16, pitch);
         if (memoryType & D3DTILE_FLAGS_ZBUFFER)
         {
-            WriteGpuRegister(base, 0x400900 + tile * 16, offset | 3);
-            WriteGpuRegister(base, 0x100240 + tile * 16, offset | 3);
-            WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
-            WriteGpuRegister(base, 0x400754, offset | 3);
+            REG_WR32(base, 0x400900 + tile * 16, offset | 3);
+            REG_WR32(base, 0x100240 + tile * 16, offset | 3);
+            REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
+            REG_WR32(base, 0x400754, offset | 3);
         }
         else
         {
-            WriteGpuRegister(base, 0x400900 + tile * 16, offset | 1);
-            WriteGpuRegister(base, 0x100240 + tile * 16, offset | 1);
-            WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
-            WriteGpuRegister(base, 0x400754, offset | 1);
+            REG_WR32(base, 0x400900 + tile * 16, offset | 1);
+            REG_WR32(base, 0x100240 + tile * 16, offset | 1);
+            REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
+            REG_WR32(base, 0x400754, offset | 1);
         }
-        WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x30) & 0x1ffc));
-        WriteGpuRegister(base, 0x400754, offset + size - 1);
-        WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x50) & 0x1ffc));
-        WriteGpuRegister(base, 0x400754, pitch);
-    } while (ReadGpuRegister(base, 0x100240 + tile * 16) != ReadGpuRegister(base, 0x400900 + tile * 16) ||
-             ReadGpuRegister(base, 0x100248 + tile * 16) != ReadGpuRegister(base, 0x400908 + tile * 16) ||
-             (ReadGpuRegister(base, 0x100244 + tile * 16) & ~0x3fffUL) !=
-             (ReadGpuRegister(base, 0x400904 + tile * 16) & ~0x3fffUL));
+        REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x30) & 0x1ffc));
+        REG_WR32(base, 0x400754, offset + size - 1);
+        REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x50) & 0x1ffc));
+        REG_WR32(base, 0x400754, pitch);
+    } while (REG_RD32(base, 0x100240 + tile * 16) != REG_RD32(base, 0x400900 + tile * 16) ||
+             REG_RD32(base, 0x100248 + tile * 16) != REG_RD32(base, 0x400908 + tile * 16) ||
+             (REG_RD32(base, 0x100244 + tile * 16) & ~0x3fffUL) !=
+             (REG_RD32(base, 0x400904 + tile * 16) & ~0x3fffUL));
     if (memoryType & D3DTILE_FLAGS_ZCOMPRESS)
     {
         DWORD zData = (zTag / 4) | 0x80000000UL;
@@ -411,24 +411,24 @@ int CMiniport::CreateTile(
         do
         {
             HalGrIdle();
-            WriteGpuRegister(base, 0x100300 + tile * 4, zData);
-            WriteGpuRegister(base, 0x400980 + tile * 4, zData);
-            WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x90) & 0x1ffc));
-            WriteGpuRegister(base, 0x400754, zData);
-        } while (ReadGpuRegister(base, 0x100300 + tile * 4) !=
-                 ReadGpuRegister(base, 0x400980 + tile * 4));
+            REG_WR32(base, 0x100300 + tile * 4, zData);
+            REG_WR32(base, 0x400980 + tile * 4, zData);
+            REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x90) & 0x1ffc));
+            REG_WR32(base, 0x400754, zData);
+        } while (REG_RD32(base, 0x100300 + tile * 4) !=
+                 REG_RD32(base, 0x400980 + tile * 4));
         if (zOffset != 0)
         {
             do
             {
                 DWORD zOffsetValue = zOffset | tile | 0x80000000UL;
                 HalGrIdle();
-                WriteGpuRegister(base, 0x100324, zOffsetValue);
-                WriteGpuRegister(base, 0x4009a0, zOffsetValue);
-            } while (ReadGpuRegister(base, 0x100324) != ReadGpuRegister(base, 0x4009a0));
+                REG_WR32(base, 0x100324, zOffsetValue);
+                REG_WR32(base, 0x4009a0, zOffsetValue);
+            } while (REG_RD32(base, 0x100324) != REG_RD32(base, 0x4009a0));
         }
     }
-    WriteGpuRegister(base, 0x3220, dmaPush);
+    REG_WR32(base, 0x3220, dmaPush);
     return TRUE;
 }
 
@@ -442,22 +442,22 @@ int CMiniport::DestroyTile(
     do
     {
         HalGrIdle();
-        WriteGpuRegister(base, 0x100240 + tile * 16, 0);
-        WriteGpuRegister(base, 0x400900 + tile * 16, 0);
-        WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
-        WriteGpuRegister(base, 0x400754, 0);
-    } while (ReadGpuRegister(base, 0x100240 + tile * 16) !=
-             ReadGpuRegister(base, 0x400900 + tile * 16));
-    WriteGpuRegister(base, 0x100300 + tile * 4, 0);
-    WriteGpuRegister(base, 0x400980 + tile * 4, 0);
-    WriteGpuRegister(base, 0x400750, 0xea0000 | ((tile * 4 + 0x90) & 0x1ffc));
-    WriteGpuRegister(base, 0x400754, 0);
+        REG_WR32(base, 0x100240 + tile * 16, 0);
+        REG_WR32(base, 0x400900 + tile * 16, 0);
+        REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x10) & 0x1ffc));
+        REG_WR32(base, 0x400754, 0);
+    } while (REG_RD32(base, 0x100240 + tile * 16) !=
+             REG_RD32(base, 0x400900 + tile * 16));
+    REG_WR32(base, 0x100300 + tile * 4, 0);
+    REG_WR32(base, 0x400980 + tile * 4, 0);
+    REG_WR32(base, 0x400750, 0xea0000 | ((tile * 4 + 0x90) & 0x1ffc));
+    REG_WR32(base, 0x400754, 0);
     if (zOffset != 0)
     {
-        WriteGpuRegister(base, 0x100324, 0);
-        WriteGpuRegister(base, 0x4009a0, 0);
+        REG_WR32(base, 0x100324, 0);
+        REG_WR32(base, 0x4009a0, 0);
     }
-    WriteGpuRegister(base, 0x3220, dmaPush);
+    REG_WR32(base, 0x3220, dmaPush);
     return TRUE;
 }
 }
@@ -468,16 +468,16 @@ int CMiniport::LoadEngines(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    DWORD command = ReadGpuRegister(base, 0x184c);
-    WriteGpuRegister(base, 0x184c, command & ~0x300UL);
-    WriteGpuRegister(base, 0x184c, command);
-    WriteGpuRegister(base, 0x200, 0xffffffffUL);
+    DWORD command = REG_RD32(base, 0x184c);
+    REG_WR32(base, 0x184c, command & ~0x300UL);
+    REG_WR32(base, 0x184c, command);
+    REG_WR32(base, 0x200, 0xffffffffUL);
     EnableInterrupts();
     HalDacLoad();
 
     LARGE_INTEGER systemTime;
     _TIME_FIELDS fields;
-    static const BYTE timerMonthDays[12] =
+    static const BYTE tmrMonthDays[12] =
     {
         31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
     };
@@ -496,21 +496,21 @@ int CMiniport::LoadEngines(
     // a corrected calendar conversion. Kernel TIME_FIELDS months are 1..12.
     while (--fields.Month)
     {
-        days += timerMonthDays[fields.Month];
+        days += tmrMonthDays[fields.Month];
     }
     days += fields.Day;
     DWORD highTime = days * 20117 + fields.Hour * 838 +
         (fields.Minute * 257698 + fields.Second * 4295) / 1000;
     highTime += 146951526;
-    WriteGpuRegister(base, 0x9400, 0);
-    WriteGpuRegister(base, 0x9410, highTime);
-    WriteGpuRegister(base, 0x400720, 0);
+    REG_WR32(base, 0x9400, 0);
+    REG_WR32(base, 0x9410, highTime);
+    REG_WR32(base, 0x400720, 0);
     HalGrControlLoad();
-    WriteGpuRegister(base, 0x400100, 0xffffffffUL);
-    WriteGpuRegister(base, 0x400140, 0xffffffffUL);
+    REG_WR32(base, 0x400100, 0xffffffffUL);
+    REG_WR32(base, 0x400140, 0xffffffffUL);
     HalFifoControlLoad();
-    WriteGpuRegister(base, 0x2100, 0xffffffffUL);
-    WriteGpuRegister(base, 0x2140, m_HalInfo.FifoIntrEn0);
+    REG_WR32(base, 0x2100, 0xffffffffUL);
+    REG_WR32(base, 0x2140, m_HalInfo.FifoIntrEn0);
     return TRUE;
 }
 

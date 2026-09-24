@@ -33,6 +33,9 @@ struct Stream
     D3DVertexBuffer *pVertexBuffer; /* +0x8 */
 };
 typedef char Stream_size_check[sizeof(Stream) == 12 ? 1 : -1];
+extern const DWORD g_PassthruProgramSpecularFog[48];
+extern const DWORD g_PassthruProgramZFog[44];
+extern const DWORD g_PassthruProgramWFog[48];
 extern VertexShader g_FvfVertexShader;
 extern Stream g_Stream[16];
 extern const DWORD g_TextureCount[4];

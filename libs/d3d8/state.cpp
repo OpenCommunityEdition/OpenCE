@@ -6,6 +6,8 @@
 #include "pixeljar.h"
 #include "state_internal.h"
 #include "math_internal.h"
+#include "vshader_internal.h"
+#include "push_float_internal.h"
 #pragma code_seg("D3D")
 
 namespace D3D
@@ -54,8 +56,8 @@ void __fastcall CommonSetAntiAliasingControl(
     DWORD *push = device->StartPush();
     push = CommonSetViewport(device, push);
     Push1(push, 0x1d7c,
-          (D3D__RenderState[D3DRS_MULTISAMPLEMASK] << 16) |
-          (D3D__RenderState[D3DRS_MULTISAMPLEANTIALIAS] & 0xf));
+          (D3D__RenderState[D3DRS_MULTISAMPLEANTIALIAS] & 0xf) |
+          (D3D__RenderState[D3DRS_MULTISAMPLEMASK] << 16));
     device->EndPush(push + 2);
     return;
 }
@@ -614,4 +616,62 @@ DWORD *__fastcall CommonSetTextureBumpEnv(
     }
     return push;
 }
+}
+
+
+namespace D3D
+{
+/* January PDB S_LDATA32: KELVIN_BORDER, const float, original value +0.53125.
+ * Kept as a real constant owner, not an address-based identifier. */
+const float KELVIN_BORDER = 0.53125f;
+DWORD *__fastcall CommonSetViewport(
+    CDevice *device,
+    DWORD *push)
+{
+    float clipNear;
+    float clipFar;
+    float xViewport = device->m_Viewport.X * device->m_SuperSampleScaleX + KELVIN_BORDER;
+    float yViewport = device->m_Viewport.Y * device->m_SuperSampleScaleY + KELVIN_BORDER;
+    if ((D3D__RenderState[D3DRS_MULTISAMPLETYPE] & 0x1000) &&
+        D3D__RenderState[D3DRS_MULTISAMPLEANTIALIAS] &&
+        device->m_pRenderTarget == &device->m_FrameBufferSurfaces[0])
+    {
+        xViewport -= 0.5f;
+        yViewport -= 0.5f;
+    }
+    if (device->m_pVertexShader->Flags & (VERTEXSHADER_PASSTHROUGH | VERTEXSHADER_PROGRAM))
+    {
+        if (!(device->m_StateFlags & 0x200))
+        {
+            float fm11 = device->m_Viewport.Width * device->m_SuperSampleScaleX * 0.5f;
+            float fm22 = device->m_Viewport.Height * device->m_SuperSampleScaleY * -0.5f;
+            float fm33 = (device->m_Viewport.MaxZ - device->m_Viewport.MinZ) * device->m_ZScale;
+            float fm43 = device->m_ZScale * device->m_Viewport.MinZ;
+            Push4fSafe(push, 0xa20, fm11 + xViewport, -fm22 + yViewport, fm43, 0.0f);
+            Push4fSafe(push + 5, 0xaf0, fm11, fm22, fm33, 0.0f);
+            push += 10;
+        }
+        clipNear = 0.0f;
+        clipFar = device->m_ZScale;
+    }
+    else
+    {
+        Push4fSafe(push, 0xa20, xViewport, yViewport, 0.0f, 0.0f);
+        push += 5;
+        clipFar = device->m_ZScale * device->m_Viewport.MaxZ;
+        clipNear = device->m_ZScale * device->m_Viewport.MinZ;
+    }
+    Push2f(push, 0x394, clipNear, clipFar);
+    return push + 3;
+}
+}
+
+HRESULT WINAPI D3DDevice_SetTextureState_ParameterCheck(
+    DWORD stage,
+    D3DTEXTURESTAGESTATETYPE type,
+    DWORD value)
+{
+    /* January's retail API reports success; validation exists only in checked
+     * builds. The entire original return sequence is independently compared. */
+    return S_OK;
 }

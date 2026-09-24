@@ -51,14 +51,11 @@ void WINAPI GPUCopyVideoRectangle(
     {
     case 1: format = 1; break;
     case 2: format = 4; break;
-    case 4:
+    case 4: format = 10; break;
     default: format = 10; break;
     }
-    PushCount(push, 0x8300, 4);
-    push[1] = format;
-    push[2] = (sourcePitch & 0xffff) | (destinationPitch << 16);
-    push[3] = sourceOffset;
-    push[4] = destinationOffset;
+    Push4(push, SUBCH_RECTCOPYSURFACES, 0x300, format,
+        (sourcePitch & 0xffff) | (destinationPitch << 16), sourceOffset, destinationOffset);
     device->EndPush(push + 5);
     while (count--)
     {
@@ -68,10 +65,7 @@ void WINAPI GPUCopyVideoRectangle(
         /* Disjoint 16-bit fields; XOR is the target's combining operation. */
         DWORD size = (((DWORD)rectangles->right - (DWORD)rectangles->left) & 0xffff)
             ^ (((DWORD)rectangles->bottom - (DWORD)rectangles->top) << 16);
-        PushCount(push, 0x6300, 3);
-        push[1] = sourcePoint;
-        push[2] = destinationPoint;
-        push[3] = size;
+        Push3(push, SUBCH_RECTCOPY, 0x300, sourcePoint, destinationPoint, size);
         device->EndPush(push + 4);
         rectangles++;
         points++;
@@ -91,7 +85,9 @@ void WINAPI GPUCopyMemory(
 {
     CDevice *device = g_pDevice;
     volatile NvNotification *notifiers = device->m_pMemCopyNotifiers;
-    unsigned __int64 notified = ReadNotificationTime(&notifiers[0]);
+    DWORD initial[2];
+    initial[0] = notifiers[0].timeStamp.nanoseconds[0];
+    initial[1] = notifiers[0].timeStamp.nanoseconds[1];
     if (size)
     {
         do
@@ -120,13 +116,13 @@ void WINAPI GPUCopyMemory(
             DWORD *push = device->StartPush();
             if (!remaining)
             {
-                Push1(push, 0x4104, 0);
+                Push1(push, SUBCH_MEMCOPY, 0x104, 0);
                 push += 2;
             }
-            PushCount(push, 0x4184, 2);
+            PushCount(push, SUBCH_MEMCOPY, 0x184, 2);
             push[1] = 5;
             push[2] = 4;
-            PushCount(push + 3, 0x430c, 8);
+            PushCount(push + 3, SUBCH_MEMCOPY, 0x30c, 8);
             push[4] = sourceOffset;
             push[5] = destinationOffset;
             push[6] = width;
@@ -141,13 +137,21 @@ void WINAPI GPUCopyMemory(
             size = remaining;
         } while (size);
         device->KickOff();
-        while (notified == ReadNotificationTime(&notifiers[0]))
+        while (initial[0] == notifiers[0].timeStamp.nanoseconds[0] &&
+            initial[1] == notifiers[0].timeStamp.nanoseconds[1])
         {
             BusyLoop();
         }
-        notified = ReadNotificationTime(&notifiers[0]);
-        while (ReadNotificationTime(&notifiers[1]) < notified)
+        DWORD completedHigh = notifiers[0].timeStamp.nanoseconds[1];
+        DWORD completedLow = notifiers[0].timeStamp.nanoseconds[0];
+        for (;;)
         {
+            DWORD otherHigh = notifiers[1].timeStamp.nanoseconds[1];
+            if (otherHigh > completedHigh ||
+                (otherHigh == completedHigh && notifiers[1].timeStamp.nanoseconds[0] >= completedLow))
+            {
+                break;
+            }
             BusyLoop();
         }
     }

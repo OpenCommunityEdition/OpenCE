@@ -14,6 +14,7 @@
 #include "vshader_internal.h"
 #include "surface_internal.h"
 #include "pixeljar.h"
+#include "memory_internal.h"
 #pragma code_seg("D3D")
 namespace D3D
 {
@@ -120,20 +121,20 @@ void CDevice::FreeFrameBuffers(
     if (m_pAutoDepthBuffer != NULL)
     {
         SetTile(1, NULL);
-        MmFreeContiguousMemory(m_pAutoDepthBuffer);
+        FreeContiguousMemory(m_pAutoDepthBuffer);
         m_pAutoDepthBuffer = NULL;
         ZeroMemory(&m_AutoDepthSurface, sizeof(m_AutoDepthSurface));
     }
     if (m_pFrameBufferBase != NULL)
     {
         SetTile(0, NULL);
-        MmFreeContiguousMemory(m_pFrameBufferBase);
+        FreeContiguousMemory(m_pFrameBufferBase);
         m_pFrameBufferBase = NULL;
         ZeroMemory(m_FrameBufferSurfaces, sizeof(m_FrameBufferSurfaces));
     }
     if (m_pAntiAliasBufferBase != NULL)
     {
-        MmFreeContiguousMemory(m_pAntiAliasBufferBase);
+        FreeContiguousMemory(m_pAntiAliasBufferBase);
         m_pAntiAliasBufferBase = NULL;
     }
     return;
@@ -267,8 +268,7 @@ HRESULT CDevice::InitializeFrameBuffers(
     frameCount = doAntiAlias ? 1 : frameCount;
     DWORD allocationSize = (frameCount * frameSize + D3DTILE_ALIGNMENT - 1)
         & ~(D3DTILE_ALIGNMENT - 1);
-    BYTE *memory = (BYTE *)MmAllocateContiguousMemoryEx(allocationSize, 0,
-        0x03ffb000, D3DTILE_ALIGNMENT, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    BYTE *memory = (BYTE *)D3D::AllocateContiguousMemory(allocationSize, D3DTILE_ALIGNMENT);
     if (memory == NULL)
         return E_OUTOFMEMORY;
     m_pFrameBufferBase = memory;
@@ -296,8 +296,7 @@ HRESULT CDevice::InitializeFrameBuffers(
             autoDepthStencilFormat, CalcTilePitch(width, autoDepthStencilFormat),
             true, false, false, &format, &size);
         allocationSize = (frameSize + D3DTILE_ALIGNMENT - 1) & ~(D3DTILE_ALIGNMENT - 1);
-        memory = (BYTE *)MmAllocateContiguousMemoryEx(allocationSize, 0,
-            0x03ffb000, D3DTILE_ALIGNMENT, PAGE_READWRITE | PAGE_WRITECOMBINE);
+        memory = (BYTE *)D3D::AllocateContiguousMemory(allocationSize, D3DTILE_ALIGNMENT);
         if (memory == NULL)
             return E_OUTOFMEMORY;
         m_pAutoDepthBuffer = memory;
@@ -319,8 +318,7 @@ HRESULT CDevice::InitializeFrameBuffers(
     {
         frameSize = PixelJar::EncodeFormat(backBufferWidth, backBufferHeight, 1, 1,
             postfilterFormat, 0, true, false, false, &format, &size);
-        memory = (BYTE *)MmAllocateContiguousMemoryEx(backBufferCount * frameSize, 0,
-            0x03ffb000, D3DTILE_ALIGNMENT, PAGE_READWRITE | PAGE_WRITECOMBINE);
+        memory = (BYTE *)D3D::AllocateContiguousMemory(backBufferCount * frameSize, D3DTILE_ALIGNMENT);
         if (memory == NULL)
             return E_OUTOFMEMORY;
         m_pAntiAliasBufferBase = memory;

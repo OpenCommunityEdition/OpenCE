@@ -9,6 +9,12 @@ Inspected paths in that repository, all under `libs/libd3d8/se/`:
 `pixeljar.cpp`, `pixeljar.hpp`, `state.cpp`, `resource.cpp`, `vshader.cpp`,
 `pshader.cpp`, `enum.cpp`, and `d3dbase.cpp`.
 
+The later D3D8 continuation also uses the same RXDK reference for the
+rectangle-copy algorithm in `memory.cpp`. The continuation-015 integration
+retains that attribution and keeps all adapted D3D8 source under this GPL
+subtree; it does not import the donor's NVIDIA-referenced `math.cpp` changes
+or any bundled binary, PDB, compiler, or SDK assets.
+
 Repository source URL:
 https://github.com/Team-Resurgent/RXDK-Libs/tree/29e018674a3443f9df5b5cb4478bb9c54d8a2a3a/libs/libd3d8/se
 

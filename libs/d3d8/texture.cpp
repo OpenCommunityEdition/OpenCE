@@ -1,5 +1,6 @@
 #include "pixeljar.h"
 #include "kernel_memory.h"
+#include "memory_internal.h"
 #pragma code_seg("D3D")
 void WINAPI D3DTexture_GetLevelDesc(
     D3DTexture *texture,
@@ -82,14 +83,13 @@ HRESULT WINAPI CreateTexture(
     if (usage & 0x10000) encodedFormat &= ~D3DFORMAT_BORDERSOURCE_COLOR;
     D3DBaseTexture *texture = (D3DBaseTexture *)LocalAlloc(LMEM_ZEROINIT, sizeof(*texture));
     if (!texture) return E_OUTOFMEMORY;
-    void *memory = MmAllocateContiguousMemoryEx(allocationSize, 0, 0x03ffb000,
-        128, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    void *memory = D3D::AllocateContiguousMemory(allocationSize, 128);
     if (!memory)
     {
         LocalFree(texture);
         return E_OUTOFMEMORY;
     }
-    texture->Data = (DWORD)memory & 0x03ffffff;
+    texture->Data = XMETAL_MapToPhysicalOffset(memory);
     texture->Common = 0x01040001;
     texture->Format = encodedFormat;
     texture->Size = encodedSize;

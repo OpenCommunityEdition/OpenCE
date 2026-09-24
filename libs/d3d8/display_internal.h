@@ -32,6 +32,8 @@ struct DISPLAYMODE
     DWORD DisplayMode;
 };
 typedef char DisplayModeSize[sizeof(DISPLAYMODE) == 12 ? 1 : -1];
+BOOL WINAPI CheckDisplayFormat(
+    D3DFORMAT format);
 const DISPLAYMODE *WINAPI GetTableForCurrentAvInfo(
     void);
 extern const D3DADAPTER_IDENTIFIER8 g_AdapterIdentifier;

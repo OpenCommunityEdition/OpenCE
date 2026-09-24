@@ -4,6 +4,7 @@
 #include "pusher_state.h"
 #include "resource_internal.h"
 #include "pixeljar.h"
+#include "kernel_dispatcher.h"
 #pragma code_seg("D3D")
 namespace D3D
 {
@@ -67,7 +68,7 @@ DWORD *CDevice::GpuGet(
     DWORD *get = HwGet();
     if (get < m_pPushBase || get >= m_pPushLimit)
     {
-        get = (DWORD *)((ReadGpuRegister(m_NvBase, 0x324c) & ~1UL) | 0x80000000UL);
+        get = (DWORD *)((REG_RD32(m_NvBase, 0x324c) & ~1UL) | 0x80000000UL);
     }
     return get;
 }
@@ -241,4 +242,145 @@ extern "C" DWORD *WINAPI XMETAL_StartPushCount(
         put = ((CDevice *)buffer)->MakeSpace();
     }
     return put;
+}
+
+namespace D3D
+{
+/* The January wait protocol patches a live GPU fence only while its gap is
+ * at least 32 KiB. If the GPU wins the race, restore harmless commands and
+ * spin on the fence time. No target code is executed by the build tools. */
+void WINAPI BlockOnTime(
+    DWORD time,
+    BOOL makeSpace)
+{
+    CDevice *device = g_pDevice;
+    if (time == 0 || !device->IsTimePending(time))
+    {
+        return;
+    }
+    if (time == device->m_CpuTime)
+    {
+        SetFence(0);
+    }
+    DWORD spinTime = time;
+    Fence *fence = FindFence(time);
+    DWORD gap = ComputeGap(device, fence);
+    if (gap >= 32768)
+    {
+        FenceEncoding *encoding = fence->pEncoding;
+        KeClearEvent(&device->m_Miniport.m_BusyBlockEvent);
+        if (!makeSpace)
+        {
+            encoding->m_WaitForIdleCommand = 0x40110;
+            encoding->m_WaitForIdleArgument = 0;
+        }
+        encoding->m_NoOperationCommand = 0x40100;
+        encoding->m_FenceCommand = 0x310;
+        FlushWCCache();
+        DWORD newGap = ComputeGap(device, fence);
+        if (newGap < 32768)
+        {
+            encoding->m_WaitForIdleCommand = 0x40100;
+            encoding->m_WaitForIdleArgument = 0;
+            encoding->m_NoOperationCommand = 0x40100;
+            encoding->m_FenceCommand = 0;
+            FlushWCCache();
+            spinTime = fence->Time;
+        }
+        else
+        {
+            while (KeWaitForSingleObject(&device->m_Miniport.m_BusyBlockEvent,
+                UserRequest, UserMode, FALSE, NULL) != 0)
+            {
+            }
+            return;
+        }
+    }
+    while (device->IsTimePending(spinTime))
+    {
+    }
+    return;
+}
+}
+
+namespace D3D
+{
+/* Addresses used to compare prospective segment limits are integer byte
+ * offsets, not pointers formed outside the allocated circular push buffer. */
+DWORD *CDevice::MakeSpace(
+    void)
+{
+    DWORD *put = m_Pusher.m_pPut;
+    if (m_StateFlags & 4)
+    {
+        DWORD *base = (DWORD *)m_pPushBufferRecordResource->Data;
+        m_PushBufferRecordWrapSize += (DWORD)((BYTE *)put - (BYTE *)base);
+        m_Pusher.m_pPut = (DWORD *)m_pPushBufferRecordResource->Data;
+        return m_Pusher.m_pPut;
+    }
+    ULONG_PTR limit = (ULONG_PTR)put + m_PushSegmentSize;
+    if (limit + m_PushSegmentSize / 2 >= (ULONG_PTR)m_pPushLimit)
+    {
+        if ((ULONG_PTR)put + m_PushSegmentSize / 2 <= (ULONG_PTR)m_pPushLimit)
+        {
+            limit = (ULONG_PTR)m_pPushLimit;
+        }
+        else
+        {
+            m_PusherLastSize = (DWORD)((BYTE *)put - (BYTE *)m_pPushBase);
+            *m_Pusher.m_pPut = ((DWORD)m_pPushBase & 0x0fffffffUL) | 1;
+            while (HwGet() == m_pPushBase)
+            {
+            }
+            put = m_pPushBase;
+            limit = (ULONG_PTR)put + m_PushSegmentSize;
+            m_Pusher.m_pPut = put;
+        }
+    }
+    DWORD gpuTime = GpuTime();
+    DWORD *get = GpuGet();
+    if (get > put && (ULONG_PTR)get <= limit)
+    {
+        DWORD index = m_PusherLastSegment;
+        ULONG_PTR midpoint = (ULONG_PTR)put + m_PushBufferSize / 2;
+        DWORD fenceTime = m_PusherSegment[index].Time;
+        ULONG_PTR fence = (ULONG_PTR)m_PusherSegment[index].pEncoding;
+        BOOL blocked = FALSE;
+        while (Age(fenceTime) < Age(gpuTime))
+        {
+            if (fence < (ULONG_PTR)put) fence += m_PusherLastSize;
+            if (fence < midpoint)
+            {
+                BlockOnTime(fenceTime, TRUE);
+                blocked = TRUE;
+                break;
+            }
+            index = (index - 1) & 15;
+            if (index == m_PusherLastSegment) break;
+            fence = (ULONG_PTR)m_PusherSegment[index].pEncoding;
+            fenceTime = m_PusherSegment[index].Time;
+        }
+        if (!blocked)
+        {
+            do
+            {
+                BusyLoop();
+                get = GpuGet();
+            } while (get > put && (ULONG_PTR)get <= limit);
+        }
+        GpuGet();
+    }
+    m_Pusher.m_pThreshold = (DWORD *)(limit - 129 * sizeof(DWORD));
+    if (m_StateFlags & 0x800)
+    {
+        m_StateFlags |= 0x1000;
+        KickOff();
+    }
+    else
+    {
+        SetFence(1);
+        KickOff();
+    }
+    return m_Pusher.m_pPut;
+}
 }

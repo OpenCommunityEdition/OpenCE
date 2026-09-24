@@ -21,7 +21,7 @@ void CMiniport::GrDone(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    while (ReadGpuRegister(base, 0x400700))
+    while (REG_RD32(base, 0x400700))
     {
     }
     return;
@@ -30,9 +30,9 @@ DWORD CMiniport::ServiceVideoInterrupt(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    if (ReadGpuRegister(base, 0x8100) & 1)
+    if (REG_RD32(base, 0x8100) & 1)
     {
-        WriteGpuRegister(base, 0x8100, 1);
+        REG_WR32(base, 0x8100, 1);
     }
     return 0;
 }
@@ -61,12 +61,12 @@ void WINAPI CMiniport::Dpc(
     DWORD pending;
     do
     {
-        DWORD interrupts = ReadGpuRegister(base, 0x100);
+        DWORD interrupts = REG_RD32(base, 0x100);
         pending = 0;
         if (interrupts & 0x100000)
         {
-            WriteGpuRegister(base, 0x9100, 1);
-            pending = ReadGpuRegister(base, 0x9100);
+            REG_WR32(base, 0x9100, 1);
+            pending = REG_RD32(base, 0x9100);
         }
         if (interrupts & 0x01000000)
         {
@@ -76,7 +76,7 @@ void WINAPI CMiniport::Dpc(
         {
             pending |= miniport->ServiceGrInterrupt();
         }
-        if ((interrupts & 0x100) || (ReadGpuRegister(base, 0x2080) & 1))
+        if ((interrupts & 0x100) || (REG_RD32(base, 0x2080) & 1))
         {
             pending |= miniport->ServiceFifoInterrupt();
         }
@@ -117,7 +117,7 @@ void CMiniport::FixupPushBuffer(
     memcpy(start + returnOffset, &jump, sizeof(jump));
     if (method == 0x308)
     {
-        WriteGpuRegister((_HWREG *)m_RegisterBase, 0x324c, returnAddress);
+        REG_WR32((_HWREG *)m_RegisterBase, 0x324c, returnAddress);
         m_PusherGetRunSize += returnOffset;
     }
     return;
@@ -141,9 +141,9 @@ BYTE WINAPI CMiniport::Isr(
 {
     CMiniport *miniport = (CMiniport *)context;
     _HWREG *base = (_HWREG *)miniport->m_RegisterBase;
-    if (miniport->m_InterruptsEnabled && ReadGpuRegister(base, 0x140))
+    if (miniport->m_InterruptsEnabled && REG_RD32(base, 0x140))
     {
-        DWORD pending = ReadGpuRegister(base, 0x100);
+        DWORD pending = REG_RD32(base, 0x100);
         if (pending)
         {
             if (pending & 0x01000000)
@@ -173,7 +173,7 @@ DWORD CMiniport::VBlank(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    BYTE crtcIndex = ReadGpuRegister8(base, 0x6013d4);
+    BYTE crtcIndex = REG_RD08(base, 0x6013d4);
     ++m_VBlankCount;
     if (m_VBlankFlips[m_VBlankFlipNext].Pending == TRUE &&
         (m_PresentationInterval != D3DPRESENT_INTERVAL_TWO || IsOddField()))
@@ -186,7 +186,7 @@ DWORD CMiniport::VBlank(
             DacProgramGammaRamp(&m_GammaRamp[bank]);
             m_GammaUpdated[bank] = FALSE;
         }
-        WriteGpuRegister(base, 0x40071c, ReadGpuRegister(base, 0x40071c) | 2);
+        REG_WR32(base, 0x40071c, REG_RD32(base, 0x40071c) | 2);
         if (++m_VBlankFlipNext == 5)
         {
             m_VBlankFlipNext = 0;
@@ -195,14 +195,14 @@ DWORD CMiniport::VBlank(
     }
     do
     {
-        WriteGpuRegister(base, 0x600100, 1);
-    } while (ReadGpuRegister(base, 0x100) & 0x01000000);
+        REG_WR32(base, 0x600100, 1);
+    } while (REG_RD32(base, 0x100) & 0x01000000);
     KeSetEvent(&m_VerticalBlankEvent, 1, FALSE);
     if (m_pVerticalBlankCallback)
     {
         m_pVerticalBlankCallback(m_VBlankCount);
     }
-    WriteGpuRegister8(base, 0x6013d4, crtcIndex);
+    REG_WR08(base, 0x6013d4, crtcIndex);
     return 0;
 }
 }
@@ -219,7 +219,7 @@ void CMiniport::SoftwareMethod(
     case SoftwareFlipImmediate:
         {
             DacProgramVideoStart(data);
-            WriteGpuRegister(base, 0x40071c, ReadGpuRegister(base, 0x40071c) | 2);
+            REG_WR32(base, 0x40071c, REG_RD32(base, 0x40071c) | 2);
             DWORD bank = m_VBlankFlipCount & 1;
             if (m_GammaUpdated[bank] == TRUE)
             {
@@ -250,30 +250,30 @@ void CMiniport::SoftwareMethod(
         break;
     case SoftwareReadCallback:
     case SoftwareWriteCallback:
-        ((D3DCALLBACK)data)(ReadGpuRegister(base, 0x40186c));
+        ((D3DCALLBACK)data)(REG_RD32(base, 0x40186c));
         break;
     case SoftwareDxt1NoiseEnable:
-        WriteGpuRegister(base, 0x400750, 0xe00050);
-        WriteGpuRegister(base, 0x400754, data);
-        WriteGpuRegister(base, 0x400750, 0xdf0008);
-        WriteGpuRegister(base, 0x400754, data);
+        REG_WR32(base, 0x400750, 0xe00050);
+        REG_WR32(base, 0x400754, data);
+        REG_WR32(base, 0x400750, 0xdf0008);
+        REG_WR32(base, 0x400754, data);
         break;
     case SoftwareWriteRegister:
-        WriteGpuRegister(base, data, ReadGpuRegister(base, 0x40186c));
+        REG_WR32(base, data, REG_RD32(base, 0x40186c));
         break;
     case SoftwareSetSurfacePitchAndOffset:
         {
-            DWORD offset = ReadGpuRegister(base, 0x40186c);
-            if (offset != ReadGpuRegister(base, 0x400828))
+            DWORD offset = REG_RD32(base, 0x40186c);
+            if (offset != REG_RD32(base, 0x400828))
             {
                 DbgPrint("D3D: Adjusting offset\n");
-                WriteGpuRegister(base, 0x400828, offset);
+                REG_WR32(base, 0x400828, offset);
                 ++g_Adjusts;
             }
-            if (data != ReadGpuRegister(base, 0x400858))
+            if (data != REG_RD32(base, 0x400858))
             {
                 DbgPrint("D3D: Adjusting pitch\n");
-                WriteGpuRegister(base, 0x400858, data);
+                REG_WR32(base, 0x400858, data);
                 ++g_Adjusts;
             }
         }
@@ -286,30 +286,30 @@ DWORD CMiniport::ServiceGrInterrupt(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    WriteGpuRegister(base, 0x400720, 0);
-    DWORD interrupts = ReadGpuRegister(base, 0x400100);
-    DWORD method = ReadGpuRegister(base, 0x400704);
-    DWORD notifySource = ReadGpuRegister(base, 0x400108);
+    REG_WR32(base, 0x400720, 0);
+    DWORD interrupts = REG_RD32(base, 0x400100);
+    DWORD method = REG_RD32(base, 0x400704);
+    DWORD notifySource = REG_RD32(base, 0x400108);
     DWORD channel = (method >> 20) & 0x1f;
     method &= 0x1ffc;
     if (interrupts & 0x1000)
     {
-        WriteGpuRegister(base, 0x400100, 0x1000);
+        REG_WR32(base, 0x400100, 0x1000);
         GrDone();
         HalGrLoadChannelContext(channel);
     }
     if (interrupts & 0x10)
     {
-        WriteGpuRegister(base, 0x400100, 0x10);
+        REG_WR32(base, 0x400100, 0x10);
     }
     if (((interrupts & 1) || (interrupts & 0x100000)) && (notifySource & 0x40))
     {
-        WriteGpuRegister(base, 0x400100, (interrupts & 1) ? 1 : 0x100000);
+        REG_WR32(base, 0x400100, (interrupts & 1) ? 1 : 0x100000);
     }
-    interrupts = ReadGpuRegister(base, 0x400100);
+    interrupts = REG_RD32(base, 0x400100);
     if (interrupts)
     {
-        WriteGpuRegister(base, 0x400100, interrupts);
+        REG_WR32(base, 0x400100, interrupts);
         if (interrupts != 0x1000 && interrupts != 0x01000000)
         {
             if (interrupts & 0x10)
@@ -318,13 +318,13 @@ DWORD CMiniport::ServiceGrInterrupt(
             }
             if (notifySource && ((interrupts & 1) || (interrupts & 0x100000)))
             {
-                DWORD objectClass = ReadGpuRegister(base, 0x40014c) & 0xff;
-                DWORD data = ReadGpuRegister(base, 0x400708);
+                DWORD objectClass = REG_RD32(base, 0x40014c) & 0xff;
+                DWORD data = REG_RD32(base, 0x400708);
                 if (!(notifySource & 0x40))
                 {
                     if (method == 0x100)
                     {
-                        SoftwareMethod(data, ReadGpuRegister(base, 0x401a88));
+                        SoftwareMethod(data, REG_RD32(base, 0x401a88));
                     }
                     else
                     {
@@ -339,30 +339,30 @@ DWORD CMiniport::ServiceGrInterrupt(
             }
         }
     }
-    WriteGpuRegister(base, 0x400720, 1);
-    return ReadGpuRegister(base, 0x400100);
+    REG_WR32(base, 0x400720, 1);
+    return REG_RD32(base, 0x400100);
 }
 
 DWORD CMiniport::ServiceFifoInterrupt(
     void)
 {
     _HWREG *base = (_HWREG *)m_RegisterBase;
-    DWORD interrupts = ReadGpuRegister(base, 0x2100);
+    DWORD interrupts = REG_RD32(base, 0x2100);
     if (interrupts & 0x100000)
     {
-        WriteGpuRegister(base, 0x2100, 0x100000);
+        REG_WR32(base, 0x2100, 0x100000);
     }
     if (interrupts & 0x01000000)
     {
-        WriteGpuRegister(base, 0x2100, 0x01000000);
+        REG_WR32(base, 0x2100, 0x01000000);
     }
-    interrupts = ReadGpuRegister(base, 0x2100);
+    interrupts = REG_RD32(base, 0x2100);
     if (interrupts & 1)
     {
-        DWORD pull = ReadGpuRegister(base, 0x3250);
-        WriteGpuRegister(base, 0x2500, 0);
-        WriteGpuRegister(base, 0x3250, 0);
-        WriteGpuRegister(base, 0x2100, 1);
+        DWORD pull = REG_RD32(base, 0x3250);
+        REG_WR32(base, 0x2500, 0);
+        REG_WR32(base, 0x3250, 0);
+        REG_WR32(base, 0x2100, 1);
         DWORD retries = 0xffff;
         do
         {
@@ -370,50 +370,50 @@ DWORD CMiniport::ServiceFifoInterrupt(
             {
                 break;
             }
-            pull = ReadGpuRegister(base, 0x3250);
+            pull = REG_RD32(base, 0x3250);
         } while (--retries);
-        WriteGpuRegister(base, 0x3258, 0);
-        WriteGpuRegister(base, 0x3250, 1);
-        WriteGpuRegister(base, 0x2500, 1);
+        REG_WR32(base, 0x3258, 0);
+        REG_WR32(base, 0x3250, 1);
+        REG_WR32(base, 0x2500, 1);
     }
     if (interrupts & 0x1000)
     {
         DbgPrint("SW PUT=%x\n", g_pDevice->m_Pusher.m_pPut);
         DbgPrint("HW PUT=%x\n", *(volatile DWORD *)0xfd003240UL);
         DbgPrint("HW GET=%x\n", *(volatile DWORD *)0xfd003244UL);
-        WriteGpuRegister(base, 0x2100, 0x1000);
-        WriteGpuRegister(base, 0x3228, 0);
-        if (ReadGpuRegister(base, 0x3240) != ReadGpuRegister(base, 0x3244))
+        REG_WR32(base, 0x2100, 0x1000);
+        REG_WR32(base, 0x3228, 0);
+        if (REG_RD32(base, 0x3240) != REG_RD32(base, 0x3244))
         {
-            WriteGpuRegister(base, 0x3244, ReadGpuRegister(base, 0x3244) + 4);
+            REG_WR32(base, 0x3244, REG_RD32(base, 0x3244) + 4);
         }
     }
-    if (ReadGpuRegister(base, 0x3220) & 0x1000)
+    if (REG_RD32(base, 0x3220) & 0x1000)
     {
-        while (!(ReadGpuRegister(base, 0x3214) & 0x10) && !ReadGpuRegister(base, 0x2100))
+        while (!(REG_RD32(base, 0x3214) & 0x10) && !REG_RD32(base, 0x2100))
         {
-            if (ReadGpuRegister(base, 0x400100))
+            if (REG_RD32(base, 0x400100))
             {
                 ServiceGrInterrupt();
             }
-            if (ReadGpuRegister(base, 0x100) & 0x01000000)
+            if (REG_RD32(base, 0x100) & 0x01000000)
             {
                 VBlank();
             }
         }
-        if (ReadGpuRegister(base, 0x3214) & 0x10)
+        if (REG_RD32(base, 0x3214) & 0x10)
         {
-            while (ReadGpuRegister(base, 0x2500) & 0x10)
+            while (REG_RD32(base, 0x2500) & 0x10)
             {
             }
-            WriteGpuRegister(base, 0x3220, ReadGpuRegister(base, 0x3220) & ~0x1000UL);
+            REG_WR32(base, 0x3220, REG_RD32(base, 0x3220) & ~0x1000UL);
         }
     }
-    if (!ReadGpuRegister(base, 0x2100))
+    if (!REG_RD32(base, 0x2100))
     {
-        WriteGpuRegister(base, 0x3250, 1);
-        WriteGpuRegister(base, 0x2500, 1);
+        REG_WR32(base, 0x3250, 1);
+        REG_WR32(base, 0x2500, 1);
     }
-    return ReadGpuRegister(base, 0x2100) | (ReadGpuRegister(base, 0x2080) & 1);
+    return REG_RD32(base, 0x2100) | (REG_RD32(base, 0x2080) & 1);
 }
 }

@@ -6,7 +6,7 @@
 #pragma code_seg("D3D")
 namespace D3D
 {
-__inline BOOL CheckDisplayFormat(
+__inline BOOL WINAPI CheckDisplayFormat(
     D3DFORMAT format)
 {
     return g_TextureFormat[format] & 0x80;

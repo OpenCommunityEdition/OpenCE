@@ -1,6 +1,7 @@
 #ifndef D3D8_HARDWARE_INTERNAL_H
 #define D3D8_HARDWARE_INTERNAL_H
 #include "device_layout.h"
+#include "xmetal_memory_internal.h"
 /* January PDB layout. Volatile register accesses describe mapped device
  * storage, rather than selecting an otherwise unnecessary instruction. */
 struct Nv206eControl
@@ -67,14 +68,14 @@ struct _HWREG
 };
 /* Address the complete mapped MMIO region, not an out-of-bounds element of
  * the one-element marker array in the historical declaration. */
-__inline DWORD WINAPI ReadGpuRegister(
-    _HWREG *base,
+static __inline DWORD WINAPI REG_RD32(
+    void *base,
     DWORD offset)
 {
     return *(volatile DWORD *)((BYTE *)base + offset);
 }
-__inline void WINAPI WriteGpuRegister(
-    _HWREG *base,
+static __inline void WINAPI REG_WR32(
+    void *base,
     DWORD offset,
     DWORD value)
 {
@@ -82,14 +83,14 @@ __inline void WINAPI WriteGpuRegister(
     return;
 }
 /* Byte-wide indexed CRTC and palette registers have distinct access widths. */
-__inline BYTE WINAPI ReadGpuRegister8(
-    _HWREG *base,
+static __inline BYTE WINAPI REG_RD08(
+    void *base,
     DWORD offset)
 {
     return *(volatile BYTE *)((BYTE *)base + offset);
 }
-__inline void WINAPI WriteGpuRegister8(
-    _HWREG *base,
+static __inline void WINAPI REG_WR08(
+    void *base,
     DWORD offset,
     BYTE value)
 {
@@ -99,20 +100,20 @@ __inline void WINAPI WriteGpuRegister8(
 __inline void CMiniport::EnableInterrupts(
     void)
 {
-    WriteGpuRegister((_HWREG *)m_RegisterBase, 0x140, m_GenInfo.ChipIntrEn0);
+    REG_WR32((_HWREG *)m_RegisterBase, 0x140, m_GenInfo.ChipIntrEn0);
     return;
 }
 /* Original inline method, also present as a 16-byte target in dxgcreate. */
 __inline void CMiniport::DisableInterrupts(
     void)
 {
-    WriteGpuRegister((_HWREG *)m_RegisterBase, 0x140, 0);
+    REG_WR32((_HWREG *)m_RegisterBase, 0x140, 0);
     return;
 }
 __inline DWORD *CDevice::HwGet(
     void)
 {
-    return (DWORD *)(m_pControlDma->Get | 0x80000000UL);
+    return (DWORD *)XMETAL_MapToContiguousAddress(m_pControlDma->Get);
 }
 __inline DWORD CDevice::GpuTime(
     void)

@@ -60,14 +60,13 @@ HRESULT WINAPI D3DDevice_CreateVertexBuffer(
     {
         return E_OUTOFMEMORY;
     }
-    void *memory = MmAllocateContiguousMemoryEx(length, 0, 0x03ffb000, 0,
-        PAGE_READWRITE | PAGE_WRITECOMBINE);
+    void *memory = D3D::AllocateContiguousMemory(length, 0);
     if (!memory)
     {
         LocalFree(buffer);
         return E_OUTOFMEMORY;
     }
-    buffer->Data = (DWORD)memory & 0x03ffffff;
+    buffer->Data = XMETAL_MapToPhysicalOffset(memory);
     buffer->Common = D3DCOMMON_D3DCREATED | D3DCOMMON_TYPE_VERTEXBUFFER | 1;
     *result = buffer;
     return S_OK;
@@ -81,16 +80,15 @@ HRESULT WINAPI D3DDevice_CreatePalette(
     {
         return E_OUTOFMEMORY;
     }
-    void *memory = MmAllocateContiguousMemoryEx(D3D::g_PaletteSize[size], 0,
-        0x03ffb000, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    void *memory = D3D::AllocateContiguousMemory(D3D::g_PaletteSize[size], 0);
     if (!memory)
     {
         LocalFree(palette);
         return E_OUTOFMEMORY;
     }
-    DWORD paletteBits = (DWORD)size << D3DPALETTE_COMMON_PALETTESIZE_SHIFT;
-    palette->Data = (DWORD)memory & 0x03ffffff;
-    palette->Common = paletteBits | D3DCOMMON_D3DCREATED | D3DCOMMON_TYPE_PALETTE | 1;
+    palette->Common = ((DWORD)size << D3DPALETTE_COMMON_PALETTESIZE_SHIFT) |
+        D3DCOMMON_D3DCREATED | D3DCOMMON_TYPE_PALETTE | 1;
+    palette->Data = XMETAL_MapToPhysicalOffset(memory);
     *result = palette;
     return S_OK;
 }

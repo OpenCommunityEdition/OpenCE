@@ -7,6 +7,7 @@
 #include "resource_internal.h"
 #include "state_internal.h"
 #include "math_internal.h"
+#include "push_float_internal.h"
 #pragma code_seg("D3D")
 namespace D3D
 {
@@ -727,4 +728,95 @@ void WINAPI D3DDevice_SetVertexShader(
         device->EndPush(push);
     }
     return;
+}
+
+namespace D3D
+{
+/* Same January semantic constant as state.cpp, separately owned in this TU. */
+const float KELVIN_BORDER = 0.53125f;
+void __fastcall CommonSetPassthroughProgram(
+    CDevice *device)
+{
+    if (device->m_pVertexShader->Flags & VERTEXSHADER_PASSTHROUGH)
+    {
+        const DWORD *program;
+        DWORD size;
+        if (D3D__RenderState[D3DRS_FOGTABLEMODE] == D3DFOG_NONE)
+        {
+            program = g_PassthruProgramSpecularFog;
+            size = sizeof(g_PassthruProgramSpecularFog) / sizeof(DWORD);
+        }
+        else if (device->m_StateFlags & 2)
+        {
+            size = sizeof(g_PassthruProgramZFog) / sizeof(DWORD);
+            program = g_PassthruProgramZFog;
+        }
+        else
+        {
+            program = g_PassthruProgramWFog;
+            size = sizeof(g_PassthruProgramWFog) / sizeof(DWORD);
+        }
+        DWORD *push = device->StartPush(size + 30);
+        Push1(push, 0x1ea4, 0);
+        PushCount(push + 2, 0xb80, 8);
+        float wScale = D3D__RenderState[D3DRS_ZENABLE] == D3DZB_USEW ?
+            device->m_ZScale * device->m_InverseWFar : 1.0f;
+        /* The eight-word constant method is already written above. */
+        StoreFloat4(push + 3, device->m_SuperSampleScaleX, device->m_SuperSampleScaleY, device->m_ZScale, wScale);
+        if ((D3D__RenderState[D3DRS_MULTISAMPLETYPE] & 0x1000) &&
+            D3D__RenderState[D3DRS_MULTISAMPLEANTIALIAS] &&
+            device->m_pRenderTarget == &device->m_FrameBufferSurfaces[0])
+        {
+            StoreFloatPair(push + 7, KELVIN_BORDER - 0.5f, KELVIN_BORDER - 0.5f);
+        }
+        else
+        {
+            StoreFloatPair(push + 7, KELVIN_BORDER, KELVIN_BORDER);
+        }
+        push[9] = 0;
+        push[10] = 0;
+        Push1(push + 11, 0x1e9c, 0);
+        push = ParseProgram(push + 13, program, size);
+        device->EndPush(push);
+    }
+    return;
+}
+}
+
+namespace D3D
+{
+extern "C"
+void WINAPI D3DDevice_SetVertexShaderConstant(
+    INT index,
+    const void *constantData,
+    DWORD constantCount)
+{
+    CDevice *device = g_pDevice;
+    index += 96;
+    int dwords = (int)(constantCount * 4);
+    if (!(device->m_StateFlags & STATE_PUREDEVICE))
+    {
+        memcpy(&device->m_VertexShaderConstants[index][0], constantData,
+            dwords * sizeof(DWORD));
+    }
+    DWORD *push = device->StartPush(dwords + 26);
+    Push1(push, 0x1ea4, index);
+    push += 2;
+    const BYTE *source = (const BYTE *)constantData;
+    /* Valid constants occupy the caller-backed original register range. Each
+     * packet is at most eight four-word registers; count and indices are bounded. */
+    while (dwords > 32)
+    {
+        PushCount(push, 0x0b80, 32);
+        memcpy(push + 1, source, 32 * sizeof(DWORD));
+        push += 33;
+        source += 32 * sizeof(DWORD);
+        dwords -= 32;
+    }
+    PushCount(push, 0x0b80, dwords);
+    memcpy(push + 1, source, dwords * sizeof(DWORD));
+    push += dwords + 1;
+    device->EndPush(push);
+    return;
+}
 }

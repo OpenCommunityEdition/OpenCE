@@ -4,6 +4,8 @@
 namespace D3D
 {
 extern const D3DMATRIX g_IdentityMatrix;
+extern const float g_Lar[32];
+extern const float g_Mar[32];
 void WINAPI ScaleVector3(
     D3DVECTOR *out,
     const D3DVECTOR *v,
@@ -23,12 +25,18 @@ void WINAPI MatrixProduct4x4(
     D3DMATRIX *out,
     const D3DMATRIX *a,
     const D3DMATRIX *b);
+float WINAPI JBInvSqrt(
+    const float value);
+float WINAPI nvSqrt(
+    float value);
+float WINAPI nvInv(
+    float value);
 void WINAPI NormalizeVector3(
     D3DVECTOR *vector);
 BOOL WINAPI Inverse4x4(
     D3DMATRIX *out,
     const D3DMATRIX *matrix,
-    BOOL ignoreScale);
+    BOOL normalize);
 long WINAPI FloatToLong(
     float value);
 __inline DWORD WINAPI Round(

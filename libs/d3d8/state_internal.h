@@ -3,6 +3,13 @@
 #include "device_layout.h"
 namespace D3D
 {
+/* Original device-state flag: pure devices do not retain shadow constants. */
+enum DeviceStateFlags
+{
+    STATE_PUREDEVICE = 0x10
+};
+void WINAPI CheckLightParameters(
+    const D3DLIGHT8 *light);
 extern const DWORD g_DirtyFromRenderState[];
 extern const DWORD g_TransformDirtyTable[];
 extern const float g_LODBias2x[];

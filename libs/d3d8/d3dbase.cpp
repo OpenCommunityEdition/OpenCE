@@ -932,7 +932,7 @@ void WINAPI D3DDevice_GetRasterStatus(
     D3DRASTER_STATUS *status)
 {
     CDevice *device = g_pDevice;
-    DWORD line = ReadGpuRegister(device->m_NvBase, NV2A_RASTER_POSITION)
+    DWORD line = REG_RD32(device->m_NvBase, NV2A_RASTER_POSITION)
         & NV2A_RASTER_POSITION_MASK;
     if (line != 0 && line < device->m_DisplayHeight)
     {
@@ -953,7 +953,7 @@ BOOL WINAPI D3DDevice_IsBusy(
     _HWREG *registerBase = device->m_NvBase;
     return (((DWORD)device->HwGet() & 0x0fffffff) !=
         ((DWORD)device->m_pKickOff & 0x0fffffff)) ||
-        ReadGpuRegister(registerBase, NV2A_GRAPHICS_STATUS) != 0;
+        REG_RD32(registerBase, NV2A_GRAPHICS_STATUS) != 0;
 }
 void WINAPI D3DDevice_GetDisplayFieldStatus(
     D3DFIELD_STATUS *status)
@@ -1011,14 +1011,14 @@ void WINAPI D3DDevice_SetTileCompressionTagBits(
     address /= 16;
     while (count)
     {
-        WriteGpuRegister(registerBase, NV2A_TAG_INDEX,
+        REG_WR32(registerBase, NV2A_TAG_INDEX,
             (((NV2A_TAG_PARTITION_SELECT + partition) & NV2A_TAG_SELECT_MASK) << 16)
             | ((address++ & NV2A_TAG_ADDRESS_MASK) << 6));
         DWORD dwordCount = min(count, 16 - dataAddress);
         count -= dwordCount;
         for (DWORD i = dataAddress; i < dwordCount; i++)
         {
-            WriteGpuRegister(registerBase, NV2A_TAG_DATA + i * sizeof(DWORD), *data++);
+            REG_WR32(registerBase, NV2A_TAG_DATA + i * sizeof(DWORD), *data++);
         }
         dataAddress = 0;
     }
@@ -1035,14 +1035,14 @@ void WINAPI D3DDevice_GetTileCompressionTagBits(
     address /= 16;
     while (count)
     {
-        WriteGpuRegister(registerBase, NV2A_TAG_INDEX,
+        REG_WR32(registerBase, NV2A_TAG_INDEX,
             (((NV2A_TAG_PARTITION_SELECT + partition) & NV2A_TAG_SELECT_MASK) << 16)
             | ((address++ & NV2A_TAG_ADDRESS_MASK) << 6));
         DWORD dwordCount = min(count, 16 - dataAddress);
         count -= dwordCount;
         for (DWORD i = dataAddress; i < dwordCount; i++)
         {
-            *data++ = ReadGpuRegister(registerBase, NV2A_TAG_DATA + i * sizeof(DWORD));
+            *data++ = REG_RD32(registerBase, NV2A_TAG_DATA + i * sizeof(DWORD));
         }
         dataAddress = 0;
     }
@@ -1066,14 +1066,14 @@ DWORD WINAPI D3DDevice_GetTileCompressionTags(
         DWORD dataStart = partitionAddressStart % 16;
         for (DWORD addressOffset = 0; dwordsToRead; addressOffset++)
         {
-            WriteGpuRegister(registerBase, NV2A_TAG_INDEX,
+            REG_WR32(registerBase, NV2A_TAG_INDEX,
                 (((NV2A_TAG_PARTITION_SELECT + partition) & NV2A_TAG_SELECT_MASK) << 16)
                 | (((partitionAddressStart / 16 + addressOffset) & NV2A_TAG_ADDRESS_MASK) << 6));
             DWORD dwordCount = min(dwordsToRead, 16 - dataStart);
             dwordsToRead -= dwordCount;
             for (DWORD i = dataStart; i < dwordCount; i++)
             {
-                DWORD data = ReadGpuRegister(registerBase,
+                DWORD data = REG_RD32(registerBase,
                     NV2A_TAG_DATA + i * sizeof(DWORD));
                 while (data)
                 {

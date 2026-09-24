@@ -152,3 +152,109 @@ void WINAPI D3DDevice_PrimeVertexCache(
     device->EndPush(push);
     return;
 }
+
+/* These user-pointer paths submit the original attribute-run representation.
+ * Integer byte cursors permit a signed/wrapping inter-run displacement without
+ * forming an invalid intermediate C++ pointer. Each copied range must be backed
+ * by the caller's valid vertex allocation, including DWORD attribute padding. */
+void WINAPI D3DDevice_DrawVerticesUP(
+    D3DPRIMITIVETYPE primitiveType,
+    UINT vertexCount,
+    const void *vertexData,
+    UINT stride)
+{
+    CDevice *device = g_pDevice;
+    device->SetStateUP();
+    DWORD *push = device->StartPush();
+    Push1(push, 0x17fc, primitiveType);
+    device->EndPush(push + 2);
+    device->m_StateFlags |= 0x800;
+    ULONG_PTR source = (ULONG_PTR)vertexData + device->m_InlineStartOffset;
+    DWORD attributeCount = device->m_InlineAttributeCount;
+    InlineAttributeData *attributes = device->m_InlineAttributeData;
+    attributes[attributeCount - 1].UP_Delta = stride + device->m_InlineDelta;
+    DWORD limit = vertexCount <= 16 ? 16 : 2047 / device->m_InlineVertexDwords;
+    do
+    {
+        DWORD batch = min(limit, vertexCount);
+        DWORD words = device->m_InlineVertexDwords * batch;
+        vertexCount -= batch;
+        push = device->StartPush(words + 3);
+        PushCount(push, 0x40001818, words);
+        push++;
+        do
+        {
+            for (DWORD i = 0; i < attributeCount; ++i)
+            {
+                DWORD bytes = attributes[i].UP_Count * sizeof(DWORD);
+                memcpy(push, (const void *)source, bytes);
+                push += attributes[i].UP_Count;
+                source += bytes + attributes[i].UP_Delta;
+            }
+        } while (--batch != 0);
+        if (vertexCount)
+        {
+            device->EndPush(push);
+        }
+    } while (vertexCount != 0);
+    Push1(push, 0x17fc, 0);
+    device->EndPush(push + 2);
+    if (device->m_StateFlags & 0x1000)
+    {
+        SetFence(1);
+    }
+    device->m_StateFlags &= ~0x1800UL;
+    return;
+}
+
+void WINAPI D3DDevice_DrawIndexedVerticesUP(
+    D3DPRIMITIVETYPE primitiveType,
+    UINT vertexCount,
+    const void *indexData,
+    const void *vertexData,
+    UINT stride)
+{
+    const WORD *indices = (const WORD *)indexData;
+    CDevice *device = g_pDevice;
+    device->SetStateUP();
+    DWORD *push = device->StartPush();
+    Push1(push, 0x17fc, primitiveType);
+    device->EndPush(push + 2);
+    device->m_StateFlags |= 0x800;
+    ULONG_PTR base = (ULONG_PTR)vertexData + device->m_InlineStartOffset;
+    DWORD attributeCount = device->m_InlineAttributeCount;
+    const InlineAttributeData *attributes = device->m_InlineAttributeData;
+    DWORD limit = vertexCount <= 16 ? 16 : 2047 / device->m_InlineVertexDwords;
+    do
+    {
+        DWORD batch = min(limit, vertexCount);
+        DWORD words = device->m_InlineVertexDwords * batch;
+        vertexCount -= batch;
+        push = device->StartPush(words + 3);
+        PushCount(push, 0x40001818, words);
+        push++;
+        do
+        {
+            ULONG_PTR source = base + (DWORD)*indices++ * stride;
+            for (DWORD i = 0; i < attributeCount; ++i)
+            {
+                DWORD bytes = attributes[i].UP_Count * sizeof(DWORD);
+                memcpy(push, (const void *)source, bytes);
+                push += attributes[i].UP_Count;
+                source += bytes + attributes[i].UP_Delta;
+            }
+        } while (--batch != 0);
+        if (vertexCount)
+        {
+            device->EndPush(push);
+        }
+    } while (vertexCount != 0);
+    Push1(push, 0x17fc, 0);
+    device->EndPush(push + 2);
+    if (device->m_StateFlags & 0x1000)
+    {
+        SetFence(1);
+    }
+    device->m_StateFlags &= ~0x1800UL;
+    return;
+}
