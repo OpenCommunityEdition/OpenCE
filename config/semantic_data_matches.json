@@ -513,6 +513,17 @@
     }
   },
   {
+    "unit": "source/math/periodic_functions",
+    "symbol": "_global_periodic_functions_enum_strings",
+    "allow_incomplete_unit": true,
+    "reason": "The January and rebuilt 96-byte periodic/transition enum .data have identical normalized payload, owner storage and flags, and all 20 relocations resolve to the same image destinations. Objdiff 3.3.1 undercredits folded string literals. The variable-period builder remains parked and earns no code credit.",
+    "measurements": {
+      "size": 96,
+      "relocation_count": 20,
+      "normalized_sha256": "8fdd4bf9e8be002fe8938ee0849dfec244c27138f7b77eff28ec8ba7b4538614"
+    }
+  },
+  {
     "unit": "source/objects/object_lights",
     "symbol": "_lights_section",
     "allow_incomplete_unit": true,
