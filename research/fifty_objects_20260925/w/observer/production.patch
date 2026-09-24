@@ -1,0 +1,184 @@
+diff --git a/source/camera/observer.c b/source/camera/observer.c
+index d4fe8cd1..d5666713 100644
+--- a/source/camera/observer.c
++++ b/source/camera/observer.c
+@@ -862,11 +862,11 @@ static void observer_update_positions(
+ 	short local_player_index)
+ {
+ 	struct observer *observer = observer_get(local_player_index);
+-	real displacement[NUMBER_OF_OBSERVER_VELOCITIES];
+-	real *delta = displacement;
++	struct observer_derivative new_camera_displacements;
+ 	real *position = observer->parameters;
+-	real *target = observer->last_command.parameters;
+ 	real *velocity = observer->velocities.n;
++	real *delta = new_camera_displacements.n;
++	real *target = observer->last_command.parameters;
+ 	real *a = observer->a;
+ 	real *b = observer->b;
+ 	real *c = observer->c;
+@@ -874,7 +874,6 @@ static void observer_update_positions(
+ 	real *e = observer->e;
+ 	real *f = observer->f;
+ 	real *timer = observer->last_command.parameter_timers;
+-	short value_index;
+ 	short parameter_index;
+ 
+ 	for (parameter_index = 0; parameter_index < NUMBER_OF_OBSERVER_VELOCITIES; parameter_index++)
+@@ -884,89 +883,101 @@ static void observer_update_positions(
+ 			0x2F4,
+ 			observer->velocities.n[parameter_index]);
+ 	}
+-	csmemset(displacement, 0, sizeof(displacement));
+ 
+ 	for (parameter_index = 0;
+ 		parameter_index < NUMBER_OF_OBSERVER_COMMAND_PARAMETERS;
+ 		parameter_index++)
+ 	{
+ 		real remaining_time = *timer - observer_globals.dtime;
+-		short derivative_count = observer_parameter_derivative_real_counts[parameter_index];
+-		short real_count = observer_parameter_real_counts[parameter_index];
+-		boolean snapped_to_target = FALSE;
+ 
+-		if (remaining_time > 0.f)
++		if (remaining_time > 0.f ||
++			!TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit))
+ 		{
+-			for (value_index = 0; value_index < derivative_count; value_index++)
++			short value_index;
++
++			if (remaining_time > 0.f)
+ 			{
+ 				real remaining_time_squared = remaining_time*remaining_time;
++				real remaining_time_cubed = remaining_time_squared*remaining_time;
++				real remaining_time_fourth = remaining_time_cubed*remaining_time;
++				real remaining_time_fifth = remaining_time_fourth*remaining_time;
+ 
+-				delta[value_index] =
+-					a[value_index]*remaining_time_squared*remaining_time_squared*remaining_time +
+-					b[value_index]*remaining_time_squared*remaining_time_squared +
+-					c[value_index]*remaining_time_squared*remaining_time +
+-					d[value_index]*remaining_time_squared +
+-					e[value_index]*remaining_time +
+-					f[value_index];
++				for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
++				{
++					delta[value_index] =
++						a[value_index]*remaining_time_fifth +
++						b[value_index]*remaining_time_fourth +
++						c[value_index]*remaining_time_cubed +
++						d[value_index]*remaining_time_squared +
++						e[value_index]*remaining_time +
++						f[value_index];
++				}
+ 			}
+-		}
+-		else if (TEST_FLAG(observer->last_command.flags, _observer_command_valid_bit))
+-		{
+-			for (value_index = 0; value_index < real_count; value_index++)
++			else
+ 			{
+-				position[value_index] = target[value_index];
++				for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
++				{
++					delta[value_index] = -velocity[value_index]*observer_globals.dtime;
++				}
+ 			}
+-			snapped_to_target = TRUE;
+-		}
+-		else
+-		{
+-			for (value_index = 0; value_index < derivative_count; value_index++)
++
++			if (parameter_index < _observer_command_parameter_orientation)
+ 			{
+-				delta[value_index] = -velocity[value_index]*observer_globals.dtime;
++				for (value_index = 0; value_index < observer_parameter_derivative_real_counts[parameter_index]; value_index++)
++				{
++					position[value_index] += delta[value_index];
++				}
+ 			}
+-		}
+-
+-		if (!snapped_to_target)
+-		{
+-			if (parameter_index == _observer_command_parameter_orientation)
++			else
+ 			{
+-				real_vector3d rotational_displacement = { delta[0], delta[1], delta[2] };
+-
+ 				observer_apply_rotational_displacement(
+-					&rotational_displacement,
+-					&observer->forward,
+-					&observer->up);
++					(real_vector3d const *)delta,
++					(real_vector3d *)position,
++					(real_vector3d *)(position + 3));
+ 			}
+-			else
++		}
++		else
++		{
++			short value_index;
++
++			for (value_index = 0; value_index < observer_parameter_real_counts[parameter_index]; value_index++)
+ 			{
+-				for (value_index = 0; value_index < derivative_count; value_index++)
+-				{
+-					position[value_index] += delta[value_index];
+-				}
++				position[value_index] = target[value_index];
+ 			}
+ 		}
+ 
+-		position += real_count;
+-		target += real_count;
+-		delta += derivative_count;
+-		velocity += derivative_count;
+-		a += derivative_count;
+-		b += derivative_count;
+-		c += derivative_count;
+-		d += derivative_count;
+-		e += derivative_count;
+-		f += derivative_count;
++		position += observer_parameter_real_counts[parameter_index];
++		target += observer_parameter_real_counts[parameter_index];
++		velocity += observer_parameter_derivative_real_counts[parameter_index];
++		delta += observer_parameter_derivative_real_counts[parameter_index];
++		a += observer_parameter_derivative_real_counts[parameter_index];
++		b += observer_parameter_derivative_real_counts[parameter_index];
++		c += observer_parameter_derivative_real_counts[parameter_index];
++		d += observer_parameter_derivative_real_counts[parameter_index];
++		e += observer_parameter_derivative_real_counts[parameter_index];
++		f += observer_parameter_derivative_real_counts[parameter_index];
+ 		timer++;
+ 	}
+ 
+-	if (!valid_real_vector3d_axes2(&observer->forward, &observer->up))
++	position = &observer->forward.i;
++	for (parameter_index = _observer_command_parameter_orientation;
++		parameter_index < NUMBER_OF_OBSERVER_COMMAND_PARAMETERS;
++		parameter_index++)
+ 	{
+-		real_vector3d left;
++		real_vector3d *forward = (real_vector3d *)position;
++		real_vector3d *up = (real_vector3d *)(position + 3);
++
++		if (!valid_real_vector3d_axes2(forward, up))
++		{
++			real_vector3d left;
++
++			cross_product3d(up, forward, &left);
++			cross_product3d(forward, &left, up);
++			normalize3d(forward);
++			normalize3d(up);
++		}
+ 
+-		cross_product3d(&observer->up, &observer->forward, &left);
+-		cross_product3d(&observer->forward, &left, &observer->up);
+-		normalize3d(&observer->forward);
+-		normalize3d(&observer->up);
++		position += observer_parameter_real_counts[parameter_index];
+ 	}
+ 
+ 	return;

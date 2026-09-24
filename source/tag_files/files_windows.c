@@ -552,11 +552,12 @@ boolean file_get_size(
 	struct file_reference const *file,
 	unsigned long *size)
 {
-	struct file_reference_info const *info;
+	struct file_reference_info const *info =
+		file_reference_get_const_info(file);
 	char full_path[MAXIMUM_FILENAME_LENGTH+1] = "";
+	boolean result = FALSE;
 	WIN32_FILE_ATTRIBUTE_DATA attribute_data;
 
-	info = file_reference_get_const_info(file);
 	match_assert(
 		"c:\\halo\\SOURCE\\tag_files\\files_windows.c",
 		524,
@@ -566,12 +567,15 @@ boolean file_get_size(
 	if (GetFileAttributesExA(full_path, GetFileExInfoStandard, &attribute_data))
 	{
 		*size = attribute_data.nFileSizeLow;
-		return TRUE;
+		result = TRUE;
 	}
 
-	file_error(file, "file_get_size");
+	if (!result)
+	{
+		file_error(file, "file_get_size");
+	}
 
-	return FALSE;
+	return result;
 }
 
 boolean find_files_next(
@@ -924,9 +928,10 @@ static void file_error(
 {
 	struct file_reference_info const *info =
 		file_reference_get_const_info(file);
+	unsigned long error_code = GetLastError();
 
 	error(_error_silent, "%s('%s') error 0x%08x", function_name,
-		info->path, GetLastError());
+		info->path, error_code);
 	SetLastError(0);
 
 	return;

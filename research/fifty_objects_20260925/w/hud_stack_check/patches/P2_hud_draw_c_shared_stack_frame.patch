@@ -1,0 +1,178 @@
+diff --git a/source/interface/hud_draw.c b/source/interface/hud_draw.c
+index b79e256b..40238431 100644
+--- a/source/interface/hud_draw.c
++++ b/source/interface/hud_draw.c
+@@ -107,12 +107,6 @@ symbols in this file:
+ 
+ /* ---------- constants */
+ 
+-enum
+-{
+-	STACK_BUFFER_LENGTH = 0x80,
+-	STACK_BUFFER_FILL = 0x62626262,
+-};
+-
+ enum
+ {
+ 	_hud_dont_scale_offset_bit = 0,
+@@ -231,13 +225,6 @@ enum
+ 
+ /* ---------- macros */
+ 
+-#define hud_draw_stack_buffer_check(line) \
+-{ \
+-	short corrupt_index = check_stack_buffer(stack_buffer); \
+-	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, return_eip==get_return_eip(), "corrupt return address!"); \
+-	match_vassert("c:\\halo\\SOURCE\\interface\\hud_draw.c", line, corrupt_index==NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
+-}
+-
+ #define hud_number_definition_get(index) \
+ 	((struct hud_number_definition *)tag_get(hud_number_group_tag, (index)))
+ 
+@@ -435,20 +422,6 @@ __declspec(naked) long get_return_eip(
+ 	}
+ }
+ 
+-short check_stack_buffer(
+-	long *buffer)
+-{
+-	short index;
+-
+-	for (index = STACK_BUFFER_LENGTH-1; index>=0; index--)
+-	{
+-		if (buffer[index]!=STACK_BUFFER_FILL)
+-			return index;
+-	}
+-
+-	return NONE;
+-}
+-
+ real hud_globals_get_scale(
+ 	boolean in_multiplayer)
+ {
+@@ -505,7 +478,7 @@ void hud_retrieve_bitmap_and_bounding_rect(
+ 	else
+ 		*clip = NULL;
+ 
+-	hud_draw_stack_buffer_check(228);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 228);
+ 
+ 	return;
+ }
+@@ -561,7 +534,7 @@ static boolean hud_draw_multitexture_overlay_get_current_weapon_definition(
+ 		result = TRUE;
+ 	}
+ 
+-	hud_draw_stack_buffer_check(1032);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 1032);
+ 
+ 	return result;
+ }
+@@ -922,7 +895,7 @@ static void hud_draw_multitexture_overlay(
+ 
+ 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+ 
+-	hud_draw_stack_buffer_check(1372);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 1372);
+ 
+ 	return;
+ }
+@@ -1059,7 +1032,7 @@ void hud_calculate_point(
+ 	result->x = (short)fast_ftol(point.x);
+ 	result->y = (short)fast_ftol(point.y);
+ 
+-	hud_draw_stack_buffer_check(181);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 181);
+ 
+ 	return;
+ }
+@@ -1168,7 +1141,7 @@ pixel32 get_flash_color(
+ 		result = base_color;
+ 	}
+ 
+-	hud_draw_stack_buffer_check(311);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 311);
+ 
+ 	return real_argb_color_to_pixel32(&result);
+ }
+@@ -1260,7 +1233,7 @@ void hud_draw_weapon_overlays(
+ 		}
+ 	}
+ 
+-	hud_draw_stack_buffer_check(748);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 748);
+ 
+ 	return;
+ }
+@@ -1407,7 +1380,7 @@ void hud_draw_static_element(
+ 		}
+ 	}
+ 
+-	hud_draw_stack_buffer_check(685);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 685);
+ 
+ 	return;
+ }
+@@ -1464,7 +1437,7 @@ static void hud_draw_bitmap_internal(
+ 
+ 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
+ 
+-	hud_draw_stack_buffer_check(985);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 985);
+ 
+ 	return;
+ }
+@@ -1536,7 +1509,7 @@ static void hud_draw_bitmap_with_meter(
+ 		theta,
+ 		color);
+ 
+-	hud_draw_stack_buffer_check(814);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 814);
+ 
+ 	return;
+ }
+@@ -1574,7 +1547,7 @@ static real_rectangle2d const *get_sprite_clip_rect(
+ 		}
+ 	}
+ 
+-	hud_draw_stack_buffer_check(100);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 100);
+ 
+ 	return result;
+ }
+@@ -1638,7 +1611,7 @@ static void hud_calculate_bitmap_bounds(
+ 		break;
+ 	}
+ 
+-	hud_draw_stack_buffer_check(907);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 907);
+ 
+ 	return;
+ }
+@@ -1696,7 +1669,7 @@ void hud_draw_bitmap_direct(
+ 		theta,
+ 		color);
+ 
+-	hud_draw_stack_buffer_check(856);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 856);
+ 
+ 	return;
+ }
+@@ -1816,7 +1789,7 @@ void hud_draw_meter(
+ 			FALSE);
+ 	}
+ 
+-	hud_draw_stack_buffer_check(428);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 428);
+ 
+ 	return;
+ }
+@@ -2108,7 +2081,7 @@ void hud_draw_numbers(
+ 		}
+ 	}
+ 
+-	hud_draw_stack_buffer_check(602);
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 602);
+ 
+ 	return;
+ }

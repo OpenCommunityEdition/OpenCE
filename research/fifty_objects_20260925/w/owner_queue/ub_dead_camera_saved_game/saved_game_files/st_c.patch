@@ -1,0 +1,20 @@
+--- a/source/saved games/saved_game_files.c
++++ b/source/saved games/saved_game_files.c
+@@ -474,6 +474,8 @@
+ 	word memory_unit_index,
+ 	struct enumerated_saved_game_file *file,
+ 	long *profile_index);
++static void enumerate_memory_units(
++	void);
+ 
+ /* ---------- globals */
+ 
+@@ -1804,7 +1806,7 @@
+ 	return;
+ }
+ 
+-void enumerate_memory_units(
++static void enumerate_memory_units(
+ 	void)
+ {
+ 	wchar_t message[MAXIMUM_FILENAME_LENGTH+1];

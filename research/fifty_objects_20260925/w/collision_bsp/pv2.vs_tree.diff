@@ -1,0 +1,121 @@
+diff --git source/physics/collision_bsp.c scratch/w/collision_bsp/pv2.c
+index b4438fa9..37906fd8 100644
+--- source/physics/collision_bsp.c
++++ scratch/w/collision_bsp/pv2.c
+@@ -2036,9 +2036,10 @@ static boolean bsp3d_test_pill_recursive(
+ 			&data->bsp->bsp3d.planes,
+ 			node->plane_designator,
+ 			real_plane3d);
+-		real distance0 = plane3d_distance_to_point(plane, data->point);
++		real distance = plane3d_distance_to_point(plane, data->point);
+ 		real dot = dot_product3d(data->vector, &plane->n);
+-		real distance1 = dot + distance0;
++		real distance0 = distance;
++		real distance1 = distance + dot;
+ 		boolean reaches_back =
+ 			distance0 <= data->radius + BSP3D_TEST_PILL_EPSILON ||
+ 			distance1 <= data->radius + BSP3D_TEST_PILL_EPSILON;
+@@ -2115,34 +2116,20 @@ static boolean bsp3d_test_pill_recursive(
+ 
+ 					if (data->result->t > t)
+ 					{
+-						real absolute_i = fabs(plane->n.i);
+-						real absolute_j = fabs(plane->n.j);
+-						real absolute_k = fabs(plane->n.k);
+-						short projection;
+ 						real_point3d pill_point;
+-						real plane_distance;
+ 						real_point2d point2d;
+ 						long surface_index;
+-						real_point3d start_point;
+-						real_point3d sweep_point;
+-						real negative_distance;
+-						real negative_dot;
+-
+-						if (absolute_k >= absolute_j && absolute_k >= absolute_i)
+-							projection = _z;
+-						else
+-							projection = absolute_j >= absolute_i ? _y : _x;
+-						data->projection_axis = projection;
++
++						data->projection_axis = projection_from_vector3d(&plane->n);
+ 						data->projection_sign =
+-							projection_sign_from_vector3d(&plane->n, projection) !=
++							projection_sign_from_vector3d(&plane->n, data->projection_axis) !=
+ 							(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
+-						pill_point.x = data->vector->i*t + data->point->x;
+-						pill_point.y = data->vector->j*t + data->point->y;
+-						pill_point.z = data->vector->k*t + data->point->z;
+-						plane_distance = -plane3d_distance_to_point(plane, &pill_point);
+-						pill_point.x = plane->n.i*plane_distance + pill_point.x;
+-						pill_point.y = plane->n.j*plane_distance + pill_point.y;
+-						pill_point.z = plane->n.k*plane_distance + pill_point.z;
++						point_from_line3d(data->point, data->vector, t, &pill_point);
++						point_from_line3d(
++							&pill_point,
++							&plane->n,
++							-plane3d_distance_to_point(plane, &pill_point),
++							&pill_point);
+ 						project_point3d(
+ 							&pill_point,
+ 							data->projection_axis,
+@@ -2169,12 +2156,7 @@ static boolean bsp3d_test_pill_recursive(
+ 							data->result->t = t;
+ 							if (reference->plane_designator & LONG_MIN)
+ 							{
+-								real_plane3d *result_plane = &data->result->plane;
+-
+-								result_plane->n.i = -plane->n.i;
+-								result_plane->n.j = -plane->n.j;
+-								result_plane->n.k = -plane->n.k;
+-								result_plane->d = -plane->d;
++								plane3d_negate(plane, &data->result->plane);
+ 							}
+ 							else
+ 							{
+@@ -2185,24 +2167,27 @@ static boolean bsp3d_test_pill_recursive(
+ 							hit = TRUE;
+ 						}
+ 
+-						negative_distance = -distance0;
+-						start_point.x = plane->n.i*negative_distance + data->point->x;
+-						start_point.y = plane->n.j*negative_distance + data->point->y;
+-						start_point.z = plane->n.k*negative_distance + data->point->z;
+-						project_point3d(
+-							&start_point,
+-							data->projection_axis,
+-							data->projection_sign,
+-							&data->point2d);
+-						negative_dot = -dot;
+-						sweep_point.x = plane->n.i*negative_dot + data->vector->i;
+-						sweep_point.y = plane->n.j*negative_dot + data->vector->j;
+-						sweep_point.z = plane->n.k*negative_dot + data->vector->k;
+-						project_point3d(
+-							&sweep_point,
+-							data->projection_axis,
+-							data->projection_sign,
+-							(real_point2d *)&data->vector2d);
++						{
++							real_point3d start_point;
++							real_vector3d sweep_vector;
++
++							point_from_line3d(data->point, &plane->n, -distance0, &start_point);
++							project_point3d(
++								&start_point,
++								data->projection_axis,
++								data->projection_sign,
++								&data->point2d);
++							point_from_line3d(
++								(real_point3d const *)data->vector,
++								&plane->n,
++								-dot,
++								(real_point3d *)&sweep_vector);
++							project_point3d(
++								(real_point3d const *)&sweep_vector,
++								data->projection_axis,
++								data->projection_sign,
++								(real_point2d *)&data->vector2d);
++						}
+ 						if (bsp2d_test_pill_recursive(data, reference->root_index))
+ 						{
+ 							hit = TRUE;

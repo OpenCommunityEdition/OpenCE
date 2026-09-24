@@ -1,0 +1,100 @@
+--- source/objects/damage.c	2026-09-23 17:32:49.501333200 -0700
++++ /c/halo-worktrees/opus5-150k-house-clean-20260914/scratch/workers/damage/park_rebase_candidate.c	2026-09-14 06:23:14.656508500 -0700
+@@ -365,7 +365,7 @@
+ 
+ extern boolean debug_damage;
+ 
+-struct damage_globals damage_globals = { 0 };
++struct damage_globals damage_globals;
+ 
+ /* ---------- public code */
+ 
+@@ -1239,16 +1239,16 @@
+ 
+ 				while (child_object_index != NONE)
+ 				{
+-					struct object_datum *child = object_get(child_object_index);
++					struct unit_datum *child_unit = (struct unit_datum *)object_get(child_object_index);
+ 
+-					if (TEST_FLAG(_object_mask_unit, child->object.type) &&
+-						unit_get(child_object_index)->unit.player_index != NONE)
++					if (TEST_FLAG(_object_mask_unit, child_unit->object.type) &&
++						child_unit->unit.player_index != NONE)
+ 					{
+ 						player_controlled = TRUE;
+ 						break;
+ 					}
+ 
+-					child_object_index = child->object.next_object_index;
++					child_object_index = child_unit->object.next_object_index;
+ 				}
+ 			}
+ 
+@@ -2199,15 +2199,6 @@
+ 	struct object_definition *object_definition;
+ 	struct damage_effect_definition *damage_effect;
+ 	real_point3d const *epicenter;
+-	real_vector3d to_object;
+-	real_vector3d perpendicular;
+-	real_vector3d cross;
+-	real_vector3d collision_vector;
+-	real_vector3d offset_vector;
+-	real_vector3d direct_vector;
+-	real_point3d collision_point;
+-	struct collision_result spread_collision;
+-	struct collision_result direct_collision;
+ 	boolean can_damage;
+ 
+ 	object = object_get(object_index);
+@@ -2228,6 +2219,13 @@
+ 		TEST_FLAG(_object_mask_unit, object->object.type) &&
+ 		damage_effect->damage.area_of_effect_core_radius > _real_epsilon)
+ 	{
++		real_vector3d to_object;
++		real_vector3d perpendicular;
++		real_vector3d cross;
++		real_vector3d collision_vector;
++		real_vector3d offset_vector;
++		real_point3d collision_point;
++		struct collision_result spread_collision;
+ 		long ray_index;
+ 		long rays_remaining;
+ 
+@@ -2301,6 +2299,8 @@
+ 	}
+ 	else
+ 	{
++		real_vector3d direct_vector;
++		struct collision_result direct_collision;
+ 		long ultimate_parent_index;
+ 
+ 		ultimate_parent_index = object_get_ultimate_parent(object_index);
+@@ -2386,17 +2386,13 @@
+ 		radius_delta = damage_effect->cutoff_radius - damage_effect->falloff_radius;
+ 		if (radius_delta > 0.f)
+ 		{
+-			scale = PIN(
+-				1.f -
+-					(distance - damage_effect->falloff_radius) /
+-					radius_delta,
+-				0.f,
+-				1.f);
++			scale = 1.f - (distance - damage_effect->falloff_radius) / radius_delta;
+ 		}
+ 		else
+ 		{
+ 			scale = 1.f;
+ 		}
++		scale = PIN(scale, 0.f, 1.f);
+ 
+ 		if (!TEST_FLAG(
+ 			damage_effect->flags,
+@@ -2414,7 +2410,7 @@
+ 				NONE,
+ 				NONE,
+ 				NULL);
+-				did_damage = TRUE;
++			did_damage = TRUE;
+ 		}
+ 
+ 		if (object_definition->object.collision_model.index != NONE)

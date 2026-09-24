@@ -1,0 +1,21 @@
+diff --git a/source/structures/leaf_map.c b/source/structures/leaf_map.c
+index 9e60d654..6ee6beb5 100644
+--- a/source/structures/leaf_map.c
++++ b/source/structures/leaf_map.c
+@@ -922,14 +922,12 @@ static short map_leaf_find_face_on_node(
+ static real normalize_three_dee(
+ 	real_vector3d *vector)
+ {
+-	real length = square_root(vector->i * vector->i + vector->j * vector->j + vector->k * vector->k);
++	real length = magnitude3d(vector);
+ 	real inverse_length = 1.f / length;
+ 
+ 	if (valid_real(inverse_length))
+ 	{
+-		vector->i *= inverse_length;
+-		vector->j *= inverse_length;
+-		vector->k *= inverse_length;
++		scale_vector3d(vector, inverse_length, vector);
+ 
+ 		if (valid_real_normal3d(vector))
+ 		{

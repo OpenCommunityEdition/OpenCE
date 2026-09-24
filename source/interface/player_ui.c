@@ -59,19 +59,19 @@ symbols in this file:
 000D0500 0030:
 	_player_ui_activate_all_solo_levels (0000)
 000D0530 0050:
-	_code_000d0530 (0000)
+	_hud_message_to_all (0000)
 000D0580 0010:
 	_player0_look_pitch_is_inverted (0000)
 000D0590 0020:
 	_player0_joystick_set_is_normal (0000)
 000D05B0 0040:
-	_code_000d05b0 (0000)
+	_generate_default_player_profile (0000)
 000D05F0 0210:
-	_code_000d05f0 (0000)
+	_set_local_player_controls_from_player_profile (0000)
 000D0800 0010:
-	_code_000d0800 (0000)
+	_clear_profile_edit_data (0000)
 000D0810 0070:
-	_code_000d0810 (0000)
+	_reset_local_player_profile (0000)
 000D0880 00a0:
 	_player_ui_initialize (0000)
 000D0920 00a0:
@@ -134,8 +134,10 @@ symbols in this file:
 	??_C@_0BO@KMODNFHM@ui?2shell?2strings?2temp_strings?$AA@ (0000)
 002FD5A4 0004:
 	_player1_last_used_profile_index (0000)
-00453D00 0330:
+00453D00 0230:
 	_player_ui_globals (0000)
+00453F30 0100:
+	_player1_profile_path (0000)
 */
 
 /* ---------- headers */
@@ -166,8 +168,7 @@ symbols in this file:
 enum
 {
 	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
-	PLAYER_UI_DISPOSE_SIZE = 0x230,
-	_playlist_profile_system_default_bit = 0
+	_variant_is_system_default_bit = 0
 };
 
 /* ---------- macros */
@@ -179,23 +180,12 @@ struct player_ui_local_player
 	struct player_profile profile;
 	long active_profile_index;
 	boolean prejoined_multiplayer;
-	byte unknown35[3];
-};
-
-struct playlist_profile
-{
-	wchar_t name[12];
-	enum game_engine_type engine_type;
-	boolean teams;
-	byte unused1D[0x47];
-	word flags;
-	byte unused66[2];
 };
 
 union player_ui_edit_profile_data
 {
 	struct player_profile player;
-	struct playlist_profile playlist;
+	struct game_variant variant;
 };
 
 struct player_ui_edit_profile
@@ -211,20 +201,17 @@ struct player_ui_globals
 	short single_player_controller[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 	struct game_variant multiplayer_variant;
 	boolean multiplayer_variant_specified;
-	byte unknown155[3];
 	long edit_profile_index;
 	struct player_ui_edit_profile edit_profile;
 	boolean initialized;
-	byte unknown22D[3];
-	char player1_last_used_profile_directory[0x100];
 };
 
 typedef char player_profile_size_assert[
 	sizeof(struct player_profile) == 0x30 ? 1 : -1];
-typedef char playlist_profile_size_assert[
-	sizeof(struct playlist_profile) == 0x68 ? 1 : -1];
 typedef char player_ui_edit_profile_size_assert[
 	sizeof(struct player_ui_edit_profile) == 0xD0 ? 1 : -1];
+typedef char player_ui_globals_size_assert[
+	sizeof(struct player_ui_globals) == 0x230 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -239,6 +226,7 @@ static void clear_profile_edit_data(
 
 static long player1_last_used_profile_index = NONE;
 struct player_ui_globals player_ui_globals = { 0 };
+static char player1_profile_path[0x100] = { 0 };
 
 /* ---------- public code */
 
@@ -267,7 +255,7 @@ static void reset_local_player_profile(
 void player_ui_dispose(
 	void)
 {
-	csmemset(&player_ui_globals, 0, PLAYER_UI_DISPOSE_SIZE);
+	csmemset(&player_ui_globals, 0, sizeof(player_ui_globals));
 	return;
 }
 
@@ -276,7 +264,7 @@ void player_ui_initialize(
 {
 	long local_player_index;
 
-	csmemset(&player_ui_globals, 0, PLAYER_UI_DISPOSE_SIZE);
+	csmemset(&player_ui_globals, 0, sizeof(player_ui_globals));
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
 		reset_local_player_profile((short)local_player_index);
@@ -372,13 +360,13 @@ struct player_profile *player_ui_get_edit_player_profile(
 	return result;
 }
 
-struct playlist_profile *player_ui_get_edit_playlist_profile(
+struct game_variant *player_ui_get_edit_playlist_profile(
 	void)
 {
-	struct playlist_profile *result;
+	struct game_variant *result;
 
 	if (saved_game_file_get_type(player_ui_globals.edit_profile_index) == _saved_game_file_type_game_variant)
-		result = &player_ui_globals.edit_profile.current.playlist;
+		result = &player_ui_globals.edit_profile.current.variant;
 	else
 		result = NULL;
 	return result;
@@ -417,20 +405,20 @@ boolean player_ui_edit_profile_is_dirty(
 
 			case _saved_game_file_type_game_variant:
 			{
-				original_flags = player_ui_globals.edit_profile.original.playlist.flags;
-				current_flags = player_ui_globals.edit_profile.current.playlist.flags;
+				original_flags = player_ui_globals.edit_profile.original.variant.flags;
+				current_flags = player_ui_globals.edit_profile.current.variant.flags;
 
-				player_ui_globals.edit_profile.original.playlist.flags = 0;
-				player_ui_globals.edit_profile.current.playlist.flags = 0;
+				player_ui_globals.edit_profile.original.variant.flags = 0;
+				player_ui_globals.edit_profile.current.variant.flags = 0;
 				if (csmemcmp(
-					&player_ui_globals.edit_profile.original.playlist,
-					&player_ui_globals.edit_profile.current.playlist,
-					sizeof(struct playlist_profile)))
+					&player_ui_globals.edit_profile.original.variant,
+					&player_ui_globals.edit_profile.current.variant,
+					sizeof(struct game_variant)))
 				{
 					result = TRUE;
 				}
-				player_ui_globals.edit_profile.original.playlist.flags = original_flags;
-				player_ui_globals.edit_profile.current.playlist.flags = current_flags;
+				player_ui_globals.edit_profile.original.variant.flags = original_flags;
+				player_ui_globals.edit_profile.current.variant.flags = current_flags;
 				break;
 			}
 
@@ -598,12 +586,12 @@ void player_ui_set_single_player_local_player_controller(
 long player_ui_get_player1_last_used_profile_index(
 	void)
 {
-	if (!player_ui_globals.player1_last_used_profile_directory[0] &&
+	if (!player1_profile_path[0] &&
 		saved_game_file_retrieve_player1_last_used_profile_directory(
-			player_ui_globals.player1_last_used_profile_directory))
+			player1_profile_path))
 	{
 		player1_last_used_profile_index = saved_game_file_find_profile_index_for_directory_path(
-			player_ui_globals.player1_last_used_profile_directory, _saved_game_file_type_player_profile);
+			player1_profile_path, _saved_game_file_type_player_profile);
 	}
 	return player1_last_used_profile_index;
 }
@@ -677,7 +665,7 @@ void player_ui_remember_player1_profile(
 		if (player_ui_globals.local_players[0].active_profile_index==NONE ||
 			!player_profile_get_enclosing_directory_path(
 				player_ui_globals.local_players[0].active_profile_index,
-				player_ui_globals.player1_last_used_profile_directory))
+				player1_profile_path))
 		{
 			error(_error_silent, "player 1 has no active player profile assigned");
 		}
@@ -685,9 +673,9 @@ void player_ui_remember_player1_profile(
 		player1_last_used_profile_index = player_ui_globals.local_players[0].active_profile_index;
 	}
 
-	if (save && player_ui_globals.player1_last_used_profile_directory[0])
+	if (save && player1_profile_path[0])
 		saved_game_file_remember_player1_last_used_profile_directory(
-			player_ui_globals.player1_last_used_profile_directory);
+			player1_profile_path);
 
 	return;
 }
@@ -722,12 +710,12 @@ void player_ui_begin_editing_profile(
 		case _saved_game_file_type_game_variant:
 			if (playlist_profile_get(
 				profile_index,
-				(struct game_variant *)&player_ui_globals.edit_profile.original.playlist))
+				&player_ui_globals.edit_profile.original.variant))
 			{
 				csmemcpy(
-					&player_ui_globals.edit_profile.current.playlist,
-					&player_ui_globals.edit_profile.original.playlist,
-					sizeof(struct playlist_profile));
+					&player_ui_globals.edit_profile.current.variant,
+					&player_ui_globals.edit_profile.original.variant,
+					sizeof(struct game_variant));
 			}
 			else
 			{
@@ -783,24 +771,24 @@ boolean player_ui_save_profile(
 				_saved_game_file_index_read_only_bit))
 			{
 				if (ustrncmp(
-					player_ui_globals.edit_profile.current.playlist.name,
-					player_ui_globals.edit_profile.original.playlist.name,
-					NUMBEROF(player_ui_globals.edit_profile.current.playlist.name)))
+					player_ui_globals.edit_profile.current.variant.human_readable_game_description,
+					player_ui_globals.edit_profile.original.variant.human_readable_game_description,
+					NUMBEROF(player_ui_globals.edit_profile.current.variant.human_readable_game_description)))
 				{
 					long new_profile_index;
 
 					SET_FLAG(
-						player_ui_globals.edit_profile.current.playlist.flags,
-						_playlist_profile_system_default_bit,
+						player_ui_globals.edit_profile.current.variant.flags,
+						_variant_is_system_default_bit,
 						FALSE);
 					new_profile_index = playlist_profile_new(
 						0,
-						player_ui_globals.edit_profile.current.playlist.name);
+						player_ui_globals.edit_profile.current.variant.human_readable_game_description);
 					if (new_profile_index != NONE)
 					{
 						playlist_profile_save(
 							new_profile_index,
-							(struct game_variant *)&player_ui_globals.edit_profile.current.playlist);
+							&player_ui_globals.edit_profile.current.variant);
 						player_ui_globals.edit_profile_index = new_profile_index;
 						if (saved_game_file_get_path_to_enclosing_directory(
 							new_profile_index,
@@ -827,7 +815,7 @@ boolean player_ui_save_profile(
 			{
 				playlist_profile_save(
 					player_ui_globals.edit_profile_index,
-					(struct game_variant *)&player_ui_globals.edit_profile.current.playlist);
+					&player_ui_globals.edit_profile.current.variant);
 				if (saved_game_file_get_path_to_enclosing_directory(
 					player_ui_globals.edit_profile_index,
 					directory_path))
@@ -893,8 +881,8 @@ boolean player_ui_edit_profile_name_is_dirty(
 
 			case _saved_game_file_type_game_variant:
 				if (ustrncmp(
-					player_ui_globals.edit_profile.current.playlist.name,
-					player_ui_globals.edit_profile.original.playlist.name,
+					player_ui_globals.edit_profile.current.variant.human_readable_game_description,
+					player_ui_globals.edit_profile.original.variant.human_readable_game_description,
 					12)!=0)
 				{
 					result = TRUE;
@@ -935,8 +923,8 @@ boolean player_ui_prompt_user_to_rename_edit_profile(
 
 			case _saved_game_file_type_game_variant:
 				result = virtual_keyboard_launch(
-					player_ui_globals.edit_profile.current.playlist.name,
-					sizeof(player_ui_globals.edit_profile.current.playlist.name),
+					player_ui_globals.edit_profile.current.variant.human_readable_game_description,
+					sizeof(player_ui_globals.edit_profile.current.variant.human_readable_game_description),
 					10);
 				break;
 

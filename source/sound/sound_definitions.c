@@ -95,25 +95,26 @@ byte *sound_permutation_get_mouth_aperture(
 short sound_definition_find_pitch_range_by_pitch(
 	struct sound_definition *definition,
 	real pitch,
-	long pitch_range_index)
+	short old_range_index)
 {
 	short result = NONE;
 
-	if ((short)pitch_range_index != NONE && (short)pitch_range_index < definition->pitch_ranges.count)
+	if (old_range_index != NONE && old_range_index < definition->pitch_ranges.count)
 	{
 		struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
 			&definition->pitch_ranges,
-			(short)pitch_range_index,
+			old_range_index,
 			struct sound_pitch_range);
 
 		if (range->bend_bounds.lower <= pitch &&
 			pitch <= range->bend_bounds.upper &&
 			range->permutations.count)
 		{
-			return (short)pitch_range_index;
+			result = old_range_index;
 		}
 	}
 
+	if (result == NONE)
 	{
 		real closest_pitch_ratio = FLT_MAX;
 		short range_index;
@@ -128,8 +129,11 @@ short sound_definition_find_pitch_range_by_pitch(
 			if (range->permutations.count)
 			{
 				if (range->bend_bounds.lower <= pitch && pitch <= range->bend_bounds.upper)
-					return range_index;
-
+				{
+					result = range_index;
+					break;
+				}
+				else
 				{
 					real pitch_ratio = range->bend_bounds.upper < pitch ?
 						pitch / range->bend_bounds.upper :
@@ -137,8 +141,8 @@ short sound_definition_find_pitch_range_by_pitch(
 
 					if (pitch_ratio < closest_pitch_ratio)
 					{
-						closest_pitch_ratio = pitch_ratio;
 						result = range_index;
+						closest_pitch_ratio = pitch_ratio;
 					}
 				}
 			}

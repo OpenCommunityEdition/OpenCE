@@ -1,0 +1,26 @@
+diff --git a/source/ai/path.h b/source/ai/path.h
+index 66e0dd73..ac731402 100644
+--- a/source/ai/path.h
++++ b/source/ai/path.h
+@@ -264,7 +264,7 @@ struct path_debug_storage
+ 	short path_traverse_result;
+ 	short path_build_result;
+ 	struct path_state path_state;
+-	char __unknown140A0[0x5C];
++	struct path_result result;
+ 	short raw_step_count;
+ 	word pad_140FE;
+ 	struct path_step raw_steps[64];
+diff --git a/source/ai/path.c b/source/ai/path.c
+index f7a7d665..94f473ae 100644
+--- a/source/ai/path.c
++++ b/source/ai/path.c
+@@ -1043,7 +1043,7 @@ boolean path_state_build_path(
+ 
+ 	if (state->debug)
+ 	{
+-		*(struct path_result *)state->debug->__unknown140A0 = *path;
++		state->debug->result = *path;
+ 
+ 		if (state->debug->path_build_result != _path_build_result_success)
+ 		{

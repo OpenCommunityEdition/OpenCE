@@ -1,0 +1,11 @@
+--- config/config.json	2026-09-23 17:32:49.254375000 -0700
++++ scratch/w/breakable_surfaces_audit/patches/b/config.json	2026-09-23 18:28:32.038787300 -0700
+@@ -517,7 +517,7 @@
+ 				{ "name": "source/physics/collision_bsp.c", "index": 142, "status": "NonMatching" },
+ 				{ "name": "source/physics/bsp3d.c", "index": 143, "status": "Matching" },
+ 				{ "name": "source/physics/bsp2d.c", "index": 144, "status": "Matching" },
+-                { "name": "source/physics/breakable_surfaces.c", "index": 145, "status": "NonMatching", "options": { "cflags": [ "/nologo", "/c", "/O2", "/Oy-", "/Ow", "/QIfist" ] } },
++                { "name": "source/physics/breakable_surfaces.c", "index": 145, "status": "NonMatching" },
+ 				{ "name": "source/objects/scenery_group.c", "index": 146, "status": "Matching" },
+ 				{ "name": "source/objects/scenery.c", "index": 147, "status": "Matching" },
+ 				{ "name": "source/objects/placeholder_definitions.c", "index": 148, "status": "Matching" },

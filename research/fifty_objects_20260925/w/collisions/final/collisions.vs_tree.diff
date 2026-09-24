@@ -1,0 +1,29 @@
+diff --git a/source/physics/collisions.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\collisions\\final\\collisions.c"
+index 60711762..b73a38ae 100644
+--- a/source/physics/collisions.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\collisions\\final\\collisions.c"
+@@ -1168,7 +1168,6 @@ short collision_move_point(
+ 	struct collision_plane *collisions)
+ {
+ 	short collision_count = 0;
+-	real_point3d position;
+ 	real_vector3d velocity = *old_velocity;
+ 	real_point3d clipped_position = *old_position;
+ 	real_vector3d clipped_velocity = *old_velocity;
+@@ -1197,6 +1196,7 @@ short collision_move_point(
+ 
+ 		if (collision_features_test_vector(features, &clipped_position, &clipped_velocity, collision))
+ 		{
++			real_point3d position;
+ 			short new_clip_indices[3];
+ 			short new_clip_count;
+ 
+@@ -1209,7 +1209,7 @@ short collision_move_point(
+ 			match_vassert(
+ 				"c:\\halo\\SOURCE\\physics\\collisions.c",
+ 				0x3CE,
+-				valid_real_normal3d(&collision->plane.n) && valid_real(collision->plane.d),
++				valid_real_plane3d(&collision->plane),
+ 				csprintf(
+ 					temporary,
+ 					"%s: assert_valid_real_plane3d(%f, %f, %f / %f)",

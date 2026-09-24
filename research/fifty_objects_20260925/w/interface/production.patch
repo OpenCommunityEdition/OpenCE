@@ -1,0 +1,72 @@
+--- a/source/interface/interface.c	2026-09-23 19:56:24.295226400 -0700
++++ b/source/interface/interface.c	2026-09-23 19:56:24.358307400 -0700
+@@ -313,9 +313,11 @@
+ 
+ /* ---------- prototypes */
+ 
+-void interface_splitscreen_render(
++static long interface_get_weapon_hud_index(
++	real *flashlight_power);
++static void interface_splitscreen_render(
+ 	void);
+-void render_debug_profile(
++static void render_debug_profile(
+ 	void);
+ static void render_debug_profile_stall_tick(
+ 	short stall_type,
+@@ -328,22 +330,22 @@
+ extern struct interface_hud_globals_definition *hud_globals;
+ extern struct interface_hud_scripted_globals *hud_scripted_globals;
+ 
+-static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
+-static struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
++short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
++struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
+ {
+ 	{ "game", "game", &global_real_argb_yellow, NONE, NONE, FALSE, TRUE },
+ 	{ "objects_update", "objects", &global_real_argb_green, NONE, NONE, FALSE, TRUE },
+ 	{ "ai_update", "ai", &global_real_argb_blue, NONE, NONE, FALSE, TRUE },
+ };
+ 
+-static short profile_frame_value_count = NUMBER_OF_PROFILE_FRAME_VALUES;
+-static struct profile_value profile_frame_values[MAXIMUM_PROFILE_VALUES] =
++short profile_frame_value_count = NUMBER_OF_PROFILE_FRAME_VALUES;
++struct profile_value profile_frame_values[MAXIMUM_PROFILE_VALUES] =
+ {
+ 	{ "frame", "frame", &global_real_argb_white, NONE, NONE, FALSE, TRUE },
+ };
+ 
+-static short profile_graph_value_count = NUMBER_OF_PROFILE_GRAPH_VALUES;
+-static struct profile_value profile_graph_values[MAXIMUM_PROFILE_VALUES] =
++short profile_graph_value_count = NUMBER_OF_PROFILE_GRAPH_VALUES;
++struct profile_value profile_graph_values[MAXIMUM_PROFILE_VALUES] =
+ {
+ 	{ "stall", "stall", &global_real_argb_red, NONE, NONE, FALSE, TRUE },
+ 	{ "texture", "texture", &global_real_argb_orange, NONE, NONE, FALSE, TRUE },
+@@ -548,7 +550,7 @@
+ 	return;
+ }
+ 
+-long interface_get_weapon_hud_index(
++static long interface_get_weapon_hud_index(
+ 	real *flashlight_power)
+ {
+ 	long player_index = local_player_get_player_index(render.local_player_index);
+@@ -971,7 +973,7 @@
+ 	return;
+ }
+ 
+-void render_debug_profile(
++static void render_debug_profile(
+ 	void)
+ {
+ 	if (profile_display)
+@@ -1324,7 +1326,7 @@
+ 	return;
+ }
+ 
+-void interface_splitscreen_render(
++static void interface_splitscreen_render(
+ 	void)
+ {
+ 	rectangle2d bounds;

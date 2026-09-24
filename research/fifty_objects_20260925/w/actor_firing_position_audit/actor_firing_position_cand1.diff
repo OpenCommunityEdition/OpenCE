@@ -1,0 +1,14 @@
+397c397
+< static struct firing_position_pre_evaluator const global_pre_evaluator_table[]=
+---
+> struct firing_position_pre_evaluator const global_pre_evaluator_table[]=
+409c409
+< static struct firing_position_post_evaluator const global_post_evaluator_table[]=
+---
+> struct firing_position_post_evaluator const global_post_evaluator_table[]=
+420,421c420,421
+< static short global_temporary_sort_firing_position_count;
+< static struct firing_position *global_temporary_sort_firing_position_array;
+---
+> short global_temporary_sort_firing_position_count= 0;
+> struct firing_position *global_temporary_sort_firing_position_array= NULL;

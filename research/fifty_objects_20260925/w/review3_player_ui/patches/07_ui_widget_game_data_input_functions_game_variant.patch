@@ -1,0 +1,46 @@
+--- a/source/interface/ui_widget_game_data_input_functions.c
++++ b/source/interface/ui_widget_game_data_input_functions.c
+@@ -2103,7 +2103,7 @@
+ void get_editable_playlist_profile_display_name(
+ 	struct widget_instance *widget)
+ {
+-	struct playlist_profile *profile;
++	struct game_variant *profile;
+ 
+ 	match_vassert(
+ 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+@@ -2121,13 +2121,13 @@
+ 	{
+ 		widget->parameters.text_box.text = ui_widget_realloc(
+ 			widget->parameters.text_box.text,
+-			sizeof(profile->name),
++			sizeof(profile->human_readable_game_description),
+ 			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+ 			0xA19);
+ 		if (widget->parameters.text_box.text)
+ 		{
+-			ustrncpy(widget->parameters.text_box.text, profile->name, NUMBEROF(profile->name) - 1);
+-			widget->parameters.text_box.text[NUMBEROF(profile->name) - 1] = 0;
++			ustrncpy(widget->parameters.text_box.text, profile->human_readable_game_description, NUMBEROF(profile->human_readable_game_description) - 1);
++			widget->parameters.text_box.text[NUMBEROF(profile->human_readable_game_description) - 1] = 0;
+ 		}
+ 	}
+ 	else
+@@ -2746,7 +2746,7 @@
+ void multiplayer_edit_profile_set_ruleset_textbox_string_index(
+ 	struct widget_instance *widget)
+ {
+-	struct playlist_profile *profile;
++	struct game_variant *profile;
+ 
+ 	match_vassert(
+ 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+@@ -2757,7 +2757,7 @@
+ 	profile = player_ui_get_edit_playlist_profile();
+ 	if (profile)
+ 	{
+-		switch (profile->engine_type)
++		switch (profile->game_engine_index)
+ 		{
+ 		case game_engine_ctf:
+ 			widget->parameters.text_box.string_list_index =

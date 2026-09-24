@@ -1,0 +1,27 @@
+diff --git a/config/parked.json b/config/parked.json
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1273,23 +1273,4 @@
+       }
+     },
+-    {
+-      "unit": "source/interface/motion_sensor",
+-      "function": "_update_motion_sensor",
+-      "class": "unclassified",
+-      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. Two decompiler-style 0.0f products were removed in favor of the typed magnitude_squared2d helper already used by this TU; January's two zero-real relocations reflect unresolved x87 scheduling and are not recreated with fake source pressure. The otherwise-discarded game_time_get call and the return-EIP/0x62 stack-sentinel diagnostics are present in January and independently authenticated by the later first-party HCEA build/PDB. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1, adversarially verified) the reopened private callees fixed their January ABIs; this parked caller follows and moves strictly closer to January (816 of 864 bytes, 37 relocations), still fuzzy. See docs/object_matching_logs/motion_sensor_obj_opus5_150k_w1_20260914.md.",
+-      "measurements": {
+-        "target": {
+-          "size": 864,
+-          "relocation_count": 39,
+-          "normalized_sha256": "b37814ed8aaa3427a5d8e1fe1327e22cc80190383562143e94c35df03f5db06b"
+-        },
+-        "base": {
+-          "size": 816,
+-          "relocation_count": 37,
+-          "normalized_sha256": "5bae910d9c27cad0c50ecad905a614a6bc13edc3c450c1717918dbeea76355aa"
+-        },
+-        "objdiff_percent": 76.04444
+-      }
+-    },
+     {
+       "unit": "source/camera/observer",

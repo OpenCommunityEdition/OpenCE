@@ -213,13 +213,6 @@ enum multiplayer_game_text
 
 /* ---------- macros */
 
-#define oddball_variant_random_start unknown4C.byte0
-#define oddball_variant_score_to_win unknown40
-#define oddball_variant_speed_with_ball unknown50
-#define oddball_variant_trait_with_ball unknown54
-#define oddball_variant_trait_without_ball unknown58
-#define oddball_variant_ball_type unknown5C
-#define oddball_variant_ball_spawn_count unknown60
 
 /* ---------- structures */
 
@@ -349,7 +342,7 @@ static void oddball_weapon_drop(
 static boolean oddball_ball_transfer_by_killing(
 	void)
 {
-	enum oddball_ball_type ball_type = game_engine_get_variant()->oddball_variant_ball_type;
+	enum oddball_ball_type ball_type = game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type;
 
 	if (ball_type > _oddball_normal && ball_type <= _oddball_terminator)
 		return TRUE;
@@ -360,7 +353,7 @@ static boolean oddball_ball_transfer_by_killing(
 static boolean accumulate_score_by_time(
 	void)
 {
-	switch (game_engine_get_variant()->oddball_variant_ball_type)
+	switch (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type)
 	{
 	case _oddball_terminator:
 		return FALSE;
@@ -372,7 +365,7 @@ static boolean accumulate_score_by_time(
 static boolean terminator_scoring_rules(
 	void)
 {
-	switch (game_engine_get_variant()->oddball_variant_ball_type)
+	switch (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type)
 	{
 	case _oddball_terminator:
 		return TRUE;
@@ -384,7 +377,7 @@ static boolean terminator_scoring_rules(
 boolean player_has_ball(
 	long player_index)
 {
-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 	boolean has_ball = FALSE;
 	long ball_index;
 
@@ -403,7 +396,7 @@ boolean player_has_ball(
 boolean ball_available(
 	void)
 {
-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 	boolean available = FALSE;
 	long ball_index;
 
@@ -426,7 +419,7 @@ static long player_ball_count(
 	long player_index)
 {
 	long ball_count = 0;
-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 	long ball_index;
 
 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
@@ -489,7 +482,7 @@ static void oddball_add_time_with_ball(
 {
 	struct player_datum *player = player_get(player_index);
 
-	if (game_engine_get_variant()->oddball_variant_ball_type == _oddball_normal)
+	if (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type == _oddball_normal)
 	{
 		game_engine_state_message(
 			player_index,
@@ -513,7 +506,7 @@ static real_point3d find_position_for_ball(
 	 */
 	real_point3d position;
 
-	if (!game_engine_get_variant()->oddball_variant_random_start)
+	if (!game_engine_get_variant()->game_engine_variant.oddball.random_start)
 	{
 		flag_index = find_netgame_flag(
 			NULL,
@@ -622,7 +615,7 @@ static void reset_ball(
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	real_point3d position = find_position_for_ball(weapon->object.owner_team_index);
 
-	if (game_engine_get_variant()->oddball_variant_ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
+	if (game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 
 	game_engine_flag_reset(weapon_index, &position);
@@ -680,7 +673,7 @@ static boolean oddball_engine_initialize_for_new_map(
 	global_scenario_get();
 	csmemset(&oddball_globals, 0, sizeof(oddball_globals));
 
-	oddball_globals.score_to_win = game_engine_get_variant()->oddball_variant_score_to_win;
+	oddball_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
 	if (accumulate_score_by_time())
 		oddball_globals.score_to_win *= ODDBALL_SCORE_TICKS_PER_UNIT;
 
@@ -694,7 +687,7 @@ static boolean oddball_engine_initialize_for_new_map(
 
 	if (!oddball_ball_transfer_by_killing())
 	{
-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 		long spawn_delay = 0;
 
 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
@@ -705,7 +698,7 @@ static boolean oddball_engine_initialize_for_new_map(
 	}
 	else
 	{
-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 
 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
 		{
@@ -730,10 +723,10 @@ static void oddball_engine_player_update(
 	player->speed_multiplier = 1.0f;
 	if (ball_count > 0)
 	{
-		if (game_engine_get_variant()->oddball_variant_trait_with_ball != _game_trait_invisible)
+		if (game_engine_get_variant()->game_engine_variant.oddball.trait_with_ball != _game_trait_invisible)
 			game_engine_player_depower_active_camo(player_index);
 
-		switch (game_engine_get_variant()->oddball_variant_speed_with_ball)
+		switch (game_engine_get_variant()->game_engine_variant.oddball.speed_with_ball)
 		{
 		case _oddball_speed_normal:
 			player->speed_multiplier = 1.0f;
@@ -880,7 +873,7 @@ static void oddball_engine_update(
 				_multiplayer_sound_oddball);
 	}
 
-	ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+	ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
 	{
 		if (oddball_globals.ball_spawn_timer[ball_index] > 0)
@@ -999,7 +992,7 @@ static void oddball_engine_player_killed_player(
 {
 	if (oddball_ball_transfer_by_killing())
 	{
-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
+		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 		long capture_index = NONE;
 		long ball_index;
 
@@ -1102,9 +1095,9 @@ static boolean oddball_test_trait(
 	if (trait != _game_trait_none)
 	{
 		if (player_has_ball(player_index))
-			result = trait == game_engine_get_variant()->oddball_variant_trait_with_ball;
+			result = trait == game_engine_get_variant()->game_engine_variant.oddball.trait_with_ball;
 		else
-			result = trait == game_engine_get_variant()->oddball_variant_trait_without_ball;
+			result = trait == game_engine_get_variant()->game_engine_variant.oddball.trait_without_ball;
 	}
 
 	return result;

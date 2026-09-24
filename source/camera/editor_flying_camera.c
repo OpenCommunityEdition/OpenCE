@@ -186,7 +186,7 @@ static void translate_orbiting_to_flying(
    and its camera_mode assertion text agree. The speed scalar is the .data
    anchor; is_scripted is a private .bss anchor as in January. The 124-byte
    .bss reserves local_player_index at +0x30. */
-real editor_camera_speed = 1.f;
+static real editor_camera_speed = 1.f;
 static long unit_focus = NONE;
 static boolean is_scripted = FALSE;
 static boolean use_roll = FALSE;
@@ -200,7 +200,7 @@ static short local_player_index = 0;
 static boolean last_scripted = FALSE;
 static struct persisted_camera_data persisted_cameras[NUMBER_OF_EDITOR_CAMERA_PERSISTED_CAMERA_SLOTS] = { 0 };
 static unsigned long speed_step = 0;
-long const editor_camera_speed_steps[NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS] = { 1, 5, 20, 40, 60 };
+static long const editor_camera_speed_steps[NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS] = { 1, 5, 20, 40, 60 };
 static real const orbiting_camera_field_of_view = DEGREES_TO_RADIANS(70.f);
 static real const orbiting_camera_scale = 1.f;
 static real const orbiting_camera_timer = 0.5f;
@@ -362,41 +362,54 @@ void editor_camera_set_position_and_roll(
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 169, point);
 	match_assert("c:\\halo\\SOURCE\\camera\\editor_flying_camera.c", 170, angles);
 
-	if (editor_camera)
+	if (!editor_camera)
 	{
-		real_matrix4x3 rotation;
-		real_vector3d facing;
-		real_euler_angles2d up_angles;
+		/* the yaw/pitch prefix of the 3d angles is the focus orientation */
+		editor_camera_set_focus(point, (real_euler_angles2d const *)angles);
+		initialized = TRUE;
+	}
+	else
+	{
+		real_matrix4x3 matrix;
+		real_vector3d forward;
+		real_vector3d left;
 		real_vector3d up;
-		real_vector3d roll_reference;
+		real_vector3d diff;
+		real_euler_angles2d hack_angles;
 
 		editor_camera->position = *point;
 		matrix4x3_rotation_from_angles(
-			&rotation,
+			&matrix,
 			angles->yaw,
 			angles->pitch,
 			angles->roll);
 		euler_angles2d_from_vector3d(
 			&editor_camera->facing,
-			&rotation.forward);
+			&matrix.forward);
 		vector3d_from_euler_angles2d(
-			&facing,
+			&forward,
 			&editor_camera->facing);
 
-		up_angles = editor_camera->facing;
-		up_angles.pitch += _pi / 2.f;
+		hack_angles = editor_camera->facing;
+		hack_angles.pitch += _pi / 2.f;
 		vector3d_from_euler_angles2d(
 			&up,
-			&up_angles);
-		normalize3d(&facing);
+			&hack_angles);
+		normalize3d(&forward);
 		normalize3d(&up);
+		/* left is never read; the later first-party build still computes and normalizes it */
 		cross_product3d(
 			&up,
-			&rotation.up,
-			&roll_reference);
-		normalize3d(&roll_reference);
-		editor_camera->roll = angle_between_vectors3d(&up, &rotation.up) *
-			dot_product3d(&roll_reference, &facing);
+			&forward,
+			&left);
+		normalize3d(&left);
+		cross_product3d(
+			&up,
+			&matrix.up,
+			&diff);
+		normalize3d(&diff);
+		editor_camera->roll = angle_between_vectors3d(&up, &matrix.up) *
+			dot_product3d(&forward, &diff);
 
 		if (unit_focus != NONE)
 		{
@@ -404,15 +417,6 @@ void editor_camera_set_position_and_roll(
 			unit_offset.j = point->y;
 			unit_offset.k = point->z;
 		}
-	}
-	else
-	{
-		real_euler_angles2d focus_angles;
-
-		focus_angles.yaw = angles->yaw;
-		focus_angles.pitch = angles->pitch;
-		editor_camera_set_focus(point, &focus_angles);
-		initialized = TRUE;
 	}
 
 	reset_all = TRUE;

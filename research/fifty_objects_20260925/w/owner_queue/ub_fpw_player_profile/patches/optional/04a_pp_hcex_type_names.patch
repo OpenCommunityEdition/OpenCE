@@ -1,0 +1,85 @@
+diff --git a/source/saved games/player_profile.c b/source/saved games/player_profile.c
+index 03d78309..1482f480 100644
+--- a/source/saved games/player_profile.c	
++++ b/source/saved games/player_profile.c	
+@@ -157,26 +157,26 @@ struct player_profile_file_block
+ typedef char verify_player_profile_file_block_size[
+ 	sizeof(struct player_profile_file_block) == SAVED_GAME_FILE_BLOCK_SIZE ? 1 : -1];
+ 
+-struct player_profile_write_request
++struct player_profile_write_internal_input
+ {
+-	long player_profile_index;
++	long index;
+ 	struct player_profile profile;
+ };
+ 
+-struct player_profile_runtime_globals
++struct _player_profile_globals
+ {
+ 	struct player_profile default_profile;
+-	struct player_profile_write_request write_request;
++	struct player_profile_write_internal_input thread_input;
+ 	struct thread_reference *thread;
+ 	boolean initialized;
+ };
+ 
+ typedef char verify_player_profile_thread_offset[
+-	offsetof(struct player_profile_runtime_globals, thread) == 0x64 ? 1 : -1];
++	offsetof(struct _player_profile_globals, thread) == 0x64 ? 1 : -1];
+ typedef char verify_player_profile_initialized_offset[
+-	offsetof(struct player_profile_runtime_globals, initialized) == 0x68 ? 1 : -1];
++	offsetof(struct _player_profile_globals, initialized) == 0x68 ? 1 : -1];
+ typedef char verify_player_profile_globals_size[
+-	sizeof(struct player_profile_runtime_globals) == 0x6C ? 1 : -1];
++	sizeof(struct _player_profile_globals) == 0x6C ? 1 : -1];
+ 
+ /* ---------- prototypes */
+ 
+@@ -218,7 +218,7 @@ static long profile_color_table[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
+ 	0x00F5999E,
+ };
+ 
+-struct player_profile_runtime_globals player_profile_globals = { 0 };
++struct _player_profile_globals player_profile_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -783,7 +783,7 @@ static boolean player_profile_read(
+ static unsigned long __stdcall player_profile_write_thread_proc(
+ 	void *input)
+ {
+-	struct player_profile_write_request *request = input;
++	struct player_profile_write_internal_input *request = input;
+ 	struct player_profile_file_block block = {0};
+ 	struct file_reference file;
+ 
+@@ -793,7 +793,7 @@ static unsigned long __stdcall player_profile_write_thread_proc(
+ 
+ 	if (saved_game_files_take_mutex())
+ 	{
+-		long player_profile_index = request->player_profile_index;
++		long player_profile_index = request->index;
+ 		boolean failed = FALSE;
+ 		struct player_profile *profile = &request->profile;
+ 
+@@ -907,16 +907,16 @@ static void player_profile_write(
+ 		player_profile_globals.thread = NULL;
+ 	}
+ 
+-	player_profile_globals.write_request.player_profile_index = player_profile_index;
++	player_profile_globals.thread_input.index = player_profile_index;
+ 	csmemcpy(
+-		&player_profile_globals.write_request.profile,
++		&player_profile_globals.thread_input.profile,
+ 		profile,
+ 		sizeof(struct player_profile));
+ 
+ 	create_thread(
+ 		0,
+ 		player_profile_write_thread_proc,
+-		&player_profile_globals.write_request,
++		&player_profile_globals.thread_input,
+ 		&player_profile_globals.thread);
+ 
+ 	return;

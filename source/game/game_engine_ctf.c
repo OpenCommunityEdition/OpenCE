@@ -438,7 +438,7 @@ static boolean ctf_engine_initialize_for_new_map(
 	short starting_location_count;
 	short starting_location_index;
 
-	if (!game_engine_get_variant()->has_teams)
+	if (!game_engine_get_variant()->universal_variant.teams)
 	{
 		error(_error_silent, "ctf started up without teams");
 	}
@@ -461,7 +461,7 @@ static boolean ctf_engine_initialize_for_new_map(
 
 		ctf_globals.scores[team_index] = 0;
 		flag_slot = team_index;
-		if (game_engine_get_variant()->unknown4C.byte0)
+		if (game_engine_get_variant()->game_engine_variant.ctf.assault)
 			flag_slot = (team_index + 1) % 2;
 
 		ctf_globals.flags[flag_slot] = NULL;
@@ -479,7 +479,7 @@ static boolean ctf_engine_initialize_for_new_map(
 		}
 	}
 
-	if (game_engine_get_variant()->unknown50 > 0)
+	if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
 	{
 		long flag_to_create = random_range(0, NUMBER_OF_CTF_TEAMS);
 
@@ -490,7 +490,7 @@ static boolean ctf_engine_initialize_for_new_map(
 
 		create_the_flag(flag_to_create);
 		ctf_single_flag_what_is_up_message(flag_to_create);
-		ctf_globals.flag_swap_timer = game_engine_get_variant()->unknown50;
+		ctf_globals.flag_swap_timer = game_engine_get_variant()->game_engine_variant.ctf.single_flag_time;
 	}
 	else
 	{
@@ -500,7 +500,7 @@ static boolean ctf_engine_initialize_for_new_map(
 		}
 	}
 
-	ctf_globals.score_to_win = game_engine_get_variant()->unknown40;
+	ctf_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
 
 	starting_location_count = player_get_starting_location_count();
 	for (starting_location_index = 0;
@@ -521,7 +521,7 @@ static boolean ctf_engine_initialize_for_new_map(
 		}
 		else if (match_game_type(game_engine_ctf, 4, starting_location->game_types))
 		{
-			boolean assault = game_engine_get_variant()->unknown4C.byte0 > 0;
+			boolean assault = game_engine_get_variant()->game_engine_variant.ctf.assault > 0;
 			long location_team_index = starting_location->team_index;
 			long own_team_index = location_team_index % 2;
 			real distance_to_own_flag = distance_squared3d(
@@ -581,8 +581,8 @@ static void ctf_engine_player_update(
 					{
 						boolean flag_at_home = TRUE;
 
-						if (game_engine_get_variant()->unknown4C.byte3 &&
-							game_engine_get_variant()->unknown50 == 0)
+						if (game_engine_get_variant()->game_engine_variant.ctf.flag_at_home_to_score &&
+							game_engine_get_variant()->game_engine_variant.ctf.single_flag_time == 0)
 						{
 							struct weapon_datum *own_flag = weapon_get(
 								ctf_globals.weapon_indices[player->team_index]);
@@ -628,7 +628,7 @@ static void ctf_engine_weapon_update(
 		0x261,
 		weapon_is_flag(weapon_index));
 
-	if (game_engine_get_variant()->unknown50 > 0)
+	if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
 	{
 		if (ctf_globals.flag_swap_timer > 0)
 			ctf_globals.flag_swap_timer--;
@@ -650,7 +650,7 @@ static void ctf_engine_weapon_update(
 			ctf_reset_flag(weapon_index);
 			game_engine_clear_goal_position(2);
 			game_engine_clear_goal_position(3);
-			ctf_globals.flag_swap_timer = game_engine_get_variant()->unknown50;
+			ctf_globals.flag_swap_timer = game_engine_get_variant()->game_engine_variant.ctf.single_flag_time;
 			ctf_single_flag_what_is_up_message(weapon->object.owner_team_index);
 		}
 	}
@@ -733,7 +733,7 @@ static boolean ctf_weapon_pickup(
 
 		if (weapon->object.owner_team_index == player->team_index)
 		{
-			if (!game_engine_get_variant()->unknown4C.byte2)
+			if (!game_engine_get_variant()->game_engine_variant.ctf.flag_must_reset)
 			{
 				if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit) &&
 					game_engine_can_score())
@@ -765,7 +765,7 @@ static boolean ctf_weapon_pickup(
 				game_engine_can_score())
 			{
 				player->statistics.multiplayer_statistics.ctf_statistics.flag_grabs++;
-				if (!game_engine_get_variant()->unknown4C.byte0)
+				if (!game_engine_get_variant()->game_engine_variant.ctf.assault)
 				{
 					game_engine_play_multiplayer_sound(
 						player->team_index == _team_red ?
@@ -1085,7 +1085,7 @@ static real ctf_engine_starting_location_rating(
 {
 	real rating = 1.0f;
 
-	if (game_engine_get_variant()->unknown4C.byte0)
+	if (game_engine_get_variant()->game_engine_variant.ctf.assault)
 	{
 		struct player_datum *player = player_get(player_index);
 		struct scenario_netgame_flag *flag = ctf_globals.flags[(player->team_index + 1) % 2];

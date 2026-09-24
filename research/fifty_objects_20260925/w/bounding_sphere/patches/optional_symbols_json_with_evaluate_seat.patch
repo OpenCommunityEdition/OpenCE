@@ -1,0 +1,22 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index d0a16b3a..4fcaabbb 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -139,7 +139,7 @@
+ { "file_offset": 37712, "flags": 32, "name": "_negate_vector2d" },
+ { "file_offset": 37744, "flags": 32, "name": "_distance3d" },
+ { "file_offset": 37808, "flags": 32, "name": "_action_vehicle_desirable", "static": true },
+-{ "file_offset": 38080, "flags": 32, "name": "_action_vehicle_evaluate_seat" },
++{ "file_offset": 38080, "flags": 32, "name": "_action_vehicle_evaluate_seat", "static": true },
+ { "file_offset": 39056, "flags": 32, "name": "_action_vehicle_find_destination", "static": true },
+ { "file_offset": 40288, "flags": 32, "name": "_action_vehicle_setup_specific" },
+ { "file_offset": 40624, "flags": 32, "name": "_action_vehicle_perform" },
+@@ -23248,7 +23248,7 @@
+ { "file_offset": 4951098, "flags": 0, "name": "_render_camera_debug_this_fucking_frustum" },
+ { "file_offset": 4951104, "flags": 0, "name": "_render_debug_globals", "static": true },
+ { "file_offset": 4980812, "flags": 0, "name": "_bss_004c004c" },
+-{ "file_offset": 4980856, "flags": 0, "name": "_lighting_storage" },
++{ "file_offset": 4980856, "flags": 0, "name": "?lighting_storage@?1??object_get_cached_render_lighting@@9@9", "static": true },
+ { "file_offset": 4980976, "flags": 0, "name": "_render_object_globals", "static": true },
+ { "file_offset": 4982004, "flags": 0, "name": "_debug_inactive_objects" },
+ { "file_offset": 4982005, "flags": 0, "name": "_reported_rendered_object_overflow", "static": true },

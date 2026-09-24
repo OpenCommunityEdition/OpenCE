@@ -1,0 +1,12 @@
+diff --git a/source/bitmaps/bitmap_drawing.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\bitmap\\lab_c10.c"
+index 9cbde4ef..e890fa71 100644
+--- a/source/bitmaps/bitmap_drawing.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\bitmap\\lab_c10.c"
+@@ -173,6 +173,7 @@ boolean bitmap_step_line(
+ 
+ /* ---------- globals */
+ 
++static char lab_prefix[10] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+ short translation_table[NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_COPY_FLAG_COMBINATIONS] =
+ {
+ 	{ 0 }, /* a8 */

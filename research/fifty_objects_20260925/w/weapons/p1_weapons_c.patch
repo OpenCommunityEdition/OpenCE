@@ -1,0 +1,108 @@
+diff -u a/source/items/weapons.c b/source/items/weapons.c
+--- a/source/items/weapons.c
++++ b/source/items/weapons.c
+@@ -194,8 +194,10 @@
+ 	??_C@_0BC@IMIGIGHG@secondary?5trigger?$AA@ (0000)
+ 00279448 0004:
+ 	__real@3d2aaaab (0000)
+-00307140 0600:
+-	_data_00307140 (0000)
++00307140 0008:
++	_blurred_permutation_names (0000)
++00307148 05f8:
++	_weapon_update_section (0000)
+ */
+ 
+ /* ---------- headers */
+@@ -446,7 +448,7 @@
+ 	short new_state,
+ 	boolean immediate);
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index);
+ static void weapon_magazine_start_reload(
+@@ -485,17 +487,8 @@
+ 
+ /* ---------- globals */
+ 
+-struct weapons_globals
+-{
+-	char *blurred_permutation_names[2];
+-	struct profile_section update_profile;
+-};
+-
+-struct weapons_globals data_00307140 =
+-{
+-	{"~primary-blur", "~secondary-blur"},
+-	{"weapon_update", NONE, TRUE}
+-};
++static char *blurred_permutation_names[MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON] = {"~primary-blur", "~secondary-blur"};
++static struct profile_section weapon_update_section = {"weapon_update", NONE, TRUE};
+ 
+ /* ---------- public code */
+ 
+@@ -523,7 +516,7 @@
+ 	return;
+ }
+ 
+-void weapon_place(
++long weapon_place(
+ 	long weapon_index,
+ 	struct scenario_weapon_datum *scenario_weapon)
+ {
+@@ -545,7 +538,7 @@
+ 	if (!TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit))
+ 		weapon->object.position.z += 0.05f;
+ 
+-	return;
++	return weapon_index;
+ }
+ 
+ void weapon_ready(
+@@ -1379,7 +1372,7 @@
+ 	return;
+ }
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index)
+ {
+@@ -2779,7 +2772,7 @@
+ 	short magazine_index;
+ 	short trigger_index;
+ 
+-	profile_enter(data_00307140.update_profile);
++	profile_enter(weapon_update_section);
+ 
+ 	if (weapon->weapon.tracked_object_index!=NONE && !object_try_and_get_and_verify_type(weapon->weapon.tracked_object_index, _object_mask_all))
+ 	{
+@@ -3171,7 +3164,7 @@
+ 				!TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) &&
+ 				trigger->rate_of_fire>trigger_definition->blurred_rate_of_fire)
+ 			{
+-				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, TRUE);
++				object_permute_region(weapon_get_effect_object_index(weapon_index), blurred_permutation_names[trigger_index], NONE, TRUE);
+ 				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, TRUE);
+ 			}
+ 		}
+@@ -3185,7 +3178,7 @@
+ 
+ 			if (TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) && trigger->rate_of_fire<trigger_definition->blurred_rate_of_fire)
+ 			{
+-				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, FALSE);
++				object_permute_region(weapon_get_effect_object_index(weapon_index), blurred_permutation_names[trigger_index], NONE, FALSE);
+ 				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, FALSE);
+ 			}
+ 		}
+@@ -3208,7 +3201,7 @@
+ 		}
+ 	}
+ 
+-	profile_exit(data_00307140.update_profile);
++	profile_exit(weapon_update_section);
+ 
+ 	return TRUE;
+ }

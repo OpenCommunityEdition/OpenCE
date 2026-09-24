@@ -1,0 +1,15 @@
+diff --git a/source/objects/object_lights.c b/source/objects/object_lights.c
+index f0c70b31..2553c63c 100644
+--- a/source/objects/object_lights.c
++++ b/source/objects/object_lights.c
+@@ -140,6 +140,10 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
++/* objects.h lies in this unit's own directory, so January's __FILE__ for it was the absolute
++   path (see OBJECTS_H_FILE in objects.h) */
++#define OBJECTS_H_FILE "c:\\halo\\source\\objects\\objects.h"
++
+ #include "cseries/cseries.h"
+ #include "cseries/errors.h"
+ #include "cseries/profile.h"

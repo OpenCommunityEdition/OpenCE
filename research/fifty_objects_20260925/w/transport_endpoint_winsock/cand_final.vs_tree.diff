@@ -1,0 +1,17 @@
+diff --git a/source/bungie_net/network/transport_endpoint_winsock.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\transport_endpoint_winsock\\cand_final.c"
+index 75e069dc..2473c6fb 100644
+--- a/source/bungie_net/network/transport_endpoint_winsock.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\transport_endpoint_winsock\\cand_final.c"
+@@ -1269,7 +1269,11 @@ static unsigned long __stdcall connect_endpoint_process(
+ 	void *input_pointer)
+ {
+ 	struct connect_process_input *input = input_pointer;
+-	struct thread_reference *thread = NULL;
++	/* BUG (original): January and October leave thread unassigned when
++	 * take_mutex() fails, so the disposal test below reads an indeterminate
++	 * value (in both images the stale parameter home, whose list scan finds no
++	 * match). A corrected build should initialize thread to NULL. */
++	struct thread_reference *thread;
+ 	struct mutex_reference *mutex = NULL;
+ 	short error;
+ 

@@ -1,0 +1,22 @@
+diff --git a/config/symbols.json b/scratch/w/rasterizer_xbox_models/config/symbols.json
+index 83830013..e879c5dc 100644
+--- a/config/symbols.json
++++ b/scratch/w/rasterizer_xbox_models/config/symbols.json
+@@ -5841,12 +5841,12 @@
+ { "file_offset": 1412896, "flags": 32, "name": "_rasterizer_sun_glow_copy_source", "static": true },
+ { "file_offset": 1413792, "flags": 32, "name": "_rasterizer_sun_glow_convolve", "static": true },
+ { "file_offset": 1415200, "flags": 32, "name": "_rasterizer_sun_glow_draw" },
+-{ "file_offset": 1417552, "flags": 32, "name": "_D3DDevice_SetRenderState" },
+-{ "file_offset": 1417984, "flags": 32, "name": "_D3DDevice_SetTextureStageState" },
++{ "file_offset": 1417552, "flags": 32, "name": "_D3DDevice_SetRenderState", "static": true },
++{ "file_offset": 1417984, "flags": 32, "name": "_D3DDevice_SetTextureStageState", "static": true },
+ { "file_offset": 1418064, "flags": 32, "name": "_set_environment_shader_pixel_shader", "static": true },
+-{ "file_offset": 1419072, "flags": 32, "name": "_IDirect3DDevice8_SetRenderState@12" },
+-{ "file_offset": 1419616, "flags": 32, "name": "_IDirect3DDevice8_SetTextureStageState@16" },
+-{ "file_offset": 1419712, "flags": 32, "name": "_IDirect3DDevice8_SetVertexShaderConstant@16" },
++{ "file_offset": 1419072, "flags": 32, "name": "_IDirect3DDevice8_SetRenderState@12", "static": true },
++{ "file_offset": 1419616, "flags": 32, "name": "_IDirect3DDevice8_SetTextureStageState@16", "static": true },
++{ "file_offset": 1419712, "flags": 32, "name": "_IDirect3DDevice8_SetVertexShaderConstant@16", "static": true },
+ { "file_offset": 1419728, "flags": 32, "name": "__rasterizer_models_begin" },
+ { "file_offset": 1419792, "flags": 32, "name": "__rasterizer_model_end" },
+ { "file_offset": 1419920, "flags": 32, "name": "__rasterizer_models_end" },

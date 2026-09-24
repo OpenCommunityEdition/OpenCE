@@ -1,0 +1,218 @@
+diff --git a/source/interface/motion_sensor.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\motion_sensor\\m4.c"
+index c5094d45..09aa3baf 100644
+--- a/source/interface/motion_sensor.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\motion_sensor\\m4.c"
+@@ -276,8 +276,8 @@ real scale[] =
+ };
+ 
+ long next_vertex_index= {0};
+-static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
+-static real sweep_theta = 0.f;
++static struct motion_sensor_globals_definition *motion_sensor_globals;
++static real sweep_theta;
+ boolean debug_motion_sensor_draw_all_units= {0};
+ 
+ extern struct motion_sensor_hud_globals *hud_globals;
+@@ -311,67 +311,69 @@ static void motion_sensor_update(
+ 	long return_eip = get_return_eip();
+ 	long stack_buffer[0x80];
+ 	long current_time;
+-	short active_sensor_index;
++	boolean done;
+ 
+ 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+ 	game_engine_running();
+ 	current_time = game_time_get();
+ 	motion_sensor_globals->update = TRUE;
++	motion_sensor_globals->active_sensor_index =
++		(short)(motion_sensor_globals->active_sensor_index + 1) %
++			MOTION_SENSOR_HISTORY_COUNT;
+ 	motion_sensor_globals->last_update_time = current_time;
+-	active_sensor_index =
+-		(short)((motion_sensor_globals->active_sensor_index + 1) %
+-			MOTION_SENSOR_HISTORY_COUNT);
+-	motion_sensor_globals->active_sensor_index = active_sensor_index;
++	done = FALSE;
+ 
+ 	if ((current_time % MOTION_SENSOR_UPDATE_PERIOD) && current_time)
+ 	{
++		short active_sensor_index = motion_sensor_globals->active_sensor_index;
+ 		short previous_sensor_index =
+ 			(short)((active_sensor_index + MOTION_SENSOR_HISTORY_COUNT - 1) %
+ 				MOTION_SENSOR_HISTORY_COUNT);
+ 		short player_count = local_player_count();
+ 		short local_player_index = local_player_get_next(NONE);
++		short player_scan_index;
+ 
+-		while (player_count-- > 0)
++		for (player_scan_index = 0;
++			player_scan_index < player_count;
++			player_scan_index++)
+ 		{
+-			struct motion_sensor_player *player =
+-				&motion_sensor_globals->players[local_player_index];
+-
+ 			csmemcpy(
+-				&player->sensor_data[active_sensor_index],
+-				&player->sensor_data[previous_sensor_index],
++				&motion_sensor_globals->players[local_player_index].sensor_data[active_sensor_index],
++				&motion_sensor_globals->players[local_player_index].sensor_data[previous_sensor_index],
+ 				sizeof(struct motion_sensor_datum));
+ 			local_player_index = local_player_get_next(local_player_index);
+ 		}
+ 	}
+ 	else
+ 	{
+-		short local_player_slots[4] = { 0 };
++		/* BUG (preserved for exact matching): the target fills
++		 * camera_positions[] only for local players whose unit index is not
++		 * NONE, but the object loop below reads the entry for every local
++		 * player, so a local player without a unit is ranged against an
++		 * uninitialised camera position.  A corrected build should clear the
++		 * entry when the unit index is NONE.
++		 */
++		real_point3d camera_positions[MAXIMUM_LOCAL_PLAYERS];
++		short local_player_indices[MAXIMUM_LOCAL_PLAYERS];
+ 		short player_count = local_player_count();
++		short blip_counts[MAXIMUM_LOCAL_PLAYERS] = { 0 };
+ 		short local_player_index = local_player_get_next(NONE);
+ 		struct object_iterator iterator;
+-		real_point3d camera_positions[2];
+-		boolean done = FALSE;
+ 		short player_scan_index;
+ 
+-		for (player_scan_index = 0;
+-			player_scan_index < player_count;
+-			player_scan_index++)
++		player_scan_index = 0;
++		while (player_scan_index < player_count)
+ 		{
+ 			struct motion_sensor_datum *sensor =
+ 				&motion_sensor_globals->players[local_player_index]
+-					.sensor_data[active_sensor_index];
+-			long player_index =
+-				local_player_get_player_index(local_player_index);
++					.sensor_data[motion_sensor_globals->active_sensor_index];
++			long player_index = local_player_get_player_index(local_player_index);
+ 			long unit_index = player_index == NONE
+ 				? NONE
+-				: player_get(
+-					local_player_get_player_index(local_player_index))->unit_index;
++				: player_get(local_player_get_player_index(local_player_index))->unit_index;
+ 			short blip_index;
+ 
+-			local_player_slots[player_scan_index + 2] = local_player_index;
+-			camera_positions[local_player_index].x = 0.0f;
+-			camera_positions[local_player_index].y = 0.0f;
+-			camera_positions[local_player_index].z = 0.0f;
++			local_player_indices[player_scan_index] = local_player_index;
+ 			if (unit_index != NONE)
+ 			{
+ 				unit_get_camera_position(
+@@ -387,6 +389,7 @@ static void motion_sensor_update(
+ 				sensor->blips[blip_index].type = _blip_type_none;
+ 			}
+ 
++			player_scan_index++;
+ 			local_player_index = local_player_get_next(local_player_index);
+ 		}
+ 
+@@ -398,7 +401,7 @@ static void motion_sensor_update(
+ 			{
+ 				real_point3d object_position;
+ 				real object_radius;
+-				short players_full = 0;
++				long players_full = 0;
+ 
+ 				object_get_bounding_sphere(
+ 					iterator.index,
+@@ -409,60 +412,39 @@ static void motion_sensor_update(
+ 					player_scan_index < player_count;
+ 					player_scan_index++)
+ 				{
+-					short scan_player_index =
+-						local_player_slots[player_scan_index + 2];
+-					long player_index =
+-						local_player_get_player_index(scan_player_index);
+-
+-					if (player_index != NONE &&
+-						player_get(
+-							local_player_get_player_index(scan_player_index))
+-							->unit_index != NONE)
+-					{
+-						short blip_index = local_player_slots[scan_player_index];
++					short scan_player_index = local_player_indices[player_scan_index];
++					short blip_index = blip_counts[scan_player_index];
+ 
+-						if (blip_index >= MAXIMUM_MOTION_SENSOR_BLIPS)
+-						{
+-							players_full++;
+-						}
+-						else
++					if (blip_index < MAXIMUM_MOTION_SENSOR_BLIPS)
++					{
++						/* flatten the object onto the camera plane: the sensor
++						 * range is a horizontal range */
++						object_position.z = camera_positions[scan_player_index].z;
++						if (game_engine_running() ||
++							distance_squared3d(
++								&camera_positions[scan_player_index],
++								&object_position) <=
++								hud_globals->defaults.motion_sensor_range *
++									hud_globals->defaults.motion_sensor_range)
+ 						{
+-							real_vector3d displacement;
+-
+-							displacement.i =
+-								object_position.x -
+-								camera_positions[scan_player_index].x;
+-							displacement.j =
+-								object_position.y -
+-								camera_positions[scan_player_index].y;
+-							displacement.k =
+-								object_position.z -
+-								camera_positions[scan_player_index].z;
+-
+-							if (game_engine_running() ||
+-								magnitude_squared3d(&displacement) <=
+-									hud_globals->defaults.motion_sensor_range *
+-										hud_globals->defaults.motion_sensor_range)
+-							{
+-								struct motion_sensor_player *player =
+-									&motion_sensor_globals->players[scan_player_index];
+-								struct motion_sensor_datum *sensor =
+-									&player->sensor_data[active_sensor_index];
+-								struct motion_sensor_blip *blip =
+-									&sensor->blips[blip_index];
+-
+-								motion_sensor_blip_set_type_and_size(
+-									blip,
+-									iterator.index,
+-									scan_player_index);
+-
+-								player->unit_indices[blip_index] = iterator.index;
+-								sensor->blip_count++;
+-								local_player_slots[scan_player_index] =
+-									(short)(blip_index + 1);
+-							}
++							struct motion_sensor_player *player =
++								&motion_sensor_globals->players[scan_player_index];
++							struct motion_sensor_datum *sensor =
++								&player->sensor_data[motion_sensor_globals->active_sensor_index];
++
++							motion_sensor_blip_set_type_and_size(
++								&sensor->blips[blip_index],
++								iterator.index,
++								scan_player_index);
++							player->unit_indices[blip_index] = iterator.index;
++							blip_counts[scan_player_index]++;
++							sensor->blip_count++;
+ 						}
+ 					}
++					else
++					{
++						players_full++;
++					}
+ 				}
+ 
+ 				if (players_full == player_count)

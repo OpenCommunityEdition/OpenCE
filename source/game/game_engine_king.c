@@ -512,7 +512,7 @@ void king_engine_player_update(
 
 				king_globals.score[player->team_index]++;
 				king_globals.score_tick[player->team_index] = game_time_get();
-				score_to_win = game_engine_get_variant()->unknown40*TICKS_PER_MINUTE;
+				score_to_win = game_engine_get_variant()->universal_variant.score_to_win*TICKS_PER_MINUTE;
 				score = king_globals.score[player->team_index];
 				if (score_to_win - score == HILL_30_SECOND_WARNING)
 				{
@@ -813,7 +813,7 @@ void king_engine_update(
 	void)
 {
 	if (game_engine_can_score() &&
-		game_engine_get_variant()->unknown4C.byte0 &&
+		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
 		--king_globals.hill_timer == 0)
 	{
 		king_globals.hill_timer = HILL_MOVE_TIME;

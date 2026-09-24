@@ -1,0 +1,42 @@
+--- a/source/interface/progress_bar.c
++++ b/source/interface/progress_bar.c
+@@ -279,6 +279,11 @@
+ 	struct gravy_layer const *layer,
+ 	struct gravy_rectangle2d *rect);
+ 
++void gen_mask_coord(
++	real x,
++	real y,
++	real mask_position);
++
+ static void draw_gravy_layer(
+ 	struct gravy_layer const *layer,
+ 	real_rgb_color const *color,
+@@ -1891,23 +1896,21 @@
+ 	struct gravy_rectangle2d rect;
+ 	real half_width= layer->texture_width*0.5f;
+ 	real half_height= layer->texture_height*0.5f;
+-	real mask_position;
+ 
+ 	generate_gravy_rect(layer, &rect);
+ 	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
+ 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_DIFFUSE,
+ 		color->red, color->green, color->blue, alpha);
+-	mask_position= progress*768.f - 64.f - 64.f;
+-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 0.f - mask_position, 0.f);
++	gen_mask_coord(0.f, 0.f, progress);
+ 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f, half_height);
+ 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x0, rect.y0, 0.5f, 1.f);
+-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 640.f - mask_position, 0.f);
++	gen_mask_coord(640.f, 0.f, progress);
+ 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width, half_height);
+ 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x1, rect.y0, 0.5f, 1.f);
+-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 640.f - mask_position, 16.f);
++	gen_mask_coord(640.f, 480.f, progress);
+ 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width, 0.f);
+ 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x1, rect.y1, 0.5f, 1.f);
+-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 0.f - mask_position, 16.f);
++	gen_mask_coord(0.f, 480.f, progress);
+ 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f, 0.f);
+ 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x0, rect.y1, 0.5f, 1.f);
+ 	IDirect3DDevice8_End(global_d3d_device);

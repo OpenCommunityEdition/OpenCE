@@ -185,9 +185,7 @@ symbols in this file:
 
 #include "cseries.h"
 
-#define plane2d_distance_to_point plane2d_distance_to_point_inline
 #include "real_math.h"
-#undef plane2d_distance_to_point
 
 #include "geometry.h"
 
@@ -541,13 +539,6 @@ static short get_edge_vertex(
 boolean convex_hull3d_verify(void)
 {
 	return TRUE;
-}
-
-real plane2d_distance_to_point(
-	real_plane2d const *plane,
-	real_point2d const *point)
-{
-	return (plane->n.i*point->x + plane->n.j*point->y) - plane->d;
 }
 
 real vector_intersect_plane2d(

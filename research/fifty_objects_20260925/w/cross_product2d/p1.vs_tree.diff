@@ -1,0 +1,47 @@
+diff --git a/source/ai/actor_combat.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\cross_product2d\\p1.c"
+index a165aab3..a7c41c68 100644
+--- a/source/ai/actor_combat.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\cross_product2d\\p1.c"
+@@ -126,7 +126,6 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
+-#define cross_product2d cross_product2d_inline
+ #define normalize2d normalize2d_inline
+ #define normalize3d normalize3d_inline
+ #define point_from_line3d actor_combat_point_from_line3d_inline
+@@ -167,7 +166,6 @@ symbols in this file:
+ #undef point_from_line3d
+ #undef normalize3d
+ #undef normalize2d
+-#undef cross_product2d
+ 
+ #include "math/real_math_declarations.h"
+ 
+@@ -520,13 +518,6 @@ static struct projectile_definition *actor_get_grenade_definition(
+ 	return projectile_definition;
+ }
+ 
+-real cross_product2d(
+-	real_vector2d const *a,
+-	real_vector2d const *b)
+-{
+-	return a->i*b->j - a->j*b->i;
+-}
+-
+ static void actor_combat_find_nearby_target(
+ 	real_point3d *target_point,
+ 	real miss_distance)
+@@ -1596,9 +1587,9 @@ long actor_aim_grenade(
+ 				aim_vector2d.j*actor->input.facing_vector.j <
+ 					GRENADE_AIMING_ANGLE_COSINE)
+ 		{
+-			boolean counterclockwise =
+-				aim_vector2d.j*actor->input.facing_vector.i -
+-					aim_vector2d.i*actor->input.facing_vector.j > 0.0f;
++			boolean counterclockwise = cross_product2d(
++				(real_vector2d const *)&actor->input.facing_vector,
++				&aim_vector2d) > 0.0f;
+ 			real_vector3d new_aim_vector = actor->input.facing_vector;
+ 			real magnitude;
+ 

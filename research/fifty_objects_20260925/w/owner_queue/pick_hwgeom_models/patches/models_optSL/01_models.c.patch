@@ -1,0 +1,88 @@
+--- a/source/models/models.c
++++ b/source/models/models.c
+@@ -55,10 +55,10 @@
+ 0030A390 05f8:
+ 	_render_model_section (0000)
+ 00456650 0088:
+-	_default_function_values (0000)
+-	_default_render_model_change_colors (0000)
+-	_default_render_model_effect (0000)
+-	_default_render_model_region_permutation_indices (0000)
++	?default_function_values@?L@??render_model@@9@9 (0000)
++	?default_render_model_change_colors@?9??render_model@@9@9 (0000)
++	?default_render_model_effect@?8??render_model@@9@9 (0000)
++	?default_render_model_region_permutation_indices@?7??render_model@@9@9 (0000)
+ */
+ 
+ /* ---------- headers */
+@@ -270,6 +270,8 @@
+ 	short geometry_detail_level_index,
+ 	short forced_shader_permutation_index,
+ 	long flags);
++static void model_geometry_part_build_tangent_matrices(
++	struct model_geometry_part *part);
+ 
+ /* ---------- globals */
+ 
+@@ -282,12 +284,7 @@
+ extern boolean render_model_index_counts;
+ extern boolean render_model_no_geometry;
+ 
+-static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
+-static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL];
+-static struct render_model_effect default_render_model_effect;
+-static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
+-
+-struct profile_section render_model_section = { "render_model", NONE, TRUE };
++static struct profile_section render_model_section = { "render_model", NONE, TRUE };
+ 
+ /* ---------- private code */
+ 
+@@ -740,17 +737,17 @@
+ 
+ 		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+ 		{
+-			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(
++			model_geometry_part_build_tangent_matrices(TAG_BLOCK_GET_ELEMENT(
+ 				&geometry->parts,
+ 				part_index,
+-				struct model_geometry_part);
++				struct model_geometry_part));
+ 		}
+ 	}
+ 
+ 	return;
+ }
+ 
+-void model_geometry_part_build_tangent_matrices(
++static void model_geometry_part_build_tangent_matrices(
+ 	struct model_geometry_part *part)
+ {
+ 	return;
+@@ -796,18 +793,26 @@
+ 
+ 		if (!region_permutation_indices)
+ 		{
++			static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
++
+ 			region_permutation_indices = default_render_model_region_permutation_indices;
+ 		}
+ 		if (!model_effect)
+ 		{
++			static struct render_model_effect default_render_model_effect;
++
+ 			model_effect = &default_render_model_effect;
+ 		}
+ 		if (!change_colors)
+ 		{
++			static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL];
++
+ 			change_colors = default_render_model_change_colors;
+ 		}
+ 		if (!function_values)
+ 		{
++			static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
++
+ 			function_values = default_function_values;
+ 		}
+ 		if (!centroid)

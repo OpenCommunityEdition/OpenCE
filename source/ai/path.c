@@ -1043,7 +1043,7 @@ boolean path_state_build_path(
 
 	if (state->debug)
 	{
-		*(struct path_result *)state->debug->__unknown140A0 = *path;
+		state->debug->result = *path;
 
 		if (state->debug->path_build_result != _path_build_result_success)
 		{

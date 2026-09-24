@@ -1,0 +1,48 @@
+# LEDGER - king (source/game/game_engine_king) whole-object admission, wave 2
+Base 931ed8dc. Task: .data _king_engine (136 B) pinned-entry verify; _king_globals + 22 table fns storage (cachebeta non-public); king.patch verify; header consumer sweep; emulated split; full audit.
+
+## Start state
+- pdb_storage.py (production): 23 disagreements (22 engine-table fns + _king_globals), all "split 2 ours 2 PDB-public False".
+- gate (production): 29/29 EXACT. object_audit (production vs build/split): PASS, 39 January symbols 0 differ (split currently ALSO says external because symbols.json lacks "static": true -> audit cannot see the storage gap; pdb_storage does).
+- surplus_identity: 10 candidate-only code COMDATs, 0 not identical (_distance3d now IDENTICAL to action_vehicle after Layer 2). provider_link: SELECTED-PROVIDER LINK PASS (22 surplus rows incl. literals). => the data_gap "distance3d NODUP conflict" reason for allow_incomplete_unit is STALE; unit can be Matching.
+- cachebeta publics for this TU: ONLY _king_engine, _render_dynamic_quad, _render_dynamic_quad_initialize. All 22 engine-table fns + _king_globals absent => file-static.
+- Data entry verify (base symbols.json): section_info_resolved(_king_engine) target==base True; size 136, relocs 23, sha 4009f5b6117e9f00cb001a23b9a56b9dc51a694206c442ce715e2bed2d5465a7 == data_gap measurements. relrows: all 23 OK; only raw diff = reloc 0x0000 'king' literal ??_C@_04PJOEONHN@king?$AA@ UNDEF in January (folded to game_engine) vs defined COMDAT in ours -> objdiff 3.3.1 '$' defect. report.json: .data 98.24561%, matched_data 740/876 (136 unmatched = exactly this section).
+- Header consumers: `grep -rn game_engine_king.h source/` -> ONLY source/game/game_engine_king.c. No other TU names any king_engine_*/king_get_*/king_globals symbol. game_engine_list.c declares `extern struct game_engine king_engine;` locally (consumer-local extern, pre-existing; out of scope, noted).
+- Intra-TU calls: none of the 22 table fns is called inside king.c; they are referenced only by the king_engine table at the bottom (defined after all 22) -> prototypes are not required for compilation.
+- Emission order evidence (January split section order): dispose, hill_points_to_2d, find_hill, dispose_from_old_map, player_added, game_ending, game_starting, statistics_append, handle_client, handle_server, pregame_post_rasterize, player_inside_hill, player_update, king_calculate_hill_state, damaged, killed, display_score, prespawn, get_score, rdq_init, rdq, get_score_string, header_string, team_score_string, goal_matches, find_next_hill, [initialize_for_new_map, post_rasterize, update]. = HCEA engine-table order with static helpers defined just before first use and the three callers of later-defined helpers deferred (wave-1 law a). Ours emits a different order (helpers in a trailing private block). Section ORDER is not part of strict exact / object_audit; recorded only as source-layout evidence (no change proposed).
+
+## Candidates (scratch/w/king/mk.py, CRLF preserved)
+- c1 = data_gap king.patch result (verified identical to scratch/w/data_gap/king/cand.c + shadow header, modulo CR): 22 static prototypes in .c prototype block (header order), 22 static defs, `static struct king_globals king_globals`, header loses 22 protos + extern king_globals.
+- c2 = oddball/slayer/ctf precedent: same but NO prototypes for the 22 (never forward-referenced; defined before the table).
+- c3 = c1 + struct king_globals + 4 verify typedefs moved from header into the .c structures block (information only).
+- Hypothesis: storage change of address-taken table fns cannot change code (no private ABI for address-taken statics); only declaration-count ties could move (TU name-count oracle) -> c1 keeps count/positions-before-every-function identical to production; c2 lowers the count before each table fn.
+- sgate (in-place compile; shadow header verified used via a #error probe): c1 29/29 EXACT, c2 29/29 EXACT, c3 29/29 EXACT. Only warning C4700 next_hill_id (pre-existing find_next_hill quirk).
+- Emulated split: scratch/w/king/symfix.py -> scratch/w/king/config/symbols.json (23 line edits appending , "static": true; len check exact) + csplit -> 833/833 objects, ONLY source/game/game_engine_king.obj changes.
+- object_audit vs emulated split (SPLIT_ROOT=scratch/w/king/split, scratch/w/king/object_audit_split.py): c1 PASS, c2 PASS, c3 PASS (39 January symbols 0 differ; every January section ok). Control: production obj vs emulated split FAIL (23 storage 3/2) -> audit sees the storage change.
+- objcmp (scratch/w/king/objcmp.py) production vs c1/c2/c3: 59 owner-keyed sections, 0 byte/reloc/flag diffs; ONLY the 23 symbol storage rows change 2->3. Surplus set unchanged.
+- provider_link on c1 and c2: SELECTED-PROVIDER LINK PASS (both orders). surplus_identity (production, same surplus bytes): 10 code COMDATs, 0 not identical.
+- pdb_storage vs emulated split + candidate obj (scratch/w/king/pdb_storage_split.py): c1 0 disagreements, c2 0 disagreements (control production: 23).
+- UNDEF scan: 0 references to any of the 23 names in build/base (621 objs) or build/split (833 objs) -> no linkage consumer anywhere.
+- Data entry re-verified under the EDITED symbols.json + emulated split + c1/c2 obj: _king_engine target==base, size 136, relocs 23, sha 4009f5b6...65a7 (unchanged snapshot).
+- c4 = c2 + struct king_globals/verify typedefs moved into the .c structures block (oddball/ctf keep their globals struct in the .c): 29/29 EXACT, 59 sections 0 diffs vs production, object_audit PASS vs emulated split. (c3 = same move on c1: also exact.)
+- .bss ownership snapshot (_section_ownership_snapshot) emulated split == c1 == c2 == c4 (560 B, 3 symbols all storage 3); production differs (_king_globals storage 2). Proposed OPTIONAL config/symbol_ownership.json entry (objects precedent) to pin the linkage of this zero-filled BSS.
+- config/object_admission_rejections.json, parked.json, semantic_matches.json: no king entries.
+
+## Emulated full admission chain (scratch/w/king/emu_progress.py)
+- Mini objdiff 3.3.1 report (scratch/w/king/mkproj.py): production pair and (emulated split, c2 obj) give IDENTICAL king rows (code 4865/4865, 29/29, data 740/876, .data 98.24561%) -> storage change is scorer-inert; with metadata.complete=true objdiff adds complete_code 4865 / complete_data 876 / complete_units 1.
+- Chain = apply_semantic_rejections -> apply_semantic_matches -> accepted_ledger -> apply_semantic_data_matches (edited manifest, edited symbols.json) -> require_symbol_ownership_snapshots (edited manifest incl. king .bss) -> revoke_incomplete_units -> require_valid_parked_functions -> audit_object_admission.audit.
+- BASE: Halo complete units 363, complete_code 732,371, complete_data 597,403, matched_data 2,574,358; revoked []; parks 93/0/0; admission 15/0/7/0.
+- EMU (c2, and identically c1, c4): Halo complete units **364**, complete_code **737,236 (+4,865)**, complete_data **598,279 (+876)**, matched_data **2,574,494 (+136)**; data credit "game_engine_king:_king_engine (+136)" WITHOUT allow_incomplete_unit; ownership snapshot king .bss (3 symbols) validates; revoked []; parks 93/0/0; admission 15/0/7/0, 0 contradicted.
+- fake_match_scan: 0 leads on c1/c2/c4 .c+.h (production also 0). Official gate.py --source c2 .c (production header, extern->static redefinition accepted by C2): 29/29 EXACT.
+- Precedent check: oddball 0 PDB disagreements (engine fns + oddball_globals static, no prototypes); ctf engine fns + ctf_globals static (prototypes only for forward-referenced helpers); slayer engine fns static. Pre-existing precedent debt (NOT this unit): slayer `_slayer_globals` and ctf `_ctf_state_message_update_warning` are external but absent from cachebeta publics, 0 UNDEF refs anywhere (ctf's prototype lives in game_engine_runtime.h).
+- Split dir pruned to the king object after the 833-object census (only king changed).
+
+## Verdict / deliverables (scratch/w/king/patches/, all `git apply --check` clean, combined too)
+- RECOMMENDED king_source.patch (= c2): 22 engine-table callbacks `static` (no prototypes; oddball/slayer/ctf precedent - none is forward-referenced), `static struct king_globals king_globals`, header drops the 22 prototypes + `extern struct king_globals king_globals;`. 29/29 EXACT, 59 sections byte-identical to production, only 23 storage rows 2->3.
+- EQUIVALENT alternatives, all byte-identical: data_gap king.patch (= c1, adds 22 static prototypes to the .c prototype block); king_source_struct_move_ALT.patch (= c4, c2 + struct king_globals/verify typedefs moved into the .c like oddball/ctf). Bytes cannot discriminate prototypes-vs-none or struct placement; choose by house style.
+- symbols_king.patch + full copy scratch/w/king/config/symbols.json: 23 in-place line edits appending `, "static": true` (22 fns + _king_globals); no reordering.
+- config_status_king.patch: game_engine_king.c NonMatching -> Matching.
+- semantic_data_matches_king.patch (+ full copy): single-section `_king_engine` entry, measurements 136/23/4009f5b6..., NO allow_incomplete_unit (the data_gap entry's allow_incomplete_unit + distance3d reason is STALE after Layer 2 - do not use it).
+- symbol_ownership_king_OPTIONAL.patch (+ full copy): .bss snapshot pinning the three file-static King globals (objects precedent).
+- Header blast radius: game_engine_king.h is included ONLY by game_engine_king.c (grep) and no object in build/base or build/split references any of the 23 symbols -> zero consumers; integrator's full ninja + stable diff still required.
+- Expected on integration: Halo objects 363 -> 364 (whole object), complete_code +4,865, complete_data +876, matched data +136, 0 function changes, parks/admission unchanged.

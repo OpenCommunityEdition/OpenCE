@@ -1,0 +1,17 @@
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -34,14 +34,6 @@
+       "reopen": "Require authentic source topology or an ordinary base/base link with an authenticated compatible canonical selected helper before clearing this veto. Do not force inline, manually expand math, alter target/COMDAT metadata, invent a discard pass, or credit candidate-only helper bytes. All remaining HUD Draw functions/data/linkage/source checks must independently pass before whole-object Matching."
+     },
+     {
+-      "unit": "source/models/models",
+-      "class": "bss-symbol-layout-mismatch",
+-      "symbol": ".bss",
+-      "reason": "The target and rebuilt objects both contain 136 zero-filled BSS bytes, but the four semantic default_render_model symbols have different section-relative offsets; byte-only data accounting therefore cannot prove equivalent ownership or final linked addresses.",
+-      "evidence": "docs/object_matching_logs/models_obj_fable_salvage_20260902.md#bss-ownership-boundary",
+-      "reopen": "Remove this rejection only after authoritative January ownership evidence or natural source makes all four BSS symbol offsets and linkage agree without aggregate facades, hash-steering names, custom sections, or other matching-only constructs."
+-    },
+-    {
+       "unit": "source/effects/decals",
+       "class": "candidate-only-comdat-owner",
+       "symbol": "_vector_from_points2d",

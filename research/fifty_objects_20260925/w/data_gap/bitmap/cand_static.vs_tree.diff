@@ -1,0 +1,13 @@
+diff --git a/source/bitmaps/bitmap_drawing.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\bitmap\\cand_static.c"
+index 9cbde4ef..7c7454ad 100644
+--- a/source/bitmaps/bitmap_drawing.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\bitmap\\cand_static.c"
+@@ -241,7 +241,7 @@ short translation_table[NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_FORMATS][NUMB
+ 	},
+ };
+ 
+-word const bitmap_bevel_sequence_indices[NUMBER_OF_BITMAP_BEVEL_PIECES] =
++static word const bitmap_bevel_sequence_indices[NUMBER_OF_BITMAP_BEVEL_PIECES] =
+ {
+ 	_bitmap_bevel_part_center,
+ 	_bitmap_bevel_part_corner,

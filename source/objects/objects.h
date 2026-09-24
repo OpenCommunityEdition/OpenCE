@@ -188,6 +188,14 @@ enum
 #define object_get(index)			((struct object_datum*)object_get_and_verify_type(index, _object_mask_all))
 #define object_try_and_get(index)	((struct object_datum*)object_try_and_get_and_verify_type(index, _object_mask_all))
 
+/* the inline assertions below report January's __FILE__ for this header, and January spelled it
+   two ways: its string census has "..\objects\objects.h" defined by action_vehicle (and
+   referenced by render_objects) and "c:\halo\source\objects\objects.h" defined by
+   object_lights; a unit that needs the absolute spelling defines OBJECTS_H_FILE first */
+#ifndef OBJECTS_H_FILE
+#define OBJECTS_H_FILE "..\\objects\\objects.h"
+#endif
+
 /* ---------- structures */
 
 typedef void (*object_deleted_proc)(long);
@@ -488,8 +496,8 @@ __inline void object_get_bounding_sphere(
 {
 	struct object_datum *object = object_get(object_index);
 
-	match_assert("c:\\halo\\source\\objects\\objects.h", 535, center);
-	match_assert("c:\\halo\\source\\objects\\objects.h", 536, radius);
+	match_assert(OBJECTS_H_FILE, 535, center);
+	match_assert(OBJECTS_H_FILE, 536, radius);
 
 	*center = object->object.bounding_sphere_center;
 	*radius = object->object.bounding_sphere_radius;
@@ -504,8 +512,8 @@ __inline void object_get_render_bounding_sphere(
 {
 	struct object_datum *object = object_get(object_index);
 
-	match_assert("..\\objects\\objects.h", 551, center);
-	match_assert("..\\objects\\objects.h", 552, radius);
+	match_assert(OBJECTS_H_FILE, 551, center);
+	match_assert(OBJECTS_H_FILE, 552, radius);
 
 	*center = object->object.bounding_sphere_center;
 	*radius = object_definition_get(object->definition_index)->object.render_bounding_radius;

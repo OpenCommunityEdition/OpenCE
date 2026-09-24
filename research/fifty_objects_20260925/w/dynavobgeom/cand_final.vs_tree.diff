@@ -1,0 +1,18 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\dynavobgeom\\cand_final.c"
+index ad7d7b6d..7b437ce4 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\dynavobgeom\\cand_final.c"
+@@ -742,9 +742,10 @@ void _rasterizer_dynamic_unlit_geometry_draw(
+ 		{
+ 			rasterizer_frame_statistics.dynamic_unlit_draw_count++;
+ 			rasterizer_frame_statistics.dynamic_unlit_triangle_count += triangle_count;
+-			rasterizer_frame_statistics.largest_dynamic_unlit_triangle_count = MAX(
+-				triangle_count,
+-				rasterizer_frame_statistics.largest_dynamic_unlit_triangle_count);
++			if (triangle_count > rasterizer_frame_statistics.largest_dynamic_unlit_triangle_count)
++			{
++				rasterizer_frame_statistics.largest_dynamic_unlit_triangle_count = triangle_count;
++			}
+ 			rasterizer_frame_statistics.dynamic_unlit_vertex_count +=
+ 				rasterizer_frame_statistics_count_dynamic_vertices(
+ 					dynamic_triangle_buffer_index,

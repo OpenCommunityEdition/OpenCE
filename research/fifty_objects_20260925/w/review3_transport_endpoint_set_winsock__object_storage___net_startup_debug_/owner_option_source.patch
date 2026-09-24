@@ -1,0 +1,35 @@
+diff --git a/source/bungie_net/network/transport_endpoint_set_winsock.c b/source/bungie_net/network/transport_endpoint_set_winsock.c
+--- a/source/bungie_net/network/transport_endpoint_set_winsock.c
++++ b/source/bungie_net/network/transport_endpoint_set_winsock.c
+@@ -154,6 +154,8 @@
+ 
+ /* ---------- prototypes */
+ 
++static void net_startup_debug(
++	void);
+ static long transport_endpoint_set_get_next_index(
+ 	struct transport_endpoint_set *set);
+ static int __cdecl transport_endpoint_set_compare_entries(
+@@ -173,7 +175,13 @@
+ 
+ /* ---------- private code */
+ 
+-void net_startup_debug(
++/* January keeps this empty private step (name from the 2001-09-25 Xbox linker maps).
++ * It is absent from the January PDB publics, so it is file-static, and VC7 emits a
++ * static only when it is used. The call position in transport_initialize is inferred
++ * (every placement is byte-identical), and the 2001 release builds (@net_startup_debug@4,
++ * ret 4) show one 4-byte float or struct parameter whose type is not recovered.
++ */
++static void net_startup_debug(
+ 	void)
+ {
+ 	return;
+@@ -271,6 +279,7 @@
+ 		FILE *bypass_file;
+ 		short wsa_error;
+ 
++		net_startup_debug();
+ 		startup_params.cfgSizeOfStruct = sizeof(startup_params);
+ 		startup_params.cfgPrivatePoolSizeInPages = 24;
+ 		startup_params.cfgEnetReceiveQueueLength = 8;

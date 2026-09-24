@@ -101,7 +101,7 @@ symbols in this file:
 002A8968 007d:
 	??_C@_0HN@FLNBFKEC@?$CIlevel?$DO?$DN0?$CJ?5?$CG?$CG?5?$CIlevel?$DMNUMBER_OF_S@ (0000)
 00316880 0048:
-	_data_00316880 (0000)
+	_profile_color_table (0000)
 004D27E8 006c:
 	_player_profile_globals (0000)
 */
@@ -169,7 +169,6 @@ struct player_profile_runtime_globals
 	struct player_profile_write_request write_request;
 	struct thread_reference *thread;
 	boolean initialized;
-	byte pad[3];
 };
 
 typedef char verify_player_profile_thread_offset[
@@ -197,7 +196,7 @@ static void player_profile_write(
 
 /* ---------- globals */
 
-long player_profile_primary_colors[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
+static long profile_color_table[NUMBER_OF_AVAILABLE_PRIMARY_COLORS] =
 {
 	0x00FFFFFF,
 	0x00000000,
@@ -335,7 +334,7 @@ real_rgb_color player_profile_get_rgb_color(
 	color_index = color_index < NUMBER_OF_AVAILABLE_PRIMARY_COLORS - 1 ?
 		color_index : NUMBER_OF_AVAILABLE_PRIMARY_COLORS - 1;
 	color_index = color_index < 0 ? 0 : color_index;
-	color = player_profile_primary_colors[color_index];
+	color = profile_color_table[color_index];
 
 	rgb_color.red = ((color >> 16) & 0xFF) / 255.f;
 	rgb_color.green = ((color >> 8) & 0xFF) / 255.f;
@@ -816,15 +815,15 @@ static unsigned long __stdcall player_profile_write_thread_proc(
 			{
 				error(_error_silent, "metadata name may not match game display name");
 			}
-
-			if (failed)
-			{
-				delete_enumerated_saved_game_file(player_profile_index);
-			}
 		}
 		else
 		{
 			error(_error_silent, "failed to open player profile file");
+		}
+
+		if (failed)
+		{
+			delete_enumerated_saved_game_file(player_profile_index);
 		}
 
 		saved_game_files_release_mutex();

@@ -1,0 +1,11 @@
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -14060,7 +14060,7 @@
+ { "file_offset": 2452052, "flags": 0, "name": "??_C@_0CF@KEFAILDC@c?3?2halo?2SOURCE?2camera?2bored_came@" },
+ { "file_offset": 2452092, "flags": 0, "name": "??_C@_0DN@JNLEKBID@cannot?5set?5first?5person?5camera?5o@" },
+ { "file_offset": 2452156, "flags": 0, "name": "??_C@_0CJ@GLCFCHKA@c?3?2halo?2SOURCE?2camera?2camera_scr@" },
+-{ "file_offset": 2452200, "flags": 0, "name": "_dead_camera_constants" },
++{ "file_offset": 2452200, "flags": 0, "name": "_dead_camera_constants", "static": true },
+ { "file_offset": 2452212, "flags": 0, "name": "??_C@_0CE@LCNMEPOD@c?3?2halo?2SOURCE?2camera?2dead_camer@" },
+ { "file_offset": 2452248, "flags": 0, "name": "_director_game_camera_modes" },
+ { "file_offset": 2452256, "flags": 0, "name": "_director_script_camera_record_camera_modes" },

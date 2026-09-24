@@ -1,0 +1,277 @@
+diff --git a/source/interface/hud_globals_definitions.h b/source/interface/hud_globals_definitions.h
+new file mode 100644
+index 00000000..75c89b5a
+--- /dev/null
++++ b/source/interface/hud_globals_definitions.h
+@@ -0,0 +1,125 @@
++/*
++HUD_GLOBALS_DEFINITIONS.H
++
++HUD globals ('hudg') tag layout, as recorded by the HCEX PDB, and the global
++owned by HUD.C.  The shared placement and color elements come from
++UNIT_HUD_INTERFACE_DEFINITION.H.  Focused owner header: HUD_DEFINITIONS.H
++cannot carry this layout while several HUD translation units still define
++their own local struct hud_globals_definition.
++*/
++
++#ifndef __HUD_GLOBALS_DEFINITIONS_H
++#define __HUD_GLOBALS_DEFINITIONS_H
++#pragma once
++
++/* ---------- headers */
++
++#include "interface/unit_hud_interface_definition.h"
++
++/* ---------- constants */
++
++enum
++{
++	HUD_GLOBALS_DEFINITION_TAG = 'hudg',
++};
++
++/* ---------- macros */
++
++#define hud_globals_definition_get(index) \
++	((struct hud_globals_definition *)tag_get( \
++		HUD_GLOBALS_DEFINITION_TAG, \
++		(index)))
++
++/* ---------- structures */
++
++struct hud_messaging_parameters_definition
++{
++	struct hud_absolute_placement_definition absolute_placement;
++	struct hud_placement_definition placement;
++	struct tag_reference single_player_font;
++	struct tag_reference multi_player_font;
++	real up_time;
++	real fade_time;
++	real_argb_color state_color;
++	real_argb_color text_color;
++	real spacing;
++	struct tag_reference hud_item_messages;
++	struct tag_reference messaging_icons;
++	struct tag_reference alternate_icon_text;
++	struct tag_block button_icons;
++	struct hud_color_definition color;
++	struct tag_reference hud_messages;
++	struct hud_color_definition objective_color;
++};
++
++struct hud_waypoint_definition
++{
++	real top_offset;
++	real bottom_offset;
++	real left_offset;
++	real right_offset;
++	long unused0[8];
++	struct tag_reference arrow_bitmap;
++	struct tag_block arrows;
++	long unused1[20];
++};
++
++struct hud_multiplayer_parameters_definition
++{
++	real hud_scale;
++	long unused[64];
++};
++
++struct hud_defaults_definition
++{
++	struct tag_reference default_weapon_hud;
++	real motion_sensor_range;
++	real motion_sensor_velocity_sensitivity;
++	real motion_sensor_scale;
++	rectangle2d default_title_bounds;
++	long unused[11];
++};
++
++struct hud_damage_indicators_definition
++{
++	short top_offset;
++	short bottom_offset;
++	short left_offset;
++	short right_offset;
++	long unused[8];
++	struct tag_reference indicator_bitmap;
++	short sequence_index;
++	short multiplayer_sequence_index;
++	unsigned long color;
++	long unused2[4];
++};
++
++struct hud_timer_definition
++{
++	struct hud_color_definition color;
++	struct hud_color_definition time_up_color;
++	long unused[10];
++};
++
++struct hud_globals_definition
++{
++	struct hud_messaging_parameters_definition messaging;
++	struct hud_waypoint_definition waypoint;
++	struct hud_multiplayer_parameters_definition multiplayer;
++	struct hud_defaults_definition defaults;
++	struct hud_damage_indicators_definition damage_indicators;
++	struct hud_timer_definition timer_definition;
++	struct tag_reference carnage_report_bitmap;
++	short loading_begin_index;
++	short loading_end_index;
++	short checkpoint_begin_index;
++	short checkpoint_end_index;
++	struct tag_reference checkpoint_sound;
++	long unused2[24];
++};
++
++/* ---------- globals */
++
++extern struct hud_globals_definition *hud_globals;
++
++#endif // __HUD_GLOBALS_DEFINITIONS_H
+diff --git a/source/interface/hud_nav_points.h b/source/interface/hud_nav_points.h
+new file mode 100644
+index 00000000..af0c0c5a
+--- /dev/null
++++ b/source/interface/hud_nav_points.h
+@@ -0,0 +1,33 @@
++/*
++HUD_NAV_POINTS.H
++
++Narrow cross-translation-unit interface owned by HUD_NAV_POINTS.C for the
++multiplayer game engine goal markers.  The rest of the nav-point API is
++declared in HUD.H; focused owner header because adding these three
++prototypes to the broad HUD.H moves distant declaration-count ties.
++*/
++
++#ifndef __HUD_NAV_POINTS_H
++#define __HUD_NAV_POINTS_H
++#pragma once
++
++/* ---------- structures */
++
++union real_point3d;
++
++/* ---------- prototypes/HUD_NAV_POINTS.C */
++
++short find_nav_point(
++	char const *name);
++short hud_get_nav_point_render_type(
++	short local_player_index,
++	union real_point3d const *head,
++	union real_point3d const *position,
++	long reference_object_index);
++void custom_render_nav_point(
++	short local_player_index,
++	union real_point3d const *position,
++	short nav_index,
++	short waypoint_type);
++
++#endif // __HUD_NAV_POINTS_H
+diff --git a/source/items/item_collection_definitions.h b/source/items/item_collection_definitions.h
+new file mode 100644
+index 00000000..68ce2bba
+--- /dev/null
++++ b/source/items/item_collection_definitions.h
+@@ -0,0 +1,40 @@
++/*
++ITEM_COLLECTION_DEFINITIONS.H
++
++Item collection ('itmc') tag layout, as recorded by the HCEX PDB.  The tag
++group constant lives with the item definitions in ITEM_DEFINITIONS.H.
++Focused owner header: adding these types to the broad ITEM_DEFINITIONS.H
++moves distant declaration-count ties.
++*/
++
++#ifndef __ITEM_COLLECTION_DEFINITIONS_H
++#define __ITEM_COLLECTION_DEFINITIONS_H
++#pragma once
++
++/* ---------- headers */
++
++#include "items/item_definitions.h"
++
++/* ---------- macros */
++
++#define item_collection_definition_get(index) ((struct item_collection_definition *)tag_get(ITEM_COLLECTION_DEFINITION_TAG, index))
++
++/* ---------- structures */
++
++struct item_permutation_definition
++{
++	long unused1[8];
++	real weight;
++	struct tag_reference item;
++	long unused2[8];
++};
++
++struct item_collection_definition
++{
++	struct tag_block permutations;
++	short spawn_time;
++	short pad;
++	long unused[19];
++};
++
++#endif // __ITEM_COLLECTION_DEFINITIONS_H
+diff --git a/source/scenario/scenario_netgame_definitions.h b/source/scenario/scenario_netgame_definitions.h
+new file mode 100644
+index 00000000..e4b0c063
+--- /dev/null
++++ b/source/scenario/scenario_netgame_definitions.h
+@@ -0,0 +1,55 @@
++/*
++SCENARIO_NETGAME_DEFINITIONS.H
++
++Narrow cross-translation-unit interface to the scenario tag's multiplayer
++blocks (netgame flags, netgame equipment and starting equipment), used by the
++multiplayer game engines.  Member names and layouts follow the HCEX PDB
++records; SCENARIO_DEFINITIONS.H keeps the enclosing struct scenario.
++Focused owner header: adding these types to the broad
++SCENARIO_DEFINITIONS.H moves distant declaration-count ties.
++*/
++
++#ifndef __SCENARIO_NETGAME_DEFINITIONS_H
++#define __SCENARIO_NETGAME_DEFINITIONS_H
++#pragma once
++
++/* ---------- headers */
++
++#include "math/real_math.h"
++#include "tag_files/tag_groups.h"
++
++/* ---------- structures */
++
++struct scenario_netgame_flag
++{
++	real_point3d position;
++	real facing;
++	short type;
++	short team_index;
++	long unused[32];
++};
++
++struct scenario_netgame_equipment
++{
++	long flags;
++	short game_type[4];
++	short team_index;
++	short spawn_time;
++	long run_time_spawned_item_index;
++	long unused1[11];
++	real_point3d position;
++	real facing;
++	struct tag_reference item_collection;
++	long unused2[12];
++};
++
++struct scenario_starting_equipment
++{
++	long flags;
++	short game_type[4];
++	long unused1[12];
++	struct tag_reference item_collection[6];
++	long unused2[12];
++};
++
++#endif // __SCENARIO_NETGAME_DEFINITIONS_H

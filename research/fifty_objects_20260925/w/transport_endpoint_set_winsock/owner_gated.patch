@@ -1,0 +1,143 @@
+diff --git a/source/bungie_net/network/transport_endpoint_set_winsock.c b/source/bungie_net/network/transport_endpoint_set_winsock.c
+index 27d5b865..d88b9a5a 100644
+--- a/source/bungie_net/network/transport_endpoint_set_winsock.c
++++ b/source/bungie_net/network/transport_endpoint_set_winsock.c
+@@ -173,7 +173,7 @@ extern byte global_nonce[TRANSPORT_NONCE_LENGTH];
+ 
+ /* ---------- private code */
+ 
+-void net_startup_debug(
++static void net_startup_debug(
+ 	void)
+ {
+ 	return;
+@@ -261,6 +261,8 @@ void transport_pop_key(
+ short transport_initialize(
+ 	void)
+ {
++	short result = _transport_error_none;
++
+ 	if (!transport_initialized)
+ 	{
+ 		WSADATA wsa_data = { 0 };
+@@ -271,12 +273,16 @@ short transport_initialize(
+ 		FILE *bypass_file;
+ 		short wsa_error;
+ 
++		net_startup_debug();
+ 		startup_params.cfgSizeOfStruct = sizeof(startup_params);
++		startup_params.cfgFlags = 0;
+ 		startup_params.cfgPrivatePoolSizeInPages = 24;
+ 		startup_params.cfgEnetReceiveQueueLength = 8;
+ 		startup_params.cfgIpFragMaxSimultaneous = 4;
+ 		startup_params.cfgIpFragMaxPacketDiv256 = 8;
+ 		startup_params.cfgSockMaxSockets = 128;
++		startup_params.cfgSockDefaultRecvBufsizeInK = 0;
++		startup_params.cfgSockDefaultSendBufsizeInK = 0;
+ 		startup_params.cfgKeyRegMax = 1;
+ 		startup_params.cfgSecRegMax = 32;
+ 
+@@ -290,6 +296,8 @@ short transport_initialize(
+ 			(link_status & XNET_ETHERNET_LINK_FULL_DUPLEX) ? " in full-duplex mode" : "",
+ 			(link_status & XNET_ETHERNET_LINK_HALF_DUPLEX) ? " in half-duplex mode" : "");
+ 
++		startup_params.cfgSizeOfStruct = sizeof(startup_params);
++		startup_params.cfgFlags = 0;
+ 		bypass_file = fopen("d:\\bypass_security.txt", "r");
+ 		if (bypass_file)
+ 		{
+@@ -299,35 +307,48 @@ short transport_initialize(
+ 		}
+ 
+ 		if (XNetStartup(&startup_params) != 0)
+-			return _transport_error_not_initialized;
+-
+-		wsa_error = WSAStartup(MAKEWORD(2, 0), &wsa_data);
+-		if (wsa_error != 0)
+ 		{
+-			XNetCleanup();
+-			winsock_error_to_string(wsa_error);
+-			return _transport_error_not_initialized;
++			result = _transport_error_not_initialized;
+ 		}
+-
+-		deadline = system_milliseconds() + 10000;
+-		do
++		else
+ 		{
+-			address_status = XNetGetTitleXnAddr(&global_address);
+-			if (system_milliseconds() > deadline ||
+-				address_status == XNET_GET_XNADDR_NONE)
++			wsa_error = WSAStartup(MAKEWORD(2, 0), &wsa_data);
++			if (wsa_error != 0)
+ 			{
+-				WSACleanup();
+ 				XNetCleanup();
+-				return _transport_error_not_initialized;
++				winsock_error_to_string(wsa_error);
++				result = _transport_error_not_initialized;
++			}
++			else
++			{
++				deadline = system_milliseconds() + 10000;
++				do
++				{
++					address_status = XNetGetTitleXnAddr(&global_address);
++					if (system_milliseconds() > deadline)
++					{
++						address_status = XNET_GET_XNADDR_NONE;
++					}
++				}
++				while (address_status == XNET_GET_XNADDR_PENDING);
++
++				if (address_status == XNET_GET_XNADDR_NONE)
++				{
++					WSACleanup();
++					XNetCleanup();
++					result = _transport_error_not_initialized;
++				}
++				else
++				{
++					XNetRandom(global_nonce, sizeof(global_nonce));
++					result = _transport_error_none;
++					transport_initialized = TRUE;
++				}
+ 			}
+ 		}
+-		while (address_status == XNET_GET_XNADDR_PENDING);
+-
+-		XNetRandom(global_nonce, sizeof(global_nonce));
+-		transport_initialized = TRUE;
+ 	}
+ 
+-	return _transport_error_none;
++	return result;
+ }
+ 
+ void transport_client_stop(
+@@ -570,14 +591,19 @@ short poll_endpoint_set(
+ 			}
+ 		}
+ 	}
+-	else if (select_result < 0)
+-	{
+-		winsock_error_to_string(WSAGetLastError());
+-		result = _transport_error_poll_error;
+-	}
+ 	else
+ 	{
+-		result = _transport_result_poll_timeout;
++		boolean select_failed = select_result < 0 || select_result == SOCKET_ERROR;
++
++		if (select_failed)
++		{
++			winsock_error_to_string(WSAGetLastError());
++			result = _transport_error_poll_error;
++		}
++		else
++		{
++			result = _transport_result_poll_timeout;
++		}
+ 	}
+ 	return result;
+ }

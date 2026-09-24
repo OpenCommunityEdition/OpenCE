@@ -1,0 +1,122 @@
+diff --git a/source/game/game_engine.h b/source/game/game_engine.h
+--- a/source/game/game_engine.h
++++ b/source/game/game_engine.h
+@@ -14,16 +14,16 @@
+ 
+ enum
+ {
+-	_game_engine_allow_dynamic_lighting_bit = 0,
+-	_game_engine_allow_integrated_lights_bit,
+-	_game_engine_disable_infinite_grenades_bit,
++	_game_engine_disable_dynamic_light_bit = 0,
++	_game_engine_disable_integrated_lights_bit,
++	_game_engine_5_or_more_players_bit,
+ };
+ 
+ enum
+ {
+ 	_game_variant_draw_object_in_motion_sensor_bit = 0,
+-	_game_variant_unknown1_bit = 1,
+-	_game_variant_infinite_grenades_bit = 2,
++	_game_variant_allow_friendly_navpoints_bit,
++	_game_variant_infinite_grenades_bit,
+ 	_game_variant_no_shields_bit,
+ 	_game_variant_always_invisible_bit,
+ };
+@@ -154,7 +154,7 @@
+ 	void (*statistics_append)(long statistic);
+ 	void (*handle_client_message)(void *message);
+ 	void (*handle_server_message)(void *message);
+-	void (*unknown2C)(void);
++	void (*pregame_post_rasterize)(void);
+ 	void (*post_rasterize_objects)(void);
+ 	void (*player_update_each_tick)(
+ 		long player_index);
+@@ -166,7 +166,7 @@
+ 		long player_index);
+ 	void (*weapon_dropped)(
+ 		long weapon_index);
+-	void (*unknown44)(void);
++	void (*update)(void);
+ 	long (*get_player_score)(
+ 		long player_index,
+ 		enum get_score_type score_type);
+@@ -192,11 +192,11 @@
+ 		boolean friendly_fire);
+ 	boolean (*format_message)(
+ 		long player_index,
+-		long parameter1,
+-		long parameter2,
+-		wchar_t *message,
+-		long message_character_count);
+-	float (*starting_location_rating)(
++		long message,
++		long message_data,
++		wchar_t *buffer,
++		long buffer_size);
++	real (*starting_location_rating)(
+ 		long player_index,
+ 		struct player_starting_location const *starting_location);
+ 	void (*prespawn_player_update)(
+@@ -268,7 +268,7 @@
+ long players_in_game(
+ 	void);
+ 
+-float get_blink_alpha(
++real get_blink_alpha(
+ 	void);
+ 
+ long game_engine_player_get_team_index(
+@@ -331,7 +331,7 @@
+ 	void);
+ 
+ void game_engine_update_non_deterministic(
+-	float delta_seconds);
++	real delta_seconds);
+ 
+ boolean match_game_type(
+ 	long game_type,
+@@ -344,7 +344,7 @@
+ void game_engine_initialize_for_new_map(
+ 	void);
+ 
+-float game_engine_get_distance_rating_for_spawn(
++real game_engine_get_distance_rating_for_spawn(
+ 	long player_index,
+ 	union real_point3d const *position);
+ 
+@@ -399,11 +399,11 @@
+ void game_engine_set_goal_position(
+ 	short goal_index,
+ 	union real_point3d const *position,
+-	float height,
++	real height,
+ 	char const *name,
+-	long target_object_index,
++	long player_index,
+ 	short team_index,
+-	long player_index);
++	long ignore_player_index);
+ 
+ boolean game_engine_has_teams(
+ 	void);
+@@ -439,7 +439,7 @@
+ 	short maximum_count);
+ 
+ void game_engine_render_nav_points(
+-	long local_player_index);
++	short local_player_index);
+ 
+ union real_rgb_color *game_engine_player_get_change_color(
+ 	union real_rgb_color *change_color,
+@@ -513,6 +513,10 @@
+ 
+ void game_engine_play_multiplayer_sound(
+ 	long sound_index);
++void game_engine_update_multiplayer_sound(
++	void);
++void game_engine_intialize_queued_sounds(
++	void);
+ 
+ long game_engine_remap_object_definition(long definition_index);
+ 

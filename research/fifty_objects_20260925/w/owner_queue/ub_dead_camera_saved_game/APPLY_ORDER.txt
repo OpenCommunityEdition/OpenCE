@@ -1,0 +1,24 @@
+Owner-queue packet ub_dead_camera_saved_game - apply order (base cdc8ebd3; also verified at eb33baec)
+NOTHING HERE IS LANDED. Apply only the item(s) the owner answers YES to (RULING.md).
+
+Worktree form (CRLF content; plain `git apply`):     patches/NN_*.patch
+Index form (LF content; `git apply --cached/--index`): patches/index_lf/NN_*.patch
+Both forms were checked clean together and one by one at cdc8ebd3 and eb33baec.
+
+ITEM 1 - dead_camera (independent of item 2)
+  1. patches/01_dead_camera_update_bug.patch        source/camera/dead_camera.c only
+     No symbols.json change (the _dead_camera_constants static landed in batch 1; split already storage 3).
+  Post (integrator): full ninja; stable sweep; object_audit; then config/config.json:743
+     "source/camera/dead_camera.c" NonMatching -> Matching. No park to retire.
+
+ITEM 2 - saved_game_files (independent of item 1)
+  2. patches/02_saved_game_files_storage.patch       .c + saved_game_files.h + config/symbols.json (line 7376,
+     in place). ZERO-CREDIT storage fix; admissible WITHOUT the ruling (held since wave 1, never landed).
+     Slug symbols.json = the full edited copy (worktree CRLF form) if a whole-file replace is preferred.
+     After it: csplit-only regen (only saved_game_files.obj changes: _enumerate_memory_units 2->3).
+  3. patches/03_saved_game_files_enumerate_available_bug.patch   ONLY on an owner YES.
+  Post (integrator): full ninja; stable sweep; retire the config/parked.json park for
+     _saved_game_files_enumerate_available_to_local_player_index via tools.campaign.unpark;
+     object_audit. Do NOT flip config/config.json:398 to Matching on the ruling alone - see MEASURED.md
+     section 2.4 (3 PDB-storage disagreements remain; the lab follow-up closes them but is a separate,
+     unreviewed real change: lab/LAB_ONLY_saved_game_files_helper_storage_on_top_of_03.diff).

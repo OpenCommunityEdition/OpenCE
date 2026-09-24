@@ -1,0 +1,13 @@
+diff --git a/config/symbols.json b/scratch/w/review3_hs_scenario_definitions/fallback/config/symbols.json
+index 22873fad..b2ce160d 100644
+--- a/config/symbols.json
++++ b/scratch/w/review3_hs_scenario_definitions/fallback/config/symbols.json
+@@ -3246,7 +3246,7 @@
+ { "file_offset": 773840, "flags": 32, "name": "_hs_runtime_initialize_for_new_map" },
+ { "file_offset": 774560, "flags": 32, "name": "_hs_runtime_update" },
+ { "file_offset": 774736, "flags": 32, "name": "_hs_runtime_evaluate" },
+-{ "file_offset": 774928, "flags": 32, "name": "_hs_syntax_data_byte_swap" },
++{ "file_offset": 774928, "flags": 32, "name": "_byte_swap_script_syntax_data", "static": true },
+ { "file_offset": 775152, "flags": 32, "name": "_reference_list_new" },
+ { "file_offset": 775216, "flags": 32, "name": "_reference_list_get_next_datum_index" },
+ { "file_offset": 775264, "flags": 32, "name": "_reference_list_add" },

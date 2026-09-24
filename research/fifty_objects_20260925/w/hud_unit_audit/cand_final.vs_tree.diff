@@ -1,0 +1,119 @@
+diff --git a/source/interface/hud_unit.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_unit_audit\\cand_final.c"
+index 1ff72603..dc853fe5 100644
+--- a/source/interface/hud_unit.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_unit_audit\\cand_final.c"
+@@ -113,6 +113,12 @@ enum hud_damage_indicator_direction
+ 	NUMBER_OF_HUD_DAMAGE_INDICATOR_DIRECTIONS
+ };
+ 
++enum
++{
++	STACK_BUFFER_LENGTH = 0x80,
++	STACK_BUFFER_FILL = 0x62626262,
++};
++
+ /* ---------- macros */
+ 
+ /* ---------- structures */
+@@ -354,8 +360,27 @@ void hud_initialize_unit_interface_for_new_map(
+ 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+ 		local_player_index++)
+ 	{
+-		hud_state = get_hud_state(local_player_index);
+-		initialize_hud_state(hud_state);
++		match_assert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x106,
++			local_player_index>=0 &&
++				local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
++		match_assert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x107,
++			unit_hud_globals);
++
++		hud_state = &unit_hud_globals->hud_states[local_player_index];
++		csmemset(
++			hud_state->auxilary_flash_time,
++			NONE,
++			sizeof(hud_state->auxilary_flash_time));
++		hud_state->last_body_vitality = -1.0f;
++		hud_state->last_shield_vitality = -1.0f;
++		hud_state->last_health_flash_time = NONE;
++		hud_state->last_motion_sensor_flash_time = NONE;
++		hud_state->fade_time = -1.0f;
++		hud_state->last_unit_index = NONE;
+ 		hud_state->sound_flags = 0;
+ 		csmemset(
+ 			hud_state->last_sound_handles,
+@@ -647,7 +672,34 @@ static void hud_update_unit_local_player(
+ 		}
+ 	}
+ 
+-	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_unit.c", 0x201);
++	{
++		short corrupt_index;
++		short buffer_index;
++
++		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
++		{
++			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
++				goto corrupt_stack_found;
++		}
++
++		corrupt_index = NONE;
++		goto stack_buffer_checked;
++
++corrupt_stack_found:
++		corrupt_index = buffer_index;
++
++stack_buffer_checked:
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x201,
++			return_eip == get_return_eip(),
++			"corrupt return address!");
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x201,
++			corrupt_index == NONE,
++			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
++	}
+ 
+ 	return;
+ }
+@@ -1390,7 +1442,34 @@ void hud_render_unit_interface(
+ 		}
+ 	}
+ 
+-	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_unit.c", 0x3C9);
++	{
++		short corrupt_index;
++		short buffer_index;
++
++		for (buffer_index = STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--)
++		{
++			if (stack_buffer[buffer_index] != STACK_BUFFER_FILL)
++				goto corrupt_stack_found;
++		}
++
++		corrupt_index = NONE;
++		goto stack_buffer_checked;
++
++corrupt_stack_found:
++		corrupt_index = buffer_index;
++
++stack_buffer_checked:
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x3C9,
++			return_eip == get_return_eip(),
++			"corrupt return address!");
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_unit.c",
++			0x3C9,
++			corrupt_index == NONE,
++			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
++	}
+ 
+ 	return;
+ }

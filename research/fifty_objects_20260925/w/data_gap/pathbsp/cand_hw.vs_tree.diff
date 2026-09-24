@@ -1,0 +1,38 @@
+diff --git a/source/ai/path_structure_bsp.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\pathbsp\\cand_hw.c"
+index 32a97c1a..02ba70fb 100644
+--- a/source/ai/path_structure_bsp.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\pathbsp\\cand_hw.c"
+@@ -14,10 +14,9 @@ symbols in this file:
+ 	_structure_surface_index_from_point (0000)
+ 00052500 0270:
+ 	_structure_test_pill2d (0000)
+-0024EC0C 0020:
++0024EC0C 0040:
+ 	_quantized_pathfinding_surface_widths (0000)
+-0024EC2C 0020:
+-	_quantized_pathfinding_surface_heights (0000)
++	_quantized_pathfinding_surface_heights (0020)
+ 0024EC4C 0027:
+ 	??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_structure@ (0000)
+ 0024EC78 0008:
+@@ -67,16 +66,14 @@ enum
+ 
+ /* ---------- globals */
+ 
+-/* HCEX.pdb path_structure_bsp compiland: two file-static const float[8] tables, widths first.
+- * January references neither from code; VC7 still emits an initialised unreferenced static. */
+-static const real quantized_pathfinding_surface_widths[] =
++static real const quantized_pathfinding_surface_heights[8] =
+ {
+-	0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f, 4.0f
++	0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 4.0f, 8.0f
+ };
+ 
+-static const real quantized_pathfinding_surface_heights[] =
++static real const quantized_pathfinding_surface_widths[8] =
+ {
+-	0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 4.0f, 8.0f
++	0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f, 4.0f
+ };
+ 
+ /* ---------- public code */

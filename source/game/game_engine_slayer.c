@@ -105,10 +105,6 @@ enum
 
 /* ---------- macros */
 
-#define slayer_variant_assault unknown4C.byte0
-#define slayer_variant_reset_on_capture unknown4C.byte1
-#define slayer_variant_flag_must_reset unknown4C.byte2
-#define slayer_variant_score_to_win unknown40
 
 #define GET_MULTIPLAYER_GAME_TEXT(index) \
 	(((string_list_index = tag_loaded( \
@@ -345,7 +341,7 @@ void update_speed_for_score(
 	struct player_datum *killing_player = player_get(killing_player_index);
 	struct player_datum *dead_player = player_get(dead_player_index);
 
-	if (!game_engine_get_variant()->slayer_variant_reset_on_capture)
+	if (!game_engine_get_variant()->game_engine_variant.slayer.no_kill_penalty)
 	{
 		killing_player->speed_multiplier -= 0.02f;
 		if (killing_player->speed_multiplier >= 1.0f)
@@ -361,7 +357,7 @@ void update_speed_for_score(
 			0.89999998f);
 	}
 
-	if (!game_engine_get_variant()->slayer_variant_assault)
+	if (!game_engine_get_variant()->game_engine_variant.slayer.no_death_bonus)
 	{
 		dead_player->speed_multiplier += 0.1f;
 		if (dead_player->speed_multiplier <= 1.0f)
@@ -472,7 +468,7 @@ static void slayer_engine_player_killed_player(
 		{
 			update_speed_for_score(dead_player_index, killing_player_index);
 
-			if (game_engine_get_variant()->slayer_variant_flag_must_reset)
+			if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
 			{
 				if (killing_player->multiplayer_special != dead_player_index)
 					return;
@@ -507,7 +503,7 @@ static boolean slayer_engine_display_score(
 
 	if (message == _slayer_message_new_target)
 	{
-		if (game_engine_get_variant()->has_teams)
+		if (game_engine_get_variant()->universal_variant.teams)
 		{
 			usnprintf(
 				string,
@@ -539,7 +535,7 @@ static boolean slayer_engine_display_score(
 		break;
 
 	case _game_engine_message_show_score:
-		if (game_engine_get_variant()->has_teams)
+		if (game_engine_get_variant()->universal_variant.teams)
 		{
 			wchar_t *place_name = get_place_name(
 				game_engine_get_place(player_index, _get_score_team));
@@ -552,7 +548,7 @@ static boolean slayer_engine_display_score(
 				place_name,
 				slayer_get_score(player_index, _get_score_individual),
 				slayer_get_score(player_index, _get_score_team),
-				game_engine_get_variant()->slayer_variant_score_to_win);
+				game_engine_get_variant()->universal_variant.score_to_win);
 		}
 		else
 		{
@@ -566,7 +562,7 @@ static boolean slayer_engine_display_score(
 					_string_name_kills_score_of_max),
 				place_name,
 				slayer_get_score(player_index, _get_score_team),
-				game_engine_get_variant()->slayer_variant_score_to_win);
+				game_engine_get_variant()->universal_variant.score_to_win);
 		}
 		break;
 
@@ -583,7 +579,7 @@ static void slayer_player_update(
 {
 	struct player_datum *player = player_get(index);
 
-	if (game_engine_get_variant()->slayer_variant_reset_on_capture &&
+	if (game_engine_get_variant()->game_engine_variant.slayer.no_kill_penalty &&
 		player->speed_multiplier > 1.0f)
 	{
 		player->speed_multiplier -= 0.00011111111f;
@@ -592,7 +588,7 @@ static void slayer_player_update(
 			1.0f);
 	}
 
-	if (game_engine_get_variant()->slayer_variant_assault &&
+	if (game_engine_get_variant()->game_engine_variant.slayer.no_death_bonus &&
 		player->speed_multiplier < 1.0f)
 	{
 		player->speed_multiplier += 0.000011111111f;
@@ -601,7 +597,7 @@ static void slayer_player_update(
 			1.0f);
 	}
 
-	if (game_engine_get_variant()->slayer_variant_flag_must_reset)
+	if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\game\\game_engine_slayer.c",
@@ -646,7 +642,7 @@ static void slayer_player_update(
 	}
 
 	if (slayer_get_score(index, _get_score_team) >=
-		game_engine_get_variant()->slayer_variant_score_to_win)
+		game_engine_get_variant()->universal_variant.score_to_win)
 	{
 		game_engine_end_game();
 	}

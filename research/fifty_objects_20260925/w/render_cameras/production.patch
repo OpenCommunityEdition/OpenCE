@@ -1,0 +1,720 @@
+diff --git a/source/render/render_cameras.c b/source/render/render_cameras.c
+index f12f300b..2a86f83b 100644
+--- a/source/render/render_cameras.c
++++ b/source/render/render_cameras.c
+@@ -164,32 +164,6 @@ enum render_frustum_plane
+ 	NUMBER_OF_RENDER_FRUSTUM_PLANES,
+ };
+ 
+-enum render_camera_warning_condition
+-{
+-	_render_camera_warning_left_bottom_left,
+-	_render_camera_warning_left_top_left,
+-	_render_camera_warning_left_apex,
+-	_render_camera_warning_right_bottom_right,
+-	_render_camera_warning_right_top_right,
+-	_render_camera_warning_right_apex,
+-	_render_camera_warning_bottom_bottom_left,
+-	_render_camera_warning_bottom_bottom_right,
+-	_render_camera_warning_bottom_apex,
+-	_render_camera_warning_top_top_left,
+-	_render_camera_warning_top_top_right,
+-	_render_camera_warning_top_apex,
+-	_render_camera_warning_far_bottom_left,
+-	_render_camera_warning_far_bottom_right,
+-	_render_camera_warning_far_top_left,
+-	_render_camera_warning_far_top_right,
+-	_render_camera_warning_midpoint_left,
+-	_render_camera_warning_midpoint_right,
+-	_render_camera_warning_midpoint_bottom,
+-	_render_camera_warning_midpoint_top,
+-	_render_camera_warning_midpoint_near,
+-	_render_camera_warning_midpoint_far,
+-};
+-
+ enum
+ {
+ 	MAXIMUM_RENDER_CAMERA_WARNING_CONDITIONS = 64,
+@@ -1123,21 +1097,9 @@ void render_camera_build_frustum(
+ 	real field_of_view_tangent;
+ 	real projection_x_scale;
+ 	real projection_y_scale;
+-	real_vector3d view_left;
+-	real_vector3d view_up;
+-	real_vector3d view_backward;
+-	real_vector3d plane_normal;
+-	real_plane3d view_plane;
+-	real left_plane_z;
+-	real bottom_plane_z;
+-	real inverse_projection_x_scale;
+-	real inverse_projection_y_scale;
++	real far_x_scale;
++	real far_y_scale;
+ 	real half_z;
+-	real far_left;
+-	real far_right;
+-	real far_bottom;
+-	real far_top;
+-	real_point3d view_point;
+ 	long vertex_index;
+ 
+ 	if (frustum_bounds)
+@@ -1163,9 +1125,8 @@ void render_camera_build_frustum(
+ 		(frustum->frustum_bounds.y0 + frustum->frustum_bounds.y1) /
+ 		half_bounds_height * -0.5f;
+ 	field_of_view_tangent = tangent(camera->vertical_field_of_view * 0.5f);
+-	projection_x_scale = 1.0f /
+-		(half_bounds_width / viewport_height * viewport_width *
+-		field_of_view_tangent);
++	half_bounds_width = half_bounds_width / viewport_height * viewport_width;
++	projection_x_scale = 1.0f / (half_bounds_width * field_of_view_tangent);
+ 	projection_y_scale = 1.0f /
+ 		(field_of_view_tangent * half_bounds_height);
+ 
+@@ -1209,162 +1170,204 @@ void render_camera_build_frustum(
+ 		436,
+ 		camera->viewport_bounds.y0<camera->viewport_bounds.y1);
+ 
+-	cross_product3d(&camera->forward, &camera->up, &view_left);
+-	cross_product3d(&view_left, &camera->forward, &view_up);
+-	negate_vector3d(&camera->forward, &view_backward);
+-	normalize3d(&view_left);
+-	normalize3d(&view_up);
+-	normalize3d(&view_backward);
+-	frustum->view_to_world.forward = view_left;
+-	frustum->view_to_world.left = view_up;
+-	frustum->view_to_world.up = view_backward;
+-	frustum->view_to_world.position = camera->position;
+-	frustum->view_to_world.scale = 1.0f;
+-	matrix4x3_inverse(&frustum->view_to_world, &frustum->world_to_view);
+-	match_assert(
+-		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+-		458,
+-		valid_real_matrix4x3(&frustum->world_to_view));
+-	match_assert(
+-		"c:\\halo\\SOURCE\\render\\render_cameras.c",
+-		459,
+-		valid_real_matrix4x3(&frustum->view_to_world));
+-
+-	plane_normal.i = -projection_x_scale;
+-	plane_normal.j = 0.0f;
+-	left_plane_z = bounds_center_x + 1.0f;
+-	plane_normal.k = left_plane_z;
+-	normalize3d(&plane_normal);
+-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_left]);
+-
+-	plane_normal.i = projection_x_scale;
+-	plane_normal.j = 0.0f;
+-	plane_normal.k = 1.0f - bounds_center_x;
+-	normalize3d(&plane_normal);
+-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_right]);
+-
+-	plane_normal.i = 0.0f;
+-	plane_normal.j = -projection_y_scale;
+-	bottom_plane_z = bounds_center_y + 1.0f;
+-	plane_normal.k = bottom_plane_z;
+-	normalize3d(&plane_normal);
+-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_bottom]);
+-
+-	plane_normal.i = 0.0f;
+-	plane_normal.j = projection_y_scale;
+-	plane_normal.k = 1.0f - bounds_center_y;
+-	normalize3d(&plane_normal);
+-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_top]);
+-
+-	view_plane.n.i = 0.0f;
+-	view_plane.n.j = 0.0f;
+-	view_plane.n.k = 1.0f;
+-	view_plane.d = -camera->z_near;
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_near]);
+-
+-	view_plane.n.i = 0.0f;
+-	view_plane.n.j = 0.0f;
+-	view_plane.n.k = -1.0f;
+-	view_plane.d = camera->z_far;
+-	matrix4x3_transform_plane(
+-		&frustum->view_to_world,
+-		&view_plane,
+-		&frustum->world_planes[_render_frustum_plane_far]);
++	{
++		real_vector3d x_axis;
++		real_vector3d y_axis;
++		real_vector3d z_axis;
++
++		cross_product3d(&camera->forward, &camera->up, &x_axis);
++		cross_product3d(&x_axis, &camera->forward, &y_axis);
++		negate_vector3d(&camera->forward, &z_axis);
++		normalize3d(&x_axis);
++		normalize3d(&y_axis);
++		normalize3d(&z_axis);
++		frustum->view_to_world.forward = x_axis;
++		frustum->view_to_world.left = y_axis;
++		frustum->view_to_world.up = z_axis;
++		frustum->view_to_world.position = camera->position;
++		frustum->view_to_world.scale = 1.0f;
++		matrix4x3_inverse(&frustum->view_to_world, &frustum->world_to_view);
++		match_assert(
++			"c:\\halo\\SOURCE\\render\\render_cameras.c",
++			458,
++			valid_real_matrix4x3(&frustum->world_to_view));
++		match_assert(
++			"c:\\halo\\SOURCE\\render\\render_cameras.c",
++			459,
++			valid_real_matrix4x3(&frustum->view_to_world));
++	}
++
++	{
++		real_vector3d viewspace_normal;
++		real_plane3d viewspace_plane;
++
++		viewspace_normal.i = -projection_x_scale;
++		viewspace_normal.j = 0.0f;
++		viewspace_normal.k = 1.0f + bounds_center_x;
++		normalize3d(&viewspace_normal);
++		plane3d_from_point_and_normal(
++			&viewspace_plane,
++			global_origin3d,
++			&viewspace_normal);
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_left]);
++
++		viewspace_normal.i = projection_x_scale;
++		viewspace_normal.j = 0.0f;
++		viewspace_normal.k = 1.0f - bounds_center_x;
++		normalize3d(&viewspace_normal);
++		plane3d_from_point_and_normal(
++			&viewspace_plane,
++			global_origin3d,
++			&viewspace_normal);
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_right]);
++
++		viewspace_normal.i = 0.0f;
++		viewspace_normal.j = -projection_y_scale;
++		viewspace_normal.k = 1.0f + bounds_center_y;
++		normalize3d(&viewspace_normal);
++		plane3d_from_point_and_normal(
++			&viewspace_plane,
++			global_origin3d,
++			&viewspace_normal);
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_bottom]);
++
++		viewspace_normal.i = 0.0f;
++		viewspace_normal.j = projection_y_scale;
++		viewspace_normal.k = 1.0f - bounds_center_y;
++		normalize3d(&viewspace_normal);
++		plane3d_from_point_and_normal(
++			&viewspace_plane,
++			global_origin3d,
++			&viewspace_normal);
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_top]);
++
++		set_real_vector3d(&viewspace_plane.n, 0.0f, 0.0f, 1.0f);
++		viewspace_plane.d = -camera->z_near;
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_near]);
++
++		set_real_vector3d(&viewspace_plane.n, 0.0f, 0.0f, -1.0f);
++		viewspace_plane.d = camera->z_far;
++		matrix4x3_transform_plane(
++			&frustum->view_to_world,
++			&viewspace_plane,
++			&frustum->world_planes[_render_frustum_plane_far]);
++	}
+ 
+ 	frustum->z_near = camera->z_near;
+ 	frustum->z_far = camera->z_far;
+-	inverse_projection_x_scale = 1.0f / projection_x_scale;
+-	inverse_projection_y_scale = 1.0f / projection_y_scale;
++	far_x_scale = -camera->z_far / projection_x_scale;
++	far_y_scale = -camera->z_far / projection_y_scale;
+ 	half_z = (camera->z_far + camera->z_near) * 0.5f;
+-	far_left = left_plane_z * -(inverse_projection_x_scale * camera->z_far);
+-	far_right =
+-		(bounds_center_x - 1.0f) * -(inverse_projection_x_scale * camera->z_far);
+-	far_bottom =
+-		bottom_plane_z * -(inverse_projection_y_scale * camera->z_far);
+-	far_top =
+-		(bounds_center_y - 1.0f) * -(inverse_projection_y_scale * camera->z_far);
+-
+-	view_point.x = far_left;
+-	view_point.y = far_bottom;
+-	view_point.z = -camera->z_far;
+-	matrix4x3_transform_point(
+-		&frustum->view_to_world,
+-		&view_point,
+-		&frustum->world_vertices[0]);
+-	view_point.x = far_right;
+-	view_point.y = far_bottom;
+-	view_point.z = -camera->z_far;
+-	matrix4x3_transform_point(
+-		&frustum->view_to_world,
+-		&view_point,
+-		&frustum->world_vertices[1]);
+-	view_point.x = far_left;
+-	view_point.y = far_top;
+-	view_point.z = -camera->z_far;
+-	matrix4x3_transform_point(
+-		&frustum->view_to_world,
+-		&view_point,
+-		&frustum->world_vertices[2]);
+-	view_point.x = far_right;
+-	view_point.y = far_top;
+-	view_point.z = -camera->z_far;
+-	matrix4x3_transform_point(
+-		&frustum->view_to_world,
+-		&view_point,
+-		&frustum->world_vertices[3]);
+ 
+-	frustum->world_vertices[4] = camera->position;
+-	view_point.x = -(inverse_projection_x_scale * half_z * bounds_center_x);
+-	view_point.y = -(inverse_projection_y_scale * half_z * bounds_center_y);
+-	view_point.z = -half_z;
+-	matrix4x3_transform_point(
+-		&frustum->view_to_world,
+-		&view_point,
+-		&frustum->world_midpoint);
+-
+-	frustum->world_bounds.x1 = frustum->world_vertices[0].x;
+-	frustum->world_bounds.x0 = frustum->world_vertices[0].x;
+-	frustum->world_bounds.y1 = frustum->world_vertices[0].y;
+-	frustum->world_bounds.y0 = frustum->world_vertices[0].y;
+-	frustum->world_bounds.z1 = frustum->world_vertices[0].z;
+-	frustum->world_bounds.z0 = frustum->world_vertices[0].z;
++	{
++		real_rectangle2d projected_bounds;
++		real_point3d frustum_vertex;
++		real_point3d frustum_midpoint;
++
++		projected_bounds.x0 = (bounds_center_x + 1.0f) * far_x_scale;
++		projected_bounds.x1 = (bounds_center_x - 1.0f) * far_x_scale;
++		projected_bounds.y0 = (bounds_center_y + 1.0f) * far_y_scale;
++		projected_bounds.y1 = (bounds_center_y - 1.0f) * far_y_scale;
++
++		set_real_point3d(
++			&frustum_vertex,
++			projected_bounds.x0,
++			projected_bounds.y0,
++			-camera->z_far);
++		matrix4x3_transform_point(
++			&frustum->view_to_world,
++			&frustum_vertex,
++			&frustum->world_vertices[0]);
++		set_real_point3d(
++			&frustum_vertex,
++			projected_bounds.x1,
++			projected_bounds.y0,
++			-camera->z_far);
++		matrix4x3_transform_point(
++			&frustum->view_to_world,
++			&frustum_vertex,
++			&frustum->world_vertices[1]);
++		set_real_point3d(
++			&frustum_vertex,
++			projected_bounds.x0,
++			projected_bounds.y1,
++			-camera->z_far);
++		matrix4x3_transform_point(
++			&frustum->view_to_world,
++			&frustum_vertex,
++			&frustum->world_vertices[2]);
++		set_real_point3d(
++			&frustum_vertex,
++			projected_bounds.x1,
++			projected_bounds.y1,
++			-camera->z_far);
++		matrix4x3_transform_point(
++			&frustum->view_to_world,
++			&frustum_vertex,
++			&frustum->world_vertices[3]);
++
++		frustum->world_vertices[4] = camera->position;
++		set_real_point3d(
++			&frustum_midpoint,
++			-half_z * bounds_center_x / projection_x_scale,
++			-half_z * bounds_center_y / projection_y_scale,
++			-half_z);
++		matrix4x3_transform_point(
++			&frustum->view_to_world,
++			&frustum_midpoint,
++			&frustum->world_midpoint);
++	}
++
++	frustum->world_bounds.x0 = frustum->world_bounds.x1 =
++		frustum->world_vertices[0].x;
++	frustum->world_bounds.y0 = frustum->world_bounds.y1 =
++		frustum->world_vertices[0].y;
++	frustum->world_bounds.z0 = frustum->world_bounds.z1 =
++		frustum->world_vertices[0].z;
+ 	for (vertex_index = 1;
+ 		vertex_index < NUMBEROF(frustum->world_vertices);
+ 		vertex_index++)
+ 	{
+-		const real_point3d *vertex = &frustum->world_vertices[vertex_index];
+-
+-		frustum->world_bounds.x0 = MIN(frustum->world_bounds.x0, vertex->x);
+-		frustum->world_bounds.y0 = MIN(frustum->world_bounds.y0, vertex->y);
+-		frustum->world_bounds.z0 = MIN(frustum->world_bounds.z0, vertex->z);
+-		frustum->world_bounds.x1 = MAX(frustum->world_bounds.x1, vertex->x);
+-		frustum->world_bounds.y1 = MAX(frustum->world_bounds.y1, vertex->y);
+-		frustum->world_bounds.z1 = MAX(frustum->world_bounds.z1, vertex->z);
++		frustum->world_bounds.x0 = MIN(
++			frustum->world_bounds.x0,
++			frustum->world_vertices[vertex_index].x);
++		frustum->world_bounds.y0 = MIN(
++			frustum->world_bounds.y0,
++			frustum->world_vertices[vertex_index].y);
++		frustum->world_bounds.z0 = MIN(
++			frustum->world_bounds.z0,
++			frustum->world_vertices[vertex_index].z);
++		frustum->world_bounds.x1 = MAX(
++			frustum->world_bounds.x1,
++			frustum->world_vertices[vertex_index].x);
++		frustum->world_bounds.y1 = MAX(
++			frustum->world_bounds.y1,
++			frustum->world_vertices[vertex_index].y);
++		frustum->world_bounds.z1 = MAX(
++			frustum->world_bounds.z1,
++			frustum->world_vertices[vertex_index].z);
+ 	}
+ 
+ 	if (build_projection)
+ 	{
+-		real inverse_plane_z;
++		real_plane3d clip_plane;
+ 		real clip_offset;
++		real z_far;
+ 		real projection_scale;
+ 
+ 		if (camera->z_near == 0.0f)
+@@ -1372,29 +1375,32 @@ void render_camera_build_frustum(
+ 			matrix4x3_transform_plane(
+ 				&frustum->world_to_view,
+ 				&camera->mirror_plane,
+-				&view_plane);
++				&clip_plane);
+ 		}
+ 		else
+ 		{
+-			view_plane.n.i = 0.0f;
+-			view_plane.n.j = 0.0f;
+-			view_plane.n.k = 1.0f;
+-			view_plane.d = -camera->z_near;
++			clip_plane.n.i = 0.0f;
++			clip_plane.n.j = 0.0f;
++			clip_plane.n.k = 1.0f;
++			clip_plane.d = -camera->z_near;
+ 		}
+ 
+-		inverse_plane_z = 1.0f / view_plane.n.k;
+-		clip_offset = -(view_plane.d * inverse_plane_z);
+-		projection_scale = (real)(camera->z_far /
+-			((camera->z_far - clip_offset) *
+-			(fabs(inverse_plane_z * view_plane.n.i) +
+-			fabs(inverse_plane_z * view_plane.n.j) + 1.0)));
+-		view_plane.n.i *= inverse_plane_z * projection_scale;
+-		view_plane.n.j *= inverse_plane_z * projection_scale;
+-		view_plane.n.k = projection_scale;
+-		view_plane.d = -(projection_scale * clip_offset);
+-		if (view_plane.d > 0.0f && camera->z_near == 0.0f)
++		clip_offset = -clip_plane.d / clip_plane.n.k;
++		z_far = camera->z_far;
++		projection_scale = (real)(z_far /
++			((z_far - clip_offset) *
++			(fabs(clip_plane.n.i / clip_plane.n.k) + 1.0f +
++			fabs(clip_plane.n.j / clip_plane.n.k))));
++		clip_plane.n.i = projection_scale * clip_plane.n.i / clip_plane.n.k;
++		clip_plane.n.j = projection_scale * clip_plane.n.j / clip_plane.n.k;
++		clip_plane.n.k = projection_scale;
++		clip_plane.d = -projection_scale * clip_offset;
++		if (clip_plane.d > 0.0f && camera->z_near == 0.0f)
+ 		{
+-			plane3d_negate(&view_plane, &view_plane);
++			clip_plane.n.i = -clip_plane.n.i;
++			clip_plane.n.j = -clip_plane.n.j;
++			clip_plane.n.k = -clip_plane.n.k;
++			clip_plane.d = -clip_plane.d;
+ 		}
+ 
+ 		csmemset(
+@@ -1402,14 +1408,14 @@ void render_camera_build_frustum(
+ 			0,
+ 			sizeof(frustum->projection_matrix));
+ 		frustum->projection_matrix[0][0] = projection_x_scale;
+-		frustum->projection_matrix[0][2] = -view_plane.n.i;
++		frustum->projection_matrix[0][2] = -clip_plane.n.i;
+ 		frustum->projection_matrix[1][1] = projection_y_scale;
+-		frustum->projection_matrix[1][2] = -view_plane.n.j;
++		frustum->projection_matrix[1][2] = -clip_plane.n.j;
+ 		frustum->projection_matrix[2][0] = -bounds_center_x;
+ 		frustum->projection_matrix[2][1] = -bounds_center_y;
+-		frustum->projection_matrix[2][2] = -view_plane.n.k;
++		frustum->projection_matrix[2][2] = -clip_plane.n.k;
+ 		frustum->projection_matrix[2][3] = -1.0f;
+-		frustum->projection_matrix[3][2] = view_plane.d;
++		frustum->projection_matrix[3][2] = clip_plane.d;
+ 		frustum->projection_valid = TRUE;
+ 		frustum->projection_world_to_screen.i =
+ 			projection_x_scale * viewport_width * 0.5f;
+@@ -1429,116 +1435,120 @@ void render_camera_build_frustum(
+ 		frustum->projection_valid = FALSE;
+ 	}
+ 
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_left_bottom_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_left],
+-			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_left_top_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_left],
+-			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_left_apex,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_left],
+-			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_right_bottom_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_right],
+-			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_right_top_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_right],
+-			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_right_apex,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_right],
+-			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_bottom_bottom_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_bottom],
+-			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_bottom_bottom_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_bottom],
+-			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_bottom_apex,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_bottom],
+-			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_top_top_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_top],
+-			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_top_top_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_top],
+-			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_top_apex,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_top],
+-			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_far_bottom_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_far],
+-			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_far_bottom_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_far],
+-			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_far_top_left,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_far],
+-			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_far_top_right,
+-		(real)fabs(plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_far],
+-			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_left,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_left],
+-			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_right,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_right],
+-			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_bottom,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_bottom],
+-			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_top,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_top],
+-			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_near,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_near],
+-			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
+-		_render_camera_warning_midpoint_far,
+-		plane3d_distance_to_point(
+-			&frustum->world_planes[_render_frustum_plane_far],
+-			&frustum->world_midpoint));
++	{
++		short condition_index = 0;
++
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_left],
++				&frustum->world_vertices[0])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_left],
++				&frustum->world_vertices[2])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_left],
++				&frustum->world_vertices[4])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_right],
++				&frustum->world_vertices[1])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_right],
++				&frustum->world_vertices[3])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_right],
++				&frustum->world_vertices[4])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_bottom],
++				&frustum->world_vertices[0])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_bottom],
++				&frustum->world_vertices[1])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_bottom],
++				&frustum->world_vertices[4])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_top],
++				&frustum->world_vertices[2])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_top],
++				&frustum->world_vertices[3])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_top],
++				&frustum->world_vertices[4])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_far],
++				&frustum->world_vertices[0])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_far],
++				&frustum->world_vertices[1])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_far],
++				&frustum->world_vertices[2])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			(real)fabs(plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_far],
++				&frustum->world_vertices[3])));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_left],
++				&frustum->world_midpoint));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_right],
++				&frustum->world_midpoint));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_bottom],
++				&frustum->world_midpoint));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_top],
++				&frustum->world_midpoint));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_near],
++				&frustum->world_midpoint));
++		render_camera_check_warning_condition(
++			condition_index++,
++			plane3d_distance_to_point(
++				&frustum->world_planes[_render_frustum_plane_far],
++				&frustum->world_midpoint));
++	}
+ 
+ 	return;
+ }

@@ -1,0 +1,129 @@
+diff --git a/source/game/game_engine.h b/source/game/game_engine.h
+index 5fd7df35..4778e7fc 100644
+--- a/source/game/game_engine.h
++++ b/source/game/game_engine.h
+@@ -84,7 +84,7 @@ struct game_variant
+ 	long unknown30;
+ 	long unknown34;
+ 	long maximum_lives;
+-	float unknown3C;
++	real unknown3C;
+ 	long unknown40;
+ 	long unknown44;
+ 	long unknown48;
+@@ -167,7 +167,7 @@ struct game_engine
+ 		long parameter2,
+ 		wchar_t *message,
+ 		long message_character_count);
+-	float (*starting_location_rating)(
++	real (*starting_location_rating)(
+ 		long player_index,
+ 		struct player_starting_location const *starting_location);
+ 	void (*prespawn_player_update)(
+@@ -239,7 +239,7 @@ long game_engine_get_team_score(
+ long players_in_game(
+ 	void);
+ 
+-float get_blink_alpha(
++real get_blink_alpha(
+ 	void);
+ 
+ long game_engine_player_get_team_index(
+@@ -302,7 +302,7 @@ void game_engine_nonplayer_post_rasterize(
+ 	void);
+ 
+ void game_engine_update_non_deterministic(
+-	float delta_seconds);
++	real delta_seconds);
+ 
+ boolean match_game_type(
+ 	long game_type,
+@@ -315,7 +315,7 @@ void game_engine_initialize(
+ void game_engine_initialize_for_new_map(
+ 	void);
+ 
+-float game_engine_get_distance_rating_for_spawn(
++real game_engine_get_distance_rating_for_spawn(
+ 	long player_index,
+ 	union real_point3d const *position);
+ 
+@@ -370,7 +370,7 @@ boolean game_engine_get_goal_in_use(
+ void game_engine_set_goal_position(
+ 	short goal_index,
+ 	union real_point3d const *position,
+-	float height,
++	real height,
+ 	char const *name,
+ 	long target_object_index,
+ 	short team_index,
+@@ -410,7 +410,7 @@ short game_engine_player_get_custom_motion_sensor_positions(
+ 	short maximum_count);
+ 
+ void game_engine_render_nav_points(
+-	long local_player_index);
++	short local_player_index);
+ 
+ union real_rgb_color *game_engine_player_get_change_color(
+ 	union real_rgb_color *change_color,
+@@ -484,6 +484,10 @@ boolean game_engine_force_autopickup(
+ 
+ void game_engine_play_multiplayer_sound(
+ 	long sound_index);
++void game_engine_update_multiplayer_sound(
++	void);
++void game_engine_intialize_queued_sounds(
++	void);
+ 
+ long game_engine_remap_object_definition(long definition_index);
+ 
+diff --git a/source/game/player_control.h b/source/game/player_control.h
+index 6ffa7a1e..124e2e11 100644
+--- a/source/game/player_control.h
++++ b/source/game/player_control.h
+@@ -152,6 +152,8 @@ void player_control_get_unit_camera_info(
+ 	struct player_control_unit_camera_info *camera_info);
+ long player_control_get_unit_index(
+ 	short local_player_index);
++short unit_get_local_player_index(
++	long unit_index);
+ long player_control_get_desired_weapon(
+ 	short local_player_index,
+ 	long unit_index);
+diff --git a/source/interface/hud_messaging.h b/source/interface/hud_messaging.h
+index 941e4888..8f82ad9a 100644
+--- a/source/interface/hud_messaging.h
++++ b/source/interface/hud_messaging.h
+@@ -15,6 +15,7 @@ header included in hcex build.
+ /* ---------- structures */
+ 
+ struct icon_hud_element_definition;
++union real_argb_color;
+ 
+ /* ---------- prototypes/HUD_MESSAGING.C */
+ 
+@@ -78,6 +79,10 @@ void hud_set_state_text(
+ 	wchar_t const *message);
+ wchar_t *hud_messaging_get_objective(
+ 	void);
++long hud_get_font_index(
++	void);
++union real_argb_color *hud_get_text_color(
++	union real_argb_color *result);
+ 
+ /* ---------- globals */
+ 
+diff --git a/source/sound/sound_classes.h b/source/sound/sound_classes.h
+index ee690265..d3c615d9 100644
+--- a/source/sound/sound_classes.h
++++ b/source/sound/sound_classes.h
+@@ -64,6 +64,10 @@ struct sound_class_definition *sound_class_get(
+ 
+ real sound_class_get_gain(
+ 	short class_index);
++void sound_class_set_gain(
++	char const *name,
++	real gain,
++	short interpolation_ticks);
+ 
+ void sound_classes_dispose_from_old_map(
+ 	void);

@@ -1,0 +1,324 @@
+diff --git a/source/objects/damage.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\damage\\final.c"
+index 62d1dd4c..82b5f316 100644
+--- a/source/objects/damage.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\damage\\final.c"
+@@ -2195,30 +2195,12 @@ static void area_of_effect_cause_damage_to_object(
+ 	long object_index,
+ 	boolean damage_next_object)
+ {
+-	boolean did_damage;
+-	boolean collision_blocked;
+-	boolean infection_form;
+-	struct object_datum *object;
+-	struct object_definition *object_definition;
+-	struct damage_effect_definition *damage_effect;
+-	real_point3d const *epicenter;
+-	real_vector3d to_object;
+-	real_vector3d perpendicular;
+-	real_vector3d cross;
+-	real_vector3d collision_vector;
+-	real_vector3d offset_vector;
+-	real_vector3d direct_vector;
+-	real_point3d collision_point;
+-	struct collision_result spread_collision;
+-	struct collision_result direct_collision;
+-	boolean can_damage;
+-
+-	object = object_get(object_index);
+-	object_definition = object_definition_get(object->definition_index);
+-	damage_effect = damage_effect_definition_get(damage->definition_index);
+-	can_damage = !TEST_FLAG(object->object.flags, _object_invisible_bit);
+-	did_damage = FALSE;
+-	infection_form = FALSE;
++	struct object_datum *object = object_get(object_index);
++	struct object_definition *object_definition = object_definition_get(object->definition_index);
++	struct damage_effect_definition *damage_effect = damage_effect_definition_get(damage->definition_index);
++	boolean can_damage = !TEST_FLAG(object->object.flags, _object_invisible_bit);
++	boolean did_damage = FALSE;
++	boolean infection_form = FALSE;
+ 
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\objects\\damage.c",
+@@ -2231,97 +2213,91 @@ static void area_of_effect_cause_damage_to_object(
+ 		TEST_FLAG(_object_mask_unit, object->object.type) &&
+ 		damage_effect->damage.area_of_effect_core_radius > _real_epsilon)
+ 	{
+-		long ray_index;
+-		long rays_remaining;
++		real_vector3d x_axis;
++		real_vector3d y_axis;
++		boolean collision_blocked = TRUE;
++		real_vector3d axis;
++		short ray_index;
++		struct collision_result collision;
++		real_vector3d offset;
++		real_point3d offset_point;
+ 
+-		epicenter = &damage->epicenter;
+-		collision_blocked = TRUE;
+ 		vector_from_points3d(
+-			epicenter,
++			&damage->epicenter,
+ 			&object->object.bounding_sphere_center,
+-			&to_object);
+-		normalize3d(perpendicular3d(&to_object, &perpendicular));
+-		normalize3d(cross_product3d(&to_object, &perpendicular, &cross));
++			&axis);
++		normalize3d(perpendicular3d(&axis, &x_axis));
++		normalize3d(cross_product3d(&axis, &x_axis, &y_axis));
+ 
+-		for (ray_index = 0, rays_remaining = 4;
+-			rays_remaining;
+-			ray_index++, rays_remaining--)
++		for (ray_index = 0; ray_index < 4; ray_index++)
+ 		{
+-			long ultimate_parent_index;
+-
+ 			switch (ray_index)
+ 			{
+ 			case 0:
+ 				scale_vector3d(
+-					&perpendicular,
++					&x_axis,
+ 					damage_effect->damage.area_of_effect_core_radius,
+-					&collision_vector);
++					&offset);
+ 				break;
+ 
+ 			case 1:
+ 				scale_vector3d(
+-					&perpendicular,
++					&x_axis,
+ 					-damage_effect->damage.area_of_effect_core_radius,
+-					&collision_vector);
++					&offset);
+ 				break;
+ 
+ 			case 2:
+ 				scale_vector3d(
+-					&cross,
++					&y_axis,
+ 					damage_effect->damage.area_of_effect_core_radius,
+-					&collision_vector);
++					&offset);
+ 				break;
+ 
+ 			case 3:
+ 				scale_vector3d(
+-					&cross,
++					&y_axis,
+ 					-damage_effect->damage.area_of_effect_core_radius,
+-					&collision_vector);
++					&offset);
+ 				break;
+ 			}
+ 
+ 			collision_test_vector(
+ 				_damage_area_of_effect_collision_flags,
+-				epicenter,
+-				&collision_vector,
++				&damage->epicenter,
++				&offset,
+ 				object_get_ultimate_parent(object_index),
+-				&spread_collision);
+-			collision_point = spread_collision.point;
+-			ultimate_parent_index = object_get_ultimate_parent(object_index);
+-			if (!collision_test_vector(
++				&collision);
++			offset_point = collision.point;
++			if (!collision_test_line(
+ 				_damage_area_of_effect_collision_flags,
+-				&collision_point,
+-				vector_from_points3d(
+-					&collision_point,
+-					&object->object.bounding_sphere_center,
+-					&offset_vector),
+-				ultimate_parent_index,
+-				&spread_collision))
++				&offset_point,
++				&object->object.bounding_sphere_center,
++				object_get_ultimate_parent(object_index),
++				&collision))
+ 			{
+ 				collision_blocked = FALSE;
+ 			}
+ 		}
++
++		if (collision_blocked)
++			can_damage = FALSE;
+ 	}
+ 	else
+ 	{
+-		long ultimate_parent_index;
++		struct collision_result collision;
+ 
+-		ultimate_parent_index = object_get_ultimate_parent(object_index);
+-		epicenter = &damage->epicenter;
+-		collision_blocked = collision_test_vector(
++		if (collision_test_line(
+ 			_damage_area_of_effect_collision_flags,
+-			epicenter,
+-			vector_from_points3d(
+-				epicenter,
+-				&object->object.bounding_sphere_center,
+-				&direct_vector),
+-			ultimate_parent_index,
+-			&direct_collision);
++			&damage->epicenter,
++			&object->object.bounding_sphere_center,
++			object_get_ultimate_parent(object_index),
++			&collision))
++		{
++			can_damage = FALSE;
++		}
+ 	}
+ 
+-	if (collision_blocked)
+-		can_damage = FALSE;
+-
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\objects\\damage.c",
+ 		660,
+@@ -2344,33 +2320,35 @@ static void area_of_effect_cause_damage_to_object(
+ 		TEST_FLAG(damage_effect->damage.flags, _damage_infection_form_pop_bit))
+ 	{
+ 		can_damage = FALSE;
+-		if (TEST_FLAG(_object_mask_unit, object->object.type) &&
+-			TEST_FLAG(
+-				unit_definition_get(object->definition_index)->unit.flags,
+-				_unit_is_inconsequential_bit) &&
+-			object_index != damage->owner_object_index)
++		if (TEST_FLAG(_object_mask_unit, object->object.type))
+ 		{
+-			real infection_form_toughness = game_difficulty_get_value(
+-				_game_difficulty_value_infection_forms);
++			struct unit_definition *unit_definition =
++				unit_definition_get(object->definition_index);
+ 
+-			can_damage = TRUE;
+-			if (infection_form_toughness > 0.f ||
+-				TEST_FLAG(
+-					damage_effect->damage.flags,
+-					_damage_does_not_hurt_infection_forms_bit))
++			if (TEST_FLAG(unit_definition->unit.flags, _unit_is_inconsequential_bit) &&
++				object_index != damage->owner_object_index)
+ 			{
+-				if (TEST_FLAG(damage->flags, _damage_damaged_one_object_bit))
++				real infection_form_toughness = game_difficulty_get_value(
++					_game_difficulty_value_infection_forms);
++
++				can_damage = TRUE;
++				if ((infection_form_toughness > 0.f ||
++					TEST_FLAG(
++						damage_effect->damage.flags,
++						_damage_does_not_hurt_infection_forms_bit)) &&
++					TEST_FLAG(damage->flags, _damage_damaged_one_object_bit))
++				{
+ 					can_damage = FALSE;
+-			}
++				}
+ 
+-			if (infection_form_toughness > 0.f &&
+-				real_seed_random(get_global_random_seed_address()) <
+-					infection_form_toughness * 0.25f)
+-			{
+-				can_damage = FALSE;
+-			}
++				if (infection_form_toughness > 0.f &&
++					real_random() < infection_form_toughness / 4.f)
++				{
++					can_damage = FALSE;
++				}
+ 
+-			infection_form = TRUE;
++				infection_form = TRUE;
++			}
+ 		}
+ 	}
+ 
+@@ -2382,24 +2360,20 @@ static void area_of_effect_cause_damage_to_object(
+ 		real scale;
+ 
+ 		vector_from_points3d(
+-			epicenter,
++			&damage->epicenter,
+ 			&object->object.bounding_sphere_center,
+ 			&damage->direction);
+ 		distance = normalize3d(&damage->direction);
+ 		radius_delta = damage_effect->cutoff_radius - damage_effect->falloff_radius;
+ 		if (radius_delta > 0.f)
+ 		{
+-			scale = PIN(
+-				1.f -
+-					(distance - damage_effect->falloff_radius) /
+-					radius_delta,
+-				0.f,
+-				1.f);
++			scale = 1.f - (distance - damage_effect->falloff_radius) / radius_delta;
+ 		}
+ 		else
+ 		{
+ 			scale = 1.f;
+ 		}
++		scale = PIN(scale, 0.f, 1.f);
+ 
+ 		if (!TEST_FLAG(
+ 			damage_effect->flags,
+@@ -2417,7 +2391,7 @@ static void area_of_effect_cause_damage_to_object(
+ 				NONE,
+ 				NONE,
+ 				NULL);
+-				did_damage = TRUE;
++			did_damage = TRUE;
+ 		}
+ 
+ 		if (object_definition->object.collision_model.index != NONE)
+@@ -2428,18 +2402,13 @@ static void area_of_effect_cause_damage_to_object(
+ 
+ 			if (TEST_FLAG(
+ 				collision_model->resistance.flags,
+-				_damage_resistance_children_take_area_damage_bit))
++				_damage_resistance_children_take_area_damage_bit) &&
++				object->object.first_child_object_index != NONE)
+ 			{
+-				long child_object_index =
+-					object->object.first_child_object_index;
+-
+-				if (child_object_index != NONE)
+-				{
+-					area_of_effect_cause_damage_to_object(
+-						damage,
+-						child_object_index,
+-						TRUE);
+-				}
++				area_of_effect_cause_damage_to_object(
++					damage,
++					object->object.first_child_object_index,
++					TRUE);
+ 			}
+ 		}
+ 	}
+@@ -2449,17 +2418,13 @@ static void area_of_effect_cause_damage_to_object(
+ 		SET_FLAG(damage->flags, _damage_damaged_one_object_bit, TRUE);
+ 	}
+ 
+-	if (damage_next_object)
++	if (damage_next_object &&
++		object->object.next_object_index != NONE)
+ 	{
+-		long next_object_index = object->object.next_object_index;
+-
+-		if (next_object_index != NONE)
+-		{
+-			area_of_effect_cause_damage_to_object(
+-				damage,
+-				next_object_index,
+-				TRUE);
+-		}
++		area_of_effect_cause_damage_to_object(
++			damage,
++			object->object.next_object_index,
++			TRUE);
+ 	}
+ 
+ 	return;

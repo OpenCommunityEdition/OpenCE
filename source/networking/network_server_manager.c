@@ -705,7 +705,7 @@ typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
 typedef char network_game_variant_has_teams_offset_assert[
 	offsetof(struct network_game, variant) +
-		offsetof(struct game_variant, has_teams) == 0xC0 ? 1 : -1];
+		offsetof(struct game_variant, universal_variant.teams) == 0xC0 ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
 typedef char network_game_server_client_machines_offset_assert[
@@ -1896,7 +1896,7 @@ boolean server_needs_more_teams(
 {
 	boolean needs_more_teams = FALSE;
 
-	if (server->game.variant.has_teams)
+	if (server->game.variant.universal_variant.teams)
 	{
 		short player_count_by_team[NUMBER_OF_MULTIPLAYER_TEAMS] = { 0, 0 };
 		long player_index;
@@ -2808,7 +2808,7 @@ static boolean network_game_server_setup_game_from_playlist(
 		server->game.minimum_players = 2;
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
 
-		if (server->game.variant.has_teams)
+		if (server->game.variant.universal_variant.teams)
 		{
 			server->game.maximum_teams = 2;
 		}
@@ -3336,7 +3336,7 @@ boolean network_game_server_reset_to_pregame(
 		{
 			network_event("server resetting to pregame");
 
-			if (server->game.variant.has_teams)
+			if (server->game.variant.universal_variant.teams)
 			{
 				for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
 				{
@@ -3411,7 +3411,7 @@ boolean network_game_server_reset_to_pregame(
 	{
 		success = network_game_server_setup_game_from_playlist(server);
 
-		if (server->game.variant.has_teams)
+		if (server->game.variant.universal_variant.teams)
 		{
 			for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
 			{

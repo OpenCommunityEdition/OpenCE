@@ -641,7 +641,7 @@ boolean network_game_create_game_objects(
 		game_unload();
 	}
 
-	if (game->variant.engine_type)
+	if (game->variant.game_engine_index)
 		game_set_game_variant(&game->variant);
 
 	if (game_load(&options))

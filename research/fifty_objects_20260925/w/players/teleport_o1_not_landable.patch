@@ -1,0 +1,380 @@
+diff --git a/source/game/players.c b/source/game/players.c
+index 281b3ae5..8ba81284 100644
+--- a/source/game/players.c
++++ b/source/game/players.c
+@@ -1620,69 +1620,42 @@ boolean player_teleport_internal(
+ 	long source_unit_index,
+ 	real_point3d const *position)
+ {
+-	struct player_datum *player;
+-	struct biped_datum *source_biped;
+-	struct
+-	{
+-		struct object_datum *source_root_object;
+-		struct biped_datum *biped;
+-	} pointers;
+-	struct scenario *scenario;
+-	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
+-	struct game_globals_player_information *player_information;
+-	real_vector3d const *adjustment_vector;
+-	real_matrix4x3 placement_matrix;
+-	real_vector3d best_adjustment_vector;
+-	real_vector3d random_adjustment_vector;
+-	real_point3d adjusted_position;
+-	real_point3d random_adjusted_position;
+-	long player_unit_index;
+-	long source_root_object_index;
+-	long respawn_effect_index;
+-	short adjustment_index;
+-	short random_adjustment_index;
+-	boolean result;
+-
+-	player = player_get(player_index);
+-	player_unit_index = player->unit_index;
+-	pointers.biped = biped_get(player_unit_index);
+-	result = FALSE;
++	struct player_datum *player = player_get(player_index);
++	long player_unit_index = player->unit_index;
++	struct biped_datum *biped = biped_get(player_unit_index);
++	boolean result = FALSE;
+ 
+-	if (source_unit_index != NONE)
++	match_assert(
++		"c:\\halo\\SOURCE\\game\\players.c",
++		0x4FB,
++		source_unit_index==NONE || local_player_count()>1);
++	if (source_unit_index != NONE &&
++		object_get_ultimate_parent(source_unit_index) != source_unit_index)
+ 	{
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\game\\players.c",
+-			0x4FB,
+-			local_player_count()>1,
+-			"source_unit_index==NONE || local_player_count()>1");
+-		if (object_get_ultimate_parent(source_unit_index) != source_unit_index)
+-		{
+-			real scale;
+-			real collision_height;
+-
+-			source_root_object_index =
+-				object_get_ultimate_parent(source_unit_index);
+-			unit_get(source_unit_index);
+-			pointers.source_root_object = object_get(source_root_object_index);
+-
+-			best_adjustment_vector =
+-				pointers.source_root_object->object.translational_velocity;
+-			best_adjustment_vector.k = 0.f;
+-			source_unit_index = source_root_object_index;
+-			if (!(magnitude_squared3d(&best_adjustment_vector) > 0.f))
+-			{
+-				adjustment_vector =
+-					pointers.source_root_object->object.forward.k < 0.70710677f
+-						? &pointers.source_root_object->object.forward
+-						: &pointers.source_root_object->object.up;
+-				best_adjustment_vector = *adjustment_vector;
+-				best_adjustment_vector.k = 0.f;
+-			}
+-
+-			collision_height = biped_definition_get(
+-				pointers.biped->definition_index)->biped.collision_radius;
+-			scale = collision_height * 3.f +
+-				pointers.source_root_object->object.bounding_sphere_radius;
++		long source_root_object_index = object_get_ultimate_parent(source_unit_index);
++		struct object_datum *source_root_object;
++		real_vector3d best_adjustment_vector;
++		real collision_radius;
++		real_matrix4x3 adjustment_matrix;
++		real scale;
++		short adjustment_index;
++		real_point3d anchor_point;
++
++		unit_get(source_unit_index);
++		source_root_object = object_get(source_root_object_index);
++		best_adjustment_vector = source_root_object->object.translational_velocity;
++		best_adjustment_vector.k = 0.f;
++		source_unit_index = source_root_object_index;
++		if (!(magnitude_squared3d(&best_adjustment_vector) > 0.f))
++		{
++			best_adjustment_vector = source_root_object->object.forward.k < 0.70710677f
++				? source_root_object->object.forward
++				: source_root_object->object.up;
++		}
++		best_adjustment_vector.k = 0.f;
++
++		collision_radius = biped_definition_get(biped->definition_index)->biped.collision_radius;
++		scale = collision_radius * 3.f + source_root_object->object.bounding_sphere_radius;
+ 		match_assert(
+ 			"c:\\halo\\SOURCE\\game\\players.c",
+ 			0x525,
+@@ -1696,27 +1669,25 @@ boolean player_teleport_internal(
+ 			&best_adjustment_vector,
+ 			&best_adjustment_vector);
+ 		normalize3d(&best_adjustment_vector);
+-			matrix4x3_from_point_and_vectors(
+-				&placement_matrix,
+-				&pointers.source_root_object->object.bounding_sphere_center,
+-				&best_adjustment_vector,
++		matrix4x3_from_point_and_vectors(
++			&adjustment_matrix,
++			&source_root_object->object.bounding_sphere_center,
++			&best_adjustment_vector,
+ 			global_up3d);
+-		placement_matrix.scale = scale;
++		adjustment_matrix.scale = scale;
+ 
+-		adjustment_index = 0;
+-		do
++		for (adjustment_index = 0;
++			adjustment_index < NUMBEROF(adjustment_weights) && !result;
++			adjustment_index++)
+ 		{
+-			if (result)
+-				break;
+-
+ 			matrix4x3_transform_point(
+-				&placement_matrix,
++				&adjustment_matrix,
+ 				&adjustment_weights[adjustment_index],
+-				&adjusted_position);
++				&anchor_point);
+ 			result = biped_fix_position(
+ 				player_unit_index,
+ 				source_unit_index,
+-				&adjusted_position,
++				&anchor_point,
+ 				NULL,
+ 				2.f,
+ 				FALSE,
+@@ -1725,53 +1696,32 @@ boolean player_teleport_internal(
+ 
+ 			if (!result)
+ 			{
+-				random_adjustment_index = 0;
+-				do
++				short random_adjustment_index;
++				real_point3d new_position;
++				real_vector3d random_offset;
++
++				for (random_adjustment_index = 0;
++					random_adjustment_index < 8 && !result;
++					random_adjustment_index++)
+ 				{
+-					if (result)
+-						break;
+-
+-					random_adjustment_vector = *global_zero_vector3d;
+-					random_direction3d(&random_adjustment_vector);
+-					random_adjusted_position.x = adjusted_position.x +
+-						random_adjustment_vector.i *
+-						collision_height;
+-					random_adjusted_position.y = adjusted_position.y +
+-						random_adjustment_vector.j *
+-						collision_height;
+-					random_adjusted_position.z = adjusted_position.z +
+-						random_adjustment_vector.k *
+-						collision_height;
++					random_offset = *global_zero_vector3d;
++					random_direction3d(&random_offset);
++					point_from_line3d(
++						&anchor_point,
++						&random_offset,
++						collision_radius,
++						&new_position);
+ 					result = biped_fix_position(
+ 						player_unit_index,
+ 						source_unit_index,
+-						&random_adjusted_position,
++						&new_position,
+ 						NULL,
+ 						2.f,
+ 						FALSE,
+ 						FALSE,
+ 						TRUE);
+-					random_adjustment_index++;
+ 				}
+-				while (random_adjustment_index < 8);
+ 			}
+-
+-			adjustment_index++;
+-		}
+-	while (adjustment_index < NUMBEROF(adjustment_weights));
+-			goto placement_complete;
+-		}
+-		else
+-		{
+-			result = biped_fix_position(
+-				player_unit_index,
+-				source_unit_index,
+-				(real_point3d *)position,
+-				NULL,
+-				2.f,
+-				FALSE,
+-				FALSE,
+-				TRUE);
+ 		}
+ 	}
+ 	else
+@@ -1787,88 +1737,94 @@ boolean player_teleport_internal(
+ 			TRUE);
+ 	}
+ 
+-placement_complete:
+-
+ 	player->cluster_index = NONE;
+-	if (!result)
+-		goto failure;
+-
+-	scenario = global_scenario_get();
+-	match_assert(
+-		"c:\\halo\\SOURCE\\game\\players.c",
+-		0x56A,
+-		player->unit_index!=NONE);
+-	for (adjustment_index = 0;
+-		adjustment_index < scenario->bsp_switch_trigger_volumes.count;
+-		adjustment_index++)
++	if (result)
+ 	{
+-		bsp_switch_trigger_volume = TAG_BLOCK_GET_ELEMENT(
+-			&scenario->bsp_switch_trigger_volumes,
+-			adjustment_index,
+-			struct scenario_bsp_switch_trigger_volume);
+-		if (bsp_switch_trigger_volume->source_structure_bsp_index ==
+-			global_structure_bsp_index &&
+-			scenario_trigger_volume_test_object(
+-				bsp_switch_trigger_volume->trigger_volume_index,
+-				player->unit_index))
+-		{
+-			result = FALSE;
+-			goto failure;
++		struct scenario *scenario = global_scenario_get();
++		short bsp_switch_trigger_volume_index;
++
++		match_assert(
++			"c:\\halo\\SOURCE\\game\\players.c",
++			0x56A,
++			player->unit_index!=NONE);
++		for (bsp_switch_trigger_volume_index = 0;
++			bsp_switch_trigger_volume_index < scenario->bsp_switch_trigger_volumes.count;
++			bsp_switch_trigger_volume_index++)
++		{
++			struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume = TAG_BLOCK_GET_ELEMENT(
++				&scenario->bsp_switch_trigger_volumes,
++				bsp_switch_trigger_volume_index,
++				struct scenario_bsp_switch_trigger_volume);
++
++			if (bsp_switch_trigger_volume->source_structure_bsp_index ==
++				global_structure_bsp_index &&
++				scenario_trigger_volume_test_object(
++					bsp_switch_trigger_volume->trigger_volume_index,
++					player->unit_index))
++			{
++				result = FALSE;
++				break;
++			}
+ 		}
+ 	}
+ 
+-	pointers.biped->object.translational_velocity = *global_zero_vector3d;
+-	if (source_unit_index != NONE)
++	if (result)
+ 	{
+-		source_biped = biped_get(source_unit_index);
+-		best_adjustment_vector = source_biped->object.forward;
+-		source_biped = biped_try_and_get(source_unit_index);
+-		if (source_biped && source_biped->biped.elevator_object_index != NONE)
++		biped->object.translational_velocity = *global_zero_vector3d;
++		if (source_unit_index != NONE)
+ 		{
+-			pointers.biped->biped.elevator_object_index =
+-				source_biped->biped.elevator_object_index;
+-			pointers.biped->biped.elevator_ticks = source_biped->biped.elevator_ticks;
+-		}
++			real_vector3d forward = unit_get(source_unit_index)->object.forward;
++			struct biped_datum *source_biped = biped_try_and_get(source_unit_index);
+ 
+-		pointers.biped->unit.desired_facing_vector = best_adjustment_vector;
+-		pointers.biped->unit.desired_aiming_vector = best_adjustment_vector;
+-		pointers.biped->unit.desired_looking_vector = best_adjustment_vector;
+-		if (player->local_player_index != NONE)
+-		{
+-			player_control_set_facing(
+-				player->local_player_index,
+-				&best_adjustment_vector);
++			if (source_biped && source_biped->biped.elevator_object_index != NONE)
++			{
++				biped->biped.elevator_object_index =
++					source_biped->biped.elevator_object_index;
++				biped->biped.elevator_ticks = source_biped->biped.elevator_ticks;
++			}
++
++			biped->unit.desired_facing_vector = forward;
++			biped->unit.desired_aiming_vector = forward;
++			biped->unit.desired_looking_vector = forward;
++			if (player->local_player_index != NONE)
++			{
++				player_control_set_facing(
++					player->local_player_index,
++					&forward);
++			}
+ 		}
+ 
+-		player_information = TAG_BLOCK_GET_ELEMENT(
+-			&scenario_get_game_globals()->player_information,
+-			0,
+-			struct game_globals_player_information);
+-		respawn_effect_index = player_information->coop_respawn_effect.index;
+-		if (respawn_effect_index != NONE)
++		if (source_unit_index != NONE)
+ 		{
+-			players_compute_combined_pvs(players_globals->combined_pvs, FALSE);
+-			effect_new_from_object(
+-				respawn_effect_index,
+-				player_unit_index,
+-				player_unit_index,
+-				NONE,
+-				0.f,
+-				0.f,
+-				NULL,
+-				NULL);
++			long respawn_effect_index = TAG_BLOCK_GET_ELEMENT(
++				&scenario_get_game_globals()->player_information,
++				0,
++				struct game_globals_player_information)->coop_respawn_effect.index;
++
++			if (respawn_effect_index != NONE)
++			{
++				players_compute_combined_pvs(players_globals->combined_pvs, FALSE);
++				effect_new_from_object(
++					respawn_effect_index,
++					player_unit_index,
++					player_unit_index,
++					NONE,
++					0.f,
++					0.f,
++					NULL,
++					NULL);
++			}
+ 		}
+ 	}
+-
+-	return result;
+-
+-failure:
+-	error(2, "couldn't teleport player into a valid location");
+-	match_assert(
+-		"c:\\halo\\SOURCE\\game\\players.c",
+-		0x5AB,
+-		player->local_player_index!=NONE);
+-	player_pseudo_kill(player_index, source_unit_index);
++	else
++	{
++		error(2, "couldn't teleport player into a valid location");
++		match_assert(
++			"c:\\halo\\SOURCE\\game\\players.c",
++			0x5AB,
++			player->local_player_index!=NONE);
++		player_pseudo_kill(player_index, source_unit_index);
++	}
+ 
+ 	return result;
+ }

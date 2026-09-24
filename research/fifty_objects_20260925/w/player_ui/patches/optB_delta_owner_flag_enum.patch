@@ -1,0 +1,51 @@
+--- a/source/game/game_engine.h
++++ b/source/game/game_engine.h
+@@ -28,6 +28,13 @@
+ 	_game_variant_always_invisible_bit,
+ };
+ 
++enum
++{
++	_variant_is_system_default_bit = 0,
++	NUMBER_OF_GAME_VARIANT_FLAGS,
++	_default_variant_index_mask = 0xFFFFFF00
++};
++
+ enum game_engine_type
+ {
+ 	game_engine_none = 0,
+--- a/source/interface/player_ui.c
++++ b/source/interface/player_ui.c
+@@ -167,8 +167,7 @@
+ 
+ enum
+ {
+-	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
+-	_variant_is_system_default_bit = 0
++	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4
+ };
+ 
+ /* ---------- macros */
+--- a/source/saved games/playlist_profile.c
++++ b/source/saved games/playlist_profile.c
+@@ -98,11 +98,6 @@
+ 	NUMBER_OF_DEFAULT_PLAYLIST_PROFILES = 26,
+ };
+ 
+-enum
+-{
+-	_game_variant_is_system_default_bit = 0
+-};
+-
+ /* ---------- macros */
+ 
+ /* ---------- structures */
+@@ -310,7 +305,7 @@
+ 				sizeof(struct game_variant));
+ 			SET_FLAG(
+ 				((struct game_variant *)block)->flags,
+-				_game_variant_is_system_default_bit,
++				_variant_is_system_default_bit,
+ 				FALSE);
+ 			game_engine_variant_cleanup((struct game_variant *)block);
+ 			ustrncpy(

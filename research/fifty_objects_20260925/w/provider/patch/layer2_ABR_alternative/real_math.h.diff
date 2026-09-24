@@ -1,0 +1,30 @@
+--- a/source/math/real_math.h
++++ b/source/math/real_math.h
+@@ -675,6 +675,7 @@
+ 
+ unsigned long *get_global_random_seed_address(void);
+ unsigned long *get_global_local_random_seed_address(void);
++unsigned long get_random_seed(void);
+ 
+ unsigned short seed_random(unsigned long *seed);
+ short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
+@@ -939,8 +940,7 @@
+ 	real_point2d const *a,
+ 	real_point2d const *b)
+ {
+-	real_vector2d v;
+-	return magnitude2d(vector_from_points2d(a, b, &v));
++	return square_root(distance_squared2d(a, b));
+ }
+ 
+ __inline real dot_product2d(
+@@ -1192,8 +1192,7 @@
+ 	real_point3d const *a,
+ 	real_point3d const *b)
+ {
+-	real_vector3d v;
+-	return magnitude3d(vector_from_points3d(a, b, &v));
++	return square_root(distance_squared3d(a, b));
+ }
+ 
+ __inline real_point3d *midpoint3d(

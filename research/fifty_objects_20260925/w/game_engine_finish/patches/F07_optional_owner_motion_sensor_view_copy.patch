@@ -1,0 +1,19 @@
+diff --git a/source/game/game_engine.c b/source/game/game_engine.c
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -4451,13 +4451,11 @@ short game_engine_player_get_custom_motion_sensor_positions(
+ 
+ 		for (goal_index = 0; goal_index < 32; goal_index++)
+ 		{
+-			struct netgame_goal *goal = &global_goal[goal_index];
+-
+ 			if (goal_matches_player(goal_index, player, player_index) && count < maximum_count)
+ 			{
+ 				goal_indices[count] = goal_index;
+-				positions[count].x = goal->position.x;
+-				positions[count].y = goal->position.y;
++				/* /Od 0x5a20e0: one 8-byte copy of the goal's x,y (the 3D point viewed as its 2D prefix) */
++				positions[count] = *(real_point2d *)&global_goal[goal_index].position;
+ 				count++;
+ 			}
+ 		}

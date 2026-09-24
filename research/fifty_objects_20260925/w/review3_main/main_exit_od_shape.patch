@@ -1,0 +1,31 @@
+diff --git a/source/main/main.c b/source/main/main.c
+index 6691312..6686cb7 100644
+--- a/source/main/main.c
++++ b/source/main/main.c
+@@ -2138,20 +2138,17 @@ static void main_exit(
+ 	case _game_connection_network_server:
+ 		dispose_global_network_game_client();
+ 		dispose_global_network_game_server();
+-		game_dispose_from_old_map();
+-		game_dispose();
+-		debug_keys_dispose();
+-		console_dispose();
+ 		break;
+ 	case _game_connection_network_client:
+ 		dispose_global_network_game_client();
+-	default:
+-		game_dispose_from_old_map();
+-		game_dispose();
+-		debug_keys_dispose();
+-		console_dispose();
+ 		break;
+ 	}
++
++	game_dispose_from_old_map();
++	game_dispose();
++	debug_keys_dispose();
++	console_dispose();
++
+ 	return;
+ }
+ 

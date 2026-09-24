@@ -1,0 +1,28 @@
+diff --git a/source/math/geometry.c b/source/math/geometry.c
+index 34401c6b..d17e0d3b 100644
+--- a/source/math/geometry.c
++++ b/source/math/geometry.c
+@@ -185,9 +185,7 @@ symbols in this file:
+ 
+ #include "cseries.h"
+ 
+-#define plane2d_distance_to_point plane2d_distance_to_point_inline
+ #include "real_math.h"
+-#undef plane2d_distance_to_point
+ 
+ #include "geometry.h"
+ 
+@@ -543,13 +541,6 @@ boolean convex_hull3d_verify(void)
+ 	return TRUE;
+ }
+ 
+-real plane2d_distance_to_point(
+-	real_plane2d const *plane,
+-	real_point2d const *point)
+-{
+-	return (plane->n.i*point->x + plane->n.j*point->y) - plane->d;
+-}
+-
+ real vector_intersect_plane2d(
+ 	real_point2d const *point,
+ 	real_vector2d const *vector,

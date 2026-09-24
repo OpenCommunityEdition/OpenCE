@@ -1,0 +1,73 @@
+diff --git a/source/networking/network_connection.c b/source/networking/network_connection.c
+--- a/source/networking/network_connection.c
++++ b/source/networking/network_connection.c
+@@ -519,49 +519,52 @@ boolean network_connection_connect(
+ 		0x2C1,
+ 		remote_address);
+ 
+-	if (!connection->reliable_endpoint && !connection->unreliable_endpoint)
+-	{
+-		return FALSE;
+-	}
+-	success = TRUE;
+-
+-	if (connection->unreliable_endpoint)
++	success = connection->reliable_endpoint || connection->unreliable_endpoint;
++	if (success && connection->unreliable_endpoint)
+ 	{
+ 		result = connect_endpoint(connection->unreliable_endpoint, remote_address);
+-		if (result)
++		if (result == _transport_error_none)
++		{
++			success = TRUE;
++		}
++		else
+ 		{
+ 			error(
+-				2,
++				_error_silent,
+ 				"connect_endpoint() on unreliable endpoint returned error '%s'",
+ 				transport_error_to_string(result));
+-			return FALSE;
++			success = FALSE;
+ 		}
+ 	}
+ 
+-	if (connection->reliable_endpoint)
++	if (success && connection->reliable_endpoint)
+ 	{
+ 		if (process_reference)
+ 		{
+ 			result = connect_endpoint_async(connection->reliable_endpoint, remote_address, process_reference);
+-			if (result && result != _transport_result_connect_in_progress)
++			if (result == _transport_error_none || result == _transport_result_connect_in_progress)
++			{
++				success = TRUE;
++			}
++			else
+ 			{
+ 				error(
+-					2,
++					_error_silent,
+ 					"connect_endpoint_async() returned error '%s'",
+ 					transport_error_to_string(result));
+-				return FALSE;
++				success = FALSE;
+ 			}
+ 		}
+ 		else
+ 		{
+ 			result = connect_endpoint(connection->reliable_endpoint, remote_address);
+-			if (result)
++			if (result != _transport_error_none)
+ 			{
+ 				error(
+-					2,
++					_error_silent,
+ 					"connect_endpoint() on reliable endpoint returned error '%s'",
+ 					transport_error_to_string(result));
+-				return FALSE;
++				success = FALSE;
+ 			}
+ 		}
+ 	}

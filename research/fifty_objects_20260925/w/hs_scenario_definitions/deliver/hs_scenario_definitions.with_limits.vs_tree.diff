@@ -1,0 +1,437 @@
+diff --git a/source/hs/hs_scenario_definitions.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hs_scenario_definitions\\deliver\\hs_scenario_definitions.with_limits.c"
+index 3f78a4fc..7f51c01e 100644
+--- a/source/hs/hs_scenario_definitions.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hs_scenario_definitions\\deliver\\hs_scenario_definitions.with_limits.c"
+@@ -49,11 +49,20 @@ symbols in this file:
+ 002E49C0 0274:
+ 	_hs_script_types_enum (0000)
+ 	_hs_types_enum (000c)
++	_hs_scripts_block_fields (0018)
+ 	_hs_scripts_block (0060)
++	_hs_globals_block_fields (0090)
+ 	_hs_globals_block (00e4)
++	_hs_references_block_reference (0110)
++	_hs_references_block_fields (011c)
+ 	_hs_references_block (0140)
+ 	_hs_source_data_definition (016c)
++	_hs_source_files_block_fields (017c)
+ 	_hs_source_files_block (01a0)
++	_data_array_header_bs_codes (01cc)
++	_data_array_header_bs_definition (0204)
++	_syntax_node_bs_codes (0218)
++	_syntax_node_bs_definition (0240)
+ 	_hs_syntax_data_definition (0254)
+ 	_hs_string_data_definition (0264)
+ */
+@@ -61,6 +70,7 @@ symbols in this file:
+ /* ---------- headers */
+ 
+ #include "cseries.h"
++#include "hs/hs.h"
+ #include "hs/hs_scenario_definitions.h"
+ #include "memory/byte_swapping.h"
+ #include "memory/data.h"
+@@ -71,138 +81,133 @@ symbols in this file:
+ 
+ /* ---------- structures */
+ 
+-#pragma pack(push, 4)
++/* ---------- prototypes */
++
++static void byte_swap_script_syntax_data(
++	void *owner,
++	void *data,
++	long size);
++
++/* ---------- globals */
+ 
+-struct hs_types_definition
++struct tag_enum_definition hs_script_types_enum =
+ {
+-	struct tag_enum_definition definition;
+-	struct tag_field script_fields[6];
++	NUMBER_OF_HS_SCRIPT_TYPES,
++	hs_script_type_names,
++	NULL,
+ };
+ 
+-struct hs_scripts_definition
++struct tag_enum_definition hs_types_enum =
+ {
+-	struct tag_block_definition definition;
+-	long field_table_alignment;
+-	struct tag_field global_fields[7];
++	NUMBER_OF_HS_TYPES,
++	hs_type_names,
++	NULL,
+ };
+ 
+-struct hs_globals_definition
++static struct tag_field hs_scripts_block_fields[6];
++
++struct tag_block_definition hs_scripts_block =
+ {
+-	struct tag_block_definition definition;
+-	long reference_group_tags[3];
+-	struct tag_field reference_fields[3];
++	"hs_scripts_block",
++	0,
++	MAXIMUM_HS_SCRIPTS_PER_SCENARIO,
++	sizeof(struct hs_script),
++	NULL,
++	hs_scripts_block_fields,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
+ };
+ 
+-struct hs_source_definition
++static struct tag_field hs_scripts_block_fields[6] =
+ {
+-	struct tag_data_definition definition;
+-	struct tag_field fields[3];
++	{ _tag_field_string, 0, "name*", NULL },
++	{ _tag_field_enum, 0, "script type*", &hs_script_types_enum },
++	{ _tag_field_enum, 0, "return type*", &hs_types_enum },
++	{ _tag_field_long_integer, 0, "root expression index*", NULL },
++	{ _tag_field_pad, 0, NULL, (void *)52 },
++	{ _tag_field_terminator, 0, NULL, NULL },
+ };
+ 
+-struct hs_source_files_definition
++static struct tag_field hs_globals_block_fields[7];
++
++struct tag_block_definition hs_globals_block =
+ {
+-	struct tag_block_definition definition;
+-	byte_swap_code data_array_codes[14];
+-	struct byte_swap_definition data_array_definition;
+-	byte_swap_code syntax_node_codes[10];
+-	struct byte_swap_definition syntax_node_definition;
++	"hs_globals_block",
++	0,
++	MAXIMUM_HS_GLOBALS_PER_SCENARIO,
++	sizeof(struct hs_global),
++	NULL,
++	hs_globals_block_fields,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
+ };
+ 
+-#pragma pack(pop)
+-
+-/* ---------- prototypes */
++static struct tag_field hs_globals_block_fields[7] =
++{
++	{ _tag_field_string, 0, "name*", NULL },
++	{ _tag_field_enum, 0, "type*", &hs_types_enum },
++	{ _tag_field_pad, 0, NULL, (void *)2 },
++	{ _tag_field_pad, 0, NULL, (void *)4 },
++	{ _tag_field_long_integer, 0, "initialization expression index*", NULL },
++	{ _tag_field_pad, 0, NULL, (void *)48 },
++	{ _tag_field_terminator, 0, NULL, NULL },
++};
+ 
+-extern char *hs_script_type_names[];
+-extern char *hs_type_names[];
+-static void byte_swap_script_syntax_data(
+-	void *owner,
+-	void *data,
+-	long size);
++static struct tag_reference_definition hs_references_block_reference =
++{
++	0,
++	NONE,
++	NULL,
++};
+ 
+-/* ---------- globals */
++static struct tag_field hs_references_block_fields[3];
+ 
+-__declspec(align(4)) struct tag_enum_definition hs_script_types_enum =
++struct tag_block_definition hs_references_block =
+ {
+-	5,
+-	hs_script_type_names,
++	"hs_references_block",
++	0,
++	MAXIMUM_HS_REFERENCES_PER_SCENARIO,
++	sizeof(struct hs_reference),
++	NULL,
++	hs_references_block_fields,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
+ 	NULL,
+ };
+ 
+-__declspec(align(4)) struct hs_types_definition hs_types_enum =
++static struct tag_field hs_references_block_fields[3] =
+ {
+-	{
+-		49,
+-		hs_type_names,
+-		NULL,
+-	},
+-	{
+-		{ _tag_field_string, 0, "name*", NULL },
+-		{ _tag_field_enum, 0, "script type*", &hs_script_types_enum },
+-		{ _tag_field_enum, 0, "return type*", &hs_types_enum.definition },
+-		{ _tag_field_long_integer, 0, "root expression index*", NULL },
+-		{ _tag_field_pad, 0, NULL, (void *)52 },
+-		{ _tag_field_terminator, 0, NULL, NULL },
+-	},
++	{ _tag_field_pad, 0, NULL, (void *)24 },
++	{ _tag_field_tag_reference, 0, "reference*^", &hs_references_block_reference },
++	{ _tag_field_terminator, 0, NULL, NULL },
+ };
+ 
+-__declspec(align(4)) struct hs_scripts_definition hs_scripts_block =
++struct tag_data_definition hs_source_data_definition =
+ {
+-	{
+-		"hs_scripts_block",
+-		0,
+-		512,
+-		sizeof(struct hs_script),
+-		NULL,
+-		hs_types_enum.script_fields,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-	},
++	"hs_source_data_definition",
+ 	0,
+-	{
+-		{ _tag_field_string, 0, "name*", NULL },
+-		{ _tag_field_enum, 0, "type*", &hs_types_enum.definition },
+-		{ _tag_field_pad, 0, NULL, (void *)2 },
+-		{ _tag_field_pad, 0, NULL, (void *)4 },
+-		{ _tag_field_long_integer, 0, "initialization expression index*", NULL },
+-		{ _tag_field_pad, 0, NULL, (void *)48 },
+-		{ _tag_field_terminator, 0, NULL, NULL },
+-	},
++	MAXIMUM_HS_SOURCE_DATA_PER_FILE,
++	NULL,
+ };
+ 
+-__declspec(align(4)) struct hs_globals_definition hs_globals_block =
+-{
+-	{
+-		"hs_globals_block",
+-		0,
+-		128,
+-		sizeof(struct hs_global),
+-		NULL,
+-		hs_scripts_block.global_fields,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-	},
+-	{ 0, NONE, 0 },
+-	{
+-		{ _tag_field_pad, 0, NULL, (void *)24 },
+-		{ _tag_field_tag_reference, 0, "reference*^", hs_globals_block.reference_group_tags },
+-		{ _tag_field_terminator, 0, NULL, NULL },
+-	},
+-};
++static struct tag_field hs_source_files_block_fields[3];
+ 
+-__declspec(align(4)) struct tag_block_definition hs_references_block =
++struct tag_block_definition hs_source_files_block =
+ {
+-	"hs_references_block",
++	"hs_source_files_block",
+ 	0,
+-	256,
+-	sizeof(struct hs_reference),
++	MAXIMUM_HS_SOURCE_FILES_PER_SCENARIO,
++	sizeof(struct hs_source_file),
+ 	NULL,
+-	hs_globals_block.reference_fields,
++	hs_source_files_block_fields,
+ 	NULL,
+ 	NULL,
+ 	NULL,
+@@ -210,93 +215,76 @@ __declspec(align(4)) struct tag_block_definition hs_references_block =
+ 	NULL,
+ };
+ 
+-__declspec(align(4)) struct hs_source_definition hs_source_data_definition =
++static struct tag_field hs_source_files_block_fields[3] =
+ {
+-	{
+-		"hs_source_data_definition",
+-		0,
+-		0x40000,
+-		NULL,
+-	},
+-	{
+-		{ _tag_field_string, 0, "name*", NULL },
+-		{ _tag_field_data, 0, "source", &hs_source_data_definition.definition },
+-		{ _tag_field_terminator, 0, NULL, NULL },
+-	},
++	{ _tag_field_string, 0, "name*", NULL },
++	{ _tag_field_data, 0, "source", &hs_source_data_definition },
++	{ _tag_field_terminator, 0, NULL, NULL },
+ };
+ 
+-__declspec(align(4)) struct hs_source_files_definition hs_source_files_block =
++static byte_swap_code data_array_header_bs_codes[] =
+ {
+-	{
+-		"hs_source_files_block",
+-		0,
+-		8,
+-		sizeof(struct hs_source_file),
+-		NULL,
+-		hs_source_data_definition.fields,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-		NULL,
+-	},
+-	{
+-		_begin_bs_array,
+-		1,
+-		32,
+-		_2byte,
+-		_2byte,
+-		1,
+-		3,
+-		_4byte,
+-		_2byte,
+-		_2byte,
+-		_2byte,
+-		_2byte,
+-		_4byte,
+-		_end_bs_array,
+-	},
+-	{
+-		"data_array_header",
+-		sizeof(struct data_array),
+-		hs_source_files_block.data_array_codes,
+-		BYTE_SWAP_DEFINITION_SIGNATURE,
+-		FALSE,
+-	},
+-	{
+-		_begin_bs_array,
+-		1,
+-		_2byte,
+-		_2byte,
+-		_2byte,
+-		_2byte,
+-		_4byte,
+-		_4byte,
+-		_4byte,
+-		_end_bs_array,
+-	},
+-	{
+-		"syntax_node",
+-		sizeof(struct hs_syntax_node),
+-		hs_source_files_block.syntax_node_codes,
+-		BYTE_SWAP_DEFINITION_SIGNATURE,
+-		FALSE,
+-	},
++	_begin_bs_array,
++	1,
++	32,
++	_2byte,
++	_2byte,
++	1,
++	3,
++	_4byte,
++	_2byte,
++	_2byte,
++	_2byte,
++	_2byte,
++	_4byte,
++	_end_bs_array,
++};
++
++static struct byte_swap_definition data_array_header_bs_definition =
++{
++	"data_array_header",
++	sizeof(struct data_array),
++	data_array_header_bs_codes,
++	BYTE_SWAP_DEFINITION_SIGNATURE,
++	FALSE,
++};
++
++static byte_swap_code syntax_node_bs_codes[] =
++{
++	_begin_bs_array,
++	1,
++	_2byte,
++	_2byte,
++	_2byte,
++	_2byte,
++	_4byte,
++	_4byte,
++	_4byte,
++	_end_bs_array,
++};
++
++static struct byte_swap_definition syntax_node_bs_definition =
++{
++	"syntax_node",
++	sizeof(struct hs_syntax_node),
++	syntax_node_bs_codes,
++	BYTE_SWAP_DEFINITION_SIGNATURE,
++	FALSE,
+ };
+ 
+-__declspec(align(4)) struct tag_data_definition hs_syntax_data_definition =
++struct tag_data_definition hs_syntax_data_definition =
+ {
+ 	"hs_syntax_data_definition",
+ 	0,
+-	380076,
++	sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node),
+ 	byte_swap_script_syntax_data,
+ };
+ 
+-__declspec(align(4)) struct tag_data_definition hs_string_data_definition =
++struct tag_data_definition hs_string_data_definition =
+ {
+ 	"hs_string_data_definition",
+ 	0,
+-	0x40000,
++	MAXIMUM_HS_STRING_DATA_PER_SCENARIO,
+ 	NULL,
+ };
+ 
+@@ -318,8 +306,8 @@ static void byte_swap_script_syntax_data(
+ 
+ 		if (!memcmp(data, "csirtpn \0edo", 12))
+ 		{
+-			byte_swap_data(&hs_source_files_block.data_array_definition, data, 1);
+-			byte_swap_data(&hs_source_files_block.syntax_node_definition, data, 0x4000);
++			byte_swap_data(&data_array_header_bs_definition, data, 1);
++			byte_swap_data(&syntax_node_bs_definition, data, 0x4000);
+ 			return;
+ 		}
+ 
+@@ -331,9 +319,9 @@ static void byte_swap_script_syntax_data(
+ 		{
+ 			long syntax_node_count= data_size/sizeof(struct hs_syntax_node);
+ 
+-			byte_swap_data(&hs_source_files_block.data_array_definition, data, 1);
++			byte_swap_data(&data_array_header_bs_definition, data, 1);
+ 			data= (byte *)data+sizeof(struct data_array);
+-			byte_swap_data(&hs_source_files_block.syntax_node_definition, data, syntax_node_count);
++			byte_swap_data(&syntax_node_bs_definition, data, syntax_node_count);
+ 		}
+ 	}
+ 

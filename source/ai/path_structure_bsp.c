@@ -14,8 +14,10 @@ symbols in this file:
 	_structure_surface_index_from_point (0000)
 00052500 0270:
 	_structure_test_pill2d (0000)
-0024EC0C 0040:
-	_rdata_0024ec0c (0000)
+0024EC0C 0020:
+	_quantized_pathfinding_surface_widths (0000)
+0024EC2C 0020:
+	_quantized_pathfinding_surface_heights (0000)
 0024EC4C 0027:
 	??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_structure@ (0000)
 0024EC78 0008:

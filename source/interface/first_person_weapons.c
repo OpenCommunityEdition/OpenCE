@@ -359,6 +359,9 @@ static void first_person_weapon_switch_weapons(
 static void first_person_weapon_new_unit(
 	short local_player_index,
 	long unit_index);
+static void first_person_weapon_message(
+	short local_player_index,
+	short message_type);
 static void first_person_weapon_next_state(
 	short local_player_index);
 static void first_person_weapon_update(
@@ -1316,7 +1319,7 @@ static void first_person_weapon_build_node_matrices(
 	return;
 }
 
-void first_person_weapon_message(
+static void first_person_weapon_message(
 	short local_player_index,
 	short message_type)
 {
@@ -1670,7 +1673,7 @@ static void first_person_weapon_update(
 		struct weapon_datum *weapon= weapon_get(first_person_weapon->weapon_index);
 		struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
 		struct animation_graph *animation_graph;
-		long triggered_sound_index;
+		long sound_definition_index;
 		short animation_update_result;
 		boolean moving;
 
@@ -1697,23 +1700,25 @@ static void first_person_weapon_update(
 			}
 		}
 
-		animation_update_result= animation_update_internal(
-			animation_update_kind_render_only,
+		animation_update_result= animation_update_render_only(
 			weapon_definition->weapon.interface_definition.first_person_animations.index,
 			&first_person_weapon->state_animation,
-			&triggered_sound_index);
-		if (animation_update_result==_animation_key_frame ||
-			animation_update_result==_animation_will_restart_on_next_frame)
+			&sound_definition_index);
+		if (animation_update_result==_animation_key_frame)
+		{
+			/* a key frame does not advance the first-person weapon state */
+		}
+		else if (animation_update_result==_animation_will_restart_on_next_frame)
 		{
 			first_person_weapon_next_state(local_player_index);
 		}
 
-		if (triggered_sound_index!=NONE &&
+		if (sound_definition_index!=NONE &&
 			director_get_perspective(local_player_index)==_director_perspective_first_person)
 		{
 			first_person_weapon->current_sound_index= object_impulse_sound_new(
 				first_person_weapon->weapon_index,
-				triggered_sound_index,
+				sound_definition_index,
 				NONE,
 				global_origin3d,
 				global_forward3d,
@@ -1729,8 +1734,7 @@ static void first_person_weapon_update(
 
 		if (first_person_weapon->moving_animation.index!=NONE)
 		{
-			animation_update_internal(
-				animation_update_kind_render_only,
+			animation_update_render_only(
 				weapon_definition->weapon.interface_definition.first_person_animations.index,
 				&first_person_weapon->moving_animation,
 				NULL);
@@ -1805,6 +1809,8 @@ static void first_person_weapon_update(
 
 		if (first_person_weapon->rendered)
 		{
+			real_vector2d turning;
+
 			accelerate_to_position(
 				&first_person_weapon->position.i,
 				&first_person_weapon->position_velocity.i,
@@ -1824,36 +1830,34 @@ static void first_person_weapon_update(
 				1.0f,
 				FALSE);
 
-			{
-				real turning_i= signed_angular_difference(
-					first_person_weapon->last_render_facing.yaw,
-					first_person_weapon->render_facing.yaw)*30.0f;
-				real turning_j= signed_angular_difference(
-					first_person_weapon->last_render_facing.pitch,
-					first_person_weapon->render_facing.pitch)*-30.0f;
+			turning.i= signed_angular_difference(
+				first_person_weapon->last_render_facing.yaw,
+				first_person_weapon->render_facing.yaw)*30.0f;
+			turning.j= signed_angular_difference(
+				first_person_weapon->last_render_facing.pitch,
+				first_person_weapon->render_facing.pitch)*-30.0f;
 
-				turning_i= PIN(turning_i, -1.0f, 1.0f);
-				turning_j= PIN(turning_j, -1.0f, 1.0f);
+			turning.i= PIN(turning.i, -1.0f, 1.0f);
+			turning.j= PIN(turning.j, -1.0f, 1.0f);
 
-				accelerate_to_position(
-					&first_person_weapon->turning.i,
-					&first_person_weapon->turning_velocity.i,
-					turning_i,
-					0.03f,
-					0.2f,
-					-1.0f,
-					1.0f,
-					FALSE);
-				accelerate_to_position(
-					&first_person_weapon->turning.j,
-					&first_person_weapon->turning_velocity.j,
-					turning_j,
-					0.03f,
-					0.2f,
-					-1.0f,
-					1.0f,
-					FALSE);
-			}
+			accelerate_to_position(
+				&first_person_weapon->turning.i,
+				&first_person_weapon->turning_velocity.i,
+				turning.i,
+				0.03f,
+				0.2f,
+				-1.0f,
+				1.0f,
+				FALSE);
+			accelerate_to_position(
+				&first_person_weapon->turning.j,
+				&first_person_weapon->turning_velocity.j,
+				turning.j,
+				0.03f,
+				0.2f,
+				-1.0f,
+				1.0f,
+				FALSE);
 		}
 
 		accelerate_to_position(

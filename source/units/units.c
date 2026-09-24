@@ -31,33 +31,33 @@ symbols in this file:
 00197DA0 0090:
 	_unit_get_animation_frames_remaining (0000)
 00197E30 0140:
-	_code_00197e30 (0000)
+	_unit_euler_axis_doplan (0000)
 00197F70 0020:
 	_unit_get_zoom_level (0000)
 00197F90 0080:
-	_code_00197f90 (0000)
+	_unit_animation_state_interruptable (0000)
 00198010 0040:
-	_code_00198010 (0000)
+	_unit_animation_busy (0000)
 00198050 0020:
-	_code_00198050 (0000)
+	_unit_animation_overlay_action_loops (0000)
 00198070 0060:
-	_code_00198070 (0000)
+	_unit_animation_state_loops (0000)
 001980D0 0060:
-	_code_001980d0 (0000)
+	_unit_animation_weapon_ik (0000)
 00198130 0040:
-	_code_00198130 (0000)
+	_unit_animation_vehicle_ik (0000)
 00198170 0020:
-	_code_00198170 (0000)
+	_unit_animation_aiming_screen (0000)
 00198190 0060:
-	_code_00198190 (0000)
+	_unit_animation_state_get_aiming_screen_index (0000)
 001981F0 0040:
-	_code_001981f0 (0000)
+	_unit_animation_state_can_be_entered_without_animation (0000)
 00198230 0040:
-	_code_00198230 (0000)
+	_unit_animation_compute_interpolation_frame_count (0000)
 00198270 0190:
 	_unit_animation_start_action (0000)
 00198400 01c0:
-	_code_00198400 (0000)
+	_unit_animation_start_overlay_action (0000)
 001985C0 00c0:
 	_unit_can_enter_seat (0000)
 00198680 0070:
@@ -79,7 +79,7 @@ symbols in this file:
 00198E00 0040:
 	_unit_get_center_of_mass (0000)
 00198E40 0190:
-	_code_00198e40 (0000)
+	_unit_animation_impulse_get_index (0000)
 00198FD0 00d0:
 	_unit_can_play_animation_impulse (0000)
 001990A0 00c0:
@@ -153,7 +153,7 @@ symbols in this file:
 0019A110 0060:
 	_unit_seat_allow_noncombatants (0000)
 0019A170 00e0:
-	_code_0019a170 (0000)
+	_unit_update_driver_and_gunner (0000)
 0019A250 0020:
 	_unit_get_current_equipment (0000)
 0019A270 0100:
@@ -169,7 +169,7 @@ symbols in this file:
 0019A5E0 0060:
 	_unit_has_weapon_definition_index (0000)
 0019A640 0030:
-	_code_0019a640 (0000)
+	_unit_first_free_weapon_index (0000)
 0019A670 0070:
 	_unit_get_weapon_count (0000)
 0019A6E0 0070:
@@ -179,37 +179,37 @@ symbols in this file:
 0019A7C0 0060:
 	_unit_get_current_grenade_type (0000)
 0019A820 01d0:
-	_code_0019a820 (0000)
+	_unit_throw_grenade_move_to_hand (0000)
 0019A9F0 0310:
-	_code_0019a9f0 (0000)
+	_unit_throw_grenade_release (0000)
 0019AD00 02d0:
-	_code_0019ad00 (0000)
+	_unit_seat_update (0000)
 0019AFD0 0050:
-	_code_0019afd0 (0000)
+	_base_seat_label_get (0000)
 0019B020 0040:
-	_code_0019b020 (0000)
+	_seat_label_to_base_seat_index (0000)
 0019B060 0050:
-	_code_0019b060 (0000)
+	_base_weapon_label_get (0000)
 0019B0B0 00b0:
-	_code_0019b0b0 (0000)
+	_unit_set_animation (0000)
 0019B160 0050:
-	_code_0019b160 (0000)
+	_unit_animation_update (0000)
 0019B1B0 0080:
-	_code_0019b1b0 (0000)
+	_unit_refresh_illumination (0000)
 0019B230 0050:
-	_code_0019b230 (0000)
+	_unit_get_weapon (0000)
 0019B280 0190:
-	_code_0019b280 (0000)
+	_unit_drop_item (0000)
 0019B410 00b0:
-	_code_0019b410 (0000)
+	_unit_drop_grenades (0000)
 0019B4C0 0100:
 	_unit_drop_inventory_weapons (0000)
 0019B5C0 0040:
 	_unit_handle_region_destroyed (0000)
 0019B600 0080:
-	_code_0019b600 (0000)
+	_unit_melee_sound (0000)
 0019B680 02a0:
-	_code_0019b680 (0000)
+	_unit_cause_continuous_melee_damage (0000)
 0019B920 0040:
 	_unit_set_enterable_by_player (0000)
 0019B960 0030:
@@ -239,17 +239,17 @@ symbols in this file:
 0019BF40 0030:
 	_unit_flying_through_air (0000)
 0019BF70 04f0:
-	_code_0019bf70 (0000)
+	_unit_euler_axis_buildplan (0000)
 0019C460 0200:
-	_code_0019c460 (0000)
+	_unit_euler_axis_couple (0000)
 0019C660 0220:
-	_code_0019c660 (0000)
+	_unit_set_or_test_seat_and_weapon_label (0000)
 0019C880 00d0:
 	_unit_adjust_projectile_ray (0000)
 0019C950 0200:
 	_unit_render_debug (0000)
 0019CB50 0580:
-	_code_0019cb50 (0000)
+	_unit_animation_set_state (0000)
 0019D0D0 0020:
 	_unit_abort_animation (0000)
 0019D0F0 0290:
@@ -273,7 +273,7 @@ symbols in this file:
 0019DB00 0080:
 	_units_set_desired_flashlight_state (0000)
 0019DB80 00a0:
-	_code_0019db80 (0000)
+	_unit_get_seat_label (0000)
 0019DC20 0040:
 	_unit_drop_current_equipment (0000)
 0019DC60 0050:
@@ -281,11 +281,11 @@ symbols in this file:
 0019DCB0 00d0:
 	_unit_approve_weapon_swap (0000)
 0019DD80 0170:
-	_code_0019dd80 (0000)
+	_unit_weapon_next_index (0000)
 0019DEF0 0100:
 	_unit_drop_current_weapon (0000)
 0019DFF0 0030:
-	_code_0019dff0 (0000)
+	_unit_get_current_weapon_label (0000)
 0019E020 0020:
 	_scripting_set_magic_base_seat (0000)
 0019E040 0030:
@@ -301,15 +301,15 @@ symbols in this file:
 0019E9F0 0080:
 	_unit_custom_animation_at_frame (0000)
 0019EA70 0120:
-	_code_0019ea70 (0000)
+	_unit_align_facing (0000)
 0019EB90 00a0:
 	_unit_start_flaming_to_death (0000)
 0019EC30 02e0:
-	_code_0019ec30 (0000)
+	_unit_running_blind (0000)
 0019EF10 0090:
-	_code_0019ef10 (0000)
+	_unit_vectors_are_valid (0000)
 0019EFA0 02e0:
-	_code_0019efa0 (0000)
+	_unit_verify_vectors (0000)
 0019F280 03a0:
 	_unit_control (0000)
 0019F620 0780:
@@ -327,9 +327,9 @@ symbols in this file:
 001A0C40 0050:
 	_unit_get_zoom_magnification (0000)
 001A0C90 0060:
-	_code_001a0c90 (0000)
+	_unit_integrated_night_vision_is_active (0000)
 001A0CF0 0620:
-	_code_001a0cf0 (0000)
+	_unit_ping_animation (0000)
 001A1310 0120:
 	_unit_start_animation_impulse (0000)
 001A1430 0020:
@@ -343,7 +343,7 @@ symbols in this file:
 001A16A0 0130:
 	_unit_add_weapon_to_inventory (0000)
 001A17D0 01b0:
-	_code_001a17d0 (0000)
+	_unit_ready_desired_weapon (0000)
 001A1980 01d0:
 	_unit_throw_grenade_begin (0000)
 001A1B50 0030:
@@ -355,9 +355,9 @@ symbols in this file:
 001A1F00 0050:
 	_unit_solo_player_integrated_night_vision_is_active (0000)
 001A1F50 00e0:
-	_code_001a1f50 (0000)
+	_unit_add_initial_weapons (0000)
 001A2030 0040:
-	_code_001a2030 (0000)
+	_unit_adjust_for_seat_change (0000)
 001A2070 0400:
 	_unit_new (0000)
 001A2470 0250:
@@ -900,68 +900,68 @@ void unit_animation_start_action(
 	long unit_index,
 	short action);
 
-static boolean code_00197e30(
+static boolean unit_euler_axis_doplan(
 	struct unit_acceleration_plan *plan,
 	real delta_time,
 	real position,
 	real *new_position,
 	real velocity,
 	real *new_velocity);
-static void code_0019bf70(
+static void unit_euler_axis_buildplan(
 	real position,
 	real velocity,
 	real maximum_velocity,
 	real maximum_acceleration,
 	struct unit_acceleration_plan *plan);
-static void code_0019c460(
+static void unit_euler_axis_couple(
 	struct unit_acceleration_plan *first_plan,
 	struct unit_acceleration_plan *second_plan,
 	real maximum_velocity,
 	real maximum_acceleration);
 
-static void code_0019b600(
+static void unit_melee_sound(
 	long unit_index,
 	short material_type,
 	long damage_effect_index);
-static void code_0019a170(
+static void unit_update_driver_and_gunner(
 	long unit_index);
-static short code_0019a640(
+static short unit_first_free_weapon_index(
 	long unit_index);
 
-static short code_00198e40(
+static short unit_animation_impulse_get_index(
 	short animation_impulse,
 	short *interpolation_frame_count);
 static boolean unit_can_play_animation_impulse(
 	long unit_index,
 	short animation_impulse);
 
-static boolean code_00198170(
+static boolean unit_animation_aiming_screen(
 	struct unit_animation *animation);
-static boolean code_001981f0(
+static boolean unit_animation_state_can_be_entered_without_animation(
 	short state);
-static short code_00198230(
+static short unit_animation_compute_interpolation_frame_count(
 	short new_state,
 	short old_state);
-static boolean code_00198050(
+static boolean unit_animation_overlay_action_loops(
 	struct unit_animation *animation);
-static boolean code_00197f90(
+static boolean unit_animation_state_interruptable(
 	struct unit_animation *animation,
 	short desired_state);
-static boolean code_00198070(
+static boolean unit_animation_state_loops(
 	struct unit_animation *animation);
-static long code_00198190(
+static long unit_animation_state_get_aiming_screen_index(
 	short state);
-static void code_0019b0b0(
+static void unit_set_animation(
 	long unit_index,
 	long animation_graph_index,
 	short animation_index);
-static short code_0019b160(
+static short unit_animation_update(
 	long unit_index,
 	long animation_graph_index,
 	struct animation_state *animation);
-static char const *code_0019dff0(
+static char const *unit_get_current_weapon_label(
 	long unit_index);
-static void code_0019ea70(
+static void unit_align_facing(
 	long unit_index,
 	real_vector2d const *alignment_vector);
 
@@ -988,9 +988,9 @@ static void unit_ready_desired_weapon(
 static void unit_throw_grenade_move_to_hand(long unit_index);
 
 
-static boolean code_001980d0(
+static boolean unit_animation_weapon_ik(
 	struct unit_animation *animation);
-static boolean code_00198130(
+static boolean unit_animation_vehicle_ik(
 	struct unit_animation *animation);
 static boolean unit_animation_busy(struct unit_animation *animation);
 
@@ -1007,7 +1007,7 @@ short unit_update_animation(
 	long unit_index,
 	struct unit_animation_update_data *data);
 
-static boolean unit_verify_inventory(long unit_index);
+static boolean unit_vectors_are_valid(long unit_index);
 static void unit_throw_grenade_release(long unit_index, boolean premature);
 
 static void unit_seat_update(long object_index);
@@ -1018,7 +1018,7 @@ static void unit_cause_continuous_melee_damage(long unit_index);
 
 static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
-static void code_0019b410(
+static void unit_drop_grenades(
 	long unit_index);
 static void unit_drop_inventory_weapons(
 	long unit_index);
@@ -2482,9 +2482,9 @@ boolean unit_solo_player_integrated_night_vision_is_active(
 	return active;
 }
 
-// HCEX identifies this private helper as unit_create_initial_weapons; the
-// January body below is independently proven against the Xbox object.
-void code_001a1f50(
+// HCEX_Release.pdb and the September 2001 map both name this private
+// helper unit_add_initial_weapons (file-static; no cachebeta public).
+static void unit_add_initial_weapons(
 	long unit_index)
 {
 	short initial_weapon_index;
@@ -2656,7 +2656,7 @@ boolean unit_new(
 			base_seat_labels[_unit_base_seat_stand],
 			NULL,
 			TRUE);
-		code_001a1f50(unit_index);
+		unit_add_initial_weapons(unit_index);
 
 		for (seat_index = 0;
 			seat_index<unit_definition->unit.seats.count;
@@ -2863,7 +2863,7 @@ void unit_died(
 		fresh_unit->unit.equipment_object_index = NONE;
 	}
 
-	code_0019b410(unit_index);
+	unit_drop_grenades(unit_index);
 	if (unit->unit.weapon_drop_delay_ticks == 0)
 		unit_drop_current_weapon(unit_index, TRUE);
 
@@ -2876,7 +2876,7 @@ void unit_died(
 	return;
 }
 
-static void code_0019b410(
+static void unit_drop_grenades(
 	long unit_index)
 {
 	struct unit_datum *unit;
@@ -3059,7 +3059,7 @@ boolean unit_can_enter_seat(
 	return result;
 }
 
-static void code_001a2030(
+static void unit_adjust_for_seat_change(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
@@ -3130,7 +3130,7 @@ boolean unit_enter_seat(
 
 			unit->unit.parent_seat_index = seat_index;
 			unit->object.parent_object_index = target_unit_index;
-			code_0019a170(target_unit_index);
+			unit_update_driver_and_gunner(target_unit_index);
 
 			updated_unit = unit_get(unit_index);
 			updated_unit->unit.desired_weapon_index = unit_weapon_next_index(
@@ -3180,7 +3180,7 @@ boolean unit_enter_seat(
 					animation_index);
 				animation_graph_index =
 					unit_definition->object.animation_graph.index;
-				code_0019b0b0(
+				unit_set_animation(
 					unit_index,
 					animation_graph_index,
 					animation_index);
@@ -3294,8 +3294,8 @@ void unit_exit_seat_end(
 			parent_unit->unit.gunner_object_index = NONE;
 		}
 
-		code_0019a170(parent_unit_index);
-		code_001a2030(unit_index);
+		unit_update_driver_and_gunner(parent_unit_index);
+		unit_adjust_for_seat_change(unit_index);
 
 		{
 			struct unit_animation_update_data animation_update_data;
@@ -3439,7 +3439,7 @@ void unit_animation_start_action(
 	return;
 }
 
-static void code_00198400(
+static void unit_animation_start_overlay_action(
 	long unit_index,
 	short overlay_action)
 {
@@ -3555,7 +3555,7 @@ void unit_handle_weapon_state_change(
 	}
 	else if (overlay_action != NONE)
 	{
-		code_00198400(unit_index, overlay_action);
+		unit_animation_start_overlay_action(unit_index, overlay_action);
 	}
 
 	return;
@@ -4090,7 +4090,7 @@ boolean unit_start_user_animation(
 
 						unit->unit.animation.state =
 							_unit_state_user_animation;
-						code_0019b0b0(
+						unit_set_animation(
 							unit_index,
 							animation_graph_index,
 							animation_index);
@@ -4223,7 +4223,7 @@ boolean unit_melee_attack_begin(
 
 				if (alignment_vector)
 				{
-					code_0019ea70(unit_index, alignment_vector);
+					unit_align_facing(unit_index, alignment_vector);
 				}
 
 				if (continuous)
@@ -4285,7 +4285,7 @@ boolean unit_leap_begin(
 			{
 				if (alignment_vector)
 				{
-					code_0019ea70(unit_index, alignment_vector);
+					unit_align_facing(unit_index, alignment_vector);
 				}
 
 				result = TRUE;
@@ -4365,7 +4365,7 @@ boolean unit_throw_grenade_begin(
 
 					if (alignment_vector)
 					{
-						code_0019ea70(unit_index, alignment_vector);
+						unit_align_facing(unit_index, alignment_vector);
 					}
 					else
 					{
@@ -4375,7 +4375,7 @@ boolean unit_throw_grenade_begin(
 						forward.j = unit->unit.aiming_vector.j;
 						if (normalize2d(&forward) > 0.f)
 						{
-							code_0019ea70(unit_index, &forward);
+							unit_align_facing(unit_index, &forward);
 						}
 					}
 
@@ -4516,7 +4516,7 @@ void unit_impact_melee_damage(
 	return;
 }
 
-void code_001a0cf0(
+static void unit_ping_animation(
 	long unit_index,
 	boolean killed,
 	boolean feign_death,
@@ -4555,7 +4555,7 @@ void unit_place(
 
 	if (TEST_FLAG(scenario_unit->flags, _scenario_unit_dead_bit))
 	{
-		code_001a0cf0(
+		unit_ping_animation(
 			unit_index,
 			TRUE,
 			FALSE,
@@ -4701,7 +4701,7 @@ boolean unit_try_and_exit_seat(
 						unit_definition->object.animation_graph.index,
 						animation_index);
 
-					code_0019b0b0(
+					unit_set_animation(
 						unit_index,
 						unit_definition->object.animation_graph.index,
 						animation_index);
@@ -6286,7 +6286,7 @@ void unit_record_damage(
 	return;
 }
 
-void code_001a0cf0(
+static void unit_ping_animation(
 	long unit_index,
 	boolean killed,
 	boolean feign_death,
@@ -6473,7 +6473,7 @@ void code_001a0cf0(
 
 			apply_animation =
 				killed ||
-				code_00197f90(
+				unit_animation_state_interruptable(
 					&unit->unit.animation,
 					animation_state);
 
@@ -6512,7 +6512,7 @@ void code_001a0cf0(
 				unit_set_or_test_seat_and_weapon_label(
 					unit_index,
 					seat_label,
-					code_0019dff0(unit_index),
+					unit_get_current_weapon_label(unit_index),
 					TRUE);
 			}
 
@@ -6578,7 +6578,7 @@ void code_001a0cf0(
 
 				object_start_interpolation(unit_index, 3);
 				unit->unit.animation.state = (char)animation_state;
-				code_0019b0b0(
+				unit_set_animation(
 					unit_index,
 					unit_definition->object.animation_graph.index,
 					animation_index);
@@ -6721,7 +6721,7 @@ apply_alignment:
 			break;
 		}
 
-		code_0019ea70(unit_index, &transformed_alignment);
+		unit_align_facing(unit_index, &transformed_alignment);
 	}
 
 	return;
@@ -6918,7 +6918,7 @@ void unit_damage_aftermath(
 			animation_flag = TRUE;
 		}
 
-		code_001a0cf0(
+		unit_ping_animation(
 			unit_index,
 			lethal,
 			feigned,
@@ -7680,7 +7680,7 @@ static void unit_throw_grenade_move_to_hand(
 	return;
 }
 
-static boolean code_00198050(
+static boolean unit_animation_overlay_action_loops(
 	struct unit_animation *animation)
 {
 	boolean result = FALSE;
@@ -7694,7 +7694,7 @@ static boolean code_00198050(
 	return result;
 }
 
-static boolean code_00197f90(
+static boolean unit_animation_state_interruptable(
 	struct unit_animation *animation,
 	short desired_state)
 {
@@ -7754,7 +7754,7 @@ static boolean code_00197f90(
 	return result;
 }
 
-static boolean code_00198070(
+static boolean unit_animation_state_loops(
 	struct unit_animation *animation)
 {
 	boolean result = TRUE;
@@ -7785,7 +7785,7 @@ static boolean code_00198070(
 	return result;
 }
 
-static boolean code_001980d0(
+static boolean unit_animation_weapon_ik(
 	struct unit_animation *animation)
 {
 	boolean result = animation->soft_ping_animation.index==NONE;
@@ -7826,7 +7826,7 @@ static boolean code_001980d0(
 	return result;
 }
 
-static boolean code_00198130(
+static boolean unit_animation_vehicle_ik(
 	struct unit_animation *animation)
 {
 	boolean result = TRUE;
@@ -7972,7 +7972,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	return result;
 }
 
-static boolean code_00197e30(
+static boolean unit_euler_axis_doplan(
 	struct unit_acceleration_plan *plan,
 	real delta_time,
 	real position,
@@ -8073,11 +8073,11 @@ void unit_set_actively_controlled(
 		}
 	}
 
-	code_0019a170(unit_index);
+	unit_update_driver_and_gunner(unit_index);
 
 	return;
 }
-static void code_0019a170(
+static void unit_update_driver_and_gunner(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
@@ -8125,7 +8125,7 @@ static void code_0019a170(
 
 	return;
 }
-static short code_0019a640(
+static short unit_first_free_weapon_index(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
@@ -8164,7 +8164,7 @@ boolean unit_add_weapon_to_inventory(
 			unit_delete_all_weapons(unit_index);
 		}
 
-		inventory_index = code_0019a640(unit_index);
+		inventory_index = unit_first_free_weapon_index(unit_index);
 
 		if (inventory_index!=NONE)
 		{
@@ -8199,7 +8199,7 @@ boolean unit_add_weapon_to_inventory(
 
 	return added;
 }
-static short code_00198e40(
+static short unit_animation_impulse_get_index(
 	short animation_impulse,
 	short *interpolation_frame_count)
 {
@@ -8396,7 +8396,7 @@ boolean unit_test_animation_impulse(
 			&unit_seat->weapon_classes,
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
-		animation_type = code_00198e40(
+		animation_type = unit_animation_impulse_get_index(
 			animation_impulse,
 			&interpolation_frame_count);
 
@@ -8446,7 +8446,7 @@ boolean unit_start_animation_impulse(
 			&unit_seat->weapon_classes,
 			unit->unit.animation.weapon_index,
 			struct animation_graph_weapon_class);
-		animation_type = code_00198e40(
+		animation_type = unit_animation_impulse_get_index(
 			animation_impulse,
 			&interpolation_frame_count);
 
@@ -8469,7 +8469,7 @@ boolean unit_start_animation_impulse(
 						TRUE,
 						animation_graph_index,
 						animation_index);
-				code_0019b0b0(
+				unit_set_animation(
 					unit_index,
 					unit_definition->object.animation_graph.index,
 					animation_index);
@@ -8483,7 +8483,7 @@ boolean unit_start_animation_impulse(
 					unit->object.type==_object_type_biped &&
 					unit->object.parent_object_index==NONE)
 				{
-					code_0019ea70(unit_index, alignment_vector);
+					unit_align_facing(unit_index, alignment_vector);
 				}
 
 				result = TRUE;
@@ -8493,7 +8493,7 @@ boolean unit_start_animation_impulse(
 
 	return result;
 }
-static void code_0019b600(
+static void unit_melee_sound(
 	long unit_index,
 	short material_type,
 	long damage_effect_index)
@@ -8637,7 +8637,7 @@ void unit_cause_melee_damage(
 			{
 				long hit_material_type = damage_data.material_type;
 
-				code_0019b600(
+				unit_melee_sound(
 					unit_index,
 					hit_material_type,
 					damage_effect_index);
@@ -8652,7 +8652,7 @@ void unit_cause_melee_damage(
 
 /* insert verbatim into source/units/units.c immediately after the closing
    brace of unit_cause_melee_damage (line 8403) and before
-   'static void code_0019ea70(' */
+   'static void unit_align_facing(' */
 enum
 {
 	_collision_result_breakable_surface_bit = 3,
@@ -8933,7 +8933,7 @@ void unit_cause_player_melee_damage(
 
 		if (hit_material_type!=NONE)
 		{
-			code_0019b600(
+			unit_melee_sound(
 				unit_index,
 				hit_material_type,
 				melee_damage_effect_index);
@@ -8967,7 +8967,7 @@ void unit_cause_player_melee_damage(
 	return;
 }
 
-static void code_0019ea70(
+static void unit_align_facing(
 	long unit_index,
 	real_vector2d const *alignment_vector)
 {
@@ -9042,7 +9042,7 @@ void unit_start_flaming_to_death(
 	return;
 }
 
-static void code_0019bf70(
+static void unit_euler_axis_buildplan(
 	real position,
 	real velocity,
 	real maximum_velocity,
@@ -9087,7 +9087,7 @@ static void code_0019bf70(
 	half_time = time*0.5f;
 	if (half_time*velocity*0.5f + position<0.f)
 	{
-		code_0019bf70(
+		unit_euler_axis_buildplan(
 			-position,
 			-velocity,
 			maximum_velocity,
@@ -9259,7 +9259,7 @@ validate_plan:
 plan_complete:
 	return;
 }
-static void code_0019c460(
+static void unit_euler_axis_couple(
 	struct unit_acceleration_plan *first_plan,
 	struct unit_acceleration_plan *second_plan,
 	real maximum_velocity,
@@ -9520,32 +9520,32 @@ desired_aiming_vector_ready:
 		}
 	}
 
-	code_0019bf70(
+	unit_euler_axis_buildplan(
 		aiming_error.yaw,
 		aiming_angular_velocity.yaw,
 		angular_velocity_limit,
 		angular_acceleration_limit,
 		&yaw_plan);
-	code_0019bf70(
+	unit_euler_axis_buildplan(
 		aiming_error.pitch,
 		aiming_angular_velocity.pitch,
 		angular_velocity_limit,
 		angular_acceleration_limit,
 		&pitch_plan);
-	code_0019c460(
+	unit_euler_axis_couple(
 		&yaw_plan,
 		&pitch_plan,
 		angular_velocity_limit,
 		angular_acceleration_limit);
 
-	yaw_complete = code_00197e30(
+	yaw_complete = unit_euler_axis_doplan(
 		&yaw_plan,
 		1.f,
 		aiming_error.yaw,
 		&aiming_error.yaw,
 		aiming_angular_velocity.yaw,
 		&end_angular_velocity.yaw);
-	pitch_complete = code_00197e30(
+	pitch_complete = unit_euler_axis_doplan(
 		&pitch_plan,
 		1.f,
 		aiming_error.pitch,
@@ -9648,7 +9648,7 @@ desired_aiming_vector_ready:
 
 	return;
 }
-static boolean code_00198170(
+static boolean unit_animation_aiming_screen(
 	struct unit_animation *animation)
 {
 	boolean result = !animation->action;
@@ -9664,7 +9664,7 @@ static boolean code_00198170(
 
 	return result;
 }
-static boolean code_001981f0(
+static boolean unit_animation_state_can_be_entered_without_animation(
 	short state)
 {
 	boolean result = TRUE;
@@ -9685,7 +9685,7 @@ static boolean code_001981f0(
 
 	return result;
 }
-static short code_00198230(
+static short unit_animation_compute_interpolation_frame_count(
 	short new_state,
 	short old_state)
 {
@@ -9709,7 +9709,7 @@ static short code_00198230(
 
 	return result;
 }
-static long code_00198190(
+static long unit_animation_state_get_aiming_screen_index(
 	short state)
 {
 	long result = NONE;
@@ -9750,7 +9750,7 @@ static long code_00198190(
 
 	return result;
 }
-static void code_0019b0b0(
+static void unit_set_animation(
 	long unit_index,
 	long animation_graph_index,
 	short animation_index)
@@ -9795,7 +9795,7 @@ static void code_0019b0b0(
 	return;
 }
 
-static short code_0019b160(
+static short unit_animation_update(
 	long unit_index,
 	long animation_graph_index,
 	struct animation_state *animation)
@@ -9821,7 +9821,7 @@ static short code_0019b160(
 	return result;
 }
 
-static char const *code_0019dff0(
+static char const *unit_get_current_weapon_label(
 	long unit_index)
 {
 	long weapon_index = unit_inventory_get_weapon(
@@ -9944,7 +9944,7 @@ short unit_update_animation(
 
 		if (unit->unit.animation.base_seat_index!=desired_base_seat_index)
 		{
-			can_change_animation = code_00197f90(
+			can_change_animation = unit_animation_state_interruptable(
 				&unit->unit.animation,
 				desired_state);
 			if (can_change_animation)
@@ -9952,7 +9952,7 @@ short unit_update_animation(
 				unit_set_or_test_seat_and_weapon_label(
 					unit_index,
 					base_seat_label_get(desired_base_seat_index),
-					code_0019dff0(unit_index),
+					unit_get_current_weapon_label(unit_index),
 					TRUE);
 			}
 		}
@@ -9960,7 +9960,7 @@ short unit_update_animation(
 
 	if (unit->unit.animation.soft_ping_animation.index!=NONE)
 	{
-		animation_update_result = code_0019b160(
+		animation_update_result = unit_animation_update(
 			unit_index,
 			unit_definition->object.animation_graph.index,
 			&unit->unit.animation.soft_ping_animation);
@@ -9972,7 +9972,7 @@ short unit_update_animation(
 
 	if (unit->object.animation.state.index!=NONE)
 	{
-		animation_update_result = code_0019b160(
+		animation_update_result = unit_animation_update(
 			unit_index,
 			unit->object.animation.animation_graph_index,
 			&unit->object.animation.state);
@@ -10103,7 +10103,7 @@ short unit_update_animation(
 				break;
 			}
 
-			if (!code_00198070(&unit->unit.animation))
+			if (!unit_animation_state_loops(&unit->unit.animation))
 			{
 				apply_state = TRUE;
 			}
@@ -10112,7 +10112,7 @@ short unit_update_animation(
 
 	if (unit->unit.animation.action_animation.index!=NONE)
 	{
-		animation_update_result = code_0019b160(
+		animation_update_result = unit_animation_update(
 			unit_index,
 			unit_definition->object.animation_graph.index,
 			&unit->unit.animation.action_animation);
@@ -10129,7 +10129,7 @@ short unit_update_animation(
 
 	if (unit->unit.animation.overlay_action_animation.index!=NONE)
 	{
-		animation_update_result = code_0019b160(
+		animation_update_result = unit_animation_update(
 			unit_index,
 			unit_definition->object.animation_graph.index,
 			&unit->unit.animation.overlay_action_animation);
@@ -10138,7 +10138,7 @@ short unit_update_animation(
 		{
 		case 2:
 		case 4:
-			if (!code_00198050(&unit->unit.animation))
+			if (!unit_animation_overlay_action_loops(&unit->unit.animation))
 			{
 				unit->unit.animation.overlay_action = FALSE;
 				unit->unit.animation.overlay_action_animation.index = NONE;
@@ -10151,7 +10151,7 @@ short unit_update_animation(
 
 	if (apply_state ||
 		(desired_state!=unit->unit.animation.state &&
-		code_00197f90(&unit->unit.animation, desired_state)))
+		unit_animation_state_interruptable(&unit->unit.animation, desired_state)))
 	{
 		unit_animation_set_state(unit_index, desired_state);
 	}
@@ -10399,7 +10399,7 @@ static boolean unit_animation_set_state(
 
 		if (animation_index == NONE)
 		{
-			if (!code_001981f0(new_state))
+			if (!unit_animation_state_can_be_entered_without_animation(new_state))
 			{
 				result = FALSE;
 
@@ -10415,13 +10415,13 @@ static boolean unit_animation_set_state(
 					TRUE,
 					animation_graph_index,
 					animation_index);
-			code_0019b0b0(
+			unit_set_animation(
 				unit_index,
 				unit_definition->object.animation_graph.index,
 				animation_index);
 
 			interpolation_frame_count =
-				code_00198230(
+				unit_animation_compute_interpolation_frame_count(
 					new_state,
 					unit->unit.animation.state);
 
@@ -10431,11 +10431,11 @@ static boolean unit_animation_set_state(
 
 	{
 		short aiming_screen_animation_index =
-			(short)code_00198190(new_state);
+			(short)unit_animation_state_get_aiming_screen_index(new_state);
 
 		if (old_state_is_none ||
 			aiming_screen_animation_index !=
-				(short)code_00198190(
+				(short)unit_animation_state_get_aiming_screen_index(
 					unit->unit.animation.state))
 		{
 			long animation_index;
@@ -10696,7 +10696,7 @@ void unit_preprocess_node_orientations(
 		}
 
 		if (!TEST_FLAG(unit_definition->unit.flags, _unit_has_no_aiming_bit) &&
-			code_00198170(&unit->unit.animation))
+			unit_animation_aiming_screen(&unit->unit.animation))
 		{
 			real_euler_angles2d relative_aiming_angles;
 			struct animation_graph_weapon_class *weapon_class =
@@ -10885,7 +10885,7 @@ void unit_postprocess_node_matrices(
 				struct animation_graph_weapon_class);
 
 		if (unit->object.parent_object_index!=NONE &&
-			code_00198130(&unit->unit.animation))
+			unit_animation_vehicle_ik(&unit->unit.animation))
 		{
 			ik_points = &unit_seat->ik_points;
 			ik_point_index = 0;
@@ -10916,7 +10916,7 @@ void unit_postprocess_node_matrices(
 		if (unit->unit.current_weapon_index!=NONE)
 		{
 			animation = &unit->unit.animation;
-			weapon_ik_active = code_001980d0(animation);
+			weapon_ik_active = unit_animation_weapon_ik(animation);
 			if (weapon_ik_active)
 			{
 				long weapon_ik_point_index = 0;
@@ -11035,7 +11035,7 @@ void unit_control(
 	return;
 }
 
-static boolean unit_verify_inventory(
+static boolean unit_vectors_are_valid(
 	long unit_index)
 {
 	struct unit_datum *unit = unit_get(unit_index);
@@ -11427,7 +11427,7 @@ static void unit_verify_vectors(
 {
 	char buffer[512];
 
-	if (!unit_verify_inventory(unit_index))
+	if (!unit_vectors_are_valid(unit_index))
 	{
 		struct unit_datum *unit = unit_get(unit_index);
 
@@ -11538,7 +11538,7 @@ static void unit_verify_vectors(
 		match_vassert(
 			"c:\\halo\\SOURCE\\units\\units.c",
 			594,
-			unit_verify_inventory(unit_index),
+			unit_vectors_are_valid(unit_index),
 			"unit_verify_vectors FAILURE, see above for details"
 		);
 	}

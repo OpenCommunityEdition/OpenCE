@@ -1,0 +1,31 @@
+diff --git a/source/main/main.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\main\\candidate_production_main.c"
+index 6686cb7e..66913129 100644
+--- a/source/main/main.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\main\\candidate_production_main.c"
+@@ -2138,17 +2138,20 @@ static void main_exit(
+ 	case _game_connection_network_server:
+ 		dispose_global_network_game_client();
+ 		dispose_global_network_game_server();
++		game_dispose_from_old_map();
++		game_dispose();
++		debug_keys_dispose();
++		console_dispose();
+ 		break;
+ 	case _game_connection_network_client:
+ 		dispose_global_network_game_client();
++	default:
++		game_dispose_from_old_map();
++		game_dispose();
++		debug_keys_dispose();
++		console_dispose();
+ 		break;
+ 	}
+-
+-	game_dispose_from_old_map();
+-	game_dispose();
+-	debug_keys_dispose();
+-	console_dispose();
+-
+ 	return;
+ }
+ 

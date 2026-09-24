@@ -61,56 +61,85 @@ union real_point2d;
 union real_point3d;
 union real_rgb_color;
 
+struct universal_variant
+{
+	boolean teams;
+	byte pad0;
+	byte pad1;
+	byte pad2;
+	unsigned long flags;
+	long goal_radar;
+	boolean odd_man_out;
+	byte pad4;
+	byte pad5;
+	byte pad6;
+	long respawn_time_growth;
+	long respawn_time;
+	long suicide_penalty;
+	long lives;
+	real health;
+	long score_to_win;
+	long weapon_set;
+	long vehicle_set;
+};
+
+struct ctf_variant
+{
+	boolean assault;
+	boolean reset_on_capture;
+	boolean flag_must_reset;
+	boolean flag_at_home_to_score;
+	long single_flag_time;
+};
+
+struct slayer_variant
+{
+	boolean no_death_bonus;
+	boolean no_kill_penalty;
+	boolean kill_in_order;
+};
+
+struct king_variant
+{
+	boolean moving_hill;
+};
+
+struct oddball_variant
+{
+	boolean random_start;
+	boolean ball_spawn_delay;
+	long speed_with_ball;
+	long trait_with_ball;
+	long trait_without_ball;
+	long oddball_ball_type;
+	long ball_spawn_count;
+};
+
+struct race_variant
+{
+	long race_type;
+	long team_scoring;
+};
+
+union game_engine_variant
+{
+	struct ctf_variant ctf;
+	struct slayer_variant slayer;
+	struct king_variant king;
+	struct oddball_variant oddball;
+	struct race_variant race;
+};
+
 struct game_variant
 {
-	short variant_index;
-	union
-	{
-		byte unused2[0x16];
-		struct
-		{
-			byte unused2_prefix[0x14];
-			short unknown16;
-		};
-	};
-	long engine_type;
-	boolean has_teams;
-	byte unused1D[3];
-	unsigned long flags;
-	long unknown24;
-	boolean unknown28;
-	byte unused29[3];
-	long unknown2C;
-	long unknown30;
-	long unknown34;
-	long maximum_lives;
-	float unknown3C;
-	long unknown40;
-	long unknown44;
-	long unknown48;
-	union
-	{
-		long value;
-		struct
-		{
-			boolean byte0;
-			boolean byte1;
-			boolean byte2;
-			boolean byte3;
-		};
-	} unknown4C;
-	long unknown50;
-	long unknown54;
-	long unknown58;
-	long unknown5C;
-	long unknown60;
-	short unknown64;
-	byte unused66[2];
+	wchar_t human_readable_game_description[12];
+	long game_engine_index;
+	struct universal_variant universal_variant;
+	union game_engine_variant game_engine_variant;
+	word flags;
 };
 
 typedef char verify_game_variant_size[sizeof(struct game_variant) == 0x68 ? 1 : -1];
-typedef char verify_game_variant_unknown16_offset[
-	offsetof(struct game_variant, unknown16) == 0x16 ? 1 : -1];
 
 struct game_engine
 {

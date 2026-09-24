@@ -1,0 +1,39 @@
+diff --git a/source/interface/hud_nav_points.h b/source/interface/hud_nav_points.h
+new file mode 100644
+index 0000000..af0c0c5
+--- /dev/null
++++ b/source/interface/hud_nav_points.h
+@@ -0,0 +1,33 @@
++/*
++HUD_NAV_POINTS.H
++
++Narrow cross-translation-unit interface owned by HUD_NAV_POINTS.C for the
++multiplayer game engine goal markers.  The rest of the nav-point API is
++declared in HUD.H; focused owner header because adding these three
++prototypes to the broad HUD.H moves distant declaration-count ties.
++*/
++
++#ifndef __HUD_NAV_POINTS_H
++#define __HUD_NAV_POINTS_H
++#pragma once
++
++/* ---------- structures */
++
++union real_point3d;
++
++/* ---------- prototypes/HUD_NAV_POINTS.C */
++
++short find_nav_point(
++	char const *name);
++short hud_get_nav_point_render_type(
++	short local_player_index,
++	union real_point3d const *head,
++	union real_point3d const *position,
++	long reference_object_index);
++void custom_render_nav_point(
++	short local_player_index,
++	union real_point3d const *position,
++	short nav_index,
++	short waypoint_type);
++
++#endif // __HUD_NAV_POINTS_H

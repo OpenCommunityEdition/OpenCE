@@ -1,0 +1,13 @@
+diff --git a/source/bungie_net/network/transport.h b/source/bungie_net/network/transport.h
+index 6b385cd9..806b59e8 100644
+--- a/source/bungie_net/network/transport.h
++++ b/source/bungie_net/network/transport.h
+@@ -87,8 +87,6 @@ char const *transport_address_to_string(
+ 	struct transport_address const *addr);
+ char const *transport_error_to_string(
+ 	short error);
+-void net_startup_debug(
+-	void);
+ boolean transport_is_nonce(
+ 	void const *nonce,
+ 	long nonce_length);

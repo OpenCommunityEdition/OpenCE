@@ -1,0 +1,76 @@
+--- a/tools/semantic_progress.py	2026-09-23 17:32:49.543427300 -0700
++++ b/tools/semantic_progress.py	2026-09-23 22:55:27.959110500 -0700
+@@ -608,6 +608,16 @@
+     return matches[0]
+ 
+ 
++def _semantic_data_member_snapshot_alignment(section):
++    alignment_code = (int(section["flags"]) >> 20) & 0xF
++    if alignment_code == 0:
++        return 1
++    if 1 <= alignment_code <= 14:
++        return 1 << (alignment_code - 1)
++    raise CoffError(
++        f"invalid COFF section alignment code {alignment_code}")
++
++
+ def _semantic_data_member_snapshot(owner, section, info):
+     if int(section["flags"]) & IMAGE_SCN_CNT_CODE:
+         raise CoffError(
+@@ -692,6 +702,7 @@
+             target_section_numbers = set()
+             base_section_numbers = set()
+             grouped_sections = {}
++            combined_members = {}
+ 
+             for member in members:
+                 target_symbol = member["symbol"]
+@@ -758,6 +769,33 @@
+                 grouped_sections[target_snapshot["section"]] = (
+                     grouped_sections.get(target_snapshot["section"], 0)
+                     + target_snapshot[credit_size_key])
++                combined_members.setdefault(
++                    target_snapshot["section"], []).append(
++                    (target_owner["section"], target_section))
++
++            if not entry.get("credit_raw_size", False):
++                # objdiff's report combines every same-named data section
++                # in section-table order and aligns the RUNNING offset to
++                # max(alignment, 4) after each section, so the reported
++                # extent is not the sum of per-member padded sizes.
++                credited_size = 0
++                for name, items in combined_members.items():
++                    numbers = sorted(number for number, _ in items)
++                    table = [
++                        section["index"] for section in target["sections"]
++                        if section["name"] == name]
++                    if numbers != table:
++                        raise SemanticProgressError(
++                            f"semantic data group does not cover every "
++                            f"target {name} section: {unit_name}:{section_label}")
++                    offset = 0
++                    for _, section in sorted(items, key=lambda item: item[0]):
++                        alignment = max(
++                            _semantic_data_member_snapshot_alignment(section), 4)
++                        offset += int(section["size"])
++                        offset = (offset + alignment - 1) & ~(alignment - 1)
++                    grouped_sections[name] = offset
++                    credited_size += offset
+ 
+             unmatched_sections = {}
+             for report_section in report_unit.get("sections", []):
+@@ -769,7 +807,13 @@
+                 unmatched_sections[name] = (
+                     unmatched_sections.get(name, 0)
+                     + int(report_section.get("size", 0)))
+-            if grouped_sections != unmatched_sections:
++            unit_unmatched_data = (
++                int(report_unit["measures"].get("total_data", 0))
++                - int(report_unit["measures"].get("matched_data", 0)))
++            # A scorer that already matches every data section (objdiff
++            # >= 3.6.0) leaves nothing to cover; the members were still
++            # verified exact above and nothing is credited below.
++            if unit_unmatched_data and grouped_sections != unmatched_sections:
+                 raise SemanticProgressError(
+                     f"semantic data group does not cover the reported "
+                     f"unmatched sections: {unit_name}:{section_label}")

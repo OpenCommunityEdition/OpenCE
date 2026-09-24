@@ -2,30 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/objects/objects",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_point_in_sphere, _real_random, _signed_angular_difference, _valid_real_vector3d, _valid_real_vector3d_axes2",
-      "reason": "All January target functions and owned data now match, but five candidate-only shared helpers conflict with hand-written no-duplicates providers in path_obstacles, action_charge, player_control and bored_camera. Exact target bytes and the corrected private symbols do not establish safe whole-object linkage.",
-      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
-      "reopen": "Replace the conflicting hand-written providers with genuine shared-header uses, retain every exact caller, and prove compatible ordinary provider links in both orders before admitting the object. Do not credit the candidate-only copies."
-    },
-    {
-      "unit": "source/structures/leaf_map",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_distance3d",
-      "reason": "All 25 target functions and target-owned data sections are exact, including two newly closed callers. But the real shared-header distance3d use emits a candidate-only 64-byte SELECT_ANY copy whose instruction SHA differs from January's selected ActionVehicle NODUP copy. Ordinary LeafMap/ActionVehicle links fail with LNK2005 in both orders. A global source-body correction makes the copies identical but loses two inherited exact functions and stales a parked function, so it was rejected. The exact callers and verified data retain their separate credit; whole-object completion does not.",
-      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
-      "reopen": "Recover a genuine shared distance3d source/header spelling and inline schedule that yields January's selected COMDAT without any exact sibling loss or stale park; verify all real_math.h consumers and ordinary links. Do not suppress emission, force inline, or attribute candidate-only helper bytes to LeafMap."
-    },
-    {
-      "unit": "source/units/biped_limp_noodle",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_distance3d",
-      "reason": "All six target functions remain strict exact, but this Matching label also emitted the same candidate-only 64-byte SELECT_ANY distance3d copy that differs from January's selected ActionVehicle NODUP provider. Ordinary link compatibility is not established; the global real_math.h correction fails the whole-board no-regression and parked-function gates. Function credit remains; whole-object completion is held.",
-      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
-      "reopen": "Use the same authentic, board-wide no-regression provider repair as LeafMap and prove ordinary selected-provider links in both orders before restoring Matching."
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
       "class": "candidate-only-comdat-owner",
       "symbol": "_D3DSIMPLERENDERSTATEENCODE",
@@ -48,30 +24,6 @@
       "reason": "The exact flash-duration leaf uses the authentic shared conversion helper and naturally emits an additional unreferenced select-any32-byte fast_ftol copy absent from January HUD Draw. January's identical selected Actor Combat copy is no-duplicates; its ordinary XDK duplicate-owner failure is already documented. The two newly exact drawing helpers receive valid target-function credit, but no whole-object or linked-coalescing claim follows.",
       "evidence": "docs/object_matching_logs/hud_draw_obj_two_exact_leaves_integration_20260904.md#complete-owner-boundary",
       "reopen": "Require authentic source topology or an ordinary base/base link with an authenticated compatible canonical selected helper before clearing this veto. Do not force inline, manually expand math, alter target/COMDAT metadata, invent a discard pass, or credit candidate-only helper bytes. All remaining HUD Draw functions/data/linkage/source checks must independently pass before whole-object Matching."
-    },
-    {
-      "unit": "source/interface/hud_unit",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_fast_ftol",
-      "reason": "The new source-authentic renderer naturally emits an unreferenced select-any32-byte fast_ftol copy absent from January HUD Unit. Its body equals January's selected Actor Combat helper, but that selected owner is no-duplicates and the prior ordinary XDK link test rejects the duplicate. Genuine initializer/data credit and the honest renderer park remain valid; identical helper bytes do not prove whole-object ownership.",
-      "evidence": "docs/object_matching_logs/hud_unit_obj_renderer_integration_20260904.md#honest-residual-and-complete-owner-boundary",
-      "reopen": "Remove only after authentic source topology preserves the January helper schedule without extra emission, or an ordinary base/base link proves a compatible authenticated canonical selected owner can coalesce the copy. Do not force inline, manually expand the helper, alter comparator/selection metadata, invent a discard pass, or count another object's selected bytes. The renderer must independently become strict and all other source/data/linkage checks must pass before Matching admission."
-    },
-    {
-      "unit": "source/interface/player_ui",
-      "class": "source-layout-incomplete",
-      "symbol": "struct playlist_profile",
-      "reason": "All42 target functions and target data are strict exact, but the public playlist_profile is only forward-declared by its owner header while Player UI defines a local partial view with an opaque0x47-byte middle misleadingly called unused. Those bytes hold real January variant state; the complete authentic January public layout is not yet recovered. Exact code/data alone cannot certify this source as a completed object. The reviewed ordinary typed-loop, enum/macro and game_variant storage cleanups remain valid and receive independent function credit.",
-      "evidence": "docs/object_matching_logs/player_ui_obj_owner_house_rule_reconciliation_20260904.md#remaining-source-boundary-and-reopen-condition",
-      "reopen": "Authenticate the full January playlist-profile layout and place shared declarations in their genuine owner without opaque fake padding or transplantation of the incompatible later152-byte format. Preserve inherited exact functions across affected callers and finish the documented natural select-any string ownership/coalescing audit before whole-object admission. Do not debit valid target-function progress for this separate source-layout veto."
-    },
-    {
-      "unit": "source/units/units",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_point_from_line3d",
-      "reason": "The rebuilt translation unit emits a 48-byte select-any _point_from_line3d COMDAT absent from the January units split, while January's selected action_charge owner is no-duplicates. All 189 January units functions remain strict exact, including the two authentic external calls from _unit_cause_continuous_melee_damage; the surplus owner is a separate whole-object admission failure under the explicit no-emission house rule.",
-      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#units-point_from_line3d-owner",
-      "reopen": "Remove only after source-authentic header/declaration topology preserves all 189 exact target functions and the two January external calls while preventing units.obj from emitting _point_from_line3d. Linker discard alone does not waive the explicit no-emission house rule; do not expand the two external calls or use forced inline/noinline, pragmas, assembly, or byte-shaping."
     },
     {
       "unit": "source/effects/decals",

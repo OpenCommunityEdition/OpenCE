@@ -1,0 +1,150 @@
+diff --git a/source/interface/motion_sensor.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_stack_check\\cand\\interface\\motion_sensor.c"
+index c5094d45..70c4977b 100644
+--- a/source/interface/motion_sensor.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_stack_check\\cand\\interface\\motion_sensor.c"
+@@ -276,8 +276,8 @@ real scale[] =
+ };
+ 
+ long next_vertex_index= {0};
+-static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
+-static real sweep_theta = 0.f;
++static struct motion_sensor_globals_definition *motion_sensor_globals;
++static real sweep_theta;
+ boolean debug_motion_sensor_draw_all_units= {0};
+ 
+ extern struct motion_sensor_hud_globals *hud_globals;
+@@ -309,7 +309,7 @@ static void motion_sensor_update(
+ 	void)
+ {
+ 	long return_eip = get_return_eip();
+-	long stack_buffer[0x80];
++	long stack_buffer[STACK_BUFFER_LENGTH];
+ 	long current_time;
+ 	short active_sensor_index;
+ 
+@@ -471,34 +471,7 @@ static void motion_sensor_update(
+ 		}
+ 	}
+ 
+-	{
+-		short corrupt_index;
+-		short buffer_index;
+-
+-		for (buffer_index = 0x7F; buffer_index >= 0; buffer_index--)
+-		{
+-			if (stack_buffer[buffer_index] != 0x62626262)
+-				goto corrupt_stack_found_motion_sensor_update;
+-		}
+-
+-		corrupt_index = NONE;
+-		goto stack_buffer_checked_motion_sensor_update;
+-
+-corrupt_stack_found_motion_sensor_update:
+-		corrupt_index = buffer_index;
+-
+-stack_buffer_checked_motion_sensor_update:
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			642,
+-			return_eip == get_return_eip(),
+-			"corrupt return address!");
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			642,
+-			corrupt_index == NONE,
+-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+-	}
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\motion_sensor.c", 642);
+ 
+ 	return;
+ }
+@@ -507,7 +480,7 @@ static void update_motion_sensor(
+ 	short local_player_index)
+ {
+ 	long return_eip = get_return_eip();
+-	long stack_buffer[0x80];
++	long stack_buffer[STACK_BUFFER_LENGTH];
+ 	struct motion_sensor_player *player;
+ 	short active_sensor_index;
+ 	long player_index;
+@@ -613,34 +586,7 @@ static void update_motion_sensor(
+ 	sensor->custom_blip_count -= (byte)out_of_range_count;
+ 
+ update_motion_sensor_done:
+-	{
+-		short corrupt_index;
+-		short buffer_index;
+-
+-		for (buffer_index = 0x7F; buffer_index >= 0; buffer_index--)
+-		{
+-			if (stack_buffer[buffer_index] != 0x62626262)
+-				goto corrupt_stack_found_update_motion_sensor;
+-		}
+-
+-		corrupt_index = NONE;
+-		goto stack_buffer_checked_update_motion_sensor;
+-
+-corrupt_stack_found_update_motion_sensor:
+-		corrupt_index = buffer_index;
+-
+-stack_buffer_checked_update_motion_sensor:
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			756,
+-			return_eip == get_return_eip(),
+-			"corrupt return address!");
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			756,
+-			corrupt_index == NONE,
+-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+-	}
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\motion_sensor.c", 756);
+ 
+ 	return;
+ }
+@@ -651,7 +597,7 @@ static void render_motion_sensor(
+ 	point2d const *reference)
+ {
+ 	long return_eip = get_return_eip();
+-	long stack_buffer[0x80];
++	long stack_buffer[STACK_BUFFER_LENGTH];
+ 	director_perspective perspective;
+ 	struct motion_sensor_player *player;
+ 	real relative_scale;
+@@ -743,34 +689,7 @@ static void render_motion_sensor(
+ 	rasterizer_hud_motion_sensor_blip_end(&center_point, sweep_theta);
+ 
+ render_motion_sensor_done:
+-	{
+-		short corrupt_index;
+-		short buffer_index;
+-
+-		for (buffer_index = 0x7F; buffer_index >= 0; buffer_index--)
+-		{
+-			if (stack_buffer[buffer_index] != 0x62626262)
+-				goto corrupt_stack_found_render_motion_sensor;
+-		}
+-
+-		corrupt_index = NONE;
+-		goto stack_buffer_checked_render_motion_sensor;
+-
+-corrupt_stack_found_render_motion_sensor:
+-		corrupt_index = buffer_index;
+-
+-stack_buffer_checked_render_motion_sensor:
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			830,
+-			return_eip == get_return_eip(),
+-			"corrupt return address!");
+-		match_vassert(
+-			"c:\\halo\\SOURCE\\interface\\motion_sensor.c",
+-			830,
+-			corrupt_index == NONE,
+-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+-	}
++	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\motion_sensor.c", 830);
+ 
+ 	return;
+ }

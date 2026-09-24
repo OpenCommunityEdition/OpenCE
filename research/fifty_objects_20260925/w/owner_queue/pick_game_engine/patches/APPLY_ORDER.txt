@@ -1,0 +1,37 @@
+owner_queue/pick_game_engine - apply order (base cdc8ebd3; NOTHING lands without the owner's pick)
+
+Pick exactly ONE directory (and, in the variant directory, exactly one of 01A / 01B).
+Every patch below passes `git apply --check` alone at cdc8ebd3, and each packet's full set passes
+in a single `git apply --check` call (the patches in a packet touch disjoint files).
+
+optionA/  (motion-sensor copy = in-loop `struct netgame_goal *goal` alias; review4 default)
+  01_F01R_game_engine_c_alias.patch            source/game/game_engine.c   (review4 F01R verbatim)
+  02_F02_new_focused_headers.patch             4 NEW headers (worker F02 verbatim)
+  03_F03aR_shared_header_game_engine_h.patch   source/game/game_engine.h   (SHARED, 37 consumer TUs; review4 F03aR verbatim)
+  04_F03b_shared_header_prototypes.patch       player_control.h (21 TUs), hud_messaging.h (8), sound_classes.h (6)
+  05_F04_hud_nav_points_owner_include.patch    source/interface/hud_nav_points.c
+  06_status_flip_config_json.patch             config/config.json: source/game/game_engine.c NonMatching -> Matching
+  one-shot:  git apply scratch/w/owner_queue/pick_game_engine/patches/optionA/0*.patch
+
+optionB/  (motion-sensor copy = F07 /Od-attested `*(real_point2d *)&...position` view copy)
+  01_F01RB_game_engine_c_view_copy.patch       source/game/game_engine.c   (= F01R + F07 as ONE standalone patch;
+                                               F07 by itself does not --check at cdc8ebd3)
+  02..06                                       identical to optionA/02..06
+  one-shot:  git apply scratch/w/owner_queue/pick_game_engine/patches/optionB/0*.patch
+
+variant_no_single_consumer_headers/  (only if the owner applies the 2026-09-21 "no one-consumer header"
+  ruling to F02: hud_globals_definitions.h, item_collection_definitions.h and scenario_netgame_definitions.h
+  are NOT created; their HCEX layouts live in game_engine.c, their only consumer. hud_nav_points.h is kept:
+  moving the nav-point trio to the genuine hud.h breaks _populate_statistic_buffer, see MEASURED.md)
+  01A_F01R_NP_game_engine_c_alias.patch        game_engine.c, alias pick          } apply exactly one
+  01B_F01RB_NP_game_engine_c_view_copy.patch   game_engine.c, view-copy pick      }
+  02_F02_NP_hud_nav_points_h.patch             NEW source/interface/hud_nav_points.h only (text identical to F02's)
+  03..06                                       identical to optionA/03..06
+  one-shot (alias):     git apply .../01A_*.patch .../02_*.patch .../03_*.patch .../04_*.patch .../05_*.patch .../06_*.patch
+  one-shot (view copy): git apply .../01B_*.patch .../02_*.patch .../03_*.patch .../04_*.patch .../05_*.patch .../06_*.patch
+
+Not included (optional, zero credit): game_engine_finish F05h/F05c (players.h teleporter_index) and F06 (sibling
+ctf/king/oddball/race drop their local scenario_netgame_flag for scenario_netgame_definitions.h). F06 still applies
+at cdc8ebd3 (with line offsets) and sweeps clean on top of optionA (optA6), BUT it edits game_engine_king.c, which
+is a separately held owner item, and it is incompatible with the no-single-consumer-headers variant.
+symbols.json: no change in any packet.

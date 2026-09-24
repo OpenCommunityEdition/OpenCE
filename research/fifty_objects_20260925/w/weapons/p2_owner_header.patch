@@ -1,0 +1,46 @@
+diff -u a/source/items/weapons.h b/source/items/weapons.h
+--- a/source/items/weapons.h
++++ b/source/items/weapons.h
+@@ -260,9 +260,13 @@
+ 
+ void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
+ 
++struct scenario_weapon_datum;
+ struct weapon_interface_state;
+ 
+ boolean weapon_new(long weapon_index);
++long weapon_place(
++	long weapon_index,
++	struct scenario_weapon_datum *scenario_weapon);
+ void weapon_export_function_values(
+ 	long weapon_index);
+ 
+diff -u a/source/objects/object_types.c b/source/objects/object_types.c
+--- a/source/objects/object_types.c
++++ b/source/objects/object_types.c
+@@ -218,9 +218,6 @@
+ void vehicle_render_debug(
+ 	long object_index);
+ 
+-void weapon_place(
+-	long object_index,
+-	struct scenario_object_datum *scenario_object);
+ void weapon_delete(
+ 	long object_index);
+ boolean weapon_update(
+@@ -370,11 +367,14 @@
+ 	NULL
+ };
+ 
++/* BUG: weapon_place returns long (HCEX weapons compiland LF_PROCEDURE: long (long, scenario_weapon_datum *);
++   January returns weapon_index in eax) but is bound to the void datum_place slot, whose result the
++   caller discards. The original conversion spelling is unknown. */
+ struct object_type_definition weapon_data_definition =
+ {
+ 	"weapon", 'weap', 0x27C, 0x270, 0x27C, 0x5C,
+ 	weapons_initialize, weapons_dispose, weapons_initialize_for_new_map, weapons_dispose_from_old_map,
+-	NULL, weapon_new, weapon_place, weapon_delete, weapon_update,
++	NULL, weapon_new, (void (*)(long, struct scenario_object_datum *))weapon_place, weapon_delete, weapon_update,
+ 	weapon_export_function_values,
+ 	NULL, NULL, NULL,
+ 	weapon_preprocess_node_orientations, NULL,

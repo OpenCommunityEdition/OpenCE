@@ -1,0 +1,57 @@
+diff --git a/source/game/game.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_unproto_before.c"
+index d77b74ec..a4e00548 100644
+--- a/source/game/game.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_unproto_before.c"
+@@ -120,6 +120,7 @@ struct game_options;
+ 
+ #include "cseries/cseries.h"
+ #define set_random_seed set_random_seed_inline
++#define game_set_game_variant game_set_game_variant__header_proto
+ #include "game/game.h"
+ #undef set_random_seed
+ #include "ai/ai.h"
+@@ -182,6 +183,8 @@ struct game_options;
+ #include "structures/structures.h"
+ #include "units/units.h"
+ #include "units/vehicles.h"
++#undef game_set_game_variant
++void game_set_game_variant();
+ 
+ /* ---------- constants */
+ 
+@@ -543,6 +546,18 @@ short game_difficulty_level_get_ignore_easy(
+ 	return difficulty > _game_difficulty_level_normal ? difficulty : _game_difficulty_level_normal;
+ }
+ 
++void game_set_game_variant_from_name(
++	const char *name)
++{
++	struct game_variant variant;
++	struct game_variant temporary_variant;
++
++	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
++	game_set_game_variant(&variant);
++
++	return;
++}
++
+ void game_set_game_variant(
+ 	struct game_variant *variant)
+ {
+@@ -1057,16 +1072,5 @@ void remove_quitting_players_from_game(
+ 	return;
+ }
+ 
+-void game_set_game_variant_from_name(
+-	const char *name)
+-{
+-	struct game_variant variant;
+-	struct game_variant temporary_variant;
+-
+-	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
+-	game_set_game_variant(&variant);
+-
+-	return;
+-}
+ 
+ /* ---------- private code */

@@ -1,0 +1,62 @@
+diff --git a/source/rasterizer/rasterizer_transparent_geometry.c b/source/rasterizer/rasterizer_transparent_geometry.c
+index 543ba22ec29b519c093cd9bbaa0c937bb593c370..0268e038f9f42eabc6dff466a2b6ccadab488aa6 100644
+--- a/source/rasterizer/rasterizer_transparent_geometry.c
++++ b/source/rasterizer/rasterizer_transparent_geometry.c
+@@ -161,8 +161,6 @@ static long transparent_geometry_group_count2 = 0;
+ static short *transparent_geometry_group_sorted_indices = NULL;
+ static short transparent_geometry_next_group_sorted_index = 0;
+ 
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+-
+ /* ---------- public code */
+ 
+ boolean rasterizer_transparent_geometry_initialize(
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c b/source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c
+index 12481615a0b42733cd6a014a4f1c8992f45a26aa..b93272f0861c6da2fbc5da8abb025dd21b77a274 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c
+@@ -252,8 +252,6 @@ typedef char verify_transparent_geometry_group_animation_offset[
+ 
+ /* ---------- globals */
+ 
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+-
+ boolean local_active_camouflage_visibility_flag = FALSE;
+ boolean local_active_camouflage_debug_cached_flag = FALSE;
+ short local_active_camouflage_debug_cache_count = 0;
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_environment.c b/source/rasterizer/xbox/rasterizer_xbox_environment.c
+index f471cae66ff3799e8ec5c6e5facf046c3dc87134..10cfe127d7fac79306267a507b88a0cfc40ec959 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_environment.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_environment.c
+@@ -573,7 +573,6 @@ static struct rasterizer_environment_globals rasterizer_environment_globals;
+ static boolean warned = FALSE;
+ extern struct pixel_shader_definition pixel_shader;
+ extern struct rasterizer_lights_globals rasterizer_lights;
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+ short specular_light_vertex_shader_permutation_index= NONE;
+ 
+ /* ---------- public code */
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_models.c b/source/rasterizer/xbox/rasterizer_xbox_models.c
+index 86d2eb5a7bcff9069175edb06e7d19a7a103f501..bf738249ec395568a5a943bd78c77bd7710a47a7 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_models.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_models.c
+@@ -638,7 +638,6 @@ static boolean local_do_not_change_z_stencil_states = FALSE;
+ static boolean local_reported_too_many_transparent_geometry_groups = FALSE;
+ static boolean local_pixel_shader_dirty_flag = TRUE;
+ extern boolean rasterizer_model_cortana_hack;
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+ extern struct rasterizer_models_frame_statistics rasterizer_frame_statistics;
+ 
+ /* ---------- public code */
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c b/source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c
+index d1f90e48dba4e5485c0ea5acdb5e7133590ed591..011369ed62c070165938144d0a46c9a3884a76ea 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c
+@@ -719,7 +719,6 @@ static struct rasterizer_xbox_transparent_geometry_globals
+ 
+ extern struct rasterizer_transparent_geometry_debug_options_prefix
+ 	rasterizer_debug_options;
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+ extern struct rasterizer_transparent_geometry_hud_globals_prefix *hud_globals;
+ 
+ /* ---------- public code */

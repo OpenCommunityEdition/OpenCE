@@ -215,7 +215,7 @@ real sound_permutation_get_real_mouth_aperture(
 short sound_definition_find_pitch_range_by_pitch(
 	struct sound_definition *definition,
 	real pitch,
-	long pitch_range_index);
+	short old_range_index);
 
 short sound_definition_next_permutation(
 	struct sound_definition *definition,

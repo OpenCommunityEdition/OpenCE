@@ -381,11 +381,10 @@ static real lens_flare_evaluate_corona_rotation_function(
 
 /* ---------- globals */
 
-static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[MAXIMUM_LIGHTS_PER_MAP];
+static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[MAXIMUM_LIGHTS_PER_MAP] = {0};
 static byte local_lens_flare_occlusion_test_results2[MAXIMUM_LENS_FLARE_MARKERS_PER_STRUCTURE+MAXIMUM_QUEUED_LENS_FLARES][MAXIMUM_WINDOWS];
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
-static boolean local_lens_flare_error_printed = FALSE;
 extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_lights_window_parameters global_window_parameters;
 extern short global_screenshot_count;
@@ -548,6 +547,8 @@ void rasterizer_lights_reset_for_new_map(
 void rasterizer_lens_flare_submit(
 	struct rasterizer_lens_flare_submit_parameters const *parameters)
 {
+	static boolean warned = FALSE;
+
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
 		266,
@@ -633,10 +634,10 @@ void rasterizer_lens_flare_submit(
 		}
 		else
 		{
-			if (!local_lens_flare_error_printed)
+			if (!warned)
 			{
 				error(2, "### ERROR too many lens flares submitted to frame");
-				local_lens_flare_error_printed= TRUE;
+				warned= TRUE;
 			}
 		}
 	}

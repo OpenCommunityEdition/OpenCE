@@ -1,0 +1,42 @@
+--- a/source/saved games/saved_game_files.c
++++ b/source/saved games/saved_game_files.c
+@@ -474,6 +474,8 @@
+ 	word memory_unit_index,
+ 	struct enumerated_saved_game_file *file,
+ 	long *profile_index);
++static void enumerate_memory_units(
++	void);
+ 
+ /* ---------- globals */
+ 
+@@ -1804,7 +1806,7 @@
+ 	return;
+ }
+ 
+-void enumerate_memory_units(
++static void enumerate_memory_units(
+ 	void)
+ {
+ 	wchar_t message[MAXIMUM_FILENAME_LENGTH+1];
+--- a/source/saved games/saved_game_files.h
++++ b/source/saved games/saved_game_files.h
+@@ -110,8 +110,6 @@
+ 	void);
+ word saved_game_file_get_type(
+ 	long profile_index);
+-void enumerate_memory_units(
+-	void);
+ void enumerate_memory_units_test(
+ 	void);
+ 
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -7373,7 +7373,7 @@
+ { "file_offset": 1788048, "flags": 32, "name": "_saved_game_file_get_path_to_enclosing_directory" },
+ { "file_offset": 1788416, "flags": 32, "name": "_saved_game_files_enumerate_default_files" },
+ { "file_offset": 1788448, "flags": 32, "name": "_saved_game_files_delete_all_custom_profiles" },
+-{ "file_offset": 1788672, "flags": 32, "name": "_enumerate_memory_units" },
++{ "file_offset": 1788672, "flags": 32, "name": "_enumerate_memory_units", "static": true },
+ { "file_offset": 1789664, "flags": 32, "name": "_saved_game_files_enumerate_available_to_local_player_index" },
+ { "file_offset": 1790032, "flags": 32, "name": "_create_enumerated_saved_game_file" },
+ { "file_offset": 1790944, "flags": 32, "name": "_enumerate_memory_units_test" },

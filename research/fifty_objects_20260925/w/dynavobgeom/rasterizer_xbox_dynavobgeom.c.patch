@@ -1,0 +1,254 @@
+--- a/source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c
+@@ -63,7 +63,7 @@
+ 0028FDD4 0013:
+ 	??_C@_0BD@LBFDNODJ@parameters?9?$DOmap?$FL0?$FN?$AA@ (0000)
+ 00465A16 0001:
+-	_reported_too_many_transparent_geometry_groups (0000)
++	?warned@?1??_rasterizer_dynamic_unlit_geometry_draw@@9@9 (0000)
+ */
+ 
+ /* ---------- headers */
+@@ -74,7 +74,9 @@
+ #include "interface/hud_draw.h"
+ #include "bitmaps/bitmaps_inlines.h"
+ #include "rasterizer.h"
++#include "rasterizer/rasterizer_debug_options.h"
+ #include "rasterizer/rasterizer_frame_statistics.h"
++#include "rasterizer/rasterizer_model_types.h"
+ #include "rasterizer/rasterizer_transparent_geometry.h"
+ #include "render/render_cameras.h"
+ #include "shaders/shader_definitions.h"
+@@ -86,6 +88,7 @@
+ 
+ #include "rasterizer_xbox.h"
+ #include "rasterizer_xbox_dynavobgeom.h"
++#include "rasterizer_xbox_pixel_shader.h"
+ 
+ /* ---------- constants */
+ 
+@@ -101,12 +104,17 @@
+ 
+ enum
+ {
++	_render_model_effect_type_none = 0,
++};
++
++enum
++{
+ 	_shader_effect_sort_bias_bit = 0,
+ };
+ 
+ enum
+ {
+-	_rasterizer_statistics_mode_enabled = 2,
++	_rasterizer_statistics_mode_geometry = 2,
+ };
+ 
+ enum
+@@ -149,17 +157,11 @@
+ #define SHADER_EFFECT_SORT_BIAS 0.25f
+ 
+ #define SHADER_GET_EFFECT(shader) \
+-	((struct shader_effect_sort_bias_prefix *)shader_get_and_verify_type( \
++	((struct shader_effect_definition *)shader_get_and_verify_type( \
+ 		(struct shader *)(shader), _shader_type_effect))
+ 
+ /* ---------- structures */
+ 
+-struct shader_effect_sort_bias_prefix
+-{
+-	struct shader shader;
+-	word flags;
+-};
+-
+ struct transparent_geometry_group
+ {
+ 	unsigned long geometry_flags;
+@@ -168,8 +170,7 @@
+ 	struct shader *shader;
+ 	short shader_permutation_index;
+ 	short pad12;
+-	short effect_type;
+-	byte reserved16[0x26];
++	struct render_model_effect effect;
+ 	real_vector2d model_base_map_scale;
+ 	long dynamic_triangle_buffer_index;
+ 	struct triangle_buffer const *triangle_buffer;
+@@ -206,17 +207,6 @@
+ typedef char transparent_geometry_group_cortana_hack_offset_assert[
+ 	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D ? 1 : -1];
+ 
+-struct rasterizer_dynamic_geometry_debug_options
+-{
+-	byte reserved00[2];
+-	short statistics_mode;
+-	byte reserved04[0x1C];
+-	boolean draw_dynamic_unlit_geometry;
+-	boolean draw_dynamic_lit_geometry;
+-	boolean draw_dynamic_screen_geometry;
+-	byte reserved23;
+-};
+-
+ struct rasterizer_meter_parameters
+ {
+ 	pixel32 gradient_min_color;
+@@ -230,47 +220,6 @@
+ 	real gradient;
+ };
+ 
+-struct pixel_shader_definition
+-{
+-	unsigned long alpha_inputs[8];
+-	unsigned long final_combiner_inputs_abcd;
+-	unsigned long final_combiner_inputs_efg;
+-	unsigned long constant_0[8];
+-	unsigned long constant_1[8];
+-	unsigned long alpha_outputs[8];
+-	unsigned long rgb_inputs[8];
+-	unsigned long compare_mode;
+-	unsigned long final_combiner_constant_0;
+-	unsigned long final_combiner_constant_1;
+-	unsigned long rgb_outputs[8];
+-	unsigned long combiner_count;
+-	unsigned long texture_modes;
+-	unsigned long dot_mapping;
+-	unsigned long input_texture;
+-	unsigned long c0_mapping;
+-	unsigned long c1_mapping;
+-	unsigned long final_combiner_constants;
+-};
+-
+-typedef char rasterizer_dynamic_geometry_pixel_shader_size_assert[
+-	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
+-
+-struct rasterizer_dynamic_geometry_window_parameters
+-{
+-	short rasterizer_target;
+-	short window_index;
+-	boolean has_mirror;
+-	boolean suppress_clear;
+-	byte pad06[2];
+-	struct render_camera camera;
+-};
+-
+-typedef char rasterizer_dynamic_geometry_viewport_bounds_offset_assert[
+-	offsetof(struct rasterizer_dynamic_geometry_window_parameters, camera.viewport_bounds) == 0x34 ? 1 : -1];
+-
+-typedef char rasterizer_dynamic_geometry_camera_offset_assert[
+-	offsetof(struct rasterizer_dynamic_geometry_window_parameters, camera) == 0x8 ? 1 : -1];
+-
+ /* ---------- prototypes */
+ 
+ static void rasterizer_screen_geometry_submit_vertex(
+@@ -278,10 +227,7 @@
+ 
+ /* ---------- globals */
+ 
+-extern struct rasterizer_dynamic_geometry_debug_options rasterizer_debug_options;
+-extern struct rasterizer_dynamic_geometry_window_parameters global_window_parameters;
+-extern struct pixel_shader_definition pixel_shader;
+-boolean reported_too_many_transparent_geometry_groups = FALSE;
++extern struct rasterizer_window_begin_parameters global_window_parameters;
+ 
+ /* ---------- public code */
+ 
+@@ -314,7 +260,7 @@
+ 		756,
+ 		global_d3d_device);
+ 
+-	if (!rasterizer_debug_options.draw_dynamic_screen_geometry)
++	if (!rasterizer_debug_options.dynamic_screen_geometry)
+ 	{
+ 		return;
+ 	}
+@@ -720,15 +666,16 @@
+ 	unsigned long geometry_flags)
+ {
+ 	struct transparent_geometry_group *group;
+-	real_point3d relative_centroid;
+-	real_plane3d plane;
++	real_vector3d forward;
++	real_plane3d zero_plane;
++	static boolean warned = FALSE;
+ 
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_dynavobgeom.c",
+ 		38,
+ 		global_d3d_device);
+ 
+-	if (!rasterizer_debug_options.draw_dynamic_unlit_geometry)
++	if (!rasterizer_debug_options.dynamic_unlit_geometry)
+ 	{
+ 		return;
+ 	}
+@@ -748,24 +695,22 @@
+ 		52,
+ 		centroid);
+ 
+-	relative_centroid.x = centroid->x - global_window_parameters.camera.position.x;
+-	relative_centroid.y = centroid->y - global_window_parameters.camera.position.y;
+-	relative_centroid.z = centroid->z - global_window_parameters.camera.position.z;
++	vector_from_points3d(&global_window_parameters.camera.position, centroid, &forward);
+ 
+ 	group = rasterizer_transparent_geometry_new_group();
+ 	if (group)
+ 	{
+-		plane.n.i = 0.0f;
+-		plane.n.j = 0.0f;
+-		plane.n.k = 0.0f;
+-		plane.d = 0.0f;
++		zero_plane.n.i = 0.0f;
++		zero_plane.n.j = 0.0f;
++		zero_plane.n.k = 0.0f;
++		zero_plane.d = 0.0f;
+ 
+ 		group->geometry_flags = geometry_flags;
+ 		group->object_index = 0;
+ 		group->source_object_index = 0;
+ 		group->shader = (struct shader *)shader;
+ 		group->shader_permutation_index = 0;
+-		group->effect_type = 0;
++		group->effect.type = _render_model_effect_type_none;
+ 		group->dynamic_triangle_buffer_index = dynamic_triangle_buffer_index;
+ 		group->triangle_buffer = NULL;
+ 		group->first_triangle_index = 0;
+@@ -773,12 +718,9 @@
+ 		group->dynamic_vertex_buffer_index = dynamic_vertex_buffer_index;
+ 		group->vertex_buffer = NULL;
+ 		group->lightmap = primary_map;
+-		group->z_sort = -(
+-			global_window_parameters.camera.forward.k * relative_centroid.z +
+-			global_window_parameters.camera.forward.j * relative_centroid.y +
+-			global_window_parameters.camera.forward.i * relative_centroid.x);
++		group->z_sort = -dot_product3d(&global_window_parameters.camera.forward, &forward);
+ 		group->centroid = *centroid;
+-		group->plane = plane;
++		group->plane = zero_plane;
+ 		group->model_base_map_scale.i = group->model_base_map_scale.j = 1.0f;
+ 		group->previous_group_presorted_index = NONE;
+ 		group->next_group_presorted_index = NONE;
+@@ -796,7 +738,7 @@
+ 		group->lighting = NULL;
+ 		group->animation = NULL;
+ 
+-		if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
++		if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_geometry)
+ 		{
+ 			rasterizer_frame_statistics.dynamic_unlit_draw_count++;
+ 			rasterizer_frame_statistics.dynamic_unlit_triangle_count += triangle_count;
+@@ -811,12 +753,12 @@
+ 					triangle_count);
+ 		}
+ 	}
+-	else if (!reported_too_many_transparent_geometry_groups)
++	else if (!warned)
+ 	{
+ 		error(
+ 			_error_silent,
+ 			"### ERROR too many transparent geometry groups");
+-		reported_too_many_transparent_geometry_groups = TRUE;
++		warned = TRUE;
+ 	}
+ 
+ 	return;

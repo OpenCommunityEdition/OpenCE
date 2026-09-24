@@ -1,0 +1,22 @@
+diff --git a/config/parked.json b/config/parked.json
+index 7b799f37a0ffbfa54c8bb5f3bb7358c32d39def3..bd8b69da5bfd6a6820fd9d14eb0ea2ab05e30a6f 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1102,17 +1102,6 @@
+         "objdiff_percent": 93.27049
+       }
+     },
+-    {
+-      "unit": "source/objects/widgets/glow",
+-      "function": "_get_particle_world_position",
+-      "class": "unclassified",
+-      "evidence": "Best complete defined-C particle spline reconstruction retained from the HCEA semantic packet, the Opus caller-connected packet, and January control-flow review. January is 1,744 padded bytes with 43 relocations; canonical is 2,528 with 55. The canonical body uses initialized side controls, a defined increasing knot sequence, and typed point/vector component copies instead of reproducing January's target-authentic uninitialized side/knot reads and point/vector pointer punning. January-confirmed y-base z-component quirks are retained. This behavioral repair remains fuzzy and receives zero exact credit. See docs/object_matching_logs/glow_obj_house_rule_reconciliation_20260908.md; reopen only for authoritative original-source, type, local-variable, or precondition evidence.",
+-      "measurements": {
+-        "target": { "size": 1744, "relocation_count": 43, "normalized_sha256": "84720a5067d22512436bb45e9b948155fa08a828b9adf592a50c11ddd885596b" },
+-        "base": { "size": 2528, "relocation_count": 55, "normalized_sha256": "fb7bb3c6b7236d625348b35cdfa4175844acc230855ecc85e7ca966dd3b518e0" },
+-        "objdiff_percent": 49.07078
+-      }
+-    },
+     {
+       "unit": "source/math/geometry",
+       "function": "_convex_hull3d_expand",

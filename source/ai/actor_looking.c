@@ -675,13 +675,13 @@ void actor_looking_test_validity(
 
 	if (actor->state.mode == _actor_mode_combat)
 	{
-		look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-		look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+		look_delta_deviations[0] = cosine(definition->looking.combat_looking_delta_angles[0]);
+		look_delta_deviations[1] = cosine(definition->looking.combat_looking_delta_angles[1]);
 	}
 	else
 	{
-		look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-		look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+		look_delta_deviations[0] = cosine(definition->looking.noncombat_looking_delta_angles[0]);
+		look_delta_deviations[1] = cosine(definition->looking.noncombat_looking_delta_angles[1]);
 	}
 
 	*looking_valid = actor_look_valid_look_vector(
@@ -716,13 +716,13 @@ static boolean actor_look_idle_find_prop(
 
 	if (actor->state.mode == _actor_mode_combat)
 	{
-		look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-		look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+		look_delta_deviations[0] = cosine(definition->looking.combat_looking_delta_angles[0]);
+		look_delta_deviations[1] = cosine(definition->looking.combat_looking_delta_angles[1]);
 	}
 	else
 	{
-		look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-		look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+		look_delta_deviations[0] = cosine(definition->looking.noncombat_looking_delta_angles[0]);
+		look_delta_deviations[1] = cosine(definition->looking.noncombat_looking_delta_angles[1]);
 	}
 
 	if (actor_index == ai_debug.selected_actor_index)
@@ -936,13 +936,13 @@ static boolean actor_look_find_random_vector(
 		rotate_vector_about_axis(
 			&direction,
 			&pitch_axis,
-			(real)sin(pitch),
-			(real)cos(pitch));
+			sine(pitch),
+			cosine(pitch));
 		rotate_vector_about_axis(
 			&direction,
 			global_up3d,
-			(real)sin(yaw),
-			(real)cos(yaw));
+			sine(yaw),
+			cosine(yaw));
 
 		if (avoid_obstructions)
 		{
@@ -1414,13 +1414,13 @@ void actor_look_update(
 
 		if (actor->state.mode == _actor_mode_combat)
 		{
-			look_delta_deviations[0] = (real)cos(definition->looking.combat_looking_delta_angles[0]);
-			look_delta_deviations[1] = (real)cos(definition->looking.combat_looking_delta_angles[1]);
+			look_delta_deviations[0] = cosine(definition->looking.combat_looking_delta_angles[0]);
+			look_delta_deviations[1] = cosine(definition->looking.combat_looking_delta_angles[1]);
 		}
 		else
 		{
-			look_delta_deviations[0] = (real)cos(definition->looking.noncombat_looking_delta_angles[0]);
-			look_delta_deviations[1] = (real)cos(definition->looking.noncombat_looking_delta_angles[1]);
+			look_delta_deviations[0] = cosine(definition->looking.noncombat_looking_delta_angles[0]);
+			look_delta_deviations[1] = cosine(definition->looking.noncombat_looking_delta_angles[1]);
 		}
 
 		if (actor_combat_currently_firing_burst(actor_index) &&
@@ -1881,13 +1881,13 @@ update_facing:
 		}
 		else if (definition->defensive.stationary_facing_angle > 0.0f)
 		{
-			real cosine = (real)cos(definition->defensive.stationary_facing_angle);
+			real stationary_cosine = cosine(definition->defensive.stationary_facing_angle);
 			boolean valid;
 
 			if (actor->state.flying)
 			{
-				valid = dot_product3d(&actor->control.desired_facing_vector, &actor->control.fixed_stationary_facing_vector) > cosine &&
-					dot_product3d(&actor->control.desired_aiming_vector, &actor->control.fixed_stationary_facing_vector) > cosine;
+				valid = dot_product3d(&actor->control.desired_facing_vector, &actor->control.fixed_stationary_facing_vector) > stationary_cosine &&
+					dot_product3d(&actor->control.desired_aiming_vector, &actor->control.fixed_stationary_facing_vector) > stationary_cosine;
 			}
 			else
 			{
@@ -1905,8 +1905,8 @@ update_facing:
 				valid = normalize2d(&facing2d) != 0.0f &&
 					normalize2d(&aiming2d) != 0.0f &&
 					normalize2d(&fixed2d) != 0.0f &&
-					dot_product2d(&fixed2d, &facing2d) > cosine &&
-					dot_product2d(&aiming2d, &fixed2d) > cosine;
+					dot_product2d(&fixed2d, &facing2d) > stationary_cosine &&
+					dot_product2d(&aiming2d, &fixed2d) > stationary_cosine;
 			}
 
 			if (!valid)

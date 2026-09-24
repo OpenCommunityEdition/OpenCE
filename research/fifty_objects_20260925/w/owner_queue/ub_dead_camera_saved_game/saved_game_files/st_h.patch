@@ -1,0 +1,11 @@
+--- a/source/saved games/saved_game_files.h
++++ b/source/saved games/saved_game_files.h
+@@ -110,8 +110,6 @@
+ 	void);
+ word saved_game_file_get_type(
+ 	long profile_index);
+-void enumerate_memory_units(
+-	void);
+ void enumerate_memory_units_test(
+ 	void);
+ 

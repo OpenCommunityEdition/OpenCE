@@ -1,0 +1,94 @@
+diff --git a/source/text/draw_string.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\draw_string\\cand2.c"
+index 10f77809..ffa3071f 100644
+--- a/source/text/draw_string.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\draw_string\\cand2.c"
+@@ -1460,55 +1460,57 @@ void bitmap_draw_string(
+ 	rectangle2d const *clip,
+ 	char const *string)
+ {
+-	rectangle2d bitmap_bounds;
+-	rectangle2d bitmap_clip;
+-	rectangle2d const *effective_bounds = bounds;
+-	short format = bitmap->format;
++	rectangle2d adjusted_bounds;
++	rectangle2d adjusted_clip;
++	boolean valid_format;
+ 
+ 	draw_character_software_globals.bitmap = bitmap;
+ 
+-	switch (format)
++	switch (bitmap->format)
+ 	{
+ 	case _bitmap_format_a8:
+ 	case _bitmap_format_y8:
+ 	case _bitmap_format_ay8:
+ 	case _bitmap_format_r5g6b5:
+ 	case _bitmap_format_a8r8g8b8:
++		valid_format = TRUE;
+ 		break;
+ 
+ 	default:
+-		return;
++		valid_format = FALSE;
++		break;
+ 	}
+ 
+-	if (!effective_bounds)
++	if (valid_format)
+ 	{
+-		set_rectangle2d(
+-			&bitmap_bounds,
+-			0,
+-			0,
+-			bitmap->width,
+-			bitmap->height);
+-		effective_bounds = &bitmap_bounds;
+-	}
++		/* BUG (original): January and the later debug build both test the wrong
++		 * sense here and clip a NULL bounds rectangle (reads of addresses 0..6).
++		 * A corrected build should clip bounds only when it is supplied and use
++		 * the full bitmap rectangle when it is NULL. */
++		if (!bounds)
++		{
++			set_rectangle2d(
++				&adjusted_bounds,
++				MAX(0, bounds->x0),
++				MAX(0, bounds->y0),
++				MIN(bitmap->width, bounds->x1),
++				MIN(bitmap->height, bounds->y1));
++			bounds = &adjusted_bounds;
++		}
+ 
+-	if (clip)
+-	{
+-		set_rectangle2d(
+-			&bitmap_clip,
+-			MAX(clip->x0, 0),
+-			MAX(clip->y0, 0),
+-			MIN(clip->x1, bitmap->width),
+-			MIN(clip->y1, bitmap->height));
+-		clip = &bitmap_clip;
+-	}
++		if (clip)
++		{
++			set_rectangle2d(
++				&adjusted_clip,
++				MAX(0, clip->x0),
++				MAX(0, clip->y0),
++				MIN(bitmap->width, clip->x1),
++				MIN(bitmap->height, clip->y1));
++			clip = &adjusted_clip;
++		}
+ 
+-	draw_string(
+-		bitmap_draw_character,
+-		effective_bounds,
+-		NULL,
+-		clip,
+-		0,
+-		string);
++		draw_string(bitmap_draw_character, bounds, NULL, clip, 0, string);
++	}
+ 
+ 	return;
+ }

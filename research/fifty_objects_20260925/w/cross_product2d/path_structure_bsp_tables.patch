@@ -1,0 +1,36 @@
+diff --git a/source/ai/path_structure_bsp.c b/source/ai/path_structure_bsp.c
+index 8c815b02..32a97c1a 100644
+--- a/source/ai/path_structure_bsp.c
++++ b/source/ai/path_structure_bsp.c
+@@ -14,8 +14,10 @@ symbols in this file:
+ 	_structure_surface_index_from_point (0000)
+ 00052500 0270:
+ 	_structure_test_pill2d (0000)
+-0024EC0C 0040:
+-	_rdata_0024ec0c (0000)
++0024EC0C 0020:
++	_quantized_pathfinding_surface_widths (0000)
++0024EC2C 0020:
++	_quantized_pathfinding_surface_heights (0000)
+ 0024EC4C 0027:
+ 	??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_structure@ (0000)
+ 0024EC78 0008:
+@@ -65,6 +67,18 @@ enum
+ 
+ /* ---------- globals */
+ 
++/* HCEX.pdb path_structure_bsp compiland: two file-static const float[8] tables, widths first.
++ * January references neither from code; VC7 still emits an initialised unreferenced static. */
++static const real quantized_pathfinding_surface_widths[] =
++{
++	0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f, 4.0f
++};
++
++static const real quantized_pathfinding_surface_heights[] =
++{
++	0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 4.0f, 8.0f
++};
++
+ /* ---------- public code */
+ 
+ boolean structure_test_ray2d(

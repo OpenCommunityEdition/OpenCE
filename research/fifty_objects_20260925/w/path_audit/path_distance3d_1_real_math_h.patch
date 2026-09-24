@@ -1,0 +1,12 @@
+--- source/math/real_math.h	2026-09-23 17:32:49.498294400 -0700
++++ source/math/real_math.h	2026-09-23 18:01:56.797053900 -0700
+@@ -1192,8 +1192,7 @@
+ 	real_point3d const *a,
+ 	real_point3d const *b)
+ {
+-	real_vector3d v;
+-	return magnitude3d(vector_from_points3d(a, b, &v));
++	return square_root(distance_squared3d(a, b));
+ }
+ 
+ __inline real_point3d *midpoint3d(

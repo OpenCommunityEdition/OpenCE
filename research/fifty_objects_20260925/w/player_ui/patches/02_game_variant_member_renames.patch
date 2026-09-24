@@ -1,0 +1,2321 @@
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -1146,11 +1146,11 @@
+ 		"c:\\halo\\SOURCE\\game\\game_engine.c",
+ 		0x36E,
+ 		title_string);
+-	if (global_variant.maximum_lives > 0)
++	if (global_variant.universal_variant.lives > 0)
+ 	{
+ 		struct player_datum *player = player_get(player_index);
+ 		long remaining_lives =
+-			global_variant.maximum_lives - player->statistics.deaths;
++			global_variant.universal_variant.lives - player->statistics.deaths;
+ 
+ 		switch (remaining_lives)
+ 		{
+@@ -1210,7 +1210,7 @@
+ 		wchar_t *outcome_string;
+ 
+ 		if (game_engine)
+-			has_teams = global_variant.has_teams;
++			has_teams = global_variant.universal_variant.teams;
+ 
+ 		switch (did_player_win)
+ 		{
+@@ -1291,7 +1291,7 @@
+ 			break;
+ 		}
+ 	}
+-	else if (game_engine && global_variant.has_teams)
++	else if (game_engine && global_variant.universal_variant.teams)
+ 	{
+ 		wchar_t team0_name[8];
+ 		wchar_t team1_name[8];
+@@ -1766,7 +1766,7 @@
+ 	wchar_t *score_name;
+ 
+ 	if (game_engine)
+-		has_teams = global_variant.has_teams;
++		has_teams = global_variant.universal_variant.teams;
+ 
+ 	game_engine_generate_title_string(title_string, player_index);
+ 	entry_count = select_players_to_display(
+@@ -1987,7 +1987,7 @@
+ 		}
+ 	}
+ 
+-	if (global_variant.has_teams)
++	if (global_variant.universal_variant.teams)
+ 	{
+ 		short team_tab_stops[6] = { 50, 200, 300, 350, 410, 500 };
+ 		long team_order[2] = { 0, 1 };
+@@ -2108,7 +2108,7 @@
+ 			drawline(row_string, draw_row, 0);
+ 			draw_string_set_color(&winner_color);
+ 
+-			if (global_variant.has_teams)
++			if (global_variant.universal_variant.teams)
+ 			{
+ 				long team_index = player->team_index;
+ 
+@@ -2324,19 +2324,19 @@
+ 		{
+ 			if (equipment->equipment.powerup_type == 2)
+ 			{
+-				if (TEST_FLAG(global_variant.flags, 3))
++				if (TEST_FLAG(global_variant.universal_variant.flags, 3))
+ 					return NONE;
+ 			}
+ 			else if (equipment->equipment.powerup_type == 3)
+ 			{
+-				if (TEST_FLAG(global_variant.flags, 4))
++				if (TEST_FLAG(global_variant.universal_variant.flags, 4))
+ 					return NONE;
+ 			}
+ 		}
+ 	}
+ 	else
+ 	{
+-		switch (global_variant.unknown44)
++		switch (global_variant.universal_variant.weapon_set)
+ 		{
+ 		case 3:
+ 			weapon_list_index = 13;
+@@ -2911,7 +2911,7 @@
+ 	boolean infinite_grenades = FALSE;
+ 
+ 	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
+-		infinite_grenades = TEST_FLAG(global_variant.flags, _game_variant_infinite_grenades_bit);
++		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
+ 
+ 	return infinite_grenades;
+ }
+@@ -3266,7 +3266,7 @@
+ {
+ 	if (game_engine)
+ 	{
+-		if ((TEST_FLAG(global_variant.flags, _game_variant_always_invisible_bit) ||
++		if ((TEST_FLAG(global_variant.universal_variant.flags, _game_variant_always_invisible_bit) ||
+ 			game_engine->test_trait && game_engine->test_trait(player_index, 1)) &&
+ 			player_get(player_index)->unit_index!=NONE)
+ 		{
+@@ -3409,10 +3409,10 @@
+ 			player_count++;
+ 	}
+ 
+-	if (global_variant.unknown48 != 1)
++	if (global_variant.universal_variant.vehicle_set != 1)
+ 	{
+ 		/* Engine type 5 is assigned by the four race variant builders below. */
+-		if (global_variant.engine_type == 5)
++		if (global_variant.game_engine_index == 5)
+ 		{
+ 			struct scenario *scenario = global_scenario_get();
+ 			short flag_index;
+@@ -3846,7 +3846,7 @@
+ 				boolean always_invisible = FALSE;
+ 
+ 				if (TEST_FLAG(
+-					global_variant.flags,
++					global_variant.universal_variant.flags,
+ 					_game_variant_always_invisible_bit))
+ 				{
+ 					always_invisible = TRUE;
+@@ -4037,26 +4037,26 @@
+ 	player_kill = !friendly_fire && valid_players && !same_player;
+ 
+ 	dead_player->respawn_timer =
+-		dead_player->respawn_penalty + global_variant.unknown30;
+-	if (global_variant.unknown2C > 0)
++		dead_player->respawn_penalty + global_variant.universal_variant.respawn_time;
++	if (global_variant.universal_variant.respawn_time_growth > 0)
+ 	{
+-		dead_player->respawn_penalty += global_variant.unknown2C;
++		dead_player->respawn_penalty += global_variant.universal_variant.respawn_time_growth;
+ 		dead_player->respawn_penalty =
+ 			MIN(
+ 				dead_player->respawn_penalty,
+-				global_variant.unknown2C * 5);
++				global_variant.universal_variant.respawn_time_growth * 5);
+ 		if (player_kill && killing_player_index != NONE)
+ 		{
+ 			struct player_datum *killing_player =
+ 				player_get(killing_player_index);
+-			killing_player->respawn_penalty -= global_variant.unknown2C;
++			killing_player->respawn_penalty -= global_variant.universal_variant.respawn_time_growth;
+ 			killing_player->respawn_penalty =
+ 				MAX(killing_player->respawn_penalty, 0);
+ 		}
+ 	}
+ 
+ 	if (!player_kill)
+-		dead_player->respawn_timer += global_variant.unknown34;
++		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
+ 
+ 	dead_player->respawn_timer = MAX(dead_player->respawn_timer, 90);
+ 	dead_player = player_get(dead_player_index);
+@@ -4209,7 +4209,7 @@
+ 	boolean display = FALSE;
+ 
+ 	if (game_engine)
+-		display = TEST_FLAG(global_variant.flags, _game_variant_unknown1_bit) && global_variant.has_teams;
++		display = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_unknown1_bit) && global_variant.universal_variant.teams;
+ 
+ 	return display;
+ }
+@@ -4234,7 +4234,7 @@
+ 		player_index!=NONE &&
+ 		!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
+ 	{
+-		infinite_grenades = TEST_FLAG(global_variant.flags, _game_variant_infinite_grenades_bit);
++		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
+ 	}
+ 
+ 	return infinite_grenades;
+@@ -4246,7 +4246,7 @@
+ 	boolean has_shield = TRUE;
+ 
+ 	if (game_engine && player_index!=NONE)
+-		has_shield = !TEST_FLAG(global_variant.flags, _game_variant_no_shields_bit);
++		has_shield = !TEST_FLAG(global_variant.universal_variant.flags, _game_variant_no_shields_bit);
+ 
+ 	return has_shield;
+ }
+@@ -4257,7 +4257,7 @@
+ 	boolean draw_object = TRUE;
+ 
+ 	if (game_engine)
+-		draw_object = TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
++		draw_object = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+ 
+ 	return draw_object;
+ }
+@@ -4272,10 +4272,10 @@
+ 		boolean default_draw_motion_sensor;
+ 
+ 		draw_motion_sensor =
+-			TEST_FLAG(global_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+-		default_draw_motion_sensor = global_variant.unknown24 == 0;
++			TEST_FLAG(global_variant.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
++		default_draw_motion_sensor = global_variant.universal_variant.goal_radar == 0;
+ 
+-		if (global_variant.engine_type == 2 && !global_variant.unknown4C.byte2)
++		if (global_variant.game_engine_index == 2 && !global_variant.game_engine_variant.slayer.kill_in_order)
+ 			default_draw_motion_sensor = FALSE;
+ 
+ 		draw_motion_sensor |= default_draw_motion_sensor;
+@@ -4635,7 +4635,7 @@
+ 	struct player_datum *player = player_get(player_index);
+ 	boolean result = FALSE;
+ 
+-	if (global_variant.unknown28 && player->unit_index==NONE)
++	if (global_variant.universal_variant.odd_man_out && player->unit_index==NONE)
+ 	{
+ 		struct data_iterator iterator;
+ 		struct player_datum *other_player;
+@@ -4667,11 +4667,11 @@
+ {
+ 	boolean out_of_lives = FALSE;
+ 
+-	if (global_variant.maximum_lives>0)
++	if (global_variant.universal_variant.lives>0)
+ 	{
+ 		struct player_datum *player = player_get(player_index);
+ 
+-		if (player->unit_index==NONE && player->statistics.deaths>=global_variant.maximum_lives)
++		if (player->unit_index==NONE && player->statistics.deaths>=global_variant.universal_variant.lives)
+ 			out_of_lives = TRUE;
+ 	}
+ 
+@@ -4686,7 +4686,7 @@
+ {
+ 	short count = 0;
+ 
+-	if (game_engine && global_variant.unknown24 == 0 && player_index != NONE)
++	if (game_engine && global_variant.universal_variant.goal_radar == 0 && player_index != NONE)
+ 	{
+ 		struct player_datum *player = player_get(player_index);
+ 		long goal_index = 0;
+@@ -4716,7 +4716,7 @@
+ 	long local_player_index)
+ {
+ 	if (game_engine &&
+-		global_variant.unknown24 == 1 &&
++		global_variant.universal_variant.goal_radar == 1 &&
+ 		(short)local_player_index != NONE)
+ 	{
+ 		long player_index = local_player_get_player_index((short)local_player_index);
+@@ -4788,7 +4788,7 @@
+ {
+ 	boolean force_autopickup = FALSE;
+ 
+-	if (game_engine && global_variant.engine_type==1 && weapon_is_flag(weapon_index))
++	if (game_engine && global_variant.game_engine_index==1 && weapon_is_flag(weapon_index))
+ 		force_autopickup = TRUE;
+ 
+ 	return force_autopickup;
+@@ -4920,21 +4920,21 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.unknown30 = 150;
+-	result.unknown40 = 2;
+-	result.unknown64 = 1;
+-	result.unknown34 = 150;
+-	result.unknown48 = 2;
+-	result.engine_type = 4;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.score_to_win = 2;
++	result.flags = 1;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_index = 4;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.king.moving_hill = 0;
+ 
+ 	*variant = result;
+ 
+@@ -4946,21 +4946,21 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.unknown40 = 2;
+-	result.unknown4C.byte0 = 1;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.engine_type = 4;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown34 = 150;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.score_to_win = 2;
++	result.game_engine_variant.king.moving_hill = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.game_engine_index = 4;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
+ 
+ 	*variant = result;
+ 
+@@ -4972,23 +4972,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 2;
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown48 = 2;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 15;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
+-	result.unknown64 = 1;
++	result.game_engine_index = 2;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 15;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
++	result.flags = 1;
+ 
+ 	*variant = result;
+ 
+@@ -5000,23 +5000,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown30 = 300;
+-	result.unknown34 = 300;
+-	result.engine_type = 2;
+-	result.has_teams = TRUE;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 50;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.suicide_penalty = 300;
++	result.game_engine_index = 2;
++	result.universal_variant.teams = TRUE;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 50;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5028,23 +5028,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.engine_type = 2;
+-	result.maximum_lives = 1;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 25;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = 2;
++	result.universal_variant.lives = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 25;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5056,23 +5056,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x2D) | 0x12;
+-	result.engine_type = 2;
+-	result.unknown30 = 150;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.unknown34 = 150;
+-	result.unknown4C.byte0 = 1;
+-	result.unknown4C.byte1 = 1;
+-	result.unknown4C.byte2 = 1;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 10;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x2D) | 0x12;
++	result.game_engine_index = 2;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.suicide_penalty = 150;
++	result.game_engine_variant.slayer.no_death_bonus = 1;
++	result.game_engine_variant.slayer.no_kill_penalty = 1;
++	result.game_engine_variant.slayer.kill_in_order = 1;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 10;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5084,23 +5084,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.engine_type = 2;
+-	result.unknown28 = TRUE;
+-	result.unknown2C = 300;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown34 = 300;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 5;
+-	result.unknown30 = 0;
+-	result.unknown40 = 10;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = 2;
++	result.universal_variant.odd_man_out = TRUE;
++	result.universal_variant.respawn_time_growth = 300;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 5;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.score_to_win = 10;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5112,23 +5112,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x1D) | 0x22;
+-	result.engine_type = 2;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 25;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 6;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1D) | 0x22;
++	result.game_engine_index = 2;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 25;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 6;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5140,23 +5140,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x1D) | 0x22;
+-	result.engine_type = 2;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 150;
+-	result.unknown40 = 15;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 4;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1D) | 0x22;
++	result.game_engine_index = 2;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 150;
++	result.universal_variant.score_to_win = 15;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 4;
++	result.game_engine_variant.slayer.no_death_bonus = 0;
++	result.game_engine_variant.slayer.no_kill_penalty = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5168,27 +5168,27 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown30 = 150;
+-	result.unknown24 = 1;
+-	result.unknown34 = 150;
+-	result.unknown48 = 1;
+-	result.unknown60 = 1;
+-	result.unknown4C.byte1 = 1;
+-	result.unknown64 = 1;
+-	result.engine_type = 3;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 2;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown5C = 0;
+-	result.unknown54 = 0;
+-	result.unknown58 = 0;
+-	result.unknown50 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.vehicle_set = 1;
++	result.game_engine_variant.oddball.ball_spawn_count = 1;
++	result.game_engine_variant.oddball.ball_spawn_delay = 1;
++	result.flags = 1;
++	result.game_engine_index = 3;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 2;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.oddball.random_start = 0;
++	result.game_engine_variant.oddball.oddball_ball_type = 0;
++	result.game_engine_variant.oddball.trait_with_ball = 0;
++	result.game_engine_variant.oddball.trait_without_ball = 0;
++	result.game_engine_variant.oddball.speed_with_ball = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5200,27 +5200,27 @@
+ {
+ 	struct game_variant result;
+ 
+-	result.flags = (result.flags & ~0x1C) | 0x23;
+-	result.unknown24 = 1;
+-	result.maximum_lives = 0;
+-	result.has_teams = TRUE;
+-	result.unknown28 = FALSE;
+-	result.unknown48 = 1;
+-	result.unknown2C = 0;
+-	result.unknown60 = 1;
+-	result.unknown44 = 0;
+-	result.unknown64 = 1;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown5C = 0;
+-	result.unknown54 = 0;
+-	result.unknown58 = 0;
+-	result.unknown50 = 0;
+-	result.engine_type = 3;
+-	result.unknown3C = 1.0f;
+-	result.unknown30 = 300;
+-	result.unknown40 = 2;
+-	result.unknown34 = 150;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.lives = 0;
++	result.universal_variant.teams = TRUE;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.vehicle_set = 1;
++	result.universal_variant.respawn_time_growth = 0;
++	result.game_engine_variant.oddball.ball_spawn_count = 1;
++	result.universal_variant.weapon_set = 0;
++	result.flags = 1;
++	result.game_engine_variant.oddball.ball_spawn_delay = 0;
++	result.game_engine_variant.oddball.random_start = 0;
++	result.game_engine_variant.oddball.oddball_ball_type = 0;
++	result.game_engine_variant.oddball.trait_with_ball = 0;
++	result.game_engine_variant.oddball.trait_without_ball = 0;
++	result.game_engine_variant.oddball.speed_with_ball = 0;
++	result.game_engine_index = 3;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.score_to_win = 2;
++	result.universal_variant.suicide_penalty = 150;
+ 
+ 	*variant = result;
+ 
+@@ -5232,27 +5232,27 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3D) | 2;
+-	result.unknown30 = 150;
+-	result.unknown24 = 1;
+-	result.unknown34 = 150;
+-	result.unknown48 = 1;
+-	result.unknown60 = 1;
+-	result.unknown4C.byte1 = 1;
+-	result.unknown5C = 1;
+-	result.unknown64 = 1;
+-	result.engine_type = 3;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 2;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown54 = 0;
+-	result.unknown58 = 0;
+-	result.unknown50 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.vehicle_set = 1;
++	result.game_engine_variant.oddball.ball_spawn_count = 1;
++	result.game_engine_variant.oddball.ball_spawn_delay = 1;
++	result.game_engine_variant.oddball.oddball_ball_type = 1;
++	result.flags = 1;
++	result.game_engine_index = 3;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 2;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.oddball.random_start = 0;
++	result.game_engine_variant.oddball.trait_with_ball = 0;
++	result.game_engine_variant.oddball.trait_without_ball = 0;
++	result.game_engine_variant.oddball.speed_with_ball = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5264,26 +5264,26 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3D) | 2;
+-	result.unknown30 = 150;
+-	result.unknown34 = 150;
+-	result.unknown48 = 1;
+-	result.unknown5C = 1;
+-	result.unknown64 = 1;
+-	result.engine_type = 3;
+-	result.unknown24 = 2;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 5;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown60 = 16;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown54 = 0;
+-	result.unknown58 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.vehicle_set = 1;
++	result.game_engine_variant.oddball.oddball_ball_type = 1;
++	result.flags = 1;
++	result.game_engine_index = 3;
++	result.universal_variant.goal_radar = 2;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 5;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.oddball.ball_spawn_count = 16;
++	result.game_engine_variant.oddball.ball_spawn_delay = 0;
++	result.game_engine_variant.oddball.random_start = 0;
++	result.game_engine_variant.oddball.trait_with_ball = 0;
++	result.game_engine_variant.oddball.trait_without_ball = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5295,26 +5295,26 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown30 = 150;
+-	result.unknown34 = 150;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.unknown60 = 1;
+-	result.unknown54 = 2;
+-	result.unknown64 = 1;
+-	result.unknown5C = 2;
+-	result.engine_type = 3;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 10;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown58 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.oddball.ball_spawn_count = 1;
++	result.game_engine_variant.oddball.trait_with_ball = 2;
++	result.flags = 1;
++	result.game_engine_variant.oddball.oddball_ball_type = 2;
++	result.game_engine_index = 3;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 10;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.oddball.ball_spawn_delay = 0;
++	result.game_engine_variant.oddball.random_start = 0;
++	result.game_engine_variant.oddball.trait_without_ball = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5326,27 +5326,27 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3D) | 2;
+-	result.unknown30 = 150;
+-	result.unknown34 = 150;
+-	result.unknown60 = 1;
+-	result.engine_type = 3;
+-	result.unknown54 = 1;
+-	result.unknown58 = 3;
+-	result.unknown64 = 1;
+-	result.unknown48 = 2;
+-	result.unknown5C = 2;
+-	result.unknown50 = 2;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown2C = 0;
+-	result.unknown40 = 10;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown4C.byte0 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	result.universal_variant.respawn_time = 150;
++	result.universal_variant.suicide_penalty = 150;
++	result.game_engine_variant.oddball.ball_spawn_count = 1;
++	result.game_engine_index = 3;
++	result.game_engine_variant.oddball.trait_with_ball = 1;
++	result.game_engine_variant.oddball.trait_without_ball = 3;
++	result.flags = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.oddball.oddball_ball_type = 2;
++	result.game_engine_variant.oddball.speed_with_ball = 2;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 10;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.oddball.ball_spawn_delay = 0;
++	result.game_engine_variant.oddball.random_start = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5358,21 +5358,21 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x1C) | 0x23;
+-	result.unknown24 = 1;
+-	result.unknown40 = 2;
+-	result.unknown64 = 1;
+-	result.unknown48 = 2;
+-	result.engine_type = 4;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 300;
+-	result.unknown2C = 0;
+-	result.unknown34 = 450;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte0 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.score_to_win = 2;
++	result.flags = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_index = 4;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.suicide_penalty = 450;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.king.moving_hill = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5384,21 +5384,21 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown40 = 2;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.has_teams = TRUE;
+-	result.unknown4C.byte0 = 1;
+-	result.unknown64 = 1;
+-	result.engine_type = 4;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 300;
+-	result.unknown2C = 0;
+-	result.unknown34 = 150;
+-	result.unknown44 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.score_to_win = 2;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.teams = TRUE;
++	result.game_engine_variant.king.moving_hill = 1;
++	result.flags = 1;
++	result.game_engine_index = 4;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.weapon_set = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5410,23 +5410,23 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 2;
+-	result.flags = (result.flags & ~0x1C) | 0x23;
+-	result.unknown48 = 2;
+-	result.unknown4C.byte0 = 1;
+-	result.unknown4C.byte1 = 1;
+-	result.unknown64 = 1;
+-	result.unknown24 = 0;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 25;
+-	result.unknown34 = 450;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown4C.byte2 = 0;
++	result.game_engine_index = 2;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.slayer.no_death_bonus = 1;
++	result.game_engine_variant.slayer.no_kill_penalty = 1;
++	result.flags = 1;
++	result.universal_variant.goal_radar = 0;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 25;
++	result.universal_variant.suicide_penalty = 450;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5438,25 +5438,25 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 1;
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.has_teams = TRUE;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 300;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 150;
+-	result.unknown44 = 0;
+-	result.unknown48 = 2;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte3 = 0;
+-	result.unknown4C.byte2 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown50 = 0;
++	result.game_engine_index = 1;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.teams = TRUE;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.ctf.assault = 0;
++	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
++	result.game_engine_variant.ctf.flag_must_reset = 0;
++	result.game_engine_variant.ctf.reset_on_capture = 0;
++	result.game_engine_variant.ctf.single_flag_time = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5468,25 +5468,25 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 1;
+-	result.flags = (result.flags & ~0x1C) | 0x23;
+-	result.unknown24 = 1;
+-	result.has_teams = TRUE;
+-	result.unknown4C.byte3 = 1;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 300;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 450;
+-	result.unknown44 = 0;
+-	result.unknown48 = 2;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte2 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown50 = 0;
++	result.game_engine_index = 1;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.teams = TRUE;
++	result.game_engine_variant.ctf.flag_at_home_to_score = 1;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 300;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 450;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.ctf.assault = 0;
++	result.game_engine_variant.ctf.flag_must_reset = 0;
++	result.game_engine_variant.ctf.reset_on_capture = 0;
++	result.game_engine_variant.ctf.single_flag_time = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5498,25 +5498,25 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 1;
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.has_teams = TRUE;
+-	result.unknown4C.byte0 = 1;
+-	result.unknown64 = 1;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 5;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 150;
+-	result.unknown44 = 0;
+-	result.unknown48 = 2;
+-	result.unknown4C.byte3 = 0;
+-	result.unknown4C.byte2 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown50 = 0;
++	result.game_engine_index = 1;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.teams = TRUE;
++	result.game_engine_variant.ctf.assault = 1;
++	result.flags = 1;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 5;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
++	result.game_engine_variant.ctf.flag_must_reset = 0;
++	result.game_engine_variant.ctf.reset_on_capture = 0;
++	result.game_engine_variant.ctf.single_flag_time = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5528,25 +5528,25 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 1;
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.has_teams = TRUE;
+-	result.unknown4C.byte2 = 1;
+-	result.unknown64 = 1;
+-	result.unknown3C = 2.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 450;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 150;
+-	result.unknown44 = 0;
+-	result.unknown48 = 4;
+-	result.unknown4C.byte0 = 0;
+-	result.unknown4C.byte3 = 0;
+-	result.unknown4C.byte1 = 0;
+-	result.unknown50 = 0;
++	result.game_engine_index = 1;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.teams = TRUE;
++	result.game_engine_variant.ctf.flag_must_reset = 1;
++	result.flags = 1;
++	result.universal_variant.health = 2.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 450;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 150;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 4;
++	result.game_engine_variant.ctf.assault = 0;
++	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
++	result.game_engine_variant.ctf.reset_on_capture = 0;
++	result.game_engine_variant.ctf.single_flag_time = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5558,22 +5558,22 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.unknown64 = 1;
+-	result.engine_type = 5;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown48 = 2;
+-	result.unknown4C.value = 0;
+-	result.unknown50 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.flags = 1;
++	result.game_engine_index = 5;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.race.race_type = 0;
++	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5585,22 +5585,22 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.unknown48 = 2;
+-	result.unknown4C.value = 2;
+-	result.unknown64 = 1;
+-	result.engine_type = 5;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 15;
+-	result.unknown34 = 300;
+-	result.has_teams = FALSE;
+-	result.unknown44 = 0;
+-	result.unknown50 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.race.race_type = 2;
++	result.flags = 1;
++	result.game_engine_index = 5;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 15;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.teams = FALSE;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5612,22 +5612,22 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.has_teams = TRUE;
+-	result.unknown64 = 1;
+-	result.engine_type = 5;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown40 = 3;
+-	result.unknown34 = 300;
+-	result.unknown44 = 0;
+-	result.unknown48 = 2;
+-	result.unknown4C.value = 0;
+-	result.unknown50 = 0;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.teams = TRUE;
++	result.flags = 1;
++	result.game_engine_index = 5;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.score_to_win = 3;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.weapon_set = 0;
++	result.universal_variant.vehicle_set = 2;
++	result.game_engine_variant.race.race_type = 0;
++	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5639,22 +5639,22 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.engine_type = 5;
+-	result.flags = (result.flags & ~0x3C) | 3;
+-	result.unknown24 = 1;
+-	result.unknown40 = 5;
+-	result.has_teams = TRUE;
+-	result.unknown48 = 2;
+-	result.unknown64 = 1;
+-	result.unknown4C.value = 2;
+-	result.unknown3C = 1.0f;
+-	result.maximum_lives = 0;
+-	result.unknown28 = FALSE;
+-	result.unknown30 = 0;
+-	result.unknown2C = 0;
+-	result.unknown34 = 300;
+-	result.unknown44 = 0;
+-	result.unknown50 = 0;
++	result.game_engine_index = 5;
++	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.universal_variant.goal_radar = 1;
++	result.universal_variant.score_to_win = 5;
++	result.universal_variant.teams = TRUE;
++	result.universal_variant.vehicle_set = 2;
++	result.flags = 1;
++	result.game_engine_variant.race.race_type = 2;
++	result.universal_variant.health = 1.0f;
++	result.universal_variant.lives = 0;
++	result.universal_variant.odd_man_out = FALSE;
++	result.universal_variant.respawn_time = 0;
++	result.universal_variant.respawn_time_growth = 0;
++	result.universal_variant.suicide_penalty = 300;
++	result.universal_variant.weapon_set = 0;
++	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+ 
+@@ -5801,7 +5801,7 @@
+ {
+ 	long result;
+ 
+-	if (global_variant.has_teams)
++	if (global_variant.universal_variant.teams)
+ 	{
+ 		long team0_score = game_engine_get_team_score(0);
+ 		long team1_score = game_engine_get_team_score(1);
+@@ -5949,11 +5949,11 @@
+ 	if (player->quit_out_of_game)
+ 		goto man_out;
+ 
+-	if (global_variant.maximum_lives>0)
++	if (global_variant.universal_variant.lives>0)
+ 	{
+ 		player = player_get(player_index);
+ 		if (player->unit_index==NONE &&
+-			player->statistics.deaths>=global_variant.maximum_lives)
++			player->statistics.deaths>=global_variant.universal_variant.lives)
+ 		{
+ 			goto man_out;
+ 		}
+@@ -5973,7 +5973,7 @@
+ 	struct player_datum *player = player_get(player_index);
+ 	real_rgb_color result;
+ 
+-	if (global_variant.has_teams)
++	if (global_variant.universal_variant.teams)
+ 	{
+ 		if (player->team_index == 0)
+ 			result = *global_real_rgb_red;
+@@ -6001,7 +6001,7 @@
+ 	boolean has_teams = FALSE;
+ 
+ 	if (game_engine)
+-		has_teams = global_variant.has_teams;
++		has_teams = global_variant.universal_variant.teams;
+ 
+ 	return has_teams;
+ }
+@@ -6039,33 +6039,33 @@
+ {
+ 	struct game_variant original = *variant;
+ 
+-	variant->unknown16 = 0;
+-	variant->engine_type = PIN(variant->engine_type, 1, 5);
+-	variant->has_teams = !!variant->has_teams;
+-	variant->unknown28 = !!variant->unknown28;
+-	variant->unknown2C = MAX(variant->unknown2C, 0);
+-	variant->unknown30 = MAX(variant->unknown30, 0);
+-	variant->unknown34 = MAX(variant->unknown34, 0);
+-	variant->maximum_lives = MAX(variant->maximum_lives, 0);
+-	variant->unknown3C = PIN(variant->unknown3C, 0.25f, 4.0f);
+-	variant->unknown44 = PIN(variant->unknown44, 0, 10);
+-	variant->unknown48 = PIN(variant->unknown48, 0, 4);
++	variant->human_readable_game_description[NUMBEROF(variant->human_readable_game_description) - 1] = 0;
++	variant->game_engine_index = PIN(variant->game_engine_index, 1, 5);
++	variant->universal_variant.teams = !!variant->universal_variant.teams;
++	variant->universal_variant.odd_man_out = !!variant->universal_variant.odd_man_out;
++	variant->universal_variant.respawn_time_growth = MAX(variant->universal_variant.respawn_time_growth, 0);
++	variant->universal_variant.respawn_time = MAX(variant->universal_variant.respawn_time, 0);
++	variant->universal_variant.suicide_penalty = MAX(variant->universal_variant.suicide_penalty, 0);
++	variant->universal_variant.lives = MAX(variant->universal_variant.lives, 0);
++	variant->universal_variant.health = PIN(variant->universal_variant.health, 0.25f, 4.0f);
++	variant->universal_variant.weapon_set = PIN(variant->universal_variant.weapon_set, 0, 10);
++	variant->universal_variant.vehicle_set = PIN(variant->universal_variant.vehicle_set, 0, 4);
+ 
+-	switch (variant->engine_type)
++	switch (variant->game_engine_index)
+ 	{
+ 	case 1:
+-		variant->unknown4C.byte0 = !!variant->unknown4C.byte0;
+-		variant->unknown4C.byte1 = !!variant->unknown4C.byte1;
+-		variant->unknown4C.byte2 = !!variant->unknown4C.byte2;
+-		variant->has_teams = TRUE;
+-		variant->unknown4C.byte3 = !!variant->unknown4C.byte3;
+-		variant->unknown50 = FLOOR(variant->unknown50, 0);
++		variant->game_engine_variant.ctf.assault = !!variant->game_engine_variant.ctf.assault;
++		variant->game_engine_variant.ctf.reset_on_capture = !!variant->game_engine_variant.ctf.reset_on_capture;
++		variant->game_engine_variant.ctf.flag_must_reset = !!variant->game_engine_variant.ctf.flag_must_reset;
++		variant->universal_variant.teams = TRUE;
++		variant->game_engine_variant.ctf.flag_at_home_to_score = !!variant->game_engine_variant.ctf.flag_at_home_to_score;
++		variant->game_engine_variant.ctf.single_flag_time = FLOOR(variant->game_engine_variant.ctf.single_flag_time, 0);
+ 		break;
+ 
+ 	case 2:
+-		variant->unknown4C.byte0 = !!variant->unknown4C.byte0;
+-		variant->unknown4C.byte1 = !!variant->unknown4C.byte1;
+-		variant->unknown4C.byte2 = !!variant->unknown4C.byte2;
++		variant->game_engine_variant.slayer.no_death_bonus = !!variant->game_engine_variant.slayer.no_death_bonus;
++		variant->game_engine_variant.slayer.no_kill_penalty = !!variant->game_engine_variant.slayer.no_kill_penalty;
++		variant->game_engine_variant.slayer.kill_in_order = !!variant->game_engine_variant.slayer.kill_in_order;
+ 		break;
+ 	}
+ 
+@@ -6099,7 +6099,7 @@
+ 		0,
+ 		struct game_globals_multiplayer_information);
+ 
+-	switch (global_variant.unknown48)
++	switch (global_variant.universal_variant.vehicle_set)
+ 	{
+ 	case 2:
+ 		vehicle = TAG_BLOCK_GET_ELEMENT(
+@@ -6162,7 +6162,7 @@
+ 		struct tag_reference);
+ 	object_definition_predict(weapon->index);
+ 
+-	if (global_variant.engine_type == 3)
++	if (global_variant.game_engine_index == 3)
+ 	{
+ 		game_globals = scenario_get_game_globals();
+ 		weapon = TAG_BLOCK_GET_ELEMENT(
+@@ -6172,7 +6172,7 @@
+ 		object_definition_predict(weapon->index);
+ 	}
+ 
+-	if (global_variant.engine_type == 1)
++	if (global_variant.game_engine_index == 1)
+ 	{
+ 		game_globals = scenario_get_game_globals();
+ 		weapon = TAG_BLOCK_GET_ELEMENT(
+@@ -6269,11 +6269,11 @@
+ 	csmemset(&game_engine_globals, 0, sizeof(game_engine_globals));
+ 	game_engine_globals.postgame_state = 0;
+ 
+-	if (variant && variant->engine_type)
++	if (variant && variant->game_engine_index)
+ 	{
+ 		global_variant = *variant;
+ 		game_engine_variant_cleanup(&global_variant);
+-		game_engine = game_engines[variant->engine_type];
++		game_engine = game_engines[variant->game_engine_index];
+ 	}
+ 
+ 	return;
+@@ -6322,7 +6322,7 @@
+ 		struct player_datum *player = player_get(player_index);
+ 		long *next_team_index = &game_engine_globals.next_team_index;
+ 
+-		if (global_variant.has_teams)
++		if (global_variant.universal_variant.teams)
+ 		{
+ 			if (global_network_game_client_get())
+ 			{
+@@ -6371,7 +6371,7 @@
+ 	long player_index,
+ 	real_point3d const *position)
+ {
+-	boolean has_teams = game_engine ? global_variant.has_teams : FALSE;
++	boolean has_teams = game_engine ? global_variant.universal_variant.teams : FALSE;
+ 	struct player_datum *player;
+ 	struct data_iterator iterator;
+ 	struct player_datum *other_player;
+@@ -6438,7 +6438,7 @@
+ 	real result = 1.0f;
+ 
+ 	if (game_engine)
+-		result /= PIN(global_variant.unknown3C, 0.25f, 4.0f);
++		result /= PIN(global_variant.universal_variant.health, 0.25f, 4.0f);
+ 
+ 	if (damaging_player_index != NONE &&
+ 		damaged_player_index != NONE)
+@@ -6492,7 +6492,7 @@
+ 			result = NONE;
+ 		}
+ 
+-		switch (global_variant.unknown48)
++		switch (global_variant.universal_variant.vehicle_set)
+ 		{
+ 		case 1:
+ 			result = NONE;
+@@ -6546,7 +6546,7 @@
+ 	if (weapon_list_index == 1)
+ 		weapon_list_index = 7;
+ 
+-	switch (global_variant.unknown44)
++	switch (global_variant.universal_variant.weapon_set)
+ 	{
+ 	case 1:
+ 		switch (weapon_list_index)
+@@ -7332,7 +7332,7 @@
+ 		score = -1000;
+ 	score += 1000;
+ 	if (player->statistics.deaths <
+-		global_variant.maximum_lives)
++		global_variant.universal_variant.lives)
+ 	{
+ 		result = 0x40000000;
+ 	}
+@@ -7614,7 +7614,7 @@
+ 			fragmentation_grenade_count;
+ 		long starting_plasma_grenade_count = 0;
+ 
+-		if (!TEST_FLAG(global_variant.flags, 5))
++		if (!TEST_FLAG(global_variant.universal_variant.flags, 5))
+ 		{
+ 			handle_custom_starting_equipment(
+ 				unit_index,
+@@ -7636,7 +7636,7 @@
+ 				unit_index,
+ 				_object_mask_unit);
+ 
+-			switch (global_variant.unknown44)
++			switch (global_variant.universal_variant.weapon_set)
+ 			{
+ 			case 3:
+ 				starting_plasma_grenade_count +=
+--- a/source/game/game_engine_ctf.c
++++ b/source/game/game_engine_ctf.c
+@@ -438,7 +438,7 @@
+ 	short starting_location_count;
+ 	short starting_location_index;
+ 
+-	if (!game_engine_get_variant()->has_teams)
++	if (!game_engine_get_variant()->universal_variant.teams)
+ 	{
+ 		error(_error_silent, "ctf started up without teams");
+ 	}
+@@ -461,7 +461,7 @@
+ 
+ 		ctf_globals.scores[team_index] = 0;
+ 		flag_slot = team_index;
+-		if (game_engine_get_variant()->unknown4C.byte0)
++		if (game_engine_get_variant()->game_engine_variant.ctf.assault)
+ 			flag_slot = (team_index + 1) % 2;
+ 
+ 		ctf_globals.flags[flag_slot] = NULL;
+@@ -479,7 +479,7 @@
+ 		}
+ 	}
+ 
+-	if (game_engine_get_variant()->unknown50 > 0)
++	if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
+ 	{
+ 		long flag_to_create = random_range(0, NUMBER_OF_CTF_TEAMS);
+ 
+@@ -490,7 +490,7 @@
+ 
+ 		create_the_flag(flag_to_create);
+ 		ctf_single_flag_what_is_up_message(flag_to_create);
+-		ctf_globals.flag_swap_timer = game_engine_get_variant()->unknown50;
++		ctf_globals.flag_swap_timer = game_engine_get_variant()->game_engine_variant.ctf.single_flag_time;
+ 	}
+ 	else
+ 	{
+@@ -500,7 +500,7 @@
+ 		}
+ 	}
+ 
+-	ctf_globals.score_to_win = game_engine_get_variant()->unknown40;
++	ctf_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
+ 
+ 	starting_location_count = player_get_starting_location_count();
+ 	for (starting_location_index = 0;
+@@ -521,7 +521,7 @@
+ 		}
+ 		else if (match_game_type(game_engine_ctf, 4, starting_location->game_types))
+ 		{
+-			boolean assault = game_engine_get_variant()->unknown4C.byte0 > 0;
++			boolean assault = game_engine_get_variant()->game_engine_variant.ctf.assault > 0;
+ 			long location_team_index = starting_location->team_index;
+ 			long own_team_index = location_team_index % 2;
+ 			real distance_to_own_flag = distance_squared3d(
+@@ -581,8 +581,8 @@
+ 					{
+ 						boolean flag_at_home = TRUE;
+ 
+-						if (game_engine_get_variant()->unknown4C.byte3 &&
+-							game_engine_get_variant()->unknown50 == 0)
++						if (game_engine_get_variant()->game_engine_variant.ctf.flag_at_home_to_score &&
++							game_engine_get_variant()->game_engine_variant.ctf.single_flag_time == 0)
+ 						{
+ 							struct weapon_datum *own_flag = weapon_get(
+ 								ctf_globals.weapon_indices[player->team_index]);
+@@ -628,7 +628,7 @@
+ 		0x261,
+ 		weapon_is_flag(weapon_index));
+ 
+-	if (game_engine_get_variant()->unknown50 > 0)
++	if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
+ 	{
+ 		if (ctf_globals.flag_swap_timer > 0)
+ 			ctf_globals.flag_swap_timer--;
+@@ -650,7 +650,7 @@
+ 			ctf_reset_flag(weapon_index);
+ 			game_engine_clear_goal_position(2);
+ 			game_engine_clear_goal_position(3);
+-			ctf_globals.flag_swap_timer = game_engine_get_variant()->unknown50;
++			ctf_globals.flag_swap_timer = game_engine_get_variant()->game_engine_variant.ctf.single_flag_time;
+ 			ctf_single_flag_what_is_up_message(weapon->object.owner_team_index);
+ 		}
+ 	}
+@@ -733,7 +733,7 @@
+ 
+ 		if (weapon->object.owner_team_index == player->team_index)
+ 		{
+-			if (!game_engine_get_variant()->unknown4C.byte2)
++			if (!game_engine_get_variant()->game_engine_variant.ctf.flag_must_reset)
+ 			{
+ 				if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit) &&
+ 					game_engine_can_score())
+@@ -765,7 +765,7 @@
+ 				game_engine_can_score())
+ 			{
+ 				player->statistics.multiplayer_statistics.ctf_statistics.flag_grabs++;
+-				if (!game_engine_get_variant()->unknown4C.byte0)
++				if (!game_engine_get_variant()->game_engine_variant.ctf.assault)
+ 				{
+ 					game_engine_play_multiplayer_sound(
+ 						player->team_index == _team_red ?
+@@ -1085,7 +1085,7 @@
+ {
+ 	real rating = 1.0f;
+ 
+-	if (game_engine_get_variant()->unknown4C.byte0)
++	if (game_engine_get_variant()->game_engine_variant.ctf.assault)
+ 	{
+ 		struct player_datum *player = player_get(player_index);
+ 		struct scenario_netgame_flag *flag = ctf_globals.flags[(player->team_index + 1) % 2];
+--- a/source/game/game_engine_king.c
++++ b/source/game/game_engine_king.c
+@@ -512,7 +512,7 @@
+ 
+ 				king_globals.score[player->team_index]++;
+ 				king_globals.score_tick[player->team_index] = game_time_get();
+-				score_to_win = game_engine_get_variant()->unknown40*TICKS_PER_MINUTE;
++				score_to_win = game_engine_get_variant()->universal_variant.score_to_win*TICKS_PER_MINUTE;
+ 				score = king_globals.score[player->team_index];
+ 				if (score_to_win - score == HILL_30_SECOND_WARNING)
+ 				{
+@@ -813,7 +813,7 @@
+ 	void)
+ {
+ 	if (game_engine_can_score() &&
+-		game_engine_get_variant()->unknown4C.byte0 &&
++		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
+ 		--king_globals.hill_timer == 0)
+ 	{
+ 		king_globals.hill_timer = HILL_MOVE_TIME;
+--- a/source/game/game_engine_oddball.c
++++ b/source/game/game_engine_oddball.c
+@@ -213,13 +213,6 @@
+ 
+ /* ---------- macros */
+ 
+-#define oddball_variant_random_start unknown4C.byte0
+-#define oddball_variant_score_to_win unknown40
+-#define oddball_variant_speed_with_ball unknown50
+-#define oddball_variant_trait_with_ball unknown54
+-#define oddball_variant_trait_without_ball unknown58
+-#define oddball_variant_ball_type unknown5C
+-#define oddball_variant_ball_spawn_count unknown60
+ 
+ /* ---------- structures */
+ 
+@@ -349,7 +342,7 @@
+ static boolean oddball_ball_transfer_by_killing(
+ 	void)
+ {
+-	enum oddball_ball_type ball_type = game_engine_get_variant()->oddball_variant_ball_type;
++	enum oddball_ball_type ball_type = game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type;
+ 
+ 	if (ball_type > _oddball_normal && ball_type <= _oddball_terminator)
+ 		return TRUE;
+@@ -360,7 +353,7 @@
+ static boolean accumulate_score_by_time(
+ 	void)
+ {
+-	switch (game_engine_get_variant()->oddball_variant_ball_type)
++	switch (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type)
+ 	{
+ 	case _oddball_terminator:
+ 		return FALSE;
+@@ -372,7 +365,7 @@
+ static boolean terminator_scoring_rules(
+ 	void)
+ {
+-	switch (game_engine_get_variant()->oddball_variant_ball_type)
++	switch (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type)
+ 	{
+ 	case _oddball_terminator:
+ 		return TRUE;
+@@ -384,7 +377,7 @@
+ boolean player_has_ball(
+ 	long player_index)
+ {
+-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 	boolean has_ball = FALSE;
+ 	long ball_index;
+ 
+@@ -403,7 +396,7 @@
+ boolean ball_available(
+ 	void)
+ {
+-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 	boolean available = FALSE;
+ 	long ball_index;
+ 
+@@ -426,7 +419,7 @@
+ 	long player_index)
+ {
+ 	long ball_count = 0;
+-	long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++	long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 	long ball_index;
+ 
+ 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
+@@ -489,7 +482,7 @@
+ {
+ 	struct player_datum *player = player_get(player_index);
+ 
+-	if (game_engine_get_variant()->oddball_variant_ball_type == _oddball_normal)
++	if (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type == _oddball_normal)
+ 	{
+ 		game_engine_state_message(
+ 			player_index,
+@@ -513,7 +506,7 @@
+ 	 */
+ 	real_point3d position;
+ 
+-	if (!game_engine_get_variant()->oddball_variant_random_start)
++	if (!game_engine_get_variant()->game_engine_variant.oddball.random_start)
+ 	{
+ 		flag_index = find_netgame_flag(
+ 			NULL,
+@@ -622,7 +615,7 @@
+ 	struct weapon_datum *weapon = weapon_get(weapon_index);
+ 	real_point3d position = find_position_for_ball(weapon->object.owner_team_index);
+ 
+-	if (game_engine_get_variant()->oddball_variant_ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
++	if (game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
+ 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+ 
+ 	game_engine_flag_reset(weapon_index, &position);
+@@ -680,7 +673,7 @@
+ 	global_scenario_get();
+ 	csmemset(&oddball_globals, 0, sizeof(oddball_globals));
+ 
+-	oddball_globals.score_to_win = game_engine_get_variant()->oddball_variant_score_to_win;
++	oddball_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
+ 	if (accumulate_score_by_time())
+ 		oddball_globals.score_to_win *= ODDBALL_SCORE_TICKS_PER_UNIT;
+ 
+@@ -694,7 +687,7 @@
+ 
+ 	if (!oddball_ball_transfer_by_killing())
+ 	{
+-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 		long spawn_delay = 0;
+ 
+ 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
+@@ -705,7 +698,7 @@
+ 	}
+ 	else
+ 	{
+-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 
+ 		for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
+ 		{
+@@ -730,10 +723,10 @@
+ 	player->speed_multiplier = 1.0f;
+ 	if (ball_count > 0)
+ 	{
+-		if (game_engine_get_variant()->oddball_variant_trait_with_ball != _game_trait_invisible)
++		if (game_engine_get_variant()->game_engine_variant.oddball.trait_with_ball != _game_trait_invisible)
+ 			game_engine_player_depower_active_camo(player_index);
+ 
+-		switch (game_engine_get_variant()->oddball_variant_speed_with_ball)
++		switch (game_engine_get_variant()->game_engine_variant.oddball.speed_with_ball)
+ 		{
+ 		case _oddball_speed_normal:
+ 			player->speed_multiplier = 1.0f;
+@@ -880,7 +873,7 @@
+ 				_multiplayer_sound_oddball);
+ 	}
+ 
+-	ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++	ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
+ 	{
+ 		if (oddball_globals.ball_spawn_timer[ball_index] > 0)
+@@ -999,7 +992,7 @@
+ {
+ 	if (oddball_ball_transfer_by_killing())
+ 	{
+-		long ball_spawn_count = game_engine_get_variant()->oddball_variant_ball_spawn_count;
++		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+ 		long capture_index = NONE;
+ 		long ball_index;
+ 
+@@ -1102,9 +1095,9 @@
+ 	if (trait != _game_trait_none)
+ 	{
+ 		if (player_has_ball(player_index))
+-			result = trait == game_engine_get_variant()->oddball_variant_trait_with_ball;
++			result = trait == game_engine_get_variant()->game_engine_variant.oddball.trait_with_ball;
+ 		else
+-			result = trait == game_engine_get_variant()->oddball_variant_trait_without_ball;
++			result = trait == game_engine_get_variant()->game_engine_variant.oddball.trait_without_ball;
+ 	}
+ 
+ 	return result;
+--- a/source/game/game_engine_race.c
++++ b/source/game/game_engine_race.c
+@@ -199,10 +199,6 @@
+ 
+ /* ---------- macros */
+ 
+-#define race_variant_laps_to_win unknown40
+-#define race_variant_vehicles unknown48
+-#define race_variant_race_type unknown4C.value
+-#define race_variant_team_scoring unknown50
+ 
+ /* ---------- structures */
+ 
+@@ -323,7 +319,7 @@
+ 		struct game_globals_vehicle);
+ 	long vehicle_definition_index = NONE;
+ 
+-	switch (game_engine_get_variant()->race_variant_vehicles)
++	switch (game_engine_get_variant()->universal_variant.vehicle_set)
+ 	{
+ 	case _game_engine_vehicles_default:
+ 		if (vehicle_number == 0)
+@@ -462,7 +458,7 @@
+ 	game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
+ 	player->statistics.multiplayer_statistics.race_statistics.last_lap_time = (short)lap_time;
+ 
+-	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++	if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 	{
+ 		game_show_score_you_ally_enemy(
+ 			player_index,
+@@ -488,7 +484,7 @@
+ 	else if (lap_time < player->statistics.multiplayer_statistics.race_statistics.best_lap_time)
+ 	{
+ 		player->statistics.multiplayer_statistics.race_statistics.best_lap_time = (short)lap_time;
+-		if (game_engine_get_variant()->race_variant_race_type != _race_type_flag_rally)
++		if (game_engine_get_variant()->game_engine_variant.race.race_type != _race_type_flag_rally)
+ 		{
+ 			game_show_score_extended(
+ 				player_index,
+@@ -502,7 +498,7 @@
+ 
+ 	team_score = player->statistics.multiplayer_statistics.race_statistics.laps;
+ 	data_iterator_new(&iterator, player_data);
+-	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_sum)
++	if (game_engine_get_variant()->game_engine_variant.race.team_scoring == _race_team_scoring_sum)
+ 		team_score = 0;
+ 	while ((team_player = data_iterator_next(&iterator)))
+ 	{
+@@ -510,7 +506,7 @@
+ 		{
+ 			long laps = team_player->statistics.multiplayer_statistics.race_statistics.laps;
+ 
+-			switch (game_engine_get_variant()->race_variant_team_scoring)
++			switch (game_engine_get_variant()->game_engine_variant.race.team_scoring)
+ 			{
+ 			case _race_team_scoring_minimum:
+ 				team_score = MIN(team_score, laps);
+@@ -533,7 +529,7 @@
+ 
+ 	if (team_score > race_globals.team_laps[player->team_index])
+ 		race_globals.team_laps[player->team_index] = team_score;
+-	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->race_variant_laps_to_win)
++	if (race_globals.team_laps[player->team_index] >= game_engine_get_variant()->universal_variant.score_to_win)
+ 		game_engine_end_game();
+ 
+ 	return;
+@@ -554,11 +550,11 @@
+ 		can_touch = FALSE;
+ 	}
+ 	else if (player->statistics.multiplayer_statistics.race_statistics.laps >=
+-		game_engine_get_variant()->race_variant_laps_to_win)
++		game_engine_get_variant()->universal_variant.score_to_win)
+ 	{
+ 		can_touch = FALSE;
+ 	}
+-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 	{
+ 		can_touch = race_globals.rally_flag == team_index;
+ 	}
+@@ -570,7 +566,7 @@
+ 	{
+ 		can_touch = FALSE;
+ 	}
+-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
++	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_normal)
+ 	{
+ 		long itr;
+ 
+@@ -662,15 +658,14 @@
+ 
+ 		if (race_globals.first_flag[absolute_player_index] == NONE)
+ 		{
+-			match_vassert(
++			match_assert(
+ 				"c:\\halo\\SOURCE\\game\\game_engine_race.c",
+ 				0x2D4,
+-				_race_type_normal != game_engine_get_variant()->race_variant_race_type,
+-				"_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type");
++				_race_type_normal != game_engine_get_variant()->game_engine_variant.race.race_type);
+ 			race_globals.first_flag[absolute_player_index] = flag->team_index;
+ 		}
+ 
+-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 		{
+ 			race_complete_lap(player_index);
+ 			race_globals.rally_flag = new_rally_flag(race_globals.rally_flag);
+@@ -708,7 +703,7 @@
+ {
+ 	boolean can_win = TRUE;
+ 
+-	if (game_engine_get_variant()->race_variant_team_scoring == _race_team_scoring_minimum)
++	if (game_engine_get_variant()->game_engine_variant.race.team_scoring == _race_team_scoring_minimum)
+ 	{
+ 		struct data_iterator iterator;
+ 		struct player_datum *player;
+@@ -718,7 +713,7 @@
+ 		{
+ 			if (player->team_index == team_index &&
+ 				player->statistics.multiplayer_statistics.race_statistics.laps <
+-					game_engine_get_variant()->race_variant_laps_to_win &&
++					game_engine_get_variant()->universal_variant.score_to_win &&
+ 				(game_engine_player_is_out_of_lives(iterator.datum_index) ||
+ 					player->quit_out_of_game))
+ 			{
+@@ -752,7 +747,7 @@
+ 		long laps_behind = maximum_laps -
+ 			player->statistics.multiplayer_statistics.race_statistics.laps;
+ 
+-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 			laps_behind /= 3;
+ 
+ 		if (laps_behind >= 2)
+@@ -936,7 +931,7 @@
+ 		break;
+ 
+ 	case _race_message_show_score:
+-		if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++		if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 		{
+ 			if (other_player->statistics.multiplayer_statistics.race_statistics.laps == 1)
+ 			{
+@@ -975,7 +970,7 @@
+ 			}
+ 		}
+ 		else if (other_player->statistics.multiplayer_statistics.race_statistics.laps + 1 >
+-			game_engine_get_variant()->race_variant_laps_to_win)
++			game_engine_get_variant()->universal_variant.score_to_win)
+ 		{
+ 			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+ 			if (string_list_index != NONE)
+@@ -1009,7 +1004,7 @@
+ 				string,
+ 				get_place_name(game_engine_get_place(player_index, _get_score_team)),
+ 				other_player->statistics.multiplayer_statistics.race_statistics.laps + 1,
+-				game_engine_get_variant()->race_variant_laps_to_win);
++				game_engine_get_variant()->universal_variant.score_to_win);
+ 		}
+ 		break;
+ 
+@@ -1106,7 +1101,7 @@
+ 	wchar_t *string)
+ {
+ 	short string_index =
+-		game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally ?
++		game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally ?
+ 			178 : 25;
+ 	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+ 	wchar_t *header_string;
+@@ -1336,7 +1331,7 @@
+ 
+ 		if (race_globals.vehicles_have_been_added)
+ 		{
+-			switch (game_engine_get_variant()->race_variant_vehicles)
++			switch (game_engine_get_variant()->universal_variant.vehicle_set)
+ 			{
+ 			case _game_engine_vehicles_default:
+ 				game_engine_play_multiplayer_sound(_multiplayer_sound_warthog);
+@@ -1414,11 +1409,11 @@
+ 		}
+ 	}
+ 
+-	if (game_engine_get_variant()->race_variant_race_type == _race_type_flag_rally)
++	if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_flag_rally)
+ 	{
+ 		race_globals.rally_flag = new_rally_flag(NONE);
+ 	}
+-	else if (game_engine_get_variant()->race_variant_race_type == _race_type_normal)
++	else if (game_engine_get_variant()->game_engine_variant.race.race_type == _race_type_normal)
+ 	{
+ 		for (itr = 0; itr < MULTIPLAYER_MAXIMUM_PLAYERS; itr++)
+ 			race_globals.first_flag[itr] = lowest_flag_index;
+--- a/source/game/game_engine_slayer.c
++++ b/source/game/game_engine_slayer.c
+@@ -105,10 +105,6 @@
+ 
+ /* ---------- macros */
+ 
+-#define slayer_variant_assault unknown4C.byte0
+-#define slayer_variant_reset_on_capture unknown4C.byte1
+-#define slayer_variant_flag_must_reset unknown4C.byte2
+-#define slayer_variant_score_to_win unknown40
+ 
+ #define GET_MULTIPLAYER_GAME_TEXT(index) \
+ 	(((string_list_index = tag_loaded( \
+@@ -345,7 +341,7 @@
+ 	struct player_datum *killing_player = player_get(killing_player_index);
+ 	struct player_datum *dead_player = player_get(dead_player_index);
+ 
+-	if (!game_engine_get_variant()->slayer_variant_reset_on_capture)
++	if (!game_engine_get_variant()->game_engine_variant.slayer.no_kill_penalty)
+ 	{
+ 		killing_player->speed_multiplier -= 0.02f;
+ 		if (killing_player->speed_multiplier >= 1.0f)
+@@ -361,7 +357,7 @@
+ 			0.89999998f);
+ 	}
+ 
+-	if (!game_engine_get_variant()->slayer_variant_assault)
++	if (!game_engine_get_variant()->game_engine_variant.slayer.no_death_bonus)
+ 	{
+ 		dead_player->speed_multiplier += 0.1f;
+ 		if (dead_player->speed_multiplier <= 1.0f)
+@@ -472,7 +468,7 @@
+ 		{
+ 			update_speed_for_score(dead_player_index, killing_player_index);
+ 
+-			if (game_engine_get_variant()->slayer_variant_flag_must_reset)
++			if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
+ 			{
+ 				if (killing_player->multiplayer_special != dead_player_index)
+ 					return;
+@@ -507,7 +503,7 @@
+ 
+ 	if (message == _slayer_message_new_target)
+ 	{
+-		if (game_engine_get_variant()->has_teams)
++		if (game_engine_get_variant()->universal_variant.teams)
+ 		{
+ 			usnprintf(
+ 				string,
+@@ -539,7 +535,7 @@
+ 		break;
+ 
+ 	case _game_engine_message_show_score:
+-		if (game_engine_get_variant()->has_teams)
++		if (game_engine_get_variant()->universal_variant.teams)
+ 		{
+ 			wchar_t *place_name = get_place_name(
+ 				game_engine_get_place(player_index, _get_score_team));
+@@ -552,7 +548,7 @@
+ 				place_name,
+ 				slayer_get_score(player_index, _get_score_individual),
+ 				slayer_get_score(player_index, _get_score_team),
+-				game_engine_get_variant()->slayer_variant_score_to_win);
++				game_engine_get_variant()->universal_variant.score_to_win);
+ 		}
+ 		else
+ 		{
+@@ -566,7 +562,7 @@
+ 					_string_name_kills_score_of_max),
+ 				place_name,
+ 				slayer_get_score(player_index, _get_score_team),
+-				game_engine_get_variant()->slayer_variant_score_to_win);
++				game_engine_get_variant()->universal_variant.score_to_win);
+ 		}
+ 		break;
+ 
+@@ -583,7 +579,7 @@
+ {
+ 	struct player_datum *player = player_get(index);
+ 
+-	if (game_engine_get_variant()->slayer_variant_reset_on_capture &&
++	if (game_engine_get_variant()->game_engine_variant.slayer.no_kill_penalty &&
+ 		player->speed_multiplier > 1.0f)
+ 	{
+ 		player->speed_multiplier -= 0.00011111111f;
+@@ -592,7 +588,7 @@
+ 			1.0f);
+ 	}
+ 
+-	if (game_engine_get_variant()->slayer_variant_assault &&
++	if (game_engine_get_variant()->game_engine_variant.slayer.no_death_bonus &&
+ 		player->speed_multiplier < 1.0f)
+ 	{
+ 		player->speed_multiplier += 0.000011111111f;
+@@ -601,7 +597,7 @@
+ 			1.0f);
+ 	}
+ 
+-	if (game_engine_get_variant()->slayer_variant_flag_must_reset)
++	if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
+ 	{
+ 		match_vassert(
+ 			"c:\\halo\\SOURCE\\game\\game_engine_slayer.c",
+@@ -646,7 +642,7 @@
+ 	}
+ 
+ 	if (slayer_get_score(index, _get_score_team) >=
+-		game_engine_get_variant()->slayer_variant_score_to_win)
++		game_engine_get_variant()->universal_variant.score_to_win)
+ 	{
+ 		game_engine_end_game();
+ 	}
+--- a/source/networking/network_game_manager.c
++++ b/source/networking/network_game_manager.c
+@@ -641,7 +641,7 @@
+ 		game_unload();
+ 	}
+ 
+-	if (game->variant.engine_type)
++	if (game->variant.game_engine_index)
+ 		game_set_game_variant(&game->variant);
+ 
+ 	if (game_load(&options))
+--- a/source/networking/network_server_manager.c
++++ b/source/networking/network_server_manager.c
+@@ -705,7 +705,7 @@
+ 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+ typedef char network_game_variant_has_teams_offset_assert[
+ 	offsetof(struct network_game, variant) +
+-		offsetof(struct game_variant, has_teams) == 0xC0 ? 1 : -1];
++		offsetof(struct game_variant, universal_variant.teams) == 0xC0 ? 1 : -1];
+ typedef char network_game_size_assert[
+ 	sizeof(struct network_game) == 0x434 ? 1 : -1];
+ typedef char network_game_server_client_machines_offset_assert[
+@@ -1896,7 +1896,7 @@
+ {
+ 	boolean needs_more_teams = FALSE;
+ 
+-	if (server->game.variant.has_teams)
++	if (server->game.variant.universal_variant.teams)
+ 	{
+ 		short player_count_by_team[NUMBER_OF_MULTIPLAYER_TEAMS] = { 0, 0 };
+ 		long player_index;
+@@ -2808,7 +2808,7 @@
+ 		server->game.minimum_players = 2;
+ 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
+ 
+-		if (server->game.variant.has_teams)
++		if (server->game.variant.universal_variant.teams)
+ 		{
+ 			server->game.maximum_teams = 2;
+ 		}
+@@ -3336,7 +3336,7 @@
+ 		{
+ 			network_event("server resetting to pregame");
+ 
+-			if (server->game.variant.has_teams)
++			if (server->game.variant.universal_variant.teams)
+ 			{
+ 				for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
+ 				{
+@@ -3411,7 +3411,7 @@
+ 	{
+ 		success = network_game_server_setup_game_from_playlist(server);
+ 
+-		if (server->game.variant.has_teams)
++		if (server->game.variant.universal_variant.teams)
+ 		{
+ 			for (i = 0; i < MAXIMUM_NETWORK_PLAYER_COUNT; i++)
+ 			{
+--- a/source/networking/network_server_message_handler.c
++++ b/source/networking/network_server_message_handler.c
+@@ -1203,20 +1203,20 @@
+ 			advertisement.version = NETWORK_GAME_MESSAGE_VERSION;
+ 			advertisement.platform = 0;
+ 			ustrncpy(advertisement.game_name, game->name, NETWORK_GAME_NAME_LENGTH - 1);
+-			advertisement.engine_type = (short)game->variant.engine_type;
++			advertisement.engine_type = (short)game->variant.game_engine_index;
+ 			csmemcpy(&advertisement.map, &game->map, sizeof(game->map));
+ 			advertisement.machine_count = game->machine_count;
+ 			advertisement.player_count = game->player_count;
+ 			advertisement.maximum_player_count = game->maximum_player_count;
+-			advertisement.variant_setting = (short)game->variant.unknown40;
++			advertisement.variant_setting = (short)game->variant.universal_variant.score_to_win;
+ 			advertisement.flags = 0;
+-			if (game->variant.has_teams == TRUE)
++			if (game->variant.universal_variant.teams == TRUE)
+ 			{
+ 				advertisement.flags = FLAG(_game_advertisement_has_teams_bit);
+ 			}
+ 
+-			if (game->variant.engine_type == game_engine_oddball &&
+-				game->variant.unknown5C == 2)
++			if (game->variant.game_engine_index == game_engine_oddball &&
++				game->variant.game_engine_variant.oddball.oddball_ball_type == 2)
+ 			{
+ 				advertisement.flags |= FLAG(_game_advertisement_oddball_variant_bit);
+ 			}
+--- a/source/saved games/playlist_profile.c
++++ b/source/saved games/playlist_profile.c
+@@ -309,7 +309,7 @@
+ 				&variant,
+ 				sizeof(struct game_variant));
+ 			SET_FLAG(
+-				((struct game_variant *)block)->unknown64,
++				((struct game_variant *)block)->flags,
+ 				_game_variant_is_system_default_bit,
+ 				FALSE);
+ 			game_engine_variant_cleanup((struct game_variant *)block);
+@@ -317,7 +317,7 @@
+ 				(wchar_t *)block,
+ 				name,
+ 				MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
+-			((struct game_variant *)block)->unknown16 = 0;
++			((struct game_variant *)block)->human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
+ 			saved_game_file_generate_checksum(
+ 				block,
+ 				PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE,
+@@ -513,8 +513,8 @@
+ 				(wchar_t *)block,
+ 				display_name,
+ 				MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
+-			((struct game_variant *)block)->unknown16 = 0;
+-			((struct game_variant *)block)->unknown64 |= (short)(profile_index << 8);
++			((struct game_variant *)block)->human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
++			((struct game_variant *)block)->flags |= (short)(profile_index << 8);
+ 			saved_game_file_generate_checksum(
+ 				block,
+ 				PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE,
+@@ -611,12 +611,12 @@
+ 						error(
+ 							_error_silent,
+ 							"checksum failed on playlist profile file, sanitizing memory resident version...");
+-						default_variant.unknown64 = 0;
++						default_variant.flags = 0;
+ 						ustrncpy(
+ 							(wchar_t *)&default_variant,
+ 							saved_game_file_get_display_name(playlist_profile_index),
+ 							MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
+-						default_variant.unknown16 = 0;
++						default_variant.human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
+ 						csmemcpy(
+ 							variant,
+ 							&default_variant,
+@@ -656,12 +656,12 @@
+ 		error(
+ 			_error_silent,
+ 			"checksum failed on playlist profile file, sanitizing memory resident version...");
+-		default_variant.unknown64 = 0;
++		default_variant.flags = 0;
+ 		ustrncpy(
+ 			(wchar_t *)&default_variant,
+ 			saved_game_file_get_display_name(playlist_profile_index),
+ 			MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1);
+-		default_variant.unknown16 = 0;
++		default_variant.human_readable_game_description[MAXIMUM_GAME_VARIANT_NAME_LENGTH - 1] = 0;
+ 		csmemcpy(
+ 			variant,
+ 			&default_variant,

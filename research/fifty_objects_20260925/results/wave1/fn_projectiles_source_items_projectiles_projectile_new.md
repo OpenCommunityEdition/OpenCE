@@ -1,0 +1,34 @@
+# source/items/projectiles:_projectile_new
+
+## verdict
+BLOCKED
+
+## newly_exact_functions
+[]
+
+## candidate_files
+[
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\production.patch",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\cand_h1.c",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\cand_h2.c",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\lab_pfull.c",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\lab_localrhsparen.c",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\od_projectile_new.txt",
+ "C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\projectiles\\LEDGER.md"
+]
+
+## production_changes
+Optional source-quality fix, zero credit. Apply scratch/w/projectiles/production.patch to source/items/projectiles.c. The patch keeps CRLF line endings and `git apply --check` passes. It replaces the hand-expanded point_from_line3d, which breaks house rule 6, with the call the /Od build attests: `point_from_line3d((real_point3d *)&projectile->object.translational_velocity, &projectile->object.forward, definition->projectile.initial_velocity, (real_point3d *)&projectile->object.translational_velocity);`. It also drops the `real initial_velocity;` local. The object comes out byte-identical to build/base (only .debug$S differs). _projectile_new keeps sha 9d8477d2, which is the park base, so the park measurements stay valid and there is no build risk: build/base already emits _point_from_line3d, and projectiles is one of the 17 objects the owner relaxed. cand_h2.c is a second byte-identical option: it also drops the `attachments` and `underwater` locals to match the /Od local set. Keep the _projectile_new park, but you may update its evidence text as follows. Mechanism: January emits the x87 point_from_line3d chain one slot earlier, relative to the scenario_location_underwater argument lea/push, only when the initial_velocity load is wrapped in a parenthesis node. Reclassify it as instruction-scheduling, with a held exact candidate pending an owner ruling. Do not land lab_pfull.c or lab_paren.c: they fail the strip test.
+
+## evidence
+Baseline: gate 29 exact / 1 residual. The alndiff has 142/142 instructions and 16/16 relocations; the frame is 0xc on both sides. The only real difference is two emission swaps at +0x13b..0x148. January emits `fld st(0); fmul [esi+0x24]; lea eax,[esi+0x50]; push eax; lea ecx,[esi+0x48]; fadd [esi+0x18]; push ecx`. Ours puts lea before fmul and push ecx before fadd. /Od readout: projectile_new is at 0x69b3a0, found by the 'cont' imm32. The velocity update there is a real call to 0x42e0d0, which is point_from_line3d (v*t+p, returns result), with args (&velocity, &forward, scale, &velocity). The /Od scale multiplies initial_velocity by a later-build difficulty factor from 0x699b60, which January lacks. Precedent from the board scan (scan_copy.py): ai_debug.c code_00039990 has the same inline-then-call site. Its landed header comment records that the bare t argument is residual and the parenthesised one is EXACT. Probes, all recorded in LEDGER.md: inline point_from_line3d with the field as t (P1), the /Od local set (P7), pointer casts (P9), 1-7 unused declarations (P8), extra used locals for the M8 law (P14), `(real)` cast (P5), local copy as t (P6), `x*1.f` and `TRUE?x:0` folds (P13), and parens on the arming, detonation, p or v expressions (P11). All are byte-inert. A `double` t changes the instruction selection (P2); three field reads reload via aliasing (P3). Only an outer paren around the initial_velocity load reaches January: `(definition->projectile.initial_velocity)` and `((definition)->projectile.initial_velocity)` are all 30 EXACT, and so is `initial_velocity = (definition->projectile.initial_velocity);` passed through a local. `(definition)->...` and `(initial_velocity)` at the call stay residual. HCEX DIA2Dump lists only the enregistered param. The October PDB has publics only. No first-party string or name was found for an accessor macro.
+
+## blockers
+(1) Policy: the only spelling that closes the function is a decoration-only parenthesis around the initial_velocity load, or an inferred macro with no first-party-attested name. Owner ruling 2026-09-21 #4 and the brief's strip test reject it, so this needs an owner ruling. (2) Even if (1) were admitted, whole-object admission is blocked by pre-existing provider-side problems that affect production base equally. provider_link reports SELECTED-PROVIDER LINK FAIL (3) because NODUP hand copies exist for _distance3d (action_vehicle), _real_random (action_charge) and _valid_real_vector3d_axes2 (bored_camera). In addition, surplus _distance3d is not byte-identical to January's selected copy in action_vehicle.obj: they use a different x87 order (fld st(2)/fmulp st(3) against fld st(0)/fmul st(1)). January projectiles.obj references _distance3d as an undefined external.
+
+## reopen_criteria
+Reopen if the owner admits a parenthesised or named accessor at this site. The ready candidate is lab_pfull.c (or lab_localrhsparen.c): it scores all 30 EXACT and object_audit PASS. Also reopen if first-party evidence turns up a macro or expression that wraps the initial_velocity load, for example a later source line or an assert string. For whole-object completion, the provider NODUP copies of _distance3d, _real_random and _valid_real_vector3d_axes2 must also be converted to shared-header inlines (owner decision under the NODUP provider link law), and the _distance3d emitted body must equal action_vehicle's January copy.
+
+## task notes
+No tracked files were edited and no ninja, configure or git-mutating commands were run; only `git apply --check` was used, and it is read-only. The mechanism is new: the x87-versus-integer emission order after an inlined point_from_line3d depends on whether a C parenthesis node wraps the t argument's load. The paren node survives a copy through a local, and it cannot be reached by casts, local-count changes (M8 or name-count) or constant folds. This probably explains the ai_debug `ai_debug_attractor_label_height` precedent too, and similar held paren sites such as collisions.c:1572, players.c:3037 and bipeds.c:4029. The board scan (scratch/w/projectiles/scan_copy.py, output scan_copy.txt) lists 19 January 'COPY,x87,filler' sites against 58 'COPY,filler,x87' sites, which gives a census of where paren-shaped sources may hide. The provider-link failures (3 NODUP providers) and the non-identical surplus _distance3d already exist in production base and block whole-object admission independently of _projectile_new.
+ledger: C:\halo-worktrees\claude-fifty-objects-20260925\scratch\w\projectiles\LEDGER.md

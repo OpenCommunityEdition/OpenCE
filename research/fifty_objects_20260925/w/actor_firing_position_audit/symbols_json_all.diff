@@ -1,0 +1,75 @@
+250,258c250,258
+< { "file_offset": 75280, "flags": 32, "name": "_firing_position_store_evaluation_debug" },
+< { "file_offset": 75360, "flags": 32, "name": "_firing_position_reject" },
+< { "file_offset": 75376, "flags": 32, "name": "_pre_evaluator_guard" },
+< { "file_offset": 75584, "flags": 32, "name": "_pre_evaluator_combatmove" },
+< { "file_offset": 76160, "flags": 32, "name": "_post_evaluator_global" },
+< { "file_offset": 76384, "flags": 32, "name": "_post_evaluator_pursuit" },
+< { "file_offset": 76768, "flags": 32, "name": "_post_evaluator_hide" },
+< { "file_offset": 76992, "flags": 32, "name": "_post_evaluator_uncover" },
+< { "file_offset": 77184, "flags": 32, "name": "_post_evaluator_attack" },
+---
+> { "file_offset": 75280, "flags": 32, "name": "_firing_position_store_evaluation_debug", "static": true },
+> { "file_offset": 75360, "flags": 32, "name": "_firing_position_reject", "static": true },
+> { "file_offset": 75376, "flags": 32, "name": "_pre_evaluator_guard", "static": true },
+> { "file_offset": 75584, "flags": 32, "name": "_pre_evaluator_combatmove", "static": true },
+> { "file_offset": 76160, "flags": 32, "name": "_post_evaluator_global", "static": true },
+> { "file_offset": 76384, "flags": 32, "name": "_post_evaluator_pursuit", "static": true },
+> { "file_offset": 76768, "flags": 32, "name": "_post_evaluator_hide", "static": true },
+> { "file_offset": 76992, "flags": 32, "name": "_post_evaluator_uncover", "static": true },
+> { "file_offset": 77184, "flags": 32, "name": "_post_evaluator_attack", "static": true },
+262c262
+< { "file_offset": 77664, "flags": 32, "name": "_firing_position_compare" },
+---
+> { "file_offset": 77664, "flags": 32, "name": "_firing_position_compare", "static": true },
+267,269c267,269
+< { "file_offset": 78592, "flags": 32, "name": "_pre_evaluator_global" },
+< { "file_offset": 80208, "flags": 32, "name": "_pre_evaluator_pursuit" },
+< { "file_offset": 80672, "flags": 32, "name": "_pre_evaluator_panic" },
+---
+> { "file_offset": 78592, "flags": 32, "name": "_pre_evaluator_global", "static": true },
+> { "file_offset": 80208, "flags": 32, "name": "_pre_evaluator_pursuit", "static": true },
+> { "file_offset": 80672, "flags": 32, "name": "_pre_evaluator_panic", "static": true },
+276c276
+< { "file_offset": 88608, "flags": 32, "name": "_pre_evaluator_attack" },
+---
+> { "file_offset": 88608, "flags": 32, "name": "_pre_evaluator_attack", "static": true },
+2104c2104
+< { "file_offset": 617600, "flags": 32, "name": "_find_closest_player_callback" },
+---
+> { "file_offset": 617600, "flags": 32, "name": "_find_closest_player_callback", "static": true },
+2126c2126
+< { "file_offset": 619872, "flags": 32, "name": "_game_engine_press_start_to_begin" },
+---
+> { "file_offset": 619872, "flags": 32, "name": "_game_engine_press_start_to_begin", "static": true },
+2214c2214
+< { "file_offset": 632448, "flags": 32, "name": "_find_closest_player_index" },
+---
+> { "file_offset": 632448, "flags": 32, "name": "_find_closest_player_index", "static": true },
+2220c2220
+< { "file_offset": 635808, "flags": 32, "name": "_game_engine_update_item_spawn" },
+---
+> { "file_offset": 635808, "flags": 32, "name": "_game_engine_update_item_spawn", "static": true },
+4734c4734
+< { "file_offset": 1113712, "flags": 32, "name": "_animation_is_compressed" },
+---
+> { "file_offset": 1113712, "flags": 32, "name": "_animation_is_compressed", "static": true },
+4746c4746
+< { "file_offset": 1115488, "flags": 32, "name": "_animation_keyframe_search" },
+---
+> { "file_offset": 1115488, "flags": 32, "name": "_animation_keyframe_search", "static": true },
+4750,4752c4750,4752
+< { "file_offset": 1117056, "flags": 32, "name": "_animation_get_keyframe_rotation" },
+< { "file_offset": 1117840, "flags": 32, "name": "_animation_get_keyframe_translation" },
+< { "file_offset": 1118608, "flags": 32, "name": "_animation_get_keyframe_scale" },
+---
+> { "file_offset": 1117056, "flags": 32, "name": "_animation_get_keyframe_rotation", "static": true },
+> { "file_offset": 1117840, "flags": 32, "name": "_animation_get_keyframe_translation", "static": true },
+> { "file_offset": 1118608, "flags": 32, "name": "_animation_get_keyframe_scale", "static": true },
+18157c18157,18160
+< { "file_offset": 2600880, "flags": 0, "name": "_real_math_constants", "static": true },
+---
+> { "file_offset": 2600880, "flags": 0, "name": "_private_identity4x3", "static": true },
+> { "file_offset": 2600932, "flags": 0, "name": "_private_negative_identity4x3", "static": true },
+> { "file_offset": 2600984, "flags": 0, "name": "_private_identity_quaternion", "static": true },
+> { "file_offset": 2601000, "flags": 0, "name": "_private_null_rectangle", "static": true },

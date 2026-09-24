@@ -1,0 +1,66 @@
+--- a/source/models/models.c
++++ b/source/models/models.c
+@@ -55,7 +55,7 @@
+ 0030A390 05f8:
+ 	_render_model_section (0000)
+ 00456650 0088:
+-	_default_function_values (0000)
++	?default_function_values@?1??render_model@@9@9 (0000)
+ 	_default_render_model_change_colors (0000)
+ 	_default_render_model_effect (0000)
+ 	_default_render_model_region_permutation_indices (0000)
+@@ -270,6 +270,8 @@
+ 	short geometry_detail_level_index,
+ 	short forced_shader_permutation_index,
+ 	long flags);
++static void model_geometry_part_build_tangent_matrices(
++	struct model_geometry_part *part);
+ 
+ /* ---------- globals */
+ 
+@@ -282,12 +284,11 @@
+ extern boolean render_model_index_counts;
+ extern boolean render_model_no_geometry;
+ 
+-static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
+-static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL];
+-static struct render_model_effect default_render_model_effect;
+-static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
++static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL] = {0};
++static struct render_model_effect default_render_model_effect = {0};
++static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL] = {0};
+ 
+-struct profile_section render_model_section = { "render_model", NONE, TRUE };
++static struct profile_section render_model_section = { "render_model", NONE, TRUE };
+ 
+ /* ---------- private code */
+ 
+@@ -740,17 +741,17 @@
+ 
+ 		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+ 		{
+-			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(
++			model_geometry_part_build_tangent_matrices(TAG_BLOCK_GET_ELEMENT(
+ 				&geometry->parts,
+ 				part_index,
+-				struct model_geometry_part);
++				struct model_geometry_part));
+ 		}
+ 	}
+ 
+ 	return;
+ }
+ 
+-void model_geometry_part_build_tangent_matrices(
++static void model_geometry_part_build_tangent_matrices(
+ 	struct model_geometry_part *part)
+ {
+ 	return;
+@@ -771,6 +772,7 @@
+ 	short forced_shader_permutation_index,
+ 	unsigned long flags)
+ {
++	static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
+ 	struct model *model = model_definition_get(model_index);
+ 
+ 	profile_enter(render_model_section);

@@ -1,0 +1,33 @@
+APPLY ORDER - owner_queue/objlights_render_debug (base cdc8ebd3; every patch is LF, git apply --check clean at
+cdc8ebd3 alone and in the sets below; sequential `git apply` in an autocrlf=true checkout reproduces the measured
+trees byte-for-byte)
+
+ITEM 1 - object_lights
+  01_object_lights_static_helpers.patch            ruling-independent (zero credit): data_gap packet rebased (+4 line
+                                                   offset only). should_render_lights/light_attenuation/
+                                                   cluster_get_first_light/cluster_get_next_light static; the /Od-attested
+                                                   should_render_lights() call in lights_render_diffuse/_specular; the
+                                                   static's prototype leaves object_lights_rendering.h.
+  02_object_lights_symbols_json.patch              ruling-independent, MUST land with 01: 4 x "static": true (in-place).
+                                                   Full edited copy: ./symbols.json (== cfg_OL/symbols.json).
+  if Q1 = YES:
+    03_YES_object_lights_semantic_data_entry.patch _lights_section single-section entry (no allow_incomplete_unit)
+    04_YES_object_lights_status_matching.patch     config.json object_lights NonMatching -> Matching
+  if Q1 = NO (optional data-only credit):
+    03_NO_ALT_object_lights_semantic_data_entry_incomplete.patch   same entry with "allow_incomplete_unit": true
+  optional, independent of Q1 (see RULING (e)):
+    07_OPTIONAL_E_object_lights_tentative_globals.patch   after 01 (touches a different hunk of object_lights.c)
+
+ITEM 2 - render_debug
+  05_render_debug_genuine_helpers_and_vehicle.patch     = review_admit2 patch (a)-(c), unchanged; ruling-independent
+                                                        (zero credit, house-rule cleanup; new _point_from_line3d COMDAT
+                                                        meets the rule-6 exception conditions - see MEASURED.md)
+  06_OPTIONAL_E_render_debug_tentative_debug_toggles.patch   after 05; (e) resolution, evidence-determined
+  08_IF_D_RULED_render_debug_status_matching.patch     ONLY after an owner yes on (d) (D0 or D1)
+  if (d) = D1 (separate statics): lab/D1_OPTION_render_debug_separate_statics.patch (after 05 AND 06) and
+                                  lab/D1_OPTION_symbols_json.patch (independent of 02), then 08.
+     NOTE: a single `git apply --check 05 06 D1` invocation at the repo root reports a spurious failure at
+     render_debug.c:248 (multi-patch same-path chaining under core.autocrlf); applying the patches one call at a
+     time is clean (verified in an autocrlf=true throwaway repo and in --directory shadow trees).
+
+Recommended full YES set (both items):  01 02 03_YES 04_YES 05 06 07 08 [+ lab D1 pair before 08 if D1]

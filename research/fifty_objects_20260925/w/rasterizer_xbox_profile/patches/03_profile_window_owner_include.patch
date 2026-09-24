@@ -1,0 +1,41 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_profile.c b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+index 5b9de7714c7c1e22e7cfa2fe9fe1a25606854877..66ff4f29b6f4b78d9da33205cae88b30c2780011 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_profile.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+@@ -117,9 +117,17 @@ symbols in this file:
+ 00292370 001e:
+ 	??_C@_0BO@KDABKJGE@profile?5not?5completed?5?$CIquery?$CJ?$AA@ (0000)
+ 0030CF00 0084:
+-	_rasterizer_profile_globals (0000)
++	_rasterizer_profile_performance_counter_frequency (0000)
++	_rasterizer_profile_globals (0008)
+ 00465E28 0462:
+-	_bss_00465e28 (0000)
++	_rasterizer_profile_callback_elapsed_times (0000)
++	_rasterizer_profile_callback_end_times (0080)
++	_rasterizer_profile_elapsed_state (0100)
++	_rasterizer_profile_start_times (0350)
++	_rasterizer_profile_frame_state (0438)
++	_local_profile_enable (0450)
++	_rasterizer_profile_state (0454)
++	_rasterizer_profile_error_count (0460)
+ */
+ 
+ /* ---------- headers */
+@@ -133,6 +141,7 @@ symbols in this file:
+ #include <xtl.h>
+ 
+ #include "rasterizer_xbox.h"
++#include "rasterizer_xbox_internal.h"
+ 
+ /* ---------- constants */
+ 
+@@ -235,8 +244,6 @@ static void rasterizer_profile_frame_callback(
+ 
+ /* ---------- globals */
+ 
+-extern struct rasterizer_window_begin_parameters global_window_parameters;
+-
+ static LARGE_INTEGER rasterizer_profile_performance_counter_frequency = { 1 };
+ static struct rasterizer_profile_globals rasterizer_profile_globals =
+ {

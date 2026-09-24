@@ -1,0 +1,28 @@
+diff --git a/config/semantic_matches.json b/config/semantic_matches.json
+index 4a6a3acb..dcf63f31 100644
+--- a/config/semantic_matches.json
++++ b/config/semantic_matches.json
+@@ -583,5 +583,23 @@
+     "unit": "source/interface/ui_widget",
+     "function": "_remap_sticks_for_local_player",
+     "reason": "hardened COFF comparison proves all 304 padded bytes and all 31 semantic relocations exact (SHA-256 963b6756ac2f3b70faf18955bad37bac6ed40bbe366baa697feccc61e7050ce8); objdiff reports a control-flow pairing false negative after the natural switch assigns the remapped icon and reaches the shared return"
++  },
++  {
++    "unit": "source/units/units",
++    "function": "$L7451",
++    "owner_function": "_unit_animation_busy",
++    "reason": "the exact owning COMDAT and an internal relocation prove this differently named jump-table label is the same destination"
++  },
++  {
++    "unit": "source/units/units",
++    "function": "$L7450",
++    "owner_function": "_unit_animation_busy",
++    "reason": "the exact owning COMDAT and an internal relocation prove this differently named jump-table label is the same destination"
++  },
++  {
++    "unit": "source/units/units",
++    "function": "$L8061",
++    "owner_function": "_unit_update",
++    "reason": "the exact owning COMDAT and an internal relocation prove this differently named jump-table label is the same destination"
+   }
+ ]

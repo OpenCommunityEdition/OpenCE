@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index b8a7789b17b4006ff88ad701243708b73d7062b9..c7296ddaedefad24160b7635cf38594be358fbbb 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -536,7 +536,7 @@
+ 				{ "name": "source/objects/widgets/light_volumes.c", "index": 161, "status": "Matching" },
+ 				{ "name": "source/objects/widgets/light_volume_definitions.c", "index": 162, "status": "Matching" },
+ 				{ "name": "source/objects/widgets/glow_definitions.c", "index": 163, "status": "Matching" },
+-				{ "name": "source/objects/widgets/glow.c", "index": 164, "status": "NonMatching" },
++				{ "name": "source/objects/widgets/glow.c", "index": 164, "status": "Matching" },
+ 				{ "name": "source/objects/widgets/flags.c", "index": 165, "status": "NonMatching" },
+ 				{ "name": "source/objects/widgets/flag_definitions.c", "index": 166, "status": "Matching" },
+ 				{ "name": "source/objects/widgets/cellular_automata2d.c", "index": 167, "status": "Matching" },

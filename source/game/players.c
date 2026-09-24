@@ -427,9 +427,10 @@ static void player_teleport_on_bsp_switch(
 
 /* ---------- globals */
 
+struct players_globals *players_globals;
+struct data_array *team_data;
 struct data_array *player_data;
-extern struct data_array *team_data;
-long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
+static long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
 static boolean players_lost_map_started = FALSE;
 static short over_shield_screen_flash_fade_function = 0;
 static real over_shield_screen_flash_alpha = 0.f;
@@ -437,9 +438,8 @@ static real over_shield_screen_flash_green = 0.f;
 static short active_camo_screen_flash_fade_function = 0;
 static real active_camo_screen_flash_alpha = 0.f;
 static real active_camo_screen_flash_blue = 0.f;
-extern short player_spawn_count;
 boolean debug_render_player_teleport = FALSE;
-struct players_static_data players_static_data =
+static struct players_static_data players_static_data =
 {
 	{ "players_update_before_game", NONE, TRUE },
 	{ "players_update_after_game", NONE, TRUE },
@@ -2693,8 +2693,6 @@ static void player_set_action_result(
 	real_point3d const *unit_position;
 	real_point3d const *current_position;
 	real_point3d const *new_position;
-	real current_distance;
-	real new_distance;
 	boolean set_action = FALSE;
 
 	player = player_get(player_index);
@@ -2708,13 +2706,8 @@ static void player_set_action_result(
 		current_position =
 			&object_get(player->action_object_index)->object.position;
 		new_position = &object_get(object_index)->object.position;
-		current_distance = distance3d(
-			unit_position,
-			current_position);
-		new_distance = distance3d(
-			unit_position,
-			new_position);
-		set_action = current_distance > new_distance;
+		set_action = distance3d(unit_position, current_position) >
+			distance3d(unit_position, new_position);
 	}
 	else if (action_result > player->action_result)
 	{

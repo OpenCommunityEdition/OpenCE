@@ -93,8 +93,6 @@ enum
 	MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH = 16,
 	NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES = 8,
 	NUMBER_OF_WEAPON_HUD_CROSSHAIR_STATES = 19,
-	HUD_WEAPON_STACK_BUFFER_LENGTH = 0x80,
-	HUD_WEAPON_STACK_BUFFER_FILL = 0x62626262,
 };
 
 enum weapon_crosshair_type
@@ -178,24 +176,6 @@ enum
 };
 
 /* ---------- macros */
-
-#define hud_weapon_stack_buffer_check(line) \
-{ \
-	short corrupt_index; \
-	short buffer_index; \
-	for (buffer_index = HUD_WEAPON_STACK_BUFFER_LENGTH - 1; buffer_index >= 0; buffer_index--) \
-	{ \
-		if (stack_buffer[buffer_index] != HUD_WEAPON_STACK_BUFFER_FILL) \
-			goto corrupt_stack_found; \
-	} \
-	corrupt_index = NONE; \
-	goto stack_buffer_checked; \
-corrupt_stack_found: \
-	corrupt_index = buffer_index; \
-stack_buffer_checked: \
-	match_vassert("c:\\halo\\SOURCE\\interface\\hud_weapon.c", line, return_eip == get_return_eip(), "corrupt return address!"); \
-	match_vassert("c:\\halo\\SOURCE\\interface\\hud_weapon.c", line, corrupt_index == NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
-}
 
 #define grenade_hud_interface_definition_get(index) \
 	((struct grenade_hud_interface_definition *)tag_get( \
@@ -583,7 +563,7 @@ static void render_grenade_hud(
 	long unit_index)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct unit_datum *unit;
 	long weapon_index;
 	long parent_index;
@@ -711,7 +691,7 @@ static void render_grenade_hud(
 	}
 
 finished:
-	hud_weapon_stack_buffer_check(0x3A2);
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x3A2);
 	return;
 }
 
@@ -722,7 +702,7 @@ static void hud_update_weapon_local_player(
 	struct weapon_interface_state *weapon_state)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct crosshair_hud_state *crosshair;
@@ -1008,7 +988,7 @@ static void hud_update_weapon_local_player(
 	}
 
 finished:
-	hud_weapon_stack_buffer_check(0x19E);
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x19E);
 	return;
 }
 
@@ -1019,7 +999,7 @@ static void crosshairs_draw(
 	struct weapon_interface_state *weapon_state)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	boolean firing_active = FALSE;
 
 	csmemset(
@@ -1327,7 +1307,7 @@ static void crosshairs_draw(
 		}
 	}
 
-	hud_weapon_stack_buffer_check(0x4E2);
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x4E2);
 	return;
 }
 
@@ -1341,7 +1321,7 @@ static void render_weapon_hud(
 	short const *new_numbers)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct weapon_hud_interface_definition *definition;
 	struct weapon_hud_state *hud_state;
 	short state_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
@@ -1827,7 +1807,7 @@ static void render_weapon_hud(
 		}
 	}
 
-	hud_weapon_stack_buffer_check(0x308);
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x308);
 	return;
 }
 
@@ -1856,7 +1836,7 @@ void hud_update_weapon(
 	void)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	short local_player_index;
 
 	csmemset(
@@ -1944,7 +1924,7 @@ void hud_update_weapon(
 		}
 	}
 
-	hud_weapon_stack_buffer_check(0xD4);
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0xD4);
 
 	return;
 }

@@ -1,0 +1,165 @@
+diff --git a/source/cache/xbox_sound_cache.c b/source/cache/xbox_sound_cache.c
+index fd7b7224..980e4ecf 100644
+--- a/source/cache/xbox_sound_cache.c
++++ b/source/cache/xbox_sound_cache.c
+@@ -109,6 +109,11 @@ symbols in this file:
+ 
+ /* ---------- constants */
+ 
++enum
++{
++	XBOX_SOUND_CACHE_PAGE_COUNT = 1024
++};
++
+ /* ---------- macros */
+ 
+ #define cache_block_index unknown0
+@@ -182,9 +187,9 @@ typedef char verify_xbox_sound_cache_globals_size[
+ 
+ /* ---------- prototypes */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index);
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index);
+ 
+ /* ---------- globals */
+@@ -192,7 +197,7 @@ void sound_cache_delete_block_proc(
+ extern short assertion_count;
+ extern boolean debug_sound_cache;
+ extern boolean debug_sound_reference_counts;
+-struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
++static struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -367,7 +372,7 @@ void sound_cache_new(
+ 		"xbox_sound_cache_globals.cache_sounds");
+ 	xbox_sound_cache_globals.cache = lruv_new(
+ 		"xbox sound cache",
+-		1024,
++		XBOX_SOUND_CACHE_PAGE_COUNT,
+ 		12,
+ 		512,
+ 		sound_cache_delete_block_proc,
+@@ -425,7 +430,7 @@ void sound_cache_close(
+ 
+ /* ---------- private code */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -441,7 +446,7 @@ long sound_cache_locked_block_proc(
+ 	return TRUE;
+ }
+ 
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -468,7 +473,7 @@ void sound_cache_delete_block_proc(
+ 	return;
+ }
+ 
+-const char *sound_cache_debug_block_name(
++static const char *sound_cache_debug_block_name(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -666,59 +671,55 @@ static void render_inverse_transform_screen_point(
+ void sound_cache_debug_render(
+ 	void)
+ {
+-	byte page_usage[1024];
+-	real_point3d world_positions[2];
+-	real_point2d screen_positions[2];
+-	real_argb_color const *colors[4];
+-	real_vector3d world_vector;
+-	long page_index;
+-	long state_index;
+-
+ 	if (debug_sound_cache)
+ 	{
++		short rows = XBOX_SOUND_CACHE_PAGE_COUNT / 640;
++		byte page_usage[XBOX_SOUND_CACHE_PAGE_COUNT];
++		long x;
++		real_argb_color const *colors[4];
++
+ 		colors[0] = global_real_argb_red;
+ 		colors[1] = global_real_argb_green;
+ 		colors[2] = global_real_argb_blue;
+ 		colors[3] = global_real_argb_yellow;
+-
+ 		lruv_cache_get_page_usage(xbox_sound_cache_globals.cache, page_usage);
+ 
+-		for (page_index = 0; page_index < 640; page_index++)
++		for (x = 0; x < 640; x++)
+ 		{
+-			for (state_index = 0; state_index < 4; state_index++)
++			short page_index = rows * x;
++			long bit;
++
++			for (bit = 0; bit < 4; bit++)
+ 			{
+-				if (page_usage[(short)page_index] & FLAG(state_index))
++				if (TEST_FLAG(page_usage[page_index], bit))
+ 				{
+-					long row;
+-					long point_index;
+-					real distance;
+-					real scale;
+-
+-					row = (state_index + (page_index / 640) * 4) * 10;
+-					screen_positions[0].x =
+-						screen_positions[1].x = (real)(page_index % 640);
+-					screen_positions[0].y = (real)row;
+-					screen_positions[1].y = (real)(row + 10);
+-					distance = render.camera.z_near + 0.001f;
+-
+-					for (point_index = 0; point_index < 2; point_index++)
++					real_point3d extent[2];
++					real_point2d line_pt[2];
++					long i;
++					real_vector3d vec;
++
++					line_pt[0].x = (real)(x % 640);
++					line_pt[0].y = (real)((bit + (x / 640) * 4) * 10);
++					line_pt[1].x = (real)(x % 640);
++					line_pt[1].y = (real)((bit + (x / 640) * 4 + 1) * 10);
++					for (i = 0; i < 2; i++)
+ 					{
+ 						render_inverse_transform_screen_point(
+-							&screen_positions[point_index],
+-							&world_positions[point_index],
+-							&world_vector);
+-						scale = distance /
+-							dot_product3d(&render.camera.forward, &world_vector);
+-						world_positions[point_index].x += world_vector.i * scale;
+-						world_positions[point_index].y += world_vector.j * scale;
+-						world_positions[point_index].z += world_vector.k * scale;
++							&line_pt[i],
++							&extent[i],
++							&vec);
++						point_from_line3d(
++							&extent[i],
++							&vec,
++							(render.camera.z_near + 0.001f) / dot_product3d(&vec, &render.camera.forward),
++							&extent[i]);
+ 					}
+ 
+ 					render_debug_line(
+ 						TRUE,
+-						&world_positions[0],
+-						&world_positions[1],
+-						colors[state_index]);
++						&extent[0],
++						&extent[1],
++						colors[bit]);
+ 				}
+ 			}
+ 		}

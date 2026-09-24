@@ -1,0 +1,11 @@
+--- a/config/config.json
++++ b/config/config.json
+@@ -555,7 +555,7 @@
+ 				{ "name": "source/networking/network_connection.c", "index": 180, "status": "NonMatching" },
+ 				{ "name": "source/networking/network_client_message_handler.c", "index": 181, "status": "Matching" },
+ 				{ "name": "source/networking/network_client_manager.c", "index": 182, "status": "Matching" },
+-				{ "name": "source/models/models.c", "index": 183, "status": "NonMatching" },
++				{ "name": "source/models/models.c", "index": 183, "status": "Matching" },
+ 				{ "name": "source/models/model_definitions.c", "index": 184, "status": "Matching" },
+ 				{ "name": "source/models/model_animations.c", "index": 185, "status": "Matching" },
+ 				{ "name": "source/models/model_animation_definitions.c", "index": 186, "status": "Matching" },

@@ -1,0 +1,18 @@
+--- a/config/symbols.json	2026-09-23 19:56:42.698630300 -0700
++++ b/config/symbols.json	2026-09-23 19:56:42.758654800 -0700
+@@ -3532,12 +3532,12 @@
+ { "file_offset": 844240, "flags": 32, "name": "_interface_get_tag_index" },
+ { "file_offset": 844368, "flags": 32, "name": "_interface_get_real_argb_color" },
+ { "file_offset": 844496, "flags": 32, "name": "_interface_set_bitmap_text_draw_mode" },
+-{ "file_offset": 844576, "flags": 32, "name": "_interface_get_weapon_hud_index" },
++{ "file_offset": 844576, "flags": 32, "name": "_interface_get_weapon_hud_index", "static": true },
+ { "file_offset": 845024, "flags": 32, "name": "_interface_draw_screen" },
+ { "file_offset": 845952, "flags": 32, "name": "_profile_graph_toggle" },
+ { "file_offset": 846080, "flags": 32, "name": "_render_debug_profile_stall_tick", "static": true },
+-{ "file_offset": 846352, "flags": 32, "name": "_render_debug_profile" },
+-{ "file_offset": 848624, "flags": 32, "name": "_interface_splitscreen_render" },
++{ "file_offset": 846352, "flags": 32, "name": "_render_debug_profile", "static": true },
++{ "file_offset": 848624, "flags": 32, "name": "_interface_splitscreen_render", "static": true },
+ { "file_offset": 848848, "flags": 32, "name": "_interface_initialize_for_new_map" },
+ { "file_offset": 848944, "flags": 32, "name": "_interface_get_rgb_color" },
+ { "file_offset": 849056, "flags": 32, "name": "_interface_draw_fullscreen_overlays" },

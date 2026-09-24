@@ -1,0 +1,41 @@
+diff --git a/source/cseries/profile.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\profile\\final.c"
+index cf7f2229..cd17aa33 100644
+--- a/source/cseries/profile.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\profile\\final.c"
+@@ -1589,7 +1589,7 @@ int compare_profile_sections(
+ {
+ 	struct profile_section *const *first = (struct profile_section *const *)section0;
+ 	struct profile_section *const *second = (struct profile_section *const *)section1;
+-	int result = 0;
++	int result;
+ 
+ 	if ((*first)->active && !(*second)->active)
+ 	{
+@@ -1620,6 +1620,8 @@ int compare_profile_sections(
+ 					result = -1;
+ 				else if (first_average<second_average)
+ 					result = 1;
++				else
++					result = 0;
+ 				break;
+ 			}
+ 
+@@ -1628,9 +1630,18 @@ int compare_profile_sections(
+ 					result = -1;
+ 				else if ((*first)->recent_elapsed_timebase<(*second)->recent_elapsed_timebase)
+ 					result = 1;
++				else
++					result = 0;
+ 				break;
+ 
+ 			default:
++				/* BUG (preserved for exact matching): an invalid compare_type leaves
++				 * result unassigned. January relies on the fatal assertion (system_exit
++				 * does not return); if it did, the epilogue would return the stale
++				 * first-parameter home ([ebp+8]). The first-party /Od+/RTC build attests
++				 * the uninitialised declaration with _RTC_UninitUse("result").
++				 * A corrected build should set result to 0 here.
++				 */
+ 				match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 844, !"unreachable");
+ 				break;
+ 		}

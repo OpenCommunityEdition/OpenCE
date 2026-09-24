@@ -51,6 +51,9 @@ symbols in this file:
 
 /* ---------- macros */
 
+#define light_volume_get(light_volume_index) \
+	((struct light_volume_datum *)datum_get(light_volume_globals.light_volume_data, (light_volume_index)))
+
 /* ---------- prototypes */
 
 static struct light_volume_frame *light_volume_interpolate_frames(
@@ -62,7 +65,7 @@ static real pow1(
 
 /* ---------- globals */
 
-struct light_volume_globals light_volume_globals = {0};
+static struct light_volume_globals light_volume_globals = {0};
 
 /* ---------- public code */
 
@@ -218,78 +221,57 @@ static real pow1(
 	real value,
 	real exponent)
 {
-	if (exponent != 1.f)
-		value = power(value, exponent);
-
-	return value;
+	return exponent != 1.f ? pow(value, exponent) : value;
 }
 
 void light_volume_render(
 	long object_index,
 	long light_volume_index)
 {
-	struct light_volume_datum *light_volume;
-	struct light_volume_definition *definition;
-	struct light_volume_frame *frame;
-	struct object_marker marker;
-	real_point3d delta;
-	real parallel_factor;
-	real angle_brightness;
-	real intensity;
-
 	if (object_index != NONE && light_volume_index != NONE)
 	{
-		light_volume = light_volume_get(light_volume_index);
-		definition = light_volume_definition_get(light_volume->definition_index);
+		struct light_volume_datum *light_volume = light_volume_get(light_volume_index);
+		struct light_volume_definition *definition = light_volume_definition_get(light_volume->definition_index);
+
 		if (definition->count > 0 && definition->frames.count > 0)
 		{
-			real distance_fade = 1.f;
+			struct light_volume_frame *frame = light_volume_interpolate_frames(definition, object_index);
+			struct object_marker marker;
+			real_vector3d eye_to_marker_vector;
+			real brightness;
+			real parallel_factor;
 
-			frame = light_volume_interpolate_frames(definition, object_index);
 			object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
-			delta.x = marker.matrix.position.x - render.camera.position.x;
-			delta.y = marker.matrix.position.y - render.camera.position.y;
-			delta.z = marker.matrix.position.z - render.camera.position.z;
-
-			parallel_factor =
-				marker.matrix.forward.i * render.camera.forward.i +
-				(render.camera.forward.j * marker.matrix.forward.j +
-				render.camera.forward.k * marker.matrix.forward.k);
-			parallel_factor = ABS(parallel_factor);
-
-			if (definition->far_fade_distance > 0.f)
+			brightness = 1.f;
+			vector_from_points3d(&render.camera.position, &marker.matrix.position, &eye_to_marker_vector);
+			parallel_factor = ABS(dot_product3d(&render.camera.forward, &marker.matrix.forward));
 			{
-				real depth =
-					delta.x * render.camera.forward.i +
-					(render.camera.forward.j * delta.y +
-					render.camera.forward.k * delta.z);
-				real fade =
-					(depth - definition->far_fade_distance) /
-					(definition->near_fade_distance - definition->far_fade_distance);
+				real external_scale = 1.f;
 
-				distance_fade = PIN(fade, 0.f, 1.f);
-			}
-
-			angle_brightness =
-				definition->perpendicular_brightness_scale * (1.f - parallel_factor) +
-				definition->parallel_brightness_scale * parallel_factor;
-			angle_brightness = PIN(angle_brightness, 0.f, 1.f);
-
-			intensity = angle_brightness * distance_fade;
-			{
-				real function_value;
-
-				if (object_get_function_value(object_index, definition->brightness_scale_source - 1, &function_value))
-					intensity *= function_value;
+				if (definition->far_fade_distance > 0.f)
+				{
+					brightness *= PIN(
+						(dot_product3d(&render.camera.forward, &eye_to_marker_vector) - definition->far_fade_distance) /
+						(definition->near_fade_distance - definition->far_fade_distance),
+						0.f,
+						1.f);
+				}
+				brightness *= PIN(
+					(1.f - parallel_factor) * definition->perpendicular_brightness_scale +
+					parallel_factor * definition->parallel_brightness_scale,
+					0.f,
+					1.f);
+				if (object_get_function_value(object_index, definition->brightness_scale_source - 1, &external_scale))
+					brightness *= external_scale;
 			}
 
 			if (
-				intensity > 0.f &&
+				brightness > 0.f &&
 				(frame->color_hither.alpha > 0.f || frame->color_yon.alpha > 0.f) &&
 				(frame->radius_hither > 0.f || frame->radius_yon > 0.f))
 			{
 				short count;
-				long sprite_index;
+				short sprite_index;
 
 				rasterizer_widget_begin(
 					_widget_type_internal_sprite,
@@ -299,62 +281,39 @@ void light_volume_render(
 					definition->map.index,
 					definition->sequence_index);
 				count = definition->count;
-				if (count > 0)
+				for (sprite_index = 0; sprite_index < count; sprite_index++)
 				{
-					sprite_index = 0;
-					do
-					{
-						real offset_fraction;
-						real radius_fraction;
-						real color_fraction;
-						real brightness_fraction;
-						real radius;
-						real offset;
-						real_argb_color color;
-						real_point3d position;
+					real offset_fraction = pow1((real)sprite_index / (real)(count - 1), frame->offset_exponent);
+					real_point3d position;
+					real radius_fraction = pow1(offset_fraction, frame->radius_exponent);
+					real radius = (1.f - radius_fraction) * frame->radius_hither + frame->radius_yon * radius_fraction;
+					real color_fraction = pow1(offset_fraction, frame->color_exponent);
+					real brightness_fraction = pow1(offset_fraction, frame->brightness_exponent);
+					real_argb_color color;
 
-						offset_fraction = (real)sprite_index / (real)(definition->count - 1);
-						offset_fraction = pow1(
-							offset_fraction,
-							frame->offset_exponent);
-						radius_fraction = pow1(
-							offset_fraction,
-							frame->radius_exponent);
-						radius =
-							(1.f - radius_fraction) * frame->radius_hither +
-							frame->radius_yon * radius_fraction;
-						color_fraction = pow1(
-							offset_fraction,
-							frame->color_exponent);
-						brightness_fraction = pow1(
-							offset_fraction,
-							frame->brightness_exponent);
-
-						offset = frame->length * offset_fraction + frame->offset_from_marker;
-						position.x = marker.matrix.forward.i * offset + marker.matrix.position.x;
-						position.y = marker.matrix.forward.j * offset + marker.matrix.position.y;
-						position.z = marker.matrix.forward.k * offset + marker.matrix.position.z;
-
-						rgb_colors_interpolate(
-							&color.rgb,
-							definition->flags &
-								(FLAG(_light_volume_color_interpolate_in_hsv_bit) |
-								 FLAG(_light_volume_color_interpolate_along_farthest_hue_path_bit)),
-							&frame->color_hither.rgb,
-							&frame->color_yon.rgb,
-							color_fraction);
-						color.alpha =
-							((1.f - brightness_fraction) * frame->color_hither.alpha +
-							frame->color_yon.alpha * brightness_fraction) * intensity;
-						rasterizer_widget_draw_sprite3d(
-							&position,
-							radius,
-							NULL,
-							0.0f,
-							real_argb_color_to_pixel32(&color));
-						sprite_index++;
-					}
-					while (--count);
+					point_from_line3d(
+						&marker.matrix.position,
+						&marker.matrix.forward,
+						offset_fraction * frame->length + frame->offset_from_marker,
+						&position);
+					rgb_colors_interpolate(
+						&color.rgb,
+						definition->flags &
+							(FLAG(_light_volume_color_interpolate_in_hsv_bit) |
+							 FLAG(_light_volume_color_interpolate_along_farthest_hue_path_bit)),
+						&frame->color_hither.rgb,
+						&frame->color_yon.rgb,
+						color_fraction);
+					color.alpha =
+						(1.f - brightness_fraction) * frame->color_hither.alpha +
+						frame->color_yon.alpha * brightness_fraction;
+					color.alpha *= brightness;
+					rasterizer_widget_draw_sprite3d(
+						&position,
+						radius,
+						NULL,
+						0.0f,
+						real_argb_color_to_pixel32(&color));
 				}
 				rasterizer_widget_end();
 			}

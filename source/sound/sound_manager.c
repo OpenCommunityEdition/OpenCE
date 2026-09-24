@@ -222,6 +222,7 @@ symbols in this file:
 #include "errors.h"
 #include "data.h"
 #include "cseries/profile.h"
+#include "cseries/cseries_windows.h"
 #include "cache/sound_cache.h"
 #include "math/real_math.h"
 #include "sound_manager.h"
@@ -577,11 +578,6 @@ typedef char verify_sound_manager_channel_count_offset[
 
 /* ---------- prototypes */
 
-long game_time_get(
-	void);
-unsigned long system_milliseconds(
-	void);
-
 static void sound_update_time(
 	void);
 static void detail_sound_random_offset(
@@ -733,7 +729,7 @@ struct sound_platform_definition *platform_definitions[2] =
 static struct profile_section sound_render_section =
 	{"sound_render", NONE, TRUE};
 real sound_fade_exponent = 2.5f;
-struct sound_manager_globals sound_manager_globals = { 0 };
+static struct sound_manager_globals sound_manager_globals = { 0 };
 
 /* ---------- public code */
 
@@ -1471,7 +1467,7 @@ static void sound_set_definition_end(
 	sound->pitch_range_index = sound_definition_find_pitch_range_by_pitch(
 		definition,
 		sound->pitch,
-		(word)sound->pitch_range_index);
+		sound->pitch_range_index);
 	sound->permutation_index = sound_definition_next_permutation(
 		definition,
 		sound->pitch_range_index,
@@ -2872,7 +2868,7 @@ static void update_channel_for_looping_sound(
 			sound_definition_find_pitch_range_by_pitch(
 				definition,
 				pitch,
-				(word)sound->pitch_range_index) != sound->pitch_range_index &&
+				sound->pitch_range_index) != sound->pitch_range_index &&
 			channel->sound_index == *primary_sound_index &&
 			!sound_manager_globals.idling)
 		{
@@ -2895,17 +2891,19 @@ static void update_channel_for_looping_sound(
 
 		if (sound->type != _sound_stop_track &&
 			(sound->type != _sound_start_track ||
-				!TEST_FLAG(track->flags, _fade_in_at_start_bit)) &&
-			(channel_get_state(sound->playing_channel_index) !=
-					_sound_channel_queued ||
-				TEST_FLAG(sound->flags, _sound_waiting_for_cache_bit) ||
-				(channel->playing_permutation->next_permutation_index == NONE &&
-					sound->next_definition_index != NONE)))
+				!TEST_FLAG(track->flags, _fade_in_at_start_bit)))
 		{
-			if (sound->next_definition_index != NONE)
+			short channel_state = channel_get_state(sound->playing_channel_index);
+
+			if (channel_state != _sound_channel_queued ||
+				TEST_FLAG(sound->flags, _sound_waiting_for_cache_bit) ||
+				(channel_state == _sound_channel_queued &&
+					channel->playing_permutation->next_permutation_index == NONE &&
+					sound->next_definition_index != NONE))
 			{
-				if (!channel->playing_permutation ||
-					channel->playing_permutation->next_permutation_index == NONE)
+				if (sound->next_definition_index != NONE &&
+					(!channel->playing_permutation ||
+						channel->playing_permutation->next_permutation_index == NONE))
 				{
 					sound_set_definition_end(channel->sound_index);
 					definition = sound_definition_get(sound->definition_index);
@@ -2914,70 +2912,70 @@ static void update_channel_for_looping_sound(
 						sound->pitch_range_index,
 						struct sound_pitch_range);
 				}
-			}
-			else if (!TEST_FLAG(sound->flags, _sound_waiting_for_cache_bit))
-			{
-				short permutation_index = sound_definition_next_permutation(
-					definition,
-					sound->pitch_range_index,
-					sound->permutation_index);
-
-				if (permutation_index == NONE)
+				else if (!TEST_FLAG(sound->flags, _sound_waiting_for_cache_bit))
 				{
-					match_assert(
-						"c:\\halo\\SOURCE\\sound\\sound_manager.c",
-						0xA1C,
-						TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit));
+					short permutation_index = sound_definition_next_permutation(
+						definition,
+						sound->pitch_range_index,
+						sound->permutation_index);
 
-					if (!TEST_FLAG(
-						looping_definition->flags,
-						_looping_sound_fake_impulse_sound_bit))
+					if (permutation_index == NONE)
 					{
-						permutation_index = sound_definition_next_permutation(
-							definition,
-							sound->pitch_range_index,
-							NONE);
-					}
-					else
-					{
-						sound->type = _sound_stop_track;
-						looping_sound->ordered_sounds_finished = TRUE;
-					}
-				}
+						match_assert(
+							"c:\\halo\\SOURCE\\sound\\sound_manager.c",
+							0xA1C,
+							TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit));
 
-				if (permutation_index != NONE)
-				{
-					sound->permutation_index = permutation_index;
-					SET_FLAG(sound->flags, _sound_waiting_for_cache_bit, TRUE);
-				}
-			}
-
-			{
-				struct sound_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
-					&pitch_range->permutations,
-					sound->permutation_index,
-					struct sound_permutation);
-
-				if (sound->type != _sound_stop_track &&
-					_sound_cache_sound_request(
-						permutation,
-						FALSE,
-						TRUE,
-						TRUE))
-				{
-					SET_FLAG(sound->flags, _sound_waiting_for_cache_bit, FALSE);
-					channel_queue_sound(channel_index, permutation);
-
-					if (sound->next_definition_index == NONE &&
-						permutation->next_permutation_index == NONE)
-					{
-						if (sound->type == _sound_start_track)
+						if (!TEST_FLAG(
+							looping_definition->flags,
+							_looping_sound_fake_impulse_sound_bit))
 						{
-							sound->type = _sound_loop_track;
+							permutation_index = sound_definition_next_permutation(
+								definition,
+								sound->pitch_range_index,
+								NONE);
 						}
-						else if (sound->type == _sound_stopping_track)
+						else
 						{
 							sound->type = _sound_stop_track;
+							looping_sound->ordered_sounds_finished = TRUE;
+						}
+					}
+
+					if (permutation_index != NONE)
+					{
+						sound->permutation_index = permutation_index;
+						SET_FLAG(sound->flags, _sound_waiting_for_cache_bit, TRUE);
+					}
+				}
+
+				{
+					struct sound_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
+						&pitch_range->permutations,
+						sound->permutation_index,
+						struct sound_permutation);
+
+					if (sound->type != _sound_stop_track &&
+						_sound_cache_sound_request(
+							permutation,
+							FALSE,
+							TRUE,
+							TRUE))
+					{
+						SET_FLAG(sound->flags, _sound_waiting_for_cache_bit, FALSE);
+						channel_queue_sound(channel_index, permutation);
+
+						if (sound->next_definition_index == NONE &&
+							permutation->next_permutation_index == NONE)
+						{
+							if (sound->type == _sound_start_track)
+							{
+								sound->type = _sound_loop_track;
+							}
+							else if (sound->type == _sound_stopping_track)
+							{
+								sound->type = _sound_stop_track;
+							}
 						}
 					}
 				}

@@ -1,0 +1,11 @@
+--- a/source/hs/hs.c
++++ b/source/hs/hs.c
+@@ -4404,8 +4404,6 @@
+ 
+ /* ---------- constants */
+ 
+-#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
+-
+ /* ---------- globals */
+ 
+ static short hs_enumeration_result_count = 0;

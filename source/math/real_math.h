@@ -675,6 +675,10 @@ boolean valid_real_plane3d(real_plane3d const *plane);
 
 unsigned long *get_global_random_seed_address(void);
 unsigned long *get_global_local_random_seed_address(void);
+void lock_global_random_seed(
+	void);
+void unlock_global_random_seed(
+	void);
 
 unsigned short seed_random(unsigned long *seed);
 short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
@@ -939,8 +943,7 @@ __inline real distance2d(
 	real_point2d const *a,
 	real_point2d const *b)
 {
-	real_vector2d v;
-	return magnitude2d(vector_from_points2d(a, b, &v));
+	return square_root(distance_squared2d(a, b));
 }
 
 __inline real dot_product2d(
@@ -1026,23 +1029,17 @@ __inline real_point3d *project_point2d(
 	boolean sign,
 	real_point3d *p3d)
 {
-	long x = global_projection3d_mappings[projection][sign][0];
-	long y = global_projection3d_mappings[projection][sign][1];
+	short x = global_projection3d_mappings[projection][sign][0];
+	short y = global_projection3d_mappings[projection][sign][1];
 
 	match_assert("..\\math\\real_math.h", 879, projection>=_x && projection<=_z);
 	match_assert("..\\math\\real_math.h", 880, ~(sign&~1));
 
 	p3d->n[x] = p2d->x;
 	p3d->n[y] = p2d->y;
-
-	if (fabs(plane->n.n[projection])>=_real_epsilon)
-	{
-		p3d->n[projection] = ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
-	}
-	else
-	{
-		p3d->n[projection] = 0.f;
-	}
+	p3d->n[projection] = (fabs(plane->n.n[projection])<_real_epsilon)
+		? 0.0f
+		: ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
 
 	return p3d;
 }
@@ -1192,8 +1189,7 @@ __inline real distance3d(
 	real_point3d const *a,
 	real_point3d const *b)
 {
-	real_vector3d v;
-	return magnitude3d(vector_from_points3d(a, b, &v));
+	return square_root(distance_squared3d(a, b));
 }
 
 __inline real_point3d *midpoint3d(

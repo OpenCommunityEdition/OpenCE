@@ -411,7 +411,7 @@ static void profile_framedump_flush(
 static void profile_sections_set_active(
 	const char *name,
 	boolean active);
-static int compare_profile_sections(
+int compare_profile_sections(
 	void const *section0,
 	void const *section1);
 static boolean string_starts_with(
@@ -430,13 +430,13 @@ static void profile_timer_end_at(
 
 /* ---------- globals */
 
-static const char *header_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
+const char *header_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
 {
 	"section\t                                     total calls / time           av. calls / time      peak calls / time\r\n",
 	"|t|rthis frame|taverage|tpeak|n"
 };
 
-static const char *format_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
+const char *format_strings[NUMBER_OF_PROFILE_DUMP_FORMAT_MODES] =
 {
 	"%-50s%6ld / %7.3f            %5.2f / %7.3f            %ld / %7.3f\r\n",
 	"|l%s|t|r% 3.2f/% 4ld|t% 3.2f/% 4ld|t% 3.2f/% 4ld|n"
@@ -1583,7 +1583,7 @@ static void profile_timer_end(
 	return;
 }
 
-static int compare_profile_sections(
+int compare_profile_sections(
 	void const *section0,
 	void const *section1)
 {

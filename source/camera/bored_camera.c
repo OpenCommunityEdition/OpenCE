@@ -36,8 +36,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define valid_real_vector3d_axes2 valid_real_vector3d_axes2_inline
-#define valid_real_normal3d valid_real_normal3d_inline
 #include "bored_camera.h"
 #include "camera/static_camera.h"
 #include "cseries/cseries_windows.h"
@@ -45,8 +43,6 @@ symbols in this file:
 #include "math/real_math.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
-#undef valid_real_normal3d
-#undef valid_real_vector3d_axes2
 #include "observer.h"
 
 /* ---------- constants */
@@ -79,11 +75,6 @@ float real_seed_random_range(
 	float upper_bound);
 long player_control_get_aiming_unit_index(
 	short local_player_index);
-boolean valid_real_normal3d(
-	real_vector3d const *v);
-boolean valid_real_vector3d_axes2(
-	real_vector3d const *forward,
-	real_vector3d const *up);
 
 static long bored_camera_shot_threshold_milliseconds(
 	long boredom_count);
@@ -242,14 +233,4 @@ boolean is_still_bored(
 	void)
 {
 	return FALSE;
-}
-
-boolean valid_real_vector3d_axes2(
-	real_vector3d const *forward,
-	real_vector3d const *up)
-{
-	return
-		valid_real_normal3d(forward) &&
-		valid_real_normal3d(up) &&
-		valid_realcmp(dot_product3d(forward, up), 0.f);
 }

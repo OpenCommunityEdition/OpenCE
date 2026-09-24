@@ -1,0 +1,25 @@
+diff --git a/source/interface/hud_nav_points.c b/source/interface/hud_nav_points.c
+index 36b392c3..ac5dd14c 100644
+--- a/source/interface/hud_nav_points.c
++++ b/source/interface/hud_nav_points.c
+@@ -113,6 +113,7 @@ symbols in this file:
+ #include "tag_files/tag_groups.h"
+ #include "interface/hud.h"
+ #include "interface/hud_definitions.h"
++#include "interface/hud_nav_points.h"
+ #include "bitmaps/bitmap_color_conversion.h"
+ #include "interface/hud_draw.h"
+ #include "objects/object_types.h"
+@@ -303,12 +304,6 @@ real_point3d *game_engine_get_goal_position(
+ 	real_point3d *position,
+ 	short goal_index);
+ 
+-void custom_render_nav_point(
+-	short local_player_index,
+-	real_point3d const *position,
+-	short nav_index,
+-	short render_type);
+-
+ void game_engine_render_nav_points(
+ 	short local_player_index);
+ 

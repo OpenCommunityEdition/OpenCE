@@ -1,0 +1,22 @@
+diff --git a/source/hs/hs.c b/source/hs/hs.c
+index 35571179..717d2b96 100644
+--- a/source/hs/hs.c
++++ b/source/hs/hs.c
+@@ -14823,7 +14823,6 @@ void real_random_range_evaluate(
+ 	union hs_real_value result;
+ 	union hs_evaluation_argument const *arguments;
+ 	real upper_bound;
+-	real lower_bound;
+ 
+ 	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+ 	if (arguments)
+@@ -14831,8 +14830,7 @@ void real_random_range_evaluate(
+ 		double upper = arguments[1].real_value;
+ 
+ 		upper_bound = (real)upper;
+-		lower_bound = arguments[0].real_value;
+-		result.real_value = real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
++		result.real_value = real_random_range(arguments[0].real_value, upper_bound);
+ 		hs_return(thread_index, result.long_value);
+ 	}
+ 	return;

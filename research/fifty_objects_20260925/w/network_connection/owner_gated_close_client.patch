@@ -1,0 +1,40 @@
+diff --git a/source/networking/network_connection.c b/source/networking/network_connection.c
+--- a/source/networking/network_connection.c
++++ b/source/networking/network_connection.c
+@@ -1324,6 +1324,7 @@ boolean network_server_close_client_connection(
+ 	struct network_connection *client_connection)
+ {
+ 	struct network_server_connection *server = (struct network_server_connection *)server_connection;
++	boolean success = FALSE;
+ 	long client_index;
+ 
+ 	match_assert(
+@@ -1347,7 +1348,12 @@ boolean network_server_close_client_connection(
+ 		0x1FB,
+ 		server->client_list);
+ 
+-	for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++)
++	/* BUG (preserved for exact matching): January bounds this search by the
++	 * endpoint-set capacity (every client plus the listening endpoint) instead
++	 * of NUMBEROF(client_list), so the last pass reads allow_client_connections
++	 * and its padding as a client pointer.  A corrected build should stop at
++	 * MAXIMUM_NUMBER_OF_LOCAL_PLAYERS. */
++	for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS + 1; client_index++)
+ 	{
+ 		if (server->client_list[client_index] &&
+ 			server->client_list[client_index] == client_connection)
+@@ -1364,11 +1370,12 @@ boolean network_server_close_client_connection(
+ 
+ 			network_connection_delete(server->client_list[client_index]);
+ 			server->client_list[client_index] = NULL;
+-			return TRUE;
++			success = TRUE;
++			break;
+ 		}
+ 	}
+ 
+-	return FALSE;
++	return success;
+ }
+ 
+ boolean network_connection_disconnect(

@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index b8a7789b..00bbd24c 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -634,7 +634,7 @@
+ 				{ "name": "source/interface/inventory_displays.c", "index": 259, "status": "Matching" },
+ 				{ "name": "source/interface/interface_panels.c", "index": 260, "status": "Matching" },
+ 				{ "name": "source/interface/interface.c", "index": 261, "status": "NonMatching" },
+-				{ "name": "source/interface/first_person_weapons.c", "index": 262, "status": "NonMatching" },
++				{ "name": "source/interface/first_person_weapons.c", "index": 262, "status": "Matching" },
+ 				{ "name": "source/interface/event_manager.c", "index": 263, "status": "Matching" },
+ 				{ "name": "source/interface/attract_mode.c", "index": 264, "status": "Matching" },
+ 				{ "name": "source/interface/weapon_hud_interface_definition.c", "index": 265, "status": "Matching" },

@@ -287,7 +287,7 @@ struct hud_nav_object_datum
 
 /* ---------- prototypes */
 
-void hud_update_nav_point_local_player(
+static void hud_update_nav_point_local_player(
 	short local_player_index);
 
 void *object_try_and_get_and_verify_type(
@@ -776,7 +776,7 @@ void custom_render_nav_point(
 	short waypoint_type)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[0x80];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct hud_waypoint_arrow *arrow;
 	real_point3d view_point;
 	real distance;
@@ -986,37 +986,7 @@ void custom_render_nav_point(
 		}
 	}
 
-	{
-		short corrupt_index;
-		short buffer_index;
-
-		for (buffer_index = 0x7F; buffer_index>=0; buffer_index--)
-		{
-			if (stack_buffer[buffer_index]!=0x62626262)
-			{
-				goto corrupt_stack_found_custom_render_nav_point;
-			}
-		}
-
-		corrupt_index = NONE;
-		goto stack_buffer_checked_custom_render_nav_point;
-
-corrupt_stack_found_custom_render_nav_point:
-		corrupt_index = buffer_index;
-
-stack_buffer_checked_custom_render_nav_point:
-
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
-			675,
-			return_eip==get_return_eip(),
-			"corrupt return address!");
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
-			675,
-			corrupt_index==NONE,
-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
-	}
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 675);
 
 	return;
 }
@@ -1096,11 +1066,11 @@ void hud_render_nav_points(
 	return;
 }
 
-void hud_update_nav_point_local_player(
+static void hud_update_nav_point_local_player(
 	short local_player_index)
 {
 	long return_eip = get_return_eip();
-	long stack_buffer[0x80];
+	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct hud_nav_point_player_datum *datum;
 	long unit_index;
 	short nav_point_index;
@@ -1187,37 +1157,7 @@ void hud_update_nav_point_local_player(
 		}
 	}
 
-	{
-		short corrupt_index;
-		short buffer_index;
-
-		for (buffer_index = 0x7F; buffer_index>=0; buffer_index--)
-		{
-			if (stack_buffer[buffer_index]!=0x62626262)
-			{
-				goto corrupt_stack_found;
-			}
-		}
-
-		corrupt_index = NONE;
-		goto stack_buffer_checked;
-
-corrupt_stack_found:
-		corrupt_index = buffer_index;
-
-stack_buffer_checked:
-
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
-			496,
-			return_eip==get_return_eip(),
-			"corrupt return address!");
-		match_vassert(
-			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
-			496,
-			corrupt_index==NONE,
-			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
-	}
+	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 496);
 
 	return;
 }

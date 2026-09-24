@@ -1,0 +1,348 @@
+diff --git a/config/config.json b/config/config.json
+index cf8106ea..d137d5bc 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -482,7 +482,7 @@
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.c", "index": 107, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c", "index": 108, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_text.c", "index": 109, "status": "Matching" },
+-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "NonMatching" },
++				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_screen_effect.c", "index": 111, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "NonMatching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c", "index": 113, "status": "Matching" },
+diff --git a/config/parked.json b/config/parked.json
+index c738bc76..5d01757d 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -835,25 +835,6 @@
+         "objdiff_percent": 96.43883
+       }
+     },
+-    {
+-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+-      "function": "__rasterizer_environment_shadow_model_draw",
+-      "class": "instruction-scheduling",
+-      "evidence": "Fuzzy-parked with the complete typed January model-shadow draw path reconstructed from target disassembly and relocations, January's shader/debug/statistics fields, and the independently corresponding HaloCEA shader-model behavior. The retained routine verifies model shaders and geometry, chooses culling and alpha-test texture state from named flags, evaluates the texture animation with the cached model parameters, uploads the three vertex constants, draws the complete static triangle buffer, and updates model-shadow statistics. Target and candidate both occupy 688 padded bytes with all 48 relocation types and destinations, and objdiff reports 97.95 percent similarity. The remaining difference is two dependency-independent scheduling transpositions around one fld/fmul pair and the neighboring constant-buffer address materialization; no behavior or call is absent. Bounded natural declaration, initialization, and include-set probes did not change that scheduler fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those two independent instruction placements.",
+-      "measurements": {
+-        "target": {
+-          "size": 688,
+-          "relocation_count": 48,
+-          "normalized_sha256": "366f4471c47176709d6d1469a6ef998e1b248296a375b8cb8e8192c734341c9c"
+-        },
+-        "base": {
+-          "size": 688,
+-          "relocation_count": 48,
+-          "normalized_sha256": "c81ae7e554a892d0f30600ed846a2585dbd904d74b628c472219ed77a5fb6489"
+-        },
+-        "objdiff_percent": 97.948715
+-      }
+-    },
+     {
+       "unit": "source/hs/hs_runtime",
+       "function": "_hs_evaluate_begin_random",
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_shadows.c b/source/rasterizer/xbox/rasterizer_xbox_shadows.c
+index f72c49ad..8c81f06c 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_shadows.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_shadows.c
+@@ -57,7 +57,12 @@ symbols in this file:
+ 0030CF84 0001:
+ 	_shadow_restored (0000)
+ 0046628C 004a:
+-	_rasterizer_environment_shadows_globals (0000)
++	_local_shadow_color (0000)
++	_local_object_bounding_radius (000c)
++	_local_shadow_matrix (0010)
++	_local_parameters (0044)
++	_shadow_setup (0048)
++	_shadow_used (0049)
+ */
+ 
+ /* ---------- headers */
+@@ -222,14 +227,6 @@ struct rasterizer_shadows_frame_parameters
+ 	real dt;
+ };
+ 
+-struct rasterizer_environment_shadows_globals
+-{
+-	real_rgb_color shadow_color;
+-	real object_bounding_radius;
+-	real_matrix4x3 shadow_matrix;
+-	struct rasterizer_model_begin_parameters const *local_parameters;
+-};
+-
+ typedef char verify_rasterizer_shadows_draw_shadows_offset[
+ 	offsetof(
+ 		struct rasterizer_shadows_debug_options_prefix,
+@@ -238,10 +235,6 @@ typedef char verify_rasterizer_shadows_model_shadow_count_offset[
+ 	offsetof(
+ 		struct rasterizer_frame_statistics_globals,
+ 		model_shadow_count) == 0xF4 ? 1 : -1];
+-typedef char verify_rasterizer_shadows_local_parameters_offset[
+-	offsetof(
+-		struct rasterizer_environment_shadows_globals,
+-		local_parameters) == 0x44 ? 1 : -1];
+ typedef char verify_rasterizer_shadows_model_parameters_size[
+ 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
+ typedef char verify_rasterizer_shadows_model_base_map_scale_offset[
+@@ -276,14 +269,13 @@ extern struct rasterizer_shadows_frame_parameters global_frame_parameters;
+ 
+ static boolean shadow_restored = TRUE;
+ 
+-static struct rasterizer_environment_shadows_globals
+-	rasterizer_environment_shadows_globals = { 0 };
+-
++static real_rgb_color local_shadow_color = { 0 };
++static real local_object_bounding_radius = 0.0f;
++static real_matrix4x3 local_shadow_matrix = { 0 };
++static struct rasterizer_model_begin_parameters const *local_parameters = NULL;
+ static boolean shadow_setup = FALSE;
+ static boolean shadow_used = FALSE;
+ 
+-#define local_parameters rasterizer_environment_shadows_globals.local_parameters
+-
+ /* ---------- public code */
+ 
+ void _rasterizer_environment_shadows_begin(
+@@ -399,10 +391,9 @@ boolean _rasterizer_environment_shadow_begin(
+ 			FALSE);
+ 		rasterizer_set_stencil_mode(0);
+ 
+-		rasterizer_environment_shadows_globals.shadow_matrix = *shadow_matrix;
+-		rasterizer_environment_shadows_globals.shadow_color = *shadow_color;
+-		rasterizer_environment_shadows_globals.object_bounding_radius =
+-			object_bounding_radius;
++		local_shadow_matrix = *shadow_matrix;
++		local_shadow_color = *shadow_color;
++		local_object_bounding_radius = object_bounding_radius;
+ 		if (shadow_volume_bounding_radius)
+ 		{
+ 			*shadow_volume_bounding_radius = object_bounding_radius;
+@@ -470,7 +461,6 @@ void _rasterizer_environment_shadow_model_draw(
+ 	struct vertex_buffer const *vertex_buffer)
+ {
+ 	struct shader_model_definition const *model;
+-	real_vector4d vertex_constants[3];
+ 
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
+@@ -558,35 +548,36 @@ void _rasterizer_environment_shadow_model_draw(
+ 					D3DTEXF_LINEAR);
+ 			}
+ 
+-			vertex_constants[0].i = model->detail_map_scale;
+-			vertex_constants[0].j =
+-				model->detail_map_v_scale * model->detail_map_scale;
+-			vertex_constants[0].k = 1.0f;
+-			vertex_constants[0].l = 1.0f;
+-			vertex_constants[1].i = 1.0f;
+-			vertex_constants[1].j = 0.0f;
+-			vertex_constants[1].k = 0.0f;
+-			vertex_constants[1].l = 0.0f;
+-			vertex_constants[2].i = 0.0f;
+-			vertex_constants[2].j = 1.0f;
+-			vertex_constants[2].k = 0.0f;
+-			vertex_constants[2].l = 0.0f;
+-			shader_texture_animation_evaluate(
+-				&model->animation,
+-				&local_parameters->animation,
+-				local_parameters->base_map_scale.i * model->map_scale.i,
+-				local_parameters->base_map_scale.j * model->map_scale.j,
+-				0.0f,
+-				0.0f,
+-				0.0f,
+-				global_frame_parameters.game_time_sec,
+-				&vertex_constants[1],
+-				&vertex_constants[2]);
+-			IDirect3DDevice8_SetVertexShaderConstant(
+-				global_d3d_device,
+-				-84,
+-				vertex_constants,
+-				3);
++			{
++				real_vector4d vertex_constants[3] =
++				{
++					{
++						model->detail_map_scale,
++						model->detail_map_scale * model->detail_map_v_scale,
++						1.0f,
++						1.0f
++					},
++					{1.0f, 0.0f, 0.0f, 0.0f},
++					{0.0f, 1.0f, 0.0f, 0.0f}
++				};
++
++				shader_texture_animation_evaluate(
++					&model->animation,
++					&local_parameters->animation,
++					local_parameters->base_map_scale.i * model->map_scale.i,
++					local_parameters->base_map_scale.j * model->map_scale.j,
++					0.0f,
++					0.0f,
++					0.0f,
++					global_frame_parameters.game_time_sec,
++					&vertex_constants[1],
++					&vertex_constants[2]);
++				IDirect3DDevice8_SetVertexShaderConstant(
++					global_d3d_device,
++					-84,
++					vertex_constants,
++					NUMBEROF(vertex_constants));
++			}
+ 
+ 			rasterizer_draw_static_triangles_static_vertices(
+ 				triangle_buffer,
+@@ -822,8 +813,7 @@ void _rasterizer_environment_shadow_draw(
+ 			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+ 			pixel_shader.texture_modes = 0x00000021;
+ 			pixel_shader.combiner_count = 4;
+-			pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(
+-				&rasterizer_environment_shadows_globals.shadow_color);
++			pixel_shader.constant_0[0] = real_rgb_color_to_pixel32(&local_shadow_color);
+ 			pixel_shader.constant_1[0] = 0x00FFFFFF;
+ 			pixel_shader.rgb_inputs[0] = 0x14200000;
+ 			pixel_shader.rgb_outputs[0] = 0x000000C0;
+@@ -850,74 +840,42 @@ void _rasterizer_environment_shadow_draw(
+ 				vertex_buffer->type,
+ 				shader_get_vertex_shader_permutation(shader));
+ 
+-			inverse_radius = 1.0f /
+-				rasterizer_environment_shadows_globals.object_bounding_radius;
+-			inverse_radius_quarter = 1.0f /
+-				(rasterizer_environment_shadows_globals.object_bounding_radius *
+-				4.0f);
+-			inverse_radius_double = 1.0f /
+-				(rasterizer_environment_shadows_globals.object_bounding_radius *
+-				0.5f);
+-
+-			vertex_constants[0][0] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.forward.i *
+-				inverse_radius * 0.5f;
+-			vertex_constants[0][1] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.forward.j *
+-				inverse_radius * 0.5f;
+-			vertex_constants[0][2] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.forward.k *
+-				inverse_radius * 0.5f;
++			inverse_radius = 1.0f / local_object_bounding_radius;
++			inverse_radius_quarter = 1.0f / (local_object_bounding_radius * 4.0f);
++			inverse_radius_double = 1.0f / (local_object_bounding_radius * 0.5f);
++
++			vertex_constants[0][0] = local_shadow_matrix.forward.i * inverse_radius * 0.5f;
++			vertex_constants[0][1] = local_shadow_matrix.forward.j * inverse_radius * 0.5f;
++			vertex_constants[0][2] = local_shadow_matrix.forward.k * inverse_radius * 0.5f;
+ 			vertex_constants[0][3] =
+ 				(1.0f -
+ 				dot_product3d(
+-					(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+-					&rasterizer_environment_shadows_globals.shadow_matrix.forward) *
++					(real_vector3d const *)&local_shadow_matrix.position,
++					&local_shadow_matrix.forward) *
+ 				inverse_radius) * 0.5f;
+-			vertex_constants[1][0] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.left.i *
+-				inverse_radius * -0.5f;
+-			vertex_constants[1][1] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.left.j *
+-				inverse_radius * -0.5f;
+-			vertex_constants[1][2] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.left.k *
+-				inverse_radius * -0.5f;
++			vertex_constants[1][0] = local_shadow_matrix.left.i * inverse_radius * -0.5f;
++			vertex_constants[1][1] = local_shadow_matrix.left.j * inverse_radius * -0.5f;
++			vertex_constants[1][2] = local_shadow_matrix.left.k * inverse_radius * -0.5f;
+ 			vertex_constants[1][3] =
+ 				(dot_product3d(
+-					(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+-					&rasterizer_environment_shadows_globals.shadow_matrix.left) *
++					(real_vector3d const *)&local_shadow_matrix.position,
++					&local_shadow_matrix.left) *
+ 				inverse_radius + 1.0f) * 0.5f;
+-			vertex_constants[2][0] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.i *
+-				inverse_radius_quarter;
+-			vertex_constants[2][1] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.j *
+-				inverse_radius_quarter;
+-			vertex_constants[2][2] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.k *
+-				inverse_radius_quarter;
++			vertex_constants[2][0] = local_shadow_matrix.up.i * inverse_radius_quarter;
++			vertex_constants[2][1] = local_shadow_matrix.up.j * inverse_radius_quarter;
++			vertex_constants[2][2] = local_shadow_matrix.up.k * inverse_radius_quarter;
+ 			position_dot_up = dot_product3d(
+-				(real_vector3d const *)&rasterizer_environment_shadows_globals.shadow_matrix.position,
+-				&rasterizer_environment_shadows_globals.shadow_matrix.up);
++				(real_vector3d const *)&local_shadow_matrix.position,
++				&local_shadow_matrix.up);
+ 			vertex_constants[2][3] =
+ 				-(position_dot_up * inverse_radius_quarter);
+-			vertex_constants[3][0] =
+-				-(rasterizer_environment_shadows_globals.shadow_matrix.up.i *
+-				inverse_radius_double);
+-			vertex_constants[3][1] =
+-				-(rasterizer_environment_shadows_globals.shadow_matrix.up.j *
+-				inverse_radius_double);
+-			vertex_constants[3][2] =
+-				-(rasterizer_environment_shadows_globals.shadow_matrix.up.k *
+-				inverse_radius_double);
++			vertex_constants[3][0] = -(local_shadow_matrix.up.i * inverse_radius_double);
++			vertex_constants[3][1] = -(local_shadow_matrix.up.j * inverse_radius_double);
++			vertex_constants[3][2] = -(local_shadow_matrix.up.k * inverse_radius_double);
+ 			vertex_constants[3][3] = position_dot_up * inverse_radius_double;
+-			vertex_constants[4][0] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.i;
+-			vertex_constants[4][1] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.j;
+-			vertex_constants[4][2] =
+-				rasterizer_environment_shadows_globals.shadow_matrix.up.k;
++			vertex_constants[4][0] = local_shadow_matrix.up.i;
++			vertex_constants[4][1] = local_shadow_matrix.up.j;
++			vertex_constants[4][2] = local_shadow_matrix.up.k;
+ 			vertex_constants[4][3] = 0.0f;
+ 			IDirect3DDevice8_SetVertexShaderConstant(
+ 				global_d3d_device,
+diff --git a/config/symbols.json b/config/symbols.json
+index d0a16b3a..53204f80 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -5903,18 +5903,18 @@
+ { "file_offset": 1440912, "flags": 32, "name": "_rasterizer_screen_effect_set_texture_transforms", "static": true },
+ { "file_offset": 1443040, "flags": 32, "name": "__rasterizer_screen_effect" },
+ { "file_offset": 1446928, "flags": 32, "name": "__rasterizer_screen_flash" },
+-{ "file_offset": 1448272, "flags": 32, "name": "_D3DDevice_SetRenderState" },
+-{ "file_offset": 1448704, "flags": 32, "name": "_D3DDevice_SetTextureStageState" },
+-{ "file_offset": 1448784, "flags": 32, "name": "_IDirect3DDevice8_SetRenderState@12" },
++{ "file_offset": 1448272, "flags": 32, "name": "_D3DDevice_SetRenderState", "static": true },
++{ "file_offset": 1448704, "flags": 32, "name": "_D3DDevice_SetTextureStageState", "static": true },
++{ "file_offset": 1448784, "flags": 32, "name": "_IDirect3DDevice8_SetRenderState@12", "static": true },
+ { "file_offset": 1449328, "flags": 32, "name": "__rasterizer_environment_shadows_begin" },
+-{ "file_offset": 1449344, "flags": 32, "name": "_IDirect3DDevice8_SetTextureStageState@16" },
+-{ "file_offset": 1449440, "flags": 32, "name": "_IDirect3DDevice8_SetVertexShaderConstant@16" },
++{ "file_offset": 1449344, "flags": 32, "name": "_IDirect3DDevice8_SetTextureStageState@16", "static": true },
++{ "file_offset": 1449440, "flags": 32, "name": "_IDirect3DDevice8_SetVertexShaderConstant@16", "static": true },
+ { "file_offset": 1449456, "flags": 32, "name": "__rasterizer_environment_shadow_model_begin" },
+ { "file_offset": 1449616, "flags": 32, "name": "__rasterizer_environment_shadow_model_end" },
+-{ "file_offset": 1449632, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData2f@16" },
+-{ "file_offset": 1449664, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData2s@16" },
+-{ "file_offset": 1449680, "flags": 32, "name": "_IDirect3DDevice8_Begin@8" },
+-{ "file_offset": 1449696, "flags": 32, "name": "_IDirect3DDevice8_End@4" },
++{ "file_offset": 1449632, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData2f@16", "static": true },
++{ "file_offset": 1449664, "flags": 32, "name": "_IDirect3DDevice8_SetVertexData2s@16", "static": true },
++{ "file_offset": 1449680, "flags": 32, "name": "_IDirect3DDevice8_Begin@8", "static": true },
++{ "file_offset": 1449696, "flags": 32, "name": "_IDirect3DDevice8_End@4", "static": true },
+ { "file_offset": 1449712, "flags": 32, "name": "__rasterizer_environment_shadow_end" },
+ { "file_offset": 1449840, "flags": 32, "name": "__rasterizer_environment_shadows_end" },
+ { "file_offset": 1449856, "flags": 32, "name": "_rasterizer_shadow_convolve", "static": true },
+@@ -23203,7 +23203,10 @@
+ { "file_offset": 4612728, "flags": 0, "name": "_local_profile_enable", "static": true },
+ { "file_offset": 4612732, "flags": 0, "name": "_rasterizer_profile_state", "static": true },
+ { "file_offset": 4612744, "flags": 0, "name": "_rasterizer_profile_error_count", "static": true },
+-{ "file_offset": 4612748, "flags": 0, "name": "_rasterizer_environment_shadows_globals", "static": true },
++{ "file_offset": 4612748, "flags": 0, "name": "_local_shadow_color", "static": true },
++{ "file_offset": 4612760, "flags": 0, "name": "_local_object_bounding_radius", "static": true },
++{ "file_offset": 4612764, "flags": 0, "name": "_local_shadow_matrix", "static": true },
++{ "file_offset": 4612816, "flags": 0, "name": "_local_parameters", "static": true },
+ { "file_offset": 4612820, "flags": 0, "name": "_shadow_setup", "static": true },
+ { "file_offset": 4612821, "flags": 0, "name": "_shadow_used", "static": true },
+ { "file_offset": 4612824, "flags": 0, "name": "_rasterizer_xbox_transparent_geometry_globals", "static": true },

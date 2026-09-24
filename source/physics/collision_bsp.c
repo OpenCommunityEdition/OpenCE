@@ -302,7 +302,7 @@ void render_debug_collision_edge(
 
 /* ---------- globals */
 
-struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
+static struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
 
 /* ---------- public code */
 

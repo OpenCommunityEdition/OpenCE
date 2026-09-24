@@ -1203,20 +1203,20 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			advertisement.version = NETWORK_GAME_MESSAGE_VERSION;
 			advertisement.platform = 0;
 			ustrncpy(advertisement.game_name, game->name, NETWORK_GAME_NAME_LENGTH - 1);
-			advertisement.engine_type = (short)game->variant.engine_type;
+			advertisement.engine_type = (short)game->variant.game_engine_index;
 			csmemcpy(&advertisement.map, &game->map, sizeof(game->map));
 			advertisement.machine_count = game->machine_count;
 			advertisement.player_count = game->player_count;
 			advertisement.maximum_player_count = game->maximum_player_count;
-			advertisement.variant_setting = (short)game->variant.unknown40;
+			advertisement.variant_setting = (short)game->variant.universal_variant.score_to_win;
 			advertisement.flags = 0;
-			if (game->variant.has_teams == TRUE)
+			if (game->variant.universal_variant.teams == TRUE)
 			{
 				advertisement.flags = FLAG(_game_advertisement_has_teams_bit);
 			}
 
-			if (game->variant.engine_type == game_engine_oddball &&
-				game->variant.unknown5C == 2)
+			if (game->variant.game_engine_index == game_engine_oddball &&
+				game->variant.game_engine_variant.oddball.oddball_ball_type == 2)
 			{
 				advertisement.flags |= FLAG(_game_advertisement_oddball_variant_bit);
 			}

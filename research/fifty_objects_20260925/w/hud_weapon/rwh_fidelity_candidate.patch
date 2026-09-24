@@ -1,0 +1,806 @@
+--- a/source/interface/hud_weapon.c
++++ b/source/interface/hud_weapon.c
+@@ -1342,488 +1342,360 @@
+ {
+ 	long return_eip = get_return_eip();
+ 	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+-	struct weapon_hud_interface_definition *definition;
+-	struct weapon_hud_state *hud_state;
+-	short state_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
+-	short overlay_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
+-	short number_values[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
+-	real number_fractions[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0.0f };
+-	short state_index;
+-	short map_type_flags;
+-	short element_index;
+ 
+ 	csmemset(
+ 		stack_buffer,
+ 		0x62,
+ 		sizeof(stack_buffer));
+-	definition = weapon_hud_interface_definition_get(hud_index);
+-	hud_state = get_hud_state(local_player_index);
+ 
+-	if (TEST_FLAG(
+-		definition->flash_cutoffs.flags,
+-		_hud_use_parent_flash_parameters_bit) &&
+-		new_state_flags &&
+-		new_overlay_flags &&
+-		new_numbers)
+ 	{
+-		csmemcpy(
+-			state_flags,
+-			new_state_flags,
+-			sizeof(state_flags));
+-		csmemcpy(
+-			overlay_flags,
+-			new_overlay_flags,
+-			sizeof(overlay_flags));
+-		csmemcpy(
+-			number_values,
+-			new_numbers,
+-			sizeof(number_values));
+-	}
+-	else
+-	{
+-		struct weapon_flash_state_definition const *cutoffs =
+-			&definition->flash_cutoffs;
+-		short flags = state_flags[0];
+-		long age_percentage;
+-
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			weapon_state->magazines[0].rounds_remaining <= cutoffs->total_ammo);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_disabled_bit,
+-			weapon_state->magazines[0].rounds_remaining == 0);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[0] = flags;
+-
+-		flags = state_flags[1];
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			weapon_state->magazines[0].rounds_loaded <= cutoffs->loaded_ammo &&
+-				!weapon_state->magazines[0].reloading);
+-		SET_FLAG(flags, _hud_draw_disabled_bit, FALSE);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[1] = flags;
+-
+-		flags = state_flags[2];
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			weapon_state->heat * 100.0f >= cutoffs->heat);
+-		SET_FLAG(flags, _hud_draw_disabled_bit, FALSE);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[2] = flags;
+-
+-		flags = state_flags[3];
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			(1.0f - weapon_state->age) * 100.0f <= cutoffs->age);
+-		age_percentage = PIN(
+-			fast_ftol_C(weapon_state->age * 100.0f),
+-			0,
+-			100);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_disabled_bit,
+-			100 - age_percentage == 0);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[3] = flags;
+-
+-		flags = state_flags[4];
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			weapon_state->magazines[1].rounds_remaining <= cutoffs->total_ammo);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_disabled_bit,
+-			weapon_state->magazines[1].rounds_remaining == 0);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[4] = flags;
+-
+-		flags = state_flags[5];
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_flashing_bit,
+-			weapon_state->magazines[1].rounds_loaded <= cutoffs->loaded_ammo &&
+-				!weapon_state->magazines[1].reloading);
+-		SET_FLAG(flags, _hud_draw_disabled_bit, FALSE);
+-		SET_FLAG(
+-			flags,
+-			_hud_draw_in_multiplayer_bit,
+-			local_player_count() > 1);
+-		state_flags[5] = flags;
+-
+-		for (state_index = 0;
+-			state_index < NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES;
+-			state_index++)
++		struct weapon_hud_interface_definition *definition = weapon_hud_interface_definition_get(hud_index);
++		struct weapon_hud_state *hud_state = get_hud_state(local_player_index);
++		short state_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
++		short overlay_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
++		short numbers[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
++		real numbers_real[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0.0f };
++		struct scenario *scenario;
++		short map_type_flags;
++		short element_index;
++
++		if (TEST_FLAG(definition->flash_cutoffs.flags, _hud_use_parent_flash_parameters_bit) &&
++			new_state_flags &&
++			new_overlay_flags &&
++			new_numbers)
++		{
++			csmemcpy(
++				state_flags,
++				new_state_flags,
++				sizeof(state_flags));
++			csmemcpy(
++				overlay_flags,
++				new_overlay_flags,
++				sizeof(overlay_flags));
++			csmemcpy(
++				numbers,
++				new_numbers,
++				sizeof(numbers));
++		}
++		else
+ 		{
+-			if (TEST_FLAG(state_flags[state_index], _hud_draw_flashing_bit))
++			short state_index;
++
++			SET_FLAG(
++				state_flags[0],
++				_hud_draw_flashing_bit,
++				weapon_state->magazines[0].rounds_remaining <= definition->flash_cutoffs.total_ammo);
++			SET_FLAG(
++				state_flags[0],
++				_hud_draw_disabled_bit,
++				weapon_state->magazines[0].rounds_remaining == 0);
++			SET_FLAG(state_flags[0], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			SET_FLAG(
++				state_flags[1],
++				_hud_draw_flashing_bit,
++				weapon_state->magazines[0].rounds_loaded <= definition->flash_cutoffs.loaded_ammo &&
++					!weapon_state->magazines[0].reloading);
++			SET_FLAG(state_flags[1], _hud_draw_disabled_bit, FALSE);
++			SET_FLAG(state_flags[1], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			SET_FLAG(
++				state_flags[2],
++				_hud_draw_flashing_bit,
++				weapon_state->heat * 100.0f >= definition->flash_cutoffs.heat);
++			SET_FLAG(state_flags[2], _hud_draw_disabled_bit, FALSE);
++			SET_FLAG(state_flags[2], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			SET_FLAG(
++				state_flags[3],
++				_hud_draw_flashing_bit,
++				(1.0f - weapon_state->age) * 100.0f <= definition->flash_cutoffs.age);
++			SET_FLAG(
++				state_flags[3],
++				_hud_draw_disabled_bit,
++				100 - PIN(fast_ftol_C(weapon_state->age * 100.0f), 0, 100) == 0);
++			SET_FLAG(state_flags[3], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			SET_FLAG(
++				state_flags[4],
++				_hud_draw_flashing_bit,
++				weapon_state->magazines[1].rounds_remaining <= definition->flash_cutoffs.total_ammo);
++			SET_FLAG(
++				state_flags[4],
++				_hud_draw_disabled_bit,
++				weapon_state->magazines[1].rounds_remaining == 0);
++			SET_FLAG(state_flags[4], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			SET_FLAG(
++				state_flags[5],
++				_hud_draw_flashing_bit,
++				weapon_state->magazines[1].rounds_loaded <= definition->flash_cutoffs.loaded_ammo &&
++					!weapon_state->magazines[1].reloading);
++			SET_FLAG(state_flags[5], _hud_draw_disabled_bit, FALSE);
++			SET_FLAG(state_flags[5], _hud_draw_in_multiplayer_bit, local_player_count() > 1);
++
++			for (state_index = 0;
++				state_index < NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES;
++				state_index++)
+ 			{
+-				if (hud_state->last_weapon_flash_time[state_index] == NONE)
++				if (TEST_FLAG(state_flags[state_index], _hud_draw_flashing_bit))
+ 				{
+-					hud_state->last_weapon_flash_time[state_index] = game_time_get();
++					if (hud_state->last_weapon_flash_time[state_index] == NONE)
++						hud_state->last_weapon_flash_time[state_index] = game_time_get();
++				}
++				else
++				{
++					hud_state->last_weapon_flash_time[state_index] = NONE;
+ 				}
+ 			}
+-			else
+-			{
+-				hud_state->last_weapon_flash_time[state_index] = NONE;
+-			}
+-		}
+ 
+-		flags = overlay_flags[0];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			weapon_state->magazines[0].rounds_remaining <= cutoffs->total_ammo &&
+-				!weapon_state->magazines[0].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->magazines[0].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			weapon_state->magazines[0].rounds_remaining == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[0] = flags;
+-
+-		flags = overlay_flags[1];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			weapon_state->magazines[0].rounds_loaded <= cutoffs->loaded_ammo);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->magazines[0].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			weapon_state->magazines[0].rounds_loaded == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[1] = flags;
+-
+-		flags = overlay_flags[2];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			weapon_state->heat * 100.0f >= cutoffs->heat);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->overheated);
+-		age_percentage = PIN(
+-			fast_ftol_C(weapon_state->age * 100.0f),
+-			0,
+-			100);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			100 - age_percentage == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[2] = flags;
+-
+-		flags = overlay_flags[3];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			(1.0f - weapon_state->age) * 100.0f <= cutoffs->age);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->overheated);
+-		age_percentage = PIN(
+-			fast_ftol_C(weapon_state->age * 100.0f),
+-			0,
+-			100);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			100 - age_percentage == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[3] = flags;
+-
+-		flags = overlay_flags[0];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			weapon_state->magazines[1].rounds_remaining <= cutoffs->total_ammo &&
+-				!weapon_state->magazines[1].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->magazines[1].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			weapon_state->magazines[1].rounds_remaining == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[0] = flags;
+-
+-		flags = overlay_flags[1];
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_flashing_bit,
+-			weapon_state->magazines[1].rounds_loaded <= cutoffs->loaded_ammo);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_reload_bit,
+-			weapon_state->magazines[1].reloading);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_empty_bit,
+-			weapon_state->magazines[1].rounds_loaded == 0);
+-		SET_FLAG(
+-			flags,
+-			_weapon_overlay_on_default_bit,
+-			flags == 0);
+-		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
+-		overlay_flags[1] = flags;
+-
+-		number_values[0] = weapon_state->magazines[0].rounds_remaining;
+-		number_values[1] = weapon_state->magazines[0].rounds_loaded;
+-		number_values[2] = (short)(weapon_state->heat * 255.0f);
+-		number_values[3] = (short)((1.0f - weapon_state->age) * 100.0f);
+-		number_values[4] = weapon_state->magazines[1].rounds_remaining;
+-		number_values[5] = weapon_state->magazines[1].rounds_loaded;
+-
+-		{
+-			long target_object_index =
+-				player_control_get_target_object_index(local_player_index);
++			SET_FLAG(
++				overlay_flags[0],
++				_weapon_overlay_on_flashing_bit,
++				weapon_state->magazines[0].rounds_remaining <= definition->flash_cutoffs.total_ammo &&
++					!weapon_state->magazines[0].reloading);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_reload_bit, weapon_state->magazines[0].reloading);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_empty_bit, weapon_state->magazines[0].rounds_remaining == 0);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_default_bit, overlay_flags[0] == 0);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_always_bit, TRUE);
++
++			SET_FLAG(
++				overlay_flags[1],
++				_weapon_overlay_on_flashing_bit,
++				weapon_state->magazines[0].rounds_loaded <= definition->flash_cutoffs.loaded_ammo);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_reload_bit, weapon_state->magazines[0].reloading);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_empty_bit, weapon_state->magazines[0].rounds_loaded == 0);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_default_bit, overlay_flags[1] == 0);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_always_bit, TRUE);
++
++			SET_FLAG(
++				overlay_flags[2],
++				_weapon_overlay_on_flashing_bit,
++				weapon_state->heat * 100.0f >= definition->flash_cutoffs.heat);
++			SET_FLAG(overlay_flags[2], _weapon_overlay_on_reload_bit, weapon_state->overheated);
++			SET_FLAG(
++				overlay_flags[2],
++				_weapon_overlay_on_empty_bit,
++				100 - PIN(fast_ftol_C(weapon_state->age * 100.0f), 0, 100) == 0);
++			SET_FLAG(overlay_flags[2], _weapon_overlay_on_default_bit, overlay_flags[2] == 0);
++			SET_FLAG(overlay_flags[2], _weapon_overlay_on_always_bit, TRUE);
++
++			SET_FLAG(
++				overlay_flags[3],
++				_weapon_overlay_on_flashing_bit,
++				(1.0f - weapon_state->age) * 100.0f <= definition->flash_cutoffs.age);
++			SET_FLAG(overlay_flags[3], _weapon_overlay_on_reload_bit, weapon_state->overheated);
++			SET_FLAG(
++				overlay_flags[3],
++				_weapon_overlay_on_empty_bit,
++				100 - PIN(fast_ftol_C(weapon_state->age * 100.0f), 0, 100) == 0);
++			SET_FLAG(overlay_flags[3], _weapon_overlay_on_default_bit, overlay_flags[3] == 0);
++			SET_FLAG(overlay_flags[3], _weapon_overlay_on_always_bit, TRUE);
++
++			SET_FLAG(
++				overlay_flags[0],
++				_weapon_overlay_on_flashing_bit,
++				weapon_state->magazines[1].rounds_remaining <= definition->flash_cutoffs.total_ammo &&
++					!weapon_state->magazines[1].reloading);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_reload_bit, weapon_state->magazines[1].reloading);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_empty_bit, weapon_state->magazines[1].rounds_remaining == 0);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_default_bit, overlay_flags[0] == 0);
++			SET_FLAG(overlay_flags[0], _weapon_overlay_on_always_bit, TRUE);
++
++			SET_FLAG(
++				overlay_flags[1],
++				_weapon_overlay_on_flashing_bit,
++				weapon_state->magazines[1].rounds_loaded <= definition->flash_cutoffs.loaded_ammo);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_reload_bit, weapon_state->magazines[1].reloading);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_empty_bit, weapon_state->magazines[1].rounds_loaded == 0);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_default_bit, overlay_flags[1] == 0);
++			SET_FLAG(overlay_flags[1], _weapon_overlay_on_always_bit, TRUE);
++
++			numbers[0] = weapon_state->magazines[0].rounds_remaining;
++			numbers[1] = weapon_state->magazines[0].rounds_loaded;
++			numbers[2] = (short)(weapon_state->heat * 255.0f);
++			numbers[3] = (short)((1.0f - weapon_state->age) * 100.0f);
++			numbers[4] = weapon_state->magazines[1].rounds_remaining;
++			numbers[5] = weapon_state->magazines[1].rounds_loaded;
+ 
+-			if (player_control_get_autoaim_level(local_player_index) == 1.0f &&
+-				target_object_index != NONE)
+ 			{
+-				long player_index = local_player_get_player_index(local_player_index);
+-				long unit_index = player_index == NONE ?
+-					NONE :
+-					player_get(local_player_get_player_index(local_player_index))->unit_index;
+-				real_point3d camera_position;
++				real_point3d position;
+ 				real_point3d target_position;
+-				real delta_x;
+-				real delta_y;
+-				real delta_z;
+-
+-				unit_get_camera_position(unit_index, &camera_position);
+-				object_get_origin(target_object_index, &target_position);
+-				delta_x = camera_position.x - target_position.x;
+-				delta_y = camera_position.y - target_position.y;
+-				delta_z = camera_position.z - target_position.z;
+-				number_fractions[6] = square_root(
+-					delta_x * delta_x +
+-					delta_y * delta_y +
+-					delta_z * delta_z) * 3.0480001f;
+-				number_fractions[7] =
+-					(target_position.z - camera_position.z) * 3.0480001f;
+-			}
+-			else
+-			{
+-				union
++				long target_object_index = player_control_get_target_object_index(local_player_index);
++
++				if (player_control_get_autoaim_level(local_player_index) == 1.0f &&
++					target_object_index != NONE)
+ 				{
+-					unsigned long bits;
+-					real value;
+-				} no_target_value;
+-
+-				no_target_value.bits = 0xFFC00000;
+-				number_fractions[6] = no_target_value.value;
+-				number_fractions[7] = no_target_value.value;
++					unit_get_camera_position(
++						local_player_get_player_index(local_player_index) == NONE ?
++							NONE :
++							player_get(local_player_get_player_index(local_player_index))->unit_index,
++						&position);
++					object_get_origin(target_object_index, &target_position);
++					numbers_real[6] = distance3d(&target_position, &position) * 3.0480001f;
++					numbers_real[7] = (target_position.z - position.z) * 3.0480001f;
++				}
++				else
++				{
++					union
++					{
++						unsigned long bits;
++						real value;
++					} no_target_value;
++
++					no_target_value.bits = 0xFFC00000;
++					numbers_real[6] = no_target_value.value;
++					numbers_real[7] = no_target_value.value;
++				}
+ 			}
+ 		}
+-	}
+-
+-	if (definition->parent_hud.index != NONE)
+-	{
+-		render_weapon_hud(
+-			definition->parent_hud.index,
+-			local_player_index,
+-			weapon_definition,
+-			weapon_state,
+-			state_flags,
+-			overlay_flags,
+-			number_values);
+-	}
+ 
+-	map_type_flags = global_scenario_get()->type != _scenario_type_main_menu;
+-	SET_FLAG(map_type_flags, 1, local_player_count() == 1);
+-	SET_FLAG(map_type_flags, 2, local_player_count() > 1);
+-
+-	for (element_index = 0;
+-		element_index < definition->statics.count;
+-		element_index++)
+-	{
+-		struct weapon_hud_static_element *element = TAG_BLOCK_GET_ELEMENT(
+-			&definition->statics,
+-			element_index,
+-			struct weapon_hud_static_element);
+-
+-		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
+-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
++		if (definition->parent_hud.index != NONE)
+ 		{
+-			state_index = element->header.state_type;
+-			hud_draw_static_element(
++			render_weapon_hud(
++				definition->parent_hud.index,
+ 				local_player_index,
+-				&definition->absolute_placement,
+-				&element->static_element,
+-				state_flags[state_index],
+-				hud_state->last_weapon_flash_time[state_index]);
++				weapon_definition,
++				weapon_state,
++				state_flags,
++				overlay_flags,
++				numbers);
+ 		}
+-	}
+ 
+-	for (element_index = 0;
+-		element_index < definition->meters.count;
+-		element_index++)
+-	{
+-		struct weapon_hud_meter_element *element = TAG_BLOCK_GET_ELEMENT(
+-			&definition->meters,
+-			element_index,
+-			struct weapon_hud_meter_element);
+-
+-		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
+-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
++		scenario = global_scenario_get();
++		map_type_flags = 0;
++		SET_FLAG(map_type_flags, 0, scenario->type != _scenario_type_main_menu);
++		SET_FLAG(map_type_flags, 1, local_player_count() == 1);
++		SET_FLAG(map_type_flags, 2, local_player_count() > 1);
++
++		for (element_index = 0;
++			element_index < definition->statics.count;
++			element_index++)
+ 		{
+-			byte value;
++			struct weapon_hud_static_element *element = TAG_BLOCK_GET_ELEMENT(
++				&definition->statics,
++				element_index,
++				struct weapon_hud_static_element);
+ 
+-			state_index = element->header.state_type;
+-			value = (byte)number_values[state_index];
+-			hud_draw_meter(
+-				local_player_index,
+-				&definition->absolute_placement,
+-				&element->meter_element,
+-				value,
+-				value,
+-				state_flags[state_index],
+-				(real)hud_state->last_weapon_flash_time[state_index],
+-				0.0f);
++			if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
++				TEST_FLAG(map_type_flags, element->header.use_on_map_type))
++			{
++				hud_draw_static_element(
++					local_player_index,
++					&definition->absolute_placement,
++					&element->static_element,
++					state_flags[element->header.state_type],
++					hud_state->last_weapon_flash_time[element->header.state_type]);
++			}
+ 		}
+-	}
+ 
+-	for (element_index = 0;
+-		element_index < definition->numbers.count;
+-		element_index++)
+-	{
+-		struct weapon_hud_number_element *element = TAG_BLOCK_GET_ELEMENT(
+-			&definition->numbers,
+-			element_index,
+-			struct weapon_hud_number_element);
++		for (element_index = 0;
++			element_index < definition->meters.count;
++			element_index++)
++		{
++			struct weapon_hud_meter_element *element = TAG_BLOCK_GET_ELEMENT(
++				&definition->meters,
++				element_index,
++				struct weapon_hud_meter_element);
++
++			if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
++				TEST_FLAG(map_type_flags, element->header.use_on_map_type))
++			{
++				hud_draw_meter(
++					local_player_index,
++					&definition->absolute_placement,
++					&element->meter_element,
++					(byte)numbers[element->header.state_type],
++					(byte)numbers[element->header.state_type],
++					state_flags[element->header.state_type],
++					(real)hud_state->last_weapon_flash_time[element->header.state_type],
++					0.0f);
++			}
++		}
+ 
+-		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
+-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
++		for (element_index = 0;
++			element_index < definition->numbers.count;
++			element_index++)
+ 		{
+-			short magazine_size = 1;
+-			short value;
+-			short decimal_value;
+-
+-			if (TEST_FLAG(
+-				element->weapon_flags,
+-				_weapon_number_divide_by_clip_size_bit))
++			struct weapon_hud_number_element *element = TAG_BLOCK_GET_ELEMENT(
++				&definition->numbers,
++				element_index,
++				struct weapon_hud_number_element);
++
++			if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
++				TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+ 			{
+-				struct weapon_magazine_definition const *magazine =
+-					TAG_BLOCK_GET_ELEMENT(
++				short magazine_size = 1;
++
++				if (TEST_FLAG(element->weapon_flags, _weapon_number_divide_by_clip_size_bit))
++				{
++					magazine_size = TAG_BLOCK_GET_ELEMENT(
+ 						&weapon_definition->weapon.magazines,
+ 						0,
+-						struct weapon_magazine_definition);
+-
+-				magazine_size = magazine->rounds_loaded_maximum;
+-			}
++						struct weapon_magazine_definition)->rounds_loaded_maximum;
++				}
+ 
+-			state_index = element->header.state_type;
+-			if (element->number_element.fractional_digits)
+-			{
+-				union
++				if (element->number_element.fractional_digits)
+ 				{
+-					unsigned long bits;
+-					real value;
+-				} fraction;
+-				real scale;
+-
+-				fraction.value = number_fractions[state_index];
+-				if (fraction.bits == 0xFFC00000)
+-					continue;
+-				scale = power(10.0f, 4.0f);
+-				decimal_value = (short)fmod(
+-					fabs(number_fractions[state_index] * scale),
+-					scale);
+-				value = (short)fast_ftol_C(
+-					number_fractions[state_index] / magazine_size);
+-			}
+-			else
+-			{
+-				value = number_values[state_index] / magazine_size;
+-				decimal_value = NONE;
++					union
++					{
++						unsigned long bits;
++						real value;
++					} fraction;
++					real scale;
++
++					fraction.value = numbers_real[element->header.state_type];
++					if (fraction.bits == 0xFFC00000)
++						continue;
++					scale = pow(10.0f, 4);
++					hud_draw_numbers(
++						local_player_index,
++						&definition->absolute_placement,
++						&element->number_element,
++						(short)fast_ftol_C(numbers_real[element->header.state_type] / magazine_size),
++						(short)fast_ftol((real)fmod(
++							fabs(numbers_real[element->header.state_type] * scale),
++							scale)),
++						state_flags[element->header.state_type],
++						hud_state->last_weapon_flash_time[element->header.state_type],
++						0.0f);
++				}
++				else
++				{
++					hud_draw_numbers(
++						local_player_index,
++						&definition->absolute_placement,
++						&element->number_element,
++						numbers[element->header.state_type] / magazine_size,
++						NONE,
++						state_flags[element->header.state_type],
++						hud_state->last_weapon_flash_time[element->header.state_type],
++						0.0f);
++				}
+ 			}
+-
+-			hud_draw_numbers(
+-				local_player_index,
+-				&definition->absolute_placement,
+-				&element->number_element,
+-				value,
+-				decimal_value,
+-				state_flags[state_index],
+-				hud_state->last_weapon_flash_time[state_index],
+-				0.0f);
+ 		}
+-	}
+-
+-	for (element_index = 0;
+-		element_index < definition->overlays.count;
+-		element_index++)
+-	{
+-		struct weapon_hud_overlays_element *element = TAG_BLOCK_GET_ELEMENT(
+-			&definition->overlays,
+-			element_index,
+-			struct weapon_hud_overlays_element);
+ 
+-		if (!TEST_FLAG(element->runtime_flags, _hud_element_runtime_invalid_bit) &&
+-			TEST_FLAG(map_type_flags, element->use_on_map_type))
++		for (element_index = 0;
++			element_index < definition->overlays.count;
++			element_index++)
+ 		{
+-			state_index = element->state_type;
+-			hud_draw_weapon_overlays(
+-				local_player_index,
+-				&definition->absolute_placement,
+-				&element->overlays,
+-				overlay_flags[state_index],
+-				hud_state->last_weapon_flash_time[state_index],
+-				state_flags[state_index],
+-				local_player_count() > 1);
++			struct weapon_hud_overlays_element *element = TAG_BLOCK_GET_ELEMENT(
++				&definition->overlays,
++				element_index,
++				struct weapon_hud_overlays_element);
++
++			if (!TEST_FLAG(element->runtime_flags, _hud_element_runtime_invalid_bit) &&
++				TEST_FLAG(map_type_flags, element->use_on_map_type))
++			{
++				hud_draw_weapon_overlays(
++					local_player_index,
++					&definition->absolute_placement,
++					&element->overlays,
++					overlay_flags[element->state_type],
++					hud_state->last_weapon_flash_time[element->state_type],
++					state_flags[element->state_type],
++					local_player_count() > 1);
++			}
+ 		}
+ 	}
+ 

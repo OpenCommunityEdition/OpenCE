@@ -1,0 +1,252 @@
+diff -u a/source/items/weapons.c b/source/items/weapons.c
+--- a/source/items/weapons.c
++++ b/source/items/weapons.c
+@@ -194,8 +194,10 @@
+ 	??_C@_0BC@IMIGIGHG@secondary?5trigger?$AA@ (0000)
+ 00279448 0004:
+ 	__real@3d2aaaab (0000)
+-00307140 0600:
+-	_data_00307140 (0000)
++00307140 0008:
++	_blurred_permutation_names (0000)
++00307148 05f8:
++	_weapon_update_section (0000)
+ */
+ 
+ /* ---------- headers */
+@@ -446,7 +448,7 @@
+ 	short new_state,
+ 	boolean immediate);
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index);
+ static void weapon_magazine_start_reload(
+@@ -485,17 +487,8 @@
+ 
+ /* ---------- globals */
+ 
+-struct weapons_globals
+-{
+-	char *blurred_permutation_names[2];
+-	struct profile_section update_profile;
+-};
+-
+-struct weapons_globals data_00307140 =
+-{
+-	{"~primary-blur", "~secondary-blur"},
+-	{"weapon_update", NONE, TRUE}
+-};
++static char *blurred_permutation_names[MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON] = {"~primary-blur", "~secondary-blur"};
++static struct profile_section weapon_update_section = {"weapon_update", NONE, TRUE};
+ 
+ /* ---------- public code */
+ 
+@@ -523,7 +516,7 @@
+ 	return;
+ }
+ 
+-void weapon_place(
++long weapon_place(
+ 	long weapon_index,
+ 	struct scenario_weapon_datum *scenario_weapon)
+ {
+@@ -545,7 +538,7 @@
+ 	if (!TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit))
+ 		weapon->object.position.z += 0.05f;
+ 
+-	return;
++	return weapon_index;
+ }
+ 
+ void weapon_ready(
+@@ -1379,7 +1372,7 @@
+ 	return;
+ }
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index)
+ {
+@@ -2779,7 +2772,7 @@
+ 	short magazine_index;
+ 	short trigger_index;
+ 
+-	profile_enter(data_00307140.update_profile);
++	profile_enter(weapon_update_section);
+ 
+ 	if (weapon->weapon.tracked_object_index!=NONE && !object_try_and_get_and_verify_type(weapon->weapon.tracked_object_index, _object_mask_all))
+ 	{
+@@ -3171,7 +3164,7 @@
+ 				!TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) &&
+ 				trigger->rate_of_fire>trigger_definition->blurred_rate_of_fire)
+ 			{
+-				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, TRUE);
++				object_permute_region(weapon_get_effect_object_index(weapon_index), blurred_permutation_names[trigger_index], NONE, TRUE);
+ 				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, TRUE);
+ 			}
+ 		}
+@@ -3185,7 +3178,7 @@
+ 
+ 			if (TEST_FLAG(trigger->flags, _weapon_trigger_blurred_bit) && trigger->rate_of_fire<trigger_definition->blurred_rate_of_fire)
+ 			{
+-				object_permute_region(weapon_get_effect_object_index(weapon_index), data_00307140.blurred_permutation_names[trigger_index], NONE, FALSE);
++				object_permute_region(weapon_get_effect_object_index(weapon_index), blurred_permutation_names[trigger_index], NONE, FALSE);
+ 				SET_FLAG(trigger->flags, _weapon_trigger_blurred_bit, FALSE);
+ 			}
+ 		}
+@@ -3208,7 +3201,7 @@
+ 		}
+ 	}
+ 
+-	profile_exit(data_00307140.update_profile);
++	profile_exit(weapon_update_section);
+ 
+ 	return TRUE;
+ }
+diff -u a/source/items/weapons.h b/source/items/weapons.h
+--- a/source/items/weapons.h
++++ b/source/items/weapons.h
+@@ -260,9 +260,13 @@
+ 
+ void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
+ 
++struct scenario_weapon_datum;
+ struct weapon_interface_state;
+ 
+ boolean weapon_new(long weapon_index);
++long weapon_place(
++	long weapon_index,
++	struct scenario_weapon_datum *scenario_weapon);
+ void weapon_export_function_values(
+ 	long weapon_index);
+ 
+diff -u a/source/objects/object_types.c b/source/objects/object_types.c
+--- a/source/objects/object_types.c
++++ b/source/objects/object_types.c
+@@ -218,9 +218,6 @@
+ void vehicle_render_debug(
+ 	long object_index);
+ 
+-void weapon_place(
+-	long object_index,
+-	struct scenario_object_datum *scenario_object);
+ void weapon_delete(
+ 	long object_index);
+ boolean weapon_update(
+@@ -370,11 +367,14 @@
+ 	NULL
+ };
+ 
++/* BUG: weapon_place returns long (HCEX weapons compiland LF_PROCEDURE: long (long, scenario_weapon_datum *);
++   January returns weapon_index in eax) but is bound to the void datum_place slot, whose result the
++   caller discards. The original conversion spelling is unknown. */
+ struct object_type_definition weapon_data_definition =
+ {
+ 	"weapon", 'weap', 0x27C, 0x270, 0x27C, 0x5C,
+ 	weapons_initialize, weapons_dispose, weapons_initialize_for_new_map, weapons_dispose_from_old_map,
+-	NULL, weapon_new, weapon_place, weapon_delete, weapon_update,
++	NULL, weapon_new, (void (*)(long, struct scenario_object_datum *))weapon_place, weapon_delete, weapon_update,
+ 	weapon_export_function_values,
+ 	NULL, NULL, NULL,
+ 	weapon_preprocess_node_orientations, NULL,
+diff -u a/source/ai/action_charge.c b/source/ai/action_charge.c
+--- a/source/ai/action_charge.c
++++ b/source/ai/action_charge.c
+@@ -83,7 +83,6 @@
+ #include "cseries.h"
+ #include "cseries/errors.h"
+ 
+-#define real_random real_random_inline
+ #include "actions.h"
+ 
+ #include "actor_definitions.h"
+@@ -101,7 +100,6 @@
+ #include "physics/collision_usage.h"
+ #include "units/units.h"
+ #include "ai_debug.h"
+-#undef real_random
+ 
+ /* ---------- constants */
+ 
+@@ -331,13 +329,6 @@
+ }
+ 
+ 
+-real real_random(
+-	void)
+-{
+-	return real_seed_random(
+-		get_global_random_seed_address());
+-}
+-
+ boolean action_charge_perform(
+ 	long actor_index)
+ {
+diff -u a/config/symbols.json b/config/symbols.json
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -4010,25 +4010,25 @@
+ { "file_offset": 960768, "flags": 32, "name": "_weapon_prevents_grenade_throwing" },
+ { "file_offset": 960848, "flags": 32, "name": "_weapon_get_first_person_animation_time" },
+ { "file_offset": 961280, "flags": 32, "name": "_weapon_overcharged" },
+-{ "file_offset": 961328, "flags": 32, "name": "_weapon_trigger_get" },
+-{ "file_offset": 961408, "flags": 32, "name": "_weapon_magazine_get" },
+-{ "file_offset": 961488, "flags": 32, "name": "_weapon_busy" },
+-{ "file_offset": 961568, "flags": 32, "name": "_weapon_magazine_state_change_ok" },
+-{ "file_offset": 961632, "flags": 32, "name": "_weapon_get_effect_object_index" },
+-{ "file_offset": 961680, "flags": 32, "name": "_weapon_get_owner_object_index" },
++{ "file_offset": 961328, "flags": 32, "name": "_weapon_trigger_get", "static": true },
++{ "file_offset": 961408, "flags": 32, "name": "_weapon_magazine_get", "static": true },
++{ "file_offset": 961488, "flags": 32, "name": "_weapon_busy", "static": true },
++{ "file_offset": 961568, "flags": 32, "name": "_weapon_magazine_state_change_ok", "static": true },
++{ "file_offset": 961632, "flags": 32, "name": "_weapon_get_effect_object_index", "static": true },
++{ "file_offset": 961680, "flags": 32, "name": "_weapon_get_owner_object_index", "static": true },
+ { "file_offset": 961744, "flags": 32, "name": "_weapon_get_projectile_owner_object_index", "static": true },
+ { "file_offset": 961824, "flags": 0, "name": "_weapon_trigger_get_charged_fraction", "static": true },
+ { "file_offset": 961968, "flags": 32, "name": "_weapon_trigger_can_fire_again", "static": true },
+ { "file_offset": 962208, "flags": 32, "name": "_weapon_magazine_idle", "static": true },
+-{ "file_offset": 962288, "flags": 32, "name": "_weapon_effect_new" },
++{ "file_offset": 962288, "flags": 32, "name": "_weapon_effect_new", "static": true },
+ { "file_offset": 962528, "flags": 32, "name": "_weapon_effect_looping_new", "static": true },
+ { "file_offset": 962640, "flags": 32, "name": "_weapon_detonate", "static": true },
+ { "file_offset": 962704, "flags": 32, "name": "_weapon_trigger_change_state", "static": true },
+ { "file_offset": 962848, "flags": 32, "name": "_weapon_trigger_start_ejection_port", "static": true },
+ { "file_offset": 962976, "flags": 32, "name": "_weapon_state_key_frame", "static": true },
+ { "file_offset": 963056, "flags": 32, "name": "_weapon_magazine_state_interruptable", "static": true },
+-{ "file_offset": 963088, "flags": 32, "name": "_weapon_state_interruptable" },
+-{ "file_offset": 963120, "flags": 32, "name": "_weapon_set_state" },
++{ "file_offset": 963088, "flags": 32, "name": "_weapon_state_interruptable", "static": true },
++{ "file_offset": 963120, "flags": 32, "name": "_weapon_set_state", "static": true },
+ { "file_offset": 963552, "flags": 32, "name": "_weapon_set_total_rounds" },
+ { "file_offset": 963840, "flags": 32, "name": "_power" },
+ { "file_offset": 963856, "flags": 32, "name": "_random" },
+@@ -4044,14 +4044,14 @@
+ { "file_offset": 966896, "flags": 32, "name": "_weapon_get_field_of_view" },
+ { "file_offset": 966976, "flags": 32, "name": "_weapon_prevents_melee_attack" },
+ { "file_offset": 967072, "flags": 32, "name": "_weapon_magazine_start_reload", "static": true },
+-{ "file_offset": 967424, "flags": 32, "name": "_weapon_magazine_finish_reload" },
++{ "file_offset": 967424, "flags": 32, "name": "_weapon_magazine_finish_reload", "static": true },
+ { "file_offset": 967648, "flags": 32, "name": "_weapon_magazine_start_chamber", "static": true },
+ { "file_offset": 967840, "flags": 32, "name": "_weapon_magazine_finish_chamber", "static": true },
+ { "file_offset": 967968, "flags": 32, "name": "_weapon_trigger_fully_charged", "static": true },
+ { "file_offset": 968160, "flags": 32, "name": "_weapon_trigger_idle", "static": true },
+ { "file_offset": 968304, "flags": 32, "name": "_weapon_trigger_locked", "static": true },
+ { "file_offset": 968400, "flags": 32, "name": "_weapon_trigger_recover", "static": true },
+-{ "file_offset": 968496, "flags": 32, "name": "_weapon_reset" },
++{ "file_offset": 968496, "flags": 32, "name": "_weapon_reset", "static": true },
+ { "file_offset": 968896, "flags": 32, "name": "_projectile_distribute", "static": true },
+ { "file_offset": 969056, "flags": 32, "name": "_weapon_state_next", "static": true },
+ { "file_offset": 969104, "flags": 32, "name": "_weapon_set_current_amount" },
+@@ -22576,7 +22576,8 @@
+ { "file_offset": 3173008, "flags": 0, "name": "_default_projectile_material_response" },
+ { "file_offset": 3173168, "flags": 0, "name": "_projectile_update_section", "static": true },
+ { "file_offset": 3174696, "flags": 0, "name": "_effect_marker_names", "static": true },
+-{ "file_offset": 3174720, "flags": 0, "name": "_data_00307140" },
++{ "file_offset": 3174720, "flags": 0, "name": "_blurred_permutation_names", "static": true },
++{ "file_offset": 3174728, "flags": 0, "name": "_weapon_update_section", "static": true },
+ { "file_offset": 3176256, "flags": 0, "name": "_console_color" },
+ { "file_offset": 3176272, "flags": 0, "name": "_global_debug_key_list" },
+ { "file_offset": 3176472, "flags": 0, "name": "_global_difficulty_level" },

@@ -304,7 +304,6 @@ static struct profile_section render_object_shadows_section =
 
 struct data_array *cached_object_render_states;
 
-struct render_lighting lighting_storage = { 0 };
 static struct render_object_globals render_object_globals = { 0 };
 
 boolean debug_inactive_objects = FALSE;
@@ -356,6 +355,7 @@ struct render_lighting *object_get_cached_render_lighting(
 	long object_index,
 	real level_of_detail_pixels)
 {
+	static struct render_lighting lighting_storage;
 	long render_state_index = object_get_cached_render_state(
 		object_index,
 		level_of_detail_pixels);

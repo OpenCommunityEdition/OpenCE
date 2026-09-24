@@ -102,7 +102,6 @@ symbols in this file:
 #include "cseries/errors.h"
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "bitmaps/bitmap_color_conversion.h"
-#include "interface/hud_draw.h"
 #include "math/periodic_functions.h"
 #include "math/real_math.h"
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D

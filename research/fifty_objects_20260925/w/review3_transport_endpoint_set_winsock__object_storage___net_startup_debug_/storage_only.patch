@@ -1,0 +1,21 @@
+diff --git a/source/bungie_net/network/transport_endpoint_set_winsock.c b/source/bungie_net/network/transport_endpoint_set_winsock.c
+index 27d5b865..01a83cc5 100644
+--- a/source/bungie_net/network/transport_endpoint_set_winsock.c
++++ b/source/bungie_net/network/transport_endpoint_set_winsock.c
+@@ -173,7 +173,7 @@ extern byte global_nonce[TRANSPORT_NONCE_LENGTH];
+ 
+ /* ---------- private code */
+ 
+-void net_startup_debug(
++static void net_startup_debug(
+ 	void)
+ {
+ 	return;
+@@ -271,6 +271,7 @@ short transport_initialize(
+ 		FILE *bypass_file;
+ 		short wsa_error;
+ 
++		net_startup_debug();
+ 		startup_params.cfgSizeOfStruct = sizeof(startup_params);
+ 		startup_params.cfgPrivatePoolSizeInPages = 24;
+ 		startup_params.cfgEnetReceiveQueueLength = 8;

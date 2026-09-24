@@ -1,0 +1,30 @@
+--- source/ai/action_vehicle.c	2026-09-23 17:32:49.441869600 -0700
++++ source/ai/action_vehicle.c	2026-09-23 18:11:12.448026600 -0700
+@@ -70,13 +70,11 @@
+ 
+ #include "cseries.h"
+ #define distance2d distance2d_inline
+-#define distance3d distance3d_inline
+ #define distance_squared2d distance_squared2d_inline
+ #define negate_vector2d negate_vector2d_inline
+ #include "actions.h"
+ #undef negate_vector2d
+ #undef distance_squared2d
+-#undef distance3d
+ #undef distance2d
+ 
+ #define object_get_bounding_sphere object_get_bounding_sphere_inline
+@@ -199,13 +197,6 @@
+ 	return magnitude2d(vector_from_points2d(a, b, &v));
+ }
+ 
+-real distance3d(
+-	real_point3d const *a,
+-	real_point3d const *b)
+-{
+-	return square_root(distance_squared3d(a, b));
+-}
+-
+ real_vector2d *negate_vector2d(
+ 	real_vector2d const *a,
+ 	real_vector2d *result)

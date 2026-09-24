@@ -1,0 +1,15 @@
+diff --git a/source/math/real_math.h b/source/math/real_math.h
+index 1b2a6b90..3c706e59 100644
+--- a/source/math/real_math.h
++++ b/source/math/real_math.h
+@@ -1502,7 +1502,9 @@ real real_local_random(
+ __inline real real_local_random(
+ 	void)
+ {
+-	return real_seed_random(get_global_local_random_seed_address());
++	real result= real_seed_random(get_global_local_random_seed_address());
++
++	return result;
+ }
+ #endif
+ 

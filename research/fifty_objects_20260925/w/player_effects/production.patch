@@ -1,0 +1,127 @@
+diff --git a/source/effects/player_effects.c b/source/effects/player_effects.c
+index 5c234df9..fdcff0da 100644
+--- a/source/effects/player_effects.c
++++ b/source/effects/player_effects.c
+@@ -901,15 +901,14 @@ void player_effect_get_camera_effect_matrix(
+ 		else
+ 		{
+ 			struct player_effect_datum *effect = player_effect_get(local_player_index);
+-			real_matrix4x3 effect_matrix;
+-			real_matrix4x3 const *source;
+ 			short camera_shake_ticks;
+ 
+ 			if (effect->camera_impulse_time_left > 0 ||
+ 				TEST_FLAG(effect->flags, _player_effect_camera_impulse_just_started_bit))
+ 			{
+-				real_vector3d axis;
++				real_matrix4x3 impulse_matrix;
+ 				real scale;
++				real_vector3d axis;
+ 				real rotation;
+ 				real translation;
+ 
+@@ -919,13 +918,11 @@ void player_effect_get_camera_effect_matrix(
+ 				}
+ 				else
+ 				{
+-					real duration = effect->camera_impulse.temporary_duration;
+-
+ 					scale = effect_scale_value(
+ 						effect->camera_impulse.temporary_transition,
+ 						effect->camera_impulse.temporary_zero_scale_factor,
+-						duration - effect->camera_impulse_time_left,
+-						duration);
++						effect->camera_impulse.temporary_duration - effect->camera_impulse_time_left,
++						effect->camera_impulse.temporary_duration);
+ 				}
+ 
+ 				SET_FLAG(
+@@ -937,39 +934,38 @@ void player_effect_get_camera_effect_matrix(
+ 
+ 				rotation = scale * effect->camera_impulse.temporary_rotation;
+ 				matrix4x3_rotation_from_axis_and_angle(
+-					&effect_matrix,
++					&impulse_matrix,
+ 					&axis,
+ 					sine(rotation),
+ 					cosine(rotation));
+ 
+ 				translation = scale * effect->camera_impulse.temporary_translation;
+-				effect_matrix.position.x = effect->direction.i * translation + effect->jitter.i * scale;
+-				effect_matrix.position.y = effect->direction.j * translation + effect->jitter.j * scale;
+-				effect_matrix.position.z = effect->direction.k * translation + effect->jitter.k * scale;
++				impulse_matrix.position.x = effect->direction.i * translation + effect->jitter.i * scale;
++				impulse_matrix.position.y = effect->direction.j * translation + effect->jitter.j * scale;
++				impulse_matrix.position.z = effect->direction.k * translation + effect->jitter.k * scale;
+ 
+ 				effect->camera_impulse_time_left -= game_time_get_elapsed();
+-				source = &effect_matrix;
++				*matrix = impulse_matrix;
+ 			}
+ 			else
+ 			{
+-				source = global_identity4x3;
++				*matrix = *global_identity4x3;
+ 			}
+ 
+-			*matrix = *source;
+-
+ 			camera_shake_ticks = effect->camera_shake_time_left;
+ 
+ 			if (camera_shake_ticks > 0 ||
+ 				TEST_FLAG(effect->flags, _player_effect_camera_shake_just_started_bit))
+ 			{
+-				struct continuous_player_effect_datum *continuous =
+-					&effect->continuous_effect;
++				real_matrix4x3 shake_matrix;
+ 				real scale;
+ 				real magnitude;
+ 				real random_translation_magnitude;
+ 				real random_rotation_magnitude;
++				struct continuous_player_effect_datum *continuous =
++					&effect->continuous_effect;
+ 
+-				effect_matrix = *global_identity4x3;
++				shake_matrix = *global_identity4x3;
+ 
+ 				if (TEST_FLAG(effect->flags, _player_effect_camera_shake_just_started_bit))
+ 				{
+@@ -977,13 +973,11 @@ void player_effect_get_camera_effect_matrix(
+ 				}
+ 				else
+ 				{
+-					real duration = effect->camera_shake.duration;
+-
+ 					scale = effect_scale_value(
+ 						effect->camera_shake.falloff_transition_function,
+ 						effect->camera_shake.zero_scale_factor,
+-						duration - camera_shake_ticks,
+-						duration);
++						effect->camera_shake.duration - camera_shake_ticks,
++						effect->camera_shake.duration);
+ 				}
+ 
+ 				magnitude = (periodic_function_evaluate(
+@@ -1008,7 +1002,7 @@ void player_effect_get_camera_effect_matrix(
+ 				get_shake_matrix(
+ 					random_translation_magnitude + continuous->translational_shake,
+ 					random_rotation_magnitude + continuous->rotational_shake,
+-					&effect_matrix);
++					&shake_matrix);
+ 
+ 				rumble_player_continuous(
+ 					local_player_index,
+@@ -1026,11 +1020,11 @@ void player_effect_get_camera_effect_matrix(
+ 				get_shake_matrix(
+ 					random_translation_magnitude,
+ 					random_rotation_magnitude,
+-					&effect_matrix);
++					&shake_matrix);
+ 
+ 				effect->camera_shake_time_left -= game_time_get_elapsed();
+ 
+-				matrix4x3_multiply(matrix, &effect_matrix, matrix);
++				matrix4x3_multiply(matrix, &shake_matrix, matrix);
+ 			}
+ 		}
+ 	}

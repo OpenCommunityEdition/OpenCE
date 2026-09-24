@@ -1,0 +1,22 @@
+diff --git a/source/camera/editor_flying_camera.c b/source/camera/editor_flying_camera.c
+index 785da8f4..f442a19d 100644
+--- a/source/camera/editor_flying_camera.c
++++ b/source/camera/editor_flying_camera.c
+@@ -186,7 +186,7 @@ static void translate_orbiting_to_flying(
+    and its camera_mode assertion text agree. The speed scalar is the .data
+    anchor; is_scripted is a private .bss anchor as in January. The 124-byte
+    .bss reserves local_player_index at +0x30. */
+-real editor_camera_speed = 1.f;
++static real editor_camera_speed = 1.f;
+ static long unit_focus = NONE;
+ static boolean is_scripted = FALSE;
+ static boolean use_roll = FALSE;
+@@ -200,7 +200,7 @@ static short local_player_index = 0;
+ static boolean last_scripted = FALSE;
+ static struct persisted_camera_data persisted_cameras[NUMBER_OF_EDITOR_CAMERA_PERSISTED_CAMERA_SLOTS] = { 0 };
+ static unsigned long speed_step = 0;
+-long const editor_camera_speed_steps[NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS] = { 1, 5, 20, 40, 60 };
++static long const editor_camera_speed_steps[NUMBER_OF_EDITOR_CAMERA_SPEED_STEPS] = { 1, 5, 20, 40, 60 };
+ static real const orbiting_camera_field_of_view = DEGREES_TO_RADIANS(70.f);
+ static real const orbiting_camera_scale = 1.f;
+ static real const orbiting_camera_timer = 0.5f;

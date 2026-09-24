@@ -1,0 +1,28 @@
+diff --git a/source/objects/widgets/lightning.c b/source/objects/widgets/lightning.c
+index 1c770a79..57322e9b 100644
+--- a/source/objects/widgets/lightning.c
++++ b/source/objects/widgets/lightning.c
+@@ -161,7 +161,7 @@ static void lightning_offset_marker_position(
+ 
+ /* ---------- globals */
+ 
+-struct lightning_globals lightning_globals = {0};
++static struct lightning_globals lightning_globals = {0};
+ 
+ /* ---------- public code */
+ 
+diff --git a/source/objects/widgets/lightning.h b/source/objects/widgets/lightning.h
+index e48069ad..a0fdda19 100644
+--- a/source/objects/widgets/lightning.h
++++ b/source/objects/widgets/lightning.h
+@@ -67,10 +67,6 @@ void lightning_submit(
+ void lightning_render(
+ 	void);
+ 
+-/* ---------- globals */
+-
+-extern struct lightning_globals lightning_globals;
+-
+ /* ---------- public code */
+ 
+ #endif // __LIGHTNING_H

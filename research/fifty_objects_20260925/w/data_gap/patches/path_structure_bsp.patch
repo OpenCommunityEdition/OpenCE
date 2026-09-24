@@ -1,0 +1,29 @@
+--- a/source/ai/path_structure_bsp.c
++++ b/source/ai/path_structure_bsp.c
+@@ -15,7 +15,8 @@
+ 00052500 0270:
+ 	_structure_test_pill2d (0000)
+ 0024EC0C 0040:
+-	_rdata_0024ec0c (0000)
++	_quantized_pathfinding_surface_widths (0000)
++	_quantized_pathfinding_surface_heights (0020)
+ 0024EC4C 0027:
+ 	??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_structure@ (0000)
+ 0024EC78 0008:
+@@ -64,6 +65,16 @@
+ /* ---------- prototypes */
+ 
+ /* ---------- globals */
++
++static real const quantized_pathfinding_surface_widths[8] =
++{
++	0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f, 4.0f
++};
++
++static real const quantized_pathfinding_surface_heights[8] =
++{
++	0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 4.0f, 8.0f
++};
+ 
+ /* ---------- public code */
+ 

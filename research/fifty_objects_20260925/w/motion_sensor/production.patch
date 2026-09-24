@@ -1,0 +1,95 @@
+--- a/source/interface/motion_sensor.c
++++ b/source/interface/motion_sensor.c
+@@ -276,8 +276,8 @@
+ };
+ 
+ long next_vertex_index= {0};
+-static struct motion_sensor_globals_definition *motion_sensor_globals;
+-static real sweep_theta;
++static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
++static real sweep_theta = 0.f;
+ boolean debug_motion_sensor_draw_all_units= {0};
+ 
+ extern struct motion_sensor_hud_globals *hud_globals;
+@@ -655,8 +655,8 @@
+ 	director_perspective perspective;
+ 	struct motion_sensor_player *player;
+ 	real relative_scale;
+-	real_point2d center;
+ 	short history_index;
++	real_point2d corner;
+ 
+ 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+ 	perspective = director_get_perspective(local_player_index);
+@@ -670,9 +670,9 @@
+ 	relative_scale =
+ 		hud_globals->defaults.motion_sensor_scale /
+ 		hud_globals->defaults.motion_sensor_range;
+-	center.x = (real)reference->x;
+-	center.y = (real)reference->y;
+-	blip_begin(&center, 0, in_multiplayer, local_player_index);
++	corner.x = (real)reference->x;
++	corner.y = (real)reference->y;
++	blip_begin(&corner, 0, in_multiplayer, local_player_index);
+ 
+ 	for (history_index = 0;
+ 		history_index < MOTION_SENSOR_HISTORY_COUNT;
+@@ -687,9 +687,10 @@
+ 		real weight =
+ 			(real)(MOTION_SENSOR_HISTORY_COUNT - history_index) * 0.1f;
+ 		real fade = weight * weight;
+-		real radius = (real)(
+-			power(1.0f - weight, 3.5f) * 7.0 + 1.0);
+ 		short blip_index;
++
++		/* the history weight local is reused for the blip radius */
++		weight = (real)(pow(1.0f - weight, 3.5) * 7.0 + 1.0);
+ 
+ 		for (blip_index = 0;
+ 			blip_index < MAXIMUM_MOTION_SENSOR_BLIPS;
+@@ -699,17 +700,17 @@
+ 
+ 			if (blip->type != _blip_type_none)
+ 			{
+-				real_point2d point;
+-
+-				tiny_point2d_get(&blip->position, &point);
++				real_point2d blip_pos;
++
++				tiny_point2d_get(&blip->position, &blip_pos);
+ 				render_blip(
+ 					sensor,
+ 					blip->type,
+ 					blip->size,
+-					&point,
++					&blip_pos,
+ 					relative_scale,
+ 					fade,
+-					radius);
++					weight);
+ 			}
+ 		}
+ 
+@@ -725,17 +726,17 @@
+ 			if (game_engine_get_goal_in_use(
+ 				(short)sensor->custom_blip_goal_indices[blip_index]))
+ 			{
+-				real_point2d point;
+-
+-				tiny_point2d_get(&sensor->custom_blips[blip_index], &point);
++				real_point2d blip_pos;
++
++				tiny_point2d_get(&sensor->custom_blips[blip_index], &blip_pos);
+ 				render_blip(
+ 					sensor,
+ 					_blip_type_custom,
+ 					_hud_blip_type_medium,
+-					&point,
++					&blip_pos,
+ 					relative_scale,
+ 					fade,
+-					radius);
++					weight);
+ 			}
+ 		}
+ 	}

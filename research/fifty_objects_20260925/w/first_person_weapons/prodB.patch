@@ -1,0 +1,240 @@
+diff --git a/source/interface/first_person_weapons.c b/source/interface/first_person_weapons.c
+index 0b21abfd..4efaa99a 100644
+--- a/source/interface/first_person_weapons.c
++++ b/source/interface/first_person_weapons.c
+@@ -97,9 +97,6 @@ symbols in this file:
+ /* ---------- headers */
+ 
+ #define REAL_MATH_EXTERNAL_SIGNED_ANGULAR_DIFFERENCE
+-#define REAL_MATH_EXTERNAL_SQUARE_ROOT
+-#define REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
+-#define REAL_MATH_EXTERNAL_MAGNITUDE3D
+ #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
+ #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
+ #include "interface/first_person_weapons.h"
+@@ -359,6 +356,9 @@ static void first_person_weapon_switch_weapons(
+ static void first_person_weapon_new_unit(
+ 	short local_player_index,
+ 	long unit_index);
++static void first_person_weapon_message(
++	short local_player_index,
++	short message_type);
+ static void first_person_weapon_next_state(
+ 	short local_player_index);
+ static void first_person_weapon_update(
+@@ -1316,7 +1316,7 @@ static void first_person_weapon_build_node_matrices(
+ 	return;
+ }
+ 
+-void first_person_weapon_message(
++static void first_person_weapon_message(
+ 	short local_player_index,
+ 	short message_type)
+ {
+@@ -1670,7 +1670,7 @@ static void first_person_weapon_update(
+ 		struct weapon_datum *weapon= weapon_get(first_person_weapon->weapon_index);
+ 		struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
+ 		struct animation_graph *animation_graph;
+-		long triggered_sound_index;
++		long sound_definition_index;
+ 		short animation_update_result;
+ 		boolean moving;
+ 
+@@ -1697,23 +1697,25 @@ static void first_person_weapon_update(
+ 			}
+ 		}
+ 
+-		animation_update_result= animation_update_internal(
+-			animation_update_kind_render_only,
++		animation_update_result= animation_update_render_only(
+ 			weapon_definition->weapon.interface_definition.first_person_animations.index,
+ 			&first_person_weapon->state_animation,
+-			&triggered_sound_index);
+-		if (animation_update_result==_animation_key_frame ||
+-			animation_update_result==_animation_will_restart_on_next_frame)
++			&sound_definition_index);
++		if (animation_update_result==_animation_key_frame)
++		{
++			/* a key frame does not advance the first-person weapon state */
++		}
++		else if (animation_update_result==_animation_will_restart_on_next_frame)
+ 		{
+ 			first_person_weapon_next_state(local_player_index);
+ 		}
+ 
+-		if (triggered_sound_index!=NONE &&
++		if (sound_definition_index!=NONE &&
+ 			director_get_perspective(local_player_index)==_director_perspective_first_person)
+ 		{
+ 			first_person_weapon->current_sound_index= object_impulse_sound_new(
+ 				first_person_weapon->weapon_index,
+-				triggered_sound_index,
++				sound_definition_index,
+ 				NONE,
+ 				global_origin3d,
+ 				global_forward3d,
+@@ -1729,8 +1731,7 @@ static void first_person_weapon_update(
+ 
+ 		if (first_person_weapon->moving_animation.index!=NONE)
+ 		{
+-			animation_update_internal(
+-				animation_update_kind_render_only,
++			animation_update_render_only(
+ 				weapon_definition->weapon.interface_definition.first_person_animations.index,
+ 				&first_person_weapon->moving_animation,
+ 				NULL);
+@@ -1753,10 +1754,15 @@ static void first_person_weapon_update(
+ 						0,
+ 						struct animation_graph_first_person_weapon_animations);
+ 
++			/* BUG (preserved for exact matching): January (and the later first-party
++			 * build at /Od 0x61fcea) reads the animations block through this pointer
++			 * without testing the NULL an empty first_person_weapon_animations block
++			 * produces.  switch_weapons only commits a weapon whose graph has the block,
++			 * so the path is unreachable in practice; a corrected build should test
++			 * first_person_weapon_animations first. */
+ 			first_person_weapon->moving_animation.frame_index= 0;
+ 			first_person_weapon->moving_animation.index=
+-				first_person_weapon_animations &&
+-					first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
++				first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
+ 					animation_graph_animation_index_get(
+ 						&first_person_weapon_animations->animations)
+ 							[_first_person_weapon_animation_moving].animation_index :
+@@ -1775,10 +1781,11 @@ static void first_person_weapon_update(
+ 							0,
+ 							struct animation_graph_first_person_weapon_animations);
+ 
++				/* BUG (preserved for exact matching): the same unguarded read as the
++				 * moving animation above (January and /Od 0x61fd96). */
+ 				first_person_weapon->overcharged_jitter_animation.frame_index= 0.0f;
+ 				first_person_weapon->overcharged_jitter_animation.index=
+-					first_person_weapon_animations &&
+-						first_person_weapon_animations->animations.count>
++					first_person_weapon_animations->animations.count>
+ 						_first_person_weapon_animation_overcharged_jitter ?
+ 						animation_graph_animation_index_get(
+ 							&first_person_weapon_animations->animations)
+@@ -1805,6 +1812,8 @@ static void first_person_weapon_update(
+ 
+ 		if (first_person_weapon->rendered)
+ 		{
++			real_vector2d turning;
++
+ 			accelerate_to_position(
+ 				&first_person_weapon->position.i,
+ 				&first_person_weapon->position_velocity.i,
+@@ -1824,36 +1833,34 @@ static void first_person_weapon_update(
+ 				1.0f,
+ 				FALSE);
+ 
+-			{
+-				real turning_i= signed_angular_difference(
+-					first_person_weapon->last_render_facing.yaw,
+-					first_person_weapon->render_facing.yaw)*30.0f;
+-				real turning_j= signed_angular_difference(
+-					first_person_weapon->last_render_facing.pitch,
+-					first_person_weapon->render_facing.pitch)*-30.0f;
+-
+-				turning_i= PIN(turning_i, -1.0f, 1.0f);
+-				turning_j= PIN(turning_j, -1.0f, 1.0f);
+-
+-				accelerate_to_position(
+-					&first_person_weapon->turning.i,
+-					&first_person_weapon->turning_velocity.i,
+-					turning_i,
+-					0.03f,
+-					0.2f,
+-					-1.0f,
+-					1.0f,
+-					FALSE);
+-				accelerate_to_position(
+-					&first_person_weapon->turning.j,
+-					&first_person_weapon->turning_velocity.j,
+-					turning_j,
+-					0.03f,
+-					0.2f,
+-					-1.0f,
+-					1.0f,
+-					FALSE);
+-			}
++			turning.i= signed_angular_difference(
++				first_person_weapon->last_render_facing.yaw,
++				first_person_weapon->render_facing.yaw)*30.0f;
++			turning.j= signed_angular_difference(
++				first_person_weapon->last_render_facing.pitch,
++				first_person_weapon->render_facing.pitch)*-30.0f;
++
++			turning.i= PIN(turning.i, -1.0f, 1.0f);
++			turning.j= PIN(turning.j, -1.0f, 1.0f);
++
++			accelerate_to_position(
++				&first_person_weapon->turning.i,
++				&first_person_weapon->turning_velocity.i,
++				turning.i,
++				0.03f,
++				0.2f,
++				-1.0f,
++				1.0f,
++				FALSE);
++			accelerate_to_position(
++				&first_person_weapon->turning.j,
++				&first_person_weapon->turning_velocity.j,
++				turning.j,
++				0.03f,
++				0.2f,
++				-1.0f,
++				1.0f,
++				FALSE);
+ 		}
+ 
+ 		accelerate_to_position(
+diff --git a/source/interface/first_person_weapons.h b/source/interface/first_person_weapons.h
+index 0432eea5..355e6ea9 100644
+--- a/source/interface/first_person_weapons.h
++++ b/source/interface/first_person_weapons.h
+@@ -75,9 +75,6 @@ void first_person_weapon_message_from_weapon(
+ struct real_matrix4x3 *first_person_weapon_get_node_matrix(
+ 	short local_player_index,
+ 	short node_index);
+-void first_person_weapon_message(
+-	short local_player_index,
+-	short message_type);
+ 
+ /* ---------- globals */
+ 
+diff --git a/config/symbols.json b/config/symbols.json
+index d0a16b3a..05353345 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -3520,7 +3520,7 @@
+ { "file_offset": 839936, "flags": 32, "name": "_first_person_weapon_set_state", "static": true },
+ { "file_offset": 840624, "flags": 32, "name": "_first_person_weapon_switch_weapons", "static": true },
+ { "file_offset": 841232, "flags": 32, "name": "_first_person_weapon_new_unit", "static": true },
+-{ "file_offset": 841328, "flags": 32, "name": "_first_person_weapon_message" },
++{ "file_offset": 841328, "flags": 32, "name": "_first_person_weapon_message", "static": true },
+ { "file_offset": 841872, "flags": 32, "name": "_first_person_weapon_message_from_unit" },
+ { "file_offset": 841952, "flags": 32, "name": "_first_person_weapon_message_from_weapon" },
+ { "file_offset": 842016, "flags": 32, "name": "_first_person_weapon_next_state", "static": true },
+diff --git a/config/parked.json b/config/parked.json
+index c738bc76..4a1083df 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1411,17 +1411,6 @@
+         "objdiff_percent": 62.452587
+       }
+     },
+-    {
+-      "unit": "source/interface/first_person_weapons",
+-      "function": "_first_person_weapon_update",
+-      "class": "unclassified",
+-      "evidence": "Complete HCEA-corroborated first-person weapon state machine retained from the 2026-09-12 update cluster. It has the real callers, typed accessors, and four-player January loop, but the current production inline schedule remains non-exact and emits one extra relocation; no forced-inline or source-pressure device is admitted. This body and its non-owned helper schedule receive zero credit. See docs/object_matching_logs/first_person_weapons_obj_update_cluster_reconciliation_20260912.md.",
+-      "measurements": {
+-        "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
+-        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "a112cf32c0e3baf805bd69c440b5beadbe51394f6a7f3161f61d4c470ea88292" },
+-        "objdiff_percent": 93.48387
+-      }
+-    },
+     {
+       "unit": "source/math/geometry",
+       "function": "_convex_polygon2d_clip_to_plane",

@@ -1,0 +1,35 @@
+--- source/ai/action_vehicle.c	2026-09-23 17:32:49.441869600 -0700
++++ source/ai/action_vehicle.c	2026-09-23 18:17:32.524234400 -0700
+@@ -79,9 +79,7 @@
+ #undef distance3d
+ #undef distance2d
+ 
+-#define object_get_bounding_sphere object_get_bounding_sphere_inline
+ #include "actors.h"
+-#undef object_get_bounding_sphere
+ 
+ #include "actor_definitions.h"
+ #include "ai_debug.h"
+@@ -165,22 +163,6 @@
+ 
+ /* ---------- public code */
+ 
+-void object_get_bounding_sphere(
+-	long object_index,
+-	real_point3d *center,
+-	real *radius)
+-{
+-	struct object_datum *object = object_get(object_index);
+-
+-	match_assert("..\\objects\\objects.h", 535, center);
+-	match_assert("..\\objects\\objects.h", 536, radius);
+-
+-	*center = object->object.bounding_sphere_center;
+-	*radius = object->object.bounding_sphere_radius;
+-
+-	return;
+-}
+-
+ real distance_squared2d(
+ 	real_point2d const *a,
+ 	real_point2d const *b)
