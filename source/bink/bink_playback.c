@@ -612,9 +612,9 @@ void bink_playback_start(
 			bink_bitmap.type= _bitmap_type_2d;
 			bink_bitmap.format= _bitmap_format_x8r8g8b8;
 			bink_bitmap.flags= FLAG(_bitmap_linear_bit);
-			bink_bitmap.pixel_data_size= bitmap_format_get_bits_per_pixel(bink_bitmap.format)*bink_bitmap.height*bink_bitmap.width/8;
-			bink_bitmap.bitmap_tag_index= NONE;
-			bink_bitmap.bitmap_data_pointer= (void *)NONE;
+			bink_bitmap.pixels_size= bitmap_format_get_bits_per_pixel(bink_bitmap.format)*bink_bitmap.height*bink_bitmap.width/8;
+			bink_bitmap.tag_index= NONE;
+			bink_bitmap.cache_block_index= NONE;
 			bink_bitmap.hardware_format= bink_globals.texture;
 			bink_bitmap.base_address= (void *)NONE;
 			bink_globals.screen_geometry.map[0]= &bink_bitmap;

@@ -17,19 +17,19 @@ symbols in this file:
 001AE600 0060:
 	_texture_cache_return_memory (0000)
 001AE660 0030:
-	_texture_cache_debug_block_name (0000)
+	_texture_cache_name_block_proc (0000)
 001AE690 0090:
 	_bitmap_format_to_d3d_format (0000)
 001AE720 0090:
 	_bitmap_format_to_d3d_linear_format (0000)
 001AE7B0 0030:
-	_texture_cache_debug_bitmap_compare (0000)
+	_compare (0000)
 001AE7E0 0010:
-	_code_001ae7e0 (0000)
+	_IDirect3DDevice8_IsBusy@4 (0000)
 001AE7F0 0010:
-	_code_001ae7f0 (0000)
+	_IDirect3DDevice8_KickPushBuffer@4 (0000)
 001AE800 0010:
-	_code_001ae800 (0000)
+	_IDirect3DBaseTexture8_IsBusy@4 (0000)
 001AE810 0010:
 	_IDirect3DBaseTexture8_Register@8 (0000)
 001AE820 0020:
@@ -39,15 +39,15 @@ symbols in this file:
 001AE880 00a0:
 	_texture_cache_delete_block_proc (0000)
 001AE920 0150:
-	_code_001ae920 (0000)
+	_texture_cache_initialize_hardware_format (0000)
 001AEA70 0100:
-	_code_001aea70 (0000)
+	_render_inverse_transform_screen_point (0000)
 001AEB70 00b0:
 	_texture_cache_new (0000)
 001AEC20 0050:
 	_texture_cache_close (0000)
 001AEC70 00e0:
-	_code_001aec70 (0000)
+	_texture_cache_start_loading_bitmap (0000)
 001AED50 0310:
 	_texture_cache_debug_render (0000)
 001AF060 01f0:
@@ -97,9 +97,12 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "cseries/sort.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps_internal.h"
 #include "bitmaps/bitmaps_mipmap.h"
 #include "cache/cache_files.h"
 #include "cache/texture_cache.h"
+#include "cache/xbox_texture_cache.h"
 #include "cache/physical_memory_map.h"
 #include "interface/interface.h"
 #include "interface/terminal.h"
@@ -109,6 +112,7 @@ symbols in this file:
 #include "memory/lruv_cache.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_swizzle.h"
+#include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -190,33 +194,6 @@ enum
 
 /* ---------- structures */
 
-struct bitmap_data
-{
-	unsigned long bitmap_class;
-	short width;
-	short height;
-	short depth;
-	short type;
-	short format;
-	unsigned short flags;
-	short registration_point_x;
-	short registration_point_y;
-	unsigned short mipmap_count;
-	unsigned short reserved16;
-	unsigned long pixel_data_offset;
-	long pixel_data_size;
-	long bitmap_tag_index;
-	long cache_block_index;
-	void *hardware_format;
-	void *base_address;
-};
-
-struct xbox_bitmap_group_prefix
-{
-	byte reserved0000[0x30];
-	struct tag_data processed_pixel_data;
-};
-
 struct xbox_texture_cache_globals
 {
 	struct data_array *textures;
@@ -231,7 +208,6 @@ struct xbox_texture_cache_texture
 	short read_request_handle;
 	boolean loaded;
 	boolean used;
-	byte reserved006[2];
 	struct bitmap_data *bitmap;
 	D3DBaseTexture hardware_format;
 };
@@ -241,28 +217,6 @@ struct texture_cache_debug_options
 	boolean graph;
 	boolean list;
 };
-
-typedef char verify_bitmap_data_flags_offset[
-	offsetof(struct bitmap_data, flags) == 0xE ? 1 : -1];
-typedef char verify_bitmap_data_pixel_data_offset_offset[
-	offsetof(struct bitmap_data, pixel_data_offset) == 0x18 ? 1 : -1];
-typedef char verify_bitmap_data_pixel_data_size_offset[
-	offsetof(struct bitmap_data, pixel_data_size) == 0x1C ? 1 : -1];
-typedef char verify_bitmap_data_bitmap_tag_index_offset[
-	offsetof(struct bitmap_data, bitmap_tag_index) == 0x20 ? 1 : -1];
-typedef char verify_bitmap_data_cache_block_index_offset[
-	offsetof(struct bitmap_data, cache_block_index) == 0x24 ? 1 : -1];
-typedef char verify_bitmap_data_hardware_format_offset[
-	offsetof(struct bitmap_data, hardware_format) == 0x28 ? 1 : -1];
-typedef char verify_bitmap_data_base_address_offset[
-	offsetof(struct bitmap_data, base_address) == 0x2C ? 1 : -1];
-typedef char verify_bitmap_data_size[
-	sizeof(struct bitmap_data) == 0x30 ? 1 : -1];
-typedef char verify_xbox_bitmap_group_pixel_data_file_offset[
-	(offsetof(
-		struct xbox_bitmap_group_prefix,
-		processed_pixel_data) +
-	 offsetof(struct tag_data, file_offset)) == 0x38 ? 1 : -1];
 
 typedef char verify_xbox_texture_cache_textures_offset[
 	offsetof(
@@ -302,28 +256,16 @@ typedef char verify_xbox_texture_cache_texture_size[
 	sizeof(struct xbox_texture_cache_texture) == 0x20 ? 1 : -1];
 /* ---------- prototypes */
 
-long bitmap_get_pixel_data_size(
-	struct bitmap_data *bitmap);
-
-void texture_cache_debug_render(
-	void);
-
 static boolean texture_cache_locked_block_proc(
 	long block_index);
 static void texture_cache_delete_block_proc(
 	long block_index);
-static const char *texture_cache_debug_block_name(
+static const char *texture_cache_name_block_proc(
 	long block_index);
-long bitmap_format_to_d3d_format(
-	short format,
-	word flags);
-long bitmap_format_to_d3d_linear_format(
-	short format,
-	word flags);
-static boolean texture_cache_debug_bitmap_compare(
+static boolean compare(
 	struct bitmap_data *first,
 	struct bitmap_data *second);
-static void texture_cache_build_hardware_format(
+static void texture_cache_initialize_hardware_format(
 	struct bitmap_data *bitmap,
 	D3DBaseTexture *texture);
 static void render_inverse_transform_screen_point(
@@ -387,7 +329,6 @@ static struct xbox_texture_cache_globals xbox_texture_cache_globals;
 struct texture_cache_debug_options texture_cache_debug_options = {0};
 boolean debug_texture_cache = FALSE;
 static unsigned long texture_cache_last_failure_time = 0;
-extern D3DDevice global_d3d_device;
 
 /* ---------- public code */
 
@@ -420,7 +361,7 @@ void texture_cache_bitmap_new(
 	long bitmap_tag_index,
 	struct bitmap_data *bitmap)
 {
-	struct xbox_bitmap_group_prefix *bitmap_group;
+	struct bitmap_group *bitmap_group;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
@@ -430,11 +371,10 @@ void texture_cache_bitmap_new(
 	bitmap->cache_block_index = NONE;
 	bitmap->base_address = NULL;
 	bitmap->hardware_format = NULL;
-	bitmap_group = tag_get('bitm', bitmap_tag_index);
-	bitmap->pixel_data_offset +=
-		bitmap_group->processed_pixel_data.file_offset;
-	bitmap->pixel_data_size = bitmap_get_pixel_data_size(bitmap);
-	bitmap->bitmap_tag_index = bitmap_tag_index;
+	bitmap_group = bitmap_group_get(bitmap_tag_index);
+	bitmap->pixels_offset += bitmap_group->pixel_data.file_offset;
+	bitmap->pixels_size = bitmap_get_pixel_data_size(bitmap);
+	bitmap->tag_index = bitmap_tag_index;
 	bitmap->base_address = NULL;
 	bitmap->hardware_format = NULL;
 	bitmap->cache_block_index = NONE;
@@ -526,14 +466,14 @@ void texture_cache_return_memory(
 	return;
 }
 
-static const char *texture_cache_debug_block_name(
+static const char *texture_cache_name_block_proc(
 	long block_index)
 {
 	struct xbox_texture_cache_texture *texture = datum_get(
 		xbox_texture_cache_globals.textures,
 		block_index);
 
-	return tag_get_name(texture->bitmap->bitmap_tag_index);
+	return tag_get_name(texture->bitmap->tag_index);
 }
 
 long bitmap_format_to_d3d_format(
@@ -584,7 +524,7 @@ long bitmap_format_to_d3d_linear_format(
 	return table[format];
 }
 
-static boolean texture_cache_debug_bitmap_compare(
+static boolean compare(
 	struct bitmap_data *first,
 	struct bitmap_data *second)
 {
@@ -597,8 +537,8 @@ static boolean texture_cache_debug_bitmap_compare(
 void texture_cache_flush(
 	void)
 {
-	IDirect3DDevice8_KickPushBuffer(&global_d3d_device);
-	IDirect3DDevice8_IsBusy(&global_d3d_device);
+	IDirect3DDevice8_KickPushBuffer(global_d3d_device);
+	IDirect3DDevice8_IsBusy(global_d3d_device);
 	lruv_flush(xbox_texture_cache_globals.cache);
 
 	return;
@@ -646,7 +586,7 @@ static void texture_cache_delete_block_proc(
 	return;
 }
 
-static void texture_cache_build_hardware_format(
+static void texture_cache_initialize_hardware_format(
 	struct bitmap_data *bitmap,
 	D3DBaseTexture *texture)
 {
@@ -789,7 +729,7 @@ static boolean texture_cache_start_loading_bitmap(
 	byte *base_address;
 	long size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
 
-	size = MAX(size, bitmap->pixel_data_size);
+	size = MAX(size, bitmap->pixels_size);
 	cache_block_index = lruv_block_new(
 		xbox_texture_cache_globals.cache,
 		size);
@@ -815,11 +755,11 @@ static boolean texture_cache_start_loading_bitmap(
 		bitmap->cache_block_index = cache_block_index;
 		bitmap->base_address = base_address;
 		texture->bitmap = bitmap;
-		texture_cache_build_hardware_format(bitmap, &texture->hardware_format);
+		texture_cache_initialize_hardware_format(bitmap, &texture->hardware_format);
 		texture->read_request_handle = cache_file_read(
-			bitmap->bitmap_tag_index,
-			bitmap->pixel_data_offset,
-			bitmap->pixel_data_size,
+			bitmap->tag_index,
+			bitmap->pixels_offset,
+			bitmap->pixels_size,
 			base_address,
 			&texture->loaded,
 			block);
@@ -921,7 +861,7 @@ void texture_cache_debug_render(
 		{
 			struct bitmap_data *bitmap = texture->bitmap;
 
-			if (bitmap->bitmap_tag_index != NONE)
+			if (bitmap->tag_index != NONE)
 			{
 				texture_cache_debug_bitmaps[bitmap_count++] = bitmap;
 			}
@@ -929,7 +869,7 @@ void texture_cache_debug_render(
 		qsort_4byte(
 			(long *)texture_cache_debug_bitmaps,
 			bitmap_count,
-			(boolean (*)(long, long))texture_cache_debug_bitmap_compare);
+			(boolean (*)(long, long))compare);
 
 		font_index = interface_get_tag_index(_interface_font_terminal);
 		tab_stops[0] = rasterizer_globals.reserved04.frame_bounds.x0;
@@ -951,7 +891,7 @@ void texture_cache_debug_render(
 				"|t%d|t%s%s",
 				rasterizer_xbox_bitmap_get_pixel_data_size(texture_cache_debug_bitmaps[bitmap_index]),
 				touched_string,
-				tag_get_name(texture_cache_debug_bitmaps[bitmap_index]->bitmap_tag_index));
+				tag_get_name(texture_cache_debug_bitmaps[bitmap_index]->tag_index));
 			bounds.y0 = (bitmap_count - bitmap_index) * 10 + 35;
 			bounds.x0 = 10;
 			bounds.y1 = bounds.x1 = SHORT_MAX;
@@ -995,7 +935,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 				{
 					console_warning(
 						"%s",
-						tag_get_name(bitmap->bitmap_tag_index));
+						tag_get_name(bitmap->tag_index));
 				}
 				cache_file_promote_read(texture->read_request_handle);
 			}
@@ -1041,11 +981,11 @@ void *_texture_cache_bitmap_get_hardware_format(
 				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 			lruv_debug_to_file(
 				"d:\\stabbed.txt",
-				tag_get_name(bitmap->bitmap_tag_index),
-				bitmap->pixel_data_size,
+				tag_get_name(bitmap->tag_index),
+				bitmap->pixels_size,
 				xbox_texture_cache_globals.cache,
 				scenario_debug_to_file,
-				texture_cache_debug_block_name);
+				texture_cache_name_block_proc);
 			texture_cache_last_failure_time = system_milliseconds();
 		}
 		hardware_format = rasterizer_get_bitmap_default_hardware_format(bitmap);
