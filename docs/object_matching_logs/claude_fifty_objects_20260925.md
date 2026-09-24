@@ -241,22 +241,60 @@ Both happened inside reviewer agents, and both were repaired byte-exact before i
 The integrator verified that the tree was clean and hs.c all-CRLF before batch 4. The worker
 brief now forbids destructive commands outside a worker's slug and running unread repo scripts.
 
-## Running tallies (vs frozen base e9e62b78, objdiff 3.3.1; at 6e3e2d35)
+## Batch 5 (466698b8 hud_unit, cdc8ebd3 hygiene)
+
+Result: Halo objects **378 -> 379** (+1). The stable diff is unchanged (0 moved rows) and there are
+**0 regressions**. Parks 86 / 0 / 0. Admission 11 / 0 / 2 / 0. pytest 1,157 / 5 / 26.
+
+| Object | Work | Evidence |
+|---|---|---|
+| interface/hud_unit | header inline + house-rule fix | January's 26 stack-sentinel sites across hud_draw, hud_unit, hud_nav_points, hud_weapon and motion_sensor share one inlined shape. Both asserts at each site carry one line literal, so it is a macro. January's 48-byte `_check_stack_buffer` has no relocations anywhere. The Sept-2001 map flags the helper as an inline COMDAT (`i hud_draw.obj`). `hud_draw.h` now carries the unchanged body as a header `__inline` plus the sentinel macro (`match_assert_stack_frame`; descriptive name, since neither /Od nor HCEX has the sentinel). That removes hud_unit's invented gotos. hud_nav_points and hud_weapon use it too; their callers are exact. motion_sensor keeps its copy, because its sentinel callers are residual (rule i). Also: the reviewer-amended names and storage, and retirement of the `_fast_ftol` rejection (identical copy; pair links pass both ways). `hud_stack_check`, `review4_hud_unit`, `review4_hud_draw` |
+
+**Disclosed, pending owner ruling (P7).** The packet drops rasterizer_xbox_models' `#include
+"interface/hud_draw.h"`:
+
+- The include is genuinely dead: it was added by project commit 635bd83d, and the file uses no name
+  from the header. Removing it is raw- and warning-inert.
+- It is load-bearing only as declared-name shielding. The inline adds about 9 names, which would
+  flip `__rasterizer_model_transparent_geometry_submit` (1,296 B).
+- It is not the held add-declarations class (Layer 2, main header_swap), but it is a count effect
+  and is disclosed as one.
+- If the owner rejects it, revert 466698b8. That loses the hud_unit admission; nothing else was
+  exact because of it.
+
+Zero-credit hygiene in cdc8ebd3:
+
+- geometry drops its NODUP `plane2d_distance_to_point` copy, which removes a latent
+  collision_bsp<->geometry LNK2005;
+- collision_bsp `collision_bsp_usage_times` is static;
+- rasterizer_lights P1: HCEX file statics with January's .bss layout;
+- motion_sensor .bss symbol layout is fixed;
+- rasterizer_xbox_models: five D3D wrapper rows are static.
+
+Wave 4 found no new strict function. Every remaining residual in those lanes falls into one of
+three groups:
+
+- the authentic-bug owner class: crosshairs_draw, hud_update_weapon_local_player,
+  motion_sensor_update, rasterizer_lights_reset_for_new_map;
+- the P1 class, where a new header COMDAT would come from a non-exact caller;
+- scheduler/allocator ties where the stop rule fired (evidence in `results/wave4/`).
+
+## Running tallies (vs frozen base e9e62b78, objdiff 3.3.1; at cdc8ebd3)
 
 | Tally | Value |
 |---|---|
-| 1. Net newly COMPLETE Halo objects | **17** (361 -> 378) |
+| 1. Net newly COMPLETE Halo objects | **18** (361 -> 379); checkpoints: 10 at b9a8d587 |
 | 2. New strict functions | **14** (stable diff; 0 regressions) |
 | 3. New meaningful exact bytes | **8,775** |
 | 4. New padded exact bytes | **8,864** |
-| 5. New verified data bytes / admission-only closures | **3,294** data (1,530 + 1,564 + 200); 11 admission-only closures (objects, units, render_objects, actor_firing_position, path, biped_limp_noodle, leaf_map, model_animations, collision_debug, player_ui, rasterizer_xbox_dynavobgeom) |
+| 5. New verified data bytes / admission-only closures | **3,294** data (1,530 + 1,564 + 200); 12 admission-only closures (objects, units, render_objects, actor_firing_position, path, biped_limp_noodle, leaf_map, model_animations, collision_debug, player_ui, rasterizer_xbox_dynavobgeom, hud_unit) |
 | 6. Fuzzy improvements at zero credit | `_main_update_time` 62.64 -> 98.99; `_main_frame_rate_debug` 94.52 -> 98.65; `_player_profile_write_thread_proc@4` 88.41 -> 88.45; first_person_weapons A (95.21506); plus the FUZZY_IMPROVED rows in the research results |
 | Scorer-only effects | +147 code / +7 functions (`$L` label credit from status flips). NOT taken: objdiff 3.6.0 would credit hs's 54,780 data bytes and actions' 2,404 at zero source cost |
 | Regressions / revocations | 0 / 0 |
 
 Contingent on the Layer 2 ruling: `_convex_hull2d_perimeter` (96), `_player_set_action_result`
 (240), and the leaf_map, biped_limp_noodle, actor_firing_position, path and model_animations
-admissions (see the Layer 2 section).
+admissions (see the Layer 2 section). Contingent on the P7 ruling: the hud_unit admission (see batch 5).
 
 ## Held for owner rulings (not landed; evidence preserved)
 
