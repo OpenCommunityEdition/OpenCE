@@ -128,11 +128,11 @@
         "base": {
           "size": 384,
           "relocation_count": 27,
-          "normalized_sha256": "839937d5e05bba8840732fd3c229c8f0829b7b35c43bcf2391c459165baaf3c0"
+          "normalized_sha256": "bbb652e083aadc92e51e4445f93d49d41941e7c53f50cc1883658c355aa579cb"
         },
-        "objdiff_percent": 88.40708
+        "objdiff_percent": 88.451324
       },
-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the genuine thread callback, mutex/file/checksum/metadata lifecycle and typed 512-byte file block, with initialized padding rather than serializing stack bytes. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the genuine thread callback, mutex/file/checksum/metadata lifecycle and typed 512-byte file block, with initialized padding rather than serializing stack bytes. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md."
     },
     {
       "unit": "source/saved games/player_profile",
@@ -931,25 +931,6 @@
       }
     },
     {
-      "unit": "source/objects/damage",
-      "function": "_object_damage_body",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete body-damage stage in ordinary typed C. January COFF is the byte and ABI authority; independent HCEA source and Stian's PC lift corroborate occupied-only damage, falling-damage difficulty handling, friendly resistance, headshots, regional damage and destruction, deathless-player child traversal, body thresholds, localized and area effects, and output multipliers. The named material fields preserve the authenticated 0x48 layout and exact +0x28/+0x2C/+0x3C offsets; region flags and damage categories use genuine enum constants, and typed tag/object access macros own all subsystem retrieval. The target occupies 1360 padded / 1347 meaningful bytes with 43 relocations; the retained house-rule candidate occupies 1392 padded / 1389 meaningful bytes with 44 relocations and objdiff reports 88.00236 percent similarity. The extra lookup/relocation is the honest typed unit_get boundary after a generic child object type check. Fable's 1360-byte 98.31-percent probe used a repeated raw object_get downcast to unit_datum; it is explicitly rejected under the typed-access house rule and receives no exact credit. The separately reconstructed private helpers damage_effect_new_at_location and object_destroy_region are strict exact under their exact-tier symbol aliases. No fake matching, raw offset, false prototype, volatile/register forcing, barrier, optimizer pragma, assembly, undefined behavior, nonsensical branch, or fake context is retained. Reopen for authoritative January source/local records or a natural owner-safe accessor arrangement that improves code generation without violating typed access.",
-      "measurements": {
-        "target": {
-          "size": 1360,
-          "relocation_count": 43,
-          "normalized_sha256": "15116626eee783a53894c24ec0e9cb3cf2ad2a5734d7c3de99a15e2df4aa460e"
-        },
-        "base": {
-          "size": 1392,
-          "relocation_count": 44,
-          "normalized_sha256": "9e29dfe9abf1237a6bea6282926123f9fa15d7140977f2cfa1dedd6c68960412"
-        },
-        "objdiff_percent": 88.00236
-      }
-    },
-    {
       "unit": "source/physics/collision_bsp",
       "function": "_collision_surface_test_sphere",
       "class": "unclassified",
@@ -1235,22 +1216,22 @@
       "unit": "source/main/main",
       "function": "_main_frame_rate_debug",
       "class": "unclassified",
-      "evidence": "Complete natural frame-rate diagnostic state machine retained from the 2026-09-09 Main packet. It uses the authenticated Main state, project types, and ordinary file/time APIs. The candidate is 528 padded bytes with 51 relocations versus January's 544 bytes and 52 relocations; the remaining code-generation difference is explicitly fuzzy. No barrier, volatile carrier, fake dependency, raw address, or exact-only branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.  2026-09-22: two January-attested corrections landed. The sample-index wrap is a SIGNED modulo in January (movsx/and 0x80000007/jns fixup), so NUMBEROF (size_t) was wrong and the divisor is a signed 8; this closed the whole 16-byte size gap and the candidate is now 544 padded bytes, exactly January's size. The slow-frame threshold literal is 0.036000000000000004 (__real@3fa26e978d4fdf3c), one ULP above the decimal 0.036 we had, so January's source folds an expression rather than writing the decimal; spelled 1.08/TICKS_PER_SECOND, which reproduces the constant exactly. The remaining residual is one duplicated framerate_sample_index load that January's jump-threading emits on the debug-true edge (51 vs 52 relocations) plus the register assignment that follows from it.",
+      "evidence": "Complete natural frame-rate diagnostic state machine retained from the 2026-09-09 Main packet. It uses the authenticated Main state, project types, and ordinary file/time APIs. The candidate is 528 padded bytes with 51 relocations versus January's 544 bytes and 52 relocations; the remaining code-generation difference is explicitly fuzzy. No barrier, volatile carrier, fake dependency, raw address, or exact-only branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.  2026-09-22: two January-attested corrections landed. The sample-index wrap is a SIGNED modulo in January (movsx/and 0x80000007/jns fixup), so NUMBEROF (size_t) was wrong and the divisor is a signed 8; this closed the whole 16-byte size gap and the candidate is now 544 padded bytes, exactly January's size. The slow-frame threshold literal is 0.036000000000000004 (__real@3fa26e978d4fdf3c), one ULP above the decimal 0.036 we had, so January's source folds an expression rather than writing the decimal; spelled 1.08/TICKS_PER_SECOND, which reproduces the constant exactly. The remaining residual is one duplicated framerate_sample_index load that January's jump-threading emits on the debug-true edge (51 vs 52 relocations) plus the register assignment that follows from it.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md.",
       "measurements": {
         "target": { "size": 544, "relocation_count": 52, "normalized_sha256": "17546b1f02410f30e6fc728300d275c40d65bf6cb6a35a096a8d735f96512d83" },
-        "base": { "size": 544, "relocation_count": 51, "normalized_sha256": "c2c8fd8f775a01fc893be42b6223733665e2bf7845312f06a1725aa626af419b" },
-        "objdiff_percent": 94.51923
+        "base": { "size": 544, "relocation_count": 51, "normalized_sha256": "3c132f904203944a7f5f7c3b746a7458964f073c1fc4374aba0988bb5f3db4ff" },
+        "objdiff_percent": 98.65385
       }
     },
     {
       "unit": "source/main/main",
       "function": "_main_update_time",
       "class": "unclassified",
-      "evidence": "Complete natural Main timing and vblank-throttle reconstruction retained from the 2026-09-09 packet. It uses named fields in the authenticated rasterizer/Main state and the genuine profiler APIs. Target and candidate are both 1,440 padded bytes, but January has 117 relocations and the candidate has 118 with different normalized code. The rejected compiler-barrier experiment is not retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.",
+      "evidence": "Complete natural Main timing and vblank-throttle reconstruction retained from the 2026-09-09 packet. It uses named fields in the authenticated rasterizer/Main state and the genuine profiler APIs. Target and candidate are both 1,440 padded bytes, but January has 117 relocations and the candidate has 118 with different normalized code. The rejected compiler-barrier experiment is not retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md.",
       "measurements": {
         "target": { "size": 1440, "relocation_count": 117, "normalized_sha256": "b32677fb6c4cc6bcd664b98bfc5cc962b68bdf65228a31759b52574becdf200b" },
-        "base": { "size": 1440, "relocation_count": 118, "normalized_sha256": "f4d7bb79a5351f50f1d0000d2b51234c1eb7d2abc44116032c537fd5f47cf3f1" },
-        "objdiff_percent": 62.637814
+        "base": { "size": 1440, "relocation_count": 117, "normalized_sha256": "ad56536c5eb119b981a9d0b89feb8bc57be3d72a21b4fcdfac4b4939db97ccdc" },
+        "objdiff_percent": 98.986336
       }
     },
     {

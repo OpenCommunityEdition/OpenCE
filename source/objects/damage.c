@@ -340,7 +340,7 @@ boolean unit_unsuspecting(
 static void object_permutation_shield_regions(
 	long object_index,
 	boolean active);
-void area_of_effect_cause_damage_to_object(
+static void area_of_effect_cause_damage_to_object(
 	struct damage_data *damage,
 	long object_index,
 	boolean damage_next_object);
@@ -365,7 +365,7 @@ static void object_destroy_region(
 
 extern boolean debug_damage;
 
-struct damage_globals damage_globals = { 0 };
+static struct damage_globals damage_globals = { 0 };
 
 /* ---------- public code */
 
@@ -585,7 +585,7 @@ void object_deplete_body(
 	return;
 }
 
-void object_destroy_notify_children(
+static void object_destroy_notify_children(
 	long object_index)
 {
 	struct object_datum *object = object_get(object_index);
@@ -1111,7 +1111,7 @@ static void object_damage_aftermath(
 	return;
 }
 
-void object_damage_body(
+static void object_damage_body(
 	long object_index,
 	short region_index,
 	short node_index,
@@ -1208,11 +1208,10 @@ void object_damage_body(
 			&damage_resistance->regions,
 			region_index,
 			struct damage_region);
-		byte region_damage = (byte)(actual_damage*255.f + object->object.region_damage[region_index]);
 
-		object->object.region_damage[region_index] = region_damage;
+		object->object.region_damage[region_index] = (byte)(actual_damage*255.f + object->object.region_damage[region_index]);
 		if (region->damage_threshold > 0.f &&
-			region_damage*(1.f/255.f) > region->damage_threshold)
+			object->object.region_damage[region_index]*(1.f/255.f) > region->damage_threshold)
 		{
 			object_destroy_region(object_index, region_index);
 			SET_FLAG(*being_damaged_flags, _object_being_damaged_region_destroyed_bit, TRUE);
@@ -1239,16 +1238,20 @@ void object_damage_body(
 
 				while (child_object_index != NONE)
 				{
-					struct object_datum *child = object_get(child_object_index);
+					struct object_datum *child_object = object_get(child_object_index);
 
-					if (TEST_FLAG(_object_mask_unit, child->object.type) &&
-						unit_get(child_object_index)->unit.player_index != NONE)
+					if (TEST_FLAG(_object_mask_unit, child_object->object.type))
 					{
-						player_controlled = TRUE;
-						break;
+						struct unit_datum *child_unit = (struct unit_datum *)child_object;
+
+						if (child_unit->unit.player_index != NONE)
+						{
+							player_controlled = TRUE;
+							break;
+						}
 					}
 
-					child_object_index = child->object.next_object_index;
+					child_object_index = child_object->object.next_object_index;
 				}
 			}
 
@@ -2187,7 +2190,7 @@ static void object_destroy_region(
 	return;
 }
 
-void area_of_effect_cause_damage_to_object(
+static void area_of_effect_cause_damage_to_object(
 	struct damage_data *damage,
 	long object_index,
 	boolean damage_next_object)

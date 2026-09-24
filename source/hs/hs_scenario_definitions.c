@@ -3,7 +3,7 @@ HS_SCENARIO_DEFINITIONS.C
 
 symbols in this file:
 000BD310 00e0:
-	_code_000bd310 (0000)
+	_byte_swap_script_syntax_data (0000)
 0026F0D0 001a:
 	??_C@_0BK@HCHIMFOO@hs_string_data_definition?$AA@ (0000)
 0026F0EC 001a:
@@ -114,10 +114,10 @@ struct hs_source_files_definition
 
 extern char *hs_script_type_names[];
 extern char *hs_type_names[];
-void hs_syntax_data_byte_swap(
+static void byte_swap_script_syntax_data(
 	void *owner,
 	void *data,
-	long data_size);
+	long size);
 
 /* ---------- globals */
 
@@ -289,7 +289,7 @@ __declspec(align(4)) struct tag_data_definition hs_syntax_data_definition =
 	"hs_syntax_data_definition",
 	0,
 	380076,
-	hs_syntax_data_byte_swap,
+	byte_swap_script_syntax_data,
 };
 
 __declspec(align(4)) struct tag_data_definition hs_string_data_definition =
@@ -302,7 +302,9 @@ __declspec(align(4)) struct tag_data_definition hs_string_data_definition =
 
 /* ---------- public code */
 
-void hs_syntax_data_byte_swap(
+/* ---------- private code */
+
+static void byte_swap_script_syntax_data(
 	void *owner,
 	void *data,
 	long size)
@@ -337,5 +339,3 @@ void hs_syntax_data_byte_swap(
 
 	return;
 }
-
-/* ---------- private code */
