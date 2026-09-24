@@ -27,9 +27,14 @@ admission 14/0/7/0; pytest 1,154 passed / 5 skipped / 26 subtests.
 Per-function gate rows of all three candidate TUs equal the baseline rows except the
 target rows (and, for physics, Lane B's `_physics_compute_new` and
 `_physics_compute_vehicle_collision`, which improve to `[sha]` - out of scope, zero credit).
-Candidate TUs (local, git-excluded): `scratch/ledger/cand_decals_clip_S4.c`,
+Original lane candidate TUs: `scratch/ledger/cand_decals_clip_S4.c`,
 `cand_decals_nfc_N14.c`, `cand_physics_LD2.c`; per-function probe logs
 `scratch/ledger/*_probe_log.md`.
+
+Preserved after handoff: all three candidate TUs, both probe logs, and the
+baseline/candidate gate rows are tracked at commit `8afe1cdc` on the
+`research/decals-physics-fuzzy-20260924` branch. This is research-only source,
+not canonical production code or exact-match credit.
 
 ## `_decal_clip_to_surface` - four source facts, one tie left
 
