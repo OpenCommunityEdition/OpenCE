@@ -452,6 +452,16 @@
     }
   },
   {
+    "unit": "source/hs/hs_scenario_definitions",
+    "symbol": "_hs_script_types_enum",
+    "reason": "January and rebuilt HS scenario .data have identical 628-byte normalized payload, all 33 relocation identities, and 8-byte section alignment (c0400040). The original nine public definitions retain their target offsets and storage. Separate typed field and byte-swap arrays replace invented packed aggregates and padding; the byte-swap function is genuinely file-static. The one target function remains strict exact, and there are no surplus external definitions.",
+    "measurements": {
+      "size": 628,
+      "relocation_count": 33,
+      "normalized_sha256": "a1add12fc2ddd7afb3935997f9e1532b27a3887f8e85e914db954d1665547c09"
+    }
+  },
+  {
     "unit": "source/interface/ui_widget_event_handler_functions",
     "symbol": "_event_handler_functions",
     "reason": "January and rebuilt 934-byte event-handler .data section (the static event_handler_function_list name/function table at +0 and the public event_handler_functions at +816) have identical normalized payload and flags (c0400040), and all 228 relocations resolve to the same image addresses. The 366-byte .bss is also identical. Ownership was corrected first: 98 handler functions, event_handler_function_list and new_campaign_profile_name are absent from cachebeta.pdb publics and referenced by no other January object, so they are file-static. All 100 functions are strict exact and all 452 January symbols match. The three stock D3D SDK .rdata tables it also emits are byte-identical to January's selected copies and pair-link in both orders, as in the 54 already-admitted objects that emit them.",
