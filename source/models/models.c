@@ -282,10 +282,10 @@ extern boolean render_model_vertex_counts;
 extern boolean render_model_index_counts;
 extern boolean render_model_no_geometry;
 
-static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL];
-static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL];
-static struct render_model_effect default_render_model_effect;
-static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL];
+static real default_function_values[MAXIMUM_FUNCTION_VALUES_PER_MODEL] = { 0 };
+static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_PER_MODEL] = { 0 };
+static struct render_model_effect default_render_model_effect = { 0 };
+static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL] = { 0 };
 
 struct profile_section render_model_section = { "render_model", NONE, TRUE };
 
