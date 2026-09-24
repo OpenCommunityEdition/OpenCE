@@ -206,3 +206,48 @@ queue.
 | structures `double t` / rasterizer_geometry staged temp | structures / rasterizer_geometry | the /Od frame contradicts both temps: likely NO |
 | January-bug class (uninitialised reads, NULL deref, etc.) | king, glow, dead_camera, first_person_weapons, saved_game_files, player_profile, transport_endpoint_winsock, draw_string, … | canonical holds; unchanged |
 | Canary PA duplicate-prototype copy choice + COMDAT admission | collisions (+4,752 B) after Codex | count-selected copy choice; re-solve after Codex |
+
+## Wave R2-3 (record-count census, January real_math.h recovery, synthesis; lab only)
+
+**Census.** The run inserted K = 0..63 dummy records at four positions for all 86 incomplete units.
+Totals: 5,504 compiles per position, a 64x64 grid for the sensitive rows, and a 28,992-compile
+whole-board fragility map. The harness was validated against gate.py on 600 rows.
+
+- **Only 1 of 126 residual functions closes by record count**: ui_widget_game_data_input_functions
+  `_solo_level_select_list_update_displayed_items` (704 B, k = +2, window 2).
+- 7 residuals flip between two forms, neither of them January's.
+- 118 are completely count-inert.
+- There is no shared-header pattern, and no object completes by count alone. **This route is
+  retired.**
+- Fragility map: 22 of 7,250 exact functions are count-sensitive, and 7 break within |3| records.
+  These are the canaries any header-authenticity work must respect:
+  - `_rasterizer_frame_statistics_draw`, `_bitmap_copy`;
+  - race_engine_player_update and race_touch_flag;
+  - `_unit_preprocess_node_orientations`, `_bitmap_2d_alpha_bleed`, `_get_edge_vertex`.
+
+**January real_math.h recovery (first-party).**
+
+- January has 10 real_math.h assert anchors, on 8 lines (848, 859/860, 879/880, 1508/1509, 1530).
+- HCEX_Release has line records for 96 out-of-line helpers.
+- Publics joined with contribs give 93 January-emitted real_math-family helpers.
+- New law, checked with 0 inversions on 34 batches: VC7 emits pending inline callees just before
+  their first user, in header definition order.
+- Missing from our header but January-public: `vector_intersect_plane2d`, `valid_real_vector2d` and
+  `valid_real_normal2d`. There are also 16 January-public prototypes; our focused math headers are
+  campaign inventions, and HCEX has none of them.
+- The record costs are calibrated. Adding the genuine January content breaks about 5 count-coincident
+  canaries, so several of today's exact functions depend on the header staying inauthentic by a
+  specific count. This is an owner-level finding. Details:
+  `research/fifty_objects_r2_20260924/w/real_math_h_recovery/`.
+
+**Synthesis.** Only packet PA closes anything with zero loss: collisions `_collision_move_point`,
+making collisions 20/20 with an audit PASS. It still needs the owner's duplicate-copy decision. PU
+(a duplicate `player_ui.h` prototype) and MN (a parameter name) are zero-loss genuine hygiene.
+They are held, because landing them now would shift the post-Codex solo lookup (`codex_lookup.txt`
+in `research/fifty_objects_r2_20260924/w/record_synthesis/`):
+
+| Codex net N in the gdif TU | Solo outcome |
+|---|---|
+| +2 or +3 | closes with nothing added |
+| +1, +4, +5 | closes with MN, PU or both |
+| anything else | needs owner-decision compensators |
