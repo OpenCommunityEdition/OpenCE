@@ -67,10 +67,6 @@ void lightning_submit(
 void lightning_render(
 	void);
 
-/* ---------- globals */
-
-extern struct lightning_globals lightning_globals;
-
 /* ---------- public code */
 
 #endif // __LIGHTNING_H

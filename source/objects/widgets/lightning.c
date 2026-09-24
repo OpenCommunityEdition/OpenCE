@@ -161,7 +161,7 @@ static void lightning_offset_marker_position(
 
 /* ---------- globals */
 
-struct lightning_globals lightning_globals = {0};
+static struct lightning_globals lightning_globals = {0};
 
 /* ---------- public code */
 
