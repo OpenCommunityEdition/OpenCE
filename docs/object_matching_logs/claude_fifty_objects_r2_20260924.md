@@ -133,3 +133,76 @@ pytest 1,159/5/26. `git diff --check` clean. Canonical was rechecked before inte
 
 **Process note:** the claim registry let two lanes that shared a label work the same unit (actors).
 They converged on byte-identical objects. Labels are now unique per lane.
+
+## Wave R2-2 (precedent audit, canary research, hygiene)
+
+**Precedent audit.** Round-1/R2-1 OWNER items were checked against canonical's actual rulings and
+admitted landings. Result: 27 HELD_CLASS, 11 NEW_RULING_NEEDED, 11 COVERED_BY_PRECEDENT. Every
+covered item is zero-credit hygiene or data; none completes an object. The audit found that
+several OWNER items the triage thought precedent-covered are not:
+
+- **projectiles' named macro** is held. It has the RB2 refusal shape, and
+  `ai_debug_attractor_label_height` landed 46 minutes before the first-party-name condition existed.
+- **actions' squaring macro** needs a new ruling. The 5186c5bd ruling was function-scoped, and here
+  the plain spelling also matches.
+- **structures' `double t` and rasterizer_geometry's staged temp** need new rulings. The later /Od
+  build CONTRADICTS both temps: its frames have no slot for them.
+
+**Canary research (lab only, real_math reserved).** `_rasterizer_frame_statistics_draw` is a
+whole-TU record-count coincidence. The findings:
+
+- C1 symbol records before the globals block, mod 64, window 1 wide.
+- One record each for: names, params, locals, distinct string literals, `if`/`&&` labels, and
+  distinct opened files.
+- **Packet PA** loses nothing board-wide and makes collisions `_collision_move_point` (4,752 B)
+  exact. It combines:
+  - real_local_random's named local;
+  - `valid_real_plane3d` as an `__inline`;
+  - removal of the plain matrix_math definition;
+  - the collisions loop-site call;
+  - dropping one copy each of two campaign-added duplicate prototypes.
+- The copy choice is count-selected, and for `bitmap_delete` it runs against ownership, so it is an
+  owner decision.
+- PA also needs COMDAT admission and a park re-baseline, and it must be re-solved after Codex's
+  real_math change. It is held, with a rerun script
+  (`research/fifty_objects_r2_20260924/w/canary_frame_statistics/`).
+
+## Batch R2-2 (42125a52)
+
+This batch has zero code credit and changes no object status. Data **+3,089**:
+
+- projectiles `_projectile_update_section`: 1,548;
+- object_lights `_lights_section`: 1,541.
+
+Both are single-section '$'-defect entries with `allow_incomplete_unit`, following the leaf_map,
+editor_flying_camera and race precedents.
+
+Also in this batch, all reviewed:
+
+- storage fixes for bink_playback, weapons, object_lights, vehicles, weather_particle_systems and
+  rasterizer_xbox_debug (an already-Matching object whose audit goes FAIL(8) -> PASS);
+- draw_string's invented aggregate replaced by HCEX file statics;
+- render_debug's genuine helper calls, vehicle_datum and tentative debug toggles;
+- vehicles' genuine point_from_line3d call;
+- rasterizer_xbox_profile V1R: byte-inert ownership.
+
+Gate: 0 regressions, parks 83/0/0, admission 10/0/2/0.
+
+The breakable_surfaces sub-packet was **not** landed. It removes a per-unit `/Ow` override on
+precedent alone, without image proof, and earns nothing.
+
+## Owner escalation (round 2)
+
+Each of these rulings would complete, or directly unblock, the listed object. Evidence and packets
+are in `research/fifty_objects_r2_20260924/results/r2w2/PRECEDENT_AUDIT.md` and the round-1 owner
+queue.
+
+| Ruling | Completes | Cost / risk |
+|---|---|---|
+| Codex actor_combat `cross_product2d` packet (in flight) | path_obstacle_avoidance, path_smoothing, real_math, collision_features, path_structure_bsp | none known; unblocks vehicles' fighter (P1 class) |
+| actor_perception Packet B: /Od aggregate view copy + empty then-arm + explicit else | actor_perception | the view copy is covered by the action_obey precedent; the empty then-arm and else need a ruling |
+| bink_playback q3 else-if split | bink_playback | 26601453 rejected this exact function; only new evidence is cross-build (4/4 vs 1/4) |
+| interface header variant | interface | A loses frame_statistics_draw by count; B is extern-over-static |
+| structures `double t` / rasterizer_geometry staged temp | structures / rasterizer_geometry | the /Od frame contradicts both temps: likely NO |
+| January-bug class (uninitialised reads, NULL deref, etc.) | king, glow, dead_camera, first_person_weapons, saved_game_files, player_profile, transport_endpoint_winsock, draw_string, … | canonical holds; unchanged |
+| Canary PA duplicate-prototype copy choice + COMDAT admission | collisions (+4,752 B) after Codex | count-selected copy choice; re-solve after Codex |
