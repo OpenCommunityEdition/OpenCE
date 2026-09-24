@@ -1146,11 +1146,11 @@ pixel32 bitmap_2d_get_pixel(
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
 				0x2A9,
-				block_address < (byte *)bitmap->base_address + bitmap->pixel_data_size,
+				block_address < (byte *)bitmap->base_address + bitmap->pixels_size,
 				csprintf(
 					temporary,
 					"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address end (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
-					block_address - ((byte *)bitmap->base_address + bitmap->pixel_data_size),
+					block_address - ((byte *)bitmap->base_address + bitmap->pixels_size),
 					bitmap->width,
 					bitmap->height,
 					(short)bitmap->mipmap_count,

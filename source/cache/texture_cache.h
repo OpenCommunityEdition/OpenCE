@@ -34,6 +34,8 @@ void texture_cache_return_memory(
 	void);
 void *texture_cache_steal_memory(
 	long size);
+void texture_cache_debug_render(
+	void);
 
 /* ---------- globals */
 

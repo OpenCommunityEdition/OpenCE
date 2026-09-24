@@ -37,11 +37,11 @@ struct bitmap_data
 	unsigned short flags;
 	union point2d registration_point;
 	short mipmap_count;
-	unsigned short pixel_data;
-	unsigned long pixels_offset;
-	unsigned long pixel_data_size;
-	unsigned long bitmap_tag_index;
-	void *bitmap_data_pointer;
+	short mipmap_pad;
+	long pixels_offset;
+	long pixels_size;
+	long tag_index;
+	long cache_block_index;
 	void *hardware_format;
 	void *base_address;
 };

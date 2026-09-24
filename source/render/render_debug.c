@@ -140,6 +140,7 @@ symbols in this file:
 #include "ai/ai_profile.h"
 #include "ai/path.h"
 #include "cache/sound_cache.h"
+#include "cache/texture_cache.h"
 #include "effects/decal_definitions.h"
 #include "effects/decals.h"
 #include "game/game.h"
