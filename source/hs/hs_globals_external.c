@@ -1090,897 +1090,1335 @@ extern byte temporary_hud[];
 extern byte terminal_render_enable[];
 extern byte texture_cache_debug_options[];
 
-struct hs_external_global_definition hs_external_global_definitions[442] =
-{
-	{ "screenshot_size", _hs_type_short_integer, 0, global_screenshot_size },
-	{ "screenshot_count", _hs_type_short_integer, 0, global_screenshot_count },
-	{ "player_spawn_count", _hs_type_short_integer, 0, &player_spawn_count },
-	{ "framerate_throttle", _hs_type_boolean, 0, &global_frame_rate_throttle },
-	{ "framerate_lock", _hs_type_boolean, 0, debug_force_frame_rate_update },
-	{ "debug_framerate", _hs_type_boolean, 0, debug_frame_rate },
-	{ "display_framerate", _hs_type_boolean, 0, display_framerate },
-	{ "display_vblank_deltas", _hs_type_boolean, 0, display_vblank_deltas },
-	{ "display_precache_progress", _hs_type_boolean, 0, display_precache_progress },
-	{ "debug_game_save", _hs_type_boolean, 0, &debug_game_save },
-	{ "terminal_render", _hs_type_boolean, 0, terminal_render_enable },
-	{ "console_dump_to_file", _hs_type_boolean, 0, console_dump_to_file },
-	{ "rasterizer_near_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x44 },
-	{ "rasterizer_far_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x48 },
-	{ "rasterizer_first_person_weapon_near_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x4C },
-	{ "rasterizer_first_person_weapon_far_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x50 },
-	{ "rasterizer_pushbuffer_size", _hs_type_short_integer, 0, rasterizer_globals + 0x38 },
-	{ "rasterizer_pushbuffer_kickoff_size", _hs_type_short_integer, 0, rasterizer_globals + 0x3A },
-	{ "rasterizer_floating_point_zbuffer", _hs_type_boolean, 0, rasterizer_globals + 0x3C },
-	{ "rasterizer_framerate_throttle", _hs_type_boolean, 0, rasterizer_globals + 0x3D },
-	{ "rasterizer_framerate_stabilization", _hs_type_boolean, 0, rasterizer_globals + 0x3E },
-	{ "rasterizer_refresh_rate", _hs_type_short_integer, 0, rasterizer_globals + 0x40 },
-	{ "rasterizer_frame_bounds_left", _hs_type_short_integer, 0, rasterizer_globals + 0xE },
-	{ "rasterizer_frame_bounds_right", _hs_type_short_integer, 0, rasterizer_globals + 0x12 },
-	{ "rasterizer_frame_bounds_top", _hs_type_short_integer, 0, rasterizer_globals + 0xC },
-	{ "rasterizer_frame_bounds_bottom", _hs_type_short_integer, 0, rasterizer_globals + 0x10 },
-	{ "rasterizer_stats", _hs_type_short_integer, 0, rasterizer_debug_options + 0x2 },
-	{ "rasterizer_mode", _hs_type_short_integer, 0, rasterizer_debug_options + 0x4 },
-	{ "rasterizer_wireframe", _hs_type_boolean, 0, rasterizer_debug_options + 0x6 },
-	{ "rasterizer_smart", _hs_type_boolean, 0, rasterizer_debug_options + 0x62 },
-	{ "rasterizer_debug_model_vertices", _hs_type_boolean, 0, rasterizer_debug_options + 0x7 },
-	{ "rasterizer_debug_model_lod", _hs_type_short_integer, 0, rasterizer_debug_options + 0x8 },
-	{ "rasterizer_debug_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0xA },
-	{ "rasterizer_debug_meter_shader", _hs_type_boolean, 0, rasterizer_debug_options + 0xB },
-	{ "rasterizer_models", _hs_type_boolean, 0, rasterizer_debug_options + 0xC },
-	{ "rasterizer_model_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0xD },
-	{ "rasterizer_draw_first_person_weapon_first", _hs_type_boolean, 0, rasterizer_debug_options + 0xE },
-	{ "rasterizer_stencil_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0xF },
-	{ "rasterizer_environment", _hs_type_boolean, 0, rasterizer_debug_options + 0x10 },
-	{ "rasterizer_environment_lightmaps", _hs_type_boolean, 0, rasterizer_debug_options + 0x11 },
-	{ "rasterizer_environment_shadows", _hs_type_boolean, 0, rasterizer_debug_options + 0x12 },
-	{ "rasterizer_environment_diffuse_lights", _hs_type_boolean, 0, rasterizer_debug_options + 0x13 },
-	{ "rasterizer_environment_diffuse_textures", _hs_type_boolean, 0, rasterizer_debug_options + 0x14 },
-	{ "rasterizer_environment_decals", _hs_type_boolean, 0, rasterizer_debug_options + 0x15 },
-	{ "rasterizer_environment_specular_lights", _hs_type_boolean, 0, rasterizer_debug_options + 0x16 },
-	{ "rasterizer_environment_specular_lightmaps", _hs_type_boolean, 0, rasterizer_debug_options + 0x17 },
-	{ "rasterizer_environment_reflection_lightmap_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0x18 },
-	{ "rasterizer_environment_reflection_mirrors", _hs_type_boolean, 0, rasterizer_debug_options + 0x19 },
-	{ "rasterizer_environment_reflections", _hs_type_boolean, 0, rasterizer_debug_options + 0x1A },
-	{ "rasterizer_environment_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0x1B },
-	{ "rasterizer_environment_fog", _hs_type_boolean, 0, rasterizer_debug_options + 0x1C },
-	{ "rasterizer_environment_fog_screen", _hs_type_boolean, 0, rasterizer_debug_options + 0x1D },
-	{ "rasterizer_water", _hs_type_boolean, 0, rasterizer_debug_options + 0x1E },
-	{ "rasterizer_lens_flares", _hs_type_boolean, 0, rasterizer_debug_options + 0x1F },
-	{ "rasterizer_dynamic_unlit_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x20 },
-	{ "rasterizer_dynamic_lit_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x21 },
-	{ "rasterizer_dynamic_screen_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x22 },
-	{ "rasterizer_hud_motion_sensor", _hs_type_boolean, 0, rasterizer_debug_options + 0x23 },
-	{ "rasterizer_detail_objects", _hs_type_boolean, 0, rasterizer_debug_options + 0x24 },
-	{ "rasterizer_debug_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x25 },
-	{ "rasterizer_debug_geometry_multipass", _hs_type_boolean, 0, rasterizer_debug_options + 0x26 },
-	{ "rasterizer_fog_atmosphere", _hs_type_boolean, 0, rasterizer_debug_options + 0x27 },
-	{ "rasterizer_fog_plane", _hs_type_boolean, 0, rasterizer_debug_options + 0x28 },
-	{ "rasterizer_bump_mapping", _hs_type_boolean, 0, rasterizer_debug_options + 0x29 },
-	{ "rasterizer_lightmap_ambient", _hs_type_real, 0, rasterizer_debug_options + 0x2C },
-	{ "rasterizer_lightmap_mode", _hs_type_short_integer, 0, rasterizer_globals + 0x60 },
-	{ "rasterizer_lightmaps_incident_radiosity", _hs_type_boolean, 0, rasterizer_debug_options + 0x34 },
-	{ "rasterizer_lightmaps_filtering", _hs_type_boolean, 0, rasterizer_debug_options + 0x35 },
-	{ "rasterizer_model_lighting_ambient", _hs_type_real, 0, rasterizer_debug_options + 0x38 },
-	{ "rasterizer_environment_alpha_testing", _hs_type_boolean, 0, rasterizer_debug_options + 0x3C },
-	{ "rasterizer_environment_specular_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0x3D },
-	{ "rasterizer_shadows_convolution", _hs_type_boolean, 0, rasterizer_debug_options + 0x3E },
-	{ "rasterizer_shadows_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x3F },
-	{ "rasterizer_water_mipmapping", _hs_type_boolean, 0, rasterizer_debug_options + 0x40 },
-	{ "rasterizer_active_camouflage", _hs_type_boolean, 0, rasterizer_debug_options + 0x41 },
-	{ "rasterizer_active_camouflage_multipass", _hs_type_boolean, 0, rasterizer_debug_options + 0x42 },
-	{ "rasterizer_plasma_energy", _hs_type_boolean, 0, rasterizer_debug_options + 0x43 },
-	{ "rasterizer_lens_flares_occlusion", _hs_type_boolean, 0, rasterizer_debug_options + 0x44 },
-	{ "rasterizer_lens_flares_occlusion_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x45 },
-	{ "rasterizer_ray_of_buddha", _hs_type_boolean, 0, rasterizer_debug_options + 0x46 },
-	{ "rasterizer_screen_flashes", _hs_type_boolean, 0, rasterizer_debug_options + 0x47 },
-	{ "rasterizer_screen_effects", _hs_type_boolean, 0, rasterizer_debug_options + 0x48 },
-	{ "rasterizer_DXTC_noise", _hs_type_boolean, 0, rasterizer_debug_options + 0x49 },
-	{ "rasterizer_soft_filter", _hs_type_boolean, 0, rasterizer_debug_options + 0x4A },
-	{ "rasterizer_secondary_render_target_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x4B },
-	{ "rasterizer_profile_log", _hs_type_boolean, 0, rasterizer_debug_options + 0x4C },
-	{ "rasterizer_detail_objects_offset_multiplier", _hs_type_real, 0, rasterizer_debug_options + 0x50 },
-	{ "rasterizer_zbias", _hs_type_long_integer, 0, rasterizer_debug_options + 0x54 },
-	{ "rasterizer_zoffset", _hs_type_real, 0, rasterizer_debug_options + 0x58 },
-	{ "force_all_player_views_to_default_player", _hs_type_boolean, 0, rasterizer_debug_options + 0x5C },
-	{ "rasterizer_safe_frame_bounds", _hs_type_boolean, 0, rasterizer_debug_options + 0x5D },
-	{ "freeze_flying_camera", _hs_type_short_integer, 0, rasterizer_debug_options + 0x5E },
-	{ "rasterizer_zsprites", _hs_type_boolean, 0, rasterizer_debug_options + 0x60 },
-	{ "rasterizer_filthy_decal_fog_hack", _hs_type_boolean, 0, rasterizer_debug_options + 0x61 },
-	{ "rasterizer_splitscreen_VB_optimization", _hs_type_boolean, 0, rasterizer_debug_options + 0x63 },
-	{ "rasterizer_profile_print_locks", _hs_type_boolean, 0, rasterizer_debug_options + 0x64 },
-	{ "rasterizer_profile_objectlock_time", _hs_type_real, 0, rasterizer_debug_options + 0x68 },
-	{ "pad3", _hs_type_short_integer, 0, rasterizer_debug_options + 0x32 },
-	{ "pad3_scale", _hs_type_real, 0, rasterizer_debug_options + 0x6C },
-	{ "f0", _hs_type_real, 0, rasterizer_debug_options + 0x70 },
-	{ "f1", _hs_type_real, 0, rasterizer_debug_options + 0x74 },
-	{ "f2", _hs_type_real, 0, rasterizer_debug_options + 0x78 },
-	{ "f3", _hs_type_real, 0, rasterizer_debug_options + 0x7C },
-	{ "f4", _hs_type_real, 0, rasterizer_debug_options + 0x80 },
-	{ "f5", _hs_type_real, 0, rasterizer_debug_options + 0x84 },
-	{ "rasterizer_transparent_pixel_counter", _hs_type_boolean, 0, rasterizer_debug_options + 0x89 },
-	{ "debug_no_frustum_clip", _hs_type_boolean, 0, debug_no_frustum_clip },
-	{ "debug_frustum", _hs_type_boolean, 0, render_camera_debug_this_fucking_frustum },
-	{ "debug_bink", _hs_type_boolean, 0, debug_bink },
-	{ "recover_saved_games_hack", _hs_type_boolean, 0, recover_saved_games_hack },
-	{ "radiosity_quality", _hs_type_short_integer, 0, NULL },
-	{ "radiosity_step_count", _hs_type_short_integer, 0, NULL },
-	{ "radiosity_lines", _hs_type_boolean, 0, NULL },
-	{ "radiosity_normals", _hs_type_boolean, 0, NULL },
-	{ "structures_use_pvs_for_vs", _hs_type_boolean, 0, structures_use_pvs_for_vs },
-	{ "debug_detail_objects", _hs_type_boolean, 0, debug_detail_objects },
-	{ "debug_texture_cache", _hs_type_boolean, 0, debug_texture_cache },
-	{ "temporary_hud", _hs_type_boolean, 0, temporary_hud },
-	{ "debug_object_garbage_collection", _hs_type_boolean, 0, debug_object_garbage_collection },
-	{ "debug_render_freeze", _hs_type_boolean, 0, debug_render_freeze },
-	{ "debug_no_drawing", _hs_type_boolean, 0, debug_no_drawing },
-	{ "debug_input_target", _hs_type_short_integer, 0, debug_input_target },
-	{ "debug_leaf_index", _hs_type_long_integer, 0, debug_leaf_index },
-	{ "debug_leaf_portal_index", _hs_type_long_integer, 0, debug_leaf_portal_index },
-	{ "debug_leaf_portals", _hs_type_boolean, 0, debug_leaf_portals },
-	{ "debug_unit_all_animations", _hs_type_boolean, 0, debug_unit_all_animations },
-	{ "debug_unit_animations", _hs_type_boolean, 0, debug_unit_animations },
-	{ "debug_unit_illumination", _hs_type_boolean, 0, debug_unit_illumination },
-	{ "debug_damage_taken", _hs_type_boolean, 0, debug_damage_taken },
-	{ "cheat_deathless_player", _hs_type_boolean, 0, cheat },
-	{ "cheat_jetpack", _hs_type_boolean, 0, cheat + 0x1 },
-	{ "cheat_infinite_ammo", _hs_type_boolean, 0, cheat + 0x2 },
-	{ "cheat_bottomless_clip", _hs_type_boolean, 0, cheat + 0x9 },
-	{ "cheat_bump_possession", _hs_type_boolean, 0, cheat + 0x3 },
-	{ "cheat_super_jump", _hs_type_boolean, 0, cheat + 0x4 },
-	{ "cheat_reflexive_damage_effects", _hs_type_boolean, 0, cheat + 0x5 },
-	{ "cheat_medusa", _hs_type_boolean, 0, cheat + 0x6 },
-	{ "cheat_omnipotent", _hs_type_boolean, 0, cheat + 0x7 },
-	{ "cheat_controller", _hs_type_boolean, 0, cheat + 0x8 },
-	{ "effects_corpse_nonviolent", _hs_type_boolean, 0, effects_corpse_nonviolent },
-	{ "debug_effects_nonviolent", _hs_type_boolean, 0, debug_effects_nonviolent },
-	{ "debug_sound_cache", _hs_type_boolean, 0, debug_sound_cache },
-	{ "debug_sound", _hs_type_boolean, 0, debug_sound },
-	{ "debug_looping_sound", _hs_type_boolean, 0, debug_looping_sound },
-	{ "debug_sound_channels", _hs_type_boolean, 0, debug_sound_channels },
-	{ "loud_dialog_hack", _hs_type_boolean, 0, loud_dialog_hack },
-	{ "sound_gain_under_dialog", _hs_type_real, 0, sound_gain_under_dialog },
-	{ "debug_sound_environment", _hs_type_boolean, 0, debug_sound_environment },
-	{ "object_light_ambient_base", _hs_type_real, 0, object_light_ambient_base },
-	{ "object_light_ambient_scale", _hs_type_real, 0, object_light_ambient_scale },
-	{ "object_light_secondary_scale", _hs_type_real, 0, object_light_secondary_scale },
-	{ "object_light_interpolate", _hs_type_boolean, 0, object_light_interpolate },
-	{ "rider_ejection", _hs_type_boolean, 0, rider_ejection },
-	{ "stun_enable", _hs_type_boolean, 0, stun_enable },
-	{ "collision_log_render", _hs_type_boolean, 0, collision_log_render_enable },
-	{ "collision_log_detailed", _hs_type_boolean, 0, collision_log_detailed },
-	{ "collision_log_extended", _hs_type_boolean, 0, collision_log_extended },
-	{ "collision_log_totals_only", _hs_type_boolean, 0, collision_log_totals_only },
-	{ "collision_log_time", _hs_type_boolean, 0, collision_log_time },
-	{ "profile_graph", _hs_type_boolean, 0, profile_graph },
-	{ "profile_display", _hs_type_boolean, 0, profile_display },
-	{ "profile_timebase_ticks", _hs_type_boolean, 0, profile_timebase_ticks },
-	{ "profile_dump_frames", _hs_type_boolean, 0, profile_dump_frames },
-	{ "profile_dump_lost_frames", _hs_type_boolean, 0, profile_dump_lost_frames },
-	{ "model_animation_compression", _hs_type_boolean, 0, hs_model_animation_compression_enabled },
-	{ "model_animation_data_compressed_size", _hs_type_long_integer, 0, hs_model_animation_data_compressed_size },
-	{ "model_animation_data_uncompressed_size", _hs_type_long_integer, 0, hs_model_animation_data_uncompressed_size },
-	{ "model_animation_data_compression_savings_in_bytes", _hs_type_long_integer, 0, hs_model_animation_data_compression_savings_in_bytes },
-	{ "model_animation_data_compression_savings_in_bytes_at_import", _hs_type_long_integer, 0, hs_model_animation_data_compression_savings_in_bytes_at_import },
-	{ "model_animation_data_compression_savings_in_percent", _hs_type_real, 0, hs_model_animation_data_compression_savings_in_percent },
-	{ "model_animation_bullshit0", _hs_type_long_integer, 0, hs_model_animation_bullshit },
-	{ "model_animation_bullshit1", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0x4 },
-	{ "model_animation_bullshit2", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0x8 },
-	{ "model_animation_bullshit3", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0xC },
-	{ "debug_portals", _hs_type_boolean, 0, debug_portals },
-	{ "debug_sprites", _hs_type_boolean, 0, debug_sprites },
-	{ "debug_inactive_objects", _hs_type_boolean, 0, debug_inactive_objects },
-	{ "render_contrails", _hs_type_boolean, 0, render_contrails_enabled },
-	{ "render_particles", _hs_type_boolean, 0, render_particles_enabled },
-	{ "render_psystems", _hs_type_boolean, 0, &render_particle_systems_enabled },
-	{ "render_wsystems", _hs_type_boolean, 0, render_weather_particle_systems_enabled },
-	{ "debug_objects", _hs_type_boolean, 0, debug_objects },
-	{ "debug_objects_position_velocity", _hs_type_boolean, 0, debug_objects_position_velocity },
-	{ "debug_objects_root_node", _hs_type_boolean, 0, debug_objects_root_node },
-	{ "debug_objects_bounding_spheres", _hs_type_boolean, 0, debug_objects_bounding_spheres },
-	{ "debug_objects_collision_models", _hs_type_boolean, 0, debug_objects_collision_models },
-	{ "debug_objects_physics", _hs_type_boolean, 0, debug_objects_physics },
-	{ "debug_objects_names", _hs_type_boolean, 0, debug_objects_names },
-	{ "debug_objects_pathfinding_spheres", _hs_type_boolean, 0, debug_objects_pathfinding_spheres },
-	{ "debug_objects_unit_vectors", _hs_type_boolean, 0, debug_objects_unit_vectors },
-	{ "debug_objects_unit_seats", _hs_type_boolean, 0, debug_objects_unit_seats },
-	{ "debug_objects_unit_mouth_apeture", _hs_type_boolean, 0, debug_objects_unit_mouth_apeture },
-	{ "debug_objects_biped_physics_pills", _hs_type_boolean, 0, debug_objects_biped_physics_pills },
-	{ "debug_objects_biped_autoaim_pills", _hs_type_boolean, 0, debug_objects_biped_autoaim_pills },
-	{ "debug_objects_vehicle_powered_mass_points", _hs_type_boolean, 0, debug_objects_vehicle_powered_mass_points },
-	{ "debug_objects_devices", _hs_type_boolean, 0, debug_objects_devices },
-	{ "render_model_nodes", _hs_type_boolean, 0, render_model_nodes },
-	{ "render_model_vertex_counts", _hs_type_boolean, 0, render_model_vertex_counts },
-	{ "render_model_index_counts", _hs_type_boolean, 0, render_model_index_counts },
-	{ "render_model_markers", _hs_type_boolean, 0, render_model_markers },
-	{ "render_model_no_geometry", _hs_type_boolean, 0, render_model_no_geometry },
-	{ "render_shadows", _hs_type_boolean, 0, render_shadows },
-	{ "debug_damage", _hs_type_boolean, 0, debug_damage },
-	{ "debug_scripting", _hs_type_boolean, 0, debug_scripting },
-	{ "debug_trigger_volumes", _hs_type_boolean, 0, &debug_trigger_volumes },
-	{ "debug_point_physics", _hs_type_boolean, 0, debug_point_physics },
-	{ "debug_physics_disable_penetration_freeze", _hs_type_boolean, 0, debug_physics_disable_penetration_freeze },
-	{ "debug_motion_sensor_draw_all_units", _hs_type_boolean, 0, debug_motion_sensor_draw_all_units },
-	{ "collision_debug", _hs_type_boolean, 0, collision_debug },
-	{ "collision_debug_spray", _hs_type_boolean, 0, collision_debug_spray },
-	{ "collision_debug_features", _hs_type_boolean, 0, collision_debug_features },
-	{ "collision_debug_repeat", _hs_type_boolean, 0, &collision_debug_repeat },
-	{ "collision_debug_flag_front_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_front_facing_surfaces },
-	{ "collision_debug_flag_back_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_back_facing_surfaces },
-	{ "collision_debug_flag_ignore_two_sided_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_two_sided_surfaces },
-	{ "collision_debug_flag_ignore_invisible_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_invisible_surfaces },
-	{ "collision_debug_flag_ignore_breakable_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_breakable_surfaces },
-	{ "collision_debug_flag_structure", _hs_type_boolean, 0, collision_debug_flag_structure },
-	{ "collision_debug_flag_media", _hs_type_boolean, 0, collision_debug_flag_media },
-	{ "collision_debug_flag_objects", _hs_type_boolean, 0, collision_debug_flag_objects },
-	{ "collision_debug_flag_objects_bipeds", _hs_type_boolean, 0, collision_debug_flag_objects_bipeds },
-	{ "collision_debug_flag_objects_vehicles", _hs_type_boolean, 0, collision_debug_flag_objects_vehicles },
-	{ "collision_debug_flag_objects_weapons", _hs_type_boolean, 0, collision_debug_flag_objects_weapons },
-	{ "collision_debug_flag_objects_equipment", _hs_type_boolean, 0, collision_debug_flag_objects_equipment },
-	{ "collision_debug_flag_objects_projectiles", _hs_type_boolean, 0, collision_debug_flag_objects_projectiles },
-	{ "collision_debug_flag_objects_scenery", _hs_type_boolean, 0, collision_debug_flag_objects_scenery },
-	{ "collision_debug_flag_objects_machines", _hs_type_boolean, 0, collision_debug_flag_objects_machines },
-	{ "collision_debug_flag_objects_controls", _hs_type_boolean, 0, collision_debug_flag_objects_controls },
-	{ "collision_debug_flag_objects_light_fixtures", _hs_type_boolean, 0, collision_debug_flag_objects_light_fixtures },
-	{ "collision_debug_flag_objects_placeholders", _hs_type_boolean, 0, collision_debug_flag_objects_placeholders },
-	{ "collision_debug_flag_try_to_keep_location_valid", _hs_type_boolean, 0, collision_debug_flag_try_to_keep_location_valid },
-	{ "collision_debug_flag_skip_passthrough_bipeds", _hs_type_boolean, 0, collision_debug_flag_skip_passthrough_bipeds },
-	{ "collision_debug_flag_use_vehicle_physics", _hs_type_boolean, 0, collision_debug_flag_use_vehicle_physics },
-	{ "collision_debug_point_x", _hs_type_real, 0, &collision_debug_point.x },
-	{ "collision_debug_point_y", _hs_type_real, 0, &collision_debug_point.y },
-	{ "collision_debug_point_z", _hs_type_real, 0, &collision_debug_point.z },
-	{ "collision_debug_vector_i", _hs_type_real, 0, &collision_debug_vector.i },
-	{ "collision_debug_vector_j", _hs_type_real, 0, &collision_debug_vector.j },
-	{ "collision_debug_vector_k", _hs_type_real, 0, &collision_debug_vector.k },
-	{ "collision_debug_length", _hs_type_real, 0, &collision_debug_length },
-	{ "collision_debug_width", _hs_type_real, 0, &collision_debug_width },
-	{ "collision_debug_height", _hs_type_real, 0, &collision_debug_height },
-	{ "collision_debug_phantom_bsp", _hs_type_boolean, 0, collision_debug_phantom_bsp },
-	{ "debug_obstacle_path", _hs_type_boolean, 0, debug_obstacle_path },
-	{ "debug_obstacle_path_on_failure", _hs_type_boolean, 0, debug_obstacle_path_on_failure },
-	{ "debug_obstacle_path_start_point_x", _hs_type_real, 0, debug_obstacle_path_start_point },
-	{ "debug_obstacle_path_start_point_y", _hs_type_real, 0, debug_obstacle_path_start_point + 0x4 },
-	{ "debug_obstacle_path_start_surface_index", _hs_type_long_integer, 0, debug_obstacle_path_start_surface_index },
-	{ "debug_obstacle_path_goal_point_x", _hs_type_real, 0, debug_obstacle_path_goal_point },
-	{ "debug_obstacle_path_goal_point_y", _hs_type_real, 0, debug_obstacle_path_goal_point + 0x4 },
-	{ "debug_obstacle_path_goal_surface_index", _hs_type_long_integer, 0, debug_obstacle_path_goal_surface_index },
-	{ "debug_camera", _hs_type_boolean, 0, debug_camera },
-	{ "debug_player", _hs_type_boolean, 0, debug_player },
-	{ "debug_structure", _hs_type_boolean, 0, debug_structure },
-	{ "debug_bsp", _hs_type_boolean, 0, debug_bsp },
-	{ "debug_input", _hs_type_boolean, 0, debug_input },
-	{ "debug_permanent_decals", _hs_type_boolean, 0, debug_permanent_decals },
-	{ "debug_fog_planes", _hs_type_boolean, 0, debug_fog_planes },
-	{ "breakable_surfaces", _hs_type_boolean, 0, breakable_surface_effect_enabled },
-	{ "decals", _hs_type_boolean, 0, decals_enabled },
-	{ "debug_decals", _hs_type_boolean, 0, debug_decals },
-	{ "debug_object_lights", _hs_type_boolean, 0, debug_object_lights },
-	{ "debug_lights", _hs_type_boolean, 0, debug_lights },
-	{ "debug_biped_physics", _hs_type_boolean, 0, debug_biped_physics },
-	{ "debug_biped_skip_update", _hs_type_boolean, 0, debug_biped_skip_update },
-	{ "debug_biped_skip_collision", _hs_type_boolean, 0, debug_biped_skip_collision },
-	{ "debug_biped_limp_body_disable", _hs_type_boolean, 0, debug_biped_limp_body_disable },
-	{ "debug_collision_skip_objects", _hs_type_boolean, 0, debug_collision_skip_objects },
-	{ "debug_collision_skip_vectors", _hs_type_boolean, 0, debug_collision_skip_vectors },
-	{ "debug_material_effects", _hs_type_boolean, 0, debug_material_effects },
-	{ "weather", _hs_type_boolean, 0, &weather },
-	{ "ai_profile_disable", _hs_type_boolean, 0, &ai_profile.disabled },
-	{ "ai_profile_random", _hs_type_boolean, 0, &ai_profile.move_actors_randomly },
-	{ "ai_show", _hs_type_boolean, 0, &ai_profile.show },
-	{ "ai_show_stats", _hs_type_boolean, 0, &ai_profile.show_stats },
-	{ "ai_show_actors", _hs_type_boolean, 0, &ai_profile.show_actors },
-	{ "ai_show_swarms", _hs_type_boolean, 0, &ai_profile.show_swarms },
-	{ "ai_show_paths", _hs_type_boolean, 0, &ai_profile.show_paths },
-	{ "ai_show_line_of_sight", _hs_type_boolean, 0, &ai_profile.show_line_of_sight },
-	{ "ai_show_prop_types", _hs_type_boolean, 0, &ai_profile.show_prop_types },
-	{ "ai_show_sound_distance", _hs_type_boolean, 0, &ai_profile.show_sound_distance },
-	{ "ai_render", _hs_type_boolean, 0, ai_debug + 0xA5 },
-	{ "ai_render_all_actors", _hs_type_boolean, 0, ai_debug + 0xA6 },
-	{ "ai_render_inactive_actors", _hs_type_boolean, 0, ai_debug + 0xA7 },
-	{ "ai_render_lineoffire_crouching", _hs_type_boolean, 0, ai_debug + 0xA8 },
-	{ "ai_render_lineoffire", _hs_type_boolean, 0, ai_debug + 0xA9 },
-	{ "ai_render_lineofsight", _hs_type_boolean, 0, ai_debug + 0xAA },
-	{ "ai_render_ballistic_lineoffire", _hs_type_boolean, 0, ai_debug + 0xAB },
-	{ "ai_render_encounter_activeregion", _hs_type_boolean, 0, ai_debug + 0xAC },
-	{ "ai_render_vision_cones", _hs_type_boolean, 0, ai_debug + 0xAD },
-	{ "ai_render_current_state", _hs_type_boolean, 0, ai_debug + 0xAE },
-	{ "ai_render_detailed_state", _hs_type_boolean, 0, ai_debug + 0xAF },
-	{ "ai_render_props", _hs_type_boolean, 0, ai_debug + 0xB0 },
-	{ "ai_render_props_web", _hs_type_boolean, 0, ai_debug + 0xB1 },
-	{ "ai_render_props_no_friends", _hs_type_boolean, 0, ai_debug + 0xB2 },
-	{ "ai_render_props_unreachable", _hs_type_boolean, 0, ai_debug + 0xB4 },
-	{ "ai_render_props_unopposable", _hs_type_boolean, 0, ai_debug + 0xB5 },
-	{ "ai_render_props_target_weight", _hs_type_boolean, 0, ai_debug + 0xB3 },
-	{ "ai_render_idle_look", _hs_type_boolean, 0, ai_debug + 0xB6 },
-	{ "ai_render_support_surfaces", _hs_type_boolean, 0, ai_debug + 0xBA },
-	{ "ai_render_recent_damage", _hs_type_boolean, 0, ai_debug + 0xBB },
-	{ "ai_render_threats", _hs_type_boolean, 0, ai_debug + 0xBC },
-	{ "ai_render_emotions", _hs_type_boolean, 0, ai_debug + 0xBD },
-	{ "ai_render_audibility", _hs_type_boolean, 0, ai_debug + 0xBE },
-	{ "ai_render_aiming_vectors", _hs_type_boolean, 0, ai_debug + 0xBF },
-	{ "ai_render_secondary_looking", _hs_type_boolean, 0, ai_debug + 0xC0 },
-	{ "ai_render_targets", _hs_type_boolean, 0, ai_debug + 0xB7 },
-	{ "ai_render_targets_last_visible", _hs_type_boolean, 0, ai_debug + 0xB8 },
-	{ "ai_render_states", _hs_type_boolean, 0, ai_debug + 0xB9 },
-	{ "ai_render_vitality", _hs_type_boolean, 0, ai_debug + 0xC1 },
-	{ "ai_render_active_cover_seeking", _hs_type_boolean, 0, ai_debug + 0xC2 },
-	{ "ai_render_evaluations", _hs_type_boolean, 0, ai_debug + 0xC3 },
-	{ "ai_render_pursuit", _hs_type_boolean, 0, ai_debug + 0xC4 },
-	{ "ai_render_shooting", _hs_type_boolean, 0, ai_debug + 0xC5 },
-	{ "ai_render_trigger", _hs_type_boolean, 0, ai_debug + 0xC6 },
-	{ "ai_render_projectile_aiming", _hs_type_boolean, 0, ai_debug + 0xC7 },
-	{ "ai_render_aiming_validity", _hs_type_boolean, 0, ai_debug + 0xC8 },
-	{ "ai_render_speech", _hs_type_boolean, 0, ai_debug + 0xC9 },
-	{ "ai_render_teams", _hs_type_boolean, 0, ai_debug + 0xCA },
-	{ "ai_render_player_ratings", _hs_type_boolean, 0, ai_debug + 0xCB },
-	{ "ai_render_spatial_effects", _hs_type_boolean, 0, ai_debug + 0xCC },
-	{ "ai_render_firing_positions", _hs_type_boolean, 0, ai_debug + 0xCD },
-	{ "ai_render_gun_positions", _hs_type_boolean, 0, ai_debug + 0xCE },
-	{ "ai_render_burst_geometry", _hs_type_boolean, 0, ai_debug + 0xCF },
-	{ "ai_render_vehicle_avoidance", _hs_type_boolean, 0, ai_debug + 0xD0 },
-	{ "ai_render_vehicles_enterable", _hs_type_boolean, 0, ai_debug + 0xD1 },
-	{ "ai_render_melee_check", _hs_type_boolean, 0, ai_debug + 0xD2 },
-	{ "ai_render_dialogue_variants", _hs_type_boolean, 0, ai_debug + 0xD3 },
-	{ "ai_render_grenade_decisions", _hs_type_boolean, 0, ai_debug + 0xD4 },
-	{ "ai_render_danger_zones", _hs_type_boolean, 0, ai_debug + 0xD5 },
-	{ "ai_render_charge_decisions", _hs_type_boolean, 0, ai_debug + 0xD6 },
-	{ "ai_render_control", _hs_type_boolean, 0, ai_debug + 0xD7 },
-	{ "ai_render_activation", _hs_type_boolean, 0, ai_debug + 0xD8 },
-	{ "ai_render_paths", _hs_type_boolean, 0, ai_debug + 0xD9 },
-	{ "ai_render_paths_selected_only", _hs_type_boolean, 0, ai_debug + 0xDA },
-	{ "ai_render_paths_destination", _hs_type_boolean, 0, ai_debug + 0xE4 },
-	{ "ai_render_paths_raw", _hs_type_boolean, 0, ai_debug + 0xDD },
-	{ "ai_render_paths_current", _hs_type_boolean, 0, ai_debug + 0xDC },
-	{ "ai_render_paths_failed", _hs_type_boolean, 0, ai_debug + 0xDB },
-	{ "ai_render_paths_smoothed", _hs_type_boolean, 0, ai_debug + 0xDE },
-	{ "ai_render_paths_avoided", _hs_type_boolean, 0, ai_debug + 0xDF },
-	{ "ai_render_paths_avoidance_segment", _hs_type_short_integer, 0, ai_debug + 0xE0 },
-	{ "ai_render_paths_avoidance_obstacles", _hs_type_boolean, 0, ai_debug + 0xE2 },
-	{ "ai_render_paths_avoidance_search", _hs_type_boolean, 0, ai_debug + 0xE3 },
-	{ "ai_render_paths_nodes", _hs_type_boolean, 0, ai_debug + 0xE5 },
-	{ "ai_render_paths_nodes_all", _hs_type_boolean, 0, ai_debug + 0xE6 },
-	{ "ai_render_paths_nodes_polygons", _hs_type_boolean, 0, ai_debug + 0xE7 },
-	{ "ai_render_paths_nodes_costs", _hs_type_boolean, 0, ai_debug + 0xE8 },
-	{ "ai_render_paths_nodes_closest", _hs_type_boolean, 0, ai_debug + 0xE9 },
-	{ "ai_render_player_aiming_blocked", _hs_type_boolean, 0, ai_debug + 0xEA },
-	{ "ai_render_vector_avoidance", _hs_type_boolean, 0, ai_debug + 0xEB },
-	{ "ai_render_vector_avoidance_rays", _hs_type_boolean, 0, ai_debug + 0xEC },
-	{ "ai_render_vector_avoidance_sense_t", _hs_type_boolean, 0, ai_debug + 0xED },
-	{ "ai_render_vector_avoidance_avoid_t", _hs_type_boolean, 0, ai_debug + 0xEE },
-	{ "ai_render_vector_avoidance_clear_time", _hs_type_boolean, 0, ai_debug + 0xEF },
-	{ "ai_render_vector_avoidance_weights", _hs_type_boolean, 0, ai_debug + 0xF0 },
-	{ "ai_render_vector_avoidance_objects", _hs_type_boolean, 0, ai_debug + 0xF1 },
-	{ "ai_render_vector_avoidance_intermediate", _hs_type_boolean, 0, ai_debug + 0xF2 },
-	{ "ai_render_postcombat", _hs_type_boolean, 0, ai_debug + 0xF3 },
-	{ "ai_print_pursuit_checks", _hs_type_boolean, 0, ai_debug + 0x8A },
-	{ "ai_print_rules", _hs_type_boolean, 0, ai_debug + 0x8B },
-	{ "ai_print_rule_values", _hs_type_boolean, 0, ai_debug + 0x8C },
-	{ "ai_print_major_upgrade", _hs_type_boolean, 0, ai_debug + 0x89 },
-	{ "ai_print_respawn", _hs_type_boolean, 0, ai_debug + 0x8D },
-	{ "ai_print_evaluation_statistics", _hs_type_boolean, 0, ai_debug + 0x8E },
-	{ "ai_print_communication", _hs_type_boolean, 0, ai_debug + 0x8F },
-	{ "ai_print_communication_player", _hs_type_boolean, 0, ai_debug + 0x90 },
-	{ "ai_print_vocalizations", _hs_type_boolean, 0, ai_debug + 0x91 },
-	{ "ai_print_placement", _hs_type_boolean, 0, ai_debug + 0x92 },
-	{ "ai_print_speech", _hs_type_boolean, 0, ai_debug + 0x93 },
-	{ "ai_print_speech_timers", _hs_type_boolean, 0, ai_debug + 0x94 },
-	{ "ai_print_allegiance", _hs_type_boolean, 0, ai_debug + 0x95 },
-	{ "ai_print_lost_speech", _hs_type_boolean, 0, ai_debug + 0x96 },
-	{ "ai_print_migration", _hs_type_boolean, 0, ai_debug + 0x97 },
-	{ "ai_print_automatic_migration", _hs_type_boolean, 0, ai_debug + 0x98 },
-	{ "ai_print_scripting", _hs_type_boolean, 0, ai_debug + 0x99 },
-	{ "ai_print_surprise", _hs_type_boolean, 0, ai_debug + 0x9A },
-	{ "ai_print_command_lists", _hs_type_boolean, 0, ai_debug + 0x9B },
-	{ "ai_print_damage_modifiers", _hs_type_boolean, 0, ai_debug + 0x9C },
-	{ "ai_print_secondary_looking", _hs_type_boolean, 0, ai_debug + 0x9D },
-	{ "ai_print_oversteer", _hs_type_boolean, 0, ai_debug + 0x9E },
-	{ "ai_print_conversations", _hs_type_boolean, 0, ai_debug + 0x9F },
-	{ "ai_print_killing_sprees", _hs_type_boolean, 0, ai_debug + 0xA0 },
-	{ "ai_print_acknowledgement", _hs_type_boolean, 0, ai_debug + 0xA1 },
-	{ "ai_print_unfinished_paths", _hs_type_boolean, 0, ai_debug + 0xA2 },
-	{ "ai_print_bsp_transition", _hs_type_boolean, 0, ai_debug + 0xA3 },
-	{ "ai_print_uncovering", _hs_type_boolean, 0, ai_debug + 0xA4 },
-	{ "ai_debug_fast_los", _hs_type_boolean, 0, ai_debug + 0x4 },
-	{ "ai_debug_oversteer_disable", _hs_type_boolean, 0, ai_debug + 0x11 },
-	{ "ai_debug_evaluate_all_positions", _hs_type_boolean, 0, ai_debug + 0x5 },
-	{ "ai_debug_path", _hs_type_boolean, 0, ai_debug + 0x3C },
-	{ "ai_debug_path_start_freeze", _hs_type_boolean, 0, ai_debug + 0x3D },
-	{ "ai_debug_path_end_freeze", _hs_type_boolean, 0, ai_debug + 0x3E },
-	{ "ai_debug_path_flood", _hs_type_boolean, 0, ai_debug + 0x3F },
-	{ "ai_debug_path_maximum_radius", _hs_type_real, 0, ai_debug + 0x40 },
-	{ "ai_debug_path_attractor", _hs_type_boolean, 0, ai_debug + 0x44 },
-	{ "ai_debug_path_attractor_radius", _hs_type_real, 0, ai_debug + 0x48 },
-	{ "ai_debug_path_attractor_weight", _hs_type_real, 0, ai_debug + 0x4C },
-	{ "ai_debug_path_accept_radius", _hs_type_real, 0, ai_debug + 0x50 },
-	{ "ai_debug_ballistic_lineoffire_freeze", _hs_type_boolean, 0, ai_debug + 0x88 },
-	{ "ai_debug_communication_random_disabled", _hs_type_boolean, 0, ai_debug + 0x85 },
-	{ "ai_debug_communication_timeout_disabled", _hs_type_boolean, 0, ai_debug + 0x86 },
-	{ "ai_debug_communication_unit_repeat_disabled", _hs_type_boolean, 0, ai_debug + 0x87 },
-	{ "ai_debug_communication_focus_enable", _hs_type_boolean, 0, ai_debug + 0x84 },
-	{ "ai_debug_blind", _hs_type_boolean, 0, ai_debug + 0xB },
-	{ "ai_debug_deaf", _hs_type_boolean, 0, ai_debug + 0xC },
-	{ "ai_debug_invisible_player", _hs_type_boolean, 0, ai_debug + 0x7 },
-	{ "ai_debug_ignore_player", _hs_type_boolean, 0, ai_debug + 0x6 },
-	{ "ai_debug_flee_always", _hs_type_boolean, 0, ai_debug + 0x8 },
-	{ "ai_debug_force_all_active", _hs_type_boolean, 0, ai_debug + 0x9 },
-	{ "ai_debug_disable_wounded_sounds", _hs_type_boolean, 0, ai_debug + 0xA },
-	{ "ai_debug_force_vocalizations", _hs_type_boolean, 0, ai_debug + 0xD },
-	{ "ai_debug_force_crouch", _hs_type_boolean, 0, ai_debug + 0xE },
-	{ "ai_debug_path_disable_smoothing", _hs_type_boolean, 0, ai_debug + 0x10 },
-	{ "ai_debug_path_disable_obstacle_avoidance", _hs_type_boolean, 0, ai_debug + 0xF },
-	{ "ai_fix_defending_guard_firing_positions", _hs_type_boolean, 0, ai_debug + 0x2 },
-	{ "ai_fix_actor_variants", _hs_type_boolean, 0, ai_debug + 0x3 },
-	{ "controls_enable_crouch", _hs_type_boolean, 0, controls_enable_crouch },
-	{ "controls_swapped", _hs_type_boolean, 0, controls_swapped },
-	{ "controls_enable_doubled_spin", _hs_type_boolean, 0, controls_enable_doubled_spin },
-	{ "controls_swap_doubled_spin_state", _hs_type_boolean, 0, controls_swap_doubled_spin_state },
-	{ "player0_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate },
-	{ "player1_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0x4 },
-	{ "player2_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0x8 },
-	{ "player3_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0xC },
-	{ "player0_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate },
-	{ "player1_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0x4 },
-	{ "player2_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0x8 },
-	{ "player3_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0xC },
-	{ "player_autoaim", _hs_type_boolean, 0, player_autoaim_flag },
-	{ "player_magnetism", _hs_type_boolean, 0, player_magnetism_flag },
-	{ "debug_player_teleport", _hs_type_boolean, 0, debug_render_player_teleport },
-	{ "texture_cache_graph", _hs_type_boolean, 0, texture_cache_debug_options },
-	{ "texture_cache_list", _hs_type_boolean, 0, texture_cache_debug_options + 0x1 },
-	{ "director_camera_switch_fast", _hs_type_boolean, 0, &director_camera_switch_fast },
-	{ "debug_recording", _hs_type_boolean, 0, debug_recording },
-	{ "debug_recording_newlines", _hs_type_short_integer, 0, debug_recording_newlines },
-	{ "debug_player_color", _hs_type_short_integer, 0, debug_player_color },
-	{ "find_all_fucked_up_shit", _hs_type_boolean, 0, find_all_fucked_up_shit },
-	{ "allow_out_of_sync", _hs_type_boolean, 0, allow_out_of_sync },
-	{ "global_connection_dont_timeout", _hs_type_boolean, 0, &global_connection_dont_timeout },
-	{ "run_game_scripts", _hs_type_boolean, 0, NULL },
-};
+static struct hs_external_global_definition screenshot_size_definition = { "screenshot_size", _hs_type_short_integer, 0, global_screenshot_size };
+
+static struct hs_external_global_definition screenshot_count_definition = { "screenshot_count", _hs_type_short_integer, 0, global_screenshot_count };
+
+static struct hs_external_global_definition player_spawn_count_definition = { "player_spawn_count", _hs_type_short_integer, 0, &player_spawn_count };
+
+static struct hs_external_global_definition framerate_throttle_definition = { "framerate_throttle", _hs_type_boolean, 0, &global_frame_rate_throttle };
+
+static struct hs_external_global_definition framerate_lock_definition = { "framerate_lock", _hs_type_boolean, 0, debug_force_frame_rate_update };
+
+static struct hs_external_global_definition debug_framerate_definition = { "debug_framerate", _hs_type_boolean, 0, debug_frame_rate };
+
+static struct hs_external_global_definition display_framerate_definition = { "display_framerate", _hs_type_boolean, 0, display_framerate };
+
+static struct hs_external_global_definition display_vblank_deltas_definition = { "display_vblank_deltas", _hs_type_boolean, 0, display_vblank_deltas };
+
+static struct hs_external_global_definition display_precache_progress_definition = { "display_precache_progress", _hs_type_boolean, 0, display_precache_progress };
+
+static struct hs_external_global_definition debug_game_save_definition = { "debug_game_save", _hs_type_boolean, 0, &debug_game_save };
+
+static struct hs_external_global_definition terminal_render_definition = { "terminal_render", _hs_type_boolean, 0, terminal_render_enable };
+
+static struct hs_external_global_definition console_dump_to_file_definition = { "console_dump_to_file", _hs_type_boolean, 0, console_dump_to_file };
+
+static struct hs_external_global_definition rasterizer_near_clip_distance_definition = { "rasterizer_near_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x44 };
+
+static struct hs_external_global_definition rasterizer_far_clip_distance_definition = { "rasterizer_far_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x48 };
+
+static struct hs_external_global_definition rasterizer_first_person_weapon_near_clip_distance_definition = { "rasterizer_first_person_weapon_near_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x4C };
+
+static struct hs_external_global_definition rasterizer_first_person_weapon_far_clip_distance_definition = { "rasterizer_first_person_weapon_far_clip_distance", _hs_type_real, 0, rasterizer_globals + 0x50 };
+
+static struct hs_external_global_definition rasterizer_pushbuffer_size_definition = { "rasterizer_pushbuffer_size", _hs_type_short_integer, 0, rasterizer_globals + 0x38 };
+
+static struct hs_external_global_definition rasterizer_pushbuffer_kickoff_size_definition = { "rasterizer_pushbuffer_kickoff_size", _hs_type_short_integer, 0, rasterizer_globals + 0x3A };
+
+static struct hs_external_global_definition rasterizer_floating_point_zbuffer_definition = { "rasterizer_floating_point_zbuffer", _hs_type_boolean, 0, rasterizer_globals + 0x3C };
+
+static struct hs_external_global_definition rasterizer_framerate_throttle_definition = { "rasterizer_framerate_throttle", _hs_type_boolean, 0, rasterizer_globals + 0x3D };
+
+static struct hs_external_global_definition rasterizer_framerate_stabilization_definition = { "rasterizer_framerate_stabilization", _hs_type_boolean, 0, rasterizer_globals + 0x3E };
+
+static struct hs_external_global_definition rasterizer_refresh_rate_definition = { "rasterizer_refresh_rate", _hs_type_short_integer, 0, rasterizer_globals + 0x40 };
+
+static struct hs_external_global_definition rasterizer_frame_bounds_left_definition = { "rasterizer_frame_bounds_left", _hs_type_short_integer, 0, rasterizer_globals + 0xE };
+
+static struct hs_external_global_definition rasterizer_frame_bounds_right_definition = { "rasterizer_frame_bounds_right", _hs_type_short_integer, 0, rasterizer_globals + 0x12 };
+
+static struct hs_external_global_definition rasterizer_frame_bounds_top_definition = { "rasterizer_frame_bounds_top", _hs_type_short_integer, 0, rasterizer_globals + 0xC };
+
+static struct hs_external_global_definition rasterizer_frame_bounds_bottom_definition = { "rasterizer_frame_bounds_bottom", _hs_type_short_integer, 0, rasterizer_globals + 0x10 };
+
+static struct hs_external_global_definition rasterizer_stats_definition = { "rasterizer_stats", _hs_type_short_integer, 0, rasterizer_debug_options + 0x2 };
+
+static struct hs_external_global_definition rasterizer_mode_definition = { "rasterizer_mode", _hs_type_short_integer, 0, rasterizer_debug_options + 0x4 };
+
+static struct hs_external_global_definition rasterizer_wireframe_definition = { "rasterizer_wireframe", _hs_type_boolean, 0, rasterizer_debug_options + 0x6 };
+
+static struct hs_external_global_definition rasterizer_smart_definition = { "rasterizer_smart", _hs_type_boolean, 0, rasterizer_debug_options + 0x62 };
+
+static struct hs_external_global_definition rasterizer_debug_model_vertices_definition = { "rasterizer_debug_model_vertices", _hs_type_boolean, 0, rasterizer_debug_options + 0x7 };
+
+static struct hs_external_global_definition rasterizer_debug_model_lod_definition = { "rasterizer_debug_model_lod", _hs_type_short_integer, 0, rasterizer_debug_options + 0x8 };
+
+static struct hs_external_global_definition rasterizer_debug_transparents_definition = { "rasterizer_debug_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0xA };
+
+static struct hs_external_global_definition rasterizer_debug_meter_shader_definition = { "rasterizer_debug_meter_shader", _hs_type_boolean, 0, rasterizer_debug_options + 0xB };
+
+static struct hs_external_global_definition rasterizer_models_definition = { "rasterizer_models", _hs_type_boolean, 0, rasterizer_debug_options + 0xC };
+
+static struct hs_external_global_definition rasterizer_model_transparents_definition = { "rasterizer_model_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0xD };
+
+static struct hs_external_global_definition rasterizer_draw_first_person_weapon_first_definition = { "rasterizer_draw_first_person_weapon_first", _hs_type_boolean, 0, rasterizer_debug_options + 0xE };
+
+static struct hs_external_global_definition rasterizer_stencil_mask_definition = { "rasterizer_stencil_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0xF };
+
+static struct hs_external_global_definition rasterizer_environment_definition = { "rasterizer_environment", _hs_type_boolean, 0, rasterizer_debug_options + 0x10 };
+
+static struct hs_external_global_definition rasterizer_environment_lightmaps_definition = { "rasterizer_environment_lightmaps", _hs_type_boolean, 0, rasterizer_debug_options + 0x11 };
+
+static struct hs_external_global_definition rasterizer_environment_shadows_definition = { "rasterizer_environment_shadows", _hs_type_boolean, 0, rasterizer_debug_options + 0x12 };
+
+static struct hs_external_global_definition rasterizer_environment_diffuse_lights_definition = { "rasterizer_environment_diffuse_lights", _hs_type_boolean, 0, rasterizer_debug_options + 0x13 };
+
+static struct hs_external_global_definition rasterizer_environment_diffuse_textures_definition = { "rasterizer_environment_diffuse_textures", _hs_type_boolean, 0, rasterizer_debug_options + 0x14 };
+
+static struct hs_external_global_definition rasterizer_environment_decals_definition = { "rasterizer_environment_decals", _hs_type_boolean, 0, rasterizer_debug_options + 0x15 };
+
+static struct hs_external_global_definition rasterizer_environment_specular_lights_definition = { "rasterizer_environment_specular_lights", _hs_type_boolean, 0, rasterizer_debug_options + 0x16 };
+
+static struct hs_external_global_definition rasterizer_environment_specular_lightmaps_definition = { "rasterizer_environment_specular_lightmaps", _hs_type_boolean, 0, rasterizer_debug_options + 0x17 };
+
+static struct hs_external_global_definition rasterizer_environment_reflection_lightmap_mask_definition = { "rasterizer_environment_reflection_lightmap_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0x18 };
+
+static struct hs_external_global_definition rasterizer_environment_reflection_mirrors_definition = { "rasterizer_environment_reflection_mirrors", _hs_type_boolean, 0, rasterizer_debug_options + 0x19 };
+
+static struct hs_external_global_definition rasterizer_environment_reflections_definition = { "rasterizer_environment_reflections", _hs_type_boolean, 0, rasterizer_debug_options + 0x1A };
+
+static struct hs_external_global_definition rasterizer_environment_transparents_definition = { "rasterizer_environment_transparents", _hs_type_boolean, 0, rasterizer_debug_options + 0x1B };
+
+static struct hs_external_global_definition rasterizer_environment_fog_definition = { "rasterizer_environment_fog", _hs_type_boolean, 0, rasterizer_debug_options + 0x1C };
+
+static struct hs_external_global_definition rasterizer_environment_fog_screen_definition = { "rasterizer_environment_fog_screen", _hs_type_boolean, 0, rasterizer_debug_options + 0x1D };
+
+static struct hs_external_global_definition rasterizer_water_definition = { "rasterizer_water", _hs_type_boolean, 0, rasterizer_debug_options + 0x1E };
+
+static struct hs_external_global_definition rasterizer_lens_flares_definition = { "rasterizer_lens_flares", _hs_type_boolean, 0, rasterizer_debug_options + 0x1F };
+
+static struct hs_external_global_definition rasterizer_dynamic_unlit_geometry_definition = { "rasterizer_dynamic_unlit_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x20 };
+
+static struct hs_external_global_definition rasterizer_dynamic_lit_geometry_definition = { "rasterizer_dynamic_lit_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x21 };
+
+static struct hs_external_global_definition rasterizer_dynamic_screen_geometry_definition = { "rasterizer_dynamic_screen_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x22 };
+
+static struct hs_external_global_definition rasterizer_hud_motion_sensor_definition = { "rasterizer_hud_motion_sensor", _hs_type_boolean, 0, rasterizer_debug_options + 0x23 };
+
+static struct hs_external_global_definition rasterizer_detail_objects_definition = { "rasterizer_detail_objects", _hs_type_boolean, 0, rasterizer_debug_options + 0x24 };
+
+static struct hs_external_global_definition rasterizer_debug_geometry_definition = { "rasterizer_debug_geometry", _hs_type_boolean, 0, rasterizer_debug_options + 0x25 };
+
+static struct hs_external_global_definition rasterizer_debug_geometry_multipass_definition = { "rasterizer_debug_geometry_multipass", _hs_type_boolean, 0, rasterizer_debug_options + 0x26 };
+
+static struct hs_external_global_definition rasterizer_fog_atmosphere_definition = { "rasterizer_fog_atmosphere", _hs_type_boolean, 0, rasterizer_debug_options + 0x27 };
+
+static struct hs_external_global_definition rasterizer_fog_plane_definition = { "rasterizer_fog_plane", _hs_type_boolean, 0, rasterizer_debug_options + 0x28 };
+
+static struct hs_external_global_definition rasterizer_bump_mapping_definition = { "rasterizer_bump_mapping", _hs_type_boolean, 0, rasterizer_debug_options + 0x29 };
+
+static struct hs_external_global_definition rasterizer_lightmap_ambient_definition = { "rasterizer_lightmap_ambient", _hs_type_real, 0, rasterizer_debug_options + 0x2C };
+
+static struct hs_external_global_definition rasterizer_lightmap_mode_definition = { "rasterizer_lightmap_mode", _hs_type_short_integer, 0, rasterizer_globals + 0x60 };
+
+static struct hs_external_global_definition rasterizer_lightmaps_incident_radiosity_definition = { "rasterizer_lightmaps_incident_radiosity", _hs_type_boolean, 0, rasterizer_debug_options + 0x34 };
+
+static struct hs_external_global_definition rasterizer_lightmaps_filtering_definition = { "rasterizer_lightmaps_filtering", _hs_type_boolean, 0, rasterizer_debug_options + 0x35 };
+
+static struct hs_external_global_definition rasterizer_model_lighting_ambient_definition = { "rasterizer_model_lighting_ambient", _hs_type_real, 0, rasterizer_debug_options + 0x38 };
+
+static struct hs_external_global_definition rasterizer_environment_alpha_testing_definition = { "rasterizer_environment_alpha_testing", _hs_type_boolean, 0, rasterizer_debug_options + 0x3C };
+
+static struct hs_external_global_definition rasterizer_environment_specular_mask_definition = { "rasterizer_environment_specular_mask", _hs_type_boolean, 0, rasterizer_debug_options + 0x3D };
+
+static struct hs_external_global_definition rasterizer_shadows_convolution_definition = { "rasterizer_shadows_convolution", _hs_type_boolean, 0, rasterizer_debug_options + 0x3E };
+
+static struct hs_external_global_definition rasterizer_shadows_debug_definition = { "rasterizer_shadows_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x3F };
+
+static struct hs_external_global_definition rasterizer_water_mipmapping_definition = { "rasterizer_water_mipmapping", _hs_type_boolean, 0, rasterizer_debug_options + 0x40 };
+
+static struct hs_external_global_definition rasterizer_active_camouflage_definition = { "rasterizer_active_camouflage", _hs_type_boolean, 0, rasterizer_debug_options + 0x41 };
+
+static struct hs_external_global_definition rasterizer_active_camouflage_multipass_definition = { "rasterizer_active_camouflage_multipass", _hs_type_boolean, 0, rasterizer_debug_options + 0x42 };
+
+static struct hs_external_global_definition rasterizer_plasma_energy_definition = { "rasterizer_plasma_energy", _hs_type_boolean, 0, rasterizer_debug_options + 0x43 };
+
+static struct hs_external_global_definition rasterizer_lens_flares_occlusion_definition = { "rasterizer_lens_flares_occlusion", _hs_type_boolean, 0, rasterizer_debug_options + 0x44 };
+
+static struct hs_external_global_definition rasterizer_lens_flares_occlusion_debug_definition = { "rasterizer_lens_flares_occlusion_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x45 };
+
+static struct hs_external_global_definition rasterizer_ray_of_buddha_definition = { "rasterizer_ray_of_buddha", _hs_type_boolean, 0, rasterizer_debug_options + 0x46 };
+
+static struct hs_external_global_definition rasterizer_screen_flashes_definition = { "rasterizer_screen_flashes", _hs_type_boolean, 0, rasterizer_debug_options + 0x47 };
+
+static struct hs_external_global_definition rasterizer_screen_effects_definition = { "rasterizer_screen_effects", _hs_type_boolean, 0, rasterizer_debug_options + 0x48 };
+
+static struct hs_external_global_definition rasterizer_DXTC_noise_definition = { "rasterizer_DXTC_noise", _hs_type_boolean, 0, rasterizer_debug_options + 0x49 };
+
+static struct hs_external_global_definition rasterizer_soft_filter_definition = { "rasterizer_soft_filter", _hs_type_boolean, 0, rasterizer_debug_options + 0x4A };
+
+static struct hs_external_global_definition rasterizer_secondary_render_target_debug_definition = { "rasterizer_secondary_render_target_debug", _hs_type_boolean, 0, rasterizer_debug_options + 0x4B };
+
+static struct hs_external_global_definition rasterizer_profile_log_definition = { "rasterizer_profile_log", _hs_type_boolean, 0, rasterizer_debug_options + 0x4C };
+
+static struct hs_external_global_definition rasterizer_detail_objects_offset_multiplier_definition = { "rasterizer_detail_objects_offset_multiplier", _hs_type_real, 0, rasterizer_debug_options + 0x50 };
+
+static struct hs_external_global_definition rasterizer_zbias_definition = { "rasterizer_zbias", _hs_type_long_integer, 0, rasterizer_debug_options + 0x54 };
+
+static struct hs_external_global_definition rasterizer_zoffset_definition = { "rasterizer_zoffset", _hs_type_real, 0, rasterizer_debug_options + 0x58 };
+
+static struct hs_external_global_definition force_all_player_views_to_default_player_definition = { "force_all_player_views_to_default_player", _hs_type_boolean, 0, rasterizer_debug_options + 0x5C };
+
+static struct hs_external_global_definition rasterizer_safe_frame_bounds_definition = { "rasterizer_safe_frame_bounds", _hs_type_boolean, 0, rasterizer_debug_options + 0x5D };
+
+static struct hs_external_global_definition freeze_flying_camera_definition = { "freeze_flying_camera", _hs_type_short_integer, 0, rasterizer_debug_options + 0x5E };
+
+static struct hs_external_global_definition rasterizer_zsprites_definition = { "rasterizer_zsprites", _hs_type_boolean, 0, rasterizer_debug_options + 0x60 };
+
+static struct hs_external_global_definition rasterizer_filthy_decal_fog_hack_definition = { "rasterizer_filthy_decal_fog_hack", _hs_type_boolean, 0, rasterizer_debug_options + 0x61 };
+
+static struct hs_external_global_definition rasterizer_splitscreen_VB_optimization_definition = { "rasterizer_splitscreen_VB_optimization", _hs_type_boolean, 0, rasterizer_debug_options + 0x63 };
+
+static struct hs_external_global_definition rasterizer_profile_print_locks_definition = { "rasterizer_profile_print_locks", _hs_type_boolean, 0, rasterizer_debug_options + 0x64 };
+
+static struct hs_external_global_definition rasterizer_profile_objectlock_time_definition = { "rasterizer_profile_objectlock_time", _hs_type_real, 0, rasterizer_debug_options + 0x68 };
+
+static struct hs_external_global_definition pad3_definition = { "pad3", _hs_type_short_integer, 0, rasterizer_debug_options + 0x32 };
+
+static struct hs_external_global_definition pad3_scale_definition = { "pad3_scale", _hs_type_real, 0, rasterizer_debug_options + 0x6C };
+
+static struct hs_external_global_definition f0_definition = { "f0", _hs_type_real, 0, rasterizer_debug_options + 0x70 };
+
+static struct hs_external_global_definition f1_definition = { "f1", _hs_type_real, 0, rasterizer_debug_options + 0x74 };
+
+static struct hs_external_global_definition f2_definition = { "f2", _hs_type_real, 0, rasterizer_debug_options + 0x78 };
+
+static struct hs_external_global_definition f3_definition = { "f3", _hs_type_real, 0, rasterizer_debug_options + 0x7C };
+
+static struct hs_external_global_definition f4_definition = { "f4", _hs_type_real, 0, rasterizer_debug_options + 0x80 };
+
+static struct hs_external_global_definition f5_definition = { "f5", _hs_type_real, 0, rasterizer_debug_options + 0x84 };
+
+static struct hs_external_global_definition rasterizer_transparent_pixel_counter_definition = { "rasterizer_transparent_pixel_counter", _hs_type_boolean, 0, rasterizer_debug_options + 0x89 };
+
+static struct hs_external_global_definition debug_no_frustum_clip_definition = { "debug_no_frustum_clip", _hs_type_boolean, 0, debug_no_frustum_clip };
+
+static struct hs_external_global_definition debug_frustum_definition = { "debug_frustum", _hs_type_boolean, 0, render_camera_debug_this_fucking_frustum };
+
+static struct hs_external_global_definition debug_bink_definition = { "debug_bink", _hs_type_boolean, 0, debug_bink };
+
+static struct hs_external_global_definition recover_saved_games_hack_definition = { "recover_saved_games_hack", _hs_type_boolean, 0, recover_saved_games_hack };
+
+static struct hs_external_global_definition radiosity_quality_definition = { "radiosity_quality", _hs_type_short_integer, 0, NULL };
+
+static struct hs_external_global_definition radiosity_step_count_definition = { "radiosity_step_count", _hs_type_short_integer, 0, NULL };
+
+static struct hs_external_global_definition radiosity_lines_definition = { "radiosity_lines", _hs_type_boolean, 0, NULL };
+
+static struct hs_external_global_definition radiosity_normals_definition = { "radiosity_normals", _hs_type_boolean, 0, NULL };
+
+static struct hs_external_global_definition structures_use_pvs_for_vs_definition = { "structures_use_pvs_for_vs", _hs_type_boolean, 0, structures_use_pvs_for_vs };
+
+static struct hs_external_global_definition debug_detail_objects_definition = { "debug_detail_objects", _hs_type_boolean, 0, debug_detail_objects };
+
+static struct hs_external_global_definition debug_texture_cache_definition = { "debug_texture_cache", _hs_type_boolean, 0, debug_texture_cache };
+
+static struct hs_external_global_definition temporary_hud_definition = { "temporary_hud", _hs_type_boolean, 0, temporary_hud };
+
+static struct hs_external_global_definition debug_object_garbage_collection_definition = { "debug_object_garbage_collection", _hs_type_boolean, 0, debug_object_garbage_collection };
+
+static struct hs_external_global_definition debug_render_freeze_definition = { "debug_render_freeze", _hs_type_boolean, 0, debug_render_freeze };
+
+static struct hs_external_global_definition debug_no_drawing_definition = { "debug_no_drawing", _hs_type_boolean, 0, debug_no_drawing };
+
+static struct hs_external_global_definition debug_input_target_definition = { "debug_input_target", _hs_type_short_integer, 0, debug_input_target };
+
+static struct hs_external_global_definition debug_leaf_index_definition = { "debug_leaf_index", _hs_type_long_integer, 0, debug_leaf_index };
+
+static struct hs_external_global_definition debug_leaf_portal_index_definition = { "debug_leaf_portal_index", _hs_type_long_integer, 0, debug_leaf_portal_index };
+
+static struct hs_external_global_definition debug_leaf_portals_definition = { "debug_leaf_portals", _hs_type_boolean, 0, debug_leaf_portals };
+
+static struct hs_external_global_definition debug_unit_all_animations_definition = { "debug_unit_all_animations", _hs_type_boolean, 0, debug_unit_all_animations };
+
+static struct hs_external_global_definition debug_unit_animations_definition = { "debug_unit_animations", _hs_type_boolean, 0, debug_unit_animations };
+
+static struct hs_external_global_definition debug_unit_illumination_definition = { "debug_unit_illumination", _hs_type_boolean, 0, debug_unit_illumination };
+
+static struct hs_external_global_definition debug_damage_taken_definition = { "debug_damage_taken", _hs_type_boolean, 0, debug_damage_taken };
+
+static struct hs_external_global_definition cheat_deathless_player_definition = { "cheat_deathless_player", _hs_type_boolean, 0, cheat };
+
+static struct hs_external_global_definition cheat_jetpack_definition = { "cheat_jetpack", _hs_type_boolean, 0, cheat + 0x1 };
+
+static struct hs_external_global_definition cheat_infinite_ammo_definition = { "cheat_infinite_ammo", _hs_type_boolean, 0, cheat + 0x2 };
+
+static struct hs_external_global_definition cheat_bottomless_clip_definition = { "cheat_bottomless_clip", _hs_type_boolean, 0, cheat + 0x9 };
+
+static struct hs_external_global_definition cheat_bump_possession_definition = { "cheat_bump_possession", _hs_type_boolean, 0, cheat + 0x3 };
+
+static struct hs_external_global_definition cheat_super_jump_definition = { "cheat_super_jump", _hs_type_boolean, 0, cheat + 0x4 };
+
+static struct hs_external_global_definition cheat_reflexive_damage_effects_definition = { "cheat_reflexive_damage_effects", _hs_type_boolean, 0, cheat + 0x5 };
+
+static struct hs_external_global_definition cheat_medusa_definition = { "cheat_medusa", _hs_type_boolean, 0, cheat + 0x6 };
+
+static struct hs_external_global_definition cheat_omnipotent_definition = { "cheat_omnipotent", _hs_type_boolean, 0, cheat + 0x7 };
+
+static struct hs_external_global_definition cheat_controller_definition = { "cheat_controller", _hs_type_boolean, 0, cheat + 0x8 };
+
+static struct hs_external_global_definition effects_corpse_nonviolent_definition = { "effects_corpse_nonviolent", _hs_type_boolean, 0, effects_corpse_nonviolent };
+
+static struct hs_external_global_definition debug_effects_nonviolent_definition = { "debug_effects_nonviolent", _hs_type_boolean, 0, debug_effects_nonviolent };
+
+static struct hs_external_global_definition debug_sound_cache_definition = { "debug_sound_cache", _hs_type_boolean, 0, debug_sound_cache };
+
+static struct hs_external_global_definition debug_sound_definition = { "debug_sound", _hs_type_boolean, 0, debug_sound };
+
+static struct hs_external_global_definition debug_looping_sound_definition = { "debug_looping_sound", _hs_type_boolean, 0, debug_looping_sound };
+
+static struct hs_external_global_definition debug_sound_channels_definition = { "debug_sound_channels", _hs_type_boolean, 0, debug_sound_channels };
+
+static struct hs_external_global_definition loud_dialog_hack_definition = { "loud_dialog_hack", _hs_type_boolean, 0, loud_dialog_hack };
+
+static struct hs_external_global_definition sound_gain_under_dialog_definition = { "sound_gain_under_dialog", _hs_type_real, 0, sound_gain_under_dialog };
+
+static struct hs_external_global_definition debug_sound_environment_definition = { "debug_sound_environment", _hs_type_boolean, 0, debug_sound_environment };
+
+static struct hs_external_global_definition object_light_ambient_base_definition = { "object_light_ambient_base", _hs_type_real, 0, object_light_ambient_base };
+
+static struct hs_external_global_definition object_light_ambient_scale_definition = { "object_light_ambient_scale", _hs_type_real, 0, object_light_ambient_scale };
+
+static struct hs_external_global_definition object_light_secondary_scale_definition = { "object_light_secondary_scale", _hs_type_real, 0, object_light_secondary_scale };
+
+static struct hs_external_global_definition object_light_interpolate_definition = { "object_light_interpolate", _hs_type_boolean, 0, object_light_interpolate };
+
+static struct hs_external_global_definition rider_ejection_definition = { "rider_ejection", _hs_type_boolean, 0, rider_ejection };
+
+static struct hs_external_global_definition stun_enable_definition = { "stun_enable", _hs_type_boolean, 0, stun_enable };
+
+static struct hs_external_global_definition collision_log_render_definition = { "collision_log_render", _hs_type_boolean, 0, collision_log_render_enable };
+
+static struct hs_external_global_definition collision_log_detailed_definition = { "collision_log_detailed", _hs_type_boolean, 0, collision_log_detailed };
+
+static struct hs_external_global_definition collision_log_extended_definition = { "collision_log_extended", _hs_type_boolean, 0, collision_log_extended };
+
+static struct hs_external_global_definition collision_log_totals_only_definition = { "collision_log_totals_only", _hs_type_boolean, 0, collision_log_totals_only };
+
+static struct hs_external_global_definition collision_log_time_definition = { "collision_log_time", _hs_type_boolean, 0, collision_log_time };
+
+static struct hs_external_global_definition profile_graph_definition = { "profile_graph", _hs_type_boolean, 0, profile_graph };
+
+static struct hs_external_global_definition profile_display_definition = { "profile_display", _hs_type_boolean, 0, profile_display };
+
+static struct hs_external_global_definition profile_timebase_ticks_definition = { "profile_timebase_ticks", _hs_type_boolean, 0, profile_timebase_ticks };
+
+static struct hs_external_global_definition profile_dump_frames_definition = { "profile_dump_frames", _hs_type_boolean, 0, profile_dump_frames };
+
+static struct hs_external_global_definition profile_dump_lost_frames_definition = { "profile_dump_lost_frames", _hs_type_boolean, 0, profile_dump_lost_frames };
+
+static struct hs_external_global_definition model_animation_compression_definition = { "model_animation_compression", _hs_type_boolean, 0, hs_model_animation_compression_enabled };
+
+static struct hs_external_global_definition model_animation_data_compressed_size_definition = { "model_animation_data_compressed_size", _hs_type_long_integer, 0, hs_model_animation_data_compressed_size };
+
+static struct hs_external_global_definition model_animation_data_uncompressed_size_definition = { "model_animation_data_uncompressed_size", _hs_type_long_integer, 0, hs_model_animation_data_uncompressed_size };
+
+static struct hs_external_global_definition model_animation_data_compression_savings_in_bytes_definition = { "model_animation_data_compression_savings_in_bytes", _hs_type_long_integer, 0, hs_model_animation_data_compression_savings_in_bytes };
+
+static struct hs_external_global_definition model_animation_data_compression_savings_in_bytes_at_import_definition = { "model_animation_data_compression_savings_in_bytes_at_import", _hs_type_long_integer, 0, hs_model_animation_data_compression_savings_in_bytes_at_import };
+
+static struct hs_external_global_definition model_animation_data_compression_savings_in_percent_definition = { "model_animation_data_compression_savings_in_percent", _hs_type_real, 0, hs_model_animation_data_compression_savings_in_percent };
+
+static struct hs_external_global_definition model_animation_bullshit0_definition = { "model_animation_bullshit0", _hs_type_long_integer, 0, hs_model_animation_bullshit };
+
+static struct hs_external_global_definition model_animation_bullshit1_definition = { "model_animation_bullshit1", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0x4 };
+
+static struct hs_external_global_definition model_animation_bullshit2_definition = { "model_animation_bullshit2", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0x8 };
+
+static struct hs_external_global_definition model_animation_bullshit3_definition = { "model_animation_bullshit3", _hs_type_long_integer, 0, hs_model_animation_bullshit + 0xC };
+
+static struct hs_external_global_definition debug_portals_definition = { "debug_portals", _hs_type_boolean, 0, debug_portals };
+
+static struct hs_external_global_definition debug_sprites_definition = { "debug_sprites", _hs_type_boolean, 0, debug_sprites };
+
+static struct hs_external_global_definition debug_inactive_objects_definition = { "debug_inactive_objects", _hs_type_boolean, 0, debug_inactive_objects };
+
+static struct hs_external_global_definition render_contrails_definition = { "render_contrails", _hs_type_boolean, 0, render_contrails_enabled };
+
+static struct hs_external_global_definition render_particles_definition = { "render_particles", _hs_type_boolean, 0, render_particles_enabled };
+
+static struct hs_external_global_definition render_psystems_definition = { "render_psystems", _hs_type_boolean, 0, &render_particle_systems_enabled };
+
+static struct hs_external_global_definition render_wsystems_definition = { "render_wsystems", _hs_type_boolean, 0, render_weather_particle_systems_enabled };
+
+static struct hs_external_global_definition debug_objects_definition = { "debug_objects", _hs_type_boolean, 0, debug_objects };
+
+static struct hs_external_global_definition debug_objects_position_velocity_definition = { "debug_objects_position_velocity", _hs_type_boolean, 0, debug_objects_position_velocity };
+
+static struct hs_external_global_definition debug_objects_root_node_definition = { "debug_objects_root_node", _hs_type_boolean, 0, debug_objects_root_node };
+
+static struct hs_external_global_definition debug_objects_bounding_spheres_definition = { "debug_objects_bounding_spheres", _hs_type_boolean, 0, debug_objects_bounding_spheres };
+
+static struct hs_external_global_definition debug_objects_collision_models_definition = { "debug_objects_collision_models", _hs_type_boolean, 0, debug_objects_collision_models };
+
+static struct hs_external_global_definition debug_objects_physics_definition = { "debug_objects_physics", _hs_type_boolean, 0, debug_objects_physics };
+
+static struct hs_external_global_definition debug_objects_names_definition = { "debug_objects_names", _hs_type_boolean, 0, debug_objects_names };
+
+static struct hs_external_global_definition debug_objects_pathfinding_spheres_definition = { "debug_objects_pathfinding_spheres", _hs_type_boolean, 0, debug_objects_pathfinding_spheres };
+
+static struct hs_external_global_definition debug_objects_unit_vectors_definition = { "debug_objects_unit_vectors", _hs_type_boolean, 0, debug_objects_unit_vectors };
+
+static struct hs_external_global_definition debug_objects_unit_seats_definition = { "debug_objects_unit_seats", _hs_type_boolean, 0, debug_objects_unit_seats };
+
+static struct hs_external_global_definition debug_objects_unit_mouth_apeture_definition = { "debug_objects_unit_mouth_apeture", _hs_type_boolean, 0, debug_objects_unit_mouth_apeture };
+
+static struct hs_external_global_definition debug_objects_biped_physics_pills_definition = { "debug_objects_biped_physics_pills", _hs_type_boolean, 0, debug_objects_biped_physics_pills };
+
+static struct hs_external_global_definition debug_objects_biped_autoaim_pills_definition = { "debug_objects_biped_autoaim_pills", _hs_type_boolean, 0, debug_objects_biped_autoaim_pills };
+
+static struct hs_external_global_definition debug_objects_vehicle_powered_mass_points_definition = { "debug_objects_vehicle_powered_mass_points", _hs_type_boolean, 0, debug_objects_vehicle_powered_mass_points };
+
+static struct hs_external_global_definition debug_objects_devices_definition = { "debug_objects_devices", _hs_type_boolean, 0, debug_objects_devices };
+
+static struct hs_external_global_definition render_model_nodes_definition = { "render_model_nodes", _hs_type_boolean, 0, render_model_nodes };
+
+static struct hs_external_global_definition render_model_vertex_counts_definition = { "render_model_vertex_counts", _hs_type_boolean, 0, render_model_vertex_counts };
+
+static struct hs_external_global_definition render_model_index_counts_definition = { "render_model_index_counts", _hs_type_boolean, 0, render_model_index_counts };
+
+static struct hs_external_global_definition render_model_markers_definition = { "render_model_markers", _hs_type_boolean, 0, render_model_markers };
+
+static struct hs_external_global_definition render_model_no_geometry_definition = { "render_model_no_geometry", _hs_type_boolean, 0, render_model_no_geometry };
+
+static struct hs_external_global_definition render_shadows_definition = { "render_shadows", _hs_type_boolean, 0, render_shadows };
+
+static struct hs_external_global_definition debug_damage_definition = { "debug_damage", _hs_type_boolean, 0, debug_damage };
+
+static struct hs_external_global_definition debug_scripting_definition = { "debug_scripting", _hs_type_boolean, 0, debug_scripting };
+
+static struct hs_external_global_definition debug_trigger_volumes_definition = { "debug_trigger_volumes", _hs_type_boolean, 0, &debug_trigger_volumes };
+
+static struct hs_external_global_definition debug_point_physics_definition = { "debug_point_physics", _hs_type_boolean, 0, debug_point_physics };
+
+static struct hs_external_global_definition debug_physics_disable_penetration_freeze_definition = { "debug_physics_disable_penetration_freeze", _hs_type_boolean, 0, debug_physics_disable_penetration_freeze };
+
+static struct hs_external_global_definition debug_motion_sensor_draw_all_units_definition = { "debug_motion_sensor_draw_all_units", _hs_type_boolean, 0, debug_motion_sensor_draw_all_units };
+
+static struct hs_external_global_definition collision_debug_definition = { "collision_debug", _hs_type_boolean, 0, collision_debug };
+
+static struct hs_external_global_definition collision_debug_spray_definition = { "collision_debug_spray", _hs_type_boolean, 0, collision_debug_spray };
+
+static struct hs_external_global_definition collision_debug_features_definition = { "collision_debug_features", _hs_type_boolean, 0, collision_debug_features };
+
+static struct hs_external_global_definition collision_debug_repeat_definition = { "collision_debug_repeat", _hs_type_boolean, 0, &collision_debug_repeat };
+
+static struct hs_external_global_definition collision_debug_flag_front_facing_surfaces_definition = { "collision_debug_flag_front_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_front_facing_surfaces };
+
+static struct hs_external_global_definition collision_debug_flag_back_facing_surfaces_definition = { "collision_debug_flag_back_facing_surfaces", _hs_type_boolean, 0, collision_debug_flag_back_facing_surfaces };
+
+static struct hs_external_global_definition collision_debug_flag_ignore_two_sided_surfaces_definition = { "collision_debug_flag_ignore_two_sided_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_two_sided_surfaces };
+
+static struct hs_external_global_definition collision_debug_flag_ignore_invisible_surfaces_definition = { "collision_debug_flag_ignore_invisible_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_invisible_surfaces };
+
+static struct hs_external_global_definition collision_debug_flag_ignore_breakable_surfaces_definition = { "collision_debug_flag_ignore_breakable_surfaces", _hs_type_boolean, 0, collision_debug_flag_ignore_breakable_surfaces };
+
+static struct hs_external_global_definition collision_debug_flag_structure_definition = { "collision_debug_flag_structure", _hs_type_boolean, 0, collision_debug_flag_structure };
+
+static struct hs_external_global_definition collision_debug_flag_media_definition = { "collision_debug_flag_media", _hs_type_boolean, 0, collision_debug_flag_media };
+
+static struct hs_external_global_definition collision_debug_flag_objects_definition = { "collision_debug_flag_objects", _hs_type_boolean, 0, collision_debug_flag_objects };
+
+static struct hs_external_global_definition collision_debug_flag_objects_bipeds_definition = { "collision_debug_flag_objects_bipeds", _hs_type_boolean, 0, collision_debug_flag_objects_bipeds };
+
+static struct hs_external_global_definition collision_debug_flag_objects_vehicles_definition = { "collision_debug_flag_objects_vehicles", _hs_type_boolean, 0, collision_debug_flag_objects_vehicles };
+
+static struct hs_external_global_definition collision_debug_flag_objects_weapons_definition = { "collision_debug_flag_objects_weapons", _hs_type_boolean, 0, collision_debug_flag_objects_weapons };
+
+static struct hs_external_global_definition collision_debug_flag_objects_equipment_definition = { "collision_debug_flag_objects_equipment", _hs_type_boolean, 0, collision_debug_flag_objects_equipment };
+
+static struct hs_external_global_definition collision_debug_flag_objects_projectiles_definition = { "collision_debug_flag_objects_projectiles", _hs_type_boolean, 0, collision_debug_flag_objects_projectiles };
+
+static struct hs_external_global_definition collision_debug_flag_objects_scenery_definition = { "collision_debug_flag_objects_scenery", _hs_type_boolean, 0, collision_debug_flag_objects_scenery };
+
+static struct hs_external_global_definition collision_debug_flag_objects_machines_definition = { "collision_debug_flag_objects_machines", _hs_type_boolean, 0, collision_debug_flag_objects_machines };
+
+static struct hs_external_global_definition collision_debug_flag_objects_controls_definition = { "collision_debug_flag_objects_controls", _hs_type_boolean, 0, collision_debug_flag_objects_controls };
+
+static struct hs_external_global_definition collision_debug_flag_objects_light_fixtures_definition = { "collision_debug_flag_objects_light_fixtures", _hs_type_boolean, 0, collision_debug_flag_objects_light_fixtures };
+
+static struct hs_external_global_definition collision_debug_flag_objects_placeholders_definition = { "collision_debug_flag_objects_placeholders", _hs_type_boolean, 0, collision_debug_flag_objects_placeholders };
+
+static struct hs_external_global_definition collision_debug_flag_try_to_keep_location_valid_definition = { "collision_debug_flag_try_to_keep_location_valid", _hs_type_boolean, 0, collision_debug_flag_try_to_keep_location_valid };
+
+static struct hs_external_global_definition collision_debug_flag_skip_passthrough_bipeds_definition = { "collision_debug_flag_skip_passthrough_bipeds", _hs_type_boolean, 0, collision_debug_flag_skip_passthrough_bipeds };
+
+static struct hs_external_global_definition collision_debug_flag_use_vehicle_physics_definition = { "collision_debug_flag_use_vehicle_physics", _hs_type_boolean, 0, collision_debug_flag_use_vehicle_physics };
+
+static struct hs_external_global_definition collision_debug_point_x_definition = { "collision_debug_point_x", _hs_type_real, 0, &collision_debug_point.x };
+
+static struct hs_external_global_definition collision_debug_point_y_definition = { "collision_debug_point_y", _hs_type_real, 0, &collision_debug_point.y };
+
+static struct hs_external_global_definition collision_debug_point_z_definition = { "collision_debug_point_z", _hs_type_real, 0, &collision_debug_point.z };
+
+static struct hs_external_global_definition collision_debug_vector_i_definition = { "collision_debug_vector_i", _hs_type_real, 0, &collision_debug_vector.i };
+
+static struct hs_external_global_definition collision_debug_vector_j_definition = { "collision_debug_vector_j", _hs_type_real, 0, &collision_debug_vector.j };
+
+static struct hs_external_global_definition collision_debug_vector_k_definition = { "collision_debug_vector_k", _hs_type_real, 0, &collision_debug_vector.k };
+
+static struct hs_external_global_definition collision_debug_length_definition = { "collision_debug_length", _hs_type_real, 0, &collision_debug_length };
+
+static struct hs_external_global_definition collision_debug_width_definition = { "collision_debug_width", _hs_type_real, 0, &collision_debug_width };
+
+static struct hs_external_global_definition collision_debug_height_definition = { "collision_debug_height", _hs_type_real, 0, &collision_debug_height };
+
+static struct hs_external_global_definition collision_debug_phantom_bsp_definition = { "collision_debug_phantom_bsp", _hs_type_boolean, 0, collision_debug_phantom_bsp };
+
+static struct hs_external_global_definition debug_obstacle_path_definition = { "debug_obstacle_path", _hs_type_boolean, 0, debug_obstacle_path };
+
+static struct hs_external_global_definition debug_obstacle_path_on_failure_definition = { "debug_obstacle_path_on_failure", _hs_type_boolean, 0, debug_obstacle_path_on_failure };
+
+static struct hs_external_global_definition debug_obstacle_path_start_point_x_definition = { "debug_obstacle_path_start_point_x", _hs_type_real, 0, debug_obstacle_path_start_point };
+
+static struct hs_external_global_definition debug_obstacle_path_start_point_y_definition = { "debug_obstacle_path_start_point_y", _hs_type_real, 0, debug_obstacle_path_start_point + 0x4 };
+
+static struct hs_external_global_definition debug_obstacle_path_start_surface_index_definition = { "debug_obstacle_path_start_surface_index", _hs_type_long_integer, 0, debug_obstacle_path_start_surface_index };
+
+static struct hs_external_global_definition debug_obstacle_path_goal_point_x_definition = { "debug_obstacle_path_goal_point_x", _hs_type_real, 0, debug_obstacle_path_goal_point };
+
+static struct hs_external_global_definition debug_obstacle_path_goal_point_y_definition = { "debug_obstacle_path_goal_point_y", _hs_type_real, 0, debug_obstacle_path_goal_point + 0x4 };
+
+static struct hs_external_global_definition debug_obstacle_path_goal_surface_index_definition = { "debug_obstacle_path_goal_surface_index", _hs_type_long_integer, 0, debug_obstacle_path_goal_surface_index };
+
+static struct hs_external_global_definition debug_camera_definition = { "debug_camera", _hs_type_boolean, 0, debug_camera };
+
+static struct hs_external_global_definition debug_player_definition = { "debug_player", _hs_type_boolean, 0, debug_player };
+
+static struct hs_external_global_definition debug_structure_definition = { "debug_structure", _hs_type_boolean, 0, debug_structure };
+
+static struct hs_external_global_definition debug_bsp_definition = { "debug_bsp", _hs_type_boolean, 0, debug_bsp };
+
+static struct hs_external_global_definition debug_input_definition = { "debug_input", _hs_type_boolean, 0, debug_input };
+
+static struct hs_external_global_definition debug_permanent_decals_definition = { "debug_permanent_decals", _hs_type_boolean, 0, debug_permanent_decals };
+
+static struct hs_external_global_definition debug_fog_planes_definition = { "debug_fog_planes", _hs_type_boolean, 0, debug_fog_planes };
+
+static struct hs_external_global_definition breakable_surfaces_definition = { "breakable_surfaces", _hs_type_boolean, 0, breakable_surface_effect_enabled };
+
+static struct hs_external_global_definition decals_definition = { "decals", _hs_type_boolean, 0, decals_enabled };
+
+static struct hs_external_global_definition debug_decals_definition = { "debug_decals", _hs_type_boolean, 0, debug_decals };
+
+static struct hs_external_global_definition debug_object_lights_definition = { "debug_object_lights", _hs_type_boolean, 0, debug_object_lights };
+
+static struct hs_external_global_definition debug_lights_definition = { "debug_lights", _hs_type_boolean, 0, debug_lights };
+
+static struct hs_external_global_definition debug_biped_physics_definition = { "debug_biped_physics", _hs_type_boolean, 0, debug_biped_physics };
+
+static struct hs_external_global_definition debug_biped_skip_update_definition = { "debug_biped_skip_update", _hs_type_boolean, 0, debug_biped_skip_update };
+
+static struct hs_external_global_definition debug_biped_skip_collision_definition = { "debug_biped_skip_collision", _hs_type_boolean, 0, debug_biped_skip_collision };
+
+static struct hs_external_global_definition debug_biped_limp_body_disable_definition = { "debug_biped_limp_body_disable", _hs_type_boolean, 0, debug_biped_limp_body_disable };
+
+static struct hs_external_global_definition debug_collision_skip_objects_definition = { "debug_collision_skip_objects", _hs_type_boolean, 0, debug_collision_skip_objects };
+
+static struct hs_external_global_definition debug_collision_skip_vectors_definition = { "debug_collision_skip_vectors", _hs_type_boolean, 0, debug_collision_skip_vectors };
+
+static struct hs_external_global_definition debug_material_effects_definition = { "debug_material_effects", _hs_type_boolean, 0, debug_material_effects };
+
+static struct hs_external_global_definition weather_definition = { "weather", _hs_type_boolean, 0, &weather };
+
+static struct hs_external_global_definition ai_profile_disable_definition = { "ai_profile_disable", _hs_type_boolean, 0, &ai_profile.disabled };
+
+static struct hs_external_global_definition ai_profile_random_definition = { "ai_profile_random", _hs_type_boolean, 0, &ai_profile.move_actors_randomly };
+
+static struct hs_external_global_definition ai_show_definition = { "ai_show", _hs_type_boolean, 0, &ai_profile.show };
+
+static struct hs_external_global_definition ai_show_stats_definition = { "ai_show_stats", _hs_type_boolean, 0, &ai_profile.show_stats };
+
+static struct hs_external_global_definition ai_show_actors_definition = { "ai_show_actors", _hs_type_boolean, 0, &ai_profile.show_actors };
+
+static struct hs_external_global_definition ai_show_swarms_definition = { "ai_show_swarms", _hs_type_boolean, 0, &ai_profile.show_swarms };
+
+static struct hs_external_global_definition ai_show_paths_definition = { "ai_show_paths", _hs_type_boolean, 0, &ai_profile.show_paths };
+
+static struct hs_external_global_definition ai_show_line_of_sight_definition = { "ai_show_line_of_sight", _hs_type_boolean, 0, &ai_profile.show_line_of_sight };
+
+static struct hs_external_global_definition ai_show_prop_types_definition = { "ai_show_prop_types", _hs_type_boolean, 0, &ai_profile.show_prop_types };
+
+static struct hs_external_global_definition ai_show_sound_distance_definition = { "ai_show_sound_distance", _hs_type_boolean, 0, &ai_profile.show_sound_distance };
+
+static struct hs_external_global_definition ai_render_definition = { "ai_render", _hs_type_boolean, 0, ai_debug + 0xA5 };
+
+static struct hs_external_global_definition ai_render_all_actors_definition = { "ai_render_all_actors", _hs_type_boolean, 0, ai_debug + 0xA6 };
+
+static struct hs_external_global_definition ai_render_inactive_actors_definition = { "ai_render_inactive_actors", _hs_type_boolean, 0, ai_debug + 0xA7 };
+
+static struct hs_external_global_definition ai_render_lineoffire_crouching_definition = { "ai_render_lineoffire_crouching", _hs_type_boolean, 0, ai_debug + 0xA8 };
+
+static struct hs_external_global_definition ai_render_lineoffire_definition = { "ai_render_lineoffire", _hs_type_boolean, 0, ai_debug + 0xA9 };
+
+static struct hs_external_global_definition ai_render_lineofsight_definition = { "ai_render_lineofsight", _hs_type_boolean, 0, ai_debug + 0xAA };
+
+static struct hs_external_global_definition ai_render_ballistic_lineoffire_definition = { "ai_render_ballistic_lineoffire", _hs_type_boolean, 0, ai_debug + 0xAB };
+
+static struct hs_external_global_definition ai_render_encounter_activeregion_definition = { "ai_render_encounter_activeregion", _hs_type_boolean, 0, ai_debug + 0xAC };
+
+static struct hs_external_global_definition ai_render_vision_cones_definition = { "ai_render_vision_cones", _hs_type_boolean, 0, ai_debug + 0xAD };
+
+static struct hs_external_global_definition ai_render_current_state_definition = { "ai_render_current_state", _hs_type_boolean, 0, ai_debug + 0xAE };
+
+static struct hs_external_global_definition ai_render_detailed_state_definition = { "ai_render_detailed_state", _hs_type_boolean, 0, ai_debug + 0xAF };
+
+static struct hs_external_global_definition ai_render_props_definition = { "ai_render_props", _hs_type_boolean, 0, ai_debug + 0xB0 };
+
+static struct hs_external_global_definition ai_render_props_web_definition = { "ai_render_props_web", _hs_type_boolean, 0, ai_debug + 0xB1 };
+
+static struct hs_external_global_definition ai_render_props_no_friends_definition = { "ai_render_props_no_friends", _hs_type_boolean, 0, ai_debug + 0xB2 };
+
+static struct hs_external_global_definition ai_render_props_unreachable_definition = { "ai_render_props_unreachable", _hs_type_boolean, 0, ai_debug + 0xB4 };
+
+static struct hs_external_global_definition ai_render_props_unopposable_definition = { "ai_render_props_unopposable", _hs_type_boolean, 0, ai_debug + 0xB5 };
+
+static struct hs_external_global_definition ai_render_props_target_weight_definition = { "ai_render_props_target_weight", _hs_type_boolean, 0, ai_debug + 0xB3 };
+
+static struct hs_external_global_definition ai_render_idle_look_definition = { "ai_render_idle_look", _hs_type_boolean, 0, ai_debug + 0xB6 };
+
+static struct hs_external_global_definition ai_render_support_surfaces_definition = { "ai_render_support_surfaces", _hs_type_boolean, 0, ai_debug + 0xBA };
+
+static struct hs_external_global_definition ai_render_recent_damage_definition = { "ai_render_recent_damage", _hs_type_boolean, 0, ai_debug + 0xBB };
+
+static struct hs_external_global_definition ai_render_threats_definition = { "ai_render_threats", _hs_type_boolean, 0, ai_debug + 0xBC };
+
+static struct hs_external_global_definition ai_render_emotions_definition = { "ai_render_emotions", _hs_type_boolean, 0, ai_debug + 0xBD };
+
+static struct hs_external_global_definition ai_render_audibility_definition = { "ai_render_audibility", _hs_type_boolean, 0, ai_debug + 0xBE };
+
+static struct hs_external_global_definition ai_render_aiming_vectors_definition = { "ai_render_aiming_vectors", _hs_type_boolean, 0, ai_debug + 0xBF };
+
+static struct hs_external_global_definition ai_render_secondary_looking_definition = { "ai_render_secondary_looking", _hs_type_boolean, 0, ai_debug + 0xC0 };
+
+static struct hs_external_global_definition ai_render_targets_definition = { "ai_render_targets", _hs_type_boolean, 0, ai_debug + 0xB7 };
+
+static struct hs_external_global_definition ai_render_targets_last_visible_definition = { "ai_render_targets_last_visible", _hs_type_boolean, 0, ai_debug + 0xB8 };
+
+static struct hs_external_global_definition ai_render_states_definition = { "ai_render_states", _hs_type_boolean, 0, ai_debug + 0xB9 };
+
+static struct hs_external_global_definition ai_render_vitality_definition = { "ai_render_vitality", _hs_type_boolean, 0, ai_debug + 0xC1 };
+
+static struct hs_external_global_definition ai_render_active_cover_seeking_definition = { "ai_render_active_cover_seeking", _hs_type_boolean, 0, ai_debug + 0xC2 };
+
+static struct hs_external_global_definition ai_render_evaluations_definition = { "ai_render_evaluations", _hs_type_boolean, 0, ai_debug + 0xC3 };
+
+static struct hs_external_global_definition ai_render_pursuit_definition = { "ai_render_pursuit", _hs_type_boolean, 0, ai_debug + 0xC4 };
+
+static struct hs_external_global_definition ai_render_shooting_definition = { "ai_render_shooting", _hs_type_boolean, 0, ai_debug + 0xC5 };
+
+static struct hs_external_global_definition ai_render_trigger_definition = { "ai_render_trigger", _hs_type_boolean, 0, ai_debug + 0xC6 };
+
+static struct hs_external_global_definition ai_render_projectile_aiming_definition = { "ai_render_projectile_aiming", _hs_type_boolean, 0, ai_debug + 0xC7 };
+
+static struct hs_external_global_definition ai_render_aiming_validity_definition = { "ai_render_aiming_validity", _hs_type_boolean, 0, ai_debug + 0xC8 };
+
+static struct hs_external_global_definition ai_render_speech_definition = { "ai_render_speech", _hs_type_boolean, 0, ai_debug + 0xC9 };
+
+static struct hs_external_global_definition ai_render_teams_definition = { "ai_render_teams", _hs_type_boolean, 0, ai_debug + 0xCA };
+
+static struct hs_external_global_definition ai_render_player_ratings_definition = { "ai_render_player_ratings", _hs_type_boolean, 0, ai_debug + 0xCB };
+
+static struct hs_external_global_definition ai_render_spatial_effects_definition = { "ai_render_spatial_effects", _hs_type_boolean, 0, ai_debug + 0xCC };
+
+static struct hs_external_global_definition ai_render_firing_positions_definition = { "ai_render_firing_positions", _hs_type_boolean, 0, ai_debug + 0xCD };
+
+static struct hs_external_global_definition ai_render_gun_positions_definition = { "ai_render_gun_positions", _hs_type_boolean, 0, ai_debug + 0xCE };
+
+static struct hs_external_global_definition ai_render_burst_geometry_definition = { "ai_render_burst_geometry", _hs_type_boolean, 0, ai_debug + 0xCF };
+
+static struct hs_external_global_definition ai_render_vehicle_avoidance_definition = { "ai_render_vehicle_avoidance", _hs_type_boolean, 0, ai_debug + 0xD0 };
+
+static struct hs_external_global_definition ai_render_vehicles_enterable_definition = { "ai_render_vehicles_enterable", _hs_type_boolean, 0, ai_debug + 0xD1 };
+
+static struct hs_external_global_definition ai_render_melee_check_definition = { "ai_render_melee_check", _hs_type_boolean, 0, ai_debug + 0xD2 };
+
+static struct hs_external_global_definition ai_render_dialogue_variants_definition = { "ai_render_dialogue_variants", _hs_type_boolean, 0, ai_debug + 0xD3 };
+
+static struct hs_external_global_definition ai_render_grenade_decisions_definition = { "ai_render_grenade_decisions", _hs_type_boolean, 0, ai_debug + 0xD4 };
+
+static struct hs_external_global_definition ai_render_danger_zones_definition = { "ai_render_danger_zones", _hs_type_boolean, 0, ai_debug + 0xD5 };
+
+static struct hs_external_global_definition ai_render_charge_decisions_definition = { "ai_render_charge_decisions", _hs_type_boolean, 0, ai_debug + 0xD6 };
+
+static struct hs_external_global_definition ai_render_control_definition = { "ai_render_control", _hs_type_boolean, 0, ai_debug + 0xD7 };
+
+static struct hs_external_global_definition ai_render_activation_definition = { "ai_render_activation", _hs_type_boolean, 0, ai_debug + 0xD8 };
+
+static struct hs_external_global_definition ai_render_paths_definition = { "ai_render_paths", _hs_type_boolean, 0, ai_debug + 0xD9 };
+
+static struct hs_external_global_definition ai_render_paths_selected_only_definition = { "ai_render_paths_selected_only", _hs_type_boolean, 0, ai_debug + 0xDA };
+
+static struct hs_external_global_definition ai_render_paths_destination_definition = { "ai_render_paths_destination", _hs_type_boolean, 0, ai_debug + 0xE4 };
+
+static struct hs_external_global_definition ai_render_paths_raw_definition = { "ai_render_paths_raw", _hs_type_boolean, 0, ai_debug + 0xDD };
+
+static struct hs_external_global_definition ai_render_paths_current_definition = { "ai_render_paths_current", _hs_type_boolean, 0, ai_debug + 0xDC };
+
+static struct hs_external_global_definition ai_render_paths_failed_definition = { "ai_render_paths_failed", _hs_type_boolean, 0, ai_debug + 0xDB };
+
+static struct hs_external_global_definition ai_render_paths_smoothed_definition = { "ai_render_paths_smoothed", _hs_type_boolean, 0, ai_debug + 0xDE };
+
+static struct hs_external_global_definition ai_render_paths_avoided_definition = { "ai_render_paths_avoided", _hs_type_boolean, 0, ai_debug + 0xDF };
+
+static struct hs_external_global_definition ai_render_paths_avoidance_segment_definition = { "ai_render_paths_avoidance_segment", _hs_type_short_integer, 0, ai_debug + 0xE0 };
+
+static struct hs_external_global_definition ai_render_paths_avoidance_obstacles_definition = { "ai_render_paths_avoidance_obstacles", _hs_type_boolean, 0, ai_debug + 0xE2 };
+
+static struct hs_external_global_definition ai_render_paths_avoidance_search_definition = { "ai_render_paths_avoidance_search", _hs_type_boolean, 0, ai_debug + 0xE3 };
+
+static struct hs_external_global_definition ai_render_paths_nodes_definition = { "ai_render_paths_nodes", _hs_type_boolean, 0, ai_debug + 0xE5 };
+
+static struct hs_external_global_definition ai_render_paths_nodes_all_definition = { "ai_render_paths_nodes_all", _hs_type_boolean, 0, ai_debug + 0xE6 };
+
+static struct hs_external_global_definition ai_render_paths_nodes_polygons_definition = { "ai_render_paths_nodes_polygons", _hs_type_boolean, 0, ai_debug + 0xE7 };
+
+static struct hs_external_global_definition ai_render_paths_nodes_costs_definition = { "ai_render_paths_nodes_costs", _hs_type_boolean, 0, ai_debug + 0xE8 };
+
+static struct hs_external_global_definition ai_render_paths_nodes_closest_definition = { "ai_render_paths_nodes_closest", _hs_type_boolean, 0, ai_debug + 0xE9 };
+
+static struct hs_external_global_definition ai_render_player_aiming_blocked_definition = { "ai_render_player_aiming_blocked", _hs_type_boolean, 0, ai_debug + 0xEA };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_definition = { "ai_render_vector_avoidance", _hs_type_boolean, 0, ai_debug + 0xEB };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_rays_definition = { "ai_render_vector_avoidance_rays", _hs_type_boolean, 0, ai_debug + 0xEC };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_sense_t_definition = { "ai_render_vector_avoidance_sense_t", _hs_type_boolean, 0, ai_debug + 0xED };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_avoid_t_definition = { "ai_render_vector_avoidance_avoid_t", _hs_type_boolean, 0, ai_debug + 0xEE };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_clear_time_definition = { "ai_render_vector_avoidance_clear_time", _hs_type_boolean, 0, ai_debug + 0xEF };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_weights_definition = { "ai_render_vector_avoidance_weights", _hs_type_boolean, 0, ai_debug + 0xF0 };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_objects_definition = { "ai_render_vector_avoidance_objects", _hs_type_boolean, 0, ai_debug + 0xF1 };
+
+static struct hs_external_global_definition ai_render_vector_avoidance_intermediate_definition = { "ai_render_vector_avoidance_intermediate", _hs_type_boolean, 0, ai_debug + 0xF2 };
+
+static struct hs_external_global_definition ai_render_postcombat_definition = { "ai_render_postcombat", _hs_type_boolean, 0, ai_debug + 0xF3 };
+
+static struct hs_external_global_definition ai_print_pursuit_checks_definition = { "ai_print_pursuit_checks", _hs_type_boolean, 0, ai_debug + 0x8A };
+
+static struct hs_external_global_definition ai_print_rules_definition = { "ai_print_rules", _hs_type_boolean, 0, ai_debug + 0x8B };
+
+static struct hs_external_global_definition ai_print_rule_values_definition = { "ai_print_rule_values", _hs_type_boolean, 0, ai_debug + 0x8C };
+
+static struct hs_external_global_definition ai_print_major_upgrade_definition = { "ai_print_major_upgrade", _hs_type_boolean, 0, ai_debug + 0x89 };
+
+static struct hs_external_global_definition ai_print_respawn_definition = { "ai_print_respawn", _hs_type_boolean, 0, ai_debug + 0x8D };
+
+static struct hs_external_global_definition ai_print_evaluation_statistics_definition = { "ai_print_evaluation_statistics", _hs_type_boolean, 0, ai_debug + 0x8E };
+
+static struct hs_external_global_definition ai_print_communication_definition = { "ai_print_communication", _hs_type_boolean, 0, ai_debug + 0x8F };
+
+static struct hs_external_global_definition ai_print_communication_player_definition = { "ai_print_communication_player", _hs_type_boolean, 0, ai_debug + 0x90 };
+
+static struct hs_external_global_definition ai_print_vocalizations_definition = { "ai_print_vocalizations", _hs_type_boolean, 0, ai_debug + 0x91 };
+
+static struct hs_external_global_definition ai_print_placement_definition = { "ai_print_placement", _hs_type_boolean, 0, ai_debug + 0x92 };
+
+static struct hs_external_global_definition ai_print_speech_definition = { "ai_print_speech", _hs_type_boolean, 0, ai_debug + 0x93 };
+
+static struct hs_external_global_definition ai_print_speech_timers_definition = { "ai_print_speech_timers", _hs_type_boolean, 0, ai_debug + 0x94 };
+
+static struct hs_external_global_definition ai_print_allegiance_definition = { "ai_print_allegiance", _hs_type_boolean, 0, ai_debug + 0x95 };
+
+static struct hs_external_global_definition ai_print_lost_speech_definition = { "ai_print_lost_speech", _hs_type_boolean, 0, ai_debug + 0x96 };
+
+static struct hs_external_global_definition ai_print_migration_definition = { "ai_print_migration", _hs_type_boolean, 0, ai_debug + 0x97 };
+
+static struct hs_external_global_definition ai_print_automatic_migration_definition = { "ai_print_automatic_migration", _hs_type_boolean, 0, ai_debug + 0x98 };
+
+static struct hs_external_global_definition ai_print_scripting_definition = { "ai_print_scripting", _hs_type_boolean, 0, ai_debug + 0x99 };
+
+static struct hs_external_global_definition ai_print_surprise_definition = { "ai_print_surprise", _hs_type_boolean, 0, ai_debug + 0x9A };
+
+static struct hs_external_global_definition ai_print_command_lists_definition = { "ai_print_command_lists", _hs_type_boolean, 0, ai_debug + 0x9B };
+
+static struct hs_external_global_definition ai_print_damage_modifiers_definition = { "ai_print_damage_modifiers", _hs_type_boolean, 0, ai_debug + 0x9C };
+
+static struct hs_external_global_definition ai_print_secondary_looking_definition = { "ai_print_secondary_looking", _hs_type_boolean, 0, ai_debug + 0x9D };
+
+static struct hs_external_global_definition ai_print_oversteer_definition = { "ai_print_oversteer", _hs_type_boolean, 0, ai_debug + 0x9E };
+
+static struct hs_external_global_definition ai_print_conversations_definition = { "ai_print_conversations", _hs_type_boolean, 0, ai_debug + 0x9F };
+
+static struct hs_external_global_definition ai_print_killing_sprees_definition = { "ai_print_killing_sprees", _hs_type_boolean, 0, ai_debug + 0xA0 };
+
+static struct hs_external_global_definition ai_print_acknowledgement_definition = { "ai_print_acknowledgement", _hs_type_boolean, 0, ai_debug + 0xA1 };
+
+static struct hs_external_global_definition ai_print_unfinished_paths_definition = { "ai_print_unfinished_paths", _hs_type_boolean, 0, ai_debug + 0xA2 };
+
+static struct hs_external_global_definition ai_print_bsp_transition_definition = { "ai_print_bsp_transition", _hs_type_boolean, 0, ai_debug + 0xA3 };
+
+static struct hs_external_global_definition ai_print_uncovering_definition = { "ai_print_uncovering", _hs_type_boolean, 0, ai_debug + 0xA4 };
+
+static struct hs_external_global_definition ai_debug_fast_los_definition = { "ai_debug_fast_los", _hs_type_boolean, 0, ai_debug + 0x4 };
+
+static struct hs_external_global_definition ai_debug_oversteer_disable_definition = { "ai_debug_oversteer_disable", _hs_type_boolean, 0, ai_debug + 0x11 };
+
+static struct hs_external_global_definition ai_debug_evaluate_all_positions_definition = { "ai_debug_evaluate_all_positions", _hs_type_boolean, 0, ai_debug + 0x5 };
+
+static struct hs_external_global_definition ai_debug_path_definition = { "ai_debug_path", _hs_type_boolean, 0, ai_debug + 0x3C };
+
+static struct hs_external_global_definition ai_debug_path_start_freeze_definition = { "ai_debug_path_start_freeze", _hs_type_boolean, 0, ai_debug + 0x3D };
+
+static struct hs_external_global_definition ai_debug_path_end_freeze_definition = { "ai_debug_path_end_freeze", _hs_type_boolean, 0, ai_debug + 0x3E };
+
+static struct hs_external_global_definition ai_debug_path_flood_definition = { "ai_debug_path_flood", _hs_type_boolean, 0, ai_debug + 0x3F };
+
+static struct hs_external_global_definition ai_debug_path_maximum_radius_definition = { "ai_debug_path_maximum_radius", _hs_type_real, 0, ai_debug + 0x40 };
+
+static struct hs_external_global_definition ai_debug_path_attractor_definition = { "ai_debug_path_attractor", _hs_type_boolean, 0, ai_debug + 0x44 };
+
+static struct hs_external_global_definition ai_debug_path_attractor_radius_definition = { "ai_debug_path_attractor_radius", _hs_type_real, 0, ai_debug + 0x48 };
+
+static struct hs_external_global_definition ai_debug_path_attractor_weight_definition = { "ai_debug_path_attractor_weight", _hs_type_real, 0, ai_debug + 0x4C };
+
+static struct hs_external_global_definition ai_debug_path_accept_radius_definition = { "ai_debug_path_accept_radius", _hs_type_real, 0, ai_debug + 0x50 };
+
+static struct hs_external_global_definition ai_debug_ballistic_lineoffire_freeze_definition = { "ai_debug_ballistic_lineoffire_freeze", _hs_type_boolean, 0, ai_debug + 0x88 };
+
+static struct hs_external_global_definition ai_debug_communication_random_disabled_definition = { "ai_debug_communication_random_disabled", _hs_type_boolean, 0, ai_debug + 0x85 };
+
+static struct hs_external_global_definition ai_debug_communication_timeout_disabled_definition = { "ai_debug_communication_timeout_disabled", _hs_type_boolean, 0, ai_debug + 0x86 };
+
+static struct hs_external_global_definition ai_debug_communication_unit_repeat_disabled_definition = { "ai_debug_communication_unit_repeat_disabled", _hs_type_boolean, 0, ai_debug + 0x87 };
+
+static struct hs_external_global_definition ai_debug_communication_focus_enable_definition = { "ai_debug_communication_focus_enable", _hs_type_boolean, 0, ai_debug + 0x84 };
+
+static struct hs_external_global_definition ai_debug_blind_definition = { "ai_debug_blind", _hs_type_boolean, 0, ai_debug + 0xB };
+
+static struct hs_external_global_definition ai_debug_deaf_definition = { "ai_debug_deaf", _hs_type_boolean, 0, ai_debug + 0xC };
+
+static struct hs_external_global_definition ai_debug_invisible_player_definition = { "ai_debug_invisible_player", _hs_type_boolean, 0, ai_debug + 0x7 };
+
+static struct hs_external_global_definition ai_debug_ignore_player_definition = { "ai_debug_ignore_player", _hs_type_boolean, 0, ai_debug + 0x6 };
+
+static struct hs_external_global_definition ai_debug_flee_always_definition = { "ai_debug_flee_always", _hs_type_boolean, 0, ai_debug + 0x8 };
+
+static struct hs_external_global_definition ai_debug_force_all_active_definition = { "ai_debug_force_all_active", _hs_type_boolean, 0, ai_debug + 0x9 };
+
+static struct hs_external_global_definition ai_debug_disable_wounded_sounds_definition = { "ai_debug_disable_wounded_sounds", _hs_type_boolean, 0, ai_debug + 0xA };
+
+static struct hs_external_global_definition ai_debug_force_vocalizations_definition = { "ai_debug_force_vocalizations", _hs_type_boolean, 0, ai_debug + 0xD };
+
+static struct hs_external_global_definition ai_debug_force_crouch_definition = { "ai_debug_force_crouch", _hs_type_boolean, 0, ai_debug + 0xE };
+
+static struct hs_external_global_definition ai_debug_path_disable_smoothing_definition = { "ai_debug_path_disable_smoothing", _hs_type_boolean, 0, ai_debug + 0x10 };
+
+static struct hs_external_global_definition ai_debug_path_disable_obstacle_avoidance_definition = { "ai_debug_path_disable_obstacle_avoidance", _hs_type_boolean, 0, ai_debug + 0xF };
+
+static struct hs_external_global_definition ai_fix_defending_guard_firing_positions_definition = { "ai_fix_defending_guard_firing_positions", _hs_type_boolean, 0, ai_debug + 0x2 };
+
+static struct hs_external_global_definition ai_fix_actor_variants_definition = { "ai_fix_actor_variants", _hs_type_boolean, 0, ai_debug + 0x3 };
+
+static struct hs_external_global_definition controls_enable_crouch_definition = { "controls_enable_crouch", _hs_type_boolean, 0, controls_enable_crouch };
+
+static struct hs_external_global_definition controls_swapped_definition = { "controls_swapped", _hs_type_boolean, 0, controls_swapped };
+
+static struct hs_external_global_definition controls_enable_doubled_spin_definition = { "controls_enable_doubled_spin", _hs_type_boolean, 0, controls_enable_doubled_spin };
+
+static struct hs_external_global_definition controls_swap_doubled_spin_state_definition = { "controls_swap_doubled_spin_state", _hs_type_boolean, 0, controls_swap_doubled_spin_state };
+
+static struct hs_external_global_definition player0_look_yaw_rate_definition = { "player0_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate };
+
+static struct hs_external_global_definition player1_look_yaw_rate_definition = { "player1_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0x4 };
+
+static struct hs_external_global_definition player2_look_yaw_rate_definition = { "player2_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0x8 };
+
+static struct hs_external_global_definition player3_look_yaw_rate_definition = { "player3_look_yaw_rate", _hs_type_real, 0, player_look_yaw_rate + 0xC };
+
+static struct hs_external_global_definition player0_look_pitch_rate_definition = { "player0_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate };
+
+static struct hs_external_global_definition player1_look_pitch_rate_definition = { "player1_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0x4 };
+
+static struct hs_external_global_definition player2_look_pitch_rate_definition = { "player2_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0x8 };
+
+static struct hs_external_global_definition player3_look_pitch_rate_definition = { "player3_look_pitch_rate", _hs_type_real, 0, player_look_pitch_rate + 0xC };
+
+static struct hs_external_global_definition player_autoaim_definition = { "player_autoaim", _hs_type_boolean, 0, player_autoaim_flag };
+
+static struct hs_external_global_definition player_magnetism_definition = { "player_magnetism", _hs_type_boolean, 0, player_magnetism_flag };
+
+static struct hs_external_global_definition debug_player_teleport_definition = { "debug_player_teleport", _hs_type_boolean, 0, debug_render_player_teleport };
+
+static struct hs_external_global_definition texture_cache_graph_definition = { "texture_cache_graph", _hs_type_boolean, 0, texture_cache_debug_options };
+
+static struct hs_external_global_definition texture_cache_list_definition = { "texture_cache_list", _hs_type_boolean, 0, texture_cache_debug_options + 0x1 };
+
+static struct hs_external_global_definition director_camera_switch_fast_definition = { "director_camera_switch_fast", _hs_type_boolean, 0, &director_camera_switch_fast };
+
+static struct hs_external_global_definition debug_recording_definition = { "debug_recording", _hs_type_boolean, 0, debug_recording };
+
+static struct hs_external_global_definition debug_recording_newlines_definition = { "debug_recording_newlines", _hs_type_short_integer, 0, debug_recording_newlines };
+
+static struct hs_external_global_definition debug_player_color_definition = { "debug_player_color", _hs_type_short_integer, 0, debug_player_color };
+
+static struct hs_external_global_definition find_all_fucked_up_shit_definition = { "find_all_fucked_up_shit", _hs_type_boolean, 0, find_all_fucked_up_shit };
+
+static struct hs_external_global_definition allow_out_of_sync_definition = { "allow_out_of_sync", _hs_type_boolean, 0, allow_out_of_sync };
+
+static struct hs_external_global_definition global_connection_dont_timeout_definition = { "global_connection_dont_timeout", _hs_type_boolean, 0, &global_connection_dont_timeout };
+
+static struct hs_external_global_definition run_game_scripts_definition = { "run_game_scripts", _hs_type_boolean, 0, NULL };
 
 struct hs_external_global_definition *hs_external_globals[443] =
 {
-	&hs_external_global_definitions[12],
-	&hs_external_global_definitions[13],
-	&hs_external_global_definitions[14],
-	&hs_external_global_definitions[15],
-	&hs_external_global_definitions[16],
-	&hs_external_global_definitions[17],
-	&hs_external_global_definitions[18],
-	&hs_external_global_definitions[19],
-	&hs_external_global_definitions[20],
-	&hs_external_global_definitions[21],
-	&hs_external_global_definitions[22],
-	&hs_external_global_definitions[23],
-	&hs_external_global_definitions[24],
-	&hs_external_global_definitions[25],
-	&hs_external_global_definitions[26],
-	&hs_external_global_definitions[27],
-	&hs_external_global_definitions[28],
-	&hs_external_global_definitions[29],
-	&hs_external_global_definitions[30],
-	&hs_external_global_definitions[31],
-	&hs_external_global_definitions[32],
-	&hs_external_global_definitions[33],
-	&hs_external_global_definitions[34],
-	&hs_external_global_definitions[35],
-	&hs_external_global_definitions[36],
-	&hs_external_global_definitions[37],
-	&hs_external_global_definitions[38],
-	&hs_external_global_definitions[39],
-	&hs_external_global_definitions[40],
-	&hs_external_global_definitions[41],
-	&hs_external_global_definitions[42],
-	&hs_external_global_definitions[43],
-	&hs_external_global_definitions[44],
-	&hs_external_global_definitions[45],
-	&hs_external_global_definitions[46],
-	&hs_external_global_definitions[47],
-	&hs_external_global_definitions[48],
-	&hs_external_global_definitions[49],
-	&hs_external_global_definitions[50],
-	&hs_external_global_definitions[51],
-	&hs_external_global_definitions[52],
-	&hs_external_global_definitions[53],
-	&hs_external_global_definitions[54],
-	&hs_external_global_definitions[55],
-	&hs_external_global_definitions[56],
-	&hs_external_global_definitions[57],
-	&hs_external_global_definitions[58],
-	&hs_external_global_definitions[59],
-	&hs_external_global_definitions[60],
-	&hs_external_global_definitions[61],
-	&hs_external_global_definitions[62],
-	&hs_external_global_definitions[63],
-	&hs_external_global_definitions[64],
-	&hs_external_global_definitions[65],
-	&hs_external_global_definitions[66],
-	&hs_external_global_definitions[67],
-	&hs_external_global_definitions[68],
-	&hs_external_global_definitions[69],
-	&hs_external_global_definitions[70],
-	&hs_external_global_definitions[71],
-	&hs_external_global_definitions[72],
-	&hs_external_global_definitions[73],
-	&hs_external_global_definitions[74],
-	&hs_external_global_definitions[75],
-	&hs_external_global_definitions[76],
-	&hs_external_global_definitions[77],
-	&hs_external_global_definitions[78],
-	&hs_external_global_definitions[79],
-	&hs_external_global_definitions[80],
-	&hs_external_global_definitions[81],
-	&hs_external_global_definitions[82],
-	&hs_external_global_definitions[83],
-	&hs_external_global_definitions[84],
-	&hs_external_global_definitions[85],
-	&hs_external_global_definitions[86],
-	&hs_external_global_definitions[87],
-	&hs_external_global_definitions[88],
-	&hs_external_global_definitions[89],
-	&hs_external_global_definitions[90],
-	&hs_external_global_definitions[91],
-	&hs_external_global_definitions[92],
-	&hs_external_global_definitions[93],
-	&hs_external_global_definitions[94],
-	&hs_external_global_definitions[95],
-	&hs_external_global_definitions[96],
-	&hs_external_global_definitions[97],
-	&hs_external_global_definitions[98],
-	&hs_external_global_definitions[99],
-	&hs_external_global_definitions[100],
-	&hs_external_global_definitions[101],
-	&hs_external_global_definitions[102],
-	&hs_external_global_definitions[103],
-	&hs_external_global_definitions[104],
-	&hs_external_global_definitions[105],
-	&hs_external_global_definitions[106],
-	&hs_external_global_definitions[107],
-	&hs_external_global_definitions[108],
-	&hs_external_global_definitions[0],
-	&hs_external_global_definitions[1],
-	&hs_external_global_definitions[10],
-	&hs_external_global_definitions[11],
-	&hs_external_global_definitions[2],
-	&hs_external_global_definitions[118],
-	&hs_external_global_definitions[119],
-	&hs_external_global_definitions[120],
-	&hs_external_global_definitions[121],
-	&hs_external_global_definitions[117],
-	&hs_external_global_definitions[122],
-	&hs_external_global_definitions[123],
-	&hs_external_global_definitions[124],
-	&hs_external_global_definitions[125],
-	&hs_external_global_definitions[126],
-	&hs_external_global_definitions[127],
-	&hs_external_global_definitions[128],
-	&hs_external_global_definitions[129],
-	&hs_external_global_definitions[130],
-	&hs_external_global_definitions[131],
-	&hs_external_global_definitions[132],
-	&hs_external_global_definitions[133],
-	&hs_external_global_definitions[134],
-	&hs_external_global_definitions[135],
-	&hs_external_global_definitions[136],
-	&hs_external_global_definitions[137],
-	&hs_external_global_definitions[138],
-	&hs_external_global_definitions[139],
-	&hs_external_global_definitions[140],
-	&hs_external_global_definitions[141],
-	&hs_external_global_definitions[142],
-	&hs_external_global_definitions[143],
-	&hs_external_global_definitions[144],
-	&hs_external_global_definitions[145],
-	&hs_external_global_definitions[146],
-	&hs_external_global_definitions[147],
-	&hs_external_global_definitions[148],
-	&hs_external_global_definitions[149],
-	&hs_external_global_definitions[150],
-	&hs_external_global_definitions[151],
-	&hs_external_global_definitions[164],
-	&hs_external_global_definitions[165],
-	&hs_external_global_definitions[166],
-	&hs_external_global_definitions[167],
-	&hs_external_global_definitions[168],
-	&hs_external_global_definitions[169],
-	&hs_external_global_definitions[170],
-	&hs_external_global_definitions[171],
-	&hs_external_global_definitions[172],
-	&hs_external_global_definitions[173],
-	&hs_external_global_definitions[152],
-	&hs_external_global_definitions[153],
-	&hs_external_global_definitions[175],
-	&hs_external_global_definitions[174],
-	&hs_external_global_definitions[176],
-	&hs_external_global_definitions[177],
-	&hs_external_global_definitions[178],
-	&hs_external_global_definitions[179],
-	&hs_external_global_definitions[180],
-	&hs_external_global_definitions[181],
-	&hs_external_global_definitions[182],
-	&hs_external_global_definitions[183],
-	&hs_external_global_definitions[184],
-	&hs_external_global_definitions[185],
-	&hs_external_global_definitions[186],
-	&hs_external_global_definitions[187],
-	&hs_external_global_definitions[188],
-	&hs_external_global_definitions[189],
-	&hs_external_global_definitions[190],
-	&hs_external_global_definitions[191],
-	&hs_external_global_definitions[192],
-	&hs_external_global_definitions[193],
-	&hs_external_global_definitions[194],
-	&hs_external_global_definitions[195],
-	&hs_external_global_definitions[196],
-	&hs_external_global_definitions[197],
-	&hs_external_global_definitions[198],
-	&hs_external_global_definitions[199],
-	&hs_external_global_definitions[200],
-	&hs_external_global_definitions[201],
-	&hs_external_global_definitions[202],
-	&hs_external_global_definitions[203],
-	&hs_external_global_definitions[204],
-	&hs_external_global_definitions[205],
-	&hs_external_global_definitions[206],
-	&hs_external_global_definitions[207],
-	&hs_external_global_definitions[208],
-	&hs_external_global_definitions[209],
-	&hs_external_global_definitions[210],
-	&hs_external_global_definitions[211],
-	&hs_external_global_definitions[212],
-	&hs_external_global_definitions[213],
-	&hs_external_global_definitions[214],
-	&hs_external_global_definitions[215],
-	&hs_external_global_definitions[216],
-	&hs_external_global_definitions[217],
-	&hs_external_global_definitions[218],
-	&hs_external_global_definitions[219],
-	&hs_external_global_definitions[220],
-	&hs_external_global_definitions[221],
-	&hs_external_global_definitions[222],
-	&hs_external_global_definitions[223],
-	&hs_external_global_definitions[224],
-	&hs_external_global_definitions[225],
-	&hs_external_global_definitions[226],
-	&hs_external_global_definitions[227],
-	&hs_external_global_definitions[228],
-	&hs_external_global_definitions[229],
-	&hs_external_global_definitions[230],
-	&hs_external_global_definitions[231],
-	&hs_external_global_definitions[232],
-	&hs_external_global_definitions[233],
-	&hs_external_global_definitions[234],
-	&hs_external_global_definitions[235],
-	&hs_external_global_definitions[236],
-	&hs_external_global_definitions[237],
-	&hs_external_global_definitions[238],
-	&hs_external_global_definitions[239],
-	&hs_external_global_definitions[240],
-	&hs_external_global_definitions[241],
-	&hs_external_global_definitions[242],
-	&hs_external_global_definitions[154],
-	&hs_external_global_definitions[155],
-	&hs_external_global_definitions[156],
-	&hs_external_global_definitions[157],
-	&hs_external_global_definitions[158],
-	&hs_external_global_definitions[243],
-	&hs_external_global_definitions[244],
-	&hs_external_global_definitions[245],
-	&hs_external_global_definitions[246],
-	&hs_external_global_definitions[247],
-	&hs_external_global_definitions[248],
-	&hs_external_global_definitions[249],
-	&hs_external_global_definitions[250],
-	&hs_external_global_definitions[251],
-	&hs_external_global_definitions[252],
-	&hs_external_global_definitions[253],
-	&hs_external_global_definitions[254],
-	&hs_external_global_definitions[255],
-	&hs_external_global_definitions[256],
-	&hs_external_global_definitions[257],
-	&hs_external_global_definitions[259],
-	&hs_external_global_definitions[260],
-	&hs_external_global_definitions[261],
-	&hs_external_global_definitions[262],
-	&hs_external_global_definitions[263],
-	&hs_external_global_definitions[264],
-	&hs_external_global_definitions[265],
-	&hs_external_global_definitions[266],
-	&hs_external_global_definitions[267],
-	&hs_external_global_definitions[268],
-	&hs_external_global_definitions[269],
-	&hs_external_global_definitions[270],
-	&hs_external_global_definitions[258],
-	&hs_external_global_definitions[259],
-	&hs_external_global_definitions[159],
-	&hs_external_global_definitions[160],
-	&hs_external_global_definitions[161],
-	&hs_external_global_definitions[162],
-	&hs_external_global_definitions[163],
-	&hs_external_global_definitions[109],
-	&hs_external_global_definitions[110],
-	&hs_external_global_definitions[111],
-	&hs_external_global_definitions[112],
-	&hs_external_global_definitions[113],
-	&hs_external_global_definitions[114],
-	&hs_external_global_definitions[116],
-	&hs_external_global_definitions[115],
-	&hs_external_global_definitions[281],
-	&hs_external_global_definitions[282],
-	&hs_external_global_definitions[283],
-	&hs_external_global_definitions[284],
-	&hs_external_global_definitions[285],
-	&hs_external_global_definitions[286],
-	&hs_external_global_definitions[287],
-	&hs_external_global_definitions[288],
-	&hs_external_global_definitions[289],
-	&hs_external_global_definitions[290],
-	&hs_external_global_definitions[291],
-	&hs_external_global_definitions[292],
-	&hs_external_global_definitions[293],
-	&hs_external_global_definitions[294],
-	&hs_external_global_definitions[297],
-	&hs_external_global_definitions[295],
-	&hs_external_global_definitions[296],
-	&hs_external_global_definitions[298],
-	&hs_external_global_definitions[299],
-	&hs_external_global_definitions[300],
-	&hs_external_global_definitions[301],
-	&hs_external_global_definitions[302],
-	&hs_external_global_definitions[303],
-	&hs_external_global_definitions[304],
-	&hs_external_global_definitions[305],
-	&hs_external_global_definitions[306],
-	&hs_external_global_definitions[307],
-	&hs_external_global_definitions[308],
-	&hs_external_global_definitions[309],
-	&hs_external_global_definitions[310],
-	&hs_external_global_definitions[311],
-	&hs_external_global_definitions[312],
-	&hs_external_global_definitions[313],
-	&hs_external_global_definitions[314],
-	&hs_external_global_definitions[315],
-	&hs_external_global_definitions[316],
-	&hs_external_global_definitions[317],
-	&hs_external_global_definitions[318],
-	&hs_external_global_definitions[319],
-	&hs_external_global_definitions[320],
-	&hs_external_global_definitions[321],
-	&hs_external_global_definitions[322],
-	&hs_external_global_definitions[323],
-	&hs_external_global_definitions[324],
-	&hs_external_global_definitions[325],
-	&hs_external_global_definitions[326],
-	&hs_external_global_definitions[327],
-	&hs_external_global_definitions[328],
-	&hs_external_global_definitions[329],
-	&hs_external_global_definitions[330],
-	&hs_external_global_definitions[331],
-	&hs_external_global_definitions[332],
-	&hs_external_global_definitions[333],
-	&hs_external_global_definitions[334],
-	&hs_external_global_definitions[335],
-	&hs_external_global_definitions[337],
-	&hs_external_global_definitions[338],
-	&hs_external_global_definitions[336],
-	&hs_external_global_definitions[339],
-	&hs_external_global_definitions[340],
-	&hs_external_global_definitions[341],
-	&hs_external_global_definitions[342],
-	&hs_external_global_definitions[343],
-	&hs_external_global_definitions[344],
-	&hs_external_global_definitions[345],
-	&hs_external_global_definitions[346],
-	&hs_external_global_definitions[347],
-	&hs_external_global_definitions[348],
-	&hs_external_global_definitions[349],
-	&hs_external_global_definitions[350],
-	&hs_external_global_definitions[351],
-	&hs_external_global_definitions[352],
-	&hs_external_global_definitions[353],
-	&hs_external_global_definitions[354],
-	&hs_external_global_definitions[355],
-	&hs_external_global_definitions[356],
-	&hs_external_global_definitions[357],
-	&hs_external_global_definitions[358],
-	&hs_external_global_definitions[359],
-	&hs_external_global_definitions[360],
-	&hs_external_global_definitions[361],
-	&hs_external_global_definitions[362],
-	&hs_external_global_definitions[363],
-	&hs_external_global_definitions[364],
-	&hs_external_global_definitions[365],
-	&hs_external_global_definitions[366],
-	&hs_external_global_definitions[367],
-	&hs_external_global_definitions[368],
-	&hs_external_global_definitions[369],
-	&hs_external_global_definitions[370],
-	&hs_external_global_definitions[371],
-	&hs_external_global_definitions[372],
-	&hs_external_global_definitions[373],
-	&hs_external_global_definitions[374],
-	&hs_external_global_definitions[375],
-	&hs_external_global_definitions[376],
-	&hs_external_global_definitions[377],
-	&hs_external_global_definitions[378],
-	&hs_external_global_definitions[379],
-	&hs_external_global_definitions[380],
-	&hs_external_global_definitions[381],
-	&hs_external_global_definitions[382],
-	&hs_external_global_definitions[383],
-	&hs_external_global_definitions[384],
-	&hs_external_global_definitions[385],
-	&hs_external_global_definitions[386],
-	&hs_external_global_definitions[271],
-	&hs_external_global_definitions[272],
-	&hs_external_global_definitions[273],
-	&hs_external_global_definitions[274],
-	&hs_external_global_definitions[275],
-	&hs_external_global_definitions[276],
-	&hs_external_global_definitions[277],
-	&hs_external_global_definitions[278],
-	&hs_external_global_definitions[279],
-	&hs_external_global_definitions[280],
-	&hs_external_global_definitions[387],
-	&hs_external_global_definitions[388],
-	&hs_external_global_definitions[389],
-	&hs_external_global_definitions[390],
-	&hs_external_global_definitions[391],
-	&hs_external_global_definitions[392],
-	&hs_external_global_definitions[393],
-	&hs_external_global_definitions[394],
-	&hs_external_global_definitions[395],
-	&hs_external_global_definitions[396],
-	&hs_external_global_definitions[397],
-	&hs_external_global_definitions[398],
-	&hs_external_global_definitions[399],
-	&hs_external_global_definitions[400],
-	&hs_external_global_definitions[401],
-	&hs_external_global_definitions[402],
-	&hs_external_global_definitions[403],
-	&hs_external_global_definitions[404],
-	&hs_external_global_definitions[405],
-	&hs_external_global_definitions[406],
-	&hs_external_global_definitions[407],
-	&hs_external_global_definitions[408],
-	&hs_external_global_definitions[409],
-	&hs_external_global_definitions[410],
-	&hs_external_global_definitions[411],
-	&hs_external_global_definitions[412],
-	&hs_external_global_definitions[413],
-	&hs_external_global_definitions[414],
-	&hs_external_global_definitions[415],
-	&hs_external_global_definitions[416],
-	&hs_external_global_definitions[417],
-	&hs_external_global_definitions[418],
-	&hs_external_global_definitions[419],
-	&hs_external_global_definitions[420],
-	&hs_external_global_definitions[421],
-	&hs_external_global_definitions[422],
-	&hs_external_global_definitions[423],
-	&hs_external_global_definitions[424],
-	&hs_external_global_definitions[425],
-	&hs_external_global_definitions[426],
-	&hs_external_global_definitions[427],
-	&hs_external_global_definitions[428],
-	&hs_external_global_definitions[429],
-	&hs_external_global_definitions[430],
-	&hs_external_global_definitions[431],
-	&hs_external_global_definitions[432],
-	&hs_external_global_definitions[433],
-	&hs_external_global_definitions[434],
-	&hs_external_global_definitions[435],
-	&hs_external_global_definitions[436],
-	&hs_external_global_definitions[437],
-	&hs_external_global_definitions[5],
-	&hs_external_global_definitions[6],
-	&hs_external_global_definitions[7],
-	&hs_external_global_definitions[3],
-	&hs_external_global_definitions[4],
-	&hs_external_global_definitions[8],
-	&hs_external_global_definitions[9],
-	&hs_external_global_definitions[439],
-	&hs_external_global_definitions[440],
-	&hs_external_global_definitions[438],
-	&hs_external_global_definitions[441],
+	&rasterizer_near_clip_distance_definition,
+	&rasterizer_far_clip_distance_definition,
+	&rasterizer_first_person_weapon_near_clip_distance_definition,
+	&rasterizer_first_person_weapon_far_clip_distance_definition,
+	&rasterizer_pushbuffer_size_definition,
+	&rasterizer_pushbuffer_kickoff_size_definition,
+	&rasterizer_floating_point_zbuffer_definition,
+	&rasterizer_framerate_throttle_definition,
+	&rasterizer_framerate_stabilization_definition,
+	&rasterizer_refresh_rate_definition,
+	&rasterizer_frame_bounds_left_definition,
+	&rasterizer_frame_bounds_right_definition,
+	&rasterizer_frame_bounds_top_definition,
+	&rasterizer_frame_bounds_bottom_definition,
+	&rasterizer_stats_definition,
+	&rasterizer_mode_definition,
+	&rasterizer_wireframe_definition,
+	&rasterizer_smart_definition,
+	&rasterizer_debug_model_vertices_definition,
+	&rasterizer_debug_model_lod_definition,
+	&rasterizer_debug_transparents_definition,
+	&rasterizer_debug_meter_shader_definition,
+	&rasterizer_models_definition,
+	&rasterizer_model_transparents_definition,
+	&rasterizer_draw_first_person_weapon_first_definition,
+	&rasterizer_stencil_mask_definition,
+	&rasterizer_environment_definition,
+	&rasterizer_environment_lightmaps_definition,
+	&rasterizer_environment_shadows_definition,
+	&rasterizer_environment_diffuse_lights_definition,
+	&rasterizer_environment_diffuse_textures_definition,
+	&rasterizer_environment_decals_definition,
+	&rasterizer_environment_specular_lights_definition,
+	&rasterizer_environment_specular_lightmaps_definition,
+	&rasterizer_environment_reflection_lightmap_mask_definition,
+	&rasterizer_environment_reflection_mirrors_definition,
+	&rasterizer_environment_reflections_definition,
+	&rasterizer_environment_transparents_definition,
+	&rasterizer_environment_fog_definition,
+	&rasterizer_environment_fog_screen_definition,
+	&rasterizer_water_definition,
+	&rasterizer_lens_flares_definition,
+	&rasterizer_dynamic_unlit_geometry_definition,
+	&rasterizer_dynamic_lit_geometry_definition,
+	&rasterizer_dynamic_screen_geometry_definition,
+	&rasterizer_hud_motion_sensor_definition,
+	&rasterizer_detail_objects_definition,
+	&rasterizer_debug_geometry_definition,
+	&rasterizer_debug_geometry_multipass_definition,
+	&rasterizer_fog_atmosphere_definition,
+	&rasterizer_fog_plane_definition,
+	&rasterizer_bump_mapping_definition,
+	&rasterizer_lightmap_ambient_definition,
+	&rasterizer_lightmap_mode_definition,
+	&rasterizer_lightmaps_incident_radiosity_definition,
+	&rasterizer_lightmaps_filtering_definition,
+	&rasterizer_model_lighting_ambient_definition,
+	&rasterizer_environment_alpha_testing_definition,
+	&rasterizer_environment_specular_mask_definition,
+	&rasterizer_shadows_convolution_definition,
+	&rasterizer_shadows_debug_definition,
+	&rasterizer_water_mipmapping_definition,
+	&rasterizer_active_camouflage_definition,
+	&rasterizer_active_camouflage_multipass_definition,
+	&rasterizer_plasma_energy_definition,
+	&rasterizer_lens_flares_occlusion_definition,
+	&rasterizer_lens_flares_occlusion_debug_definition,
+	&rasterizer_ray_of_buddha_definition,
+	&rasterizer_screen_flashes_definition,
+	&rasterizer_screen_effects_definition,
+	&rasterizer_DXTC_noise_definition,
+	&rasterizer_soft_filter_definition,
+	&rasterizer_secondary_render_target_debug_definition,
+	&rasterizer_profile_log_definition,
+	&rasterizer_detail_objects_offset_multiplier_definition,
+	&rasterizer_zbias_definition,
+	&rasterizer_zoffset_definition,
+	&force_all_player_views_to_default_player_definition,
+	&rasterizer_safe_frame_bounds_definition,
+	&freeze_flying_camera_definition,
+	&rasterizer_zsprites_definition,
+	&rasterizer_filthy_decal_fog_hack_definition,
+	&rasterizer_splitscreen_VB_optimization_definition,
+	&rasterizer_profile_print_locks_definition,
+	&rasterizer_profile_objectlock_time_definition,
+	&pad3_definition,
+	&pad3_scale_definition,
+	&f0_definition,
+	&f1_definition,
+	&f2_definition,
+	&f3_definition,
+	&f4_definition,
+	&f5_definition,
+	&rasterizer_transparent_pixel_counter_definition,
+	&debug_no_frustum_clip_definition,
+	&debug_frustum_definition,
+	&debug_bink_definition,
+	&screenshot_size_definition,
+	&screenshot_count_definition,
+	&terminal_render_definition,
+	&console_dump_to_file_definition,
+	&player_spawn_count_definition,
+	&debug_object_garbage_collection_definition,
+	&debug_render_freeze_definition,
+	&debug_no_drawing_definition,
+	&debug_input_target_definition,
+	&temporary_hud_definition,
+	&debug_leaf_index_definition,
+	&debug_leaf_portal_index_definition,
+	&debug_leaf_portals_definition,
+	&debug_unit_all_animations_definition,
+	&debug_unit_animations_definition,
+	&debug_unit_illumination_definition,
+	&debug_damage_taken_definition,
+	&cheat_deathless_player_definition,
+	&cheat_jetpack_definition,
+	&cheat_infinite_ammo_definition,
+	&cheat_bottomless_clip_definition,
+	&cheat_bump_possession_definition,
+	&cheat_super_jump_definition,
+	&cheat_reflexive_damage_effects_definition,
+	&cheat_medusa_definition,
+	&cheat_omnipotent_definition,
+	&cheat_controller_definition,
+	&effects_corpse_nonviolent_definition,
+	&debug_effects_nonviolent_definition,
+	&debug_sound_cache_definition,
+	&debug_sound_definition,
+	&debug_looping_sound_definition,
+	&debug_sound_channels_definition,
+	&loud_dialog_hack_definition,
+	&sound_gain_under_dialog_definition,
+	&debug_sound_environment_definition,
+	&object_light_ambient_base_definition,
+	&object_light_ambient_scale_definition,
+	&object_light_secondary_scale_definition,
+	&object_light_interpolate_definition,
+	&model_animation_compression_definition,
+	&model_animation_data_compressed_size_definition,
+	&model_animation_data_uncompressed_size_definition,
+	&model_animation_data_compression_savings_in_bytes_definition,
+	&model_animation_data_compression_savings_in_bytes_at_import_definition,
+	&model_animation_data_compression_savings_in_percent_definition,
+	&model_animation_bullshit0_definition,
+	&model_animation_bullshit1_definition,
+	&model_animation_bullshit2_definition,
+	&model_animation_bullshit3_definition,
+	&rider_ejection_definition,
+	&stun_enable_definition,
+	&debug_sprites_definition,
+	&debug_portals_definition,
+	&debug_inactive_objects_definition,
+	&render_contrails_definition,
+	&render_particles_definition,
+	&render_psystems_definition,
+	&render_wsystems_definition,
+	&debug_objects_definition,
+	&debug_objects_position_velocity_definition,
+	&debug_objects_root_node_definition,
+	&debug_objects_bounding_spheres_definition,
+	&debug_objects_collision_models_definition,
+	&debug_objects_physics_definition,
+	&debug_objects_names_definition,
+	&debug_objects_pathfinding_spheres_definition,
+	&debug_objects_unit_vectors_definition,
+	&debug_objects_unit_seats_definition,
+	&debug_objects_unit_mouth_apeture_definition,
+	&debug_objects_biped_physics_pills_definition,
+	&debug_objects_biped_autoaim_pills_definition,
+	&debug_objects_vehicle_powered_mass_points_definition,
+	&debug_objects_devices_definition,
+	&render_model_nodes_definition,
+	&render_model_vertex_counts_definition,
+	&render_model_index_counts_definition,
+	&render_model_markers_definition,
+	&render_model_no_geometry_definition,
+	&render_shadows_definition,
+	&debug_damage_definition,
+	&debug_scripting_definition,
+	&debug_trigger_volumes_definition,
+	&debug_point_physics_definition,
+	&debug_physics_disable_penetration_freeze_definition,
+	&debug_motion_sensor_draw_all_units_definition,
+	&collision_debug_definition,
+	&collision_debug_spray_definition,
+	&collision_debug_features_definition,
+	&collision_debug_repeat_definition,
+	&collision_debug_flag_front_facing_surfaces_definition,
+	&collision_debug_flag_back_facing_surfaces_definition,
+	&collision_debug_flag_ignore_two_sided_surfaces_definition,
+	&collision_debug_flag_ignore_invisible_surfaces_definition,
+	&collision_debug_flag_ignore_breakable_surfaces_definition,
+	&collision_debug_flag_structure_definition,
+	&collision_debug_flag_media_definition,
+	&collision_debug_flag_objects_definition,
+	&collision_debug_flag_objects_bipeds_definition,
+	&collision_debug_flag_objects_vehicles_definition,
+	&collision_debug_flag_objects_weapons_definition,
+	&collision_debug_flag_objects_equipment_definition,
+	&collision_debug_flag_objects_projectiles_definition,
+	&collision_debug_flag_objects_scenery_definition,
+	&collision_debug_flag_objects_machines_definition,
+	&collision_debug_flag_objects_controls_definition,
+	&collision_debug_flag_objects_light_fixtures_definition,
+	&collision_debug_flag_objects_placeholders_definition,
+	&collision_debug_flag_try_to_keep_location_valid_definition,
+	&collision_debug_flag_skip_passthrough_bipeds_definition,
+	&collision_debug_flag_use_vehicle_physics_definition,
+	&collision_debug_point_x_definition,
+	&collision_debug_point_y_definition,
+	&collision_debug_point_z_definition,
+	&collision_debug_vector_i_definition,
+	&collision_debug_vector_j_definition,
+	&collision_debug_vector_k_definition,
+	&collision_debug_length_definition,
+	&collision_debug_width_definition,
+	&collision_debug_height_definition,
+	&collision_debug_phantom_bsp_definition,
+	&collision_log_render_definition,
+	&collision_log_detailed_definition,
+	&collision_log_extended_definition,
+	&collision_log_totals_only_definition,
+	&collision_log_time_definition,
+	&debug_obstacle_path_definition,
+	&debug_obstacle_path_on_failure_definition,
+	&debug_obstacle_path_start_point_x_definition,
+	&debug_obstacle_path_start_point_y_definition,
+	&debug_obstacle_path_start_surface_index_definition,
+	&debug_obstacle_path_goal_point_x_definition,
+	&debug_obstacle_path_goal_point_y_definition,
+	&debug_obstacle_path_goal_surface_index_definition,
+	&debug_camera_definition,
+	&debug_player_definition,
+	&debug_structure_definition,
+	&debug_bsp_definition,
+	&debug_input_definition,
+	&debug_permanent_decals_definition,
+	&debug_fog_planes_definition,
+	&decals_definition,
+	&debug_decals_definition,
+	&debug_object_lights_definition,
+	&debug_lights_definition,
+	&debug_biped_physics_definition,
+	&debug_biped_skip_update_definition,
+	&debug_biped_skip_collision_definition,
+	&debug_biped_limp_body_disable_definition,
+	&debug_collision_skip_objects_definition,
+	&debug_collision_skip_vectors_definition,
+	&debug_material_effects_definition,
+	&weather_definition,
+	&breakable_surfaces_definition,
+	&decals_definition,
+	&profile_graph_definition,
+	&profile_display_definition,
+	&profile_timebase_ticks_definition,
+	&profile_dump_frames_definition,
+	&profile_dump_lost_frames_definition,
+	&recover_saved_games_hack_definition,
+	&radiosity_quality_definition,
+	&radiosity_step_count_definition,
+	&radiosity_lines_definition,
+	&radiosity_normals_definition,
+	&structures_use_pvs_for_vs_definition,
+	&debug_texture_cache_definition,
+	&debug_detail_objects_definition,
+	&ai_render_definition,
+	&ai_render_all_actors_definition,
+	&ai_render_inactive_actors_definition,
+	&ai_render_lineoffire_crouching_definition,
+	&ai_render_lineoffire_definition,
+	&ai_render_lineofsight_definition,
+	&ai_render_ballistic_lineoffire_definition,
+	&ai_render_encounter_activeregion_definition,
+	&ai_render_vision_cones_definition,
+	&ai_render_current_state_definition,
+	&ai_render_detailed_state_definition,
+	&ai_render_props_definition,
+	&ai_render_props_web_definition,
+	&ai_render_props_no_friends_definition,
+	&ai_render_props_target_weight_definition,
+	&ai_render_props_unreachable_definition,
+	&ai_render_props_unopposable_definition,
+	&ai_render_idle_look_definition,
+	&ai_render_support_surfaces_definition,
+	&ai_render_recent_damage_definition,
+	&ai_render_threats_definition,
+	&ai_render_emotions_definition,
+	&ai_render_audibility_definition,
+	&ai_render_aiming_vectors_definition,
+	&ai_render_secondary_looking_definition,
+	&ai_render_targets_definition,
+	&ai_render_targets_last_visible_definition,
+	&ai_render_states_definition,
+	&ai_render_vitality_definition,
+	&ai_render_active_cover_seeking_definition,
+	&ai_render_evaluations_definition,
+	&ai_render_pursuit_definition,
+	&ai_render_shooting_definition,
+	&ai_render_trigger_definition,
+	&ai_render_projectile_aiming_definition,
+	&ai_render_aiming_validity_definition,
+	&ai_render_speech_definition,
+	&ai_render_teams_definition,
+	&ai_render_player_ratings_definition,
+	&ai_render_spatial_effects_definition,
+	&ai_render_firing_positions_definition,
+	&ai_render_gun_positions_definition,
+	&ai_render_burst_geometry_definition,
+	&ai_render_vehicle_avoidance_definition,
+	&ai_render_vehicles_enterable_definition,
+	&ai_render_melee_check_definition,
+	&ai_render_dialogue_variants_definition,
+	&ai_render_grenade_decisions_definition,
+	&ai_render_danger_zones_definition,
+	&ai_render_charge_decisions_definition,
+	&ai_render_control_definition,
+	&ai_render_activation_definition,
+	&ai_render_paths_definition,
+	&ai_render_paths_selected_only_definition,
+	&ai_render_paths_destination_definition,
+	&ai_render_paths_current_definition,
+	&ai_render_paths_failed_definition,
+	&ai_render_paths_raw_definition,
+	&ai_render_paths_smoothed_definition,
+	&ai_render_paths_avoided_definition,
+	&ai_render_paths_avoidance_segment_definition,
+	&ai_render_paths_avoidance_obstacles_definition,
+	&ai_render_paths_avoidance_search_definition,
+	&ai_render_paths_nodes_definition,
+	&ai_render_paths_nodes_all_definition,
+	&ai_render_paths_nodes_polygons_definition,
+	&ai_render_paths_nodes_costs_definition,
+	&ai_render_paths_nodes_closest_definition,
+	&ai_render_player_aiming_blocked_definition,
+	&ai_render_vector_avoidance_definition,
+	&ai_render_vector_avoidance_rays_definition,
+	&ai_render_vector_avoidance_sense_t_definition,
+	&ai_render_vector_avoidance_avoid_t_definition,
+	&ai_render_vector_avoidance_clear_time_definition,
+	&ai_render_vector_avoidance_weights_definition,
+	&ai_render_vector_avoidance_objects_definition,
+	&ai_render_vector_avoidance_intermediate_definition,
+	&ai_render_postcombat_definition,
+	&ai_print_pursuit_checks_definition,
+	&ai_print_rules_definition,
+	&ai_print_rule_values_definition,
+	&ai_print_major_upgrade_definition,
+	&ai_print_respawn_definition,
+	&ai_print_evaluation_statistics_definition,
+	&ai_print_communication_definition,
+	&ai_print_communication_player_definition,
+	&ai_print_vocalizations_definition,
+	&ai_print_placement_definition,
+	&ai_print_speech_definition,
+	&ai_print_speech_timers_definition,
+	&ai_print_allegiance_definition,
+	&ai_print_lost_speech_definition,
+	&ai_print_migration_definition,
+	&ai_print_automatic_migration_definition,
+	&ai_print_scripting_definition,
+	&ai_print_surprise_definition,
+	&ai_print_command_lists_definition,
+	&ai_print_damage_modifiers_definition,
+	&ai_print_secondary_looking_definition,
+	&ai_print_oversteer_definition,
+	&ai_print_conversations_definition,
+	&ai_print_killing_sprees_definition,
+	&ai_print_acknowledgement_definition,
+	&ai_print_unfinished_paths_definition,
+	&ai_print_bsp_transition_definition,
+	&ai_print_uncovering_definition,
+	&ai_profile_disable_definition,
+	&ai_profile_random_definition,
+	&ai_show_definition,
+	&ai_show_stats_definition,
+	&ai_show_actors_definition,
+	&ai_show_swarms_definition,
+	&ai_show_paths_definition,
+	&ai_show_line_of_sight_definition,
+	&ai_show_prop_types_definition,
+	&ai_show_sound_distance_definition,
+	&ai_debug_fast_los_definition,
+	&ai_debug_oversteer_disable_definition,
+	&ai_debug_evaluate_all_positions_definition,
+	&ai_debug_path_definition,
+	&ai_debug_path_start_freeze_definition,
+	&ai_debug_path_end_freeze_definition,
+	&ai_debug_path_flood_definition,
+	&ai_debug_path_maximum_radius_definition,
+	&ai_debug_path_attractor_definition,
+	&ai_debug_path_attractor_radius_definition,
+	&ai_debug_path_attractor_weight_definition,
+	&ai_debug_path_accept_radius_definition,
+	&ai_debug_ballistic_lineoffire_freeze_definition,
+	&ai_debug_communication_random_disabled_definition,
+	&ai_debug_communication_timeout_disabled_definition,
+	&ai_debug_communication_unit_repeat_disabled_definition,
+	&ai_debug_communication_focus_enable_definition,
+	&ai_debug_blind_definition,
+	&ai_debug_deaf_definition,
+	&ai_debug_invisible_player_definition,
+	&ai_debug_ignore_player_definition,
+	&ai_debug_flee_always_definition,
+	&ai_debug_force_all_active_definition,
+	&ai_debug_disable_wounded_sounds_definition,
+	&ai_debug_force_vocalizations_definition,
+	&ai_debug_force_crouch_definition,
+	&ai_debug_path_disable_smoothing_definition,
+	&ai_debug_path_disable_obstacle_avoidance_definition,
+	&ai_fix_defending_guard_firing_positions_definition,
+	&ai_fix_actor_variants_definition,
+	&controls_enable_crouch_definition,
+	&controls_swapped_definition,
+	&controls_enable_doubled_spin_definition,
+	&controls_swap_doubled_spin_state_definition,
+	&player0_look_yaw_rate_definition,
+	&player1_look_yaw_rate_definition,
+	&player2_look_yaw_rate_definition,
+	&player3_look_yaw_rate_definition,
+	&player0_look_pitch_rate_definition,
+	&player1_look_pitch_rate_definition,
+	&player2_look_pitch_rate_definition,
+	&player3_look_pitch_rate_definition,
+	&player_autoaim_definition,
+	&player_magnetism_definition,
+	&debug_player_teleport_definition,
+	&texture_cache_graph_definition,
+	&texture_cache_list_definition,
+	&director_camera_switch_fast_definition,
+	&debug_recording_definition,
+	&debug_recording_newlines_definition,
+	&debug_player_color_definition,
+	&debug_framerate_definition,
+	&display_framerate_definition,
+	&display_vblank_deltas_definition,
+	&framerate_throttle_definition,
+	&framerate_lock_definition,
+	&display_precache_progress_definition,
+	&debug_game_save_definition,
+	&allow_out_of_sync_definition,
+	&global_connection_dont_timeout_definition,
+	&find_all_fucked_up_shit_definition,
+	&run_game_scripts_definition,
 };
 
 /* ---------- public code */

@@ -22519,7 +22519,7 @@
 { "file_offset": 3013348, "flags": 0, "name": "_hs_script_type_names" },
 { "file_offset": 3013368, "flags": 0, "name": "__hs_type_string_default" },
 { "file_offset": 3013376, "flags": 0, "name": "_hs_function_table" },
-{ "file_offset": 3016648, "flags": 0, "name": "_hs_external_global_definitions" },
+{ "file_offset": 3016648, "flags": 0, "name": "_screenshot_size_definition", "static": true },
 { "file_offset": 3021952, "flags": 0, "name": "_hs_external_globals" },
 { "file_offset": 3023728, "flags": 0, "name": "_hs_type_inspectors", "static": true },
 { "file_offset": 3023928, "flags": 0, "name": "_typecasting_procedures" },

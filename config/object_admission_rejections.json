@@ -10,14 +10,6 @@
       "reopen": "Replace the conflicting hand-written providers with genuine shared-header uses, retain every exact caller, and prove compatible ordinary provider links in both orders before admitting the object. Do not credit the candidate-only copies."
     },
     {
-      "unit": "source/hs/hs_globals_external",
-      "class": "source-layout-incomplete",
-      "symbol": "_hs_external_global_definitions",
-      "reason": "The rebuilt data is byte-identical, but it is one invented 442-element array where January had 442 separately named file-static global definitions. The later build does not independently authenticate all January names or this aggregate source shape.",
-      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
-      "reopen": "Recover and verify the January per-global names and ownership from first-party evidence, replace the aggregate with authentic separate definitions, and preserve every exact function and data relocation before whole-object admission."
-    },
-    {
       "unit": "source/structures/leaf_map",
       "class": "candidate-only-comdat-owner",
       "symbol": "_distance3d",
