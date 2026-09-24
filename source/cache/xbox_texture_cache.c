@@ -474,6 +474,8 @@ void *texture_cache_steal_memory(
 		(byte *)physical_memory_get_texture_cache_base_address() +
 		remaining_page_count * XBOX_TEXTURE_CACHE_PAGE_SIZE;
 	long stolen_size = page_count * XBOX_TEXTURE_CACHE_PAGE_SIZE;
+	byte *stolen_address =
+		base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE;
 	byte *end_guard_address =
 		base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE + stolen_size;
 
@@ -489,7 +491,7 @@ void *texture_cache_steal_memory(
 		xbox_texture_cache_globals.cache,
 		remaining_page_count);
 	XPhysicalProtect(
-		base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE,
+		stolen_address,
 		stolen_size,
 		PAGE_READWRITE);
 	XPhysicalProtect(
@@ -502,7 +504,7 @@ void *texture_cache_steal_memory(
 		PAGE_READONLY);
 	xbox_texture_cache_globals.stolen_memory = TRUE;
 
-	return base_address + XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE;
+	return stolen_address;
 }
 
 void texture_cache_return_memory(

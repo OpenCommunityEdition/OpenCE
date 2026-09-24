@@ -394,7 +394,7 @@ static boolean firing_position_forced_evaluation(
 
 /* ---------- globals */
 
-static struct firing_position_pre_evaluator const global_pre_evaluator_table[]=
+struct firing_position_pre_evaluator const global_pre_evaluator_table[]=
 {
 	{-1, pre_evaluator_global},
 	{FLAG(_firing_point_evaluation_mode_fight)|FLAG(_firing_point_evaluation_mode_uncover), pre_evaluator_attack},
@@ -406,7 +406,7 @@ static struct firing_position_pre_evaluator const global_pre_evaluator_table[]=
 	{0, NULL},
 };
 
-static struct firing_position_post_evaluator const global_post_evaluator_table[]=
+struct firing_position_post_evaluator const global_post_evaluator_table[]=
 {
 	{-1, post_evaluator_global},
 	{FLAG(_firing_point_evaluation_mode_fight)|FLAG(_firing_point_evaluation_mode_guard)|
@@ -417,8 +417,8 @@ static struct firing_position_post_evaluator const global_post_evaluator_table[]
 	{0, NULL},
 };
 
-static short global_temporary_sort_firing_position_count;
-static struct firing_position *global_temporary_sort_firing_position_array;
+short global_temporary_sort_firing_position_count= 0;
+struct firing_position *global_temporary_sort_firing_position_array= NULL;
 
 /* ---------- private code */
 

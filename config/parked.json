@@ -263,25 +263,6 @@
       }
     },
     {
-      "unit": "source/tag_files/files_windows",
-      "function": "_file_get_size",
-      "class": "unclassified",
-      "evidence": "Complete typed path/attribute lookup, low-size return and natural file_error call. Same padded size and relocation count; info-pointer lifetime/register differences remain. No proven narrow compiler recipe, allocation search, fake operations, raw offsets, assembly or forced inline. Reopen on authentic source or family API evidence. See docs/object_matching_logs/files_windows_obj_small_family_wave_20260904.md.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 13,
-          "normalized_sha256": "3e237cfe3e76e06d034d1b64effb416e37dfb3694bfa56ca1d16cd16cfba958f"
-        },
-        "base": {
-          "size": 224,
-          "relocation_count": 13,
-          "normalized_sha256": "d26fde60720be6198f891f7f8e4688b9a5617339aa8b8f4d1d314522ece62a27"
-        },
-        "objdiff_percent": 85.75325
-      }
-    },
-    {
       "unit": "source/effects/player_effects",
       "function": "_player_effect_get_camera_effect_matrix",
       "class": "unclassified",
@@ -1099,25 +1080,6 @@
           "normalized_sha256": "5fb478d5414138003fa6ec1126c191fe0383f3c68c42523b28e455dd62e39f10"
         },
         "objdiff_percent": 98.3871
-      }
-    },
-    {
-      "unit": "source/cache/xbox_texture_cache",
-      "function": "_texture_cache_steal_memory",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete public texture-cache memory-steal path in ordinary typed C. The retained function uses the owning texture_cache.h prototype, signed long page arithmetic independently confirmed by January's cdq/and/add/sar sequence, named page/guard constants, the genuine operational xbox_texture_cache_globals fields, the real XDK XPhysicalProtect declaration and PAGE_READWRITE/PAGE_READONLY constants, and explicit return. January and later HCEA/Pastudan/Stian semantic lifts corroborate the two guards, LRU resize, protection sequence, stolen flag, and returned writable range. Target and candidate are both 224 padded / 209 meaningful bytes with the same 16 relocation offsets, types and identities; objdiff reports 96.95652 percent. The only aligned emitted-code difference is January retaining the returned guard pointer in ESI while VC7 selects EDI for the natural candidate, plus the corresponding pop/move order. The fail-closed classifier returns UNKNOWN, so no recipe or exact credit is claimed. No declaration-order search, register/volatile forcing, pragma, barrier, assembly, raw offset, fake dependency, forced inline, undefined behavior, extra helper, COMMON owner, or point_from_line3d COMDAT is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining this final pointer-register allocation.",
-      "measurements": {
-        "target": {
-          "size": 224,
-          "relocation_count": 16,
-          "normalized_sha256": "7ffbda42b22d2c8bae6f2604509e6b0e39ae275fe38c011febed6f55e1d4620e"
-        },
-        "base": {
-          "size": 224,
-          "relocation_count": 16,
-          "normalized_sha256": "37670ded23c6273a3a573265fe14a008f6abb5fc2799c821368c77f7710cf076"
-        },
-        "objdiff_percent": 96.95652
       }
     },
     {

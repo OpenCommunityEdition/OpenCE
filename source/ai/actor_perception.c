@@ -247,8 +247,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
-
 #include "cseries.h"
 #include "cseries/errors.h"
 
@@ -275,8 +273,6 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "units/biped_definitions.h"
-
-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 /* ---------- constants */
 
@@ -365,6 +361,7 @@ enum
 enum
 {
 	_actor_combat_status_none = 0,
+	_actor_combat_status_investigate = 2,
 	_actor_combat_status_definite = 3,
 	_actor_combat_status_certain = 4,
 	_actor_combat_status_visible = 7,
@@ -1096,7 +1093,7 @@ struct actor_perception_definition_view
 
 /* ---------- prototypes */
 
-long actor_perception_qsort_compare_optional_props(
+static long actor_perception_qsort_compare_optional_props(
 	void const *a,
 	void const *b);
 
@@ -1148,10 +1145,10 @@ static boolean actor_perception_assess_vehicle_danger(
 	boolean mark,
 	struct actor_position_data const *position);
 
-void actor_perception_refresh(
+static void actor_perception_refresh(
 	long actor_index);
 
-void actor_perception_refresh_test_object(
+static void actor_perception_refresh_test_object(
 	long actor_index,
 	long object_index,
 	struct actor_perception_refresh_list *friend_list,
@@ -1232,7 +1229,7 @@ short const global_acknowledgement_speeds[4][4] =
 	{ 0, 3, 4, 4 }
 };
 
-long last_refresh_overflow_warning_time = NONE;
+static long last_refresh_overflow_warning_time = NONE;
 
 /* ---------- public code */
 
@@ -1421,60 +1418,50 @@ short actor_get_perception_knowledge(
 	long actor_index,
 	long prop_index)
 {
-	struct actor_perception_actor_view *actor =
-		(struct actor_perception_actor_view *)actor_get(actor_index);
-	short result;
+	struct actor_datum *actor = actor_get(actor_index);
+	short knowledge_type = NONE;
 
 	if (prop_index != NONE)
 	{
-		struct actor_perception_prop_view *prop =
-			(struct actor_perception_prop_view *)prop_get(prop_index);
+		struct prop_datum *prop = prop_get(prop_index);
 
 #line 1394 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 		assert(prop->owner_actor_index == actor_index);
 #line 390 "source\\ai\\actor_perception.c"
 
-		if (prop->state >= 2 && prop->state <= 3)
+		if (prop_acknowledged(prop) ||
+			prop->unit_effect == _ai_unit_effect_shooting ||
+			prop->unit_effect == _ai_unit_effect_death_scream ||
+			(!prop->enemy &&
+				(!prop->dead || actor->state.mode >= _actor_mode_combat)))
 		{
-			result = 3;
-			goto done;
+			knowledge_type = _actor_knowledge_definite;
 		}
 
-		if (prop->perception == 1 || prop->perception == 2)
+		if (knowledge_type == NONE &&
+			prop->orphan_prop_index != NONE)
 		{
-			result = 3;
-			goto done;
-		}
-
-		if (!prop->enemy &&
-			(!prop->dead || actor->combat_status >= 3))
-		{
-			result = 3;
-			goto done;
-		}
-
-		if (prop->orphan_prop_index != NONE)
-		{
-			struct actor_perception_prop_view *orphan =
-				(struct actor_perception_prop_view *)prop_get(
-					prop->orphan_prop_index);
-			result = (orphan->definitely_located != FALSE) + 2;
-
-			if (result != NONE)
-				goto done;
+			knowledge_type =
+				_actor_knowledge_searching +
+				(prop_get(prop->orphan_prop_index)->definitely_located != FALSE);
 		}
 	}
 
-	if (actor->artificial_combat_status >= 2)
+	if (knowledge_type == NONE)
 	{
-		result = 2;
-		goto done;
+		if (actor->state.combat_status >= _actor_combat_status_investigate)
+		{
+			knowledge_type = _actor_knowledge_searching;
+		}
+		else
+		{
+			knowledge_type = actor->state.mode >= _actor_mode_combat ?
+				_actor_knowledge_guard :
+				_actor_knowledge_noncombat;
+		}
 	}
 
-	result = actor->combat_status >= 3;
-
-done:
-	return result;
+	return knowledge_type;
 }
 
 void actor_get_vision_distances(
@@ -2835,7 +2822,7 @@ short actor_audibility_at_point(
 	return result;
 }
 
-void actor_emotion_unopposable_retreat(
+static void actor_emotion_unopposable_retreat(
 	long actor_index)
 {
 	struct actor_emotion_target targets[16];
@@ -5339,7 +5326,7 @@ static void actor_perception_refresh_danger_zone(
 
 
 
-void actor_perception_refresh_test_object(
+static void actor_perception_refresh_test_object(
 	long actor_index,
 	long object_index,
 	struct actor_perception_refresh_list *enemy_list,
@@ -5824,7 +5811,7 @@ done:
 }
 
 
-void actor_perception_refresh(
+static void actor_perception_refresh(
 	long actor_index)
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
@@ -6263,7 +6250,7 @@ boolean actor_situation_try_new_target(
 
 /* ---------- private code */
 
-long actor_perception_qsort_compare_optional_props(
+static long actor_perception_qsort_compare_optional_props(
 	void const *a,
 	void const *b)
 {

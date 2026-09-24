@@ -460,5 +460,15 @@
       "relocation_count": 228,
       "normalized_sha256": "c1040d667c392fd772fab34335ade456dac49ae864a8200c4560df63cec186fd"
     }
+  },
+  {
+    "unit": "source/objects/objects",
+    "symbol": "?section@?1??objects_update@@9@9",
+    "reason": "objects_update's function-static section table: January and the rebuilt object have identical 1,530-byte .data, relocation site/type and independently resolved string destination; objdiff 3.3.1's '$'-literal relocation-name defect undercredits it despite exact COFF section comparison. Whole object admitted after the Layer 1 provider repairs (action_charge, player_control, bored_camera, path_obstacles, decals) replaced hand-written NODUP helper copies with the genuine real_math.h inlines: all 121 functions strict exact, 225 symbols match storage/offsets and cachebeta.pdb publics, 26 candidate-only helper COMDATs byte-identical to January's selected copies and pair-linking in both orders.",
+    "measurements": {
+      "size": 1530,
+      "relocation_count": 1,
+      "normalized_sha256": "e94bb79478c95dce11c4a1f720a07ccbaa3a8d18b84acbe5605472d6f8635b74"
+    }
   }
 ]

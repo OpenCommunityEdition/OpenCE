@@ -83,7 +83,6 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 
-#define real_random real_random_inline
 #include "actions.h"
 
 #include "actor_definitions.h"
@@ -101,7 +100,6 @@ symbols in this file:
 #include "physics/collision_usage.h"
 #include "units/units.h"
 #include "ai_debug.h"
-#undef real_random
 
 /* ---------- constants */
 
@@ -330,13 +328,6 @@ boolean action_charge_is_leaping(
 	return result;
 }
 
-
-real real_random(
-	void)
-{
-	return real_seed_random(
-		get_global_random_seed_address());
-}
 
 boolean action_charge_perform(
 	long actor_index)

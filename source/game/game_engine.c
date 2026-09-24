@@ -764,7 +764,7 @@ void game_engine_playlist_next(
 	long parameter1,
 	long playlist_type);
 
-void game_engine_build_lighting(
+static void game_engine_build_lighting(
 	void);
 
 static boolean is_place_tied(
@@ -783,7 +783,7 @@ static void drawline(
 	long row_index,
 	short justification);
 
-boolean game_engine_infinite_grenades_internal(
+static boolean game_engine_infinite_grenades_internal(
 	void);
 
 static long select_players_to_display(
@@ -829,14 +829,14 @@ struct network_game_server *global_network_game_server_get(
 boolean player_ui_game_variant_specified(
 	struct game_variant *variant);
 
-void game_engine_post_rasterize_in_game(
+static void game_engine_post_rasterize_in_game(
 	void);
 
-void game_engine_rasterize_in_game_score(
+static void game_engine_rasterize_in_game_score(
 	long player_index,
 	real alpha);
 
-void game_engine_predict_resources(
+static void game_engine_predict_resources(
 	void);
 
 static void game_engine_verify_current_map(
@@ -878,10 +878,10 @@ static void game_engine_update_player_no_shield(
 static void game_engine_update_teleporter(
 	long player_index);
 
-void game_engine_update_weapons(
+static void game_engine_update_weapons(
 	void);
 
-void game_engine_update_item_spawn(
+static void game_engine_update_item_spawn(
 	void);
 
 void game_engine_update_multiplayer_sound(
@@ -934,11 +934,11 @@ long populate_statistic_buffer(
 	long parameter1,
 	long parameter2);
 
-boolean find_closest_player_callback(
+static boolean find_closest_player_callback(
 	long object_index,
 	long const *excluded_player_index);
 
-long find_closest_player_index(
+static long find_closest_player_index(
 	long player_index);
 
 static void internal_rasterize_target_name(
@@ -1745,7 +1745,7 @@ static long select_players_to_display(
 	return MIN(maximum_count, player_count);
 }
 
-void game_engine_rasterize_in_game_score(
+static void game_engine_rasterize_in_game_score(
 	long player_index,
 	real alpha)
 {
@@ -2231,7 +2231,7 @@ void game_engine_post_rasterize_post_game(
 	return;
 }
 
-long find_closest_player_index(
+static long find_closest_player_index(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -2675,7 +2675,7 @@ long players_in_game(
 	return player_count;
 }
 
-void game_engine_press_start_to_begin(
+static void game_engine_press_start_to_begin(
 	void)
 {
 	return;
@@ -2905,7 +2905,7 @@ boolean match_game_type(
 	return result;
 }
 
-boolean game_engine_infinite_grenades_internal(
+static boolean game_engine_infinite_grenades_internal(
 	void)
 {
 	boolean infinite_grenades = FALSE;
@@ -2916,7 +2916,7 @@ boolean game_engine_infinite_grenades_internal(
 	return infinite_grenades;
 }
 
-boolean find_closest_player_callback(
+static boolean find_closest_player_callback(
 	long object_index,
 	long const *excluded_player_index)
 {
@@ -2935,7 +2935,7 @@ boolean find_closest_player_callback(
 	return result;
 }
 
-void game_engine_update_purge(
+static void game_engine_update_purge(
 	void)
 {
 	struct object_iterator iterator;
@@ -3190,7 +3190,7 @@ void game_engine_rasterize_message(
 	return;
 }
 
-void game_engine_post_rasterize_in_game(
+static void game_engine_post_rasterize_in_game(
 	void)
 {
 	long local_player_index;
@@ -3395,7 +3395,7 @@ static void game_engine_update_player_no_shield(
 	return;
 }
 
-void game_engine_build_lighting(
+static void game_engine_build_lighting(
 	void)
 {
 	long player_count = 0;
@@ -3573,6 +3573,7 @@ void game_engine_nonplayer_post_rasterize(
 		{
 		case 0:
 		case 1:
+			game_engine_press_start_to_begin();
 			break;
 
 		case 2:
@@ -5841,7 +5842,7 @@ tied:
 	return NONE;
 }
 
-long game_engine_get_type(
+static long game_engine_get_type(
 	void)
 {
 	long game_engine_type = NONE;
@@ -6082,7 +6083,7 @@ void game_engine_variant_cleanup(
 	return;
 }
 
-void game_engine_predict_resources(
+static void game_engine_predict_resources(
 	void)
 {
 	struct game_globals *game_globals;
@@ -6421,12 +6422,7 @@ real game_engine_get_starting_location_rating(
 	struct player_starting_location const *starting_location)
 {
 	/* NonMatching with the same EBX/EDI mirror as code_0009c460. */
-	long game_type = NONE;
-
-	if (game_engine)
-		game_type = game_engine->type;
-
-	if (!match_game_type(game_type, 4, starting_location->game_types))
+	if (!match_game_type(game_engine_get_type(), 4, starting_location->game_types))
 		return 0.0f;
 
 	if (nearby_vehicle(player_index, starting_location))
@@ -6752,7 +6748,7 @@ static void update_weapon_inventory(
 	return;
 }
 
-void game_engine_update_weapons(
+static void game_engine_update_weapons(
 	void)
 {
 	struct object_iterator iterator;
@@ -7396,7 +7392,7 @@ static long random_item(
 }
 
 
-void game_engine_update_item_spawn(
+static void game_engine_update_item_spawn(
 	void)
 {
 	struct scenario *scenario = global_scenario_get();
@@ -7411,13 +7407,8 @@ void game_engine_update_item_spawn(
 				&scenario->netgame_equipment,
 				equipment_index,
 				struct scenario_netgame_equipment);
-		long game_type = NONE;
-
-		if (game_engine)
-			game_type = game_engine->type;
-
 		if (match_game_type(
-			game_type,
+			game_engine_get_type(),
 			NUMBEROF(equipment->game_types),
 			equipment->game_types))
 		{
@@ -7490,18 +7481,12 @@ static void handle_custom_starting_equipment(
 
 	while (TRUE)
 	{
-		long game_type;
-
 		starting_equipment = TAG_BLOCK_GET_ELEMENT(
 			&scenario->scenario_starting_equipment,
 			starting_equipment_index,
 			struct scenario_starting_equipment);
-		game_type = NONE;
-		if (game_engine)
-			game_type = game_engine->type;
-
 		if (match_game_type(
-			game_type,
+			game_engine_get_type(),
 			4,
 			starting_equipment->game_types))
 		{

@@ -340,13 +340,12 @@ static void connection_thread_list_mark_for_disposal(
 	struct thread_reference *thread);
 static unsigned long __stdcall connect_endpoint_process(
 	void *input_pointer);
-
-void connection_thread_list_maintenance(
+static void connection_thread_list_maintenance(
 	void);
 
 /* ---------- globals */
 
-struct transport_endpoint_winsock_globals transport_endpoint_globals = {0};
+static struct transport_endpoint_winsock_globals transport_endpoint_globals = {0};
 
 /* ---------- public code */
 
@@ -395,7 +394,7 @@ static void connection_thread_list_mark_for_disposal(
 	return;
 }
 
-void connection_thread_list_maintenance(
+static void connection_thread_list_maintenance(
 	void)
 {
 	long endpoint_thread_index = 0;

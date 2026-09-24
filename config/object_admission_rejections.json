@@ -2,14 +2,6 @@
   "version": 1,
   "entries": [
     {
-      "unit": "source/objects/objects",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_point_in_sphere, _real_random, _signed_angular_difference, _valid_real_vector3d, _valid_real_vector3d_axes2",
-      "reason": "All January target functions and owned data now match, but five candidate-only shared helpers conflict with hand-written no-duplicates providers in path_obstacles, action_charge, player_control and bored_camera. Exact target bytes and the corrected private symbols do not establish safe whole-object linkage.",
-      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
-      "reopen": "Replace the conflicting hand-written providers with genuine shared-header uses, retain every exact caller, and prove compatible ordinary provider links in both orders before admitting the object. Do not credit the candidate-only copies."
-    },
-    {
       "unit": "source/hs/hs_scenario_definitions",
       "class": "source-layout-incomplete",
       "symbol": ".data",

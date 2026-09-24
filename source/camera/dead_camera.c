@@ -83,7 +83,7 @@ static long player_get_next_player_with_a_unit(
 
 /* ---------- globals */
 
-struct dead_camera_constants const dead_camera_constants =
+static struct dead_camera_constants const dead_camera_constants =
 {
 	3.f,
 	15.f,
@@ -97,24 +97,18 @@ void dead_camera_new(
 	short local_player_index,
 	long unit_index)
 {
-	struct observer_result const *observer;
-	long player_index;
-	real distance;
+	struct observer_result const *observer = observer_get_camera(local_player_index);
 	real pitch;
 	real switch_timer;
-	real yaw;
 
-	observer = observer_get_camera(local_player_index);
 	match_assert("c:\\halo\\SOURCE\\camera\\dead_camera.c", 23, camera);
 	camera->position = observer->position;
 	camera->field_of_view = DEGREES_TO_RADIANS(70.f);
-	distance = real_local_random_range(2.f, 6.f);
-	camera->distance = distance;
-	yaw = real_local_random_range(0.f, 2.f * _pi);
-	camera->facing.yaw = yaw;
+	camera->distance = real_local_random_range(2.f, 6.f);
+	camera->facing.yaw = real_local_random_range(0.f, 2.f * _pi);
 	pitch = real_local_random_range(0.47123894f, 1.0995574f);
-	camera->timer = dead_camera_constants.dead_timer;
 	camera->facing.pitch = -pitch;
+	camera->timer = dead_camera_constants.dead_timer;
 	if (unit_index != NONE)
 	{
 		switch_timer = FLT_MAX;
@@ -126,18 +120,10 @@ void dead_camera_new(
 			: dead_camera_constants.singleplayer_switch_timer;
 	}
 	camera->switch_timer = switch_timer;
-
-	player_index = local_player_get_player_index(local_player_index);
-	camera->player_index = player_index;
-
-	if (unit_index == NONE)
-	{
-		camera->unit_index = player_get(player_index)->dead_unit_index;
-	}
-	else
-	{
-		camera->unit_index = unit_index;
-	}
+	camera->player_index = local_player_get_player_index(local_player_index);
+	camera->unit_index = unit_index == NONE
+		? player_get(camera->player_index)->dead_unit_index
+		: unit_index;
 	camera->current_player_index = camera->player_index;
 
 	return;

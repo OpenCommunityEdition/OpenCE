@@ -67,7 +67,6 @@ symbols in this file:
 #define distance_squared2d distance_squared2d_inline
 #define point_in_circle point_in_circle_inline
 #define distance_squared3d distance_squared3d_inline
-#define point_in_sphere point_in_sphere_inline
 #include "cseries.h"
 #include "path.h"
 #include "devices/device_definitions.h"
@@ -81,7 +80,6 @@ symbols in this file:
 #undef distance_squared2d
 #undef point_in_circle
 #undef distance_squared3d
-#undef point_in_sphere
 
 /* ---------- constants */
 
@@ -186,14 +184,6 @@ boolean point_in_circle(
 	real radius)
 {
 	return distance_squared2d_inline(point, center) <= (radius * radius);
-}
-
-boolean point_in_sphere(
-	real_point3d const *point,
-	real_point3d const *center,
-	real radius)
-{
-	return distance_squared3d_inline(point, center) <= (radius * radius);
 }
 
 boolean obstacles_add_disc(
