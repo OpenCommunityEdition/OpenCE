@@ -58,7 +58,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define object_get_type items_object_get_type_inline
 #include "cseries.h"
 
 #include "cseries/profile.h"
@@ -77,7 +76,6 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "units/units.h"
-#undef object_get_type
 
 /* ---------- constants */
 
@@ -110,12 +108,6 @@ struct profile_section item_update_section = { "item_update", NONE, TRUE };
 real const item_maximum_impact_velocity = 0.1f;
 
 /* ---------- public code */
-
-short object_get_type(
-	long object_index)
-{
-	return object_header_get(object_index)->type;
-}
 
 void items_initialize(
 	void)
