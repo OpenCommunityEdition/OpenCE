@@ -1,0 +1,12 @@
+# `bitmap_drawing` 16-byte data prefix: bounded evidence (2026-09-24)
+
+`bitmap_drawing.obj` is 7/7 strict-exact functions, but its target `.data` is 2,644 bytes and our rebuilt `.data` is 2,628. January places 16 bytes before the public `translation_table` at `0x2db688`. Those bytes are `ff ff ff ff ff ff ff ff ff ff 00 00 00 00 00 00` (five `0xffff` words and three zero words if interpreted as 16-bit values). The name `_bitmap_copy_translation_table_data` at `0x2db678` in `config/symbols.json` was added during reconstruction in commit `974080b7`; it is **not** a recovered Bungie name.
+
+Two independent original-build checks establish that the prefix is real, rather than csplit padding or a neighboring object's tail:
+
+- January `cachebeta.pdb`'s section contributions assign one contiguous `.data` range `0x2db678..0x2dc0cc` (0xa54 bytes) to `bitmap_drawing.obj`. `translation_table` is public at +16; `_bitmap_bevel_translation_flags` starts at +2608. Its public-symbol list has `translation_table` but no name for the prefix, and the compiland dump has no private locals. No split COFF object other than `bitmap_drawing.obj` references the synthetic prefix symbol.
+- The independent Halo Editing Kit `sapien.exe` contains the **entire byte-identical 2,592-byte translation table** at file offset `0x68ccc0`, preceded immediately by the **same 16 bytes**. It therefore survived a different build of this source family. This corroborates byte content and adjacency, not the C type or original name.
+
+The 2011 HCEX PDB has no `bitmap_drawing.obj` compiland. The inspected Halo cache/tag symbol-build EXEs have no PE COFF symbol table; the inspected cache/tag/Sapien/tool symbol-build EXEs do not contain this entire 2,592-byte table as an exact donor. The five negative words could be an eight-element `short` array, but that is an **inference only**; no January relocation references this prefix, so even its intended use is unproved.
+
+No production source/config/status was changed and **zero code/data bytes are credited**. Do not manufacture an unused 16-byte global merely to satisfy the section size. Reopen on first-party source/local-symbol evidence that identifies the declaration, or a same-family debug build that independently names and types these 16 bytes. Then verify target section bytes and offsets, selected-provider links, full build, strict function sweep, parks, and admission before whole-object credit.
