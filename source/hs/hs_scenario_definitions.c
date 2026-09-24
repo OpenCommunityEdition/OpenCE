@@ -108,62 +108,62 @@ struct tag_enum_definition hs_types_enum =
 
 static struct tag_field hs_script_fields[6] =
 {
-		{ _tag_field_string, 0, "name*", NULL },
-		{ _tag_field_enum, 0, "script type*", &hs_script_types_enum },
-		{ _tag_field_enum, 0, "return type*", &hs_types_enum },
-		{ _tag_field_long_integer, 0, "root expression index*", NULL },
-		{ _tag_field_pad, 0, NULL, (void *)52 },
-		{ _tag_field_terminator, 0, NULL, NULL },
+	{ _tag_field_string, 0, "name*", NULL },
+	{ _tag_field_enum, 0, "script type*", &hs_script_types_enum },
+	{ _tag_field_enum, 0, "return type*", &hs_types_enum },
+	{ _tag_field_long_integer, 0, "root expression index*", NULL },
+	{ _tag_field_pad, 0, NULL, (void *)52 },
+	{ _tag_field_terminator, 0, NULL, NULL },
 };
 
 struct tag_block_definition hs_scripts_block =
 {
-		"hs_scripts_block",
-		0,
-		512,
-		sizeof(struct hs_script),
-		NULL,
-		hs_script_fields,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
+	"hs_scripts_block",
+	0,
+	512,
+	sizeof(struct hs_script),
+	NULL,
+	hs_script_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static struct tag_field hs_global_fields[7] =
 {
-		{ _tag_field_string, 0, "name*", NULL },
-		{ _tag_field_enum, 0, "type*", &hs_types_enum },
-		{ _tag_field_pad, 0, NULL, (void *)2 },
-		{ _tag_field_pad, 0, NULL, (void *)4 },
-		{ _tag_field_long_integer, 0, "initialization expression index*", NULL },
-		{ _tag_field_pad, 0, NULL, (void *)48 },
-		{ _tag_field_terminator, 0, NULL, NULL },
+	{ _tag_field_string, 0, "name*", NULL },
+	{ _tag_field_enum, 0, "type*", &hs_types_enum },
+	{ _tag_field_pad, 0, NULL, (void *)2 },
+	{ _tag_field_pad, 0, NULL, (void *)4 },
+	{ _tag_field_long_integer, 0, "initialization expression index*", NULL },
+	{ _tag_field_pad, 0, NULL, (void *)48 },
+	{ _tag_field_terminator, 0, NULL, NULL },
 };
 
 struct tag_block_definition hs_globals_block =
 {
-		"hs_globals_block",
-		0,
-		128,
-		sizeof(struct hs_global),
-		NULL,
-		hs_global_fields,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
+	"hs_globals_block",
+	0,
+	128,
+	sizeof(struct hs_global),
+	NULL,
+	hs_global_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static unsigned long hs_reference_group_tags[3] = { 0, NONE, 0 };
 
 static struct tag_field hs_reference_fields[3] =
 {
-		{ _tag_field_pad, 0, NULL, (void *)24 },
-		{ _tag_field_tag_reference, 0, "reference*^", hs_reference_group_tags },
-		{ _tag_field_terminator, 0, NULL, NULL },
+	{ _tag_field_pad, 0, NULL, (void *)24 },
+	{ _tag_field_tag_reference, 0, "reference*^", hs_reference_group_tags },
+	{ _tag_field_terminator, 0, NULL, NULL },
 };
 
 struct tag_block_definition hs_references_block =
@@ -183,82 +183,82 @@ struct tag_block_definition hs_references_block =
 
 struct tag_data_definition hs_source_data_definition =
 {
-		"hs_source_data_definition",
-		0,
-		0x40000,
-		NULL,
+	"hs_source_data_definition",
+	0,
+	0x40000,
+	NULL,
 };
 
 static struct tag_field hs_source_fields[3] =
 {
-		{ _tag_field_string, 0, "name*", NULL },
-		{ _tag_field_data, 0, "source", &hs_source_data_definition },
-		{ _tag_field_terminator, 0, NULL, NULL },
+	{ _tag_field_string, 0, "name*", NULL },
+	{ _tag_field_data, 0, "source", &hs_source_data_definition },
+	{ _tag_field_terminator, 0, NULL, NULL },
 };
 
 struct tag_block_definition hs_source_files_block =
 {
-		"hs_source_files_block",
-		0,
-		8,
-		sizeof(struct hs_source_file),
-		NULL,
-		hs_source_fields,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
+	"hs_source_files_block",
+	0,
+	8,
+	sizeof(struct hs_source_file),
+	NULL,
+	hs_source_fields,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static byte_swap_code hs_data_array_codes[14] =
 {
-		_begin_bs_array,
-		1,
-		32,
-		_2byte,
-		_2byte,
-		1,
-		3,
-		_4byte,
-		_2byte,
-		_2byte,
-		_2byte,
-		_2byte,
-		_4byte,
-		_end_bs_array,
+	_begin_bs_array,
+	1,
+	32,
+	_2byte,
+	_2byte,
+	1,
+	3,
+	_4byte,
+	_2byte,
+	_2byte,
+	_2byte,
+	_2byte,
+	_4byte,
+	_end_bs_array,
 };
 
 static struct byte_swap_definition hs_data_array_definition =
 {
-		"data_array_header",
-		sizeof(struct data_array),
-		hs_data_array_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
+	"data_array_header",
+	sizeof(struct data_array),
+	hs_data_array_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
 };
 
 static byte_swap_code hs_syntax_node_codes[10] =
 {
-		_begin_bs_array,
-		1,
-		_2byte,
-		_2byte,
-		_2byte,
-		_2byte,
-		_4byte,
-		_4byte,
-		_4byte,
-		_end_bs_array,
+	_begin_bs_array,
+	1,
+	_2byte,
+	_2byte,
+	_2byte,
+	_2byte,
+	_4byte,
+	_4byte,
+	_4byte,
+	_end_bs_array,
 };
 
 static struct byte_swap_definition hs_syntax_node_definition =
 {
-		"syntax_node",
-		sizeof(struct hs_syntax_node),
-		hs_syntax_node_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
+	"syntax_node",
+	sizeof(struct hs_syntax_node),
+	hs_syntax_node_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
 };
 
 struct tag_data_definition hs_syntax_data_definition =
