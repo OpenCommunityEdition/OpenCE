@@ -323,11 +323,11 @@
       "unit": "source/math/periodic_functions",
       "function": "@periodic_function_build_variable_period_x_table@4",
       "class": "instruction-scheduling",
-      "evidence": "The retained ordinary C is the authenticated HCEA/Fable waveform-table reconstruction, uses the January-atlas __fastcall name and the shared cseries fast_ftol policy, and has the exact 256-byte envelope and all 18 relocation destinations. After 21 bounded natural-source experiments, only a two-instruction EDX/ECX ordering tie remains around the first cosine constant; artificial volatile, barrier, pragma, dead-dependency, inline-assembly, and compiler-control forms are rejected. The integration ledger records the donor history and negative controls. Reopen only for original January source or new same-compiler scheduling evidence.",
+      "evidence": "2026-09-24 rebaseline: the retained zero-credit fuzzy body now follows the later /Od first-party builder's indexed loops, short index, x_table parameter, real_random() helper calls and one accumulation expression, with January's attested waveform constants. The prior hand-expanded helper and invented amplitude/cosine/destination locals are removed. The exact sibling periodic_function_build_table uses real_random() in its noise arm as the later /Od build does; its bytes remain unchanged and the emitted _real_random COMDAT is byte-identical to January's selected copy and passes both provider link orders. January and the rebuilt builder are both 256 padded bytes with 18 relocations. One independent VC7 scheduling choice remains: January issues inc edx before fld [ebp-4] at +0x6f, while ours issues the load first. The function is not exact and earns zero code credit. About 150 natural source-shape probes and compiler controls in research/fifty_objects_20260925/w/periodic_functions/LEDGER.md did not close the tie; no volatile, barrier, pragma, dead dependency, inline assembly, or hand-expanded helper is retained. Reopen for authenticated January source or a decoded VC7 DAG scheduler rule for this ready-node choice.",
       "measurements": {
         "target": { "size": 256, "relocation_count": 18, "normalized_sha256": "802ef4da9736bcaf8a616c56d03ba3e9322b229ad4b3814c60909462d7ebacf3" },
-        "base": { "size": 256, "relocation_count": 18, "normalized_sha256": "af8e65f5d773f0fb1e635264e54d3e63fccee99c69b65364a72be56cdca323b4" },
-        "objdiff_percent": 91.233765
+        "base": { "size": 256, "relocation_count": 18, "normalized_sha256": "c5280305149a6466d123f479355c2a15167f284c1c358403a9d5b4f20e48a54d" },
+        "objdiff_percent": 96.623375
       }
     },
     {
