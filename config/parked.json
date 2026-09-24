@@ -418,25 +418,6 @@
       }
     },
     {
-      "unit": "source/objects/widgets/light_volumes",
-      "function": "_light_volume_render",
-      "class": "tu-context-optimization",
-      "evidence": "Fuzzy-parked under the current house rule after the complete source-history and worktree census, the authenticated HCEA renderer/interpolator/type records at commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c, the January disassembly, and the recorded bounded legal-C experiment families were rechecked from canonical ec4ae894a. The retained typed C implements the complete marker, view-angle, distance-fade, object-function, sprite-count, exponent, color-interpolation, and rasterizer path without fake steering. January emits a 912-byte function with a 0xA4 frame; VC7 emits 928 bytes with a 0xA8 frame. Both have 47 relocation types and destinations in the same semantic order. The remaining structural boundary is January's immediate 1.0f distance-fade store interleaved with the marker delta and its compact x87-valued inlined pow1 joins, while the available compiler materializes an earlier distance-fade local and memory phis for the later exponent results. Statement-position, scope, helper-edge, conditional-expression, direct-consumption, loop-count/divisor, HCEA-topology, compiler-version, and donor-branch families either reproduce this fixed point or lose the proven frame/relocation topology. No volatile access, register hint, barrier, assembly, raw offset, representation cast, undefined behavior, fake dependency, or nonsensical branch is retained. Reopen only for authoritative January source/local records, a natural same-compiler donor that distinguishes the x87 lifetime, or a genuinely distinct authentic VC7/QFE compiler.",
-      "measurements": {
-        "target": {
-          "size": 912,
-          "relocation_count": 47,
-          "normalized_sha256": "2e43dbc111ad125565ead94aff803117a92a3bb3215d18254e28281e204d0031"
-        },
-        "base": {
-          "size": 928,
-          "relocation_count": 47,
-          "normalized_sha256": "a4e273c7939882fcf1dadf774289b21742f1f88e718136216c33eaf04d55a94f"
-        },
-        "objdiff_percent": 75.711266
-      }
-    },
-    {
       "unit": "source/structures/structure_lens_flares",
       "function": "_build_structure_lens_flares",
       "class": "instruction-scheduling",
@@ -779,25 +760,6 @@
       }
     },
     {
-      "unit": "source/cache/cache_files_windows",
-      "function": "_cache_files_open_cache_files",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule with the full cache-file startup loop retained as ordinary typed C. January's 47-relocation call graph, file/API constants, assertions, diagnostic strings, cache-file layout, and the surrounding HaloCEA cache subsystem establish the behavior: delete the sentinel slot, open each cache file, preserve correctly sized existing files, rewrite stale files asynchronously, truncate them to the configured size, install the handle, validate cached headers against the DVD checksum/build, and clear invalid slots. Target and candidate share the 752-byte padded envelope and all 47 relocation identities; objdiff reports 83.333336 percent similarity. The residual is broad VC7 basic-block and register scheduling, especially cold CreateFile/setup-failure placement and the post-open validation path, without evidence for a unique source rewrite. No goto reshaping, raw offsets, volatile/register forcing beyond the real asynchronous completion flag, barrier, pragma, assembly, fake dependency, forced inline, or nonsensical success path is retained. Reopen for authoritative January source/local records or a natural same-compiler donor that explains the cold-block layout. Re-measured 2026-09-16: the exact static helper cached_map_block_on_async_request now snapshots the completion flag, reproducing January's double volatile load at this inlined wait tail (0x17a/0x17d); the body is otherwise unchanged and still non-exact (752 bytes / 47 relocations; alndiff 48 -> 36 differing target instructions; the CreateFileA-failure vassert placement remains).",
-      "measurements": {
-        "target": {
-          "size": 752,
-          "relocation_count": 47,
-          "normalized_sha256": "f1c88310c585856cc88840f5dfa06dfa579231bca2e1f57c06cf7d00803c7a3f"
-        },
-        "base": {
-          "size": 752,
-          "relocation_count": 47,
-          "normalized_sha256": "54553053bda7f8841b99fe7fffbc35e44c8f97490433028ff6256b33840d2abd"
-        },
-        "objdiff_percent": 85.32895
-      }
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_lights",
       "function": "_rasterizer_sun_glow_draw",
       "class": "unclassified",
@@ -833,25 +795,6 @@
           "normalized_sha256": "776ba88304402bf2ae995d27de02026f8a9a6655fe565c6385712bbf55c8d2ee"
         },
         "objdiff_percent": 96.43883
-      }
-    },
-    {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
-      "function": "__rasterizer_environment_shadow_model_draw",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked with the complete typed January model-shadow draw path reconstructed from target disassembly and relocations, January's shader/debug/statistics fields, and the independently corresponding HaloCEA shader-model behavior. The retained routine verifies model shaders and geometry, chooses culling and alpha-test texture state from named flags, evaluates the texture animation with the cached model parameters, uploads the three vertex constants, draws the complete static triangle buffer, and updates model-shadow statistics. Target and candidate both occupy 688 padded bytes with all 48 relocation types and destinations, and objdiff reports 97.95 percent similarity. The remaining difference is two dependency-independent scheduling transpositions around one fld/fmul pair and the neighboring constant-buffer address materialization; no behavior or call is absent. Bounded natural declaration, initialization, and include-set probes did not change that scheduler fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those two independent instruction placements.",
-      "measurements": {
-        "target": {
-          "size": 688,
-          "relocation_count": 48,
-          "normalized_sha256": "366f4471c47176709d6d1469a6ef998e1b248296a375b8cb8e8192c734341c9c"
-        },
-        "base": {
-          "size": 688,
-          "relocation_count": 48,
-          "normalized_sha256": "c81ae7e554a892d0f30600ed846a2585dbd904d74b628c472219ed77a5fb6489"
-        },
-        "objdiff_percent": 97.948715
       }
     },
     {
@@ -1390,17 +1333,6 @@
       }
     },
     {
-      "unit": "source/camera/editor_flying_camera",
-      "function": "_editor_camera_set_position_and_roll",
-      "class": "unclassified",
-      "evidence": "Complete January/HCEA-authenticated editor-camera reconstruction with the HCEX-attested file-static state split. It uses correctly typed Euler storage and copying instead of representation-pointer punning; the house-rule-compliant shape remains 464 versus 432 padded bytes and receives zero credit. Three x87 operand-load-order blocks remain (cross-product i term and two dot-product terms); no source-level lever is proven. See docs/object_matching_logs/editor_flying_camera_obj_opus5_150k_w3_20260914.md and docs/object_matching_logs/editor_flying_camera_static_split_recovery_20260923.md.",
-      "measurements": {
-        "target": { "size": 432, "relocation_count": 30, "normalized_sha256": "a209aa201db09ef8600e6aa329e259b552acb2fe89532ea3bc18f4c007912b82" },
-        "base": { "size": 464, "relocation_count": 30, "normalized_sha256": "2115d1bd30c95e6bd4c50d82e32480e2b8760bcae21ced47946bfef4706ee9fa" },
-        "objdiff_percent": 79.92618
-      }
-    },
-    {
       "unit": "source/camera/observer",
       "function": "_observer_update_positions",
       "class": "unclassified",
@@ -1415,11 +1347,11 @@
       "unit": "source/interface/first_person_weapons",
       "function": "_first_person_weapon_update",
       "class": "unclassified",
-      "evidence": "Complete HCEA-corroborated first-person weapon state machine retained from the 2026-09-12 update cluster. It has the real callers, typed accessors, and four-player January loop, but the current production inline schedule remains non-exact and emits one extra relocation; no forced-inline or source-pressure device is admitted. This body and its non-owned helper schedule receive zero credit. See docs/object_matching_logs/first_person_weapons_obj_update_cluster_reconciliation_20260912.md.",
+      "evidence": "Complete HCEA-corroborated first-person weapon state machine with the four-player January loop. Wave 2 of claude/fifty-objects-20260925 applied three /Od-attested corrections. First, a key-frame result no longer advances the state: January @0x13c jumps past next_state on _animation_key_frame, and /Od 0x61fb2e has an empty then-arm. Second, both animation updates call the TU wrapper animation_update_render_only (/Od 0x61fb22/0x61fc59); no other January object references the wrapper, so it was inlined here. Third, turning is a real_vector2d aggregate (/Od RTC descriptor turning, 8 bytes). With the null guards removed and magnitude3d inlined, the function is strictly exact (scratch/w/first_person_weapons/final_exact.c). January omits both null tests after count ? TAG_BLOCK_GET_ELEMENT(...) : NULL, and the later /Od build omits them too. That is an authentic unguarded dereference and is owner-gated. The retained defined-behaviour body keeps both guards and keeps magnitude3d out of line, so no helper COMDAT is emitted while the caller is non-exact. Zero credit. Reopen on an owner ruling admitting the unguarded dereference. See scratch/w/first_person_weapons/LEDGER.md.",
       "measurements": {
         "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
-        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "a112cf32c0e3baf805bd69c440b5beadbe51394f6a7f3161f61d4c470ea88292" },
-        "objdiff_percent": 93.48387
+        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "ba39884c90f2ef0afbac711db26225e2b41d4fc0719a2afbe0a600883e2bf8ff" },
+        "objdiff_percent": 95.21506
       }
     },
     {

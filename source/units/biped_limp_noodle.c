@@ -25,7 +25,8 @@ symbols in this file:
 002A30AC 0004:
 	__real@bd036d41 (0000)
 004C1C08 af08:
-	_biped_limp_noodle_globals (0000)
+	_features (0000)
+	_last_positions (ac08)
 */
 
 /* ---------- headers */
@@ -71,12 +72,6 @@ struct animation_graph_node
 	long pad1;
 };
 
-struct biped_limp_noodle_globals
-{
-	struct collision_feature_list features;
-	real_point3d last_positions[MAXIMUM_NODES_PER_ANIMATION];
-};
-
 /* ---------- prototypes */
 
 static boolean biped_limp_noodle_valid_joint_rotation(
@@ -96,7 +91,8 @@ static void biped_limp_noodle_adjust_orientations(
 	real_point3d const *last_positions);
 /* ---------- globals */
 
-static struct biped_limp_noodle_globals biped_limp_noodle_globals;
+static struct collision_feature_list features;
+static real_point3d last_positions[MAXIMUM_NODES_PER_ANIMATION];
 
 /* ---------- public code */
 
@@ -318,7 +314,7 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 		0.f,
 		collision_radius,
 		biped_index,
-		&biped_limp_noodle_globals.features);
+		&features);
 	csmemset(moved_node_flags, 0, sizeof(moved_node_flags));
 
 	for (iteration = 0; iteration < 4; iteration++)
@@ -362,7 +358,7 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 					collision_move_point(
 						position,
 						&velocity,
-						&biped_limp_noodle_globals.features,
+						&features,
 						&moved_position,
 						&moved_velocity,
 						3,
@@ -496,7 +492,7 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 								collision_move_point(
 									parent_position,
 									&velocity,
-									&biped_limp_noodle_globals.features,
+									&features,
 									parent_position,
 									&velocity,
 									3,
@@ -505,7 +501,7 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 								collision_move_point(
 									position,
 									&velocity,
-									&biped_limp_noodle_globals.features,
+									&features,
 									position,
 									&velocity,
 									3,
@@ -524,7 +520,7 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 								collision_move_point(
 									position,
 									&velocity,
-									&biped_limp_noodle_globals.features,
+									&features,
 									position,
 									&velocity,
 									3,
@@ -715,7 +711,7 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 
 		for (node_index = 0; node_index < animation_graph->nodes.count; node_index++)
 		{
-			biped_limp_noodle_globals.last_positions[node_index] =
+			last_positions[node_index] =
 				node_matrices[node_index].position;
 		}
 
@@ -724,7 +720,7 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 			biped_index,
 			node_matrices,
 			animation_graph->nodes.count,
-			biped_limp_noodle_globals.last_positions);
+			last_positions);
 
 		if (biped->biped.limp_body_current_relaxation_iterations < CHAR_MAX)
 			biped->biped.limp_body_current_relaxation_iterations++;

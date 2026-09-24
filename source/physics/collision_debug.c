@@ -252,9 +252,9 @@ void collision_debug_render(
 				real_point3d rotated_points[8];
 				short point_index;
 
-				yaw = (real)fmod((real)game_time_get() * 0.104719758f, 6.2831854820251465);
-				pitch = (real)fmod((real)game_time_get() * -0.073303826f, 6.2831854820251465);
-				roll = (real)fmod((real)game_time_get() * 0.146607652f, 6.2831854820251465);
+				yaw = (real)fmod(game_time_get() * 1.0f * _pi / 30.f, _pi*2.f);
+				pitch = (real)fmod(game_time_get() * -0.7f * _pi / 30.f, _pi*2.f);
+				roll = (real)fmod(game_time_get() * 1.4f * _pi / 30.f, _pi*2.f);
 
 				render_debug_string_at_point(
 					TRUE,
@@ -361,7 +361,7 @@ void collision_debug_render(
 							TEST_FLAG(collision.flags, _collision_surface_climbable_bit) ? " climbable" : "",
 							TEST_FLAG(collision.flags, _collision_surface_breakable_bit) ? " breakable" : "",
 							material_get_name(collision.material_type),
-							(real)acos(collision.plane.n.k) * 57.295776f);
+							arccosine(collision.plane.n.k) * 360.f / (_pi*2.f));
 						render_debug_string(TRUE, textstring);
 					}
 				}
@@ -550,10 +550,7 @@ void collision_debug_render(
 
 			point_from_line3d(&collision_debug_point, &collision_debug_vector, 0.5f, &test_center);
 			test_center.z += collision_debug_height * 0.5f;
-			radius = (real)sqrt(
-				collision_debug_vector.i * collision_debug_vector.i
-				+ collision_debug_vector.j * collision_debug_vector.j
-				+ collision_debug_vector.k * collision_debug_vector.k) * 0.5f
+			radius = magnitude3d(&collision_debug_vector) * 0.5f
 				+ collision_debug_height * 0.5f
 				+ collision_debug_width;
 

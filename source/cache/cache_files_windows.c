@@ -992,8 +992,6 @@ static void cache_files_open_cache_files(
 						811,
 						FALSE,
 						csprintf(temporary, "setup for new cache file failed (#%d)", GetLastError()));
-					CloseHandle(file);
-					file = INVALID_HANDLE_VALUE;
 				}
 			}
 		}
@@ -1004,6 +1002,12 @@ static void cache_files_open_cache_files(
 				823,
 				FALSE,
 				csprintf(temporary, "couldn't open or create new cache file (#%d)", GetLastError()));
+		}
+
+		if (!valid && file != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(file);
+			file = INVALID_HANDLE_VALUE;
 		}
 
 		map_file->file = file;

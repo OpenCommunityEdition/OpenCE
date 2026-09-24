@@ -18,22 +18,6 @@
       "reopen": "Recover and verify the January per-global names and ownership from first-party evidence, replace the aggregate with authentic separate definitions, and preserve every exact function and data relocation before whole-object admission."
     },
     {
-      "unit": "source/structures/leaf_map",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_distance3d",
-      "reason": "All 25 target functions and target-owned data sections are exact, including two newly closed callers. But the real shared-header distance3d use emits a candidate-only 64-byte SELECT_ANY copy whose instruction SHA differs from January's selected ActionVehicle NODUP copy. Ordinary LeafMap/ActionVehicle links fail with LNK2005 in both orders. A global source-body correction makes the copies identical but loses two inherited exact functions and stales a parked function, so it was rejected. The exact callers and verified data retain their separate credit; whole-object completion does not.",
-      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
-      "reopen": "Recover a genuine shared distance3d source/header spelling and inline schedule that yields January's selected COMDAT without any exact sibling loss or stale park; verify all real_math.h consumers and ordinary links. Do not suppress emission, force inline, or attribute candidate-only helper bytes to LeafMap."
-    },
-    {
-      "unit": "source/units/biped_limp_noodle",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_distance3d",
-      "reason": "All six target functions remain strict exact, but this Matching label also emitted the same candidate-only 64-byte SELECT_ANY distance3d copy that differs from January's selected ActionVehicle NODUP provider. Ordinary link compatibility is not established; the global real_math.h correction fails the whole-board no-regression and parked-function gates. Function credit remains; whole-object completion is held.",
-      "evidence": "docs/object_matching_logs/claude_object_closure_canonical_reconciliation_20260924.md#distance3d-provider-conflict",
-      "reopen": "Use the same authentic, board-wide no-regression provider repair as LeafMap and prove ordinary selected-provider links in both orders before restoring Matching."
-    },
-    {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
       "class": "candidate-only-comdat-owner",
       "symbol": "_D3DSIMPLERENDERSTATEENCODE",
@@ -80,14 +64,6 @@
       "reason": "The target and rebuilt objects both contain 136 zero-filled BSS bytes, but the four semantic default_render_model symbols have different section-relative offsets; byte-only data accounting therefore cannot prove equivalent ownership or final linked addresses.",
       "evidence": "docs/object_matching_logs/models_obj_fable_salvage_20260902.md#bss-ownership-boundary",
       "reopen": "Remove this rejection only after authoritative January ownership evidence or natural source makes all four BSS symbol offsets and linkage agree without aggregate facades, hash-steering names, custom sections, or other matching-only constructs."
-    },
-    {
-      "unit": "source/units/units",
-      "class": "candidate-only-comdat-owner",
-      "symbol": "_point_from_line3d",
-      "reason": "The rebuilt translation unit emits a 48-byte select-any _point_from_line3d COMDAT absent from the January units split, while January's selected action_charge owner is no-duplicates. All 189 January units functions remain strict exact, including the two authentic external calls from _unit_cause_continuous_melee_damage; the surplus owner is a separate whole-object admission failure under the explicit no-emission house rule.",
-      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#units-point_from_line3d-owner",
-      "reopen": "Remove only after source-authentic header/declaration topology preserves all 189 exact target functions and the two January external calls while preventing units.obj from emitting _point_from_line3d. Linker discard alone does not waive the explicit no-emission house rule; do not expand the two external calls or use forced inline/noinline, pragmas, assembly, or byte-shaping."
     },
     {
       "unit": "source/effects/decals",

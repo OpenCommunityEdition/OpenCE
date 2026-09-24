@@ -27,8 +27,6 @@ enum
 
 /* ---------- macros */
 
-#define light_volume_get(light_volume_index) \
-	((struct light_volume_datum *)datum_get(light_volume_globals.light_volume_data, (light_volume_index)))
 #define light_volume_definition_get(definition_index) \
 	((struct light_volume_definition *)tag_get('mgs2', (definition_index)))
 
@@ -140,10 +138,6 @@ void light_volume_submit(
 	long light_volume_index,
 	struct render_lighting const *lighting,
 	struct render_animation const *animation);
-
-/* ---------- globals */
-
-extern struct light_volume_globals light_volume_globals;
 
 /* ---------- public code */
 

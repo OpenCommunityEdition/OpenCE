@@ -287,7 +287,7 @@ struct hud_nav_object_datum
 
 /* ---------- prototypes */
 
-void hud_update_nav_point_local_player(
+static void hud_update_nav_point_local_player(
 	short local_player_index);
 
 void *object_try_and_get_and_verify_type(
@@ -1096,7 +1096,7 @@ void hud_render_nav_points(
 	return;
 }
 
-void hud_update_nav_point_local_player(
+static void hud_update_nav_point_local_player(
 	short local_player_index)
 {
 	long return_eip = get_return_eip();
