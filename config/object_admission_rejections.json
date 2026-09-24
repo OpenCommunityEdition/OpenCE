@@ -35,11 +35,11 @@
     },
     {
       "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
-      "class": "source-layout-incomplete",
-      "symbol": "struct rasterizer_dynamic_geometry_debug_options",
-      "reason": "All 17 target functions remain strict exact and the diagnostic flag now has its authentic one-byte BSS owner instead of COMMON storage. Whole-object completion still fails source ownership: debug-options and frame-statistics globals use caller-local incomplete views with opaque spans, and the window global uses a separate partial type. The candidate also retains an extra real_alpha_to_pixel32 code owner and stock SDK data copies absent from this January split; no ordinary final-link ownership proof is claimed.",
-      "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_obj_bss_owner_audit_20260904.md#remaining-completion-boundary",
-      "reopen": "Recover the authentic shared January layouts and use their proper owning declarations, preserving existing target-function matches across all consumers. Separately establish complete helper/SDK data ownership through authentic source topology and ordinary link verification. Do not use opaque prefix facades, declaration-order steering, forced inlining, altered selection metadata, or candidate-only bytes to claim Matching."
+      "class": "candidate-only-comdat-owner",
+      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+      "reason": "All 17 January code functions and all 31 January-owned sections/symbols match after replacing local debug, window and pixel-shader views with genuine owner types. Nine D3DINLINE wrappers have January's file-static storage. The two surplus color-conversion helpers are byte-identical to January's selected providers, and all 17 surplus symbols pass selected-provider links in both orders. The global_window_parameters extern still lives in consumer C files, with incompatible partial views in other consumers rather than a common owner declaration. Three stock SDK tables and other candidate-only constants/literals remain absent from January's split; the selected-provider test ignores unrelated unresolved symbols. A complete ordinary final-link ownership proof has not been established, so exact function credit does not imply Matching.",
+      "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_owner_layout_reconciliation.md",
+      "reopen": "Move global_window_parameters to its authentic owner declaration and reconcile the partial consumer views with a full regression sweep. Establish selected ownership/coalescing of candidate-only SDK tables and helper data through a complete compatible ordinary link or equally decisive January source/link evidence, without losing target exactness. Do not suppress genuine header emissions, alter selection metadata, force-inline, hand-copy helpers or count candidate-only bytes as January-owned."
     },
     {
       "unit": "source/interface/hud_draw",

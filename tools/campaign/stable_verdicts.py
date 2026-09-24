@@ -44,7 +44,7 @@ def build_snapshot(project_root: Path, config_path: Path) -> dict[str, dict[str,
         for symbol in target["symbols"]:
             section = symbol["section"]
             if (
-                not symbol["name"].startswith("_")
+                symbol["type"] != 0x20
                 or section <= 0
                 or section in seen_sections
                 or symbol["storage"] not in (2, 3)

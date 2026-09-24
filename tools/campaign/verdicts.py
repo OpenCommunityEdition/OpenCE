@@ -25,7 +25,7 @@ def dump(out_path):
         seen = set()
         for sym in target['symbols']:
             name = sym['name']
-            if not name.startswith('_') or name in seen:
+            if sym['type'] != 0x20 or name in seen:
                 continue
             if sym['section'] <= 0 or sym['storage'] not in (2, 3) or sym['value'] != 0:
                 continue

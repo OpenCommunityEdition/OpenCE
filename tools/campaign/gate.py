@@ -95,7 +95,7 @@ def fn_syms(o):
     secs = o['sections']
     out = {}
     for s in o['symbols']:
-        if (s['name'].startswith('_') and s['section'] > 0 and s['storage'] in (2, 3)
+        if (s['type'] == 0x20 and s['section'] > 0 and s['storage'] in (2, 3)
                 and s['value'] == 0 and secs[s['section'] - 1]['name'] == '.text'):
             out.setdefault(s['name'], s)
     return out

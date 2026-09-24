@@ -75,9 +75,11 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render_cameras.h"
 #include "shaders/shader_definitions.h"
+#include "rasterizer_xbox_pixel_shader.h"
 
 /* The January translation unit retains the XDK's out-of-line D3D wrappers.
  * Keep the stock D3DINLINE definition: the real calls below make VC7 emit
@@ -206,17 +208,6 @@ typedef char transparent_geometry_group_plane_offset_assert[
 typedef char transparent_geometry_group_cortana_hack_offset_assert[
 	offsetof(struct transparent_geometry_group, cortana_hack) == 0x9D ? 1 : -1];
 
-struct rasterizer_dynamic_geometry_debug_options
-{
-	byte reserved00[2];
-	short statistics_mode;
-	byte reserved04[0x1C];
-	boolean draw_dynamic_unlit_geometry;
-	boolean draw_dynamic_lit_geometry;
-	boolean draw_dynamic_screen_geometry;
-	byte reserved23;
-};
-
 struct rasterizer_meter_parameters
 {
 	pixel32 gradient_min_color;
@@ -230,46 +221,14 @@ struct rasterizer_meter_parameters
 	real gradient;
 };
 
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 typedef char rasterizer_dynamic_geometry_pixel_shader_size_assert[
 	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
 
-struct rasterizer_dynamic_geometry_window_parameters
-{
-	short rasterizer_target;
-	short window_index;
-	boolean has_mirror;
-	boolean suppress_clear;
-	byte pad06[2];
-	struct render_camera camera;
-};
-
 typedef char rasterizer_dynamic_geometry_viewport_bounds_offset_assert[
-	offsetof(struct rasterizer_dynamic_geometry_window_parameters, camera.viewport_bounds) == 0x34 ? 1 : -1];
+	offsetof(struct rasterizer_window_begin_parameters, camera.viewport_bounds) == 0x34 ? 1 : -1];
 
 typedef char rasterizer_dynamic_geometry_camera_offset_assert[
-	offsetof(struct rasterizer_dynamic_geometry_window_parameters, camera) == 0x8 ? 1 : -1];
+	offsetof(struct rasterizer_window_begin_parameters, camera) == 0x8 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -278,9 +237,7 @@ static void rasterizer_screen_geometry_submit_vertex(
 
 /* ---------- globals */
 
-extern struct rasterizer_dynamic_geometry_debug_options rasterizer_debug_options;
-extern struct rasterizer_dynamic_geometry_window_parameters global_window_parameters;
-extern struct pixel_shader_definition pixel_shader;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 boolean reported_too_many_transparent_geometry_groups = FALSE;
 
 /* ---------- public code */
@@ -314,7 +271,7 @@ void _rasterizer_psuedo_dynamic_screen_quad_draw(
 		756,
 		global_d3d_device);
 
-	if (!rasterizer_debug_options.draw_dynamic_screen_geometry)
+	if (!rasterizer_debug_options.dynamic_screen_geometry)
 	{
 		return;
 	}
@@ -728,7 +685,7 @@ void _rasterizer_dynamic_unlit_geometry_draw(
 		38,
 		global_d3d_device);
 
-	if (!rasterizer_debug_options.draw_dynamic_unlit_geometry)
+	if (!rasterizer_debug_options.dynamic_unlit_geometry)
 	{
 		return;
 	}
@@ -796,7 +753,7 @@ void _rasterizer_dynamic_unlit_geometry_draw(
 		group->lighting = NULL;
 		group->animation = NULL;
 
-		if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
+		if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_enabled)
 		{
 			rasterizer_frame_statistics.dynamic_unlit_draw_count++;
 			rasterizer_frame_statistics.dynamic_unlit_triangle_count += triangle_count;
