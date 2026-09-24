@@ -93,3 +93,43 @@ Held going in:
   - the stable whole-board diff;
   - parks, admission audit, fake-match scan and pytest;
   - `git diff --check`.
+
+## Wave R2-1 (family triage -> attack -> review)
+
+Eight family triages covered all 80 open, non-reserved objects. The verdicts split into:
+
+- **3 ADMISSION:** hardware_geometry, xbox_texture_cache, hs_runtime storage.
+- **3 ATTACK:** hs_runtime trigger volumes, actors (two functions), rasterizer_xbox_environment.
+- **~30 OWNER**, with the ruling each needs recorded.
+- **The rest RETIRE**, each citing the ledger negatives that exhaust it.
+
+Per-object triage records are in `research/fifty_objects_r2_20260924/results/r2w1/TRIAGE__*.md`.
+
+The key new evidence source was the Halo symbol atlas's **2001-09-25 linker-map tier**: MSVC map
+ground truth for the retail cache exe and the cachebeta xbe. No earlier lane had used it. It names
+static functions with January's exact spacing. The atlas carries functions only, so it cannot
+name static data.
+
+## Batch R2-1 (7979cf8f, 05255584)
+
+Result: Halo objects **381 -> 384** (+3). Stable diff: +3 strict functions, **4,128 meaningful /
+4,144 padded** code bytes, **0 regressions**. Parks 83/0/0. Admission 9/0/2/0. Fake scan 26.
+pytest 1,159/5/26. `git diff --check` clean. Canonical was rechecked before integrating
+(still f6d00a8c).
+
+| Object | Kind of work | Evidence |
+|---|---|---|
+| cache/xbox_texture_cache | ownership + shared headers | Three D3D wrapper rows are static. Three first-party renames come from the 2001-09 map (`texture_cache_name_block_proc`, `compare`, `texture_cache_initialize_hardware_format`). `bitmap_group.h` `struct bitmap_data` takes HCEX field names and types (45 includers, 0 moved rows). The TU-local bitmap views are gone. `texture_cache_debug_render` goes in `texture_cache.h`; the Xbox-only public format mappers go in the object's own `xbox_texture_cache.h`, whose placement is disclosed as declaration-count-driven. The reviewer removed an invented pad member. `w/xbox_texture_cache`, `w/review_r2_xbox_texture_cache` |
+| rasterizer/xbox/rasterizer_xbox_hardware_geometry | ownership (first-party name) | Round 1 held this as an owner pick, A vs B. The 2001-09 linker maps name `_D3DResource_MoveResourceMemory@8`/`_D3DVertexBuffer_MoveResourceMemory@8` with January's exact spacing, which attests B. The six placeholder stubs become XDK names, and 13 wrapper rows are static. The call's argument and position are byte-inert and disclosed. `w/rasterizer_xbox_hardware_geometry`, reviewer slug |
+| ai/actors | new code (2 functions) | `_actor_input_update` (2,384) and `_actors_spawn_from_unit` (672) use the complete /Od named-local inventory in /Od declaration order. The reviewer notes a latent January swarm-member `actor_get(NONE)` path that the source reproduces unchanged. `w/actors`, `w/review_r2_actors` |
+
+**Function gain, object still blocked:** hs_runtime `_render_debug_trigger_volumes` (1,088).
+
+- It uses the /Od helper form, with the reviewer-amended /Od declaration order and the escape-law
+  block.
+- Its ruling-5 `_point_from_line3d` COMDAT is identical to January's copy and pair-links.
+- 12 typecast converters are static, which fixes 12 provider-link failures.
+- The `begin_random` tie still blocks the object.
+
+**Process note:** the claim registry let two lanes that shared a label work the same unit (actors).
+They converged on byte-identical objects. Labels are now unique per lane.
