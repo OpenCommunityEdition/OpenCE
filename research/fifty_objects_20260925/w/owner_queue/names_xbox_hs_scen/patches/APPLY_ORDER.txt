@@ -1,0 +1,35 @@
+Owner-queue packet names_xbox_hs_scen - base cdc8ebd3 (Halo objects 379). NOTHING LANDS WITHOUT AN OWNER YES.
+All patches: `git apply --check` clean at cdc8ebd3, individually and in every combination listed below.
+Line endings: CRLF preserved (tree files are CRLF). Apply from the worktree root with `git apply <patch>`.
+
+ITEM 1 - rasterizer_xbox .bss split (owner ruling on 9 non-first-party names). Apply together, in order:
+  1_rasterizer_xbox/01_rasterizer_xbox.c.patch            (source: 23 file statics, HCEX blend tables, static storage, direct flicker calls, filthy rename)
+  1_rasterizer_xbox/02_rasterizer_xbox_internal.h.patch   (drop the stale default_initialize prototype)
+  1_rasterizer_xbox/03_symbols.json.patch                 (in-place rows: aggregate -> 23 statics, 3 blend local statics, 20 static wrappers, filthy rename, 2 statics)
+  1_rasterizer_xbox/04_config.json.patch                  (rasterizer_xbox.c NonMatching -> Matching)
+  1_rasterizer_xbox/05_parked.json.patch                  (NEW at cdc8ebd3: re-baseline the PARKED __rasterizer_model_draw hash moved by patch 02; zero-credit, no source change)
+  03 must land with 01 (and a csplit regen): 9 functions go reloc-identity without it (measured).
+  05 must land with 02: without it the park check is STALE (measured).
+
+ITEM 2 - hs_scenario_definitions data split (owner ruling on 9 non-first-party names). Choose ONE route:
+  Route A (no header change), in order:
+    2_hs_scenario_definitions/A01_hs_scenario_definitions.c.patch
+    2_hs_scenario_definitions/A02_symbols.json.patch          (9 inserted static rows only; the function rename already landed in 6e3e2d35)
+    2_hs_scenario_definitions/A03_config.json.patch           (hs_scenario_definitions.c NonMatching -> Matching)
+    2_hs_scenario_definitions/A04_object_admission_rejections.json.patch (retire the source-layout-incomplete .data rejection)
+  Route C (A + HCEX scenario-limit enum in the shared header), in order:
+    2_hs_scenario_definitions/C01_hs_scenario_definitions.h.patch
+    2_hs_scenario_definitions/C02_hs.c.patch                  (drop hs.c's TU-local #define; needs C01)
+    2_hs_scenario_definitions/C03_hs_scenario_definitions.c.patch (INSTEAD of A01; needs C01)
+    then A02, A03, A04.
+  A02 must land with A01/C03 (and a csplit regen): without the rows .data objdiff drops to 48.93% (484/1112).
+
+Both items together (either hs route) also apply cleanly; symbols.json/config.json hunks are disjoint.
+Combined post-images verified outside the repo (git apply in a scratch dir, cmp with the packet trees).
+
+INDEPENDENT (not name-gated; storage-only; reviewer-approved in wave 2, never landed):
+  independent/rasterizer_xbox_debug_static_wrappers_symbols.json.patch  (8 XDK wrapper rows "static": true;
+  csplit radius = rasterizer_xbox_debug.obj only; gate 18/18; object_audit FAIL(8) -> PASS). Applies standalone or with item 1.
+
+After applying: regenerate build/split (csplit) and run the full ninja + stable diff as usual.
+Edited symbols.json copies (in-place edits of cdc8ebd3's file): ../symbols/symbols.json.{rasterizer_xbox_only,hs_scenario_definitions_only,both_items}

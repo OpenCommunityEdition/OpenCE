@@ -333,3 +333,210 @@ review ledgers and patches, `results/wave*/` for the structured results).
 best non-exact candidates as `*.vs_tree.diff` against this tree. `.obj` files, split copies and
 symbols.json copies are excluded, and the folder is exempt from EOL and whitespace conversion so
 the patches stay byte-exact.
+
+## Final handoff
+
+- **Branch:** `claude/fifty-objects-20260925`. Local only; never pushed; canonical never edited.
+- **Base:** e9e62b78, the `git ls-remote` tip of `jonas/exact-pilots` at lane start.
+- **Tip:** the commit that adds this section. The last code commit is cdc8ebd3.
+- **Scorer:** objdiff-cli **3.3.1** (sha1 3130e428) for every number. Not upgraded; 3.6.0 figures appear only where marked scorer-only.
+
+### Commit order
+
+| Commit | Content |
+|---|---|
+| bf937aac | Batch 1: files_windows, objects; 5 exact functions; ownership corrections |
+| 931ed8dc | Layer 2: real_math.h helper bodies, provider hand-copy removal (**lock/unlock prototype move pending owner ruling**) |
+| b807f9f6 | Header prerequisites: objects.h `OBJECTS_H_FILE`, path.h HCEX field |
+| b9a8d587 | Batch 3: 12 objects, 4 exact functions |
+| 954eebd2 | Research evidence (waves 1-2) |
+| f7cd2e72 | Batch 4a: player_ui (game_engine.h/player_ui.h), sound_manager (sound_definitions.h) |
+| 6e3e2d35 | Batch 4b: dynavobgeom; damage `_object_damage_body`; storage packets |
+| 16542e46 | Ledger + wave-3 evidence |
+| 466698b8 | Batch 5a: hud_unit via the hud_draw.h `check_stack_buffer` inline (**P7 pending owner ruling**) |
+| cdc8ebd3 | Batch 5b: zero-credit storage and provider hygiene |
+| eb33baec | Ledger: batch 5 |
+| (this commit) | Owner queue, final handoff, wave-4/5 evidence |
+
+Changed paths, excluding `research/`, as of eb33baec: 75 files, +3,717 / -4,304 lines. This commit adds the owner-queue doc.
+
+- **config (5):** config.json, object_admission_rejections.json, parked.json,
+  semantic_data_matches.json, symbols.json.
+- **Shared headers (10):** real_math.h, random_math.h, objects.h, path.h, game_engine.h,
+  player_ui.h, sound_definitions.h, hud_draw.h, first_person_weapons.h, light_volumes.h.
+- **Source (59 .c files)** and **docs (2):** this ledger and the owner queue.
+
+### Target vs result
+
+**Target: 50 new complete Halo objects. Verified: 18** (361 -> 379). The evidence cannot support
+50 without owner rulings. The measured owner queue
+(`claude_fifty_objects_20260925_owner_queue.md`) adds 16 more on an all-yes, excluding the two
+items canonical already superseded. That gives 34, still short of 50. Every remaining
+self-landable residual in the pool is a documented tie, where the stop rule fired, or an
+owner-gated form.
+
+| # | Object | Kind of work |
+|---:|---|---|
+| 1 | tag_files/files_windows | new code (file_get_size) |
+| 2 | objects/objects | provider repair (Layer 1) + data entry |
+| 3 | units/units | ownership: first-party names, storage, data entry |
+| 4 | physics/collision_debug | house-rule fix (/Od helper calls) + storage |
+| 5 | render/render_objects | provider packet (objects.h) + static-local storage |
+| 6 | camera/editor_flying_camera | new code + storage |
+| 7 | rasterizer/xbox/rasterizer_xbox_shadows | new code + storage |
+| 8 | cache/cache_files_windows | new code |
+| 9 | objects/widgets/light_volumes | new code + storage |
+| 10 | ai/actor_firing_position | admission (storage packet verified) |
+| 11 | ai/path | admission + path.h HCEX field |
+| 12 | units/biped_limp_noodle | storage (HCEX file statics) |
+| 13 | structures/leaf_map | house-rule fix (/Od helper calls) |
+| 14 | models/model_animations | house-rule fix (/Od helper call) |
+| 15 | interface/player_ui | shared-header layout recovery (game_variant) |
+| 16 | sound/sound_manager | new code + shared header |
+| 17 | rasterizer/xbox/rasterizer_xbox_dynavobgeom | view removal + storage (**see policy conflict below**) |
+| 18 | interface/hud_unit | header inline + house-rule fix (**P7 disclosure**) |
+
+Checkpoints: 10 objects at b9a8d587. 20/30/40/50 were not reached. No 10,000-meaningful-byte
+checkpoint was reached either: the total is 8,775.
+
+### Tallies (vs e9e62b78, objdiff 3.3.1)
+
+| Tally | Value |
+|---|---|
+| 1. Net newly complete Halo objects | **18** |
+| 2. New strict functions | **14** (stable 8,245-function diff; 0 regressions) |
+| 3. New meaningful exact bytes | **8,775** |
+| 4. New padded exact bytes | **8,864** |
+| 5. New verified data bytes / admission-only closures | **3,294** / **12** |
+| 6. Fuzzy improvements at zero credit | `_main_update_time` 62.64 -> 98.99, `_main_frame_rate_debug` 94.52 -> 98.65, `_player_profile_write_thread_proc@4` 88.41 -> 88.45, first_person_weapons A 95.21506; more in `research/.../results/` |
+| Scorer-only (not counted) | +147 code / +7 functions (`$L` label credit on status flips); objdiff 3.6.0 would add hs 54,780 and actions 2,404 data bytes at zero source cost |
+| Regressions / revocations | **0 / 0** |
+
+**Contingent credits:**
+
+- Layer 2 ruling: `_convex_hull2d_perimeter`, `_player_set_action_result`, and the leaf_map,
+  biped_limp_noodle, actor_firing_position, path and model_animations admissions.
+- P7 ruling: the hud_unit admission.
+
+### House-rule review (source, headers, COMDATs, providers)
+
+**Source.**
+
+- Every landed packet passed an independent adversarial reviewer. Each reviewer checked house
+  rules 1-22 and the strip test, ran /Od declaration-order checks for any new scope, and verified
+  storage claims against cachebeta publics.
+- Where a reviewer issued an amendment, the amendment is what landed:
+  - units (unit_vectors_are_valid);
+  - light_volumes (/Od declaration order);
+  - dynavobgeom (MAX);
+  - hs (`hs_enumerate_scenario_data`, no cleanup COMDAT);
+  - main (`main_exit` /Od shape);
+  - damage (B+, not A);
+  - player_ui (patch 07);
+  - hud_unit (01RS; P6 dropped).
+- The fake-match lead count went 25 -> 26. The new lead is the /Od-attested empty then-arm in
+  the still-parked first_person_weapons update.
+
+**Headers.** Every shared-header edit landed with a full ninja and stable diff, with 0 regressions:
+
+- real_math.h/random_math.h;
+- objects.h, path.h;
+- game_engine.h, player_ui.h, sound_definitions.h;
+- hud_draw.h;
+- first_person_weapons.h.
+
+Count-sensitive edits are disclosed (Layer 2 move, P7). No filler declarations landed.
+
+**COMDATs.** Newly emitted header-inline COMDATs come only from strictly exact callers (rule i).
+Each is identical to January's selected copy and passes provider links in both orders.
+
+**Providers.** Four sets of NODUP hand copies were removed:
+
+- Layers 1 and 2: 17 helpers;
+- action_vehicle `object_get_bounding_sphere`;
+- geometry `plane2d_distance_to_point`;
+- hud_draw `check_stack_buffer`.
+
+Known remaining NODUP conflicts:
+
+- actor_combat `cross_product2d` (owner item P1);
+- effects `real_local_random`;
+- player_control `limit2d`;
+- decals `plane2d_from_points`;
+- items `object_get_type`.
+
+**Disclosed judgement calls:**
+
+- the Layer 2 prototype move and P7 (count effects, pending rulings);
+- editor_flying_camera's /Od-attested dead `left` pair;
+- the descriptive names of rasterizer_xbox_shadows' gap statics and of the
+  `match_assert_stack_frame` macro;
+- cache_files_windows' analog evidence;
+- rasterizer_lights' load-bearing `= {0}`. Canonical a595bbc2 later landed the same idiom for
+  models.
+
+### Held and rejected items
+
+Every held item has an apply-ready packet, a ruling question and measured unlocks in
+`claude_fifty_objects_20260925_owner_queue.md`. The items with no object at stake are in the
+held-items table above. Evidence for each is under `research/fifty_objects_20260925/`.
+
+Items that are not to be retried without new evidence:
+
+- the brief's do-not-reopen list (decals/physics, path_obstacles parenthesis, aim_grenade goto, hud_draw pragma, s3tc, render_sprite, incompatible providers, flags `x * height`);
+- periodic_functions' DAG tie (~150 respellings);
+- the residuals whose stop rule fired, listed in `results/wave3` and `results/wave4`.
+
+### Process incidents
+
+Both happened in wave 3, inside reviewer agents, and both were repaired byte-exact before
+integration:
+
+- `rm -rf .git` in the worktree root;
+- a hs.c rewrite by `volatile_scan.py`.
+
+No tracked change resulted. The worker brief now forbids both patterns.
+
+### Expected integration conflicts (trial `git merge-tree` against canonical dbcea3d6)
+
+Canonical gained 9 commits after e9e62b78. The two lanes' new Matching sets are disjoint:
+canonical added models, hs_scenario_definitions and hs_globals_external. A resolved merge
+therefore expects **382** Halo objects, subject to a full gate. Five files conflict:
+
+| File | Resolution guidance |
+|---|---|
+| `source/ai/path_structure_bsp.c` | Both lanes added the same HCEX tables (canonical e208c87b). Take canonical's spelling `static real const ...[8]`, drop this lane's comment, and re-gate (bytes expected identical). |
+| `source/hs/hs_scenario_definitions.c` | Take canonical's separate data definitions (Matching upstream). This lane's static `byte_swap_script_syntax_data` rename (6e3e2d35) is subsumed if canonical has it; keep canonical's symbols.json rows. |
+| `source/rasterizer/xbox/rasterizer_xbox_dynavobgeom.c` | Both lanes replaced the local views with genuine owner types. This lane also has the /Od helper calls, HCEX locals, the `warned` latch and MAX, and admits the object. Canonical 641e1466 keeps a narrowed rejection instead. **Policy conflict, needs an owner decision:** see below. |
+| `config/symbols.json` | Line-level overlaps on the dynavobgeom wrapper rows, the path_structure_bsp tables and the hs rows. Take the union; the rows are identical where both edited. Never re-serialise. |
+| `config/object_admission_rejections.json` | Take the union of retirements. This lane retired objects, leaf_map, biped_limp_noodle, units, the hud_unit `_fast_ftol` rejection and dynavobgeom. Canonical retired hs_scenario_definitions, hs_globals_external and models. Canonical's new narrowed dynavobgeom entry follows the policy decision below. |
+
+Canonical also changed `tools/campaign/gate.py`, `stable_verdicts.py` and `verdicts.py`, which
+now identify functions by COFF type 0x20, so fastcall functions count. Re-take the stable
+snapshot after merging before comparing function counts.
+
+**Dynavobgeom and SDK-table policy conflict.** Canonical 641e1466 declined to admit dynavobgeom
+for two reasons:
+
+- the unreconciled `global_window_parameters` extern;
+- selected-provider links "not a complete ordinary program link" for the three stock D3D SDK
+  tables every D3D8.h TU emits.
+
+This lane admitted objects under the brief's criterion: identical to January's selected copy,
+plus pair links passing in both orders. A census on this tree (built objects vs build/split) finds:
+
+- **55 objects canonical already lists as Matching emit the same three surplus D3D SDK tables.**
+- **9 of this lane's 18 admissions emit them too:** files_windows, objects, units,
+  collision_debug, rasterizer_xbox_shadows, cache_files_windows, biped_limp_noodle,
+  sound_manager and rasterizer_xbox_dynavobgeom.
+- Seven Matching objects declare `global_window_parameters` the same consumer-local way as
+  dynavobgeom.
+
+Two outcomes:
+
+- If the owner applies canonical's stricter standard uniformly, those 64 objects need revisiting,
+  not only this lane's.
+- If the owner keeps the brief's standard, canonical's narrowed dynavobgeom rejection should be
+  retired at reconciliation.
+
+This conflict was found at handoff, after all admissions landed.

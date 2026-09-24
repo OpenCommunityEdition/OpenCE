@@ -1,0 +1,843 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_models.c b/scratch/w/rasterizer_xbox_models/g6.c
+index 86d2eb5a..8f89fe6f 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_models.c
++++ b/scratch/w/rasterizer_xbox_models/g6.c
+@@ -1172,18 +1172,13 @@ void rasterizer_model_draw_environment_shader(
+ 	long dynamic_vertex_buffer_index)
+ {
+ 	struct shader_environment_definition *shader_environment;
++	short vertex_shader_permutation;
+ 	real_vector3d camera_to_model;
+-	real vertex_constants[3][4];
+-	real specular_constants[2][4];
+-	real perpendicular_brightness;
+-	real_rgb_color perpendicular_color;
+-	real parallel_brightness;
+-	real_rgb_color parallel_color;
+-	real detail_map_scale;
++	real_argb_color perpendicular;
++	real_argb_color parallel;
+ 	pixel32 cc0_pixel;
+ 	pixel32 cc1_pixel;
+ 	pixel32 cc0_error_pixel;
+-	short vertex_shader_permutation;
+ 
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+@@ -1204,12 +1199,10 @@ void rasterizer_model_draw_environment_shader(
+ 		shader_environment = (struct shader_environment_definition *)
+ 			shader_get_and_verify_type(shader, _shader_type_environment);
+ 
+-		camera_to_model.i = local_parameters->centroid.x -
+-			global_window_parameters.camera.position.x;
+-		camera_to_model.j = local_parameters->centroid.y -
+-			global_window_parameters.camera.position.y;
+-		camera_to_model.k = local_parameters->centroid.z -
+-			global_window_parameters.camera.position.z;
++		vector_from_points3d(
++			&global_window_parameters.camera.position,
++			&local_parameters->centroid,
++			&camera_to_model);
+ 
+ 		if (TEST_FLAG(
+ 				local_parameters->geometry_flags,
+@@ -1399,67 +1392,72 @@ void rasterizer_model_draw_environment_shader(
+ 				vertex_shader_permutation] += vertex_buffer->count;
+ 		}
+ 
+-		perpendicular_brightness =
++		perpendicular.alpha =
+ 			shader_environment->environment.reflection.view_perpendicular_brightness *
+ 			local_parameters->lighting.reflection_tint_color.alpha;
+-		perpendicular_color.red =
++		perpendicular.red =
+ 			shader_environment->environment.specular.view_perpendicular_color.red *
+ 			local_parameters->lighting.reflection_tint_color.red;
+-		perpendicular_color.green =
++		perpendicular.green =
+ 			shader_environment->environment.specular.view_perpendicular_color.green *
+ 			local_parameters->lighting.reflection_tint_color.green;
+-		perpendicular_color.blue =
++		perpendicular.blue =
+ 			shader_environment->environment.specular.view_perpendicular_color.blue *
+ 			local_parameters->lighting.reflection_tint_color.blue;
+-		parallel_brightness =
++		parallel.alpha =
+ 			shader_environment->environment.reflection.view_parallel_brightness *
+ 			local_parameters->lighting.reflection_tint_color.alpha;
+-		parallel_color.red =
++		parallel.red =
+ 			shader_environment->environment.specular.view_parallel_color.red *
+ 			local_parameters->lighting.reflection_tint_color.red;
+-		parallel_color.green =
++		parallel.green =
+ 			shader_environment->environment.specular.view_parallel_color.green *
+ 			local_parameters->lighting.reflection_tint_color.green;
+-		parallel_color.blue =
++		parallel.blue =
+ 			shader_environment->environment.specular.view_parallel_color.blue *
+ 			local_parameters->lighting.reflection_tint_color.blue;
+ 
+-		detail_map_scale =
+-			shader_environment->environment.diffuse.primary_detail_map_scale;
+-		vertex_constants[0][0] = detail_map_scale;
+-		vertex_constants[0][1] = detail_map_scale;
+-		vertex_constants[0][2] = 1.0f;
+-		vertex_constants[0][3] = 1.0f;
+-		vertex_constants[1][0] = local_parameters->base_map_scale.i;
+-		vertex_constants[1][1] = 0.0f;
+-		vertex_constants[1][2] = 0.0f;
+-		vertex_constants[1][3] = 0.0f;
+-		vertex_constants[2][0] = 0.0f;
+-		vertex_constants[2][1] = local_parameters->base_map_scale.j;
+-		vertex_constants[2][2] = 0.0f;
+-		vertex_constants[2][3] = 0.0f;
+-		specular_constants[0][0] =
+-			perpendicular_color.red - parallel_color.red;
+-		specular_constants[0][1] =
+-			perpendicular_color.green - parallel_color.green;
+-		specular_constants[0][2] =
+-			perpendicular_color.blue - parallel_color.blue;
+-		specular_constants[0][3] =
+-			perpendicular_brightness - parallel_brightness;
+-		specular_constants[1][0] = parallel_color.red;
+-		specular_constants[1][1] = parallel_color.green;
+-		specular_constants[1][2] = parallel_color.blue;
+-		specular_constants[1][3] = parallel_brightness;
+-		IDirect3DDevice8_SetVertexShaderConstant(
+-			global_d3d_device,
+-			-84,
+-			vertex_constants,
+-			3);
+-		IDirect3DDevice8_SetVertexShaderConstant(
+-			global_d3d_device,
+-			-81,
+-			specular_constants,
+-			2);
++		{
++			real detail_map_scale=
++				shader_environment->environment.diffuse.primary_detail_map_scale;
++			real vertex_constants[3][4];
++			real specular_constants[2][4];
++
++			vertex_constants[0][0] = detail_map_scale;
++			vertex_constants[0][1] = detail_map_scale;
++			vertex_constants[0][2] = 1.0f;
++			vertex_constants[0][3] = 1.0f;
++			vertex_constants[1][0] = local_parameters->base_map_scale.i;
++			vertex_constants[1][1] = 0.0f;
++			vertex_constants[1][2] = 0.0f;
++			vertex_constants[1][3] = 0.0f;
++			vertex_constants[2][0] = 0.0f;
++			vertex_constants[2][1] = local_parameters->base_map_scale.j;
++			vertex_constants[2][2] = 0.0f;
++			vertex_constants[2][3] = 0.0f;
++			specular_constants[0][0] =
++				perpendicular.red - parallel.red;
++			specular_constants[0][1] =
++				perpendicular.green - parallel.green;
++			specular_constants[0][2] =
++				perpendicular.blue - parallel.blue;
++			specular_constants[0][3] =
++				perpendicular.alpha - parallel.alpha;
++			specular_constants[1][0] = parallel.red;
++			specular_constants[1][1] = parallel.green;
++			specular_constants[1][2] = parallel.blue;
++			specular_constants[1][3] = parallel.alpha;
++			IDirect3DDevice8_SetVertexShaderConstant(
++				global_d3d_device,
++				-84,
++				vertex_constants,
++				3);
++			IDirect3DDevice8_SetVertexShaderConstant(
++				global_d3d_device,
++				-81,
++				specular_constants,
++				2);
++		}
+ 
+ 		match_assert(
+ 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+@@ -1483,30 +1481,26 @@ void rasterizer_model_draw_environment_shader(
+ 				local_parameters->geometry_flags,
+ 				_rasterizer_geometry_no_fog_bit))
+ 		{
+-			real planar_fog_fraction;
+-			real fog_density;
+ 			real_argb_color cc0;
++			real_rgb_color cc0_error;
+ 			real_rgb_color cc1;
+-			real_argb_color cc0_error;
++			real camera_plane_distance= plane3d_distance_to_point(
++				&global_window_parameters.fog.plane,
++				&global_window_parameters.camera.position);
++			real planar_fog_fraction;
++			real camera_distance;
++			real fog_density;
+ 
+ 			planar_fog_fraction = PIN(
+-				(global_window_parameters.camera.position.x *
+-					global_window_parameters.fog.plane.n.i +
+-				global_window_parameters.camera.position.y *
+-					global_window_parameters.fog.plane.n.j +
+-				global_window_parameters.camera.position.z *
+-					global_window_parameters.fog.plane.n.k -
+-				global_window_parameters.fog.plane.d) /
++				camera_plane_distance/
+ 				global_window_parameters.fog.atmospheric_maximum_distance,
+ 				0.0f,
+ 				1.0f);
++			camera_distance = dot_product3d(
++				&global_window_parameters.camera.forward,
++				&camera_to_model);
+ 			fog_density = PIN(
+-				(camera_to_model.i *
+-					global_window_parameters.camera.forward.i +
+-				camera_to_model.j *
+-					global_window_parameters.camera.forward.j +
+-				camera_to_model.k *
+-					global_window_parameters.camera.forward.k -
++				(camera_distance -
+ 				global_window_parameters.fog.atmospheric_minimum_distance) /
+ 				(global_window_parameters.fog.atmospheric_maximum_distance -
+ 				global_window_parameters.fog.atmospheric_minimum_distance),
+@@ -1594,7 +1588,7 @@ void rasterizer_model_draw_environment_shader(
+ 				cc0_error.blue >=0.0f && cc0_error.blue <=1.0f);
+ 
+ 			cc0_pixel = real_argb_color_to_pixel32(&cc0);
+-			cc0_error_pixel = real_rgb_color_to_pixel32(&cc0_error.rgb);
++			cc0_error_pixel = real_rgb_color_to_pixel32(&cc0_error);
+ 			cc1_pixel = real_rgb_color_to_pixel32(&cc1);
+ 		}
+ 		else
+@@ -1718,10 +1712,6 @@ void _rasterizer_model_draw(
+ 	real_rgb_color diffuse_change_color;
+ 	unsigned long vertex_shader_work;
+ 	short vertex_shader_permutation;
+-	real_argb_color perpendicular;
+-	real_argb_color parallel;
+-	real_vector4d vertex_constants[3];
+-	real specular_constants[2][4];
+ 	pixel32 cc0_pixel;
+ 	pixel32 cc0_error_pixel;
+ 	pixel32 cc1_pixel;
+@@ -2173,294 +2163,42 @@ void _rasterizer_model_draw(
+ 						vertex_shader_permutation] += vertex_buffer->count;
+ 				}
+ 
+-				perpendicular.alpha = reflection_fraction*
+-					shader_model->model.perpendicular_brightness*
+-					local_parameters->lighting.reflection_tint_color.alpha;
+-				perpendicular.red =
+-					shader_model->model.perpendicular_tint_color.red*
+-					local_parameters->lighting.reflection_tint_color.red;
+-				perpendicular.green =
+-					shader_model->model.perpendicular_tint_color.green*
+-					local_parameters->lighting.reflection_tint_color.green;
+-				perpendicular.blue =
+-					shader_model->model.perpendicular_tint_color.blue*
+-					local_parameters->lighting.reflection_tint_color.blue;
+-				parallel.alpha = reflection_fraction*
+-					shader_model->model.parallel_brightness*
+-					local_parameters->lighting.reflection_tint_color.alpha;
+-				parallel.red =
+-					shader_model->model.parallel_tint_color.red*
+-					local_parameters->lighting.reflection_tint_color.red;
+-				parallel.green =
+-					shader_model->model.parallel_tint_color.green*
+-					local_parameters->lighting.reflection_tint_color.green;
+-				parallel.blue =
+-					shader_model->model.parallel_tint_color.blue*
+-					local_parameters->lighting.reflection_tint_color.blue;
+-
+-				vertex_constants[0].n[0] = shader_model->model.detail_map_scale;
+-				vertex_constants[0].n[1] = shader_model->model.detail_map_scale*
+-					shader_model->model.detail_map_v_scale;
+-				vertex_constants[0].n[2] = 1.0f;
+-				vertex_constants[0].n[3] = 1.0f;
+-				vertex_constants[1].n[0] = 1.0f;
+-				vertex_constants[1].n[1] = 0.0f;
+-				vertex_constants[1].n[2] = 0.0f;
+-				vertex_constants[1].n[3] = 0.0f;
+-				vertex_constants[2].n[0] = 0.0f;
+-				vertex_constants[2].n[1] = 1.0f;
+-				vertex_constants[2].n[2] = 0.0f;
+-				vertex_constants[2].n[3] = 0.0f;
+-				specular_constants[0][0] = perpendicular.red - parallel.red;
+-				specular_constants[0][1] = perpendicular.green - parallel.green;
+-				specular_constants[0][2] = perpendicular.blue - parallel.blue;
+-				specular_constants[0][3] = perpendicular.alpha - parallel.alpha;
+-				specular_constants[1][0] = parallel.red;
+-				specular_constants[1][1] = parallel.green;
+-				specular_constants[1][2] = parallel.blue;
+-				specular_constants[1][3] = parallel.alpha;
+-
+-				shader_texture_animation_evaluate(
+-					&shader_model->model.texture_animation,
+-					&local_parameters->animation,
+-					local_parameters->base_map_scale.i*
+-						shader_model->model.map_u_scale,
+-					local_parameters->base_map_scale.j*
+-						shader_model->model.map_v_scale,
+-					0.0f,
+-					0.0f,
+-					0.0f,
+-					global_frame_parameters.game_time_sec,
+-					&vertex_constants[1],
+-					&vertex_constants[2]);
+-				vertex_constants[2].n[2] = shader_model->model.translucency;
+-
+-				IDirect3DDevice8_SetVertexShaderConstant(
+-					global_d3d_device,
+-					-84,
+-					vertex_constants,
+-					3);
+-				IDirect3DDevice8_SetVertexShaderConstant(
+-					global_d3d_device,
+-					-81,
+-					specular_constants,
+-					2);
+-
+-				if (global_rasterizer_model_ambient_reflection_tint &&
+-					(global_rasterizer_model_ambient_reflection_tint->alpha>0.0f ||
+-					global_rasterizer_model_ambient_reflection_tint->red>0.0f ||
+-					global_rasterizer_model_ambient_reflection_tint->green>0.0f ||
+-					global_rasterizer_model_ambient_reflection_tint->blue>0.0f))
+ 				{
+-					specular_constants[0][0] = 0.0f;
+-					specular_constants[0][1] = 0.0f;
+-					specular_constants[0][2] = 0.0f;
+-					specular_constants[0][3] = 0.0f;
+-					specular_constants[1][0] =
+-						global_rasterizer_model_ambient_reflection_tint->alpha;
+-					specular_constants[1][1] =
+-						global_rasterizer_model_ambient_reflection_tint->red;
+-					specular_constants[1][2] =
+-						global_rasterizer_model_ambient_reflection_tint->green;
+-					specular_constants[1][3] =
+-						global_rasterizer_model_ambient_reflection_tint->blue;
+-
+-					IDirect3DDevice8_SetVertexShaderConstant(
+-						global_d3d_device,
+-						-81,
+-						specular_constants,
+-						2);
+-				}
+-
+-				match_assert(
+-					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-					1074,
+-					global_window_parameters.fog.atmospheric_maximum_distance>global_window_parameters.fog.atmospheric_minimum_distance);
+-				match_assert(
+-					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-					1075,
+-					global_window_parameters.fog.atmospheric_maximum_distance>0.0f);
+-				match_assert(
+-					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-					1076,
+-					global_window_parameters.fog.planar_maximum_distance>0.0f);
+-				match_assert(
+-					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-					1077,
+-					global_window_parameters.fog.planar_maximum_depth>0.0f);
+-
+-				if (rasterizer_debug_options.fog &&
+-					!TEST_FLAG(
+-						local_parameters->geometry_flags,
+-						_rasterizer_geometry_no_fog_bit))
+-				{
+-					real_plane3d const *fog_plane =
+-						&global_window_parameters.fog.plane;
+-					real camera_plane_distance;
+-					real planar_fog_fraction;
+-					real fog_density;
+-					real_argb_color cc0;
+-					real_rgb_color cc1;
+-					real_rgb_color cc0_error;
+-
+-					camera_plane_distance = plane3d_distance_to_point(
+-						fog_plane,
+-						&global_window_parameters.camera.position);
+-					planar_fog_fraction = PIN(
+-						camera_plane_distance/
+-						global_window_parameters.fog.atmospheric_maximum_distance,
+-						0.0f,
+-						1.0f);
+-					fog_density = PIN(
+-						(camera_distance -
+-						global_window_parameters.fog.atmospheric_minimum_distance)/
+-						(global_window_parameters.fog.atmospheric_maximum_distance -
+-						global_window_parameters.fog.atmospheric_minimum_distance),
+-						0.0f,
+-						1.0f) *
+-						global_window_parameters.fog.atmospheric_maximum_density;
+-
+-					if (TEST_FLAG(
+-							global_window_parameters.fog.fog_definition_flags,
+-						_fog_definition_atmosphere_dominant_bit))
+-					{
+-						planar_fog_fraction = 1.0f;
+-					}
+-
+-					cc0.alpha = 1.0f - fog_density;
+-					cc0.red = global_window_parameters.fog.planar_color.red -
+-						fog_density *
+-						(global_window_parameters.fog.atmospheric_color.red *
+-							(1.0f - planar_fog_fraction) +
+-						global_window_parameters.fog.planar_color.red *
+-							planar_fog_fraction);
+-					cc0.green = global_window_parameters.fog.planar_color.green -
+-						fog_density *
+-						(global_window_parameters.fog.atmospheric_color.green *
+-							(1.0f - planar_fog_fraction) +
+-						global_window_parameters.fog.planar_color.green *
+-							planar_fog_fraction);
+-					cc0.blue = global_window_parameters.fog.planar_color.blue -
+-						fog_density *
+-						(global_window_parameters.fog.atmospheric_color.blue *
+-							(1.0f - planar_fog_fraction) +
+-						global_window_parameters.fog.planar_color.blue *
+-							planar_fog_fraction);
+-
+-					cc0_error.red = PIN(-cc0.red, 0.0f, 1.0f);
+-					cc0_error.green = PIN(-cc0.green, 0.0f, 1.0f);
+-					cc0_error.blue = PIN(-cc0.blue, 0.0f, 1.0f);
+-
+-					cc0.red = PIN(cc0.red, 0.0f, 1.0f);
+-					cc0.green = PIN(cc0.green, 0.0f, 1.0f);
+-					cc0.blue = PIN(cc0.blue, 0.0f, 1.0f);
+-
+-					cc1.red = global_window_parameters.fog.atmospheric_color.red *
+-						fog_density;
+-					cc1.green = global_window_parameters.fog.atmospheric_color.green *
+-						fog_density;
+-					cc1.blue = global_window_parameters.fog.atmospheric_color.blue *
+-						fog_density;
+-
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1115,
+-						cc0.red >=0.0f && cc0.red <=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1116,
+-						cc0.green>=0.0f && cc0.green<=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1117,
+-						cc0.blue >=0.0f && cc0.blue <=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1118,
+-						cc1.red >=0.0f && cc1.red <=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1119,
+-						cc1.green>=0.0f && cc1.green<=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1120,
+-						cc1.blue >=0.0f && cc1.blue <=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1121,
+-						cc0_error.red >=0.0f && cc0_error.red <=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1122,
+-						cc0_error.green>=0.0f && cc0_error.green<=1.0f);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+-						1123,
+-						cc0_error.blue >=0.0f && cc0_error.blue <=1.0f);
+-
+-					cc0_pixel = real_argb_color_to_pixel32(&cc0);
+-					cc0_error_pixel = real_rgb_color_to_pixel32(&cc0_error);
+-					cc1_pixel = real_rgb_color_to_pixel32(&cc1);
+-				}
+-				else
+-				{
+-					cc1_pixel = 0xFF000000;
+-					cc0_error_pixel = 0xFF000000;
+-					cc0_pixel = 0xFF000000;
+-				}
+-
+-				set_environment_shader_pixel_shader(
+-					real_rgb_color_to_pixel32(&self_illumination_color),
+-					shader_model->model.detail_function,
+-					shader_model->model.detail_mask,
+-					real_rgb_color_to_pixel32(&diffuse_change_color),
+-					cc0_pixel,
+-					cc0_error_pixel,
+-					cc1_pixel,
+-					(boolean)TEST_FLAG(
+-						shader_model->model.flags,
+-						_shader_model_detail_after_reflection_bit),
+-					(boolean)TEST_FLAG(
+-						shader_model->model.flags,
+-						_shader_model_true_atmospheric_fog_bit));
+-
+-				IDirect3DDevice8_SetRenderState(
+-					global_d3d_device,
+-					D3DRS_CULLMODE,
+-					D3DCULL_CCW);
+-
+-				rasterizer_draw(
+-					triangle_buffer,
+-					dynamic_triangle_buffer_index,
+-					0,
+-					triangle_count,
+-					vertex_buffer,
+-					dynamic_vertex_buffer_index);
+-
+-				if (rasterizer_debug_options.statistics_mode ==
+-					_rasterizer_statistics_mode_enabled)
+-				{
+-					rasterizer_frame_statistics.model_draw_count++;
+-					rasterizer_frame_statistics.model_triangle_count +=
+-						triangle_count;
+-					rasterizer_frame_statistics.model_vertex_count +=
+-						rasterizer_frame_statistics_count_static_vertices(
+-							triangle_buffer,
+-							vertex_buffer);
+-				}
+-
+-				if (TEST_FLAG(
+-						shader_model->model.flags,
+-						_shader_model_two_sided_bit))
+-				{
+-					vertex_constants[0].n[0] =
+-						shader_model->model.detail_map_scale;
+-					vertex_constants[0].n[1] =
+-						shader_model->model.detail_map_scale*
++					real_argb_color perpendicular;
++					real_argb_color parallel;
++					real_vector4d vertex_constants[3];
++					real specular_constants[2][4];
++
++					perpendicular.alpha = reflection_fraction*
++						shader_model->model.perpendicular_brightness*
++						local_parameters->lighting.reflection_tint_color.alpha;
++					perpendicular.red =
++						shader_model->model.perpendicular_tint_color.red*
++						local_parameters->lighting.reflection_tint_color.red;
++					perpendicular.green =
++						shader_model->model.perpendicular_tint_color.green*
++						local_parameters->lighting.reflection_tint_color.green;
++					perpendicular.blue =
++						shader_model->model.perpendicular_tint_color.blue*
++						local_parameters->lighting.reflection_tint_color.blue;
++					parallel.alpha = reflection_fraction*
++						shader_model->model.parallel_brightness*
++						local_parameters->lighting.reflection_tint_color.alpha;
++					parallel.red =
++						shader_model->model.parallel_tint_color.red*
++						local_parameters->lighting.reflection_tint_color.red;
++					parallel.green =
++						shader_model->model.parallel_tint_color.green*
++						local_parameters->lighting.reflection_tint_color.green;
++					parallel.blue =
++						shader_model->model.parallel_tint_color.blue*
++						local_parameters->lighting.reflection_tint_color.blue;
++
++					vertex_constants[0].n[0] = shader_model->model.detail_map_scale;
++					vertex_constants[0].n[1] = shader_model->model.detail_map_scale*
+ 						shader_model->model.detail_map_v_scale;
+ 					vertex_constants[0].n[2] = 1.0f;
+-					vertex_constants[0].n[3] = -1.0f;
++					vertex_constants[0].n[3] = 1.0f;
+ 					vertex_constants[1].n[0] = 1.0f;
+ 					vertex_constants[1].n[1] = 0.0f;
+ 					vertex_constants[1].n[2] = 0.0f;
+@@ -2469,6 +2207,14 @@ void _rasterizer_model_draw(
+ 					vertex_constants[2].n[1] = 1.0f;
+ 					vertex_constants[2].n[2] = 0.0f;
+ 					vertex_constants[2].n[3] = 0.0f;
++					specular_constants[0][0] = perpendicular.red - parallel.red;
++					specular_constants[0][1] = perpendicular.green - parallel.green;
++					specular_constants[0][2] = perpendicular.blue - parallel.blue;
++					specular_constants[0][3] = perpendicular.alpha - parallel.alpha;
++					specular_constants[1][0] = parallel.red;
++					specular_constants[1][1] = parallel.green;
++					specular_constants[1][2] = parallel.blue;
++					specular_constants[1][3] = parallel.alpha;
+ 
+ 					shader_texture_animation_evaluate(
+ 						&shader_model->model.texture_animation,
+@@ -2483,15 +2229,202 @@ void _rasterizer_model_draw(
+ 						global_frame_parameters.game_time_sec,
+ 						&vertex_constants[1],
+ 						&vertex_constants[2]);
+-					vertex_constants[2].n[2] =
+-						shader_model->model.translucency;
++					vertex_constants[2].n[2] = shader_model->model.translucency;
+ 
+ 					IDirect3DDevice8_SetVertexShaderConstant(
+ 						global_d3d_device,
+ 						-84,
+ 						vertex_constants,
+ 						3);
+-					SetRenderStateSmart(D3DRS_CULLMODE, D3DCULL_CW);
++					IDirect3DDevice8_SetVertexShaderConstant(
++						global_d3d_device,
++						-81,
++						specular_constants,
++						2);
++
++					if (global_rasterizer_model_ambient_reflection_tint &&
++						(global_rasterizer_model_ambient_reflection_tint->alpha>0.0f ||
++						global_rasterizer_model_ambient_reflection_tint->red>0.0f ||
++						global_rasterizer_model_ambient_reflection_tint->green>0.0f ||
++						global_rasterizer_model_ambient_reflection_tint->blue>0.0f))
++					{
++						specular_constants[0][0] = 0.0f;
++						specular_constants[0][1] = 0.0f;
++						specular_constants[0][2] = 0.0f;
++						specular_constants[0][3] = 0.0f;
++						specular_constants[1][0] =
++							global_rasterizer_model_ambient_reflection_tint->alpha;
++						specular_constants[1][1] =
++							global_rasterizer_model_ambient_reflection_tint->red;
++						specular_constants[1][2] =
++							global_rasterizer_model_ambient_reflection_tint->green;
++						specular_constants[1][3] =
++							global_rasterizer_model_ambient_reflection_tint->blue;
++
++						IDirect3DDevice8_SetVertexShaderConstant(
++							global_d3d_device,
++							-81,
++							specular_constants,
++							2);
++					}
++
++					match_assert(
++						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++						1074,
++						global_window_parameters.fog.atmospheric_maximum_distance>global_window_parameters.fog.atmospheric_minimum_distance);
++					match_assert(
++						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++						1075,
++						global_window_parameters.fog.atmospheric_maximum_distance>0.0f);
++					match_assert(
++						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++						1076,
++						global_window_parameters.fog.planar_maximum_distance>0.0f);
++					match_assert(
++						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++						1077,
++						global_window_parameters.fog.planar_maximum_depth>0.0f);
++
++					if (rasterizer_debug_options.fog &&
++						!TEST_FLAG(
++							local_parameters->geometry_flags,
++							_rasterizer_geometry_no_fog_bit))
++					{
++						real_plane3d const *fog_plane =
++							&global_window_parameters.fog.plane;
++						real camera_plane_distance;
++						real planar_fog_fraction;
++						real fog_density;
++						real_argb_color cc0;
++						real_rgb_color cc1;
++						real_rgb_color cc0_error;
++
++						camera_plane_distance = plane3d_distance_to_point(
++							fog_plane,
++							&global_window_parameters.camera.position);
++						planar_fog_fraction = PIN(
++							camera_plane_distance/
++							global_window_parameters.fog.atmospheric_maximum_distance,
++							0.0f,
++							1.0f);
++						fog_density = PIN(
++							(camera_distance -
++							global_window_parameters.fog.atmospheric_minimum_distance)/
++							(global_window_parameters.fog.atmospheric_maximum_distance -
++							global_window_parameters.fog.atmospheric_minimum_distance),
++							0.0f,
++							1.0f) *
++							global_window_parameters.fog.atmospheric_maximum_density;
++
++						if (TEST_FLAG(
++								global_window_parameters.fog.fog_definition_flags,
++							_fog_definition_atmosphere_dominant_bit))
++						{
++							planar_fog_fraction = 1.0f;
++						}
++
++						cc0.alpha = 1.0f - fog_density;
++						cc0.red = global_window_parameters.fog.planar_color.red -
++							fog_density *
++							(global_window_parameters.fog.atmospheric_color.red *
++								(1.0f - planar_fog_fraction) +
++							global_window_parameters.fog.planar_color.red *
++								planar_fog_fraction);
++						cc0.green = global_window_parameters.fog.planar_color.green -
++							fog_density *
++							(global_window_parameters.fog.atmospheric_color.green *
++								(1.0f - planar_fog_fraction) +
++							global_window_parameters.fog.planar_color.green *
++								planar_fog_fraction);
++						cc0.blue = global_window_parameters.fog.planar_color.blue -
++							fog_density *
++							(global_window_parameters.fog.atmospheric_color.blue *
++								(1.0f - planar_fog_fraction) +
++							global_window_parameters.fog.planar_color.blue *
++								planar_fog_fraction);
++
++						cc0_error.red = PIN(-cc0.red, 0.0f, 1.0f);
++						cc0_error.green = PIN(-cc0.green, 0.0f, 1.0f);
++						cc0_error.blue = PIN(-cc0.blue, 0.0f, 1.0f);
++
++						cc0.red = PIN(cc0.red, 0.0f, 1.0f);
++						cc0.green = PIN(cc0.green, 0.0f, 1.0f);
++						cc0.blue = PIN(cc0.blue, 0.0f, 1.0f);
++
++						cc1.red = global_window_parameters.fog.atmospheric_color.red *
++							fog_density;
++						cc1.green = global_window_parameters.fog.atmospheric_color.green *
++							fog_density;
++						cc1.blue = global_window_parameters.fog.atmospheric_color.blue *
++							fog_density;
++
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1115,
++							cc0.red >=0.0f && cc0.red <=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1116,
++							cc0.green>=0.0f && cc0.green<=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1117,
++							cc0.blue >=0.0f && cc0.blue <=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1118,
++							cc1.red >=0.0f && cc1.red <=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1119,
++							cc1.green>=0.0f && cc1.green<=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1120,
++							cc1.blue >=0.0f && cc1.blue <=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1121,
++							cc0_error.red >=0.0f && cc0_error.red <=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1122,
++							cc0_error.green>=0.0f && cc0_error.green<=1.0f);
++						match_assert(
++							"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
++							1123,
++							cc0_error.blue >=0.0f && cc0_error.blue <=1.0f);
++
++						cc0_pixel = real_argb_color_to_pixel32(&cc0);
++						cc0_error_pixel = real_rgb_color_to_pixel32(&cc0_error);
++						cc1_pixel = real_rgb_color_to_pixel32(&cc1);
++					}
++					else
++					{
++						cc1_pixel = 0xFF000000;
++						cc0_error_pixel = 0xFF000000;
++						cc0_pixel = 0xFF000000;
++					}
++
++					set_environment_shader_pixel_shader(
++						real_rgb_color_to_pixel32(&self_illumination_color),
++						shader_model->model.detail_function,
++						shader_model->model.detail_mask,
++						real_rgb_color_to_pixel32(&diffuse_change_color),
++						cc0_pixel,
++						cc0_error_pixel,
++						cc1_pixel,
++						(boolean)TEST_FLAG(
++							shader_model->model.flags,
++							_shader_model_detail_after_reflection_bit),
++						(boolean)TEST_FLAG(
++							shader_model->model.flags,
++							_shader_model_true_atmospheric_fog_bit));
++
++					IDirect3DDevice8_SetRenderState(
++						global_d3d_device,
++						D3DRS_CULLMODE,
++						D3DCULL_CCW);
+ 
+ 					rasterizer_draw(
+ 						triangle_buffer,
+@@ -2512,6 +2445,70 @@ void _rasterizer_model_draw(
+ 								triangle_buffer,
+ 								vertex_buffer);
+ 					}
++
++					if (TEST_FLAG(
++							shader_model->model.flags,
++							_shader_model_two_sided_bit))
++					{
++						vertex_constants[0].n[0] =
++							shader_model->model.detail_map_scale;
++						vertex_constants[0].n[1] =
++							shader_model->model.detail_map_scale*
++							shader_model->model.detail_map_v_scale;
++						vertex_constants[0].n[2] = 1.0f;
++						vertex_constants[0].n[3] = -1.0f;
++						vertex_constants[1].n[0] = 1.0f;
++						vertex_constants[1].n[1] = 0.0f;
++						vertex_constants[1].n[2] = 0.0f;
++						vertex_constants[1].n[3] = 0.0f;
++						vertex_constants[2].n[0] = 0.0f;
++						vertex_constants[2].n[1] = 1.0f;
++						vertex_constants[2].n[2] = 0.0f;
++						vertex_constants[2].n[3] = 0.0f;
++
++						shader_texture_animation_evaluate(
++							&shader_model->model.texture_animation,
++							&local_parameters->animation,
++							local_parameters->base_map_scale.i*
++								shader_model->model.map_u_scale,
++							local_parameters->base_map_scale.j*
++								shader_model->model.map_v_scale,
++							0.0f,
++							0.0f,
++							0.0f,
++							global_frame_parameters.game_time_sec,
++							&vertex_constants[1],
++							&vertex_constants[2]);
++						vertex_constants[2].n[2] =
++							shader_model->model.translucency;
++
++						IDirect3DDevice8_SetVertexShaderConstant(
++							global_d3d_device,
++							-84,
++							vertex_constants,
++							3);
++						SetRenderStateSmart(D3DRS_CULLMODE, D3DCULL_CW);
++
++						rasterizer_draw(
++							triangle_buffer,
++							dynamic_triangle_buffer_index,
++							0,
++							triangle_count,
++							vertex_buffer,
++							dynamic_vertex_buffer_index);
++
++						if (rasterizer_debug_options.statistics_mode ==
++							_rasterizer_statistics_mode_enabled)
++						{
++							rasterizer_frame_statistics.model_draw_count++;
++							rasterizer_frame_statistics.model_triangle_count +=
++								triangle_count;
++							rasterizer_frame_statistics.model_vertex_count +=
++								rasterizer_frame_statistics_count_static_vertices(
++									triangle_buffer,
++									vertex_buffer);
++						}
++					}
+ 				}
+ 			}
+ 

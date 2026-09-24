@@ -1,0 +1,20 @@
+diff --git a/source/rasterizer/rasterizer_lights.c b/source/rasterizer/rasterizer_lights.c
+index b6f75b39..89684ae3 100644
+--- a/source/rasterizer/rasterizer_lights.c
++++ b/source/rasterizer/rasterizer_lights.c
+@@ -534,10 +534,14 @@ static real lens_flare_evaluate_corona_rotation_function(
+ void rasterizer_lights_reset_for_new_map(
+ 	void)
+ {
++	/* BUG (preserved for exact matching): January clears one record more than the array holds, so the
++	 * first 34 bytes of local_lens_flare_parameters[0] (the next .bss object in January's layout) are also
++	 * zeroed. It is harmless: local_lens_flare_count is reset below, every parameter read is bounded by the
++	 * count, and a record only becomes readable after rasterizer_lens_flare_submit memcpy()s all of it. */
+ 	memset(
+ 		local_lens_flare_occlusion_test_results,
+ 		0,
+-		sizeof(local_lens_flare_occlusion_test_results));
++		(MAXIMUM_LIGHTS_PER_MAP+1)*sizeof(struct lens_flare_occlusion_test_results));
+ 	memset(local_lens_flare_occlusion_test_results2, 0, sizeof(local_lens_flare_occlusion_test_results2));
+ 	local_lens_flare_count = 0;
+ 

@@ -1,0 +1,11 @@
+--- a/config/config.json
++++ b/config/config.json
+@@ -459,7 +459,7 @@
+ 				{ "name": "source/render/render_objects.c", "index": 84, "status": "Matching" },
+ 				{ "name": "source/render/render_media.c", "index": 85, "status": "Matching" },
+ 				{ "name": "source/render/render_detail_objects.c", "index": 86, "status": "Matching" },
+-				{ "name": "source/render/render_debug.c", "index": 87, "status": "NonMatching" },
++				{ "name": "source/render/render_debug.c", "index": 87, "status": "Matching" },
+ 				{ "name": "source/render/render_contrails.c", "index": 88, "status": "Matching" },
+ 				{ "name": "source/render/render_cameras.c", "index": 89, "status": "NonMatching", "options": { "cflags": [ "/nologo", "/c", "/O2", "/Oy-", "/Ob1" ] } },
+ 				{ "name": "source/render/render.c", "index": 90, "status": "Matching" },

@@ -1,0 +1,11 @@
+--- a/config/config.json
++++ b/config/config.json
+@@ -500,7 +500,7 @@
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_decals.c", "index": 125, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_debug.c", "index": 126, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_active_camouflage.c", "index": 127, "status": "Matching" },
+-				{ "name": "source/rasterizer/xbox/rasterizer_xbox.c", "index": 128, "status": "NonMatching" },
++				{ "name": "source/rasterizer/xbox/rasterizer_xbox.c", "index": 128, "status": "Matching" },
+ 				{ "name": "source/rasterizer/common/rasterizer_common.c", "index": 129, "status": "Matching" },
+ 				{ "name": "source/physics/terrain_definitions.c", "index": 130, "status": "Matching" },
+ 				{ "name": "source/physics/point_physics.c", "index": 131, "status": "Matching" },

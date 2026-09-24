@@ -1,0 +1,13 @@
+diff --git a/source/physics/collision_bsp.c b/source/physics/collision_bsp.c
+index b4438fa9..49456e37 100644
+--- a/source/physics/collision_bsp.c
++++ b/source/physics/collision_bsp.c
+@@ -302,7 +302,7 @@ void render_debug_collision_edge(
+ 
+ /* ---------- globals */
+ 
+-struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
++static struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
+ 
+ /* ---------- public code */
+ 

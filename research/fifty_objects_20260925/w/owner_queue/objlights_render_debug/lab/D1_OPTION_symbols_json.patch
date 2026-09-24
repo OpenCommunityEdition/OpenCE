@@ -1,0 +1,17 @@
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -23251,7 +23251,13 @@
+ { "file_offset": 4951096, "flags": 0, "name": "_render_camera_warnings_initialized", "static": true },
+ { "file_offset": 4951097, "flags": 0, "name": "_debug_no_frustum_clip" },
+ { "file_offset": 4951098, "flags": 0, "name": "_render_camera_debug_this_fucking_frustum" },
+-{ "file_offset": 4951104, "flags": 0, "name": "_render_debug_globals", "static": true },
++{ "file_offset": 4951104, "flags": 0, "name": "_render_debug_cache_strings", "static": true },
++{ "file_offset": 4952128, "flags": 0, "name": "_render_debug_cache_entries", "static": true },
++{ "file_offset": 4980800, "flags": 0, "name": "_render_debug_cache_game_time", "static": true },
++{ "file_offset": 4980804, "flags": 0, "name": "_render_debug_cache_entry_count", "static": true },
++{ "file_offset": 4980808, "flags": 0, "name": "_render_debug_cache_string_offset", "static": true },
++{ "file_offset": 4980810, "flags": 0, "name": "_render_debug_cache_entry_overflow_reported", "static": true },
++{ "file_offset": 4980811, "flags": 0, "name": "_render_debug_cache_string_overflow_reported", "static": true },
+ { "file_offset": 4980812, "flags": 0, "name": "_bss_004c004c" },
+ { "file_offset": 4980856, "flags": 0, "name": "?lighting_storage@?1??object_get_cached_render_lighting@@9@9", "static": true },
+ { "file_offset": 4980976, "flags": 0, "name": "_render_object_globals", "static": true },

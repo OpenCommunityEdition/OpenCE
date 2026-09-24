@@ -1,0 +1,89 @@
+--- a/source/objects/object_lights.c
++++ b/source/objects/object_lights.c
+@@ -406,6 +406,8 @@
+ 
+ /* ---------- prototypes */
+ 
++static boolean should_render_lights(
++	void);
+ static void light_marker_begin(
+ 	void);
+ static void light_marker_end(
+@@ -414,10 +416,10 @@
+ 	long light_index);
+ static boolean light_mark(
+ 	long light_index);
+-long cluster_get_first_light(
++static long cluster_get_first_light(
+ 	long *reference_index,
+ 	short cluster_index);
+-long cluster_get_next_light(
++static long cluster_get_next_light(
+ 	long *reference_index);
+ static void find_point_lights_for_object_in_cluster(
+ 	long object_index,
+@@ -640,7 +642,7 @@
+ 	return;
+ }
+ 
+-boolean should_render_lights(
++static boolean should_render_lights(
+ 	void)
+ {
+ 	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+@@ -1481,7 +1483,7 @@
+ 
+ /* ---------- private code */
+ 
+-real light_attenuation(
++static real light_attenuation(
+ 	real radius,
+ 	real distance)
+ {
+@@ -1512,7 +1514,7 @@
+ 	return;
+ }
+ 
+-long cluster_get_first_light(
++static long cluster_get_first_light(
+ 	long *reference_index,
+ 	short cluster_index)
+ {
+@@ -1522,7 +1524,7 @@
+ 		cluster_index);
+ }
+ 
+-long cluster_get_next_light(
++static long cluster_get_next_light(
+ 	long *reference_index)
+ {
+ 	return cluster_partition_get_next_datum(
+@@ -1634,7 +1636,7 @@
+ 	short light_index;
+ 
+ 	rasterizer_environment_diffuse_lights_begin();
+-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
++	if (should_render_lights())
+ 	{
+ 		for (light_index = 0;
+ 			light_index < lights_globals.scene_point_light_count;
+@@ -1689,7 +1691,7 @@
+ 	short light_index;
+ 
+ 	rasterizer_environment_specular_lights_begin();
+-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
++	if (should_render_lights())
+ 	{
+ 		for (light_index = 0;
+ 			light_index < lights_globals.scene_point_light_count;
+--- a/source/objects/object_lights_rendering.h
++++ b/source/objects/object_lights_rendering.h
+@@ -19,8 +19,6 @@
+ 
+ /* ---------- prototypes/OBJECT_LIGHTS.C */
+ 
+-boolean should_render_lights(
+-	void);
+ void lights_preprocess_scene(
+ 	void);
+ void lights_render_diffuse(

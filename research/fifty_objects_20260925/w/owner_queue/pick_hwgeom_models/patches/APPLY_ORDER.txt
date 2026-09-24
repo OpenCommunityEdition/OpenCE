@@ -1,0 +1,41 @@
+APPLY ORDER - owner_queue/pick_hwgeom_models (base cdc8ebd3). Nothing here is landed.
+Every packet is STANDALONE against cdc8ebd3. Apply with `git apply <patch>` from the worktree root, in the numbered order.
+The two items are independent (disjoint symbols.json rows and config.json lines; verified stacked: tools/verify_apply.py).
+
+ITEM 1 - rasterizer_xbox_hardware_geometry: apply EXACTLY ONE of these packets.
+  Owner picks A:
+    hwgeom_A/01_rasterizer_xbox_hardware_geometry.c.patch
+    hwgeom_A/02_symbols.json.patch          (13 in-place row edits, lines 5813-5825; full copy: hwgeom_A/symbols.json)
+    hwgeom_A/03_config.json.patch           (status NonMatching -> Matching; admission)
+  Owner picks B:
+    hwgeom_B/01_rasterizer_xbox_hardware_geometry.c.patch
+    hwgeom_B/02_symbols.json.patch          (13 in-place row edits, lines 5813-5825; full copy: hwgeom_B/symbols.json)
+    hwgeom_B/03_config.json.patch           (status NonMatching -> Matching; admission)
+  Owner rejects both (zero-credit hygiene only; object stays NonMatching):
+    hwgeom_fallback_hg0/01_rasterizer_xbox_hardware_geometry.c.patch
+    hwgeom_fallback_hg0/02_symbols.json.patch   (11 in-place row edits; full copy: ../cfg_hg0/symbols.json)
+    NOTE: scratch/w/breakable_surfaces_audit/patches/symbols.json.patch carries the same hg0 rows - apply those rows once.
+
+ITEM 2 - models: apply EXACTLY ONE of these packets (each already contains the C1 storage prerequisite).
+  Owner admits P1 (file-scope `= {0}` defaults in January declaration order):
+    models_optP1/01_models.c.patch
+    models_optP1/02_models.h.patch          (SHARED HEADER; consumer sweep IDENTICAL, see MEASURED.md)
+    models_optP1/03_symbols.json.patch      (2 in-place edits, lines 4771 + 22672; full copy: ../cfg_mC1/symbols.json)
+    models_optP1/04_config.json.patch       (status NonMatching -> Matching; admission)
+    models_optP1/05_object_admission_rejections.json.patch   (retire the bss-symbol-layout-mismatch entry)
+  Owner admits variant P2 (fv = HCEX static local, three `= {0}` file statics):
+    models_optP2/01_models.c.patch
+    models_optP2/02_models.h.patch
+    models_optP2/03_symbols.json.patch      (3 in-place edits: 4771, 22672, 23095; full copy: ../cfg_mP2/symbols.json)
+    models_optP2/04_config.json.patch
+    models_optP2/05_object_admission_rejections.json.patch
+  Owner keeps the first-party in-block static-local form (object stays NonMatching, rejection stays):
+    models_optSL/01_models.c.patch
+    models_optSL/02_models.h.patch
+    models_optSL/03_symbols.json.patch      (6 in-place edits: 4771, 22672, 23095-23098; full copy: ../cfg_mSL/symbols.json)
+  Owner rejects every .bss change (zero-credit storage fix only; object stays NonMatching):
+    models_C1/01_models.c.patch
+    models_C1/02_models.h.patch
+    models_C1/03_symbols.json.patch
+
+After applying: regenerate the split (ninja / csplit) - each symbols.json packet changes exactly one split object.

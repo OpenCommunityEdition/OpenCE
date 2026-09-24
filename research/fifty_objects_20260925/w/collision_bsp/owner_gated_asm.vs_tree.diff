@@ -1,0 +1,48 @@
+diff --git source/physics/collision_bsp.c scratch/w/collision_bsp/owner_gated_asm.c
+index b4438fa9..23e70768 100644
+--- source/physics/collision_bsp.c
++++ scratch/w/collision_bsp/owner_gated_asm.c
+@@ -118,6 +118,9 @@ enum contents
+ #define BSP3D_TEST_PILL_EPSILON (1.f/4096.f)
+ #define BSP2D_TEST_PILL_EPSILON (1.f/8192.f)
+ 
++/* hand-written SSE squared distance between the points a and b, stored through result */
++#define fast_distance_squared3d(a, b, result) 	{ 		real_point3d const *fast_distance_a = (a); 		real_point3d const *fast_distance_b = (b); 		real *fast_distance_result = (result); 		__asm mov eax, fast_distance_result 		__asm mov ecx, fast_distance_a 		__asm movss xmm0, dword ptr [ecx] 		__asm movhps xmm0, qword ptr [ecx+4] 		__asm mov ecx, fast_distance_b 		__asm movss xmm1, dword ptr [ecx] 		__asm movhps xmm1, qword ptr [ecx+4] 		__asm subps xmm0, xmm1 		__asm mulps xmm0, xmm0 		__asm movss xmm2, xmm0 		__asm shufps xmm0, xmm0, 0Eh 		__asm addss xmm2, xmm0 		__asm shufps xmm0, xmm0, 39h 		__asm addss xmm2, xmm0 		__asm movss dword ptr [eax], xmm2 	}
++
+ /* ---------- structures */
+ 
+ struct collision_bsp_test_pill_new_context
+@@ -1078,7 +1081,7 @@ static void collision_surface_test_sphere(
+ 	byte breakable_surface_index;
+ 	long edge_index;
+ 	real radius_squared;
+-	boolean hit_feature = FALSE;
++	boolean hit_feature;
+ 
+ 	if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
+ 	{
+@@ -1092,6 +1095,7 @@ static void collision_surface_test_sphere(
+ 		}
+ 	}
+ 
++	hit_feature = FALSE;
+ 	radius_squared = data->radius * data->radius;
+ 	edge_index = surface->first_edge_index;
+ 	do
+@@ -1106,14 +1110,9 @@ static void collision_surface_test_sphere(
+ 			&data->bsp->vertices,
+ 			vertex_index,
+ 			struct collision_vertex);
+-		real delta_x = vertex->point.x - data->center->x;
+-		real delta_y = vertex->point.y - data->center->y;
+-		real delta_z = vertex->point.z - data->center->z;
+-		real distance_squared =
+-			delta_x * delta_x +
+-			delta_y * delta_y +
+-			delta_z * delta_z;
++		real distance_squared;
+ 
++		fast_distance_squared3d(&vertex->point, data->center, &distance_squared);
+ 		if (distance_squared <= radius_squared)
+ 		{
+ 			add_feature(

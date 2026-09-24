@@ -1,0 +1,420 @@
+--- a/source/interface/hud_weapon.c
++++ b/source/interface/hud_weapon.c
+@@ -724,6 +724,7 @@
+ 	long return_eip = get_return_eip();
+ 	long stack_buffer[HUD_WEAPON_STACK_BUFFER_LENGTH];
+ 	struct player_datum *player;
++	long unit_index;
+ 	struct unit_datum *unit;
+ 	struct crosshair_hud_state *crosshair;
+ 	struct weapon_hud_interface_definition *root_definition;
+@@ -733,7 +734,8 @@
+ 		0x62,
+ 		sizeof(stack_buffer));
+ 	player = player_get(local_player_get_player_index(local_player_index));
+-	unit = unit_try_and_get(player->unit_index);
++	unit_index = player->unit_index;
++	unit = unit_try_and_get(unit_index);
+ 	if (!unit)
+ 		goto finished;
+ 
+@@ -784,223 +786,189 @@
+ 			crosshair_index < NUMBER_OF_CROSSHAIR_STATES;
+ 			crosshair_index++)
+ 		{
+-			short result;
+-
+-			if (!TEST_FLAG(valid_crosshair_types, crosshair_index))
+-				continue;
+-
+-			switch (crosshair_index)
+-			{
+-			case _crosshair_state_aim:
+-				result = weapon_index == NONE ?
+-					FALSE :
+-					player_control_get_autoaim_level(player->local_player_index) == 1.0f;
+-				break;
+-
+-			case _crosshair_state_zoom:
+-				result = player_control_get_zoom_level(player->local_player_index) == NONE ?
+-					1 :
+-					player_control_get_zoom_level(player->local_player_index) + 2;
+-				break;
+-
+-			case _crosshair_state_charge:
+-				result = FALSE;
+-				break;
+-
+-			case _crosshair_state_flash_ammo:
+-				if (weapon_state->magazines[0].rounds_remaining)
+-				{
+-					result = weapon_state->magazines[0].rounds_loaded <=
+-						root_definition->flash_cutoffs.loaded_ammo;
+-				}
+-				else
+-				{
+-					result = FALSE;
+-				}
+-				break;
+-
+-			case _crosshair_state_flash_heat:
+-				result = weapon_state->heat * 100.0f >=
+-					(real)root_definition->flash_cutoffs.heat;
+-				break;
+-
+-			case _crosshair_state_flash_total_ammo:
+-				result = weapon_state->magazines[0].rounds_remaining <=
+-						root_definition->flash_cutoffs.total_ammo &&
+-					!weapon_state->magazines[0].reloading;
+-				break;
+-
+-			case _crosshair_state_flash_total_battery:
+-				result = weapon_state->age < 1.0f &&
+-					(1.0f - weapon_state->age) * 100.0f <=
+-						(real)root_definition->flash_cutoffs.age;
+-				break;
+-
+-			case _crosshair_state_reload:
+-				result = weapon_state->magazines[0].reloading;
+-				break;
+-
+-			case _crosshair_state_fired_with_no_ammo:
+-				if (!weapon_state->magazines[0].rounds_loaded &&
+-					!weapon_state->magazines[0].rounds_remaining &&
+-					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+-				{
+-					result = TRUE;
+-				}
+-				else
+-				{
+-					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+-				}
+-				break;
+-
+-			case _crosshair_state_threw_with_no_grenade:
++			if (TEST_FLAG(valid_crosshair_types, crosshair_index))
+ 			{
+-				boolean no_grenades = TRUE;
+-				short grenade_type;
++				struct crosshair_state *state = &crosshair->states[crosshair_index];
++				short result;
+ 
+-				for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
++				switch (crosshair_index)
+ 				{
+-					if (unit->unit.grenade_counts[grenade_type])
+-						no_grenades = FALSE;
+-				}
+-				if (no_grenades &&
+-					!unit->unit.grenade_throw_state &&
+-					TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit))
+-				{
+-					result = TRUE;
+-				}
+-				else
+-				{
+-					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+-				}
+-				break;
+-			}
++				case _crosshair_state_primary_trigger_ready:
++					result = weapon_state->magazines[0].can_fire;
++					break;
++
++				case _crosshair_state_secondary_trigger_ready:
++					result = weapon_state->magazines[1].can_fire;
++					break;
++
++				case _crosshair_state_aim:
++					result = weapon_index == NONE ?
++						FALSE :
++						player_control_get_autoaim_level(player->local_player_index) == 1.0f;
++					break;
++
++				case _crosshair_state_zoom:
++					result = player_control_get_zoom_level(player->local_player_index) != NONE ?
++						player_control_get_zoom_level(player->local_player_index) + 2 :
++						1;
++					break;
++
++				case _crosshair_state_reload:
++					result = weapon_state->magazines[0].reloading;
++					break;
++
++				case _crosshair_state_flash_ammo:
++					result = (weapon_state->magazines[0].rounds_remaining || weapon_state->magazines[0].rounds_loaded) &&
++						weapon_state->magazines[0].rounds_remaining &&
++						weapon_state->magazines[0].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
++					break;
++
++				case _crosshair_state_flash_heat:
++					result = weapon_state->heat * 100.0f >=
++						(real)root_definition->flash_cutoffs.heat;
++					break;
++
++				case _crosshair_state_flash_total_ammo:
++					result = weapon_state->magazines[0].rounds_remaining <=
++							root_definition->flash_cutoffs.total_ammo &&
++						!weapon_state->magazines[0].reloading;
++					break;
++
++				case _crosshair_state_flash_total_battery:
++					result = weapon_state->age < 1.0f &&
++						(1.0f - weapon_state->age) * 100.0f <=
++							(real)root_definition->flash_cutoffs.age;
++					break;
+ 
+-			case _crosshair_state_flash_ammo_none_for_reload:
+-				result = !weapon_state->magazines[0].rounds_remaining &&
+-					weapon_state->magazines[0].rounds_loaded &&
+-					weapon_state->magazines[0].rounds_loaded <=
+-						root_definition->flash_cutoffs.loaded_ammo;
+-				break;
+-
+-			case _crosshair_state_flash_secondary_ammo:
+-				if (weapon_state->magazines[1].rounds_remaining)
+-				{
+-					result = weapon_state->magazines[1].rounds_loaded <=
+-						root_definition->flash_cutoffs.loaded_ammo;
+-				}
+-				else
+-				{
++				case _crosshair_state_charge:
+ 					result = FALSE;
+-				}
+-				break;
+-
+-			case _crosshair_state_flash_secondary_total_ammo:
+-				result = weapon_state->magazines[1].rounds_remaining <=
+-						root_definition->flash_cutoffs.total_ammo &&
+-					!weapon_state->magazines[1].reloading;
+-				break;
+-
+-			case _crosshair_state_secondary_reload:
+-				result = weapon_state->magazines[1].reloading;
+-				break;
+-
+-			case _crosshair_state_fired_secondary_with_no_ammo:
+-				if (!weapon_state->magazines[1].rounds_loaded &&
+-					!weapon_state->magazines[1].rounds_remaining &&
+-					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_secondary_trigger_bit))
+-				{
+-					result = TRUE;
+-				}
+-				else
+-				{
+-					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+-				}
+-				break;
+-
+-			case _crosshair_state_flash_secondary_ammo_none_for_reload:
+-				result = !weapon_state->magazines[1].rounds_remaining &&
+-					weapon_state->magazines[1].rounds_loaded &&
+-					weapon_state->magazines[1].rounds_loaded <=
+-						root_definition->flash_cutoffs.loaded_ammo;
+-				break;
+-
+-			case _crosshair_state_primary_trigger_ready:
+-				result = weapon_state->magazines[0].can_fire;
+-				break;
+-
+-			case _crosshair_state_secondary_trigger_ready:
+-				result = weapon_state->magazines[1].can_fire;
+-				break;
++					break;
+ 
+-			case _crosshair_state_flash_fired_battery_depleted:
+-				if (weapon_state->age == 1.0f &&
+-					TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+-				{
+-					result = TRUE;
+-				}
+-				else
+-				{
+-					result = crosshair->states[crosshair_index].value.reference_data != NONE;
+-				}
+-				break;
+-
+-			default:
+-				match_assert(
+-					"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+-					0x16E,
+-					!"unreachable");
+-				result = FALSE;
+-				break;
+-			}
+-
+-			SET_FLAG(
+-				render_flags,
+-				crosshair_index,
+-				result > 0 || crosshair_index == _crosshair_state_aim);
+-			switch (crosshair_index)
+-			{
+-			case _crosshair_state_aim:
+-				crosshair->states[crosshair_index].value.reference_data = result;
+-				break;
+-
+-			case _crosshair_state_zoom:
+-				crosshair->states[crosshair_index].value.reference_data = result - 1;
+-				break;
+-
+-			case _crosshair_state_charge:
+-			case _crosshair_state_flash_ammo:
+-			case _crosshair_state_flash_heat:
+-			case _crosshair_state_flash_total_ammo:
+-			case _crosshair_state_flash_total_battery:
+-			case _crosshair_state_reload:
+-			case _crosshair_state_fired_with_no_ammo:
+-			case _crosshair_state_threw_with_no_grenade:
+-			case _crosshair_state_flash_ammo_none_for_reload:
+-			case _crosshair_state_flash_secondary_ammo:
+-			case _crosshair_state_flash_secondary_total_ammo:
+-			case _crosshair_state_secondary_reload:
+-			case _crosshair_state_fired_secondary_with_no_ammo:
+-			case _crosshair_state_flash_secondary_ammo_none_for_reload:
+-			case _crosshair_state_primary_trigger_ready:
+-			case _crosshair_state_secondary_trigger_ready:
+-			case _crosshair_state_flash_fired_battery_depleted:
+-				if (!result)
+-				{
+-					crosshair->states[crosshair_index].value.reference_data = NONE;
++				case _crosshair_state_flash_fired_battery_depleted:
++					result = (weapon_state->age == 1.0f &&
++							TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit)) ||
++						state->value.reference_data != NONE;
++					break;
++
++				case _crosshair_state_fired_with_no_ammo:
++					result = (!weapon_state->magazines[0].rounds_loaded &&
++							!weapon_state->magazines[0].rounds_remaining &&
++							TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit)) ||
++						state->value.reference_data != NONE;
++					break;
++
++				case _crosshair_state_threw_with_no_grenade:
++				{
++					boolean no_grenades = TRUE;
++					short grenade_type;
++
++					for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_type++)
++					{
++						no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
++					}
++					result = (no_grenades &&
++							!unit->unit.grenade_throw_state &&
++							TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit)) ||
++						state->value.reference_data != NONE;
++					break;
++				}
++
++				case _crosshair_state_flash_ammo_none_for_reload:
++					result = (weapon_state->magazines[0].rounds_remaining || weapon_state->magazines[0].rounds_loaded) &&
++						!weapon_state->magazines[0].rounds_remaining &&
++						weapon_state->magazines[0].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
++					break;
++
++				case _crosshair_state_flash_secondary_ammo:
++					result = (weapon_state->magazines[1].rounds_remaining || weapon_state->magazines[1].rounds_loaded) &&
++						weapon_state->magazines[1].rounds_remaining &&
++						weapon_state->magazines[1].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
++					break;
++
++				case _crosshair_state_flash_secondary_total_ammo:
++					result = weapon_state->magazines[1].rounds_remaining <=
++							root_definition->flash_cutoffs.total_ammo &&
++						!weapon_state->magazines[1].reloading;
++					break;
++
++				case _crosshair_state_secondary_reload:
++					result = weapon_state->magazines[1].reloading;
++					break;
++
++				case _crosshair_state_fired_secondary_with_no_ammo:
++					/* January (T+0x3b7 shared tail `test ch,8`) and the later /Od build (0x638a07
++					   `and edx,0x800`) both test the primary trigger for this secondary state. */
++					result = (!weapon_state->magazines[1].rounds_loaded &&
++							!weapon_state->magazines[1].rounds_remaining &&
++							TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit)) ||
++						state->value.reference_data != NONE;
++					break;
++
++				case _crosshair_state_flash_secondary_ammo_none_for_reload:
++					result = (weapon_state->magazines[1].rounds_remaining || weapon_state->magazines[1].rounds_loaded) &&
++						!weapon_state->magazines[1].rounds_remaining &&
++						weapon_state->magazines[1].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
++					break;
++
++				default:
++					match_assert(
++						"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
++						0x16E,
++						!"unreachable");
++					/* BUG (preserved for exact matching): January and the later /Od build
++					   (0x638ac2) leave result unassigned here, so it is read uninitialised
++					   below if system_exit returns (T+0x144 loads its never-stored home). */
++					break;
++				}
++
++				SET_FLAG(
++					render_flags,
++					crosshair_index,
++					result > 0 || crosshair_index == _crosshair_state_aim);
++				switch (crosshair_index)
++				{
++				case _crosshair_state_aim:
++					state->value.reference_data = result;
++					break;
++
++				case _crosshair_state_zoom:
++					state->value.reference_data = result - 1;
++					break;
++
++				case _crosshair_state_charge:
++				case _crosshair_state_flash_ammo:
++				case _crosshair_state_flash_heat:
++				case _crosshair_state_flash_total_ammo:
++				case _crosshair_state_flash_total_battery:
++				case _crosshair_state_reload:
++				case _crosshair_state_fired_with_no_ammo:
++				case _crosshair_state_threw_with_no_grenade:
++				case _crosshair_state_flash_ammo_none_for_reload:
++				case _crosshair_state_flash_secondary_ammo:
++				case _crosshair_state_flash_secondary_total_ammo:
++				case _crosshair_state_secondary_reload:
++				case _crosshair_state_fired_secondary_with_no_ammo:
++				case _crosshair_state_flash_secondary_ammo_none_for_reload:
++				case _crosshair_state_primary_trigger_ready:
++				case _crosshair_state_secondary_trigger_ready:
++				case _crosshair_state_flash_fired_battery_depleted:
++					if (!result)
++					{
++						state->value.reference_data = NONE;
++					}
++					else if (state->value.reference_data == NONE)
++					{
++						state->value.reference_data = game_time_get();
++					}
++					break;
++
++				default:
++					match_assert(
++						"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
++						0x197,
++						!"unreachable");
++					break;
+ 				}
+-				else if (crosshair->states[crosshair_index].value.reference_data == NONE)
+-				{
+-					crosshair->states[crosshair_index].value.reference_data = game_time_get();
+-				}
+-				break;
+-
+-			default:
+-				match_assert(
+-					"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
+-					0x197,
+-					!"unreachable");
+-				break;
+ 			}
+ 		}
+ 

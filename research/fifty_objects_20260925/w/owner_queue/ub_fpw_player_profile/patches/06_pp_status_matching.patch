@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index b8a7789b..9bf8cef7 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -397,7 +397,7 @@
+ 				{ "name": "source/saved films/saved_films.c", "index": 22, "status": "Matching" },
+ 				{ "name": "source/saved games/saved_game_files.c", "index": 23, "status": "NonMatching" },
+ 				{ "name": "source/saved games/playlist_profile.c", "index": 24, "status": "Matching" },
+-				{ "name": "source/saved games/player_profile.c", "index": 25, "status": "NonMatching" },
++				{ "name": "source/saved games/player_profile.c", "index": 25, "status": "Matching" },
+ 				{ "name": "source/saved games/game_state_xbox.c", "index": 26, "status": "Matching" },
+ 				{ "name": "source/saved games/game_state.c", "index": 27, "status": "Matching" },
+ 				{ "name": "source/cache/xbox_texture_cache.c", "index": 28, "status": "NonMatching" },

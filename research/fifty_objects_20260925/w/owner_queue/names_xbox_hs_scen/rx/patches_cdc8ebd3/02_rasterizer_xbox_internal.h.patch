@@ -1,0 +1,11 @@
+--- a/source/rasterizer/xbox/rasterizer_xbox_internal.h
++++ b/source/rasterizer/xbox/rasterizer_xbox_internal.h
+@@ -72,8 +72,6 @@
+ 	short vertex_shader_index);
+ void *rasterizer_get_bitmap_default_hardware_format(
+ 	struct bitmap_data const *bitmap);
+-void rasterizer_filthy_bitmap_default_initialize(
+-	void);
+ void rasterizer_secondary_render_target_debug(
+ 	rectangle2d *bounds);
+ void rasterizer_water_set_visibility_for_frame(

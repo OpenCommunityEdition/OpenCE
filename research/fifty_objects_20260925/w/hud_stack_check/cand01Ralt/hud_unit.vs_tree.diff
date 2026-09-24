@@ -1,0 +1,62 @@
+diff --git a/source/interface/hud_unit.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_stack_check\\cand01Ralt\\hud_unit.c"
+index 1ff72603..195128e0 100644
+--- a/source/interface/hud_unit.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_stack_check\\cand01Ralt\\hud_unit.c"
+@@ -605,36 +605,38 @@ static void hud_update_unit_local_player(
+ 				if (game_time_get() - hud_state->last_shield_hit_time < 15)
+ 				{
+ 					hud_state->fade_time = 0.0f;
++					goto update_finished;
+ 				}
+-				else
+-				{
+-					hud_state->last_shield_vitality = unit->object.shield_vitality;
+-					hud_state->fade_time +=
+-						(real)(game_time_get() - hud_state->last_shield_hit_time) *
+-						(1.0f / TICKS_PER_SECOND);
+-					hud_state->last_shield_hit_time = game_time_get();
+-				}
+-			}
+-			else if (hud_state->last_shield_vitality < unit->object.shield_vitality)
+-			{
++
+ 				hud_state->last_shield_vitality = unit->object.shield_vitality;
+-				hud_state->fade_time = -1.0f;
+-				hud_state->last_shield_hit_time = game_time_get();
++				hud_state->fade_time +=
++					(real)(game_time_get() - hud_state->last_shield_hit_time) *
++					(1.0f / TICKS_PER_SECOND);
+ 			}
+ 			else
+ 			{
+-				hud_state->last_shield_vitality = unit->object.shield_vitality;
+-				if (hud_state->fade_time > 0.0f)
++				if (hud_state->last_shield_vitality < unit->object.shield_vitality)
+ 				{
+-					hud_state->fade_time +=
+-						(real)(game_time_get() - hud_state->last_shield_hit_time) *
+-						(1.0f / TICKS_PER_SECOND);
++					hud_state->last_shield_vitality = unit->object.shield_vitality;
++					hud_state->fade_time = -1.0f;
++				}
++				else
++				{
++					hud_state->last_shield_vitality = unit->object.shield_vitality;
++					if (hud_state->fade_time > 0.0f)
++					{
++						hud_state->fade_time +=
++							(real)(game_time_get() - hud_state->last_shield_hit_time) *
++							(1.0f / TICKS_PER_SECOND);
++					}
+ 				}
+-				hud_state->last_shield_hit_time = game_time_get();
+ 			}
++
++			hud_state->last_shield_hit_time = game_time_get();
+ 		}
+ 	}
+ 
++update_finished:
+ 	if (cinematic_in_progress())
+ 	{
+ 		long player_index = local_player_get_player_index(local_player_index);

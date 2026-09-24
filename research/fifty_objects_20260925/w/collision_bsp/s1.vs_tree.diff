@@ -1,0 +1,48 @@
+diff --git source/physics/collision_bsp.c scratch/w/collision_bsp/s1.c
+index b4438fa9..cb41dc74 100644
+--- source/physics/collision_bsp.c
++++ scratch/w/collision_bsp/s1.c
+@@ -1694,32 +1694,20 @@ static void bsp3d_test_sphere_recursive(
+ 						&data->bsp->bsp3d.planes,
+ 						reference->plane_designator & LONG_MAX,
+ 						real_plane3d);
+-					real plane_distance = -plane3d_distance_to_point(plane, data->center);
+-					real_point3d projected_center;
+-					real absolute_i;
+-					real absolute_j;
+-					real absolute_k;
+-					short projection;
+-
+-					projected_center.x =
+-						plane->n.i * plane_distance + data->center->x;
+-					projected_center.y =
+-						plane->n.j * plane_distance + data->center->y;
+-					projected_center.z =
+-						plane->n.k * plane_distance + data->center->z;
+-					absolute_i = fabs(plane->n.i);
+-					absolute_j = fabs(plane->n.j);
+-					absolute_k = fabs(plane->n.k);
+-					if (absolute_k >= absolute_j && absolute_k >= absolute_i)
+-						projection = _z;
+-					else
+-						projection = absolute_j >= absolute_i ? _y : _x;
+-					data->projection_axis = projection;
++					real distance = plane3d_distance_to_point(plane, data->center);
++					real_point3d center_projected_on_plane;
++
++					point_from_line3d(
++						data->center,
++						&plane->n,
++						-distance,
++						&center_projected_on_plane);
++					data->projection_axis = projection_from_vector3d(&plane->n);
+ 					data->projection_sign =
+-						projection_sign_from_vector3d(&plane->n, projection) !=
++						projection_sign_from_vector3d(&plane->n, data->projection_axis) !=
+ 						(reference->plane_designator & LONG_MIN ? TRUE : FALSE);
+ 					project_point3d(
+-						&projected_center,
++						&center_projected_on_plane,
+ 						data->projection_axis,
+ 						data->projection_sign,
+ 						&data->center2d);

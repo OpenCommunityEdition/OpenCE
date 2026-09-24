@@ -1,0 +1,35 @@
+diff --git a/config/config.json b/config/config.json
+--- a/config/config.json
++++ b/config/config.json
+@@ -511,7 +511,7 @@
+ 				{ "name": "source/physics/collision_usage.c", "index": 136, "status": "Matching" },
+ 				{ "name": "source/physics/collision_models.c", "index": 137, "status": "Matching" },
+ 				{ "name": "source/physics/collision_model_definitions.c", "index": 138, "status": "Matching" },
+-				{ "name": "source/physics/collision_features.c", "index": 139, "status": "NonMatching" },
++				{ "name": "source/physics/collision_features.c", "index": 139, "status": "Matching" },
+ 				{ "name": "source/physics/collision_debug.c", "index": 140, "status": "Matching" },
+ 				{ "name": "source/physics/collision_bsp_definitions.c", "index": 141, "status": "Matching" },
+ 				{ "name": "source/physics/collision_bsp.c", "index": 142, "status": "NonMatching" },
+@@ -594,7 +594,7 @@
+ 				{ "name": "source/memory/zlib/adler32.c", "index": 219, "status": "Matching" },
+ 				{ "name": "source/math/vector_tree.c", "index": 220, "status": "Matching" },
+ 				{ "name": "source/math/trig_math.c", "index": 221, "status": "Matching" },
+-				{ "name": "source/math/real_math.c", "index": 222, "status": "NonMatching" },
++				{ "name": "source/math/real_math.c", "index": 222, "status": "Matching" },
+ 				{ "name": "source/math/random_math.c", "index": 223, "status": "Matching" },
+ 				{ "name": "source/math/probability.c", "index": 224, "status": "Matching" },
+ 				{ "name": "source/math/periodic_functions.c", "index": 225, "status": "NonMatching" },
+@@ -798,10 +798,10 @@
+ 				{ "name": "source/bitmaps/libtiff/tif_ccittrle.c", "index": 423, "status": "Matching" },
+ 				{ "name": "source/bitmaps/libtiff/tif_aux.c", "index": 424, "status": "Matching" },
+ 				{ "name": "source/ai/props.c", "index": 425, "status": "Matching" },
+-				{ "name": "source/ai/path_structure_bsp.c", "index": 426, "status": "NonMatching" },
+-				{ "name": "source/ai/path_smoothing.c", "index": 427, "status": "NonMatching" },
++				{ "name": "source/ai/path_structure_bsp.c", "index": 426, "status": "Matching" },
++				{ "name": "source/ai/path_smoothing.c", "index": 427, "status": "Matching" },
+ 				{ "name": "source/ai/path_obstacles.c", "index": 428, "status": "NonMatching" },
+-				{ "name": "source/ai/path_obstacle_avoidance.c", "index": 429, "status": "NonMatching" },
++				{ "name": "source/ai/path_obstacle_avoidance.c", "index": 429, "status": "Matching" },
+ 				{ "name": "source/ai/path.c", "index": 430, "status": "Matching" },
+ 				{ "name": "source/ai/encounters.c", "index": 431, "status": "Matching" },
+ 				{ "name": "source/ai/ai_script.c", "index": 432, "status": "Matching" },

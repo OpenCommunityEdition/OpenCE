@@ -1,0 +1,22 @@
+diff --git a/config/parked.json b/config/parked.json
+index 7b799f37..291a5317 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1302,17 +1302,6 @@
+         "objdiff_percent": 62.452587
+       }
+     },
+-    {
+-      "unit": "source/interface/first_person_weapons",
+-      "function": "_first_person_weapon_update",
+-      "class": "unclassified",
+-      "evidence": "Complete HCEA-corroborated first-person weapon state machine with the four-player January loop. Wave 2 of claude/fifty-objects-20260925 applied three /Od-attested corrections. First, a key-frame result no longer advances the state: January @0x13c jumps past next_state on _animation_key_frame, and /Od 0x61fb2e has an empty then-arm. Second, both animation updates call the TU wrapper animation_update_render_only (/Od 0x61fb22/0x61fc59); no other January object references the wrapper, so it was inlined here. Third, turning is a real_vector2d aggregate (/Od RTC descriptor turning, 8 bytes). With the null guards removed and magnitude3d inlined, the function is strictly exact (scratch/w/first_person_weapons/final_exact.c). January omits both null tests after count ? TAG_BLOCK_GET_ELEMENT(...) : NULL, and the later /Od build omits them too. That is an authentic unguarded dereference and is owner-gated. The retained defined-behaviour body keeps both guards and keeps magnitude3d out of line, so no helper COMDAT is emitted while the caller is non-exact. Zero credit. Reopen on an owner ruling admitting the unguarded dereference. See scratch/w/first_person_weapons/LEDGER.md.",
+-      "measurements": {
+-        "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
+-        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "ba39884c90f2ef0afbac711db26225e2b41d4fc0719a2afbe0a600883e2bf8ff" },
+-        "objdiff_percent": 95.21506
+-      }
+-    },
+     {
+       "unit": "source/math/geometry",
+       "function": "_convex_polygon2d_clip_to_plane",

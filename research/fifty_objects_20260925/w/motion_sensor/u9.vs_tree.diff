@@ -1,0 +1,187 @@
+diff --git a/source/interface/motion_sensor.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\motion_sensor\\u9.c"
+index c5094d45..b215f649 100644
+--- a/source/interface/motion_sensor.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\motion_sensor\\u9.c"
+@@ -276,8 +276,8 @@ real scale[] =
+ };
+ 
+ long next_vertex_index= {0};
+-static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
+-static real sweep_theta = 0.f;
++static struct motion_sensor_globals_definition *motion_sensor_globals;
++static real sweep_theta;
+ boolean debug_motion_sensor_draw_all_units= {0};
+ 
+ extern struct motion_sensor_hud_globals *hud_globals;
+@@ -510,13 +510,11 @@ static void update_motion_sensor(
+ 	long stack_buffer[0x80];
+ 	struct motion_sensor_player *player;
+ 	short active_sensor_index;
+-	long player_index;
+ 	long unit_index;
+ 	struct motion_sensor_datum *sensor;
+-	real_point3d camera_position;
+ 	short blip_index;
+-	real_point2d custom_positions[MAXIMUM_MOTION_SENSOR_BLIPS];
+-	long out_of_range_count = 0;
++	struct motion_sensor_blip *blips;
++	real_point2d customs[MAXIMUM_MOTION_SENSOR_BLIPS];
+ 
+ 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
+ 	player = get_motion_sensor_data(local_player_index);
+@@ -525,18 +523,22 @@ static void update_motion_sensor(
+ 		goto update_motion_sensor_done;
+ 
+ 	active_sensor_index = motion_sensor_globals->active_sensor_index;
+-	player_index = local_player_get_player_index(local_player_index);
+-	unit_index = player_index == NONE
++	unit_index = local_player_get_player_index(local_player_index) == NONE
+ 		? NONE
+ 		: player_get(local_player_get_player_index(local_player_index))->unit_index;
+ 	sensor = &player->sensor_data[active_sensor_index];
+ 	if (unit_index == NONE)
+ 		goto update_motion_sensor_done;
+ 
+-	unit_get_camera_position(unit_index, &camera_position);
+-	sensor->reference_point.x = camera_position.x;
+-	sensor->reference_point.y = camera_position.y;
++	{
++		real_point3d reference_point;
++
++		unit_get_camera_position(unit_index, &reference_point);
++		sensor->reference_point.x = reference_point.x;
++		sensor->reference_point.y = reference_point.y;
++	}
+ 
++	blips = sensor->blips;
+ 	for (blip_index = 0;
+ 		blip_index < MAXIMUM_MOTION_SENSOR_BLIPS;
+ 		blip_index++)
+@@ -545,31 +547,35 @@ static void update_motion_sensor(
+ 
+ 		if (unit_try_and_get(object_index))
+ 		{
+-			real_point3d object_position;
+-			real object_radius;
+-			real_point2d displacement;
++			real_point3d unit_center;
++			real_point3d player_center;
++			real_point2d point;
++			real dummy;
+ 			boolean draw = should_draw_object(object_index);
+ 
+ 			object_get_bounding_sphere(
+ 				object_index,
+-				&object_position,
+-				&object_radius);
+-			displacement.x = object_position.x - sensor->reference_point.x;
+-			displacement.y = object_position.y - sensor->reference_point.y;
+-
+-			if (!draw ||
+-				magnitude_squared2d((real_vector2d const *)&displacement) >
++				&unit_center,
++				&dummy);
++			point.x = unit_center.x - sensor->reference_point.x;
++			point.y = unit_center.y - sensor->reference_point.y;
++			player_center.x = sensor->reference_point.x;
++			player_center.y = sensor->reference_point.y;
++			player_center.z = unit_center.z;
++
++			if (draw &&
++				distance_squared3d(&player_center, &unit_center) <=
+ 					hud_globals->defaults.motion_sensor_range *
+ 						hud_globals->defaults.motion_sensor_range)
+ 			{
+-				sensor->blips[blip_index].type = _blip_type_none;
+-				player->unit_indices[blip_index] = NONE;
++				tiny_point2d_set(
++					&blips[blip_index].position,
++					&point);
+ 			}
+ 			else
+ 			{
+-				tiny_point2d_set(
+-					&sensor->blips[blip_index].position,
+-					&displacement);
++				blips[blip_index].type = _blip_type_none;
++				player->unit_indices[blip_index] = NONE;
+ 			}
+ 		}
+ 	}
+@@ -577,40 +583,46 @@ static void update_motion_sensor(
+ 	sensor->yaw =
+ 		player_control_get_facing_angles(local_player_index)->yaw +
+ 		1.5707964f;
+-	player_index = local_player_get_player_index(local_player_index);
+-	sensor->custom_blip_count =
+-		(byte)game_engine_player_get_custom_motion_sensor_positions(
+-			player_index,
+-			custom_positions,
+-			(byte *)sensor->custom_blip_goal_indices,
+-			MAXIMUM_MOTION_SENSOR_BLIPS);
+-	unit_get_camera_position(unit_index, &camera_position);
+-
+-	for (blip_index = 0;
+-		blip_index < sensor->custom_blip_count;
+-		blip_index++)
+ 	{
+-		real_point2d *position = &custom_positions[blip_index];
+-		real_point2d displacement;
+-
+-		displacement.x = position->x - camera_position.x;
+-		displacement.y = position->y - camera_position.y;
+-		*position = displacement;
+-		if (magnitude_squared2d((real_vector2d const *)&displacement) >
+-				hud_globals->defaults.motion_sensor_range *
+-					hud_globals->defaults.motion_sensor_range)
++		real_point3d reference_point;
++		long custom_index;
++		long out_of_range_count = 0;
++
++		sensor->custom_blip_count =
++			(byte)game_engine_player_get_custom_motion_sensor_positions(
++				local_player_get_player_index(local_player_index),
++				customs,
++				(byte *)sensor->custom_blip_goal_indices,
++				MAXIMUM_MOTION_SENSOR_BLIPS);
++		unit_get_camera_position(unit_index, &reference_point);
++
++		for (custom_index = 0;
++			custom_index < sensor->custom_blip_count;
++			custom_index++)
+ 		{
+-			out_of_range_count++;
+-		}
+-		else
+-		{
+-			tiny_point2d_set(
+-				&sensor->custom_blips[blip_index - out_of_range_count],
+-				position);
++			real_point3d custom_temp;
++
++			custom_temp.x = customs[custom_index].x;
++			custom_temp.y = customs[custom_index].y;
++			custom_temp.z = reference_point.z;
++			customs[custom_index].x -= reference_point.x;
++			customs[custom_index].y -= reference_point.y;
++			if (distance_squared3d(&reference_point, &custom_temp) <=
++					hud_globals->defaults.motion_sensor_range *
++						hud_globals->defaults.motion_sensor_range)
++			{
++				tiny_point2d_set(
++					&sensor->custom_blips[custom_index - out_of_range_count],
++					&customs[custom_index]);
++			}
++			else
++			{
++				out_of_range_count++;
++			}
+ 		}
+-	}
+ 
+-	sensor->custom_blip_count -= (byte)out_of_range_count;
++		sensor->custom_blip_count -= (byte)out_of_range_count;
++	}
+ 
+ update_motion_sensor_done:
+ 	{

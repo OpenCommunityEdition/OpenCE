@@ -1,0 +1,28 @@
+game_engine_king owner packet - apply order at cdc8ebd3 (HEAD eb33baec is cdc8ebd3 + a ledger-only commit)
+All paths below are relative to scratch/w/owner_queue/ub_king_glow/king/patches/.
+Every patch is a canonical git patch (LF, full blob index lines equal to the cdc8ebd3 blobs).
+`git apply --check` passes on each one and on 01-05 together; so does the combined king + glow set.
+
+IF THE OWNER SAYS YES (admit the BUG-commented uninitialised result):
+  01_king_source_owner_bug.patch          source/game/game_engine_king.c + .h
+                                           - 22 engine-table callbacks and king_globals become static (cachebeta publics)
+                                           - the header loses the 22 prototypes and `extern struct king_globals king_globals;`
+                                           - find_next_hill: local renamed next_hill (the /Od RTC name); policy-form BUG comment
+     (or instead of 01: alt/01A_king_source_owner_bug_od_single_exit.patch - the same change, but with the /Od 0x5bd630
+      single-exit shape `next_hill = ...; break;` and one `return next_hill;`. Byte-identical object; pick exactly one.)
+  02_king_symbols.patch                   config/symbols.json: 23 in-place `, "static": true` edits (22 fns + _king_globals)
+                                           full edited copy: ../new/config/symbols.json
+  03_king_config_status.patch             config/config.json: game_engine_king.c NonMatching -> Matching
+  04_king_semantic_data_matches.patch     config/semantic_data_matches.json: single-section _king_engine entry
+                                           (136 / 23 / 4009f5b6...65a7), NO allow_incomplete_unit
+  05_king_symbol_ownership_OPTIONAL.patch config/symbol_ownership.json: .bss snapshot for the three file-static King globals
+                                           (optional; the admission does not need it, it pins the linkage)
+
+  Apply 01 (or 01A) and 02 together: the storage edits in source and symbols.json must land atomically.
+  04 needs 03: apply_semantic_data_matches raises for a unit that is not complete and has no allow_incomplete_unit.
+
+IF THE OWNER SAYS NO:
+  if_declined/king_source_storage_only.patch + 02_king_symbols.patch [+ 05 optional]
+    = the review2-verified, byte-inert storage correction at zero credit (worker candidate c2, production comment kept).
+    Do NOT apply 03 or 04. The existing production read in find_next_hill is untouched by this patch; see RULING.md
+    for what a "no" implies for that already-credited function.

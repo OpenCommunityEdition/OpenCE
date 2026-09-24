@@ -1,0 +1,21 @@
+glow owner packet - apply order at cdc8ebd3 (HEAD eb33baec is cdc8ebd3 + a ledger-only commit)
+All paths below are relative to scratch/w/owner_queue/ub_king_glow/glow/patches/.
+Every patch is a canonical git patch (LF, full blob index lines equal to the cdc8ebd3 blobs).
+`git apply --check` passes on each one and on 01-03 together; so does the combined king + glow set.
+
+IF THE OWNER SAYS YES (admit the two BUG-commented uninitialised array reads in get_particle_world_position):
+  01_glow_source_owner_bug.patch   source/objects/widgets/glow.c: body of get_particle_world_position replaced with the
+                                    wave-2 cand_final body (== scratch/w/glow/cand_final.c byte-for-byte after apply);
+                                    HCEX/RTC local names, /Od vector_from_points3d + point_from_parametric_line routing,
+                                    two policy-form BUG comments
+  02_glow_parked.patch             config/parked.json: removes the glow _get_particle_world_position park entry
+  03_glow_config_status.patch      config/config.json: source/objects/widgets/glow.c NonMatching -> Matching
+  Apply all three together. Measured: 01 without 02 makes `configure.py progress` fail
+  ("parked-function evidence is stale or invalid: source/objects/widgets/glow:_get_particle_world_position").
+  symbols.json: no change (_get_particle_world_position is already "static": true, line 5061).
+  semantic_data_matches.json: no entry needed (.rdata 392/392 = 100%; no .data/.bss).
+
+IF THE OWNER SAYS NO:
+  Apply nothing. The current park (2,528/55 defined body, 49.07%) stays valid. The wave-2 fallback cand_fixed.c
+  was REJECTED by review2 (it propagates the point_from_parametric_line y-base z quirk into invented left-vector
+  interpolation, and it is 16 B larger than the park), so it is not offered.

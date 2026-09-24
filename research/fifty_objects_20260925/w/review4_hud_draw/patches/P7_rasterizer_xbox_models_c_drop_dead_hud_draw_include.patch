@@ -1,0 +1,12 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_models.c b/source/rasterizer/xbox/rasterizer_xbox_models.c
+index 86d2eb5a..ef1545e6 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_models.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_models.c
+@@ -102,7 +102,6 @@ symbols in this file:
+ #include "cseries/errors.h"
+ #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #include "bitmaps/bitmap_color_conversion.h"
+-#include "interface/hud_draw.h"
+ #include "math/periodic_functions.h"
+ #include "math/real_math.h"
+ #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D

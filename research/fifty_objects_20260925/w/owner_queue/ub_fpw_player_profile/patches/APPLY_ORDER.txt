@@ -1,0 +1,32 @@
+owner_queue/ub_fpw_player_profile - apply order at cdc8ebd3 (Halo objects 379)
+
+The two items are independent.  Each set applies to cdc8ebd3 on its own, and 01..06 also apply
+together in one invocation:  git apply --check patches/0[1-6]_*.patch  -> OK.
+No symbols.json edit and no csplit regeneration is needed for either item.  The split is already
+current: a control regen from cdc8ebd3 config is byte-identical to build/split for all 833 objects.
+
+ITEM 1  first_person_weapons patch B  (apply only if the owner admits the unguarded dereference)
+  01_fpw_B_source.patch            source/interface/first_person_weapons.c
+                                   drop REAL_MATH_EXTERNAL_{SQUARE_ROOT,MAGNITUDE_SQUARED3D,MAGNITUDE3D};
+                                   remove the two `first_person_weapon_animations &&` guards; add the BUG comments
+  02_fpw_B_retire_park.patch       config/parked.json: remove the _first_person_weapon_update park
+  03_fpw_B_status_matching.patch   config/config.json line 637: first_person_weapons.c -> "Matching"
+
+ITEM 2  player_profile R1-R3  (apply only if the owner admits all three of R1, R2 and R3)
+  04_pp_R1R3_source.patch          source/saved games/player_profile.c
+                                   (HCEX union player_profile_block, /Od local names, R1/R2/R3 forms + BUG comments;
+                                   the R3 comment is amended to say the file is deleted while still open)
+  05_pp_retire_parks.patch         config/parked.json: remove the write_thread_proc@4 / new / create_default parks
+  06_pp_status_matching.patch      config/config.json line 400: player_profile.c -> "Matching"
+
+  OPTIONAL variant, advised by reviewer 3 (HCEX type/member names; byte-inert).  Use it INSTEAD of 04:
+  optional/04a_pp_hcex_type_names.patch                then
+  optional/04b_pp_R1R3_source_over_hcex_names.patch    then 05, 06
+  Apply 04a and 04b as TWO SEPARATE `git apply` commands.  git cannot check two patches that edit the
+  same hunks of one file in a single invocation.  The sequential application was verified.
+  04a alone is also a byte-inert zero-credit patch if R1-R3 is refused (19/3, identical SHAs).
+
+After applying: run the full ninja build and the stable sweep, then refresh the docs ledger (integrator).
+Expected: both objects strict-complete.  Parks go 86 -> 82.  No new semantic_matches entries are needed
+(first_person_weapons' five objdiff-3.3.1 false negatives are already credited by semantic_matches.json
+and the accepted ledger).

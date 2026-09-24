@@ -1,0 +1,72 @@
+diff --git a/source/interface/hud_draw.h b/source/interface/hud_draw.h
+index 4c0505cd..f041b019 100644
+--- a/source/interface/hud_draw.h
++++ b/source/interface/hud_draw.h
+@@ -11,6 +11,14 @@ Narrow cross-translation-unit interface owned by HUD_DRAW.C.
+ #include "math/integer_math.h"
+ #include "math/real_math.h"
+ 
++/* ---------- constants */
++
++enum
++{
++	STACK_BUFFER_LENGTH = 0x80,
++	STACK_BUFFER_FILL = 0x62626262,
++};
++
+ enum hud_draw_flags
+ {
+ 	_hud_draw_flashing_bit = 0,
+@@ -20,6 +28,22 @@ enum hud_draw_flags
+ 	NUMBER_OF_HUD_DRAW_FLAGS
+ };
+ 
++/* ---------- macros */
++
++/* The stack sentinel: a guarded function starts with
++	long return_eip = get_return_eip();
++	long stack_buffer[STACK_BUFFER_LENGTH];
++	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
++and ends with this check of both its return address and its fill pattern. */
++#define match_assert_stack_frame(file, line) \
++{ \
++	short corrupt_index = check_stack_buffer(stack_buffer); \
++	match_vassert(file, line, return_eip==get_return_eip(), "corrupt return address!"); \
++	match_vassert(file, line, corrupt_index==NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index)); \
++}
++
++/* ---------- structures */
++
+ struct bitmap_data;
+ struct hud_absolute_placement_definition;
+ struct hud_color_definition;
+@@ -29,6 +53,8 @@ struct number_hud_element_definition;
+ struct static_hud_element_definition;
+ struct weapon_hud_overlay_definition;
+ 
++/* ---------- prototypes/HUD_DRAW.C */
++
+ long get_return_eip(
+ 	void);
+ real hud_globals_get_scale(
+@@ -110,4 +136,20 @@ void hud_draw_numbers(
+ 	long flash_reference_time,
+ 	real override_scale);
+ 
++/* ---------- public code */
++
++__inline short check_stack_buffer(
++	long *buffer)
++{
++	short index;
++
++	for (index = STACK_BUFFER_LENGTH-1; index>=0; index--)
++	{
++		if (buffer[index]!=STACK_BUFFER_FILL)
++			return index;
++	}
++
++	return NONE;
++}
++
+ #endif /* __HUD_DRAW_H */

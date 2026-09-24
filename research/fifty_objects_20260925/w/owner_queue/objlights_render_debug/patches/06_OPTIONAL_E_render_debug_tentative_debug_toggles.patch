@@ -1,0 +1,21 @@
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -319,12 +319,12 @@
+ 
+ /* ---------- globals */
+ 
+-extern boolean debug_bsp;
+-extern boolean debug_camera;
+-extern boolean debug_input;
+-extern boolean debug_permanent_decals;
+-extern boolean debug_player;
+-extern boolean debug_structure;
++boolean debug_bsp;
++boolean debug_camera;
++boolean debug_input;
++boolean debug_permanent_decals;
++boolean debug_player;
++boolean debug_structure;
+ 
+ static struct render_debug_globals_definition render_debug_globals;
+ 

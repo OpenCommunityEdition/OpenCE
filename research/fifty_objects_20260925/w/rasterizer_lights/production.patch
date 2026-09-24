@@ -1,0 +1,180 @@
+diff --git a/config/parked.json b/config/parked.json
+index 7b799f37..ef83e321 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1128,11 +1128,11 @@
+       "unit": "source/rasterizer/rasterizer_lights",
+       "function": "_rasterizer_lens_flares_draw",
+       "class": "unclassified",
+-      "evidence": "Complete typed lens-flare reflection renderer reconstructed from January control flow, assertions, relocations and the authenticated cross-build lens-flare definitions. It is retained because the genuine caller naturally owns the now-exact private corona-rotation evaluator. Peer audit corrected the texture-setup gate to break on a nonzero return, as proved independently by January's conditional branch and the recovered HCEA source. January and canonical are both 2,240 padded bytes with all 115 relocations; the remaining normalized instruction scheduling differs at 99.38321 percent similarity and receives zero exact credit. The natural math calls retain two helper COMDATs that the linked January split assigns elsewhere; no helper alias, declaration trick, forced inline, compiler steering, raw offset, undefined behavior or nonsensical branch is used. See docs/object_matching_logs/rasterizer_lights_obj_corona_rotation_and_draw_frontier_20260909.md.",
++      "evidence": "Complete typed lens-flare reflection renderer reconstructed from January control flow, assertions, relocations and the authenticated cross-build lens-flare definitions. It is retained because the genuine caller naturally owns the now-exact private corona-rotation evaluator. Peer audit corrected the texture-setup gate to break on a nonzero return, as proved independently by January's conditional branch and the recovered HCEA source. January and canonical are both 2,240 padded bytes with all 115 relocations; the remaining normalized instruction scheduling differs at 99.38321 percent similarity and receives zero exact credit. The natural math calls retain two helper COMDATs that the linked January split assigns elsewhere; no helper alias, declaration trick, forced inline, compiler steering, raw offset, undefined behavior or nonsensical branch is used. See docs/object_matching_logs/rasterizer_lights_obj_corona_rotation_and_draw_frontier_20260909.md. 2026-09-25 fifty-objects wave 4 re-baseline (zero exact credit): the hand-expanded reflection point is replaced by the /Od-attested genuine point_from_line3d(&position, &mirror, reflection->offset, &point) call (/Od 0x8308c5; house rule 6), light_brightness takes the /Od-attested 1.0f initialiser and conditional-expression assignment (/Od 0x82fb92, 0x82fcad-0x82fd8b), which closes the +0x202 occlusion_fraction/light_brightness operand order, and the /Od-attested named locals brightness_upper_bound, radius_upper_bound, set_texture_result and the separate second-loop counter are declared (/Od [ebp-0xc4], [ebp-0x100], [ebp-0x105], [ebp-0x140]). Remaining: the +0x31c i-term operand order of dot_product3d(&direction, &camera_offset) and the +0x738 set_texture argument interleave (dead locals, unused aggregates, TU names, declaration order, scope and argument order measured inert). See research/fifty_objects_20260925/w/rasterizer_lights/LEDGER.md.",
+       "measurements": {
+         "target": { "size": 2240, "relocation_count": 115, "normalized_sha256": "05fb320827e436e1733ef2667350c93c08d8acfe68778f47d3ff0a6f675a583b" },
+-        "base": { "size": 2240, "relocation_count": 115, "normalized_sha256": "25834daf80e88b4175ab92e01e17a5cc917acdeb58f57fc1b9856c22e317fb03" },
+-        "objdiff_percent": 99.38321
++        "base": { "size": 2240, "relocation_count": 115, "normalized_sha256": "39103012d0bd42ef0f16cc285c5617331a95ce432f2d7bae17376d3781d79972" },
++        "objdiff_percent": 99.38626
+       }
+     },
+     {
+diff --git a/config/symbols.json b/config/symbols.json
+index 83830013..b09a64b0 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -6210,7 +6210,7 @@
+ { "file_offset": 1510144, "flags": 32, "name": "_rasterizer_lights_begin" },
+ { "file_offset": 1510160, "flags": 32, "name": "_rasterizer_light_submit" },
+ { "file_offset": 1510496, "flags": 32, "name": "_rasterizer_lights_end" },
+-{ "file_offset": 1510512, "flags": 32, "name": "_lens_flare_evaluate_corona_rotation_function" },
++{ "file_offset": 1510512, "flags": 32, "name": "_lens_flare_evaluate_corona_rotation_function", "static": true },
+ { "file_offset": 1511104, "flags": 32, "name": "_rasterizer_lens_flare_submit" },
+ { "file_offset": 1511760, "flags": 32, "name": "_rasterizer_lens_flare_submit_for_cluster" },
+ { "file_offset": 1512160, "flags": 32, "name": "_rasterizer_lens_flares_submit_occlusion_tests" },
+@@ -23224,11 +23224,11 @@
+ { "file_offset": 4615028, "flags": 0, "name": "_profile_accumulation_index", "static": true },
+ { "file_offset": 4615032, "flags": 0, "name": "_profile_accumulated_time", "static": true },
+ { "file_offset": 4615036, "flags": 0, "name": "_profile_accumulated_pushbuffer_size", "static": true },
+-{ "file_offset": 4615040, "flags": 0, "name": "_local_lens_flare_occlusion_test_results2" },
+-{ "file_offset": 4877216, "flags": 0, "name": "_local_lens_flare_occlusion_test_results" },
+-{ "file_offset": 4907680, "flags": 0, "name": "_local_lens_flare_parameters" },
+-{ "file_offset": 4948640, "flags": 0, "name": "_local_lens_flare_count" },
+-{ "file_offset": 4948644, "flags": 0, "name": "_local_lens_flare_error_printed" },
++{ "file_offset": 4615040, "flags": 0, "name": "_local_lens_flare_occlusion_test_results2", "static": true },
++{ "file_offset": 4877216, "flags": 0, "name": "_local_lens_flare_occlusion_test_results", "static": true },
++{ "file_offset": 4907680, "flags": 0, "name": "_local_lens_flare_parameters", "static": true },
++{ "file_offset": 4948640, "flags": 0, "name": "_local_lens_flare_count", "static": true },
++{ "file_offset": 4948644, "flags": 0, "name": "?warned@?1??rasterizer_lens_flare_submit@@9@9", "static": true },
+ { "file_offset": 4948648, "flags": 0, "name": "_global_memory_pool" },
+ { "file_offset": 4948652, "flags": 0, "name": "_global_memory_index" },
+ { "file_offset": 4948656, "flags": 0, "name": "_rasterizer_swizzle_z_mask", "static": true },
+diff --git a/source/rasterizer/rasterizer_lights.c b/source/rasterizer/rasterizer_lights.c
+index e13b301a..b6f75b39 100644
+--- a/source/rasterizer/rasterizer_lights.c
++++ b/source/rasterizer/rasterizer_lights.c
+@@ -381,11 +381,10 @@ static real lens_flare_evaluate_corona_rotation_function(
+ 
+ /* ---------- globals */
+ 
+-static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[MAXIMUM_LIGHTS_PER_MAP];
++static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_results[MAXIMUM_LIGHTS_PER_MAP] = {0};
+ static byte local_lens_flare_occlusion_test_results2[MAXIMUM_LENS_FLARE_MARKERS_PER_STRUCTURE+MAXIMUM_QUEUED_LENS_FLARES][MAXIMUM_WINDOWS];
+ static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
+ static long local_lens_flare_count = 0;
+-static boolean local_lens_flare_error_printed = FALSE;
+ extern struct rasterizer_lights_globals rasterizer_lights;
+ extern struct rasterizer_lights_window_parameters global_window_parameters;
+ extern short global_screenshot_count;
+@@ -548,6 +547,8 @@ void rasterizer_lights_reset_for_new_map(
+ void rasterizer_lens_flare_submit(
+ 	struct rasterizer_lens_flare_submit_parameters const *parameters)
+ {
++	static boolean warned = FALSE;
++
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\rasterizer_lights.c",
+ 		266,
+@@ -633,10 +634,10 @@ void rasterizer_lens_flare_submit(
+ 		}
+ 		else
+ 		{
+-			if (!local_lens_flare_error_printed)
++			if (!warned)
+ 			{
+ 				error(2, "### ERROR too many lens flares submitted to frame");
+-				local_lens_flare_error_printed= TRUE;
++				warned= TRUE;
+ 			}
+ 		}
+ 	}
+@@ -904,7 +905,7 @@ void rasterizer_lens_flares_draw(
+ 					real_vector3d mirror;
+ 					real depth;
+ 					real occlusion_fraction;
+-					real light_brightness;
++					real light_brightness = 1.0f;
+ 					real corona_rotation;
+ 					real screen_rotation;
+ 					real cosine_scale;
+@@ -925,18 +926,13 @@ void rasterizer_lens_flares_draw(
+ 
+ 					occlusion_fraction = *occlusion_test_result*(1.0f/255.0f);
+ 
+-					if (definition->far_fade_distance > 0.0f)
+-					{
+-						light_brightness = PIN(
++					light_brightness = definition->far_fade_distance > 0.0f ?
++						PIN(
+ 							(depth-definition->far_fade_distance)/
+ 								(definition->near_fade_distance-definition->far_fade_distance),
+ 							0.0f,
+-							1.0f);
+-					}
+-					else
+-					{
+-						light_brightness = 1.0f;
+-					}
++							1.0f) :
++						1.0f;
+ 
+ 					light_brightness *= occlusion_fraction;
+ 					light_brightness *= uncompress_int8_to_real(
+@@ -979,8 +975,9 @@ void rasterizer_lens_flares_draw(
+ 								reflection_index,
+ 								struct lens_flare_reflection);
+ 							real brightness_lower_bound = reflection->brightness_lower_bounds;
++							real brightness_upper_bound = reflection->brightness_upper_bounds;
+ 							real brightness = (brightness_lower_bound+
+-								(reflection->brightness_upper_bounds-brightness_lower_bound)*light_scale)*
++								(brightness_upper_bound-brightness_lower_bound)*light_scale)*
+ 								scale_functions[reflection->brightness_scale_function]*light_brightness;
+ 
+ 							if (reflection_index == 0)
+@@ -991,8 +988,9 @@ void rasterizer_lens_flares_draw(
+ 							if (brightness > 0.0f)
+ 							{
+ 								real radius_lower_bound = reflection->radius_lower_bounds;
++								real radius_upper_bound = reflection->radius_upper_bounds;
+ 								real radius = radius_lower_bound+
+-									(reflection->radius_upper_bounds-radius_lower_bound)*light_scale;
++									(radius_upper_bound-radius_lower_bound)*light_scale;
+ 								real_argb_color color;
+ 								real_vector2d radius_scale;
+ 								real rotation;
+@@ -1094,17 +1092,16 @@ void rasterizer_lens_flares_draw(
+ 								}
+ 
+ 								{
+-									real offset = reflection->offset;
+ 									real_point3d point;
++									boolean set_texture_result;
+ 
+-									point.x = offset*mirror.i + position.x;
+-									point.y = offset*mirror.j + position.y;
+-									point.z = offset*mirror.k + position.z;
++									point_from_line3d(&position, &mirror, reflection->offset, &point);
+ 
+-									if (rasterizer_widget_set_texture(
++									set_texture_result = rasterizer_widget_set_texture(
+ 										0,
+ 										definition->primary_map.index,
+-										reflection->bitmap_index))
++										reflection->bitmap_index);
++									if (set_texture_result)
+ 									{
+ 										break;
+ 									}
+@@ -1138,10 +1135,12 @@ void rasterizer_lens_flares_draw(
+ 
+ 		if (rasterizer_debug_options.ray_of_buddha)
+ 		{
+-			for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
++			short sun_lens_flare_index;
++
++			for (sun_lens_flare_index = 0; sun_lens_flare_index < local_lens_flare_count; sun_lens_flare_index++)
+ 			{
+ 				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+-					lens_flare_submit_parameter_get(lens_flare_index);
++					lens_flare_submit_parameter_get(sun_lens_flare_index);
+ 
+ 				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
+ 					(lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==

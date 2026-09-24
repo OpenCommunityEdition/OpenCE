@@ -1,0 +1,18 @@
+diff --git a/source/effects/player_effects.c b/source/effects/player_effects.c
+index 5c234df9..3aa94134 100644
+--- a/source/effects/player_effects.c
++++ b/source/effects/player_effects.c
+@@ -368,11 +368,8 @@ void player_effect_add_continuous_effect(
+ 		struct player_effect_datum *effect = player_effect_get(local_player_index);
+ 		struct continuous_player_effect_datum *continuous = &effect->continuous_effect;
+ 		real scale = PIN(1.0f - (distance - definition->falloff_radius) / (definition->falloff_radius - definition->cutoff_radius), 0.0f, 1.0f);
+-		real magnitude;
+-
+-		magnitude = ((1.0f - definition->camera_shake.periodic_weight) +
+-			periodic_function_evaluate(definition->camera_shake.periodic_function, game_time_get() / definition->camera_shake.periodic_period) *
+-			definition->camera_shake.periodic_weight) * scale;
++		real periodic = periodic_function_evaluate(definition->camera_shake.periodic_function, game_time_get() / definition->camera_shake.periodic_period);
++		real magnitude = ((1.0f - definition->camera_shake.periodic_weight) + periodic * definition->camera_shake.periodic_weight) * scale;
+ 
+ 		if (effect->continuous_effect_timer > 0)
+ 		{

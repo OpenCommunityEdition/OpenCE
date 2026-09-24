@@ -1,0 +1,25 @@
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -5135,7 +5135,7 @@
+ { "file_offset": 1214400, "flags": 32, "name": "_shade_vector3d", "static": true },
+ { "file_offset": 1214496, "flags": 32, "name": "_sample_lightmap" },
+ { "file_offset": 1214752, "flags": 32, "name": "_sample_diffuse_texture" },
+-{ "file_offset": 1214992, "flags": 32, "name": "_should_render_lights" },
++{ "file_offset": 1214992, "flags": 32, "name": "_should_render_lights", "static": true },
+ { "file_offset": 1215024, "flags": 32, "name": "_lights_initialize" },
+ { "file_offset": 1215216, "flags": 32, "name": "_lights_dispose" },
+ { "file_offset": 1215232, "flags": 32, "name": "_lights_initialize_for_new_map" },
+@@ -5147,10 +5147,10 @@
+ { "file_offset": 1215696, "flags": 32, "name": "_light_particle" },
+ { "file_offset": 1216304, "flags": 32, "name": "_light_disconnect_from_map" },
+ { "file_offset": 1216400, "flags": 32, "name": "_lights_disconnect_from_structure_bsp" },
+-{ "file_offset": 1216576, "flags": 32, "name": "_light_attenuation" },
++{ "file_offset": 1216576, "flags": 32, "name": "_light_attenuation", "static": true },
+ { "file_offset": 1216608, "flags": 32, "name": "_brighten_real_rgb_color", "static": true },
+-{ "file_offset": 1216768, "flags": 32, "name": "_cluster_get_first_light" },
+-{ "file_offset": 1216800, "flags": 32, "name": "_cluster_get_next_light" },
++{ "file_offset": 1216768, "flags": 32, "name": "_cluster_get_first_light", "static": true },
++{ "file_offset": 1216800, "flags": 32, "name": "_cluster_get_next_light", "static": true },
+ { "file_offset": 1216832, "flags": 32, "name": "_light_marker_begin", "static": true },
+ { "file_offset": 1216896, "flags": 32, "name": "_light_unmarked", "static": true },
+ { "file_offset": 1216992, "flags": 32, "name": "_light_mark", "static": true },

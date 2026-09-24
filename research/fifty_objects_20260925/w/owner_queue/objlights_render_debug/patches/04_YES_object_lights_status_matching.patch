@@ -1,0 +1,11 @@
+--- a/config/config.json
++++ b/config/config.json
+@@ -524,7 +524,7 @@
+ 				{ "name": "source/objects/objects.c", "index": 149, "status": "Matching" },
+ 				{ "name": "source/objects/object_types.c", "index": 150, "status": "Matching" },
+ 				{ "name": "source/objects/object_shadows.c", "index": 151, "status": "Matching" },
+-				{ "name": "source/objects/object_lights.c", "index": 152, "status": "NonMatching" },
++				{ "name": "source/objects/object_lights.c", "index": 152, "status": "Matching" },
+ 				{ "name": "source/objects/object_deleted_procs.c", "index": 153, "status": "Matching" },
+ 				{ "name": "source/objects/object_definitions.c", "index": 154, "status": "Matching" },
+ 				{ "name": "source/objects/light_definitions.c", "index": 155, "status": "Matching" },

@@ -1,0 +1,17 @@
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -2,14 +2,6 @@
+   "version": 1,
+   "entries": [
+     {
+-      "unit": "source/hs/hs_scenario_definitions",
+-      "class": "source-layout-incomplete",
+-      "symbol": ".data",
+-      "reason": "January's data section has 8-byte alignment while the rebuilt section has 4-byte alignment. The current definitions force their layout with invented aggregates, pack/align directives and a padding member; identical payload alone does not authenticate the object.",
+-      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+-      "reopen": "Recover the genuine separate January data definitions and their natural alignment, including the static byte-swap owner, without fabricated aggregates or padding; preserve target code and data bytes across a full sweep."
+-    },
+-    {
+       "unit": "source/hs/hs_globals_external",
+       "class": "source-layout-incomplete",
+       "symbol": "_hs_external_global_definitions",

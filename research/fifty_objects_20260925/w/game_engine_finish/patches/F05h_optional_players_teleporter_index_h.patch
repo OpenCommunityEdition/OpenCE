@@ -1,0 +1,13 @@
+diff --git a/source/game/players.h b/source/game/players.h
+index 34ee5f08..769ca943 100644
+--- a/source/game/players.h
++++ b/source/game/players.h
+@@ -100,7 +100,7 @@ struct player_datum
+ 	struct network_player network_player_data;
+ 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+ 	real speed_multiplier;
+-	long unknown70;
++	long teleporter_index;
+ 	long state_message;
+ 	long state_message_player_index;
+ 	long unknown7c;

@@ -1,0 +1,100 @@
+diff --git a/source/interface/hud_nav_points.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_nav_points\\st1.c"
+index 700a6e03..36b392c3 100644
+--- a/source/interface/hud_nav_points.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_nav_points\\st1.c"
+@@ -776,7 +776,7 @@ void custom_render_nav_point(
+ 	short waypoint_type)
+ {
+ 	long return_eip = get_return_eip();
+-	long stack_buffer[STACK_BUFFER_LENGTH];
++	long stack_buffer[0x80];
+ 	struct hud_waypoint_arrow *arrow;
+ 	real_point3d view_point;
+ 	real distance;
+@@ -986,7 +986,37 @@ void custom_render_nav_point(
+ 		}
+ 	}
+ 
+-	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 675);
++	{
++		short corrupt_index;
++		short buffer_index;
++
++		for (buffer_index = 0x7F; buffer_index>=0; buffer_index--)
++		{
++			if (stack_buffer[buffer_index]!=0x62626262)
++			{
++				goto corrupt_stack_found_custom_render_nav_point;
++			}
++		}
++
++		corrupt_index = NONE;
++		goto stack_buffer_checked_custom_render_nav_point;
++
++corrupt_stack_found_custom_render_nav_point:
++		corrupt_index = buffer_index;
++
++stack_buffer_checked_custom_render_nav_point:
++
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
++			675,
++			return_eip==get_return_eip(),
++			"corrupt return address!");
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
++			675,
++			corrupt_index==NONE,
++			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
++	}
+ 
+ 	return;
+ }
+@@ -1070,7 +1100,7 @@ static void hud_update_nav_point_local_player(
+ 	short local_player_index)
+ {
+ 	long return_eip = get_return_eip();
+-	long stack_buffer[STACK_BUFFER_LENGTH];
++	long stack_buffer[0x80];
+ 	struct hud_nav_point_player_datum *datum;
+ 	long unit_index;
+ 	short nav_point_index;
+@@ -1157,7 +1187,37 @@ static void hud_update_nav_point_local_player(
+ 		}
+ 	}
+ 
+-	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 496);
++	{
++		short corrupt_index;
++		short buffer_index;
++
++		for (buffer_index = 0x7F; buffer_index>=0; buffer_index--)
++		{
++			if (stack_buffer[buffer_index]!=0x62626262)
++			{
++				goto corrupt_stack_found;
++			}
++		}
++
++		corrupt_index = NONE;
++		goto stack_buffer_checked;
++
++corrupt_stack_found:
++		corrupt_index = buffer_index;
++
++stack_buffer_checked:
++
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
++			496,
++			return_eip==get_return_eip(),
++			"corrupt return address!");
++		match_vassert(
++			"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
++			496,
++			corrupt_index==NONE,
++			csprintf(temporary, "corrupt stack at %d!", corrupt_index));
++	}
+ 
+ 	return;
+ }

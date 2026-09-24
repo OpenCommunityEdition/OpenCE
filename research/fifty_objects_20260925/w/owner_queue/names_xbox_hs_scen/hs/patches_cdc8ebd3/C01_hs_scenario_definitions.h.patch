@@ -1,0 +1,20 @@
+--- a/source/hs/hs_scenario_definitions.h
++++ b/source/hs/hs_scenario_definitions.h
+@@ -20,6 +20,17 @@
+ 	NUMBER_OF_HS_SCRIPT_TYPES,
+ };
+ 
++enum
++{
++	MAXIMUM_HS_SCRIPTS_PER_SCENARIO = 512,
++	MAXIMUM_HS_GLOBALS_PER_SCENARIO = 128,
++	MAXIMUM_HS_REFERENCES_PER_SCENARIO = 256,
++	MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO = 19001,
++	MAXIMUM_HS_STRING_DATA_PER_SCENARIO = 0x40000,
++	MAXIMUM_HS_SOURCE_FILES_PER_SCENARIO = 8,
++	MAXIMUM_HS_SOURCE_DATA_PER_FILE = 0x40000,
++};
++
+ /* ---------- headers */
+ 
+ #include "tag_files/tag_groups.h"

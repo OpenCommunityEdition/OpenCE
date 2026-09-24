@@ -1,0 +1,68 @@
+diff --git a/config/parked.json b/config/parked.json
+index 7b799f37..fb87205a 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -115,63 +115,6 @@
+       },
+       "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Repair the null-source clear to four output bytes rather than the original 64-byte overrun. Require coordinates 0..3, not the original inclusive 4 which permits an invalid selector shift. Preserve the actual three/four-color palette implementation. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning.  On 2026-09-21 (Lane C, graphics/UI) RGBToColor's body was restored to January's in-place channel form and its `= { 0 }` initialiser dropped, which made RGBToColor and DecodeBlockRGB strict exact. This function's bytes moved as a consequence and the base measurement is refreshed here: its size and relocation count now EQUAL January's (the tag went from [size 432!=496, relocs 11!=10, sha] to [sha] only), so the remaining residual is ordering or selection rather than structure. Its January assert text (`u>=0 && u<=4` / `v<=4` against our `< 4`) is a separate owner-held January defect and is unchanged."
+     },
+-    {
+-      "unit": "source/saved games/player_profile",
+-      "function": "_player_profile_write_thread_proc@4",
+-      "class": "unclassified",
+-      "measurements": {
+-        "target": {
+-          "size": 352,
+-          "relocation_count": 27,
+-          "normalized_sha256": "9a173aa9929df8a1827813fbb56be23b0e01ba5909c15458179fcdecc81a0cf5"
+-        },
+-        "base": {
+-          "size": 384,
+-          "relocation_count": 27,
+-          "normalized_sha256": "bbb652e083aadc92e51e4445f93d49d41941e7c53f50cc1883658c355aa579cb"
+-        },
+-        "objdiff_percent": 88.451324
+-      },
+-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the genuine thread callback, mutex/file/checksum/metadata lifecycle and typed 512-byte file block, with initialized padding rather than serializing stack bytes. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md."
+-    },
+-    {
+-      "unit": "source/saved games/player_profile",
+-      "function": "_player_profile_new",
+-      "class": "unclassified",
+-      "measurements": {
+-        "target": {
+-          "size": 464,
+-          "relocation_count": 19,
+-          "normalized_sha256": "ce58c5a489fbc7f573a6dfe0317252b6e02b73afcfd552784c6bc7bb18d22dc6"
+-        },
+-        "base": {
+-          "size": 464,
+-          "relocation_count": 18,
+-          "normalized_sha256": "4df7452aff75a49e3ce459ccce47ed3e699b3bf20092cfbfdfd1cbcc58fbb01d"
+-        },
+-        "objdiff_percent": 76.566666
+-      },
+-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep the complete creation/default/name/level/checksum graph and initialize the entire file block. Close using the valid opened index before deleting a failed write and setting the returned index to NONE; never pass NONE to the asserted close API. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+-    },
+-    {
+-      "unit": "source/saved games/player_profile",
+-      "function": "_player_profile_create_default_profiles_on_disk",
+-      "class": "unclassified",
+-      "measurements": {
+-        "target": {
+-          "size": 288,
+-          "relocation_count": 14,
+-          "normalized_sha256": "0f24b860ac0a7fc78494fc8a5800b536295353b883b135905cd1bab3f8d96b64"
+-        },
+-        "base": {
+-          "size": 336,
+-          "relocation_count": 14,
+-          "normalized_sha256": "3ce0cc6f2de1f5b8b0af45174e0ceddd0c5938259a79b8822281af82cf7d3347"
+-        },
+-        "objdiff_percent": 83.795456
+-      },
+-      "evidence": "Best currently integrated house-rule-compliant reconstruction from the 2026-09-07 PlayerProfile/S3TC reconciliation batch. Keep both real default profiles and the typed checksummed file format. Initialize all serialized padding and close after every successful open, including seek failure; do not restore the donor's disclosure/leak paths. See docs/object_matching_logs/player_profile_s3tc_batch_reconciliation_20260907.md for donor provenance, raw-target limits, full-batch review and research pointers. Zero exact credit; retain for future evidence-driven work without source-pressure tuning."
+-    },
+     {
+       "unit": "source/interface/ui_widget_game_data_input_functions",
+       "function": "_solo_level_select_list_update_displayed_items",

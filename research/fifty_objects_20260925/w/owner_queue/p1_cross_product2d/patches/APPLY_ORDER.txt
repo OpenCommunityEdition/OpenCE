@@ -1,0 +1,24 @@
+actor_combat P1 (cross_product2d) owner packet - apply order at cdc8ebd3
+(only if the owner answers YES to RULING.md; nothing here lands otherwise)
+
+1. 01_actor_combat_cross_product2d.patch
+      source/ai/actor_combat.c: drop the TU-private `#define cross_product2d cross_product2d_inline` / `#undef`,
+      drop the hand-written NODUP `real cross_product2d(...)` copy, and spell the /Od-attested call in
+      actor_aim_grenade: `cross_product2d((real_vector2d const *)&actor->input.facing_vector, &aim_vector2d) > 0.0f`.
+      Identical to the wave-2 patch (research/fifty_objects_20260925/w/cross_product2d/); actor_combat.c is
+      unchanged 931ed8dc..cdc8ebd3, so no rebase edit was needed.
+2. 02_config_status_five_objects.patch
+      config/config.json: NonMatching -> Matching for
+        source/ai/path_obstacle_avoidance.c, source/ai/path_smoothing.c, source/math/real_math.c,
+        source/physics/collision_features.c, source/ai/path_structure_bsp.c
+3. EITHER 03_retire_collision_features_rejection.patch            (required minimum)
+   OR     03b_ALTERNATIVE_retire_collision_features_and_decals_cross_product2d_rejections.patch
+      config/object_admission_rejections.json. 03 removes the stale collision_features
+      `_projection_from_vector3d` entry (required, or the admission audit reports collision_features as
+      completion-label-contradicted). 03b additionally removes the decals `_cross_product2d` entry whose premise
+      (NODUP actor_combat copy) P1 removes; decals stays NonMatching regardless. 03 and 03b edit adjacent
+      entries: apply exactly one of them.
+
+Checked: `git apply --check` clean at cdc8ebd3 for 01+02+03 and for 01+02+03b (each also alone).
+No symbols.json, header, parked.json or semantic_*.json change is needed.
+Integrator must still run the full batch gate (ninja, stable_verdicts diff, parks, admission, fake scan, pytest).

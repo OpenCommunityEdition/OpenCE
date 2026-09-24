@@ -1,0 +1,25 @@
+--- a/source/saved games/saved_game_files.c
++++ b/source/saved games/saved_game_files.c
+@@ -1619,7 +1619,13 @@
+ 	boolean include_default_profiles)
+ {
+ 	struct enumerated_saved_game_file file;
+-	long number_of_available_profiles = 0;
++	/* BUG (preserved for exact matching): January zeroes the count only after
++	 * taking the saved game files mutex (xor edi,edi at +0x94), so the mutex
++	 * failure path stores an indeterminate count (+0x156 loads the dead
++	 * player_index home [ebp+8]). A corrected build should initialize
++	 * number_of_available_profiles to zero here.
++	 */
++	long number_of_available_profiles;
+ 	word memory_unit_index = _memory_unit_hard_drive;
+ 
+ 	match_assert(
+@@ -1637,6 +1643,7 @@
+ 		}
+ 
+ 		number_of_entries = count_enumerated_profiles_in_mapfile(memory_unit_index);
++		number_of_available_profiles = 0;
+ 		if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+ 		{
+ 			if (open_mapfile_for_reading(memory_unit_index))

@@ -1,0 +1,332 @@
+--- a/source/rasterizer/xbox/rasterizer_xbox.c
++++ b/source/rasterizer/xbox/rasterizer_xbox.c
+@@ -169,7 +169,7 @@
+ 001465D0 0080:
+ 	_SetupSmartStates (0000)
+ 00146650 0210:
+-	_rasterizer_filthy_bitmap_default_initialize (0000)
++	_rasterizer_filthy_bitmap_defaults_initialize (0000)
+ 00146860 0930:
+ 	__rasterizer_initialize (0000)
+ 00147190 0090:
+@@ -193,7 +193,9 @@
+ 001487E0 00e0:
+ 	__rasterizer_window_end (0000)
+ 0028BFAC 006c:
+-	_framebuffer_blend_function_states (0000)
++	?srcblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0000)
++	?destblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0024)
++	?blendop_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0048)
+ 0028C018 0026:
+ 	??_C@_0CG@LJAEJIHF@?$CD?$CD?$CD?5ERROR?5failed?5to?5create?5D3D?5d@ (0000)
+ 0028C040 0096:
+@@ -377,7 +379,29 @@
+ 0030CEEC 0006:
+ 	_rasterizer_state_cache (0000)
+ 0045E028 08b6:
+-	_rasterizer_xbox_d3d_globals (0000)
++	_node_matrix_constants (0000)
++	_bitmap_dimensions_non_blocking (0840)
++	_bitmap_dimensions (0844)
++	_d3d (0848)
++	_global_d3d_texture_render_primary (084c)
++	_global_d3d_surface_render_primary (0854)
++	_global_d3d_surface_render_primary_z (0858)
++	_global_d3d_texture_render_secondary (085c)
++	_global_d3d_texture_render_secondary_z (0860)
++	_global_d3d_surface_render_secondary (0864)
++	_global_d3d_surface_render_secondary_z (0868)
++	_global_d3d_texture_shadow_primary (086c)
++	_global_d3d_surface_shadow_primary (0870)
++	_global_d3d_texture_shadow_secondary (0874)
++	_global_d3d_surface_shadow_secondary (0878)
++	_global_d3d_texture_sun_glow_primary (087c)
++	_global_d3d_surface_sun_glow_primary (0880)
++	_global_d3d_texture_sun_glow_secondary (0884)
++	_global_d3d_surface_sun_glow_secondary (0888)
++	_global_d3d_texture_water (088c)
++	_global_d3d_surface_water (0890)
++	_global_d3d_texture_render_primary_copy (08a0)
++	_global_d3d_surface_render_primary_copy (08a4)
+ 	_global_d3d_device (08a8)
+ */
+ 
+@@ -437,14 +461,6 @@
+ 
+ enum
+ {
+-	_framebuffer_blend_state_source_blend = 0,
+-	_framebuffer_blend_state_destination_blend,
+-	_framebuffer_blend_state_blend_operation,
+-	NUMBER_OF_FRAMEBUFFER_BLEND_STATES
+-};
+-
+-enum
+-{
+ 	RASTERIZER_MAXIMUM_TEXTURE_STAGES = 4,
+ };
+ 
+@@ -786,80 +802,51 @@
+ 
+ /* ---------- prototypes */
+ 
++static void rasterizer_filthy_bitmap_defaults_initialize(
++	void);
++
+ void SetupSmartStates(
+ 	void);
+ 
+ /* ---------- globals */
+ 
+-/* January keeps this object's private Direct3D state in one contiguous owner.
+- * The aggregate name follows the subsystem convention; member names come from
+- * the object's own IDirect3D*() error strings and their relocation offsets. */
+-struct rasterizer_xbox_d3d_globals
+-{
+-	real node_matrix_constants
+-		[RASTERIZER_MAXIMUM_NODES_PER_MODEL][3][4];         /* +0    */
+-	point2d bitmap_dimensions_non_blocking;             /* +2112 */
+-	point2d bitmap_dimensions;                          /* +2116 */
+-	Direct3D *d3d;                                      /* +2120 */
+-	/* hand-built descriptors wrapping the two back buffers */
+-	D3DBaseTexture *global_d3d_texture_render_primary[2];/* +2124 */
+-	D3DSurface *global_d3d_surface_render_primary;      /* +2132 */
+-	D3DSurface *global_d3d_surface_render_primary_z;    /* +2136 */
+-	D3DTexture *global_d3d_texture_render_secondary;    /* +2140 */
+-	/* the render-secondary target has no depth buffer; both slots are
+-	 * explicitly cleared at initialization.  The texture name is inferred
+-	 * from the surface name immediately behind it. */
+-	D3DTexture *global_d3d_texture_render_secondary_z;   /* +2144 */
+-	D3DSurface *global_d3d_surface_render_secondary;    /* +2148 */
+-	D3DSurface *global_d3d_surface_render_secondary_z;   /* +2152 */
+-	D3DTexture *global_d3d_texture_shadow_primary;      /* +2156 */
+-	D3DSurface *global_d3d_surface_shadow_primary;      /* +2160 */
+-	D3DTexture *global_d3d_texture_shadow_secondary;    /* +2164 */
+-	D3DSurface *global_d3d_surface_shadow_secondary;    /* +2168 */
+-	D3DTexture *global_d3d_texture_sun_glow_primary;    /* +2172 */
+-	D3DSurface *global_d3d_surface_sun_glow_primary;    /* +2176 */
+-	D3DTexture *global_d3d_texture_sun_glow_secondary;  /* +2180 */
+-	D3DSurface *global_d3d_surface_sun_glow_secondary;  /* +2184 */
+-	D3DTexture *global_d3d_texture_water;               /* +2188 */
+-	D3DSurface *global_d3d_surface_water
+-		[RASTERIZER_TARGET_WATER_MAX_MIPMAP_LEVELS];    /* +2192 */
+-	D3DBaseTexture *global_d3d_texture_render_primary_copy; /* +2208 */
+-	D3DSurface *global_d3d_surface_render_primary_copy; /* +2212 */
+-};
+-
+-struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals = { 0 };
+-
+-#define node_matrix_constants rasterizer_xbox_d3d_globals.node_matrix_constants
+-#define d3d rasterizer_xbox_d3d_globals.d3d
+-#define bitmap_dimensions_non_blocking rasterizer_xbox_d3d_globals.bitmap_dimensions_non_blocking
+-#define bitmap_dimensions rasterizer_xbox_d3d_globals.bitmap_dimensions
+-#define global_d3d_texture_render_primary rasterizer_xbox_d3d_globals.global_d3d_texture_render_primary
+-#define global_d3d_surface_render_primary rasterizer_xbox_d3d_globals.global_d3d_surface_render_primary
+-#define global_d3d_surface_render_primary_z rasterizer_xbox_d3d_globals.global_d3d_surface_render_primary_z
+-#define global_d3d_texture_render_secondary rasterizer_xbox_d3d_globals.global_d3d_texture_render_secondary
+-#define global_d3d_texture_render_secondary_z rasterizer_xbox_d3d_globals.global_d3d_texture_render_secondary_z
+-#define global_d3d_surface_render_secondary rasterizer_xbox_d3d_globals.global_d3d_surface_render_secondary
+-#define global_d3d_texture_shadow_primary rasterizer_xbox_d3d_globals.global_d3d_texture_shadow_primary
+-#define global_d3d_surface_shadow_primary rasterizer_xbox_d3d_globals.global_d3d_surface_shadow_primary
+-#define global_d3d_texture_shadow_secondary rasterizer_xbox_d3d_globals.global_d3d_texture_shadow_secondary
+-#define global_d3d_surface_shadow_secondary rasterizer_xbox_d3d_globals.global_d3d_surface_shadow_secondary
+-#define global_d3d_texture_sun_glow_primary rasterizer_xbox_d3d_globals.global_d3d_texture_sun_glow_primary
+-#define global_d3d_surface_sun_glow_primary rasterizer_xbox_d3d_globals.global_d3d_surface_sun_glow_primary
+-#define global_d3d_texture_sun_glow_secondary rasterizer_xbox_d3d_globals.global_d3d_texture_sun_glow_secondary
+-#define global_d3d_surface_sun_glow_secondary rasterizer_xbox_d3d_globals.global_d3d_surface_sun_glow_secondary
+-#define global_d3d_texture_water rasterizer_xbox_d3d_globals.global_d3d_texture_water
+-#define global_d3d_surface_water rasterizer_xbox_d3d_globals.global_d3d_surface_water
+-#define global_d3d_surface_render_secondary_z rasterizer_xbox_d3d_globals.global_d3d_surface_render_secondary_z
+-#define global_d3d_texture_render_primary_copy rasterizer_xbox_d3d_globals.global_d3d_texture_render_primary_copy
+-#define global_d3d_surface_render_primary_copy rasterizer_xbox_d3d_globals.global_d3d_surface_render_primary_copy
++/* this object's private Direct3D state; the IDirect3D*() error strings name
++ * these globals bare (not as members of an aggregate), and cachebeta.pdb has
++ * no public in 0x0045E028..0x0045E8CF, so each is a file static. */
++static real node_matrix_constants[RASTERIZER_MAXIMUM_NODES_PER_MODEL][3][4] = { 0 };
++static point2d bitmap_dimensions_non_blocking = { 0 };
++static point2d bitmap_dimensions = { 0 };
++static Direct3D *d3d = NULL;
++/* hand-built descriptors wrapping the two back buffers */
++static D3DBaseTexture *global_d3d_texture_render_primary[2] = { 0 };
++static D3DSurface *global_d3d_surface_render_primary = NULL;
++static D3DSurface *global_d3d_surface_render_primary_z = NULL;
++static D3DTexture *global_d3d_texture_render_secondary = NULL;
++/* the render-secondary target has no depth buffer; both slots are
++ * explicitly cleared at initialization.  The texture name is inferred
++ * from the surface name immediately behind it. */
++static D3DTexture *global_d3d_texture_render_secondary_z = NULL;
++static D3DSurface *global_d3d_surface_render_secondary = NULL;
++static D3DSurface *global_d3d_surface_render_secondary_z = NULL;
++static D3DTexture *global_d3d_texture_shadow_primary = NULL;
++static D3DSurface *global_d3d_surface_shadow_primary = NULL;
++static D3DTexture *global_d3d_texture_shadow_secondary = NULL;
++static D3DSurface *global_d3d_surface_shadow_secondary = NULL;
++static D3DTexture *global_d3d_texture_sun_glow_primary = NULL;
++static D3DSurface *global_d3d_surface_sun_glow_primary = NULL;
++static D3DTexture *global_d3d_texture_sun_glow_secondary = NULL;
++static D3DSurface *global_d3d_surface_sun_glow_secondary = NULL;
++static D3DTexture *global_d3d_texture_water = NULL;
++static D3DSurface *global_d3d_surface_water[RASTERIZER_TARGET_WATER_MAX_MIPMAP_LEVELS] = { 0 };
++static D3DBaseTexture *global_d3d_texture_render_primary_copy = NULL;
++static D3DSurface *global_d3d_surface_render_primary_copy = NULL;
+ 
+ D3DDevice *global_d3d_device = NULL;
+ 
+ /* the shared 256-entry palette; January's own
+  * IDirect3DDevice8_CreatePalette(global_d3d_device, D3DPALETTE_256,
+- * &d3d_palette) error string names it, and csplit anchors it on
+- * _global_d3d_device + 4. */
+-D3DPalette *d3d_palette = NULL;
++ * &d3d_palette) error string names it. */
++static D3DPalette *d3d_palette = NULL;
+ 
+ /* owned by another object; named by this object's own
+  * D3DDevice_GetDeviceCaps() call site. */
+@@ -872,7 +859,7 @@
+ static boolean suppress_window_begin_end = FALSE;
+ static short previous_window_index = 0;
+ 
+-struct rasterizer_hardware_state_cache rasterizer_state_cache =
++static struct rasterizer_hardware_state_cache rasterizer_state_cache =
+ {
+ 	INVALID_RASTERIZER_HARDWARE_STATE,
+ 	0,
+@@ -896,44 +883,6 @@
+ extern unsigned long texturestagestate_table[D3DTSS_MAXSTAGES][D3DTSS_MAX];
+ extern D3DBaseTexture *texture_table[D3DTSS_MAXSTAGES];
+ 
+-static const long framebuffer_blend_function_states
+-	[NUMBER_OF_FRAMEBUFFER_BLEND_STATES][NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
+-{
+-	{
+-		D3DBLEND_SRCALPHA,
+-		D3DBLEND_DESTCOLOR,
+-		D3DBLEND_DESTCOLOR,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		NONE
+-	},
+-	{
+-		D3DBLEND_INVSRCALPHA,
+-		D3DBLEND_ZERO,
+-		D3DBLEND_SRCCOLOR,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_ONE,
+-		D3DBLEND_INVSRCALPHA,
+-		NONE
+-	},
+-	{
+-		D3DBLENDOP_ADD,
+-		D3DBLENDOP_ADD,
+-		D3DBLENDOP_ADD,
+-		D3DBLENDOP_ADD,
+-		D3DBLENDOP_REVSUBTRACT,
+-		D3DBLENDOP_MIN,
+-		D3DBLENDOP_MAX,
+-		D3DBLENDOP_ADD,
+-		NONE
+-	}
+-};
+-
+ /* ---------- public code */
+ 
+ void _rasterizer_reset_state(
+@@ -2199,6 +2148,48 @@
+ void rasterizer_set_framebuffer_blend_function(
+ 	short framebuffer_blend_function)
+ {
++	/* three separate NONE-terminated tables (January .rdata is 4-byte aligned, so
++	 * no single 108-byte array); names, scope and type follow HCEX.pdb's static
++	 * locals of this function (const unsigned long srcblend_table[9], ...). */
++	static const unsigned long srcblend_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
++	{
++		D3DBLEND_SRCALPHA,
++		D3DBLEND_DESTCOLOR,
++		D3DBLEND_DESTCOLOR,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		NONE
++	};
++
++	static const unsigned long destblend_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
++	{
++		D3DBLEND_INVSRCALPHA,
++		D3DBLEND_ZERO,
++		D3DBLEND_SRCCOLOR,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_ONE,
++		D3DBLEND_INVSRCALPHA,
++		NONE
++	};
++
++	static const unsigned long blendop_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
++	{
++		D3DBLENDOP_ADD,
++		D3DBLENDOP_ADD,
++		D3DBLENDOP_ADD,
++		D3DBLENDOP_ADD,
++		D3DBLENDOP_REVSUBTRACT,
++		D3DBLENDOP_MIN,
++		D3DBLENDOP_MAX,
++		D3DBLENDOP_ADD,
++		NONE
++	};
++
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
+ 		1907,
+@@ -2206,15 +2197,15 @@
+ 	IDirect3DDevice8_SetRenderState(
+ 		global_d3d_device,
+ 		D3DRS_SRCBLEND,
+-		framebuffer_blend_function_states[_framebuffer_blend_state_source_blend][framebuffer_blend_function]);
++		srcblend_table[framebuffer_blend_function]);
+ 	IDirect3DDevice8_SetRenderState(
+ 		global_d3d_device,
+ 		D3DRS_DESTBLEND,
+-		framebuffer_blend_function_states[_framebuffer_blend_state_destination_blend][framebuffer_blend_function]);
++		destblend_table[framebuffer_blend_function]);
+ 	IDirect3DDevice8_SetRenderState(
+ 		global_d3d_device,
+ 		D3DRS_BLENDOP,
+-		framebuffer_blend_function_states[_framebuffer_blend_state_blend_operation][framebuffer_blend_function]);
++		blendop_table[framebuffer_blend_function]);
+ 	return;
+ }
+ 
+@@ -3408,13 +3399,13 @@
+ 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_TEXCOORDINDEX, 1);
+ 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_TEXCOORDINDEX, 2);
+ 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_TEXCOORDINDEX, 3);
+-					IDirect3DDevice8_SetFlickerFilter(global_d3d_device, RASTERIZER_FLICKER_FILTER_LEVEL);
+-					IDirect3DDevice8_SetSoftDisplayFilter(global_d3d_device, FALSE);
++					D3DDevice_SetFlickerFilter(RASTERIZER_FLICKER_FILTER_LEVEL);
++					D3DDevice_SetSoftDisplayFilter(FALSE);
+ 				}
+ 			}
+ 		}
+ 	}
+-	rasterizer_filthy_bitmap_default_initialize();
++	rasterizer_filthy_bitmap_defaults_initialize();
+ 	success = success &&
+ 		rasterizer_memory_pool_initialize() &&
+ 		rasterizer_dynamic_geometry_initialize() &&
+@@ -3516,7 +3507,7 @@
+ 	return hardware_format;
+ }
+ 
+-void rasterizer_filthy_bitmap_default_initialize(
++static void rasterizer_filthy_bitmap_defaults_initialize(
+ 	void)
+ {
+ 	IDirect3DTexture8 *default_2d_hardware_format;

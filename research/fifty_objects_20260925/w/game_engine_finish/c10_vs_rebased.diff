@@ -1,0 +1,2979 @@
+--- rebased/source/game/game_engine.c	2026-09-24 02:30:53.978444900 -0700
++++ lab/c10_full.c	2026-09-24 03:19:03.900829300 -0700
+@@ -596,21 +596,80 @@
+ 	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+ };
+ 
++enum game_engine_mode
++{
++	game_engine_mode_active = 0,
++	game_engine_mode_postgame_delay,
++	game_engine_mode_postgame_rasterize_delay,
++	game_engine_mode_postgame_rasterize,
++};
++
++enum postgame_statistic
++{
++	_postgame_statistic_ranking = 0,
++	_postgame_statistic_score,
++	_postgame_statistic_kills,
++	_postgame_statistic_assists,
++	_postgame_statistic_deaths,
++	NUMBER_OF_POSTGAME_STATISTICS,
++};
++
++enum game_engine_weapons
++{
++	_game_engine_weapons_normal = 0,
++	_game_engine_weapons_pistols,
++	_game_engine_weapons_assault_rifles,
++	_game_engine_weapons_plasma_weapons,
++	_game_engine_weapons_sniping,
++	_game_engine_weapons_no_sniping,
++	_game_engine_weapons_rocket_launchers,
++	_game_engine_weapons_shotguns,
++	_game_engine_weapons_short_range,
++	_game_engine_weapons_human,
++	_game_engine_weapons_no_grenades,
++	NUMBER_OF_GAME_ENGINE_WEAPON_SETS,
++};
++
++enum game_engine_vehicles
++{
++	_game_engine_vehicles_default = 0,
++	_game_engine_vehicles_none,
++	_game_engine_vehicles_warthog,
++	_game_engine_vehicles_ghost,
++	_game_engine_vehicles_tank,
++	NUMBER_OF_GAME_ENGINE_VEHICLE_SETS,
++};
++
++enum
++{
++	_weapon_list_assault_rifle = 0,
++	_weapon_list_flamethrower,
++	_weapon_list_gravity_rifle,
++	_weapon_list_needler,
++	_weapon_list_pistol,
++	_weapon_list_plasma_pistol,
++	_weapon_list_plasma_rifle,
++	_weapon_list_rocket_launcher,
++	_weapon_list_shotgun,
++	_weapon_list_sniper_rifle,
++	_weapon_list_ball,
++	_weapon_list_flag,
++	_weapon_list_frag_grenade,
++	_weapon_list_plasma_grenade,
++};
++
+ /* ---------- macros */
+ 
+ /* ---------- structures */
+ 
+-struct game_engine_goal
++struct netgame_goal
+ {
+ 	real_point3d position;
+ 	boolean in_use;
+-	byte padD[3];
+-	long target_object_index;
+-	short team_index;
+-	short pad16;
+ 	long player_index;
+-	short nav_point_index;
+-	byte pad1E[2];
++	short team_index;
++	long ignore_player_index;
++	short nav_index;
+ };
+ 
+ struct game_engine_globals
+@@ -648,7 +707,7 @@
+ 
+ typedef char verify_statistic_buffer_size[
+ 	sizeof(struct statistic_buffer) == 0x1C ? 1 : -1];
+-typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
++typedef char verify_netgame_goal_size[sizeof(struct netgame_goal) == 0x20 ? 1 : -1];
+ typedef char verify_game_engine_globals_postgame_timer_offset[
+ 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
+ typedef char verify_game_engine_globals_next_team_index_offset[
+@@ -750,10 +809,10 @@
+ 
+ static boolean internal_rasterize_score(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2,
+-	wchar_t *message,
+-	long message_character_count);
++	long message,
++	long message_data,
++	wchar_t *buffer,
++	long buffer_size);
+ 
+ static void game_engine_update_player_no_shield(
+ 	long player_index);
+@@ -775,14 +834,13 @@
+ 
+ long postgame_statistic_get_rating(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2);
+-
++	long statistic,
++	long inverse);
+ 
+ long populate_statistic_buffer(
+-	struct statistic_buffer *entries,
+-	long parameter1,
+-	long parameter2);
++	struct statistic_buffer *statistic_buffer,
++	long statistic,
++	boolean inverse);
+ 
+ static boolean find_closest_player_callback(
+ 	long object_index,
+@@ -849,7 +907,7 @@
+ 	1.0f
+ };
+ 
+-struct game_engine_goal global_goal[32] = { 0 };
++struct netgame_goal global_goal[32] = { 0 };
+ struct game_variant global_variant = { 0 };
+ struct game_engine *game_engine = NULL;
+ static long game_engine_teleport_message_ticks = 0;
+@@ -1042,7 +1100,7 @@
+ 		}
+ 	}
+ 
+-	if (game_engine_globals.postgame_state == 1)
++	if (game_engine_globals.postgame_state == game_engine_mode_postgame_delay)
+ 	{
+ 		long did_player_win = game_engine_did_player_win(player_index);
+ 		boolean has_teams = FALSE;
+@@ -1336,92 +1394,70 @@
+ }
+ 
+ long populate_statistic_buffer(
+-	struct statistic_buffer *entries,
++	struct statistic_buffer *statistic_buffer,
+ 	long statistic,
+-	long invert_parameter)
++	boolean inverse)
+ {
+-	long player_count;
+-	struct player_datum *iterator_player;
++	long player_count = 0;
++	boolean invert = statistic == _postgame_statistic_deaths ? !inverse : inverse;
++	struct data_iterator player_iterator;
+ 	struct player_datum *player;
+-	struct statistic_buffer *entry;
+-	boolean invert;
+-	long entry_index;
+-	struct data_iterator iterator;
++	long statistic_index;
+ 
+-	player_count = 0;
+-	if (statistic == 4)
+-		invert = (boolean)invert_parameter == 0;
+-	else
+-		invert = (boolean)invert_parameter;
+-
+-	data_iterator_new(&iterator, player_data);
+-	iterator_player =
+-		(struct player_datum *)data_iterator_next(&iterator);
+-	if (iterator_player)
++	data_iterator_new(&player_iterator, player_data);
++	while ((player = (struct player_datum *)data_iterator_next(&player_iterator)) != NULL)
+ 	{
+-		entry = entries;
+-		do
++		match_assert(
++			"c:\\halo\\SOURCE\\game\\game_engine.c",
++			0x2C8,
++			player_count < MULTIPLAYER_MAXIMUM_PLAYERS);
++		if (player_count < MULTIPLAYER_MAXIMUM_PLAYERS)
+ 		{
+-			if (player_count >= MULTIPLAYER_MAXIMUM_PLAYERS)
+-			{
+-				match_assert(
+-					"c:\\halo\\SOURCE\\game\\game_engine.c",
+-					0x2C8,
+-					player_count < MULTIPLAYER_MAXIMUM_PLAYERS);
+-			}
+-			else
+-			{
+-				entry->player_index = iterator.datum_index;
+-				player_count++;
+-				entry++;
+-			}
+-
+-			iterator_player =
+-				(struct player_datum *)data_iterator_next(&iterator);
+-		} while (iterator_player);
++			statistic_buffer[player_count].player_index = player_iterator.datum_index;
++			player_count++;
++		}
+ 	}
+ 
+-	entry = entries;
+-	for (entry_index = 0; entry_index < player_count; entry_index++, entry++)
++	for (statistic_index = 0; statistic_index < player_count; statistic_index++)
+ 	{
+-		long player_index = entry->player_index;
++		long player_index = statistic_buffer[statistic_index].player_index;
+ 
+ 		player = player_get(player_index);
+ 		switch (statistic)
+ 		{
+-		case 0:
+-			entry->custom = 0;
++		case _postgame_statistic_ranking:
++			statistic_buffer[statistic_index].custom = 0;
+ 			if (game_engine->get_player_score)
+ 			{
+-				entry->custom = adjust_score_for_ranking(
++				statistic_buffer[statistic_index].custom = adjust_score_for_ranking(
+ 					game_engine->get_player_score(player_index, FALSE),
+ 					player_index);
+ 			}
+-			entry->kills = player->statistics.kills[0];
+-			entry->assists = player->statistics.assists[0];
+-			entry->deaths = player->statistics.deaths;
++			statistic_buffer[statistic_index].kills = player->statistics.kills[0];
++			statistic_buffer[statistic_index].assists = player->statistics.assists[0];
++			statistic_buffer[statistic_index].deaths = player->statistics.deaths;
+ 			break;
+ 
+-		case 1:
+-			entry->score = 0;
++		case _postgame_statistic_score:
++			statistic_buffer[statistic_index].score = 0;
+ 			if (game_engine->get_player_score)
+ 			{
+-				entry->score = adjust_score_for_ranking(
++				statistic_buffer[statistic_index].score = adjust_score_for_ranking(
+ 					game_engine->get_player_score(player_index, FALSE),
+ 					player_index);
+ 			}
+ 			break;
+ 
+-		case 2:
+-			entry->score = player->statistics.kills[0];
++		case _postgame_statistic_kills:
++			statistic_buffer[statistic_index].score = player->statistics.kills[0];
+ 			break;
+ 
+-		case 3:
+-			entry->score = player->statistics.assists[0];
++		case _postgame_statistic_assists:
++			statistic_buffer[statistic_index].score = player->statistics.assists[0];
+ 			break;
+ 
+-		case 4:
+-			entry->score = player->statistics.deaths;
++		case _postgame_statistic_deaths:
++			statistic_buffer[statistic_index].score = player->statistics.deaths;
+ 			break;
+ 
+ 		default:
+@@ -1433,48 +1469,40 @@
+ 		}
+ 
+ 		if (invert)
+-			entry->score = -entry->score;
++			statistic_buffer[statistic_index].score = -statistic_buffer[statistic_index].score;
+ 	}
+ 
+-	if (statistic == 0)
++	if (statistic == _postgame_statistic_ranking)
+ 	{
+ 		qsort(
+-			entries,
++			statistic_buffer,
+ 			player_count,
+-			sizeof(*entries),
++			sizeof(*statistic_buffer),
+ 			sort_statistic_buffer_ranking);
+ 	}
+ 	else
+ 	{
+ 		qsort(
+-			entries,
++			statistic_buffer,
+ 			player_count,
+-			sizeof(*entries),
++			sizeof(*statistic_buffer),
+ 			sort_statistic_buffer);
+ 	}
+ 
+-	entry_index = 0;
+-	if (player_count > 0)
++	for (statistic_index = 0; statistic_index < player_count; statistic_index++)
+ 	{
+-		entry = entries;
+-		do
++		if (statistic_index != 0 &&
++			sort_statistic_buffer_ranking(
++				&statistic_buffer[statistic_index - 1],
++				&statistic_buffer[statistic_index]) == 0)
+ 		{
+-			struct statistic_buffer *previous = entry - 1;
+-
+-			if (entry_index != 0 &&
+-				sort_statistic_buffer_ranking(previous, entry) == 0)
+-			{
+-				previous->place |= 0x80000000;
+-				entry->place = previous->place;
+-			}
+-			else
+-			{
+-				entry->place = entry_index;
+-			}
+-
+-			entry_index++;
+-			entry++;
+-		} while (entry_index < player_count);
++			statistic_buffer[statistic_index - 1].place |= 0x80000000;
++			statistic_buffer[statistic_index].place = statistic_buffer[statistic_index - 1].place;
++		}
++		else
++		{
++			statistic_buffer[statistic_index].place = statistic_index;
++		}
+ 	}
+ 
+ 	return player_count;
+@@ -1491,13 +1519,12 @@
+ 	struct statistic_buffer *output,
+ 	long maximum_count)
+ {
+-	struct statistic_buffer entries[MULTIPLAYER_MAXIMUM_PLAYERS];
+-	long player_count;
+-	boolean debug;
+-	long entry_index;
++	struct statistic_buffer statistic_buffer[MULTIPLAYER_MAXIMUM_PLAYERS];
++	long player_count = populate_statistic_buffer(statistic_buffer, statistic, FALSE);
++	boolean debug = rasterizer_debug_options.pad3 == 'E';
++	long local_player_count = 0;
++	long statistic_index;
+ 
+-	player_count = populate_statistic_buffer(entries, statistic, 0);
+-	debug = rasterizer_debug_options.pad3 == 'E';
+ 	if (debug)
+ 	{
+ 		terminal_printf(
+@@ -1507,20 +1534,23 @@
+ 			maximum_count);
+ 	}
+ 
+-	for (entry_index = 0; entry_index < player_count; entry_index++)
++	for (statistic_index = 0; statistic_index < player_count; statistic_index++)
+ 	{
+-		player_get(entries[entry_index].player_index);
++		struct player_datum *player = player_get(statistic_buffer[statistic_index].player_index);
++
++		if (player->local_player_index != NONE)
++			local_player_count++;
+ 	}
+ 
+ 	if (player_count > maximum_count)
+ 	{
+-		struct statistic_buffer local_entries[MAXIMUM_LOCAL_PLAYERS];
+-		long local_player_count = 0;
+-		long local_index;
++		long outside_range_count = 0;
++		struct statistic_buffer outside_range[MAXIMUM_LOCAL_PLAYERS];
++		long outside_range_index;
+ 
+-		for (entry_index = maximum_count; entry_index < player_count; entry_index++)
++		for (statistic_index = maximum_count; statistic_index < player_count; statistic_index++)
+ 		{
+-			struct player_datum *player = player_get(entries[entry_index].player_index);
++			struct player_datum *player = player_get(statistic_buffer[statistic_index].player_index);
+ 
+ 			if (player && player->local_player_index != NONE)
+ 			{
+@@ -1531,27 +1561,27 @@
+ 						"found local player");
+ 				}
+ 
+-				local_entries[local_player_count] = entries[entry_index];
+-				local_player_count++;
++				outside_range[outside_range_count] = statistic_buffer[statistic_index];
++				outside_range_count++;
+ 			}
+ 		}
+ 
+-		for (local_index = 0; local_index < local_player_count; local_index++)
++		for (outside_range_index = 0; outside_range_index < outside_range_count; outside_range_index++)
+ 		{
+ 			long insertion_index;
+ 
+ 			for (insertion_index = maximum_count - 1; insertion_index >= 0; insertion_index--)
+ 			{
+-				struct player_datum *player = player_get(entries[insertion_index].player_index);
++				struct player_datum *player = player_get(statistic_buffer[insertion_index].player_index);
+ 
+ 				if (player->local_player_index == NONE)
+ 				{
+ 					csmemmove(
+-						&entries[insertion_index],
+-						&entries[insertion_index + 1],
++						&statistic_buffer[insertion_index],
++						&statistic_buffer[insertion_index + 1],
+ 						maximum_count * sizeof(struct statistic_buffer) -
+ 							(insertion_index + 1) * sizeof(struct statistic_buffer));
+-					entries[maximum_count - 1] = local_entries[local_index];
++					statistic_buffer[maximum_count - 1] = outside_range[outside_range_index];
+ 					break;
+ 				}
+ 			}
+@@ -1560,7 +1590,7 @@
+ 
+ 	csmemcpy(
+ 		output,
+-		entries,
++		statistic_buffer,
+ 		MIN(maximum_count, player_count) *
+ 			sizeof(struct statistic_buffer));
+ 	return MIN(maximum_count, player_count);
+@@ -1590,7 +1620,7 @@
+ 
+ 	game_engine_generate_title_string(title_string, player_index);
+ 	entry_count = select_players_to_display(
+-		0,
++		_postgame_statistic_ranking,
+ 		player_index,
+ 		entries,
+ 		NUMBEROF(entries));
+@@ -1882,7 +1912,7 @@
+ 		drawline(row_string, 7, 0);
+ 	}
+ 
+-	entry_count = select_players_to_display(0, NONE, entries, 12);
++	entry_count = select_players_to_display(_postgame_statistic_ranking, NONE, entries, 12);
+ 	{
+ 		long entry_index;
+ 
+@@ -1932,7 +1962,7 @@
+ 			drawline(row_string, draw_row, 0);
+ 			draw_string_set_color(&winner_color);
+ 
+-			if (!postgame_statistic_get_rating(player_index, 1, 0))
++			if (!postgame_statistic_get_rating(player_index, _postgame_statistic_score, FALSE))
+ 				draw_string_set_color(&hilite_color);
+ 			game_engine->format_player_score(
+ 				player_index,
+@@ -1942,7 +1972,7 @@
+ 			drawline(row_string, draw_row, 0);
+ 			draw_string_set_color(&winner_color);
+ 
+-			if (!postgame_statistic_get_rating(player_index, 2, 0))
++			if (!postgame_statistic_get_rating(player_index, _postgame_statistic_kills, FALSE))
+ 				draw_string_set_color(&hilite_color);
+ 			usnprintf(
+ 				row_string,
+@@ -1953,7 +1983,7 @@
+ 			drawline(row_string, draw_row, 0);
+ 			draw_string_set_color(&winner_color);
+ 
+-			if (!postgame_statistic_get_rating(player_index, 3, 0))
++			if (!postgame_statistic_get_rating(player_index, _postgame_statistic_assists, FALSE))
+ 				draw_string_set_color(&hilite_color);
+ 			usnprintf(
+ 				row_string,
+@@ -1964,7 +1994,7 @@
+ 			drawline(row_string, draw_row, 0);
+ 			draw_string_set_color(&winner_color);
+ 
+-			if (!postgame_statistic_get_rating(player_index, 4, 0))
++			if (!postgame_statistic_get_rating(player_index, _postgame_statistic_deaths, FALSE))
+ 				draw_string_set_color(&hilite_color);
+ 			usnprintf(
+ 				row_string,
+@@ -2120,19 +2150,20 @@
+ 
+ 	weapon_list_index =
+ 		weapon_definition_index_to_list_index(equipment_definition_index);
+-	remap_equipment = weapon_list_index == 12 || weapon_list_index == 13;
++	remap_equipment = weapon_list_index == _weapon_list_frag_grenade ||
++		weapon_list_index == _weapon_list_plasma_grenade;
+ 	if (!remap_equipment)
+ 	{
+ 		if (equipment)
+ 		{
+-			if (equipment->equipment.powerup_type == 2)
++			if (equipment->equipment.powerup_type == _equipment_powerup_overshield)
+ 			{
+-				if (TEST_FLAG(global_variant.universal_variant.flags, 3))
++				if (TEST_FLAG(global_variant.universal_variant.flags, _game_variant_no_shields_bit))
+ 					return NONE;
+ 			}
+-			else if (equipment->equipment.powerup_type == 3)
++			else if (equipment->equipment.powerup_type == _equipment_powerup_active_camouflage)
+ 			{
+-				if (TEST_FLAG(global_variant.universal_variant.flags, 4))
++				if (TEST_FLAG(global_variant.universal_variant.flags, _game_variant_always_invisible_bit))
+ 					return NONE;
+ 			}
+ 		}
+@@ -2141,20 +2172,20 @@
+ 	{
+ 		switch (global_variant.universal_variant.weapon_set)
+ 		{
+-		case 3:
+-			weapon_list_index = 13;
++		case _game_engine_weapons_plasma_weapons:
++			weapon_list_index = _weapon_list_plasma_grenade;
+ 			break;
+ 
+-		case 9:
+-			weapon_list_index = 12;
++		case _game_engine_weapons_human:
++			weapon_list_index = _weapon_list_frag_grenade;
+ 			break;
+ 
+-		case 10:
++		case _game_engine_weapons_no_grenades:
+ 			weapon_list_index = NONE;
+ 			break;
+ 		}
+ 
+-		if (!TEST_FLAG(game_engine_globals.flags, 2))
++		if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+ 		{
+ 			if (game_engine_infinite_grenades_internal())
+ 			{
+@@ -2162,12 +2193,12 @@
+ 			}
+ 		}
+ 
+-		if (TEST_FLAG(game_engine_globals.flags, 3))
++		if (TEST_FLAG(game_engine_globals.flags, _game_engine_9_or_more_players_bit))
+ 		{
+ 			if (real_seed_random(get_global_random_seed_address()) > 0.3f)
+ 				weapon_list_index = NONE;
+ 		}
+-		else if (TEST_FLAG(game_engine_globals.flags, 2))
++		else if (TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+ 		{
+ 			if (real_seed_random(get_global_random_seed_address()) > 0.55f)
+ 				weapon_list_index = NONE;
+@@ -2290,10 +2321,10 @@
+ 
+ static boolean multiplayer_message_internal(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2,
+-	wchar_t *message,
+-	long message_character_count)
++	long message,
++	long message_data,
++	wchar_t *buffer,
++	long buffer_size)
+ {
+ 	boolean result = FALSE;
+ 
+@@ -2301,20 +2332,20 @@
+ 	{
+ 		result = game_engine->format_message(
+ 			player_index,
+-			parameter1,
+-			parameter2,
+ 			message,
+-			message_character_count);
++			message_data,
++			buffer,
++			buffer_size);
+ 	}
+ 
+ 	if (!result)
+ 	{
+ 		result = internal_rasterize_score(
+ 			player_index,
+-			parameter1,
+-			parameter2,
+ 			message,
+-			message_character_count);
++			message_data,
++			buffer,
++			buffer_size);
+ 	}
+ 
+ 	return result;
+@@ -2323,24 +2354,24 @@
+ 
+ static void multiplayer_message(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2)
++	long message,
++	long message_data)
+ {
+ 	struct player_datum *player = player_get(player_index);
+ 
+ 	if (player->local_player_index != NONE)
+ 	{
+-		wchar_t message[1024];
++		wchar_t buffer[1024];
+ 
+ 		if (multiplayer_message_internal(
+ 			player_index,
+-			parameter1,
+-			parameter2,
+ 			message,
+-			NUMBEROF(message)))
++			message_data,
++			buffer,
++			NUMBEROF(buffer)))
+ 		{
+-			message[NUMBEROF(message) - 1] = 0;
+-			hud_print_message(player->local_player_index, message);
++			buffer[NUMBEROF(buffer) - 1] = 0;
++			hud_print_message(player->local_player_index, buffer);
+ 		}
+ 	}
+ 
+@@ -2349,11 +2380,11 @@
+ 
+ static void game_show_score_one_player(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2)
++	long message,
++	long message_data)
+ {
+-	if (parameter1 != NONE)
+-		multiplayer_message(player_index, parameter1, parameter2);
++	if (message != NONE)
++		multiplayer_message(player_index, message, message_data);
+ 
+ 	return;
+ }
+@@ -2493,7 +2524,7 @@
+ 
+ 	if (game_engine)
+ 	{
+-		struct game_engine_goal *goal = &global_goal[goal_index];
++		struct netgame_goal *goal = &global_goal[goal_index];
+ 
+ 		if (game_engine->player_can_see_goal)
+ 		{
+@@ -2502,9 +2533,9 @@
+ 		}
+ 		else if (
+ 			goal->in_use &&
+-			(goal->target_object_index == NONE || player_index == goal->target_object_index) &&
++			(goal->player_index == NONE || player_index == goal->player_index) &&
+ 			(goal->team_index == NONE || player->team_index == goal->team_index) &&
+-			(goal->player_index == NONE || player_index != goal->player_index))
++			(goal->ignore_player_index == NONE || player_index != goal->ignore_player_index))
+ 		{
+ 			result = TRUE;
+ 		}
+@@ -2706,7 +2737,7 @@
+ {
+ 	boolean infinite_grenades = FALSE;
+ 
+-	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
++	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+ 		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
+ 
+ 	return infinite_grenades;
+@@ -3015,7 +3046,7 @@
+ 	fade = game_engine_globals.hud_message_timers[local_player_index];
+ 	if ((!gamepad ||
+ 		!gamepad->buttons[_gamepad_binary_button_back]) &&
+-		game_engine_globals.postgame_state != 1)
++		game_engine_globals.postgame_state != game_engine_mode_postgame_delay)
+ 	{
+ 		fade -= 0.06666667f;
+ 	}
+@@ -3138,8 +3169,8 @@
+ 	boolean force_single_screen = FALSE;
+ 
+ 	if (game_engine &&
+-		game_engine_globals.postgame_state>=2 &&
+-		game_engine_globals.postgame_state<=3)
++		game_engine_globals.postgame_state>=game_engine_mode_postgame_rasterize_delay &&
++		game_engine_globals.postgame_state<=game_engine_mode_postgame_rasterize)
+ 	{
+ 		force_single_screen = TRUE;
+ 	}
+@@ -3197,10 +3228,10 @@
+ 			player_count++;
+ 	}
+ 
+-	if (global_variant.universal_variant.vehicle_set != 1)
++	if (global_variant.universal_variant.vehicle_set != _game_engine_vehicles_none)
+ 	{
+ 		/* Engine type 5 is assigned by the four race variant builders below. */
+-		if (global_variant.game_engine_index == 5)
++		if (global_variant.game_engine_index == game_engine_race)
+ 		{
+ 			struct scenario *scenario = global_scenario_get();
+ 			short flag_index;
+@@ -3238,21 +3269,21 @@
+ 	if ((player_count > 8 && object_count >= 2) ||
+ 		player_count >= 13)
+ 	{
+-		game_engine_globals.flags |= FLAG(0);
++		SET_FLAG(game_engine_globals.flags, _game_engine_disable_dynamic_lighting_bit, TRUE);
+ 	}
+ 
+ 	if (player_count > 4 ||
+ 		object_count >= 4 ||
+-		TEST_FLAG(game_engine_globals.flags, 0))
++		TEST_FLAG(game_engine_globals.flags, _game_engine_disable_dynamic_lighting_bit))
+ 	{
+-		game_engine_globals.flags |= FLAG(1);
++		SET_FLAG(game_engine_globals.flags, _game_engine_disable_integrated_lights_bit, TRUE);
+ 	}
+ 
+ 	if (player_count >= 5)
+-		game_engine_globals.flags |= FLAG(2);
++		SET_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit, TRUE);
+ 
+ 	if (player_count >= 9)
+-		game_engine_globals.flags |= FLAG(3);
++		SET_FLAG(game_engine_globals.flags, _game_engine_9_or_more_players_bit, TRUE);
+ 
+ 	return;
+ }
+@@ -3332,12 +3363,12 @@
+ 	{
+ 		switch (game_engine_globals.postgame_state)
+ 		{
+-		case 0:
+-		case 1:
++		case game_engine_mode_active:
++		case game_engine_mode_postgame_delay:
+ 			game_engine_post_rasterize_in_game();
+ 			break;
+-		case 2:
+-		case 3:
++		case game_engine_mode_postgame_rasterize_delay:
++		case game_engine_mode_postgame_rasterize:
+ 			game_engine_post_rasterize_post_game();
+ 			break;
+ 		default:
+@@ -3359,13 +3390,13 @@
+ 	{
+ 		switch (game_engine_globals.postgame_state)
+ 		{
+-		case 0:
+-		case 1:
++		case game_engine_mode_active:
++		case game_engine_mode_postgame_delay:
+ 			game_engine_press_start_to_begin();
+ 			break;
+ 
+-		case 2:
+-		case 3:
++		case game_engine_mode_postgame_rasterize_delay:
++		case game_engine_mode_postgame_rasterize:
+ 			{
+ 				rectangle2d window_bounds;
+ 				long local_player_index;
+@@ -3657,25 +3688,25 @@
+ 
+ 	}
+ 
+-	if (game_engine->unknown44)
+-		game_engine->unknown44();
++	if (game_engine->update)
++		game_engine->update();
+ 
+ 	switch (game_engine_globals.postgame_state)
+ 	{
+-	case 0:
++	case game_engine_mode_active:
+ 		if (game_engine_should_end_game())
+ 			game_engine_end_game();
+ 		break;
+ 
+-	case 1:
++	case game_engine_mode_postgame_delay:
+ 		if (game_engine_globals.postgame_timer <= 2.0f &&
+-			!TEST_FLAG(game_engine_globals.flags, 4))
++			!TEST_FLAG(game_engine_globals.flags, _game_engine_game_over_sound_disabled_bit))
+ 		{
+ 			sound_class_set_gain("", 0.0f, 30);
+ 			sound_class_set_gain("ambient_nature", 0.2f, 30);
+ 			sound_class_set_gain("ambient_machinery", 0.2f, 30);
+ 			sound_class_set_gain("ambient_computers", 0.2f, 30);
+-			game_engine_globals.flags |= FLAG(4);
++			SET_FLAG(game_engine_globals.flags, _game_engine_game_over_sound_disabled_bit, TRUE);
+ 		}
+ 
+ 		game_engine_globals.postgame_timer -= 1.0f / TICKS_PER_SECOND;
+@@ -3684,7 +3715,7 @@
+ 			struct network_game_server *server;
+ 
+ 			game_engine_globals.postgame_progress = 0.0f;
+-			game_engine_globals.postgame_state = 2;
++			game_engine_globals.postgame_state = game_engine_mode_postgame_rasterize_delay;
+ 			game_engine_globals.postgame_timer = 5.0f;
+ 
+ 			data_iterator_new(&iterator.data, player_data);
+@@ -3715,8 +3746,8 @@
+ 		}
+ 		break;
+ 
+-	case 2:
+-	case 3:
++	case game_engine_mode_postgame_rasterize_delay:
++	case game_engine_mode_postgame_rasterize:
+ 		break;
+ 
+ 	default:
+@@ -3767,14 +3798,6 @@
+ 	NUMBER_OF_GAME_ENGINE_MESSAGES,
+ };
+ 
+-enum game_engine_postgame_state
+-{
+-	_game_engine_postgame_state_active = 0,
+-	_game_engine_postgame_state_delay,
+-	_game_engine_postgame_state_rasterize_delay,
+-	_game_engine_postgame_state_rasterize,
+-};
+-
+ enum
+ {
+ 	_multiplayer_sound_countdown_for_respawn = 0x1D,
+@@ -3956,14 +3979,14 @@
+ 	{
+ 		switch (game_engine_globals.postgame_state)
+ 		{
+-		case 2:
++		case game_engine_mode_postgame_rasterize_delay:
+ 			rumble_clear_all_now();
+ 			game_engine_globals.postgame_timer -= delta_seconds;
+ 			if (game_engine_globals.postgame_timer <= 0.0f)
+-				game_engine_globals.postgame_state = 3;
++				game_engine_globals.postgame_state = game_engine_mode_postgame_rasterize;
+ 			break;
+ 
+-		case 3:
++		case game_engine_mode_postgame_rasterize:
+ 			rumble_clear_all_now();
+ 			game_engine_globals.postgame_progress += delta_seconds;
+ 			if (game_engine_globals.postgame_progress > 1.0f)
+@@ -3992,7 +4015,7 @@
+ 	boolean display = FALSE;
+ 
+ 	if (game_engine)
+-		display = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_unknown1_bit) && global_variant.universal_variant.teams;
++		display = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit) && global_variant.universal_variant.teams;
+ 
+ 	return display;
+ }
+@@ -4003,7 +4026,7 @@
+ 	boolean can_score = TRUE;
+ 
+ 	if (game_engine)
+-		can_score = game_engine_globals.postgame_state==0;
++		can_score = game_engine_globals.postgame_state==game_engine_mode_active;
+ 
+ 	return can_score;
+ }
+@@ -4013,12 +4036,8 @@
+ {
+ 	boolean infinite_grenades = FALSE;
+ 
+-	if (game_engine &&
+-		player_index!=NONE &&
+-		!TEST_FLAG(game_engine_globals.flags, _game_engine_disable_infinite_grenades_bit))
+-	{
+-		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
+-	}
++	if (game_engine_running() && player_index!=NONE)
++		infinite_grenades = game_engine_infinite_grenades_internal();
+ 
+ 	return infinite_grenades;
+ }
+@@ -4058,7 +4077,7 @@
+ 			TEST_FLAG(global_variant.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit);
+ 		default_draw_motion_sensor = global_variant.universal_variant.goal_radar == 0;
+ 
+-		if (global_variant.game_engine_index == 2 && !global_variant.game_engine_variant.slayer.kill_in_order)
++		if (global_variant.game_engine_index == game_engine_slayer && !global_variant.game_engine_variant.slayer.kill_in_order)
+ 			default_draw_motion_sensor = FALSE;
+ 
+ 		draw_motion_sensor |= default_draw_motion_sensor;
+@@ -4159,18 +4178,18 @@
+ 		place.place < 16,
+ 		"place.place < maximum_places");
+ 
+-	if ((place.flags & FLAG(2)) && TEST_FLAG(place.flags, 0))
++	if (TEST_FLAG(place.flags, _place_two_groups) && TEST_FLAG(place.flags, _place_tied))
+ 		lookup_index = 35;
+-	else if ((place.flags & FLAG(2)) && place.place == 0)
++	else if (TEST_FLAG(place.flags, _place_two_groups) && place.place == 0)
+ 		lookup_index = 33;
+-	else if ((place.flags & FLAG(2)) && place.place == 1)
++	else if (TEST_FLAG(place.flags, _place_two_groups) && place.place == 1)
+ 		lookup_index = 34;
+-	else if (TEST_FLAG(place.flags, 1))
++	else if (TEST_FLAG(place.flags, _place_all_tied))
+ 		lookup_index = 32;
+ 	else
+ 	{
+ 		lookup_index = place.place;
+-		if (TEST_FLAG(place.flags, 0))
++		if (TEST_FLAG(place.flags, _place_tied))
+ 			lookup_index += 16;
+ 	}
+ 
+@@ -4298,7 +4317,7 @@
+ void game_engine_clear_goal_position(
+ 	short goal_index)
+ {
+-	csmemset(&global_goal[goal_index], 0, sizeof(struct game_engine_goal));
++	csmemset(&global_goal[goal_index], 0, sizeof(struct netgame_goal));
+ 
+ 	return;
+ }
+@@ -4356,16 +4375,16 @@
+ void game_engine_switch_to_postgame(
+ 	void)
+ {
+-	if (game_engine_globals.postgame_state==0)
++	if (game_engine_globals.postgame_state==game_engine_mode_active)
+ 	{
+ 		if (global_network_game_server_get())
+ 		{
+-			game_engine_globals.postgame_state = 1;
++			game_engine_globals.postgame_state = game_engine_mode_postgame_delay;
+ 			game_engine_globals.postgame_timer = 7.0f;
+ 		}
+ 		else
+ 		{
+-			game_engine_globals.postgame_state = 3;
++			game_engine_globals.postgame_state = game_engine_mode_postgame_rasterize;
+ 		}
+ 	}
+ 
+@@ -4388,9 +4407,9 @@
+ void game_engine_end_game(
+ 	void)
+ {
+-	if (game_engine_globals.postgame_state==0)
++	if (game_engine_globals.postgame_state==game_engine_mode_active)
+ 	{
+-		game_engine_globals.postgame_state = 1;
++		game_engine_globals.postgame_state = game_engine_mode_postgame_delay;
+ 		game_engine_globals.postgame_timer = 7.0f;
+ 		game_engine_play_multiplayer_sound(1);
+ 		ui_widgets_close_all();
+@@ -4476,7 +4495,7 @@
+ 
+ 		for (goal_index = 0; goal_index < 32; goal_index++)
+ 		{
+-			struct game_engine_goal *goal = &global_goal[goal_index];
++			struct netgame_goal *goal = &global_goal[goal_index];
+ 
+ 			if (goal_matches_player(goal_index, player, player_index) && count < maximum_count)
+ 			{
+@@ -4525,7 +4544,7 @@
+ 							custom_render_nav_point(
+ 								local_player_index,
+ 								&global_goal[goal_index].position,
+-								global_goal[goal_index].nav_point_index,
++								global_goal[goal_index].nav_index,
+ 								render_type);
+ 						}
+ 					}
+@@ -4562,7 +4581,7 @@
+ {
+ 	boolean force_autopickup = FALSE;
+ 
+-	if (game_engine && global_variant.game_engine_index==1 && weapon_is_flag(weapon_index))
++	if (game_engine && global_variant.game_engine_index==game_engine_ctf && weapon_is_flag(weapon_index))
+ 		force_autopickup = TRUE;
+ 
+ 	return force_autopickup;
+@@ -4666,24 +4685,23 @@
+ static struct statistic_buffer game_engine_get_player_place(
+ 	long player_index)
+ {
+-	struct statistic_buffer entries[16];
++	struct statistic_buffer statistic_buffer[MULTIPLAYER_MAXIMUM_PLAYERS];
+ 	long place = 0;
+ 
+-	populate_statistic_buffer(entries, 0, 0);
+-	if (entries[place].player_index != player_index)
++	populate_statistic_buffer(statistic_buffer, _postgame_statistic_ranking, FALSE);
++	while (TRUE)
+ 	{
+-		do
+-		{
+-			place++;
+-			match_assert(
+-				"c:\\halo\\SOURCE\\game\\game_engine.c",
+-				0x362,
+-				place<MULTIPLAYER_MAXIMUM_PLAYERS);
+-		}
+-		while (entries[place].player_index != player_index);
++		if (statistic_buffer[place].player_index == player_index)
++			break;
++
++		place++;
++		match_assert(
++			"c:\\halo\\SOURCE\\game\\game_engine.c",
++			0x362,
++			place<MULTIPLAYER_MAXIMUM_PLAYERS);
+ 	}
+ 
+-	return entries[place];
++	return statistic_buffer[place];
+ }
+ 
+ struct game_variant *build_game_variant_king(
+@@ -4691,20 +4709,25 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.score_to_win = 2;
+ 	result.flags = 1;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.vehicle_set = 2;
+-	result.game_engine_index = 4;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
++	result.game_engine_index = game_engine_king;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.king.moving_hill = 0;
+ 
+ 	*variant = result;
+@@ -4717,13 +4740,18 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.score_to_win = 2;
+ 	result.game_engine_variant.king.moving_hill = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+-	result.game_engine_index = 4;
++	result.game_engine_index = game_engine_king;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+@@ -4731,7 +4759,7 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.suicide_penalty = 150;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 
+ 	*variant = result;
+ 
+@@ -4743,9 +4771,14 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 2;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
+-	result.universal_variant.vehicle_set = 2;
++	result.game_engine_index = game_engine_slayer;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.universal_variant.goal_radar = 0;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+@@ -4755,7 +4788,7 @@
+ 	result.universal_variant.score_to_win = 15;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4771,12 +4804,17 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 300;
+ 	result.universal_variant.suicide_penalty = 300;
+-	result.game_engine_index = 2;
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.teams = TRUE;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.universal_variant.goal_radar = 0;
+ 	result.universal_variant.health = 1.0f;
+@@ -4784,7 +4822,7 @@
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 50;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4799,10 +4837,15 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
+-	result.game_engine_index = 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.lives = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.universal_variant.goal_radar = 0;
+ 	result.universal_variant.health = 1.0f;
+@@ -4812,7 +4855,7 @@
+ 	result.universal_variant.score_to_win = 25;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4827,11 +4870,16 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x2D) | 0x12;
+-	result.game_engine_index = 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.universal_variant.suicide_penalty = 150;
+ 	result.game_engine_variant.slayer.no_death_bonus = 1;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 1;
+@@ -4843,7 +4891,7 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 10;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 
+ 	*variant = result;
+ 
+@@ -4855,11 +4903,16 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
+-	result.game_engine_index = 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.odd_man_out = TRUE;
+ 	result.universal_variant.respawn_time_growth = 300;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.goal_radar = 0;
+@@ -4868,7 +4921,7 @@
+ 	result.universal_variant.respawn_time = 0;
+ 	result.universal_variant.score_to_win = 10;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4883,10 +4936,15 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1D) | 0x22;
+-	result.game_engine_index = 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+@@ -4896,7 +4954,7 @@
+ 	result.universal_variant.score_to_win = 25;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 6;
++	result.universal_variant.weapon_set = _game_engine_weapons_rocket_launchers;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4911,10 +4969,15 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1D) | 0x22;
+-	result.game_engine_index = 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
++	result.game_engine_index = game_engine_slayer;
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+@@ -4924,7 +4987,7 @@
+ 	result.universal_variant.score_to_win = 15;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 4;
++	result.universal_variant.weapon_set = _game_engine_weapons_sniping;
+ 	result.game_engine_variant.slayer.no_death_bonus = 0;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 0;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+@@ -4939,22 +5002,27 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.vehicle_set = 1;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_none;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 1;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 1;
+ 	result.flags = 1;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 2;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.oddball.random_start = 0;
+ 	result.game_engine_variant.oddball.oddball_ball_type = 0;
+ 	result.game_engine_variant.oddball.trait_with_ball = 0;
+@@ -4971,15 +5039,20 @@
+ {
+ 	struct game_variant result;
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.teams = TRUE;
+ 	result.universal_variant.odd_man_out = FALSE;
+-	result.universal_variant.vehicle_set = 1;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_none;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 1;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.flags = 1;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 0;
+ 	result.game_engine_variant.oddball.random_start = 0;
+@@ -4987,7 +5060,7 @@
+ 	result.game_engine_variant.oddball.trait_with_ball = 0;
+ 	result.game_engine_variant.oddball.trait_without_ball = 0;
+ 	result.game_engine_variant.oddball.speed_with_ball = 0;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.respawn_time = 300;
+ 	result.universal_variant.score_to_win = 2;
+@@ -5003,23 +5076,28 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.vehicle_set = 1;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_none;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 1;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 1;
+ 	result.game_engine_variant.oddball.oddball_ball_type = 1;
+ 	result.flags = 1;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 2;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.oddball.random_start = 0;
+ 	result.game_engine_variant.oddball.trait_with_ball = 0;
+ 	result.game_engine_variant.oddball.trait_without_ball = 0;
+@@ -5035,13 +5113,18 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.vehicle_set = 1;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_none;
+ 	result.game_engine_variant.oddball.oddball_ball_type = 1;
+ 	result.flags = 1;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.universal_variant.goal_radar = 2;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+@@ -5049,7 +5132,7 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 5;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 16;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 0;
+ 	result.game_engine_variant.oddball.random_start = 0;
+@@ -5066,23 +5149,28 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.suicide_penalty = 150;
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 1;
+ 	result.game_engine_variant.oddball.trait_with_ball = 2;
+ 	result.flags = 1;
+ 	result.game_engine_variant.oddball.oddball_ball_type = 2;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 10;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 0;
+ 	result.game_engine_variant.oddball.random_start = 0;
+ 	result.game_engine_variant.oddball.trait_without_ball = 0;
+@@ -5097,15 +5185,20 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3D) | 2;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.respawn_time = 150;
+ 	result.universal_variant.suicide_penalty = 150;
+ 	result.game_engine_variant.oddball.ball_spawn_count = 1;
+-	result.game_engine_index = 3;
++	result.game_engine_index = game_engine_oddball;
+ 	result.game_engine_variant.oddball.trait_with_ball = 1;
+ 	result.game_engine_variant.oddball.trait_without_ball = 3;
+ 	result.flags = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.oddball.oddball_ball_type = 2;
+ 	result.game_engine_variant.oddball.speed_with_ball = 2;
+ 	result.universal_variant.goal_radar = 0;
+@@ -5115,7 +5208,7 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 10;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.oddball.ball_spawn_delay = 0;
+ 	result.game_engine_variant.oddball.random_start = 0;
+ 
+@@ -5129,12 +5222,17 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.score_to_win = 2;
+ 	result.flags = 1;
+-	result.universal_variant.vehicle_set = 2;
+-	result.game_engine_index = 4;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
++	result.game_engine_index = game_engine_king;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+@@ -5142,7 +5240,7 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.suicide_penalty = 450;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.king.moving_hill = 0;
+ 
+ 	*variant = result;
+@@ -5155,21 +5253,26 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.score_to_win = 2;
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.universal_variant.teams = TRUE;
+ 	result.game_engine_variant.king.moving_hill = 1;
+ 	result.flags = 1;
+-	result.game_engine_index = 4;
++	result.game_engine_index = game_engine_king;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+ 	result.universal_variant.respawn_time = 300;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 
+ 	*variant = result;
+ 
+@@ -5181,9 +5284,14 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 2;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
+-	result.universal_variant.vehicle_set = 2;
++	result.game_engine_index = game_engine_slayer;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.slayer.no_death_bonus = 1;
+ 	result.game_engine_variant.slayer.no_kill_penalty = 1;
+ 	result.flags = 1;
+@@ -5196,7 +5304,7 @@
+ 	result.universal_variant.score_to_win = 25;
+ 	result.universal_variant.suicide_penalty = 450;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.slayer.kill_in_order = 0;
+ 
+ 	*variant = result;
+@@ -5209,8 +5317,13 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 1;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = game_engine_ctf;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.teams = TRUE;
+ 	result.flags = 1;
+@@ -5221,8 +5334,8 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.ctf.assault = 0;
+ 	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
+ 	result.game_engine_variant.ctf.flag_must_reset = 0;
+@@ -5239,8 +5352,13 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 1;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x1C) | 0x23;
++	result.game_engine_index = game_engine_ctf;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, TRUE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.teams = TRUE;
+ 	result.game_engine_variant.ctf.flag_at_home_to_score = 1;
+@@ -5252,8 +5370,8 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 450;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.ctf.assault = 0;
+ 	result.game_engine_variant.ctf.flag_must_reset = 0;
+ 	result.game_engine_variant.ctf.reset_on_capture = 0;
+@@ -5269,8 +5387,13 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 1;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = game_engine_ctf;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.teams = TRUE;
+ 	result.game_engine_variant.ctf.assault = 1;
+@@ -5282,8 +5405,8 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
+ 	result.game_engine_variant.ctf.flag_must_reset = 0;
+ 	result.game_engine_variant.ctf.reset_on_capture = 0;
+@@ -5299,8 +5422,13 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 1;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = game_engine_ctf;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.teams = TRUE;
+ 	result.game_engine_variant.ctf.flag_must_reset = 1;
+@@ -5312,8 +5440,8 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 150;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 4;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_tank;
+ 	result.game_engine_variant.ctf.assault = 0;
+ 	result.game_engine_variant.ctf.flag_at_home_to_score = 0;
+ 	result.game_engine_variant.ctf.reset_on_capture = 0;
+@@ -5329,10 +5457,15 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.flags = 1;
+-	result.game_engine_index = 5;
++	result.game_engine_index = game_engine_race;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+@@ -5341,8 +5474,8 @@
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.race.race_type = 0;
+ 	result.game_engine_variant.race.team_scoring = 0;
+ 
+@@ -5356,12 +5489,17 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.race.race_type = 2;
+ 	result.flags = 1;
+-	result.game_engine_index = 5;
++	result.game_engine_index = game_engine_race;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+@@ -5370,7 +5508,7 @@
+ 	result.universal_variant.score_to_win = 15;
+ 	result.universal_variant.suicide_penalty = 300;
+ 	result.universal_variant.teams = FALSE;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+@@ -5383,11 +5521,16 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.teams = TRUE;
+ 	result.flags = 1;
+-	result.game_engine_index = 5;
++	result.game_engine_index = game_engine_race;
+ 	result.universal_variant.health = 1.0f;
+ 	result.universal_variant.lives = 0;
+ 	result.universal_variant.odd_man_out = FALSE;
+@@ -5395,8 +5538,8 @@
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.score_to_win = 3;
+ 	result.universal_variant.suicide_penalty = 300;
+-	result.universal_variant.weapon_set = 0;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.game_engine_variant.race.race_type = 0;
+ 	result.game_engine_variant.race.team_scoring = 0;
+ 
+@@ -5410,12 +5553,17 @@
+ {
+ 	struct game_variant result = { 0 };
+ 
+-	result.game_engine_index = 5;
+-	result.universal_variant.flags = (result.universal_variant.flags & ~0x3C) | 3;
++	result.game_engine_index = game_engine_race;
++	SET_FLAG(result.universal_variant.flags, _game_variant_draw_object_in_motion_sensor_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_allow_friendly_navpoints_bit, TRUE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_infinite_grenades_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_no_shields_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_always_invisible_bit, FALSE);
++	SET_FLAG(result.universal_variant.flags, _game_variant_generic_starting_equipment_bit, FALSE);
+ 	result.universal_variant.goal_radar = 1;
+ 	result.universal_variant.score_to_win = 5;
+ 	result.universal_variant.teams = TRUE;
+-	result.universal_variant.vehicle_set = 2;
++	result.universal_variant.vehicle_set = _game_engine_vehicles_warthog;
+ 	result.flags = 1;
+ 	result.game_engine_variant.race.race_type = 2;
+ 	result.universal_variant.health = 1.0f;
+@@ -5424,7 +5572,7 @@
+ 	result.universal_variant.respawn_time = 0;
+ 	result.universal_variant.respawn_time_growth = 0;
+ 	result.universal_variant.suicide_penalty = 300;
+-	result.universal_variant.weapon_set = 0;
++	result.universal_variant.weapon_set = _game_engine_weapons_normal;
+ 	result.game_engine_variant.race.team_scoring = 0;
+ 
+ 	*variant = result;
+@@ -5434,24 +5582,24 @@
+ 
+ long postgame_statistic_get_rating(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2)
++	long statistic,
++	long inverse)
+ {
+-	struct statistic_buffer entries[16];
++	struct statistic_buffer statistic_buffer[MULTIPLAYER_MAXIMUM_PLAYERS];
++	long player_count = 0;
+ 	long rating;
+-	long entry_count;
+-	long entry_index;
++	long statistic_index;
+ 
+-	entry_count = populate_statistic_buffer(entries, parameter1, parameter2);
++	player_count = populate_statistic_buffer(statistic_buffer, statistic, inverse);
+ 	rating = 0;
+-	if (entries[0].player_index != player_index)
++	if (statistic_buffer[0].player_index != player_index)
+ 	{
+-		for (entry_index = 1; entry_index < entry_count; entry_index++)
++		for (statistic_index = 1; statistic_index < player_count; statistic_index++)
+ 		{
+-			if (entries[entry_index - 1].score != entries[entry_index].score)
++			if (statistic_buffer[statistic_index - 1].score != statistic_buffer[statistic_index].score)
+ 				rating++;
+ 
+-			if (entries[entry_index].player_index == player_index)
++			if (statistic_buffer[statistic_index].player_index == player_index)
+ 				break;
+ 		}
+ 	}
+@@ -5532,7 +5680,7 @@
+ 		result = TRUE;
+ 		goto done;
+ 	}
+-
++	else
+ 	{
+ 		struct data_iterator iterator;
+ 		struct player_datum *player;
+@@ -5570,7 +5718,7 @@
+ long game_engine_did_player_win_default(
+ 	long player_index)
+ {
+-	long result;
++	long result = 0;
+ 
+ 	if (global_variant.universal_variant.teams)
+ 	{
+@@ -5585,9 +5733,11 @@
+ 			winning_team_index = team_has_players(0) ? 0 : 1;
+ 
+ 		if (winning_team_index == NONE)
+-			goto tied;
+-
+-		result = player->team_index == winning_team_index;
++			result = NONE;
++		else if (player->team_index == winning_team_index)
++			result = TRUE;
++		else
++			result = FALSE;
+ 	}
+ 	else
+ 	{
+@@ -5596,15 +5746,14 @@
+ 		entry = game_engine_get_player_place(player_index);
+ 		if (is_place_tied(&entry) &&
+ 			!place_get_position(&entry))
+-			goto tied;
++			result = NONE;
++		else if (!place_get_position(&entry))
++			result = TRUE;
+ 		else
+-			result = place_get_position(&entry) == 0;
++			result = FALSE;
+ 	}
+ 
+ 	return result;
+-
+-tied:
+-	return NONE;
+ }
+ 
+ static long game_engine_get_type(
+@@ -5691,17 +5840,17 @@
+ 	real_point3d const *position,
+ 	real height,
+ 	char const *name,
+-	long target_object_index,
++	long player_index,
+ 	short team_index,
+-	long player_index)
++	long ignore_player_index)
+ {
+-	global_goal[goal_index].player_index = player_index;
+-	global_goal[goal_index].nav_point_index = find_nav_point(name);
++	global_goal[goal_index].ignore_player_index = ignore_player_index;
++	global_goal[goal_index].nav_index = find_nav_point(name);
+ 	global_goal[goal_index].in_use = TRUE;
+ 	global_goal[goal_index].position = *position;
+ 	global_goal[goal_index].team_index = team_index;
+ 	global_goal[goal_index].position.z += height + 0.63f;
+-	global_goal[goal_index].target_object_index = target_object_index;
++	global_goal[goal_index].player_index = player_index;
+ 
+ 	return;
+ }
+@@ -5710,25 +5859,11 @@
+ 	long player_index)
+ {
+ 	struct player_datum *player = player_get(player_index);
++	boolean man_out = player->quit_out_of_game ||
++		game_engine_player_is_out_of_lives(player_index) ||
++		game_engine_player_is_odd_man_out(player_index);
+ 
+-	if (player->quit_out_of_game)
+-		goto man_out;
+-
+-	if (global_variant.universal_variant.lives>0)
+-	{
+-		player = player_get(player_index);
+-		if (player->unit_index==NONE &&
+-			player->statistics.deaths>=global_variant.universal_variant.lives)
+-		{
+-			goto man_out;
+-		}
+-	}
+-
+-	if (!game_engine_player_is_odd_man_out(player_index))
+-		return FALSE;
+-
+-man_out:
+-	return TRUE;
++	return man_out;
+ }
+ 
+ real_rgb_color *game_engine_player_get_change_color(
+@@ -5774,7 +5909,7 @@
+ boolean game_engine_allow_pause(
+ 	void)
+ {
+-	return game_engine_globals.postgame_state==0;
++	return game_engine_globals.postgame_state==game_engine_mode_active;
+ }
+ 
+ boolean game_engine_allow_dynamic_lighting(
+@@ -5783,7 +5918,7 @@
+ 	boolean allow_dynamic_lighting = TRUE;
+ 
+ 	if (game_engine)
+-		allow_dynamic_lighting = !TEST_FLAG(game_engine_globals.flags, _game_engine_allow_dynamic_lighting_bit);
++		allow_dynamic_lighting = !TEST_FLAG(game_engine_globals.flags, _game_engine_disable_dynamic_lighting_bit);
+ 
+ 	return allow_dynamic_lighting;
+ }
+@@ -5794,7 +5929,7 @@
+ 	boolean allow_integrated_lights = TRUE;
+ 
+ 	if (game_engine)
+-		allow_integrated_lights = !TEST_FLAG(game_engine_globals.flags, _game_engine_allow_integrated_lights_bit);
++		allow_integrated_lights = !TEST_FLAG(game_engine_globals.flags, _game_engine_disable_integrated_lights_bit);
+ 
+ 	return allow_integrated_lights;
+ }
+@@ -5813,12 +5948,12 @@
+ 	variant->universal_variant.suicide_penalty = MAX(variant->universal_variant.suicide_penalty, 0);
+ 	variant->universal_variant.lives = MAX(variant->universal_variant.lives, 0);
+ 	variant->universal_variant.health = PIN(variant->universal_variant.health, 0.25f, 4.0f);
+-	variant->universal_variant.weapon_set = PIN(variant->universal_variant.weapon_set, 0, 10);
+-	variant->universal_variant.vehicle_set = PIN(variant->universal_variant.vehicle_set, 0, 4);
++	variant->universal_variant.weapon_set = PIN(variant->universal_variant.weapon_set, 0, NUMBER_OF_GAME_ENGINE_WEAPON_SETS - 1);
++	variant->universal_variant.vehicle_set = PIN(variant->universal_variant.vehicle_set, 0, NUMBER_OF_GAME_ENGINE_VEHICLE_SETS - 1);
+ 
+ 	switch (variant->game_engine_index)
+ 	{
+-	case 1:
++	case game_engine_ctf:
+ 		variant->game_engine_variant.ctf.assault = !!variant->game_engine_variant.ctf.assault;
+ 		variant->game_engine_variant.ctf.reset_on_capture = !!variant->game_engine_variant.ctf.reset_on_capture;
+ 		variant->game_engine_variant.ctf.flag_must_reset = !!variant->game_engine_variant.ctf.flag_must_reset;
+@@ -5827,7 +5962,7 @@
+ 		variant->game_engine_variant.ctf.single_flag_time = FLOOR(variant->game_engine_variant.ctf.single_flag_time, 0);
+ 		break;
+ 
+-	case 2:
++	case game_engine_slayer:
+ 		variant->game_engine_variant.slayer.no_death_bonus = !!variant->game_engine_variant.slayer.no_death_bonus;
+ 		variant->game_engine_variant.slayer.no_kill_penalty = !!variant->game_engine_variant.slayer.no_kill_penalty;
+ 		variant->game_engine_variant.slayer.kill_in_order = !!variant->game_engine_variant.slayer.kill_in_order;
+@@ -5854,7 +5989,6 @@
+ 	struct game_globals *game_globals;
+ 	struct game_globals_multiplayer_information *multiplayer_information;
+ 	struct game_globals_vehicle *vehicle;
+-	struct tag_reference *weapon;
+ 	long weapon_indices[10];
+ 	long weapon_index;
+ 
+@@ -5866,7 +6000,7 @@
+ 
+ 	switch (global_variant.universal_variant.vehicle_set)
+ 	{
+-	case 2:
++	case _game_engine_vehicles_warthog:
+ 		vehicle = TAG_BLOCK_GET_ELEMENT(
+ 			&multiplayer_information->vehicles,
+ 			0,
+@@ -5874,7 +6008,7 @@
+ 		object_definition_predict(vehicle->vehicle.index);
+ 		break;
+ 
+-	case 3:
++	case _game_engine_vehicles_ghost:
+ 		vehicle = TAG_BLOCK_GET_ELEMENT(
+ 			&multiplayer_information->vehicles,
+ 			1,
+@@ -5882,7 +6016,7 @@
+ 		object_definition_predict(vehicle->vehicle.index);
+ 		break;
+ 
+-	case 4:
++	case _game_engine_vehicles_tank:
+ 		vehicle = TAG_BLOCK_GET_ELEMENT(
+ 			&multiplayer_information->vehicles,
+ 			2,
+@@ -5913,116 +6047,30 @@
+ 	}
+ 	}
+ 
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		12,
+-		struct tag_reference);
+-	object_definition_predict(weapon->index);
++	object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_frag_grenade));
++	object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_plasma_grenade));
+ 
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		13,
+-		struct tag_reference);
+-	object_definition_predict(weapon->index);
++	if (global_variant.game_engine_index == game_engine_oddball)
++		object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_ball));
+ 
+-	if (global_variant.game_engine_index == 3)
+-	{
+-		game_globals = scenario_get_game_globals();
+-		weapon = TAG_BLOCK_GET_ELEMENT(
+-			&game_globals->weapon_list,
+-			10,
+-			struct tag_reference);
+-		object_definition_predict(weapon->index);
+-	}
+-
+-	if (global_variant.game_engine_index == 1)
+-	{
+-		game_globals = scenario_get_game_globals();
+-		weapon = TAG_BLOCK_GET_ELEMENT(
+-			&game_globals->weapon_list,
+-			11,
+-			struct tag_reference);
+-		object_definition_predict(weapon->index);
+-	}
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		0,
+-		struct tag_reference);
+-	weapon_indices[0] = weapon->index;
++	if (global_variant.game_engine_index == game_engine_ctf)
++		object_definition_predict(list_index_to_weapon_definition_index(_weapon_list_flag));
+ 
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		1,
+-		struct tag_reference);
+-	weapon_indices[1] = weapon->index;
++	weapon_indices[0] = list_index_to_weapon_definition_index(0);
++	weapon_indices[1] = list_index_to_weapon_definition_index(1);
++	weapon_indices[2] = list_index_to_weapon_definition_index(2);
++	weapon_indices[3] = list_index_to_weapon_definition_index(3);
++	weapon_indices[4] = list_index_to_weapon_definition_index(4);
++	weapon_indices[5] = list_index_to_weapon_definition_index(5);
++	weapon_indices[6] = list_index_to_weapon_definition_index(6);
++	weapon_indices[7] = list_index_to_weapon_definition_index(7);
++	weapon_indices[8] = list_index_to_weapon_definition_index(8);
++	weapon_indices[9] = list_index_to_weapon_definition_index(9);
+ 
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		2,
+-		struct tag_reference);
+-	weapon_indices[2] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		3,
+-		struct tag_reference);
+-	weapon_indices[3] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		4,
+-		struct tag_reference);
+-	weapon_indices[4] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		5,
+-		struct tag_reference);
+-	weapon_indices[5] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		6,
+-		struct tag_reference);
+-	weapon_indices[6] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		7,
+-		struct tag_reference);
+-	weapon_indices[7] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		8,
+-		struct tag_reference);
+-	weapon_indices[8] = weapon->index;
+-
+-	game_globals = scenario_get_game_globals();
+-	weapon = TAG_BLOCK_GET_ELEMENT(
+-		&game_globals->weapon_list,
+-		9,
+-		struct tag_reference);
+-	weapon_indices[9] = weapon->index;
+-
+-	weapon_index = 0;
+-	while (weapon_index < 10)
++	for (weapon_index = 0; weapon_index < 10; weapon_index++)
+ 	{
+ 		object_definition_predict(
+ 			game_engine_remap_weapon(weapon_indices[weapon_index]));
+-		weapon_index++;
+ 	}
+ 
+ 	return;
+@@ -6032,7 +6080,7 @@
+ 	struct game_variant *variant)
+ {
+ 	csmemset(&game_engine_globals, 0, sizeof(game_engine_globals));
+-	game_engine_globals.postgame_state = 0;
++	game_engine_globals.postgame_state = game_engine_mode_active;
+ 
+ 	if (variant && variant->game_engine_index)
+ 	{
+@@ -6258,11 +6306,11 @@
+ 
+ 		switch (global_variant.universal_variant.vehicle_set)
+ 		{
+-		case 1:
++		case _game_engine_vehicles_none:
+ 			result = NONE;
+ 			break;
+ 
+-		case 2:
++		case _game_engine_vehicles_warthog:
+ 			vehicle = TAG_BLOCK_GET_ELEMENT(
+ 				vehicles,
+ 				0,
+@@ -6271,7 +6319,7 @@
+ 				result = NONE;
+ 			break;
+ 
+-		case 3:
++		case _game_engine_vehicles_ghost:
+ 			vehicle = TAG_BLOCK_GET_ELEMENT(
+ 				vehicles,
+ 				1,
+@@ -6280,7 +6328,7 @@
+ 				result = NONE;
+ 			break;
+ 
+-		case 4:
++		case _game_engine_vehicles_tank:
+ 			vehicle = TAG_BLOCK_GET_ELEMENT(
+ 				vehicles,
+ 				2,
+@@ -6300,107 +6348,107 @@
+ 	long weapon_list_index =
+ 		weapon_definition_index_to_list_index(weapon_definition_index);
+ 
+-	if (weapon_list_index == 10 ||
+-		weapon_list_index == 11 ||
++	if (weapon_list_index == _weapon_list_ball ||
++		weapon_list_index == _weapon_list_flag ||
+ 		weapon_list_index == NONE)
+ 	{
+ 		return weapon_definition_index;
+ 	}
+ 
+-	if (weapon_list_index == 1)
+-		weapon_list_index = 7;
++	if (weapon_list_index == _weapon_list_flamethrower)
++		weapon_list_index = _weapon_list_rocket_launcher;
+ 
+ 	switch (global_variant.universal_variant.weapon_set)
+ 	{
+-	case 1:
++	case _game_engine_weapons_pistols:
+ 		switch (weapon_list_index)
+ 		{
+-		case 3:
+-		case 4:
+-		case 6:
+-		case 7:
+-			weapon_list_index = 5;
++		case _weapon_list_needler:
++		case _weapon_list_pistol:
++		case _weapon_list_plasma_rifle:
++		case _weapon_list_rocket_launcher:
++			weapon_list_index = _weapon_list_plasma_pistol;
+ 			break;
+ 
+-		case 5:
++		case _weapon_list_plasma_pistol:
+ 		default:
+-			weapon_list_index = 4;
++			weapon_list_index = _weapon_list_pistol;
+ 			break;
+ 		}
+ 		break;
+ 
+-	case 2:
++	case _game_engine_weapons_assault_rifles:
+ 		switch (weapon_list_index)
+ 		{
+-		case 3:
+-		case 4:
+-		case 6:
+-		case 7:
+-			weapon_list_index = 6;
++		case _weapon_list_needler:
++		case _weapon_list_pistol:
++		case _weapon_list_plasma_rifle:
++		case _weapon_list_rocket_launcher:
++			weapon_list_index = _weapon_list_plasma_rifle;
+ 			break;
+ 
+-		case 5:
++		case _weapon_list_plasma_pistol:
+ 		default:
+-			weapon_list_index = 0;
++			weapon_list_index = _weapon_list_assault_rifle;
+ 			break;
+ 		}
+ 		break;
+ 
+-	case 3:
+-		if (weapon_list_index >= 3 && weapon_list_index <= 5)
+-			weapon_list_index = 5;
++	case _game_engine_weapons_plasma_weapons:
++		if (weapon_list_index >= _weapon_list_needler && weapon_list_index <= _weapon_list_plasma_pistol)
++			weapon_list_index = _weapon_list_plasma_pistol;
+ 		else
+-			weapon_list_index = 6;
++			weapon_list_index = _weapon_list_plasma_rifle;
+ 		break;
+ 
+-	case 4:
+-		if (weapon_list_index != 4 && weapon_list_index != 9)
+-			weapon_list_index = 9;
++	case _game_engine_weapons_sniping:
++		if (weapon_list_index != _weapon_list_pistol && weapon_list_index != _weapon_list_sniper_rifle)
++			weapon_list_index = _weapon_list_sniper_rifle;
+ 		break;
+ 
+-	case 5:
++	case _game_engine_weapons_no_sniping:
+ 		switch (weapon_list_index)
+ 		{
+-		case 4:
+-			weapon_list_index = 0;
++		case _weapon_list_pistol:
++			weapon_list_index = _weapon_list_assault_rifle;
+ 			break;
+ 
+-		case 9:
+-			weapon_list_index = 8;
++		case _weapon_list_sniper_rifle:
++			weapon_list_index = _weapon_list_shotgun;
+ 			break;
+ 		}
+ 		break;
+ 
+-	case 6:
+-		weapon_list_index = 7;
++	case _game_engine_weapons_rocket_launchers:
++		weapon_list_index = _weapon_list_rocket_launcher;
+ 		break;
+ 
+-	case 7:
+-		weapon_list_index = 8;
++	case _game_engine_weapons_shotguns:
++		weapon_list_index = _weapon_list_shotgun;
+ 		break;
+ 
+-	case 8:
++	case _game_engine_weapons_short_range:
+ 		switch (weapon_list_index)
+ 		{
+-		case 0:
+-		case 3:
+-		case 4:
+-		case 9:
+-			weapon_list_index = 8;
++		case _weapon_list_assault_rifle:
++		case _weapon_list_needler:
++		case _weapon_list_pistol:
++		case _weapon_list_sniper_rifle:
++			weapon_list_index = _weapon_list_shotgun;
+ 			break;
+ 		}
+ 		break;
+ 
+-	case 9:
++	case _game_engine_weapons_human:
+ 		switch (weapon_list_index)
+ 		{
+-		case 3:
+-		case 6:
+-			weapon_list_index = 0;
++		case _weapon_list_needler:
++		case _weapon_list_plasma_rifle:
++			weapon_list_index = _weapon_list_assault_rifle;
+ 			break;
+ 
+-		case 5:
+-			weapon_list_index = 4;
++		case _weapon_list_plasma_pistol:
++			weapon_list_index = _weapon_list_pistol;
+ 			break;
+ 		}
+ 		break;
+@@ -6811,271 +6859,398 @@
+ 
+ static boolean internal_rasterize_score(
+ 	long player_index,
+-	long parameter1,
+-	long parameter2,
+-	wchar_t *message,
+-	long message_character_count)
++	long message,
++	long message_data,
++	wchar_t *buffer,
++	long buffer_size)
+ {
+ 	struct player_datum *player;
+ 	struct player_datum *other_player;
+ 	long score;
+ 	long string_list_index;
++	wchar_t const *format;
+ 	boolean result;
+ 
+ 	result = TRUE;
+ 	player = player_get(player_index);
+ 	score = 0;
+ 
+-#define GET_GAME_ENGINE_HUD_FORMAT(index) \
+-	(((string_list_index = tag_loaded( \
+-		'ustr', \
+-		"ui\\multiplayer_game_text")) != NONE) \
+-		? unicode_string_list_get_string(string_list_index, (index)) \
+-		: L"")
+-
+ 	if (game_engine &&
+ 		game_engine->test_flag &&
+ 		game_engine->test_flag(1))
+ 	{
+-		switch (parameter1)
++		switch (message)
+ 		{
+-		case 10:
+-			parameter1 = 14;
++		case _game_engine_message_multi_kill:
++			message = _game_engine_message_multi_kill_with_score;
+ 			break;
+-		case 9:
+-			parameter1 = 15;
++		case _game_engine_message_triple_kill:
++			message = _game_engine_message_triple_kill_with_score;
+ 			break;
+-		case 7:
+-			parameter1 = 16;
++		case _game_engine_message_double_kill:
++			message = _game_engine_message_double_kill_with_score;
+ 			break;
+-		case 12:
+-			parameter1 = 17;
++		case _game_engine_message_ten_kills_in_a_row:
++			message = _game_engine_message_ten_kills_in_a_row_with_score;
+ 			break;
+-		case 11:
+-			parameter1 = 18;
++		case _game_engine_message_five_kills_in_row:
++			message = _game_engine_message_five_kills_in_row_with_score;
+ 			break;
+-		case 8:
+-			parameter1 = 19;
++		case _game_engine_message_killed_enemy:
++			message = _game_engine_message_killed_enemy_with_score;
+ 			break;
+ 		default:
+ 			break;
+ 		}
+ 
+-		if (parameter1 >= 14 &&
+-			parameter1 <= 19)
++		if (message >= _game_engine_message_multi_kill_with_score &&
++			message <= _game_engine_message_killed_enemy_with_score)
+ 		{
+ 			score = game_engine->get_player_score(player_index, TRUE);
+ 		}
+ 	}
+ 
+-	switch (parameter1)
++	switch (message)
+ 	{
+-	case 0:
++	case _game_engine_message_welcome:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4A);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4A),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name);
+ 		break;
+-	case 1:
++	case _game_engine_message_killed_by_unknown:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4B);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4B),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name);
+ 		break;
+-	case 2:
++	case _game_engine_message_killed_by_biped:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4C);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4C),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name);
+ 		break;
+-	case 3:
++	case _game_engine_message_killed_by_vehicle:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4D);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4D),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name);
+ 		break;
+-	case 4:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_killed_by_player:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4E);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4E),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name,
+ 			other_player->name);
+ 		break;
+-	case 5:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_killed_by_friendly_fire:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x4F);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x4F),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name,
+ 			other_player->name);
+ 		break;
+-	case 28:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_quit:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x50);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x50),
++			buffer,
++			buffer_size,
++			format,
+ 			other_player->name);
+ 		break;
+-	case 6:
++	case _game_engine_message_killed_by_self:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x51);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x51),
++			buffer,
++			buffer_size,
++			format,
+ 			player->name);
+ 		break;
+-	case 13:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_killed_friendly:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x52);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x52),
++			buffer,
++			buffer_size,
++			format,
+ 			other_player->name);
+ 		break;
+-	case 10:
++	case _game_engine_message_multi_kill:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x53);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x53),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		game_engine_play_multiplayer_sound(0x10);
+ 		break;
+-	case 9:
++	case _game_engine_message_triple_kill:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x54);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x54),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		game_engine_play_multiplayer_sound(0xF);
+ 		break;
+-	case 7:
++	case _game_engine_message_double_kill:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x55);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x55),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		game_engine_play_multiplayer_sound(0xE);
+ 		break;
+-	case 12:
++	case _game_engine_message_ten_kills_in_a_row:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x56);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x56),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		game_engine_play_multiplayer_sound(0x11);
+ 		break;
+-	case 11:
++	case _game_engine_message_five_kills_in_row:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x57);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x57),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		game_engine_play_multiplayer_sound(0x12);
+ 		break;
+-	case 8:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_killed_enemy:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x58);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x58),
++			buffer,
++			buffer_size,
++			format,
+ 			other_player->name);
+ 		break;
+-	case 14:
++	case _game_engine_message_multi_kill_with_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x59);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x59),
++			buffer,
++			buffer_size,
++			format,
+ 			score);
+ 		game_engine_play_multiplayer_sound(0x10);
+ 		break;
+-	case 15:
++	case _game_engine_message_triple_kill_with_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5A);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5A),
++			buffer,
++			buffer_size,
++			format,
+ 			score);
+ 		game_engine_play_multiplayer_sound(0xF);
+ 		break;
+-	case 16:
++	case _game_engine_message_double_kill_with_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5B);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5B),
++			buffer,
++			buffer_size,
++			format,
+ 			score);
+ 		game_engine_play_multiplayer_sound(0xE);
+ 		break;
+-	case 17:
++	case _game_engine_message_ten_kills_in_a_row_with_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5C);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5C),
++			buffer,
++			buffer_size,
++			format,
+ 			score);
+ 		game_engine_play_multiplayer_sound(0x11);
+ 		break;
+-	case 18:
++	case _game_engine_message_five_kills_in_row_with_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5D);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5D),
++			buffer,
++			buffer_size,
++			format,
+ 			score);
+ 		game_engine_play_multiplayer_sound(0x12);
+ 		break;
+-	case 19:
+-		other_player = player_get(parameter2);
++	case _game_engine_message_killed_enemy_with_score:
++		other_player = player_get(message_data);
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5E);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5E),
++			buffer,
++			buffer_size,
++			format,
+ 			other_player->name,
+ 			score);
+ 		break;
+-	case 23:
++	case _game_engine_message_odd_man_out:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x5F);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x5F),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		break;
+-	case 24:
++	case _game_engine_message_out_of_lives:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x60);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x60),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		break;
+-	case 25:
++	case _game_engine_message_respawn_timer:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x61);
++		else
++			format = L"";
+ 		usnprintf(
+-			message,
+-			message_character_count,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x61),
+-			parameter2);
++			buffer,
++			buffer_size,
++			format,
++			message_data);
+ 		break;
+-	case 26:
++	case _game_engine_message_waiting_for_space_to_clear:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x62);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x62),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		break;
+-	case 27:
++	case _game_engine_message_player_quit_self:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x63);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x63),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		break;
+-	case 29:
++	case _game_engine_message_press_back_for_score:
++		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++		if (string_list_index != NONE)
++			format = unicode_string_list_get_string(string_list_index, 0x64);
++		else
++			format = L"";
+ 		ustrncpy(
+-			message,
+-			GET_GAME_ENGINE_HUD_FORMAT(0x64),
+-			message_character_count);
++			buffer,
++			format,
++			buffer_size);
+ 		break;
+ 	default:
+ 		result = FALSE;
+ 		break;
+ 	}
+ 
+-#undef GET_GAME_ENGINE_HUD_FORMAT
+-
+-	message[message_character_count - 1] = 0;
++	buffer[buffer_size - 1] = 0;
+ 	return result;
+ }
+ 
+@@ -7298,13 +7473,13 @@
+ 				}
+ 			}
+ 
+-			if (TEST_FLAG(starting_equipment->flags, 0))
++			if (TEST_FLAG(starting_equipment->flags, _netgame_starting_equipment_flag_no_grenades_bit))
+ 			{
+ 				*fragmentation_grenade_count = 0;
+ 				*plasma_grenade_count = 0;
+ 			}
+ 
+-			if (TEST_FLAG(starting_equipment->flags, 1))
++			if (TEST_FLAG(starting_equipment->flags, _netgame_starting_equipment_flag_plasma_greandes_bit))
+ 			{
+ 				*plasma_grenade_count += *fragmentation_grenade_count;
+ 				*fragmentation_grenade_count = 0;
+@@ -7349,12 +7524,12 @@
+ 	plasma_grenade_count = plasma_grenade->maximum_count;
+ 	fragmentation_grenade_count = fragmentation_grenade->maximum_count;
+ 
+-	if (TEST_FLAG(game_engine_globals.flags, 3))
++	if (TEST_FLAG(game_engine_globals.flags, _game_engine_9_or_more_players_bit))
+ 	{
+ 		fragmentation_grenade_count = 1;
+ 		plasma_grenade_count = 1;
+ 	}
+-	else if (TEST_FLAG(game_engine_globals.flags, 2))
++	else if (TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+ 	{
+ 		fragmentation_grenade_count = 2;
+ 		plasma_grenade_count = 2;
+@@ -7365,7 +7540,7 @@
+ 			fragmentation_grenade_count;
+ 		long starting_plasma_grenade_count = 0;
+ 
+-		if (!TEST_FLAG(global_variant.universal_variant.flags, 5))
++		if (!TEST_FLAG(global_variant.universal_variant.flags, _game_variant_generic_starting_equipment_bit))
+ 		{
+ 			handle_custom_starting_equipment(
+ 				unit_index,
+@@ -7389,17 +7564,17 @@
+ 
+ 			switch (global_variant.universal_variant.weapon_set)
+ 			{
+-			case 3:
++			case _game_engine_weapons_plasma_weapons:
+ 				starting_plasma_grenade_count +=
+ 					starting_fragmentation_grenade_count;
+ 				starting_fragmentation_grenade_count = 0;
+ 				break;
+-			case 9:
++			case _game_engine_weapons_human:
+ 				starting_fragmentation_grenade_count +=
+ 					starting_plasma_grenade_count;
+ 				starting_plasma_grenade_count = 0;
+ 				break;
+-			case 10:
++			case _game_engine_weapons_no_grenades:
+ 				if (!game_engine_infinite_grenades_internal())
+ 				{
+ 					starting_fragmentation_grenade_count = 0;
+@@ -7529,9 +7704,9 @@
+ 			should_spawn = FALSE;
+ 		}
+ 		else if (game_engine_globals.postgame_state ==
+-				_game_engine_postgame_state_rasterize ||
++				game_engine_mode_postgame_rasterize ||
+ 			game_engine_globals.postgame_state ==
+-				_game_engine_postgame_state_rasterize_delay)
++				game_engine_mode_postgame_rasterize_delay)
+ 		{
+ 			should_spawn = FALSE;
+ 		}
