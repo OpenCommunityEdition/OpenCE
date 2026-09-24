@@ -203,27 +203,27 @@ void recorded_animation_initialize_unit_control(
 	byte **stream,
 	byte unit_control_data_version);
 
-void apply_animation_state(
+static void apply_animation_state(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_aiming_speed(
+static void apply_aiming_speed(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_control_flags(
+static void apply_control_flags(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_weapon_index(
+static void apply_weapon_index(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_throttle(
+static void apply_throttle(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -453,7 +453,7 @@ void byte_swap_recording_stream(
 
 /* ---------- private code */
 
-void apply_animation_state(
+static void apply_animation_state(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -471,7 +471,7 @@ void apply_animation_state(
 	return;
 }
 
-void apply_aiming_speed(
+static void apply_aiming_speed(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -489,7 +489,7 @@ void apply_aiming_speed(
 	return;
 }
 
-void apply_control_flags(
+static void apply_control_flags(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -507,7 +507,7 @@ void apply_control_flags(
 	return;
 }
 
-void apply_weapon_index(
+static void apply_weapon_index(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -525,7 +525,7 @@ void apply_weapon_index(
 	return;
 }
 
-void apply_throttle(
+static void apply_throttle(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,

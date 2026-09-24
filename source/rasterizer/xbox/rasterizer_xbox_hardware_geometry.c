@@ -3,31 +3,31 @@ RASTERIZER_XBOX_HARDWARE_GEOMETRY.C
 
 symbols in this file:
 00158410 0020:
-	_IDirect3DDevice8_CreateVertexBuffer@24 (0000)
+	_code_00158410 (0000)
 00158430 0020:
-	_IDirect3DDevice8_CreateIndexBuffer@24 (0000)
+	_code_00158430 (0000)
 00158450 0010:
-	_D3DResource_MoveResourceMemory@8 (0000)
+	_code_00158450@8 (0000)
 00158460 0010:
-	_D3DVertexBuffer_MoveResourceMemory@8 (0000)
+	_code_00158460@8 (0000)
 00158470 0010:
-	_D3DVertexBuffer_Unlock@4 (0000)
+	_code_00158470@4 (0000)
 00158480 0010:
-	_IDirect3DVertexBuffer8_Release@4 (0000)
+	_code_00158480 (0000)
 00158490 0020:
-	_IDirect3DVertexBuffer8_Lock@20 (0000)
+	_code_00158490 (0000)
 001584B0 0010:
-	_IDirect3DVertexBuffer8_Unlock@4 (0000)
+	_code_001584b0@4 (0000)
 001584C0 0010:
-	_D3DIndexBuffer_Lock@20 (0000)
+	_code_001584c0 (0000)
 001584D0 0010:
-	_D3DIndexBuffer_Unlock@4 (0000)
+	_code_001584d0@4 (0000)
 001584E0 0010:
-	_IDirect3DIndexBuffer8_Release@4 (0000)
+	_code_001584e0 (0000)
 001584F0 0020:
-	_IDirect3DIndexBuffer8_Lock@20 (0000)
+	_code_001584f0 (0000)
 00158510 0010:
-	_IDirect3DIndexBuffer8_Unlock@4 (0000)
+	_code_00158510@4 (0000)
 00158520 0170:
 	_rasterizer_vertex_buffer_new (0000)
 00158690 0030:
@@ -72,6 +72,44 @@ symbols in this file:
 /* ---------- globals */
 
 /* ---------- public code */
+
+void __stdcall code_00158450(
+	void *resource,
+	void *data)
+{
+	return;
+}
+
+void __stdcall code_00158460(
+	void *resource,
+	void *data)
+{
+	return;
+}
+
+void __stdcall code_00158470(
+	void *resource)
+{
+	return;
+}
+
+long __stdcall code_001584b0(
+	void *resource)
+{
+	return 0;
+}
+
+void __stdcall code_001584d0(
+	void *resource)
+{
+	return;
+}
+
+long __stdcall code_00158510(
+	void *resource)
+{
+	return 0;
+}
 
 boolean rasterizer_vertex_buffer_new(
 	struct vertex_buffer *vertex_buffer,
@@ -158,13 +196,6 @@ boolean rasterizer_vertex_buffer_new(
 					result,
 					"IDirect3DVertexBuffer8_Unlock(d3d_vertex_buffer)");
 			}
-
-			/* January emits this no-op XDK wrapper (0x00158460) and its
-			 * D3DResource_MoveResourceMemory callee (0x00158450) out of line;
-			 * the argument and position are not recoverable from the bytes. */
-			D3DVertexBuffer_MoveResourceMemory(
-				d3d_vertex_buffer,
-				D3DMEM_VIDEO);
 
 			vertex_buffer->count = count;
 			vertex_buffer->offset = 0;
