@@ -1,0 +1,16 @@
+diff --git a/source/game/game.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\cand_declinit.c"
+index d77b74ec..30548796 100644
+--- a/source/game/game.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\cand_declinit.c"
+@@ -1060,10 +1060,9 @@ void remove_quitting_players_from_game(
+ void game_set_game_variant_from_name(
+ 	const char *name)
+ {
+-	struct game_variant variant;
+ 	struct game_variant temporary_variant;
++	struct game_variant variant = *game_engine_get_variant_by_name(&temporary_variant, name);
+ 
+-	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
+ 	game_set_game_variant(&variant);
+ 
+ 	return;

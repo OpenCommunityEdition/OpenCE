@@ -1,0 +1,33 @@
+--- source/physics/breakable_surfaces.c	2026-09-23 17:32:49.506582500 -0700
++++ scratch/w/breakable_surfaces_audit/patches/b/breakable_surfaces.c	2026-09-23 18:28:32.066646400 -0700
+@@ -51,21 +51,6 @@
+ 	const struct damage_data *damage_data,
+ 	long seed_surface_index);
+ 
+-static __inline real_plane3d *breakable_surface_get_plane_from_designator(
+-	struct bsp3d const *bsp,
+-	long plane_designator,
+-	real_plane3d *result)
+-{
+-	real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&bsp->planes, plane_designator & LONG_MAX, real_plane3d);
+-
+-	if (plane_designator & LONG_MIN)
+-		plane3d_negate(plane, result);
+-	else
+-		*result = *plane;
+-
+-	return result;
+-}
+-
+ /* ---------- globals */
+ 
+ static struct breakable_surface_globals *globals;
+@@ -318,7 +303,7 @@
+ 			edge_index = surface->first_edge_index;
+ 			surface_vertex_index = 0;
+ 
+-			breakable_surface_get_plane_from_designator(&collision_bsp->bsp3d, surface->plane_designator, &surface_plane);
++			bsp3d_get_plane_from_designator(&collision_bsp->bsp3d, surface->plane_designator, &surface_plane);
+ 			projection_axis = projection_from_vector3d(&surface_plane.n);
+ 			projection_sign = projection_sign_from_vector3d(&surface_plane.n, projection_axis);
+ 			

@@ -1,0 +1,40 @@
+diff --git a/source/game/game.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_order_before_setter.c"
+index d77b74ec..66f86fff 100644
+--- a/source/game/game.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_order_before_setter.c"
+@@ -543,6 +543,18 @@ short game_difficulty_level_get_ignore_easy(
+ 	return difficulty > _game_difficulty_level_normal ? difficulty : _game_difficulty_level_normal;
+ }
+ 
++void game_set_game_variant_from_name(
++	const char *name)
++{
++	struct game_variant variant;
++	struct game_variant temporary_variant;
++
++	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
++	game_set_game_variant(&variant);
++
++	return;
++}
++
+ void game_set_game_variant(
+ 	struct game_variant *variant)
+ {
+@@ -1057,16 +1069,5 @@ void remove_quitting_players_from_game(
+ 	return;
+ }
+ 
+-void game_set_game_variant_from_name(
+-	const char *name)
+-{
+-	struct game_variant variant;
+-	struct game_variant temporary_variant;
+-
+-	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
+-	game_set_game_variant(&variant);
+-
+-	return;
+-}
+ 
+ /* ---------- private code */

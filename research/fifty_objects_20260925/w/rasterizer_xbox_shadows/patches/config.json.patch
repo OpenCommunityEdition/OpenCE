@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index cf8106ea..d137d5bc 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -482,7 +482,7 @@
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_vertex_shaders.c", "index": 107, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c", "index": 108, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_text.c", "index": 109, "status": "Matching" },
+-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "NonMatching" },
++				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_screen_effect.c", "index": 111, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "NonMatching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c", "index": 113, "status": "Matching" },

@@ -1,0 +1,12 @@
+# REVIEW ledger: rasterizer_geometry OBJECT_COMPLETE_CANDIDATE (reviewer, 2026-09-23)
+
+- R1 cand.c == worker cand.c == probes/final.c; diff vs production = only uncompress_int32_to_real_vector3d body (+`real value;`, 3 staged conversions). CRLF both.
+- R2 gate --all on cand: 19/19 EXACT (gate_cand.txt). Production copy: _uncompress_int32_to_real_vector3d residual [sha] (confirms the only delta).
+- R3 /Od re-derived (odbuild fn 0x82ea80, called from 0x82d080 which refs "fabs(v2.i - v->i)<0.01f"): identical to worker's od_uncompress.txt. Frame 0x18 = RTC guard [ebp-0x18] + v [ebp-0x14..-0x9] (RTC descriptor size 12) + guard [ebp-8] + GS cookie [ebp-4]: NO scalar user local. Later first-party source has no `value` temp.
+- R4 STRIP TEST: s1 = exact /Od spelling (masks + divisions, no temp) -> residual [sha]; s2 = t7 (same + staged `value` temp) -> EXACT. Production (no temp) residual. => the temp alone is the lever; the plain first-party-attested spelling does not match. Strip test FIRES.
+- R5 object_audit.py cand.obj: PASS (44 January symbols 0 differ; all January-owned sections ok). Base audit FAIL(1) = only _uncompress_int32_to_real_vector3d. Candidate-only surplus byte-for-byte same list as base (literal COMDATs + _fast_ftol).
+- R6 surplus_identity: _fast_ftol IDENTICAL to actor_combat.obj selected copy. provider_link cand.obj: every surplus PASS; SELECTED-PROVIDER LINK: PASS. pdb_storage: 44 symbols, 0 disagreements.
+- R7 build/report.json: data 864/864 100%; code 3919/4054 (135 B missing = this function). No rejections/semantic entries for the unit.
+- R8 fake_match_scan cand.c: 0 leads. CL /Zs /W3 prod vs cand: identical warning set (16 each, w3_*.txt). git apply --check OK; patch --binary -p1 reproduces cand.c byte-for-byte.
+- R9 Source-credibility: sibling codecs (uncompress_int8/16_to_real) are unstaged direct expressions; compress_real_to_int16's `z = (real)floor(...)` is a byte-attested PARAMETER reassignment (fstp [ebp+8]), not a new temp -> the "file style" argument does not attest a new local. The `value` temp has no byte trace (x87-only, frame stays 0xc), and the later /Od build counter-attests it.
+- VERDICT: bytes/whole-object audit fully verified, but admissibility is an owner ruling: strip test fires (plain + /Od spelling residual, only the staged temp matches), first-party /Od contradicts the local, and the patch lacks the owner-required "inferred construct" disclosure comment (2026-09-20 ruling). approve=false / ESCALATE.

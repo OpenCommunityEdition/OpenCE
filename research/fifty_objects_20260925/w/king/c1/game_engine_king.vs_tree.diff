@@ -1,0 +1,257 @@
+diff --git a/source/game/game_engine_king.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\king\\c1\\game_engine_king.c"
+index df345537..5ee48923 100644
+--- a/source/game/game_engine_king.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\king\\c1\\game_engine_king.c"
+@@ -222,6 +222,63 @@ typedef char verify_scenario_netgame_flags_offset[
+ 
+ /* ---------- prototypes */
+ 
++static void king_engine_dispose(
++	void);
++static boolean king_engine_initialize_for_new_map(
++	void);
++static void king_engine_dispose_from_old_map(
++	void);
++static void king_engine_player_added(
++	long player_index);
++static void king_engine_game_ending(
++	void);
++static void king_engine_game_starting(
++	void);
++static void king_engine_statistics_append(
++	long statistic);
++static void king_engine_handle_client_message(
++	void *message);
++static void king_engine_handle_server_message(
++	void *message);
++static void king_engine_pregame_post_rasterize(
++	void);
++static void king_engine_post_rasterize(
++	void);
++static void king_engine_player_update(
++	long player_index);
++static void king_engine_player_damaged_player(
++	long damaging_player_index,
++	long dead_player_index,
++	boolean damage_type);
++static void king_engine_player_killed_player(
++	long killing_player_index,
++	long killing_object_index,
++	long dead_player_index,
++	boolean friendly_fire);
++static boolean king_engine_display_score(
++	long player_index,
++	long message,
++	long message_player_index,
++	wchar_t *buffer,
++	long buffer_size);
++static void king_engine_prespawn_player_update(
++	long player_index);
++static long king_get_score(
++	long player_index,
++	enum get_score_type score_type);
++static wchar_t *king_get_score_string(
++	long player_index,
++	wchar_t *buffer);
++static wchar_t *king_get_score_header_string(
++	wchar_t *buffer);
++static wchar_t *king_get_team_score_string(
++	long team_index,
++	wchar_t *buffer);
++static boolean king_engine_goal_matches_player(
++	long player_index,
++	long goal_index);
++static void king_engine_update(
++	void);
+ static void hill_points_to_2d(
+ 	real_point3d const *points,
+ 	real_point2d *points2d,
+@@ -241,55 +298,55 @@ static void king_calculate_hill_state(
+ extern real_rgb_color global_default_animation_colors[4];
+ extern real global_default_animation_values[4];
+ 
+-struct king_globals king_globals = { 0 };
++static struct king_globals king_globals = { 0 };
+ static short king_engine_hill_count = 0;
+ static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
+ 
+ /* ---------- public code */
+ 
+-void king_engine_dispose(
++static void king_engine_dispose(
+ 	void)
+ {
+ 	return;
+ }
+ 
+-void king_engine_dispose_from_old_map(
++static void king_engine_dispose_from_old_map(
+ 	void)
+ {
+ 	return;
+ }
+ 
+-void king_engine_game_ending(
++static void king_engine_game_ending(
+ 	void)
+ {
+ 	return;
+ }
+ 
+-void king_engine_statistics_append(
++static void king_engine_statistics_append(
+ 	long statistic)
+ {
+ 	return;
+ }
+ 
+-void king_engine_handle_client_message(
++static void king_engine_handle_client_message(
+ 	void *message)
+ {
+ 	return;
+ }
+ 
+-void king_engine_handle_server_message(
++static void king_engine_handle_server_message(
+ 	void *message)
+ {
+ 	return;
+ }
+ 
+-void king_engine_pregame_post_rasterize(
++static void king_engine_pregame_post_rasterize(
+ 	void)
+ {
+ 	return;
+ }
+ 
+-void king_engine_post_rasterize(
++static void king_engine_post_rasterize(
+ 	void)
+ {
+ 	struct game_globals *game_globals;
+@@ -374,7 +431,7 @@ void king_engine_post_rasterize(
+ 	return;
+ }
+ 
+-void king_engine_player_damaged_player(
++static void king_engine_player_damaged_player(
+ 	long damaging_player_index,
+ 	long dead_player_index,
+ 	boolean damage_type)
+@@ -382,7 +439,7 @@ void king_engine_player_damaged_player(
+ 	return;
+ }
+ 
+-void king_engine_player_killed_player(
++static void king_engine_player_killed_player(
+ 	long killing_player_index,
+ 	long killing_object_index,
+ 	long dead_player_index,
+@@ -391,13 +448,13 @@ void king_engine_player_killed_player(
+ 	return;
+ }
+ 
+-void king_engine_prespawn_player_update(
++static void king_engine_prespawn_player_update(
+ 	long player_index)
+ {
+ 	return;
+ }
+ 
+-void king_engine_player_added(
++static void king_engine_player_added(
+ 	long player_index)
+ {
+ 	player_get(player_index);
+@@ -405,7 +462,7 @@ void king_engine_player_added(
+ 	return;
+ }
+ 
+-void king_engine_game_starting(
++static void king_engine_game_starting(
+ 	void)
+ {
+ 	game_engine_play_multiplayer_sound(
+@@ -416,7 +473,7 @@ void king_engine_game_starting(
+ 	return;
+ }
+ 
+-wchar_t *king_get_score_string(
++static wchar_t *king_get_score_string(
+ 	long player_index,
+ 	wchar_t *buffer)
+ {
+@@ -430,7 +487,7 @@ wchar_t *king_get_score_string(
+ 	return buffer;
+ }
+ 
+-wchar_t *king_get_team_score_string(
++static wchar_t *king_get_team_score_string(
+ 	long team_index,
+ 	wchar_t *buffer)
+ {
+@@ -442,7 +499,7 @@ wchar_t *king_get_team_score_string(
+ 	return buffer;
+ }
+ 
+-boolean king_engine_initialize_for_new_map(
++static boolean king_engine_initialize_for_new_map(
+ 	void)
+ {
+ 	struct scenario *scenario = global_scenario_get();
+@@ -490,7 +547,7 @@ boolean king_engine_initialize_for_new_map(
+ 	return TRUE;
+ }
+ 
+-void king_engine_player_update(
++static void king_engine_player_update(
+ 	long player_index)
+ {
+ 	struct player_datum *player = player_get(player_index);
+@@ -558,7 +615,7 @@ void king_engine_player_update(
+ 	return;
+ }
+ 
+-boolean king_engine_display_score(
++static boolean king_engine_display_score(
+ 	long player_index,
+ 	long message,
+ 	long message_player_index,
+@@ -639,7 +696,7 @@ boolean king_engine_display_score(
+ 	return result;
+ }
+ 
+-long king_get_score(
++static long king_get_score(
+ 	long player_index,
+ 	enum get_score_type score_type)
+ {
+@@ -779,7 +836,7 @@ void render_dynamic_quad(
+ 	return;
+ }
+ 
+-wchar_t *king_get_score_header_string(
++static wchar_t *king_get_score_header_string(
+ 	wchar_t *buffer)
+ {
+ 	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+@@ -800,7 +857,7 @@ wchar_t *king_get_score_header_string(
+ 	return buffer;
+ }
+ 
+-boolean king_engine_goal_matches_player(
++static boolean king_engine_goal_matches_player(
+ 	long player_index,
+ 	long goal_index)
+ {
+@@ -809,7 +866,7 @@ boolean king_engine_goal_matches_player(
+ 	return matches;
+ }
+ 
+-void king_engine_update(
++static void king_engine_update(
+ 	void)
+ {
+ 	if (game_engine_can_score() &&

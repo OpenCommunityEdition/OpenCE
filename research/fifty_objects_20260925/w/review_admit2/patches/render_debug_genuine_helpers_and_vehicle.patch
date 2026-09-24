@@ -1,0 +1,148 @@
+diff --git a/source/render/render_debug.c b/source/render/render_debug.c
+index e335494c..f79b8d46 100644
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -132,9 +132,6 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
+-#define REAL_MATH_EXTERNAL_ARCTANGENT
+-#define REAL_MATH_EXTERNAL_DOT_PRODUCT3D
+-#define REAL_MATH_EXTERNAL_PLANE3D_DISTANCE_TO_POINT
+ #include "cseries/cseries.h"
+ #include "cseries/errors.h"
+ #include "ai/ai_profile.h"
+@@ -165,6 +162,7 @@ symbols in this file:
+ #include "tag_files/tag_files.h"
+ #include "text/draw_string.h"
+ #include "units/bipeds.h"
++#include "units/vehicle_datum.h"
+ #include "units/vehicles.h"
+ 
+ /* ---------- constants */
+@@ -196,9 +194,6 @@ enum
+ 
+ /* ---------- macros */
+ 
+-#define vehicle_runtime_try_and_get(index) \
+-	((struct vehicle_runtime_datum *)object_try_and_get_and_verify_type((index), _object_mask_vehicle))
+-
+ /* ---------- structures */
+ 
+ struct render_debug_cache_entry
+@@ -266,26 +261,6 @@ struct render_debug_globals_definition
+ 	boolean string_overflow_reported;
+ };
+ 
+-struct render_debug_vehicle_data
+-{
+-	word flags;
+-	short unknown426;
+-	byte unknown428[4];
+-	real speed;
+-	real slide;
+-	real turn;
+-	byte unknown438[0x40];
+-	long stuck;
+-};
+-
+-struct vehicle_runtime_datum
+-{
+-	long definition_index;
+-	struct _object_datum object;
+-	struct _unit_datum unit;
+-	struct render_debug_vehicle_data vehicle;
+-};
+-
+ typedef char render_debug_cache_entry_size_check[
+ 	sizeof(struct render_debug_cache_entry) == 0x38 ? 1 : -1];
+ typedef char render_debug_globals_size_check[
+@@ -304,14 +279,6 @@ typedef char render_debug_globals_entry_overflow_offset_check[
+ 	offsetof(struct render_debug_globals_definition, entry_overflow_reported) == 0x740A ? 1 : -1];
+ typedef char render_debug_globals_string_overflow_offset_check[
+ 	offsetof(struct render_debug_globals_definition, string_overflow_reported) == 0x740B ? 1 : -1];
+-typedef char render_debug_vehicle_speed_offset_check[
+-	offsetof(struct vehicle_runtime_datum, vehicle.speed) == 0x42C ? 1 : -1];
+-typedef char render_debug_vehicle_slide_offset_check[
+-	offsetof(struct vehicle_runtime_datum, vehicle.slide) == 0x430 ? 1 : -1];
+-typedef char render_debug_vehicle_turn_offset_check[
+-	offsetof(struct vehicle_runtime_datum, vehicle.turn) == 0x434 ? 1 : -1];
+-typedef char render_debug_vehicle_stuck_offset_check[
+-	offsetof(struct vehicle_runtime_datum, vehicle.stuck) == 0x478 ? 1 : -1];
+ 
+ /* ---------- prototypes */
+ 
+@@ -794,9 +761,7 @@ void render_debug_vector(
+ 		390,
+ 		color);
+ 
+-	end_point.x = point->x + size*vector->i;
+-	end_point.y = point->y + size*vector->j;
+-	end_point.z = point->z + size*vector->k;
++	point_from_line3d(point, vector, size, &end_point);
+ 
+ 	render_debug_line(
+ 		immediate,
+@@ -816,15 +781,9 @@ void render_debug_tick(
+ {
+ 	real_point3d point0;
+ 	real_point3d point1;
+-	real negative_tick_size;
+ 
+-	point0.x = point->x + tick_size*tick_vector->i;
+-	point0.y = point->y + tick_size*tick_vector->j;
+-	point0.z = point->z + tick_size*tick_vector->k;
+-	negative_tick_size = -tick_size;
+-	point1.x = point->x + negative_tick_size*tick_vector->i;
+-	point1.y = point->y + negative_tick_size*tick_vector->j;
+-	point1.z = point->z + negative_tick_size*tick_vector->k;
++	point_from_line3d(point, tick_vector, tick_size, &point0);
++	point_from_line3d(point, tick_vector, -tick_size, &point1);
+ 
+ 	render_debug_line(
+ 		immediate,
+@@ -845,12 +804,8 @@ void render_debug_line_offset(
+ 	real_point3d point0;
+ 	real_point3d point1;
+ 
+-	point0.x = p0->x + offset*global_up3d->i;
+-	point0.y = p0->y + offset*global_up3d->j;
+-	point0.z = p0->z + offset*global_up3d->k;
+-	point1.x = p1->x + offset*global_up3d->i;
+-	point1.y = p1->y + offset*global_up3d->j;
+-	point1.z = p1->z + offset*global_up3d->k;
++	point_from_line3d(p0, global_up3d, offset, &point0);
++	point_from_line3d(p1, global_up3d, offset, &point1);
+ 
+ 	render_debug_line(
+ 		immediate,
+@@ -1413,7 +1368,7 @@ static void render_debug_player(
+ 
+ 			if (biped->object.parent_object_index != NONE && biped->unit.parent_seat_index != NONE)
+ 			{
+-				struct vehicle_runtime_datum *vehicle = vehicle_runtime_try_and_get(
++				struct vehicle_datum *vehicle = vehicle_datum_try_and_get(
+ 					biped->object.parent_object_index);
+ 				char text[MAXIMUM_RENDER_DEBUG_PLAYER_TEXT_LENGTH + 1];
+ 
+@@ -1423,7 +1378,7 @@ static void render_debug_player(
+ 					vehicle->vehicle.speed,
+ 					vehicle->vehicle.slide,
+ 					vehicle->vehicle.turn,
+-					vehicle->vehicle.stuck ? "|nstuck!" : "");
++					vehicle->vehicle.stuck_mass_point_flags ? "|nstuck!" : "");
+ 				render_debug_string(
+ 					TRUE,
+ 					text);
+diff --git a/source/units/vehicle_datum.h b/source/units/vehicle_datum.h
+index ceb7535e..a4050b64 100644
+--- a/source/units/vehicle_datum.h
++++ b/source/units/vehicle_datum.h
+@@ -16,6 +16,7 @@ Private runtime vehicle datum ownership shared by vehicles.c and physics.c.
+ /* ---------- macros */
+ 
+ #define vehicle_datum_get(index) ((struct vehicle_datum *)object_get_and_verify_type((index), _object_mask_vehicle))
++#define vehicle_datum_try_and_get(index) ((struct vehicle_datum *)object_try_and_get_and_verify_type((index), _object_mask_vehicle))
+ 
+ /* ---------- structures */
+ 

@@ -1,0 +1,22 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 3da39456..93443bb9 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -1393,7 +1393,7 @@
+ { "file_offset": 463424, "flags": 32, "name": "_transport_client_start" },
+ { "file_offset": 463616, "flags": 32, "name": "_connection_thread_list_add", "static": true },
+ { "file_offset": 463712, "flags": 32, "name": "_connection_thread_list_mark_for_disposal", "static": true },
+-{ "file_offset": 463776, "flags": 32, "name": "_connection_thread_list_maintenance" },
++{ "file_offset": 463776, "flags": 32, "name": "_connection_thread_list_maintenance", "static": true },
+ { "file_offset": 463840, "flags": 32, "name": "_create_transport_endpoint" },
+ { "file_offset": 463968, "flags": 32, "name": "_get_endpoint_type" },
+ { "file_offset": 464064, "flags": 32, "name": "_read_endpoint" },
+@@ -22940,7 +22940,7 @@
+ { "file_offset": 3264048, "flags": 0, "name": "_transport_initialized" },
+ { "file_offset": 3264049, "flags": 0, "name": "_global_client_active" },
+ { "file_offset": 3264052, "flags": 0, "name": "_global_key_depth" },
+-{ "file_offset": 3264056, "flags": 0, "name": "_transport_endpoint_globals" },
++{ "file_offset": 3264056, "flags": 0, "name": "_transport_endpoint_globals", "static": true },
+ { "file_offset": 3264584, "flags": 0, "name": "_director_globals" },
+ { "file_offset": 3265584, "flags": 0, "name": "_director_camera_switch_fast" },
+ { "file_offset": 3265585, "flags": 0, "name": "_hyper_key_down", "static": true },

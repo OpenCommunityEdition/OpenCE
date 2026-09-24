@@ -1,0 +1,21 @@
+--- a/source/interface/ui_widget_game_data_input_functions.c
++++ b/source/interface/ui_widget_game_data_input_functions.c
+@@ -2870,12 +2870,12 @@
+ 		{
+ 			widget->parameters.text_box.string_list_index =
+ 				_multiplayer_game_text_string_teams_ready;
+-			widget->visible = TRUE;
+-			return;
+-		}
+-
+-		widget->parameters.text_box.string_list_index =
+-			_multiplayer_game_text_string_waiting_for_teams;
++		}
++		else
++		{
++			widget->parameters.text_box.string_list_index =
++				_multiplayer_game_text_string_waiting_for_teams;
++		}
+ 		widget->visible = TRUE;
+ 		return;
+ 	}

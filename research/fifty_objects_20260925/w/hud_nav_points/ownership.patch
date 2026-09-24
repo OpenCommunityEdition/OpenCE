@@ -1,0 +1,20 @@
+--- a/source/interface/hud_nav_points.c
++++ b/source/interface/hud_nav_points.c
+@@ -287,7 +287,7 @@
+ 
+ /* ---------- prototypes */
+ 
+-void hud_update_nav_point_local_player(
++static void hud_update_nav_point_local_player(
+ 	short local_player_index);
+ 
+ void *object_try_and_get_and_verify_type(
+@@ -1096,7 +1096,7 @@
+ 	return;
+ }
+ 
+-void hud_update_nav_point_local_player(
++static void hud_update_nav_point_local_player(
+ 	short local_player_index)
+ {
+ 	long return_eip = get_return_eip();

@@ -1,0 +1,12 @@
+--- a/source/math/random_math.h
++++ b/source/math/random_math.h
+@@ -14,9 +14,6 @@
+ void unlock_global_random_seed(
+ 	void);
+ 
+-unsigned long get_random_seed(
+-	void);
+-
+ void random_seed_debug_log(
+ 	boolean log);
+ 

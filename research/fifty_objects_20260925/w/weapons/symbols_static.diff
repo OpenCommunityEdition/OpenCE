@@ -1,0 +1,32 @@
+4013,4018c4013,4018
+< { "file_offset": 961328, "flags": 32, "name": "_weapon_trigger_get" },
+< { "file_offset": 961408, "flags": 32, "name": "_weapon_magazine_get" },
+< { "file_offset": 961488, "flags": 32, "name": "_weapon_busy" },
+< { "file_offset": 961568, "flags": 32, "name": "_weapon_magazine_state_change_ok" },
+< { "file_offset": 961632, "flags": 32, "name": "_weapon_get_effect_object_index" },
+< { "file_offset": 961680, "flags": 32, "name": "_weapon_get_owner_object_index" },
+---
+> { "file_offset": 961328, "flags": 32, "name": "_weapon_trigger_get", "static": true },
+> { "file_offset": 961408, "flags": 32, "name": "_weapon_magazine_get", "static": true },
+> { "file_offset": 961488, "flags": 32, "name": "_weapon_busy", "static": true },
+> { "file_offset": 961568, "flags": 32, "name": "_weapon_magazine_state_change_ok", "static": true },
+> { "file_offset": 961632, "flags": 32, "name": "_weapon_get_effect_object_index", "static": true },
+> { "file_offset": 961680, "flags": 32, "name": "_weapon_get_owner_object_index", "static": true },
+4023c4023
+< { "file_offset": 962288, "flags": 32, "name": "_weapon_effect_new" },
+---
+> { "file_offset": 962288, "flags": 32, "name": "_weapon_effect_new", "static": true },
+4030,4031c4030,4031
+< { "file_offset": 963088, "flags": 32, "name": "_weapon_state_interruptable" },
+< { "file_offset": 963120, "flags": 32, "name": "_weapon_set_state" },
+---
+> { "file_offset": 963088, "flags": 32, "name": "_weapon_state_interruptable", "static": true },
+> { "file_offset": 963120, "flags": 32, "name": "_weapon_set_state", "static": true },
+4047c4047
+< { "file_offset": 967424, "flags": 32, "name": "_weapon_magazine_finish_reload" },
+---
+> { "file_offset": 967424, "flags": 32, "name": "_weapon_magazine_finish_reload", "static": true },
+4054c4054
+< { "file_offset": 968496, "flags": 32, "name": "_weapon_reset" },
+---
+> { "file_offset": 968496, "flags": 32, "name": "_weapon_reset", "static": true },

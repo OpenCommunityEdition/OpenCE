@@ -1,0 +1,7 @@
+23271c23271,23274
+< { "file_offset": 4987144, "flags": 0, "name": "_draw_string_globals" },
+---
+> { "file_offset": 4987144, "flags": 0, "name": "_draw_character_software_globals", "static": true },
+> { "file_offset": 4987152, "flags": 0, "name": "_text_pick_globals", "static": true },
+> { "file_offset": 4987164, "flags": 0, "name": "_text_bounds_globals", "static": true },
+> { "file_offset": 4987176, "flags": 0, "name": "_font_drawing_globals", "static": true },

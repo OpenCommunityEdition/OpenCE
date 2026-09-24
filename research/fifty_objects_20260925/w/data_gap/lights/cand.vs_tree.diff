@@ -1,0 +1,101 @@
+diff --git a/source/objects/object_lights.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\lights\\cand.c"
+index 2553c63c..71286752 100644
+--- a/source/objects/object_lights.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\data_gap\\lights\\cand.c"
+@@ -140,10 +140,6 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
+-/* objects.h lies in this unit's own directory, so January's __FILE__ for it was the absolute
+-   path (see OBJECTS_H_FILE in objects.h) */
+-#define OBJECTS_H_FILE "c:\\halo\\source\\objects\\objects.h"
+-
+ #include "cseries/cseries.h"
+ #include "cseries/errors.h"
+ #include "cseries/profile.h"
+@@ -406,6 +402,8 @@ typedef char verify_lights_globals_size[
+ 
+ /* ---------- prototypes */
+ 
++static boolean should_render_lights(
++	void);
+ static void light_marker_begin(
+ 	void);
+ static void light_marker_end(
+@@ -414,10 +412,10 @@ static boolean light_unmarked(
+ 	long light_index);
+ static boolean light_mark(
+ 	long light_index);
+-long cluster_get_first_light(
++static long cluster_get_first_light(
+ 	long *reference_index,
+ 	short cluster_index);
+-long cluster_get_next_light(
++static long cluster_get_next_light(
+ 	long *reference_index);
+ static void find_point_lights_for_object_in_cluster(
+ 	long object_index,
+@@ -640,7 +638,7 @@ void sample_diffuse_texture(
+ 	return;
+ }
+ 
+-boolean should_render_lights(
++static boolean should_render_lights(
+ 	void)
+ {
+ 	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
+@@ -1481,7 +1479,7 @@ static void render_debug_light(
+ 
+ /* ---------- private code */
+ 
+-real light_attenuation(
++static real light_attenuation(
+ 	real radius,
+ 	real distance)
+ {
+@@ -1512,7 +1510,7 @@ static void brighten_real_rgb_color(
+ 	return;
+ }
+ 
+-long cluster_get_first_light(
++static long cluster_get_first_light(
+ 	long *reference_index,
+ 	short cluster_index)
+ {
+@@ -1522,7 +1520,7 @@ long cluster_get_first_light(
+ 		cluster_index);
+ }
+ 
+-long cluster_get_next_light(
++static long cluster_get_next_light(
+ 	long *reference_index)
+ {
+ 	return cluster_partition_get_next_datum(
+@@ -1634,7 +1632,7 @@ void lights_render_diffuse(
+ 	short light_index;
+ 
+ 	rasterizer_environment_diffuse_lights_begin();
+-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
++	if (should_render_lights())
+ 	{
+ 		for (light_index = 0;
+ 			light_index < lights_globals.scene_point_light_count;
+@@ -1689,7 +1687,7 @@ void lights_render_specular(
+ 	short light_index;
+ 
+ 	rasterizer_environment_specular_lights_begin();
+-	if (lights_game_globals->render_lights && game_engine_allow_dynamic_lighting())
++	if (should_render_lights())
+ 	{
+ 		for (light_index = 0;
+ 			light_index < lights_globals.scene_point_light_count;
+@@ -1835,7 +1833,8 @@ static void find_point_lights_for_object_in_cluster(
+ 					|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
+ 						_light_definition_dont_light_own_object_bit)))
+ 			{
+-				real distance = distance3d(&light->position, center);
++				real_point3d const *light_position = &light->position;
++				real distance = distance3d(light_position, center);
+ 
+ 				if (distance < radius + light->radius)
+ 				{

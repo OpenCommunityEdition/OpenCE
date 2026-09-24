@@ -1,0 +1,20 @@
+diff --git a/source/render/render_objects.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\path_audit\\cand_ro_a.c"
+index 7c6d8d08..3207c92b 100644
+--- a/source/render/render_objects.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\path_audit\\cand_ro_a.c"
+@@ -304,6 +304,7 @@ static struct profile_section render_object_shadows_section =
+ 
+ struct data_array *cached_object_render_states;
+ 
++static struct render_lighting lighting_storage = { 0 };
+ static struct render_object_globals render_object_globals = { 0 };
+ 
+ boolean debug_inactive_objects = FALSE;
+@@ -355,7 +356,6 @@ struct render_lighting *object_get_cached_render_lighting(
+ 	long object_index,
+ 	real level_of_detail_pixels)
+ {
+-	static struct render_lighting lighting_storage;
+ 	long render_state_index = object_get_cached_render_state(
+ 		object_index,
+ 		level_of_detail_pixels);

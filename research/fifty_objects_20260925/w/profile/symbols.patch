@@ -1,0 +1,33 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 3da39456..6c905618 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -1627,7 +1627,7 @@
+ { "file_offset": 516560, "flags": 32, "name": "_profile_frame_build_string", "static": true },
+ { "file_offset": 518112, "flags": 32, "name": "_profile_timer_start_at", "static": true },
+ { "file_offset": 518128, "flags": 32, "name": "_profile_timer_end_at", "static": true },
+-{ "file_offset": 518208, "flags": 32, "name": "_compare_profile_sections", "static": true },
++{ "file_offset": 518208, "flags": 32, "name": "_compare_profile_sections" },
+ { "file_offset": 518496, "flags": 32, "name": "_profile_dump" },
+ { "file_offset": 519360, "flags": 32, "name": "_profile_dump_to_file" },
+ { "file_offset": 519488, "flags": 32, "name": "_profile_frame_dump", "static": true },
+@@ -22478,8 +22478,8 @@
+ { "file_offset": 3001608, "flags": 0, "name": "_global_real_rgb_violet" },
+ { "file_offset": 3001612, "flags": 0, "name": "_debug_memory_globals" },
+ { "file_offset": 3001644, "flags": 0, "name": "_data_002dcd2c" },
+-{ "file_offset": 3001648, "flags": 0, "name": "_header_strings", "static": true },
+-{ "file_offset": 3001656, "flags": 0, "name": "_format_strings", "static": true },
++{ "file_offset": 3001648, "flags": 0, "name": "_header_strings" },
++{ "file_offset": 3001656, "flags": 0, "name": "_format_strings" },
+ { "file_offset": 3001664, "flags": 0, "name": "_stack_walk_globals" },
+ { "file_offset": 3001688, "flags": 0, "name": "_recorded_animation_event_stream_data" },
+ { "file_offset": 3001824, "flags": 0, "name": "_recorded_animation_block" },
+@@ -22949,7 +22949,7 @@
+ { "file_offset": 3268396, "flags": 0, "name": "_bss_0031df2c" },
+ { "file_offset": 3268404, "flags": 0, "name": "_find_all_fucked_up_shit" },
+ { "file_offset": 3268408, "flags": 0, "name": "_fucked_up_shit_count" },
+-{ "file_offset": 3268416, "flags": 0, "name": "_profile_globals" },
++{ "file_offset": 3268416, "flags": 0, "name": "_profile_globals", "static": true },
+ { "file_offset": 4398224, "flags": 0, "name": "_profile_timebase_ticks" },
+ { "file_offset": 4398225, "flags": 0, "name": "_profile_global_enable" },
+ { "file_offset": 4398226, "flags": 0, "name": "_profile_dump_frames" },

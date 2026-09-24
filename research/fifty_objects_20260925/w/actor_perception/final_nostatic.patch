@@ -1,0 +1,273 @@
+--- a/source/ai/actor_perception.c
++++ b/source/ai/actor_perception.c
+@@ -247,8 +247,6 @@
+ 
+ /* ---------- headers */
+ 
+-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+-
+ #include "cseries.h"
+ #include "cseries/errors.h"
+ 
+@@ -276,8 +274,6 @@
+ #include "units/vehicles.h"
+ #include "units/biped_definitions.h"
+ 
+-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+-
+ /* ---------- constants */
+ 
+ enum
+@@ -365,6 +361,7 @@
+ enum
+ {
+ 	_actor_combat_status_none = 0,
++	_actor_combat_status_investigate = 2,
+ 	_actor_combat_status_definite = 3,
+ 	_actor_combat_status_certain = 4,
+ 	_actor_combat_status_visible = 7,
+@@ -1421,60 +1418,50 @@
+ 	long actor_index,
+ 	long prop_index)
+ {
+-	struct actor_perception_actor_view *actor =
+-		(struct actor_perception_actor_view *)actor_get(actor_index);
+-	short result;
++	struct actor_datum *actor = actor_get(actor_index);
++	short knowledge_type = NONE;
+ 
+ 	if (prop_index != NONE)
+ 	{
+-		struct actor_perception_prop_view *prop =
+-			(struct actor_perception_prop_view *)prop_get(prop_index);
++		struct prop_datum *prop = prop_get(prop_index);
+ 
+ #line 1394 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
+ 		assert(prop->owner_actor_index == actor_index);
+ #line 390 "source\\ai\\actor_perception.c"
+ 
+-		if (prop->state >= 2 && prop->state <= 3)
++		if (prop_acknowledged(prop) ||
++			prop->unit_effect == _ai_unit_effect_shooting ||
++			prop->unit_effect == _ai_unit_effect_death_scream ||
++			(!prop->enemy &&
++				(!prop->dead || actor->state.mode >= _actor_mode_combat)))
+ 		{
+-			result = 3;
+-			goto done;
++			knowledge_type = _actor_knowledge_definite;
+ 		}
+ 
+-		if (prop->perception == 1 || prop->perception == 2)
++		if (knowledge_type == NONE &&
++			prop->orphan_prop_index != NONE)
+ 		{
+-			result = 3;
+-			goto done;
++			knowledge_type =
++				_actor_knowledge_searching +
++				(prop_get(prop->orphan_prop_index)->definitely_located != FALSE);
+ 		}
++	}
+ 
+-		if (!prop->enemy &&
+-			(!prop->dead || actor->combat_status >= 3))
++	if (knowledge_type == NONE)
++	{
++		if (actor->state.combat_status >= _actor_combat_status_investigate)
+ 		{
+-			result = 3;
+-			goto done;
++			knowledge_type = _actor_knowledge_searching;
+ 		}
+-
+-		if (prop->orphan_prop_index != NONE)
++		else
+ 		{
+-			struct actor_perception_prop_view *orphan =
+-				(struct actor_perception_prop_view *)prop_get(
+-					prop->orphan_prop_index);
+-			result = (orphan->definitely_located != FALSE) + 2;
+-
+-			if (result != NONE)
+-				goto done;
++			knowledge_type = actor->state.mode >= _actor_mode_combat ?
++				_actor_knowledge_guard :
++				_actor_knowledge_noncombat;
+ 		}
+ 	}
+ 
+-	if (actor->artificial_combat_status >= 2)
+-	{
+-		result = 2;
+-		goto done;
+-	}
+-
+-	result = actor->combat_status >= 3;
+-
+-done:
+-	return result;
++	return knowledge_type;
+ }
+ 
+ void actor_get_vision_distances(
+@@ -2063,91 +2050,82 @@
+ }
+ 
+ short actor_perception_aiming_vector_test_blockage(
+-	real_point3d const *origin,
+-	real_vector3d const *aiming_vector,
+-	real_point3d const *point,
+-	real_vector3d *error)
+-{
+-	real_vector2d horizontal_aiming;
+-	real_vector3d friend_vector;
+-	real_vector3d blockage_vector;
+-	real horizontal_aiming_magnitude;
+-	real projection;
+-	real friend_distance;
+-	real horizontal_error_squared;
++	real_point3d const *source_position,
++	real_vector3d const *source_vector,
++	real_point3d const *friend_position,
++	real_vector3d *friend_direction_to_aiming_vector)
++{
++	real_vector2d source_planar_direction;
+ 	short blockage = 0;
+ 
+-	horizontal_aiming.i = aiming_vector->i;
+-	horizontal_aiming.j = aiming_vector->j;
+-	horizontal_aiming_magnitude = magnitude2d(&horizontal_aiming);
+-	if (!(_real_epsilon > fabs(horizontal_aiming_magnitude)))
+-	{
+-		real inverse_magnitude = 1.0f / horizontal_aiming_magnitude;
+-
+-		horizontal_aiming.i *= inverse_magnitude;
+-		horizontal_aiming.j *= inverse_magnitude;
+-	}
+-	else
++	source_planar_direction = *(real_vector2d const *)source_vector;
++	if (normalize2d(&source_planar_direction) > 0.0f)
+ 	{
+-		horizontal_aiming_magnitude = 0.0f;
+-	}
+-
+-	if (!(horizontal_aiming_magnitude > 0.0f))
+-		goto done;
+-
+-	vector_from_points3d(origin, point, &friend_vector);
+-	projection =
+-		friend_vector.i * horizontal_aiming.i +
+-		friend_vector.j * horizontal_aiming.j;
+-	friend_distance = square_root(
+-		friend_vector.i * friend_vector.i +
+-		friend_vector.j * friend_vector.j);
+-	friend_distance *= 0.8660254f;
+-
+-	if (!(projection > friend_distance))
+-		goto done;
+-
+-	projection = -projection;
+-	blockage_vector.i =
+-		friend_vector.i + projection * aiming_vector->i;
+-	blockage_vector.j =
+-		friend_vector.j + projection * aiming_vector->j;
+-	blockage_vector.k =
+-		friend_vector.k + projection * aiming_vector->k;
++		real_vector3d friend_vector;
++		real friend_distance;
++		real friend_projection;
++
++		vector_from_points3d(
++			source_position,
++			friend_position,
++			&friend_vector);
++		friend_distance = magnitude2d((real_vector2d *)&friend_vector);
++		friend_projection = dot_product2d(
++			(real_vector2d *)&friend_vector,
++			&source_planar_direction);
++		if (friend_projection > 0.8660254f * friend_distance)
++		{
++			real_vector3d friend_perpendicular_vector;
++
++			point_from_line3d(
++				(real_point3d *)&friend_vector,
++				source_vector,
++				-friend_projection,
++				(real_point3d *)&friend_perpendicular_vector);
++			if (friend_direction_to_aiming_vector != NULL)
++			{
++				negate_vector3d(
++					&friend_perpendicular_vector,
++					friend_direction_to_aiming_vector);
++			}
+ 
+-	if (error != NULL)
+-	{
+-		error->i = -blockage_vector.i;
+-		error->j = -blockage_vector.j;
+-		error->k = -blockage_vector.k;
+-	}
++			if (friend_perpendicular_vector.k > -0.5f &&
++				friend_perpendicular_vector.k < 0.9f)
++			{
++				blockage = 2;
++			}
++			else if (friend_perpendicular_vector.k > -0.8f &&
++				friend_perpendicular_vector.k < 1.2f)
++			{
++				blockage = 1;
++			}
++			else
++			{
++				blockage = 0;
++			}
+ 
+-	if (blockage_vector.k > -0.5f && blockage_vector.k < 0.9f)
+-	{
+-		blockage = 2;
+-	}
+-	else if (blockage_vector.k > -0.8f && blockage_vector.k < 1.2f)
+-	{
+-		blockage = 1;
+-	}
+-	else
+-	{
+-		blockage = 0;
+-		goto done;
+-	}
++			if (blockage > 0)
++			{
++				real horizontal_error_squared =
++					magnitude_squared2d(
++						(real_vector2d *)&friend_perpendicular_vector);
+ 
+-	horizontal_error_squared =
+-		blockage_vector.i * blockage_vector.i +
+-		blockage_vector.j * blockage_vector.j;
+-	if (!(horizontal_error_squared < 0.36f))
+-	{
+-		if (horizontal_error_squared < 1.21f)
+-			blockage = 1;
+-		else
+-			blockage = 0;
++				if (horizontal_error_squared < 0.36f)
++				{
++					/* close to the line of fire: keep the vertical blockage */
++				}
++				else if (horizontal_error_squared < 1.21f)
++				{
++					blockage = 1;
++				}
++				else
++				{
++					blockage = 0;
++				}
++			}
++		}
+ 	}
+ 
+-done:
+ 	return blockage;
+ }
+ 

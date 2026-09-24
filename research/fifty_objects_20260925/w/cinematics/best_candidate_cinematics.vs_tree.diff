@@ -1,0 +1,263 @@
+diff --git a/source/cutscene/cinematics.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\cinematics\\best_candidate_cinematics.c"
+index 4bfdeb70..05111f8a 100644
+--- a/source/cutscene/cinematics.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\cinematics\\best_candidate_cinematics.c"
+@@ -311,7 +311,6 @@ void cinematic_render(
+ 	{
+ 		long game_time;
+ 		long elapsed_ticks;
+-		real letterbox_amount;
+ 
+ 		game_time = game_time_get();
+ 		elapsed_ticks =
+@@ -321,7 +320,7 @@ void cinematic_render(
+ 		{
+ 			cinematic_globals->letterbox_amount +=
+ 				(real)elapsed_ticks * (1.0f / (real)TICKS_PER_SECOND);
+-			letterbox_amount =
++			cinematic_globals->letterbox_amount =
+ 				MIN(cinematic_globals->letterbox_amount, 1.0f);
+ 		}
+ 		else
+@@ -329,12 +328,10 @@ void cinematic_render(
+ 			cinematic_globals->letterbox_amount =
+ 				cinematic_globals->letterbox_amount -
+ 				(real)elapsed_ticks * (1.0f / (real)TICKS_PER_SECOND);
+-			letterbox_amount =
++			cinematic_globals->letterbox_amount =
+ 				MAX(cinematic_globals->letterbox_amount, 0.0f);
+ 		}
+ 
+-		cinematic_globals->letterbox_amount = letterbox_amount;
+-
+ 		if (cinematic_globals->letterbox_amount > 0.0f)
+ 		{
+ 			rectangle2d bar;
+@@ -370,128 +367,111 @@ void cinematic_render(
+ 			title_slot_index < MAXIMUM_QUEUED_CINEMATIC_TITLES;
+ 			title_slot_index++)
+ 		{
+-			struct cinematic_title *active_title;
+-			struct scenario_cutscene_title *title;
+-			struct string_list *string_list;
+-			rectangle2d const *title_bounds;
+-			long font_index;
+-			long help_text_tag_index;
+-			real fade_amount;
+-
+-			active_title =
++			struct cinematic_title *active_title =
+ 				&cinematic_globals->queued_titles[title_slot_index];
+ 
+-			if (active_title->title_index == NONE)
+-				continue;
+-
+-			font_index = hud_globals->single_player_font_index;
+-			if (font_index == NONE)
+-				continue;
+-
+-			title = TAG_BLOCK_GET_ELEMENT(
+-				&global_scenario_get()->cutscene_chapter_titles,
+-				active_title->title_index,
+-				struct scenario_cutscene_title);
+-
+-			help_text_tag_index =
+-				global_scenario_get()->ingame_help_text.index;
+-			if (help_text_tag_index == NONE)
+-				continue;
+-
+-			string_list =
+-				unicode_string_list_definition_get(help_text_tag_index);
+-			if (title->text_index < 0 ||
+-				title->text_index >= string_list->strings.count)
+-			{
+-				continue;
+-			}
+-
+-			title_bounds = &title->bounds;
+-			fade_amount = 1.0f;
+-			if (title_bounds->x1 == title_bounds->x0 ||
+-				title_bounds->y1 == title_bounds->y0)
+-			{
+-				title_bounds = &hud_globals->default_title_bounds;
+-			}
+-
+-			if (!game_in_editor())
+-			{
+-				real title_time = (real)active_title->time;
+-
+-				if (title_time < title->fade_in_time)
+-				{
+-					fade_amount =
+-						title_time / title->fade_in_time;
+-				}
+-				else if (title_time > title->up_time)
+-				{
+-					fade_amount =
+-						1.0f -
+-						(title_time - title->up_time) /
+-						title->fade_out_time;
+-				}
+-
+-				fade_amount = PIN(fade_amount, 0.0f, 1.0f);
+-			}
+-
++			if (active_title->title_index != NONE)
+ 			{
+-				real_argb_color color;
+-				long shadow_alpha;
+-
+-				pixel32_to_real_argb_color(
+-					title->foreground_color,
+-					&color);
+-				color.alpha *= fade_amount;
++				long font_index = hud_globals->single_player_font_index;
+ 
+-				if (fabs(color.red - 1.0f) < _real_epsilon &&
+-					fabs(color.green - 1.0f) < _real_epsilon &&
+-					fabs(color.blue - 1.0f) < _real_epsilon)
++				if (font_index != NONE)
+ 				{
+-					color.red = MIN(color.red, 0.8f);
+-					color.green = MIN(color.green, 0.8f);
+-					color.blue = MIN(color.blue, 0.8f);
++					struct scenario_cutscene_title *title = TAG_BLOCK_GET_ELEMENT(
++						&global_scenario_get()->cutscene_chapter_titles,
++						active_title->title_index,
++						struct scenario_cutscene_title);
++					long help_text_tag_index =
++						global_scenario_get()->ingame_help_text.index;
++
++					if (help_text_tag_index != NONE)
++					{
++						struct string_list *string_list =
++							unicode_string_list_definition_get(help_text_tag_index);
++
++						if (title->text_index >= 0 &&
++							title->text_index < string_list->strings.count)
++						{
++							rectangle2d const *title_bounds = &title->bounds;
++							real fade_amount = 1.0f;
++
++							if (title_bounds->x1 == title_bounds->x0 ||
++								title_bounds->y1 == title_bounds->y0)
++							{
++								title_bounds = &hud_globals->default_title_bounds;
++							}
++
++							if (!game_in_editor())
++							{
++								if ((real)active_title->time < title->fade_in_time)
++								{
++									fade_amount =
++										(real)active_title->time / title->fade_in_time;
++								}
++								else if ((real)active_title->time > title->up_time)
++								{
++									fade_amount =
++										1.0f -
++										((real)active_title->time - title->up_time) /
++										title->fade_out_time;
++								}
++
++								fade_amount = PIN(fade_amount, 0.0f, 1.0f);
++							}
++
++							{
++								real_argb_color text_color;
++
++								pixel32_to_real_argb_color(
++									title->foreground_color,
++									&text_color);
++								text_color.alpha *= fade_amount;
++
++								if (fabs(text_color.red - 1.0f) < _real_epsilon &&
++									fabs(text_color.green - 1.0f) < _real_epsilon &&
++									fabs(text_color.blue - 1.0f) < _real_epsilon)
++								{
++									text_color.red = MIN(text_color.red, 0.8f);
++									text_color.green = MIN(text_color.green, 0.8f);
++									text_color.blue = MIN(text_color.blue, 0.8f);
++								}
++
++								draw_string_set_draw_mode(
++									font_index,
++									title->style - 1,
++									title->justification,
++									title->text_flags,
++									&text_color);
++
++								rasterizer_text_set_shadow_color(
++									(PIN(fast_ftol((real)(title->shadow_color >> 24) * fade_amount), 0, 255) << 24) |
++									(title->shadow_color & 0x00FFFFFF));
++
++								rasterizer_draw_unicode_string(
++									title_bounds,
++									NULL,
++									NULL,
++									0,
++									unicode_string_list_get_string(
++										help_text_tag_index,
++										title->text_index));
++
++								rasterizer_text_set_shadow_color(0);
++							}
++
++							active_title->time += game_time_get_paused()
++								? 0
++								: game_time_get_elapsed();
++
++							if (!game_in_editor() &&
++								(real)active_title->time >=
++									title->up_time + title->fade_out_time)
++							{
++								active_title->title_index = NONE;
++								active_title->time = NONE;
++							}
++						}
++					}
+ 				}
+-
+-				draw_string_set_draw_mode(
+-					font_index,
+-					title->style - 1,
+-					title->justification,
+-					title->text_flags,
+-					&color);
+-
+-				shadow_alpha = PIN(
+-					fast_ftol(
+-						(real)(long)(byte)(title->shadow_color >> 24) *
+-						fade_amount),
+-					0,
+-					255);
+-
+-				rasterizer_text_set_shadow_color(
+-					((pixel32)shadow_alpha << 24) |
+-					(title->shadow_color & 0x00FFFFFF));
+-
+-				rasterizer_draw_unicode_string(
+-					title_bounds,
+-					NULL,
+-					NULL,
+-					0,
+-					unicode_string_list_get_string(
+-						help_text_tag_index,
+-						title->text_index));
+-
+-				rasterizer_text_set_shadow_color(0);
+-			}
+-
+-			active_title->time += game_time_get_paused()
+-				? 0
+-				: game_time_get_elapsed();
+-
+-			if (!game_in_editor() &&
+-				(real)active_title->time >=
+-					title->up_time + title->fade_out_time)
+-			{
+-				active_title->title_index = NONE;
+-				active_title->time = NONE;
+ 			}
+ 		}
+ 	}

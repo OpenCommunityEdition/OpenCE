@@ -1,0 +1,30 @@
+diff --git a/config/parked.json b/config/parked.json
+index c738bc76..5d01757d 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -835,25 +835,6 @@
+         "objdiff_percent": 96.43883
+       }
+     },
+-    {
+-      "unit": "source/rasterizer/xbox/rasterizer_xbox_shadows",
+-      "function": "__rasterizer_environment_shadow_model_draw",
+-      "class": "instruction-scheduling",
+-      "evidence": "Fuzzy-parked with the complete typed January model-shadow draw path reconstructed from target disassembly and relocations, January's shader/debug/statistics fields, and the independently corresponding HaloCEA shader-model behavior. The retained routine verifies model shaders and geometry, chooses culling and alpha-test texture state from named flags, evaluates the texture animation with the cached model parameters, uploads the three vertex constants, draws the complete static triangle buffer, and updates model-shadow statistics. Target and candidate both occupy 688 padded bytes with all 48 relocation types and destinations, and objdiff reports 97.95 percent similarity. The remaining difference is two dependency-independent scheduling transpositions around one fld/fmul pair and the neighboring constant-buffer address materialization; no behavior or call is absent. Bounded natural declaration, initialization, and include-set probes did not change that scheduler fixed point. No volatile/register forcing, barrier, pragma, assembly, fake dependency, raw offset, forced inline, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining those two independent instruction placements.",
+-      "measurements": {
+-        "target": {
+-          "size": 688,
+-          "relocation_count": 48,
+-          "normalized_sha256": "366f4471c47176709d6d1469a6ef998e1b248296a375b8cb8e8192c734341c9c"
+-        },
+-        "base": {
+-          "size": 688,
+-          "relocation_count": 48,
+-          "normalized_sha256": "c81ae7e554a892d0f30600ed846a2585dbd904d74b628c472219ed77a5fb6489"
+-        },
+-        "objdiff_percent": 97.948715
+-      }
+-    },
+     {
+       "unit": "source/hs/hs_runtime",
+       "function": "_hs_evaluate_begin_random",

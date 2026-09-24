@@ -1,0 +1,30 @@
+diff --git a/source/camera/dead_camera.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\dead_camera\\final_full.c"
+index 7c69a41a..78fe5723 100644
+--- a/source/camera/dead_camera.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\dead_camera\\final_full.c"
+@@ -174,6 +174,11 @@ void dead_camera_update(
+ 	if (0.f == camera->switch_timer && !game_time_get_paused())
+ 	{
+ 		long next_player_index;
++		/* BUG (January original, preserved for exact matching; owner ruling
++		 * required): next_unit_index is never initialised, so when no next
++		 * player is found the comparison below reads an indeterminate value
++		 * (in January it is whatever occupies the reused home slot of the
++		 * `result` parameter). Later builds initialise it to NONE. */
+ 		long next_unit_index;
+ 		boolean match_team;
+ 
+@@ -188,13 +193,6 @@ void dead_camera_update(
+ 		{
+ 			next_unit_index = player_get(next_player_index)->unit_index;
+ 		}
+-		else
+-		{
+-			next_unit_index = (long)result;
+-		}
+-		/* January preserves the command pointer as the fallback object index
+-		 * when no player is found. This is a bug; a corrected build should
+-		 * initialize next_unit_index to NONE instead. */
+ 
+ 		if (next_unit_index != camera->unit_index && next_unit_index != NONE)
+ 		{

@@ -1,0 +1,52 @@
+diff --git a/source/cache/xbox_sound_cache.c b/source/cache/xbox_sound_cache.c
+index fd7b7224..611971c7 100644
+--- a/source/cache/xbox_sound_cache.c
++++ b/source/cache/xbox_sound_cache.c
+@@ -182,9 +182,9 @@ typedef char verify_xbox_sound_cache_globals_size[
+ 
+ /* ---------- prototypes */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index);
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index);
+ 
+ /* ---------- globals */
+@@ -192,7 +192,7 @@ void sound_cache_delete_block_proc(
+ extern short assertion_count;
+ extern boolean debug_sound_cache;
+ extern boolean debug_sound_reference_counts;
+-struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
++static struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -425,7 +425,7 @@ void sound_cache_close(
+ 
+ /* ---------- private code */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -441,7 +441,7 @@ long sound_cache_locked_block_proc(
+ 	return TRUE;
+ }
+ 
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -468,7 +468,7 @@ void sound_cache_delete_block_proc(
+ 	return;
+ }
+ 
+-const char *sound_cache_debug_block_name(
++static const char *sound_cache_debug_block_name(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;

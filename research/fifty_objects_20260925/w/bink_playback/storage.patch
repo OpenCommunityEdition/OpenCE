@@ -1,0 +1,41 @@
+--- a/source/bink/bink_playback.c	2026-09-23 19:16:33.494537200 -0700
++++ b/source/bink/bink_playback.c	2026-09-23 19:16:45.186811300 -0700
+@@ -401,15 +401,15 @@
+ static boolean bink_saved_frame_rate_throttle= TRUE;
+ 
+ /* January .bss +0x00: the allocation table handed to bink */
+-void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS] = { 0 };
++static void *bink_pointer_blocks[MAXIMUM_NUMBER_OF_BINK_POINTER_BLOCKS] = { 0 };
+ /* January .bss +0x40: the bitmap the rasterizer draws the movie frame from */
+-struct bitmap_data bink_bitmap = { 0 };
++static struct bitmap_data bink_bitmap = { 0 };
+ /* January .bss +0x70: the hand-built linear texture over the frame buffer */
+-D3DBaseTexture bink_texture = { 0 };
++static D3DBaseTexture bink_texture = { 0 };
+ boolean debug_bink = FALSE;
+ struct bink_playback_globals bink_globals = { 0 };
+ /* January .bss +0x160: entries used in bink_pointer_blocks */
+-long bink_pointer_block_count = 0;
++static long bink_pointer_block_count = 0;
+ 
+ /* ---------- public code */
+ 
+--- a/config/symbols.json	2026-09-23 19:16:45.157238600 -0700
++++ b/config/symbols.json	2026-09-23 19:16:45.122107800 -0700
+@@ -23296,12 +23296,12 @@
+ { "file_offset": 5056600, "flags": 0, "name": "_playlist_profile_globals" },
+ { "file_offset": 5056720, "flags": 0, "name": "_saved_game_file_display_name", "static": true },
+ { "file_offset": 5056976, "flags": 0, "name": "_saved_game_files_globals" },
+-{ "file_offset": 5057264, "flags": 0, "name": "_bink_pointer_blocks" },
+-{ "file_offset": 5057328, "flags": 0, "name": "_bink_bitmap" },
+-{ "file_offset": 5057376, "flags": 0, "name": "_bink_texture" },
++{ "file_offset": 5057264, "flags": 0, "name": "_bink_pointer_blocks", "static": true },
++{ "file_offset": 5057328, "flags": 0, "name": "_bink_bitmap", "static": true },
++{ "file_offset": 5057376, "flags": 0, "name": "_bink_texture", "static": true },
+ { "file_offset": 5057396, "flags": 0, "name": "_debug_bink" },
+ { "file_offset": 5057400, "flags": 0, "name": "_bink_globals" },
+-{ "file_offset": 5057616, "flags": 0, "name": "_bink_pointer_block_count" },
++{ "file_offset": 5057616, "flags": 0, "name": "_bink_pointer_block_count", "static": true },
+ { "file_offset": 5057624, "flags": 0, "name": "_dsound_error_string", "static": true },
+ { "file_offset": 5057888, "flags": 0, "name": "_sound_manager_globals" },
+ { "file_offset": 5058264, "flags": 0, "name": "?MU_DriverExtension@@3UMU_DRIVER_EXTENSION@@A" },

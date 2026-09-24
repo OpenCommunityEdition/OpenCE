@@ -1,0 +1,310 @@
+diff --git a/source/objects/widgets/glow.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\glow\\cand_fixed.c"
+index 0d606263..5e79cb92 100644
+--- a/source/objects/widgets/glow.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\glow\\cand_fixed.c"
+@@ -806,15 +806,16 @@ static void get_particle_world_position(
+ 	struct glow_particle *particle,
+ 	real rotation_per_unit_t)
+ {
+-	real_vector3d sides[4];
+-	real_vector3d side;
+-	real_vector3d ups[4];
+-	real_vector3d up;
+-	real_point3d positions[4];
+-	real_vector3d position_vectors[4];
+-	real_vector3d position;
+-	real knots[4];
++	real_vector3d traversal_left_vectors[4];
++	real_vector3d v;
++	real_vector3d traversal_up_vectors[4];
++	real_vector3d u;
++	real_point3d traversal_points[4];
++	real_vector3d forward;
++	real traversal_time_indices[4];
+ 	real angle;
++	real sine;
++	real cosine;
+ 	short marker_index;
+ 	short first_marker_index;
+ 	short last_marker_index;
+@@ -829,114 +830,94 @@ static void get_particle_world_position(
+ 		}
+ 	}
+ 	match_vassert("c:\\halo\\SOURCE\\objects\\widgets\\glow.c", 1079, marker_index < glow->number_of_markers - 1, "marker_index<glow->number_of_markers-1");
+-	particle->parent_marker_index = PIN(marker_index, 0, glow->number_of_markers - 1);
++	marker_index = PIN(marker_index, 0, glow->number_of_markers - 1);
++	particle->parent_marker_index = marker_index;
+ 
+ 	match_vassert("c:\\halo\\SOURCE\\objects\\widgets\\glow.c", 1083, glow->number_of_markers > 1, "glow->number_of_markers > 1");
+ 
+ 	switch (glow->number_of_markers)
+ 	{
+ 		case 2:
+-			positions[0] = glow->markers[0].matrix.position;
+-			positions[3] = glow->markers[1].matrix.position;
+-			ups[0] = glow->markers[0].matrix.up;
+-			ups[3] = glow->markers[1].matrix.up;
++			traversal_points[0] = glow->markers[0].matrix.position;
++			traversal_points[3] = glow->markers[1].matrix.position;
++			traversal_up_vectors[0] = glow->markers[0].matrix.up;
++			traversal_up_vectors[3] = glow->markers[1].matrix.up;
++			traversal_time_indices[0] = glow->marker_time_index[0];
++			traversal_time_indices[3] = glow->marker_time_index[1];
+ 			cross_product3d(
+ 				&glow->markers[0].matrix.up,
+ 				&glow->markers[0].matrix.forward,
+-				&sides[0]);
++				&traversal_left_vectors[0]);
+ 			cross_product3d(
+ 				&glow->markers[1].matrix.up,
+ 				&glow->markers[1].matrix.forward,
+-				&sides[3]);
+-			knots[0] = glow->marker_time_index[0];
+-			knots[3] = glow->marker_time_index[1];
+-
+-			positions[1].x = (positions[3].x - positions[0].x) * 0.25f + positions[0].x;
+-			positions[1].y = (positions[3].y - positions[0].y) * 0.25f + positions[0].y;
+-			positions[1].z = (positions[3].z - positions[0].z) * 0.25f + positions[0].y;
+-			positions[2].x = (positions[3].x - positions[0].x) * 0.75f + positions[0].x;
+-			positions[2].y = (positions[3].y - positions[0].y) * 0.75f + positions[0].y;
+-			positions[2].z = (positions[3].z - positions[0].z) * 0.75f + positions[0].y;
+-
+-			ups[1].i = (ups[3].i - ups[0].i) * 0.25f + ups[0].i;
+-			ups[1].j = (ups[3].j - ups[0].j) * 0.25f + ups[0].j;
+-			ups[1].k = (ups[3].k - ups[0].k) * 0.25f + ups[0].j;
+-			ups[2].i = (ups[3].i - ups[0].i) * 0.75f + ups[0].i;
+-			ups[2].j = (ups[3].j - ups[0].j) * 0.75f + ups[0].j;
+-			ups[2].k = (ups[3].k - ups[0].k) * 0.75f + ups[0].j;
+-			sides[1].i = (sides[3].i - sides[0].i) * 0.25f + sides[0].i;
+-			sides[1].j = (sides[3].j - sides[0].j) * 0.25f + sides[0].j;
+-			sides[1].k = (sides[3].k - sides[0].k) * 0.25f + sides[0].k;
+-			sides[2].i = (sides[3].i - sides[0].i) * 0.75f + sides[0].i;
+-			sides[2].j = (sides[3].j - sides[0].j) * 0.75f + sides[0].j;
+-			sides[2].k = (sides[3].k - sides[0].k) * 0.75f + sides[0].k;
+-
+-			knots[1] = (knots[3] - knots[0]) * 0.25f + knots[0];
+-			knots[2] = (knots[3] - knots[0]) * 0.75f + knots[0];
++				&traversal_left_vectors[3]);
++
++			vector_from_points3d(&traversal_points[0], &traversal_points[3], &forward);
++			point_from_parametric_line(&traversal_points[0], &forward, 0.25f, &traversal_points[1]);
++			point_from_parametric_line(&traversal_points[0], &forward, 0.75f, &traversal_points[2]);
++			vector_from_points3d((real_point3d *)&traversal_up_vectors[0], (real_point3d *)&traversal_up_vectors[3], &forward);
++			point_from_parametric_line((real_point3d *)&traversal_up_vectors[0], &forward, 0.25f, (real_point3d *)&traversal_up_vectors[1]);
++			point_from_parametric_line((real_point3d *)&traversal_up_vectors[0], &forward, 0.75f, (real_point3d *)&traversal_up_vectors[2]);
++			vector_from_points3d((real_point3d *)&traversal_left_vectors[0], (real_point3d *)&traversal_left_vectors[3], &forward);
++			point_from_parametric_line((real_point3d *)&traversal_left_vectors[0], &forward, 0.25f, (real_point3d *)&traversal_left_vectors[1]);
++			point_from_parametric_line((real_point3d *)&traversal_left_vectors[0], &forward, 0.75f, (real_point3d *)&traversal_left_vectors[2]);
++			traversal_time_indices[1] = (traversal_time_indices[3] - traversal_time_indices[0]) * 0.25f + traversal_time_indices[0];
++			traversal_time_indices[2] = (traversal_time_indices[3] - traversal_time_indices[0]) * 0.75f + traversal_time_indices[0];
+ 			break;
+ 
+ 		case 3:
+-			positions[0] = glow->markers[0].matrix.position;
+-			positions[3] = glow->markers[2].matrix.position;
+-			ups[0] = glow->markers[0].matrix.up;
+-			ups[3] = glow->markers[2].matrix.up;
++			traversal_points[0] = glow->markers[0].matrix.position;
++			traversal_points[3] = glow->markers[2].matrix.position;
++			traversal_up_vectors[0] = glow->markers[0].matrix.up;
++			traversal_up_vectors[3] = glow->markers[2].matrix.up;
++			traversal_time_indices[0] = glow->marker_time_index[0];
++			traversal_time_indices[3] = glow->marker_time_index[2];
+ 			cross_product3d(
+ 				&glow->markers[0].matrix.up,
+ 				&glow->markers[0].matrix.forward,
+-				&sides[0]);
++				&traversal_left_vectors[0]);
+ 			cross_product3d(
+ 				&glow->markers[2].matrix.up,
+ 				&glow->markers[2].matrix.forward,
+-				&sides[3]);
+-			knots[0] = glow->marker_time_index[0];
+-			knots[3] = glow->marker_time_index[2];
++				&traversal_left_vectors[3]);
+ 
+ 			switch (particle->parent_marker_index)
+ 			{
+ 				case 0:
+-					positions[1] = glow->markers[1].matrix.position;
+-					ups[1] = glow->markers[1].matrix.up;
++					traversal_points[1] = glow->markers[1].matrix.position;
++					traversal_up_vectors[1] = glow->markers[1].matrix.up;
++					traversal_time_indices[1] = glow->marker_time_index[1];
+ 					cross_product3d(
+ 						&glow->markers[1].matrix.up,
+ 						&glow->markers[1].matrix.forward,
+-						&sides[1]);
+-					knots[1] = glow->marker_time_index[1];
+-
+-					positions[2].x = (positions[3].x - positions[1].x) * 0.5f + positions[1].x;
+-					positions[2].y = (positions[3].y - positions[1].y) * 0.5f + positions[1].y;
+-					positions[2].z = (positions[3].z - positions[1].z) * 0.5f + positions[1].y;
+-
+-					ups[2].i = (ups[3].i - ups[1].i) * 0.5f + ups[1].i;
+-					ups[2].j = (ups[3].j - ups[1].j) * 0.5f + ups[1].j;
+-					ups[2].k = (ups[3].k - ups[1].k) * 0.5f + ups[1].j;
+-					sides[2].i = (sides[3].i - sides[1].i) * 0.5f + sides[1].i;
+-					sides[2].j = (sides[3].j - sides[1].j) * 0.5f + sides[1].j;
+-					sides[2].k = (sides[3].k - sides[1].k) * 0.5f + sides[1].k;
+-
+-					knots[2] = (knots[3] - knots[1]) * 0.5f + knots[1];
++						&traversal_left_vectors[1]);
++
++					vector_from_points3d(&traversal_points[1], &traversal_points[3], &forward);
++					point_from_parametric_line(&traversal_points[1], &forward, 0.5f, &traversal_points[2]);
++					vector_from_points3d((real_point3d *)&traversal_up_vectors[1], (real_point3d *)&traversal_up_vectors[3], &forward);
++					point_from_parametric_line((real_point3d *)&traversal_up_vectors[1], &forward, 0.5f, (real_point3d *)&traversal_up_vectors[2]);
++					vector_from_points3d((real_point3d *)&traversal_left_vectors[1], (real_point3d *)&traversal_left_vectors[3], &forward);
++					point_from_parametric_line((real_point3d *)&traversal_left_vectors[1], &forward, 0.5f, (real_point3d *)&traversal_left_vectors[2]);
++					traversal_time_indices[2] = (traversal_time_indices[3] - traversal_time_indices[1]) * 0.5f + traversal_time_indices[1];
+ 					break;
+ 
+ 				case 1:
+-					positions[2] = glow->markers[1].matrix.position;
+-					ups[2] = glow->markers[1].matrix.up;
++					traversal_points[2] = glow->markers[1].matrix.position;
++					traversal_up_vectors[2] = glow->markers[1].matrix.up;
++					traversal_time_indices[2] = glow->marker_time_index[1];
+ 					cross_product3d(
+ 						&glow->markers[1].matrix.up,
+ 						&glow->markers[1].matrix.forward,
+-						&sides[2]);
+-
+-					positions[1].x = (positions[2].x - positions[0].x) * 0.5f + positions[0].x;
+-					positions[1].y = (positions[2].y - positions[0].y) * 0.5f + positions[0].y;
+-					positions[1].z = (positions[2].z - positions[0].z) * 0.5f + positions[0].y;
+-
+-					ups[1].i = (ups[2].i - ups[0].i) * 0.5f + ups[0].i;
+-					ups[1].j = (ups[2].j - ups[0].j) * 0.5f + ups[0].j;
+-					ups[1].k = (ups[2].k - ups[0].k) * 0.5f + ups[0].j;
+-					sides[1].i = (sides[2].i - sides[0].i) * 0.5f + sides[0].i;
+-					sides[1].j = (sides[2].j - sides[0].j) * 0.5f + sides[0].j;
+-					sides[1].k = (sides[2].k - sides[0].k) * 0.5f + sides[0].k;
+-
+-					knots[1] = (glow->marker_time_index[1] - knots[0]) * 0.5f + knots[0];
+-					knots[2] = glow->marker_time_index[1];
++						&traversal_left_vectors[2]);
++
++					vector_from_points3d(&traversal_points[0], &traversal_points[2], &forward);
++					point_from_parametric_line(&traversal_points[0], &forward, 0.5f, &traversal_points[1]);
++					vector_from_points3d((real_point3d *)&traversal_up_vectors[0], (real_point3d *)&traversal_up_vectors[2], &forward);
++					point_from_parametric_line((real_point3d *)&traversal_up_vectors[0], &forward, 0.5f, (real_point3d *)&traversal_up_vectors[1]);
++					vector_from_points3d((real_point3d *)&traversal_left_vectors[0], (real_point3d *)&traversal_left_vectors[2], &forward);
++					point_from_parametric_line((real_point3d *)&traversal_left_vectors[0], &forward, 0.5f, (real_point3d *)&traversal_left_vectors[1]);
++					traversal_time_indices[1] = (traversal_time_indices[2] - traversal_time_indices[0]) * 0.5f + traversal_time_indices[0];
+ 					break;
+ 			}
+ 			break;
+@@ -963,71 +944,59 @@ static void get_particle_world_position(
+ 					last_marker_index++;
+ 			}
+ 
+-			knots[0] = glow->marker_time_index[first_marker_index];
+-			knots[1] = glow->marker_time_index[first_marker_index + 1];
+-			knots[2] = glow->marker_time_index[first_marker_index + 2];
+-			knots[3] = glow->marker_time_index[first_marker_index + 3];
+-
+-			for (index = 0; index < 4; index++)
++			for (index = 0; index < NUMBEROF(traversal_time_indices); index++)
+ 			{
+-				struct object_marker *marker = &glow->markers[glow->marker_order[first_marker_index + index]];
+-
+-				positions[index] = marker->matrix.position;
+-				ups[index] = marker->matrix.up;
+-				cross_product3d(&marker->matrix.up, &marker->matrix.forward, &sides[index]);
++				traversal_points[index] = glow->markers[glow->marker_order[first_marker_index + index]].matrix.position;
++				traversal_up_vectors[index] = glow->markers[glow->marker_order[first_marker_index + index]].matrix.up;
++				cross_product3d(
++					&glow->markers[glow->marker_order[first_marker_index + index]].matrix.up,
++					&glow->markers[glow->marker_order[first_marker_index + index]].matrix.forward,
++					&traversal_left_vectors[index]);
++				traversal_time_indices[index] = glow->marker_time_index[first_marker_index + index];
+ 			}
+ 			break;
+ 	}
+ 
+-	for (index = 0; index < NUMBEROF(position_vectors); index++)
+-	{
+-		position_vectors[index].i = positions[index].x;
+-		position_vectors[index].j = positions[index].y;
+-		position_vectors[index].k = positions[index].z;
+-	}
+-
+ 	nonuniform_cubic_spline_vector3d(
+-		&position,
+-		&position_vectors[0],
+-		&position_vectors[1],
+-		&position_vectors[2],
+-		&position_vectors[3],
+-		knots[0],
+-		knots[1],
+-		knots[2],
+-		knots[3],
++		(real_vector3d *)&particle->position,
++		(real_vector3d *)&traversal_points[0],
++		(real_vector3d *)&traversal_points[1],
++		(real_vector3d *)&traversal_points[2],
++		(real_vector3d *)&traversal_points[3],
++		traversal_time_indices[0],
++		traversal_time_indices[1],
++		traversal_time_indices[2],
++		traversal_time_indices[3],
+ 		particle->t);
+ 	nonuniform_cubic_spline_vector3d(
+-		&up,
+-		&ups[0],
+-		&ups[1],
+-		&ups[2],
+-		&ups[3],
+-		knots[0],
+-		knots[1],
+-		knots[2],
+-		knots[3],
++		&u,
++		&traversal_up_vectors[0],
++		&traversal_up_vectors[1],
++		&traversal_up_vectors[2],
++		&traversal_up_vectors[3],
++		traversal_time_indices[0],
++		traversal_time_indices[1],
++		traversal_time_indices[2],
++		traversal_time_indices[3],
+ 		particle->t);
+ 	nonuniform_cubic_spline_vector3d(
+-		&side,
+-		&sides[0],
+-		&sides[1],
+-		&sides[2],
+-		&sides[3],
+-		knots[0],
+-		knots[1],
+-		knots[2],
+-		knots[3],
++		&v,
++		&traversal_left_vectors[0],
++		&traversal_left_vectors[1],
++		&traversal_left_vectors[2],
++		&traversal_left_vectors[3],
++		traversal_time_indices[0],
++		traversal_time_indices[1],
++		traversal_time_indices[2],
++		traversal_time_indices[3],
+ 		particle->t);
+ 
+-	particle->position.x = position.i;
+-	particle->position.y = position.j;
+-	particle->position.z = position.k;
+-
+ 	angle = rotation_per_unit_t * particle->t + particle->initial_angle;
+-	particle->position.x = (side.i * (real)cos(angle) + up.i * (real)sin(angle)) * particle->distance_to_object + particle->position.x;
+-	particle->position.y = (side.j * (real)cos(angle) + up.j * (real)sin(angle)) * particle->distance_to_object + particle->position.y;
+-	particle->position.z = (side.k * (real)cos(angle) + up.k * (real)sin(angle)) * particle->distance_to_object + particle->position.z;
++	sine = (real)sin(angle);
++	cosine = (real)cos(angle);
++	particle->position.x = (v.i * cosine + u.i * sine) * particle->distance_to_object + particle->position.x;
++	particle->position.y = (v.j * cosine + u.j * sine) * particle->distance_to_object + particle->position.y;
++	particle->position.z = (v.k * cosine + u.k * sine) * particle->distance_to_object + particle->position.z;
+ 
+ 	return;
+ }

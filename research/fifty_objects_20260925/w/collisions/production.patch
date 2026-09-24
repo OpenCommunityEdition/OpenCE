@@ -1,0 +1,69 @@
+--- a/source/math/real_math_planes.h
++++ b/source/math/real_math_planes.h
+@@ -19,4 +19,16 @@
+ 	real_point3d *point,
+ 	real_vector3d *direction);
+ 
++/* valid_real_plane3d is an inline helper: January inlines it at one collision_move_point
++   assert and calls it out of line at another without treating the plane as escaping, so its
++   body must be visible here; the broad real_math.h keeps only the prototype (declaration-count
++   sensitivity, see above). */
++__inline boolean valid_real_plane3d(
++	real_plane3d const *plane)
++{
++	return
++		valid_real_normal3d(&plane->n) &&
++		valid_real(plane->d);
++}
++
+ #endif /* __REAL_MATH_PLANES_H */
+--- a/source/math/matrix_math.c
++++ b/source/math/matrix_math.c
+@@ -88,6 +88,7 @@
+ 
+ #include "cseries.h"
+ #include "real_math.h"
++#include "real_math_planes.h"
+ 
+ /* ---------- constants */
+ 
+@@ -1070,12 +1071,4 @@
+ 	return;
+ }
+ 
+-boolean valid_real_plane3d(
+-	real_plane3d const *plane)
+-{
+-	return
+-		valid_real_normal3d(&plane->n) &&
+-		valid_real(plane->d);
+-}
+-
+ /* ---------- private code */
+--- a/source/physics/collisions.c
++++ b/source/physics/collisions.c
+@@ -1168,7 +1168,6 @@
+ 	struct collision_plane *collisions)
+ {
+ 	short collision_count = 0;
+-	real_point3d position;
+ 	real_vector3d velocity = *old_velocity;
+ 	real_point3d clipped_position = *old_position;
+ 	real_vector3d clipped_velocity = *old_velocity;
+@@ -1197,6 +1196,7 @@
+ 
+ 		if (collision_features_test_vector(features, &clipped_position, &clipped_velocity, collision))
+ 		{
++			real_point3d position;
+ 			short new_clip_indices[3];
+ 			short new_clip_count;
+ 
+@@ -1209,7 +1209,7 @@
+ 			match_vassert(
+ 				"c:\\halo\\SOURCE\\physics\\collisions.c",
+ 				0x3CE,
+-				valid_real_normal3d(&collision->plane.n) && valid_real(collision->plane.d),
++				valid_real_plane3d(&collision->plane),
+ 				csprintf(
+ 					temporary,
+ 					"%s: assert_valid_real_plane3d(%f, %f, %f / %f)",

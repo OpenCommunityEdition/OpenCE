@@ -1,0 +1,33 @@
+--- source/rasterizer/xbox/rasterizer_xbox_hardware_geometry.c	2026-09-23 17:32:49.519654900 -0700
++++ scratch/w/breakable_surfaces_audit/patches/b/rasterizer_xbox_hardware_geometry.c	2026-09-23 18:28:32.127285400 -0700
+@@ -87,30 +87,6 @@
+ 	return;
+ }
+ 
+-void __stdcall code_00158470(
+-	void *resource)
+-{
+-	return;
+-}
+-
+-long __stdcall code_001584b0(
+-	void *resource)
+-{
+-	return 0;
+-}
+-
+-void __stdcall code_001584d0(
+-	void *resource)
+-{
+-	return;
+-}
+-
+-long __stdcall code_00158510(
+-	void *resource)
+-{
+-	return 0;
+-}
+-
+ boolean rasterizer_vertex_buffer_new(
+ 	struct vertex_buffer *vertex_buffer,
+ 	long vertex_type,

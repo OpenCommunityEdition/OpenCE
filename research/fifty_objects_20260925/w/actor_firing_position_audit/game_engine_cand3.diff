@@ -1,0 +1,117 @@
+767c767
+< void game_engine_build_lighting(
+---
+> static void game_engine_build_lighting(
+786c786
+< boolean game_engine_infinite_grenades_internal(
+---
+> static boolean game_engine_infinite_grenades_internal(
+832c832
+< void game_engine_post_rasterize_in_game(
+---
+> static void game_engine_post_rasterize_in_game(
+835c835
+< void game_engine_rasterize_in_game_score(
+---
+> static void game_engine_rasterize_in_game_score(
+839c839
+< void game_engine_predict_resources(
+---
+> static void game_engine_predict_resources(
+881c881
+< void game_engine_update_weapons(
+---
+> static void game_engine_update_weapons(
+884c884
+< void game_engine_update_item_spawn(
+---
+> static void game_engine_update_item_spawn(
+937c937
+< boolean find_closest_player_callback(
+---
+> static boolean find_closest_player_callback(
+941c941
+< long find_closest_player_index(
+---
+> static long find_closest_player_index(
+1748c1748
+< void game_engine_rasterize_in_game_score(
+---
+> static void game_engine_rasterize_in_game_score(
+2234c2234
+< long find_closest_player_index(
+---
+> static long find_closest_player_index(
+2678c2678
+< void game_engine_press_start_to_begin(
+---
+> static void game_engine_press_start_to_begin(
+2908c2908
+< boolean game_engine_infinite_grenades_internal(
+---
+> static boolean game_engine_infinite_grenades_internal(
+2919c2919
+< boolean find_closest_player_callback(
+---
+> static boolean find_closest_player_callback(
+2938c2938
+< void game_engine_update_purge(
+---
+> static void game_engine_update_purge(
+3193c3193
+< void game_engine_post_rasterize_in_game(
+---
+> static void game_engine_post_rasterize_in_game(
+3398c3398
+< void game_engine_build_lighting(
+---
+> static void game_engine_build_lighting(
+3575a3576
+> 			game_engine_press_start_to_begin();
+5844c5845
+< long game_engine_get_type(
+---
+> static long game_engine_get_type(
+6085c6086
+< void game_engine_predict_resources(
+---
+> static void game_engine_predict_resources(
+6424,6429c6425
+< 	long game_type = NONE;
+< 
+< 	if (game_engine)
+< 		game_type = game_engine->type;
+< 
+< 	if (!match_game_type(game_type, 4, starting_location->game_types))
+---
+> 	if (!match_game_type(game_engine_get_type(), 4, starting_location->game_types))
+6755c6751
+< void game_engine_update_weapons(
+---
+> static void game_engine_update_weapons(
+7399c7395
+< void game_engine_update_item_spawn(
+---
+> static void game_engine_update_item_spawn(
+7414,7418d7409
+< 		long game_type = NONE;
+< 
+< 		if (game_engine)
+< 			game_type = game_engine->type;
+< 
+7420c7411
+< 			game_type,
+---
+> 			game_engine_get_type(),
+7493,7494d7483
+< 		long game_type;
+< 
+7499,7502d7487
+< 		game_type = NONE;
+< 		if (game_engine)
+< 			game_type = game_engine->type;
+< 
+7504c7489
+< 			game_type,
+---
+> 			game_engine_get_type(),

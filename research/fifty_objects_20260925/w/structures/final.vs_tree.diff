@@ -1,0 +1,139 @@
+diff --git a/source/structures/structures.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\structures\\final.c"
+index 85a695ba..bb39ab6f 100644
+--- a/source/structures/structures.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\structures\\final.c"
+@@ -328,79 +328,75 @@ boolean structure_cluster_mark(
+ boolean sphere_intersects_cluster_portal(
+ 	struct structure_bsp *structure,
+ 	short portal_index,
+-	real_point3d const *position,
++	real_point3d const *point,
+ 	real radius)
+ {
+ 	struct structure_cluster_portal *portal = TAG_BLOCK_GET_ELEMENT(
+ 		&structure->cluster_portals,
+ 		portal_index,
+ 		struct structure_cluster_portal);
+-	real_plane3d *collision_plane = TAG_BLOCK_GET_ELEMENT(
+-		&TAG_BLOCK_GET_ELEMENT(
+-			&structure->collision_bsp,
+-			0,
+-			struct collision_bsp)->bsp3d.planes,
+-		portal->plane_index,
+-		real_plane3d);
+-	real plane_distance = plane3d_distance_to_point(collision_plane, position);
+-	real_point2d projected_vertices[MAXIMUM_VERTICES_PER_CLUSTER_PORTAL];
+-	real_point3d projected_position;
+-	real_point2d projected_position2d;
+-	real_vector3d const *plane_normal;
+-	short projection;
+-	boolean projection_sign;
+-	short vertex_index;
+-
+-	if (!(fabs(plane_distance) < radius))
+-	{
+-		return FALSE;
+-	}
+-
+-	if (!(distance_squared3d(position, &portal->centroid) <
+-		(portal->bounding_radius + radius) * (portal->bounding_radius + radius)))
++	real plane_distance = plane3d_distance_to_point(
++		TAG_BLOCK_GET_ELEMENT(
++			&TAG_BLOCK_GET_ELEMENT(
++				&structure->collision_bsp,
++				0,
++				struct collision_bsp)->bsp3d.planes,
++			portal->plane_index,
++			real_plane3d),
++		point);
++
++	if (fabs(plane_distance) < radius &&
++		distance_squared3d(point, &portal->centroid) <
++			(portal->bounding_radius + radius) * (portal->bounding_radius + radius))
+ 	{
+-		return FALSE;
+-	}
++		double t = -plane_distance;
++		real_point2d projected_points[MAXIMUM_VERTICES_PER_CLUSTER_PORTAL];
++		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
++			&global_bsp3d_get()->planes,
++			portal->plane_index,
++			real_plane3d);
++		short projection = projection_from_vector3d(&plane->n);
++		short projection_sign = projection_sign_from_vector3d(&plane->n, projection);
++		real_point3d projected_centroid3d;
++		real_point2d projected_centroid2d;
++		short vertex_index;
+ 
+-	plane_normal = &TAG_BLOCK_GET_ELEMENT(
+-		&global_bsp3d_get()->planes,
+-		portal->plane_index,
+-		real_plane3d)->n;
+-	projection = projection_from_vector3d(plane_normal);
+-	projection_sign = projection_sign_from_vector3d(plane_normal, projection);
+-	projected_position.x = plane_normal->i * -plane_distance + position->x;
+-	projected_position.y = plane_normal->j * -plane_distance + position->y;
+-	projected_position.z = plane_normal->k * -plane_distance + position->z;
+-	project_point3d(
+-		&projected_position,
+-		projection,
+-		projection_sign,
+-		&projected_position2d);
+-
+-	for (vertex_index = 0;
+-		vertex_index < portal->vertices.count;
+-		vertex_index++)
+-	{
++		point_from_line3d(
++			point,
++			&plane->n,
++			t,
++			&projected_centroid3d);
+ 		project_point3d(
+-			TAG_BLOCK_GET_ELEMENT(
+-				&portal->vertices,
+-				vertex_index,
+-				real_point3d),
++			&projected_centroid3d,
+ 			projection,
+ 			projection_sign,
+-			&projected_vertices[vertex_index]);
+-	}
++			&projected_centroid2d);
+ 
+-	if (!convex_hull2d_test_circle(
+-		(short)portal->vertices.count,
+-		projected_vertices,
+-		&projected_position2d,
+-		square_root(radius * radius - plane_distance * plane_distance)))
+-	{
+-		return FALSE;
++		for (vertex_index = 0;
++			vertex_index < portal->vertices.count;
++			vertex_index++)
++		{
++			project_point3d(
++				TAG_BLOCK_GET_ELEMENT(
++					&portal->vertices,
++					vertex_index,
++					real_point3d),
++				projection,
++				projection_sign,
++				&projected_points[vertex_index]);
++		}
++
++		if (convex_hull2d_test_circle(
++			(short)portal->vertices.count,
++			projected_points,
++			&projected_centroid2d,
++			square_root(radius * radius - plane_distance * plane_distance)))
++		{
++			return TRUE;
++		}
+ 	}
+ 
+-	return TRUE;
++	return FALSE;
+ }
+ 
+ static short structure_clusters_in_sphere_recursive(

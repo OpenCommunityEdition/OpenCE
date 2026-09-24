@@ -1,0 +1,19 @@
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index 1b630536..64e2a34f 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -81,14 +81,6 @@
+       "evidence": "docs/object_matching_logs/models_obj_fable_salvage_20260902.md#bss-ownership-boundary",
+       "reopen": "Remove this rejection only after authoritative January ownership evidence or natural source makes all four BSS symbol offsets and linkage agree without aggregate facades, hash-steering names, custom sections, or other matching-only constructs."
+     },
+-    {
+-      "unit": "source/units/units",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_point_from_line3d",
+-      "reason": "The rebuilt translation unit emits a 48-byte select-any _point_from_line3d COMDAT absent from the January units split, while January's selected action_charge owner is no-duplicates. All 189 January units functions remain strict exact, including the two authentic external calls from _unit_cause_continuous_melee_damage; the surplus owner is a separate whole-object admission failure under the explicit no-emission house rule.",
+-      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#units-point_from_line3d-owner",
+-      "reopen": "Remove only after source-authentic header/declaration topology preserves all 189 exact target functions and the two January external calls while preventing units.obj from emitting _point_from_line3d. Linker discard alone does not waive the explicit no-emission house rule; do not expand the two external calls or use forced inline/noinline, pragmas, assembly, or byte-shaping."
+-    },
+     {
+       "unit": "source/effects/decals",
+       "class": "candidate-only-comdat-owner",

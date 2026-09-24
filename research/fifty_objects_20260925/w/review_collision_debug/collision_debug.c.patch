@@ -1,0 +1,14 @@
+--- a/source/physics/collision_debug.c
++++ b/source/physics/collision_debug.c
+@@ -550,10 +550,7 @@
+ 
+ 			point_from_line3d(&collision_debug_point, &collision_debug_vector, 0.5f, &test_center);
+ 			test_center.z += collision_debug_height * 0.5f;
+-			radius = (real)sqrt(
+-				collision_debug_vector.i * collision_debug_vector.i
+-				+ collision_debug_vector.j * collision_debug_vector.j
+-				+ collision_debug_vector.k * collision_debug_vector.k) * 0.5f
++			radius = magnitude3d(&collision_debug_vector) * 0.5f
+ 				+ collision_debug_height * 0.5f
+ 				+ collision_debug_width;
+ 

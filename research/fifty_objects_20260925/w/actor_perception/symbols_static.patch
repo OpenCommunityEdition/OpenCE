@@ -1,0 +1,25 @@
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -331,3 +331,3 @@
+ { "file_offset": 121472, "flags": 32, "name": "_actor_get_vision_distances" },
+-{ "file_offset": 121792, "flags": 32, "name": "_actor_perception_qsort_compare_optional_props" },
++{ "file_offset": 121792, "flags": 32, "name": "_actor_perception_qsort_compare_optional_props", "static": true },
+ { "file_offset": 121856, "flags": 32, "name": "_actor_perception_assess_suicide_danger", "static": true },
+@@ -351,3 +351,3 @@
+ { "file_offset": 128240, "flags": 32, "name": "_actor_emotion_assess_unopposable_danger", "static": true },
+-{ "file_offset": 128352, "flags": 32, "name": "_actor_emotion_unopposable_retreat" },
++{ "file_offset": 128352, "flags": 32, "name": "_actor_emotion_unopposable_retreat", "static": true },
+ { "file_offset": 129616, "flags": 32, "name": "_actor_berserk" },
+@@ -368,5 +368,5 @@
+ { "file_offset": 137808, "flags": 32, "name": "_prop_status_refresh" },
+-{ "file_offset": 141488, "flags": 32, "name": "_actor_perception_refresh_test_object" },
++{ "file_offset": 141488, "flags": 32, "name": "_actor_perception_refresh_test_object", "static": true },
+ { "file_offset": 143232, "flags": 32, "name": "_actor_perception_create_orphan_from_friend" },
+-{ "file_offset": 144016, "flags": 32, "name": "_actor_perception_refresh" },
++{ "file_offset": 144016, "flags": 32, "name": "_actor_perception_refresh", "static": true },
+ { "file_offset": 146432, "flags": 32, "name": "_actor_perception_update" },
+@@ -22317,3 +22317,3 @@
+ { "file_offset": 2845392, "flags": 0, "name": "_global_actor_mode_names" },
+-{ "file_offset": 2845408, "flags": 0, "name": "_last_refresh_overflow_warning_time" },
++{ "file_offset": 2845408, "flags": 0, "name": "_last_refresh_overflow_warning_time", "static": true },
+ { "file_offset": 2845412, "flags": 0, "name": "_actor_type_carrier" },

@@ -1,0 +1,46 @@
+diff --git a/source/interface/first_person_weapons.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\first_person_weapons\\final_exact.c"
+index 6a0a50fb..4efaa99a 100644
+--- a/source/interface/first_person_weapons.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\first_person_weapons\\final_exact.c"
+@@ -97,9 +97,6 @@ symbols in this file:
+ /* ---------- headers */
+ 
+ #define REAL_MATH_EXTERNAL_SIGNED_ANGULAR_DIFFERENCE
+-#define REAL_MATH_EXTERNAL_SQUARE_ROOT
+-#define REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
+-#define REAL_MATH_EXTERNAL_MAGNITUDE3D
+ #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
+ #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
+ #include "interface/first_person_weapons.h"
+@@ -1757,10 +1754,15 @@ static void first_person_weapon_update(
+ 						0,
+ 						struct animation_graph_first_person_weapon_animations);
+ 
++			/* BUG (preserved for exact matching): January (and the later first-party
++			 * build at /Od 0x61fcea) reads the animations block through this pointer
++			 * without testing the NULL an empty first_person_weapon_animations block
++			 * produces.  switch_weapons only commits a weapon whose graph has the block,
++			 * so the path is unreachable in practice; a corrected build should test
++			 * first_person_weapon_animations first. */
+ 			first_person_weapon->moving_animation.frame_index= 0;
+ 			first_person_weapon->moving_animation.index=
+-				first_person_weapon_animations &&
+-					first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
++				first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
+ 					animation_graph_animation_index_get(
+ 						&first_person_weapon_animations->animations)
+ 							[_first_person_weapon_animation_moving].animation_index :
+@@ -1779,10 +1781,11 @@ static void first_person_weapon_update(
+ 							0,
+ 							struct animation_graph_first_person_weapon_animations);
+ 
++				/* BUG (preserved for exact matching): the same unguarded read as the
++				 * moving animation above (January and /Od 0x61fd96). */
+ 				first_person_weapon->overcharged_jitter_animation.frame_index= 0.0f;
+ 				first_person_weapon->overcharged_jitter_animation.index=
+-					first_person_weapon_animations &&
+-						first_person_weapon_animations->animations.count>
++					first_person_weapon_animations->animations.count>
+ 						_first_person_weapon_animation_overcharged_jitter ?
+ 						animation_graph_animation_index_get(
+ 							&first_person_weapon_animations->animations)

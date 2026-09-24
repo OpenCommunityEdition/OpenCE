@@ -1,0 +1,41 @@
+diff --git a/config/symbol_ownership.json b/config/symbol_ownership.json
+index 192247c21ae67d336f6852d57cb74b8b523a52a1..b11c420b75b0af5270b5ac92a6282484459a80b1 100644
+--- a/config/symbol_ownership.json
++++ b/config/symbol_ownership.json
+@@ -35,5 +35,36 @@
+         }
+       ]
+     }
++  },
++  {
++    "unit": "source/game/game_engine_king",
++    "section": ".bss",
++    "reason": "January layout and cachebeta.pdb publics prove three source-private King globals (king_globals, king_engine_hill_count, king_engine_hills) sharing one zero-filled section; the snapshot pins their file-static linkage, which byte comparison of BSS cannot see",
++    "snapshot": {
++      "size": 560,
++      "flags": 3225419904,
++      "relocation_count": 0,
++      "normalized_sha256": "738c079dff6c9b77a0891ac42db1cabcab933a672b14aed8ecfcf94c0e77bb40",
++      "symbols": [
++        {
++          "name": "_king_globals",
++          "value": 0,
++          "type": 0,
++          "storage": 3
++        },
++        {
++          "name": "_king_engine_hill_count",
++          "value": 428,
++          "type": 0,
++          "storage": 3
++        },
++        {
++          "name": "_king_engine_hills",
++          "value": 432,
++          "type": 0,
++          "storage": 3
++        }
++      ]
++    }
+   }
+ ]

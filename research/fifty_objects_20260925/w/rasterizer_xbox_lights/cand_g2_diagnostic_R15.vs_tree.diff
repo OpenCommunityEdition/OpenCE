@@ -1,0 +1,104 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_lights.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\rasterizer_xbox_lights\\cand_g2_diagnostic_R15.c"
+index bccbb5b4..14d78da8 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_lights.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\rasterizer_xbox_lights\\cand_g2_diagnostic_R15.c"
+@@ -200,12 +200,8 @@ void rasterizer_sun_glow_draw(
+ 	real_rectangle2d bounds;
+ 	real_vector2d projected_axes;
+ 	real_point3d projected_center;
+-	real_vector3d direction;
+-	real intensity;
+ 	short viewport_width;
+ 	short viewport_height;
+-	real center_x;
+-	real center_y;
+ 	real r;
+ 	short blurred_target;
+ 	boolean success;
+@@ -215,28 +211,22 @@ void rasterizer_sun_glow_draw(
+ 		583,
+ 		global_d3d_device);
+ 
+-	direction.i = parameters->position.x - global_window_parameters.camera_position.x;
+-	direction.j = parameters->position.y - global_window_parameters.camera_position.y;
+-	direction.k = parameters->position.z - global_window_parameters.camera_position.z;
+-	normalize3d(&direction);
+-
+-	intensity =
+-		(direction.i * global_window_parameters.camera_forward.i +
+-		direction.j * global_window_parameters.camera_forward.j +
+-		direction.k * global_window_parameters.camera_forward.k -
+-		(real)cos(0.7853981634f)) /
+-		(1.0f - (real)cos(0.7853981634f));
+-	if (intensity < 0.0f)
+ 	{
+-		brightness = 0.0f;
+-	}
+-	else if (intensity > 1.0f)
+-	{
+-		brightness = 1.0f;
+-	}
+-	else
+-	{
+-		brightness = intensity;
++		real_vector3d camera_to_light;
++		real_vector3d *direction = vector_from_points3d(
++			&global_window_parameters.camera_position,
++			&parameters->position,
++			&camera_to_light);
++		real cosine;
++
++		normalize3d(direction);
++		cosine = direction->i * global_window_parameters.camera_forward.i;
++		cosine += direction->j * global_window_parameters.camera_forward.j;
++		cosine += direction->k * global_window_parameters.camera_forward.k;
++		brightness = PIN(
++			(cosine - (real)cos(_pi / 4.0f)) / (1.0f - (real)cos(_pi / 4.0f)),
++			0.0f,
++			1.0f);
+ 	}
+ 
+ 	viewport_width = global_window_parameters.viewport_bounds.x1 -
+@@ -270,13 +260,15 @@ void rasterizer_sun_glow_draw(
+ 		vertex_constants,
+ 		5);
+ 
+-	direction = uncompress_int32_to_real_vector3d(parameters->compressed_direction);
+-	occlusion_point.x = parameters->definition->occlusion_radius * direction.i +
+-		parameters->position.x;
+-	occlusion_point.y = parameters->definition->occlusion_radius * direction.j +
+-		parameters->position.y;
+-	occlusion_point.z = parameters->definition->occlusion_radius * direction.k +
+-		parameters->position.z;
++	{
++		real_vector3d direction = uncompress_int32_to_real_vector3d(parameters->compressed_direction);
++
++		point_from_line3d(
++			&parameters->position,
++			&direction,
++			parameters->definition->occlusion_radius,
++			&occlusion_point);
++	}
+ 
+ 	if (rasterizer_project_billboard(
+ 		&occlusion_point,
+@@ -284,13 +276,13 @@ void rasterizer_sun_glow_draw(
+ 		&projected_center,
+ 		&projected_axes))
+ 	{
+-		center_x = (real)floor(projected_center.x + 0.5f);
+-		center_y = (real)floor(projected_center.y + 0.5f);
++		projected_center.x = (real)floor(projected_center.x + 0.5f);
++		projected_center.y = (real)floor(projected_center.y + 0.5f);
+ 
+-		bounds.x0 = center_x - 32.0f;
+-		bounds.y0 = center_y - 32.0f;
+-		bounds.x1 = center_x + 32.0f;
+-		bounds.y1 = center_y + 32.0f;
++		bounds.x0 = projected_center.x - 32.0f;
++		bounds.y0 = projected_center.y - 32.0f;
++		bounds.x1 = projected_center.x + 32.0f;
++		bounds.y1 = projected_center.y + 32.0f;
+ 
+ 		screen_bounds.x0 = (real)global_window_parameters.viewport_bounds.x0 + bounds.x0;
+ 		screen_bounds.y0 = (real)global_window_parameters.viewport_bounds.y0 + bounds.y0;

@@ -1,0 +1,40 @@
+--- a/source/bitmaps/bitmap_group.c
++++ b/source/bitmaps/bitmap_group.c
+@@ -301,6 +301,7 @@
+ #include "cseries.h"
+ 
+ #include "bitmaps/bitmap_group.h"
++#include "bitmaps/bitmap_group_internal.h"
+ #include "bitmaps/bitmaps.h"
+ #include "bitmaps/bitmaps_internal.h"
+ #include "cache/cache_files.h"
+@@ -377,10 +378,10 @@
+ 
+ /* ---------- prototypes */
+ 
+-boolean postprocess_bitmap(
++static boolean postprocess_bitmap(
+ 	struct bitmap_data *bitmap,
+ 	boolean editing);
+-void delete_bitmap(
++static void delete_bitmap(
+ 	struct tag_block *block,
+ 	long element_index);
+ static boolean postprocess_bitmap_group(
+@@ -987,14 +988,14 @@
+ 
+ /* ---------- private code */
+ 
+-boolean postprocess_bitmap(
++static boolean postprocess_bitmap(
+ 	struct bitmap_data *bitmap,
+ 	boolean editing)
+ {
+ 	return TRUE;
+ }
+ 
+-void delete_bitmap(
++static void delete_bitmap(
+ 	struct tag_block *block,
+ 	long element_index)
+ {

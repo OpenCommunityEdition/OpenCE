@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index cf8106ea..25526dda 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -517,7 +517,7 @@
+ 				{ "name": "source/physics/collision_bsp.c", "index": 142, "status": "NonMatching" },
+ 				{ "name": "source/physics/bsp3d.c", "index": 143, "status": "Matching" },
+ 				{ "name": "source/physics/bsp2d.c", "index": 144, "status": "Matching" },
+-                { "name": "source/physics/breakable_surfaces.c", "index": 145, "status": "NonMatching", "options": { "cflags": [ "/nologo", "/c", "/O2", "/Oy-", "/Ow", "/QIfist" ] } },
++                { "name": "source/physics/breakable_surfaces.c", "index": 145, "status": "NonMatching" },
+ 				{ "name": "source/objects/scenery_group.c", "index": 146, "status": "Matching" },
+ 				{ "name": "source/objects/scenery.c", "index": 147, "status": "Matching" },
+ 				{ "name": "source/objects/placeholder_definitions.c", "index": 148, "status": "Matching" },

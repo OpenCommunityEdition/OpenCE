@@ -1,0 +1,24 @@
+diff --git a/source/physics/collision_debug.c b/source/physics/collision_debug.c
+--- a/source/physics/collision_debug.c
++++ b/source/physics/collision_debug.c
+@@ -361,7 +361,7 @@ void collision_debug_render(
+ 							TEST_FLAG(collision.flags, _collision_surface_climbable_bit) ? " climbable" : "",
+ 							TEST_FLAG(collision.flags, _collision_surface_breakable_bit) ? " breakable" : "",
+ 							material_get_name(collision.material_type),
+-							(real)acos(collision.plane.n.k) * 57.295776f);
++							arccosine(collision.plane.n.k) * 57.295776f);
+ 						render_debug_string(TRUE, textstring);
+ 					}
+ 				}
+@@ -550,10 +550,7 @@ void collision_debug_render(
+ 
+ 			point_from_line3d(&collision_debug_point, &collision_debug_vector, 0.5f, &test_center);
+ 			test_center.z += collision_debug_height * 0.5f;
+-			radius = (real)sqrt(
+-				collision_debug_vector.i * collision_debug_vector.i
+-				+ collision_debug_vector.j * collision_debug_vector.j
+-				+ collision_debug_vector.k * collision_debug_vector.k) * 0.5f
++			radius = magnitude3d(&collision_debug_vector) * 0.5f
+ 				+ collision_debug_height * 0.5f
+ 				+ collision_debug_width;
+ 

@@ -1,0 +1,262 @@
+--- a/source/ai/action_charge.c
++++ b/source/ai/action_charge.c
+@@ -536,19 +536,17 @@
+ 
+ 	if (state_data->launched_melee_attack)
+ 	{
+-		long unit_index = actor->meta.unit_index;
+-
+-		state_data->finished_melee_attack = unit_index == NONE || !unit_is_busy(unit_index);
++		state_data->finished_melee_attack =
++			actor->meta.unit_index == NONE || !unit_is_busy(actor->meta.unit_index);
+ 	}
+ 	else if (!state_data->leap_pending &&
+ 		(state_data->goal == _charge_goal_melee || state_data->goal == _charge_goal_melee_leaping) &&
+ 		prop)
+ 	{
+ 		boolean melee = FALSE;
++		real_vector3d vector_to_target;
+ 		struct actor_debug_info *debug_info =
+ 			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
+-		real_vector3d direction;
+-		real distance;
+ 
+ 		debug_info->last_melee_time = game_time_get();
+ 		point_from_line3d(&actor->input.position.body_position, global_up3d, 0.05f, &debug_info->field_108);
+@@ -563,15 +561,16 @@
+ 		if (prop->distance < 0.8f)
+ 		{
+ 			debug_info->field_139 = TRUE;
+-			direction = prop->actor_to_prop;
++			vector_to_target = prop->actor_to_prop;
+ 			melee = TRUE;
+ 		}
+ 		else
+ 		{
+ 			struct unit_datum *unit = unit_get(actor->meta.unit_index);
++			real distance;
++			real_point3d estimated_target_position;
+ 			real lead_fraction;
+ 			real speed;
+-			real_point3d target_point;
+ 
+ 			debug_info->field_139 = FALSE;
+ 			lead_fraction = 0.f;
+@@ -585,21 +584,21 @@
+ 				&prop->body_position,
+ 				&prop->velocity,
+ 				lead_fraction * state_data->melee_ticks_until_dangerous,
+-				&target_point);
+-			vector_from_points3d(&actor->input.position.body_position, &target_point, &direction);
+-			point_from_line3d(&target_point, global_up3d, 0.05f, &debug_info->field_13C);
++				&estimated_target_position);
++			vector_from_points3d(&actor->input.position.body_position, &estimated_target_position, &vector_to_target);
++			point_from_line3d(&estimated_target_position, global_up3d, 0.05f, &debug_info->field_13C);
+ 
+-			if (dot_product3d(&direction, &prop->actor_to_prop) < 0.f)
++			if (dot_product3d(&vector_to_target, &prop->actor_to_prop) < 0.f)
+ 			{
+ 				distance = 0.f;
+-				direction = prop->actor_to_prop;
++				vector_to_target = prop->actor_to_prop;
+ 			}
+ 			else
+ 			{
+-				distance = normalize3d(&direction);
++				distance = normalize3d(&vector_to_target);
+ 				if (distance == 0.f)
+ 				{
+-					direction = prop->actor_to_prop;
++					vector_to_target = prop->actor_to_prop;
+ 				}
+ 			}
+ 
+@@ -619,41 +618,58 @@
+ 				{
+ 					if (distance < definition->berserk.melee_leap_range_upper_bound)
+ 					{
+-						real target_velocity_minimum = definition->berserk.melee_leap_velocity * 0.3f;
+-						real_vector3d aim_vector;
+-						real horizontal_velocity;
+-						real vertical_velocity;
+-
+-						if (projectile_aim_ballistic(
+-							definition->berserk.melee_leap_velocity,
+-							1.f,
+-							&actor->input.position.body_position,
+-							&prop->body_position,
+-							&target_velocity_minimum,
+-							&definition->berserk.melee_leap_ballistic,
+-							NULL,
+-							FALSE,
+-							&aim_vector,
+-							NULL,
+-							NULL,
+-							NULL,
+-							&vertical_velocity,
+-							&horizontal_velocity))
++						real_vector2d alignment_vector = *(real_vector2d *)&vector_to_target;
++
++						if (normalize2d(&alignment_vector) == 0.f)
+ 						{
+-							if (normalize2d((real_vector2d *)&aim_vector) == 0.f)
++							alignment_vector = *(real_vector2d *)&actor->input.facing_vector;
++							if (normalize2d(&alignment_vector) == 0.f)
++							{
++								alignment_vector = *global_forward2d;
++							}
++						}
++
++						{
++							boolean success = FALSE;
++							real minimum_velocity;
++							real_point3d target_point = prop->body_position;
++							real_vector3d aim_vector;
++							real vertical_velocity;
++							real horizontal_velocity;
++
++							target_point.z += 0.4f;
++							minimum_velocity = definition->berserk.melee_leap_velocity * 0.3f;
++							success = projectile_aim_ballistic(
++								definition->berserk.melee_leap_velocity,
++								1.f,
++								&actor->input.position.body_position,
++								&prop->body_position,
++								&minimum_velocity,
++								&definition->berserk.melee_leap_ballistic,
++								NULL,
++								FALSE,
++								&aim_vector,
++								NULL,
++								NULL,
++								NULL,
++								&vertical_velocity,
++								&horizontal_velocity);
++							if (success)
+ 							{
+-								aim_vector = actor->input.facing_vector;
+ 								if (normalize2d((real_vector2d *)&aim_vector) == 0.f)
+ 								{
+-									aim_vector = *global_forward3d;
++									aim_vector = actor->input.facing_vector;
++									if (normalize2d((real_vector2d *)&aim_vector) == 0.f)
++									{
++										aim_vector = *global_forward3d;
++									}
+ 								}
+-							}
+ 
+-							state_data->leap_pending = TRUE;
+-							state_data->leap_alignment_vector.i = aim_vector.i;
+-							state_data->leap_alignment_vector.j = aim_vector.j;
+-							state_data->leap_horizontal_velocity = horizontal_velocity;
+-							state_data->leap_vertical_velocity = vertical_velocity;
++								state_data->leap_pending = TRUE;
++								state_data->leap_alignment_vector = *(real_vector2d *)&aim_vector;
++								state_data->leap_horizontal_velocity = horizontal_velocity;
++								state_data->leap_vertical_velocity = vertical_velocity;
++							}
+ 						}
+ 					}
+ 				}
+@@ -669,10 +685,12 @@
+ 				}
+ 				else if (distance < definition->berserk.suicide_sensing_distance)
+ 				{
+-					real_vector3d relative_velocity;
++					real_vector3d target_relative_velocity;
++					real closing_velocity;
+ 
+-					subtract_vectors3d(&prop->velocity, &unit->object.translational_velocity, &relative_velocity);
+-					if (dot_product3d(&relative_velocity, &direction) > 0.023333333f)
++					subtract_vectors3d(&prop->velocity, &unit->object.translational_velocity, &target_relative_velocity);
++					closing_velocity = dot_product3d(&target_relative_velocity, &vector_to_target);
++					if (closing_velocity > 0.023333333f)
+ 					{
+ 						melee = TRUE;
+ 					}
+@@ -682,7 +700,7 @@
+ 			{
+ 				if (state_data->goal == _charge_goal_melee_leaping && state_data->launched_leap)
+ 				{
+-					distance -= dot_product3d(&direction, &unit->object.translational_velocity) *
++					distance -= dot_product3d(&vector_to_target, &unit->object.translational_velocity) *
+ 						state_data->melee_ticks_until_dangerous;
+ 				}
+ 
+@@ -697,15 +715,14 @@
+ 
+ 		if (state_data->leap_pending || (melee && !state_data->melee_suicide))
+ 		{
+-			real_vector2d facing_direction;
++			real_vector2d target_alignment_vector = *(real_vector2d *)&vector_to_target;
+ 
+-			facing_direction.i = direction.i;
+-			facing_direction.j = direction.j;
+-			if (normalize2d(&facing_direction) > 0.f)
++			if (normalize2d(&target_alignment_vector) > 0.f)
+ 			{
+ 				real minimum_alignment = state_data->launched_leap ? 0.f : 0.8660254f;
++				real alignment = dot_product2d(&target_alignment_vector, (real_vector2d *)&actor->input.facing_vector);
+ 
+-				if (dot_product2d(&facing_direction, (real_vector2d *)&actor->input.facing_vector) < minimum_alignment)
++				if (alignment < minimum_alignment)
+ 				{
+ 					melee = FALSE;
+ 					state_data->leap_pending = FALSE;
+@@ -714,22 +731,19 @@
+ 			}
+ 		}
+ 
+-		debug_info->field_12C = direction;
++		debug_info->field_12C = vector_to_target;
+ 		debug_info->field_138 = melee;
+ 
+ 		if (melee)
+ 		{
+-			real_vector2d melee_direction;
++			real_vector2d alignment_vector = *(real_vector2d *)&vector_to_target;
+ 
+-			melee_direction.i = direction.i;
+-			melee_direction.j = direction.j;
+-			if (normalize2d(&melee_direction) == 0.f)
++			if (normalize2d(&alignment_vector) == 0.f)
+ 			{
+-				melee_direction.i = actor->input.facing_vector.i;
+-				melee_direction.j = actor->input.facing_vector.j;
++				alignment_vector = *(real_vector2d *)&actor->input.facing_vector;
+ 			}
+ 
+-			if (unit_melee_attack_begin(actor->meta.unit_index, FALSE, &melee_direction))
++			if (unit_melee_attack_begin(actor->meta.unit_index, FALSE, &alignment_vector))
+ 			{
+ 				ai_communication_event(
+ 					_ai_communication_melee,
+@@ -746,7 +760,6 @@
+ 
+ 	{
+ 		long time = game_time_get();
+-		real target_range;
+ 
+ 		if ((state_data->goal == _charge_goal_melee || state_data->goal == _charge_goal_melee_leaping) &&
+ 			!state_data->launched_melee_attack &&
+@@ -772,8 +785,8 @@
+ 			actor->emotions.last_vehicle_charge_time = time;
+ 		}
+ 
+-		target_range = action_charge_find_target_range(actor_index, state_data->goal, state_data);
+-		state_data->acceptable_target_range = target_range;
++		state_data->acceptable_target_range =
++			action_charge_find_target_range(actor_index, state_data->goal, state_data);
+ 
+ 		if (!actor->meta.swarm && actor->meta.timeslice)
+ 		{
+@@ -786,7 +799,7 @@
+ 				state_data->advancing)
+ 			{
+ 				real minimum_move_range = state_data->goal == _charge_goal_melee_leaping ? 4.f : 1.5f;
+-				real move_range = MAX(minimum_move_range, target_range);
++				real move_range = MAX(minimum_move_range, state_data->acceptable_target_range);
+ 
+ 				if (actor_move_to_prop(actor_index, actor->target.target_prop_index, move_range))
+ 				{

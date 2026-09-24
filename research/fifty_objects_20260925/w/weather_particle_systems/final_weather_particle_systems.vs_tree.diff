@@ -1,0 +1,288 @@
+diff --git a/source/effects/weather_particle_systems.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\weather_particle_systems\\final_weather_particle_systems.c"
+index d2aae8ff..d6c246a8 100644
+--- a/source/effects/weather_particle_systems.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\weather_particle_systems\\final_weather_particle_systems.c"
+@@ -306,7 +306,7 @@ static void weather_particle_system_render(
+ 
+ /* ---------- globals */
+ 
+-static real const one_over_char_max = 1.f/255.f;
++real const one_over_char_max = 1.f/255.f;
+ 
+ boolean weather = TRUE;
+ 
+@@ -428,10 +428,7 @@ static void weather_particle_system_transform_clip_planes_to_box(
+ 
+ 	for (plane_index = 0; plane_index<NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES; plane_index++)
+ 	{
+-		plane_distances[plane_index] =
+-			planes[plane_index].n.i*box_position->x +
+-			planes[plane_index].n.j*box_position->y +
+-			planes[plane_index].n.k*box_position->z;
++		plane_distances[plane_index] = dot_product3d(&planes[plane_index].n, (real_vector3d const *)box_position);
+ 	}
+ 
+ 	return;
+@@ -547,7 +544,7 @@ static void weather_particle_system_render(
+ {
+ 	struct weather_particle_system *system = weather_particle_system_get(local_player_index);
+ 	struct weather_particle_system_definition *definition = weather_particle_system_definition_get(system->definition_index);
+-	struct structure_bsp *structure_bsp = global_structure_bsp_get();
++	struct structure_bsp *structure = global_structure_bsp_get();
+ 	short type_index;
+ 
+ 	weather_particle_system_update(local_player_index);
+@@ -559,38 +556,42 @@ static void weather_particle_system_render(
+ 			&definition->particle_types,
+ 			type_index,
+ 			struct weather_particle_type_definition);
++		long particle_index;
++		short unused_count = 0; /* dead: no use in January or in the later first-party /Od build (frame slot ebp-0x24) */
+ 
+ 		if (type->particle_count)
+ 		{
+-			real_plane3d clipping_planes[NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
+-			real_point3d box_positions[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES];
+-			real box_plane_distances[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES][NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
+-			short visible_polyhedron_indices[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_POLYHEDRA];
+-			short visible_polyhedron_count = weather_polyhedra_find(visible_polyhedron_indices, type->box_width);
+-			struct build_sprite_data sprite_data;
+-			struct weather_particle *particle;
+-			real box_offsets[3];
+-			real_rectangle3d bounds;
+-			short box_count;
++			struct build_sprite_data build_sprite_data;
++			real_point3d box_offsets[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES];
++			short box_count = 0;
++			real far_clip_distance;
++			real_plane3d clip_planes[NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
++			real clip_plane_d_transforms[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES][NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
++			short weather_polyhedra_indices[MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_POLYHEDRA];
++			short weather_polyhedra_count = weather_polyhedra_find(weather_polyhedra_indices, type->box_width);
++			real box_deltas[3];
+ 			short i, j, k;
+-			long particle_index;
+-
+-			weather_particle_system_build_clipping_planes(clipping_planes, type->box_width);
+-			weather_particle_system_box_offset_from_point3d(type->box_width, &render.camera.position, &box_positions[0]);
+-			weather_particle_system_transform_clip_planes_to_box(box_plane_distances[0], clipping_planes, &box_positions[0]);
++			real_rectangle3d viewer_box;
++
++			far_clip_distance = type->box_width;
++			weather_particle_system_build_clipping_planes(clip_planes, far_clip_distance);
++			weather_particle_system_box_offset_from_point3d(type->box_width, &render.camera.position, &box_offsets[box_count]);
++			weather_particle_system_transform_clip_planes_to_box(clip_plane_d_transforms[box_count], clip_planes, &box_offsets[box_count]);
++			box_count++;
++
++			viewer_box.x0 = viewer_box.y0 = viewer_box.z0 = 0.f;
++			viewer_box.x1 = viewer_box.y1 = viewer_box.z1 = type->box_width;
++			viewer_box.x0 += box_offsets[0].x;
++			viewer_box.y0 += box_offsets[0].y;
++			viewer_box.z0 += box_offsets[0].z;
++			viewer_box.x1 += box_offsets[0].x;
++			viewer_box.y1 += box_offsets[0].y;
++			viewer_box.z1 += box_offsets[0].z;
++
++			box_deltas[0] = -type->box_width;
++			box_deltas[1] = 0.f;
++			box_deltas[2] = type->box_width;
+ 
+-			bounds.x0 = box_positions[0].x;
+-			bounds.x1 = box_positions[0].x + type->box_width;
+-			bounds.y0 = box_positions[0].y;
+-			bounds.y1 = box_positions[0].y + type->box_width;
+-			bounds.z0 = box_positions[0].z;
+-			bounds.z1 = box_positions[0].z + type->box_width;
+-
+-			box_offsets[0] = -type->box_width;
+-			box_offsets[1] = 0.f;
+-			box_offsets[2] = type->box_width;
+-
+-			box_count = 1;
+ 			for (i = 0; i<3; i++)
+ 			{
+ 				for (j = 0; j<3; j++)
+@@ -599,22 +600,26 @@ static void weather_particle_system_render(
+ 					{
+ 						if (i!=1 || j!=1 || k!=1)
+ 						{
+-							real_rectangle3d box_bounds;
+-
+-							box_bounds.x0 = bounds.x0 + box_offsets[i];
+-							box_bounds.x1 = bounds.x1 + box_offsets[i];
+-							box_bounds.y0 = bounds.y0 + box_offsets[j];
+-							box_bounds.y1 = bounds.y1 + box_offsets[j];
+-							box_bounds.z0 = bounds.z0 + box_offsets[k];
+-							box_bounds.z1 = bounds.z1 + box_offsets[k];
+-
+-							if (render_frustum_cube_visible(&render.frustum, &box_bounds, TRUE))
++							real_vector3d box_delta;
++							real_rectangle3d box;
++
++							box_delta.i = box_deltas[i];
++							box_delta.j = box_deltas[j];
++							box_delta.k = box_deltas[k];
++							box.x0 = viewer_box.x0 + box_delta.i;
++							box.y0 = viewer_box.y0 + box_delta.j;
++							box.z0 = viewer_box.z0 + box_delta.k;
++							box.x1 = viewer_box.x1 + box_delta.i;
++							box.y1 = viewer_box.y1 + box_delta.j;
++							box.z1 = viewer_box.z1 + box_delta.k;
++
++							if (render_frustum_cube_visible(&render.frustum, &box, TRUE))
+ 							{
+ 								match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 673, box_count<MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES);
+-								box_positions[box_count].x = box_bounds.x0;
+-								box_positions[box_count].y = box_bounds.y0;
+-								box_positions[box_count].z = box_bounds.z0;
+-								weather_particle_system_transform_clip_planes_to_box(box_plane_distances[box_count], clipping_planes, &box_positions[box_count]);
++								box_offsets[box_count].x = box.x0;
++								box_offsets[box_count].y = box.y0;
++								box_offsets[box_count].z = box.z0;
++								weather_particle_system_transform_clip_planes_to_box(clip_plane_d_transforms[box_count], clip_planes, &box_offsets[box_count]);
+ 								box_count++;
+ 							}
+ 						}
+@@ -622,71 +627,75 @@ static void weather_particle_system_render(
+ 				}
+ 			}
+ 
+-			build_sprites_begin(&sprite_data, type->particle_count, type_definition->bitmap.index, &type_definition->shader, 0);
++			build_sprites_begin(&build_sprite_data, type->particle_count, type_definition->bitmap.index, &type_definition->shader, 0);
+ 
+-			for (particle_index = type->first_particle_index; particle_index!=NONE; particle_index = particle->next_particle_index)
++			particle_index = type->first_particle_index;
++			while (particle_index!=NONE)
+ 			{
+-				real particle_plane_distances[NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
+-				short plane_index;
++				struct weather_particle *particle = datum_get(weather_particle_data, particle_index);
++				real_point3d *box_offset = NULL;
+ 				short box_index;
+-
+-				particle = datum_get(weather_particle_data, particle_index);
++				short plane_index;
++				real plane_evaluations[NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES];
+ 
+ 				for (plane_index = 0; plane_index<NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES; plane_index++)
+ 				{
+-					particle_plane_distances[plane_index] = plane3d_distance_to_point(&clipping_planes[plane_index], &particle->position);
++					plane_evaluations[plane_index] = plane3d_distance_to_point(&clip_planes[plane_index], &particle->position);
+ 				}
+ 
+-				for (box_index = 0; box_index<box_count; box_index++)
++				for (box_index = 0; box_index<box_count && !box_offset; box_index++)
+ 				{
+ 					boolean visible = TRUE;
+ 
+ 					for (plane_index = 0; plane_index<NUMBER_OF_WEATHER_PARTICLE_CLIPPING_PLANES && visible; plane_index++)
+ 					{
+-						visible = box_plane_distances[box_index][plane_index] + particle_plane_distances[plane_index]<0.f;
++						visible = plane_evaluations[plane_index] + clip_plane_d_transforms[box_index][plane_index]<0.f;
+ 					}
+ 
+ 					if (visible)
+ 					{
++						box_offset = &box_offsets[box_index];
+ 						break;
+ 					}
+ 				}
+ 
+-				if (box_index<box_count)
++				if (box_offset)
+ 				{
+-					real far_clip_distance = MIN(type_definition->distance_fadeout_end, type->box_width);
+ 					real_point3d position;
+-					real_vector3d camera_to_position;
++					real_vector3d viewer_to_particle;
+ 					real depth;
++					real maximum_distance = MIN(type_definition->distance_fadeout_end, far_clip_distance);
+ 
+-					position.x = box_positions[box_index].x + particle->position.x;
+-					position.y = box_positions[box_index].y + particle->position.y;
+-					position.z = box_positions[box_index].z + particle->position.z;
+-					depth = dot_product3d(vector_from_points3d(&render.camera.position, &position, &camera_to_position), &render.camera.forward);
++					position.x = particle->position.x + box_offset->x;
++					position.y = particle->position.y + box_offset->y;
++					position.z = particle->position.z + box_offset->z;
++					viewer_to_particle.i = position.x - render.camera.position.x;
++					viewer_to_particle.j = position.y - render.camera.position.y;
++					viewer_to_particle.k = position.z - render.camera.position.z;
++					depth = dot_product3d(&viewer_to_particle, &render.camera.forward);
+ 
+-					if (depth>type_definition->distance_fadein_start && depth<far_clip_distance)
++					if (depth>type_definition->distance_fadein_start && depth<maximum_distance)
+ 					{
+ 						real fade_in = PIN(
+ 							(depth - type_definition->distance_fadein_start)/(type_definition->distance_fadein_end - type_definition->distance_fadein_start),
+ 							0.f, 1.f);
+ 						real fade_out = 1.f - PIN(
+-							(depth - type_definition->distance_fadeout_start)/(far_clip_distance - type_definition->distance_fadeout_start),
++							(depth - type_definition->distance_fadeout_start)/(maximum_distance - type_definition->distance_fadeout_start),
+ 							0.f, 1.f);
+ 						short polyhedron_index;
++						boolean visible = TRUE;
+ 
+-						for (polyhedron_index = 0; polyhedron_index<visible_polyhedron_count; polyhedron_index++)
++						for (polyhedron_index = 0; polyhedron_index<weather_polyhedra_count; polyhedron_index++)
+ 						{
+ 							struct structure_weather_polyhedron *polyhedron = TAG_BLOCK_GET_ELEMENT(
+-								&structure_bsp->weather_polyhedra,
+-								visible_polyhedron_indices[polyhedron_index],
++								&structure->weather_polyhedra,
++								weather_polyhedra_indices[polyhedron_index],
+ 								struct structure_weather_polyhedron);
+ 							short polyhedron_plane_index;
+ 
+ 							for (polyhedron_plane_index = 0; polyhedron_plane_index<polyhedron->planes.count; polyhedron_plane_index++)
+ 							{
+-								real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(&polyhedron->planes, polyhedron_plane_index, real_plane3d);
+-
+-								if (plane3d_distance_to_point(plane, &position)<0.f)
++								if (plane3d_distance_to_point(TAG_BLOCK_GET_ELEMENT(&polyhedron->planes, polyhedron_plane_index, real_plane3d), &position)<0.f)
+ 								{
+ 									break;
+ 								}
+@@ -694,11 +703,12 @@ static void weather_particle_system_render(
+ 
+ 							if (polyhedron_plane_index==polyhedron->planes.count)
+ 							{
++								visible = FALSE;
+ 								break;
+ 							}
+ 						}
+ 
+-						if (polyhedron_index==visible_polyhedron_count)
++						if (visible)
+ 						{
+ 							real_vector3d const *direction = type_definition->render_direction_source==_weather_particle_direction_from_acceleration ?
+ 								&particle->acceleration : &particle->velocity;
+@@ -709,23 +719,25 @@ static void weather_particle_system_render(
+ 							}
+ 
+ 							build_sprite(
+-								&sprite_data,
++								&build_sprite_data,
+ 								type_definition->render_mode,
+ 								particle->sequence_index,
+ 								(short)particle->sprite_index,
+ 								&position,
+ 								direction,
+ 								particle->rotation,
+-								2.f*particle->radius*type_definition->runtime_one_over_sprite_width,
++								type_definition->runtime_one_over_sprite_width*(2.f*particle->radius),
+ 								&particle->color,
+ 								fade_in*fade_out,
+ 								0);
+ 						}
+ 					}
+ 				}
++
++				particle_index = particle->next_particle_index;
+ 			}
+ 
+-			build_sprites_end(&sprite_data);
++			build_sprites_end(&build_sprite_data);
+ 		}
+ 	}
+ 

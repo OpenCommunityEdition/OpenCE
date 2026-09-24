@@ -1,0 +1,60 @@
+diff --git a/source/units/units.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\units_ownership\\candidate_units.c"
+index 060a21fe..e555648d 100644
+--- a/source/units/units.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\units_ownership\\candidate_units.c"
+@@ -307,7 +307,7 @@ symbols in this file:
+ 0019EC30 02e0:
+ 	_unit_running_blind (0000)
+ 0019EF10 0090:
+-	_unit_vectors_are_valid (0000)
++	_unit_verify_inventory (0000)
+ 0019EFA0 02e0:
+ 	_unit_verify_vectors (0000)
+ 0019F280 03a0:
+@@ -1007,7 +1007,7 @@ short unit_update_animation(
+ 	long unit_index,
+ 	struct unit_animation_update_data *data);
+ 
+-static boolean unit_vectors_are_valid(long unit_index);
++static boolean unit_verify_inventory(long unit_index);
+ static void unit_throw_grenade_release(long unit_index, boolean premature);
+ 
+ static void unit_seat_update(long object_index);
+@@ -2482,8 +2482,8 @@ boolean unit_solo_player_integrated_night_vision_is_active(
+ 	return active;
+ }
+ 
+-// HCEX_Release.pdb and the September 2001 map both name this private
+-// helper unit_add_initial_weapons (file-static; no cachebeta public).
++// HCEX identifies this private helper as unit_create_initial_weapons; the
++// January body below is independently proven against the Xbox object.
+ static void unit_add_initial_weapons(
+ 	long unit_index)
+ {
+@@ -11035,7 +11035,7 @@ void unit_control(
+ 	return;
+ }
+ 
+-static boolean unit_vectors_are_valid(
++static boolean unit_verify_inventory(
+ 	long unit_index)
+ {
+ 	struct unit_datum *unit = unit_get(unit_index);
+@@ -11427,7 +11427,7 @@ static void unit_verify_vectors(
+ {
+ 	char buffer[512];
+ 
+-	if (!unit_vectors_are_valid(unit_index))
++	if (!unit_verify_inventory(unit_index))
+ 	{
+ 		struct unit_datum *unit = unit_get(unit_index);
+ 
+@@ -11538,7 +11538,7 @@ static void unit_verify_vectors(
+ 		match_vassert(
+ 			"c:\\halo\\SOURCE\\units\\units.c",
+ 			594,
+-			unit_vectors_are_valid(unit_index),
++			unit_verify_inventory(unit_index),
+ 			"unit_verify_vectors FAILURE, see above for details"
+ 		);
+ 	}

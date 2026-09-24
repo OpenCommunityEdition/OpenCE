@@ -1,0 +1,64 @@
+--- a/source/game/player_control.c
++++ b/source/game/player_control.c
+@@ -181,13 +181,9 @@
+ /* ---------- headers */
+ 
+ #include "cseries.h"
+-#define signed_angular_difference signed_angular_difference_inline
+ #define limit2d limit2d_inline
+-#define interpolate_scalar interpolate_scalar_inline
+ #include "game/game.h"
+-#undef interpolate_scalar
+ #undef limit2d
+-#undef signed_angular_difference
+ #include "game/player_control.h"
+ #include "game/player_control_runtime.h"
+ #include "players.h"
+@@ -899,25 +895,6 @@
+ 	return;
+ }
+ 
+-real signed_angular_difference(
+-	real angle1,
+-	real angle2)
+-{
+-	real result = angle2 - angle1;
+-
+-	if (result >= _pi)
+-	{
+-		result -= _pi * 2.f;
+-	}
+-
+-	if (result <= -_pi)
+-	{
+-		result += _pi * 2.f;
+-	}
+-
+-	return result;
+-}
+-
+ boolean limit2d(
+ 	real_vector2d *vector,
+ 	real length)
+@@ -937,21 +914,6 @@
+ 	return FALSE;
+ }
+ 
+-void interpolate_scalar(
+-	real *current,
+-	real desired,
+-	real maximum_speed)
+-{
+-	real difference = desired - *current;
+-
+-	*current += PIN(
+-		difference,
+-		-maximum_speed,
+-		maximum_speed);
+-
+-	return;
+-}
+-
+ void player_control_set_facing(
+ 	short local_player_index,
+ 	real_vector3d const *facing_direction)

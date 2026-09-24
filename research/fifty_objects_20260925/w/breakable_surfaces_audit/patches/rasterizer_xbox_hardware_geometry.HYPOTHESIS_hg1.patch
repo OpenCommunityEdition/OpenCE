@@ -1,0 +1,55 @@
+--- source/rasterizer/xbox/rasterizer_xbox_hardware_geometry.c	2026-09-23 17:32:49.519654900 -0700
++++ scratch/w/breakable_surfaces_audit/patches/b/rasterizer_xbox_hardware_geometry.HYPOTHESIS_hg1.c	2026-09-23 18:28:32.147226900 -0700
+@@ -73,44 +73,6 @@
+ 
+ /* ---------- public code */
+ 
+-void __stdcall code_00158450(
+-	void *resource,
+-	void *data)
+-{
+-	return;
+-}
+-
+-void __stdcall code_00158460(
+-	void *resource,
+-	void *data)
+-{
+-	return;
+-}
+-
+-void __stdcall code_00158470(
+-	void *resource)
+-{
+-	return;
+-}
+-
+-long __stdcall code_001584b0(
+-	void *resource)
+-{
+-	return 0;
+-}
+-
+-void __stdcall code_001584d0(
+-	void *resource)
+-{
+-	return;
+-}
+-
+-long __stdcall code_00158510(
+-	void *resource)
+-{
+-	return 0;
+-}
+-
+ boolean rasterizer_vertex_buffer_new(
+ 	struct vertex_buffer *vertex_buffer,
+ 	long vertex_type,
+@@ -184,6 +146,7 @@
+ 		else
+ 		{
+ 			csmemcpy(locked_vertices, vertices, buffer_size);
++			D3DVertexBuffer_MoveResourceMemory(d3d_vertex_buffer, D3DMEM_VIDEO);
+ 			result = IDirect3DVertexBuffer8_Unlock(d3d_vertex_buffer);
+ 			if (result >= 0)
+ 			{

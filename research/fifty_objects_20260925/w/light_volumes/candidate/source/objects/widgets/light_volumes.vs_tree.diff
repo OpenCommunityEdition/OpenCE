@@ -1,0 +1,28 @@
+diff --git a/source/objects/widgets/light_volumes.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\light_volumes\\candidate\\source\\objects\\widgets\\light_volumes.c"
+index 48e8886c..cd879399 100644
+--- a/source/objects/widgets/light_volumes.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\light_volumes\\candidate\\source\\objects\\widgets\\light_volumes.c"
+@@ -237,17 +237,18 @@ void light_volume_render(
+ 		{
+ 			struct light_volume_frame *frame = light_volume_interpolate_frames(definition, object_index);
+ 			struct object_marker marker;
+-			real_vector3d eye_to_marker_vector;
+ 			real brightness;
+-			real parallel_factor;
+ 
+ 			object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
+ 			brightness = 1.f;
+-			vector_from_points3d(&render.camera.position, &marker.matrix.position, &eye_to_marker_vector);
+-			parallel_factor = ABS(dot_product3d(&render.camera.forward, &marker.matrix.forward));
+ 			{
+-				real external_scale = 1.f;
++				real_vector3d eye_to_marker_vector;
++				real parallel_factor;
++				real external_scale;
+ 
++				vector_from_points3d(&render.camera.position, &marker.matrix.position, &eye_to_marker_vector);
++				parallel_factor = ABS(dot_product3d(&render.camera.forward, &marker.matrix.forward));
++				external_scale = 1.f;
+ 				if (definition->far_fade_distance > 0.f)
+ 				{
+ 					brightness *= PIN(

@@ -1,0 +1,165 @@
+--- a/source/math/periodic_functions.c
++++ b/source/math/periodic_functions.c
+@@ -85,7 +85,9 @@
+ 	_global_periodic_functions_enum (0030)
+ 	_global_transition_functions_enum (0054)
+ 004561BC 004c:
+-	_periodic_functions_globals (0000)
++	_function_tables_initialized (0000)
++	_transition_function_tables (0004)
++	_periodic_function_tables (001c)
+ */
+ 
+ /* ---------- headers */
+@@ -130,18 +132,11 @@
+ 
+ /* ---------- structures */
+ 
+-struct periodic_functions_globals
+-{
+-	boolean function_tables_initialized;
+-	byte pad[3];
+-	byte *transition_function_tables[NUMBER_OF_TRANSITION_FUNCTIONS];
+-	byte *periodic_function_tables[NUMBER_OF_PERIODIC_FUNCTIONS];
+-};
+-
+ /* ---------- prototypes */
+ 
+ static void __fastcall periodic_function_build_variable_period_x_table(real *values);
+ static void transition_function_build_table(short function_type, byte *table);
++static void periodic_function_build_table(short function_type, byte *table);
+ 
+ /* ---------- globals */
+ 
+@@ -185,7 +180,9 @@
+ 	NULL,
+ };
+ 
+-static struct periodic_functions_globals periodic_functions_globals = { 0 };
++static boolean function_tables_initialized = FALSE;
++static byte *transition_function_tables[NUMBER_OF_TRANSITION_FUNCTIONS] = { 0 };
++static byte *periodic_function_tables[NUMBER_OF_PERIODIC_FUNCTIONS] = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -194,14 +191,14 @@
+ {
+ 	short function_index;
+ 
+-	if (periodic_functions_globals.function_tables_initialized)
++	if (function_tables_initialized)
+ 	{
+ 		for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
+ 		{
+ 			match_free(
+ 				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+ 				122,
+-				periodic_functions_globals.periodic_function_tables[function_index]);
++				periodic_function_tables[function_index]);
+ 		}
+ 
+ 		for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
+@@ -209,10 +206,10 @@
+ 			match_free(
+ 				"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+ 				132,
+-				periodic_functions_globals.transition_function_tables[function_index]);
+-		}
+-
+-		periodic_functions_globals.function_tables_initialized = FALSE;
++				transition_function_tables[function_index]);
++		}
++
++		function_tables_initialized = FALSE;
+ 	}
+ 
+ 	return;
+@@ -237,12 +234,12 @@
+ 		157,
+ 		function_type>=0 && function_type<NUMBER_OF_PERIODIC_FUNCTIONS);
+ 
+-	if (periodic_functions_globals.function_tables_initialized)
++	if (function_tables_initialized)
+ 	{
+ 		time *= 25.6f;
+ 		fraction = (real)fmod((double)time, 1.0);
+ 		index = fast_ftol(time-fraction);
+-		table = periodic_functions_globals.periodic_function_tables[function_type];
++		table = periodic_function_tables[function_type];
+ 		index &= PERIODIC_FUNCTION_TABLE_MASK;
+ 		first_value = table[index] * (1.0f/255.0f);
+ 		index = (index+1)&PERIODIC_FUNCTION_TABLE_MASK;
+@@ -290,9 +287,9 @@
+ 		216,
+ 		function_type>=0 && function_type<NUMBER_OF_TRANSITION_FUNCTIONS);
+ 
+-	if (periodic_functions_globals.function_tables_initialized)
+-	{
+-		table = periodic_functions_globals.transition_function_tables[function_type];
++	if (function_tables_initialized)
++	{
++		table = transition_function_tables[function_type];
+ 		scaled = value*(real)(PERIODIC_FUNCTION_TABLE_SIZE-1);
+ 		fraction = (real)fmod((double)scaled, 1.0);
+ 		index = fast_ftol(scaled-0.5f);
+@@ -401,7 +398,7 @@
+ 	return;
+ }
+ 
+-void periodic_function_build_table(
++static void periodic_function_build_table(
+ 	short function_type,
+ 	byte *table)
+ {
+@@ -509,8 +506,6 @@
+ 	return;
+ }
+ 
+-#define function_tables_initialized periodic_functions_globals.function_tables_initialized
+-
+ void periodic_functions_initialize(
+ 	void)
+ {
+@@ -525,15 +520,15 @@
+ 
+ 	for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
+ 	{
+-		periodic_functions_globals.periodic_function_tables[function_index] = match_malloc(
++		periodic_function_tables[function_index] = match_malloc(
+ 			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+ 			78,
+ 			PERIODIC_FUNCTION_TABLE_SIZE);
+-		if (periodic_functions_globals.periodic_function_tables[function_index])
++		if (periodic_function_tables[function_index])
+ 		{
+ 			periodic_function_build_table(
+ 				function_index,
+-				periodic_functions_globals.periodic_function_tables[function_index]);
++				periodic_function_tables[function_index]);
+ 		}
+ 		else
+ 		{
+@@ -543,15 +538,15 @@
+ 
+ 	for (function_index = 0; function_index < NUMBER_OF_TRANSITION_FUNCTIONS; function_index++)
+ 	{
+-		periodic_functions_globals.transition_function_tables[function_index] = match_malloc(
++		transition_function_tables[function_index] = match_malloc(
+ 			"c:\\halo\\SOURCE\\math\\periodic_functions.c",
+ 			96,
+ 			PERIODIC_FUNCTION_TABLE_SIZE);
+-		if (periodic_functions_globals.transition_function_tables[function_index])
++		if (transition_function_tables[function_index])
+ 		{
+ 			transition_function_build_table(
+ 				function_index,
+-				periodic_functions_globals.transition_function_tables[function_index]);
++				transition_function_tables[function_index]);
+ 		}
+ 		else
+ 		{
+@@ -562,4 +557,3 @@
+ 	return;
+ }
+ 
+-#undef function_tables_initialized

@@ -1,0 +1,324 @@
+diff --git a/source/bitmaps/bitmap_group.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\bitmap_group\\cand.c"
+index d8529997..eba47e90 100644
+--- a/source/bitmaps/bitmap_group.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\bitmap_group\\cand.c"
+@@ -301,6 +301,7 @@ symbols in this file:
+ #include "cseries.h"
+ 
+ #include "bitmaps/bitmap_group.h"
++#include "bitmaps/bitmap_group_internal.h"
+ #include "bitmaps/bitmaps.h"
+ #include "bitmaps/bitmaps_internal.h"
+ #include "cache/cache_files.h"
+@@ -377,10 +378,10 @@ typedef char tag_group_size_assert[sizeof(struct tag_group) == 0x60 ? 1 : -1];
+ 
+ /* ---------- prototypes */
+ 
+-boolean postprocess_bitmap(
++static boolean postprocess_bitmap(
+ 	struct bitmap_data *bitmap,
+ 	boolean editing);
+-void delete_bitmap(
++static void delete_bitmap(
+ 	struct tag_block *block,
+ 	long element_index);
+ static boolean postprocess_bitmap_group(
+@@ -812,24 +813,23 @@ short bitmap_group_add_bitmap(
+ {
+ 	struct bitmap_data new_bitmap_data;
+ 	long pixels_end = 0;
+-	long previous_count;
+-	long pixel_data_size;
++	short bitmap_index = NONE;
++	boolean valid = TRUE;
+ 
+ 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c", 0x2DB, group);
+ 
++	new_bitmap_data.signature = BITMAP_GROUP_TAG;
++	new_bitmap_data.width = width;
++	new_bitmap_data.height = height;
++	new_bitmap_data.depth = depth;
+ 	new_bitmap_data.type = type;
++	new_bitmap_data.format = format;
+ 	new_bitmap_data.flags = 0;
+-	new_bitmap_data.registration_point.y = 0;
+-	new_bitmap_data.registration_point.x = 0;
++	new_bitmap_data.registration_point.x = new_bitmap_data.registration_point.y = 0;
+ 	new_bitmap_data.mipmap_count = mipmap_count;
+ 	new_bitmap_data.pixels_offset = 0;
+ 	new_bitmap_data.hardware_format = NULL;
+ 	new_bitmap_data.base_address = NULL;
+-	new_bitmap_data.signature = BITMAP_GROUP_TAG;
+-	new_bitmap_data.width = width;
+-	new_bitmap_data.height = height;
+-	new_bitmap_data.depth = depth;
+-	new_bitmap_data.format = format;
+ 
+ 	if (group->type == _bitmap_group_type_interface_bitmaps)
+ 	{
+@@ -846,17 +846,27 @@ short bitmap_group_add_bitmap(
+ 			height,
+ 			depth);
+ 		fflush(stdout);
+-		return NONE;
++		valid = FALSE;
+ 	}
+-	else if (group->type == _bitmap_group_type_cube_maps && width != height)
++	else if (group->type == _bitmap_group_type_cube_maps)
+ 	{
+-		fprintf(
+-			stdout,
+-			"skipping cube map with non-square faces (#%dx#%d)\r\n",
+-			width,
+-			height);
+-		fflush(stdout);
+-		return NONE;
++		if (width == height)
++		{
++			SET_FLAG(
++				new_bitmap_data.flags,
++				_bitmap_has_power_of_two_dimensions_bit,
++				TRUE);
++		}
++		else
++		{
++			fprintf(
++				stdout,
++				"skipping cube map with non-square faces (#%dx#%d)\r\n",
++				width,
++				height);
++			fflush(stdout);
++			valid = FALSE;
++		}
+ 	}
+ 	else
+ 	{
+@@ -866,105 +876,110 @@ short bitmap_group_add_bitmap(
+ 			TRUE);
+ 	}
+ 
+-	if (format >= _bitmap_format_dxt1 && format <= _bitmap_format_dxt5)
+-	{
+-		SET_FLAG(new_bitmap_data.flags, _bitmap_compressed_bit, TRUE);
+-	}
+-	if (format == _bitmap_format_p8_bump)
++	if (valid)
+ 	{
+-		SET_FLAG(new_bitmap_data.flags, _bitmap_palettized_bit, TRUE);
+-	}
++		if (format >= _bitmap_format_dxt1 && format <= _bitmap_format_dxt5)
++		{
++			SET_FLAG(new_bitmap_data.flags, _bitmap_compressed_bit, TRUE);
++		}
++		if (format == _bitmap_format_p8_bump)
++		{
++			SET_FLAG(new_bitmap_data.flags, _bitmap_palettized_bit, TRUE);
++		}
+ 
+-	/* January repeats these validation guards after assigning format flags. */
+-	if (group->type == _bitmap_group_type_cube_maps && width != height)
+-	{
+-		fprintf(
+-			stdout,
+-			"skipping cube map with non-square faces (#%dx#%d)\r\n",
+-			width,
+-			height);
+-		fflush(stdout);
+-		return NONE;
+-	}
+-	if (!TEST_FLAG(
+-		new_bitmap_data.flags,
+-		_bitmap_has_power_of_two_dimensions_bit) &&
+-		group->type != _bitmap_group_type_interface_bitmaps)
+-	{
+-		fprintf(
+-			stdout,
+-			"skipping bitmap with non power-of-two dimensions (#%dx#%d)\r\n",
+-			width,
+-			height);
+-		fflush(stdout);
+-		return NONE;
++		/* January repeats the cube-map and power-of-two guards after assigning the format flags. */
++		if (group->type == _bitmap_group_type_cube_maps && width != height)
++		{
++			fprintf(
++				stdout,
++				"skipping cube map with non-square faces (#%dx#%d)\r\n",
++				width,
++				height);
++			fflush(stdout);
++			valid = FALSE;
++		}
++		else if (!TEST_FLAG(
++			new_bitmap_data.flags,
++			_bitmap_has_power_of_two_dimensions_bit) &&
++			group->type != _bitmap_group_type_interface_bitmaps)
++		{
++			fprintf(
++				stdout,
++				"skipping bitmap with non power-of-two dimensions (#%dx#%d)\r\n",
++				width,
++				height);
++			fflush(stdout);
++			valid = FALSE;
++		}
+ 	}
+ 
+-	previous_count = group->bitmaps.count;
+-	pixel_data_size = bitmap_get_pixel_data_size(&new_bitmap_data);
+-	if (tag_block_resize(&group->bitmaps, group->bitmaps.count + 1) &&
+-		tag_data_resize(&group->pixel_data, group->pixel_data.size + pixel_data_size))
++	if (valid)
+ 	{
+-		struct bitmap_data *previous_bitmap = NULL;
+-		short bitmap_index = 0;
++		long previous_count = group->bitmaps.count;
++		long pixel_data_size = bitmap_get_pixel_data_size(&new_bitmap_data);
+ 
+-		for (;
+-			bitmap_index < group->bitmaps.count;
+-			bitmap_index = (short)(bitmap_index + 1))
++		if (tag_block_resize(&group->bitmaps, group->bitmaps.count + 1) &&
++			tag_data_resize(&group->pixel_data, group->pixel_data.size + pixel_data_size))
+ 		{
+-			struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
+-				&group->bitmaps,
+-				bitmap_index,
+-				struct bitmap_data);
++			struct bitmap_data *previous_bitmap = NULL;
++			struct bitmap_data *new_bitmap;
++			short index;
+ 
+-			if (bitmap->base_address)
++			for (index = 0;
++				index < group->bitmaps.count;
++				index = (short)(index + 1))
+ 			{
+-				long space_between;
+-
+-				match_assert(
+-					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+-					0x34D,
+-					!bitmap->hardware_format);
+-				bitmap->base_address =
+-					(byte *)group->pixel_data.address + bitmap->pixels_offset;
+-				match_assert(
+-					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+-					0x352,
+-					(byte*)bitmap->base_address>=(byte*)group->pixel_data.address);
+-				match_assert(
+-					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+-					0x354,
+-					(byte*)bitmap->base_address + bitmap_get_pixel_data_size(bitmap) <= (byte*)group->pixel_data.address + group->pixel_data.size);
+-
+-				if (previous_bitmap)
++				struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
++					&group->bitmaps,
++					index,
++					struct bitmap_data);
++
++				if (bitmap->base_address)
+ 				{
+-					space_between = bitmap->pixels_offset -
+-						previous_bitmap->pixels_offset -
+-						bitmap_get_pixel_data_size(previous_bitmap);
+ 					match_assert(
+ 						"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+-						0x35B,
+-						space_between>=0);
+-					if (space_between != 0)
++						0x34D,
++						!bitmap->hardware_format);
++					bitmap->base_address =
++						(byte *)group->pixel_data.address + bitmap->pixels_offset;
++					match_assert(
++						"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
++						0x352,
++						(byte*)bitmap->base_address>=(byte*)group->pixel_data.address);
++					match_assert(
++						"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
++						0x354,
++						(byte*)bitmap->base_address + bitmap_get_pixel_data_size(bitmap) <= (byte*)group->pixel_data.address + group->pixel_data.size);
++
++					if (previous_bitmap)
+ 					{
+-						error(
+-							_error_silent,
+-							"### WARNING bitmap group pixel data isn't tight");
++						long space_between = bitmap->pixels_offset -
++							previous_bitmap->pixels_offset -
++							bitmap_get_pixel_data_size(previous_bitmap);
++
++						match_assert(
++							"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
++							0x35B,
++							space_between>=0);
++						if (space_between != 0)
++						{
++							error(
++								_error_silent,
++								"### WARNING bitmap group pixel data isn't tight");
++						}
+ 					}
+-				}
+ 
+-				previous_bitmap = bitmap;
+-				pixels_end = bitmap_get_pixel_data_size(bitmap) +
+-					bitmap->pixels_offset;
++					previous_bitmap = bitmap;
++					pixels_end = bitmap_get_pixel_data_size(bitmap) +
++						bitmap->pixels_offset;
++				}
+ 			}
+-		}
+ 
+-		{
+-			struct bitmap_data *new_bitmap = TAG_BLOCK_GET_ELEMENT(
++			bitmap_index = (short)previous_count;
++			new_bitmap = TAG_BLOCK_GET_ELEMENT(
+ 				&group->bitmaps,
+-				previous_count,
++				bitmap_index,
+ 				struct bitmap_data);
+-
+ 			match_assert(
+ 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
+ 				0x371,
+@@ -974,27 +989,28 @@ short bitmap_group_add_bitmap(
+ 			new_bitmap->base_address = (byte *)group->pixel_data.address + pixels_end;
+ 			csmemset(new_bitmap->base_address, 0, pixel_data_size);
+ 		}
+-
+-		return (short)previous_count;
++		else
++		{
++			error(
++				_error_silent,
++				"### ERROR failed to add bitmap to group (tag resize failed)");
++			tag_block_resize(&group->bitmaps, previous_count);
++		}
+ 	}
+ 
+-	error(
+-		_error_silent,
+-		"### ERROR failed to add bitmap to group (tag resize failed)");
+-	tag_block_resize(&group->bitmaps, previous_count);
+-	return NONE;
++	return bitmap_index;
+ }
+ 
+ /* ---------- private code */
+ 
+-boolean postprocess_bitmap(
++static boolean postprocess_bitmap(
+ 	struct bitmap_data *bitmap,
+ 	boolean editing)
+ {
+ 	return TRUE;
+ }
+ 
+-void delete_bitmap(
++static void delete_bitmap(
+ 	struct tag_block *block,
+ 	long element_index)
+ {

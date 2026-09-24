@@ -1,0 +1,20 @@
+diff --git a/config/semantic_data_matches.json b/config/semantic_data_matches.json
+index 35638d1faf5914600d6784ec96cac7fa74e68b94..0bdcb7aaa2434e0f5e4dcddc4679cddef8e80f97 100644
+--- a/config/semantic_data_matches.json
++++ b/config/semantic_data_matches.json
+@@ -470,5 +470,15 @@
+       "relocation_count": 1,
+       "normalized_sha256": "e94bb79478c95dce11c4a1f720a07ccbaa3a8d18b84acbe5605472d6f8635b74"
+     }
++  },
++  {
++    "unit": "source/game/game_engine_king",
++    "symbol": "_king_engine",
++    "reason": "King engine callback table: January and the rebuilt object have identical 136-byte .data (flags c0400040, public _king_engine at +0), identical normalized payload and relocation sites/types, and all 23 relocations resolve independently to the same image destinations; objdiff 3.3.1's '$'-literal relocation-name defect undercredits it because the name relocation targets the '??_C@_04PJOEONHN@king?$AA@' literal, which January folds to game_engine. Whole object admitted: all 29 functions strict exact; cachebeta.pdb publics make the 22 engine-table callbacks and king_globals file-static (static in source and symbols.json), so all 39 January symbols match storage/section/offset; the 10 candidate-only real_math.h helper COMDATs are byte-identical to January's selected copies and every surplus symbol pair-links in both orders after the Layer 2 provider repair.",
++    "measurements": {
++      "size": 136,
++      "relocation_count": 23,
++      "normalized_sha256": "4009f5b6117e9f00cb001a23b9a56b9dc51a694206c442ce715e2bed2d5465a7"
++    }
+   }
+ ]

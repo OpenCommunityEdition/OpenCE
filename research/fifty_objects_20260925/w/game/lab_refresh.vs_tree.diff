@@ -1,0 +1,57 @@
+diff --git a/source/game/game.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_refresh.c"
+index d77b74ec..af8c9dbc 100644
+--- a/source/game/game.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\game\\lab_refresh.c"
+@@ -1069,4 +1069,52 @@ void game_set_game_variant_from_name(
+ 	return;
+ }
+ 
++
++struct network_game_server;
++struct network_game_server *global_network_game_server_get(void);
++void network_game_server_change_game_variant(struct network_game_server *server, struct game_variant *variant);
++
++static void lab_setter_refresh(
++	struct game_variant *variant)
++{
++	if (!variant)
++	{
++		csmemset(&game_variant_global, 0, sizeof(game_variant_global));
++	}
++	else
++	{
++		struct network_game_server *server;
++
++		game_variant_global = *variant;
++		server = global_network_game_server_get();
++		if (server)
++			network_game_server_change_game_variant(server, variant);
++	}
++
++	return;
++}
++
++void lab_refresh_one_local(
++	const char *name)
++{
++	struct game_variant variant;
++
++	game_engine_get_variant_by_name(&variant, name);
++	lab_setter_refresh(&variant);
++
++	return;
++}
++
++void lab_refresh_two_local(
++	const char *name)
++{
++	struct game_variant variant;
++	struct game_variant temporary_variant;
++
++	variant = *game_engine_get_variant_by_name(&temporary_variant, name);
++	lab_setter_refresh(&variant);
++
++	return;
++}
++
+ /* ---------- private code */

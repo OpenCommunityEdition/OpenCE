@@ -1,0 +1,322 @@
+diff --git a/config/parked.json b/config/parked.json
+index c738bc76..9f8f2ffe 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1237,11 +1237,11 @@
+       "unit": "source/ai/ai",
+       "function": "_ai_test_line_of_sight",
+       "class": "instruction-scheduling",
+-      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. Remeasured 2026-09-25 after the /Od-attested real_math.h distance3d body correction (claude_fifty_objects_20260925.md, batch 2); size and relocations unchanged.",
++      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+       "measurements": {
+         "target": { "size": 1008, "relocation_count": 50, "normalized_sha256": "aecb662c1c4868e27cbd680dba829bdedc994fc2f91911172ad86ecdfdec9b86" },
+-        "base": { "size": 1040, "relocation_count": 50, "normalized_sha256": "c524fe19529bfd4a72e95be52a875925bcc929d347b37471eb16b75bd393da78" },
+-        "objdiff_percent": 97.91843
++        "base": { "size": 1040, "relocation_count": 50, "normalized_sha256": "61a3ce7f829fcafe2bf34705e9d6e2a0bb2be0d80257c1921cc134edb6eb0488" },
++        "objdiff_percent": 97.97885
+       }
+     },
+     {
+@@ -1422,6 +1422,17 @@
+         "objdiff_percent": 93.48387
+       }
+     },
++    {
++      "unit": "source/math/geometry",
++      "function": "_convex_hull2d_perimeter",
++      "class": "unclassified",
++      "evidence": "Complete natural convex-hull perimeter reconstruction retained from the reconciled Fable geometry packet. Target and candidate share a 96-byte extent with no relocations but have different normalized streams; earlier exact-looking expression/helper variants had unresolved provenance and are not used as credit. The retained ordinary project-type body receives zero credit. See docs/object_matching_logs/geometry_obj_fable_clean_pair_independent_intake_20260906.md.",
++      "measurements": {
++        "target": { "size": 96, "relocation_count": 0, "normalized_sha256": "71292feb41a8e5d57e328751240458cb0b9678237d26b7f8be4ba7abab7f4b0e" },
++        "base": { "size": 96, "relocation_count": 0, "normalized_sha256": "22c6d46416fece30ca43252116be4b7f30369b3c2df152ea46ef045b031d073d" },
++        "objdiff_percent": 91.5
++      }
++    },
+     {
+       "unit": "source/math/geometry",
+       "function": "_convex_polygon2d_clip_to_plane",
+diff --git a/source/ai/action_vehicle.c b/source/ai/action_vehicle.c
+index 82dae1b7..f31d44cd 100644
+--- a/source/ai/action_vehicle.c
++++ b/source/ai/action_vehicle.c
+@@ -69,7 +69,15 @@ symbols in this file:
+ /* ---------- headers */
+ 
+ #include "cseries.h"
++#define distance2d distance2d_inline
++#define distance3d distance3d_inline
++#define distance_squared2d distance_squared2d_inline
++#define negate_vector2d negate_vector2d_inline
+ #include "actions.h"
++#undef negate_vector2d
++#undef distance_squared2d
++#undef distance3d
++#undef distance2d
+ 
+ #define object_get_bounding_sphere object_get_bounding_sphere_inline
+ #include "actors.h"
+@@ -173,6 +181,41 @@ void object_get_bounding_sphere(
+ 	return;
+ }
+ 
++real distance_squared2d(
++	real_point2d const *a,
++	real_point2d const *b)
++{
++	real_vector2d v;
++
++	return magnitude_squared2d(vector_from_points2d(a, b, &v));
++}
++
++real distance2d(
++	real_point2d const *a,
++	real_point2d const *b)
++{
++	real_vector2d v;
++
++	return magnitude2d(vector_from_points2d(a, b, &v));
++}
++
++real distance3d(
++	real_point3d const *a,
++	real_point3d const *b)
++{
++	return square_root(distance_squared3d(a, b));
++}
++
++real_vector2d *negate_vector2d(
++	real_vector2d const *a,
++	real_vector2d *result)
++{
++	result->i = -a->i;
++	result->j = -a->j;
++
++	return result;
++}
++
+ void action_vehicle_begin(
+ 	long actor_index)
+ {
+diff --git a/source/ai/path_obstacles.c b/source/ai/path_obstacles.c
+index 300d4980..3b079bb2 100644
+--- a/source/ai/path_obstacles.c
++++ b/source/ai/path_obstacles.c
+@@ -62,6 +62,11 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
++#define rotate_vector2d rotate_vector2d_inline
++#define project_point3d project_point3d_inline
++#define distance_squared2d distance_squared2d_inline
++#define point_in_circle point_in_circle_inline
++#define distance_squared3d distance_squared3d_inline
+ #include "cseries.h"
+ #include "path.h"
+ #include "devices/device_definitions.h"
+@@ -70,6 +75,11 @@ symbols in this file:
+ #include "physics/collision_model_definitions.h"
+ #include "physics/collisions.h"
+ #include "render/render_debug.h"
++#undef rotate_vector2d
++#undef project_point3d
++#undef distance_squared2d
++#undef point_in_circle
++#undef distance_squared3d
+ 
+ /* ---------- constants */
+ 
+@@ -138,6 +148,44 @@ void obstacles_new(
+ 	return;
+ }
+ 
++real_vector2d *rotate_vector2d(
++	real_vector2d const *vector,
++	real sine,
++	real cosine,
++	real_vector2d *result)
++{
++	real j = sine * vector->i + cosine * vector->j;
++	real i = cosine * vector->i - sine * vector->j;
++
++	result->i = i;
++	result->j = j;
++	return result;
++}
++
++real_point2d *project_point3d(
++	real_point3d const *p3d,
++	short projection,
++	boolean sign,
++	real_point2d *p2d)
++{
++	match_assert("..\\math\\real_math.h", 859, projection>=_x && projection<=_z);
++	match_assert("..\\math\\real_math.h", 860, ~(sign&~1));
++
++	set_real_point2d(
++		p2d,
++		p3d->n[global_projection3d_mappings[projection][sign][0]],
++		p3d->n[global_projection3d_mappings[projection][sign][1]]);
++	return p2d;
++}
++
++boolean point_in_circle(
++	real_point2d const *point,
++	real_point2d const *center,
++	real radius)
++{
++	return distance_squared2d_inline(point, center) <= (radius * radius);
++}
++
+ boolean obstacles_add_disc(
+ 	struct obstacles *obstacles,
+ 	long object_index,
+@@ -451,7 +499,7 @@ void obstacles_disc_neighborhood(
+ 				{
+ 					struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
+ 
+-					if (point_in_circle(
++					if (point_in_circle_inline(
+ 						&current_disc->center,
+ 						&disc->center,
+ 						(disc->radius + radius) + (current_disc->radius + radius)))
+diff --git a/source/effects/decals.c b/source/effects/decals.c
+index 94379d20..c83169d7 100644
+--- a/source/effects/decals.c
++++ b/source/effects/decals.c
+@@ -212,12 +212,14 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
++#define project_point2d project_point2d_inline
+ #define plane2d_from_points plane2d_from_points_inline
+ #define REAL_MATH_EXTERNAL_PROJECT_POINT3D
+ #include "effects/decals.h"
+ #include "cseries/cseries.h"
+ #include "math/real_math.h"
+ #include "physics/collision_bsp_definitions.h"
++#undef project_point2d
+ #undef plane2d_from_points
+ #undef REAL_MATH_EXTERNAL_PROJECT_POINT3D
+ 
+@@ -810,6 +812,28 @@ static void decal_sprite_get_bounds(
+ 	return;
+ }
+ 
++real_point3d *project_point2d(
++	real_point2d const *p2d,
++	real_plane3d const *plane,
++	short projection,
++	boolean sign,
++	real_point3d *p3d)
++{
++	short x = global_projection3d_mappings[projection][sign][0];
++	short y = global_projection3d_mappings[projection][sign][1];
++
++	match_assert("..\\math\\real_math.h", 879, projection>=_x && projection<=_z);
++	match_assert("..\\math\\real_math.h", 880, ~(sign&~1));
++
++	p3d->n[x] = p2d->x;
++	p3d->n[y] = p2d->y;
++	p3d->n[projection] = (fabs(plane->n.n[projection])<_real_epsilon)
++		? 0.0f
++		: ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
++
++	return p3d;
++}
++
+ real_plane2d *plane2d_from_points(
+ 	real_plane2d *plane,
+ 	real_point2d const *point0,
+diff --git a/source/math/random_math.h b/source/math/random_math.h
+index ebe2a652..4c913474 100644
+--- a/source/math/random_math.h
++++ b/source/math/random_math.h
+@@ -8,6 +8,12 @@ RANDOM_MATH.H
+ 
+ /* ---------- prototypes/RANDOM_MATH.C */
+ 
++void lock_global_random_seed(
++	void);
++
++void unlock_global_random_seed(
++	void);
++
+ unsigned long get_random_seed(
+ 	void);
+ 
+diff --git a/source/math/real_math.h b/source/math/real_math.h
+index 1b2a6b90..dae85f1d 100644
+--- a/source/math/real_math.h
++++ b/source/math/real_math.h
+@@ -675,8 +675,6 @@ boolean valid_real_plane3d(real_plane3d const *plane);
+ 
+ unsigned long *get_global_random_seed_address(void);
+ unsigned long *get_global_local_random_seed_address(void);
+-void lock_global_random_seed(void);
+-void unlock_global_random_seed(void);
+ 
+ unsigned short seed_random(unsigned long *seed);
+ short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
+@@ -941,7 +939,8 @@ __inline real distance2d(
+ 	real_point2d const *a,
+ 	real_point2d const *b)
+ {
+-	return square_root(distance_squared2d(a, b));
++	real_vector2d v;
++	return magnitude2d(vector_from_points2d(a, b, &v));
+ }
+ 
+ __inline real dot_product2d(
+@@ -1027,17 +1026,23 @@ __inline real_point3d *project_point2d(
+ 	boolean sign,
+ 	real_point3d *p3d)
+ {
+-	short x = global_projection3d_mappings[projection][sign][0];
+-	short y = global_projection3d_mappings[projection][sign][1];
++	long x = global_projection3d_mappings[projection][sign][0];
++	long y = global_projection3d_mappings[projection][sign][1];
+ 
+ 	match_assert("..\\math\\real_math.h", 879, projection>=_x && projection<=_z);
+ 	match_assert("..\\math\\real_math.h", 880, ~(sign&~1));
+ 
+ 	p3d->n[x] = p2d->x;
+ 	p3d->n[y] = p2d->y;
+-	p3d->n[projection] = (fabs(plane->n.n[projection])<_real_epsilon)
+-		? 0.0f
+-		: ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
++
++	if (fabs(plane->n.n[projection])>=_real_epsilon)
++	{
++		p3d->n[projection] = ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
++	}
++	else
++	{
++		p3d->n[projection] = 0.f;
++	}
+ 
+ 	return p3d;
+ }
+@@ -1187,7 +1192,8 @@ __inline real distance3d(
+ 	real_point3d const *a,
+ 	real_point3d const *b)
+ {
+-	return square_root(distance_squared3d(a, b));
++	real_vector3d v;
++	return magnitude3d(vector_from_points3d(a, b, &v));
+ }
+ 
+ __inline real_point3d *midpoint3d(
+diff --git a/source/objects/object_lights.c b/source/objects/object_lights.c
+index f0c70b31..225aefdc 100644
+--- a/source/objects/object_lights.c
++++ b/source/objects/object_lights.c
+@@ -1831,7 +1831,8 @@ static void find_point_lights_for_object_in_cluster(
+ 					|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
+ 						_light_definition_dont_light_own_object_bit)))
+ 			{
+-				real distance = distance3d(&light->position, center);
++				real_point3d const *light_position = &light->position;
++				real distance = distance3d(light_position, center);
+ 
+ 				if (distance < radius + light->radius)
+ 				{

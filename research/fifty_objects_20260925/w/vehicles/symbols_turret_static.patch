@@ -1,0 +1,13 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 3da39456..d8496b1f 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -7049,7 +7049,7 @@
+ { "file_offset": 1724128, "flags": 32, "name": "_vehicle_build_update" },
+ { "file_offset": 1724144, "flags": 32, "name": "_vehicle_parse_update" },
+ { "file_offset": 1724160, "flags": 32, "name": "_vehicle_hover" },
+-{ "file_offset": 1724240, "flags": 32, "name": "_update_turret_physics" },
++{ "file_offset": 1724240, "flags": 32, "name": "_update_turret_physics", "static": true },
+ { "file_offset": 1724272, "flags": 32, "name": "_vehicle_is_flipped" },
+ { "file_offset": 1724320, "flags": 32, "name": "_compute_airborne_ticks", "static": true },
+ { "file_offset": 1724480, "flags": 32, "name": "_set_real_quaternion" },

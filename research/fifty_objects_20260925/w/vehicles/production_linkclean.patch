@@ -1,0 +1,480 @@
+diff --git a/source/units/vehicles.c b/source/units/vehicles.c
+index 3dede853..e5c18c43 100644
+--- a/source/units/vehicles.c
++++ b/source/units/vehicles.c
+@@ -144,10 +144,8 @@ symbols in this file:
+ 
+ #include "cseries.h"
+ #include "cseries/profile.h"
+-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #include "vehicles.h"
+ #include "math/real_math.h"
+-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #include "game/game_globals.h"
+ #include "game/players.h"
+ #include "effects/material_effects.h"
+@@ -885,23 +883,15 @@ long vehicle_find_pathfinding_surface_index(
+ 
+ 			object_get_origin(vehicle_index, &origin);
+ 
+-			origin.x += global_up3d->i*0.4f;
+-			origin.y += global_up3d->j*0.4f;
+-			origin.z += global_up3d->k*0.4f;
++			point_from_line3d(&origin, global_up3d, 0.4f, &origin);
+ 
+ 			add_vectors3d(global_down3d, global_down3d, &vector);
+ 
+ 			if (collision_bsp_test_vector(1, bsp, 0, NULL, &origin, &vector, FLT_MAX, &result))
+ 			{
+-				real t = result.t;
+-
+ 				surface_index = result.surface_index;
+ 
+-				/* Preserve the January inline schedule without owning
+-				 * point_from_line3d in this translation unit. */
+-				position->x = vector.i*t + origin.x;
+-				position->y = vector.j*t + origin.y;
+-				position->z = vector.k*t + origin.z;
++				point_from_line3d(&origin, &vector, result.t, position);
+ 			}
+ 			break;
+ 		}
+@@ -2110,7 +2100,7 @@ static void update_human_jeep_physics(
+ static void update_alien_scout_physics(
+ 	long vehicle_index,
+ 	real steering,
+-	struct powered_mass_point_datum *state,
++	struct powered_mass_point_datum *powered_mass_points,
+ 	struct mass_point_datum *mass_points)
+ {
+ 	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
+@@ -2118,252 +2108,223 @@ static void update_alien_scout_physics(
+ 		vehicle->definition_index);
+ 	struct physics_definition *physics = physics_definition_get(
+ 		definition->unit.object.physics.index);
+-	real_matrix4x3 matrix;
+-	real_vector3d local_velocity;
+-	real_vector3d magic_force;
+-	real_vector3d magic_torque;
+-	real antigrav;
+-	real water_depth;
+-	short mass_point_index;
+-
+-	water_depth = scenario_location_water_depth(&vehicle->object.location,
++	real const maximum_water_depth = 0.5f;
++	real water_depth = scenario_location_water_depth(&vehicle->object.location,
+ 		&vehicle->object.position);
+-
+-	magic_force = *global_zero_vector3d;
+-	magic_torque = *global_zero_vector3d;
+-	antigrav = vehicle->unit.seat_power[0];
++	real_vector3d magic_force = *global_zero_vector3d;
++	real_vector3d magic_torque = *global_zero_vector3d;
++	real antigrav = vehicle->unit.seat_power[0];
++	short mass_point_index;
+ 
+ 	for (mass_point_index = 0;
+ 		mass_point_index<physics->powered_mass_points.count;
+ 		mass_point_index++)
+ 	{
+-		state[mass_point_index].antigrav_fraction = antigrav;
+-		state[mass_point_index].rotation.v.i = 0.0f;
+-		state[mass_point_index].rotation.v.j = 0.0f;
+-		state[mass_point_index].rotation.v.k = 0.0f;
+-		state[mass_point_index].rotation.w = 1.0f;
++		struct powered_mass_point_datum *powered_mass_point = &powered_mass_points[mass_point_index];
++
++		powered_mass_point->antigrav_fraction = antigrav;
++		set_real_quaternion(&powered_mass_point->rotation, 0.0f, 0.0f, 0.0f, 1.0f);
+ 	}
+ 
+-	if (water_depth<0.5f && vehicle->object.up.k>-0.2f)
++	if (water_depth<maximum_water_depth && vehicle->object.up.k>-0.2f)
+ 	{
+-		real_vector3d const *object_forward = &vehicle->object.forward;
+-		real_vector3d const *object_up = &vehicle->object.up;
+-		real_vector3d const *object_angular_velocity =
+-			&vehicle->object.angular_velocity;
+-		matrix4x3_from_point_and_vectors(&matrix, &vehicle->object.position,
+-			object_forward, object_up);
+-		matrix4x3_inverse_transform_vector(&matrix,
+-			&vehicle->object.translational_velocity, &local_velocity);
++		real_matrix4x3 vehicle_matrix;
++		real_vector3d velocity;
++
++		matrix4x3_from_point_and_vectors(&vehicle_matrix, &vehicle->object.position,
++			&vehicle->object.forward, &vehicle->object.up);
++		matrix4x3_inverse_transform_vector(&vehicle_matrix,
++			&vehicle->object.translational_velocity, &velocity);
+ 
+ 		if (vehicle->vehicle.hover>0.0f)
+ 		{
+ 			real maximum_speed = definition->unknown2f8;
+ 			real maximum_acceleration;
+-			real_vector2d target_velocity;
+-			real_vector3d acceleration;
+-			real scale;
++			real_vector3d desired_velocity;
++			real_vector3d desired_acceleration;
+ 
+ 			if (TEST_FLAG(vehicle->vehicle.flags, 3))
+-				maximum_speed *= 0.8f;
++			{
++				real const boost_speed_scale = 0.8f;
+ 
+-			maximum_acceleration = definition->unknown300;
++				maximum_speed *= boost_speed_scale;
++			}
++
++			scale_vector3d(&vehicle->unit.throttle, maximum_speed, &desired_velocity);
++			subtract_vectors3d(&desired_velocity, &velocity, &desired_acceleration);
++			desired_acceleration.k = 0.0f;
+ 
+-			target_velocity.i = maximum_speed*vehicle->unit.throttle.i;
+-			target_velocity.j = maximum_speed*vehicle->unit.throttle.j;
+-			acceleration.i = target_velocity.i-local_velocity.i;
+-			acceleration.j = target_velocity.j-local_velocity.j;
+-			acceleration.k = 0.0f;
++			maximum_acceleration = definition->unknown300;
+ 
+ 			if (vehicle->vehicle.on_ground_ticks>0 && fabs(steering)>0.785398185f)
+ 			{
+-				real reduction = MIN(vehicle->vehicle.on_ground_ticks*0.05f, 0.98f);
++				real const reduction_per_tick = 0.05f;
++				real const maximum_reduction = 0.98f;
++				real reduction = MIN(vehicle->vehicle.on_ground_ticks*reduction_per_tick, maximum_reduction);
++
+ 				maximum_acceleration *= 1.0f-reduction;
+ 			}
+ 
+-			limit3d(&acceleration, maximum_acceleration);
+-			matrix4x3_transform_vector(&matrix, &acceleration, &acceleration);
++			limit3d(&desired_acceleration, maximum_acceleration);
++			matrix4x3_transform_vector(&vehicle_matrix, &desired_acceleration, &desired_acceleration);
+ 
+-			scale = physics->mass*vehicle->vehicle.hover;
+-			magic_force.i += acceleration.i*scale;
+-			magic_force.j += acceleration.j*scale;
+-			magic_force.k += acceleration.k*scale;
++			point_from_line3d((real_point3d *)&magic_force, &desired_acceleration,
++				physics->mass*vehicle->vehicle.hover, (real_point3d *)&magic_force);
+ 		}
+ 
+ 		if (vehicle->vehicle.hover>0.0f)
+ 		{
+-			real current = dot_product3d(object_up,
+-				object_angular_velocity);
+-			long sign = steering!=0.0f ? (steering<0.0f ? -1 : 1) : 0;
+-			real desired = square_root((real)(fabs(steering)*0.0069813174f))*sign;
++			real const maximum_angular_error = 0.0034906587f;
++			real steering_input = steering;
++			real current = dot_product3d(&vehicle->object.angular_velocity, &vehicle->object.up);
++			real desired = (steering_input!=0.0f ? (steering_input<0.0f ? -1 : 1) : 0)*
++				square_root((real)(fabs(steering_input)*0.0069813174f));
+ 			real error;
+ 			real torque;
+ 
+-			if (fabs(desired)>_real_epsilon && steering/desired<2.0f)
+-				desired = steering*0.5f;
++			if (fabs(desired)>_real_epsilon && steering_input/desired<2.0f)
++				desired = steering_input*0.5f;
+ 
+-			error = PIN(desired-current, -0.0034906587f, 0.0034906587f);
++			error = PIN(desired-current, -maximum_angular_error, maximum_angular_error);
+ 			torque = error*physics->zz_moment;
+-			torque *= vehicle->vehicle.hover;
+ 
+-			magic_torque.i += object_up->i*torque;
+-			magic_torque.j += object_up->j*torque;
+-			magic_torque.k += object_up->k*torque;
++			point_from_line3d((real_point3d *)&magic_torque, &vehicle->object.up,
++				torque*vehicle->vehicle.hover, (real_point3d *)&magic_torque);
+ 		}
+ 
+ 		if (vehicle->vehicle.hover<1.0f)
+ 		{
+-			real_vector3d left;
+-			real_vector2d forward2d;
+-			real_vector2d left2d;
+-			real_vector2d control_torque = *global_zero_vector2d;
+-			real torque_a;
+-			real torque_b;
+-
+-			vehicle_cross_product3d_target(object_up, object_forward, &left);
+-			forward2d.i = object_forward->i;
+-			forward2d.j = object_forward->j;
+-			left2d.i = left.i;
+-			left2d.j = left.j;
+-			normalize2d(&forward2d);
+-			normalize2d(&left2d);
+-
+-			if (object_up->k>0.0f)
++			real const control_scale = 0.0015514038f;
++			real_vector2d applied_alpha = *global_zero_vector2d;
++			real_vector3d vehicle_left;
++			real_vector2d vehicle_forward_horizontal = *(real_vector2d const *)&vehicle->object.forward;
++			real_vector2d vehicle_left_horizontal;
++
++			cross_product3d(&vehicle->object.up, &vehicle->object.forward, &vehicle_left);
++			vehicle_left_horizontal = *(real_vector2d const *)&vehicle_left;
++			normalize2d(&vehicle_forward_horizontal);
++			normalize2d(&vehicle_left_horizontal);
++
++			if (vehicle->object.up.k>0.0f)
+ 			{
+-				real_vector2d level_torque;
+-				real_vector2d alignment;
+-				real_vector2d rate;
+-				real_vector2d up;
++				real_vector2d offset_from_vertical;
+ 				real_vector2d angular_velocity;
+-				long sign_a;
+-				long sign_b;
+-				real weight_a;
+-				real weight_b;
+-
+-				up.i = object_up->i;
+-				up.j = object_up->j;
+-				angular_velocity.i = object_angular_velocity->i;
+-				angular_velocity.j = object_angular_velocity->j;
+-				alignment.i = dot_product2d(&up, &forward2d);
+-				alignment.j = dot_product2d(&up, &left2d);
+-				rate.i = dot_product2d(&angular_velocity, &left2d);
+-				rate.j = -dot_product2d(&angular_velocity, &forward2d);
+-				level_torque = *global_zero_vector2d;
+-				level_torque.i -= alignment.i;
+-				level_torque.j -= alignment.j;
+-				level_torque.i -= 15.0f*rate.i;
+-				level_torque.j -= 15.0f*rate.j;
+-				sign_a = vehicle->unit.throttle.i*level_torque.i!=0.0f ?
+-					(vehicle->unit.throttle.i*level_torque.i<0.0f ? -1 : 1) : 0;
+-				weight_a = (real)fabs(level_torque.i)*sign_a;
+-				sign_b = vehicle->unit.throttle.j*level_torque.j!=0.0f ?
+-					(vehicle->unit.throttle.j*level_torque.j<0.0f ? -1 : 1) : 0;
+-				weight_b = (real)fabs(level_torque.j)*sign_b;
+-				control_torque.i += vehicle->unit.throttle.i*
+-					PIN(weight_a+1.0f, 0.3f, 2.5f)*0.0015514038f;
+-				control_torque.j += vehicle->unit.throttle.j*
+-					PIN(weight_b+1.0f, 0.3f, 2.5f)*0.0015514038f;
++				real_vector2d alpha_desire;
++				real_vector2d alpha_bonus;
++
++				offset_from_vertical.i = dot_product2d((real_vector2d const *)&vehicle->object.up,
++					&vehicle_forward_horizontal);
++				offset_from_vertical.j = dot_product2d((real_vector2d const *)&vehicle->object.up,
++					&vehicle_left_horizontal);
++				angular_velocity.i = dot_product2d((real_vector2d const *)&vehicle->object.angular_velocity,
++					&vehicle_left_horizontal);
++				angular_velocity.j = -dot_product2d((real_vector2d const *)&vehicle->object.angular_velocity,
++					&vehicle_forward_horizontal);
++
++				alpha_desire = *global_zero_vector2d;
++				point_from_line2d((real_point2d *)&alpha_desire, &offset_from_vertical, -1.0f,
++					(real_point2d *)&alpha_desire);
++				point_from_line2d((real_point2d *)&alpha_desire, &angular_velocity, -15.0f,
++					(real_point2d *)&alpha_desire);
++
++				{
++					real const alpha_bonus_scale = 1.0f;
++
++					alpha_bonus.i = (alpha_desire.i*vehicle->unit.throttle.i!=0.0f ?
++						(alpha_desire.i*vehicle->unit.throttle.i<0.0f ? -1 : 1) : 0)*
++						alpha_bonus_scale*(real)fabs(alpha_desire.i);
++					alpha_bonus.j = (alpha_desire.j*vehicle->unit.throttle.j!=0.0f ?
++						(alpha_desire.j*vehicle->unit.throttle.j<0.0f ? -1 : 1) : 0)*
++						alpha_bonus_scale*(real)fabs(alpha_desire.j);
++				}
++
++				applied_alpha.i += control_scale*vehicle->unit.throttle.i*PIN(1.0f+alpha_bonus.i, 0.3f, 2.5f);
++				applied_alpha.j += control_scale*vehicle->unit.throttle.j*PIN(1.0f+alpha_bonus.j, 0.3f, 2.5f);
++
+ 				{
+-					real level_scale = (1.0f-object_up->k)*0.0038785094f;
++					real const leveling_scale = 0.0038785094f;
+ 
+-					torque_a = level_scale*level_torque.i;
+-					torque_b = level_scale*level_torque.j;
+-					torque_a += control_torque.i;
++					point_from_line2d((real_point2d *)&applied_alpha, &alpha_desire,
++						leveling_scale*(1.0f-vehicle->object.up.k), (real_point2d *)&applied_alpha);
+ 				}
+ 			}
+ 			else
+ 			{
+-				torque_a = vehicle->unit.throttle.i*0.0015514038f;
+-				torque_b = vehicle->unit.throttle.j*0.0015514038f;
+-				torque_a += control_torque.i;
++				applied_alpha.i += control_scale*vehicle->unit.throttle.i;
++				applied_alpha.j += control_scale*vehicle->unit.throttle.j;
+ 			}
+ 
+-			torque_b += control_torque.j;
+-
+ 			{
+-				real_vector3d torque = *global_zero_vector3d;
+-				real left_scale = physics->yy_moment*torque_a;
+-				real forward_scale = -(physics->xx_moment*torque_b);
+-				real scale = 1.0f-vehicle->vehicle.hover;
+-
+-				torque.i += left.i*left_scale;
+-				torque.j += left.j*left_scale;
+-				torque.k += left.k*left_scale;
+-				torque.i += object_forward->i*forward_scale;
+-				torque.j += object_forward->j*forward_scale;
+-				torque.k += object_forward->k*forward_scale;
+-
+-				magic_torque.i += torque.i*scale;
+-				magic_torque.j += torque.j*scale;
+-				magic_torque.k += torque.k*scale;
++				real_vector3d turning_torque = *global_zero_vector3d;
++
++				point_from_line3d((real_point3d *)&turning_torque, &vehicle_left,
++					applied_alpha.i*physics->yy_moment, (real_point3d *)&turning_torque);
++				point_from_line3d((real_point3d *)&turning_torque, &vehicle->object.forward,
++					-applied_alpha.j*physics->xx_moment, (real_point3d *)&turning_torque);
++				point_from_line3d((real_point3d *)&magic_torque, &turning_torque,
++					1.0f-vehicle->vehicle.hover, (real_point3d *)&magic_torque);
+ 			}
+ 		}
+ 
+ 		if (TEST_FLAG(vehicle->vehicle.flags, 3))
+ 		{
+-			real speed = dot_product3d(object_forward,
+-				&vehicle->object.translational_velocity)/definition->unknown2f8;
+-			real_vector3d left;
++			real speed = dot_product3d(&vehicle->object.translational_velocity,
++				&vehicle->object.forward)/definition->unknown2f8;
++			real_vector3d vehicle_left;
+ 
+ 			speed = PIN(speed, 0.0f, 1.0f);
+-
+-			cross_product3d(object_up, object_forward, &left);
++			cross_product3d(&vehicle->object.up, &vehicle->object.forward, &vehicle_left);
+ 
+ 			if (speed>0.0f)
+ 			{
+-				real torque = physics->yy_moment*speed*vehicle->vehicle.hover*-0.005817764f;
+-				real lift;
+-
+-				magic_torque.i += left.i*torque;
+-				magic_torque.j += left.j*torque;
+-				magic_torque.k += left.k*torque;
+-
+-				lift = physics->mass*speed*vehicle->vehicle.hover*0.004f;
+-				magic_force.i += global_up3d->i*lift;
+-				magic_force.j += global_up3d->j*lift;
+-				magic_force.k += global_up3d->k*lift;
++				real const pitch_torque_scale = 0.005817764f;
++				real const lift_scale = 0.004f;
++
++				point_from_line3d((real_point3d *)&magic_torque, &vehicle_left,
++					-pitch_torque_scale*physics->yy_moment*speed*vehicle->vehicle.hover,
++					(real_point3d *)&magic_torque);
++				point_from_line3d((real_point3d *)&magic_force, global_up3d,
++					lift_scale*physics->mass*speed*vehicle->vehicle.hover,
++					(real_point3d *)&magic_force);
+ 			}
+ 
+ 			if (vehicle->vehicle.airborne_ticks>0)
+ 			{
+-				real_vector3d axis;
++				real_vector3d vehicle_horizontal_forward;
+ 
+-				cross_product3d(&left, global_up3d, &axis);
+-				if (normalize3d(&axis)>0.0f)
++				cross_product3d(&vehicle_left, global_up3d, &vehicle_horizontal_forward);
++				if (normalize3d(&vehicle_horizontal_forward)>0.0f)
+ 				{
+-					real fade = PIN(1.0f-vehicle->vehicle.airborne_ticks*(1.0f/30), 0.0f, 1.0f);
+-					real axis_scale = (1.0f-vehicle->vehicle.hover)*
+-						physics->mass*fade*0.002f;
+-					real up_scale;
+-
+-					magic_force.i += axis.i*axis_scale;
+-					magic_force.j += axis.j*axis_scale;
+-					magic_force.k += axis.k*axis_scale;
+-
+-					up_scale = (1.0f-vehicle->vehicle.hover)*
+-						physics->mass*fade*0.001f;
+-					magic_force.i += global_up3d->i*up_scale;
+-					magic_force.j += global_up3d->j*up_scale;
+-					magic_force.k += global_up3d->k*up_scale;
++					real const forward_push_scale = 0.002f;
++					real const upward_push_scale = 0.001f;
++					real const airborne_fade_ticks = 30.0f;
++					real fade = PIN(1.0f-vehicle->vehicle.airborne_ticks/airborne_fade_ticks, 0.0f, 1.0f);
++
++					point_from_line3d((real_point3d *)&magic_force, &vehicle_horizontal_forward,
++						forward_push_scale*fade*physics->mass*(1.0f-vehicle->vehicle.hover),
++						(real_point3d *)&magic_force);
++					point_from_line3d((real_point3d *)&magic_force, global_up3d,
++						upward_push_scale*fade*physics->mass*(1.0f-vehicle->vehicle.hover),
++						(real_point3d *)&magic_force);
+ 				}
+ 			}
+ 		}
+ 
+-		magic_force.i *= antigrav;
+-		magic_force.j *= antigrav;
+-		magic_force.k *= antigrav;
+-		magic_torque.i *= antigrav;
+-		magic_torque.j *= antigrav;
+-		magic_torque.k *= antigrav;
++		scale_vector3d(&magic_force, antigrav, &magic_force);
++		scale_vector3d(&magic_torque, antigrav, &magic_torque);
+ 	}
+ 
+-	physics_update(vehicle_index, state, mass_points, &magic_force, &magic_torque);
++	physics_update(vehicle_index, powered_mass_points, mass_points, &magic_force, &magic_torque);
+ 
+ 	{
+-		real maximum = MAX(vehicle->object.up.k, 0.4f);
+-		long powered_count = 0;
+-		long grounded_count = 0;
++		real maximum = MAX(0.4f, vehicle->object.up.k);
+ 		real ratio = 0.0f;
++		short powered_count = 0;
++		short grounded_count = 0;
++		short mass_point_index;
+ 		real target;
++		real const maximum_hover_change = 0.1f;
++		real delta;
+ 
+ 		for (mass_point_index = 0;
+ 			mass_point_index<physics->mass_points.count;
+@@ -2374,22 +2335,25 @@ static void update_alien_scout_physics(
+ 
+ 			if (mass_point_definition->powered_mass_point_index!=NONE)
+ 			{
++				struct mass_point_datum *mass_point = &mass_points[mass_point_index];
++
+ 				powered_count++;
+-				if (TEST_FLAG(mass_points[mass_point_index].flags, 4))
++				if (TEST_FLAG(mass_point->flags, 4))
+ 					grounded_count++;
+ 			}
+ 		}
+ 
+-		if ((short)powered_count>0)
+-			ratio = (real)(short)grounded_count/(real)(short)powered_count;
+-
+-		target = PIN(ratio*maximum, 0.0f, 1.0f);
+-		if (target-vehicle->vehicle.hover>0.1f)
+-			target = vehicle->vehicle.hover+0.1f;
+-		else if (target-vehicle->vehicle.hover<-0.1f)
+-			target = vehicle->vehicle.hover-0.1f;
++		if (powered_count>0)
++			ratio = (real)grounded_count/(real)powered_count;
+ 
+-		vehicle->vehicle.hover = target;
++		target = PIN(maximum*ratio, 0.0f, 1.0f);
++		delta = target-vehicle->vehicle.hover;
++		if (delta>maximum_hover_change)
++			vehicle->vehicle.hover += maximum_hover_change;
++		else if (delta<-maximum_hover_change)
++			vehicle->vehicle.hover -= maximum_hover_change;
++		else
++			vehicle->vehicle.hover = target;
+ 	}
+ 
+ 	create_ghost_effect(vehicle_index);

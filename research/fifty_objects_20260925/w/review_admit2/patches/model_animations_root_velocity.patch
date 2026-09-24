@@ -1,0 +1,18 @@
+diff --git a/source/models/model_animations.c b/source/models/model_animations.c
+index 4cda233d..9ae4f2f3 100644
+--- a/source/models/model_animations.c
++++ b/source/models/model_animations.c
+@@ -735,9 +735,10 @@ void animation_get_root_velocity(
+ 	animation_get_node_orientations(model, animation, frame_index, node_orientations);
+ 	animation_get_node_orientations(model, animation, frame_index - 1, previous_node_orientations);
+ 
+-	root_velocity->i = node_orientations[0].translation.x - previous_node_orientations[0].translation.x;
+-	root_velocity->j = node_orientations[0].translation.y - previous_node_orientations[0].translation.y;
+-	root_velocity->k = node_orientations[0].translation.z - previous_node_orientations[0].translation.z;
++	vector_from_points3d(
++		&previous_node_orientations[0].translation,
++		&node_orientations[0].translation,
++		root_velocity);
+ 
+ 	return;
+ }

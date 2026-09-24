@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index cf8106ea58f5c70d026e0031c8c911618c3582ee..97c0ad7a425c6d8c3141465e433dc32e65025bac 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -675,7 +675,7 @@
+ 				{ "name": "source/game/game_engine_oddball.c", "index": 300, "status": "Matching" },
+ 				{ "name": "source/game/game_engine_multiplayer_sounds.c", "index": 301, "status": "Matching" },
+ 				{ "name": "source/game/game_engine_list.c", "index": 302, "status": "Matching" },
+-				{ "name": "source/game/game_engine_king.c", "index": 303, "status": "NonMatching" },
++				{ "name": "source/game/game_engine_king.c", "index": 303, "status": "Matching" },
+ 				{ "name": "source/game/game_engine_defend.c", "index": 304, "status": "Matching" },
+ 				{ "name": "source/game/game_engine_ctf.c", "index": 305, "status": "Matching" },
+ 				{ "name": "source/game/game_engine_bomb.c", "index": 306, "status": "Matching" },
