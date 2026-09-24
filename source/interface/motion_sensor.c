@@ -276,8 +276,8 @@ real scale[] =
 };
 
 long next_vertex_index= {0};
-static struct motion_sensor_globals_definition *motion_sensor_globals;
-static real sweep_theta;
+static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
+static real sweep_theta = 0.f;
 boolean debug_motion_sensor_draw_all_units= {0};
 
 extern struct motion_sensor_hud_globals *hud_globals;
