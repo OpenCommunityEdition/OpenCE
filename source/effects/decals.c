@@ -212,14 +212,12 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define project_point2d project_point2d_inline
 #define plane2d_from_points plane2d_from_points_inline
 #define REAL_MATH_EXTERNAL_PROJECT_POINT3D
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
-#undef project_point2d
 #undef plane2d_from_points
 #undef REAL_MATH_EXTERNAL_PROJECT_POINT3D
 
@@ -810,28 +808,6 @@ static void decal_sprite_get_bounds(
 		- sprite->bounds.y0) * height_scale;
 
 	return;
-}
-
-real_point3d *project_point2d(
-	real_point2d const *p2d,
-	real_plane3d const *plane,
-	short projection,
-	boolean sign,
-	real_point3d *p3d)
-{
-	short x = global_projection3d_mappings[projection][sign][0];
-	short y = global_projection3d_mappings[projection][sign][1];
-
-	match_assert("..\\math\\real_math.h", 879, projection>=_x && projection<=_z);
-	match_assert("..\\math\\real_math.h", 880, ~(sign&~1));
-
-	p3d->n[x] = p2d->x;
-	p3d->n[y] = p2d->y;
-	p3d->n[projection] = (fabs(plane->n.n[projection])<_real_epsilon)
-		? 0.0f
-		: ((plane->d - (p2d->x * plane->n.n[x])) - (p2d->y * plane->n.n[y])) / plane->n.n[projection];
-
-	return p3d;
 }
 
 real_plane2d *plane2d_from_points(

@@ -1831,8 +1831,7 @@ static void find_point_lights_for_object_in_cluster(
 					|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
 						_light_definition_dont_light_own_object_bit)))
 			{
-				real_point3d const *light_position = &light->position;
-				real distance = distance3d(light_position, center);
+				real distance = distance3d(&light->position, center);
 
 				if (distance < radius + light->radius)
 				{

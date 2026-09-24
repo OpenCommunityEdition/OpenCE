@@ -1237,11 +1237,11 @@
       "unit": "source/ai/ai",
       "function": "_ai_test_line_of_sight",
       "class": "instruction-scheduling",
-      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md.",
+      "evidence": "Complete typed PVS, collision, fog, expanded-source, and expanded-target visibility classifier reconstructed from January code/relocations and HCEA semantics. It preserves January's external helper schedule without emitting point_from_line3d. The retained source initializes collision_fraction before the fog path so no execution can read an indeterminate value. January is 1,008 padded bytes and candidate is 1,040, both with 50 relocations. Remaining differences are compiler-local frame/register scheduling. No fake dependency, raw offset, forced inline, undefined read, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. Remeasured 2026-09-25 after the /Od-attested real_math.h distance3d body correction (claude_fifty_objects_20260925.md, batch 2); size and relocations unchanged.",
       "measurements": {
         "target": { "size": 1008, "relocation_count": 50, "normalized_sha256": "aecb662c1c4868e27cbd680dba829bdedc994fc2f91911172ad86ecdfdec9b86" },
-        "base": { "size": 1040, "relocation_count": 50, "normalized_sha256": "61a3ce7f829fcafe2bf34705e9d6e2a0bb2be0d80257c1921cc134edb6eb0488" },
-        "objdiff_percent": 97.97885
+        "base": { "size": 1040, "relocation_count": 50, "normalized_sha256": "c524fe19529bfd4a72e95be52a875925bcc929d347b37471eb16b75bd393da78" },
+        "objdiff_percent": 97.91843
       }
     },
     {
@@ -1420,17 +1420,6 @@
         "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
         "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "a112cf32c0e3baf805bd69c440b5beadbe51394f6a7f3161f61d4c470ea88292" },
         "objdiff_percent": 93.48387
-      }
-    },
-    {
-      "unit": "source/math/geometry",
-      "function": "_convex_hull2d_perimeter",
-      "class": "unclassified",
-      "evidence": "Complete natural convex-hull perimeter reconstruction retained from the reconciled Fable geometry packet. Target and candidate share a 96-byte extent with no relocations but have different normalized streams; earlier exact-looking expression/helper variants had unresolved provenance and are not used as credit. The retained ordinary project-type body receives zero credit. See docs/object_matching_logs/geometry_obj_fable_clean_pair_independent_intake_20260906.md.",
-      "measurements": {
-        "target": { "size": 96, "relocation_count": 0, "normalized_sha256": "71292feb41a8e5d57e328751240458cb0b9678237d26b7f8be4ba7abab7f4b0e" },
-        "base": { "size": 96, "relocation_count": 0, "normalized_sha256": "22c6d46416fece30ca43252116be4b7f30369b3c2df152ea46ef045b031d073d" },
-        "objdiff_percent": 91.5
       }
     },
     {

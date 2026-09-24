@@ -8,12 +8,6 @@ RANDOM_MATH.H
 
 /* ---------- prototypes/RANDOM_MATH.C */
 
-void lock_global_random_seed(
-	void);
-
-void unlock_global_random_seed(
-	void);
-
 unsigned long get_random_seed(
 	void);
 

@@ -2693,8 +2693,6 @@ static void player_set_action_result(
 	real_point3d const *unit_position;
 	real_point3d const *current_position;
 	real_point3d const *new_position;
-	real current_distance;
-	real new_distance;
 	boolean set_action = FALSE;
 
 	player = player_get(player_index);
@@ -2708,13 +2706,8 @@ static void player_set_action_result(
 		current_position =
 			&object_get(player->action_object_index)->object.position;
 		new_position = &object_get(object_index)->object.position;
-		current_distance = distance3d(
-			unit_position,
-			current_position);
-		new_distance = distance3d(
-			unit_position,
-			new_position);
-		set_action = current_distance > new_distance;
+		set_action = distance3d(unit_position, current_position) >
+			distance3d(unit_position, new_position);
 	}
 	else if (action_result > player->action_result)
 	{

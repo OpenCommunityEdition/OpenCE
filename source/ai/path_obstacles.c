@@ -62,11 +62,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define rotate_vector2d rotate_vector2d_inline
-#define project_point3d project_point3d_inline
-#define distance_squared2d distance_squared2d_inline
-#define point_in_circle point_in_circle_inline
-#define distance_squared3d distance_squared3d_inline
 #include "cseries.h"
 #include "path.h"
 #include "devices/device_definitions.h"
@@ -75,11 +70,6 @@ symbols in this file:
 #include "physics/collision_model_definitions.h"
 #include "physics/collisions.h"
 #include "render/render_debug.h"
-#undef rotate_vector2d
-#undef project_point3d
-#undef distance_squared2d
-#undef point_in_circle
-#undef distance_squared3d
 
 /* ---------- constants */
 
@@ -146,44 +136,6 @@ void obstacles_new(
 	obstacles->disc_count = 0;
 	obstacles->disc_optional_count = 0;
 	return;
-}
-
-real_vector2d *rotate_vector2d(
-	real_vector2d const *vector,
-	real sine,
-	real cosine,
-	real_vector2d *result)
-{
-	real j = sine * vector->i + cosine * vector->j;
-	real i = cosine * vector->i - sine * vector->j;
-
-	result->i = i;
-	result->j = j;
-	return result;
-}
-
-real_point2d *project_point3d(
-	real_point3d const *p3d,
-	short projection,
-	boolean sign,
-	real_point2d *p2d)
-{
-	match_assert("..\\math\\real_math.h", 859, projection>=_x && projection<=_z);
-	match_assert("..\\math\\real_math.h", 860, ~(sign&~1));
-
-	set_real_point2d(
-		p2d,
-		p3d->n[global_projection3d_mappings[projection][sign][0]],
-		p3d->n[global_projection3d_mappings[projection][sign][1]]);
-	return p2d;
-}
-
-boolean point_in_circle(
-	real_point2d const *point,
-	real_point2d const *center,
-	real radius)
-{
-	return distance_squared2d_inline(point, center) <= (radius * radius);
 }
 
 boolean obstacles_add_disc(
@@ -499,7 +451,7 @@ void obstacles_disc_neighborhood(
 				{
 					struct obstacle_disc const *disc = obstacles_get_disc(obstacles, disc_index);
 
-					if (point_in_circle_inline(
+					if (point_in_circle(
 						&current_disc->center,
 						&disc->center,
 						(disc->radius + radius) + (current_disc->radius + radius)))

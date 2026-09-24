@@ -69,15 +69,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#define distance2d distance2d_inline
-#define distance3d distance3d_inline
-#define distance_squared2d distance_squared2d_inline
-#define negate_vector2d negate_vector2d_inline
 #include "actions.h"
-#undef negate_vector2d
-#undef distance_squared2d
-#undef distance3d
-#undef distance2d
 
 #define object_get_bounding_sphere object_get_bounding_sphere_inline
 #include "actors.h"
@@ -179,41 +171,6 @@ void object_get_bounding_sphere(
 	*radius = object->object.bounding_sphere_radius;
 
 	return;
-}
-
-real distance_squared2d(
-	real_point2d const *a,
-	real_point2d const *b)
-{
-	real_vector2d v;
-
-	return magnitude_squared2d(vector_from_points2d(a, b, &v));
-}
-
-real distance2d(
-	real_point2d const *a,
-	real_point2d const *b)
-{
-	real_vector2d v;
-
-	return magnitude2d(vector_from_points2d(a, b, &v));
-}
-
-real distance3d(
-	real_point3d const *a,
-	real_point3d const *b)
-{
-	return square_root(distance_squared3d(a, b));
-}
-
-real_vector2d *negate_vector2d(
-	real_vector2d const *a,
-	real_vector2d *result)
-{
-	result->i = -a->i;
-	result->j = -a->j;
-
-	return result;
 }
 
 void action_vehicle_begin(
