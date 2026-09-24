@@ -1,0 +1,74 @@
+diff --git a/source/saved games/player_profile.c b/source/saved games/player_profile.c
+index 048026db..2e3e1843 100644
+--- a/source/saved games/player_profile.c	
++++ b/source/saved games/player_profile.c	
+@@ -412,7 +412,6 @@ long player_profile_new(
+ 			union player_profile_block block = {0};
+ 			struct player_profile *profile = &block.profile_block.profile;
+ 			long level;
+-			boolean succeeded;
+ 
+ 			csmemset(profile, 0, sizeof(struct player_profile));
+ 			profile->primary_color_index = NONE;
+@@ -445,16 +444,17 @@ long player_profile_new(
+ 			saved_game_file_generate_checksum(&block.profile_block.profile, sizeof(block.profile_block.profile),
+ 				&block.profile_block.checksum);
+ 
+-			succeeded = file_set_position(&profile_file, 0) &&
+-				file_write(&profile_file, sizeof(block), &block);
+-			saved_game_file_close(&profile_file, player_profile_index);
+-
+-			if (!succeeded)
++			if (!file_set_position(&profile_file, 0) ||
++				!file_write(&profile_file, sizeof(block), &block))
+ 			{
+ 				error(_error_silent, "failed to initialize newly created player profile");
+ 				delete_enumerated_saved_game_file(player_profile_index);
+ 				player_profile_index = NONE;
+ 			}
++
++			/* BUG (preserved for exact matching): after a failed write the index is already NONE, so
++			   saved_game_file_close() fails its index assertions */
++			saved_game_file_close(&profile_file, player_profile_index);
+ 		}
+ 		else
+ 		{
+@@ -788,7 +788,9 @@ static unsigned long __stdcall player_profile_write_thread_proc(
+ 	void *input)
+ {
+ 	struct player_profile_write_request *request = input;
+-	union player_profile_block block = {0};
++	/* BUG (preserved for exact matching): only the profile and checksum are initialised, so the
++	   rest of the 512-byte block is written from uninitialised stack storage */
++	union player_profile_block block;
+ 	struct file_reference profile_file;
+ 
+ 	match_vassert("c:\\halo\\SOURCE\\saved games\\player_profile.c", 0x2D7, input, "input");
+@@ -851,7 +853,9 @@ static void player_profile_create_default_profiles_on_disk(
+ 
+ 	for (i = 0; i < NUMBER_OF_DEFAULT_PROFILES; i++)
+ 	{
+-		union player_profile_block block = {0};
++		/* BUG (preserved for exact matching): only the profile and checksum are initialised, so the
++		   rest of the 512-byte block is written from uninitialised stack storage */
++		union player_profile_block block;
+ 		char full_path[MAXIMUM_FILENAME_LENGTH+1];
+ 		struct file_reference file;
+ 		boolean succeeded = FALSE;
+@@ -865,11 +869,13 @@ static void player_profile_create_default_profiles_on_disk(
+ 			saved_game_file_generate_checksum(&block.profile_block.profile, sizeof(block.profile_block.profile),
+ 				&block.profile_block.checksum);
+ 
++			/* BUG (preserved for exact matching): a failed seek skips file_close() and leaves the
++			   file open */
+ 			if (file_create(&file) &&
+-				file_open(&file, FLAG(_permission_write_bit)))
++				file_open(&file, FLAG(_permission_write_bit)) &&
++				file_set_position(&file, 0))
+ 			{
+-				succeeded = file_set_position(&file, 0) &&
+-					file_write(&file, sizeof(block), &block);
++				succeeded = file_write(&file, sizeof(block), &block);
+ 
+ 				if (!file_close(&file))
+ 				{

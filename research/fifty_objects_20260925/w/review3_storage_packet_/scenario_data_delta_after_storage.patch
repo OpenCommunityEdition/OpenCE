@@ -1,0 +1,202 @@
+diff --git a/source/hs/hs.c b/source/hs/hs.c
+index d55f7879..0ed6887b 100644
+--- a/source/hs/hs.c
++++ b/source/hs/hs.c
+@@ -13585,7 +13585,7 @@ static void hs_enumerate_block_data(
+ 	return;
+ }
+ 
+-void hs_enumerate_scenario_data(
++static void hs_enumerate_scenario_data(
+ 	short block_offset,
+ 	short name_offset,
+ 	long element_size)
+@@ -13647,16 +13647,7 @@ static void hs_enumerate_function_names(
+ static void hs_enumerate_script_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *scripts;
+-
+-		scenario = global_scenario_get();
+-		scripts = (struct tag_block const *)scenario;
+-		scripts = (struct tag_block const *)((byte const *)scripts + offsetof(struct scenario, hs_scripts));
+-		hs_enumerate_block_data(scripts, 0, sizeof(struct hs_script));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, hs_scripts), 0, sizeof(struct hs_script));
+ 	return;
+ }
+ 
+@@ -13689,160 +13680,70 @@ static void hs_enumerate_variable_names(
+ static void hs_enumerate_ai_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *encounters;
+-
+-		scenario = global_scenario_get();
+-		encounters = (struct tag_block const *)scenario;
+-		encounters = (struct tag_block const *)((byte const *)encounters + offsetof(struct scenario, ai_encounters));
+-		hs_enumerate_block_data(encounters, 0, sizeof(struct encounter_definition));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, ai_encounters), 0, sizeof(struct encounter_definition));
+ 	return;
+ }
+ 
+ static void hs_enumerate_ai_command_list_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *command_lists;
+-
+-		scenario = global_scenario_get();
+-		command_lists = (struct tag_block const *)scenario;
+-		command_lists = (struct tag_block const *)((byte const *)command_lists + offsetof(struct scenario, ai_command_lists));
+-		hs_enumerate_block_data(command_lists, 0, sizeof(struct ai_command_list_definition));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, ai_command_lists), 0, sizeof(struct ai_command_list_definition));
+ 	return;
+ }
+ 
+ static void hs_enumerate_starting_profile_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *starting_profiles;
+-
+-		scenario = global_scenario_get();
+-		starting_profiles = (struct tag_block const *)scenario;
+-		starting_profiles = (struct tag_block const *)((byte const *)starting_profiles + offsetof(struct scenario, starting_profiles));
+-		hs_enumerate_block_data(starting_profiles, 0, scenario_starting_profile_size);
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, starting_profiles), 0, scenario_starting_profile_size);
+ 	return;
+ }
+ 
+ static void hs_enumerate_conversation_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *conversations;
+-
+-		scenario = global_scenario_get();
+-		conversations = (struct tag_block const *)scenario;
+-		conversations = (struct tag_block const *)((byte const *)conversations + offsetof(struct scenario, ai_conversations));
+-		hs_enumerate_block_data(conversations, 0, scenario_conversation_definition_size);
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, ai_conversations), 0, scenario_conversation_definition_size);
+ 	return;
+ }
+ 
+ static void hs_enumerate_object_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *object_names;
+-
+-		scenario = global_scenario_get();
+-		object_names = (struct tag_block const *)scenario;
+-		object_names = (struct tag_block const *)((byte const *)object_names + offsetof(struct scenario, object_names));
+-		hs_enumerate_block_data(object_names, 0, sizeof(struct scenario_object_name));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, object_names), 0, sizeof(struct scenario_object_name));
+ 	return;
+ }
+ 
+ static void hs_enumerate_trigger_volume_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *trigger_volumes;
+-
+-		scenario = global_scenario_get();
+-		trigger_volumes = (struct tag_block const *)scenario;
+-		trigger_volumes = (struct tag_block const *)((byte const *)trigger_volumes + offsetof(struct scenario, trigger_volumes));
+-		hs_enumerate_block_data(trigger_volumes, 4, sizeof(struct scenario_trigger_volume));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, trigger_volumes), 4, sizeof(struct scenario_trigger_volume));
+ 	return;
+ }
+ 
+ static void hs_enumerate_cutscene_flag_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *cutscene_flags;
+-
+-		scenario = global_scenario_get();
+-		cutscene_flags = (struct tag_block const *)scenario;
+-		cutscene_flags = (struct tag_block const *)((byte const *)cutscene_flags + offsetof(struct scenario, cutscene_flags));
+-		hs_enumerate_block_data(cutscene_flags, 4, scenario_cutscene_flag_size);
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, cutscene_flags), 4, scenario_cutscene_flag_size);
+ 	return;
+ }
+ 
+ static void hs_enumerate_cutscene_camera_point_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *camera_points;
+-
+-		scenario = global_scenario_get();
+-		camera_points = (struct tag_block const *)scenario;
+-		camera_points = (struct tag_block const *)((byte const *)camera_points + offsetof(struct scenario, cutscene_camera_points));
+-		hs_enumerate_block_data(camera_points, 4, sizeof(struct scenario_cutscene_camera_point));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, cutscene_camera_points), 4, sizeof(struct scenario_cutscene_camera_point));
+ 	return;
+ }
+ 
+ static void hs_enumerate_cutscene_title_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *chapter_titles;
+-
+-		scenario = global_scenario_get();
+-		chapter_titles = (struct tag_block const *)scenario;
+-		chapter_titles = (struct tag_block const *)((byte const *)chapter_titles + offsetof(struct scenario, cutscene_chapter_titles));
+-		hs_enumerate_block_data(chapter_titles, 4, scenario_cutscene_chapter_title_size);
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, cutscene_chapter_titles), 4, scenario_cutscene_chapter_title_size);
+ 	return;
+ }
+ 
+ static void hs_enumerate_cutscene_recording_names(
+ 	void)
+ {
+-	if (global_scenario_index != NONE)
+-	{
+-		struct scenario *scenario;
+-		struct tag_block const *recorded_animations;
+-
+-		scenario = global_scenario_get();
+-		recorded_animations = (struct tag_block const *)scenario;
+-		recorded_animations = (struct tag_block const *)((byte const *)recorded_animations + offsetof(struct scenario, recorded_animations));
+-		hs_enumerate_block_data(recorded_animations, 0, sizeof(struct recorded_animation_definition));
+-	}
++	hs_enumerate_scenario_data(offsetof(struct scenario, recorded_animations), 0, sizeof(struct recorded_animation_definition));
+ 	return;
+ }
+ 

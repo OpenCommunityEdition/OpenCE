@@ -1,0 +1,11 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_internal.h b/source/rasterizer/xbox/rasterizer_xbox_internal.h
+index 25726def0db1c9a0aded21a7a4937c91e99dbaa7..3f356a946a5d14ea6525dd9fa601e9272fef7b3c 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_internal.h
++++ b/source/rasterizer/xbox/rasterizer_xbox_internal.h
+@@ -139,4 +139,6 @@ void _rasterizer_environment_reflection_draw(
+ void _rasterizer_environment_reflections_end(
+ 	void);
+ 
++extern struct rasterizer_window_begin_parameters global_window_parameters;
++
+ #endif /* __RASTERIZER_XBOX_INTERNAL_H */

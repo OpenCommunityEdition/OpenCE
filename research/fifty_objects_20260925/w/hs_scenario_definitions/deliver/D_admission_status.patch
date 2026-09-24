@@ -1,0 +1,32 @@
+diff --git a/config/config.json b/config/config.json
+index e7b839a2..51a1cfa2 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -654,7 +654,7 @@
+ 				{ "name": "source/input/input_abstraction.c", "index": 279, "status": "Matching" },
+ 				{ "name": "source/input/HaloAutoTest.c", "index": 280, "status": "Matching" },
+ 				{ "name": "source/hs/object_lists.c", "index": 281, "status": "Matching" },
+-				{ "name": "source/hs/hs_scenario_definitions.c", "index": 282, "status": "NonMatching" },
++				{ "name": "source/hs/hs_scenario_definitions.c", "index": 282, "status": "Matching" },
+ 				{ "name": "source/hs/hs_runtime.c", "index": 283, "status": "NonMatching" },
+ 				{ "name": "source/hs/hs_library_external.c", "index": 284, "status": "Matching" },
+ 				{ "name": "source/hs/hs_globals_external.c", "index": 285, "status": "NonMatching" },
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index efd9599d..89f8422c 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -1,14 +1,6 @@
+ {
+   "version": 1,
+   "entries": [
+-    {
+-      "unit": "source/hs/hs_scenario_definitions",
+-      "class": "source-layout-incomplete",
+-      "symbol": ".data",
+-      "reason": "January's data section has 8-byte alignment while the rebuilt section has 4-byte alignment. The current definitions force their layout with invented aggregates, pack/align directives and a padding member; identical payload alone does not authenticate the object.",
+-      "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+-      "reopen": "Recover the genuine separate January data definitions and their natural alignment, including the static byte-swap owner, without fabricated aggregates or padding; preserve target code and data bytes across a full sweep."
+-    },
+     {
+       "unit": "source/hs/hs_globals_external",
+       "class": "source-layout-incomplete",

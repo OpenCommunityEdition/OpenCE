@@ -1,0 +1,35 @@
+diff --git a/a/source/hs/hs.c b/b/source/hs/hs.c
+index 35571179..e825e935 100644
+--- a/a/source/hs/hs.c
++++ b/b/source/hs/hs.c
+@@ -4404,8 +4404,6 @@ boolean game_state_reverted(
+ 
+ /* ---------- constants */
+ 
+-#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
+-
+ /* ---------- globals */
+ 
+ static short hs_enumeration_result_count = 0;
+diff --git a/a/source/hs/hs_scenario_definitions.h b/b/source/hs/hs_scenario_definitions.h
+index 2eeefc50..8cdc1a50 100644
+--- a/a/source/hs/hs_scenario_definitions.h
++++ b/b/source/hs/hs_scenario_definitions.h
+@@ -20,6 +20,17 @@ enum
+ 	NUMBER_OF_HS_SCRIPT_TYPES,
+ };
+ 
++enum
++{
++	MAXIMUM_HS_SCRIPTS_PER_SCENARIO = 512,
++	MAXIMUM_HS_GLOBALS_PER_SCENARIO = 128,
++	MAXIMUM_HS_REFERENCES_PER_SCENARIO = 256,
++	MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO = 19001,
++	MAXIMUM_HS_STRING_DATA_PER_SCENARIO = 0x40000,
++	MAXIMUM_HS_SOURCE_FILES_PER_SCENARIO = 8,
++	MAXIMUM_HS_SOURCE_DATA_PER_FILE = 0x40000,
++};
++
+ /* ---------- headers */
+ 
+ #include "tag_files/tag_groups.h"

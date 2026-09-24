@@ -1,0 +1,35 @@
+diff --git a/source/main/main.c b/source/main/main.c
+--- a/source/main/main.c
++++ b/source/main/main.c
+@@ -2892,7 +2892,7 @@
+ 	return;
+ }
+ 
+-void main_game_render(
++static void main_game_render(
+ 	double time_delta_since_tick_sec)
+ {
+ 	boolean force_single_screen;
+diff --git a/source/main/main.h b/source/main/main.h
+--- a/source/main/main.h
++++ b/source/main/main.h
+@@ -23,9 +23,6 @@
+ void set_window_camera_values(
+ 	struct render_window *window,
+ 	struct observer_result const *observer);
+-
+-void main_game_render(
+-	double time_delta_since_tick_sec);
+ 
+ void game_connection_set(
+ 	short connection);
+@@ -171,6 +168,9 @@
+ void main_rasterizer_throttle(
+ 	void);
+ 
++void main_crash(
++	char const *reason);
++
+ void main_print_version(
+ 	void);
+ 

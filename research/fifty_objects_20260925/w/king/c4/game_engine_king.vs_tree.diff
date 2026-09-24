@@ -1,5 +1,5 @@
 diff --git a/source/game/game_engine_king.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\king\\c4\\game_engine_king.c"
-index df345537..5c6418d5 100644
+index 526c8e02..5c6418d5 100644
 --- a/source/game/game_engine_king.c
 +++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\king\\c4\\game_engine_king.c"
 @@ -145,6 +145,33 @@ enum
@@ -180,6 +180,15 @@ index df345537..5c6418d5 100644
  	long player_index)
  {
  	struct player_datum *player = player_get(player_index);
+@@ -512,7 +539,7 @@ void king_engine_player_update(
+ 
+ 				king_globals.score[player->team_index]++;
+ 				king_globals.score_tick[player->team_index] = game_time_get();
+-				score_to_win = game_engine_get_variant()->universal_variant.score_to_win*TICKS_PER_MINUTE;
++				score_to_win = game_engine_get_variant()->unknown40*TICKS_PER_MINUTE;
+ 				score = king_globals.score[player->team_index];
+ 				if (score_to_win - score == HILL_30_SECOND_WARNING)
+ 				{
 @@ -558,7 +585,7 @@ void king_engine_player_update(
  	return;
  }
@@ -216,7 +225,7 @@ index df345537..5c6418d5 100644
  	long player_index,
  	long goal_index)
  {
-@@ -809,7 +836,7 @@ boolean king_engine_goal_matches_player(
+@@ -809,11 +836,11 @@ boolean king_engine_goal_matches_player(
  	return matches;
  }
  
@@ -225,3 +234,8 @@ index df345537..5c6418d5 100644
  	void)
  {
  	if (game_engine_can_score() &&
+-		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
++		game_engine_get_variant()->unknown4C.byte0 &&
+ 		--king_globals.hill_timer == 0)
+ 	{
+ 		king_globals.hill_timer = HILL_MOVE_TIME;

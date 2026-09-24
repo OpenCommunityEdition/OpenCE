@@ -1,0 +1,626 @@
+diff --git a/source/main/main.c b/source/main/main.c
+--- a/source/main/main.c
++++ b/source/main/main.c
+@@ -363,6 +363,7 @@
+ #include "bitmaps/bitmaps_internal.h"
+ #include "bitmaps/tiff_file.h"
+ #include "interface/hud.h"
++#include "interface/attract_mode.h"
+ #include "interface/interface.h"
+ #include "interface/terminal.h"
+ #include "saved games/player_profile.h"
+@@ -666,29 +667,26 @@
+ 
+ /* ---------- prototypes */
+ 
+-long sort_controllers_ascending(
++static long sort_controllers_ascending(
+ 	short const *a,
+ 	short const *b);
+-extern void main_setup_connection(
++static void main_setup_connection(
+ 	void);
+-extern void main_initialize_time(void);
+-extern void main_skip_private(void);
+-extern void main_update_time(
++static void main_initialize_time(
++	void);
++static void main_skip_private(
++	void);
++static void main_update_time(
+ 	void);
+ static void main_frame_rate_debug(
+ 	void);
+ 
+-extern void main_new_map(
++static void main_new_map(
+ 	struct game_options *options);
+ extern void scripted_camera_set(
+ 	word camera_point_index0,
+ 	word camera_point_index1,
+ 	long transition_time);
+-extern struct bitmap_data *bitmap_2d_new(
+-	short width,
+-	short height,
+-	short mipmap_count,
+-	short format);
+ extern struct main_hud_globals_definition *hud_globals;
+ 
+ /* ---------- globals */
+@@ -760,7 +758,7 @@
+ 	return result;
+ }
+ 
+-void create_local_players(
++static void create_local_players(
+ 	void)
+ {
+ 	short used_controllers[MAXIMUM_GAMEPADS];
+@@ -1061,7 +1059,7 @@
+ 	return;
+ }
+ 
+-void main_queue_map_private(
++static void main_queue_map_private(
+ 	void)
+ {
+ 	real progress;
+@@ -1421,7 +1419,7 @@
+ 	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
+ }
+ 
+-void main_new_map(
++static void main_new_map(
+ 	struct game_options *options)
+ {
+ 	input_flush();
+@@ -1465,7 +1463,7 @@
+ 	return;
+ }
+ 
+-void main_change_map_name(
++static void main_change_map_name(
+ 	void)
+ {
+ 	if (main_globals.main_menu_scenario_loaded == TRUE)
+@@ -1551,7 +1549,7 @@
+ 	return;
+ }
+ 
+-long sort_controllers_ascending(
++static long sort_controllers_ascending(
+ 	short const *a,
+ 	short const *b)
+ {
+@@ -1778,9 +1776,6 @@
+ 
+ 	return;
+ }
+-
+-extern void game_end_credits_start(
+-	void);
+ 
+ void main_roll_credits(
+ 	void)
+@@ -1829,7 +1824,7 @@
+ 	return;
+ }
+ 
+-void main_revert_map_private(
++static void main_revert_map_private(
+ 	void)
+ {
+ 	game_state_revert();
+@@ -1838,7 +1833,7 @@
+ 	return;
+ }
+ 
+-void main_skip_cinematic_private(
++static void main_skip_cinematic_private(
+ 	void)
+ {
+ 	if (cinematic_can_be_skipped())
+@@ -1851,7 +1846,7 @@
+ 	return;
+ }
+ 
+-void main_skip_private(
++static void main_skip_private(
+ 	void)
+ {
+ 	if (main_globals.skip_ticks && cinematic_in_progress())
+@@ -1876,7 +1871,7 @@
+ 	return;
+ }
+ 
+-void main_saving_map_private(
++static void main_saving_map_private(
+ 	void)
+ {
+ 	game_state_save();
+@@ -1885,7 +1880,7 @@
+ 	return;
+ }
+ 
+-void main_save_map_private(
++static void main_save_map_private(
+ 	void)
+ {
+ 	if (!game_time_get_paused())
+@@ -1935,7 +1930,7 @@
+ 	return;
+ }
+ 
+-void main_switch_to_structure_bsp_private(
++static void main_switch_to_structure_bsp_private(
+ 	void)
+ {
+ 	scenario_switch_structure_bsp(main_globals.switch_to_structure_bsp_index);
+@@ -1944,7 +1939,7 @@
+ 	return;
+ }
+ 
+-void main_lost_map_private(
++static void main_lost_map_private(
+ 	void)
+ {
+ 	if (!game_time_get_paused())
+@@ -1959,7 +1954,7 @@
+ 	return;
+ }
+ 
+-void main_respawn_private(
++static void main_respawn_private(
+ 	void)
+ {
+ 	if (!game_time_get_paused() && !cinematic_in_progress())
+@@ -1973,7 +1968,7 @@
+ 	return;
+ }
+ 
+-void main_load_core_private(
++static void main_load_core_private(
+ 	void)
+ {
+ 	game_state_load_core(main_globals.core_name);
+@@ -1981,7 +1976,7 @@
+ 	return;
+ }
+ 
+-void main_save_core_private(
++static void main_save_core_private(
+ 	void)
+ {
+ 	game_state_save_core(main_globals.core_name);
+@@ -1989,7 +1984,7 @@
+ 	return;
+ }
+ 
+-void main_run_demos_private(
++static void main_run_demos_private(
+ 	void)
+ {
+ 	main_globals.run_xdemos = FALSE;
+@@ -2037,8 +2032,8 @@
+ 			sample_index,
+ 			main_globals.seconds_elapsed > 1.08/TICKS_PER_SECOND);
+ 
+-		sample_index = (char)(
+-			(sample_index + 1) % (long)NUMBEROF(global_screenshot_count.framerate_samples));
++		sample_index++;
++		sample_index = (char)(sample_index % (long)NUMBEROF(global_screenshot_count.framerate_samples));
+ 		global_screenshot_count.framerate_sample_index = sample_index;
+ 		global_screenshot_count.framerate_reset = TRUE;
+ 
+@@ -2107,7 +2102,7 @@
+ 	return;
+ }
+ 
+-void main_won_map_private(
++static void main_won_map_private(
+ 	void)
+ {
+ 	short level;
+@@ -2135,7 +2130,7 @@
+ 	return;
+ }
+ 
+-void main_exit(
++static void main_exit(
+ 	void)
+ {
+ 	switch (main_globals.connection)
+@@ -2160,7 +2155,7 @@
+ 	return;
+ }
+ 
+-void main_reset_time(
++static void main_reset_time(
+ 	void)
+ {
+ 	main_globals.frame_start_milliseconds = system_milliseconds();
+@@ -2168,13 +2163,13 @@
+ 	return;
+ }
+ 
+-boolean main_framerate_throttle_enabled(
++static boolean main_framerate_throttle_enabled(
+ 	void)
+ {
+ 	return rasterizer_globals.framerate_throttle;
+ }
+ 
+-void main_update_time(
++static void main_update_time(
+ 	void)
+ {
+ 	unsigned long end_milliseconds;
+@@ -2185,25 +2180,24 @@
+ 	short slot;
+ 	boolean framerate_throttle;
+ 	__int64 target_index;
+-	__int64 short_target_index;
++	__int64 minimum_target_index;
++	short short_target_index;
+ 	real seconds_elapsed;
+ 
+ 	end_milliseconds = system_milliseconds();
+-	target_index = MAX(
++	minimum_target_index = MAX(
+ 		main_globals.rasterizer_target_index,
+ 		main_globals.rasterizer_throttle_end_index);
+-	framerate_throttle = rasterizer_globals.framerate_throttle;
++	target_index = minimum_target_index;
++	framerate_throttle = main_framerate_throttle_enabled();
+ 
+ 	if (framerate_throttle)
+ 	{
+ 		csstrcpy(main_globals.vblank_debug_string, "");
+ 		if (global_frame_rate_throttle && rasterizer_globals.framerate_throttle_target >= 0)
+ 		{
+-			requested_rate = rasterizer_globals.framerate_throttle_target;
+-			if (requested_rate == 0)
+-				requested_rate = 30;
+-
+-			selected_interval = (short)(60 / requested_rate);
++			selected_interval = (short)(
++				60 / (rasterizer_globals.framerate_throttle_target ? rasterizer_globals.framerate_throttle_target : 30));
+ 			main_globals.vblank_interval_requested = selected_interval;
+ 
+ 			if (rasterizer_globals.framerate_throttle_debug)
+@@ -2212,8 +2206,6 @@
+ 				short current_interval;
+ 
+ 				elapsed_game_ticks = game_time_get_elapsed();
+-				short_target_index = (short)target_index;
+-				best_interval = 5;
+ 
+ 				_snprintf(
+ 					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+@@ -2226,6 +2218,8 @@
+ 					elapsed_game_ticks,
+ 					main_globals.vblank_interval_current);
+ 
++				best_interval = 5;
++				short_target_index = (short)minimum_target_index;
+ 				for (slot = 5; slot > 0; slot--)
+ 				{
+ 					short displayed_failure_count;
+@@ -2236,10 +2230,10 @@
+ 					__int64 last_failure_index;
+ 					__int64 target_age_raw;
+ 
++					ignore_failure = FALSE;
+ 					displayed_failure_count = main_globals.vblank_failure_counts[slot];
+-					if (displayed_failure_count > 99)
++					if (displayed_failure_count >= 99)
+ 						displayed_failure_count = 99;
+-					ignore_failure = FALSE;
+ 
+ 					last_failure_index = main_globals.vblank_last_failure_indices[slot];
+ 					target_age_raw = short_target_index - last_failure_index;
+@@ -2251,42 +2245,46 @@
+ 					slot_bucket = (short)((slot + 1) / 2);
+ 					current_interval = main_globals.vblank_interval_current;
+ 					if ((short)((current_interval + 1) / 2) > slot_bucket &&
+-						slot_bucket >= (short)(current_interval / 2) &&
++						(short)(current_interval / 2) <= slot_bucket &&
+ 						elapsed_game_ticks > slot_bucket)
+ 					{
+ 						ignore_failure = TRUE;
+ 					}
+ 
+-					if (main_globals.rasterizer_throttle_start_index >=
++					if (main_globals.rasterizer_throttle_start_index >
+ 						main_globals.rasterizer_initial_index + slot)
+ 					{
+-						if (ignore_failure)
+-						{
+-							label = "ignor";
+-						}
+-						else
++						if (!ignore_failure)
+ 						{
+ 							long failure_count;
+ 
+ 							failure_count = main_globals.vblank_failure_counts[slot];
+ 							main_globals.vblank_failure_counts[slot] =
+ 								(short)(failure_count + 1);
+-							main_globals.vblank_last_failure_indices[slot] = target_index;
+-							label = "fail ";
++							main_globals.vblank_last_failure_indices[slot] = minimum_target_index;
+ 						}
+ 
+ 						_snprintf(
+ 							main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+ 							sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+ 							"(%s%2d) ",
+-							label,
++							ignore_failure ? "ignor" : "fail ",
+ 							displayed_failure_count);
+ 					}
+ 					else
+ 					{
+-						if (target_index < last_failure_index + 15)
++						if (minimum_target_index >= last_failure_index + 15)
+ 						{
+-							label = main_globals.vblank_failure_counts[slot] < 4 ? "wt" : "dn";
++							main_globals.vblank_failure_counts[slot] = 0;
++							_snprintf(
++								main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
++								sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
++								"(ok   %2d) ",
++								target_age);
++						}
++						else
++						{
++							label = main_globals.vblank_failure_counts[slot] >= 4 ? "dn" : "wt";
+ 							_snprintf(
+ 								main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+ 								sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+@@ -2295,18 +2293,9 @@
+ 								displayed_failure_count,
+ 								target_age);
+ 						}
+-						else
+-						{
+-							main_globals.vblank_failure_counts[slot] = 0;
+-							_snprintf(
+-								main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+-								sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+-								"(ok   %2d) ",
+-								target_age);
+-						}
+ 					}
+ 
+-					if (main_globals.vblank_interval_requested <= slot &&
++					if (slot >= main_globals.vblank_interval_requested &&
+ 						main_globals.vblank_failure_counts[slot] < 4)
+ 					{
+ 						best_interval = slot;
+@@ -2318,27 +2307,42 @@
+ 				else
+ 					requested_rate = (short)(60 / best_interval);
+ 
+-				_snprintf(
+-					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+-					sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+-					main_globals.vblank_interval_current < best_interval
+-						? " FAILDOWN %d"
+-						: best_interval < main_globals.vblank_interval_current
+-							? " RESTORE  %d"
+-							: " MAINTAIN %d",
+-					requested_rate);
++				if (main_globals.vblank_interval_current < best_interval)
++				{
++					_snprintf(
++						main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
++						sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
++						" FAILDOWN %d",
++						requested_rate);
++				}
++				else if (best_interval < main_globals.vblank_interval_current)
++				{
++					_snprintf(
++						main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
++						sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
++						" RESTORE  %d",
++						requested_rate);
++				}
++				else
++				{
++					_snprintf(
++						main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
++						sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
++						" MAINTAIN %d",
++						requested_rate);
++				}
+ 
+ 				_snprintf(
+ 					main_globals.vblank_debug_string + csstrlen(main_globals.vblank_debug_string),
+ 					sizeof(main_globals.vblank_debug_string) - csstrlen(main_globals.vblank_debug_string),
+ 					" des %d targ%6I64d",
+-					requested_rate,
+-					target_index + best_interval);
++					best_interval,
++					minimum_target_index + best_interval);
+ 				selected_interval = best_interval;
+ 			}
+ 
++			main_globals.vblank_interval_current = selected_interval;
+ 			target_index += selected_interval;
+-			main_globals.vblank_interval_current = selected_interval;
+ 		}
+ 	}
+ 	else
+@@ -2360,7 +2364,7 @@
+ 	}
+ 
+ 	end_milliseconds = system_milliseconds();
+-	if (target_index < (__int64)rasterizer_globals.frame_and_vertical_blank_index)
++	if ((__int64)rasterizer_globals.frame_and_vertical_blank_index > target_index)
+ 		target_index = (__int64)rasterizer_globals.frame_and_vertical_blank_index;
+ 
+ 	if (framerate_throttle)
+@@ -2485,7 +2489,7 @@
+ 	return;
+ }
+ 
+-void main_setup_connection(
++static void main_setup_connection(
+ 	void)
+ {
+ 	struct game_options options;
+@@ -2524,7 +2528,7 @@
+ 	return;
+ }
+ 
+-void main_initialize_time(
++static void main_initialize_time(
+ 	void)
+ {
+ 	main_globals.frame_start_milliseconds = system_milliseconds();
+@@ -2988,7 +2992,6 @@
+ 	void)
+ {
+ 	boolean render_frame;
+-	real precache_progress;
+ 	long connection;
+ 
+ 	if (!game_in_editor())
+@@ -3014,19 +3017,12 @@
+ 		{
+ 			if (main_globals.switch_to_structure_bsp_index!=NONE)
+ 			{
+-				scenario_switch_structure_bsp(main_globals.switch_to_structure_bsp_index);
+-				main_globals.switch_to_structure_bsp_index = NONE;
+-				hud_load(FALSE);
++				main_switch_to_structure_bsp_private();
+ 			}
+ 
+ 			if (main_globals.lost_map)
+ 			{
+-				if (!game_time_get_paused() && main_globals.loss_timer++>90)
+-				{
+-					main_globals.lost_map = FALSE;
+-					main_globals.loss_timer = 0;
+-					game_state_revert();
+-				}
++				main_lost_map_private();
+ 			}
+ 
+ 			if (main_globals.won_map)
+@@ -3036,18 +3032,12 @@
+ 
+ 			if (main_globals.respawn)
+ 			{
+-				if (!game_time_get_paused() && !cinematic_in_progress() && main_globals.respawn_timer++>90 && players_respawn_coop())
+-				{
+-					main_globals.respawn = FALSE;
+-					main_globals.respawn_timer = 0;
+-				}
++				main_respawn_private();
+ 			}
+ 
+ 			if (main_globals.save_map_completed)
+ 			{
+-				game_state_save();
+-				hud_autosave(FALSE);
+-				main_globals.save_map_completed = FALSE;
++				main_saving_map_private();
+ 			}
+ 
+ 			if (main_globals.defer_map_change)
+@@ -3057,21 +3047,12 @@
+ 
+ 			if (main_globals.revert_map)
+ 			{
+-				game_state_revert();
+-				ui_widgets_disable_pause_game(30);
+-				main_globals.revert_map = FALSE;
++				main_revert_map_private();
+ 			}
+ 
+ 			if (main_globals.skip_cinematic)
+ 			{
+-				if (cinematic_can_be_skipped())
+-				{
+-					game_state_revert();
+-					ui_widgets_disable_pause_game(30);
+-					main_globals.revert_map = FALSE;
+-				}
+-
+-				main_globals.skip_cinematic = FALSE;
++				main_skip_cinematic_private();
+ 			}
+ 
+ 			if (main_globals.reset_map)
+@@ -3081,14 +3062,12 @@
+ 
+ 			if (main_globals.save_core)
+ 			{
+-				game_state_save_core(main_globals.core_name);
+-				main_globals.save_core = FALSE;
++				main_save_core_private();
+ 			}
+ 
+ 			if (main_globals.load_core)
+ 			{
+-				game_state_load_core(main_globals.core_name);
+-				main_globals.load_core = FALSE;
++				main_load_core_private();
+ 			}
+ 
+ 			if (main_globals.want_to_be_at_main_menu)
+@@ -3103,8 +3082,7 @@
+ 
+ 			if (main_globals.run_xdemos)
+ 			{
+-				main_globals.run_xdemos = FALSE;
+-				xbox_demos_launch();
++				main_run_demos_private();
+ 			}
+ 
+ 			if (main_globals.skip)
+@@ -3114,16 +3092,7 @@
+ 
+ 			if (main_globals.queue_map)
+ 			{
+-				if (cache_files_precache_in_progress() && cache_files_precache_map_status(&precache_progress)==1)
+-				{
+-					cache_files_precache_map_end();
+-				}
+-
+-				if (!cache_files_precache_in_progress())
+-				{
+-					cache_files_precache_map_begin(main_globals.queued_map_name, FALSE);
+-					main_globals.queue_map = FALSE;
+-				}
++				main_queue_map_private();
+ 			}
+ 		}
+ 		else if (main_globals.reset_map)
+@@ -3258,22 +3227,7 @@
+ 	}
+ 
+ 	error(_error_silent, "end of saved film");
+-
+-	switch (main_globals.connection)
+-	{
+-	case _game_connection_network_server:
+-		dispose_global_network_game_client();
+-		dispose_global_network_game_server();
+-		break;
+-	case _game_connection_network_client:
+-		dispose_global_network_game_client();
+-		break;
+-	}
+-
+-	game_dispose_from_old_map();
+-	game_dispose();
+-	debug_keys_dispose();
+-	console_dispose();
++	main_exit();
+ 
+ 	return;
+ }

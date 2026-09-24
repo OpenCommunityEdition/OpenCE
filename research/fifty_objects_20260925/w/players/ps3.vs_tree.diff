@@ -1,0 +1,15 @@
+diff --git a/source/game/players.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\players\\ps3.c"
+index d0428c6b..284bcd95 100644
+--- a/source/game/players.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\players\\ps3.c"
+@@ -427,9 +427,8 @@ static void player_teleport_on_bsp_switch(
+ 
+ /* ---------- globals */
+ 
+-struct players_globals *players_globals;
+-struct data_array *team_data;
+ struct data_array *player_data;
++extern struct data_array *team_data;
+ static long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
+ static boolean players_lost_map_started = FALSE;
+ static short over_shield_screen_flash_fade_function = 0;

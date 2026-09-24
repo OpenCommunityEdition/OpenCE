@@ -1,0 +1,61 @@
+diff --git a/source/rasterizer/rasterizer.c b/source/rasterizer/rasterizer.c
+index a3673dc3a89dfd54bd990daab0ab17a314fbbedd..42effca3073587906278fa6a4d9e7e276c549c4d 100644
+--- a/source/rasterizer/rasterizer.c
++++ b/source/rasterizer/rasterizer.c
+@@ -333,15 +333,6 @@ enum
+ 
+ /* ---------- structures */
+ 
+-struct rasterizer_window_parameters
+-{
+-	short rasterizer_target;
+-	short window_index;
+-	byte reserved04[4];
+-	real_point3d camera_position;
+-	real_vector3d camera_forward;
+-};
+-
+ struct rasterizer_model_vertex_compressed
+ {
+ 	real_point3d position;
+@@ -700,7 +691,6 @@ struct rasterizer_debug_options_definition rasterizer_debug_options =
+ 	FALSE, /* transparent_pixel_counter */
+ 	{ 0 }, /* pad8A[2] */
+ };
+-extern struct rasterizer_window_parameters global_window_parameters;
+ /* No PDB name survives for this target-owned BSS symbol. */
+ #pragma bss_seg(".bss")
+ long bss_004662ec;
+@@ -1828,12 +1818,12 @@ void rasterizer_models_begin(
+ 			740,
+ 			global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+ 		global_current_collision_users[global_current_collision_user_depth++] = 21;
+-		vector.i = global_window_parameters.camera_forward.i * 10000.f;
+-		vector.j = global_window_parameters.camera_forward.j * 10000.f;
+-		vector.k = global_window_parameters.camera_forward.k * 10000.f;
++		vector.i = global_window_parameters.camera.forward.i * 10000.f;
++		vector.j = global_window_parameters.camera.forward.j * 10000.f;
++		vector.k = global_window_parameters.camera.forward.k * 10000.f;
+ 		if (collision_test_vector(
+ 			0xFFF80,
+-			&global_window_parameters.camera_position,
++			&global_window_parameters.camera.position,
+ 			&vector,
+ 			render.local_player_index,
+ 			&collision))
+@@ -2037,13 +2027,13 @@ void rasterizer_debug_model_vertices(
+ 				debug_vertex->model_vertex_index_count = 1;
+ 
+ 				vector_from_points3d(
+-					&global_window_parameters.camera_position,
++					&global_window_parameters.camera.position,
+ 					&point,
+ 					&camera_to_vertex);
+ 				normalize3d(&camera_to_vertex);
+ 				camera_dot = dot_product3d(
+ 					&camera_to_vertex,
+-					&global_window_parameters.camera_forward);
++					&global_window_parameters.camera.forward);
+ 				if ((dot_product3d(&camera_to_vertex, &normal) < 0.f &&
+ 					closest_debug_vertex_dot < camera_dot) ||
+ 					closest_debug_vertex_dot == -1.f)

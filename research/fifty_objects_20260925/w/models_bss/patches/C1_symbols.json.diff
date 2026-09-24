@@ -1,0 +1,8 @@
+4771c4771
+< { "file_offset": 1128208, "flags": 32, "name": "_model_geometry_part_build_tangent_matrices" },
+---
+> { "file_offset": 1128208, "flags": 32, "name": "_model_geometry_part_build_tangent_matrices", "static": true },
+22672c22672
+< { "file_offset": 3187600, "flags": 0, "name": "_render_model_section" },
+---
+> { "file_offset": 3187600, "flags": 0, "name": "_render_model_section", "static": true },

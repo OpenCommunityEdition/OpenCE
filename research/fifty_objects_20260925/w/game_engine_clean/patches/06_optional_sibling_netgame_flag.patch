@@ -1,0 +1,123 @@
+diff --git a/source/game/game_engine_ctf.c b/source/game/game_engine_ctf.c
+index 28df215b..d5faf45f 100644
+--- a/source/game/game_engine_ctf.c
++++ b/source/game/game_engine_ctf.c
+@@ -129,6 +129,7 @@ symbols in this file:
+ #include "objects/objects.h"
+ #include "scenario/scenario.h"
+ #include "scenario/scenario_definitions.h"
++#include "scenario/scenario_netgame_definitions.h"
+ #include "tag_files/tag_groups.h"
+ #include "text/text_group.h"
+ #include "text/unicode.h"
+@@ -209,18 +210,6 @@ enum
+ 
+ /* ---------- structures */
+ 
+-struct scenario_netgame_flag
+-{
+-	real_point3d position;
+-	real facing;
+-	short type;
+-	short team_index;
+-	byte unused[0x80];
+-};
+-
+-typedef char verify_scenario_netgame_flag_size[
+-	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+-
+ struct ctf_globals
+ {
+ 	struct scenario_netgame_flag *flags[NUMBER_OF_CTF_TEAMS];
+diff --git a/source/game/game_engine_king.c b/source/game/game_engine_king.c
+index df345537..eec5e0a0 100644
+--- a/source/game/game_engine_king.c
++++ b/source/game/game_engine_king.c
+@@ -94,6 +94,7 @@ symbols in this file:
+ #include "render/render.h"
+ #include "scenario/scenario.h"
+ #include "scenario/scenario_definitions.h"
++#include "scenario/scenario_netgame_definitions.h"
+ #include "shaders/shader_definitions.h"
+ #include "shaders/shaders.h"
+ #include "tag_files/tag_groups.h"
+@@ -206,17 +207,6 @@ typedef char verify_rasterizer_model_begin_parameters_size[
+ 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
+ 
+ /* January scenario flag layout consumed by the King map scan. */
+-struct scenario_netgame_flag
+-{
+-	real_point3d position;
+-	real facing;
+-	short type;
+-	short team_index;
+-	byte unused[0x80];
+-};
+-
+-typedef char verify_scenario_netgame_flag_size[
+-	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+ typedef char verify_scenario_netgame_flags_offset[
+ 	offsetof(struct scenario, netgame_flags) == 0x378 ? 1 : -1];
+ 
+diff --git a/source/game/game_engine_oddball.c b/source/game/game_engine_oddball.c
+index a567f524..57fe087a 100644
+--- a/source/game/game_engine_oddball.c
++++ b/source/game/game_engine_oddball.c
+@@ -114,6 +114,7 @@ symbols in this file:
+ #include "players.h"
+ #include "scenario/scenario.h"
+ #include "scenario/scenario_definitions.h"
++#include "scenario/scenario_netgame_definitions.h"
+ #include "tag_files/tag_groups.h"
+ #include "text/text_group.h"
+ #include "text/unicode.h"
+@@ -239,18 +240,6 @@ typedef char verify_oddball_globals_ball_spawn_timer_offset[
+ typedef char verify_oddball_globals_current_ball_owner_offset[
+ 	offsetof(struct oddball_globals, current_ball_owner) == 0xC4 ? 1 : -1];
+ 
+-struct scenario_netgame_flag
+-{
+-	real_point3d position;
+-	real facing;
+-	short type;
+-	short team_index;
+-	byte unused[0x80];
+-};
+-
+-typedef char verify_scenario_netgame_flag_size[
+-	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+-
+ /* ---------- prototypes */
+ 
+ /* ---------- globals */
+diff --git a/source/game/game_engine_race.c b/source/game/game_engine_race.c
+index 0de4df0f..2e076851 100644
+--- a/source/game/game_engine_race.c
++++ b/source/game/game_engine_race.c
+@@ -111,6 +111,7 @@ symbols in this file:
+ #include "objects/objects.h"
+ #include "scenario/scenario.h"
+ #include "scenario/scenario_definitions.h"
++#include "scenario/scenario_netgame_definitions.h"
+ #include "tag_files/tag_groups.h"
+ #include "text/text_group.h"
+ #include "text/unicode.h"
+@@ -206,18 +207,6 @@ enum multiplayer_game_text
+ 
+ /* ---------- structures */
+ 
+-struct scenario_netgame_flag
+-{
+-	real_point3d position;
+-	real facing;
+-	short type;
+-	short team_index;
+-	byte unused[0x80];
+-};
+-
+-typedef char verify_scenario_netgame_flag_size[
+-	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+-
+ struct race_globals
+ {
+ 	unsigned long lap_completed_value;

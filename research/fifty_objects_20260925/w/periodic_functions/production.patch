@@ -1,0 +1,77 @@
+diff --git a/source/math/periodic_functions.c b/source/math/periodic_functions.c
+index d3cf194..66aa1d4 100644
+--- a/source/math/periodic_functions.c
++++ b/source/math/periodic_functions.c
+@@ -134,7 +134,7 @@ enum
+ 
+ /* ---------- prototypes */
+ 
+-static void __fastcall periodic_function_build_variable_period_x_table(real *values);
++static void __fastcall periodic_function_build_variable_period_x_table(real *x_table);
+ static void transition_function_build_table(short function_type, byte *table);
+ static void periodic_function_build_table(short function_type, byte *table);
+ 
+@@ -308,45 +308,22 @@ real transition_function_evaluate(
+ /* ---------- private code */
+ 
+ static void __fastcall periodic_function_build_variable_period_x_table(
+-	real *values)
++	real *x_table)
+ {
+-	long index;
+-	long count;
+ 	real sum = 0.0f;
+-	real x;
+-	real value;
+-	real amplitude0;
+-	real amplitude1;
+-	real amplitude2;
+-	real cosine0;
+-	real cosine1;
+-	real cosine2;
+-	real *destination;
++	short index;
+ 
+-	index = 0;
+-	destination = values;
+-	for (count = PERIODIC_FUNCTION_TABLE_SIZE; count; count--)
++	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+ 	{
+-		*destination = sum;
+-		amplitude0 = real_seed_random(get_global_random_seed_address());
+-		amplitude1 = real_seed_random(get_global_random_seed_address());
+-		amplitude2 = real_seed_random(get_global_random_seed_address());
+-		x = (real)index;
+-		value = (real_seed_random(get_global_random_seed_address())+1.0f)*0.25f;
+-		cosine0 = (real)cos(x*0.044792242f);
+-		value = (cosine0+1.0f)*amplitude2 + value;
+-		cosine1 = (real)cos(x*0.03129321f);
+-		value = (cosine1+1.0f)*amplitude1 + value;
+-		cosine2 = (real)cos(x*0.025157286f);
+-		value = (cosine2+1.0f)*amplitude0 + value;
+-		sum += value;
+-		destination++;
+-		index++;
++		x_table[index] = sum;
++		sum += (real_random()+1.0f)*0.25f +
++			((real)cos(8.2f*_pi*index/PERIODIC_FUNCTION_TABLE_SIZE)+1.0f)*real_random() +
++			((real)cos(10.2f*_pi*index/PERIODIC_FUNCTION_TABLE_SIZE)+1.0f)*real_random() +
++			((real)cos(14.6f*_pi*index/PERIODIC_FUNCTION_TABLE_SIZE)+1.0f)*real_random();
+ 	}
+ 
+-	destination = values;
+ 	for (index = 0; index < PERIODIC_FUNCTION_TABLE_SIZE; index++)
+-		*destination++ *= 1.0f/sum;
++		x_table[index] = x_table[index]/sum;
+ 
+ 	return;
+ }
+@@ -456,7 +433,7 @@ static void periodic_function_build_table(
+ 				result = 1.0f-(result-0.5f)*2.0f;
+ 			break;
+ 		case _periodic_function_noise:
+-			result = real_seed_random(get_global_random_seed_address());
++			result = real_random();
+ 			break;
+ 		case _periodic_function_jitter:
+ 		case _periodic_function_wander:

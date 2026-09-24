@@ -1,0 +1,24 @@
+diff --git a/source/game/players.c b/source/game/players.c
+index 281b3ae5..284bcd95 100644
+--- a/source/game/players.c
++++ b/source/game/players.c
+@@ -429,7 +429,7 @@ static void player_teleport_on_bsp_switch(
+ 
+ struct data_array *player_data;
+ extern struct data_array *team_data;
+-long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
++static long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
+ static boolean players_lost_map_started = FALSE;
+ static short over_shield_screen_flash_fade_function = 0;
+ static real over_shield_screen_flash_alpha = 0.f;
+@@ -437,9 +437,8 @@ static real over_shield_screen_flash_green = 0.f;
+ static short active_camo_screen_flash_fade_function = 0;
+ static real active_camo_screen_flash_alpha = 0.f;
+ static real active_camo_screen_flash_blue = 0.f;
+-extern short player_spawn_count;
+ boolean debug_render_player_teleport = FALSE;
+-struct players_static_data players_static_data =
++static struct players_static_data players_static_data =
+ {
+ 	{ "players_update_before_game", NONE, TRUE },
+ 	{ "players_update_after_game", NONE, TRUE },

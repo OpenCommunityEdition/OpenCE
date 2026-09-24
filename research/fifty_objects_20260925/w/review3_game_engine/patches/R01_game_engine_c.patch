@@ -1,0 +1,1657 @@
+diff --git a/source/game/game_engine.c b/source/game/game_engine.c
+index 12139353..2fe4936d 100644
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -11,9 +11,9 @@ symbols in this file:
+ 00096830 0020:
+ 	_game_engine_dispose (0000)
+ 00096850 0040:
+-	_code_00096850 (0000)
++	_initialize_player_multiplayer_data (0000)
+ 00096890 0120:
+-	_code_00096890 (0000)
++	_game_engine_build_lighting (0000)
+ 000969B0 0020:
+ 	_game_engine_dispose_from_old_map (0000)
+ 000969D0 0020:
+@@ -33,31 +33,31 @@ symbols in this file:
+ 00096AE0 0050:
+ 	_sort_statistic_buffer_ranking (0000)
+ 00096B30 0010:
+-	_code_00096b30 (0000)
++	_is_place_tied (0000)
+ 00096B40 0010:
+-	_code_00096b40 (0000)
++	_place_get_position (0000)
+ 00096B50 0050:
+-	_code_00096b50 (0000)
++	_get_place_string (0000)
+ 00096BA0 0070:
+-	_code_00096ba0 (0000)
++	_drawline (0000)
+ 00096C10 0020:
+-	_code_00096c10 (0000)
++	_get_selected_color (0000)
+ 00096C30 0050:
+ 	_get_postgame_hilite_colors (0000)
+ 00096C80 0060:
+-	_code_00096c80 (0000)
++	_find_closest_player_callback (0000)
+ 00096CE0 0020:
+ 	_game_engine_post_rasterize_objects (0000)
+ 00096D00 0030:
+-	_code_00096d00 (0000)
++	_can_delete_item (0000)
+ 00096D30 0100:
+-	_code_00096d30 (0000)
++	_game_engine_update_purge (0000)
+ 00096E30 00a0:
+-	_code_00096e30 (0000)
++	_update_weapon_inventory (0000)
+ 00096ED0 0150:
+-	_code_00096ed0 (0000)
++	_game_engine_update_weapons (0000)
+ 00097020 00b0:
+-	_code_00097020 (0000)
++	_item_collection_get_total (0000)
+ 000970D0 0050:
+ 	_game_engine_load_stage (0000)
+ 00097120 0030:
+@@ -71,7 +71,7 @@ symbols in this file:
+ 00097200 0050:
+ 	_game_engine_player_damaged_player (0000)
+ 00097250 00a0:
+-	_code_00097250 (0000)
++	_game_engine_player_is_odd_man_out (0000)
+ 000972F0 0040:
+ 	_game_engine_player_is_out_of_lives (0000)
+ 00097330 0100:
+@@ -89,15 +89,15 @@ symbols in this file:
+ 00097530 0030:
+ 	_get_blink_alpha (0000)
+ 00097560 0010:
+-	_code_00097560 (0000)
++	_game_engine_press_start_to_begin (0000)
+ 00097570 00f0:
+-	_code_00097570 (0000)
++	_nearby_vehicle (0000)
+ 00097660 0100:
+ 	_game_engine_rasterize_message (0000)
+ 00097760 00e0:
+ 	_game_engine_picking_up (0000)
+ 00097840 0080:
+-	_code_00097840 (0000)
++	_goal_matches_player (0000)
+ 000978C0 00a0:
+ 	_game_engine_player_get_custom_motion_sensor_positions (0000)
+ 00097960 0030:
+@@ -119,7 +119,7 @@ symbols in this file:
+ 00097B30 00d0:
+ 	_game_engine_render_nav_points (0000)
+ 00097C00 0020:
+-	_code_00097c00 (0000)
++	_game_engine_infinite_grenades_internal (0000)
+ 00097C20 0030:
+ 	_game_engine_infinite_grenades (0000)
+ 00097C50 0020:
+@@ -227,7 +227,7 @@ symbols in this file:
+ 00099770 0110:
+ 	_game_engine_weapon_fired (0000)
+ 00099880 0030:
+-	_code_00099880 (0000)
++	_test_any_gamepad_button (0000)
+ 000998B0 00c0:
+ 	_ticks_to_unicode_time_string (0000)
+ 00099970 0060:
+@@ -237,7 +237,7 @@ symbols in this file:
+ 00099B80 0010:
+ 	_game_engine_allow_pause (0000)
+ 00099B90 0270:
+-	_code_00099b90 (0000)
++	_game_engine_predict_resources (0000)
+ 00099E00 0020:
+ 	_game_engine_draw_object_in_motion_sensor (0000)
+ 00099E20 0020:
+@@ -255,41 +255,41 @@ symbols in this file:
+ 0009A0E0 0020:
+ 	_game_engine_should_end_game (0000)
+ 0009A100 0080:
+-	_code_0009a100 (0000)
++	_adjust_score_for_ranking (0000)
+ 0009A180 0230:
+ 	_populate_statistic_buffer (0000)
+ 0009A3B0 0080:
+-	_code_0009a3b0 (0000)
++	_game_engine_get_player_place (0000)
+ 0009A430 0060:
+ 	_postgame_statistic_get_rating (0000)
+ 0009A490 01f0:
+-	_code_0009a490 (0000)
++	_select_players_to_display (0000)
+ 0009A680 01c0:
+-	_code_0009a680 (0000)
++	_find_closest_player_index (0000)
+ 0009A840 0100:
+-	_code_0009a840 (0000)
++	_internal_rasterize_target_name (0000)
+ 0009A940 0920:
+-	_code_0009a940 (0000)
++	_internal_rasterize_score (0000)
+ 0009B260 0080:
+-	_code_0009b260 (0000)
++	_random_item (0000)
+ 0009B2E0 0020:
+-	_code_0009b2e0 (0000)
++	_game_engine_get_type (0000)
+ 0009B300 00a0:
+ 	_match_game_type (0000)
+ 0009B3A0 0150:
+-	_code_0009b3a0 (0000)
++	_game_engine_update_item_spawn (0000)
+ 0009B4F0 0070:
+-	_code_0009b4f0 (0000)
++	_game_engine_update_player_no_shield (0000)
+ 0009B560 0060:
+ 	_game_engine_update_player_always_invis (0000)
+ 0009B5C0 00e0:
+ 	_game_engine_update_non_deterministic (0000)
+ 0009B6A0 0040:
+-	_code_0009b6a0 (0000)
++	_multiplayer_message_internal (0000)
+ 0009B6E0 0090:
+-	_code_0009b6e0 (0000)
++	_multiplayer_message (0000)
+ 0009B770 0010:
+-	_code_0009b770 (0000)
++	_game_show_score_one_player (0000)
+ 0009B780 0060:
+ 	_game_show_score_team (0000)
+ 0009B7E0 00d0:
+@@ -303,7 +303,7 @@ symbols in this file:
+ 0009BA60 0040:
+ 	_find_netgame_flag (0000)
+ 0009BAA0 0130:
+-	_code_0009baa0 (0000)
++	_handle_custom_starting_equipment (0000)
+ 0009BBD0 0150:
+ 	_game_engine_postspawn_player_update (0000)
+ 0009BD20 00d0:
+@@ -313,9 +313,9 @@ symbols in this file:
+ 0009C1D0 0170:
+ 	_game_engine_get_distance_rating_for_spawn (0000)
+ 0009C340 0120:
+-	_code_0009c340 (0000)
++	_game_engine_get_friendly_bonus (0000)
+ 0009C460 00b0:
+-	_code_0009c460 (0000)
++	_default_starting_location_rate_function (0000)
+ 0009C510 0060:
+ 	_game_engine_get_starting_location_rating (0000)
+ 0009C570 0220:
+@@ -331,7 +331,7 @@ symbols in this file:
+ 0009CB30 0030:
+ 	_game_engine_did_player_win (0000)
+ 0009CB60 0080:
+-	_code_0009cb60 (0000)
++	_game_engine_did_team_win (0000)
+ 0009CBE0 0040:
+ 	_netgame_flag_verify_team_exists (0000)
+ 0009CC20 0060:
+@@ -347,7 +347,7 @@ symbols in this file:
+ 0009D000 0140:
+ 	_game_engine_player_added (0000)
+ 0009D140 0480:
+-	_code_0009d140 (0000)
++	_game_engine_generate_title_string (0000)
+ 0009D5C0 09e0:
+ 	_game_engine_post_rasterize_post_game (0000)
+ 0009DFA0 02f0:
+@@ -357,9 +357,9 @@ symbols in this file:
+ 0009E5D0 00a0:
+ 	_game_engine_nonplayer_post_rasterize (0000)
+ 0009E670 0350:
+-	_code_0009e670 (0000)
++	_game_engine_rasterize_in_game_score (0000)
+ 0009E9C0 0140:
+-	_code_0009e9c0 (0000)
++	_game_engine_post_rasterize_in_game (0000)
+ 0009EB00 0060:
+ 	_game_engine_post_rasterize (0000)
+ 0025B190 0008:
+@@ -541,19 +541,28 @@ symbols in this file:
+ #include "errors.h"
+ #include "aim_assist.h"
+ #include "game_engine.h"
++#include "game_engine_list.h"
+ #include "game_engine_place.h"
+ #include "game_engine_runtime.h"
+ 
+ #include "bitmaps/bitmap_group.h"
++#include "bitmaps/bitmap_group_lookup.h"
++#include "effects/player_effects.h"
++#include "game_allegiance.h"
+ #include "game_globals.h"
+ #include "interface/interface.h"
++#include "interface/hud_globals_definitions.h"
+ #include "interface/hud_messaging.h"
++#include "interface/hud_nav_points.h"
++#include "interface/player_ui.h"
+ #include "interface/terminal.h"
+ #include "interface/ui_widget.h"
+ #include "input/input.h"
+ #include "items/equipment_definitions.h"
++#include "items/item_collection_definitions.h"
+ #include "items/weapon_definitions.h"
+ #include "items/weapons.h"
++#include "main/console.h"
+ #include "main/main.h"
+ #include "math/integer_math.h"
+ #include "networking/network_game_globals.h"
+@@ -564,10 +573,15 @@ symbols in this file:
+ #include "player_control.h"
+ #include "player_rumble.h"
+ #include "players.h"
++#include "players_runtime.h"
++#include "rasterizer/rasterizer.h"
++#include "rasterizer/rasterizer_debug_options.h"
+ #include "render/render.h"
+ #include "saved games/player_profile.h"
+ #include "scenario/scenario.h"
+ #include "scenario/scenario_definitions.h"
++#include "scenario/scenario_netgame_definitions.h"
++#include "sound/sound_classes.h"
+ #include "text/draw_string.h"
+ #include "text/font_group.h"
+ #include "text/text_group.h"
+@@ -584,13 +598,6 @@ enum
+ 
+ /* ---------- macros */
+ 
+-#define game_engine_postgame_hud_definition_get(index) \
+-	((struct game_engine_postgame_hud_definition *)tag_get('hudg', (index)))
+-#define item_collection_definition_get(index) \
+-	((struct item_collection_definition *)tag_get( \
+-		ITEM_COLLECTION_DEFINITION_TAG, \
+-		(index)))
+-
+ /* ---------- structures */
+ 
+ struct game_engine_goal
+@@ -622,23 +629,15 @@ struct game_engine_stage
+ 	struct game_variant variant;
+ };
+ 
+-struct postgame_statistic_entry
+-{
+-	long values[7];
+-};
+-
+-struct rasterizer_debug_options
+-{
+-	byte unused0[0x32];
+-	short postgame_player_list_debug;
+-};
+-
+-struct game_engine_hud_globals
++struct statistic_buffer
+ {
+-	byte unused00[0x54];
+-	long no_local_player_message_font_index;
+-	byte unused58[0xC];
+-	long local_player_message_font_index;
++	long player_index;
++	long score;
++	long custom;
++	long kills;
++	long deaths;
++	long assists;
++	long place;
+ };
+ 
+ union game_engine_update_iterator
+@@ -647,26 +646,8 @@ union game_engine_update_iterator
+ 	struct object_iterator object;
+ };
+ 
+-struct game_engine_postgame_hud_definition
+-{
+-	byte unused00[0x3D4];
+-	long bitmap_group_index;
+-};
+-
+-typedef char verify_postgame_statistic_entry_size[
+-	sizeof(struct postgame_statistic_entry) == 0x1C ? 1 : -1];
+-typedef char verify_game_engine_hud_globals_no_local_player_message_font_index_offset[
+-	offsetof(
+-		struct game_engine_hud_globals,
+-		no_local_player_message_font_index) == 0x54 ? 1 : -1];
+-typedef char verify_game_engine_hud_globals_local_player_message_font_index_offset[
+-	offsetof(
+-		struct game_engine_hud_globals,
+-		local_player_message_font_index) == 0x64 ? 1 : -1];
+-typedef char verify_game_engine_postgame_hud_definition_bitmap_group_index_offset[
+-	offsetof(
+-		struct game_engine_postgame_hud_definition,
+-		bitmap_group_index) == 0x3D4 ? 1 : -1];
++typedef char verify_statistic_buffer_size[
++	sizeof(struct statistic_buffer) == 0x1C ? 1 : -1];
+ typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
+ typedef char verify_game_engine_globals_postgame_timer_offset[
+ 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
+@@ -684,81 +665,9 @@ typedef char verify_game_engine_stage_variant_offset[
+ 	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
+ typedef char verify_game_engine_stage_size[
+ 	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
+-struct scenario_netgame_flag
+-{
+-	real_point3d position;
+-	real facing;
+-	short type;
+-	short team_index;
+-	byte unused[0x80];
+-};
+-
+-typedef char verify_scenario_netgame_flag_size[
+-	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
+-
+-struct scenario_netgame_equipment
+-{
+-	unsigned long flags;
+-	short game_types[4];
+-	byte unusedC[2];
+-	short respawn_time;
+-	byte unused10[0x30];
+-	real_point3d position;
+-	byte unused4C[0x10];
+-	long item_collection_index;
+-	byte unused60[0x30];
+-};
+-
+-typedef char verify_scenario_netgame_equipment_size[
+-	sizeof(struct scenario_netgame_equipment) == 0x90 ? 1 : -1];
+-
+-struct scenario_starting_equipment
+-{
+-	unsigned long flags;
+-	short game_types[4];
+-	byte unusedC[0x3C];
+-	struct
+-	{
+-		long item_collection_index;
+-		byte unused4[0xC];
+-	} item_collections[5];
+-	byte unused98[0x34];
+-};
+-
+-struct item_collection_permutation
+-{
+-	byte unused0[0x20];
+-	real weight;
+-	byte unused24[0xC];
+-	long item_index;
+-	byte unused34[0x20];
+-};
+-
+-struct item_collection_definition
+-{
+-	struct tag_block permutations;
+-	short respawn_time;
+-};
+-
+-typedef char verify_scenario_starting_equipment_size[
+-	sizeof(struct scenario_starting_equipment) == 0xCC ? 1 : -1];
+-typedef char verify_item_collection_permutation_size[
+-	sizeof(struct item_collection_permutation) == 0x54 ? 1 : -1];
+ 
+ /* ---------- prototypes */
+ 
+-long hud_get_nav_point_render_type(
+-	long local_player_index,
+-	real_point3d const *position,
+-	struct game_engine_goal const *goal,
+-	long object_index);
+-
+-void custom_render_nav_point(
+-	long local_player_index,
+-	struct game_engine_goal const *goal,
+-	word nav_point_index,
+-	long render_type);
+-
+ void game_engine_playlist_next(
+ 	long parameter0,
+ 	long parameter1,
+@@ -768,7 +677,7 @@ static void game_engine_build_lighting(
+ 	void);
+ 
+ static boolean is_place_tied(
+-	struct postgame_statistic_entry const *entry);
++	struct statistic_buffer const *entry);
+ 
+ int __cdecl sort_statistic_buffer(
+ 	void const *entry0_pointer,
+@@ -789,7 +698,7 @@ static boolean game_engine_infinite_grenades_internal(
+ static long select_players_to_display(
+ 	long statistic,
+ 	long player_index,
+-	struct postgame_statistic_entry *output,
++	struct statistic_buffer *output,
+ 	long maximum_count);
+ 
+ static void netgame_flag_verify_no_team_duplicates(
+@@ -823,12 +732,6 @@ void game_show_score_extended(
+ boolean multiple_teams_alive(
+ 	void);
+ 
+-struct network_game_server *global_network_game_server_get(
+-	void);
+-
+-boolean player_ui_game_variant_specified(
+-	struct game_variant *variant);
+-
+ static void game_engine_post_rasterize_in_game(
+ 	void);
+ 
+@@ -842,29 +745,9 @@ static void game_engine_predict_resources(
+ static void game_engine_verify_current_map(
+ 	void);
+ 
+-void game_engine_intialize_queued_sounds(
+-	void);
+-
+ void game_engine_post_rasterize_post_game(
+ 	void);
+ 
+-void rasterizer_draw_unicode_string(
+-	rectangle2d const *bounds,
+-	short parameter1,
+-	short parameter2,
+-	short parameter3,
+-	wchar_t const *string);
+-
+-struct bitmap_data *bitmap_group_try_and_get_bitmap(
+-	long bitmap_group_index,
+-	short bitmap_index);
+-
+-long hud_get_font_index(
+-	void);
+-
+-real_argb_color *hud_get_text_color(
+-	real_argb_color *color);
+-
+ static boolean internal_rasterize_score(
+ 	long player_index,
+ 	long parameter1,
+@@ -884,43 +767,10 @@ static void game_engine_update_weapons(
+ static void game_engine_update_item_spawn(
+ 	void);
+ 
+-void game_engine_update_multiplayer_sound(
+-	void);
+-
+-void sound_class_set_gain(
+-	char const *name,
+-	real gain,
+-	short interpolation_ticks);
+-
+-void network_game_server_switch_to_postgame(
+-	struct network_game_server *server);
+-
+-void player_effect_screen_flash(
+-	long player_index,
+-	struct screen_flash_definition const *screen_flash,
+-	real scale);
+-
+-short unit_get_local_player_index(
+-	long unit_index);
+-
+-boolean game_team_is_enemy(
+-	short team_index0,
+-	short team_index1);
+-
+-short player_get_starting_location_count(
+-	void);
+-
+-struct player_starting_location *player_get_starting_location(
+-	short starting_location_index);
+-
+ boolean team_has_players(
+ 	long team_index);
+ 
+-short find_nav_point(
+-	char const *name);
+-
+-static struct postgame_statistic_entry *game_engine_get_player_place(
+-	struct postgame_statistic_entry *entry,
++static struct statistic_buffer game_engine_get_player_place(
+ 	long player_index);
+ 
+ long postgame_statistic_get_rating(
+@@ -930,7 +780,7 @@ long postgame_statistic_get_rating(
+ 
+ 
+ long populate_statistic_buffer(
+-	struct postgame_statistic_entry *entries,
++	struct statistic_buffer *entries,
+ 	long parameter1,
+ 	long parameter2);
+ 
+@@ -1009,10 +859,7 @@ long global_autogenerate_count = 0;
+ 
+ extern struct game_engine_globals game_engine_globals;
+ extern struct game_engine_stage global_stage;
+-extern struct game_engine *game_engines[];
+ extern long timeout_for_endgame_sound;
+-extern struct game_engine_hud_globals *hud_globals;
+-extern struct rasterizer_debug_options rasterizer_debug_options;
+ 
+ /* ---------- public code */
+ 
+@@ -1074,19 +921,11 @@ static void initialize_player_multiplayer_data(
+ }
+ 
+ static wchar_t *get_place_string(
+-	struct postgame_statistic_entry *entry)
++	struct statistic_buffer *entry)
+ {
+-	long raw_index = entry->values[6] & 0x7F;
+-	long string_index;
++	long string_index = PIN(entry->place & 0x7F, 0, 15);
+ 	long string_list_index;
+ 
+-	if (raw_index < 0)
+-		string_index = 0;
+-	else if (raw_index > 15)
+-		string_index = 15;
+-	else
+-		string_index = raw_index;
+-
+ 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+ 	if (string_list_index != NONE)
+ 		return unicode_string_list_get_string(
+@@ -1369,10 +1208,9 @@ static void game_engine_generate_title_string(
+ 	}
+ 	else
+ 	{
+-		struct postgame_statistic_entry entry;
++		struct statistic_buffer entry;
+ 
+-		entry =
+-			*game_engine_get_player_place(&entry, player_index);
++		entry = game_engine_get_player_place(player_index);
+ 		game_engine->format_player_score(player_index, score_string);
+ 
+ 		if (is_place_tied(&entry))
+@@ -1489,7 +1327,7 @@ static void rasterize_in_game_score_draw_line(
+ 		bounds.y0 = (short)(row_index * line_height);
+ 		bounds.y1 = (short)((row_index + 1) * line_height);
+ 		draw_string_set_draw_mode(font_index, NONE, 0, 0, color);
+-		rasterizer_draw_unicode_string(&bounds, 0, 0, 0, string);
++		rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, string);
+ 	}
+ 
+ 	draw_string_set_tab_stops(NULL, 0);
+@@ -1498,18 +1336,16 @@ static void rasterize_in_game_score_draw_line(
+ }
+ 
+ long populate_statistic_buffer(
+-	struct postgame_statistic_entry *entries,
++	struct statistic_buffer *entries,
+ 	long statistic,
+ 	long invert_parameter)
+ {
+ 	long player_count;
+ 	struct player_datum *iterator_player;
+ 	struct player_datum *player;
+-	struct postgame_statistic_entry *entry;
++	struct statistic_buffer *entry;
+ 	boolean invert;
+ 	long entry_index;
+-	long previous_value;
+-	long entry_value;
+ 	struct data_iterator iterator;
+ 
+ 	player_count = 0;
+@@ -1535,7 +1371,7 @@ long populate_statistic_buffer(
+ 			}
+ 			else
+ 			{
+-				entry->values[0] = iterator.datum_index;
++				entry->player_index = iterator.datum_index;
+ 				player_count++;
+ 				entry++;
+ 			}
+@@ -1548,44 +1384,44 @@ long populate_statistic_buffer(
+ 	entry = entries;
+ 	for (entry_index = 0; entry_index < player_count; entry_index++, entry++)
+ 	{
+-		long player_index = entry->values[0];
++		long player_index = entry->player_index;
+ 
+ 		player = player_get(player_index);
+ 		switch (statistic)
+ 		{
+ 		case 0:
+-			entry->values[2] = 0;
++			entry->custom = 0;
+ 			if (game_engine->get_player_score)
+ 			{
+-				entry->values[2] = adjust_score_for_ranking(
++				entry->custom = adjust_score_for_ranking(
+ 					game_engine->get_player_score(player_index, FALSE),
+ 					player_index);
+ 			}
+-			entry->values[3] = player->statistics.kills[0];
+-			entry->values[5] = player->statistics.assists[0];
+-			entry->values[4] = player->statistics.deaths;
++			entry->kills = player->statistics.kills[0];
++			entry->assists = player->statistics.assists[0];
++			entry->deaths = player->statistics.deaths;
+ 			break;
+ 
+ 		case 1:
+-			entry->values[1] = 0;
++			entry->score = 0;
+ 			if (game_engine->get_player_score)
+ 			{
+-				entry->values[1] = adjust_score_for_ranking(
++				entry->score = adjust_score_for_ranking(
+ 					game_engine->get_player_score(player_index, FALSE),
+ 					player_index);
+ 			}
+ 			break;
+ 
+ 		case 2:
+-			entry->values[1] = player->statistics.kills[0];
++			entry->score = player->statistics.kills[0];
+ 			break;
+ 
+ 		case 3:
+-			entry->values[1] = player->statistics.assists[0];
++			entry->score = player->statistics.assists[0];
+ 			break;
+ 
+ 		case 4:
+-			entry->values[1] = player->statistics.deaths;
++			entry->score = player->statistics.deaths;
+ 			break;
+ 
+ 		default:
+@@ -1597,7 +1433,7 @@ long populate_statistic_buffer(
+ 		}
+ 
+ 		if (invert)
+-			entry->values[1] = -entry->values[1];
++			entry->score = -entry->score;
+ 	}
+ 
+ 	if (statistic == 0)
+@@ -1623,32 +1459,17 @@ long populate_statistic_buffer(
+ 		entry = entries;
+ 		do
+ 		{
+-			struct postgame_statistic_entry *previous = entry - 1;
++			struct statistic_buffer *previous = entry - 1;
+ 
+ 			if (entry_index != 0 &&
+-				!((previous_value = previous->values[2],
+-						entry_value = entry->values[2],
+-						entry_value < previous_value ||
+-						entry_value > previous_value) ||
+-					(previous_value = previous->values[3],
+-						entry_value = entry->values[3],
+-						entry_value < previous_value ||
+-						entry_value > previous_value) ||
+-					(previous_value = previous->values[4],
+-						entry_value = entry->values[4],
+-						entry_value < previous_value ||
+-						entry_value > previous_value) ||
+-					(previous_value = previous->values[5],
+-						entry_value = entry->values[5],
+-						entry_value < previous_value ||
+-						entry_value > previous_value)))
++				sort_statistic_buffer_ranking(previous, entry) == 0)
+ 			{
+-				previous->values[6] |= 0x80000000;
+-				entry->values[6] = previous->values[6];
++				previous->place |= 0x80000000;
++				entry->place = previous->place;
+ 			}
+ 			else
+ 			{
+-				entry->values[6] = entry_index;
++				entry->place = entry_index;
+ 			}
+ 
+ 			entry_index++;
+@@ -1667,16 +1488,16 @@ long populate_statistic_buffer(
+ static long select_players_to_display(
+ 	long statistic,
+ 	long player_index,
+-	struct postgame_statistic_entry *output,
++	struct statistic_buffer *output,
+ 	long maximum_count)
+ {
+-	struct postgame_statistic_entry entries[MULTIPLAYER_MAXIMUM_PLAYERS];
++	struct statistic_buffer entries[MULTIPLAYER_MAXIMUM_PLAYERS];
+ 	long player_count;
+ 	boolean debug;
+ 	long entry_index;
+ 
+ 	player_count = populate_statistic_buffer(entries, statistic, 0);
+-	debug = rasterizer_debug_options.postgame_player_list_debug == 'E';
++	debug = rasterizer_debug_options.pad3 == 'E';
+ 	if (debug)
+ 	{
+ 		terminal_printf(
+@@ -1688,18 +1509,18 @@ static long select_players_to_display(
+ 
+ 	for (entry_index = 0; entry_index < player_count; entry_index++)
+ 	{
+-		player_get(entries[entry_index].values[0]);
++		player_get(entries[entry_index].player_index);
+ 	}
+ 
+ 	if (player_count > maximum_count)
+ 	{
+-		struct postgame_statistic_entry local_entries[MAXIMUM_LOCAL_PLAYERS];
++		struct statistic_buffer local_entries[MAXIMUM_LOCAL_PLAYERS];
+ 		long local_player_count = 0;
+ 		long local_index;
+ 
+ 		for (entry_index = maximum_count; entry_index < player_count; entry_index++)
+ 		{
+-			struct player_datum *player = player_get(entries[entry_index].values[0]);
++			struct player_datum *player = player_get(entries[entry_index].player_index);
+ 
+ 			if (player && player->local_player_index != NONE)
+ 			{
+@@ -1721,15 +1542,15 @@ static long select_players_to_display(
+ 
+ 			for (insertion_index = maximum_count - 1; insertion_index >= 0; insertion_index--)
+ 			{
+-				struct player_datum *player = player_get(entries[insertion_index].values[0]);
++				struct player_datum *player = player_get(entries[insertion_index].player_index);
+ 
+ 				if (player->local_player_index == NONE)
+ 				{
+ 					csmemmove(
+ 						&entries[insertion_index],
+ 						&entries[insertion_index + 1],
+-						maximum_count * sizeof(struct postgame_statistic_entry) -
+-							(insertion_index + 1) * sizeof(struct postgame_statistic_entry));
++						maximum_count * sizeof(struct statistic_buffer) -
++							(insertion_index + 1) * sizeof(struct statistic_buffer));
+ 					entries[maximum_count - 1] = local_entries[local_index];
+ 					break;
+ 				}
+@@ -1741,7 +1562,7 @@ static long select_players_to_display(
+ 		output,
+ 		entries,
+ 		MIN(maximum_count, player_count) *
+-			sizeof(struct postgame_statistic_entry));
++			sizeof(struct statistic_buffer));
+ 	return MIN(maximum_count, player_count);
+ }
+ 
+@@ -1751,7 +1572,7 @@ static void game_engine_rasterize_in_game_score(
+ {
+ 	wchar_t row_string[256];
+ 	wchar_t score_string[256];
+-	struct postgame_statistic_entry entries[6];
++	struct statistic_buffer entries[6];
+ 	wchar_t title_string[80];
+ 	real_argb_color text_color;
+ 	real_argb_color team_colors[2];
+@@ -1760,7 +1581,6 @@ static void game_engine_rasterize_in_game_score(
+ 	boolean is_current_player;
+ 	long entry_count;
+ 	long entry_index;
+-	long *entry_placement;
+ 	long string_list_index;
+ 	wchar_t *column_name;
+ 	wchar_t *score_name;
+@@ -1802,105 +1622,89 @@ static void game_engine_rasterize_in_game_score(
+ 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
+ 	rasterize_in_game_score_draw_line(row_string, FALSE, &color, 1);
+ 
+-	entry_index = 0;
+-	if (entry_count > 0)
++	for (entry_index = 0; entry_index < entry_count; entry_index++)
+ 	{
+-		entry_placement = &entries[0].values[6];
+-		do
++		long entry_player_index = entries[entry_index].player_index;
++		struct player_datum *player =
++			player_try_and_get(entry_player_index);
++		wchar_t *status_string;
++		wchar_t *place_string;
++		long place_index;
++		real_argb_color *row_color;
++
++		is_current_player = player_index == entry_player_index;
++		if (player)
+ 		{
+-			long entry_player_index = entry_placement[-6];
+-			struct player_datum *player =
+-				player_try_and_get(entry_player_index);
+-			wchar_t *status_string;
+-			wchar_t *place_string;
+-			long raw_place;
+-			long place_index;
+-			real_argb_color *row_color;
+-
+-			is_current_player = player_index == entry_player_index;
+-			if (player)
+-			{
+-				color = *hud_get_text_color(&text_color);
+-				player = player_get(entry_player_index);
+-
+-				team_colors[0].alpha = alpha;
+-				team_colors[0].red = 0.6f;
+-				team_colors[0].green = 0.3f;
+-				team_colors[0].blue = 0.3f;
+-				team_colors[1].alpha = alpha;
+-				team_colors[1].red = 0.3f;
+-				team_colors[1].green = 0.3f;
+-				team_colors[1].blue = 0.6f;
+-				color.alpha = alpha;
+-
+-				game_engine->format_player_score(
+-					entry_player_index,
+-					score_string);
+-
+-				if (game_engine_player_is_out_of_lives(entry_player_index))
+-				{
+-					string_list_index =
+-						tag_loaded('ustr', "ui\\multiplayer_game_text");
+-					if (string_list_index != NONE)
+-						status_string =
+-							unicode_string_list_get_string(string_list_index, 0x8A);
+-					else
+-						status_string = L"";
+-				}
+-				else if (player->quit_out_of_game)
+-				{
+-					string_list_index =
+-						tag_loaded('ustr', "ui\\multiplayer_game_text");
+-					if (string_list_index != NONE)
+-						status_string =
+-							unicode_string_list_get_string(string_list_index, 0x8B);
+-					else
+-						status_string = L"";
+-				}
+-				else
+-					status_string = score_string;
++			color = *hud_get_text_color(&text_color);
++			player = player_get(entry_player_index);
++
++			team_colors[0].alpha = alpha;
++			team_colors[0].red = 0.6f;
++			team_colors[0].green = 0.3f;
++			team_colors[0].blue = 0.3f;
++			team_colors[1].alpha = alpha;
++			team_colors[1].red = 0.3f;
++			team_colors[1].green = 0.3f;
++			team_colors[1].blue = 0.6f;
++			color.alpha = alpha;
+ 
+-				raw_place = *entry_placement & 0x7F;
+-				if (raw_place < 0)
+-					place_index = 0;
+-				else if (raw_place > 15)
+-					place_index = 15;
+-				else
+-					place_index = raw_place;
++			game_engine->format_player_score(
++				entry_player_index,
++				score_string);
+ 
+-				string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++			if (game_engine_player_is_out_of_lives(entry_player_index))
++			{
++				string_list_index =
++					tag_loaded('ustr', "ui\\multiplayer_game_text");
+ 				if (string_list_index != NONE)
+-				{
+-					place_string = unicode_string_list_get_string(
+-						string_list_index,
+-						place_index + 36);
+-				}
++					status_string =
++						unicode_string_list_get_string(string_list_index, 0x8A);
+ 				else
+-					place_string = L"";
+-
+-				usprintf(
+-					row_string,
+-					L"\t%s\t%s\t%s",
+-					place_string,
+-					player->name,
+-					status_string);
+-
+-				if (has_teams)
+-					row_color = &team_colors[PIN(player->team_index, 0, 1)];
++					status_string = L"";
++			}
++			else if (player->quit_out_of_game)
++			{
++				string_list_index =
++					tag_loaded('ustr', "ui\\multiplayer_game_text");
++				if (string_list_index != NONE)
++					status_string =
++						unicode_string_list_get_string(string_list_index, 0x8B);
+ 				else
+-					row_color = &color;
++					status_string = L"";
++			}
++			else
++				status_string = score_string;
++
++			place_index = PIN(entries[entry_index].place & 0x7F, 0, 15);
+ 
+-				rasterize_in_game_score_draw_line(
+-					row_string,
+-					is_current_player,
+-					row_color,
+-					entry_index + 2);
++			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
++			if (string_list_index != NONE)
++			{
++				place_string = unicode_string_list_get_string(
++					string_list_index,
++					place_index + 36);
+ 			}
++			else
++				place_string = L"";
+ 
+-			entry_index++;
+-			entry_placement += NUMBEROF(entries[0].values);
++			usprintf(
++				row_string,
++				L"\t%s\t%s\t%s",
++				place_string,
++				player->name,
++				status_string);
++
++			if (has_teams)
++				row_color = &team_colors[PIN(player->team_index, 0, 1)];
++			else
++				row_color = &color;
++
++			rasterize_in_game_score_draw_line(
++				row_string,
++				is_current_player,
++				row_color,
++				entry_index + 2);
+ 		}
+-		while (entry_index < entry_count);
+ 	}
+ 
+ 	return;
+@@ -1922,7 +1726,7 @@ static void drawline(
+ 	bounds.y0 = (short)(row_index * line_height);
+ 	bounds.y1 = (short)((row_index + 1) * line_height + line_spacing);
+ 	draw_string_set_format(NONE, justification, 0);
+-	rasterizer_draw_unicode_string(&bounds, 0, 0, 0, string);
++	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, string);
+ 
+ 	return;
+ }
+@@ -1930,7 +1734,7 @@ static void drawline(
+ void game_engine_post_rasterize_post_game(
+ 	void)
+ {
+-	struct postgame_statistic_entry entries[16];
++	struct statistic_buffer entries[16];
+ 	wchar_t score_string[256];
+ 	wchar_t row_string[256];
+ 	short tab_stops[6];
+@@ -1950,7 +1754,7 @@ void game_engine_post_rasterize_post_game(
+ 	tab_stops[4] = 410;
+ 	tab_stops[5] = 500;
+ 
+-	font_index = hud_globals->no_local_player_message_font_index;
++	font_index = hud_globals->messaging.single_player_font.index;
+ 	get_postgame_hilite_colors(
+ 		&winner_color,
+ 		&normal_color,
+@@ -1965,8 +1769,8 @@ void game_engine_post_rasterize_post_game(
+ 	draw_string_set_format(NONE, 0, 0);
+ 
+ 	{
+-		struct game_engine_postgame_hud_definition *hud_definition =
+-			game_engine_postgame_hud_definition_get(
++		struct hud_globals_definition *hud_definition =
++			hud_globals_definition_get(
+ 				interface_get_tag_index(_interface_hud_globals));
+ 		rectangle2d bounds;
+ 
+@@ -1974,10 +1778,10 @@ void game_engine_post_rasterize_post_game(
+ 		bounds.y0 = 0;
+ 		bounds.x1 = 640;
+ 		bounds.y1 = 480;
+-		if (bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0))
++		if (bitmap_group_try_and_get_bitmap(hud_definition->carnage_report_bitmap.index, 0))
+ 		{
+ 			draw_bitmap_in_rect(
+-				bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0),
++				bitmap_group_try_and_get_bitmap(hud_definition->carnage_report_bitmap.index, 0),
+ 				&bounds,
+ 				&bounds,
+ 				NULL,
+@@ -2084,7 +1888,7 @@ void game_engine_post_rasterize_post_game(
+ 
+ 		for (entry_index = 0; entry_index < entry_count; entry_index++)
+ 		{
+-			long player_index = entries[entry_index].values[0];
++			long player_index = entries[entry_index].player_index;
+ 			long draw_row = entry_index + 8;
+ 			struct player_datum *player = player_get(player_index);
+ 			real_argb_color team_colors[2];
+@@ -2097,7 +1901,7 @@ void game_engine_post_rasterize_post_game(
+ 			else
+ 				draw_string_set_color(&winner_color);
+ 			draw_string_set_tab_stops(tab_stops, NUMBEROF(tab_stops));
+-			place = PIN(entries[entry_index].values[6] & 0x7F, 0, 15);
++			place = PIN(entries[entry_index].place & 0x7F, 0, 15);
+ 			string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+ 			place_string =
+ 				string_list_index != NONE ?
+@@ -2268,10 +2072,9 @@ static long find_closest_player_index(
+ 		{
+ 			long candidate_object_index = object_indices[object_index];
+ 			struct unit_datum *candidate = unit_get(candidate_object_index);
+-			real x = candidate->object.position.x - camera_position.x;
+-			real y = candidate->object.position.y - camera_position.y;
+-			real z = candidate->object.position.z - camera_position.z;
+-			real distance_squared = y * y + (x * x + z * z);
++			real distance_squared = distance_squared3d(
++				&camera_position,
++				&candidate->object.position);
+ 			real_point3d target_position;
+ 			real_vector3d target_direction;
+ 			real target_distance;
+@@ -2382,14 +2185,14 @@ int __cdecl sort_statistic_buffer(
+ 	void const *entry0_pointer,
+ 	void const *entry1_pointer)
+ {
+-	struct postgame_statistic_entry const *entry0 = entry0_pointer;
+-	struct postgame_statistic_entry const *entry1 = entry1_pointer;
++	struct statistic_buffer const *entry0 = entry0_pointer;
++	struct statistic_buffer const *entry1 = entry1_pointer;
+ 	long result = 0;
+ 	long entry0_value;
+ 	long entry1_value;
+ 
+-	entry0_value = entry0->values[1];
+-	entry1_value = entry1->values[1];
++	entry0_value = entry0->score;
++	entry1_value = entry1->score;
+ 	if (entry1_value < entry0_value)
+ 		return -1;
+ 	if (entry1_value > entry0_value)
+@@ -2402,38 +2205,38 @@ int __cdecl sort_statistic_buffer_ranking(
+ 	void const *entry0_pointer,
+ 	void const *entry1_pointer)
+ {
+-	struct postgame_statistic_entry const *entry0 = entry0_pointer;
+-	struct postgame_statistic_entry const *entry1 = entry1_pointer;
++	struct statistic_buffer const *entry0 = entry0_pointer;
++	struct statistic_buffer const *entry1 = entry1_pointer;
+ 	long result = 0;
+ 	long entry0_value;
+ 	long entry1_value;
+ 
+-	entry0_value = entry0->values[2];
+-	entry1_value = entry1->values[2];
++	entry0_value = entry0->custom;
++	entry1_value = entry1->custom;
+ 	if (entry1_value < entry0_value)
+ 		result = -1;
+ 	else if (entry1_value > entry0_value)
+ 		result = 1;
+ 	else
+ 	{
+-		entry0_value = entry0->values[3];
+-		entry1_value = entry1->values[3];
++		entry0_value = entry0->kills;
++		entry1_value = entry1->kills;
+ 		if (entry1_value < entry0_value)
+ 			result = -1;
+ 		else if (entry1_value > entry0_value)
+ 			result = 1;
+ 		else
+ 		{
+-			entry0_value = entry0->values[4];
+-			entry1_value = entry1->values[4];
++			entry0_value = entry0->deaths;
++			entry1_value = entry1->deaths;
+ 			if (entry1_value < entry0_value)
+ 				result = 1;
+ 			else if (entry1_value > entry0_value)
+ 				result = -1;
+ 			else
+ 			{
+-				entry0_value = entry0->values[5];
+-				entry1_value = entry1->values[5];
++				entry0_value = entry0->assists;
++				entry1_value = entry1->assists;
+ 				if (entry1_value < entry0_value)
+ 					result = -1;
+ 				else if (entry1_value > entry0_value)
+@@ -2446,18 +2249,18 @@ int __cdecl sort_statistic_buffer_ranking(
+ }
+ 
+ static boolean is_place_tied(
+-	struct postgame_statistic_entry const *entry)
++	struct statistic_buffer const *entry)
+ {
+ 	boolean result =
+-		(entry->values[6] & (unsigned long)0x80000000) > 0;
++		(entry->place & 0x80000000) > 0;
+ 
+ 	return result;
+ }
+ 
+ static long place_get_position(
+-	struct postgame_statistic_entry const *entry)
++	struct statistic_buffer const *entry)
+ {
+-	return entry->values[6] & ~FLAG(31);
++	return entry->place & ~FLAG(31);
+ }
+ 
+ static void get_selected_color(
+@@ -2799,13 +2602,6 @@ static real game_engine_get_friendly_bonus(
+ 	return rating * 3.0f + 1.0f;
+ }
+ 
+-/*
+- * NonMatching: this source is retained with its caller because VC7 otherwise
+- * removes the two exact private helpers above.  The remaining binary delta is
+- * an EBX/EDI allocation mirror; relocation count, order, and destinations
+- * already agree with the January object.
+- */
+-
+ static real default_starting_location_rate_function(
+ 	long player_index,
+ 	struct player_starting_location const *starting_location)
+@@ -3136,7 +2932,7 @@ void game_engine_player_depower_active_camo(
+ 	return;
+ }
+ 
+-float get_blink_alpha(
++real get_blink_alpha(
+ 	void)
+ {
+ 	long phase = system_milliseconds()%2700;
+@@ -3154,9 +2950,9 @@ void game_engine_rasterize_message(
+ 	long terminal_font_index;
+ 
+ 	if (local_player_count())
+-		font_index = hud_globals->local_player_message_font_index;
++		font_index = hud_globals->messaging.multi_player_font.index;
+ 	else
+-		font_index = hud_globals->no_local_player_message_font_index;
++		font_index = hud_globals->messaging.single_player_font.index;
+ 
+ 	bounds = render.camera.window_bounds;
+ 
+@@ -3183,7 +2979,7 @@ void game_engine_rasterize_message(
+ 
+ 	draw_string_set_draw_mode(font_index, NONE, 2, 8, &color);
+ 	draw_string_set_color(&color);
+-	rasterizer_draw_unicode_string(&bounds, 0, 0, 0, message);
++	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, message);
+ 	draw_string_set_format(NONE, 0, 0);
+ 	draw_string_set_tab_stops(NULL, 0);
+ 
+@@ -3228,21 +3024,13 @@ static void game_engine_post_rasterize_in_game(
+ 		fade += 0.06666667f;
+ 	}
+ 
+-	if (fade < 0.0f)
+-	{
+-		fade = 0.0f;
+-		goto result;
+-	}
+-
+-	if (fade > 1.0f)
+-		fade = 1.0f;
++	fade = PIN(fade, 0.0f, 1.0f);
+ 	if (fade > 0.0f)
+ 	{
+ 		real alpha = (real)pow((double)fade, 1.9f);
+ 		game_engine_rasterize_in_game_score(player_index, alpha);
+ 	}
+ 
+-result:
+ 	game_engine_globals.hud_message_timers[local_player_index] = fade;
+ 
+ 	return;
+@@ -3634,13 +3422,8 @@ static void game_engine_update_teleporter(
+ 			&scenario->netgame_flags,
+ 			player->unknown70,
+ 			struct scenario_netgame_flag);
+-		real_vector3d delta;
+ 
+-		vector_from_points3d(
+-			&previous_flag->position,
+-			&unit->object.position,
+-			&delta);
+-		if (delta.j * delta.j + delta.i * delta.i + delta.k * delta.k > 1.0f)
++		if (distance_squared3d(&previous_flag->position, &unit->object.position) > 1.0f)
+ 			player->unknown70 = NONE;
+ 	}
+ 
+@@ -4689,11 +4472,12 @@ short game_engine_player_get_custom_motion_sensor_positions(
+ 	if (game_engine && global_variant.unknown24 == 0 && player_index != NONE)
+ 	{
+ 		struct player_datum *player = player_get(player_index);
+-		long goal_index = 0;
+-		struct game_engine_goal *goal = global_goal;
++		long goal_index;
+ 
+-		do
++		for (goal_index = 0; goal_index < 32; goal_index++)
+ 		{
++			struct game_engine_goal *goal = &global_goal[goal_index];
++
+ 			if (goal_matches_player(goal_index, player, player_index) && count < maximum_count)
+ 			{
+ 				goal_indices[count] = goal_index;
+@@ -4701,25 +4485,20 @@ short game_engine_player_get_custom_motion_sensor_positions(
+ 				positions[count].y = goal->position.y;
+ 				count++;
+ 			}
+-
+-			goal++;
+-			goal_index++;
+ 		}
+-		/* January uses the adjacent global_variant address as the signed loop bound. */
+-		while ((long)goal < (long)&global_variant);
+ 	}
+ 
+ 	return count;
+ }
+ 
+ void game_engine_render_nav_points(
+-	long local_player_index)
++	short local_player_index)
+ {
+ 	if (game_engine &&
+ 		global_variant.unknown24 == 1 &&
+-		(short)local_player_index != NONE)
++		local_player_index != NONE)
+ 	{
+-		long player_index = local_player_get_player_index((short)local_player_index);
++		long player_index = local_player_get_player_index(local_player_index);
+ 
+ 		if (player_index != NONE)
+ 		{
+@@ -4731,30 +4510,25 @@ void game_engine_render_nav_points(
+ 
+ 				unit_get_head_position(player->unit_index, &head_position);
+ 				{
+-					long goal_index = 0;
+-					struct game_engine_goal *goal = global_goal;
++					long goal_index;
+ 
+-					do
++					for (goal_index = 0; goal_index < 32; goal_index++)
+ 					{
+ 						if (goal_matches_player(goal_index, player, player_index))
+ 						{
+-							long render_type = hud_get_nav_point_render_type(
++							short render_type = hud_get_nav_point_render_type(
+ 								local_player_index,
+ 								&head_position,
+-								goal,
++								&global_goal[goal_index].position,
+ 								NONE);
+ 
+ 							custom_render_nav_point(
+ 								local_player_index,
+-								goal,
+-								(word)goal->nav_point_index,
++								&global_goal[goal_index].position,
++								global_goal[goal_index].nav_point_index,
+ 								render_type);
+ 						}
+-
+-						goal++;
+-						goal_index++;
+ 					}
+-					while ((long)goal < (long)&global_variant);
+ 				}
+ 			}
+ 		}
+@@ -4889,15 +4663,14 @@ void game_engine_prespawn_player_update(
+ 	return;
+ }
+ 
+-static struct postgame_statistic_entry *game_engine_get_player_place(
+-	struct postgame_statistic_entry *entry,
++static struct statistic_buffer game_engine_get_player_place(
+ 	long player_index)
+ {
+-	struct postgame_statistic_entry entries[16];
++	struct statistic_buffer entries[16];
+ 	long place = 0;
+ 
+ 	populate_statistic_buffer(entries, 0, 0);
+-	if (entries[place].values[0] != player_index)
++	if (entries[place].player_index != player_index)
+ 	{
+ 		do
+ 		{
+@@ -4907,12 +4680,10 @@ static struct postgame_statistic_entry *game_engine_get_player_place(
+ 				0x362,
+ 				place<MULTIPLAYER_MAXIMUM_PLAYERS);
+ 		}
+-		while (entries[place].values[0] != player_index);
++		while (entries[place].player_index != player_index);
+ 	}
+ 
+-	*entry = entries[place];
+-
+-	return entry;
++	return entries[place];
+ }
+ 
+ struct game_variant *build_game_variant_king(
+@@ -5666,21 +5437,21 @@ long postgame_statistic_get_rating(
+ 	long parameter1,
+ 	long parameter2)
+ {
+-	struct postgame_statistic_entry entries[16];
++	struct statistic_buffer entries[16];
+ 	long rating;
+ 	long entry_count;
+ 	long entry_index;
+ 
+ 	entry_count = populate_statistic_buffer(entries, parameter1, parameter2);
+ 	rating = 0;
+-	if (entries[0].values[0] != player_index)
++	if (entries[0].player_index != player_index)
+ 	{
+ 		for (entry_index = 1; entry_index < entry_count; entry_index++)
+ 		{
+-			if (entries[entry_index - 1].values[1] != entries[entry_index].values[1])
++			if (entries[entry_index - 1].score != entries[entry_index].score)
+ 				rating++;
+ 
+-			if (entries[entry_index].values[0] == player_index)
++			if (entries[entry_index].player_index == player_index)
+ 				break;
+ 		}
+ 	}
+@@ -5806,29 +5577,23 @@ long game_engine_did_player_win_default(
+ 		long team0_score = game_engine_get_team_score(0);
+ 		long team1_score = game_engine_get_team_score(1);
+ 		struct player_datum *player = player_get(player_index);
++		long winning_team_index;
+ 
+ 		if (multiple_teams_alive())
+-		{
+-			if (team0_score == team1_score)
+-				goto tied;
+-
+-			result = team0_score <= team1_score;
+-		}
++			winning_team_index = team0_score == team1_score ? NONE : (team0_score > team1_score ? 0 : 1);
+ 		else
+-		{
+-			result = !team_has_players(0);
+-		}
++			winning_team_index = team_has_players(0) ? 0 : 1;
+ 
+-		if (result != NONE)
+-			result = player->team_index == result;
+-		else
++		if (winning_team_index == NONE)
+ 			goto tied;
++
++		result = player->team_index == winning_team_index;
+ 	}
+ 	else
+ 	{
+-		struct postgame_statistic_entry entry;
++		struct statistic_buffer entry;
+ 
+-		entry = *game_engine_get_player_place(&entry, player_index);
++		entry = game_engine_get_player_place(player_index);
+ 		if (is_place_tied(&entry) &&
+ 			!place_get_position(&entry))
+ 			goto tied;
+@@ -6421,7 +6186,6 @@ real game_engine_get_starting_location_rating(
+ 	long player_index,
+ 	struct player_starting_location const *starting_location)
+ {
+-	/* NonMatching with the same EBX/EDI mirror as code_0009c460. */
+ 	if (!match_game_type(game_engine_get_type(), 4, starting_location->game_types))
+ 		return 0.0f;
+ 
+@@ -6861,7 +6625,7 @@ static void netgame_verify_equipment(
+ 		if (match_game_type(
+ 			game_type,
+ 			4,
+-			equipment->game_types))
++			equipment->game_type))
+ 		{
+ 			matching_count++;
+ 		}
+@@ -7345,8 +7109,8 @@ static long adjust_score_for_ranking(
+ static long item_collection_get_total(
+ 	struct tag_block const *permutations)
+ {
+-	struct item_collection_permutation const *permutation =
+-		(struct item_collection_permutation const *)permutations->address;
++	struct item_permutation_definition const *permutation =
++		(struct item_permutation_definition const *)permutations->address;
+ 	long permutation_count = permutations->count;
+ 	long result = 0;
+ 	long permutation_index;
+@@ -7373,7 +7137,7 @@ static long random_item(
+ 		get_global_random_seed_address(),
+ 		0,
+ 		(short)item_collection_get_total(permutations));
+-	struct item_collection_permutation const *permutation =
++	struct item_permutation_definition const *permutation =
+ 		permutations->address;
+ 	long permutation_index = 0;
+ 
+@@ -7383,7 +7147,7 @@ static long random_item(
+ 			(long)((real)remaining_weight -
+ 				permutation[permutation_index].weight);
+ 		if (remaining_weight < 0)
+-			return permutation[permutation_index].item_index;
++			return permutation[permutation_index].item.index;
+ 
+ 		permutation_index++;
+ 	}
+@@ -7409,21 +7173,21 @@ static void game_engine_update_item_spawn(
+ 				struct scenario_netgame_equipment);
+ 		if (match_game_type(
+ 			game_engine_get_type(),
+-			NUMBEROF(equipment->game_types),
+-			equipment->game_types))
++			NUMBEROF(equipment->game_type),
++			equipment->game_type))
+ 		{
+ 			long respawn_period = 30 * TICKS_PER_SECOND;
+-			short respawn_time = equipment->respawn_time;
++			short respawn_time = equipment->spawn_time;
+ 
+ 			if (respawn_time == 0)
+ 			{
+-				if (equipment->item_collection_index != NONE)
++				if (equipment->item_collection.index != NONE)
+ 				{
+ 					struct item_collection_definition *item_collection =
+ 						item_collection_definition_get(
+-							equipment->item_collection_index);
++							equipment->item_collection.index);
+ 
+-					respawn_time = item_collection->respawn_time;
++					respawn_time = item_collection->spawn_time;
+ 					if (respawn_time != 0)
+ 						respawn_period = respawn_time * TICKS_PER_SECOND;
+ 				}
+@@ -7436,7 +7200,7 @@ static void game_engine_update_item_spawn(
+ 			if (game_time_get() % respawn_period == 0)
+ 			{
+ 				long definition_index =
+-					random_item(equipment->item_collection_index);
++					random_item(equipment->item_collection.index);
+ 				struct object_placement_data placement_data;
+ 				long object_index;
+ 
+@@ -7473,93 +7237,80 @@ static void handle_custom_starting_equipment(
+ 	long *plasma_grenade_count)
+ {
+ 	struct scenario *scenario = global_scenario_get();
+-	struct scenario_starting_equipment *starting_equipment;
+-	long starting_equipment_index = 0;
+-
+-	if (scenario->scenario_starting_equipment.count <= 0)
+-		return;
++	long starting_equipment_index;
+ 
+-	while (TRUE)
++	for (starting_equipment_index = 0;
++		starting_equipment_index < scenario->scenario_starting_equipment.count;
++		starting_equipment_index++)
+ 	{
+-		starting_equipment = TAG_BLOCK_GET_ELEMENT(
++		struct scenario_starting_equipment *starting_equipment = TAG_BLOCK_GET_ELEMENT(
+ 			&scenario->scenario_starting_equipment,
+ 			starting_equipment_index,
+ 			struct scenario_starting_equipment);
++
+ 		if (match_game_type(
+ 			game_engine_get_type(),
+ 			4,
+-			starting_equipment->game_types))
++			starting_equipment->game_type))
+ 		{
+-			break;
+-		}
+-
+-		starting_equipment_index++;
+-		if (starting_equipment_index <
+-			scenario->scenario_starting_equipment.count)
+-			continue;
+-
+-		return;
+-	}
+-
+-	{
+-		boolean first_weapon = TRUE;
+-		long remaining_item_collection_count = 5;
+-		long *item_collection =
+-			&starting_equipment->item_collections[0].item_collection_index;
++			boolean first_weapon = TRUE;
++			long item_collection_index;
+ 
+-		do
+-		{
+-			if (*item_collection != NONE)
++			/* January visits the first five of the six item collections */
++			for (item_collection_index = 0;
++				item_collection_index < 5;
++				item_collection_index++)
+ 			{
+-				long definition_index = random_item(*item_collection);
+-				struct object_placement_data placement_data;
+-				long weapon_index;
+-
+-				object_placement_data_new(
+-					&placement_data,
+-					definition_index,
+-					NONE);
+-				weapon_index = object_new(&placement_data);
+-				if (weapon_index != NONE)
++				if (starting_equipment->item_collection[item_collection_index].index != NONE)
+ 				{
+-					struct object_datum *weapon = object_get_and_verify_type(
+-						weapon_index,
+-						_object_mask_item);
+-
+-					if (!first_weapon &&
+-						unit_has_weapon_definition_index(
+-							unit_index,
+-							weapon->definition_index))
++					long definition_index = random_item(
++						starting_equipment->item_collection[item_collection_index].index);
++					long weapon_index;
++					struct object_placement_data placement_data;
++
++					object_placement_data_new(
++						&placement_data,
++						definition_index,
++						NONE);
++					weapon_index = object_new(&placement_data);
++					if (weapon_index != NONE)
+ 					{
+-						object_delete(weapon_index);
+-					}
+-					else
+-					{
+-						unit_add_weapon_to_inventory(
+-							unit_index,
++						struct object_datum *weapon = object_get_and_verify_type(
+ 							weapon_index,
+-							first_weapon ? 2 : 0);
+-						first_weapon = FALSE;
++							_object_mask_item);
++
++						if (!first_weapon &&
++							unit_has_weapon_definition_index(
++								unit_index,
++								weapon->definition_index))
++						{
++							object_delete(weapon_index);
++						}
++						else
++						{
++							unit_add_weapon_to_inventory(
++								unit_index,
++								weapon_index,
++								first_weapon ? 2 : 0);
++							first_weapon = FALSE;
++						}
+ 					}
+ 				}
+ 			}
+ 
+-			item_collection += sizeof(starting_equipment->item_collections[0]) /
+-				sizeof(*item_collection);
+-			remaining_item_collection_count--;
+-		}
+-		while (remaining_item_collection_count != 0);
++			if (TEST_FLAG(starting_equipment->flags, 0))
++			{
++				*fragmentation_grenade_count = 0;
++				*plasma_grenade_count = 0;
++			}
+ 
+-		if (TEST_FLAG(starting_equipment->flags, 0))
+-		{
+-			*fragmentation_grenade_count = 0;
+-			*plasma_grenade_count = 0;
+-		}
++			if (TEST_FLAG(starting_equipment->flags, 1))
++			{
++				*plasma_grenade_count += *fragmentation_grenade_count;
++				*fragmentation_grenade_count = 0;
++			}
+ 
+-		if (TEST_FLAG(starting_equipment->flags, 1))
+-		{
+-			*plasma_grenade_count += *fragmentation_grenade_count;
+-			*fragmentation_grenade_count = 0;
++			break;
+ 		}
+ 	}
+ 

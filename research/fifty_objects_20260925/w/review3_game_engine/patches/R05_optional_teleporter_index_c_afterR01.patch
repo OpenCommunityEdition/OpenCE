@@ -1,0 +1,50 @@
+diff --git a/source/game/game_engine.c b/source/game/game_engine.c
+index 2fe4936d..203e9eae 100644
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -910,7 +910,7 @@ static void initialize_player_multiplayer_data(
+ 	player->state_message = NONE;
+ 	player->state_message_player_index = NONE;
+ 	player->speed_multiplier = 1.0f;
+-	player->unknown70 = NONE;
++	player->teleporter_index = NONE;
+ 	player->unknown7c = NONE;
+ 	csmemset(
+ 		&player->statistics.multiplayer_statistics,
+@@ -3416,15 +3416,15 @@ static void game_engine_update_teleporter(
+ 		return;
+ 
+ 	unit = unit_get(player->unit_index);
+-	if (player->unknown70 != NONE)
++	if (player->teleporter_index != NONE)
+ 	{
+ 		struct scenario_netgame_flag *previous_flag = TAG_BLOCK_GET_ELEMENT(
+ 			&scenario->netgame_flags,
+-			player->unknown70,
++			player->teleporter_index,
+ 			struct scenario_netgame_flag);
+ 
+ 		if (distance_squared3d(&previous_flag->position, &unit->object.position) > 1.0f)
+-			player->unknown70 = NONE;
++			player->teleporter_index = NONE;
+ 	}
+ 
+ 	source_flag_index = NONE;
+@@ -3437,7 +3437,7 @@ static void game_engine_update_teleporter(
+ 		1,
+ 		&source_flag_index);
+ 	if (source_flag_index == NONE ||
+-		source_flag_index == player->unknown70)
++		source_flag_index == player->teleporter_index)
+ 	{
+ 		return;
+ 	}
+@@ -3584,7 +3584,7 @@ static void game_engine_update_teleporter(
+ 			if (player->local_player_index != NONE)
+ 				player_control_set_facing(player->local_player_index, &forward);
+ 
+-			player->unknown70 = find_netgame_flag(
++			player->teleporter_index = find_netgame_flag(
+ 				&unit->object.position,
+ 				1.0f,
+ 				0.0f,

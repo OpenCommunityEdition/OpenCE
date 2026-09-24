@@ -1,0 +1,10 @@
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -23050,6 +23050,7 @@
+ { "file_offset": 4537548, "flags": 0, "name": "_demos_available", "static": true },
+ { "file_offset": 4537552, "flags": 0, "name": "_bss_00453cd0" },
+ { "file_offset": 4537600, "flags": 0, "name": "_player_ui_globals" },
++{ "file_offset": 4538160, "flags": 0, "name": "_player1_profile_path", "static": true },
+ { "file_offset": 4538416, "flags": 0, "name": "_progress_bar_globals", "static": true },
+ { "file_offset": 4538888, "flags": 0, "name": "_progress_bar_mode" },
+ { "file_offset": 4538908, "flags": 0, "name": "_last_t" },

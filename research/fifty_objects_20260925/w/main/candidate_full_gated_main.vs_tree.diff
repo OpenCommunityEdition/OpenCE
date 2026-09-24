@@ -1,0 +1,54 @@
+diff --git a/source/main/main.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\main\\candidate_full_gated_main.c"
+index 6686cb7e..d6d9b298 100644
+--- a/source/main/main.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\main\\candidate_full_gated_main.c"
+@@ -934,6 +934,13 @@ void main_start_time(
+ 	return;
+ }
+ 
++void main_crash(
++	char const *reason)
++{
++	*(char const **)NULL = "chucky was here!  NULL belongs to me!!!!!";
++	return;
++}
++
+ void main_reset_map(
+ 	void)
+ {
+@@ -2138,17 +2145,20 @@ static void main_exit(
+ 	case _game_connection_network_server:
+ 		dispose_global_network_game_client();
+ 		dispose_global_network_game_server();
++		game_dispose_from_old_map();
++		game_dispose();
++		debug_keys_dispose();
++		console_dispose();
+ 		break;
+ 	case _game_connection_network_client:
+ 		dispose_global_network_game_client();
++	default:
++		game_dispose_from_old_map();
++		game_dispose();
++		debug_keys_dispose();
++		console_dispose();
+ 		break;
+ 	}
+-
+-	game_dispose_from_old_map();
+-	game_dispose();
+-	debug_keys_dispose();
+-	console_dispose();
+-
+ 	return;
+ }
+ 
+@@ -2889,7 +2899,7 @@ void main_loop_of_death(
+ 	return;
+ }
+ 
+-void main_game_render(
++static void main_game_render(
+ 	double time_delta_since_tick_sec)
+ {
+ 	boolean force_single_screen;

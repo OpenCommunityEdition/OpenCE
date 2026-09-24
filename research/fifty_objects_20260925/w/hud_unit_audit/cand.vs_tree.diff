@@ -1,0 +1,66 @@
+diff --git a/source/interface/hud_unit.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_unit_audit\\cand.c"
+index cfa13729..c41e946d 100644
+--- a/source/interface/hud_unit.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\hud_unit_audit\\cand.c"
+@@ -3,13 +3,13 @@ HUD_UNIT.C
+ 
+ symbols in this file:
+ 000C6590 0010:
+-	_code_000c6590 (0000)
++	_unit_hud_outline_mapper_tick (0000)
+ 000C65A0 0010:
+-	_code_000c65a0 (0000)
++	_unit_hud_shield_meter_mapper_tick (0000)
+ 000C65B0 0010:
+ 	_unit_hud_shield_meter_mapper_init (0000)
+ 000C65C0 0040:
+-	_code_000c65c0 (0000)
++	_initialize_hud_state (0000)
+ 000C6600 0070:
+ 	_get_hud_state (0000)
+ 000C6670 0040:
+@@ -59,7 +59,7 @@ symbols in this file:
+ 002702D8 001d:
+ 	??_C@_0BN@NPOPPJAG@old_local_player_index?$CB?$DNNONE?$AA@ (0000)
+ 002E4C68 0004:
+-	_data_002e4c68 (0000)
++	?overcharge_count@?1??hud_render_unit_interface@@9@9 (0000)
+ 00453AC0 0004:
+ 	_unit_hud_globals (0000)
+ */
+@@ -266,20 +266,22 @@ static struct unit_hud_globals *unit_hud_globals = NULL;
+ extern struct hud_scripted_globals *hud_scripted_globals;
+ extern struct hud_globals_definition *hud_globals;
+ 
+-/* ---------- public code */
++/* ---------- private code */
+ 
+-void code_000c6590(
++static void unit_hud_outline_mapper_tick(
+ 	void)
+ {
+ 	return;
+ }
+ 
+-void code_000c65a0(
++static void unit_hud_shield_meter_mapper_tick(
+ 	void)
+ {
+ 	return;
+ }
+ 
++/* ---------- public code */
++
+ void unit_hud_shield_meter_mapper_init(
+ 	void)
+ {
+@@ -890,6 +892,9 @@ void hud_render_unit_interface(
+ 		0x209,
+ 		player->local_player_index==render.local_player_index);
+ 
++	unit_hud_shield_meter_mapper_tick();
++	unit_hud_outline_mapper_tick();
++
+ 	if (player->local_player_index == render.local_player_index &&
+ 		player->unit_index != NONE)
+ 	{

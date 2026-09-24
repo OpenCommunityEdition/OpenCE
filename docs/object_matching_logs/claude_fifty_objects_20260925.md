@@ -190,17 +190,68 @@ Result: Halo objects **363 -> 375** (+12). Stable diff: 4 new strict functions, 
     `sound_definition_index`.
   - The `_first_person_weapon_update` park is re-baselined (95.21506).
 
-## Running tallies (vs frozen base e9e62b78, objdiff 3.3.1)
+## Batch 4 (f7cd2e72 header packets, 6e3e2d35 admissions and storage)
+
+Result: Halo objects **375 -> 378** (+3). Stable diff: 3 new strict functions, 2,928 padded
+(2,911 meaningful), **0 regressions**. Parks 86 / 0 / 0. Admission 11 / 0 / 3 / 0. Fake scan 26
+(unchanged). pytest 1,157 / 5 / 26. `git diff --check` clean.
+
+### Objects admitted (3)
+
+| Object | Work | Evidence (research `w/<slug>/`) |
+|---|---|---|
+| interface/player_ui | shared-header layout recovery | Two edits in the header commit f7cd2e72. (1) `game_engine.h`'s opaque `game_variant` view becomes the recovered January layout: universal/ctf/slayer/oddball/king/race variant members, with HCEX names only where January's offsets attest the field. The game engines, network managers and playlist_profile use the new member names. (2) `player_ui_get_edit_playlist_profile` returns `struct game_variant *`. The reviewer found two C4133 warnings in ui_widget_game_data_input_functions that the worker missed; the reviewer's patch 07 fixes them. Sweep: 46 header consumers, 0 moved rows. `player_ui`, `review3_player_ui` |
+| sound/sound_manager | new code + shared header | `_update_channel_for_looping_sound` (1,360) and `_sound_set_definition_end` (208) are exact. The shared header `sound_definitions.h` now declares HCEX's `short old_range_index`, landed together with the /Od 0x877810 single-exit definition; this avoids the prototype/definition mismatch the owner rejected earlier. The redundant `channel_state == _sound_channel_queued &&` term is load-bearing and /Od-attested verbatim (0x89a5a1). 45 statics per cachebeta publics. Sweep: 18 consumers. `sound_manager`, `review3_sound_manager` |
+| rasterizer/xbox/rasterizer_xbox_dynavobgeom | view removal + storage | Genuine shared declarations replace the caller-local debug-options, window and pixel-shader views. The unlit draw uses the /Od-attested `vector_from_points3d`/`dot_product3d` calls and HCEX's `forward`/`zero_plane` locals. The HCEX function-static `warned` latch is not public in cachebeta. `MAX()` reproduces the /Od `?:` store. Nine D3DINLINE wrappers are static. The surplus `real_*_to_pixel32` COMDATs and SDK tables are identical to January's selected copies and link in both orders. January's own object has UNDEF references to them, so its TU emitted them. `dynavobgeom`, `review3_rasterizer_xbox_dynavobgeom` |
+
+### Function gains and zero-credit packets landed in batch 4
+
+- **damage:** `_object_damage_body` is exact (1,360; reviewer patch B+). Patch A would newly emit
+  the `collision_test_line`/`real_random` header COMDATs from a non-exact caller, so it is held (P1
+  class).
+- **players:**
+  - Storage for three rows.
+  - COMMON tentative definitions of `players_globals`/`team_data`. January's `linker_common`
+    records 154-156 are players.c's, and HCEX has them as DataIsGlobal.
+- **hs:**
+  - 839 January-static storage flags.
+  - The /Od-attested static helper `hs_enumerate_scenario_data` replaces 11 hand expansions (the
+    reviewer's amendment; its PDB storage disagreement goes to 0).
+  - The worker's `real_random_range` cleanup is held (P1 class).
+- **hs_scenario_definitions:** first-party `static byte_swap_script_syntax_data` (the reviewer's
+  fallback). The 9-name data split stays held.
+- **player_profile:** HCEX `profile_color_table`; the write-thread park is re-baselined
+  (88.40708 -> 88.451324).
+- **main:**
+  - `main_exit` in the /Od 0x6aff90 shape, and 25 statics.
+  - January-resolved corrections: strict `>`, dead `requested_rate` store dropped, and
+    `best_interval` as the `" des %d"` argument.
+  - Parks re-baselined: `_main_update_time` 62.637814 -> 98.986336, `_main_frame_rate_debug`
+    94.51923 -> 98.65385.
+
+### Process incidents in wave 3 (repaired, no tracked change)
+
+Both happened inside reviewer agents, and both were repaired byte-exact before integration:
+
+- A broken `&&` chain ran `rm -rf .git` in the worktree root. The reviewer restored the
+  worktree pointer file.
+- `tools/campaign/volatile_scan.py --help` ran its hard-coded scan, because the script has no
+  argparse. The scan rewrote `source/hs/hs.c` to LF; the reviewer restored it from backup.
+
+The integrator verified that the tree was clean and hs.c all-CRLF before batch 4. The worker
+brief now forbids destructive commands outside a worker's slug and running unread repo scripts.
+
+## Running tallies (vs frozen base e9e62b78, objdiff 3.3.1; at 6e3e2d35)
 
 | Tally | Value |
 |---|---|
-| 1. Net newly COMPLETE Halo objects | **14** (361 -> 375) |
-| 2. New strict functions | **11** (stable diff; 0 regressions) |
-| 3. New meaningful exact bytes | **5,864** |
-| 4. New padded exact bytes | **5,936** |
-| 5. New verified data bytes / admission-only closures | **3,294** data (1,530 + 1,564 + 200); 9 admission-only closures (objects, units, render_objects, actor_firing_position, path, biped_limp_noodle, leaf_map, model_animations, collision_debug) |
-| 6. Fuzzy improvements at zero credit | first_person_weapons A (95.21506), plus the wave-2 FUZZY_IMPROVED rows in the research results |
-| Scorer-only effects | +147 code / +7 functions (`$L` label credit from status flips); objdiff 3.6.0 not used |
+| 1. Net newly COMPLETE Halo objects | **17** (361 -> 378) |
+| 2. New strict functions | **14** (stable diff; 0 regressions) |
+| 3. New meaningful exact bytes | **8,775** |
+| 4. New padded exact bytes | **8,864** |
+| 5. New verified data bytes / admission-only closures | **3,294** data (1,530 + 1,564 + 200); 11 admission-only closures (objects, units, render_objects, actor_firing_position, path, biped_limp_noodle, leaf_map, model_animations, collision_debug, player_ui, rasterizer_xbox_dynavobgeom) |
+| 6. Fuzzy improvements at zero credit | `_main_update_time` 62.64 -> 98.99; `_main_frame_rate_debug` 94.52 -> 98.65; `_player_profile_write_thread_proc@4` 88.41 -> 88.45; first_person_weapons A (95.21506); plus the FUZZY_IMPROVED rows in the research results |
+| Scorer-only effects | +147 code / +7 functions (`$L` label credit from status flips). NOT taken: objdiff 3.6.0 would credit hs's 54,780 data bytes and actions' 2,404 at zero source cost |
 | Regressions / revocations | 0 / 0 |
 
 Contingent on the Layer 2 ruling: `_convex_hull2d_perimeter` (96), `_player_set_action_result`
@@ -228,6 +279,14 @@ review ledgers and patches, `results/wave*/` for the structured results).
 | actions grouped data entry | +2,404 data | tools change to `semantic_progress.py` for grouped extents (scorer change; not taken in this lane) | owner or integrator accepts the verifier fix, or the scorer moves to 3.6.0 | `w/actions/verifier_combined_extent.diff` |
 | render_debug | 1 object | an invented `render_debug_globals_definition` aggregate whose separate-static names are unrecoverable, plus six consumer-local `extern boolean debug_*` with no definer | owner ruling or new naming evidence; the helper/vehicle patch (a)-(c) is ready at zero credit | `w/review_admit2/patches/render_debug_genuine_helpers_and_vehicle.patch` |
 | bitmap_drawing | 1 object | the unnamed 16-byte static stays held under the 2026-09-20 ruling | first-party name and type | `results/wave1/` |
+| hud_unit | 1 object (+ hud_weapon/motion_sensor/hud_nav_points hygiene) | the stack-sentinel code is a hand-copied `check_stack_buffer` with two invented gotos (held class); January's asserts share one line (a macro), and the Sept-2001 map tags the helpers as inlines | a `hud_draw.h` `__inline check_stack_buffer` packet (wave 4), or an owner ruling; the reviewer-amended 01R + 02-04 are ready | `w/review3_hud_unit/` |
+| rasterizer_xbox_profile | 1 object | invented TU-private aggregates (pad members; loose statics need new descriptive .bss names = held class), a /Od-attested `%s`-with-NONE crash path (BUG class), three load-bearing `volatile`s | owner rulings on names, BUG and volatile | `w/rasterizer_xbox_profile/`, `w/review3_rasterizer_xbox_profile/` |
+| hs_scenario_definitions data split | 1 object | 9 file-static data names with no first-party attestation (1 invented) | owner ruling on descriptive names | `w/hs_scenario_definitions/`, `w/review3_hs_scenario_definitions/` |
+| models .bss | 1 object | the only exact form is file-scope `= {0}` statics in reverse use order, contradicting the first-party static-local form; 3 of 4 names are lost | owner ruling or first-party names | `w/models_bss/` |
+| transport_endpoint_set_winsock `net_startup_debug();` | storage only | a call needed only to make VC7 emit the static; its arity contradicts the 2001 `@net_startup_debug@4` evidence | owner ruling (+ signature) | `w/transport_endpoint_set_winsock/`, reviewer slug |
+| player_profile R1-R3 | 3 functions | authentic defects: uninitialised serialised block, file left open, close after delete (BUG comments ready) | owner ruling (authentic-bug class) | `w/player_profile/production_owner_gated.patch` |
+| main header_swap / main_crash | 1 function | declared-name-count compensation (Layer 2 class) / authentic NULL write | owner ruling | `w/review3_main/` |
+| damage patch A / hs real_random_range cleanup | 0 (house-clean) | new header COMDAT emitted from a non-exact caller (P1 class) | same as P1 | `w/damage/`, `w/review3_storage_packet_/` |
 
 ## Research material
 

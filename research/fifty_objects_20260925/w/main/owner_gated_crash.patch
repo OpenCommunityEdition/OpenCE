@@ -1,0 +1,17 @@
+diff --git a/source/main/main.c b/source/main/main.c
+--- a/source/main/main.c
++++ b/source/main/main.c
+@@ -934,6 +934,13 @@
+ 	return;
+ }
+ 
++void main_crash(
++	char const *reason)
++{
++	*(char const **)NULL = "chucky was here!  NULL belongs to me!!!!!";
++	return;
++}
++
+ void main_reset_map(
+ 	void)
+ {

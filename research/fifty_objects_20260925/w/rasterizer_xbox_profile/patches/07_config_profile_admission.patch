@@ -1,0 +1,52 @@
+diff --git a/config/config.json b/config/config.json
+index e7b839a22104be4fe09ee6979cc636ece2ac6c6c..98abd57dfe71b4303d3080f306c5d835aa92e97d 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -484,7 +484,7 @@
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_text.c", "index": 109, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_shadows.c", "index": 110, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_screen_effect.c", "index": 111, "status": "Matching" },
+-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "NonMatching" },
++				{ "name": "source/rasterizer/xbox/rasterizer_xbox_profile.c", "index": 112, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c", "index": 113, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_motion_sensor.c", "index": 114, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_models.c", "index": 115, "status": "NonMatching" },
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index efd9599d4251f74aa4eabced20c336927e73b078..e90ec89a719b2d4cc32de91054705923e4bdcab1 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -17,14 +17,6 @@
+       "evidence": "docs/object_matching_logs/claude_data_ownership_closeout_20260924.md",
+       "reopen": "Recover and verify the January per-global names and ownership from first-party evidence, replace the aggregate with authentic separate definitions, and preserve every exact function and data relocation before whole-object admission."
+     },
+-    {
+-      "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+-      "reason": "All 16 target functions and all 2234 target data bytes are exact, including the independently verified 132-byte initialized section. The incompatible debug-options prefix has been replaced by the complete genuine shared type. The candidate still emits three stock SDK select-any tables absent from January's split: D3DTEXTUREDIRECTENCODE (16 bytes), D3DSIMPLERENDERSTATEENCODE (328), and D3DPRIMITIVETOVERTEXCOUNT (88). Forced unresolved-link diagnostics prove only compatible current-base duplicate selection, not a complete ordinary final link. Shared window-state declaration ownership and three consumer-local Profile API declaration pairs also remain inherited source-owner debt. Exact target-data accounting does not waive these separate whole-object checks.",
+-      "evidence": "docs/object_matching_logs/rasterizer_xbox_profile_obj_shared_owner_reconciliation_20260906.md#remaining-whole-object-boundaries",
+-      "reopen": "Finish genuine shared window/API declaration ownership with full consumer regression gates and prove the complete SDK table ownership through authenticated original source topology or a successful ordinary compatible canonical link with the real dependency/import closure and call graph. Do not use partial-header facades, forced unresolved linking, altered selection metadata, fake references, or an invented discard pass. Preserve all target-function and data matches before claiming Matching."
+-    },
+     {
+       "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
+       "class": "source-layout-incomplete",
+diff --git a/config/semantic_data_matches.json b/config/semantic_data_matches.json
+index 92269c5ce7c637f96e0a87c3a6bc2b85e6642969..94434ca6ab97b805efb14ae77bb70de72fdcc828 100644
+--- a/config/semantic_data_matches.json
++++ b/config/semantic_data_matches.json
+@@ -480,5 +480,15 @@
+       "relocation_count": 7,
+       "normalized_sha256": "6ed61c39a648905cf23b12b916e2adadfe97b6e5aa492c29a14c7265809ef1a7"
+     }
++  },
++  {
++    "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
++    "symbol": "_rasterizer_profile_performance_counter_frequency",
++    "reason": "January and the rebuilt 132-byte profile .data section (static performance-counter frequency LARGE_INTEGER at +0, static rasterizer_profile_globals name table at +8) have identical normalized payload and flags (c0400040), and all 29 relocations resolve to the same image addresses; objdiff 3.3.1's '$'-literal relocation-name defect undercredits it (68.69%; renaming only '$' in the ??_C@ names of both objects scores 100.0). Whole object admitted: all 16 functions strict exact, 59 January sections and 67 symbols match with 0 cachebeta.pdb storage disagreements; the 10 candidate-only definitions (3 stock D3D SDK SELECT_ANY tables, 7 literals) are byte-identical to January's selected copies and pair-link in both orders, as in the 61 already-admitted objects that emit the same SDK tables.",
++    "measurements": {
++      "size": 132,
++      "relocation_count": 29,
++      "normalized_sha256": "b577924a924477a95be3c0a539812cce4cae4eaf93489d580a909a02169d0cf9"
++    }
+   }
+ ]

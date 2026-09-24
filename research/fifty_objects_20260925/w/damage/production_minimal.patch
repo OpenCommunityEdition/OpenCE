@@ -1,0 +1,74 @@
+--- a/source/objects/damage.c
++++ b/source/objects/damage.c
+@@ -340,7 +340,7 @@
+ static void object_permutation_shield_regions(
+ 	long object_index,
+ 	boolean active);
+-void area_of_effect_cause_damage_to_object(
++static void area_of_effect_cause_damage_to_object(
+ 	struct damage_data *damage,
+ 	long object_index,
+ 	boolean damage_next_object);
+@@ -365,7 +365,7 @@
+ 
+ extern boolean debug_damage;
+ 
+-struct damage_globals damage_globals = { 0 };
++static struct damage_globals damage_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -585,7 +585,7 @@
+ 	return;
+ }
+ 
+-void object_destroy_notify_children(
++static void object_destroy_notify_children(
+ 	long object_index)
+ {
+ 	struct object_datum *object = object_get(object_index);
+@@ -1111,7 +1111,7 @@
+ 	return;
+ }
+ 
+-void object_damage_body(
++static void object_damage_body(
+ 	long object_index,
+ 	short region_index,
+ 	short node_index,
+@@ -1239,16 +1239,20 @@
+ 
+ 				while (child_object_index != NONE)
+ 				{
+-					struct object_datum *child = object_get(child_object_index);
++					struct object_datum *child_object = object_get(child_object_index);
+ 
+-					if (TEST_FLAG(_object_mask_unit, child->object.type) &&
+-						unit_get(child_object_index)->unit.player_index != NONE)
++					if (TEST_FLAG(_object_mask_unit, child_object->object.type))
+ 					{
+-						player_controlled = TRUE;
+-						break;
++						struct unit_datum *child_unit = (struct unit_datum *)child_object;
++
++						if (child_unit->unit.player_index != NONE)
++						{
++							player_controlled = TRUE;
++							break;
++						}
+ 					}
+ 
+-					child_object_index = child->object.next_object_index;
++					child_object_index = child_object->object.next_object_index;
+ 				}
+ 			}
+ 
+@@ -2187,7 +2191,7 @@
+ 	return;
+ }
+ 
+-void area_of_effect_cause_damage_to_object(
++static void area_of_effect_cause_damage_to_object(
+ 	struct damage_data *damage,
+ 	long object_index,
+ 	boolean damage_next_object)

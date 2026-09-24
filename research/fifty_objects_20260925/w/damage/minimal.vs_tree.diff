@@ -1,0 +1,18 @@
+diff --git a/source/objects/damage.c "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\damage\\minimal.c"
+index 62d1dd4c..fec9a676 100644
+--- a/source/objects/damage.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-20260925\\scratch\\w\\damage\\minimal.c"
+@@ -1208,10 +1208,11 @@ static void object_damage_body(
+ 			&damage_resistance->regions,
+ 			region_index,
+ 			struct damage_region);
++		byte region_damage = (byte)(actual_damage*255.f + object->object.region_damage[region_index]);
+ 
+-		object->object.region_damage[region_index] = (byte)(actual_damage*255.f + object->object.region_damage[region_index]);
++		object->object.region_damage[region_index] = region_damage;
+ 		if (region->damage_threshold > 0.f &&
+-			object->object.region_damage[region_index]*(1.f/255.f) > region->damage_threshold)
++			region_damage*(1.f/255.f) > region->damage_threshold)
+ 		{
+ 			object_destroy_region(object_index, region_index);
+ 			SET_FLAG(*being_damaged_flags, _object_being_damaged_region_destroyed_bit, TRUE);

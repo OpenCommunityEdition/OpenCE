@@ -1,0 +1,31 @@
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1144,28 +1144,6 @@
+       }
+     },
+     {
+-      "unit": "source/sound/sound_manager",
+-      "function": "_update_channel_for_looping_sound",
+-      "class": "unclassified",
+-      "evidence": "Complete typed looping-channel update reconstructed from January code/relocations and HCEA semantics. It covers properties, cache transitions, linked permutations, definition changes and crossfades. January is 1,360 padded bytes with 61 relocations; canonical is 1,376 with 61. No unique source-level mechanism explains the residual, so it receives zero exact credit. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md. 2026-09-15 (next-150K lane wave n3a): re-baselined at ZERO strict credit and strictly closer than 1376/61. Size and relocation count are now both January-exact (1360/61); the residual is [sha] only. The row stays parked and fuzzy.",
+-      "measurements": {
+-        "target": { "size": 1360, "relocation_count": 61, "normalized_sha256": "457d122269e7e06c8b4a557f80eef434e3eb925aa8aaaa73d9e69bce635a6d78" },
+-        "base": { "size": 1360, "relocation_count": 61, "normalized_sha256": "cb7925e4a26b946436b50b7c0f3172fdc975c1e48f7f9780f0d6d1cc8bc12f10" },
+-        "objdiff_percent": 99.19809
+-      }
+-    },
+-    {
+-      "unit": "source/sound/sound_manager",
+-      "function": "_sound_set_definition_end",
+-      "class": "unclassified",
+-      "evidence": "Complete queued-end-definition transition retained under its corrected semantic target name. January and canonical are both 208 padded bytes with all nine relocations; the code hash remains different. It uses the now-exact bounded channel-summary builder and the typed instance-limit flow. No compiler steering, raw offset, fake dependency, undefined behavior or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/sound_manager_obj_idle_channel_spine_20260908.md.",
+-      "measurements": {
+-        "target": { "size": 208, "relocation_count": 9, "normalized_sha256": "06f507e27039b2a39192271221e6c7b703aee4d5ae45becdac84f3543095ec13" },
+-        "base": { "size": 208, "relocation_count": 9, "normalized_sha256": "4f5a03ed0532981c792521f1ce7cdcc47eef5a3ee2d038caf65f57b1987675d9" },
+-        "objdiff_percent": 91.884056
+-      }
+-    },
+-    {
+       "unit": "source/rasterizer/rasterizer_lights",
+       "function": "_rasterizer_lens_flares_draw",
+       "class": "unclassified",

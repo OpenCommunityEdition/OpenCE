@@ -1,0 +1,2865 @@
+diff --git a/source/hs/hs.c b/source/hs/hs.c
+index 35571179..f73bc010 100644
+--- a/source/hs/hs.c
++++ b/source/hs/hs.c
+@@ -2818,7 +2818,7 @@ enum
+ /* ---------- macros */
+ 
+ #define HS_EVALUATE_NO_ARGUMENTS(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2829,7 +2829,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_NO_OP(evaluator) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2839,7 +2839,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_RETURN_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2849,7 +2849,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_RETURN_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2862,7 +2862,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2875,7 +2875,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_SHORT_FROM_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2893,7 +2893,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_SHORT_FROM_UNSIGNED_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2911,7 +2911,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_RETURN_SHORT_FROM_ARGUMENTS(evaluator, arguments_type, expression) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2929,7 +2929,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_LONG_FROM_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2941,7 +2941,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_REAL_FROM_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2957,7 +2957,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_REAL_FROM_UNSIGNED_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2973,7 +2973,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -2988,7 +2988,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_BOOLEAN(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3003,7 +3003,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_UNSIGNED_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3018,7 +3018,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_BOOLEAN(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3033,7 +3033,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3048,7 +3048,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_LONG_LONG(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3063,7 +3063,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_SHORT_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3078,7 +3078,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_UNSIGNED_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3093,7 +3093,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_UNSIGNED_SHORT(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3108,7 +3108,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_BOOLEAN(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3123,7 +3123,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_STRING(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3138,7 +3138,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_STRING(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3153,7 +3153,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_LONG_LONG_STRING(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3168,7 +3168,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_SHORT_BOOLEAN(evaluator, function) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3183,7 +3183,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_VOID_FROM_ARGUMENTS(evaluator, arguments_type, expression) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3204,7 +3204,7 @@ void evaluator( \
+ 	((struct hud_message_text_definition *)tag_get(hud_message_text_group_tag, (index)))
+ 
+ #define HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(evaluator, arguments_type, real_index, expression) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3221,7 +3221,7 @@ void evaluator( \
+ }
+ 
+ #define HS_EVALUATE_RETURN_BOOLEAN(evaluator, arguments_type, expression) \
+-void evaluator( \
++static void evaluator( \
+ 	short function_index, \
+ 	long thread_index, \
+ 	boolean initialize) \
+@@ -3541,7 +3541,7 @@ void console_printf(
+ 	boolean clear,
+ 	char const *format,
+ 	...);
+-long alphabetize(
++static long alphabetize(
+ 	char const **left,
+ 	char const **right);
+ struct scenario *global_scenario_get(
+@@ -4371,7 +4371,7 @@ void vehicle_hover(
+ 	boolean hover);
+ void hs_dispose_from_old_map(
+ 	void);
+-long alphabetize_file_references(
++static long alphabetize_file_references(
+ 	struct file_reference const *left,
+ 	struct file_reference const *right);
+ boolean tag_data_resize(
+@@ -4387,11 +4387,11 @@ int isspace(
+ boolean hs_scenario_merge(
+ 	struct scenario *scenario,
+ 	struct scenario *source_scenario);
+-void hs_allocate(
++static void hs_allocate(
+ 	void);
+-boolean hs_rebuild_source(
++static boolean hs_rebuild_source(
+ 	void);
+-boolean hs_compile_source(
++static boolean hs_compile_source(
+ 	void);
+ boolean hs_scenario_postprocess(
+ 	boolean restore_syntax_data);
+@@ -4463,647 +4463,647 @@ struct hs_function_definition_with_6_parameters
+ 
+ /* ---------- prototypes */
+ 
+-void ai_debug_sound_point_set_evaluate(
++static void ai_debug_sound_point_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_debug_speak_evaluate(
++static void ai_debug_speak_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_debug_speak_list_evaluate(
++static void ai_debug_speak_list_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_debug_teleport_to_evaluate(
++static void ai_debug_teleport_to_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_debug_vocalize_evaluate(
++static void ai_debug_vocalize_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_globals_ai_active_evaluate(
++static void ai_globals_ai_active_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_globals_dialogue_triggers_enabled_evaluate(
++static void ai_globals_dialogue_triggers_enabled_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_globals_grenades_enabled_evaluate(
++static void ai_globals_grenades_enabled_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_profile_change_render_spray_evaluate(
++static void ai_profile_change_render_spray_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_allegiance_broken_evaluate(
++static void ai_scripting_allegiance_broken_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_allegiance_evaluate(
++static void ai_scripting_allegiance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_allegiance_remove_evaluate(
++static void ai_scripting_allegiance_remove_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_allow_charge_evaluate(
++static void ai_scripting_allow_charge_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_allow_dormant_evaluate(
++static void ai_scripting_allow_dormant_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_attach_free_evaluate(
++static void ai_scripting_attach_free_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_attach_unit_evaluate(
++static void ai_scripting_attach_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_attach_units_evaluate(
++static void ai_scripting_attach_units_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_attack_evaluate(
++static void ai_scripting_attack_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_automatic_migration_target_evaluate(
++static void ai_scripting_automatic_migration_target_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_berserk_evaluate(
++static void ai_scripting_berserk_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_braindead_by_unit_evaluate(
++static void ai_scripting_braindead_by_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_braindead_evaluate(
++static void ai_scripting_braindead_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_command_list_advance_by_unit_evaluate(
++static void ai_scripting_command_list_advance_by_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_command_list_advance_evaluate(
++static void ai_scripting_command_list_advance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_command_list_by_unit_evaluate(
++static void ai_scripting_command_list_by_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_command_list_evaluate(
++static void ai_scripting_command_list_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_command_list_status_evaluate(
++static void ai_scripting_command_list_status_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_conversation_advance_evaluate(
++static void ai_scripting_conversation_advance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_conversation_evaluate(
++static void ai_scripting_conversation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_conversation_line_evaluate(
++static void ai_scripting_conversation_line_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_conversation_status_evaluate(
++static void ai_scripting_conversation_status_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_conversation_stop_evaluate(
++static void ai_scripting_conversation_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_defend_evaluate(
++static void ai_scripting_defend_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_deselect_evaluate(
++static void ai_scripting_deselect_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_detach_unit_evaluate(
++static void ai_scripting_detach_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_detach_units_evaluate(
++static void ai_scripting_detach_units_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_erase_all_evaluate(
++static void ai_scripting_erase_all_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_erase_evaluate(
++static void ai_scripting_erase_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_exit_vehicle_evaluate(
++static void ai_scripting_exit_vehicle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_follow_distance_evaluate(
++static void ai_scripting_follow_distance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_follow_target_ai_evaluate(
++static void ai_scripting_follow_target_ai_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_follow_target_disable_evaluate(
++static void ai_scripting_follow_target_disable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_follow_target_players_evaluate(
++static void ai_scripting_follow_target_players_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_follow_target_unit_evaluate(
++static void ai_scripting_follow_target_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_force_active_by_unit_evaluate(
++static void ai_scripting_force_active_by_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_force_active_evaluate(
++static void ai_scripting_force_active_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_free_evaluate(
++static void ai_scripting_free_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_free_units_evaluate(
++static void ai_scripting_free_units_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_go_to_vehicle_evaluate(
++static void ai_scripting_go_to_vehicle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_go_to_vehicle_override_evaluate(
++static void ai_scripting_go_to_vehicle_override_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_going_to_vehicle_evaluate(
++static void ai_scripting_going_to_vehicle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_ignore_evaluate(
++static void ai_scripting_ignore_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_is_attacking_evaluate(
++static void ai_scripting_is_attacking_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_kill_evaluate(
++static void ai_scripting_kill_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_kill_silent_evaluate(
++static void ai_scripting_kill_silent_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_link_activation_evaluate(
++static void ai_scripting_link_activation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_living_count_evaluate(
++static void ai_scripting_living_count_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_living_fraction_evaluate(
++static void ai_scripting_living_fraction_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_look_at_object_evaluate(
++static void ai_scripting_look_at_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_magically_see_encounter_evaluate(
++static void ai_scripting_magically_see_encounter_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_magically_see_players_evaluate(
++static void ai_scripting_magically_see_players_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_magically_see_unit_evaluate(
++static void ai_scripting_magically_see_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_magically_see_units_evaluate(
++static void ai_scripting_magically_see_units_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_maneuver_enable_evaluate(
++static void ai_scripting_maneuver_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_maneuver_evaluate(
++static void ai_scripting_maneuver_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_migrate_and_speak_evaluate(
++static void ai_scripting_migrate_and_speak_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_migrate_by_unit_evaluate(
++static void ai_scripting_migrate_by_unit_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_migrate_evaluate(
++static void ai_scripting_migrate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_nonswarm_count_evaluate(
++static void ai_scripting_nonswarm_count_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_place_evaluate(
++static void ai_scripting_place_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_playfight_evaluate(
++static void ai_scripting_playfight_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_prefer_target_evaluate(
++static void ai_scripting_prefer_target_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_reconnect_evaluate(
++static void ai_scripting_reconnect_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_renew_evaluate(
++static void ai_scripting_renew_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_retreat_evaluate(
++static void ai_scripting_retreat_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_select_evaluate(
++static void ai_scripting_select_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_blind_evaluate(
++static void ai_scripting_set_blind_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_current_state_evaluate(
++static void ai_scripting_set_current_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_deaf_evaluate(
++static void ai_scripting_set_deaf_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_respawn_evaluate(
++static void ai_scripting_set_respawn_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_return_state_evaluate(
++static void ai_scripting_set_return_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_set_team_evaluate(
++static void ai_scripting_set_team_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_spawn_actor_evaluate(
++static void ai_scripting_spawn_actor_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_status_evaluate(
++static void ai_scripting_status_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_stop_looking_evaluate(
++static void ai_scripting_stop_looking_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_strength_evaluate(
++static void ai_scripting_strength_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_swarm_count_evaluate(
++static void ai_scripting_swarm_count_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_teleport_starting_location_evaluate(
++static void ai_scripting_teleport_starting_location_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_teleport_starting_location_if_unsupported_evaluate(
++static void ai_scripting_teleport_starting_location_if_unsupported_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_timer_expire_evaluate(
++static void ai_scripting_timer_expire_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_timer_start_evaluate(
++static void ai_scripting_timer_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_try_to_fight_evaluate(
++static void ai_scripting_try_to_fight_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_try_to_fight_nothing_evaluate(
++static void ai_scripting_try_to_fight_nothing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_try_to_fight_player_evaluate(
++static void ai_scripting_try_to_fight_player_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_encounter_evaluate(
++static void ai_scripting_vehicle_encounter_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_enterable_actor_type_evaluate(
++static void ai_scripting_vehicle_enterable_actor_type_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_enterable_actors_evaluate(
++static void ai_scripting_vehicle_enterable_actors_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_enterable_disable_evaluate(
++static void ai_scripting_vehicle_enterable_disable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_enterable_distance_evaluate(
++static void ai_scripting_vehicle_enterable_distance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ai_scripting_vehicle_enterable_team_evaluate(
++static void ai_scripting_vehicle_enterable_team_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void attract_mode_start_evaluate(
++static void attract_mode_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void breakable_surfaces_enable_evaluate(
++static void breakable_surfaces_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void breakable_surfaces_reset_evaluate(
++static void breakable_surfaces_reset_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_active_camouflage_evaluate(
++static void cheat_active_camouflage_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_active_camouflage_local_player_evaluate(
++static void cheat_active_camouflage_local_player_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_all_powerups_evaluate(
++static void cheat_all_powerups_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_all_vehicles_evaluate(
++static void cheat_all_vehicles_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_all_weapons_evaluate(
++static void cheat_all_weapons_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheat_teleport_to_camera_evaluate(
++static void cheat_teleport_to_camera_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cheats_load_evaluate(
++static void cheats_load_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_set_title_delayed_evaluate(
++static void cinematic_set_title_delayed_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_set_title_evaluate(
++static void cinematic_set_title_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_show_letterbox_evaluate(
++static void cinematic_show_letterbox_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_skip_start_evaluate(
++static void cinematic_skip_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_skip_stop_evaluate(
++static void cinematic_skip_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_start_evaluate(
++static void cinematic_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_stop_evaluate(
++static void cinematic_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void cinematic_suppress_bsp_object_creation_evaluate(
++static void cinematic_suppress_bsp_object_creation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_dump_memory_by_file_evaluate(
++static void debug_dump_memory_by_file_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_dump_memory_evaluate(
++static void debug_dump_memory_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_dump_memory_for_file_evaluate(
++static void debug_dump_memory_for_file_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_player_teleport_evaluate(
++static void debug_player_teleport_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_pvs_evaluate(
++static void debug_pvs_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_sound_classes_enable_evaluate(
++static void debug_sound_classes_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_sound_classes_set_distances_evaluate(
++static void debug_sound_classes_set_distances_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void debug_sound_classes_set_wet_evaluate(
++static void debug_sound_classes_set_wet_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_get_position_evaluate(
++static void device_get_position_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_get_power_evaluate(
++static void device_get_power_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_group_change_only_once_more_set_evaluate(
++static void device_group_change_only_once_more_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_group_get_value_evaluate(
++static void device_group_get_value_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_group_set_actual_value_evaluate(
++static void device_group_set_actual_value_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_group_set_desired_value_evaluate(
++static void device_group_set_desired_value_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_one_sided_set_evaluate(
++static void device_one_sided_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_operates_automatically_set_evaluate(
++static void device_operates_automatically_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_set_actual_position_evaluate(
++static void device_set_actual_position_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_set_desired_position_evaluate(
++static void device_set_desired_position_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_set_never_appears_locked_evaluate(
++static void device_set_never_appears_locked_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void device_set_power_evaluate(
++static void device_set_power_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void director_load_camera_evaluate(
++static void director_load_camera_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void director_save_camera_evaluate(
++static void director_save_camera_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void director_script_camera_evaluate(
++static void director_script_camera_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void display_scenario_help_evaluate(
++static void display_scenario_help_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void enumerate_memory_units_test_evaluate(
++static void enumerate_memory_units_test_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void errors_overflow_suppression_enable_evaluate(
++static void errors_overflow_suppression_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_all_quiet_evaluate(
++static void game_all_quiet_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_difficulty_level_get_evaluate(
++static void game_difficulty_level_get_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_difficulty_level_get_ignore_easy_evaluate(
++static void game_difficulty_level_get_ignore_easy_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_is_cooperative_evaluate(
++static void game_is_cooperative_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_safe_to_save_evaluate(
++static void game_safe_to_save_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_safe_to_speak_evaluate(
++static void game_safe_to_speak_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_set_game_variant_from_name_evaluate(
++static void game_set_game_variant_from_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_state_reverted_evaluate(
++static void game_state_reverted_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_time_get_evaluate(
++static void game_time_get_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void game_time_set_speed_evaluate(
++static void game_time_set_speed_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void garbage_collect_now_evaluate(
++static void garbage_collect_now_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void global_structure_bsp_index_get_evaluate(
++static void global_structure_bsp_index_get_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_damage_new_evaluate(
++static void hs_damage_new_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_damage_object_evaluate(
++static void hs_damage_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_doc_evaluate(
++static void hs_doc_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_effect_new_evaluate(
++static void hs_effect_new_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_effect_new_from_object_marker_evaluate(
++static void hs_effect_new_from_object_marker_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+@@ -5159,973 +5159,973 @@ void hs_evaluate_sleep_until(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_help_evaluate(
++static void hs_help_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_not_evaluate(
++static void hs_not_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_create_anew_containing_evaluate(
++static void hs_object_create_anew_containing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_create_anew_evaluate(
++static void hs_object_create_anew_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_create_containing_evaluate(
++static void hs_object_create_containing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_create_evaluate(
++static void hs_object_create_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_destroy_all_evaluate(
++static void hs_object_destroy_all_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_destroy_containing_evaluate(
++static void hs_object_destroy_containing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_destroy_evaluate(
++static void hs_object_destroy_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_list_get_element_evaluate(
++static void hs_object_list_get_element_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_set_facing_evaluate(
++static void hs_object_set_facing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_set_permutation_evaluate(
++static void hs_object_set_permutation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_set_shield_evaluate(
++static void hs_object_set_shield_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_object_teleport_evaluate(
++static void hs_object_teleport_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_objects_can_see_flag_evaluate(
++static void hs_objects_can_see_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_objects_can_see_object_evaluate(
++static void hs_objects_can_see_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_objects_delete_by_definition_evaluate(
++static void hs_objects_delete_by_definition_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_objects_predict_evaluate(
++static void hs_objects_predict_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_players_evaluate(
++static void hs_players_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_print_evaluate(
++static void hs_print_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_recompile_evaluate(
++static void hs_recompile_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_sound_get_gain_evaluate(
++static void hs_sound_get_gain_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_sound_set_gain_evaluate(
++static void hs_sound_set_gain_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_teleport_players_not_in_trigger_volume_evaluate(
++static void hs_teleport_players_not_in_trigger_volume_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_trigger_volume_test_objects_all_evaluate(
++static void hs_trigger_volume_test_objects_all_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_trigger_volume_test_objects_any_evaluate(
++static void hs_trigger_volume_test_objects_any_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_activate_team_nav_point_with_flag_evaluate(
++static void hud_activate_team_nav_point_with_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_activate_team_nav_point_with_object_evaluate(
++static void hud_activate_team_nav_point_with_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_deactivate_team_nav_point_with_flag_evaluate(
++static void hud_deactivate_team_nav_point_with_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_deactivate_team_nav_point_with_object_evaluate(
++static void hud_deactivate_team_nav_point_with_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_unit_activate_nav_point_with_flag_evaluate(
++static void hud_unit_activate_nav_point_with_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_unit_activate_nav_point_with_object_evaluate(
++static void hud_unit_activate_nav_point_with_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_unit_deactivate_nav_point_with_flag_evaluate(
++static void hud_unit_deactivate_nav_point_with_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hud_unit_deactivate_nav_point_with_object_evaluate(
++static void hud_unit_deactivate_nav_point_with_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void lights_enable_evaluate(
++static void lights_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_crash_evaluate(
++static void main_crash_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_load_core_at_startup_evaluate(
++static void main_load_core_at_startup_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_load_core_evaluate(
++static void main_load_core_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_load_core_name_at_startup_evaluate(
++static void main_load_core_name_at_startup_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_load_core_name_evaluate(
++static void main_load_core_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_lost_map_evaluate(
++static void main_lost_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_print_version_evaluate(
++static void main_print_version_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_reset_map_evaluate(
++static void main_reset_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_revert_map_evaluate(
++static void main_revert_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_cancel_evaluate(
++static void main_save_cancel_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_core_evaluate(
++static void main_save_core_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_core_name_evaluate(
++static void main_save_core_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_map_no_timeout_evaluate(
++static void main_save_map_no_timeout_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_map_nonsafe_evaluate(
++static void main_save_map_nonsafe_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_save_map_safe_evaluate(
++static void main_save_map_safe_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_saving_map_evaluate(
++static void main_saving_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_set_difficulty_evaluate(
++static void main_set_difficulty_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_set_game_connection_to_film_playback_evaluate(
++static void main_set_game_connection_to_film_playback_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_set_map_name_evaluate(
++static void main_set_map_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_set_multiplayer_map_name_evaluate(
++static void main_set_multiplayer_map_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_skip_evaluate(
++static void main_skip_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void main_won_map_evaluate(
++static void main_won_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void network_game_client_request_immediate_start_evaluate(
++static void network_game_client_request_immediate_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void numeric_countdown_timer_get_evaluate(
++static void numeric_countdown_timer_get_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void numeric_countdown_timer_restart_evaluate(
++static void numeric_countdown_timer_restart_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void numeric_countdown_timer_set_evaluate(
++static void numeric_countdown_timer_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void numeric_countdown_timer_stop_evaluate(
++static void numeric_countdown_timer_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_beautify_evaluate(
++static void object_beautify_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_can_take_damage_evaluate(
++static void object_can_take_damage_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_cannot_take_damage_evaluate(
++static void object_cannot_take_damage_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_definition_predict_evaluate(
++static void object_definition_predict_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_list_count_evaluate(
++static void object_list_count_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_list_from_ai_reference_evaluate(
++static void object_list_from_ai_reference_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_pvs_activate_evaluate(
++static void object_pvs_activate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_pvs_clear_evaluate(
++static void object_pvs_clear_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_pvs_set_camera_point_evaluate(
++static void object_pvs_set_camera_point_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_pvs_set_object_evaluate(
++static void object_pvs_set_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_scripting_set_collideable_evaluate(
++static void object_scripting_set_collideable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_set_melee_attack_inhibited_evaluate(
++static void object_set_melee_attack_inhibited_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void object_set_ranged_attack_inhibited_evaluate(
++static void object_set_ranged_attack_inhibited_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void objects_dump_memory_evaluate(
++static void objects_dump_memory_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void objects_scripting_attach_evaluate(
++static void objects_scripting_attach_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void objects_scripting_detach_evaluate(
++static void objects_scripting_detach_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void objects_scripting_set_scale_evaluate(
++static void objects_scripting_set_scale_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player0_joystick_set_is_normal_evaluate(
++static void player0_joystick_set_is_normal_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player0_look_invert_pitch_evaluate(
++static void player0_look_invert_pitch_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player0_look_pitch_is_inverted_evaluate(
++static void player0_look_pitch_is_inverted_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_add_equipment_evaluate(
++static void player_add_equipment_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_accept_evaluate(
++static void player_control_action_test_accept_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_action_evaluate(
++static void player_control_action_test_action_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_back_evaluate(
++static void player_control_action_test_back_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_grenade_trigger_evaluate(
++static void player_control_action_test_grenade_trigger_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_jump_evaluate(
++static void player_control_action_test_jump_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_look_relative_all_directions_evaluate(
++static void player_control_action_test_look_relative_all_directions_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_look_relative_down_evaluate(
++static void player_control_action_test_look_relative_down_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_look_relative_left_evaluate(
++static void player_control_action_test_look_relative_left_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_look_relative_right_evaluate(
++static void player_control_action_test_look_relative_right_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_look_relative_up_evaluate(
++static void player_control_action_test_look_relative_up_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_move_relative_all_directions_evaluate(
++static void player_control_action_test_move_relative_all_directions_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_primary_trigger_evaluate(
++static void player_control_action_test_primary_trigger_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_reset_evaluate(
++static void player_control_action_test_reset_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_control_action_test_zoom_evaluate(
++static void player_control_action_test_zoom_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_effect_screen_fade_in_evaluate(
++static void player_effect_screen_fade_in_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_effect_screen_fade_out_evaluate(
++static void player_effect_screen_fade_out_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_input_enable_evaluate(
++static void player_input_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_ui_activate_all_solo_levels_evaluate(
++static void player_ui_activate_all_solo_levels_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void player_ui_fast_setup_network_server_evaluate(
++static void player_ui_fast_setup_network_server_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void players_unzoom_all_evaluate(
++static void players_unzoom_all_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void profile_dump_to_file_evaluate(
++static void profile_dump_to_file_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void profile_graph_toggle_evaluate(
++static void profile_graph_toggle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void profile_initialize_evaluate(
++static void profile_initialize_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void profile_sections_activate_evaluate(
++static void profile_sections_activate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void profile_sections_deactivate_evaluate(
++static void profile_sections_deactivate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void radiosity_debug_point_evaluate(
++static void radiosity_debug_point_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void radiosity_save_evaluate(
++static void radiosity_save_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void radiosity_start_evaluate(
++static void radiosity_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void random_range_evaluate(
++static void random_range_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_decals_flush_evaluate(
++static void rasterizer_decals_flush_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_fps_accumulate_evaluate(
++static void rasterizer_fps_accumulate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_lights_reset_for_new_map_evaluate(
++static void rasterizer_lights_reset_for_new_map_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_model_ambient_reflection_tint_evaluate(
++static void rasterizer_model_ambient_reflection_tint_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_set_convolution_evaluate(
++static void rasterizer_screen_effect_set_convolution_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_set_filter_desaturation_tint_evaluate(
++static void rasterizer_screen_effect_set_filter_desaturation_tint_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_set_filter_evaluate(
++static void rasterizer_screen_effect_set_filter_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_set_video_evaluate(
++static void rasterizer_screen_effect_set_video_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_start_evaluate(
++static void rasterizer_screen_effect_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_screen_effect_stop_evaluate(
++static void rasterizer_screen_effect_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_script_screen_effect_set_value_evaluate(
++static void rasterizer_script_screen_effect_set_value_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void rasterizer_set_near_clip_distance_evaluate(
++static void rasterizer_set_near_clip_distance_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void real_random_range_evaluate(
++static void real_random_range_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void recorded_animation_get_time_left_evaluate(
++static void recorded_animation_get_time_left_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void recorded_animation_kill_evaluate(
++static void recorded_animation_kill_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void recorded_animation_play_and_delete_evaluate(
++static void recorded_animation_play_and_delete_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void recorded_animation_play_and_hover_evaluate(
++static void recorded_animation_play_and_hover_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void recorded_animation_play_evaluate(
++static void recorded_animation_play_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void render_effects_evaluate(
++static void render_effects_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void saved_game_files_delete_all_custom_profiles_evaluate(
++static void saved_game_files_delete_all_custom_profiles_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scenario_switch_structure_bsp_evaluate(
++static void scenario_switch_structure_bsp_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scenario_trigger_volume_test_object_evaluate(
++static void scenario_trigger_volume_test_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scenery_animation_start_at_frame_evaluate(
++static void scenery_animation_start_at_frame_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scenery_animation_start_evaluate(
++static void scenery_animation_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scenery_get_animation_time_evaluate(
++static void scenery_get_animation_time_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_set_absolute_evaluate(
++static void scripted_camera_set_absolute_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_set_animation_evaluate(
++static void scripted_camera_set_animation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_set_dead_evaluate(
++static void scripted_camera_set_dead_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_set_evaluate(
++static void scripted_camera_set_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_set_first_person_evaluate(
++static void scripted_camera_set_first_person_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_camera_time_evaluate(
++static void scripted_camera_time_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_foley_predict_evaluate(
++static void scripted_foley_predict_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_blink_health_evaluate(
++static void scripted_hud_blink_health_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_blink_motion_sensor_evaluate(
++static void scripted_hud_blink_motion_sensor_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_blink_shield_evaluate(
++static void scripted_hud_blink_shield_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_get_timer_ticks_evaluate(
++static void scripted_hud_get_timer_ticks_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_messages_clear_evaluate(
++static void scripted_hud_messages_clear_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_pause_timer_evaluate(
++static void scripted_hud_pause_timer_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_restart_flashing_evaluate(
++static void scripted_hud_restart_flashing_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_flashing_state_evaluate(
++static void scripted_hud_set_flashing_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_objective_evaluate(
++static void scripted_hud_set_objective_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_state_message_evaluate(
++static void scripted_hud_set_state_message_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_timer_position_evaluate(
++static void scripted_hud_set_timer_position_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_timer_time_evaluate(
++static void scripted_hud_set_timer_time_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_set_timer_warning_cutoff_evaluate(
++static void scripted_hud_set_timer_warning_cutoff_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_show_crosshair_evaluate(
++static void scripted_hud_show_crosshair_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_show_health_evaluate(
++static void scripted_hud_show_health_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_show_motion_sensor_evaluate(
++static void scripted_hud_show_motion_sensor_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_show_shield_evaluate(
++static void scripted_hud_show_shield_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_show_timer_evaluate(
++static void scripted_hud_show_timer_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_time_code_reset_evaluate(
++static void scripted_hud_time_code_reset_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_time_code_show_evaluate(
++static void scripted_hud_time_code_show_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_hud_time_code_start_evaluate(
++static void scripted_hud_time_code_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_looping_sound_set_alternate_evaluate(
++static void scripted_looping_sound_set_alternate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_looping_sound_set_scale_evaluate(
++static void scripted_looping_sound_set_scale_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_looping_sound_start_evaluate(
++static void scripted_looping_sound_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_looping_sound_stop_evaluate(
++static void scripted_looping_sound_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_control_set_camera_control_evaluate(
++static void scripted_player_control_set_camera_control_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_effect_set_rotation_evaluate(
++static void scripted_player_effect_set_rotation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_effect_set_rumble_evaluate(
++static void scripted_player_effect_set_rumble_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_effect_set_translation_evaluate(
++static void scripted_player_effect_set_translation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_effect_start_evaluate(
++static void scripted_player_effect_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_player_effect_stop_evaluate(
++static void scripted_player_effect_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_show_hud_evaluate(
++static void scripted_show_hud_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_show_hud_help_text_evaluate(
++static void scripted_show_hud_help_text_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_sound_new_evaluate(
++static void scripted_sound_new_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_sound_stop_evaluate(
++static void scripted_sound_stop_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripted_sound_time_evaluate(
++static void scripted_sound_time_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripting_magic_melee_attack_evaluate(
++static void scripting_magic_melee_attack_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void scripting_set_magic_base_seat_evaluate(
++static void scripting_set_magic_base_seat_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void sound_cache_flush_evaluate(
++static void sound_cache_flush_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void sound_class_set_gain_evaluate(
++static void sound_class_set_gain_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void sound_enable_evaluate(
++static void sound_enable_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void structure_lens_flares_place_evaluate(
++static void structure_lens_flares_place_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void tag_groups_dump_memory_evaluate(
++static void tag_groups_dump_memory_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void terminal_clear_evaluate(
++static void terminal_clear_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void texture_cache_flush_evaluate(
++static void texture_cache_flush_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void ui_widget_debug_show_path_evaluate(
++static void ui_widget_debug_show_path_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_aim_without_turning_evaluate(
++static void unit_aim_without_turning_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_close_evaluate(
++static void unit_close_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_custom_animation_at_frame_evaluate(
++static void unit_custom_animation_at_frame_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_get_current_flashlight_state_evaluate(
++static void unit_get_current_flashlight_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_get_custom_animation_time_evaluate(
++static void unit_get_custom_animation_time_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_is_playing_custom_animation_evaluate(
++static void unit_is_playing_custom_animation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_kill_evaluate(
++static void unit_kill_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_kill_silent_evaluate(
++static void unit_kill_silent_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_open_evaluate(
++static void unit_open_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_can_blink_evaluate(
++static void unit_scripting_can_blink_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_doesnt_drop_items_evaluate(
++static void unit_scripting_doesnt_drop_items_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_enter_vehicle_evaluate(
++static void unit_scripting_enter_vehicle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_exit_vehicle_evaluate(
++static void unit_scripting_exit_vehicle_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_get_grenade_count_evaluate(
++static void unit_scripting_get_grenade_count_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_get_health_evaluate(
++static void unit_scripting_get_health_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_get_shield_evaluate(
++static void unit_scripting_get_shield_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_has_weapon_evaluate(
++static void unit_scripting_has_weapon_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_has_weapon_readied_evaluate(
++static void unit_scripting_has_weapon_readied_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_impervious_evaluate(
++static void unit_scripting_impervious_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_set_current_vitality_evaluate(
++static void unit_scripting_set_current_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_set_emotion_animation_evaluate(
++static void unit_scripting_set_emotion_animation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_set_maximum_vitality_evaluate(
++static void unit_scripting_set_maximum_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_set_seat_evaluate(
++static void unit_scripting_set_seat_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_start_user_animation_list_evaluate(
++static void unit_scripting_start_user_animation_list_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_suspended_evaluate(
++static void unit_scripting_suspended_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_unit_driver_evaluate(
++static void unit_scripting_unit_driver_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_unit_gunner_evaluate(
++static void unit_scripting_unit_gunner_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_unit_riders_evaluate(
++static void unit_scripting_unit_riders_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_vehicle_test_seat_evaluate(
++static void unit_scripting_vehicle_test_seat_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_scripting_vehicle_test_seat_list_evaluate(
++static void unit_scripting_vehicle_test_seat_list_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_set_desired_flashlight_state_evaluate(
++static void unit_set_desired_flashlight_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_set_emotion_evaluate(
++static void unit_set_emotion_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_set_enterable_by_player_evaluate(
++static void unit_set_enterable_by_player_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_solo_player_integrated_night_vision_is_active_evaluate(
++static void unit_solo_player_integrated_night_vision_is_active_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_start_user_animation_evaluate(
++static void unit_start_user_animation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void unit_stop_custom_animation_evaluate(
++static void unit_stop_custom_animation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void units_scripting_set_current_vitality_evaluate(
++static void units_scripting_set_current_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void units_scripting_set_maximum_vitality_evaluate(
++static void units_scripting_set_maximum_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void units_set_desired_flashlight_state_evaluate(
++static void units_set_desired_flashlight_state_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void vehicle_hover_evaluate(
++static void vehicle_hover_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void vehicle_scripting_load_magic_evaluate(
++static void vehicle_scripting_load_magic_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void vehicle_scripting_unload_evaluate(
++static void vehicle_scripting_unload_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void xbox_set_machine_name_evaluate(
++static void xbox_set_machine_name_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-void hs_enumerate_special_form_names(
++static void hs_enumerate_special_form_names(
+ 	void);
+-void hs_enumerate_script_type_names(
++static void hs_enumerate_script_type_names(
+ 	void);
+-void hs_enumerate_type_names(
++static void hs_enumerate_type_names(
+ 	void);
+-void hs_enumerate_function_names(
++static void hs_enumerate_function_names(
+ 	void);
+-void hs_enumerate_script_names(
++static void hs_enumerate_script_names(
+ 	void);
+-void hs_enumerate_variable_names(
++static void hs_enumerate_variable_names(
+ 	void);
+-void hs_enumerate_ai_names(
++static void hs_enumerate_ai_names(
+ 	void);
+-void hs_enumerate_ai_command_list_names(
++static void hs_enumerate_ai_command_list_names(
+ 	void);
+-void hs_enumerate_starting_profile_names(
++static void hs_enumerate_starting_profile_names(
+ 	void);
+-void hs_enumerate_conversation_names(
++static void hs_enumerate_conversation_names(
+ 	void);
+-void hs_enumerate_object_names(
++static void hs_enumerate_object_names(
+ 	void);
+-void hs_enumerate_trigger_volume_names(
++static void hs_enumerate_trigger_volume_names(
+ 	void);
+-void hs_enumerate_cutscene_flag_names(
++static void hs_enumerate_cutscene_flag_names(
+ 	void);
+-void hs_enumerate_cutscene_camera_point_names(
++static void hs_enumerate_cutscene_camera_point_names(
+ 	void);
+-void hs_enumerate_cutscene_title_names(
++static void hs_enumerate_cutscene_title_names(
+ 	void);
+-void hs_enumerate_cutscene_recording_names(
++static void hs_enumerate_cutscene_recording_names(
+ 	void);
+-void hs_enumerate_navpoints(
++static void hs_enumerate_navpoints(
+ 	void);
+-void hs_enumerate_hud_messages(
++static void hs_enumerate_hud_messages(
+ 	void);
+ 
+ extern char const *global_game_difficulty_level_names[];
+@@ -6272,45 +6272,45 @@ short const hs_type_sizes[NUMBER_OF_HS_TYPES]=
+ 	2,
+ };
+ 
+-static boolean const _hs_type_boolean_default= FALSE;
+-static real const _hs_type_real_default= 0.0f;
+-static short const _hs_type_short_integer_default= 0;
+-static long const _hs_type_long_integer_default= 0;
+-static char const *_hs_type_string_default= "";
+-static short const _hs_type_script_default= NONE;
+-static short const _hs_type_trigger_volume_default= NONE;
+-static short const _hs_type_cutscene_flag_default= NONE;
+-static short const _hs_type_cutscene_camera_point_default= NONE;
+-static short const _hs_type_cutscene_title_default= NONE;
+-static short const _hs_type_cutscene_recording_default= NONE;
+-static short const _hs_type_device_group_default= NONE;
+-static long const _hs_type_ai_default= NONE;
+-static short const _hs_type_ai_command_list_default= NONE;
+-static short const _hs_type_starting_profile_default= NONE;
+-static short const _hs_type_conversation_default= NONE;
+-static short const _hs_type_navpoint_default= NONE;
+-static short const _hs_type_hud_message_default= NONE;
+-static long const _hs_type_object_list_default= NONE;
+-static long const _hs_type_sound_default= NONE;
+-static long const _hs_type_looping_sound_default= NONE;
+-static long const _hs_type_effect_default= NONE;
+-static long const _hs_type_damage_default= NONE;
+-static long const _hs_type_animation_graph_default= NONE;
+-static long const _hs_type_actor_variant_default= NONE;
+-static long const _hs_type_damage_effect_default= NONE;
+-static long const _hs_type_object_definition_default= NONE;
+-static short const _hs_type_enum_game_difficulty_default= NONE;
+-static short const _hs_type_enum_team_default= NONE;
+-static short const _hs_type_enum_ai_default_state_default= NONE;
+-static short const _hs_type_enum_actor_type_default= NONE;
+-static short const _hs_type_enum_hud_corner_default= NONE;
+-static short const _hs_type_object_name_default= NONE;
+-static long const _hs_type_object_default= NONE;
+-static long const _hs_type_unit_default= NONE;
+-static long const _hs_type_vehicle_default= NONE;
+-static long const _hs_type_weapon_default= NONE;
+-static long const _hs_type_device_default= NONE;
+-static long const _hs_type_scenery_default= NONE;
++boolean const _hs_type_boolean_default= FALSE;
++real const _hs_type_real_default= 0.0f;
++short const _hs_type_short_integer_default= 0;
++long const _hs_type_long_integer_default= 0;
++char const *_hs_type_string_default= "";
++short const _hs_type_script_default= NONE;
++short const _hs_type_trigger_volume_default= NONE;
++short const _hs_type_cutscene_flag_default= NONE;
++short const _hs_type_cutscene_camera_point_default= NONE;
++short const _hs_type_cutscene_title_default= NONE;
++short const _hs_type_cutscene_recording_default= NONE;
++short const _hs_type_device_group_default= NONE;
++long const _hs_type_ai_default= NONE;
++short const _hs_type_ai_command_list_default= NONE;
++short const _hs_type_starting_profile_default= NONE;
++short const _hs_type_conversation_default= NONE;
++short const _hs_type_navpoint_default= NONE;
++short const _hs_type_hud_message_default= NONE;
++long const _hs_type_object_list_default= NONE;
++long const _hs_type_sound_default= NONE;
++long const _hs_type_looping_sound_default= NONE;
++long const _hs_type_effect_default= NONE;
++long const _hs_type_damage_default= NONE;
++long const _hs_type_animation_graph_default= NONE;
++long const _hs_type_actor_variant_default= NONE;
++long const _hs_type_damage_effect_default= NONE;
++long const _hs_type_object_definition_default= NONE;
++short const _hs_type_enum_game_difficulty_default= NONE;
++short const _hs_type_enum_team_default= NONE;
++short const _hs_type_enum_ai_default_state_default= NONE;
++short const _hs_type_enum_actor_type_default= NONE;
++short const _hs_type_enum_hud_corner_default= NONE;
++short const _hs_type_object_name_default= NONE;
++long const _hs_type_object_default= NONE;
++long const _hs_type_unit_default= NONE;
++long const _hs_type_vehicle_default= NONE;
++long const _hs_type_weapon_default= NONE;
++long const _hs_type_device_default= NONE;
++long const _hs_type_scenery_default= NONE;
+ 
+ static struct hs_function_definition const hs_begin_definition=
+ {
+@@ -12409,7 +12409,7 @@ static struct hs_function_definition_with_1_parameter const hs_xbox_set_machine_
+ 	},
+ };
+ 
+-static long const hs_function_table_count= 418;
++long const hs_function_table_count= 418;
+ 
+ struct hs_enum_definition const hs_enum_table[]=
+ {
+@@ -12929,7 +12929,7 @@ boolean hs_scenario_merge(
+ 	return success;
+ }
+ 
+-void hs_allocate(
++static void hs_allocate(
+ 	void)
+ {
+ 	struct scenario *scenario;
+@@ -13055,7 +13055,7 @@ static void hs_compile_source_error(
+ 	return;
+ }
+ 
+-boolean hs_compile_source(
++static boolean hs_compile_source(
+ 	void)
+ {
+ 	struct scenario *scenario;
+@@ -13160,7 +13160,7 @@ static boolean hs_rebuild_source_file(
+ 	return FALSE;
+ }
+ 
+-boolean hs_rebuild_source(
++static boolean hs_rebuild_source(
+ 	void)
+ {
+ 	boolean success = TRUE;
+@@ -13612,7 +13612,7 @@ static void hs_enumerate_from_string_list(
+ 	return;
+ }
+ 
+-void hs_enumerate_special_form_names(
++static void hs_enumerate_special_form_names(
+ 	void)
+ {
+ 	hs_tokens_enumerate_add_string("script");
+@@ -13620,21 +13620,21 @@ void hs_enumerate_special_form_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_script_type_names(
++static void hs_enumerate_script_type_names(
+ 	void)
+ {
+ 	hs_enumerate_from_string_list(hs_script_type_names, 0, 5);
+ 	return;
+ }
+ 
+-void hs_enumerate_type_names(
++static void hs_enumerate_type_names(
+ 	void)
+ {
+ 	hs_enumerate_from_string_list(hs_type_names, 4, 49);
+ 	return;
+ }
+ 
+-void hs_enumerate_function_names(
++static void hs_enumerate_function_names(
+ 	void)
+ {
+ 	short function_index;
+@@ -13644,7 +13644,7 @@ void hs_enumerate_function_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_script_names(
++static void hs_enumerate_script_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13660,7 +13660,7 @@ void hs_enumerate_script_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_variable_names(
++static void hs_enumerate_variable_names(
+ 	void)
+ {
+ 	short global_index;
+@@ -13686,7 +13686,7 @@ void hs_enumerate_variable_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_ai_names(
++static void hs_enumerate_ai_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13702,7 +13702,7 @@ void hs_enumerate_ai_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_ai_command_list_names(
++static void hs_enumerate_ai_command_list_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13718,7 +13718,7 @@ void hs_enumerate_ai_command_list_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_starting_profile_names(
++static void hs_enumerate_starting_profile_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13734,7 +13734,7 @@ void hs_enumerate_starting_profile_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_conversation_names(
++static void hs_enumerate_conversation_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13750,7 +13750,7 @@ void hs_enumerate_conversation_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_object_names(
++static void hs_enumerate_object_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13766,7 +13766,7 @@ void hs_enumerate_object_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_trigger_volume_names(
++static void hs_enumerate_trigger_volume_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13782,7 +13782,7 @@ void hs_enumerate_trigger_volume_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_cutscene_flag_names(
++static void hs_enumerate_cutscene_flag_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13798,7 +13798,7 @@ void hs_enumerate_cutscene_flag_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_cutscene_camera_point_names(
++static void hs_enumerate_cutscene_camera_point_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13814,7 +13814,7 @@ void hs_enumerate_cutscene_camera_point_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_cutscene_title_names(
++static void hs_enumerate_cutscene_title_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13830,7 +13830,7 @@ void hs_enumerate_cutscene_title_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_cutscene_recording_names(
++static void hs_enumerate_cutscene_recording_names(
+ 	void)
+ {
+ 	if (global_scenario_index != NONE)
+@@ -13846,7 +13846,7 @@ void hs_enumerate_cutscene_recording_names(
+ 	return;
+ }
+ 
+-void hs_enumerate_navpoints(
++static void hs_enumerate_navpoints(
+ 	void)
+ {
+ 	long hud_globals_index;
+@@ -13866,7 +13866,7 @@ void hs_enumerate_navpoints(
+ 	return;
+ }
+ 
+-void hs_enumerate_hud_messages(
++static void hs_enumerate_hud_messages(
+ 	void)
+ {
+ 	if (global_scenario_get()->hud_messages.index != NONE)
+@@ -13880,7 +13880,7 @@ void hs_enumerate_hud_messages(
+ 	return;
+ }
+ 
+-long alphabetize_file_references(
++static long alphabetize_file_references(
+ 	struct file_reference const *left,
+ 	struct file_reference const *right)
+ {
+@@ -13892,7 +13892,7 @@ long alphabetize_file_references(
+ 	return _stricmp(left_name, right_name);
+ }
+ 
+-long alphabetize(
++static long alphabetize(
+ 	char const **left,
+ 	char const **right)
+ {
+@@ -14097,7 +14097,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(
+ 	hs_effect_new_from_object_marker_evaluate,
+ 	struct hs_arguments_long_long_string,
+ 	hs_effect_new_from_object_marker(arguments->value0, arguments->value1, arguments->value2))
+-void hs_objects_can_see_object_evaluate(
++static void hs_objects_can_see_object_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14117,7 +14117,7 @@ void hs_objects_can_see_object_evaluate(
+ 
+ 	return;
+ }
+-void hs_objects_can_see_flag_evaluate(
++static void hs_objects_can_see_flag_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14142,7 +14142,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	hs_sound_set_gain(arguments[0].long_value, real_argument))
+-void objects_scripting_set_scale_evaluate(
++static void objects_scripting_set_scale_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14173,7 +14173,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(
+ 	scenery_animation_start_at_frame_evaluate,
+ 	struct hs_arguments_long_long_string_word,
+ 	scenery_animation_start_at_frame(arguments->value0, arguments->value1, arguments->value2, arguments->value3))
+-void unit_scripting_set_maximum_vitality_evaluate(
++static void unit_scripting_set_maximum_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14192,7 +14192,7 @@ void unit_scripting_set_maximum_vitality_evaluate(
+ 
+ 	return;
+ }
+-void units_scripting_set_maximum_vitality_evaluate(
++static void units_scripting_set_maximum_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14211,7 +14211,7 @@ void units_scripting_set_maximum_vitality_evaluate(
+ 
+ 	return;
+ }
+-void unit_scripting_set_current_vitality_evaluate(
++static void unit_scripting_set_current_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14230,7 +14230,7 @@ void unit_scripting_set_current_vitality_evaluate(
+ 
+ 	return;
+ }
+-void units_scripting_set_current_vitality_evaluate(
++static void units_scripting_set_current_vitality_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14254,7 +14254,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	device_set_power(arguments[0].long_value, real_argument))
+-void device_set_desired_position_evaluate(
++static void device_set_desired_position_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14279,7 +14279,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	device_set_actual_position(arguments[0].long_value, real_argument))
+-void device_group_set_desired_value_evaluate(
++static void device_group_set_desired_value_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14314,7 +14314,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	ai_scripting_follow_distance(arguments[0].long_value, real_argument))
+-void player_effect_screen_fade_in_evaluate(
++static void player_effect_screen_fade_in_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14333,7 +14333,7 @@ void player_effect_screen_fade_in_evaluate(
+ 
+ 	return;
+ }
+-void player_effect_screen_fade_out_evaluate(
++static void player_effect_screen_fade_out_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14372,7 +14372,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	scripted_looping_sound_set_scale(arguments[0].long_value, real_argument))
+-void debug_sound_classes_set_distances_evaluate(
++static void debug_sound_classes_set_distances_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14396,7 +14396,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	debug_sound_classes_set_wet((char const *)arguments[0].long_value, real_argument))
+-void sound_class_set_gain_evaluate(
++static void sound_class_set_gain_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14434,7 +14434,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	3,
+ 	hud_activate_team_nav_point_with_object(arguments[0].unsigned_short_value, arguments[1].unsigned_short_value, arguments[2].long_value, real_argument))
+-void scripted_player_effect_set_translation_evaluate(
++static void scripted_player_effect_set_translation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14453,7 +14453,7 @@ void scripted_player_effect_set_translation_evaluate(
+ 
+ 	return;
+ }
+-void scripted_player_effect_set_rotation_evaluate(
++static void scripted_player_effect_set_rotation_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14472,7 +14472,7 @@ void scripted_player_effect_set_rotation_evaluate(
+ 
+ 	return;
+ }
+-void scripted_player_effect_set_rumble_evaluate(
++static void scripted_player_effect_set_rumble_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14490,7 +14490,7 @@ void scripted_player_effect_set_rumble_evaluate(
+ 
+ 	return;
+ }
+-void scripted_player_effect_start_evaluate(
++static void scripted_player_effect_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14508,7 +14508,7 @@ void scripted_player_effect_start_evaluate(
+ 
+ 	return;
+ }
+-void rasterizer_model_ambient_reflection_tint_evaluate(
++static void rasterizer_model_ambient_reflection_tint_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14533,7 +14533,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	union hs_evaluation_argument,
+ 	1,
+ 	rasterizer_script_screen_effect_set_value(arguments[0].unsigned_short_value, real_argument))
+-void rasterizer_screen_effect_set_convolution_evaluate(
++static void rasterizer_screen_effect_set_convolution_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14553,7 +14553,7 @@ void rasterizer_screen_effect_set_convolution_evaluate(
+ 
+ 	return;
+ }
+-void rasterizer_screen_effect_set_filter_evaluate(
++static void rasterizer_screen_effect_set_filter_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14574,7 +14574,7 @@ void rasterizer_screen_effect_set_filter_evaluate(
+ 
+ 	return;
+ }
+-void rasterizer_screen_effect_set_filter_desaturation_tint_evaluate(
++static void rasterizer_screen_effect_set_filter_desaturation_tint_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14599,7 +14599,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
+ 	1,
+ 	rasterizer_screen_effect_set_video(arguments[0].unsigned_short_value, real_argument))
+ 
+-void hs_object_list_get_element_evaluate(
++static void hs_object_list_get_element_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14784,7 +14784,7 @@ HS_EVALUATE_RETURN_BOOLEAN(scripted_player_control_set_camera_control_evaluate,
+ HS_EVALUATE_RETURN_BOOLEAN(scripted_show_hud_evaluate, struct hs_arguments_boolean, (scripted_show_hud(arguments->value)))
+ HS_EVALUATE_RETURN_BOOLEAN(scripted_show_hud_help_text_evaluate, struct hs_arguments_boolean, (scripted_show_hud_help_text(arguments->value)))
+ 
+-void hs_recompile_evaluate(
++static void hs_recompile_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14794,7 +14794,7 @@ void hs_recompile_evaluate(
+ 	return;
+ }
+ 
+-void random_range_evaluate(
++static void random_range_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14815,7 +14815,7 @@ void random_range_evaluate(
+ 	return;
+ }
+ 
+-void real_random_range_evaluate(
++static void real_random_range_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize)
+@@ -14823,7 +14823,6 @@ void real_random_range_evaluate(
+ 	union hs_real_value result;
+ 	union hs_evaluation_argument const *arguments;
+ 	real upper_bound;
+-	real lower_bound;
+ 
+ 	arguments = (union hs_evaluation_argument const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+ 	if (arguments)
+@@ -14831,8 +14830,7 @@ void real_random_range_evaluate(
+ 		double upper = arguments[1].real_value;
+ 
+ 		upper_bound = (real)upper;
+-		lower_bound = arguments[0].real_value;
+-		result.real_value = real_seed_random_range(get_global_random_seed_address(), lower_bound, upper_bound);
++		result.real_value = real_random_range(arguments[0].real_value, upper_bound);
+ 		hs_return(thread_index, result.long_value);
+ 	}
+ 	return;

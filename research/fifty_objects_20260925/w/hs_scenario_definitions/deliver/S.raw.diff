@@ -1,0 +1,34 @@
+diff --git a/symbols_base_lf.json b/symbols_new_lf.json
+index 8e165740..aa94e8f0 100644
+--- a/symbols_base_lf.json
++++ b/symbols_new_lf.json
+@@ -3246,7 +3246,7 @@
+ { "file_offset": 773840, "flags": 32, "name": "_hs_runtime_initialize_for_new_map" },
+ { "file_offset": 774560, "flags": 32, "name": "_hs_runtime_update" },
+ { "file_offset": 774736, "flags": 32, "name": "_hs_runtime_evaluate" },
+-{ "file_offset": 774928, "flags": 32, "name": "_hs_syntax_data_byte_swap" },
++{ "file_offset": 774928, "flags": 32, "name": "_byte_swap_script_syntax_data", "static": true },
+ { "file_offset": 775152, "flags": 32, "name": "_reference_list_new" },
+ { "file_offset": 775216, "flags": 32, "name": "_reference_list_get_next_datum_index" },
+ { "file_offset": 775264, "flags": 32, "name": "_reference_list_add" },
+@@ -22529,11 +22529,20 @@
+ { "file_offset": 3023928, "flags": 0, "name": "_typecasting_procedures" },
+ { "file_offset": 3033536, "flags": 0, "name": "_hs_script_types_enum" },
+ { "file_offset": 3033548, "flags": 0, "name": "_hs_types_enum" },
++{ "file_offset": 3033560, "flags": 0, "name": "_hs_scripts_block_fields", "static": true },
+ { "file_offset": 3033632, "flags": 0, "name": "_hs_scripts_block" },
++{ "file_offset": 3033680, "flags": 0, "name": "_hs_globals_block_fields", "static": true },
+ { "file_offset": 3033764, "flags": 0, "name": "_hs_globals_block" },
++{ "file_offset": 3033808, "flags": 0, "name": "_hs_references_block_reference", "static": true },
++{ "file_offset": 3033820, "flags": 0, "name": "_hs_references_block_fields", "static": true },
+ { "file_offset": 3033856, "flags": 0, "name": "_hs_references_block" },
+ { "file_offset": 3033900, "flags": 0, "name": "_hs_source_data_definition" },
++{ "file_offset": 3033916, "flags": 0, "name": "_hs_source_files_block_fields", "static": true },
+ { "file_offset": 3033952, "flags": 0, "name": "_hs_source_files_block" },
++{ "file_offset": 3033996, "flags": 0, "name": "_data_array_header_bs_codes", "static": true },
++{ "file_offset": 3034052, "flags": 0, "name": "_data_array_header_bs_definition", "static": true },
++{ "file_offset": 3034072, "flags": 0, "name": "_syntax_node_bs_codes", "static": true },
++{ "file_offset": 3034112, "flags": 0, "name": "_syntax_node_bs_definition", "static": true },
+ { "file_offset": 3034132, "flags": 0, "name": "_hs_syntax_data_definition" },
+ { "file_offset": 3034148, "flags": 0, "name": "_hs_string_data_definition" },
+ { "file_offset": 3034164, "flags": 0, "name": "_default_string" },

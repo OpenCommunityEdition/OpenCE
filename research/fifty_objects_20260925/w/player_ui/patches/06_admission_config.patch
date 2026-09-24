@@ -1,0 +1,28 @@
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -50,14 +50,6 @@
+       "reopen": "Remove only after authentic source topology preserves the January helper schedule without extra emission, or an ordinary base/base link proves a compatible authenticated canonical selected owner can coalesce the copy. Do not force inline, manually expand the helper, alter comparator/selection metadata, invent a discard pass, or count another object's selected bytes. The renderer must independently become strict and all other source/data/linkage checks must pass before Matching admission."
+     },
+     {
+-      "unit": "source/interface/player_ui",
+-      "class": "source-layout-incomplete",
+-      "symbol": "struct playlist_profile",
+-      "reason": "All42 target functions and target data are strict exact, but the public playlist_profile is only forward-declared by its owner header while Player UI defines a local partial view with an opaque0x47-byte middle misleadingly called unused. Those bytes hold real January variant state; the complete authentic January public layout is not yet recovered. Exact code/data alone cannot certify this source as a completed object. The reviewed ordinary typed-loop, enum/macro and game_variant storage cleanups remain valid and receive independent function credit.",
+-      "evidence": "docs/object_matching_logs/player_ui_obj_owner_house_rule_reconciliation_20260904.md#remaining-source-boundary-and-reopen-condition",
+-      "reopen": "Authenticate the full January playlist-profile layout and place shared declarations in their genuine owner without opaque fake padding or transplantation of the incompatible later152-byte format. Preserve inherited exact functions across affected callers and finish the documented natural select-any string ownership/coalescing audit before whole-object admission. Do not debit valid target-function progress for this separate source-layout veto."
+-    },
+-    {
+       "unit": "source/models/models",
+       "class": "bss-symbol-layout-mismatch",
+       "symbol": ".bss",
+--- a/config/config.json
++++ b/config/config.json
+@@ -626,7 +626,7 @@
+ 				{ "name": "source/interface/ui_widget.c", "index": 251, "status": "NonMatching" },
+ 				{ "name": "source/interface/terminal.c", "index": 252, "status": "Matching" },
+ 				{ "name": "source/interface/progress_bar.c", "index": 253, "status": "NonMatching" },
+-				{ "name": "source/interface/player_ui.c", "index": 254, "status": "NonMatching" },
++				{ "name": "source/interface/player_ui.c", "index": 254, "status": "Matching" },
+ 				{ "name": "source/interface/overhead_map.c", "index": 255, "status": "Matching" },
+ 				{ "name": "source/interface/meters.c", "index": 256, "status": "Matching" },
+ 				{ "name": "source/interface/meter_definitions.c", "index": 257, "status": "Matching" },
