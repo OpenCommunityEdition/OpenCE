@@ -140,6 +140,10 @@ symbols in this file:
 
 /* ---------- headers */
 
+/* objects.h lies in this unit's own directory, so January's __FILE__ for it was the absolute
+   path (see OBJECTS_H_FILE in objects.h) */
+#define OBJECTS_H_FILE "c:\\halo\\source\\objects\\objects.h"
+
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"

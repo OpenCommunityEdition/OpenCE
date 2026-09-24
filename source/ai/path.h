@@ -264,7 +264,7 @@ struct path_debug_storage
 	short path_traverse_result;
 	short path_build_result;
 	struct path_state path_state;
-	char __unknown140A0[0x5C];
+	struct path_result result;
 	short raw_step_count;
 	word pad_140FE;
 	struct path_step raw_steps[64];

@@ -70,11 +70,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "actions.h"
-
-#define object_get_bounding_sphere object_get_bounding_sphere_inline
 #include "actors.h"
-#undef object_get_bounding_sphere
-
 #include "actor_definitions.h"
 #include "ai_debug.h"
 #include "props.h"
@@ -156,22 +152,6 @@ boolean unit_get_seat_entrance_point(
 /* ---------- globals */
 
 /* ---------- public code */
-
-void object_get_bounding_sphere(
-	long object_index,
-	real_point3d *center,
-	real *radius)
-{
-	struct object_datum *object = object_get(object_index);
-
-	match_assert("..\\objects\\objects.h", 535, center);
-	match_assert("..\\objects\\objects.h", 536, radius);
-
-	*center = object->object.bounding_sphere_center;
-	*radius = object->object.bounding_sphere_radius;
-
-	return;
-}
 
 void action_vehicle_begin(
 	long actor_index)
