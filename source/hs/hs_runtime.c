@@ -466,29 +466,29 @@ static void hs_inspect_enum(
 	short type,
 	union hs_conversion_result value,
 	char *result);
-union hs_conversion_result hs_long_to_boolean(
+static union hs_conversion_result hs_long_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result hs_short_to_boolean(
+static union hs_conversion_result hs_short_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result hs_string_to_boolean(
+static union hs_conversion_result hs_string_to_boolean(
 	union hs_conversion_result value);
-union hs_conversion_result hs_data_to_void(
+static union hs_conversion_result hs_data_to_void(
 	union hs_conversion_result value);
-union hs_conversion_result hs_short_to_real(
+static union hs_conversion_result hs_short_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result hs_long_to_real(
+static union hs_conversion_result hs_long_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result hs_enum_to_real(
+static union hs_conversion_result hs_enum_to_real(
 	union hs_conversion_result value);
-union hs_conversion_result hs_real_to_short(
+static union hs_conversion_result hs_real_to_short(
 	union hs_conversion_result value);
-long hs_real_to_long(
+static long hs_real_to_long(
 	union hs_conversion_result value);
-long hs_long_to_short(
+static long hs_long_to_short(
 	union hs_conversion_result value);
-long hs_object_name_to_object_list(
+static long hs_object_name_to_object_list(
 	short object_name_index);
-long hs_object_to_object_list(
+static long hs_object_to_object_list(
 	long object_index);
 static boolean hs_object_type_can_cast(
 	short actual_type,
@@ -1004,8 +1004,9 @@ void render_debug_trigger_volumes(
 {
 	if (debug_trigger_volumes)
 	{
-		struct scenario *scenario = global_scenario_get();
+		real_matrix4x3 matrix;
 		short volume_index;
+		struct scenario *scenario = global_scenario_get();
 
 		for (volume_index = 0;
 			volume_index < scenario->trigger_volumes.count;
@@ -1015,42 +1016,37 @@ void render_debug_trigger_volumes(
 				&scenario->trigger_volumes,
 				volume_index,
 				struct scenario_trigger_volume);
-			struct collision_result collision;
-			real_matrix4x3 frame;
-			real_argb_color color;
-			real_vector3d vector;
-			real_point3d center;
-			real_point3d points[4];
-			real_vector3d world_diagonal;
-			real_vector3d extents;
+			real_vector3d local_extent;
+			real_vector3d world_extent;
 			short edge_index;
+			real_point3d corner[4];
 
 			switch (volume->type)
 			{
 			case _scenario_trigger_volume_type_axis_aligned:
-				frame = *global_identity4x3;
+				matrix = *global_identity4x3;
 				set_real_point3d(
-					&frame.position,
+					&matrix.position,
 					volume->bounds.x0,
 					volume->bounds.y0,
 					volume->bounds.z0);
 				set_real_vector3d(
-					&extents,
+					&local_extent,
 					volume->bounds.x1 - volume->bounds.x0,
 					volume->bounds.y1 - volume->bounds.y0,
 					volume->bounds.z1 - volume->bounds.z0);
-				world_diagonal = extents;
+				world_extent = local_extent;
 				break;
 
 			case _scenario_trigger_volume_type_oriented:
-				extents = volume->extents;
-				world_diagonal = volume->extents;
+				local_extent = volume->extents;
+				world_extent = volume->extents;
 				matrix4x3_from_point_and_vectors(
-					&frame,
+					&matrix,
 					&volume->position,
 					&volume->forward,
 					&volume->up);
-				matrix4x3_transform_vector(&frame, &extents, &world_diagonal);
+				matrix4x3_transform_vector(&matrix, &local_extent, &world_extent);
 				break;
 
 			default:
@@ -1063,72 +1059,71 @@ void render_debug_trigger_volumes(
 
 			for (edge_index = 0; edge_index < 6; edge_index++)
 			{
-				real_vector3d edge_b = { 0 };
-				real_vector3d edge_c = { 0 };
-				short axis = edge_index / 2;
+				real_vector3d sides[2] = { 0 };
 				short side = edge_index % 2;
+				short axis = edge_index / 2;
 
 				if (side)
 				{
-					points[0].x = world_diagonal.i + frame.position.x;
-					points[0].y = world_diagonal.j + frame.position.y;
-					points[0].z = world_diagonal.k + frame.position.z;
-					edge_b.n[(axis + 1) % 3] = -extents.n[(axis + 1) % 3];
-					edge_c.n[(axis + 2) % 3] = -extents.n[(axis + 2) % 3];
-					matrix4x3_transform_vector(&frame, &edge_b, &edge_b);
-					matrix4x3_transform_vector(&frame, &edge_c, &edge_c);
+					point_from_line3d(&matrix.position, &world_extent, 1.0f, &corner[0]);
+					sides[0].n[(axis + 1) % 3] = -local_extent.n[(axis + 1) % 3];
+					sides[1].n[(axis + 2) % 3] = -local_extent.n[(axis + 2) % 3];
+					matrix4x3_transform_vector(&matrix, &sides[0], &sides[0]);
+					matrix4x3_transform_vector(&matrix, &sides[1], &sides[1]);
+					point_from_line3d(&corner[0], &sides[0], 1.0f, &corner[1]);
+					point_from_line3d(&corner[1], &sides[1], 1.0f, &corner[2]);
+					point_from_line3d(&corner[2], &sides[0], -1.0f, &corner[3]);
 				}
 				else
 				{
-					points[0] = frame.position;
-					edge_b.n[(axis + 1) % 3] = extents.n[(axis + 1) % 3];
-					edge_c.n[(axis + 2) % 3] = extents.n[(axis + 2) % 3];
-					matrix4x3_transform_vector(&frame, &edge_b, &edge_b);
-					matrix4x3_transform_vector(&frame, &edge_c, &edge_c);
+					corner[0] = matrix.position;
+					sides[0].n[(axis + 1) % 3] = local_extent.n[(axis + 1) % 3];
+					sides[1].n[(axis + 2) % 3] = local_extent.n[(axis + 2) % 3];
+					matrix4x3_transform_vector(&matrix, &sides[0], &sides[0]);
+					matrix4x3_transform_vector(&matrix, &sides[1], &sides[1]);
+					point_from_line3d(&corner[0], &sides[0], 1.0f, &corner[1]);
+					point_from_line3d(&corner[1], &sides[1], 1.0f, &corner[2]);
+					point_from_line3d(&corner[2], &sides[0], -1.0f, &corner[3]);
 				}
-
-				points[1].x = points[0].x + edge_b.i;
-				points[1].y = points[0].y + edge_b.j;
-				points[1].z = points[0].z + edge_b.k;
-				points[2].x = points[1].x + edge_c.i;
-				points[2].y = points[1].y + edge_c.j;
-				points[2].z = points[1].z + edge_c.k;
-				points[3].x = points[2].x - edge_b.i;
-				points[3].y = points[2].y - edge_b.j;
-				points[3].z = points[2].z - edge_b.k;
 
 				if (BIT_VECTOR_TEST_FLAG(hs_debug_data, volume_index))
 				{
-					render_debug_polygon_edges(points, 4, global_real_argb_blue);
+					render_debug_polygon_edges(corner, 4, global_real_argb_blue);
 				}
 				else
 				{
-					color = *global_real_argb_blue;
+					real_argb_color color = *global_real_argb_blue;
+
 					color.alpha = 0.15f;
-					render_debug_polygon_edges(points, 4, global_real_argb_red);
-					render_debug_polygon(points, 4, &color);
+					render_debug_polygon_edges(corner, 4, global_real_argb_red);
+					render_debug_polygon(corner, 4, &color);
 				}
 			}
 
-			center.x = frame.position.x + world_diagonal.i * 0.5f;
-			center.y = frame.position.y + world_diagonal.j * 0.5f;
-			center.z = frame.position.z + world_diagonal.k * 0.5f;
-			vector_from_points3d(&render.camera.position, &center, &vector);
-			scale_vector3d(&vector, 0.95f, &vector);
-			if (!collision_test_vector(
-				_collision_test_for_line_of_sight_flags,
-				&render.camera.position,
-				&vector,
-				NONE,
-				&collision))
 			{
-				render_debug_string_at_point(
-					TRUE,
-					&center,
-					volume->name,
-					BIT_VECTOR_TEST_FLAG(hs_debug_data, volume_index)
-						? global_real_argb_yellow
-						: global_real_argb_white);
+				real_point3d center;
+				real_vector3d ray;
+				struct collision_result result;
+
+				point_from_line3d(&matrix.position, &world_extent, 0.5f, &center);
+				vector_from_points3d(&render.camera.position, &center, &ray);
+				scale_vector3d(&ray, 0.95f, &ray);
+				if (!collision_test_vector(
+					_collision_test_for_line_of_sight_flags,
+					&render.camera.position,
+					&ray,
+					NONE,
+					&result))
+				{
+					if (BIT_VECTOR_TEST_FLAG(hs_debug_data, volume_index))
+					{
+						render_debug_string_at_point(TRUE, &center, volume->name, global_real_argb_yellow);
+					}
+					else
+					{
+						render_debug_string_at_point(TRUE, &center, volume->name, global_real_argb_white);
+					}
+				}
 			}
 		}
 	}
@@ -1538,7 +1533,7 @@ static void hs_inspect_enum(
 	return;
 }
 
-union hs_conversion_result hs_long_to_boolean(
+static union hs_conversion_result hs_long_to_boolean(
 	union hs_conversion_result value)
 {
 	value.boolean = value.long_integer==0;
@@ -1546,7 +1541,7 @@ union hs_conversion_result hs_long_to_boolean(
 	return value;
 }
 
-union hs_conversion_result hs_short_to_boolean(
+static union hs_conversion_result hs_short_to_boolean(
 	union hs_conversion_result value)
 {
 	value.boolean = value.short_integer==0;
@@ -1554,7 +1549,7 @@ union hs_conversion_result hs_short_to_boolean(
 	return value;
 }
 
-union hs_conversion_result hs_string_to_boolean(
+static union hs_conversion_result hs_string_to_boolean(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -1564,7 +1559,7 @@ union hs_conversion_result hs_string_to_boolean(
 	return result;
 }
 
-union hs_conversion_result hs_data_to_void(
+static union hs_conversion_result hs_data_to_void(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -1574,7 +1569,7 @@ union hs_conversion_result hs_data_to_void(
 	return result;
 }
 
-union hs_conversion_result hs_short_to_real(
+static union hs_conversion_result hs_short_to_real(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -1585,7 +1580,7 @@ union hs_conversion_result hs_short_to_real(
 	return result;
 }
 
-union hs_conversion_result hs_long_to_real(
+static union hs_conversion_result hs_long_to_real(
 	union hs_conversion_result value)
 {
 	value.real = value.long_integer;
@@ -1593,7 +1588,7 @@ union hs_conversion_result hs_long_to_real(
 	return value;
 }
 
-union hs_conversion_result hs_enum_to_real(
+static union hs_conversion_result hs_enum_to_real(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -1604,7 +1599,7 @@ union hs_conversion_result hs_enum_to_real(
 	return result;
 }
 
-union hs_conversion_result hs_real_to_short(
+static union hs_conversion_result hs_real_to_short(
 	union hs_conversion_result value)
 {
 	value.short_integer = (short)value.real;
@@ -1612,13 +1607,13 @@ union hs_conversion_result hs_real_to_short(
 	return value;
 }
 
-long hs_real_to_long(
+static long hs_real_to_long(
 	union hs_conversion_result value)
 {
 	return (long)value.real;
 }
 
-long hs_long_to_short(
+static long hs_long_to_short(
 	union hs_conversion_result value)
 {
 	union hs_conversion_result result;
@@ -1628,7 +1623,7 @@ long hs_long_to_short(
 	return result.long_integer;
 }
 
-long hs_object_name_to_object_list(
+static long hs_object_name_to_object_list(
 	short object_name_index)
 {
 	long object_index;
@@ -1644,7 +1639,7 @@ long hs_object_name_to_object_list(
 	return object_list_index;
 }
 
-long hs_object_to_object_list(
+static long hs_object_to_object_list(
 	long object_index)
 {
 	long object_list_index = NONE;

@@ -665,44 +665,6 @@
       }
     },
     {
-      "unit": "source/ai/actors",
-      "function": "_actors_spawn_from_unit",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked after reconstructing the full typed spawn loop from January disassembly and independent HCEA semantics. The retained ordinary C inherits encounter/squad ownership, resolves actor tags through subsystem macros, creates each unit at the source origin with randomized facing and offset, settles bipeds, customizes and creates actors, emits January's exact failure warning and cleanup, verifies activation, and applies the randomized outward launch. Target and candidate share the 672-byte padded envelope and all 29 relocation identities. Objdiff reports 54.82266 percent because an early register-allocation shift makes its index-aligned score pessimistic; the major call, constant, placement, cleanup, activation, launch, and loop topology remains aligned. Bounded early-return, single-exit, loop, declaration, and vector-expression forms only traded VC7 callee-save/register and x87-stack schedules. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining those schedules.",
-      "measurements": {
-        "target": {
-          "size": 672,
-          "relocation_count": 29,
-          "normalized_sha256": "38d0b2f1fcd5109d57fab7a261e7d8abe3bf5d4b8c1d44e26feccf0941ded7e1"
-        },
-        "base": {
-          "size": 688,
-          "relocation_count": 29,
-          "normalized_sha256": "6920d01004049e7bcf335a2442429ed51756dfb5ded01554a9e641412e11b952"
-        },
-        "objdiff_percent": 80.46798
-      }
-    },
-    {
-      "unit": "source/ai/actors",
-      "function": "_actor_input_update",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked after reconstructing the full typed actor-input refresh from January disassembly, January relocation/assert/string topology, independent HCEA behavior, and the recovered Claude draft as secondary evidence. The retained ordinary C updates swarm centers and members, samples individual or parent-vehicle state, handles vehicle roles and encounter migration, diagnoses flying/3D-position mismatches, scans attached melee/projectile threats, refreshes biped path state and orientation vectors, validates every resulting normal, and records vitality. Target is 2384 padded bytes and the candidate 2400, with all 89 relocation identities preserved; objdiff reports 94.84425 percent similarity. The residual spans several VC7 allocation and instruction-scheduling choices rather than one isolated source construct, so it remains fail-closed as unclassified. Bounded natural condition, declaration-lifetime, encounter-migration, and vector-expression forms did not close it; an earlier equal-size form was rejected because it expressed January's behavior less faithfully. No register hint, volatile access, barrier, pragma, forced inline, assembly, raw offset, fake dependency, or nonsensical control flow is retained. Reopen for authoritative January source/local records or a natural same-compiler donor.",
-      "measurements": {
-        "target": {
-          "size": 2384,
-          "relocation_count": 89,
-          "normalized_sha256": "bf2e87448623ee925aa42e94ee93f1e1ebc439fd58971dba93e1a2b993c0d9b8"
-        },
-        "base": {
-          "size": 2384,
-          "relocation_count": 89,
-          "normalized_sha256": "f6ff0151006bb86f375c641286002998d8d558f4d0d30684ab5d5c05c6127280"
-        },
-        "objdiff_percent": 98.51674
-      }
-    },
-    {
       "unit": "source/networking/network_connection",
       "function": "_network_connection_connect",
       "class": "instruction-scheduling",
@@ -1333,17 +1295,6 @@
         "target": { "size": 1120, "relocation_count": 26, "normalized_sha256": "0d106198b6d9ccb8c0d74d8af566876f04b2610ae714fb5cabb28254b33e0d20" },
         "base": { "size": 1120, "relocation_count": 26, "normalized_sha256": "9c1611d216717b6d0ba6792f37f6dde55d3fbbffac81c875f48a0e934072f6a3" },
         "objdiff_percent": 80.76382
-      }
-    },
-    {
-      "unit": "source/hs/hs_runtime",
-      "function": "_render_debug_trigger_volumes",
-      "class": "unclassified",
-      "evidence": "Complete natural trigger-volume debug renderer retained from HCEA and preserved project history. It uses the typed scenario trigger-volume record, named trigger-volume enums, project real/vector/color types, correct render-debug and collision owners, and ordinary project math helpers. The January and candidate functions both occupy 1088 padded bytes, carry the same 34 relocation destinations, and disassemble to 342 instructions; the normalized difference is dominated by VC7 local-stack allocation and register scheduling. Direct component arithmetic preserves the January inline schedule without emitting a point_from_line3d COMDAT. No source-pressure variant search, forced register, volatile, raw offset, representation punning, or fake dependency is admitted. This honest 94.96407 percent residual receives zero exact credit. See docs/object_matching_logs/small_unwritten_threshold_wave_main_hs_ai_20260913.md.",
-      "measurements": {
-        "target": { "size": 1088, "relocation_count": 34, "normalized_sha256": "5789a872498d7ef2bca2ea4d3e4687e0294ef9ef9e1b11ad7629b63fbae9abdb" },
-        "base": { "size": 1088, "relocation_count": 34, "normalized_sha256": "66af597069fc087b6095a9add3e960cdeb1af96f3e8a6f3184028352ba053023" },
-        "objdiff_percent": 94.96407
       }
     },
     {
