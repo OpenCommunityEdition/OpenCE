@@ -65,6 +65,16 @@ enum
 
 /* ---------- globals */
 
+static real const quantized_pathfinding_surface_widths[8] =
+{
+	0.2f, 0.4f, 0.6f, 0.8f, 1.0f, 1.5f, 2.0f, 4.0f
+};
+
+static real const quantized_pathfinding_surface_heights[8] =
+{
+	0.25f, 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, 4.0f, 8.0f
+};
+
 /* ---------- public code */
 
 boolean structure_test_ray2d(

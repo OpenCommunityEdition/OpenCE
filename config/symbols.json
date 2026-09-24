@@ -13110,7 +13110,7 @@
 { "file_offset": 2419672, "flags": 0, "name": "??_C@_0BE@FBKMNIEA@smoothed_step_count?$AA@" },
 { "file_offset": 2419692, "flags": 0, "name": "??_C@_09LCGCKCI@raw_steps?$AA@" },
 { "file_offset": 2419704, "flags": 0, "name": "??_C@_0BD@DLANHJEI@raw_step_count?5?$DO?50?$AA@" },
-{ "file_offset": 2419724, "flags": 0, "name": "_rdata_0024ec0c" },
+{ "file_offset": 2419724, "flags": 0, "name": "_quantized_pathfinding_surface_widths", "static": true },
 { "file_offset": 2419788, "flags": 0, "name": "??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_structure@" },
 { "file_offset": 2419832, "flags": 0, "name": "__real@3fa99999a0000000" },
 { "file_offset": 2419840, "flags": 0, "name": "__real@3c000000" },
