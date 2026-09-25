@@ -97,3 +97,45 @@ Residual functions:
 | collisions duplicate-prototype copy choice (stack_walk; bitmap_delete route) | collisions (1 object, +4,744 B) | count-keyed site; HCEX topology cannot decide ownership |
 | real_math.h P2 (complete January tier) vs 3 count-coincident canaries | authenticity; no credit | each canary is one adjacent load swap keyed to TU count |
 | transport_endpoint.h duplicate prototype (tn) | none (hygiene) | count-selected; byte-inert today |
+
+## Wave R3-2 (three board-wide instruments + attacks)
+
+- **Cross-build census (A):** covered 119 non-reserved residuals.
+  - 106 are **class iii**: the Aug/Sept/Oct-2001 bodies equal January's, so our source has a local
+    defect (not a late January edit and not a count site).
+  - 6 are count-keyed; 2 are partial late edits; 2 are unwritten.
+- **/Od statement-structure census (B):** covered all 128 residuals. Only a handful of structural
+  differences were both new and usable.
+- **Escape/redirect census (C):** confirmed law L2 on controls:
+  - making a header-inline callee external grows the frame by exactly the January cells the
+    escaped local shares (editor_camera +12, limp_noodle +24);
+  - negative controls held;
+  - E1 is per-address;
+  - an external redirect can also masquerade as a "scheduler tie" through L5;
+  - the frame census misses `__chkstk` prologues.
+
+Attack outcomes (all reviewed):
+
+| Function | Result |
+|---|---|
+| bipeds `_biped_find_nearby_support_surface` | **EXACT.** Real_math.h `plane3d_negate` body (P1) + render_objects /Od body (P2, approved) + genuine helper calls (P3, approved). P1 is under a dedicated shared-header review before landing. |
+| decals `_decal_clip_to_surface` | **EXACT once the external project_point3d redirect is removed** (reverses a 2026-09-12 decision; disclosed). **OWNER-GATED:** the combined flag mask `!(flags & (a\|b\|c))` is supported only by January's inline decision; HCEX/2020 spell three tests. Reviewer amended the /Od declaration scope (P5b). |
+| ai `_ai_test_line_of_sight` | EXACT frame/size only with both redirects removed; owner-gated (January uninitialised read). |
+| first_person_weapons `_first_person_weapon_update` | owner packet. The same TU already has an identical landed construct (`weapon_play_first_person_weapon_sound`, 6d351b35), so the ruling is a consistency question. |
+| structures, transport_endpoint_winsock, transport_initialize | owner packets |
+| saved_game_files | zero-credit first-party static names (01) + storage (02r) approved; completion still needs owner patch 03 |
+| geometry polygon3d, bitmap_group, bsp3d sphere, ballistic line of fire | fuzzy or blocked |
+
+## Owner decisions after wave R3-2 (cumulative)
+
+| # | Decision | Unlocks |
+|---|---|---|
+| 1 | Credit `_actor_aim_grenade` with January's authentic uninitialised vehicle-path read | +544 B; path_smoothing, real_math, collision_features (3 objects) |
+| 2 | actor_perception empty then-arm + explicit else (HCEX line evidence) | actor_perception (+385 B, 1 object) |
+| 3 | collisions duplicate-prototype copy choice (count-keyed site) | collisions (+4,744 B, 1 object) |
+| 4 | decals clip combined flag mask (+ project_point3d internal) | +1,768 B (decals not complete) |
+| 5 | first_person_weapons unguarded constant-index read (same class as a landed row) | first_person_weapons (1 object) |
+| 6 | saved_game_files patch 03 (/Od double zeroing; January-bug class) | saved_game_files (1 object) |
+| 7 | ai_test_line_of_sight uninitialised read | +996 B (ai not complete) |
+| 8 | structures `double t`, rasterizer_geometry staged temp | structures, rasterizer_geometry (2 objects) |
+| 9 | real_math.h P2 complete January tier vs 3 count-coincident canaries | authenticity |
