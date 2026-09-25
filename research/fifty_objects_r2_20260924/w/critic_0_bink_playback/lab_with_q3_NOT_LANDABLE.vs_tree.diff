@@ -1,0 +1,99 @@
+diff --git a/source/bink/bink_playback.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\critic_0_bink_playback\\lab_with_q3_NOT_LANDABLE.c"
+index 51377358..9f107a3d 100644
+--- a/source/bink/bink_playback.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\critic_0_bink_playback\\lab_with_q3_NOT_LANDABLE.c"
+@@ -19,7 +19,7 @@ symbols in this file:
+ 001B5790 00c0:
+ 	_code_001b5790 (0000)
+ 001B5850 0010:
+-	_code_001b5850 (0000)
++	_bink_decompress_audio_frame (0000)
+ 001B5860 0390:
+ 	_code_001b5860 (0000)
+ 001B5BF0 0010:
+@@ -43,7 +43,7 @@ symbols in this file:
+ 001B5E00 0030:
+ 	_bink_playback_dispose (0000)
+ 001B5E30 00a0:
+-	_bink_playback_update__internal (0000)
++	_code_001b5e30 (0000)
+ 001B5ED0 0060:
+ 	_bink_playback_render (0000)
+ 001B5F30 0430:
+@@ -382,7 +382,7 @@ static void * __stdcall bink_alloc(
+ 	unsigned long size_in_bytes);
+ static void __stdcall bink_free(
+ 	void *memory);
+-void code_001b5850(
++static void bink_decompress_audio_frame(
+ 	void);
+ static void bink_draw_frame(
+ 	void);
+@@ -392,7 +392,7 @@ static void bink_free_texture_cache(
+ 	void);
+ static void bink_decompress_video_frame(
+ 	void);
+-static void bink_playback_update__internal(
++static void bink_playback_idle(
+ 	void);
+ 
+ /* ---------- globals */
+@@ -495,6 +495,9 @@ void bink_playback_render(
+ 	else if (!bink_globals.needs_decode)
+ 		goto skip_decode;
+ 
++	/* January emits this empty static (0x001b5850) out of line; every call is
++	 * inlined away, so the call position is not recoverable from the bytes. */
++	bink_decompress_audio_frame();
+ 	bink_decompress_video_frame();
+ 	bink_globals.needs_decode = FALSE;
+ 
+@@ -503,7 +506,7 @@ skip_decode:
+ 	bink_globals.rendered_frame_count++;
+ 
+ 	if (!global_frame_rate_throttle)
+-		bink_playback_update__internal();
++		bink_playback_idle();
+ 
+ 	return;
+ }
+@@ -659,14 +662,14 @@ void bink_playback_update(
+ 	void)
+ {
+ 	if (global_frame_rate_throttle)
+-		bink_playback_update__internal();
++		bink_playback_idle();
+ 
+ 	return;
+ }
+ 
+ /* ---------- private code */
+ 
+-void code_001b5850(
++static void bink_decompress_audio_frame(
+ 	void)
+ {
+ 	return;
+@@ -974,7 +977,7 @@ static void bink_decompress_video_frame(
+ 	return;
+ }
+ 
+-static void bink_playback_update__internal(
++static void bink_playback_idle(
+ 	void)
+ {
+ 	if (bink_globals.initialized && bink_globals.bink)
+@@ -1025,8 +1028,11 @@ static boolean bink_query_analog_controller_buttons(
+ 
+ 		if (gamepad)
+ 		{
+-			if (gamepad->buttons[_gamepad_binary_button_start]==1 ||
+-				gamepad->buttons[_gamepad_binary_button_back]==1)
++			if (gamepad->buttons[_gamepad_binary_button_start]==1)
++			{
++				button_pressed= TRUE;
++			}
++			else if (gamepad->buttons[_gamepad_binary_button_back]==1)
+ 			{
+ 				button_pressed= TRUE;
+ 			}

@@ -1,0 +1,26 @@
+diff --git a/source/effects/weather_particle_systems.c b/source/effects/weather_particle_systems.c
+index d2aae8ff..143acb0c 100644
+--- a/source/effects/weather_particle_systems.c
++++ b/source/effects/weather_particle_systems.c
+@@ -310,7 +310,7 @@ static real const one_over_char_max = 1.f/255.f;
+ 
+ boolean weather = TRUE;
+ 
+-struct weather_particle_system_globals weather_particle_system_globals = { 0 };
++static struct weather_particle_system_globals weather_particle_system_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+diff --git a/config/symbols.json b/config/symbols.json
+index f9abb17d..b6b073fe 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -22978,7 +22978,7 @@
+ { "file_offset": 4445576, "flags": 0, "name": "_debug_effects_nonviolent" },
+ { "file_offset": 4445577, "flags": 0, "name": "_debug_material_effects" },
+ { "file_offset": 4445580, "flags": 0, "name": "_player_effect_globals" },
+-{ "file_offset": 4445584, "flags": 0, "name": "_weather_particle_system_globals" },
++{ "file_offset": 4445584, "flags": 0, "name": "_weather_particle_system_globals", "static": true },
+ { "file_offset": 4446216, "flags": 0, "name": "_cheat_strings" },
+ { "file_offset": 4449420, "flags": 0, "name": "_game_globals", "static": true },
+ { "file_offset": 4449424, "flags": 0, "name": "_game_allegiance_globals", "static": true },

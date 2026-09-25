@@ -1,0 +1,11 @@
+--- a/source/main/main.h
++++ b/source/main/main.h
+@@ -183,7 +183,7 @@
+ void main_start_time(void);
+ 
+ void main_vertical_blank_interrupt_handler(
+-	unsigned long);
++	unsigned long context);
+ 
+ void main_loop(void);
+ 

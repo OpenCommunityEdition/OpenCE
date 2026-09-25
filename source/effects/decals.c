@@ -3,7 +3,7 @@ DECALS.C
 
 symbols in this file:
 00086FE0 0130:
-	_decal_verify_neighbors (0000)
+	_decal_check (0000)
 00087110 0080:
 	_decal_set_first_decal_index (0000)
 00087190 0180:
@@ -418,7 +418,7 @@ struct decal_globals
 
 /* ---------- prototypes */
 
-static void decal_verify_neighbors(
+static void decal_check(
 	long decal_index,
 	boolean layer_check);
 static void decal_update(
@@ -1544,7 +1544,7 @@ void decals_reconnect_to_structure_bsp(
 			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 661,
 				decal->layer>=0 && decal->layer<NUMBER_OF_DECAL_LAYERS);
 
-			decal_verify_neighbors(decal_index, FALSE);
+			decal_check(decal_index, FALSE);
 
 			scenario_location_from_point(&location, &decal->position);
 
@@ -1570,7 +1570,7 @@ void decals_reconnect_to_structure_bsp(
 				decal_reinsert(decal_index, location.cluster_index, decal->layer);
 			}
 
-			decal_verify_neighbors(decal_index, FALSE);
+			decal_check(decal_index, FALSE);
 
 			decal_index= next_decal_index;
 		}
@@ -2393,7 +2393,7 @@ static void decal_update(
 
 	return;
 }
-static void decal_verify_neighbors(
+static void decal_check(
 	long decal_index,
 	boolean layer_check)
 {

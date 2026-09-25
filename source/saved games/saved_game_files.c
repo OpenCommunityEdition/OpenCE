@@ -35,7 +35,7 @@ symbols in this file:
 001B2C50 0090:
 	_saved_game_file_generate_checksum (0000)
 001B2CE0 0060:
-	_code_001b2ce0 (0000)
+	_find_and_create_directory_if_necessary (0000)
 001B2D40 00d0:
 	_code_001b2d40 (0000)
 001B2E10 0090:
@@ -61,9 +61,9 @@ symbols in this file:
 001B33C0 0160:
 	_saved_game_file_find_profile_index_for_directory_path (0000)
 001B3520 0210:
-	_code_001b3520 (0000)
+	_enumerate_default_playlist_profiles (0000)
 001B3730 0200:
-	_code_001b3730 (0000)
+	_enumerate_default_player_profiles (0000)
 001B3930 01f0:
 	_code_001b3930 (0000)
 001B3B20 01e0:
@@ -83,7 +83,7 @@ symbols in this file:
 001B4890 0170:
 	_saved_game_file_get_path_to_enclosing_directory (0000)
 001B4A00 0020:
-	_code_001b4a00 (0000)
+	_enumerate_default_profiles (0000)
 001B4A20 00e0:
 	_saved_game_files_delete_all_custom_profiles (0000)
 001B4B00 03e0:
@@ -433,7 +433,7 @@ typedef char verify_saved_game_files_globals_size[
 
 /* ---------- prototypes */
 
-static boolean find_or_create_directory(
+static boolean find_and_create_directory_if_necessary(
 	char const *path);
 static boolean append_entry_to_mapfile(
 	struct enumerated_saved_game_file *file);
@@ -455,9 +455,9 @@ static long build_saved_game_file_index(
 	boolean valid);
 static boolean enumerate_mapfile_end(
 	word memory_unit);
-static short enumerate_default_playlist_profile_files(
+static short enumerate_default_playlist_profiles(
 	void);
-static short enumerate_default_player_profile_files(
+static short enumerate_default_player_profiles(
 	void);
 static boolean get_nth_entry_in_mapfile(
 	word memory_unit_index,
@@ -497,37 +497,37 @@ struct saved_game_files_globals saved_game_files_globals = {0};
 void saved_game_files_initialize(
 	void)
 {
-	if (!find_or_create_directory("z:\\saved"))
+	if (!find_and_create_directory_if_necessary("z:\\saved"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\player_profiles"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\player_profiles"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\player_profiles");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\player_profiles\\default_profile"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\player_profiles\\default_profile"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\player_profiles\\default_profile");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\playlists"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\playlists"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\playlists");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\playlists\\default_playlist"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\playlists\\default_playlist"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\playlists\\default_playlist");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\recordings"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\recordings"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\recordings");
 	}
 
-	if (!find_or_create_directory("z:\\saved\\recordings\\last_recording"))
+	if (!find_and_create_directory_if_necessary("z:\\saved\\recordings\\last_recording"))
 	{
 		error(_error_silent, "failed to find/create '%s' directory", "z:\\saved\\recordings\\last_recording");
 	}
@@ -1321,11 +1321,11 @@ static boolean set_nth_entry_in_mapfile(
 	return success;
 }
 
-short saved_game_files_enumerate_default_files(
+short enumerate_default_profiles(
 	void)
 {
-	short number_of_playlist_files = enumerate_default_playlist_profile_files();
-	short number_of_player_profile_files = enumerate_default_player_profile_files();
+	short number_of_playlist_files = enumerate_default_playlist_profiles();
+	short number_of_player_profile_files = enumerate_default_player_profiles();
 
 	return number_of_playlist_files+number_of_player_profile_files;
 }
@@ -1787,8 +1787,8 @@ void saved_game_files_delete_all_custom_profiles(
 				}
 
 				{
-					short number_of_playlist_files = enumerate_default_playlist_profile_files();
-					short number_of_player_profile_files = enumerate_default_player_profile_files();
+					short number_of_playlist_files = enumerate_default_playlist_profiles();
+					short number_of_player_profile_files = enumerate_default_player_profiles();
 					short number_of_default_files = number_of_playlist_files+number_of_player_profile_files;
 
 					number_of_enumerated_files += number_of_default_files;
@@ -1947,8 +1947,8 @@ void enumerate_memory_units(
 					}
 
 					{
-						short number_of_playlist_files = enumerate_default_playlist_profile_files();
-						short number_of_player_profile_files = enumerate_default_player_profile_files();
+						short number_of_playlist_files = enumerate_default_playlist_profiles();
+						short number_of_player_profile_files = enumerate_default_player_profiles();
 						short number_of_default_files = number_of_playlist_files+number_of_player_profile_files;
 
 						number_of_enumerated_files += number_of_default_files;
@@ -1978,7 +1978,7 @@ void enumerate_memory_units_test(
 
 /* ---------- private code */
 
-static boolean find_or_create_directory(
+static boolean find_and_create_directory_if_necessary(
 	char const *path)
 {
 	struct file_reference directory;
@@ -2208,7 +2208,7 @@ static long build_saved_game_file_index(
 	return profile_index;
 }
 
-static short enumerate_default_playlist_profile_files(
+static short enumerate_default_playlist_profiles(
 	void)
 {
 	byte block[SAVED_GAME_FILE_BLOCK_SIZE];
@@ -2286,7 +2286,7 @@ static short enumerate_default_playlist_profile_files(
 	return profile_index;
 }
 
-static short enumerate_default_player_profile_files(
+static short enumerate_default_player_profiles(
 	void)
 {
 	byte block[SAVED_GAME_FILE_BLOCK_SIZE];

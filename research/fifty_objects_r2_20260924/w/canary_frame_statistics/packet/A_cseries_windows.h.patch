@@ -1,0 +1,11 @@
+--- a/source/cseries/cseries_windows.h
++++ b/source/cseries/cseries_windows.h
+@@ -59,8 +59,6 @@
+ 
+ long stack_walk_global_function_offset(
+ 	void);
+-void stack_walk_disregard_symbol_names(
+-	boolean disregard);
+ void stack_walk_initialize(
+ 	void);
+ void stack_walk_dispose(

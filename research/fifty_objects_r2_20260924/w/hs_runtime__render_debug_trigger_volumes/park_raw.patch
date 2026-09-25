@@ -1,0 +1,22 @@
+diff --git a/a/config/parked.json b/b/config/parked.json
+index 7b799f37..dcfc73e5 100644
+--- a/a/config/parked.json
++++ b/b/config/parked.json
+@@ -1335,17 +1335,6 @@
+         "objdiff_percent": 80.76382
+       }
+     },
+-    {
+-      "unit": "source/hs/hs_runtime",
+-      "function": "_render_debug_trigger_volumes",
+-      "class": "unclassified",
+-      "evidence": "Complete natural trigger-volume debug renderer retained from HCEA and preserved project history. It uses the typed scenario trigger-volume record, named trigger-volume enums, project real/vector/color types, correct render-debug and collision owners, and ordinary project math helpers. The January and candidate functions both occupy 1088 padded bytes, carry the same 34 relocation destinations, and disassemble to 342 instructions; the normalized difference is dominated by VC7 local-stack allocation and register scheduling. Direct component arithmetic preserves the January inline schedule without emitting a point_from_line3d COMDAT. No source-pressure variant search, forced register, volatile, raw offset, representation punning, or fake dependency is admitted. This honest 94.96407 percent residual receives zero exact credit. See docs/object_matching_logs/small_unwritten_threshold_wave_main_hs_ai_20260913.md.",
+-      "measurements": {
+-        "target": { "size": 1088, "relocation_count": 34, "normalized_sha256": "5789a872498d7ef2bca2ea4d3e4687e0294ef9ef9e1b11ad7629b63fbae9abdb" },
+-        "base": { "size": 1088, "relocation_count": 34, "normalized_sha256": "66af597069fc087b6095a9add3e960cdeb1af96f3e8a6f3184028352ba053023" },
+-        "objdiff_percent": 94.96407
+-      }
+-    },
+     {
+       "unit": "libs/libcmt/frnd",
+       "function": "__frnd",

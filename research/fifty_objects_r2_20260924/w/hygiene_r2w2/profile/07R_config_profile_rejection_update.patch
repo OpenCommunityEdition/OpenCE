@@ -1,0 +1,21 @@
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index 4d7a4f8a..01ea5308 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -3,11 +3,11 @@
+   "entries": [
+     {
+       "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+-      "reason": "All 16 target functions and all 2234 target data bytes are exact, including the independently verified 132-byte initialized section. The incompatible debug-options prefix has been replaced by the complete genuine shared type. The candidate still emits three stock SDK select-any tables absent from January's split: D3DTEXTUREDIRECTENCODE (16 bytes), D3DSIMPLERENDERSTATEENCODE (328), and D3DPRIMITIVETOVERTEXCOUNT (88). Forced unresolved-link diagnostics prove only compatible current-base duplicate selection, not a complete ordinary final link. Shared window-state declaration ownership and three consumer-local Profile API declaration pairs also remain inherited source-owner debt. Exact target-data accounting does not waive these separate whole-object checks.",
+-      "evidence": "docs/object_matching_logs/rasterizer_xbox_profile_obj_shared_owner_reconciliation_20260906.md#remaining-whole-object-boundaries",
+-      "reopen": "Finish genuine shared window/API declaration ownership with full consumer regression gates and prove the complete SDK table ownership through authenticated original source topology or a successful ordinary compatible canonical link with the real dependency/import closure and call graph. Do not use partial-header facades, forced unresolved linking, altered selection metadata, fake references, or an invented discard pass. Preserve all target-function and data matches before claiming Matching."
++      "class": "source-layout-incomplete",
++      "symbol": "_rasterizer_profile_globals",
++      "reason": "All 16 target functions and all 2234 target data bytes are exact. The three stock SDK select-any tables are now accounted for as authentic topology: January's object imports _D3DDevice_InsertCallback@12 and QueryPerformance*, so the TU included D3D8.h, whose D3DCONST tables are unconditional extern const selectany definitions; each copy is byte-identical to January's selected provider and pair-links in both orders. Whole-object admission still fails source authenticity. The private state is written as four invented file-static aggregates (rasterizer_profile_globals, rasterizer_profile_elapsed_state, rasterizer_profile_frame_state, rasterizer_profile_state). Their pad02/pad06/pad12/pad16 members only spell out VC7's per-static 4-byte alignment padding, and reserved06[6] hides one unattested 4-byte object at .bss +0x45c. Loose file statics reproduce every code byte and every other data offset, and the later /Od build places elapsed_times before callback_start_times, contradicting the elapsed_state member order. The rasterizer_profile_check NONE branch reproduces January's format/varargs defect (%s consumes the NONE profile value), which awaits the owner's original-bug ruling. Three load-bearing volatile qualifiers have no first-party attestation.",
++      "evidence": "research/fifty_objects_20260925/w/review3_rasterizer_xbox_profile/REVIEW.md",
++      "reopen": "Recover the genuine January private state shape: replace the invented aggregates with authentic separate file statics, or first-party-attested structures, without fabricated pad/reserved members. Identify the unreferenced 4-byte January object at .bss +0x45c from first-party evidence rather than a filler. Obtain the owner's rulings on the BUG-marked NONE-branch varargs defect and the three volatile qualifiers. Any new private names need the owner's descriptive-name policy (as for the held rasterizer_xbox .bss split). Preserve all 16 target functions and all data sections, and land the pinned 132-byte .data entry only with the Matching flip."
+     },
+     {
+       "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",

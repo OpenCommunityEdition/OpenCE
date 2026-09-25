@@ -1,0 +1,11 @@
+--- a/source/bitmaps/bitmaps.h
++++ b/source/bitmaps/bitmaps.h
+@@ -24,8 +24,6 @@
+ 
+ void bitmap_rebuild(
+ 	struct bitmap_data *bitmap);
+-void bitmap_delete(
+-	struct bitmap_data *bitmap);
+ 
+ boolean bitmap_verify(
+ 	struct bitmap_data *bitmap,

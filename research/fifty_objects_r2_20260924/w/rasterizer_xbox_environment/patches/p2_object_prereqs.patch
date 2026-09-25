@@ -1,0 +1,29 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_environment.c b/source/rasterizer/xbox/rasterizer_xbox_environment.c
+index f471cae6..45f400a2 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_environment.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_environment.c
+@@ -140,6 +140,7 @@ symbols in this file:
+ 
+ #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #define REAL_MATH_EXTERNAL_SCALE_VECTOR3D
++#define REAL_MATH_EXTERNAL_NORMALIZE3D
+ #include "cseries.h"
+ #include "bitmaps/bitmaps.h"
+ #include "cseries/errors.h"
+@@ -151,6 +152,7 @@ symbols in this file:
+ #include "math/real_math.h"
+ #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #undef REAL_MATH_EXTERNAL_SCALE_VECTOR3D
++#undef REAL_MATH_EXTERNAL_NORMALIZE3D
+ #include "rasterizer/rasterizer.h"
+ #include "rasterizer/rasterizer_environment.h"
+ #include "rasterizer/common/rasterizer_common.h"
+@@ -574,7 +576,7 @@ static boolean warned = FALSE;
+ extern struct pixel_shader_definition pixel_shader;
+ extern struct rasterizer_lights_globals rasterizer_lights;
+ extern struct rasterizer_window_begin_parameters global_window_parameters;
+-short specular_light_vertex_shader_permutation_index= NONE;
++static short specular_light_vertex_shader_permutation_index= NONE;
+ 
+ /* ---------- public code */
+ 

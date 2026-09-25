@@ -87,7 +87,7 @@ boolean synchronize_metadata_display_name_with_profile_name(
 boolean saved_game_file_get_path_to_enclosing_directory(
 	long profile_index,
 	char *directory_path);
-short saved_game_files_enumerate_default_files(
+short enumerate_default_profiles(
 	void);
 long create_enumerated_saved_game_file(
 	word saved_game_file_type,

@@ -77,7 +77,7 @@ symbols in this file:
 000BAB50 0190:
 	_hs_global_reconcile_write (0000)
 000BACE0 0040:
-	_hs_runtime_recompile_error (0000)
+	_script_error (0000)
 000BAD20 0020:
 	_hs_runtime_get_executing_thread_name (0000)
 000BAD40 0020:
@@ -527,7 +527,7 @@ static long *hs_arguments_evaluate(
 	short formal_parameter_count,
 	short const *formal_parameters,
 	boolean initialize);
-static boolean hs_runtime_recompile_error(
+static boolean script_error(
 	long thread_index,
 	char const *reason,
 	char const *expression);
@@ -3091,7 +3091,7 @@ static long *hs_arguments_evaluate(
 
 		if (hs_syntax_get(*expression_index)->type!=formal_parameters[*argument_index])
 		{
-			hs_runtime_recompile_error(thread_index, "unexpected actual parameters.",
+			script_error(thread_index, "unexpected actual parameters.",
 				"hs_syntax_get(*expression_index)->type==formal_parameters[*argument_index]");
 
 			return values;
@@ -3110,7 +3110,7 @@ static long *hs_arguments_evaluate(
 	return values;
 }
 
-static boolean hs_runtime_recompile_error(
+static boolean script_error(
 	long thread_index,
 	char const *reason,
 	char const *expression)

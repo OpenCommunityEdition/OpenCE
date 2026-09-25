@@ -63,7 +63,7 @@ symbols in this file:
 000A9F10 0070:
 	_placement_data_set_change_color (0000)
 000A9F80 0070:
-	_unit_create_starting_weapon (0000)
+	_create_weapon (0000)
 000A9FF0 0170:
 	_players_compute_combined_pvs (0000)
 000AA160 0020:
@@ -3189,7 +3189,7 @@ static void player_examine_nearby_objects(
 	return;
 }
 
-static long unit_create_starting_weapon(
+static long create_weapon(
 	struct scenario_starting_profile_weapon const *starting_weapon,
 	long unit_index)
 {
@@ -3250,7 +3250,7 @@ void player_add_equipment(
 
 			if (starting_profile->primary_weapon.weapon.index != NONE)
 			{
-				weapon_index = unit_create_starting_weapon(
+				weapon_index = create_weapon(
 					&starting_profile->primary_weapon,
 					unit_index);
 				if (weapon_index != NONE &&
@@ -3266,7 +3266,7 @@ void player_add_equipment(
 
 			if (starting_profile->secondary_weapon.weapon.index != NONE)
 			{
-				weapon_index = unit_create_starting_weapon(
+				weapon_index = create_weapon(
 					&starting_profile->secondary_weapon,
 					unit_index);
 				if (weapon_index != NONE &&

@@ -1,0 +1,30 @@
+| function | padded T/C | normalized sha T | normalized sha C | relocs T/C | cand vs emu split | prod vs build/split |
+|---|---|---|---|---|---|---|
+| _bitmap_draw_character | 944/944 | 1fbab7db0314 | 1fbab7db0314 | 25/25 | EXACT | EXACT |
+| _bitmap_draw_string | 304/240 | 4e8747543c90 | ad3d0d63e2c8 | 9/9 | residual | residual |
+| _draw_string | 912/912 | 8a16ea28aab4 | 8a16ea28aab4 | 46/46 | EXACT | EXACT |
+| _draw_string_compute_bounds | 192/192 | 1546e737cb0c | 1546e737cb0c | 14/14 | EXACT | EXACT |
+| _draw_string_dispose | 16/16 | 499f1f307c1c | 499f1f307c1c | 0/0 | EXACT | EXACT |
+| _draw_string_dispose_from_old_map | 16/16 | b9bd36457785 | b9bd36457785 | 1/1 | EXACT | EXACT |
+| _draw_string_get_color | 80/80 | 6cdc473035e9 | 6cdc473035e9 | 8/8 | EXACT | EXACT |
+| _draw_string_get_string | 80/80 | 61586751e9a5 | 61586751e9a5 | 6/6 | EXACT | EXACT |
+| _draw_string_initialize | 16/16 | 499f1f307c1c | 499f1f307c1c | 0/0 | EXACT | EXACT |
+| _draw_string_initialize_for_new_map | 112/112 | 6701a2e6ec52 | 6701a2e6ec52 | 13/13 | EXACT | EXACT |
+| _draw_string_partial | 528/528 | e55f2a4aa9eb | e55f2a4aa9eb | 9/9 | EXACT | EXACT |
+| _draw_string_pick | 80/80 | 35dca73f36d5 | 35dca73f36d5 | 7/7 | EXACT | EXACT |
+| _draw_string_set_color | 336/336 | af6aa61c5be8 | af6aa61c5be8 | 32/32 | EXACT | EXACT |
+| _draw_string_set_draw_mode | 64/64 | c1668e229e44 | c1668e229e44 | 4/4 | EXACT | EXACT |
+| _draw_string_set_font | 32/32 | 5f9be66d707d | 5f9be66d707d | 2/2 | EXACT | EXACT |
+| _draw_string_set_format | 176/176 | c4ae4ad9adb7 | c4ae4ad9adb7 | 15/15 | EXACT | EXACT |
+| _draw_string_set_highlight | 32/32 | e54dbb9a5dcb | e54dbb9a5dcb | 2/2 | EXACT | EXACT |
+| _draw_string_set_indents | 112/112 | 4874d5ae352d | 4874d5ae352d | 10/10 | EXACT | EXACT |
+| _draw_string_set_tab_stops | 112/112 | 093c317d014b | 093c317d014b | 8/8 | EXACT | EXACT |
+| _draw_unicode_string | 912/912 | a9959a0469b0 | a9959a0469b0 | 46/46 | EXACT | EXACT |
+| _draw_unicode_string_compute_bounds | 192/192 | 1546e737cb0c | 1546e737cb0c | 14/14 | EXACT | EXACT |
+| _draw_unicode_string_partial | 528/528 | a5bfb710d5d9 | a5bfb710d5d9 | 9/9 | EXACT | EXACT |
+| _parse_string | 624/624 | f80225b7f49e | f80225b7f49e | 30/30 | EXACT | EXACT |
+| _parse_string_new | 256/256 | e257eb07009c | e257eb07009c | 17/17 | EXACT | EXACT |
+| _parse_unicode_string | 272/272 | 933bc5d77f06 | 933bc5d77f06 | 7/7 | EXACT | EXACT |
+| _styled_font_get | 112/112 | 85f0a63276b8 | 85f0a63276b8 | 6/6 | EXACT | EXACT |
+| _text_bounds_draw_character | 112/112 | 8497c0497bf3 | 8497c0497bf3 | 10/10 | EXACT | EXACT |
+| _text_pick_draw_character | 224/224 | a0b5c3c509e2 | a0b5c3c509e2 | 11/11 | EXACT | EXACT |

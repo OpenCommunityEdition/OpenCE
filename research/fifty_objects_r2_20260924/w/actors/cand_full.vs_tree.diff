@@ -1,0 +1,247 @@
+diff --git a/source/ai/actors.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\actors\\cand_full.c"
+index 05ae6746..f8150057 100644
+--- a/source/ai/actors.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\actors\\cand_full.c"
+@@ -453,6 +453,14 @@ enum
+ 
+ /* ---------- macros */
+ 
++/* These object chains are polymorphic.  The accessors preserve January's
++ * broad verification masks while giving each use site the complete layout it
++ * needs after checking object.type. */
++#define actor_parent_vehicle_candidate_get(index) \
++	((struct unit_datum *)object_get(index))
++
++
++
+ #define prop_orphaned(prop) \
+ 	((prop)->state >= _prop_state_uninspected_orphan && \
+ 		(prop)->state <= _prop_state_inspected_orphan)
+@@ -1548,20 +1556,24 @@ static void actor_input_update(
+ 	if (actor->meta.swarm)
+ 	{
+ 		struct swarm_datum *swarm = swarm_get(actor->meta.swarm_cache_index);
+-		short unit_index;
++		long component_index;
+ 
+ 		swarm->swarm_center = *global_origin3d;
+-		for (unit_index = 0; unit_index < swarm->unit_count; unit_index++)
++		for (
++			component_index = 0;
++			(short)component_index < swarm->unit_count;
++			component_index++)
+ 		{
+ 			struct swarm_component_datum *component =
+-				swarm_component_get(swarm->component_indices[unit_index]);
++				swarm_component_get(
++					swarm->component_indices[(short)component_index]);
+ 
+ 			actor_swarm_component_refresh(
+-				swarm->unit_indices[unit_index],
+-				swarm->component_indices[unit_index]);
++				swarm->unit_indices[(short)component_index],
++				swarm->component_indices[(short)component_index]);
+ 			add_vectors3d(
+-				(real_vector3d *)&component->position,
+-				(real_vector3d *)&swarm->swarm_center,
++				(real_vector3d const *)&component->position,
++				(real_vector3d const *)&swarm->swarm_center,
+ 				(real_vector3d *)&swarm->swarm_center);
+ 		}
+ 
+@@ -1589,9 +1601,9 @@ static void actor_input_update(
+ 	{
+ 		struct unit_datum *unit = unit_get(actor->meta.unit_index);
+ 		long vehicle_index = unit->object.parent_object_index;
+-		struct object_datum *parent_object = vehicle_index == NONE
++		struct unit_datum *vehicle = vehicle_index == NONE
+ 			? NULL
+-			: object_get(vehicle_index);
++			: actor_parent_vehicle_candidate_get(vehicle_index);
+ 		real_point3d center_of_mass;
+ 
+ 		actor_input_sample_position(
+@@ -1606,9 +1618,8 @@ static void actor_input_update(
+ 		actor->state.flying =
+ 			TEST_FLAG(actor_definition->flags, _actor_definition_flying_bit);
+ 
+-		if (parent_object && parent_object->object.type == _object_type_vehicle)
++		if (vehicle && vehicle->object.type == _object_type_vehicle)
+ 		{
+-			struct unit_datum *vehicle = (struct unit_datum *)parent_object;
+ 			struct vehicle_definition *vehicle_definition =
+ 				vehicle_specific_definition_get(vehicle->definition_index);
+ 
+@@ -1643,13 +1654,10 @@ static void actor_input_update(
+ 
+ 			if (vehicle->unit.gunner_object_index == actor->meta.unit_index)
+ 			{
+-				struct actor_variant_definition *firing_variant_definition;
+-
+ 				actor->input.vehicle_gunner = TRUE;
+-				firing_variant_definition =
+-					actor_combat_get_firing_variant_definition(actor_index);
+ 				actor->input.vehicle_gunner_bombardment =
+-					firing_variant_definition->ranged_combat.weapon_bombardment_range > 0.f;
++					actor_combat_get_firing_variant_definition(actor_index)->
++						ranged_combat.weapon_bombardment_range > 0.f;
+ 			}
+ 
+ 			actor->input.vehicle_passenger =
+@@ -1660,12 +1668,8 @@ static void actor_input_update(
+ 			{
+ 				boolean migrate = FALSE;
+ 
+-				if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index) !=
++				if (DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index) ==
+ 					vehicle->unit.fake_encounter_index)
+-				{
+-					migrate = TRUE;
+-				}
+-				else
+ 				{
+ 					if (vehicle->unit.fake_squad_index != NONE &&
+ 						actor->meta.squad_index != vehicle->unit.fake_squad_index)
+@@ -1693,6 +1697,10 @@ static void actor_input_update(
+ 						}
+ 					}
+ 				}
++				else
++				{
++					migrate = TRUE;
++				}
+ 
+ 				if (migrate)
+ 				{
+@@ -1706,10 +1714,10 @@ static void actor_input_update(
+ 
+ 						if (actor->meta.encounter_index != NONE)
+ 						{
+-							struct encounter_datum *prevehicle_encounter =
++							struct encounter_datum *encounter =
+ 								encounter_get(actor->meta.encounter_index);
+ 
+-							prevehicle_encounter->is_prevehicle_encounter = TRUE;
++							encounter->is_prevehicle_encounter = TRUE;
+ 						}
+ 					}
+ 
+@@ -1722,12 +1730,15 @@ static void actor_input_update(
+ 		}
+ 		else
+ 		{
++			boolean stored_prevehicle_encounter =
++				actor->meta.stored_prevehicle_encounter;
++
+ 			actor->input.vehicle_index = NONE;
+ 			actor->input.vehicle_driver_type = _actor_vehicle_driver_none;
+ 			actor->input.vehicle_passenger = FALSE;
+ 			actor->input.vehicle_gunner = FALSE;
+ 
+-			if (actor->meta.stored_prevehicle_encounter)
++			if (stored_prevehicle_encounter)
+ 			{
+ 				actor_change_encounter(
+ 					actor_index,
+@@ -1750,12 +1761,16 @@ static void actor_input_update(
+ 			boolean firing_position_type_mismatch = FALSE;
+ 
+ 			if (actor->state.flying &&
+-				!TEST_FLAG(encounter_definition->flags, _encounter_3d_firing_positions_bit))
++				!TEST_FLAG(
++					encounter_definition->flags,
++					_encounter_3d_firing_positions_bit))
+ 			{
+ 				firing_position_type_mismatch = TRUE;
+ 			}
+ 			else if (!actor->state.flying &&
+-				TEST_FLAG(encounter_definition->flags, _encounter_3d_firing_positions_bit))
++				TEST_FLAG(
++					encounter_definition->flags,
++					_encounter_3d_firing_positions_bit))
+ 			{
+ 				firing_position_type_mismatch = TRUE;
+ 			}
+@@ -1812,16 +1827,22 @@ static void actor_input_update(
+ 				}
+ 				else if (threat->object.type == _object_type_projectile)
+ 				{
+-					struct projectile_datum *projectile = (struct projectile_datum *)threat;
++					struct projectile_datum *projectile =
++						(struct projectile_datum *)threat;
+ 
+-					if (TEST_FLAG(projectile->projectile.flags, _projectile_will_super_explode_bit))
++					if (TEST_FLAG(
++						projectile->projectile.flags,
++						_projectile_will_super_explode_bit))
+ 					{
+-						actor->input.delayed_attached_projectile_index = threat_index;
++						actor->input.delayed_attached_projectile_index =
++							threat_index;
+ 					}
+-					else if (actor->danger_zone.danger_type == _actor_danger_zone_projectile &&
++					else if (actor->danger_zone.danger_type ==
++							_actor_danger_zone_projectile &&
+ 						threat_index == actor->danger_zone.object_index)
+ 					{
+-						actor->input.delayed_attached_projectile_index = threat_index;
++						actor->input.delayed_attached_projectile_index =
++							threat_index;
+ 					}
+ 				}
+ 
+@@ -1897,11 +1918,10 @@ static void actor_input_update(
+ 		}
+ 
+ 		actor->input.looking_vector = unit->unit.looking_vector;
+-		cross_product3d(
++		normalize3d(cross_product3d(
+ 			global_up3d,
+ 			&actor->input.looking_vector,
+-			&actor->input.looking_left_vector);
+-		normalize3d(&actor->input.looking_left_vector);
++			&actor->input.looking_left_vector));
+ 		cross_product3d(
+ 			&actor->input.looking_vector,
+ 			&actor->input.looking_left_vector,
+@@ -2846,7 +2866,7 @@ short actors_spawn_from_unit(
+ 	short actor_count,
+ 	real throw_velocity)
+ {
+-	short spawned_actor_count = 0;
++	long spawned_actor_count = 0;
+ 
+ 	if (actor_variant_definition_index != NONE && actor_count > 0)
+ 	{
+@@ -2880,9 +2900,12 @@ short actors_spawn_from_unit(
+ 
+ 			for (spawn_index = 0; spawn_index < actor_count; spawn_index++)
+ 			{
++				real angle = real_seed_random_range(
++					get_global_random_seed_address(),
++					0.f,
++					2.f * _pi);
+ 				struct object_placement_data placement_data;
+ 				long spawned_unit_index;
+-				real angle = real_random_range(0.f, 2.f * _pi);
+ 
+ 				object_placement_data_new(
+ 					&placement_data,
+@@ -2942,9 +2965,15 @@ short actors_spawn_from_unit(
+ 						actor_verify_activation(actor_index);
+ 						if (throw_velocity > 0.f)
+ 						{
++							real speed_factor = real_seed_random_range(
++								get_global_random_seed_address(),
++								0.5f,
++								1.f);
++							real vertical_factor = real_seed_random_range(
++								get_global_random_seed_address(),
++								0.8f,
++								1.5f);
+ 							real_vector3d acceleration;
+-							real speed_factor = real_random_range(0.5f, 1.f);
+-							real vertical_factor = real_random_range(0.8f, 1.5f);
+ 
+ 							acceleration.i = placement_data.forward.i * speed_factor;
+ 							acceleration.j = placement_data.forward.j * speed_factor;

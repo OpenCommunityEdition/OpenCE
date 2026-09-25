@@ -1,0 +1,41 @@
+diff --git a/source/bink/bink_playback.c b/source/bink/bink_playback.c
+index aa25ad5a..94b281d9 100644
+--- a/source/bink/bink_playback.c
++++ b/source/bink/bink_playback.c
+@@ -19,7 +19,7 @@ symbols in this file:
+ 001B5790 00c0:
+ 	_code_001b5790 (0000)
+ 001B5850 0010:
+-	_code_001b5850 (0000)
++	_bink_decompress_audio_frame (0000)
+ 001B5860 0390:
+ 	_code_001b5860 (0000)
+ 001B5BF0 0010:
+@@ -382,7 +382,7 @@ static void * __stdcall bink_alloc(
+ 	unsigned long size_in_bytes);
+ static void __stdcall bink_free(
+ 	void *memory);
+-void code_001b5850(
++static void bink_decompress_audio_frame(
+ 	void);
+ static void bink_draw_frame(
+ 	void);
+@@ -495,6 +495,9 @@ void bink_playback_render(
+ 	else if (!bink_globals.needs_decode)
+ 		goto skip_decode;
+ 
++	/* January emits this empty static (0x001b5850) out of line; every call is
++	 * inlined away, so the call position is not recoverable from the bytes. */
++	bink_decompress_audio_frame();
+ 	bink_decompress_video_frame();
+ 	bink_globals.needs_decode = FALSE;
+ 
+@@ -666,7 +669,7 @@ void bink_playback_update(
+ 
+ /* ---------- private code */
+ 
+-void code_001b5850(
++static void bink_decompress_audio_frame(
+ 	void)
+ {
+ 	return;

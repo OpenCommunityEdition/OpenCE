@@ -1,0 +1,71 @@
+diff --git a/source/hs/hs_compile.c b/source/hs/hs_compile.c
+--- a/source/hs/hs_compile.c
++++ b/source/hs/hs_compile.c
+@@ -588,6 +588,8 @@
+ 	short parameter_count,
+ 	long *parameter_indices,
+ 	long expression_index);
++static void hs_compile_finish(
++	void);
+ static long hs_find_string_constant(
+ 	char const *string);
+ static boolean character_in_list(
+@@ -631,9 +633,9 @@
+ 
+ static struct hs_compile_globals hs_compile_globals;
+ 
+-static char const whitespace_characters[2] = { ' ', '\t' };
+-static char const eol_characters[2] = { '\n', '\r' };
+-static hs_primitive_parser const hs_type_primitive_parsers[NUMBER_OF_HS_TYPES] =
++char const whitespace_characters[2] = { ' ', '\t' };
++char const eol_characters[2] = { '\n', '\r' };
++hs_primitive_parser const hs_type_primitive_parsers[NUMBER_OF_HS_TYPES] =
+ {
+ 	NULL,
+ 	NULL,
+@@ -1079,7 +1081,7 @@
+ 	return;
+ }
+ 
+-void hs_compile_finish(
++static void hs_compile_finish(
+ 	void)
+ {
+ 	struct scenario *scenario = global_scenario_get();
+diff --git a/source/hs/hs_library_internal_compile.h b/source/hs/hs_library_internal_compile.h
+--- a/source/hs/hs_library_internal_compile.h
++++ b/source/hs/hs_library_internal_compile.h
+@@ -29,8 +29,6 @@
+ boolean hs_compile_postprocess(
+ 	char const **error_message,
+ 	char const **error_source);
+-void hs_compile_finish(
+-	void);
+ boolean hs_parse_sleep(
+ 	short function_index,
+ 	long expression_index);
+diff --git a/config/symbols.json b/config/symbols.json
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -3142,7 +3142,7 @@
+ { "file_offset": 754400, "flags": 32, "name": "_hs_parse_debug_string" },
+ { "file_offset": 754672, "flags": 32, "name": "_hs_compile_expression" },
+ { "file_offset": 755280, "flags": 32, "name": "_hs_compile" },
+-{ "file_offset": 755600, "flags": 32, "name": "_hs_compile_finish" },
++{ "file_offset": 755600, "flags": 32, "name": "_hs_compile_finish", "static": true },
+ { "file_offset": 755856, "flags": 32, "name": "_hs_compile_dispose" },
+ { "file_offset": 756064, "flags": 32, "name": "_hs_not" },
+ { "file_offset": 756080, "flags": 32, "name": "_hs_print" },
+@@ -16252,9 +16252,9 @@
+ { "file_offset": 2531152, "flags": 0, "name": "??_C@_0DE@GGJDPECD@you?5can?8t?5add?5an?5hs?5type?5without@" },
+ { "file_offset": 2531204, "flags": 0, "name": "??_C@_04ENHBHKMJ@?$CI?$CFs?$CJ?$AA@" },
+ { "file_offset": 2531212, "flags": 0, "name": "??_C@_08POBEIOG@?$CIset?5?$CFs?$CJ?$AA@" },
+-{ "file_offset": 2531224, "flags": 0, "name": "_whitespace_characters", "static": true },
+-{ "file_offset": 2531228, "flags": 0, "name": "_eol_characters", "static": true },
+-{ "file_offset": 2531232, "flags": 0, "name": "_hs_type_primitive_parsers", "static": true },
++{ "file_offset": 2531224, "flags": 0, "name": "_whitespace_characters" },
++{ "file_offset": 2531228, "flags": 0, "name": "_eol_characters" },
++{ "file_offset": 2531232, "flags": 0, "name": "_hs_type_primitive_parsers" },
+ { "file_offset": 2531428, "flags": 0, "name": "??_C@_0DI@FFMILLMF@this?5argument?5to?5cond?5should?5be?5@" },
+ { "file_offset": 2531484, "flags": 0, "name": "??_C@_0CG@CKIGEJPJ@this?5argument?5to?5cond?5needs?5a?5re@" },
+ { "file_offset": 2531524, "flags": 0, "name": "??_C@_0CD@IJMPPEHP@i?5couldn?8t?5allocate?5a?5syntax?5nod@" },

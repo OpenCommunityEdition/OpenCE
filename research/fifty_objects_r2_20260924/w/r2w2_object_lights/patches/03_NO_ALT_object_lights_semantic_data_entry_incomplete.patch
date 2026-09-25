@@ -1,0 +1,21 @@
+diff --git a/config/semantic_data_matches.json b/config/semantic_data_matches.json
+index 77814b3d..3f1a813e 100644
+--- a/config/semantic_data_matches.json
++++ b/config/semantic_data_matches.json
+@@ -500,5 +500,16 @@
+       "relocation_count": 7,
+       "normalized_sha256": "6ed61c39a648905cf23b12b916e2adadfe97b6e5aa492c29a14c7265809ef1a7"
+     }
++  },
++  {
++    "unit": "source/objects/object_lights",
++    "symbol": "_lights_section",
++    "allow_incomplete_unit": true,
++    "reason": "object_lights' writable .data (the static lights_section profile section at +0 and the four public object_light_* tuning globals at +1528..+1540): January and the rebuilt object have identical 1,541-byte payload, owner storage and flags (c0400040), and its single relocation (the 'render_lights' string, selected in hs) resolves independently to the same image destination; objdiff 3.3.1's '$'-literal relocation-name defect undercredits it despite exact COFF section comparison. All 43 functions are strict exact; should_render_lights, light_attenuation and cluster_get_first/next_light are file-static per cachebeta.pdb publics (no January reference outside the object; should_render_lights is the /Od-attested call in lights_render_diffuse and lights_render_specular), so all 71 January symbols match storage and offsets; the 12 candidate-only helper COMDATs pair-link with their selected providers in both orders. The unit is not marked Matching only because its _object_get_bounding_sphere COMDAT differs from action_vehicle's selected copy in its two __FILE__ literal relocations (January object_lights' own 'c:\\halo\\source\\objects\\objects.h' literal; held owner item), so this sole unmatched section is credited with an explicit incomplete-unit opt-in.",
++    "measurements": {
++      "size": 1541,
++      "relocation_count": 1,
++      "normalized_sha256": "527b43a173f528444fa4423af92d7d58a83f2afe7fc1661b6d297401b2760f71"
++    }
+   }
+ ]

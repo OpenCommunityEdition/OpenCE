@@ -1,0 +1,26 @@
+diff --git a/source/ai/actors.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\actors\\r2w1b_twin_final_v2.c"
+index 05ae6746..43b78954 100644
+--- a/source/ai/actors.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\actors\\r2w1b_twin_final_v2.c"
+@@ -2880,9 +2880,9 @@ short actors_spawn_from_unit(
+ 
+ 			for (spawn_index = 0; spawn_index < actor_count; spawn_index++)
+ 			{
++				real angle = real_random_range(0.f, 2.f * _pi);
+ 				struct object_placement_data placement_data;
+ 				long spawned_unit_index;
+-				real angle = real_random_range(0.f, 2.f * _pi);
+ 
+ 				object_placement_data_new(
+ 					&placement_data,
+@@ -2942,9 +2942,9 @@ short actors_spawn_from_unit(
+ 						actor_verify_activation(actor_index);
+ 						if (throw_velocity > 0.f)
+ 						{
+-							real_vector3d acceleration;
+ 							real speed_factor = real_random_range(0.5f, 1.f);
+ 							real vertical_factor = real_random_range(0.8f, 1.5f);
++							real_vector3d acceleration;
+ 
+ 							acceleration.i = placement_data.forward.i * speed_factor;
+ 							acceleration.j = placement_data.forward.j * speed_factor;

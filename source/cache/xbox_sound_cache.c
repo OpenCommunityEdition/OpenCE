@@ -23,7 +23,7 @@ symbols in this file:
 001ADCA0 00c0:
 	_sound_cache_delete_block_proc (0000)
 001ADD60 0040:
-	_sound_cache_debug_block_name (0000)
+	_cache_block_get_sound_permutation_name (0000)
 001ADDA0 0130:
 	_sound_cache_start_loading_sound (0000)
 001ADED0 00b0:
@@ -468,7 +468,7 @@ static void sound_cache_delete_block_proc(
 	return;
 }
 
-static const char *sound_cache_debug_block_name(
+static const char *cache_block_get_sound_permutation_name(
 	long block_index)
 {
 	struct xbox_cache_sound_datum *cache_sound;
@@ -541,7 +541,7 @@ static void sound_cache_start_loading_sound(
 			sound->samples.size,
 			xbox_sound_cache_globals.cache,
 			scenario_debug_to_file,
-			sound_cache_debug_block_name);
+			cache_block_get_sound_permutation_name);
 		xbox_sound_cache_globals.last_allocation_failure_time =
 			system_milliseconds();
 	}

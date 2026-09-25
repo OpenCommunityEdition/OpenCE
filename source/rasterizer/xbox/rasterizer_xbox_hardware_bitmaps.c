@@ -35,7 +35,7 @@ symbols in this file:
 00157F10 0210:
 	_code_00157f10 (0000)
 00158120 0210:
-	_code_00158120 (0000)
+	_rasterizer_bitmap_cm_changed (0000)
 00158330 0030:
 	_rasterizer_bitmap_delete (0000)
 00158360 00b0:
@@ -108,7 +108,7 @@ static void rasterizer_bitmap_2d_changed(
 	struct bitmap_data *bitmap);
 static void rasterizer_bitmap_3d_changed(
 	struct bitmap_data *bitmap);
-static void rasterizer_bitmap_cube_map_changed(
+static void rasterizer_bitmap_cm_changed(
 	struct bitmap_data *bitmap);
 
 /* ---------- globals */
@@ -539,7 +539,7 @@ mipmaps_done:
 	return;
 }
 
-static void rasterizer_bitmap_cube_map_changed(
+static void rasterizer_bitmap_cm_changed(
 	struct bitmap_data *bitmap)
 {
 	D3DLOCKED_RECT d3d_locked_rect;
@@ -712,7 +712,7 @@ void rasterizer_bitmap_changed(
 		break;
 
 	case _bitmap_type_cube_map:
-		rasterizer_bitmap_cube_map_changed(bitmap);
+		rasterizer_bitmap_cm_changed(bitmap);
 		break;
 
 	default:

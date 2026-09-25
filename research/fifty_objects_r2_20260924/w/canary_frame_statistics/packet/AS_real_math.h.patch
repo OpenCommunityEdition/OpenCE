@@ -1,0 +1,82 @@
+--- a/source/math/real_math.h
++++ b/source/math/real_math.h
+@@ -669,7 +669,6 @@
+ 	real_vector3d const *forward,
+ 	real_vector3d const *up);
+ real_vector3d *matrix3x3_transform_vector(real_matrix3x3 const *matrix, real_vector3d const *vector, real_vector3d *result);
+-boolean valid_real_plane3d(real_plane3d const *plane);
+ 
+ /* ---------- prototypes/RANDOM_MATH.C */
+ 
+@@ -1504,7 +1503,9 @@
+ __inline real real_local_random(
+ 	void)
+ {
+-	return real_seed_random(get_global_local_random_seed_address());
++	real result= real_seed_random(get_global_local_random_seed_address());
++
++	return result;
+ }
+ #endif
+ 
+@@ -1561,30 +1562,27 @@
+ 			(f2 + (t - (t0 + 2.f*h)) * (f3 - f2) / (3.f*h)) / (2.f*h));
+ }
+ 
+-// TODO: doesn't match, needs cleanup
+ __inline real nonuniform_cubic_spline(
+ 	real f0,
+ 	real f1,
+-	real f2, 
++	real f2,
+ 	real f3,
+-	real t0, 
+-	real t1, 
+-	real t2, 
+-	real t3, 
++	real t0,
++	real t1,
++	real t2,
++	real t3,
+ 	real t)
+ {
+-	real v9, v10, v11;
+-	v10 = ((f2 - f1) / (t2 - t1)) - ((f1 - f0) / (t1 - t0));
+-	v11 = (((((((((((f3 - f2) / (t3 - t2)) - ((f2 - f1) 
+-		/ (t2 - t1))) / (t3 - t1)) - (v10 / (t2 - t0))) 
+-		/ (t3 - t0))
+-		* (v9 - t2))
+-		+ (v10 / (t2 - t0)))
+-		* (v9 - t1))
+-		+ ((f1 - f0) / (t1 - t0)))
+-		* (v9 - t0))
+-		 + f0;
+-	return v11;
++	match_assert("..\\math\\real_math.h", 1530, t>= t0 && t <= t3);
++
++	f3 = (f3 - f2) / (t3 - t2);
++	f2 = (f2 - f1) / (t2 - t1);
++	f1 = (f1 - f0) / (t1 - t0);
++	f3 = (f3 - f2) / (t3 - t1);
++	f2 = (f2 - f1) / (t2 - t0);
++	f3 = (f3 - f2) / (t3 - t0);
++
++	return f0 + (t - t0) * (f1 + (t - t1) * (f2 + (t - t2) * f3));
+ }
+ 
+ __inline void uniform_cubic_spline_vector3d(
+@@ -1715,6 +1713,14 @@
+ 	return valid_realcmp(magnitude_squared3d(n), 1.f);
+ }
+ 
++__inline boolean valid_real_plane3d(
++	real_plane3d const *plane)
++{
++	return
++		valid_real_normal3d(&plane->n) &&
++		valid_real(plane->d);
++}
++
+ __inline boolean valid_real_vector3d_axes2(
+ 	real_vector3d const *forward,
+ 	real_vector3d const *up)

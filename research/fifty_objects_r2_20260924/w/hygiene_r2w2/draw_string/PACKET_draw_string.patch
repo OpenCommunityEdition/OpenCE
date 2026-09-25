@@ -1,0 +1,660 @@
+diff --git a/source/text/draw_string.c b/source/text/draw_string.c
+index 10f77809..79bc5933 100644
+--- a/source/text/draw_string.c
++++ b/source/text/draw_string.c
+@@ -92,8 +92,14 @@ symbols in this file:
+ 	??_C@_0N@HNKPGPMM@result?$CB?$DNNONE?$AA@ (0000)
+ 002A29B8 0049:
+ 	??_C@_0EJ@CJKOFANJ@tab_stop_index?$DO?$DN0?5?$CG?$CG?5tab_stop_in@ (0000)
+-004C1908 00f8:
+-	_draw_string_globals (0000)
++004C1908 0008:
++	_draw_character_software_globals (0000)
++004C1910 000c:
++	_text_pick_globals (0000)
++004C191C 000c:
++	_text_bounds_globals (0000)
++004C1928 00d8:
++	_font_drawing_globals (0000)
+ */
+ 
+ /* ---------- headers */
+@@ -105,6 +111,7 @@ symbols in this file:
+ #include "interface/interface.h"
+ #include "math/integer_math.h"
+ #include "math/real_math.h"
++#include "rasterizer/rasterizer.h"
+ #include "text/draw_string.h"
+ #include "text/font_group.h"
+ #include "text/international_strings.h"
+@@ -148,39 +155,23 @@ enum
+ 	_bitmap_format_a8r8g8b8 = 11,
+ };
+ 
+-/* ---------- macros */
+-
+-#define draw_character_software_globals draw_string_globals
+-#define font_drawing_globals draw_string_globals
+-
+ /* ---------- structures */
+ 
+-struct draw_string_globals
++struct font_drawing_globals
+ {
+-	struct bitmap_data *bitmap;
+-	byte encoding_shift;
+-	byte __pad05[3];
+-	point2d pick_point;
+-	short best_pick_string_index;
+-	short best_pick_distance;
+-	short last_string_index;
+-	byte __pad12[2];
+-	rectangle2d text_bounds;
+-	struct font_header *last_font_header;
+-	long localization_string_list_index;
+-	long font_index;
+-	unsigned long flags;
+-	short style;
+-	short justification;
+-	real_argb_color color;
++	long string_list_index;
++	long current_font_index;
++	unsigned long current_flags;
++	short current_style;
++	short current_justification;
++	real_argb_color current_color;
+ 	short tab_stop_count;
+-	short tab_stops[16];
+-	short highlight_start;
+-	short highlight_end;
++	short tab_stops[MAXIMUM_NUMBER_OF_TAB_STOPS];
++	short highlight_start_index;
++	short highlight_stop_index;
+ 	short initial_indent;
+ 	short paragraph_indent;
+-	byte __pad6A[2];
+-	byte multitexture_parameters[0x8C];
++	struct rasterizer_dynamic_screen_geometry_parameters multitexture_params;
+ };
+ 
+ struct font_character
+@@ -247,7 +238,27 @@ static void draw_unicode_string_partial(
+ 
+ /* ---------- globals */
+ 
+-struct draw_string_globals draw_string_globals = { 0 };
++static struct
++{
++	struct bitmap_data *bitmap;
++	byte encoding_shift;
++} draw_character_software_globals = { 0 };
++
++static struct
++{
++	point2d pick_point;
++	short best_pick_string_index;
++	short best_pick_distance;
++	short last_string_index;
++} text_pick_globals = { 0 };
++
++static struct
++{
++	rectangle2d bounds;
++	struct font_header *last_font_header;
++} text_bounds_globals = { 0 };
++
++static struct font_drawing_globals font_drawing_globals = { 0 };
+ 
+ 
+ /* ---------- public code */
+@@ -262,17 +273,17 @@ void draw_string_initialize_for_new_map(
+ 	void)
+ {
+ 	long localization_string_list_index = interface_get_tag_index(_interface_string_list_localization);
+-	draw_string_globals.localization_string_list_index = localization_string_list_index;
++	font_drawing_globals.string_list_index = localization_string_list_index;
+ 
+ 	if (localization_string_list_index != NONE)
+ 	{
+ 		set_language_code((short)atoi(string_list_get_string(localization_string_list_index, 0)));
+-		draw_string_globals.tab_stop_count = 0;
+-		draw_string_globals.flags = 0;
+-		draw_string_globals.justification = _text_justification_left;
+-		draw_string_globals.initial_indent = 0;
+-		draw_string_globals.paragraph_indent = 0;
+-		draw_string_globals.font_index = NONE;
++		font_drawing_globals.tab_stop_count = 0;
++		font_drawing_globals.current_flags = 0;
++		font_drawing_globals.current_justification = _text_justification_left;
++		font_drawing_globals.initial_indent = 0;
++		font_drawing_globals.paragraph_indent = 0;
++		font_drawing_globals.current_font_index = NONE;
+ 	}
+ 	else
+ 	{
+@@ -285,7 +296,7 @@ void draw_string_initialize_for_new_map(
+ void draw_string_dispose_from_old_map(
+ 	void)
+ {
+-	draw_string_globals.localization_string_list_index = NONE;
++	font_drawing_globals.string_list_index = NONE;
+ 	return;
+ }
+ 
+@@ -310,15 +321,15 @@ static void text_bounds_draw_character(
+ 	short x1 = (short)(x0 + dx);
+ 	short y1 = (short)(y0 + dy);
+ 
+-	if (x0 < draw_string_globals.text_bounds.x0)
+-		draw_string_globals.text_bounds.x0 = x0;
+-	if (y0 < draw_string_globals.text_bounds.y0)
+-		draw_string_globals.text_bounds.y0 = y0;
+-	if (x1 > draw_string_globals.text_bounds.x1)
+-		draw_string_globals.text_bounds.x1 = x1;
+-	if (y1 > draw_string_globals.text_bounds.y1)
+-		draw_string_globals.text_bounds.y1 = y1;
+-	draw_string_globals.last_font_header = font;
++	if (x0 < text_bounds_globals.bounds.x0)
++		text_bounds_globals.bounds.x0 = x0;
++	if (y0 < text_bounds_globals.bounds.y0)
++		text_bounds_globals.bounds.y0 = y0;
++	if (x1 > text_bounds_globals.bounds.x1)
++		text_bounds_globals.bounds.x1 = x1;
++	if (y1 > text_bounds_globals.bounds.y1)
++		text_bounds_globals.bounds.y1 = y1;
++	text_bounds_globals.last_font_header = font;
+ 
+ 	return;
+ }
+@@ -337,10 +348,10 @@ static void text_pick_draw_character(
+ {
+ 	short x1 = x0 + dx;
+ 	short y1 = y0 + dy;
+-	short distance_x0 = x0 - draw_string_globals.pick_point.x;
+-	short distance_x1 = x1 - draw_string_globals.pick_point.x;
+-	short distance_y0 = y0 - draw_string_globals.pick_point.y;
+-	short distance_y1 = y1 - draw_string_globals.pick_point.y;
++	short distance_x0 = x0 - text_pick_globals.pick_point.x;
++	short distance_x1 = x1 - text_pick_globals.pick_point.x;
++	short distance_y0 = y0 - text_pick_globals.pick_point.y;
++	short distance_y1 = y1 - text_pick_globals.pick_point.y;
+ 	short distance;
+ 
+ 	distance_x0 = ABS(distance_x0);
+@@ -351,22 +362,22 @@ static void text_pick_draw_character(
+ 	distance = MAX(distance, distance_y0);
+ 	distance = MAX(distance, distance_y1);
+ 
+-	if (distance < draw_string_globals.best_pick_distance)
++	if (distance < text_pick_globals.best_pick_distance)
+ 	{
+-		draw_string_globals.best_pick_distance = distance;
+-		if (draw_string_globals.pick_point.x - x0 < ((x1 - x0) >> 1))
++		text_pick_globals.best_pick_distance = distance;
++		if (text_pick_globals.pick_point.x - x0 < ((x1 - x0) >> 1))
+ 		{
+-			draw_string_globals.best_pick_string_index = draw_string_globals.last_string_index;
+-			draw_string_globals.last_string_index = state->string_index;
++			text_pick_globals.best_pick_string_index = text_pick_globals.last_string_index;
++			text_pick_globals.last_string_index = state->string_index;
+ 			return;
+ 		}
+ 
+-		draw_string_globals.best_pick_string_index = state->string_index;
+-		draw_string_globals.last_string_index = state->string_index;
++		text_pick_globals.best_pick_string_index = state->string_index;
++		text_pick_globals.last_string_index = state->string_index;
+ 		return;
+ 	}
+ 
+-	draw_string_globals.last_string_index = state->string_index;
++	text_pick_globals.last_string_index = state->string_index;
+ 
+ 	return;
+ }
+@@ -376,7 +387,7 @@ char *draw_string_get_string(
+ {
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 341, index>=0 && index<NUMBER_OF_TEXT_STRINGS);
+ 
+-	return string_list_get_string(draw_string_globals.localization_string_list_index, index + 7);
++	return string_list_get_string(font_drawing_globals.string_list_index, index + 7);
+ }
+ 
+ void draw_string_set_tab_stops(
+@@ -385,11 +396,11 @@ void draw_string_set_tab_stops(
+ {
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 350, count>=0 && count<MAXIMUM_NUMBER_OF_TAB_STOPS);
+ 
+-	draw_string_globals.tab_stop_count = MIN(count, MAXIMUM_NUMBER_OF_TAB_STOPS);
++	font_drawing_globals.tab_stop_count = MIN(count, MAXIMUM_NUMBER_OF_TAB_STOPS);
+ 
+-	if (draw_string_globals.tab_stop_count > 0)
++	if (font_drawing_globals.tab_stop_count > 0)
+ 	{
+-		csmemcpy(draw_string_globals.tab_stops, tab_stops, draw_string_globals.tab_stop_count * sizeof(short));
++		csmemcpy(font_drawing_globals.tab_stops, tab_stops, font_drawing_globals.tab_stop_count * sizeof(short));
+ 	}
+ 
+ 	return;
+@@ -402,8 +413,8 @@ void draw_string_set_indents(
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 366, initial_indent>=0);
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 367, paragraph_indent>=0);
+ 
+-	draw_string_globals.paragraph_indent = paragraph_indent;
+-	draw_string_globals.initial_indent = initial_indent;
++	font_drawing_globals.paragraph_indent = paragraph_indent;
++	font_drawing_globals.initial_indent = initial_indent;
+ 
+ 	return;
+ }
+@@ -417,7 +428,7 @@ void draw_string_set_color(
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 381, (color->green >= 0.f) && (color->green <= 1.f));
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 382, (color->blue >= 0.f) && (color->blue <= 1.f));
+ 
+-	draw_string_globals.color = *color;
++	font_drawing_globals.current_color = *color;
+ 
+ 	return;
+ }
+@@ -427,7 +438,7 @@ void draw_string_get_color(
+ {
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 392, color);
+ 
+-	*color = draw_string_globals.color;
++	*color = font_drawing_globals.current_color;
+ 
+ 	return;
+ }
+@@ -436,7 +447,7 @@ void draw_string_set_font(
+ 	long font_index)
+ {
+ 	font_definition_get(font_index);
+-	draw_string_globals.font_index = font_index;
++	font_drawing_globals.current_font_index = font_index;
+ 
+ 	return;
+ }
+@@ -450,9 +461,9 @@ void draw_string_set_format(
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 411, style==_text_style_plain || (style>=0 && style<NUMBER_OF_TEXT_STYLES));
+ 	match_assert("c:\\halo\\SOURCE\\text\\draw_string.c", 412, justification>=0 && justification<NUMBER_OF_TEXT_JUSTIFICATIONS);
+ 
+-	draw_string_globals.style = style;
+-	draw_string_globals.justification = justification;
+-	draw_string_globals.flags = flags;
++	font_drawing_globals.current_style = style;
++	font_drawing_globals.current_justification = justification;
++	font_drawing_globals.current_flags = flags;
+ 
+ 	return;
+ }
+@@ -475,8 +486,8 @@ void draw_string_set_highlight(
+ 	short start,
+ 	short end)
+ {
+-	draw_string_globals.highlight_start = start;
+-	draw_string_globals.highlight_end = end;
++	font_drawing_globals.highlight_start_index = start;
++	font_drawing_globals.highlight_stop_index = end;
+ 
+ 	return;
+ }
+@@ -698,9 +709,9 @@ static short parse_string(
+ 				{
+ 					short next_string_index = *string_index;
+ 					long next_character = get_next_character(state->string, &next_string_index);
+-					char *can_end_words = string_list_get_string(draw_string_globals.localization_string_list_index, _string_index_can_end_words);
+-					char *cannot_end_words = string_list_get_string(draw_string_globals.localization_string_list_index, _string_index_cannot_end_words);
+-					char *cannot_begin_words = string_list_get_string(draw_string_globals.localization_string_list_index, _string_index_cannot_begin_words);
++					char *can_end_words = string_list_get_string(font_drawing_globals.string_list_index, _string_index_can_end_words);
++					char *cannot_end_words = string_list_get_string(font_drawing_globals.string_list_index, _string_index_cannot_end_words);
++					char *cannot_begin_words = string_list_get_string(font_drawing_globals.string_list_index, _string_index_cannot_begin_words);
+ 
+ 					if (((character & 0xFF00) || character_in_pattern(character, can_end_words)) &&
+ 						(!(character & 0xFF00) || !character_in_pattern(character, cannot_end_words)) &&
+@@ -814,15 +825,15 @@ static void draw_string_partial(
+ 		parse_string_new(
+ 			&state,
+ 			string,
+-			draw_string_globals.font_index,
+-			draw_string_globals.style,
+-			draw_string_globals.justification,
+-			&draw_string_globals.color);
++			font_drawing_globals.current_font_index,
++			font_drawing_globals.current_style,
++			font_drawing_globals.current_justification,
++			&font_drawing_globals.current_color);
+ 
+ 		for (state.string_index = string_index; state.string_index < string_length; )
+ 		{
+ 			pixel32 character_color =
+-				(state.string_index >= draw_string_globals.highlight_start && state.string_index < draw_string_globals.highlight_end) ?
++				(state.string_index >= font_drawing_globals.highlight_start_index && state.string_index < font_drawing_globals.highlight_stop_index) ?
+ 				color ^ 0xFFFFFF :
+ 				color;
+ 			struct font_character *character;
+@@ -919,15 +930,15 @@ static void draw_unicode_string_partial(
+ 		parse_string_new(
+ 			&state,
+ 			(char const *)string,
+-			draw_string_globals.font_index,
+-			draw_string_globals.style,
+-			draw_string_globals.justification,
+-			&draw_string_globals.color);
++			font_drawing_globals.current_font_index,
++			font_drawing_globals.current_style,
++			font_drawing_globals.current_justification,
++			&font_drawing_globals.current_color);
+ 
+ 		for (state.string_index = string_index; state.string_index < string_length; )
+ 		{
+ 			pixel32 character_color =
+-				(state.string_index >= draw_string_globals.highlight_start && state.string_index < draw_string_globals.highlight_end) ?
++				(state.string_index >= font_drawing_globals.highlight_start_index && state.string_index < font_drawing_globals.highlight_stop_index) ?
+ 				color ^ 0xFFFFFF :
+ 				color;
+ 			struct font_character *character;
+@@ -999,16 +1010,16 @@ void draw_string(
+ 	parse_string_new(
+ 		&state,
+ 		string,
+-		draw_string_globals.font_index,
+-		draw_string_globals.style,
+-		draw_string_globals.justification,
+-		&draw_string_globals.color);
++		font_drawing_globals.current_font_index,
++		font_drawing_globals.current_style,
++		font_drawing_globals.current_justification,
++		&font_drawing_globals.current_color);
+ 
+ 	do
+ 	{
+ 		short justification = state.justification;
+ 		short segment_start_index = state.string_index;
+-		short tab_stop_count = draw_string_globals.tab_stop_count;
++		short tab_stop_count = font_drawing_globals.tab_stop_count;
+ 		short line_width = 0;
+ 		short break_string_index = 0;
+ 		short break_line_width;
+@@ -1023,29 +1034,29 @@ void draw_string(
+ 
+ 			if (tab_stop_index != 0)
+ 			{
+-				line_bounds.x0 = draw_string_globals.tab_stops[tab_stop_index - 1];
++				line_bounds.x0 = font_drawing_globals.tab_stops[tab_stop_index - 1];
+ 			}
+ 			else if (paragraph_line_index != 0)
+ 			{
+-				line_bounds.x0 += draw_string_globals.paragraph_indent;
++				line_bounds.x0 += font_drawing_globals.paragraph_indent;
+ 			}
+ 			else
+ 			{
+-				line_bounds.x0 += draw_string_globals.initial_indent;
++				line_bounds.x0 += font_drawing_globals.initial_indent;
+ 			}
+ 
+-			if (tab_stop_index < draw_string_globals.tab_stop_count)
++			if (tab_stop_index < font_drawing_globals.tab_stop_count)
+ 			{
+-				line_bounds.x1 = draw_string_globals.tab_stops[tab_stop_index];
++				line_bounds.x1 = font_drawing_globals.tab_stops[tab_stop_index];
+ 			}
+ 		}
+ 		else if (paragraph_line_index != 0)
+ 		{
+-			line_bounds.x0 += draw_string_globals.paragraph_indent;
++			line_bounds.x0 += font_drawing_globals.paragraph_indent;
+ 		}
+ 		else
+ 		{
+-			line_bounds.x0 += draw_string_globals.initial_indent;
++			line_bounds.x0 += font_drawing_globals.initial_indent;
+ 		}
+ 
+ 		cursor.x = state.font_header->leading_width + line_bounds.x0;
+@@ -1078,7 +1089,7 @@ void draw_string(
+ 					{
+ 						line_width += character->character_width;
+ 					}
+-					else if (TEST_FLAG(draw_string_globals.flags, _draw_text_wrap_horizontally_bit))
++					else if (TEST_FLAG(font_drawing_globals.current_flags, _draw_text_wrap_horizontally_bit))
+ 					{
+ 						if (break_string_index > 0)
+ 						{
+@@ -1110,7 +1121,7 @@ void draw_string(
+ 			break;
+ 		}
+ 
+-		if (TEST_FLAG(draw_string_globals.flags, _draw_text_wrap_vertically_bit) || cursor.y < line_bounds.y1)
++		if (TEST_FLAG(font_drawing_globals.current_flags, _draw_text_wrap_vertically_bit) || cursor.y < line_bounds.y1)
+ 		{
+ 			draw_string_partial(
+ 				draw_character,
+@@ -1141,7 +1152,7 @@ void draw_string(
+ 			break;
+ 
+ 		case _parsed_end_of_column:
+-			if (tab_stop_index < draw_string_globals.tab_stop_count)
++			if (tab_stop_index < font_drawing_globals.tab_stop_count)
+ 			{
+ 				tab_stop_index++;
+ 				wrapped_line_index = 0;
+@@ -1166,8 +1177,8 @@ void draw_string(
+ 	}
+ 	while (state.result != _parsed_end_of_string);
+ 
+-	draw_string_globals.highlight_end = 0;
+-	draw_string_globals.highlight_start = 0;
++	font_drawing_globals.highlight_stop_index = 0;
++	font_drawing_globals.highlight_start_index = 0;
+ 	if (cursor_reference)
+ 	{
+ 		*cursor_reference = cursor;
+@@ -1197,16 +1208,16 @@ void draw_unicode_string(
+ 	parse_string_new(
+ 		&state,
+ 		(char const *)string,
+-		draw_string_globals.font_index,
+-		draw_string_globals.style,
+-		draw_string_globals.justification,
+-		&draw_string_globals.color);
++		font_drawing_globals.current_font_index,
++		font_drawing_globals.current_style,
++		font_drawing_globals.current_justification,
++		&font_drawing_globals.current_color);
+ 
+ 	do
+ 	{
+ 		short justification = state.justification;
+ 		short segment_start_index = state.string_index;
+-		short tab_stop_count = draw_string_globals.tab_stop_count;
++		short tab_stop_count = font_drawing_globals.tab_stop_count;
+ 		short line_width = 0;
+ 		short break_string_index = 0;
+ 		short break_line_width;
+@@ -1221,29 +1232,29 @@ void draw_unicode_string(
+ 
+ 			if (tab_stop_index != 0)
+ 			{
+-				line_bounds.x0 = draw_string_globals.tab_stops[tab_stop_index - 1];
++				line_bounds.x0 = font_drawing_globals.tab_stops[tab_stop_index - 1];
+ 			}
+ 			else if (paragraph_line_index != 0)
+ 			{
+-				line_bounds.x0 += draw_string_globals.paragraph_indent;
++				line_bounds.x0 += font_drawing_globals.paragraph_indent;
+ 			}
+ 			else
+ 			{
+-				line_bounds.x0 += draw_string_globals.initial_indent;
++				line_bounds.x0 += font_drawing_globals.initial_indent;
+ 			}
+ 
+-			if (tab_stop_index < draw_string_globals.tab_stop_count)
++			if (tab_stop_index < font_drawing_globals.tab_stop_count)
+ 			{
+-				line_bounds.x1 = draw_string_globals.tab_stops[tab_stop_index];
++				line_bounds.x1 = font_drawing_globals.tab_stops[tab_stop_index];
+ 			}
+ 		}
+ 		else if (paragraph_line_index != 0)
+ 		{
+-			line_bounds.x0 += draw_string_globals.paragraph_indent;
++			line_bounds.x0 += font_drawing_globals.paragraph_indent;
+ 		}
+ 		else
+ 		{
+-			line_bounds.x0 += draw_string_globals.initial_indent;
++			line_bounds.x0 += font_drawing_globals.initial_indent;
+ 		}
+ 
+ 		cursor.x = state.font_header->leading_width + line_bounds.x0;
+@@ -1276,7 +1287,7 @@ void draw_unicode_string(
+ 					{
+ 						line_width += character->character_width;
+ 					}
+-					else if (TEST_FLAG(draw_string_globals.flags, _draw_text_wrap_horizontally_bit))
++					else if (TEST_FLAG(font_drawing_globals.current_flags, _draw_text_wrap_horizontally_bit))
+ 					{
+ 						if (break_string_index > 0)
+ 						{
+@@ -1308,7 +1319,7 @@ void draw_unicode_string(
+ 			break;
+ 		}
+ 
+-		if (TEST_FLAG(draw_string_globals.flags, _draw_text_wrap_vertically_bit) || cursor.y < line_bounds.y1)
++		if (TEST_FLAG(font_drawing_globals.current_flags, _draw_text_wrap_vertically_bit) || cursor.y < line_bounds.y1)
+ 		{
+ 			draw_unicode_string_partial(
+ 				draw_character,
+@@ -1339,7 +1350,7 @@ void draw_unicode_string(
+ 			break;
+ 
+ 		case _parsed_end_of_column:
+-			if (tab_stop_index < draw_string_globals.tab_stop_count)
++			if (tab_stop_index < font_drawing_globals.tab_stop_count)
+ 			{
+ 				tab_stop_index++;
+ 				wrapped_line_index = 0;
+@@ -1364,8 +1375,8 @@ void draw_unicode_string(
+ 	}
+ 	while (state.result != _parsed_end_of_string);
+ 
+-	draw_string_globals.highlight_end = 0;
+-	draw_string_globals.highlight_start = 0;
++	font_drawing_globals.highlight_stop_index = 0;
++	font_drawing_globals.highlight_start_index = 0;
+ 	if (cursor_reference)
+ 	{
+ 		*cursor_reference = cursor;
+@@ -1382,26 +1393,26 @@ void draw_string_compute_bounds(
+ {
+ 	point2d cursor;
+ 
+-	draw_string_globals.text_bounds.y0 = SHORT_MAX;
+-	draw_string_globals.text_bounds.x0 = SHORT_MAX;
+-	draw_string_globals.text_bounds.y1 = SHORT_MIN;
+-	draw_string_globals.text_bounds.x1 = SHORT_MIN;
++	text_bounds_globals.bounds.y0 = SHORT_MAX;
++	text_bounds_globals.bounds.x0 = SHORT_MAX;
++	text_bounds_globals.bounds.y1 = SHORT_MIN;
++	text_bounds_globals.bounds.x1 = SHORT_MIN;
+ 
+-	draw_string_globals.last_font_header = styled_font_get(
+-		draw_string_globals.font_index,
+-		draw_string_globals.style);
++	text_bounds_globals.last_font_header = styled_font_get(
++		font_drawing_globals.current_font_index,
++		font_drawing_globals.current_style);
+ 	draw_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
+ 
+ 	cursor_bounds->x0 = cursor.x;
+ 	cursor_bounds->x1 = (short)(cursor.x + 1);
+ 	cursor_bounds->y0 = (short)(
+-		cursor.y - draw_string_globals.last_font_header->ascending_height);
++		cursor.y - text_bounds_globals.last_font_header->ascending_height);
+ 	cursor_bounds->y1 = (short)(
+-		draw_string_globals.last_font_header->descending_height + cursor.y);
++		text_bounds_globals.last_font_header->descending_height + cursor.y);
+ 
+-	text_bounds->x0 = draw_string_globals.text_bounds.x0;
++	text_bounds->x0 = text_bounds_globals.bounds.x0;
+ 	text_bounds->y0 = bounds->y0;
+-	text_bounds->x1 = draw_string_globals.text_bounds.x1;
++	text_bounds->x1 = text_bounds_globals.bounds.x1;
+ 	text_bounds->y1 = cursor_bounds->y1;
+ 
+ 	return;
+@@ -1415,26 +1426,26 @@ void draw_unicode_string_compute_bounds(
+ {
+ 	point2d cursor;
+ 
+-	draw_string_globals.text_bounds.y0 = SHORT_MAX;
+-	draw_string_globals.text_bounds.x0 = SHORT_MAX;
+-	draw_string_globals.text_bounds.y1 = SHORT_MIN;
+-	draw_string_globals.text_bounds.x1 = SHORT_MIN;
++	text_bounds_globals.bounds.y0 = SHORT_MAX;
++	text_bounds_globals.bounds.x0 = SHORT_MAX;
++	text_bounds_globals.bounds.y1 = SHORT_MIN;
++	text_bounds_globals.bounds.x1 = SHORT_MIN;
+ 
+-	draw_string_globals.last_font_header = styled_font_get(
+-		draw_string_globals.font_index,
+-		draw_string_globals.style);
++	text_bounds_globals.last_font_header = styled_font_get(
++		font_drawing_globals.current_font_index,
++		font_drawing_globals.current_style);
+ 	draw_unicode_string(text_bounds_draw_character, bounds, &cursor, NULL, 0, string);
+ 
+ 	cursor_bounds->x0 = cursor.x;
+ 	cursor_bounds->x1 = (short)(cursor.x + 1);
+ 	cursor_bounds->y0 = (short)(
+-		cursor.y - draw_string_globals.last_font_header->ascending_height);
++		cursor.y - text_bounds_globals.last_font_header->ascending_height);
+ 	cursor_bounds->y1 = (short)(
+-		draw_string_globals.last_font_header->descending_height + cursor.y);
++		text_bounds_globals.last_font_header->descending_height + cursor.y);
+ 
+-	text_bounds->x0 = draw_string_globals.text_bounds.x0;
++	text_bounds->x0 = text_bounds_globals.bounds.x0;
+ 	text_bounds->y0 = bounds->y0;
+-	text_bounds->x1 = draw_string_globals.text_bounds.x1;
++	text_bounds->x1 = text_bounds_globals.bounds.x1;
+ 	text_bounds->y1 = cursor_bounds->y1;
+ 
+ 	return;
+@@ -1445,13 +1456,13 @@ short draw_string_pick(
+ 	char const *string,
+ 	point2d const *point)
+ {
+-	draw_string_globals.pick_point = *point;
+-	draw_string_globals.best_pick_distance = SHORT_MAX;
+-	draw_string_globals.best_pick_string_index = 0;
+-	draw_string_globals.last_string_index = 0;
++	text_pick_globals.pick_point = *point;
++	text_pick_globals.best_pick_distance = SHORT_MAX;
++	text_pick_globals.best_pick_string_index = 0;
++	text_pick_globals.last_string_index = 0;
+ 
+ 	draw_string(text_pick_draw_character, bounds, NULL, NULL, 0, string);
+-	return (word)draw_string_globals.best_pick_string_index;
++	return (word)text_pick_globals.best_pick_string_index;
+ }
+ 
+ void bitmap_draw_string(
+diff --git a/config/symbols.json b/config/symbols.json
+index f9abb17d..0f677d81 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -23276,7 +23276,10 @@
+ { "file_offset": 4984048, "flags": 0, "name": "_warned_about_missing_subclusters", "static": true },
+ { "file_offset": 4984056, "flags": 0, "name": "_structure_visibility_globals", "static": true },
+ { "file_offset": 4985088, "flags": 0, "name": "_structure_globals", "static": true },
+-{ "file_offset": 4987144, "flags": 0, "name": "_draw_string_globals" },
++{ "file_offset": 4987144, "flags": 0, "name": "_draw_character_software_globals", "static": true },
++{ "file_offset": 4987152, "flags": 0, "name": "_text_pick_globals", "static": true },
++{ "file_offset": 4987164, "flags": 0, "name": "_text_bounds_globals", "static": true },
++{ "file_offset": 4987176, "flags": 0, "name": "_font_drawing_globals", "static": true },
+ { "file_offset": 4987392, "flags": 0, "name": "_global_language_code" },
+ { "file_offset": 4987400, "flags": 0, "name": "_bss_004c1a08" },
+ { "file_offset": 4987912, "flags": 0, "name": "_features", "static": true },

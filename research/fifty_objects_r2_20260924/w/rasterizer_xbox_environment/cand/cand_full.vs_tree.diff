@@ -1,0 +1,95 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_environment.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\rasterizer_xbox_environment\\cand\\cand_full.c"
+index f471cae6..fbd024c8 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_environment.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\rasterizer_xbox_environment\\cand\\cand_full.c"
+@@ -140,6 +140,7 @@ symbols in this file:
+ 
+ #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #define REAL_MATH_EXTERNAL_SCALE_VECTOR3D
++#define REAL_MATH_EXTERNAL_NORMALIZE3D
+ #include "cseries.h"
+ #include "bitmaps/bitmaps.h"
+ #include "cseries/errors.h"
+@@ -151,6 +152,7 @@ symbols in this file:
+ #include "math/real_math.h"
+ #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #undef REAL_MATH_EXTERNAL_SCALE_VECTOR3D
++#undef REAL_MATH_EXTERNAL_NORMALIZE3D
+ #include "rasterizer/rasterizer.h"
+ #include "rasterizer/rasterizer_environment.h"
+ #include "rasterizer/common/rasterizer_common.h"
+@@ -574,7 +576,7 @@ static boolean warned = FALSE;
+ extern struct pixel_shader_definition pixel_shader;
+ extern struct rasterizer_lights_globals rasterizer_lights;
+ extern struct rasterizer_window_begin_parameters global_window_parameters;
+-short specular_light_vertex_shader_permutation_index= NONE;
++static short specular_light_vertex_shader_permutation_index= NONE;
+ 
+ /* ---------- public code */
+ 
+@@ -3325,11 +3327,10 @@ static void rasterizer_environment_specular_spot_light_begin(
+ 	{
+ 		struct rasterizer_light_submit_parameters *light;
+ 		long gel_bitmap_index;
+-		real_vector3d forward;
+-		real_vector3d side;
+-		real_vector3d up;
++		real_matrix4x3 light_matrix;
+ 		real_vector4d vertex_constants[5];
+ 		real radius;
++		real inner_radius;
+ 		real cone_scale;
+ 
+ 		match_assert(
+@@ -3346,32 +3347,34 @@ static void rasterizer_environment_specular_spot_light_begin(
+ 		if (gel_bitmap_index == NONE)
+ 			gel_bitmap_index = light->definition->gel.secondary_map.index;
+ 
+-		forward = light->forward;
+-		up = light->up;
+-		normalize3d(cross_product3d(&forward, &up, &side));
++		light_matrix.forward = light->forward;
++		light_matrix.up = light->up;
++		cross_product3d(&light->forward, &light->up, &light_matrix.left);
++		normalize3d(&light_matrix.left);
+ 		radius = light->definition->geometry.specular_radius_multiplier * light->radius;
+-		cone_scale = 1.0f / (radius - radius * 0.5f);
++		inner_radius = radius * 0.5f;
++		cone_scale = 1.0f / (radius - inner_radius);
+ 
+ 		vertex_constants[0].i = light->position.x;
+ 		vertex_constants[0].j = light->position.y;
+ 		vertex_constants[0].k = light->position.z;
+ 		vertex_constants[0].l = 0.5f / radius;
+-		vertex_constants[1].i = -forward.i;
+-		vertex_constants[1].j = -forward.j;
+-		vertex_constants[1].k = -forward.k;
++		vertex_constants[1].i = -light_matrix.forward.i;
++		vertex_constants[1].j = -light_matrix.forward.j;
++		vertex_constants[1].k = -light_matrix.forward.k;
+ 		vertex_constants[1].l = 1.0f;
+-		vertex_constants[2].i = -side.i;
+-		vertex_constants[2].j = -side.j;
+-		vertex_constants[2].k = -side.k;
++		vertex_constants[2].i = -light_matrix.left.i;
++		vertex_constants[2].j = -light_matrix.left.j;
++		vertex_constants[2].k = -light_matrix.left.k;
+ 		vertex_constants[2].l = 1.0f;
+-		vertex_constants[3].i = -up.i;
+-		vertex_constants[3].j = -up.j;
+-		vertex_constants[3].k = -up.k;
++		vertex_constants[3].i = -light_matrix.up.i;
++		vertex_constants[3].j = -light_matrix.up.j;
++		vertex_constants[3].k = -light_matrix.up.k;
+ 		vertex_constants[3].l = 1.0f;
+-		vertex_constants[4].i = forward.i * cone_scale;
+-		vertex_constants[4].j = forward.j * cone_scale;
+-		vertex_constants[4].k = forward.k * cone_scale;
+-		vertex_constants[4].l = -(cone_scale * (radius * 0.5f));
++		vertex_constants[4].i = light_matrix.forward.i * cone_scale;
++		vertex_constants[4].j = light_matrix.forward.j * cone_scale;
++		vertex_constants[4].k = light_matrix.forward.k * cone_scale;
++		vertex_constants[4].l = -cone_scale * inner_radius;
+ 		D3DDevice_SetVertexShaderConstant(-81, vertex_constants, 5);
+ 
+ 		rasterizer_set_texture(1, 2, 1, gel_bitmap_index, 0);

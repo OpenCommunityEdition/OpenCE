@@ -1,0 +1,62 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..e3eae5d6 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -1837,7 +1837,7 @@
+ { "file_offset": 551920, "flags": 32, "name": "_contrail_new" },
+ { "file_offset": 552256, "flags": 32, "name": "_contrail_owner_collision" },
+ { "file_offset": 552384, "flags": 32, "name": "_contrails_update" },
+-{ "file_offset": 552928, "flags": 32, "name": "_decal_verify_neighbors", "static": true },
++{ "file_offset": 552928, "flags": 32, "name": "_decal_check", "static": true },
+ { "file_offset": 553232, "flags": 32, "name": "_decal_set_first_decal_index", "static": true },
+ { "file_offset": 553360, "flags": 32, "name": "_decal_sprite_get_bounds", "static": true },
+ { "file_offset": 553744, "flags": 32, "name": "_decals_initialize" },
+diff --git a/source/effects/decals.c b/source/effects/decals.c
+index 94379d20..b2f96eb0 100644
+--- a/source/effects/decals.c
++++ b/source/effects/decals.c
+@@ -3,7 +3,7 @@ DECALS.C
+ 
+ symbols in this file:
+ 00086FE0 0130:
+-	_decal_verify_neighbors (0000)
++	_decal_check (0000)
+ 00087110 0080:
+ 	_decal_set_first_decal_index (0000)
+ 00087190 0180:
+@@ -418,7 +418,7 @@ struct decal_globals
+ 
+ /* ---------- prototypes */
+ 
+-static void decal_verify_neighbors(
++static void decal_check(
+ 	long decal_index,
+ 	boolean layer_check);
+ static void decal_update(
+@@ -1544,7 +1544,7 @@ void decals_reconnect_to_structure_bsp(
+ 			match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 661,
+ 				decal->layer>=0 && decal->layer<NUMBER_OF_DECAL_LAYERS);
+ 
+-			decal_verify_neighbors(decal_index, FALSE);
++			decal_check(decal_index, FALSE);
+ 
+ 			scenario_location_from_point(&location, &decal->position);
+ 
+@@ -1570,7 +1570,7 @@ void decals_reconnect_to_structure_bsp(
+ 				decal_reinsert(decal_index, location.cluster_index, decal->layer);
+ 			}
+ 
+-			decal_verify_neighbors(decal_index, FALSE);
++			decal_check(decal_index, FALSE);
+ 
+ 			decal_index= next_decal_index;
+ 		}
+@@ -2393,7 +2393,7 @@ static void decal_update(
+ 
+ 	return;
+ }
+-static void decal_verify_neighbors(
++static void decal_check(
+ 	long decal_index,
+ 	boolean layer_check)
+ {

@@ -1,0 +1,13 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..dc1dc066 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -7385,7 +7385,7 @@
+ { "file_offset": 1791344, "flags": 32, "name": "_is_all_bink_memory_free", "static": true },
+ { "file_offset": 1791392, "flags": 32, "name": "_bink_alloc@4", "static": true },
+ { "file_offset": 1791888, "flags": 32, "name": "_bink_free@4", "static": true },
+-{ "file_offset": 1792080, "flags": 32, "name": "_code_001b5850" },
++{ "file_offset": 1792080, "flags": 32, "name": "_bink_decompress_audio_frame", "static": true },
+ { "file_offset": 1792096, "flags": 32, "name": "_bink_draw_frame", "static": true },
+ { "file_offset": 1793008, "flags": 32, "name": "_IDirect3DBaseTexture8_Register@8", "static": true },
+ { "file_offset": 1793024, "flags": 32, "name": "_bink_query_analog_controller_buttons", "static": true },

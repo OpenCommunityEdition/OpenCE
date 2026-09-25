@@ -5,7 +5,7 @@ symbols in this file:
 000A0030 0010:
 	_king_engine_dispose (0000)
 000A0040 0020:
-	_hill_points_to_2d (0000)
+	_point3d_to_point2d (0000)
 000A0060 0350:
 	_find_hill (0000)
 000A03B0 0010:
@@ -222,7 +222,7 @@ typedef char verify_scenario_netgame_flags_offset[
 
 /* ---------- prototypes */
 
-static void hill_points_to_2d(
+static void point3d_to_point2d(
 	real_point3d const *points,
 	real_point2d *points2d,
 	long point_count);
@@ -850,7 +850,7 @@ void king_engine_update(
 
 /* ---------- private code */
 
-static void hill_points_to_2d(
+static void point3d_to_point2d(
 	real_point3d const *points,
 	real_point2d *points2d,
 	long point_count)
@@ -918,7 +918,7 @@ static void find_hill(
 			points[3].y += 1.0f;
 			point_count = 4;
 		}
-		hill_points_to_2d(points, points2d, point_count);
+		point3d_to_point2d(points, points2d, point_count);
 		hull_point_count = convex_hull2d(point_count, points2d, hull_indices);
 		for (i = 0; i < hull_point_count; i++)
 		{

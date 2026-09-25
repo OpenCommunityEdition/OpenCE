@@ -1,0 +1,13 @@
+diff --git a/source/units/vehicles.c b/source/units/vehicles.c
+index e6710a637ffc23191069f4a4a2f53547753888af..a9e6fee55c651c5ae64444085889d25c906279a0 100644
+--- a/source/units/vehicles.c
++++ b/source/units/vehicles.c
+@@ -885,7 +885,7 @@ long vehicle_find_pathfinding_surface_index(
+ 
+ 			point_from_line3d(&origin, global_up3d, 0.4f, &origin);
+ 
+-			add_vectors3d(global_down3d, global_down3d, &vector);
++			scale_vector3d(global_down3d, 2.0f, &vector);
+ 
+ 			if (collision_bsp_test_vector(1, bsp, 0, NULL, &origin, &vector, FLT_MAX, &result))
+ 			{

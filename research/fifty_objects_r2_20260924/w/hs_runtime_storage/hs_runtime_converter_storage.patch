@@ -1,0 +1,151 @@
+diff --git a/source/hs/hs_runtime.c b/source/hs/hs_runtime.c
+--- a/source/hs/hs_runtime.c
++++ b/source/hs/hs_runtime.c
+@@ -466,29 +466,29 @@ static void hs_inspect_enum(
+ 	short type,
+ 	union hs_conversion_result value,
+ 	char *result);
+-union hs_conversion_result hs_long_to_boolean(
++static union hs_conversion_result hs_long_to_boolean(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_short_to_boolean(
++static union hs_conversion_result hs_short_to_boolean(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_string_to_boolean(
++static union hs_conversion_result hs_string_to_boolean(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_data_to_void(
++static union hs_conversion_result hs_data_to_void(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_short_to_real(
++static union hs_conversion_result hs_short_to_real(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_long_to_real(
++static union hs_conversion_result hs_long_to_real(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_enum_to_real(
++static union hs_conversion_result hs_enum_to_real(
+ 	union hs_conversion_result value);
+-union hs_conversion_result hs_real_to_short(
++static union hs_conversion_result hs_real_to_short(
+ 	union hs_conversion_result value);
+-long hs_real_to_long(
++static long hs_real_to_long(
+ 	union hs_conversion_result value);
+-long hs_long_to_short(
++static long hs_long_to_short(
+ 	union hs_conversion_result value);
+-long hs_object_name_to_object_list(
++static long hs_object_name_to_object_list(
+ 	short object_name_index);
+-long hs_object_to_object_list(
++static long hs_object_to_object_list(
+ 	long object_index);
+ static boolean hs_object_type_can_cast(
+ 	short actual_type,
+@@ -1538,7 +1538,7 @@ static void hs_inspect_enum(
+ 	return;
+ }
+ 
+-union hs_conversion_result hs_long_to_boolean(
++static union hs_conversion_result hs_long_to_boolean(
+ 	union hs_conversion_result value)
+ {
+ 	value.boolean = value.long_integer==0;
+@@ -1546,7 +1546,7 @@ union hs_conversion_result hs_long_to_boolean(
+ 	return value;
+ }
+ 
+-union hs_conversion_result hs_short_to_boolean(
++static union hs_conversion_result hs_short_to_boolean(
+ 	union hs_conversion_result value)
+ {
+ 	value.boolean = value.short_integer==0;
+@@ -1554,7 +1554,7 @@ union hs_conversion_result hs_short_to_boolean(
+ 	return value;
+ }
+ 
+-union hs_conversion_result hs_string_to_boolean(
++static union hs_conversion_result hs_string_to_boolean(
+ 	union hs_conversion_result value)
+ {
+ 	union hs_conversion_result result;
+@@ -1564,7 +1564,7 @@ union hs_conversion_result hs_string_to_boolean(
+ 	return result;
+ }
+ 
+-union hs_conversion_result hs_data_to_void(
++static union hs_conversion_result hs_data_to_void(
+ 	union hs_conversion_result value)
+ {
+ 	union hs_conversion_result result;
+@@ -1574,7 +1574,7 @@ union hs_conversion_result hs_data_to_void(
+ 	return result;
+ }
+ 
+-union hs_conversion_result hs_short_to_real(
++static union hs_conversion_result hs_short_to_real(
+ 	union hs_conversion_result value)
+ {
+ 	union hs_conversion_result result;
+@@ -1585,7 +1585,7 @@ union hs_conversion_result hs_short_to_real(
+ 	return result;
+ }
+ 
+-union hs_conversion_result hs_long_to_real(
++static union hs_conversion_result hs_long_to_real(
+ 	union hs_conversion_result value)
+ {
+ 	value.real = value.long_integer;
+@@ -1593,7 +1593,7 @@ union hs_conversion_result hs_long_to_real(
+ 	return value;
+ }
+ 
+-union hs_conversion_result hs_enum_to_real(
++static union hs_conversion_result hs_enum_to_real(
+ 	union hs_conversion_result value)
+ {
+ 	union hs_conversion_result result;
+@@ -1604,7 +1604,7 @@ union hs_conversion_result hs_enum_to_real(
+ 	return result;
+ }
+ 
+-union hs_conversion_result hs_real_to_short(
++static union hs_conversion_result hs_real_to_short(
+ 	union hs_conversion_result value)
+ {
+ 	value.short_integer = (short)value.real;
+@@ -1612,13 +1612,13 @@ union hs_conversion_result hs_real_to_short(
+ 	return value;
+ }
+ 
+-long hs_real_to_long(
++static long hs_real_to_long(
+ 	union hs_conversion_result value)
+ {
+ 	return (long)value.real;
+ }
+ 
+-long hs_long_to_short(
++static long hs_long_to_short(
+ 	union hs_conversion_result value)
+ {
+ 	union hs_conversion_result result;
+@@ -1628,7 +1628,7 @@ long hs_long_to_short(
+ 	return result.long_integer;
+ }
+ 
+-long hs_object_name_to_object_list(
++static long hs_object_name_to_object_list(
+ 	short object_name_index)
+ {
+ 	long object_index;
+@@ -1644,7 +1644,7 @@ long hs_object_name_to_object_list(
+ 	return object_list_index;
+ }
+ 
+-long hs_object_to_object_list(
++static long hs_object_to_object_list(
+ 	long object_index)
+ {
+ 	long object_list_index = NONE;

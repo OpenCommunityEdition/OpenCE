@@ -1,0 +1,21 @@
+diff --git a/source/cache/xbox_texture_cache.c b/source/cache/xbox_texture_cache.c
+index 672a3ce5..8a1cf894 100644
+--- a/source/cache/xbox_texture_cache.c
++++ b/source/cache/xbox_texture_cache.c
+@@ -136,7 +136,6 @@ enum
+ 		2 * (XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE / XBOX_TEXTURE_CACHE_PAGE_SIZE),
+ 	XBOX_TEXTURE_CACHE_ENTRY_SIZE = 0x20,
+ 	XBOX_TEXTURE_CACHE_SIZE = 0x1600000,
+-	XBOX_TEXTURE_CACHE_PROTECTION = 0x404,
+ };
+ 
+ enum
+@@ -460,7 +459,7 @@ void texture_cache_return_memory(
+ 	XPhysicalProtect(
+ 		physical_memory_get_texture_cache_base_address(),
+ 		XBOX_TEXTURE_CACHE_SIZE,
+-		XBOX_TEXTURE_CACHE_PROTECTION);
++		PAGE_READWRITE | PAGE_WRITECOMBINE);
+ 	xbox_texture_cache_globals.stolen_memory = FALSE;
+ 
+ 	return;

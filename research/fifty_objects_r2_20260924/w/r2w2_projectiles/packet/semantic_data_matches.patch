@@ -1,0 +1,19 @@
+--- a/config/semantic_data_matches.json
++++ b/config/semantic_data_matches.json
+@@ -500,5 +500,16 @@
+       "relocation_count": 7,
+       "normalized_sha256": "6ed61c39a648905cf23b12b916e2adadfe97b6e5aa492c29a14c7265809ef1a7"
+     }
++  },
++  {
++    "unit": "source/items/projectiles",
++    "symbol": "_projectile_update_section",
++    "allow_incomplete_unit": true,
++    "reason": "January and rebuilt projectile-update profile-section data have identical 1548-byte payload, section flags and static owners (_projectile_update_section at 0, _effect_marker_names at 1528), with all six relocations independently resolving to the same image destinations; January's split leaves the pooled normal and gravity literals undefined while the rebuilt object emits identical select-any copies, and objdiff 3.3.1's '$'-literal name defect undercredits this sole unmatched section. The unit's .rdata is already 100%; the parked _projectile_new residual keeps the unit incomplete and receives no credit from this entry.",
++    "measurements": {
++      "size": 1548,
++      "relocation_count": 6,
++      "normalized_sha256": "7bfaf5fb0b0c9e0593153885a81788bc8b118a9651a60a8a94e5ffd9fd203cf2"
++    }
+   }
+ ]

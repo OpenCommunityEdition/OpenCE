@@ -1,0 +1,53 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..c22de356 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -3217,7 +3217,7 @@
+ { "file_offset": 763152, "flags": 32, "name": "_hs_cast" },
+ { "file_offset": 763344, "flags": 32, "name": "_hs_global_reconcile_read", "static": true },
+ { "file_offset": 764752, "flags": 32, "name": "_hs_global_reconcile_write", "static": true },
+-{ "file_offset": 765152, "flags": 32, "name": "_hs_runtime_recompile_error", "static": true },
++{ "file_offset": 765152, "flags": 32, "name": "_script_error", "static": true },
+ { "file_offset": 765216, "flags": 32, "name": "_hs_runtime_get_executing_thread_name" },
+ { "file_offset": 765248, "flags": 32, "name": "_hs_wake_by_name" },
+ { "file_offset": 765280, "flags": 32, "name": "_render_debug_scripting" },
+diff --git a/source/hs/hs_runtime.c b/source/hs/hs_runtime.c
+index 7324b1cd..8c70fac0 100644
+--- a/source/hs/hs_runtime.c
++++ b/source/hs/hs_runtime.c
+@@ -77,7 +77,7 @@ symbols in this file:
+ 000BAB50 0190:
+ 	_hs_global_reconcile_write (0000)
+ 000BACE0 0040:
+-	_hs_runtime_recompile_error (0000)
++	_script_error (0000)
+ 000BAD20 0020:
+ 	_hs_runtime_get_executing_thread_name (0000)
+ 000BAD40 0020:
+@@ -527,7 +527,7 @@ static long *hs_arguments_evaluate(
+ 	short formal_parameter_count,
+ 	short const *formal_parameters,
+ 	boolean initialize);
+-static boolean hs_runtime_recompile_error(
++static boolean script_error(
+ 	long thread_index,
+ 	char const *reason,
+ 	char const *expression);
+@@ -3091,7 +3091,7 @@ static long *hs_arguments_evaluate(
+ 
+ 		if (hs_syntax_get(*expression_index)->type!=formal_parameters[*argument_index])
+ 		{
+-			hs_runtime_recompile_error(thread_index, "unexpected actual parameters.",
++			script_error(thread_index, "unexpected actual parameters.",
+ 				"hs_syntax_get(*expression_index)->type==formal_parameters[*argument_index]");
+ 
+ 			return values;
+@@ -3110,7 +3110,7 @@ static long *hs_arguments_evaluate(
+ 	return values;
+ }
+ 
+-static boolean hs_runtime_recompile_error(
++static boolean script_error(
+ 	long thread_index,
+ 	char const *reason,
+ 	char const *expression)

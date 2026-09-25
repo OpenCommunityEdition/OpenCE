@@ -1,0 +1,19 @@
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index edbb60c24868e40bfa909bf876185b14131eb9d3..f9d2dbdab260fa304bf488f3bd31a5f96d6d6d0a 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -40,14 +40,6 @@
+       "reason": "The exact typed decal_projection_create body naturally inlines cross_product2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Actor Combat copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+       "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+       "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
+-    },
+-    {
+-      "unit": "source/physics/collision_features",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_projection_from_vector3d",
+-      "reason": "All 20 target-owned functions compare strict exact, but the rebuilt translation unit also emits an 80-byte _projection_from_vector3d COMDAT absent from its January split. That surplus body reverses the x/y dominant-axis choice and differs from January's selected decals owner; exact external callers do not establish correct helper code or ownership.",
+-      "evidence": "docs/object_matching_logs/shared_inline_helper_admission_audit_20260904.md#collision-features-projection-owner",
+-      "reopen": "Correct the shared helper from January evidence, preserve inherited target-function matches across all header consumers, and establish authentic compatible ownership through ordinary source topology and link verification. Do not invent a helper owner, force emission, or credit the decals-owned 80 bytes from a candidate-only copy."
+     }
+   ]
+ }

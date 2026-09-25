@@ -1,0 +1,12 @@
+diff --git a/source/cache/xbox_texture_cache.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\xbox_texture_cache\\cand_P3.c"
+index 672a3ce5..58eef577 100644
+--- a/source/cache/xbox_texture_cache.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\xbox_texture_cache\\cand_P3.c"
+@@ -208,6 +208,7 @@ struct xbox_texture_cache_texture
+ 	short read_request_handle;
+ 	boolean loaded;
+ 	boolean used;
++	byte reserved006[2];
+ 	struct bitmap_data *bitmap;
+ 	D3DBaseTexture hardware_format;
+ };

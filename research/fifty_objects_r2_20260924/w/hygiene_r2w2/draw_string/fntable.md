@@ -1,0 +1,30 @@
+| function | size T/C | sha T | sha C | relocs T/C | row |
+|---|---|---|---|---|---|
+| _bitmap_draw_character | 944/944 | 1fbab7db03 | 1fbab7db03 | 25/25 | EXACT |
+| _bitmap_draw_string | 304/240 | 4e8747543c | ad3d0d63e2 | 9/9 | residual |
+| _draw_string | 912/912 | 8a16ea28aa | 8a16ea28aa | 46/46 | EXACT |
+| _draw_string_compute_bounds | 192/192 | 1546e737cb | 1546e737cb | 14/14 | EXACT |
+| _draw_string_dispose | 16/16 | 499f1f307c | 499f1f307c | 0/0 | EXACT |
+| _draw_string_dispose_from_old_map | 16/16 | b9bd364577 | b9bd364577 | 1/1 | EXACT |
+| _draw_string_get_color | 80/80 | 6cdc473035 | 6cdc473035 | 8/8 | EXACT |
+| _draw_string_get_string | 80/80 | 61586751e9 | 61586751e9 | 6/6 | EXACT |
+| _draw_string_initialize | 16/16 | 499f1f307c | 499f1f307c | 0/0 | EXACT |
+| _draw_string_initialize_for_new_map | 112/112 | 6701a2e6ec | 6701a2e6ec | 13/13 | EXACT |
+| _draw_string_partial | 528/528 | e55f2a4aa9 | e55f2a4aa9 | 9/9 | EXACT |
+| _draw_string_pick | 80/80 | 35dca73f36 | 35dca73f36 | 7/7 | EXACT |
+| _draw_string_set_color | 336/336 | af6aa61c5b | af6aa61c5b | 32/32 | EXACT |
+| _draw_string_set_draw_mode | 64/64 | c1668e229e | c1668e229e | 4/4 | EXACT |
+| _draw_string_set_font | 32/32 | 5f9be66d70 | 5f9be66d70 | 2/2 | EXACT |
+| _draw_string_set_format | 176/176 | c4ae4ad9ad | c4ae4ad9ad | 15/15 | EXACT |
+| _draw_string_set_highlight | 32/32 | e54dbb9a5d | e54dbb9a5d | 2/2 | EXACT |
+| _draw_string_set_indents | 112/112 | 4874d5ae35 | 4874d5ae35 | 10/10 | EXACT |
+| _draw_string_set_tab_stops | 112/112 | 093c317d01 | 093c317d01 | 8/8 | EXACT |
+| _draw_unicode_string | 912/912 | a9959a0469 | a9959a0469 | 46/46 | EXACT |
+| _draw_unicode_string_compute_bounds | 192/192 | 1546e737cb | 1546e737cb | 14/14 | EXACT |
+| _draw_unicode_string_partial | 528/528 | a5bfb710d5 | a5bfb710d5 | 9/9 | EXACT |
+| _parse_string | 624/624 | f80225b7f4 | f80225b7f4 | 30/30 | EXACT |
+| _parse_string_new | 256/256 | e257eb0700 | e257eb0700 | 17/17 | EXACT |
+| _parse_unicode_string | 272/272 | 933bc5d77f | 933bc5d77f | 7/7 | EXACT |
+| _styled_font_get | 112/112 | 85f0a63276 | 85f0a63276 | 6/6 | EXACT |
+| _text_bounds_draw_character | 112/112 | 8497c0497b | 8497c0497b | 10/10 | EXACT |
+| _text_pick_draw_character | 224/224 | a0b5c3c509 | a0b5c3c509 | 11/11 | EXACT |

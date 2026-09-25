@@ -1,0 +1,62 @@
+diff --git a/source/bink/bink_playback.c b/source/bink/bink_playback.c
+index 94b281d9..cc27b290 100644
+--- a/source/bink/bink_playback.c
++++ b/source/bink/bink_playback.c
+@@ -43,7 +43,7 @@ symbols in this file:
+ 001B5E00 0030:
+ 	_bink_playback_dispose (0000)
+ 001B5E30 00a0:
+-	_code_001b5e30 (0000)
++	_bink_playback_update__internal (0000)
+ 001B5ED0 0060:
+ 	_bink_playback_render (0000)
+ 001B5F30 0430:
+@@ -392,7 +392,7 @@ static void bink_free_texture_cache(
+ 	void);
+ static void bink_decompress_video_frame(
+ 	void);
+-static void bink_playback_idle(
++static void bink_playback_update__internal(
+ 	void);
+ 
+ /* ---------- globals */
+@@ -506,7 +506,7 @@ skip_decode:
+ 	bink_globals.rendered_frame_count++;
+ 
+ 	if (!global_frame_rate_throttle)
+-		bink_playback_idle();
++		bink_playback_update__internal();
+ 
+ 	return;
+ }
+@@ -662,7 +662,7 @@ void bink_playback_update(
+ 	void)
+ {
+ 	if (global_frame_rate_throttle)
+-		bink_playback_idle();
++		bink_playback_update__internal();
+ 
+ 	return;
+ }
+@@ -977,7 +977,7 @@ static void bink_decompress_video_frame(
+ 	return;
+ }
+ 
+-static void bink_playback_idle(
++static void bink_playback_update__internal(
+ 	void)
+ {
+ 	if (bink_globals.initialized && bink_globals.bink)
+diff --git a/config/symbols.json b/config/symbols.json
+index dc1dc066..65510792 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -7397,7 +7397,7 @@
+ { "file_offset": 1793312, "flags": 32, "name": "_bink_decompress_video_frame", "static": true },
+ { "file_offset": 1793424, "flags": 32, "name": "_bink_playback_stop" },
+ { "file_offset": 1793536, "flags": 32, "name": "_bink_playback_dispose" },
+-{ "file_offset": 1793584, "flags": 32, "name": "_bink_playback_idle", "static": true },
++{ "file_offset": 1793584, "flags": 32, "name": "_bink_playback_update__internal", "static": true },
+ { "file_offset": 1793744, "flags": 32, "name": "_bink_playback_render" },
+ { "file_offset": 1793840, "flags": 32, "name": "_bink_playback_start" },
+ { "file_offset": 1794912, "flags": 32, "name": "_bink_playback_update" },

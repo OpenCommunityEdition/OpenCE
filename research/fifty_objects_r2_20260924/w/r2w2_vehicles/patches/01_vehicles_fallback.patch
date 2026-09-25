@@ -1,0 +1,41 @@
+diff --git a/source/units/vehicles.c b/source/units/vehicles.c
+index 3dede853d1c338b8925ccc6a32bfdcd4e96e32a1..e6710a637ffc23191069f4a4a2f53547753888af 100644
+--- a/source/units/vehicles.c
++++ b/source/units/vehicles.c
+@@ -144,10 +144,8 @@ symbols in this file:
+ 
+ #include "cseries.h"
+ #include "cseries/profile.h"
+-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #include "vehicles.h"
+ #include "math/real_math.h"
+-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
+ #include "game/game_globals.h"
+ #include "game/players.h"
+ #include "effects/material_effects.h"
+@@ -885,23 +883,15 @@ long vehicle_find_pathfinding_surface_index(
+ 
+ 			object_get_origin(vehicle_index, &origin);
+ 
+-			origin.x += global_up3d->i*0.4f;
+-			origin.y += global_up3d->j*0.4f;
+-			origin.z += global_up3d->k*0.4f;
++			point_from_line3d(&origin, global_up3d, 0.4f, &origin);
+ 
+ 			add_vectors3d(global_down3d, global_down3d, &vector);
+ 
+ 			if (collision_bsp_test_vector(1, bsp, 0, NULL, &origin, &vector, FLT_MAX, &result))
+ 			{
+-				real t = result.t;
+-
+ 				surface_index = result.surface_index;
+ 
+-				/* Preserve the January inline schedule without owning
+-				 * point_from_line3d in this translation unit. */
+-				position->x = vector.i*t + origin.x;
+-				position->y = vector.j*t + origin.y;
+-				position->z = vector.k*t + origin.z;
++				point_from_line3d(&origin, &vector, result.t, position);
+ 			}
+ 			break;
+ 		}

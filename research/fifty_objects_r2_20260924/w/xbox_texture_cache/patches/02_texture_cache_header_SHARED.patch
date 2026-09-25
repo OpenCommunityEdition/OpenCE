@@ -1,0 +1,88 @@
+diff --git a/source/cache/texture_cache.h b/source/cache/texture_cache.h
+--- a/source/cache/texture_cache.h
++++ b/source/cache/texture_cache.h
+@@ -34,6 +34,8 @@
+ 	void);
+ void *texture_cache_steal_memory(
+ 	long size);
++void texture_cache_debug_render(
++	void);
+ 
+ /* ---------- globals */
+ 
+diff --git a/source/cache/xbox_texture_cache.h b/source/cache/xbox_texture_cache.h
+new file mode 100644
+--- /dev/null
++++ b/source/cache/xbox_texture_cache.h
+@@ -0,0 +1,27 @@
++/*
++XBOX_TEXTURE_CACHE.H
++
++focused owner header for the xbox_texture_cache.c bitmap-format-to-D3D mapping
++routines that the platform-neutral texture_cache.h does not declare; adding them
++to texture_cache.h regresses exact consumers through declaration-count
++sensitivity.
++*/
++
++#ifndef __XBOX_TEXTURE_CACHE_H
++#define __XBOX_TEXTURE_CACHE_H
++#pragma once
++
++/* ---------- headers */
++
++#include "cseries/cseries.h"
++
++/* ---------- prototypes/XBOX_TEXTURE_CACHE.C */
++
++long bitmap_format_to_d3d_format(
++	short format,
++	word flags);
++long bitmap_format_to_d3d_linear_format(
++	short format,
++	word flags);
++
++#endif // __XBOX_TEXTURE_CACHE_H
+diff --git a/source/cache/xbox_texture_cache.c b/source/cache/xbox_texture_cache.c
+--- a/source/cache/xbox_texture_cache.c
++++ b/source/cache/xbox_texture_cache.c
+@@ -101,6 +101,7 @@
+ #include "bitmaps/bitmaps_mipmap.h"
+ #include "cache/cache_files.h"
+ #include "cache/texture_cache.h"
++#include "cache/xbox_texture_cache.h"
+ #include "cache/physical_memory_map.h"
+ #include "interface/interface.h"
+ #include "interface/terminal.h"
+@@ -304,21 +305,12 @@
+ 	sizeof(struct xbox_texture_cache_texture) == 0x20 ? 1 : -1];
+ /* ---------- prototypes */
+ 
+-void texture_cache_debug_render(
+-	void);
+-
+ static boolean texture_cache_locked_block_proc(
+ 	long block_index);
+ static void texture_cache_delete_block_proc(
+ 	long block_index);
+ static const char *texture_cache_name_block_proc(
+ 	long block_index);
+-long bitmap_format_to_d3d_format(
+-	short format,
+-	word flags);
+-long bitmap_format_to_d3d_linear_format(
+-	short format,
+-	word flags);
+ static boolean compare(
+ 	struct bitmap_data *first,
+ 	struct bitmap_data *second);
+diff --git a/source/render/render_debug.c b/source/render/render_debug.c
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -140,6 +140,7 @@
+ #include "ai/ai_profile.h"
+ #include "ai/path.h"
+ #include "cache/sound_cache.h"
++#include "cache/texture_cache.h"
+ #include "effects/decal_definitions.h"
+ #include "effects/decals.h"
+ #include "game/game.h"
