@@ -385,9 +385,21 @@ Complete objects that consume the new `_negate_vector3d` surplus, re-audited:
   - Reconciliation dependency: `cdc79e78` needs `3ee32a5c` (actor_combat `_cross_product2d`
     NODUP -> ANY). Without it the selected-provider link fails with LNK2005.
 
-Credit status at this point:
+Credit status at the lane freeze:
 
 | | Functions | Meaningful | Objects |
 |---|---|---|---|
 | Lane-verified (R3-1..R3-3) | +6 | +4,725 | +5 (388 / 468) |
 | Lane-only, pending independent reconciliation (fighter) | +1 | +1,088 | 0 |
+
+## Independent canonical reconciliation (2026-09-25)
+
+Codex fast-forwarded `jonas/exact-pilots` from `f9988451` to `fd057897` after confirming
+`3ee32a5c` was already canonical. The fresh canonical build passed with objdiff-cli 3.3.1.
+The stable sweep against the pre-fighter snapshot gained only
+`_update_alien_fighter_physics_new` (1,088 meaningful bytes), with zero regressions.
+The `_cross_product2d` selected-provider link passed in both orders. The vehicles object
+audit has one remaining difference, `_update_alien_scout_physics`, so vehicles stays 38/39
+and is not marked Matching. Parks: 79 active, 0 stale, 0 invalid; admission audit:
+0 contradicted, 0 revoked; vehicles fake-match scan: 0 leads; pytest: 1,161 passed,
+5 skipped, 26 subtests. Bink q3 remains parked and earns zero credit.
