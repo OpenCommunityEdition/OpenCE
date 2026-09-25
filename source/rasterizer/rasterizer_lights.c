@@ -768,21 +768,25 @@ void rasterizer_lens_flare_submit_for_cluster(
 			struct structure_lens_flare_marker *marker= TAG_BLOCK_GET_ELEMENT(&structure_bsp->lens_flare_markers, structure_lens_flare_marker_index, struct structure_lens_flare_marker);
 			struct structure_lens_flare *structure_lens_flare= TAG_BLOCK_GET_ELEMENT(&structure_bsp->lens_flares, marker->lens_flare_index, struct structure_lens_flare);
 			struct rasterizer_lens_flare_submit_parameters parameters;
-			real_vector3d direction;
-			real_vector3d up;
 
-			set_real_vector3d(
-				&direction,
-				marker->i_direction*(1.0f/127.0f),
-				marker->j_direction*(1.0f/127.0f),
-				marker->k_direction*(1.0f/127.0f));
+			{
+				real_vector3d direction;
+				real_vector3d up;
 
-			perpendicular3d(&direction, &up);
-			normalize3d(&direction);
-			normalize3d(&up);
+				set_real_vector3d(
+					&direction,
+					marker->i_direction*(1.0f/127.0f),
+					marker->j_direction*(1.0f/127.0f),
+					marker->k_direction*(1.0f/127.0f));
 
-			parameters.compressed_direction= compress_real_vector3d_to_int32_clamp(&direction);
-			parameters.compressed_up= compress_real_vector3d_to_int32_clamp(&up);
+				perpendicular3d(&direction, &up);
+				normalize3d(&direction);
+				normalize3d(&up);
+
+				parameters.compressed_direction= compress_real_vector3d_to_int32_clamp(&direction);
+				parameters.compressed_up= compress_real_vector3d_to_int32_clamp(&up);
+			}
+
 			parameters.definition= lens_flare_definition_get(structure_lens_flare->lens_flare.index);
 			parameters.position= marker->position;
 			parameters.compressed_light_color= NONE;
