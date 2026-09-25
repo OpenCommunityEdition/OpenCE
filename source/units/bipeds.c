@@ -516,6 +516,8 @@ static void biped_update_jumping(
 	struct unit_animation_update_data *animation);
 static void biped_update_physics(
 	struct biped_physics *physics);
+static void biped_snap_facing(
+	long biped_index);
 
 /* ---------- globals */
 
@@ -530,7 +532,7 @@ static struct profile_section biped_update_section = {"biped_update", NONE, TRUE
 extern boolean debug_objects_biped_autoaim_pills;
 extern boolean debug_objects_biped_physics_pills;
 
-real_vector3d const fudge_vectors[27] =
+static real_vector3d const fudge_vectors[27] =
 {
 	{ { 0.f, 0.f, 0.f } },
 	{ { 1.f, 0.f, 0.f } },
@@ -1680,7 +1682,7 @@ void biped_accelerate(
 	return;
 }
 
-void biped_falling_danger(
+static void biped_falling_danger(
 	long biped_index)
 {
 	struct biped_datum *biped = biped_get(biped_index);
@@ -2079,7 +2081,7 @@ no_footstep:
 	return;
 }
 
-void biped_update_airborne(
+static void biped_update_airborne(
 	long biped_index,
 	struct unit_animation_update_data *animation)
 {
@@ -2303,33 +2305,18 @@ static void biped_find_nearby_support_surface(
 
 		for (surface_index = 0; surface_index<result.surface_count; ++surface_index)
 		{
-			long plane_designator = TAG_BLOCK_GET_ELEMENT(
+			struct collision_surface *surface = TAG_BLOCK_GET_ELEMENT(
 				&collision_bsp->surfaces,
 				result.surface_indices[surface_index],
-				struct collision_surface)->plane_designator;
-			real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->bsp3d.planes,
-				plane_designator & LONG_MAX,
-				real_plane3d);
+				struct collision_surface);
 			real_plane3d surface_plane;
 			real distance;
 
-			if (TEST_FLAG(plane_designator, 31))
-			{
-				surface_plane.n.i = -plane->n.i;
-				surface_plane.n.j = -plane->n.j;
-				surface_plane.n.k = -plane->n.k;
-				surface_plane.d = -plane->d;
-			}
-			else
-			{
-				surface_plane = *plane;
-			}
-
-			distance =
-				base.y*surface_plane.n.j +
-				(surface_plane.n.i*base.x + base.z*surface_plane.n.k) -
-				surface_plane.d;
+			bsp3d_get_plane_from_designator(
+				&collision_bsp->bsp3d,
+				surface->plane_designator,
+				&surface_plane);
+			distance = plane3d_distance_to_point(&surface_plane, &base);
 			if (distance<closest_distance)
 			{
 				closest_distance = distance;
@@ -3050,7 +3037,7 @@ static void biped_update_physics(
 	return;
 }
 
-void biped_snap_facing(
+static void biped_snap_facing(
 	long biped_index)
 {
 	struct biped_datum *biped = biped_get(biped_index);
@@ -3476,7 +3463,7 @@ static void biped_update_turning(
 	return;
 }
 
-void biped_update_moving(
+static void biped_update_moving(
 	long biped_index,
 	struct unit_animation_update_data *animation)
 {

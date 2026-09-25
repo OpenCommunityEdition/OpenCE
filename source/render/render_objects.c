@@ -825,8 +825,9 @@ static void shadow_volume_plane_pair(
 	real_plane3d *opposite_plane)
 {
 	plane->n = *normal;
-	plane->d = normal->i * point->x + normal->j * point->y + normal->k * point->z;
-	plane3d_negate(plane, opposite_plane);
+	plane->d = dot_product3d(normal, (real_vector3d const *)point);
+	negate_vector3d(&plane->n, &opposite_plane->n);
+	opposite_plane->d = -plane->d;
 
 	return;
 }

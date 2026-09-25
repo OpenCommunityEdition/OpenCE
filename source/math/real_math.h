@@ -1515,9 +1515,7 @@ __inline real_plane3d *plane3d_negate(
 	real_plane3d *plane
 )
 {
-	plane->n.i = -p1->n.i;
-	plane->n.j = -p1->n.j;
-	plane->n.k = -p1->n.k;
+	negate_vector3d(&p1->n, &plane->n);
 	plane->d = -p1->d;
 
 	return plane;

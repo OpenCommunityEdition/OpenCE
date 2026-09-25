@@ -139,8 +139,6 @@ boolean biped_fix_position(
 void biped_accelerate(
 	long biped_index,
 	real_vector3d *acceleration);
-void biped_snap_facing(
-	long biped_index);
 
 void biped_stop_limp_body_physics(
 	long biped_index);
@@ -154,8 +152,6 @@ void biped_build_flying_axes(
 void biped_exit_seat_end(
 	long biped_index,
 	long seat_object_index);
-void biped_falling_danger(
-	long biped_index);
 void biped_render_debug(
 	long biped_index);
 long biped_approximate_surface_index(
@@ -168,15 +164,9 @@ boolean biped_new(
 	long biped_index);
 boolean biped_update(
 	long biped_index);
-void biped_update_airborne(
-	long biped_index,
-	struct unit_animation_update_data *animation);
 void biped_preprocess_node_orientations(
 	long biped_index,
 	struct real_orientation *node_orientations);
-void biped_update_moving(
-	long biped_index,
-	struct unit_animation_update_data *animation);
 
 /* ---------- globals */
 

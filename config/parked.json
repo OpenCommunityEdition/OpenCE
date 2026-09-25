@@ -5,7 +5,7 @@
       "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum",
       "class": "unclassified",
-      "evidence": "Complete typed ordinary-C January frustum reconstruction retained after one natural house-rule pass. It builds the view/world transforms, six named clip planes, five world vertices, midpoint, world bounds, optional projection state, and all 22 integrity checks using project real/math types and owned helpers. The equivalent PC reverse-engineering corpus independently names the private warning helper render_camera_check_warning_condition and confirms its 64-entry state and behavior. A narrow per-object /Ob1 option is required by January's 22 real helper calls: default /O2 duplicates the ordinary private helper at every site, whereas /Ob1 preserves the target boundary while retaining all 12 inherited exact functions and still permits explicitly inline math helpers. Under that independently evidenced schedule the target is 3,376 padded bytes and 113 relocations versus 3,408 and 112 at 88.98603 percent objdiff; differences remain distributed x87/local scheduling plus one zero-literal relocation and the current project _pi folding bit. No constant tuning, raw array/offset lift, address name, local foreign prototype, source-pressure steering, UB, pragma, barrier, or fake dependency is retained. The separately emitted 160-byte semantic helper has equal normalized bytes and relocation shape after the January-proven >= threshold correction, but still receives no credit until the renamed private globals are regenerated into the split target. This main body remains zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor. See docs/object_matching_logs/render_cameras_obj_frustum_natural_reconstruction_20260913.md.",
+      "evidence": "Complete typed ordinary-C January frustum reconstruction retained after one natural house-rule pass. It builds the view/world transforms, six named clip planes, five world vertices, midpoint, world bounds, optional projection state, and all 22 integrity checks using project real/math types and owned helpers. The equivalent PC reverse-engineering corpus independently names the private warning helper render_camera_check_warning_condition and confirms its 64-entry state and behavior. A narrow per-object /Ob1 option is required by January's 22 real helper calls: default /O2 duplicates the ordinary private helper at every site, whereas /Ob1 preserves the target boundary while retaining all 12 inherited exact functions and still permits explicitly inline math helpers. Under that independently evidenced schedule the target is 3,376 padded bytes and 113 relocations versus 3,408 and 112 at 88.98603 percent objdiff; differences remain distributed x87/local scheduling plus one zero-literal relocation and the current project _pi folding bit. No constant tuning, raw array/offset lift, address name, local foreign prototype, source-pressure steering, UB, pragma, barrier, or fake dependency is retained. The separately emitted 160-byte semantic helper has equal normalized bytes and relocation shape after the January-proven >= threshold correction, but still receives no credit until the renamed private globals are regenerated into the split target. This main body remains zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor. See docs/object_matching_logs/render_cameras_obj_frustum_natural_reconstruction_20260913.md.  2026-09-25 R3 batch 3: base refreshed after the attested real_math.h plane3d_negate body (negate_vector3d + d) landed with bipeds P1+P2+P3; the render_cameras.c build_frustum site is not a plane3d_negate caller in /Od; size/relocs unchanged.",
       "measurements": {
         "target": {
           "size": 3376,
@@ -15,9 +15,9 @@
         "base": {
           "size": 3408,
           "relocation_count": 112,
-          "normalized_sha256": "a0e3988aced7247783ec64e020ce5afd7f6d00ac739e4d6ffbb87fd11401f6e8"
+          "normalized_sha256": "d42e420f90156644a2ebac2bc234df8017efbb0c8c8fe22fb79a7a02e3ad3e07"
         },
-        "objdiff_percent": 88.98603
+        "objdiff_percent": 88.8082
       }
     },
     {
@@ -551,25 +551,6 @@
       }
     },
     {
-      "unit": "source/units/bipeds",
-      "function": "_biped_find_nearby_support_surface",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed support-surface search from January disassembly and relocation topology, the later HCEA semantic implementation, and the earlier e02971dfd campaign reconstruction. The same-build Halo CE symbol atlas independently recovers the private name biped_find_nearby_support_surface. The retained ordinary C obtains the biped physics pill, brackets the collision query with the semantic collision-user stack, tests the structure BSP with the breakable-surface flags, corrects back-facing planes through named fields and LONG_MAX, selects the closest support plane, and updates the biped's support surface, ground plane, and up vector. Target and candidate have the same 544-byte padded envelope, all 23 relocation identities, and 175 decoded instructions; the current report records 99.98837 percent similarity. Their sole machine-code difference is the order of the first two independent x87 multiply/add terms inside the inlined plane3d_distance_to_point expression. The source-authentic project helper is retained rather than expanding and reordering its dot-product terms solely to steer code generation. No forced inline/noinline, barrier, volatile access, pragma, assembly, fake dependency, raw offset, undefined behavior, manual bitwise plane mask, or nonsensical branch is retained. This is zero-credit fuzzy source. Reopen only for authoritative January source/local records, a proven January inline-schedule correction, or a natural compatible-compiler donor that explains the x87 evaluation order. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
-      "measurements": {
-        "target": {
-          "size": 544,
-          "relocation_count": 23,
-          "normalized_sha256": "d2fe0224f5db1253a04cdd2a4749291078f65eb5c0b9a9f21e7de2b2b31e6b4b"
-        },
-        "base": {
-          "size": 544,
-          "relocation_count": 23,
-          "normalized_sha256": "a0ef780b38e8c2aa3674296ff845cfc30ae8c759adfd18d2ed816b4bc3536c02"
-        },
-        "objdiff_percent": 99.98837
-      }
-    },
-    {
       "unit": "source/bitmaps/bitmap_group",
       "function": "_bitmap_group_add_bitmap",
       "class": "unclassified",
@@ -1093,11 +1074,11 @@
       "unit": "source/ai/ai",
       "function": "_ai_test_ballistic_line_of_fire",
       "class": "instruction-scheduling",
-      "evidence": "Complete typed ballistic trajectory, world-collision, friendly-pill, and debug-recording reconstruction from January code/relocations and HCEA semantics. Target and candidate are both 944 padded bytes with all 49 relocations. Remaining differences are compiler-local x87 and independent instruction scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. 2026-09-20 Lane A re-baseline (zero exact credit): the recorded 250K-lane w3c 'b5' shape is rebuilt from this baseline and landed. Three changes: block-scope segment_time to the coordinate statement; parenthesise the linear term of the z row as (segment_time * arc_velocity.k + point.z); spell the post-call velocity update as (segment_end_time - segment_start_time) * gravity + arc_velocity.k. Instruction counts become 296/296 (HEAD was 292/296) and objdiff rises 94.50 to 98.99645. It reproduces January's x87 structure for segment_time exactly: fsubr of the parameter home at +0x1e7, fst (store-and-keep) to a dead parameter home at +0x1f4, and a post-call fld from that same home at +0x2cc feeding fmul gravity / fadd / fstp. Surviving hunks: an ebx/edi reload transposition at +0x159, a collision_flags/segment_time parameter-home swap, one 3-versus-2 x87 hunk at +0x21a and a consequent 3-byte alignment pad. Reopen only with a spelling that materialises the second x87 copy the way January does; do not replay operand or declaration sweeps. 2026-09-22 integration rebaseline: shared declaration context changed the normalized code hash while preserving the 944-byte envelope and all 49 relocations; similarity improves to 99.05674, with zero exact-row regressions. No new exact credit is claimed.",
+      "evidence": "Complete typed ballistic trajectory, world-collision, friendly-pill, and debug-recording reconstruction from January code/relocations and HCEA semantics. Target and candidate are both 944 padded bytes with all 49 relocations. Remaining differences are compiler-local x87 and independent instruction scheduling. No fake dependency, raw offset, forced inline, or nonsensical logic is retained. Zero exact credit. See docs/object_matching_logs/ai_obj_large_visibility_spatial_packet_20260909.md. 2026-09-20 Lane A re-baseline (zero exact credit): the recorded 250K-lane w3c 'b5' shape is rebuilt from this baseline and landed. Three changes: block-scope segment_time to the coordinate statement; parenthesise the linear term of the z row as (segment_time * arc_velocity.k + point.z); spell the post-call velocity update as (segment_end_time - segment_start_time) * gravity + arc_velocity.k. Instruction counts become 296/296 (HEAD was 292/296) and objdiff rises 94.50 to 98.99645. It reproduces January's x87 structure for segment_time exactly: fsubr of the parameter home at +0x1e7, fst (store-and-keep) to a dead parameter home at +0x1f4, and a post-call fld from that same home at +0x2cc feeding fmul gravity / fadd / fstp. Surviving hunks: an ebx/edi reload transposition at +0x159, a collision_flags/segment_time parameter-home swap, one 3-versus-2 x87 hunk at +0x21a and a consequent 3-byte alignment pad. Reopen only with a spelling that materialises the second x87 copy the way January does; do not replay operand or declaration sweeps. 2026-09-22 integration rebaseline: shared declaration context changed the normalized code hash while preserving the 944-byte envelope and all 49 relocations; similarity improves to 99.05674, with zero exact-row regressions. No new exact credit is claimed. 2026-09-24 R3 bipeds storage rebaseline: removing the four January file-static prototypes (biped_falling_danger, biped_update_airborne, biped_snap_facing, biped_update_moving) from units/bipeds.h changes only this TU's declaration context; the body returns to the Lane A wave A2 hash 5c03c751 (944 bytes, 49 relocations, objdiff 3.3.1 98.99645: the collision_flags/segment_time parameter-home swap reappears). Zero exact-row change in all 23 bipeds.h includers.",
       "measurements": {
         "target": { "size": 944, "relocation_count": 49, "normalized_sha256": "6c90076033e91f26356e42166cf4bb0a8d5a902ae35bc67db15aec19ee9982ac" },
-        "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "ea5eb3a40fbddb9d60f2bcbfeaf6a207f59a2bafe156cff1cc65aee0406692ae" },
-        "objdiff_percent": 99.05674
+        "base": { "size": 944, "relocation_count": 49, "normalized_sha256": "5c03c751c19c33cde8c6645c5fd39d505e2bca6bf161beb6e6126101f3fbcaa8" },
+        "objdiff_percent": 98.99645
       }
     },
     {
