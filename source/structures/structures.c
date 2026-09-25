@@ -351,56 +351,52 @@ boolean sphere_intersects_cluster_portal(
 	boolean projection_sign;
 	short vertex_index;
 
-	if (!(fabs(plane_distance) < radius))
+	if (fabs(plane_distance) < radius &&
+		distance_squared3d(position, &portal->centroid) <
+			(portal->bounding_radius + radius) * (portal->bounding_radius + radius))
 	{
-		return FALSE;
-	}
-
-	if (!(distance_squared3d(position, &portal->centroid) <
-		(portal->bounding_radius + radius) * (portal->bounding_radius + radius)))
-	{
-		return FALSE;
-	}
-
-	plane_normal = &TAG_BLOCK_GET_ELEMENT(
-		&global_bsp3d_get()->planes,
-		portal->plane_index,
-		real_plane3d)->n;
-	projection = projection_from_vector3d(plane_normal);
-	projection_sign = projection_sign_from_vector3d(plane_normal, projection);
-	projected_position.x = plane_normal->i * -plane_distance + position->x;
-	projected_position.y = plane_normal->j * -plane_distance + position->y;
-	projected_position.z = plane_normal->k * -plane_distance + position->z;
-	project_point3d(
-		&projected_position,
-		projection,
-		projection_sign,
-		&projected_position2d);
-
-	for (vertex_index = 0;
-		vertex_index < portal->vertices.count;
-		vertex_index++)
-	{
+		plane_normal = &TAG_BLOCK_GET_ELEMENT(
+			&global_bsp3d_get()->planes,
+			portal->plane_index,
+			real_plane3d)->n;
+		projection = projection_from_vector3d(plane_normal);
+		projection_sign = projection_sign_from_vector3d(plane_normal, projection);
+		point_from_line3d(
+			position,
+			plane_normal,
+			-plane_distance,
+			&projected_position);
 		project_point3d(
-			TAG_BLOCK_GET_ELEMENT(
-				&portal->vertices,
-				vertex_index,
-				real_point3d),
+			&projected_position,
 			projection,
 			projection_sign,
-			&projected_vertices[vertex_index]);
+			&projected_position2d);
+
+		for (vertex_index = 0;
+			vertex_index < portal->vertices.count;
+			vertex_index++)
+		{
+			project_point3d(
+				TAG_BLOCK_GET_ELEMENT(
+					&portal->vertices,
+					vertex_index,
+					real_point3d),
+				projection,
+				projection_sign,
+				&projected_vertices[vertex_index]);
+		}
+
+		if (convex_hull2d_test_circle(
+			(short)portal->vertices.count,
+			projected_vertices,
+			&projected_position2d,
+			square_root(radius * radius - plane_distance * plane_distance)))
+		{
+			return TRUE;
+		}
 	}
 
-	if (!convex_hull2d_test_circle(
-		(short)portal->vertices.count,
-		projected_vertices,
-		&projected_position2d,
-		square_root(radius * radius - plane_distance * plane_distance)))
-	{
-		return FALSE;
-	}
-
-	return TRUE;
+	return FALSE;
 }
 
 static short structure_clusters_in_sphere_recursive(
