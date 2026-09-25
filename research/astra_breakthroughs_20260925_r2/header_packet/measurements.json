@@ -1,0 +1,539 @@
+{
+  "credit": 0,
+  "head": "012f7283230d13be8427ef7e93f73f3ef686111f",
+  "six_unit_probe": {
+    "source/physics/collisions": {
+      "baseline": {
+        "source_sha256": "8c343ee7bde99087f63300221fdc95318998d5c1ff4fda37b38050ccced24a54",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "70924a66c6fb44c8bc3e52758427f858efa4a47b95315913226134f5de95192d",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "c087e70a83d84ba2f74b1486741f9e25ea1d187b0b44f1ad071660f2a1cbd127",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "299bf507861e5d5c1bb4cc849e3995996c63133de54e4e35fb65ef9e9f802069",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [
+          "_collision_move_point"
+        ],
+        "lost": [],
+        "changed": [
+          "_collision_move_point"
+        ],
+        "added": [
+          "_valid_real_plane3d"
+        ],
+        "removed": []
+      }
+    },
+    "source/math/matrix_math": {
+      "baseline": {
+        "source_sha256": "4cac860a1212a12648dba0a768865d2fc76dad7c470a31a813d404db3f84d139",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "99957b0974acbada2d2f24c6d787c796d4bd14589c225215ee0156e10677a9c0",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "10c874de06c8446f60a2985cb33471104060684907408dbc0cee62ea0eb5c83c",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "ba5e5ad95a58f58c051deaef062d48f456508c8100833c2511e835bcace5ed68",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      }
+    },
+    "source/bitmaps/bitmap_drawing": {
+      "baseline": {
+        "source_sha256": "2d9856fadc8ccae4bb8dad7d007895c766c84dee0055d856aafc4b68d722a457",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "6bc8bfab8ac31cde6525d906c2a509818e7beba97e086240104322113ee42b87",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "2d9856fadc8ccae4bb8dad7d007895c766c84dee0055d856aafc4b68d722a457",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "a117c0abe1b312463e3909eb254e44e8a952624c3a63abdff3889409732241be",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [
+          "_bitmap_copy"
+        ],
+        "changed": [
+          "_bitmap_copy"
+        ],
+        "added": [],
+        "removed": []
+      }
+    },
+    "source/rasterizer/rasterizer_frame_statistics": {
+      "baseline": {
+        "source_sha256": "979740365abba3464e67894da64a65e8271426bb3bed350ec494d9bb1ad5d641",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "02fc6ccc01134f94c720a9c185d1d1d46562c7424d1e92a3d33369e924e0c143",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "979740365abba3464e67894da64a65e8271426bb3bed350ec494d9bb1ad5d641",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "d57890f1d068fdaffa736cda2faa0c26fad5cec43c0f63b9123c0f85f43a6316",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [
+          "_rasterizer_frame_statistics_draw"
+        ],
+        "changed": [
+          "_rasterizer_frame_statistics_draw"
+        ],
+        "added": [],
+        "removed": []
+      }
+    },
+    "source/render/render_cameras": {
+      "baseline": {
+        "source_sha256": "2d30c245877c76768bab66041e742a60508315e3a59d49de4bdb1bd8b3c78cea",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "3e6fd9316e0bc4512a4854de4c1205685d92a6235a5123b27bb3e0dd79f207b2",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "2d30c245877c76768bab66041e742a60508315e3a59d49de4bdb1bd8b3c78cea",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "cca1b2f5768775cf511da5ffac13eaf557c10ed1c21887588d36445a9b4d2fc4",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [
+          "_valid_real_plane3d"
+        ],
+        "removed": []
+      }
+    },
+    "source/units/units": {
+      "baseline": {
+        "source_sha256": "f236de1c4ecfd9264c4bd293ac50a7dfdd9760cc1444a03da4fd448b528354ae",
+        "header_sha256": "d0417821afc9c2e8fe8e8f26124652c70232349e85dce46197dab7eb65057bf1",
+        "object_sha256": "1ab65a99abff8c512d9a436b9eafc738539d1225e79d710e132b0467b863febd",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\baseline\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      },
+      "owner": {
+        "source_sha256": "f236de1c4ecfd9264c4bd293ac50a7dfdd9760cc1444a03da4fd448b528354ae",
+        "header_sha256": "6b9c28e8f2fdaf154d9e815907c19f35163d313fceff1d0c69b3f7e0d54c4883",
+        "object_sha256": "220c61595c98a5ee3bd1105c406d56707587d4bfb91a871b977badf305f213c0",
+        "real_math_includes": [
+          "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_header_r2_20260925\\owner\\source\\math\\real_math.h"
+        ],
+        "shadow_header_confirmed": true,
+        "gained": [],
+        "lost": [],
+        "changed": [],
+        "added": [],
+        "removed": []
+      }
+    }
+  },
+  "chooser_count": 40,
+  "chooser_projection_changes": [],
+  "named_choices": {
+    "baseline": [
+      {
+        "position": 0,
+        "name": "_environment_vertices",
+        "register_index": 7,
+        "web_id": 39,
+        "symbol_ordinal": 138
+      },
+      {
+        "position": 1,
+        "name": "_environment_triangles",
+        "register_index": 8,
+        "web_id": 87,
+        "symbol_ordinal": 139
+      },
+      {
+        "position": 2,
+        "name": "_environment_primitives",
+        "register_index": 4,
+        "web_id": 85,
+        "symbol_ordinal": 140
+      },
+      {
+        "position": 9,
+        "name": "_left",
+        "register_index": 8,
+        "web_id": 68,
+        "symbol_ordinal": 967
+      },
+      {
+        "position": 10,
+        "name": "_profile",
+        "register_index": 7,
+        "web_id": 89,
+        "symbol_ordinal": 968
+      },
+      {
+        "position": 17,
+        "name": "_profile",
+        "register_index": 7,
+        "web_id": 90,
+        "symbol_ordinal": 969
+      },
+      {
+        "position": 19,
+        "name": "_model_vertices",
+        "register_index": 1,
+        "web_id": 65,
+        "symbol_ordinal": 141
+      },
+      {
+        "position": 20,
+        "name": "_model_primitives",
+        "register_index": 2,
+        "web_id": 62,
+        "symbol_ordinal": 143
+      },
+      {
+        "position": 21,
+        "name": "_length",
+        "register_index": 1,
+        "web_id": 92,
+        "symbol_ordinal": 970
+      },
+      {
+        "position": 23,
+        "name": "_left",
+        "register_index": 1,
+        "web_id": 69,
+        "symbol_ordinal": 967
+      },
+      {
+        "position": 30,
+        "name": "_profile",
+        "register_index": 4,
+        "web_id": 91,
+        "symbol_ordinal": 969
+      },
+      {
+        "position": 34,
+        "name": "_profile_accumulation_index",
+        "register_index": 1,
+        "web_id": 95,
+        "symbol_ordinal": 997
+      }
+    ],
+    "owner": [
+      {
+        "position": 0,
+        "name": "_environment_vertices",
+        "register_index": 7,
+        "web_id": 85,
+        "symbol_ordinal": 138
+      },
+      {
+        "position": 1,
+        "name": "_environment_triangles",
+        "register_index": 8,
+        "web_id": 38,
+        "symbol_ordinal": 139
+      },
+      {
+        "position": 2,
+        "name": "_environment_primitives",
+        "register_index": 4,
+        "web_id": 6,
+        "symbol_ordinal": 140
+      },
+      {
+        "position": 9,
+        "name": "_left",
+        "register_index": 8,
+        "web_id": 69,
+        "symbol_ordinal": 967
+      },
+      {
+        "position": 10,
+        "name": "_profile",
+        "register_index": 7,
+        "web_id": 89,
+        "symbol_ordinal": 968
+      },
+      {
+        "position": 17,
+        "name": "_profile",
+        "register_index": 7,
+        "web_id": 90,
+        "symbol_ordinal": 969
+      },
+      {
+        "position": 19,
+        "name": "_model_vertices",
+        "register_index": 1,
+        "web_id": 70,
+        "symbol_ordinal": 141
+      },
+      {
+        "position": 20,
+        "name": "_model_primitives",
+        "register_index": 2,
+        "web_id": 62,
+        "symbol_ordinal": 143
+      },
+      {
+        "position": 21,
+        "name": "_length",
+        "register_index": 1,
+        "web_id": 92,
+        "symbol_ordinal": 970
+      },
+      {
+        "position": 23,
+        "name": "_left",
+        "register_index": 1,
+        "web_id": 80,
+        "symbol_ordinal": 967
+      },
+      {
+        "position": 30,
+        "name": "_profile",
+        "register_index": 4,
+        "web_id": 91,
+        "symbol_ordinal": 969
+      },
+      {
+        "position": 34,
+        "name": "_profile_accumulation_index",
+        "register_index": 1,
+        "web_id": 95,
+        "symbol_ordinal": 997
+      }
+    ]
+  },
+  "anchored_loads": {
+    "baseline": [
+      {
+        "offset": 31,
+        "register": "ecx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 172,
+        "symbol_type": 8196,
+        "symbol_ordinal": 58,
+        "bytes": "8b0dac000000"
+      },
+      {
+        "offset": 37,
+        "register": "edx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 156,
+        "symbol_type": 8196,
+        "symbol_ordinal": 56,
+        "bytes": "8b159c000000"
+      },
+      {
+        "offset": 43,
+        "register": "ebx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 144,
+        "symbol_type": 8196,
+        "symbol_ordinal": 54,
+        "bytes": "8b1d90000000"
+      },
+      {
+        "offset": 49,
+        "register": "edi",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 132,
+        "symbol_type": 8196,
+        "symbol_ordinal": 52,
+        "bytes": "8b3d84000000"
+      },
+      {
+        "offset": 58,
+        "register": "edx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 120,
+        "symbol_type": 8196,
+        "symbol_ordinal": 50,
+        "bytes": "8b1578000000"
+      }
+    ],
+    "owner": [
+      {
+        "offset": 31,
+        "register": "ecx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 156,
+        "symbol_type": 8196,
+        "symbol_ordinal": 56,
+        "bytes": "8b0d9c000000"
+      },
+      {
+        "offset": 37,
+        "register": "edx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 172,
+        "symbol_type": 8196,
+        "symbol_ordinal": 58,
+        "bytes": "8b15ac000000"
+      },
+      {
+        "offset": 43,
+        "register": "ebx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 144,
+        "symbol_type": 8196,
+        "symbol_ordinal": 54,
+        "bytes": "8b1d90000000"
+      },
+      {
+        "offset": 49,
+        "register": "edi",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 132,
+        "symbol_type": 8196,
+        "symbol_ordinal": 52,
+        "bytes": "8b3d84000000"
+      },
+      {
+        "offset": 58,
+        "register": "edx",
+        "global": "_rasterizer_frame_statistics",
+        "member_offset": 120,
+        "symbol_type": 8196,
+        "symbol_ordinal": 50,
+        "bytes": "8b1578000000"
+      }
+    ]
+  },
+  "receipts": {
+    "trace_baseline": {
+      "path": "scratch/astra_header_r2_20260925/trace_baseline/receipt.json",
+      "sha256": "949d897f3309ce5e31986f384140dd5fe522572acaac9581b50f9965b846c08f",
+      "instrumented_sha256": "7f060e486ea2f273736c55beca6dc433a7a7bd353ea3e7c2f56b34a7eefc63c0",
+      "stock_sha256": "7f060e486ea2f273736c55beca6dc433a7a7bd353ea3e7c2f56b34a7eefc63c0",
+      "timestamp_only_equal": true
+    },
+    "symbols_baseline": {
+      "path": "scratch/astra_header_r2_20260925/symbols_baseline/receipt.json",
+      "sha256": "4e3c8e3d67e8581315b566689316ada4f425205ef88d3a452f86636131ba0dc9",
+      "instrumented_sha256": "1196dbdfb12bd3aae8b7de83534eede3f7111d024e4b9d9b1c169ad48e0f29b0",
+      "stock_sha256": "1196dbdfb12bd3aae8b7de83534eede3f7111d024e4b9d9b1c169ad48e0f29b0",
+      "timestamp_only_equal": true
+    },
+    "emission_baseline": {
+      "path": "scratch/astra_header_r2_20260925/emission_baseline/receipt.json",
+      "sha256": "f12fffa8f580dd05fd45fc9ea11d86c300537bd6c6a613b42c0be0f769b41e42",
+      "instrumented_sha256": "b97963d2bcd1fc128d6d679e98bc0335d8b3cbaea47770a33c29926e0e4febc0",
+      "stock_sha256": "b97963d2bcd1fc128d6d679e98bc0335d8b3cbaea47770a33c29926e0e4febc0",
+      "timestamp_only_equal": true
+    },
+    "emission_identity_baseline": {
+      "path": "scratch/astra_header_r2_20260925/emission_identity_baseline/receipt.json",
+      "sha256": "a83e21640d5a2a069da01a1de7cc167ac2b9b4826c442402b6c82f8c02d843c4",
+      "instrumented_sha256": "a86736cf890d86d66f58a03925b8e427c61e9f8c77546efec8cf1a3e9bf1df69",
+      "stock_sha256": "04f3495f45387abe0106aa1471096ce3e79a5fc89156030a45ae4da1b96592da",
+      "timestamp_only_equal": true
+    },
+    "trace_owner": {
+      "path": "scratch/astra_header_r2_20260925/trace_owner/receipt.json",
+      "sha256": "7a353022e37c7278ef972ea513d2d6fd4ba428f5fd590dd5435eb77073df0c06",
+      "instrumented_sha256": "f0d2d7d80f1b8216dd4c5c89bfcffae531bf51b4a04edbb93887c4b5a24a4b18",
+      "stock_sha256": "f0d2d7d80f1b8216dd4c5c89bfcffae531bf51b4a04edbb93887c4b5a24a4b18",
+      "timestamp_only_equal": true
+    },
+    "symbols_owner": {
+      "path": "scratch/astra_header_r2_20260925/symbols_owner/receipt.json",
+      "sha256": "d3d41030be37191dd7fc5da099ebe119ef4403def529ee85c27082578c277dd2",
+      "instrumented_sha256": "ce72b79ecf155a6e2c81d67a6e0a06f27f65bef6f82304ed9a8fdfa8332fba09",
+      "stock_sha256": "3e88a01ecfe800640d04f1c2433d56dbc4ea06d0121c0b9515d4306634d7dcbd",
+      "timestamp_only_equal": true
+    },
+    "emission_owner": {
+      "path": "scratch/astra_header_r2_20260925/emission_owner/receipt.json",
+      "sha256": "2c98454fbfeb1ebb6d9781518fa1b1ceaa8401001583f4fa4c9c3fa829c1b4d8",
+      "instrumented_sha256": "7dc590a890985b371e3db71fe43bb44e20d82d32012cea799540ba5bca5879bd",
+      "stock_sha256": "7dc590a890985b371e3db71fe43bb44e20d82d32012cea799540ba5bca5879bd",
+      "timestamp_only_equal": true
+    },
+    "emission_identity_owner": {
+      "path": "scratch/astra_header_r2_20260925/emission_identity_owner/receipt.json",
+      "sha256": "639ba4ed95b606f057ed500c4591ea120fb7bcb6b7dc3fd585f712e47649b535",
+      "instrumented_sha256": "36caebf4b43a3aa2255d3cae2c31098065436adecd072e371a621724458904b6",
+      "stock_sha256": "36caebf4b43a3aa2255d3cae2c31098065436adecd072e371a621724458904b6",
+      "timestamp_only_equal": true
+    }
+  },
+  "limits": [
+    "40 choice projections are equal positionally, not proof of equal value assignments.",
+    "Twelve named choices are identified; unnamed temporaries are not semantically mapped.",
+    "The swapped global members have no directly corresponding named CHOOSE event.",
+    "Emission proves their symbol-to-byte mapping, not which earlier pass first reordered them.",
+    "Six TUs are a mechanism probe, not a full-board admission sweep."
+  ]
+}

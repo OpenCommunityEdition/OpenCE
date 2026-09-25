@@ -1,0 +1,12 @@
+--- a/control.c
++++ b/control.c
+@@ -15,8 +15,7 @@
+         left.xy.x = a[0]*a[3]-a[1]*a[2];
+         left.xy.y = a[1]*a[4]-a[2]*a[0];
+         left.z = a[0]*a[5]-a[4]*a[3];
+-        horizontal.x = left.xy.x;
+-        horizontal.y = left.xy.y;
++        horizontal = left.xy;
+         use2(&horizontal);
+         use2(&alpha);
+         use3(&left);

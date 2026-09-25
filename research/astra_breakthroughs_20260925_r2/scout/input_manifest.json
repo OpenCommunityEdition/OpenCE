@@ -1,0 +1,30 @@
+{
+  "head": "012f7283230d13be8427ef7e93f73f3ef686111f",
+  "compiler": {
+    "CL.Exe": "483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11",
+    "C1.Dll": "02843d31ae15775aaf185c97f2da9b178e98ca44cd8066bc132b8db48a286af2",
+    "C2.Dll": "9dbf908b9437dbb42902ffe29ae14c6305bb5ff4f33ff01a95cc9060b7d16a5c"
+  },
+  "debugger": {
+    "default_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\dbg32c.exe",
+    "sha256": "32ee5e4da72d4b49511f278acc35d81bd5c96a7bd6f37273bf088fa779effd96"
+  },
+  "sources": {
+    "scalar_left": {
+      "patch": "research/astra_breakthroughs_20260925/scout/held_D_forward_aggregate_only.patch",
+      "sha256": "a15ae7343e5219bb5eae66db23611b64551feaa28739a4ed033345b2fbeccb84"
+    },
+    "aggregate_left": {
+      "patch": "research/astra_breakthroughs_20260925/scout/held_aggregate_control.patch",
+      "sha256": "12fecbc19700719c36be19c17b978d9e59828d799d5cd0fd0f2a102e7b65ce75"
+    }
+  },
+  "helpers": {
+    "trace.py": "07c36a533639d8a3591ea2be7ca0149011cf469053496a3db0d2da1ffa5af35c",
+    "oracle.py": "27d06c86fea09b40248551bccbdeeaafbf5c205ba725e876c4ff808c7ab4d40e",
+    "objfns.py": "dd1bd2ed7971c10834a241e5e2921c736bbba9684f288898b5a5b21bc63c7e28",
+    "forcesearch.py": "39cd52df929f1208da14005c6de35adc0431d791f9d4a51421ba0111742d0a81",
+    "mapweb.py": "ddd86fb4ffecfd13f7d91aa8bd1b47e35dbe26a0cd091bb6110ed9ced2b7d329",
+    "dbg32c.c": "7a39d9f8dae7272ce7abf13aa0e2044e29be2c909c9b27b75ec48c47b74fb8e3"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "research_handoff_not_admission",
+  "baseline": "012f7283230d13be8427ef7e93f73f3ef686111f",
+  "unchanged_production_baseline": "20d0563d508f7836670db62514ffc3d1f1e2217e",
+  "new_meaningful_exact_code_bytes": 0,
+  "new_object_admissions": 0,
+  "policy_holds_lifted": [],
+  "canonical_halo_unchanged": {
+    "credited_meaningful_code_bytes": 1583050,
+    "total_meaningful_code_bytes": 1770166,
+    "remaining_meaningful_code_bytes": 187116,
+    "complete_objects": 388,
+    "halo_objects": 468
+  },
+  "packets": [
+    {
+      "path": "scout/README.md",
+      "status": "predictive_reference_weight_order_and_frame_packing_mechanism",
+      "production_frame_control_bytes": [152, 148],
+      "independent_control_frame_bytes": [32, 28],
+      "source_candidate_still_held": true,
+      "separate_x87_residual_solved": false,
+      "review": "decal_clip/SCOUT_REVIEW.md"
+    },
+    {
+      "path": "decal_clip/README.md",
+      "status": "spill_to_materialized_reload_to_encoded_instruction_identity_proven",
+      "remaining_load_order_solved": false,
+      "review": "scout/CLIP_REVIEW.md"
+    },
+    {
+      "path": "header_packet/README.md",
+      "status": "genuine_owner_packet_reproduced_but_two_existing_exact_rows_regress",
+      "tested_translation_units": 6,
+      "positive_global_load_anchors": 10,
+      "full_board_sweep": false,
+      "review": "header_evidence/PROBE_REVIEW.md"
+    },
+    {
+      "path": "header_evidence/README.md",
+      "status": "qualified_source_witness_and_stale_proposal_audit",
+      "new_authorized_header_fix": false
+    }
+  ],
+  "next_tasks": "NEXT_MODEL_TASKS.md",
+  "reusable_frame_probe": "scout/trace_frame.py",
+  "additional_real_tu_smoke": "frame_probe_smoke.json",
+  "offline_tests": "python -m pytest -q tools research/astra_breakthroughs_20260925 research/astra_breakthroughs_20260925_r2",
+  "credit_note": "Research controls and overlapping target sizes confer no matching credit. Instrumentation validates this compiler, not January's unavailable IR."
+}
