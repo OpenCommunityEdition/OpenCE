@@ -1,0 +1,16 @@
+n3_q1 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+n3_q2 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+n3_q3 | EXACT        80  _bink_query_analog_controller_buttons |   R OCT=0x15f180   SEP=MATCH   src_oct=True     80 @bink_query_analog_controller_buttons@0
+n5_qA | residual     80  _bink_query_analog_controller_buttons  [sha] |   R OCT=none       SEP=DIFF    src_oct=True     80 @bink_query_analog_controller_buttons@0
+n5_qB | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w19_c1 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w19_c2 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w19_c3 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w19_c4 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w2_q1 | residual     80  _bink_query_analog_controller_buttons  [sha] |   R OCT=none       SEP=DIFF    src_oct=True     80 @bink_query_analog_controller_buttons@0
+w2_q10 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w2_q4 | residual     80  _bink_query_analog_controller_buttons  [size 96!=80, sha] |   R OCT=none       SEP=short-image src_oct=True     96 @bink_query_analog_controller_buttons@0
+w2_q5 | residual     80  _bink_query_analog_controller_buttons  [sha] |   R OCT=none       SEP=DIFF    src_oct=True     80 @bink_query_analog_controller_buttons@0
+w2_q9 | residual     80  _bink_query_analog_controller_buttons  [sha] |   R OCT=none       SEP=DIFF    src_oct=True     80 @bink_query_analog_controller_buttons@0
+inv_gamepad | EXACT        80  _bink_query_analog_controller_buttons |   R OCT=0x15f180   SEP=MATCH   src_oct=True     80 @bink_query_analog_controller_buttons@0
+inv_index | EXACT        80  _bink_query_analog_controller_buttons |   R OCT=0x15f180   SEP=MATCH   src_oct=True     80 @bink_query_analog_controller_buttons@0

@@ -1,0 +1,800 @@
+[
+ {
+  "unit": "source/ai/action_converse",
+  "line": 124,
+  "fn": "action_converse_perform",
+  "debug": "residual    256  _action_converse_perform  [sha]",
+  "debug_total": [
+   "== exact 8  residual 1  unwritten 0  (of 9 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x12f10    SEP=DIFF    src_oct=True    240 @action_converse_perform@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    240 @action_converse_perform@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 1783,
+  "fn": "actor_action_can_stop_conversing",
+  "debug": "residual    144  _actor_action_can_stop_conversing  [sha]",
+  "debug_total": [
+   "== exact 61  residual 2  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True    128 @actor_action_can_stop_conversing@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    128 @actor_action_can_stop_conversing@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 1788,
+  "fn": "actor_action_can_stop_conversing",
+  "debug": "EXACT       144  _actor_action_can_stop_conversing",
+  "debug_total": [
+   "== exact 62  residual 1  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True    128 @actor_action_can_stop_conversing@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    128 @actor_action_can_stop_conversing@4"
+  ],
+  "cls": [
+   "EXACT",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 2639,
+  "fn": "actor_action_handle_combat_selection",
+  "debug": "EXACT      1776  _actor_action_handle_combat_selection",
+  "debug_total": [
+   "== exact 62  residual 1  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "cls": [
+   "EXACT",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 2735,
+  "fn": "actor_action_handle_combat_selection",
+  "debug": "residual   1776  _actor_action_handle_combat_selection  [size 1760!=1776, sha]",
+  "debug_total": [
+   "== exact 61  residual 2  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 2743,
+  "fn": "actor_action_handle_combat_selection",
+  "debug": "residual   1776  _actor_action_handle_combat_selection  [size 1760!=1776, sha]",
+  "debug_total": [
+   "== exact 61  residual 2  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1600 @actor_action_handle_combat_selection@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actions",
+  "line": 4544,
+  "fn": "actor_action_handle_evasion",
+  "debug": "residual    800  _actor_action_handle_evasion  [sha]",
+  "debug_total": [
+   "== exact 61  residual 2  unwritten 0  (of 63 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x1c660    SEP=DIFF    src_oct=True    784 @actor_action_handle_evasion@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    816 @actor_action_handle_evasion@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_moving",
+  "line": 1233,
+  "fn": "actor_move_try_evasion_vector",
+  "debug": "residual    592  _actor_move_try_evasion_vector  [sha]",
+  "debug_total": [
+   "== exact 30  residual 6  unwritten 0  (of 36 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True    640 @actor_move_try_evasion_vector@24"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    640 @actor_move_try_evasion_vector@24"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 1333,
+  "fn": "actor_perception_desire_prop",
+  "debug": "residual    560  _actor_perception_desire_prop  [size 544!=560, sha]",
+  "debug_total": [
+   "== exact 41  residual 3  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x2afb0    SEP=DIFF    src_oct=True    592 @actor_perception_desire_prop@52"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    592 @actor_perception_desire_prop@52"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 2207,
+  "fn": "actor_compute_prop_target_weight",
+  "debug": "residual    928  _actor_compute_prop_target_weight  [sha]",
+  "debug_total": [
+   "== exact 42  residual 2  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True    960 @actor_compute_prop_target_weight@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    944 @actor_compute_prop_target_weight@8"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 2276,
+  "fn": "actor_compute_prop_target_weight",
+  "debug": "residual    928  _actor_compute_prop_target_weight  [size 912!=928, sha]",
+  "debug_total": [
+   "== exact 42  residual 2  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True    960 @actor_compute_prop_target_weight@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    944 @actor_compute_prop_target_weight@8"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 3299,
+  "fn": "actor_compute_prop_unopposable",
+  "debug": "EXACT       240  _actor_compute_prop_unopposable",
+  "debug_total": [
+   "== exact 43  residual 1  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x2b5f0    SEP=DIFF    src_oct=True    240 @actor_compute_prop_unopposable@8"
+  ],
+  "retail_var": [
+   "E OCT=0x2b5f0    SEP=DIFF    src_oct=True    240 @actor_compute_prop_unopposable@8"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 3305,
+  "fn": "actor_compute_prop_unopposable",
+  "debug": "EXACT       240  _actor_compute_prop_unopposable",
+  "debug_total": [
+   "== exact 43  residual 1  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x2b5f0    SEP=DIFF    src_oct=True    240 @actor_compute_prop_unopposable@8"
+  ],
+  "retail_var": [
+   "E OCT=0x2b5f0    SEP=DIFF    src_oct=True    240 @actor_compute_prop_unopposable@8"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 4832,
+  "fn": "prop_position_refresh",
+  "debug": "residual    896  _prop_position_refresh  [sha]",
+  "debug_total": [
+   "== exact 42  residual 2  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True    960 @prop_position_refresh@20"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    928 @prop_position_refresh@20"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_perception",
+  "line": 5153,
+  "fn": "actor_perception_refresh_danger_zone",
+  "debug": "residual   1472  _actor_perception_refresh_danger_zone  [sha]",
+  "debug_total": [
+   "== exact 42  residual 2  unwritten 0  (of 44 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True   1440 @actor_perception_refresh_danger_zone@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True   1424 @actor_perception_refresh_danger_zone@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_elite",
+  "line": 139,
+  "fn": "elite_decide_action",
+  "debug": "EXACT       688  _elite_decide_action",
+  "debug_total": [
+   "== exact 1  residual 0  unwritten 0  (of 1 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32290    SEP=DIFF    src_oct=True    688 @elite_decide_action@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32290    SEP=DIFF    src_oct=True    688 @elite_decide_action@4"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_flood",
+  "line": 171,
+  "fn": "actor_type_flood_desire_shamble",
+  "debug": "EXACT      1296  _actor_type_flood_desire_shamble",
+  "debug_total": [
+   "== exact 2  residual 0  unwritten 0  (of 2 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_flood",
+  "line": 194,
+  "fn": "actor_type_flood_desire_shamble",
+  "debug": "EXACT      1296  _actor_type_flood_desire_shamble",
+  "debug_total": [
+   "== exact 2  residual 0  unwritten 0  (of 2 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_flood",
+  "line": 208,
+  "fn": "actor_type_flood_desire_shamble",
+  "debug": "residual   1296  _actor_type_flood_desire_shamble  [sha]",
+  "debug_total": [
+   "== exact 1  residual 1  unwritten 0  (of 2 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "cls": [
+   "REJ",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_flood",
+  "line": 215,
+  "fn": "actor_type_flood_desire_shamble",
+  "debug": "EXACT      1296  _actor_type_flood_desire_shamble",
+  "debug_total": [
+   "== exact 2  residual 0  unwritten 0  (of 2 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_flood",
+  "line": 223,
+  "fn": "actor_type_flood_desire_shamble",
+  "debug": "EXACT      1296  _actor_type_flood_desire_shamble",
+  "debug_total": [
+   "== exact 2  residual 0  unwritten 0  (of 2 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "retail_var": [
+   "E OCT=0x32870    SEP=DIFF    src_oct=True   1280 @actor_type_flood_desire_shamble@4"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_infection",
+  "line": 819,
+  "fn": "infection_swarm_control",
+  "debug": "residual   3616  _infection_swarm_control  [size 3600!=3616, sha]",
+  "debug_total": [
+   "== exact 4  residual 1  unwritten 0  (of 5 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True   3824 @infection_swarm_control@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True   3824 @infection_swarm_control@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actor_type_infection",
+  "line": 823,
+  "fn": "infection_swarm_control",
+  "debug": "residual   3616  _infection_swarm_control  [size 3600!=3616, sha]",
+  "debug_total": [
+   "== exact 4  residual 1  unwritten 0  (of 5 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=DIFF    src_oct=True   3824 @infection_swarm_control@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True   3824 @infection_swarm_control@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actors",
+  "line": 1752,
+  "fn": "actor_input_update",
+  "debug": "residual   2384  _actor_input_update  [sha]",
+  "debug_total": [
+   "== exact 75  residual 1  unwritten 0  (of 76 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1936 @actor_input_update@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1936 @actor_input_update@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/actors",
+  "line": 1817,
+  "fn": "actor_input_update",
+  "debug": "residual   2384  _actor_input_update  [sha]",
+  "debug_total": [
+   "== exact 75  residual 1  unwritten 0  (of 76 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1936 @actor_input_update@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1936 @actor_input_update@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/ai/ai_communication",
+  "line": 5845,
+  "fn": "ai_conversation_update",
+  "debug": "residual    608  _ai_conversation_update  [sha]",
+  "debug_total": [
+   "== exact 45  residual 3  unwritten 0  (of 48 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True    544 @ai_conversation_update@0"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    528 @ai_conversation_update@0"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/bitmaps/bitmap_extract",
+  "line": 900,
+  "fn": "extract_find_bitmap_bounds",
+  "debug": "EXACT       400  _extract_find_bitmap_bounds",
+  "debug_total": [
+   "== exact 21  residual 0  unwritten 0  (of 21 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x5a730    SEP=not-located src_oct=True    320 @extract_find_bitmap_bounds@8"
+  ],
+  "retail_var": [
+   "E OCT=0x5a730    SEP=not-located src_oct=True    320 @extract_find_bitmap_bounds@8"
+  ],
+  "cls": [
+   "EXACT",
+   "inert"
+  ]
+ },
+ {
+  "unit": "source/game/aim_assist",
+  "line": 263,
+  "fn": "aim_assist_clear_line_of_sight",
+  "debug": "EXACT       240  _aim_assist_clear_line_of_sight",
+  "debug_total": [
+   "== exact 16  residual 0  unwritten 0  (of 16 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True    176 @aim_assist_clear_line_of_sight@16"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    176 @aim_assist_clear_line_of_sight@16"
+  ],
+  "cls": [
+   "EXACT",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/game/game_engine",
+  "line": 7772,
+  "fn": "game_engine_should_spawn_player",
+  "debug": "residual    256  _game_engine_should_spawn_player  [sha]",
+  "debug_total": [
+   "== exact 179  residual 1  unwritten 0  (of 180 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x7eec0    SEP=MATCH   src_oct=True    256 @game_engine_should_spawn_player@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    272 @game_engine_should_spawn_player@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/game/game_engine",
+  "line": 7776,
+  "fn": "game_engine_should_spawn_player",
+  "debug": "residual    256  _game_engine_should_spawn_player  [sha]",
+  "debug_total": [
+   "== exact 179  residual 1  unwritten 0  (of 180 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x7eec0    SEP=MATCH   src_oct=True    256 @game_engine_should_spawn_player@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    272 @game_engine_should_spawn_player@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/game/game_engine",
+  "line": 7795,
+  "fn": "game_engine_should_spawn_player",
+  "debug": "residual    256  _game_engine_should_spawn_player  [size 240!=256, sha]",
+  "debug_total": [
+   "== exact 179  residual 1  unwritten 0  (of 180 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x7eec0    SEP=MATCH   src_oct=True    256 @game_engine_should_spawn_player@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    240 @game_engine_should_spawn_player@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/game/game_engine",
+  "line": 7800,
+  "fn": "game_engine_should_spawn_player",
+  "debug": "residual    256  _game_engine_should_spawn_player  [size 240!=256, sha]",
+  "debug_total": [
+   "== exact 179  residual 1  unwritten 0  (of 180 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x7eec0    SEP=MATCH   src_oct=True    256 @game_engine_should_spawn_player@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    240 @game_engine_should_spawn_player@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/game/game_engine_race",
+  "line": 548,
+  "fn": "can_touch_team",
+  "debug": "residual    288  _can_touch_team  [sha]",
+  "debug_total": [
+   "== exact 33  residual 3  unwritten 0  (of 36 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x896f0    SEP=MATCH   src_oct=False   240 @can_touch_team@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=False   208 @can_touch_team@8"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/game/game_time",
+  "line": 534,
+  "fn": "game_time_update",
+  "debug": "residual    864  _game_time_update  [size 848!=864, sha]",
+  "debug_total": [
+   "== exact 19  residual 1  unwritten 0  (of 20 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0x8b5b0    SEP=MATCH   src_oct=True    608 @game_time_update@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    592 @game_time_update@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/interface/event_manager",
+  "line": 184,
+  "fn": "queue_event",
+  "debug": "residual    768  _queue_event  [sha]",
+  "debug_total": [
+   "== exact 7  residual 1  unwritten 0  (of 8 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0xaa210    SEP=MATCH   src_oct=True    752 @queue_event@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    736 @queue_event@8"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/interface/event_manager",
+  "line": 235,
+  "fn": "queue_event",
+  "debug": "residual    768  _queue_event  [sha]",
+  "debug_total": [
+   "== exact 7  residual 1  unwritten 0  (of 8 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0xaa210    SEP=MATCH   src_oct=True    752 @queue_event@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    736 @queue_event@8"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/interface/progress_bar",
+  "line": 2043,
+  "fn": "progress_bar_render",
+  "debug": "residual   1200  _progress_bar_render  [size 1184!=1200, sha]",
+  "debug_total": [
+   "== exact 52  residual 2  unwritten 0  (of 54 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0xaf7b0    SEP=MATCH   src_oct=True   1248 @progress_bar_render@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True   1232 @progress_bar_render@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/interface/ui_widget",
+  "line": 5409,
+  "fn": "render_ui_widgets_postgame",
+  "debug": "residual    384  _render_ui_widgets_postgame  [relocs 7!=6, sha]",
+  "debug_total": [
+   "== exact 95  residual 7  unwritten 0  (of 102 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0xb39d0    SEP=MATCH   src_oct=True    400 @render_ui_widgets_postgame@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    400 @render_ui_widgets_postgame@8"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/interface/ui_widget",
+  "line": 5480,
+  "fn": "render_ui_widgets",
+  "debug": "residual    560  _render_ui_widgets  [relocs 29!=28, sha]",
+  "debug_total": [
+   "== exact 95  residual 7  unwritten 0  (of 102 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True    528 @render_ui_widgets@8"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True    528 @render_ui_widgets@8"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/items/weapons",
+  "line": 1317,
+  "fn": "weapon_can_be_fired",
+  "debug": "residual    144  _weapon_can_be_fired  [sha]",
+  "debug_total": [
+   "== exact 77  residual 2  unwritten 0  (of 79 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=0xc22f0    SEP=MATCH   src_oct=True    128 @weapon_can_be_fired@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=DIFF    src_oct=True    128 @weapon_can_be_fired@4"
+  ],
+  "cls": [
+   "REJ",
+   "REJ"
+  ]
+ },
+ {
+  "unit": "source/main/main",
+  "line": 3124,
+  "fn": "main_loop",
+  "debug": "residual   1648  _main_loop  [sha]",
+  "debug_total": [
+   "== exact 91  residual 3  unwritten 1  (of 95 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=short-image src_oct=True   1728 @main_loop@0"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=short-image src_oct=True   1728 @main_loop@0"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ },
+ {
+  "unit": "source/physics/collision_usage",
+  "line": 554,
+  "fn": "collision_log_get_current_user",
+  "debug": "residual    256  _collision_log_get_current_user  [size 240!=256, sha]",
+  "debug_total": [
+   "== exact 13  residual 1  unwritten 0  (of 14 listed)"
+  ],
+  "retail_prod": [
+   "E OCT=none       SEP=not-located src_oct=True     80 @collision_log_get_current_user@4"
+  ],
+  "retail_var": [
+   "E OCT=none       SEP=not-located src_oct=True     80 @collision_log_get_current_user@4"
+  ],
+  "cls": [
+   "REJ",
+   "uncal"
+  ]
+ }
+]

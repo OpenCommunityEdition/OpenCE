@@ -1,0 +1,63 @@
+{
+ "lane": "claude/fifty-objects-r3-20260924",
+ "base": "193a6868 (local canonical jonas/exact-pilots)",
+ "status": "in progress; curated at handoff",
+ "credit_status": {
+  "lane_verified": {
+   "commits": [
+    "6f531fdd",
+    "3ee32a5c",
+    "fd8bf047",
+    "9ae22cf4"
+   ],
+   "functions": [
+    "_ai_communication_finished",
+    "_actor_aim_grenade",
+    "_first_person_weapon_update",
+    "_uncompress_int32_to_real_vector3d",
+    "_biped_find_nearby_support_surface",
+    "_rasterizer_lens_flare_submit_for_cluster"
+   ],
+   "objects_completed": [
+    "collision_features",
+    "real_math",
+    "path_smoothing",
+    "first_person_weapons",
+    "rasterizer_geometry"
+   ],
+   "meaningful_code": 4725,
+   "padded": 4752
+  },
+  "lane_only_pending_independent_reconciliation": {
+   "commit": "cdc79e78",
+   "function": "_update_alien_fighter_physics_new",
+   "padded": 1088,
+   "meaningful": 1088,
+   "depends_on": "3ee32a5c (actor_combat _cross_product2d NODUP->ANY); cherry-picking cdc79e78 without it fails the selected-provider link (LNK2005)"
+  },
+  "zero_credit": [
+   "c6ceadf6 structures helper cleanup",
+   "fd8bf047 bipeds file-static storage",
+   "b9bd0875 game_sound typed accessor",
+   "9b4bf1a8 saved_game_files names+storage"
+  ]
+ },
+ "preserved_candidates": [
+  {
+   "unit": "source/bink/bink_playback",
+   "function": "_bink_query_analog_controller_buttons",
+   "dir": "bink_q3/",
+   "candidate": "bink_q3/01_q3_source.patch",
+   "state": "PARKED by owner ruling 2026-09-25; zero credit; do not land or retire the park",
+   "why_held": "January shares one block for both arms; laws_w3 A26 (two distinct rejection blocks) and the recorded /Od-witness reopen condition are unmet; retail evidence strengthens byte-match evidence but does not establish separate source arms",
+   "evidence": {
+    "debug": "EXACT 80/1 c88d131b",
+    "oct_2276P": "0x15f180 verbatim",
+    "sept_cache_exe": "MATCH 0x54da60",
+    "other_shapes": "13 recorded shapes rejected in both retail views",
+    "family_control": "22/23 calibrated split-arm sites agree debug vs retail"
+   },
+   "reopen": "an unoptimized (/Od) or first-party source witness of separate START/BACK arms"
+  }
+ ]
+}

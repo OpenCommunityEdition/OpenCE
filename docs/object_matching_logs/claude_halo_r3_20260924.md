@@ -369,3 +369,25 @@ Complete objects that consume the new `_negate_vector3d` surplus, re-audited:
   - Stable diff against the frozen baseline: gained 7 functions / 5,840 padded, **0 regressions**.
   - Parks 79. Admission: 0 contradicted, 0 revoked.
   - Fake-match leads 26. pytest 1,161 passed. `git diff --check` clean.
+
+## Owner rulings, 2026-09-25 (bink; fighter credit status)
+
+- **bink `_bink_query_analog_controller_buttons`: stays PARKED.**
+  - The two retail builds strengthen the byte-match evidence, but neither establishes that this
+    function's source had separate arms.
+  - January shares one block, so the laws_w3 A26 exception and the /Od reopen condition remain
+    unmet.
+  - q3 is preserved as the best exact-byte candidate at zero credit:
+    `research/halo_r3_20260924/bink_q3/`, with the park evidence pointing to it. It is not landed
+    and the park is not retired.
+- **Fighter (`cdc79e78`, +1,088):** ready for independent reconciliation, but its 1,088 bytes
+  remain **lane-only** until that passes.
+  - Reconciliation dependency: `cdc79e78` needs `3ee32a5c` (actor_combat `_cross_product2d`
+    NODUP -> ANY). Without it the selected-provider link fails with LNK2005.
+
+Credit status at this point:
+
+| | Functions | Meaningful | Objects |
+|---|---|---|---|
+| Lane-verified (R3-1..R3-3) | +6 | +4,725 | +5 (388 / 468) |
+| Lane-only, pending independent reconciliation (fighter) | +1 | +1,088 | 0 |

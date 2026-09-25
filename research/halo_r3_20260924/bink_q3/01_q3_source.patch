@@ -1,0 +1,17 @@
+diff --git a/source/bink/bink_playback.c b/source/bink/bink_playback.c
+--- a/source/bink/bink_playback.c
++++ b/source/bink/bink_playback.c
+@@ -1025,8 +1025,11 @@
+ 
+ 		if (gamepad)
+ 		{
+-			if (gamepad->buttons[_gamepad_binary_button_start]==1 ||
+-				gamepad->buttons[_gamepad_binary_button_back]==1)
++			if (gamepad->buttons[_gamepad_binary_button_start]==1)
++			{
++				button_pressed= TRUE;
++			}
++			else if (gamepad->buttons[_gamepad_binary_button_back]==1)
+ 			{
+ 				button_pressed= TRUE;
+ 			}

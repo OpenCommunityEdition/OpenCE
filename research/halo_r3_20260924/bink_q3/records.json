@@ -1,0 +1,85 @@
+[
+ {
+  "unit": "source/bink/bink_playback",
+  "function": "_bink_query_analog_controller_buttons",
+  "baseline": {
+   "size": 96,
+   "normalized_sha256": "eec8d318ea74fd9a14e67eb76a9c44415ed448308d3fb875105cd31286fad6d0",
+   "relocations": 1
+  },
+  "target": {
+   "size": 80,
+   "normalized_sha256": "c88d131ba2ff1ac71831f79a7cc5c8d03b77bc67282bcde88660f7b2cbf47bc3",
+   "relocations": 1
+  },
+  "candidate": {
+   "path": "scratch/w/r3w3_retail_bink_playback__bink_query_analog_controller_button/q3.c",
+   "size": 80,
+   "normalized_sha256": "c88d131ba2ff1ac71831f79a7cc5c8d03b77bc67282bcde88660f7b2cbf47bc3",
+   "relocations": 1,
+   "gate": "24/0/0 whole TU (strict EXACT)",
+   "git_blob": "6b04ec2e6f22d121fc2c52ad4e49d0adf4007514",
+   "retail": {
+    "oct_2276P": "0x15f180 verbatim (reloc-masked full body)",
+    "sept_retail_cache_exe": "MATCH at 0x54da60 (@bink_query_analog_controller_buttons@0, Static symbols, bink_playback.obj), 0 relocation-name mismatches"
+   }
+  },
+  "first_differing_regions": [
+   "production vs January: +0x0 prologue `push ebp; mov ebp,esp; push ecx` (EBP frame for the spilled boolean) and the constant-1 pin (`mov bl,1`; `cmp [eax+0x1c],bl` / `[eax+0x1d],bl` / `[edx+eax+0x10],bl`) where January uses immediates and keeps the boolean in BL; candidate q3: none"
+  ],
+  "source_evidence": [
+   {
+    "construct": "START and BACK tested in separate if / else-if arms, each assigning button_pressed= TRUE",
+    "evidence": "debug: q3 is the only one of 15 measured bodies (production || + 14 recorded shapes) that is strict EXACT; retail (calibrated, 70.2% of source-stable exact bodies verbatim): q3 is the only one of the same 15 bodies found verbatim in Oct-12-2001 2276P.xbe (0x15f180) AND matching the Sept-25-2001 retail cache.exe map body (0x54da60); January's body is also verbatim in 2276betaP, Sept cachebeta and Aug builds (cross-build census). The || form fails all six images by the same mechanism (constant-1 wins EBX, boolean spills).",
+    "tier": "two independent compile contexts (debug /Oy- cdecl; retail FPO /Gr no-DEBUG) x 6 first-party images; allocation-class evidence, NOT control-flow (the three TRUE sites cross-jump into one `mov bl,1` block in every image)"
+   },
+   {
+    "construct": "evidence class calibration",
+    "evidence": "action_converse_perform (landed d57ba30c on /Od attestation): identical else-if arms whose optimized stores share one block, distinguished from || only by a constant-1 EBX pin; /Od 0x432bf0 shows two distinct stores (0x432cce, 0x432ceb; re-verified here). Both debug and retail reject the || merge there too.",
+    "tier": "/Od ground truth at a sibling site of the same evidence class"
+   },
+   {
+    "construct": "idiom frequency",
+    "evidence": "46 identical adjacent else-if arm pairs already exist in production-EXACT functions (26 functions); 30 are required by debug bytes; at 23 retail-calibrated sites retail agrees with debug 22/23 on merge-vs-split.",
+    "tier": "first-party idiom census (canonical source), not byte proof for this site"
+   }
+  ],
+  "house_rule_review": "Admissibility is the OWNER-HELD question: commit 26601453 rejected q3 as identical fake arms 'whose edges share one block' (laws_w3 A26 admits split arms only with two distinct rejection blocks or /Od attestation); recorded reopen criterion = an unoptimized witness of separate START/BACK arms, which is unsatisfiable on hand (/Od halo_cache_symbols and HCEX carry only bink stubs). This packet adds an independent second compile view and a calibration of the evidence class; it does NOT satisfy the /Od criterion. No casts, parentheses, volatile, pragma, asm, dummy locals, or flag changes; strip test N/A (the change is the arm structure itself: the || strip is rejected by both views). Other house rules: real enum constants, TRUE, void on own line - unchanged from production.",
+  "controls": [
+   {
+    "name": "harness copy",
+    "result": "own copy of r3w3_retail harness reproduces run5 verdicts for all 24 bink_playback rows"
+   },
+   {
+    "name": "TU calibration (production source, other functions)",
+    "result": "OCT unique 11 + ambiguous 4 of 21 src-stable E rows; SEP MATCH 17/24; misses are debug-only code"
+   },
+   {
+    "name": "spelling-family control on OTHER functions (dupctl)",
+    "result": "merge identical arms -> ||: at 23 retail-calibrated site-variants retail agrees with debug 22/23 (14 both reject, 8 both inert, 1 retail-inert, 0 retail-only reject)"
+   },
+   {
+    "name": "recorded shapes in retail",
+    "result": "13 recorded non-q3 shapes + production all rejected by retail (OCT none; SEP DIFF/short-image); q3 unique accept"
+   },
+   {
+    "name": "invariance",
+    "result": "q3 with renamed locals (gamepad, button_index): debug EXACT, retail OCT+SEP match"
+   },
+   {
+    "name": "/Od calibration",
+    "result": "action_converse_perform /Od two stores confirmed; both optimized views reject its || merge"
+   }
+  ],
+  "verdict": "OWNER_RULING_PACKET",
+  "credit": {
+   "meaningful": 0,
+   "padded": 0,
+   "on_admission": {
+    "meaningful": 70,
+    "padded": 80
+   }
+  },
+  "reopen_criterion": "Owner ruling on q3 given the retail + calibration evidence; or an unoptimized first-party body of bink_query_analog_controller_buttons (none on hand); on admission apply patches/01 + 02 (park retire) atomically; object additionally needs the held _code_001b5850 -> static bink_decompress_audio_frame naming ruling for the pdb_storage row."
+ }
+]

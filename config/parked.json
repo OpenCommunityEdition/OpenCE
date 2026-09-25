@@ -934,7 +934,7 @@
       "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
-      "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md.",
+      "evidence": "Typed controller-query helper retained from the Fable graph reconciliation. January is 80 padded bytes and canonical is 96; both have one relocation to the input owner, with the remaining difference confined to boolean/index register allocation and scheduling. The function receives zero exact credit. No volatile/register forcing, pragma, assembly, fake dependency, raw offset, undefined behavior, or nonsensical branch is retained. See docs/object_matching_logs/bink_playback_obj_fable_graph_reconciliation_20260908.md. Owner ruling 2026-09-25: stays parked. The best exact-byte candidate q3 (identical START/BACK else-if arms; debug EXACT, verbatim in Oct-2001 2276P and the Sept-2001 cache.exe) is preserved at zero credit in research/halo_r3_20260924/bink_q3/. January shares one block, so the laws_w3 A26 exception and the /Od-witness reopen condition remain unmet.",
       "measurements": {
         "target": {
           "size": 80,
