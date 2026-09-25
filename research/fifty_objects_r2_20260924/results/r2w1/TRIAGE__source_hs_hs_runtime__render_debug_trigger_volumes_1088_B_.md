@@ -1,0 +1,19 @@
+# source/hs/hs_runtime::_render_debug_trigger_volumes (1088 B)
+
+## decision
+ATTACK
+
+## est_probability
+0.5
+
+## route
+Port the /Od-attested body onto the current hs_runtime.c. Use HCEX local names and `real_vector3d sides[2] = { 0 }`, computing side = edge_index % 2 before axis = edge_index / 2 as /Od does. In BOTH if(side) arms, write points[0] (the side arm via point_from_line3d(&matrix.position, &world_extent, 1.0f, &points[0]); the else arm via points[0] = matrix.position), then the sides assignments and two matrix4x3_transform_vector calls. Each arm must also contain its own point_from_line3d(&points[0], &sides[0], 1.0f, &points[1]), (&points[1], &sides[1], 1.0f, &points[2]) and (&points[2], &sides[0], -1.0f, &points[3]). Compute center with point_from_line3d(&matrix.position, &world_extent, 0.5f, &center), and keep the if/else pair of render_debug_string_at_point calls (yellow/white). No hand-expanded arithmetic. Gate it, then run object_audit, surplus_identity and provider_link (the new _point_from_line3d SELECT_ANY COMDAT must be byte-identical) and a full sweep, and land under owner ruling 5 (2026-09-21: the all-inlined header-inline COMDAT class is admitted when the caller is strict-exact). Claim hs_runtime first.
+
+## why_new
+New first-party /Od evidence: I located the /Od function through the hs globals table ('debug_trigger_volumes' string 0x9810e0 -> global 0xc7de25 -> sole code ref at 0x606cbd, inside an aligned-frame function 0x606c80..0x607462; disassembly in scratch/w/triage_game_hs_net/od_trigger_volumes.txt). Earlier lanes believed no /Od body existed. It shows four things: (a) the points[1..3] tail is written separately in BOTH side arms (/Od does not cross-jump); (b) all 8 point computations are REAL point_from_line3d calls (fn 0x42e0d0) with t = 1.0 / 1.0 / 1.0 / -1.0 / 0.5 (floats decoded at 0x93dd5c, 0x9401b4, 0x93dd50); (c) the two string calls are an if/else; (d) sides[2] is zero-initialised. Two earlier lanes each measured half of this. The throughput lane's w7 duplicated-arm candidate is EXACT, and I re-gated it at f6d00a8c: still EXACT (scratch/w/triage_game_hs_net/w7_tv_now.obj). It was rejected only as 'duplicated arm stores (R2)' and it hand-expands the helper (rule 6). The 150K lane's w1 t6/t7 showed that the real helper fixes January's x87 operand order but not the frame layout. The combination, which is exactly the /Od shape, was never measured. Two premise checks: January's exact action_vehicle_find_destination inlines point_from_line3d(...,1.0f,...) with no 1.0 constant relocation, so VC7 folds *1.0f and the helper form can give January's add-only code; nodup_census shows _point_from_line3d has 24 SELECT_ANY definers and 0 NODUP, so emitting it is link-safe.
+
+## prior_negatives_checked
+hs_runtime_obj_opus5_150k_w1 (t1-t7: sides[2], scoping, rename, helper -> 134 differing instructions or layout unchanged); hs_runtime_obj_opus5_250k_w3c (slot map, frame ranking fixed point; reopen criterion = a decode of the frame-ranking input, since met by the Lane C F3 decode plus this /Od evidence); throughput-recovery checkpoint_50k/75k (w7 EXACT but rejected under R2); park 82 (94.96%); small_unwritten_threshold_wave_main_hs_ai_20260913.
+
+## notes
+Credit is the function only: hs_runtime stays incomplete because of begin_random (a tie) and 12 storage rows (see the ADMISSION row). If the helper form is not exact, the fallback is an OWNER question: w7's exact body with its duplication now /Od-attested but its point_from_line3d hand-expanded (rule 6). math/real_math is Codex-reserved; this route does not edit real_math.h, but the byte-identity check of the COMDAT should run after the Codex packet lands.

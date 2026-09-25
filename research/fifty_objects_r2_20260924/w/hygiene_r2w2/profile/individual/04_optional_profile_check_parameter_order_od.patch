@@ -1,0 +1,112 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_profile.c b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+index 66ff4f29b6f4b78d9da33205cae88b30c2780011..9b0cfe12b4ae752c7b3185a4565eee8a2e08ff58 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_profile.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+@@ -234,9 +234,9 @@ static boolean rasterizer_profile_active(
+ 	void);
+ 
+ static void rasterizer_profile_check(
+-	const char *message,
++	boolean condition,
+ 	short profile,
+-	boolean condition);
++	const char *message);
+ static void rasterizer_profile_callback(
+ 	unsigned long context);
+ static void rasterizer_profile_frame_callback(
+@@ -329,17 +329,17 @@ void rasterizer_profile_frame_begin(
+ 		global_d3d_device);
+ 
+ 	rasterizer_profile_check(
+-		"callback recieved invalid context",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context));
++		"callback recieved invalid context");
+ 	rasterizer_profile_check(
+-		"begin out-of-synch",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch));
++		"begin out-of-synch");
+ 	rasterizer_profile_check(
+-		"end out-of-synch",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch));
++		"end out-of-synch");
+ 
+ 	rasterizer_profile_state.callback_errors = 0;
+ 
+@@ -408,13 +408,13 @@ void rasterizer_profile_begin(
+ 			global_d3d_device);
+ 
+ 		rasterizer_profile_check(
+-			"profile duplication within frame (begin)",
++			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
+ 			profile,
+-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
++			"profile duplication within frame (begin)");
+ 		rasterizer_profile_check(
+-			"profile begin/end pairing incorrect (begin)",
++			rasterizer_profile_globals.active_profile_index==NONE,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==NONE);
++			"profile begin/end pairing incorrect (begin)");
+ 
+ 		D3DDevice_InsertCallback(D3DCALLBACK_READ, rasterizer_profile_callback, profile|FLAG(_rasterizer_profile_callback_begin_bit));
+ 		rasterizer_profile_globals.active_profile_index = profile;
+@@ -444,13 +444,13 @@ void rasterizer_profile_end(
+ 			global_d3d_device);
+ 
+ 		rasterizer_profile_check(
+-			"profile duplication within frame (end)",
++			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
+ 			profile,
+-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
++			"profile duplication within frame (end)");
+ 		rasterizer_profile_check(
+-			"profile begin/end pairing incorrect (end)",
++			rasterizer_profile_globals.active_profile_index==profile,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==profile);
++			"profile begin/end pairing incorrect (end)");
+ 
+ 		D3DDevice_InsertCallback(D3DCALLBACK_WRITE, rasterizer_profile_callback, profile);
+ 		rasterizer_profile_elapsed_state.pushbuffer_elapsed_times[profile] = 0;
+@@ -505,9 +505,9 @@ real rasterizer_profile_query(
+ 				profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
+ 
+ 			rasterizer_profile_check(
+-				"profile not completed (query)",
++				rasterizer_profile_globals.active_profile_index==NONE,
+ 				profile,
+-				rasterizer_profile_globals.active_profile_index==NONE);
++				"profile not completed (query)");
+ 
+ 			if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
+ 			{
+@@ -548,9 +548,9 @@ long rasterizer_profile_query_pushbuffer(
+ 			profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
+ 
+ 		rasterizer_profile_check(
+-			"profile not completed (query)",
++			rasterizer_profile_globals.active_profile_index==NONE,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==NONE);
++			"profile not completed (query)");
+ 
+ 		if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
+ 		{
+@@ -609,9 +609,9 @@ static boolean rasterizer_profile_active(
+ }
+ 
+ static void rasterizer_profile_check(
+-	const char *message,
++	boolean condition,
+ 	short profile,
+-	boolean condition)
++	const char *message)
+ {
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",

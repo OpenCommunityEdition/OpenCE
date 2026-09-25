@@ -1,0 +1,55 @@
+diff --git a/source/effects/effects.c b/source/effects/effects.c
+index 5ea49a0c..cd692358 100644
+--- a/source/effects/effects.c
++++ b/source/effects/effects.c
+@@ -139,7 +139,6 @@ symbols in this file:
+ 
+ /* ---------- headers */
+ 
+-#define real_local_random real_local_random_inline
+ #include "cseries/cseries.h"
+ #include "cseries/errors.h"
+ #include "bitmaps/bitmaps.h"
+@@ -172,7 +171,6 @@ symbols in this file:
+ #include "tag_files/tag_groups.h"
+ #include "units/bipeds.h"
+ #include "units/units.h"
+-#undef real_local_random
+ 
+ /* ---------- constants */
+ 
+@@ -1395,14 +1393,6 @@ boolean dangerous_effects_near_player(
+ 	return FALSE;
+ }
+ 
+-real real_local_random(
+-	void)
+-{
+-	real result = real_seed_random(get_global_local_random_seed_address());
+-
+-	return result;
+-}
+-
+ /* ---------- private code */
+ 
+ 
+@@ -2128,8 +2118,7 @@ static void effect_generate_particles(
+ 					data.rotation = TEST_FLAG(
+ 						particles->flags,
+ 						_effect_particle_random_orientation_bit)
+-						? real_seed_random_range(
+-							get_global_local_random_seed_address(),
++						? real_local_random_range(
+ 							0.0f,
+ 							2.f*_pi)
+ 						: 0.0f;
+@@ -2146,8 +2135,7 @@ static void effect_generate_particles(
+ 					}
+ 					else
+ 					{
+-						data.color.alpha = real_seed_random(
+-							get_global_local_random_seed_address());
++						data.color.alpha = real_local_random();
+ 					}
+ 
+ 					rgb_colors_interpolate(

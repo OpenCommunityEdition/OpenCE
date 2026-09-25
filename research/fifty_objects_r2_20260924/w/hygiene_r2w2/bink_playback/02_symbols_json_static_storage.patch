@@ -1,0 +1,21 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index f9abb17d..a6af3ffc 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -23305,12 +23305,12 @@
+ { "file_offset": 5056600, "flags": 0, "name": "_playlist_profile_globals" },
+ { "file_offset": 5056720, "flags": 0, "name": "_saved_game_file_display_name", "static": true },
+ { "file_offset": 5056976, "flags": 0, "name": "_saved_game_files_globals" },
+-{ "file_offset": 5057264, "flags": 0, "name": "_bink_pointer_blocks" },
+-{ "file_offset": 5057328, "flags": 0, "name": "_bink_bitmap" },
+-{ "file_offset": 5057376, "flags": 0, "name": "_bink_texture" },
++{ "file_offset": 5057264, "flags": 0, "name": "_bink_pointer_blocks", "static": true },
++{ "file_offset": 5057328, "flags": 0, "name": "_bink_bitmap", "static": true },
++{ "file_offset": 5057376, "flags": 0, "name": "_bink_texture", "static": true },
+ { "file_offset": 5057396, "flags": 0, "name": "_debug_bink" },
+ { "file_offset": 5057400, "flags": 0, "name": "_bink_globals" },
+-{ "file_offset": 5057616, "flags": 0, "name": "_bink_pointer_block_count" },
++{ "file_offset": 5057616, "flags": 0, "name": "_bink_pointer_block_count", "static": true },
+ { "file_offset": 5057624, "flags": 0, "name": "_dsound_error_string", "static": true },
+ { "file_offset": 5057888, "flags": 0, "name": "_sound_manager_globals", "static": true },
+ { "file_offset": 5058264, "flags": 0, "name": "?MU_DriverExtension@@3UMU_DRIVER_EXTENSION@@A" },

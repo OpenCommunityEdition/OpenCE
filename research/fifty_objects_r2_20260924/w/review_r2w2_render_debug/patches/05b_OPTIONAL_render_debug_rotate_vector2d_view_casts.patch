@@ -1,0 +1,20 @@
+diff --git a/source/render/render_debug.c b/source/render/render_debug.c
+index 57b8c1f9..9baa76e7 100644
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -1955,10 +1955,11 @@ static void build_circle_points(
+ 
+ 	for (index = 0; index+1<NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS; index++)
+ 	{
+-		set_real_point2d(
+-			&points[index+1],
+-			cosine_of_angle*points[index].x - sine_of_angle*points[index].y,
+-			sine_of_angle*points[index].x + cosine_of_angle*points[index].y);
++		rotate_vector2d(
++			(real_vector2d const *)&points[index],
++			sine_of_angle,
++			cosine_of_angle,
++			(real_vector2d *)&points[index+1]);
+ 	}
+ 
+ 	points[NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS] = points[0];

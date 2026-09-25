@@ -1,0 +1,95 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..41d1d1b0 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -2905,9 +2905,9 @@
+ { "file_offset": 725984, "flags": 32, "name": "_profile_sections_deactivate_evaluate", "static": true },
+ { "file_offset": 726048, "flags": 32, "name": "_profile_graph_toggle_evaluate", "static": true },
+ { "file_offset": 726112, "flags": 32, "name": "_debug_pvs_evaluate", "static": true },
+-{ "file_offset": 726176, "flags": 32, "name": "_radiosity_start_evaluate", "static": true },
+-{ "file_offset": 726208, "flags": 32, "name": "_radiosity_save_evaluate", "static": true },
+-{ "file_offset": 726240, "flags": 32, "name": "_radiosity_debug_point_evaluate", "static": true },
++{ "file_offset": 726176, "flags": 32, "name": "_radiosity_hack_start_evaluate", "static": true },
++{ "file_offset": 726208, "flags": 32, "name": "_radiosity_hack_save_evaluate", "static": true },
++{ "file_offset": 726240, "flags": 32, "name": "_radiosity_hack_find_point_evaluate", "static": true },
+ { "file_offset": 726272, "flags": 32, "name": "_ai_profile_change_render_spray_evaluate", "static": true },
+ { "file_offset": 726304, "flags": 32, "name": "_ai_debug_sound_point_set_evaluate", "static": true },
+ { "file_offset": 726336, "flags": 32, "name": "_ai_debug_vocalize_evaluate", "static": true },
+diff --git a/source/hs/hs.c b/source/hs/hs.c
+index 0ed6887b..8b2a3283 100644
+--- a/source/hs/hs.c
++++ b/source/hs/hs.c
+@@ -549,11 +549,11 @@ symbols in this file:
+ 000B1460 0040:
+ 	_code_000b1460 (0000)
+ 000B14A0 0020:
+-	_code_000b14a0 (0000)
++	_radiosity_hack_start_evaluate (0000)
+ 000B14C0 0020:
+-	_code_000b14c0 (0000)
++	_radiosity_hack_save_evaluate (0000)
+ 000B14E0 0020:
+-	_code_000b14e0 (0000)
++	_radiosity_hack_find_point_evaluate (0000)
+ 000B1500 0020:
+ 	_code_000b1500 (0000)
+ 000B1520 0020:
+@@ -5591,15 +5591,15 @@ static void profile_sections_deactivate_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-static void radiosity_debug_point_evaluate(
++static void radiosity_hack_find_point_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-static void radiosity_save_evaluate(
++static void radiosity_hack_save_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+-static void radiosity_start_evaluate(
++static void radiosity_hack_start_evaluate(
+ 	short function_index,
+ 	long thread_index,
+ 	boolean initialize);
+@@ -10770,7 +10770,7 @@ static struct hs_function_definition const hs_radiosity_start_definition=
+ 	0,
+ 	"radiosity_start",
+ 	hs_macro_function_parse,
+-	radiosity_start_evaluate,
++	radiosity_hack_start_evaluate,
+ 	"starts radiosity computation.",
+ 	NULL,
+ 	0,
+@@ -10782,7 +10782,7 @@ static struct hs_function_definition const hs_radiosity_save_definition=
+ 	0,
+ 	"radiosity_save",
+ 	hs_macro_function_parse,
+-	radiosity_save_evaluate,
++	radiosity_hack_save_evaluate,
+ 	"saves radiosity solution.",
+ 	NULL,
+ 	0,
+@@ -10794,7 +10794,7 @@ static struct hs_function_definition const hs_radiosity_debug_point_definition=
+ 	0,
+ 	"radiosity_debug_point",
+ 	hs_macro_function_parse,
+-	radiosity_debug_point_evaluate,
++	radiosity_hack_find_point_evaluate,
+ 	"tests sun occlusion at a point.",
+ 	NULL,
+ 	0,
+@@ -13869,9 +13869,9 @@ HS_EVALUATE_NO_ARGUMENTS(player_ui_activate_all_solo_levels_evaluate, player_ui_
+ HS_EVALUATE_NO_ARGUMENTS(network_game_client_request_immediate_start_evaluate, network_game_client_request_immediate_start)
+ HS_EVALUATE_NO_ARGUMENTS(hs_doc_evaluate, hs_doc)
+ HS_EVALUATE_NO_OP(tag_groups_dump_memory_evaluate)
+-HS_EVALUATE_NO_OP(radiosity_start_evaluate)
+-HS_EVALUATE_NO_OP(radiosity_save_evaluate)
+-HS_EVALUATE_NO_OP(radiosity_debug_point_evaluate)
++HS_EVALUATE_NO_OP(radiosity_hack_start_evaluate)
++HS_EVALUATE_NO_OP(radiosity_hack_save_evaluate)
++HS_EVALUATE_NO_OP(radiosity_hack_find_point_evaluate)
+ HS_EVALUATE_RETURN_LONG(hs_players_evaluate, hs_players)
+ HS_EVALUATE_RETURN_LONG(game_time_get_evaluate, game_time_get)
+ HS_EVALUATE_RETURN_SHORT(scripted_camera_time_evaluate, scripted_camera_time)

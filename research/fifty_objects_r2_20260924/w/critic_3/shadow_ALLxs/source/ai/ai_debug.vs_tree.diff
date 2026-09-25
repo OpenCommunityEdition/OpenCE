@@ -1,0 +1,20 @@
+diff --git a/source/ai/ai_debug.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\critic_3\\shadow_ALLxs\\source\\ai\\ai_debug.c"
+index 62b41151..8a6d8a8d 100644
+--- a/source/ai/ai_debug.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\critic_3\\shadow_ALLxs\\source\\ai\\ai_debug.c"
+@@ -748,6 +748,7 @@ static void ai_debug_highlight_unit(
+ 	return;
+ }
+ 
++/* Render the path-node overlays selected by the caller. */
+ static void ai_debug_render_surface(
+ 	struct structure_bsp const *structure_bsp,
+ 	long surface_index,
+@@ -3823,7 +3824,6 @@ static void ai_debug_render_actor(
+ 	return;
+ }
+ 
+-/* Render the path-node overlays selected by the caller. */
+ static void ai_debug_render_path_nodes(
+ 	struct path_state *state,
+ 	boolean render_surfaces,

@@ -1,0 +1,13 @@
+diff --git a/source/effects/weather_particle_systems.c b/source/effects/weather_particle_systems.c
+index d2aae8ff..40d657c0 100644
+--- a/source/effects/weather_particle_systems.c
++++ b/source/effects/weather_particle_systems.c
+@@ -306,7 +306,7 @@ static void weather_particle_system_render(
+ 
+ /* ---------- globals */
+ 
+-static real const one_over_char_max = 1.f/255.f;
++real const one_over_char_max = 1.f/255.f;
+ 
+ boolean weather = TRUE;
+ 

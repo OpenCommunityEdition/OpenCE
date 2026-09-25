@@ -1,0 +1,13 @@
+diff --git a/config/config.json b/config/config.json
+index b928f182..0938f2d0 100644
+--- a/config/config.json
++++ b/config/config.json
+@@ -489,7 +489,7 @@
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_motion_sensor.c", "index": 114, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_models.c", "index": 115, "status": "NonMatching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_lights.c", "index": 116, "status": "NonMatching" },
+-				{ "name": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry.c", "index": 117, "status": "NonMatching" },
++				{ "name": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry.c", "index": 117, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c", "index": 118, "status": "NonMatching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_errors.c", "index": 119, "status": "Matching" },
+ 				{ "name": "source/rasterizer/xbox/rasterizer_xbox_environment_fog.c", "index": 120, "status": "NonMatching" },

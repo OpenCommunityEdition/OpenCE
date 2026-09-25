@@ -1,0 +1,221 @@
+diff --git a/source/bitmaps/bitmap_group.h b/source/bitmaps/bitmap_group.h
+--- a/source/bitmaps/bitmap_group.h
++++ b/source/bitmaps/bitmap_group.h
+@@ -37,11 +37,11 @@
+ 	unsigned short flags;
+ 	union point2d registration_point;
+ 	short mipmap_count;
+-	unsigned short pixel_data;
+-	unsigned long pixels_offset;
+-	unsigned long pixel_data_size;
+-	unsigned long bitmap_tag_index;
+-	void *bitmap_data_pointer;
++	short mipmap_pad;
++	long pixels_offset;
++	long pixels_size;
++	long tag_index;
++	long cache_block_index;
+ 	void *hardware_format;
+ 	void *base_address;
+ };
+diff --git a/source/bink/bink_playback.c b/source/bink/bink_playback.c
+--- a/source/bink/bink_playback.c
++++ b/source/bink/bink_playback.c
+@@ -612,9 +612,9 @@
+ 			bink_bitmap.type= _bitmap_type_2d;
+ 			bink_bitmap.format= _bitmap_format_x8r8g8b8;
+ 			bink_bitmap.flags= FLAG(_bitmap_linear_bit);
+-			bink_bitmap.pixel_data_size= bitmap_format_get_bits_per_pixel(bink_bitmap.format)*bink_bitmap.height*bink_bitmap.width/8;
+-			bink_bitmap.bitmap_tag_index= NONE;
+-			bink_bitmap.bitmap_data_pointer= (void *)NONE;
++			bink_bitmap.pixels_size= bitmap_format_get_bits_per_pixel(bink_bitmap.format)*bink_bitmap.height*bink_bitmap.width/8;
++			bink_bitmap.tag_index= NONE;
++			bink_bitmap.cache_block_index= NONE;
+ 			bink_bitmap.hardware_format= bink_globals.texture;
+ 			bink_bitmap.base_address= (void *)NONE;
+ 			bink_globals.screen_geometry.map[0]= &bink_bitmap;
+diff --git a/source/bitmaps/bitmaps.c b/source/bitmaps/bitmaps.c
+--- a/source/bitmaps/bitmaps.c
++++ b/source/bitmaps/bitmaps.c
+@@ -1146,11 +1146,11 @@
+ 			match_vassert(
+ 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+ 				0x2A9,
+-				block_address < (byte *)bitmap->base_address + bitmap->pixel_data_size,
++				block_address < (byte *)bitmap->base_address + bitmap->pixels_size,
+ 				csprintf(
+ 					temporary,
+ 					"bitmap_2d_get_pixel tried to access compressed block @ -%d bytes from address end (w=%d, h=%d, m=%d, x=%d, y=%d, lod=%f)",
+-					block_address - ((byte *)bitmap->base_address + bitmap->pixel_data_size),
++					block_address - ((byte *)bitmap->base_address + bitmap->pixels_size),
+ 					bitmap->width,
+ 					bitmap->height,
+ 					(short)bitmap->mipmap_count,
+diff --git a/source/cache/xbox_texture_cache.c b/source/cache/xbox_texture_cache.c
+--- a/source/cache/xbox_texture_cache.c
++++ b/source/cache/xbox_texture_cache.c
+@@ -97,6 +97,7 @@
+ #include "cseries/cseries_windows.h"
+ #include "cseries/errors.h"
+ #include "cseries/sort.h"
++#include "bitmaps/bitmap_group.h"
+ #include "bitmaps/bitmaps_internal.h"
+ #include "bitmaps/bitmaps_mipmap.h"
+ #include "cache/cache_files.h"
+@@ -193,33 +194,6 @@
+ 
+ /* ---------- structures */
+ 
+-struct bitmap_data
+-{
+-	unsigned long bitmap_class;
+-	short width;
+-	short height;
+-	short depth;
+-	short type;
+-	short format;
+-	unsigned short flags;
+-	short registration_point_x;
+-	short registration_point_y;
+-	unsigned short mipmap_count;
+-	unsigned short reserved16;
+-	unsigned long pixel_data_offset;
+-	long pixel_data_size;
+-	long bitmap_tag_index;
+-	long cache_block_index;
+-	void *hardware_format;
+-	void *base_address;
+-};
+-
+-struct xbox_bitmap_group_prefix
+-{
+-	byte reserved0000[0x30];
+-	struct tag_data processed_pixel_data;
+-};
+-
+ struct xbox_texture_cache_globals
+ {
+ 	struct data_array *textures;
+@@ -244,28 +218,6 @@
+ 	boolean graph;
+ 	boolean list;
+ };
+-
+-typedef char verify_bitmap_data_flags_offset[
+-	offsetof(struct bitmap_data, flags) == 0xE ? 1 : -1];
+-typedef char verify_bitmap_data_pixel_data_offset_offset[
+-	offsetof(struct bitmap_data, pixel_data_offset) == 0x18 ? 1 : -1];
+-typedef char verify_bitmap_data_pixel_data_size_offset[
+-	offsetof(struct bitmap_data, pixel_data_size) == 0x1C ? 1 : -1];
+-typedef char verify_bitmap_data_bitmap_tag_index_offset[
+-	offsetof(struct bitmap_data, bitmap_tag_index) == 0x20 ? 1 : -1];
+-typedef char verify_bitmap_data_cache_block_index_offset[
+-	offsetof(struct bitmap_data, cache_block_index) == 0x24 ? 1 : -1];
+-typedef char verify_bitmap_data_hardware_format_offset[
+-	offsetof(struct bitmap_data, hardware_format) == 0x28 ? 1 : -1];
+-typedef char verify_bitmap_data_base_address_offset[
+-	offsetof(struct bitmap_data, base_address) == 0x2C ? 1 : -1];
+-typedef char verify_bitmap_data_size[
+-	sizeof(struct bitmap_data) == 0x30 ? 1 : -1];
+-typedef char verify_xbox_bitmap_group_pixel_data_file_offset[
+-	(offsetof(
+-		struct xbox_bitmap_group_prefix,
+-		processed_pixel_data) +
+-	 offsetof(struct tag_data, file_offset)) == 0x38 ? 1 : -1];
+ 
+ typedef char verify_xbox_texture_cache_textures_offset[
+ 	offsetof(
+@@ -410,7 +362,7 @@
+ 	long bitmap_tag_index,
+ 	struct bitmap_data *bitmap)
+ {
+-	struct xbox_bitmap_group_prefix *bitmap_group;
++	struct bitmap_group *bitmap_group;
+ 
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
+@@ -420,11 +372,10 @@
+ 	bitmap->cache_block_index = NONE;
+ 	bitmap->base_address = NULL;
+ 	bitmap->hardware_format = NULL;
+-	bitmap_group = tag_get('bitm', bitmap_tag_index);
+-	bitmap->pixel_data_offset +=
+-		bitmap_group->processed_pixel_data.file_offset;
+-	bitmap->pixel_data_size = bitmap_get_pixel_data_size(bitmap);
+-	bitmap->bitmap_tag_index = bitmap_tag_index;
++	bitmap_group = bitmap_group_get(bitmap_tag_index);
++	bitmap->pixels_offset += bitmap_group->pixel_data.file_offset;
++	bitmap->pixels_size = bitmap_get_pixel_data_size(bitmap);
++	bitmap->tag_index = bitmap_tag_index;
+ 	bitmap->base_address = NULL;
+ 	bitmap->hardware_format = NULL;
+ 	bitmap->cache_block_index = NONE;
+@@ -523,7 +474,7 @@
+ 		xbox_texture_cache_globals.textures,
+ 		block_index);
+ 
+-	return tag_get_name(texture->bitmap->bitmap_tag_index);
++	return tag_get_name(texture->bitmap->tag_index);
+ }
+ 
+ long bitmap_format_to_d3d_format(
+@@ -779,7 +730,7 @@
+ 	byte *base_address;
+ 	long size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
+ 
+-	size = MAX(size, bitmap->pixel_data_size);
++	size = MAX(size, bitmap->pixels_size);
+ 	cache_block_index = lruv_block_new(
+ 		xbox_texture_cache_globals.cache,
+ 		size);
+@@ -807,9 +758,9 @@
+ 		texture->bitmap = bitmap;
+ 		texture_cache_initialize_hardware_format(bitmap, &texture->hardware_format);
+ 		texture->read_request_handle = cache_file_read(
+-			bitmap->bitmap_tag_index,
+-			bitmap->pixel_data_offset,
+-			bitmap->pixel_data_size,
++			bitmap->tag_index,
++			bitmap->pixels_offset,
++			bitmap->pixels_size,
+ 			base_address,
+ 			&texture->loaded,
+ 			block);
+@@ -911,7 +862,7 @@
+ 		{
+ 			struct bitmap_data *bitmap = texture->bitmap;
+ 
+-			if (bitmap->bitmap_tag_index != NONE)
++			if (bitmap->tag_index != NONE)
+ 			{
+ 				texture_cache_debug_bitmaps[bitmap_count++] = bitmap;
+ 			}
+@@ -941,7 +892,7 @@
+ 				"|t%d|t%s%s",
+ 				rasterizer_xbox_bitmap_get_pixel_data_size(texture_cache_debug_bitmaps[bitmap_index]),
+ 				touched_string,
+-				tag_get_name(texture_cache_debug_bitmaps[bitmap_index]->bitmap_tag_index));
++				tag_get_name(texture_cache_debug_bitmaps[bitmap_index]->tag_index));
+ 			bounds.y0 = (bitmap_count - bitmap_index) * 10 + 35;
+ 			bounds.x0 = 10;
+ 			bounds.y1 = bounds.x1 = SHORT_MAX;
+@@ -985,7 +936,7 @@
+ 				{
+ 					console_warning(
+ 						"%s",
+-						tag_get_name(bitmap->bitmap_tag_index));
++						tag_get_name(bitmap->tag_index));
+ 				}
+ 				cache_file_promote_read(texture->read_request_handle);
+ 			}
+@@ -1031,8 +982,8 @@
+ 				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+ 			lruv_debug_to_file(
+ 				"d:\\stabbed.txt",
+-				tag_get_name(bitmap->bitmap_tag_index),
+-				bitmap->pixel_data_size,
++				tag_get_name(bitmap->tag_index),
++				bitmap->pixels_size,
+ 				xbox_texture_cache_globals.cache,
+ 				scenario_debug_to_file,
+ 				texture_cache_name_block_proc);

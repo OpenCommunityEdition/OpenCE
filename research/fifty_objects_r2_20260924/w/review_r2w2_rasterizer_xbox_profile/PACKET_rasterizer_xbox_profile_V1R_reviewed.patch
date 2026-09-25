@@ -1,0 +1,240 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_profile.c b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+--- a/source/rasterizer/xbox/rasterizer_xbox_profile.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+@@ -117,9 +117,17 @@
+ 00292370 001e:
+ 	??_C@_0BO@KDABKJGE@profile?5not?5completed?5?$CIquery?$CJ?$AA@ (0000)
+ 0030CF00 0084:
+-	_rasterizer_profile_globals (0000)
++	_rasterizer_profile_performance_counter_frequency (0000)
++	_rasterizer_profile_globals (0008)
+ 00465E28 0462:
+-	_bss_00465e28 (0000)
++	_rasterizer_profile_callback_elapsed_times (0000)
++	_rasterizer_profile_callback_end_times (0080)
++	_rasterizer_profile_elapsed_state (0100)
++	_rasterizer_profile_start_times (0350)
++	_rasterizer_profile_frame_state (0438)
++	_local_profile_enable (0450)
++	_rasterizer_profile_state (0454)
++	_rasterizer_profile_error_count (0460)
+ */
+ 
+ /* ---------- headers */
+@@ -225,9 +233,9 @@
+ 	void);
+ 
+ static void rasterizer_profile_check(
+-	const char *message,
++	boolean condition,
+ 	short profile,
+-	boolean condition);
++	const char *message);
+ static void rasterizer_profile_callback(
+ 	unsigned long context);
+ static void rasterizer_profile_frame_callback(
+@@ -322,17 +330,17 @@
+ 		global_d3d_device);
+ 
+ 	rasterizer_profile_check(
+-		"callback recieved invalid context",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_invalid_context));
++		"callback recieved invalid context");
+ 	rasterizer_profile_check(
+-		"begin out-of-synch",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_begin_out_of_synch));
++		"begin out-of-synch");
+ 	rasterizer_profile_check(
+-		"end out-of-synch",
++		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch),
+ 		NONE,
+-		!TEST_FLAG(rasterizer_profile_state.callback_errors, _rasterizer_profile_error_end_out_of_synch));
++		"end out-of-synch");
+ 
+ 	rasterizer_profile_state.callback_errors = 0;
+ 
+@@ -401,13 +409,13 @@
+ 			global_d3d_device);
+ 
+ 		rasterizer_profile_check(
+-			"profile duplication within frame (begin)",
++			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
+ 			profile,
+-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
++			"profile duplication within frame (begin)");
+ 		rasterizer_profile_check(
+-			"profile begin/end pairing incorrect (begin)",
++			rasterizer_profile_globals.active_profile_index==NONE,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==NONE);
++			"profile begin/end pairing incorrect (begin)");
+ 
+ 		D3DDevice_InsertCallback(D3DCALLBACK_READ, rasterizer_profile_callback, profile|FLAG(_rasterizer_profile_callback_begin_bit));
+ 		rasterizer_profile_globals.active_profile_index = profile;
+@@ -437,13 +445,13 @@
+ 			global_d3d_device);
+ 
+ 		rasterizer_profile_check(
+-			"profile duplication within frame (end)",
++			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile),
+ 			profile,
+-			!TEST_FLAG(rasterizer_profile_state.profile_flags, profile));
++			"profile duplication within frame (end)");
+ 		rasterizer_profile_check(
+-			"profile begin/end pairing incorrect (end)",
++			rasterizer_profile_globals.active_profile_index==profile,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==profile);
++			"profile begin/end pairing incorrect (end)");
+ 
+ 		D3DDevice_InsertCallback(D3DCALLBACK_WRITE, rasterizer_profile_callback, profile);
+ 		rasterizer_profile_elapsed_state.pushbuffer_elapsed_times[profile] = 0;
+@@ -498,9 +506,9 @@
+ 				profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
+ 
+ 			rasterizer_profile_check(
+-				"profile not completed (query)",
++				rasterizer_profile_globals.active_profile_index==NONE,
+ 				profile,
+-				rasterizer_profile_globals.active_profile_index==NONE);
++				"profile not completed (query)");
+ 
+ 			if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
+ 			{
+@@ -541,9 +549,9 @@
+ 			profile>=0 && profile<NUMBER_OF_RASTERIZER_PROFILES);
+ 
+ 		rasterizer_profile_check(
+-			"profile not completed (query)",
++			rasterizer_profile_globals.active_profile_index==NONE,
+ 			profile,
+-			rasterizer_profile_globals.active_profile_index==NONE);
++			"profile not completed (query)");
+ 
+ 		if (TEST_FLAG(rasterizer_profile_state.profile_flags, profile))
+ 		{
+@@ -602,9 +610,9 @@
+ }
+ 
+ static void rasterizer_profile_check(
+-	const char *message,
++	boolean condition,
+ 	short profile,
+-	boolean condition)
++	const char *message)
+ {
+ 	match_assert(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
+@@ -623,11 +631,12 @@
+ 		}
+ 		else
+ 		{
+-			/*
+-			January passes the same two varargs in both branches. The NONE value
+-			therefore becomes this format's first argument; retain that target-
+-			proven rare-path defect instead of disguising it as a clean rewrite.
+-			*/
++			/* BUG (preserved for exact matching): January pushes the same two
++			 * varargs (profile, message) in both branches (target push and
++			 * relocation order; the later /Od build at 0x8004c0 does the same), so
++			 * this format's %s consumes the NONE profile value, not the message.
++			 * A corrected build should pass only message here.
++			 */
+ 			error(
+ 				_error_silent,
+ 				"### PROFILE: %s -- tell Bernie!",
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_detail_objects.c b/source/rasterizer/xbox/rasterizer_xbox_detail_objects.c
+--- a/source/rasterizer/xbox/rasterizer_xbox_detail_objects.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_detail_objects.c
+@@ -82,6 +82,8 @@
+ #include "tag_files/tag_groups.h"
+ #include <xtl.h>
+ 
++#include "rasterizer/xbox/rasterizer_xbox.h"
++
+ /* ---------- constants */
+ 
+ enum
+@@ -258,40 +260,12 @@
+ 
+ /* ---------- prototypes */
+ 
+-void rasterizer_error(
+-	long error_result,
+-	char const *format,
+-	...);
+-
+-void rasterizer_profile_end(
+-	short profile);
+-
+-void rasterizer_profile_begin(
+-	short profile);
+-
+ short main_get_window_count(
+ 	void);
+ 
+-void rasterizer_set_pixel_shader(
+-	struct pixel_shader_definition const *definition);
+-
+-void rasterizer_set_texture(
+-	short stage,
+-	short bitmap_type,
+-	short bitmap_index,
+-	long bitmap_definition_index,
+-	short bitmap_sequence_index);
+-
+-void rasterizer_set_vertex_shader_permutation(
+-	short vertex_shader_index,
+-	short vertex_type,
+-	short permutation_index);
+-
+ /* ---------- globals */
+ 
+-extern D3DDevice *global_d3d_device;
+ extern struct detail_objects_debug_options rasterizer_debug_options;
+-extern struct pixel_shader_definition pixel_shader;
+ D3DVertexBuffer *bss_0045e904 = NULL;
+ 
+ #define local_d3d_vertex_buffer bss_0045e904
+@@ -397,7 +371,7 @@
+ void _rasterizer_detail_objects_begin(
+ 	void)
+ {
+-	rasterizer_profile_begin(21);
++	rasterizer_profile_begin(_rasterizer_profile_detail_objects);
+ 	if (!rasterizer_debug_options.detail_objects)
+ 	{
+ 		return;
+@@ -920,7 +894,7 @@
+ void _rasterizer_detail_objects_end(
+ 	void)
+ {
+-	rasterizer_profile_end(21);
++	rasterizer_profile_end(_rasterizer_profile_detail_objects);
+ 	return;
+ }
+ 
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -3,11 +3,11 @@
+   "entries": [
+     {
+       "unit": "source/rasterizer/xbox/rasterizer_xbox_profile",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+-      "reason": "All 16 target functions and all 2234 target data bytes are exact, including the independently verified 132-byte initialized section. The incompatible debug-options prefix has been replaced by the complete genuine shared type. The candidate still emits three stock SDK select-any tables absent from January's split: D3DTEXTUREDIRECTENCODE (16 bytes), D3DSIMPLERENDERSTATEENCODE (328), and D3DPRIMITIVETOVERTEXCOUNT (88). Forced unresolved-link diagnostics prove only compatible current-base duplicate selection, not a complete ordinary final link. Shared window-state declaration ownership and three consumer-local Profile API declaration pairs also remain inherited source-owner debt. Exact target-data accounting does not waive these separate whole-object checks.",
+-      "evidence": "docs/object_matching_logs/rasterizer_xbox_profile_obj_shared_owner_reconciliation_20260906.md#remaining-whole-object-boundaries",
+-      "reopen": "Finish genuine shared window/API declaration ownership with full consumer regression gates and prove the complete SDK table ownership through authenticated original source topology or a successful ordinary compatible canonical link with the real dependency/import closure and call graph. Do not use partial-header facades, forced unresolved linking, altered selection metadata, fake references, or an invented discard pass. Preserve all target-function and data matches before claiming Matching."
++      "class": "source-layout-incomplete",
++      "symbol": "_rasterizer_profile_globals",
++      "reason": "All 16 target functions and all 2234 target data bytes are exact. The three stock SDK select-any tables (D3DTEXTUREDIRECTENCODE 16 bytes, D3DSIMPLERENDERSTATEENCODE 328, D3DPRIMITIVETOVERTEXCOUNT 88) come from D3D8.h's unconditional extern const selectany definitions, which January's TU included (its object imports _D3DDevice_InsertCallback@12 and QueryPerformance*). Each copy is byte-identical to January's selected provider and passes the selected-provider pair links in both orders, the standard under which collision_debug and the other Matching emitters carry the same tables. Canonical's dynavobgeom reconciliation (641e1466, docs/object_matching_logs/claude_fifty_objects_canonical_reconciliation.md) still leaves stock SDK-table coalescing open pending a uniform owner policy audit, so this object inherits that decision. Whole-object admission also fails source authenticity. The private state is written as four invented file-static aggregates (rasterizer_profile_globals, rasterizer_profile_elapsed_state, rasterizer_profile_frame_state, rasterizer_profile_state). Their pad02/pad06/pad12/pad16 members only spell out VC7's per-static 4-byte alignment padding, and reserved06[6] hides one unattested 4-byte object at .bss +0x45c. Loose file statics reproduce every code byte and every other data offset, and the later /Od build places elapsed_times before callback_start_times, contradicting the elapsed_state member order. The rasterizer_profile_check NONE branch reproduces January's format/varargs defect (%s consumes the NONE profile value), which awaits the owner's original-bug ruling. Three load-bearing volatile qualifiers have no first-party attestation. The TU also still declares global_window_parameters with a consumer-local extern: moving it to the owner header rasterizer_xbox_internal.h keeps every exact section byte-identical but declares the name earlier in rasterizer_xbox_models, which moves the residual __rasterizer_model_draw by one instruction.",
++      "evidence": "research/fifty_objects_20260925/w/review3_rasterizer_xbox_profile/REVIEW.md",
++      "reopen": "Recover the genuine January private state shape: replace the invented aggregates with authentic separate file statics, or first-party-attested structures, without fabricated pad/reserved members. Identify the unreferenced 4-byte January object at .bss +0x45c from first-party evidence rather than a filler. Obtain the owner's rulings on the BUG-marked NONE-branch varargs defect and the three volatile qualifiers. Any new private names need the owner's descriptive-name policy (as for the held rasterizer_xbox .bss split). Preserve all 16 target functions and all data sections, land the pinned 132-byte .data entry only with the Matching flip, move the window extern to its owner header with a full consumer sweep (re-baselining the rasterizer_xbox_models __rasterizer_model_draw park it perturbs), and apply the owner's uniform stock SDK-table decision from the open dynavobgeom reconciliation."
+     },
+     {
+       "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",

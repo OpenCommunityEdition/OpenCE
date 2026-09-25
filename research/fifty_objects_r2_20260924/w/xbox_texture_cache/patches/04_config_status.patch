@@ -1,0 +1,12 @@
+diff --git a/config/config.json b/config/config.json
+--- a/config/config.json
++++ b/config/config.json
+@@ -400,7 +400,7 @@
+ 				{ "name": "source/saved games/player_profile.c", "index": 25, "status": "NonMatching" },
+ 				{ "name": "source/saved games/game_state_xbox.c", "index": 26, "status": "Matching" },
+ 				{ "name": "source/saved games/game_state.c", "index": 27, "status": "Matching" },
+-				{ "name": "source/cache/xbox_texture_cache.c", "index": 28, "status": "NonMatching" },
++				{ "name": "source/cache/xbox_texture_cache.c", "index": 28, "status": "Matching" },
+ 				{ "name": "source/cache/xbox_sound_cache.c", "index": 29, "status": "NonMatching" },
+ 				{ "name": "source/cache/predicted_resources.c", "index": 30, "status": "Matching" },
+ 				{ "name": "source/cache/physical_memory_map.c", "index": 31, "status": "Matching" },

@@ -1,0 +1,176 @@
+diff --git a/source/render/render_debug.c "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\r2w2_render_debug\\files\\c06\\source\\render\\render_debug.c"
+index c5516367..c73b70a8 100644
+--- a/source/render/render_debug.c
++++ "b/C:\\halo-worktrees\\claude-fifty-objects-r2-20260924\\scratch\\w\\r2w2_render_debug\\files\\c06\\source\\render\\render_debug.c"
+@@ -465,14 +465,30 @@ void render_debug_box_outline(
+ 		real_point3d points[8];
+ 		short index;
+ 
+-		set_real_point3d(&points[0], bounds->x0, bounds->y0, bounds->z0);
+-		set_real_point3d(&points[1], bounds->x1, bounds->y0, bounds->z0);
+-		set_real_point3d(&points[2], bounds->x1, bounds->y1, bounds->z0);
+-		set_real_point3d(&points[3], bounds->x0, bounds->y1, bounds->z0);
+-		set_real_point3d(&points[4], bounds->x0, bounds->y0, bounds->z1);
+-		set_real_point3d(&points[5], bounds->x1, bounds->y0, bounds->z1);
+-		set_real_point3d(&points[6], bounds->x1, bounds->y1, bounds->z1);
+-		set_real_point3d(&points[7], bounds->x0, bounds->y1, bounds->z1);
++		points[0].x = bounds->x0;
++		points[0].y = bounds->y0;
++		points[0].z = bounds->z0;
++		points[1].x = bounds->x1;
++		points[1].y = bounds->y0;
++		points[1].z = bounds->z0;
++		points[2].x = bounds->x1;
++		points[2].y = bounds->y1;
++		points[2].z = bounds->z0;
++		points[3].x = bounds->x0;
++		points[3].y = bounds->y1;
++		points[3].z = bounds->z0;
++		points[4].x = bounds->x0;
++		points[4].y = bounds->y0;
++		points[4].z = bounds->z1;
++		points[5].x = bounds->x1;
++		points[5].y = bounds->y0;
++		points[5].z = bounds->z1;
++		points[6].x = bounds->x1;
++		points[6].y = bounds->y1;
++		points[6].z = bounds->z1;
++		points[7].x = bounds->x0;
++		points[7].y = bounds->y1;
++		points[7].z = bounds->z1;
+ 
+ 		render_debug_polygon_edges(
+ 			&points[0],
+@@ -1043,14 +1059,30 @@ void render_debug_box(
+ 	{
+ 		real_point3d points[8];
+ 
+-		set_real_point3d(&points[0], bounds->x0, bounds->y0, bounds->z0);
+-		set_real_point3d(&points[1], bounds->x1, bounds->y0, bounds->z0);
+-		set_real_point3d(&points[2], bounds->x0, bounds->y0, bounds->z1);
+-		set_real_point3d(&points[3], bounds->x1, bounds->y0, bounds->z1);
+-		set_real_point3d(&points[4], bounds->x0, bounds->y1, bounds->z1);
+-		set_real_point3d(&points[5], bounds->x1, bounds->y1, bounds->z1);
+-		set_real_point3d(&points[6], bounds->x0, bounds->y1, bounds->z0);
+-		set_real_point3d(&points[7], bounds->x1, bounds->y1, bounds->z0);
++		points[0].x = bounds->x0;
++		points[0].y = bounds->y0;
++		points[0].z = bounds->z0;
++		points[1].x = bounds->x1;
++		points[1].y = bounds->y0;
++		points[1].z = bounds->z0;
++		points[2].x = bounds->x0;
++		points[2].y = bounds->y0;
++		points[2].z = bounds->z1;
++		points[3].x = bounds->x1;
++		points[3].y = bounds->y0;
++		points[3].z = bounds->z1;
++		points[4].x = bounds->x0;
++		points[4].y = bounds->y1;
++		points[4].z = bounds->z1;
++		points[5].x = bounds->x1;
++		points[5].y = bounds->y1;
++		points[5].z = bounds->z1;
++		points[6].x = bounds->x0;
++		points[6].y = bounds->y1;
++		points[6].z = bounds->z0;
++		points[7].x = bounds->x1;
++		points[7].y = bounds->y1;
++		points[7].z = bounds->z0;
+ 
+ 		render_debug_quadrilateral(
+ 			TRUE, &points[0], &points[2], &points[4], &points[6], color);
+@@ -1263,7 +1295,7 @@ static void render_debug_camera(
+ 				collision.point.x,
+ 				collision.point.y,
+ 				collision.point.z,
+-				arctangent(render.camera.forward.j, render.camera.forward.i) * 57.29578f,
++				(real)atan2(render.camera.forward.j, render.camera.forward.i) * 57.29578f,
+ 				collision.surface_index);
+ 		}
+ 
+@@ -1414,7 +1446,12 @@ static void render_debug_bsp(
+ 				&bsp->planes,
+ 				node->plane_designator,
+ 				real_plane3d);
+-			boolean side = plane3d_distance_to_point(plane, &render.camera.position) >= 0.0f;
++			real_point3d const *point = &render.camera.position;
++			boolean side =
++				point->x*plane->n.i +
++				point->y*plane->n.j +
++				point->z*plane->n.k -
++				plane->d >= 0.0f;
+ 
+ 			match_assert(
+ 				"c:\\halo\\SOURCE\\render\\render_debug.c",
+@@ -1718,10 +1755,18 @@ void render_debug_box2d_outline(
+ 	{
+ 		real_point3d points[4];
+ 
+-		set_real_point3d(&points[0], bounds->x0, bounds->y0, -1.0f);
+-		set_real_point3d(&points[1], bounds->x1, bounds->y0, -1.0f);
+-		set_real_point3d(&points[2], bounds->x1, bounds->y1, -1.0f);
+-		set_real_point3d(&points[3], bounds->x0, bounds->y1, -1.0f);
++		points[0].x = bounds->x0;
++		points[0].y = bounds->y0;
++		points[0].z = -1.0f;
++		points[1].x = bounds->x1;
++		points[1].y = bounds->y0;
++		points[1].z = -1.0f;
++		points[2].x = bounds->x1;
++		points[2].y = bounds->y1;
++		points[2].z = -1.0f;
++		points[3].x = bounds->x0;
++		points[3].y = bounds->y1;
++		points[3].z = -1.0f;
+ 
+ 		matrix4x3_transform_point(
+ 			&render.frustum.view_to_world,
+@@ -1883,7 +1928,8 @@ void render_debug_vector2d(
+ 		272,
+ 		color);
+ 
+-	point_from_line2d(point, vector, size, &end_point);
++	end_point.x = point->x + size*vector->i;
++	end_point.y = point->y + size*vector->j;
+ 
+ 	render_debug_line2d(
+ 		immediate,
+@@ -2008,8 +2054,12 @@ static void build_pill_points(
+ 		{
+ 			real_point2d const *circle_point = &points[index];
+ 
+-			set_real_point3d(&top_points[index], circle_point->x, circle_point->y, height_magnitude);
+-			set_real_point3d(&bottom_points[index], circle_point->x, circle_point->y, 0.f);
++			top_points[index].x = circle_point->x;
++			top_points[index].y = circle_point->y;
++			top_points[index].z = height_magnitude;
++			bottom_points[index].x = circle_point->x;
++			bottom_points[index].y = circle_point->y;
++			bottom_points[index].z = 0.f;
+ 			matrix4x3_transform_point(&matrix, &top_points[index], &top_points[index]);
+ 			matrix4x3_transform_point(&matrix, &bottom_points[index], &bottom_points[index]);
+ 		}
+@@ -2022,10 +2072,18 @@ static void build_pill_points(
+ 			real_point2d const *top_circle_point = &points[index];
+ 			real_point2d const *bottom_circle_point = &points[index+NUMBER_OF_RENDER_DEBUG_CIRCLE_POINTS/2];
+ 
+-			set_real_point3d(&top_yz_points[index], 0.f, top_circle_point->x, height_magnitude + top_circle_point->y);
+-			set_real_point3d(&bottom_yz_points[index], 0.f, bottom_circle_point->x, bottom_circle_point->y);
+-			set_real_point3d(&top_xz_points[index], top_circle_point->x, 0.f, height_magnitude + top_circle_point->y);
+-			set_real_point3d(&bottom_xz_points[index], bottom_circle_point->x, 0.f, bottom_circle_point->y);
++			top_yz_points[index].x = 0.f;
++			top_yz_points[index].y = top_circle_point->x;
++			top_yz_points[index].z = height_magnitude + top_circle_point->y;
++			bottom_yz_points[index].x = 0.f;
++			bottom_yz_points[index].y = bottom_circle_point->x;
++			bottom_yz_points[index].z = bottom_circle_point->y;
++			top_xz_points[index].x = top_circle_point->x;
++			top_xz_points[index].y = 0.f;
++			top_xz_points[index].z = height_magnitude + top_circle_point->y;
++			bottom_xz_points[index].x = bottom_circle_point->x;
++			bottom_xz_points[index].y = 0.f;
++			bottom_xz_points[index].z = bottom_circle_point->y;
+ 			matrix4x3_transform_point(&matrix, &top_yz_points[index], &top_yz_points[index]);
+ 			matrix4x3_transform_point(&matrix, &bottom_yz_points[index], &bottom_yz_points[index]);
+ 			matrix4x3_transform_point(&matrix, &top_xz_points[index], &top_xz_points[index]);

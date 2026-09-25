@@ -1,0 +1,339 @@
+diff --git a/source/ai/actions.c b/source/ai/actions.c
+index 2c996930..af8cb90c 100644
+--- a/source/ai/actions.c
++++ b/source/ai/actions.c
+@@ -4058,203 +4058,178 @@ boolean actor_action_handle_vehicle_entry(
+ 	long current_time = game_time_get();
+ 	boolean result = FALSE;
+ 	real best_distance_squared;
+-	long best_vehicle_index;
+ 	real attempt_distance;
+ 	real continue_distance;
+-	struct action_state_data state;
+-
+-	if (actor->state.action == _actor_action_flee &&
+-		actor->state.action_data.flee.panic_type > _actor_panic_none)
+-	{
+-		goto result_exit;
+-	}
++	long best_vehicle_index;
++	struct action_state_data new_state_data;
+ 
+-	if (actor->state.action == _actor_action_obey)
++	if ((actor->state.action == _actor_action_flee &&
++			actor->state.action_data.flee.panic_type > _actor_panic_none) ||
++		actor->state.action == _actor_action_obey)
+ 	{
+ 		goto result_exit;
+ 	}
+ 
+-	if (actor->emotions.last_vehicle_check_time != NONE &&
+-		actor->emotions.last_vehicle_check_time + 45 >= current_time)
++	if (actor->emotions.last_vehicle_check_time == NONE ||
++		actor->emotions.last_vehicle_check_time + 45 < current_time)
+ 	{
+-		goto result_exit;
+-	}
+-
+-	actor->emotions.last_vehicle_check_time = current_time;
+-	best_distance_squared = REAL_MAX;
+-	attempt_distance = REAL_MAX;
+-	continue_distance = REAL_MAX;
+-	best_vehicle_index = NONE;
++		best_distance_squared = REAL_MAX;
++		attempt_distance = REAL_MAX;
++		continue_distance = REAL_MAX;
++		best_vehicle_index = NONE;
++		actor->emotions.last_vehicle_check_time = current_time;
+ 
+-	if (TEST_FLAG(
+-		definition->flags,
+-		_actor_definition_helps_players_in_vehicles_bit))
+-	{
+-		struct prop_iterator iterator;
+-		struct prop_datum *prop;
+-
+-		prop_iterator_new(&iterator, actor_index);
+-		prop = prop_iterator_next(&iterator);
+-
+-		while (prop)
++		if (TEST_FLAG(
++			definition->flags,
++			_actor_definition_helps_players_in_vehicles_bit))
+ 		{
+-			if (prop->state >= _prop_state_becoming_unacknowledged &&
+-				prop->state <= _prop_state_acknowledged &&
+-				prop->player &&
+-				!prop->enemy &&
+-				prop->vehicle_index != NONE &&
+-				actor_action_allowed_to_enter_vehicle(actor_index, prop->vehicle_index))
+-			{
+-				struct unit_datum *vehicle =
+-					vehicle_try_and_get(prop->vehicle_index);
++			struct prop_iterator iterator;
++			struct prop_datum *prop;
+ 
+-				if (vehicle &&
+-					vehicle->unit.driver_object_index == prop->unit_index)
++			prop_iterator_new(&iterator, actor_index);
++			while ((prop = prop_iterator_next(&iterator)) != NULL)
++			{
++				if (prop->state >= _prop_state_becoming_unacknowledged &&
++					prop->state <= _prop_state_acknowledged &&
++					prop->player &&
++					!prop->enemy &&
++					prop->vehicle_index != NONE &&
++					actor_action_allowed_to_enter_vehicle(actor_index, prop->vehicle_index))
+ 				{
+-					real_point3d origin;
+-					real distance_squared;
+-
+-					object_get_origin(prop->vehicle_index, &origin);
+-					distance_squared = distance_squared3d(
+-						&actor->input.position.body_position,
+-						&origin);
++					struct unit_datum *vehicle =
++						vehicle_try_and_get(prop->vehicle_index);
+ 
+-					if (distance_squared < 100.0f &&
+-						distance_squared < best_distance_squared)
++					if (vehicle &&
++						vehicle->unit.driver_object_index == prop->unit_index)
+ 					{
+-						best_distance_squared = prop->distance * prop->distance;
+-						best_vehicle_index = prop->vehicle_index;
+-						attempt_distance = 8.0f;
+-						continue_distance = 10.0f;
++						real_point3d vehicle_origin;
++						real distance_squared;
++
++						object_get_origin(prop->vehicle_index, &vehicle_origin);
++						distance_squared = distance_squared3d(
++							&actor->input.position.body_position,
++							&vehicle_origin);
++
++						if (distance_squared < 100.0f &&
++							distance_squared < best_distance_squared)
++						{
++							best_vehicle_index = prop->vehicle_index;
++							best_distance_squared = prop->distance * prop->distance;
++							attempt_distance = 8.0f;
++							continue_distance = 10.0f;
++						}
+ 					}
+ 				}
+ 			}
+-
+-			prop = prop_iterator_next(&iterator);
+ 		}
+ 
+-		if (best_vehicle_index != NONE)
+-			goto setup_entry;
+-	}
+-
+-	if (actor->state.certain_combat_timer < 60)
+-		return FALSE;
+-
+-	{
+-		long slot = 0;
+-
+-		if (0 >= ai_globals->enterable_vehicle_count)
+-			return FALSE;
+-
+-		for (;
+-			(short)slot < ai_globals->enterable_vehicle_count;
+-			slot++)
++		if (best_vehicle_index == NONE &&
++			actor->state.certain_combat_timer >= 60)
+ 		{
+-			struct ai_vehicle_enterable *enterable =
+-				&ai_globals->enterable_vehicles[(short)slot];
+-			real_point3d origin;
+-			real distance_squared;
+-			short team_bitmask;
+-			short actor_type_bitmask;
+-
+-			if (!vehicle_try_and_get(enterable->vehicle_index) ||
+-				!actor_action_allowed_to_enter_vehicle(actor_index, enterable->vehicle_index))
+-			{
+-				continue;
+-			}
+-
+-			object_get_origin(enterable->vehicle_index, &origin);
+-			distance_squared = distance_squared3d(
+-				&origin,
+-				&actor->input.position.body_position);
++			short slot;
+ 
+-			if (!(distance_squared < best_distance_squared) ||
+-				(enterable->radius != REAL_MAX &&
+-					distance_squared > enterable->radius * enterable->radius))
++			for (slot = 0;
++				slot < ai_globals->enterable_vehicle_count;
++				slot++)
+ 			{
+-				continue;
+-			}
++				struct ai_vehicle_enterable *enterable =
++					&ai_globals->enterable_vehicles[slot];
++				struct unit_datum *vehicle =
++					vehicle_try_and_get(enterable->vehicle_index);
++				real_point3d position;
++				real distance_squared;
+ 
+-			team_bitmask = enterable->team_bitmask;
+-			if (team_bitmask > 0 &&
+-				(actor->meta.team_index == NONE ||
+-					!TEST_FLAG(team_bitmask, actor->meta.team_index)))
+-			{
+-				continue;
+-			}
++				if (!vehicle ||
++					!actor_action_allowed_to_enter_vehicle(actor_index, enterable->vehicle_index))
++				{
++					continue;
++				}
+ 
+-			actor_type_bitmask = enterable->actor_type_bitmask;
+-			if (actor_type_bitmask > 0 &&
+-				!TEST_FLAG(actor_type_bitmask, actor->meta.type))
+-			{
+-				continue;
+-			}
++				object_get_origin(enterable->vehicle_index, &position);
++				distance_squared = distance_squared3d(
++					&position,
++					&actor->input.position.body_position);
+ 
+-			if (enterable->ai_indices_count > 0)
+-			{
+-				boolean matched = FALSE;
+-				long index;
++				if (!(distance_squared < best_distance_squared) ||
++					(enterable->radius != REAL_MAX &&
++						distance_squared > enterable->radius * enterable->radius))
++				{
++					continue;
++				}
+ 
+-				for (index = 0;
+-					(short)index < enterable->ai_indices_count;
+-					index++)
++				if (enterable->team_bitmask > 0 &&
++					(actor->meta.team_index == NONE ||
++						!TEST_FLAG(enterable->team_bitmask, actor->meta.team_index)))
+ 				{
+-					long ai_index = enterable->ai_indices[(short)index];
++					continue;
++				}
+ 
+-					if (ai_index == NONE)
+-						continue;
++				if (enterable->actor_type_bitmask > 0 &&
++					!TEST_FLAG(enterable->actor_type_bitmask, actor->meta.type))
++				{
++					continue;
++				}
+ 
+-					matched =
+-						((actor->meta.encounter_index ^ ai_index) & 0xFFFF) == 0;
++				if (enterable->ai_indices_count > 0)
++				{
++					boolean matched = FALSE;
++					short index;
+ 
+-					if (matched)
++					for (index = 0;
++						index < enterable->ai_indices_count;
++						index++)
+ 					{
+-						switch (AI_INDEX_SCOPE(ai_index))
++						long ai_index = enterable->ai_indices[index];
++
++						if (ai_index == NONE)
++							continue;
++
++						matched =
++							DATUM_INDEX_TO_ABSOLUTE_INDEX(actor->meta.encounter_index) ==
++							DATUM_INDEX_TO_ABSOLUTE_INDEX(ai_index);
++
++						if (matched)
+ 						{
+-						case _ai_index_platoon:
+-							matched = actor->meta.platoon_index ==
+-								AI_INDEX_SUB_INDEX(ai_index);
+-							break;
++							switch (AI_INDEX_SCOPE(ai_index))
++							{
++							case _ai_index_platoon:
++								matched = actor->meta.platoon_index ==
++									AI_INDEX_SUB_INDEX(ai_index);
++								break;
++
++							case _ai_index_squad:
++								matched = actor->meta.squad_index ==
++									AI_INDEX_SUB_INDEX(ai_index);
++								break;
++							}
++						}
+ 
+-						case _ai_index_squad:
+-							matched = actor->meta.squad_index ==
+-								AI_INDEX_SUB_INDEX(ai_index);
++						if (matched)
+ 							break;
+-						}
+ 					}
+ 
+-					if (matched)
+-						break;
++					if (!matched)
++						continue;
+ 				}
+ 
+-				if (!matched)
+-					continue;
++				best_vehicle_index = enterable->vehicle_index;
++				best_distance_squared = distance_squared;
++				attempt_distance = enterable->radius + 3.0f;
++				continue_distance = enterable->radius + 6.0f;
+ 			}
+-
+-			best_vehicle_index = enterable->vehicle_index;
+-			best_distance_squared = distance_squared;
+-			attempt_distance = enterable->radius + 3.0f;
+-			continue_distance = enterable->radius + 6.0f;
+ 		}
+-	}
+-
+-	if (best_vehicle_index == NONE)
+-		return FALSE;
+ 
+-setup_entry:
+-	if (action_vehicle_setup_impromptu(
+-		actor_index,
+-		best_vehicle_index,
+-		attempt_distance,
+-		continue_distance,
+-		&state.vehicle))
+-	{
+-		actor_action_change(actor_index, _actor_action_vehicle, &state);
+-		result = TRUE;
+-	}
+-	else
+-	{
+-		return FALSE;
++		if (best_vehicle_index != NONE &&
++			action_vehicle_setup_impromptu(
++				actor_index,
++				best_vehicle_index,
++				attempt_distance,
++				continue_distance,
++				&new_state_data.vehicle))
++		{
++			actor_action_change(actor_index, _actor_action_vehicle, &new_state_data);
++			result = TRUE;
++		}
+ 	}
+ 
+ result_exit:

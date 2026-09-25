@@ -1,0 +1,86 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 30961b42..36fc0818 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -7219,15 +7219,15 @@
+ { "file_offset": 1760128, "flags": 32, "name": "_sound_cache_sound_finished" },
+ { "file_offset": 1760240, "flags": 32, "name": "_sound_cache_sound_hardware_lock" },
+ { "file_offset": 1760304, "flags": 32, "name": "_sound_cache_sound_hardware_unlock" },
+-{ "file_offset": 1760352, "flags": 32, "name": "_sound_cache_locked_block_proc" },
+-{ "file_offset": 1760416, "flags": 32, "name": "_sound_cache_delete_block_proc" },
+-{ "file_offset": 1760608, "flags": 32, "name": "_cache_block_get_sound_permutation_name" },
+-{ "file_offset": 1760672, "flags": 32, "name": "_sound_cache_start_loading_sound" },
++{ "file_offset": 1760352, "flags": 32, "name": "_sound_cache_locked_block_proc", "static": true },
++{ "file_offset": 1760416, "flags": 32, "name": "_sound_cache_delete_block_proc", "static": true },
++{ "file_offset": 1760608, "flags": 32, "name": "_cache_block_get_sound_permutation_name", "static": true },
++{ "file_offset": 1760672, "flags": 32, "name": "_sound_cache_start_loading_sound", "static": true },
+ { "file_offset": 1760976, "flags": 32, "name": "_sound_cache_new" },
+ { "file_offset": 1761152, "flags": 32, "name": "_sound_cache_flush" },
+ { "file_offset": 1761248, "flags": 32, "name": "_sound_cache_close" },
+ { "file_offset": 1761344, "flags": 32, "name": "__sound_cache_sound_request" },
+-{ "file_offset": 1761696, "flags": 32, "name": "_render_inverse_transform_screen_point" },
++{ "file_offset": 1761696, "flags": 32, "name": "_render_inverse_transform_screen_point", "static": true },
+ { "file_offset": 1761952, "flags": 32, "name": "_sound_cache_debug_render" },
+ { "file_offset": 1762320, "flags": 32, "name": "_texture_cache_delete" },
+ { "file_offset": 1762352, "flags": 32, "name": "_texture_cache_open" },
+@@ -23295,7 +23295,7 @@
+ { "file_offset": 5038064, "flags": 0, "name": "_decompressor_print_timing", "static": true },
+ { "file_offset": 5038072, "flags": 0, "name": "_cache_file_globals", "static": true },
+ { "file_offset": 5050484, "flags": 0, "name": "_physical_memory_map_globals" },
+-{ "file_offset": 5050504, "flags": 0, "name": "_xbox_sound_cache_globals" },
++{ "file_offset": 5050504, "flags": 0, "name": "_xbox_sound_cache_globals", "static": true },
+ { "file_offset": 5050776, "flags": 0, "name": "_texture_cache_debug_bitmaps", "static": true },
+ { "file_offset": 5056408, "flags": 0, "name": "_xbox_texture_cache_globals", "static": true },
+ { "file_offset": 5056424, "flags": 0, "name": "_texture_cache_debug_options" },
+diff --git a/source/cache/xbox_sound_cache.c b/source/cache/xbox_sound_cache.c
+index 642529f7..4417f434 100644
+--- a/source/cache/xbox_sound_cache.c
++++ b/source/cache/xbox_sound_cache.c
+@@ -182,9 +182,9 @@ typedef char verify_xbox_sound_cache_globals_size[
+ 
+ /* ---------- prototypes */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index);
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index);
+ 
+ /* ---------- globals */
+@@ -192,7 +192,7 @@ void sound_cache_delete_block_proc(
+ extern short assertion_count;
+ extern boolean debug_sound_cache;
+ extern boolean debug_sound_reference_counts;
+-struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
++static struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
+ 
+ /* ---------- public code */
+ 
+@@ -425,7 +425,7 @@ void sound_cache_close(
+ 
+ /* ---------- private code */
+ 
+-long sound_cache_locked_block_proc(
++static long sound_cache_locked_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -441,7 +441,7 @@ long sound_cache_locked_block_proc(
+ 	return TRUE;
+ }
+ 
+-void sound_cache_delete_block_proc(
++static void sound_cache_delete_block_proc(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;
+@@ -468,7 +468,7 @@ void sound_cache_delete_block_proc(
+ 	return;
+ }
+ 
+-const char *cache_block_get_sound_permutation_name(
++static const char *cache_block_get_sound_permutation_name(
+ 	long block_index)
+ {
+ 	struct xbox_cache_sound_datum *cache_sound;

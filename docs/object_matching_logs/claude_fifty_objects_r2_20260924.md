@@ -251,3 +251,102 @@ in `research/fifty_objects_r2_20260924/w/record_synthesis/`):
 | +2 or +3 | closes with nothing added |
 | +1, +4, +5 | closes with MN, PU or both |
 | anything else | needs owner-decision compensators |
+
+## Canonical checkpoint 4d1ebf17 (merged as cf3a1a6a)
+
+Canonical cherry-picked this lane's f6d00a8c..5d3ca708 range and **held the
+rasterizer_xbox_hardware_geometry admission**. The 2001 maps support the wrapper names, but the
+added `D3DVertexBuffer_MoveResourceMemory(d3d_vertex_buffer, D3DMEM_VIDEO)` call has an unattested
+position and argument. Canonical also added an isolated Xbox link probe (`tools/link_probe.py`) and
+private-helper ownership repairs (20dd67c0).
+
+This lane merged 4d1ebf17 with canonical's exact tree, so the hold is respected. **The corrected
+object count is 383, not 384.**
+
+## Completeness critic and batch R2-3 (b9930521)
+
+An independent critic found five routes with concrete evidence. The main one was that the
+2001-09-25 linker maps name static functions that still carried placeholder or invented names in
+21 incomplete objects. Twenty-two adversarial reviews approved 22 of 22 packets. The last 10 ran
+concurrently at the user's direction, and one interrupted review was re-run from scratch.
+
+Landed, all zero credit:
+
+- **72 first-party static-function renames across 20 objects.** Each has map alignment,
+  relocation-masked body identity and matching callers, and each row is absent from cachebeta
+  publics. The hs radiosity pairing is proven by the Sept `.rdata` definition pointers.
+- **hs_compile storage:** three tables external, `hs_compile_finish` static with a TU-local
+  prototype.
+- **bink_playback:** `bink_playback_update__internal`.
+
+Held: bink `bink_decompress_audio_frame`. Landing it needs an added call with an unattested
+position, which is the class canonical held for hardware_geometry.
+
+Gate: objects 383, code and data unchanged, 0 regressions, parks 83/0/0, pytest 1,161.
+
+## Round-2 handoff
+
+**Base / tip.**
+
+- Base: canonical f6d00a8c.
+- Merged canonical 4d1ebf17 at cf3a1a6a.
+- Tip: this commit, on branch `claude/fifty-objects-r2-20260924`.
+- Local only; never pushed.
+- Scorer: objdiff 3.3.1 (sha1 3130e428) throughout.
+
+**Target vs result.**
+
+- **Target: 50 new complete Halo objects. Verified: 2** (381 -> 383): ai/actors (new code) and
+  cache/xbox_texture_cache (first-party ownership plus shared-header fixes).
+- A third, rasterizer_xbox_hardware_geometry, is held by canonical.
+
+The evidence does not support 50. Every one of the 86 open objects was triaged:
+
+- the retirements cite exhausting negatives;
+- the precedent audit found no uncovered admission;
+- the record-count census closes 1 of 126 residuals, and no object;
+- the remaining pool is owner-gated (see the owner escalation table), Codex-reserved, or a
+  recorded tie.
+
+| Tally (vs f6d00a8c) | Value |
+|---|---|
+| 1. Net newly complete Halo objects | **2** (actors, xbox_texture_cache) |
+| 2. New strict functions | **3**: `_actor_input_update` 2,384; `_actors_spawn_from_unit` 672; `_render_debug_trigger_volumes` 1,088 |
+| 3. New meaningful exact code bytes | **4,128** |
+| 4. New padded exact code bytes | **4,144** |
+| 5. New verified data bytes / admission-only closures | **3,089** (projectiles 1,548; object_lights 1,541) / **1** (xbox_texture_cache) |
+| 6. Fuzzy improvements at zero credit | none landed; zero-credit candidates are preserved in the research copy |
+| Scorer-only effects | none (objdiff 3.6.0 would additionally credit hs 54,780 and actions 2,404 data bytes; not taken) |
+| Regressions / revocations | 0 / 0 (hardware_geometry was quarantined before canonical credit, not revoked) |
+
+**Landed zero-credit hygiene** (makes objects' admission state truthful):
+
+- storage and ownership for bink_playback, weapons, object_lights, vehicles,
+  weather_particle_systems, rasterizer_xbox_debug, draw_string, render_debug and
+  rasterizer_xbox_profile;
+- 72 first-party renames in 20 objects;
+- hs_compile storage;
+- hs_runtime converter storage.
+
+**Held, with reopen criteria** (evidence in `research/fifty_objects_r2_20260924/`):
+
+| Item | Reopen when |
+|---|---|
+| Codex-reserved actor_combat + 5 dependents | Codex reports; then re-gate P1 dependents (vehicles fighter) |
+| Canary packet PA (collisions `_collision_move_point` +4,752, collisions complete) | Codex's real_math change lands; `rerun_packet.py --refresh` still 0 lost; owner rules on the duplicate-prototype copy choice (bdB vs ownership-natural bdI) and COMDAT admission |
+| ui_widget_game_data_input_functions solo (704 B) | Codex's record net N is known; consult `codex_lookup.txt` (N = +2/+3 closes it; +1/+4/+5 closes it with the PU/MN hygiene) |
+| hardware_geometry, bink `bink_decompress_audio_frame` | first-party evidence of the call site/argument, or an owner ruling on byte-inert unattested calls |
+| owner escalation table (above) | the listed rulings |
+| real_math.h January content (3 January-public helpers, 16 prototypes) | owner accepts losing the count-coincident canaries (fragility map), or their genuine repairs are found |
+
+**Retired routes:**
+
+- the record-count oracle as a primary route (1/126);
+- the Sept-map route for static DATA names (the atlas holds functions only);
+- the family-triage RETIRE list (`results/r2w1/TRIAGE__*`).
+
+**Process incidents:** none this round. One review was interrupted by the integrator and re-run;
+its stale claim was released.
+
+**Expected integration conflicts:** none known. The branch contains canonical 4d1ebf17
+exactly, plus b9930521 and the docs and research commits on top.

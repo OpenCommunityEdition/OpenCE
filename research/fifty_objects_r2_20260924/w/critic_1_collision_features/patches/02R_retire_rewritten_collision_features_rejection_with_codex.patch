@@ -1,0 +1,19 @@
+diff --git a/config/object_admission_rejections.json b/config/object_admission_rejections.json
+index 2b50b8bdd664ae8bbf754ec395170cfd3beeae8d..f9d2dbdab260fa304bf488f3bd31a5f96d6d6d0a 100644
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -40,14 +40,6 @@
+       "reason": "The exact typed decal_projection_create body naturally inlines cross_product2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Actor Combat copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+       "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+       "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes."
+-    },
+-    {
+-      "unit": "source/physics/collision_features",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_cross_product2d",
+-      "reason": "All 20 target-owned functions, all 30 January symbols and all 896 target data bytes compare exact. Every candidate-only helper COMDAT is byte-identical to January's selected copy (29 of 29). This includes _projection_from_vector3d, which January's own object references out of line and whose real_math.h body has equalled decals' January copy since 4f4c8502. The one remaining ownership failure is the inlined-only _cross_product2d: its select-any copy is identical to January's actor_combat selection, but production actor_combat.c still defines a hand-written no-duplicates copy. The selected-provider pair link therefore reports LNK2005 in both orders. The exact functions keep their credit; the surplus helper receives none and blocks whole-object Matching.",
+-      "evidence": "docs/object_matching_logs/claude_fifty_objects_20260925_owner_queue.md#1-actor_combat-p1-cross_product2d-remove-the-nodup-hand-copy-and-restore-the-od-attested-call-in-_actor_aim_grenade",
+-      "reopen": "Retire this entry when production actor_combat.c no longer defines its hand-written no-duplicates _cross_product2d. At that point the genuine real_math.h __inline supplies January's selected copy, and provider_link must PASS for every collision_features surplus symbol in both orders. Then run the full batch gate before marking the object Matching. Do not suppress the header emission, alter COMDAT metadata, hand-expand the helper, or credit the actor_combat-owned 32 bytes from this copy."
+     }
+   ]
+ }

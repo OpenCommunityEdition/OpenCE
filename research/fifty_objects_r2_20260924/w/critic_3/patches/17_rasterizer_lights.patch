@@ -1,0 +1,89 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..d56917b2 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -6203,7 +6203,7 @@
+ { "file_offset": 1508192, "flags": 32, "name": "_compress_real_vector3d_to_int32_clamp" },
+ { "file_offset": 1508704, "flags": 32, "name": "_rasterizer_geometry_compress_vertices" },
+ { "file_offset": 1509440, "flags": 32, "name": "_screenshot_in_progress", "static": true },
+-{ "file_offset": 1509488, "flags": 32, "name": "_lens_flare_submit_parameter_get", "static": true },
++{ "file_offset": 1509488, "flags": 32, "name": "_lens_flare_parameters_get", "static": true },
+ { "file_offset": 1509552, "flags": 32, "name": "_lens_flare_occlusion_test_results_get", "static": true },
+ { "file_offset": 1509792, "flags": 32, "name": "_rasterizer_lights_reset_for_new_map" },
+ { "file_offset": 1509840, "flags": 32, "name": "_rasterizer_lights_begin_for_new_frame" },
+diff --git a/source/rasterizer/rasterizer_lights.c b/source/rasterizer/rasterizer_lights.c
+index 65c70d7b..9bcfc996 100644
+--- a/source/rasterizer/rasterizer_lights.c
++++ b/source/rasterizer/rasterizer_lights.c
+@@ -5,7 +5,7 @@ symbols in this file:
+ 00170840 0030:
+ 	_screenshot_in_progress (0000)
+ 00170870 0040:
+-	_lens_flare_submit_parameter_get (0000)
++	_lens_flare_parameters_get (0000)
+ 001708B0 00f0:
+ 	_lens_flare_occlusion_test_results_get (0000)
+ 001709A0 0030:
+@@ -371,7 +371,7 @@ typedef char verify_rasterizer_lights_frame_statistics_lens_flare_count_offset[
+ 
+ static boolean screenshot_in_progress(
+ 	void);
+-static struct rasterizer_lens_flare_submit_parameters *lens_flare_submit_parameter_get(
++static struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters_get(
+ 	short lens_flare_index);
+ static byte *lens_flare_occlusion_test_results_get(
+ 	struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters);
+@@ -398,7 +398,7 @@ static boolean screenshot_in_progress(
+ 	return global_screenshot_count>1 || (global_screenshot_count==1 && global_screenshot_size>1);
+ }
+ 
+-static struct rasterizer_lens_flare_submit_parameters *lens_flare_submit_parameter_get(
++static struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters_get(
+ 	short lens_flare_index)
+ {
+ 	match_assert(
+@@ -581,7 +581,7 @@ void rasterizer_lens_flare_submit(
+ 				(parameters->compressed_light_color&LENS_FLARE_LIGHT_COLOR_ALPHA_MASK)>0)
+ 			{
+ 				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters=
+-					lens_flare_submit_parameter_get((short)local_lens_flare_count++);
++					lens_flare_parameters_get((short)local_lens_flare_count++);
+ 
+ 				memcpy(lens_flare_parameters, parameters, sizeof(*lens_flare_parameters));
+ 
+@@ -656,7 +656,7 @@ void rasterizer_lights_begin_for_new_frame(
+ 
+ 		for (lens_flare_index= 0; lens_flare_index<local_lens_flare_count; lens_flare_index++)
+ 		{
+-			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters= lens_flare_submit_parameter_get(lens_flare_index);
++			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters= lens_flare_parameters_get(lens_flare_index);
+ 			byte *occlusion_test_result= lens_flare_occlusion_test_results_get(lens_flare_parameters);
+ 			byte latest_visibility;
+ 
+@@ -817,7 +817,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
+ 		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+ 		{
+ 			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+-				lens_flare_submit_parameter_get(lens_flare_index);
++				lens_flare_parameters_get(lens_flare_index);
+ 			struct lens_flare_definition *definition = lens_flare_parameters->definition;
+ 			real_vector3d direction = uncompress_int32_to_real_vector3d(lens_flare_parameters->compressed_direction);
+ 
+@@ -887,7 +887,7 @@ void rasterizer_lens_flares_draw(
+ 		for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+ 		{
+ 			struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+-				lens_flare_submit_parameter_get(lens_flare_index);
++				lens_flare_parameters_get(lens_flare_index);
+ 			byte *occlusion_test_result = lens_flare_occlusion_test_results_get(lens_flare_parameters);
+ 			real_vector3d direction = uncompress_int32_to_real_vector3d(lens_flare_parameters->compressed_direction);
+ 
+@@ -1142,7 +1142,7 @@ void rasterizer_lens_flares_draw(
+ 			for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
+ 			{
+ 				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters =
+-					lens_flare_submit_parameter_get(lens_flare_index);
++					lens_flare_parameters_get(lens_flare_index);
+ 
+ 				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
+ 					(lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==

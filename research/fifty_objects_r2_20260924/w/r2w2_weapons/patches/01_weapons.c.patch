@@ -1,0 +1,22 @@
+diff --git a/source/items/weapons.c b/source/items/weapons.c
+index 72e3597..c0baa42 100644
+--- a/source/items/weapons.c
++++ b/source/items/weapons.c
+@@ -446,7 +446,7 @@ static boolean weapon_set_state(
+ 	short new_state,
+ 	boolean immediate);
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index);
+ static void weapon_magazine_start_reload(
+@@ -1379,7 +1379,7 @@ void weapon_owner_update(
+ 	return;
+ }
+ 
+-void weapon_magazine_finish_reload(
++static void weapon_magazine_finish_reload(
+ 	long weapon_index,
+ 	short magazine_index)
+ {

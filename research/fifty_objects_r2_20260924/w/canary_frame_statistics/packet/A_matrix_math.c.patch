@@ -1,0 +1,15 @@
+--- a/source/math/matrix_math.c
++++ b/source/math/matrix_math.c
+@@ -1070,12 +1070,4 @@
+ 	return;
+ }
+ 
+-boolean valid_real_plane3d(
+-	real_plane3d const *plane)
+-{
+-	return
+-		valid_real_normal3d(&plane->n) &&
+-		valid_real(plane->d);
+-}
+-
+ /* ---------- private code */

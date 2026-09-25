@@ -1,0 +1,36 @@
+--- a/source/math/real_math.h
++++ b/source/math/real_math.h
+@@ -669,7 +669,6 @@
+ 	real_vector3d const *forward,
+ 	real_vector3d const *up);
+ real_vector3d *matrix3x3_transform_vector(real_matrix3x3 const *matrix, real_vector3d const *vector, real_vector3d *result);
+-boolean valid_real_plane3d(real_plane3d const *plane);
+ 
+ /* ---------- prototypes/RANDOM_MATH.C */
+ 
+@@ -1504,7 +1503,9 @@
+ __inline real real_local_random(
+ 	void)
+ {
+-	return real_seed_random(get_global_local_random_seed_address());
++	real result= real_seed_random(get_global_local_random_seed_address());
++
++	return result;
+ }
+ #endif
+ 
+@@ -1715,6 +1716,14 @@
+ 	return valid_realcmp(magnitude_squared3d(n), 1.f);
+ }
+ 
++__inline boolean valid_real_plane3d(
++	real_plane3d const *plane)
++{
++	return
++		valid_real_normal3d(&plane->n) &&
++		valid_real(plane->d);
++}
++
+ __inline boolean valid_real_vector3d_axes2(
+ 	real_vector3d const *forward,
+ 	real_vector3d const *up)

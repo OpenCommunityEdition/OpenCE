@@ -1,0 +1,26 @@
+APPLY ORDER - r2w2_object_lights (base 05255584 = HEAD 434f0151 + lane ledger only; all patches LF with git index
+lines; `git apply --check` clean at the repo root for each patch alone and for 01+02+03 in one call; applied one at a
+time with --directory into a copy of the four files they reproduce the measured post-images byte for byte)
+
+01_object_lights_static_helpers.patch
+    source/objects/object_lights.c + source/objects/object_lights_rendering.h (index 2553c63c..9e77ec23,
+    c863833f..527cc0b3). static on should_render_lights, light_attenuation, cluster_get_first_light,
+    cluster_get_next_light (prototypes + definitions); the should_render_lights prototype moves from the public
+    object_lights_rendering.h into object_lights.c's prototype block; lights_render_diffuse / lights_render_specular
+    test `if (should_render_lights())` (the /Od-attested call) instead of the hand-expanded predicate.
+    Hunk bodies identical to round-1 owner_queue/objlights_render_debug 01 (only headers/line numbers refreshed).
+
+02_object_lights_symbols_json.patch            MUST land with 01, then csplit regen (ninja reruns csplit on a
+    config/symbols.json change). 4 in-place `, "static": true` rows at file_offset 1214992, 1216576, 1216768,
+    1216800 (lines 5138, 5150, 5152, 5153). No re-serialisation, order untouched. Full edited copy:
+    ../cfg_OL/config/symbols.json (derive sym_edit ops with sym_ops_from_copy.py against base 434f0151).
+    csplit emulation: only source/objects/object_lights.obj changes (1/833).
+
+03_NO_ALT_object_lights_semantic_data_entry_incomplete.patch   after 01+02 (its reason text states their result).
+    Appends the single-section `_lights_section` entry with "allow_incomplete_unit": true (+1,541 data).
+    Use ONLY while owner question Q1 (the __FILE__ surplus _object_get_bounding_sphere) is refused/undecided; a Q1
+    YES replaces it with round-1 03_YES (no allow_incomplete_unit) + 04_YES (config.json Matching).
+
+Not included (outside this task): round-1 07_OPTIONAL_E tentative globals; 03_YES/04_YES (owner-gated Q1).
+Side effect to expect: tools/audit_object_admission.py summary 9/0/2/0 -> 10/0/2/0 (object_lights enters the
+review queue as audit-coff-ownership-before-admission, like render_debug / rasterizer_xbox / game_engine).

@@ -1,0 +1,80 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..1ede6fdc 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -5783,7 +5783,7 @@
+ { "file_offset": 1398800, "flags": 32, "name": "_rasterizer_environment_fog_screen_model_end" },
+ { "file_offset": 1398816, "flags": 32, "name": "_set_real_vector4d" },
+ { "file_offset": 1398848, "flags": 32, "name": "_local_random_boolean" },
+-{ "file_offset": 1398880, "flags": 32, "name": "_rasterizer_environment_fog_screen_active", "static": true },
++{ "file_offset": 1398880, "flags": 32, "name": "_rasterizer_environment_fog_screen_is_active", "static": true },
+ { "file_offset": 1399392, "flags": 32, "name": "_rasterizer_environment_fog_screen_wind_update", "static": true },
+ { "file_offset": 1399888, "flags": 32, "name": "__rasterizer_environment_fog_begin" },
+ { "file_offset": 1401056, "flags": 32, "name": "__rasterizer_environment_fog_screen_begin" },
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_environment_fog.c b/source/rasterizer/xbox/rasterizer_xbox_environment_fog.c
+index ff9ea9b5..a2db46d7 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_environment_fog.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_environment_fog.c
+@@ -43,7 +43,7 @@ symbols in this file:
+ 00155840 0020:
+ 	_local_random_boolean (0000)
+ 00155860 0200:
+-	_code_00155860 (0000)
++	_rasterizer_environment_fog_screen_is_active (0000)
+ 00155A60 01f0:
+ 	_rasterizer_environment_fog_screen_wind_update (0000)
+ 00155C50 0490:
+@@ -451,7 +451,7 @@ static boolean local_fog_screen_first_time = TRUE;
+ extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
+ extern struct rasterizer_window_begin_parameters global_window_parameters;
+ 
+-static boolean rasterizer_environment_fog_screen_active(
++static boolean rasterizer_environment_fog_screen_is_active(
+ 	void);
+ static void rasterizer_environment_fog_screen_wind_update(
+ 	struct fog_screen const *screen,
+@@ -517,7 +517,7 @@ boolean rasterizer_environment_fog_screen_model_begin(
+ 
+ 	if (rasterizer_debug_options.draw_environment_fog_screen &&
+ 		rasterizer_debug_options.drawing_mode == _rasterizer_drawing_mode_normal &&
+-		rasterizer_environment_fog_screen_active())
++		rasterizer_environment_fog_screen_is_active())
+ 	{
+ 		struct fog_screen const *screen = global_window_parameters.fog.screen;
+ 
+@@ -817,7 +817,7 @@ boolean local_random_boolean(
+ 	return local_random() > 0x8000;
+ }
+ 
+-static boolean rasterizer_environment_fog_screen_active(
++static boolean rasterizer_environment_fog_screen_is_active(
+ 	void)
+ {
+ 	short window_index = global_window_parameters.window_index;
+@@ -990,7 +990,7 @@ void _rasterizer_environment_fog_screen_begin(
+ 	local_fog_pass = pass;
+ 	if (pass == 0)
+ 		rasterizer_profile_begin(_rasterizer_profile_environment_fog_screen);
+-	if (rasterizer_environment_fog_screen_active())
++	if (rasterizer_environment_fog_screen_is_active())
+ 	{
+ 		struct rasterizer_environment_fog_screen_window *window =
+ 			&windows[
+@@ -1576,7 +1576,7 @@ void _rasterizer_environment_fog_screen_draw(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+ 		988,
+ 		global_d3d_device);
+-	if (rasterizer_environment_fog_screen_active())
++	if (rasterizer_environment_fog_screen_is_active())
+ 	{
+ 		match_assert(
+ 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+@@ -1628,7 +1628,7 @@ void _rasterizer_environment_fog_screen_end(
+ 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment_fog.c",
+ 		1036,
+ 		global_d3d_device);
+-	if (rasterizer_environment_fog_screen_active())
++	if (rasterizer_environment_fog_screen_is_active())
+ 	{
+ 		struct fog_screen const *screen = global_window_parameters.fog.screen;
+ 		struct rasterizer_environment_fog_screen_window *window =

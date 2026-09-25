@@ -1,0 +1,69 @@
+diff --git a/source/ai/actions.c b/source/ai/actions.c
+index af8cb90c..3722407c 100644
+--- a/source/ai/actions.c
++++ b/source/ai/actions.c
+@@ -320,6 +320,25 @@ enum
+ 
+ /* ---------- macros */
+ 
++/* INFERRED FROM JANUARY'S BYTES, the same squaring macro as
++ * actor_perception.c's actor_perception_distance_squared (owner ruling
++ * 2026-09-20). It is not attested in any surviving header or source.
++ * January's actor_action_handle_vehicle_entry squares prop->distance with
++ * the fmul issued before the best_vehicle_index store. Measured with the
++ * rest of the function held constant:
++ *
++ *     prop->distance * prop->distance              residual
++ *     (prop->distance * prop->distance)            residual
++ *     (real)prop->distance * (real)prop->distance  residual
++ *     (prop->distance) * prop->distance            residual, loads not CSE'd
++ *     ((prop->distance) * (prop->distance))        EXACT
++ *
++ * A parenthesis around one operand defeats VC7's load CSE, so January's two
++ * operands carried the same wrapper: one macro argument substituted twice.
++ * Every other square in this file is byte-identical in either spelling. */
++#define actor_action_distance_squared(distance) \
++	((distance) * (distance))
++
+ /* ---------- structures */
+ 
+ /* The fields used here from the 0x74-byte scenario conversation record. */
+@@ -4114,7 +4133,7 @@ boolean actor_action_handle_vehicle_entry(
+ 							distance_squared < best_distance_squared)
+ 						{
+ 							best_vehicle_index = prop->vehicle_index;
+-							best_distance_squared = prop->distance * prop->distance;
++							best_distance_squared = actor_action_distance_squared(prop->distance);
+ 							attempt_distance = 8.0f;
+ 							continue_distance = 10.0f;
+ 						}
+diff --git a/config/parked.json b/config/parked.json
+index 870ee966..6ed137e7 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -493,25 +493,6 @@
+         "objdiff_percent": 95.0
+       }
+     },
+-    {
+-      "unit": "source/ai/actions",
+-      "function": "_actor_action_handle_vehicle_entry",
+-      "class": "register-allocation",
+-      "evidence": "Fuzzy-parked with the /Od-attested reconstruction (later /Od+RTC build fn 0x42abb0: one return site, `if ((flee && panic) || obey) goto result_exit;` trampoline, `if (last_check == NONE || last_check + 45 < now)` body, best_vehicle_index stored first in the prop arm, short slot/index counters, /Od vehicle local in the scripted loop, RTC names vehicle_origin/position/new_state_data). Same 960-byte envelope and all 22 relocations; 300/300 instructions; the only machine difference is one adjacent FP/int transposition at +0x17b: January `fmul st(1); mov [ebp-4],ecx`, ours `mov [ebp-4],ecx; fmul st(1)` (5 bytes). Measured: the transposition is decided solely by the spelling of the prop->distance square - a parenthesis around ONE operand defeats the load CSE, both operands parenthesised (the canonical ((x) * (x)) macro expansion) is strict EXACT, and bare, outer-paren, no-op-cast, named-temp and RMW spellings reproduce this residual; the /Od build's duplicated prop->vehicle_index != NONE test is inert. The macro form is held for an owner ruling extending the 2026-09-20 actor_perception_distance_squared ruling to actions.c (research/fifty_objects_20260925/w/actions/owner_gated_exact.patch and LEDGER.md, donor lane claude/fifty-objects-20260925; re-measured in lane claude/fifty-objects-r2-20260924). Do not repeat V1-V5, VE1-VE9, od1-od11, g1-g7 or the square battery d1-d10.",
+-      "measurements": {
+-        "target": {
+-          "size": 960,
+-          "relocation_count": 22,
+-          "normalized_sha256": "df9b95a1daf88c72ac92d1bf7a1877f8cc3acfab8916e7ffc18c640ec793630f"
+-        },
+-        "base": {
+-          "size": 960,
+-          "relocation_count": 22,
+-          "normalized_sha256": "7ef7a0e0ac5c66eda94a6d1f28f76ba291e23c27e1d9c10706ffb2822804dd32"
+-        },
+-        "objdiff_percent": 99.319725
+-      }
+-    },
+     {
+       "unit": "source/interface/hud_nav_points",
+       "function": "_custom_render_nav_point",

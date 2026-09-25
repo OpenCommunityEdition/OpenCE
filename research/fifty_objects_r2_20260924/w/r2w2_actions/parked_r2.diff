@@ -1,0 +1,25 @@
+diff --git a/config/parked.json b/config/parked.json
+index 69c454eb..870ee966 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -497,7 +497,7 @@
+       "unit": "source/ai/actions",
+       "function": "_actor_action_handle_vehicle_entry",
+       "class": "register-allocation",
+-      "evidence": "Fuzzy-parked after replaying every distinct Actions source blob visible to the campaign and retaining the complete ordinary-C vehicle-entry policy reconstructed from January control flow and the later HCEA implementation. Target and candidate have the same 960-byte padded envelope, all 22 relocation identities at the same addresses, and 96.54422% objdiff similarity; normalized comparison leaves 39 differing instruction positions in otherwise aligned streams. The best natural source differs in false-result tail topology and register assignment. An enclosing negative-guard rewrite increased the difference count from 39 to 240 and was reverted. No volatile/register forcing, barrier, pragma, assembly, fake dependency, inert carrier, or nonsensical branch is retained. Reopen only for authoritative January locals/source or a natural same-compiler donor that explains the remaining result/register lifetime.",
++      "evidence": "Fuzzy-parked with the /Od-attested reconstruction (later /Od+RTC build fn 0x42abb0: one return site, `if ((flee && panic) || obey) goto result_exit;` trampoline, `if (last_check == NONE || last_check + 45 < now)` body, best_vehicle_index stored first in the prop arm, short slot/index counters, /Od vehicle local in the scripted loop, RTC names vehicle_origin/position/new_state_data). Same 960-byte envelope and all 22 relocations; 300/300 instructions; the only machine difference is one adjacent FP/int transposition at +0x17b: January `fmul st(1); mov [ebp-4],ecx`, ours `mov [ebp-4],ecx; fmul st(1)` (5 bytes). Measured: the transposition is decided solely by the spelling of the prop->distance square - a parenthesis around ONE operand defeats the load CSE, both operands parenthesised (the canonical ((x) * (x)) macro expansion) is strict EXACT, and bare, outer-paren, no-op-cast, named-temp and RMW spellings reproduce this residual; the /Od build's duplicated prop->vehicle_index != NONE test is inert. The macro form is held for an owner ruling extending the 2026-09-20 actor_perception_distance_squared ruling to actions.c (research/fifty_objects_20260925/w/actions/owner_gated_exact.patch and LEDGER.md, donor lane claude/fifty-objects-20260925; re-measured in lane claude/fifty-objects-r2-20260924). Do not repeat V1-V5, VE1-VE9, od1-od11, g1-g7 or the square battery d1-d10.",
+       "measurements": {
+         "target": {
+           "size": 960,
+@@ -507,9 +507,9 @@
+         "base": {
+           "size": 960,
+           "relocation_count": 22,
+-          "normalized_sha256": "80e7bf257e70635f1a9a668d895ab372d01671ab05db2a55b2db8afbb8866ac3"
++          "normalized_sha256": "7ef7a0e0ac5c66eda94a6d1f28f76ba291e23c27e1d9c10706ffb2822804dd32"
+         },
+-        "objdiff_percent": 96.54422
++        "objdiff_percent": 99.319725
+       }
+     },
+     {

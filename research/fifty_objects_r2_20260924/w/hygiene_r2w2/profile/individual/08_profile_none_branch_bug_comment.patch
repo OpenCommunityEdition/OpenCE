@@ -1,0 +1,22 @@
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_profile.c b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+index 9b0cfe12..82c36e7c 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_profile.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_profile.c
+@@ -630,11 +630,12 @@ static void rasterizer_profile_check(
+ 		}
+ 		else
+ 		{
+-			/*
+-			January passes the same two varargs in both branches. The NONE value
+-			therefore becomes this format's first argument; retain that target-
+-			proven rare-path defect instead of disguising it as a clean rewrite.
+-			*/
++			/* BUG (preserved for exact matching): January pushes the same two
++			 * varargs (profile, message) in both branches (target push and
++			 * relocation order; the later /Od build at 0x8004c0 does the same), so
++			 * this format's %s consumes the NONE profile value, not the message.
++			 * A corrected build should pass only message here.
++			 */
+ 			error(
+ 				_error_silent,
+ 				"### PROFILE: %s -- tell Bernie!",

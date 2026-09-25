@@ -1,0 +1,179 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..73257ee3 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -6280,7 +6280,7 @@
+ { "file_offset": 1525488, "flags": 32, "name": "_render_window", "static": true },
+ { "file_offset": 1526496, "flags": 32, "name": "_render_player_frame", "static": true },
+ { "file_offset": 1527504, "flags": 32, "name": "_render_frame" },
+-{ "file_offset": 1527744, "flags": 32, "name": "_render_camera_check_warning_condition", "static": true },
++{ "file_offset": 1527744, "flags": 32, "name": "_render_camera_warn_once", "static": true },
+ { "file_offset": 1527904, "flags": 32, "name": "_render_camera_new" },
+ { "file_offset": 1527936, "flags": 32, "name": "_render_camera_hack_frustum_z" },
+ { "file_offset": 1528224, "flags": 32, "name": "_render_camera_build_frustum_bounds" },
+diff --git a/source/render/render_cameras.c b/source/render/render_cameras.c
+index f12f300b..396af968 100644
+--- a/source/render/render_cameras.c
++++ b/source/render/render_cameras.c
+@@ -3,7 +3,7 @@ RENDER_CAMERAS.C
+ 
+ symbols in this file:
+ 00174FC0 00a0:
+-	_code_00174fc0 (0000)
++	_render_camera_warn_once (0000)
+ 00175060 0020:
+ 	_render_camera_new (0000)
+ 00175080 0120:
+@@ -209,7 +209,7 @@ boolean render_camera_debug_this_fucking_frustum= {0};
+ 
+ /* ---------- private prototypes */
+ 
+-static void render_camera_check_warning_condition(
++static void render_camera_warn_once(
+ 	short id,
+ 	real value);
+ 
+@@ -1429,112 +1429,112 @@ void render_camera_build_frustum(
+ 		frustum->projection_valid = FALSE;
+ 	}
+ 
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_left_bottom_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_left],
+ 			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_left_top_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_left],
+ 			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_left_apex,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_left],
+ 			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_right_bottom_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_right],
+ 			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_right_top_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_right],
+ 			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_right_apex,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_right],
+ 			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_bottom_bottom_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_bottom],
+ 			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_bottom_bottom_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_bottom],
+ 			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_bottom_apex,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_bottom],
+ 			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_top_top_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_top],
+ 			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_top_top_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_top],
+ 			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_top_apex,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_top],
+ 			&frustum->world_vertices[4])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_far_bottom_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_far],
+ 			&frustum->world_vertices[0])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_far_bottom_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_far],
+ 			&frustum->world_vertices[1])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_far_top_left,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_far],
+ 			&frustum->world_vertices[2])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_far_top_right,
+ 		(real)fabs(plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_far],
+ 			&frustum->world_vertices[3])));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_left,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_left],
+ 			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_right,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_right],
+ 			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_bottom,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_bottom],
+ 			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_top,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_top],
+ 			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_near,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_near],
+ 			&frustum->world_midpoint));
+-	render_camera_check_warning_condition(
++	render_camera_warn_once(
+ 		_render_camera_warning_midpoint_far,
+ 		plane3d_distance_to_point(
+ 			&frustum->world_planes[_render_frustum_plane_far],
+@@ -1545,7 +1545,7 @@ void render_camera_build_frustum(
+ 
+ /* ---------- private code */
+ 
+-static void render_camera_check_warning_condition(
++static void render_camera_warn_once(
+ 	short id,
+ 	real value)
+ {

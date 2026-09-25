@@ -1,0 +1,53 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..75247e3c 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -2592,7 +2592,7 @@
+ { "file_offset": 695808, "flags": 32, "name": "_player_get_starting_location_count" },
+ { "file_offset": 695888, "flags": 32, "name": "_player_get_starting_location" },
+ { "file_offset": 696080, "flags": 32, "name": "_placement_data_set_change_color" },
+-{ "file_offset": 696192, "flags": 32, "name": "_unit_create_starting_weapon", "static": true },
++{ "file_offset": 696192, "flags": 32, "name": "_create_weapon", "static": true },
+ { "file_offset": 696304, "flags": 32, "name": "_players_compute_combined_pvs", "static": true },
+ { "file_offset": 696672, "flags": 32, "name": "_players_compute_local_player_count", "static": true },
+ { "file_offset": 696704, "flags": 32, "name": "_player_examine_nearby_unit", "static": true },
+diff --git a/source/game/players.c b/source/game/players.c
+index d0428c6b..fa11d097 100644
+--- a/source/game/players.c
++++ b/source/game/players.c
+@@ -63,7 +63,7 @@ symbols in this file:
+ 000A9F10 0070:
+ 	_placement_data_set_change_color (0000)
+ 000A9F80 0070:
+-	_unit_create_starting_weapon (0000)
++	_create_weapon (0000)
+ 000A9FF0 0170:
+ 	_players_compute_combined_pvs (0000)
+ 000AA160 0020:
+@@ -3189,7 +3189,7 @@ static void player_examine_nearby_objects(
+ 	return;
+ }
+ 
+-static long unit_create_starting_weapon(
++static long create_weapon(
+ 	struct scenario_starting_profile_weapon const *starting_weapon,
+ 	long unit_index)
+ {
+@@ -3250,7 +3250,7 @@ void player_add_equipment(
+ 
+ 			if (starting_profile->primary_weapon.weapon.index != NONE)
+ 			{
+-				weapon_index = unit_create_starting_weapon(
++				weapon_index = create_weapon(
+ 					&starting_profile->primary_weapon,
+ 					unit_index);
+ 				if (weapon_index != NONE &&
+@@ -3266,7 +3266,7 @@ void player_add_equipment(
+ 
+ 			if (starting_profile->secondary_weapon.weapon.index != NONE)
+ 			{
+-				weapon_index = unit_create_starting_weapon(
++				weapon_index = create_weapon(
+ 					&starting_profile->secondary_weapon,
+ 					unit_index);
+ 				if (weapon_index != NONE &&

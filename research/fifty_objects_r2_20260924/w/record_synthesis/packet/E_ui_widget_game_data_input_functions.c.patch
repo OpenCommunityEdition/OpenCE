@@ -1,0 +1,10 @@
+--- a/source/interface/ui_widget_game_data_input_functions.c
++++ b/source/interface/ui_widget_game_data_input_functions.c
+@@ -336,6 +336,7 @@
+ 
+ #include "cseries/cseries.h"
+ #include "cseries/cseries_windows.h"
++#include "cseries/errors.h"
+ #include "bungie_net/network/transport.h"
+ #include "interface/ui_widget.h"
+ #include "interface/ui_widget_definitions.h"

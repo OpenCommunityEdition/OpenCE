@@ -1,0 +1,23 @@
+diff --git a/source/render/render_debug.c b/source/render/render_debug.c
+index 3e18af39..c73b70a8 100644
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -320,12 +320,12 @@ static void render_debug_structure_decals(
+ 
+ /* ---------- globals */
+ 
+-extern boolean debug_bsp;
+-extern boolean debug_camera;
+-extern boolean debug_input;
+-extern boolean debug_permanent_decals;
+-extern boolean debug_player;
+-extern boolean debug_structure;
++boolean debug_bsp;
++boolean debug_camera;
++boolean debug_input;
++boolean debug_permanent_decals;
++boolean debug_player;
++boolean debug_structure;
+ 
+ static struct render_debug_globals_definition render_debug_globals;
+ 

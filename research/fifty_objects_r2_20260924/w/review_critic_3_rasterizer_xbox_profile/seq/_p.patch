@@ -1,0 +1,19 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..e67d2a0d 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -5874,10 +5874,10 @@
+ { "file_offset": 1435344, "flags": 32, "name": "_IDirect3DDevice8_SetTextureStageState@16" },
+ { "file_offset": 1435440, "flags": 32, "name": "_IDirect3DDevice8_SetVertexShaderConstant@16" },
+ { "file_offset": 1435456, "flags": 32, "name": "_rasterizer_plasma_energy_draw" },
+-{ "file_offset": 1436880, "flags": 32, "name": "_rasterizer_profile_check", "static": true },
+-{ "file_offset": 1437008, "flags": 32, "name": "_rasterizer_profile_callback", "static": true },
+-{ "file_offset": 1437280, "flags": 32, "name": "_rasterizer_profile_frame_callback", "static": true },
+-{ "file_offset": 1437424, "flags": 32, "name": "_rasterizer_profile_active", "static": true },
++{ "file_offset": 1436880, "flags": 32, "name": "_profile_assert", "static": true },
++{ "file_offset": 1437008, "flags": 32, "name": "_callback_function", "static": true },
++{ "file_offset": 1437280, "flags": 32, "name": "_frame_callback_function", "static": true },
++{ "file_offset": 1437424, "flags": 32, "name": "_rasterizer_profile_enabled", "static": true },
+ { "file_offset": 1437456, "flags": 32, "name": "_rasterizer_profile_initialize" },
+ { "file_offset": 1437568, "flags": 32, "name": "_rasterizer_profile_frame_begin" },
+ { "file_offset": 1437904, "flags": 32, "name": "_rasterizer_profile_window_begin" },

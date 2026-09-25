@@ -1,0 +1,53 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..0a142e81 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -4104,7 +4104,7 @@
+ { "file_offset": 981088, "flags": 32, "name": "_main_get_multiplayer_map_name" },
+ { "file_offset": 981104, "flags": 32, "name": "_main_set_difficulty" },
+ { "file_offset": 981136, "flags": 32, "name": "_main_get_difficulty" },
+-{ "file_offset": 981152, "flags": 32, "name": "_sort_controllers_ascending", "static": true },
++{ "file_offset": 981152, "flags": 32, "name": "_sort_desired_local_player_controllers", "static": true },
+ { "file_offset": 981216, "flags": 32, "name": "_create_local_players", "static": true },
+ { "file_offset": 981680, "flags": 32, "name": "_main_reset_map" },
+ { "file_offset": 981712, "flags": 32, "name": "_main_revert_map" },
+diff --git a/source/main/main.c b/source/main/main.c
+index 6686cb7e..c5df8087 100644
+--- a/source/main/main.c
++++ b/source/main/main.c
+@@ -27,7 +27,7 @@ symbols in this file:
+ 000EF890 0010:
+ 	_main_get_difficulty (0000)
+ 000EF8A0 0040:
+-	_code_000ef8a0 (0000)
++	_sort_desired_local_player_controllers (0000)
+ 000EF8E0 01d0:
+ 	_code_000ef8e0 (0000)
+ 000EFAB0 0020:
+@@ -667,7 +667,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
+ 
+ /* ---------- prototypes */
+ 
+-static long sort_controllers_ascending(
++static long sort_desired_local_player_controllers(
+ 	short const *a,
+ 	short const *b);
+ static void main_setup_connection(
+@@ -827,7 +827,7 @@ static void create_local_players(
+ 			desired_controllers,
+ 			MAXIMUM_GAMEPADS,
+ 			sizeof(*desired_controllers),
+-			(int (__cdecl *)(void const *, void const *))sort_controllers_ascending);
++			(int (__cdecl *)(void const *, void const *))sort_desired_local_player_controllers);
+ 		for (i = 0; i < player_spawn_count; i++)
+ 		{
+ 			gamepad_index = desired_controllers[i];
+@@ -1549,7 +1549,7 @@ void main_set_difficulty(
+ 	return;
+ }
+ 
+-static long sort_controllers_ascending(
++static long sort_desired_local_player_controllers(
+ 	short const *a,
+ 	short const *b)
+ {

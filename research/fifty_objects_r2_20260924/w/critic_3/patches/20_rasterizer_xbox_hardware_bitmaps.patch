@@ -1,0 +1,53 @@
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..970593ab 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -5807,7 +5807,7 @@
+ { "file_offset": 1408320, "flags": 32, "name": "_IDirect3DCubeTexture8_UnlockRect@12", "static": true },
+ { "file_offset": 1408336, "flags": 32, "name": "_rasterizer_bitmap_2d_changed", "static": true },
+ { "file_offset": 1408784, "flags": 32, "name": "_rasterizer_bitmap_3d_changed", "static": true },
+-{ "file_offset": 1409312, "flags": 32, "name": "_rasterizer_bitmap_cube_map_changed", "static": true },
++{ "file_offset": 1409312, "flags": 32, "name": "_rasterizer_bitmap_cm_changed", "static": true },
+ { "file_offset": 1409840, "flags": 32, "name": "_rasterizer_bitmap_delete" },
+ { "file_offset": 1409888, "flags": 32, "name": "_rasterizer_bitmap_changed" },
+ { "file_offset": 1410064, "flags": 32, "name": "_IDirect3DDevice8_CreateVertexBuffer@24", "static": true },
+diff --git a/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c b/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c
+index a62f75f5..c7d026e2 100644
+--- a/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c
++++ b/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c
+@@ -35,7 +35,7 @@ symbols in this file:
+ 00157F10 0210:
+ 	_code_00157f10 (0000)
+ 00158120 0210:
+-	_code_00158120 (0000)
++	_rasterizer_bitmap_cm_changed (0000)
+ 00158330 0030:
+ 	_rasterizer_bitmap_delete (0000)
+ 00158360 00b0:
+@@ -108,7 +108,7 @@ static void rasterizer_bitmap_2d_changed(
+ 	struct bitmap_data *bitmap);
+ static void rasterizer_bitmap_3d_changed(
+ 	struct bitmap_data *bitmap);
+-static void rasterizer_bitmap_cube_map_changed(
++static void rasterizer_bitmap_cm_changed(
+ 	struct bitmap_data *bitmap);
+ 
+ /* ---------- globals */
+@@ -539,7 +539,7 @@ mipmaps_done:
+ 	return;
+ }
+ 
+-static void rasterizer_bitmap_cube_map_changed(
++static void rasterizer_bitmap_cm_changed(
+ 	struct bitmap_data *bitmap)
+ {
+ 	D3DLOCKED_RECT d3d_locked_rect;
+@@ -712,7 +712,7 @@ void rasterizer_bitmap_changed(
+ 		break;
+ 
+ 	case _bitmap_type_cube_map:
+-		rasterizer_bitmap_cube_map_changed(bitmap);
++		rasterizer_bitmap_cm_changed(bitmap);
+ 		break;
+ 
+ 	default:

@@ -1,0 +1,194 @@
+diff --git a/config/parked.json b/config/parked.json
+index 69c454eb..cc4f1e79 100644
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1318,9 +1318,9 @@
+     },
+     {
+       "unit": "source/bungie_net/network/transport_endpoint_winsock",
+-      "function": "_connect_endpoint_process@4",
++      "function": "_connect_async_thread_proc@4",
+       "class": "unclassified",
+-      "evidence": "Complete typed asynchronous connect worker reconstructed from the January body. It uses the authentic 40-byte input layout, stdcall thread ABI, mutex/thread owners, real endpoint operations, named errors, and semantic private name. Target and candidate both occupy 304 padded bytes with all 25 relocations. The coherent candidate initializes its deferred thread reference to NULL; reproducing January's stack-slot reuse would require reading an uninitialized local on mutex failure, which house rules reject. The initialized, safe body is therefore retained at zero exact credit. See docs/object_matching_logs/transport_endpoint_winsock_obj_async_leaf_packet_20260913.md.",
++      "evidence": "Complete typed asynchronous connect worker reconstructed from the January body. It uses the authentic 40-byte input layout, stdcall thread ABI, mutex/thread owners, real endpoint operations, named errors, and semantic private name. Target and candidate both occupy 304 padded bytes with all 25 relocations. The coherent candidate initializes its deferred thread reference to NULL; reproducing January's stack-slot reuse would require reading an uninitialized local on mutex failure, which house rules reject. The initialized, safe body is therefore retained at zero exact credit. See docs/object_matching_logs/transport_endpoint_winsock_obj_async_leaf_packet_20260913.md. Renamed 2026-09-24 (critic_3) to the first-party Sept-2001 cachebeta.map static name _connect_async_thread_proc@4: the Sept body is instruction-identical at the same anchor position; the rename is byte-inert.",
+       "measurements": {
+         "target": { "size": 304, "relocation_count": 25, "normalized_sha256": "9533beb1d4e9a53568bc1141902bf2b6de740161acc2225f7a1a9a24838fd276" },
+         "base": { "size": 304, "relocation_count": 25, "normalized_sha256": "124019ea872d584781a0c8424c9fbce31bc491ba51226808716bc6e4335a2062" },
+diff --git a/config/symbols.json b/config/symbols.json
+index 885b3b3d..eb7c5876 100644
+--- a/config/symbols.json
++++ b/config/symbols.json
+@@ -1391,8 +1391,8 @@
+ { "file_offset": 463104, "flags": 32, "name": "_transport_server_initialize" },
+ { "file_offset": 463264, "flags": 32, "name": "_transport_server_terminate" },
+ { "file_offset": 463424, "flags": 32, "name": "_transport_client_start" },
+-{ "file_offset": 463616, "flags": 32, "name": "_connection_thread_list_add", "static": true },
+-{ "file_offset": 463712, "flags": 32, "name": "_connection_thread_list_mark_for_disposal", "static": true },
++{ "file_offset": 463616, "flags": 32, "name": "_add_connect_thread", "static": true },
++{ "file_offset": 463712, "flags": 32, "name": "_mark_connection_thread_as_terminated", "static": true },
+ { "file_offset": 463776, "flags": 32, "name": "_connection_thread_list_maintenance", "static": true },
+ { "file_offset": 463840, "flags": 32, "name": "_create_transport_endpoint" },
+ { "file_offset": 463968, "flags": 32, "name": "_get_endpoint_type" },
+@@ -1406,13 +1406,13 @@
+ { "file_offset": 465104, "flags": 32, "name": "_get_endpoint_error" },
+ { "file_offset": 465168, "flags": 32, "name": "_endpoint_equivalent" },
+ { "file_offset": 465280, "flags": 32, "name": "_winsock_error_to_string" },
+-{ "file_offset": 466848, "flags": 32, "name": "_create_endpoint_socket", "static": true },
++{ "file_offset": 466848, "flags": 32, "name": "_create_socket", "static": true },
+ { "file_offset": 467152, "flags": 32, "name": "_get_endpoint_address" },
+ { "file_offset": 467520, "flags": 32, "name": "_set_endpoint_blocking" },
+ { "file_offset": 467792, "flags": 32, "name": "_bind_endpoint" },
+ { "file_offset": 468112, "flags": 32, "name": "_connect_endpoint" },
+ { "file_offset": 468592, "flags": 32, "name": "_disconnect_endpoint" },
+-{ "file_offset": 468720, "flags": 32, "name": "_connect_endpoint_process@4", "static": true },
++{ "file_offset": 468720, "flags": 32, "name": "_connect_async_thread_proc@4", "static": true },
+ { "file_offset": 469024, "flags": 32, "name": "_connect_endpoint_async" },
+ { "file_offset": 469360, "flags": 32, "name": "_cancel_connect_process" },
+ { "file_offset": 469520, "flags": 32, "name": "_listen_endpoint" },
+diff --git a/source/bungie_net/network/transport_endpoint_winsock.c b/source/bungie_net/network/transport_endpoint_winsock.c
+index 75e069dc..37cecff2 100644
+--- a/source/bungie_net/network/transport_endpoint_winsock.c
++++ b/source/bungie_net/network/transport_endpoint_winsock.c
+@@ -3,9 +3,9 @@ TRANSPORT_ENDPOINT_WINSOCK.C
+ 
+ symbols in this file:
+ 00071300 0060:
+-	_connection_thread_list_add (0000)
++	_add_connect_thread (0000)
+ 00071360 0040:
+-	_connection_thread_list_mark_for_disposal (0000)
++	_mark_connection_thread_as_terminated (0000)
+ 000713A0 0040:
+ 	_connection_thread_list_maintenance (0000)
+ 000713E0 0080:
+@@ -33,7 +33,7 @@ symbols in this file:
+ 00071980 0620:
+ 	_winsock_error_to_string (0000)
+ 00071FA0 0130:
+-	_create_endpoint_socket (0000)
++	_create_socket (0000)
+ 000720D0 0170:
+ 	_get_endpoint_address (0000)
+ 00072240 0110:
+@@ -45,7 +45,7 @@ symbols in this file:
+ 00072670 0080:
+ 	_disconnect_endpoint (0000)
+ 000726F0 0130:
+-	_connect_endpoint_process@4 (0000)
++	_connect_async_thread_proc@4 (0000)
+ 00072820 0150:
+ 	_connect_endpoint_async (0000)
+ 00072970 00a0:
+@@ -330,15 +330,15 @@ struct transport_endpoint_winsock_globals
+ 
+ /* ---------- prototypes */
+ 
+-static SOCKET create_endpoint_socket(
++static SOCKET create_socket(
+ 	int address_family,
+ 	int socket_type,
+ 	int protocol);
+-static boolean connection_thread_list_add(
++static boolean add_connect_thread(
+ 	struct thread_reference *thread);
+-static void connection_thread_list_mark_for_disposal(
++static void mark_connection_thread_as_terminated(
+ 	struct thread_reference *thread);
+-static unsigned long __stdcall connect_endpoint_process(
++static unsigned long __stdcall connect_async_thread_proc(
+ 	void *input_pointer);
+ static void connection_thread_list_maintenance(
+ 	void);
+@@ -349,7 +349,7 @@ static struct transport_endpoint_winsock_globals transport_endpoint_globals = {0
+ 
+ /* ---------- public code */
+ 
+-static boolean connection_thread_list_add(
++static boolean add_connect_thread(
+ 	struct thread_reference *thread)
+ {
+ 	long endpoint_thread_index = 0;
+@@ -373,7 +373,7 @@ static boolean connection_thread_list_add(
+ 	return endpoint_thread_index != NONE;
+ }
+ 
+-static void connection_thread_list_mark_for_disposal(
++static void mark_connection_thread_as_terminated(
+ 	struct thread_reference *thread)
+ {
+ 	long endpoint_thread_index;
+@@ -1137,7 +1137,7 @@ short bind_endpoint(
+ 
+ 		if (error == _transport_error_none)
+ 		{
+-			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
++			ep->socket = create_socket(AF_INET, socket_type, IPPROTO_IP);
+ 			if (ep->socket == INVALID_SOCKET)
+ 			{
+ 				error = _transport_error_unknown;
+@@ -1199,7 +1199,7 @@ short connect_endpoint(
+ 
+ 		if (ep->socket == INVALID_SOCKET)
+ 		{
+-			ep->socket = create_endpoint_socket(AF_INET, socket_type, IPPROTO_IP);
++			ep->socket = create_socket(AF_INET, socket_type, IPPROTO_IP);
+ 		}
+ 
+ 		socket_address.sin_addr.s_addr = SWAP4(address->address.long_words[0]);
+@@ -1265,7 +1265,7 @@ short connect_endpoint(
+ 	return result;
+ }
+ 
+-static unsigned long __stdcall connect_endpoint_process(
++static unsigned long __stdcall connect_async_thread_proc(
+ 	void *input_pointer)
+ {
+ 	struct connect_process_input *input = input_pointer;
+@@ -1304,7 +1304,7 @@ static unsigned long __stdcall connect_endpoint_process(
+ 
+ 	if (thread)
+ 	{
+-		connection_thread_list_mark_for_disposal(thread);
++		mark_connection_thread_as_terminated(thread);
+ 	}
+ 
+ 	return error;
+@@ -1337,9 +1337,9 @@ short connect_endpoint_async(
+ 		input->cancelled = FALSE;
+ 
+ 		if (create_mutex(&input->mutex) &&
+-			create_thread(2, connect_endpoint_process, input, &input->thread))
++			create_thread(2, connect_async_thread_proc, input, &input->thread))
+ 		{
+-			if (connection_thread_list_add(input->thread))
++			if (add_connect_thread(input->thread))
+ 			{
+ 				result = _transport_result_connect_in_progress;
+ 				*process_ref_ptr = input;
+@@ -1502,7 +1502,7 @@ long read_from_endpoint(
+ 			0x37C,
+ 			ep->type == _transport_type_udp);
+ 
+-		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, 0);
++		ep->socket = create_socket(AF_INET, SOCK_DGRAM, 0);
+ 		if (ep->socket != INVALID_SOCKET)
+ 		{
+ 			struct transport_address bind_address = {0};
+@@ -1599,7 +1599,7 @@ long write_to_endpoint(
+ 			0x3C6,
+ 			ep->type == _transport_type_udp);
+ 
+-		ep->socket = create_endpoint_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
++		ep->socket = create_socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+ 	}
+ 
+ 	if (ep->socket != INVALID_SOCKET)
+@@ -1670,7 +1670,7 @@ short reject_endpoint(
+ 
+ /* ---------- private code */
+ 
+-static SOCKET create_endpoint_socket(
++static SOCKET create_socket(
+ 	int address_family,
+ 	int socket_type,
+ 	int protocol)

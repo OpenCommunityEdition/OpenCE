@@ -1,0 +1,19 @@
+# source/ai/actor_moving
+
+## decision
+RETIRE
+
+## est_probability
+0.08
+
+## route
+No route closes any of the 5 residuals. There is ready zero-credit hygiene, measured row-neutral: (a) delete `#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D` / `#undef` (actor_moving.c:207/238). All 36 rows are unchanged. calculate_movement and try_evasion_vector keep their out-of-line _point_from_line3d calls, as in January. The object then defines a 48 B _point_from_line3d (sha 9b763841) byte-identical to action_charge's selected copy, and provider_link passes. (b) Rewrite the hand-expanded actor_move_transform_avoidance_vector as /Od 0x467840 has it: `*direction = *global_zero_vector3d;` then 3x point_from_line3d(dir,&basis,v->i/j/k,dir). It stays EXACT at 144, and get_avoidance_direction stays EXACT. Production's form is a rule-6 hand expansion. (c) The move_update blend (/Od 0x4684fd) and the test_avoidance_vector / vector_avoidance-perpendicular point_from_line3d forms are /Od-attested fidelity fixes. All are non-exact, so they earn zero credit.
+
+## why_new
+New since the last actor_moving work (0920): owner ruling 1 (0921) lifts the point_from_line3d guard for actor_moving, which is one of the 17 January objects that references it out of line. I measured the define drop as row-neutral with a clean provider link. That makes the point_from_line3d forms admissible, but they do not close anything. test_avoidance_vector with the /Od form (7x point_from_line3d + scale_vector3d, no transform call; /Od 0x466b10) reaches 768 vs 752 bytes, 16/16 relocations and 276 vs 272 instructions. Five shapes of mine all leave the same residual: P2 (ta5 at HEAD), P3 (/Od locals: frame grows to 0x444), P8 (/Od statement order: 47 blocks), P9 (escape-law block scopes, frame back to 0x438), and P10 (/Od declaration order). In that residual, January loads the ray fields for the 2nd/3rd point_from_line3d of each vector only after the previous store to offset.z, as `fld [edi+8]; fst [ebp-4]`. Ours hoists them as integer prefetches. No source construct for that memory ordering has been identified. The other four residuals: vector_avoidance has frame 0x60e4 vs 0x60e0 (+4, unidentified scalar), and the perpendicular point_from_line3d form (P4) gives no gain (222->231 blocks). move_update P5 goes 97->90 blocks; the rest is a reversed LAW Z (we pin zero in edi) plus the crouch family. P6 tried the ternary-outside TEST_FLAG, which January's bytes suggest (`test bl; test dh,dh; test dh,0x40`); it materialises the value (3120 bytes) and does not close. path_refresh: /Od 0x46c720 has our structure; 3 && edges bind to the far epilogue copy. destination_update: T tie.
+
+## prior_negatives_checked
+actor_moving_obj_opus5_next150_n4_20260915 (transform inline matrix, section-order proof); w1 worker notes ta1-ta9 (opus5-150k scratch/workers/actor_moving.md: ta5 point_from_line3d form, same t-def residual); 150k_w3 (path_refresh 6 forms, va6 0x60e4); 250k_w3d; astra_90pct_actor_moving_avoidance_packet_20260920; astra research11 (move_update, 45 shapes); claude_lane_a_waveA4 (crouch || form 3104); Lane A pathrefresh NOTES (v1 nest inert, v2 worse); laws_w3 D (destination_update 5 shapes).
+
+## notes
+The probability is for test_avoidance_vector (752 B), the best lead in this family, if someone finds why January keeps the ray-field loads behind the preceding point_from_line3d stores (an alias/memory-dependence ordering difference, not a register tie). Probes: scratch/w/triage_ai_b/p1..p10 *.json/*.obj. Hygiene (a)+(b) can land now at zero credit after a full sweep: the unit is unchanged and provider link passes.
