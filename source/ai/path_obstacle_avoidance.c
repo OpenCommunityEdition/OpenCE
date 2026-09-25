@@ -134,18 +134,6 @@ symbols in this file:
 
 /* ---------- macros */
 
-#define match_assert_valid_real_point2d(file, line, point)	\
-match_vassert(												\
-	file,													\
-	line,													\
-	valid_real_point2d(point),								\
-	csprintf(												\
-		temporary,											\
-		"%s: assert_valid_real_point2d(%f, %f)",			\
-		#point, (*point).x, (*point).y						\
-	)														\
-)
-
 /* ---------- structures */
 
 struct structure_bsp;

@@ -63,14 +63,6 @@ enum
 	NUMBER_OF_GAME_TEAMS = 10
 };
 
-enum allegiance_incident_type
-{
-	_allegiance_incident_accident = 0,
-	_allegiance_incident_betrayal,
-	_allegiance_incident_forgive,
-	NUMBER_OF_ALLEGIANCE_INCIDENT_TYPES
-};
-
 /* ---------- macros */
 
 /* ---------- structures */

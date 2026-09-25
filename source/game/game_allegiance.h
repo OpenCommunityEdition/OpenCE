@@ -2,6 +2,17 @@
 #define __GAME_ALLEGIANCE_H
 #pragma once
 
+/* ---------- constants */
+
+enum
+{
+	_allegiance_incident_accident = 0,
+	_allegiance_incident_betrayal,
+	_allegiance_incident_forgive
+};
+
+/* ---------- prototypes/GAME_ALLEGIANCE.C */
+
 void game_allegiance_initialize(
 	void);
 void game_allegiance_dispose(
@@ -44,6 +55,8 @@ boolean game_allegiance_incident(
 	short victim_team_index,
 	short incident_type,
 	boolean *notify_immediately);
+
+/* ---------- globals */
 
 extern char const *global_game_team_names[];
 

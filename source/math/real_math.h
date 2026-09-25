@@ -78,6 +78,79 @@ vassert(																	\
 	)																		\
 )
 
+#define assert_valid_real_point2d(point)	\
+vassert(	\
+	valid_real_point2d(point),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_point2d(%f, %f)",	\
+		#point, (*point).x, (*point).y	\
+	)	\
+)
+
+#define assert_valid_real_vector2d(vector)	\
+vassert(	\
+	valid_real_vector2d(vector),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_vector2d(%f, %f)",	\
+		#vector, (*vector).i, (*vector).j	\
+	)	\
+)
+
+#define assert_valid_real_normal2d(vector)	\
+vassert(	\
+	valid_real_normal2d(vector),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_normal2d(%f, %f)",	\
+		#vector, (*vector).i, (*vector).j	\
+	)	\
+)
+
+#define assert_valid_realcmp(a, b)	\
+vassert(	\
+	valid_realcmp(a, b),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s: assert_valid_realcmp(%f, %f)",	\
+		#a, #b, a, b	\
+	)	\
+)
+
+#define assert_valid_real_plane3d(plane)	\
+vassert(	\
+	valid_real_plane3d(plane),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_plane3d(%f, %f, %f / %f)",	\
+		#plane, (*plane).n.i, (*plane).n.j, (*plane).n.k, (*plane).d	\
+	)	\
+)
+
+#define assert_valid_real_vector3d_axes3(forward, left, up)	\
+vassert(	\
+	valid_real_vector3d_axes3(forward, left, up),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s, %s: assert_valid_real_vector3d_axes3(%f, %f, %f / %f, %f, %f / %f, %f, %f)",	\
+		#forward, #left, #up,	\
+		(*forward).i, (*forward).j, (*forward).k,	\
+		(*up).i, (*up).j, (*up).k,	\
+		(*left).i, (*left).j, (*left).k	\
+	)	\
+)
+
+#define assert_valid_real_sine_cosine(sine, cosine)	\
+vassert(	\
+	valid_real_sine_cosine(sine, cosine),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s: assert_valid_real_sine_cosine(%f, %f)",	\
+		#sine, #cosine, sine, cosine	\
+	)	\
+)
+
 #define assert_valid_real_matrix4x3_internal(matrix, string)				\
 vassert(valid_real((*matrix).scale), csprintf(temporary, "%s had a bad scale %f", string, (*matrix).scale));	\
 vassert(valid_real_normal3d(&(*matrix).forward), csprintf(temporary, "%s had a bad forward (%f,%f,%f)", string, (*matrix).forward.i, (*matrix).forward.j, (*matrix).forward.k));		\
@@ -183,6 +256,93 @@ match_vassert(																\
 		#forward, #up,														\
 		(*forward).i, (*forward).j, (*forward).k, (*up).i, (*up).j, (*up).k	\
 	)																		\
+)
+
+#define match_assert_valid_real_point2d(file, line, point)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_point2d(point),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_point2d(%f, %f)",	\
+		#point, (*point).x, (*point).y	\
+	)	\
+)
+
+#define match_assert_valid_real_vector2d(file, line, vector)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_vector2d(vector),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_vector2d(%f, %f)",	\
+		#vector, (*vector).i, (*vector).j	\
+	)	\
+)
+
+#define match_assert_valid_real_normal2d(file, line, vector)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_normal2d(vector),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_normal2d(%f, %f)",	\
+		#vector, (*vector).i, (*vector).j	\
+	)	\
+)
+
+#define match_assert_valid_realcmp(file, line, a, b)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_realcmp(a, b),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s: assert_valid_realcmp(%f, %f)",	\
+		#a, #b, a, b	\
+	)	\
+)
+
+#define match_assert_valid_real_plane3d(file, line, plane)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_plane3d(plane),	\
+	csprintf(	\
+		temporary,	\
+		"%s: assert_valid_real_plane3d(%f, %f, %f / %f)",	\
+		#plane, (*plane).n.i, (*plane).n.j, (*plane).n.k, (*plane).d	\
+	)	\
+)
+
+#define match_assert_valid_real_vector3d_axes3(file, line, forward, left, up)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_vector3d_axes3(forward, left, up),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s, %s: assert_valid_real_vector3d_axes3(%f, %f, %f / %f, %f, %f / %f, %f, %f)",	\
+		#forward, #left, #up,	\
+		(*forward).i, (*forward).j, (*forward).k,	\
+		(*up).i, (*up).j, (*up).k,	\
+		(*left).i, (*left).j, (*left).k	\
+	)	\
+)
+
+#define match_assert_valid_real_sine_cosine(file, line, sine, cosine)	\
+match_vassert(	\
+	file,	\
+	line,	\
+	valid_real_sine_cosine(sine, cosine),	\
+	csprintf(	\
+		temporary,	\
+		"%s, %s: assert_valid_real_sine_cosine(%f, %f)",	\
+		#sine, #cosine, sine, cosine	\
+	)	\
 )
 
 #define match_assert_valid_real_matrix4x3_internal(file, line, matrix, string)	\
@@ -1561,30 +1721,27 @@ __inline real uniform_cubic_spline(
 			(f2 + (t - (t0 + 2.f*h)) * (f3 - f2) / (3.f*h)) / (2.f*h));
 }
 
-// TODO: doesn't match, needs cleanup
 __inline real nonuniform_cubic_spline(
 	real f0,
 	real f1,
-	real f2, 
+	real f2,
 	real f3,
-	real t0, 
-	real t1, 
-	real t2, 
-	real t3, 
+	real t0,
+	real t1,
+	real t2,
+	real t3,
 	real t)
 {
-	real v9, v10, v11;
-	v10 = ((f2 - f1) / (t2 - t1)) - ((f1 - f0) / (t1 - t0));
-	v11 = (((((((((((f3 - f2) / (t3 - t2)) - ((f2 - f1) 
-		/ (t2 - t1))) / (t3 - t1)) - (v10 / (t2 - t0))) 
-		/ (t3 - t0))
-		* (v9 - t2))
-		+ (v10 / (t2 - t0)))
-		* (v9 - t1))
-		+ ((f1 - f0) / (t1 - t0)))
-		* (v9 - t0))
-		 + f0;
-	return v11;
+	match_assert("..\\math\\real_math.h", 1530, t>= t0 && t <= t3);
+
+	f3 = (f3 - f2) / (t3 - t2);
+	f2 = (f2 - f1) / (t2 - t1);
+	f1 = (f1 - f0) / (t1 - t0);
+	f3 = (f3 - f2) / (t3 - t1);
+	f2 = (f2 - f1) / (t2 - t0);
+	f3 = (f3 - f2) / (t3 - t0);
+
+	return f0 + (t - t0) * (f1 + (t - t1) * (f2 + (t - t2) * f3));
 }
 
 __inline void uniform_cubic_spline_vector3d(
