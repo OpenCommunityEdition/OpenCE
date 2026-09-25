@@ -665,9 +665,7 @@ void scripted_looping_sound_set_scale(
 		definition = looping_sound_definition_get(sound_index);
 		if (definition->runtime_scripting_sound_index != NONE)
 		{
-			looping_sound = datum_get(
-				game_looping_sound_data,
-				definition->runtime_scripting_sound_index);
+			looping_sound = game_looping_sound_get(definition->runtime_scripting_sound_index);
 			looping_sound->scale = PIN(scale, 0.0f, 1.0f);
 		}
 	}
@@ -687,9 +685,7 @@ void scripted_looping_sound_set_alternate(
 		definition = looping_sound_definition_get(sound_index);
 		if (definition->runtime_scripting_sound_index != NONE)
 		{
-			looping_sound = datum_get(
-				game_looping_sound_data,
-				definition->runtime_scripting_sound_index);
+			looping_sound = game_looping_sound_get(definition->runtime_scripting_sound_index);
 			SET_FLAG(looping_sound->flags, _game_looping_sound_alternate_bit, alternate);
 		}
 	}
@@ -700,9 +696,8 @@ void scripted_looping_sound_set_alternate(
 void unattached_looping_sound_stop(
 	long looping_sound_index)
 {
-	struct game_looping_sound_datum *looping_sound = datum_get(
-		game_looping_sound_data,
-		looping_sound_index);
+	struct game_looping_sound_datum *looping_sound =
+		game_looping_sound_get(looping_sound_index);
 
 	SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_stop_bit, TRUE);
 
@@ -721,9 +716,7 @@ static void scripted_looping_sound_stop_internal(
 		definition = looping_sound_definition_get(sound_index);
 		if (definition->runtime_scripting_sound_index != NONE)
 		{
-			looping_sound = datum_get(
-				game_looping_sound_data,
-				definition->runtime_scripting_sound_index);
+			looping_sound = game_looping_sound_get(definition->runtime_scripting_sound_index);
 			SET_FLAG(looping_sound->flags, _game_looping_sound_scripted_bit, FALSE);
 			unattached_looping_sound_stop(definition->runtime_scripting_sound_index);
 			definition->runtime_scripting_sound_index = NONE;
@@ -776,9 +769,7 @@ void scripted_looping_sound_start(
 		definition->runtime_scripting_sound_index = looping_sound_index;
 		if (looping_sound_index != NONE)
 		{
-			looping_sound = datum_get(
-				game_looping_sound_data,
-				looping_sound_index);
+			looping_sound = game_looping_sound_get(looping_sound_index);
 			SET_FLAG(looping_sound->flags, _game_looping_sound_scripted_bit, TRUE);
 		}
 	}
@@ -802,9 +793,7 @@ long unattached_looping_sound_start(
 		NONE);
 	if (looping_sound_index != NONE)
 	{
-		looping_sound = datum_get(
-			game_looping_sound_data,
-			looping_sound_index);
+		looping_sound = game_looping_sound_get(looping_sound_index);
 		SET_FLAG(looping_sound->flags, _game_looping_sound_unattached_bit, TRUE);
 		looping_sound->scale = scale;
 	}
@@ -1265,9 +1254,8 @@ static void scripted_music_stop_all(
 		looping_sound_index != NONE;
 		looping_sound_index = data_next_index(game_looping_sound_data, looping_sound_index))
 	{
-		struct game_looping_sound_datum *looping_sound = datum_get(
-			game_looping_sound_data,
-			looping_sound_index);
+		struct game_looping_sound_datum *looping_sound =
+			game_looping_sound_get(looping_sound_index);
 
 		if (looping_sound->object_index == NONE
 			&& looping_sound_definition_is_music(looping_sound->definition_index))
