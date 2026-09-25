@@ -1,0 +1,31 @@
+--- a/C_canonical_context.c
++++ b/SU_storage_unsigned.c
+@@ -466,7 +466,6 @@
+ extern struct data_array *global_decal_data;
+ 
+ boolean decals_enabled= TRUE;
+-static real_point2d decal_points2d_temp[2][12];
+ static struct decal_globals *decal_globals;
+ static struct decal_geometry decal_geometry = {0};
+ static boolean decal_locked_count_reported = FALSE;
+@@ -1133,9 +1132,10 @@
+ 		real_plane2d const *plane,
+ 		short maximum_count,
+ 		real_point2d *result,
+-		long *clip_flags,
++		unsigned long *clip_flags,
+ 		boolean *clipped,
+ 		real epsilon);
++	static real_point2d decal_points2d_temp[2][12];
+ 	struct collision_bsp *collision_bsp;
+ 	struct collision_surface *surface;
+ 	real_plane3d surface_plane;
+@@ -1202,7 +1202,7 @@
+ 		short edge_iteration = 0;
+ 		real_point2d const *input_points = projection->decal_points2d;
+ 		short decal_point_count = 4;
+-		long clipped_flags = 0;
++		unsigned long clipped_flags = 0;
+ 		real texture_y;
+ 
+ 		{

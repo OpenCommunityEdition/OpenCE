@@ -1,0 +1,955 @@
+[
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 24,
+    "unit": "source/ai/path_obstacle_avoidance"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 6,
+    "unit": "source/ai/path_structure_bsp"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 180,
+    "unit": "source/game/game_engine"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 43,
+    "unit": "source/objects/object_lights"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 12,
+    "unit": "source/physics/breakable_surfaces"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 95,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [
+      {
+        "class": "candidate-only-comdat-owner",
+        "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_owner_layout_reconciliation.md",
+        "reason": "All 17 January code functions and all 31 January-owned sections/symbols match after replacing local debug, window and pixel-shader views with genuine owner types. Nine D3DINLINE wrappers have January's file-static storage. The two surplus color-conversion helpers are byte-identical to January's selected providers, and all 17 surplus symbols pass selected-provider links in both orders. The global_window_parameters extern still lives in consumer C files, with incompatible partial views in other consumers rather than a common owner declaration. Three stock SDK tables and other candidate-only constants/literals remain absent from January's split; the selected-provider test ignores unrelated unresolved symbols. A complete ordinary final-link ownership proof has not been established, so exact function credit does not imply Matching.",
+        "reopen": "Move global_window_parameters to its authentic owner declaration and reconcile the partial consumer views with a full regression sweep. Establish selected ownership/coalescing of candidate-only SDK tables and helper data through a complete compatible ordinary link or equally decisive January source/link evidence, without losing target exactness. Do not suppress genuine header emissions, alter selection metadata, force-inline, hand-copy helpers or count candidate-only bytes as January-owned.",
+        "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+        "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom"
+      }
+    ],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 17,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 17,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry"
+  },
+  {
+    "data_gap": 0,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 36,
+    "unit": "source/render/render_debug"
+  },
+  {
+    "data_gap": 2644,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 7,
+    "unit": "source/bitmaps/bitmap_drawing"
+  },
+  {
+    "data_gap": 136,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 29,
+    "unit": "source/game/game_engine_king"
+  },
+  {
+    "data_gap": 1272664,
+    "functions": [],
+    "rejections": [],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 0,
+    "unit": "source/linker_common"
+  },
+  {
+    "data_gap": 132,
+    "functions": [],
+    "rejections": [
+      {
+        "class": "source-layout-incomplete",
+        "evidence": "research/fifty_objects_20260925/w/review3_rasterizer_xbox_profile/REVIEW.md",
+        "reason": "All 16 target functions and all 2234 target data bytes are exact. The three stock SDK select-any tables (D3DTEXTUREDIRECTENCODE 16 bytes, D3DSIMPLERENDERSTATEENCODE 328, D3DPRIMITIVETOVERTEXCOUNT 88) come from D3D8.h's unconditional extern const selectany definitions, which January's TU included (its object imports _D3DDevice_InsertCallback@12 and QueryPerformance*). Each copy is byte-identical to January's selected provider and passes the selected-provider pair links in both orders, the standard under which collision_debug and the other Matching emitters carry the same tables. Canonical's dynavobgeom reconciliation (641e1466, docs/object_matching_logs/claude_fifty_objects_canonical_reconciliation.md) still leaves stock SDK-table coalescing open pending a uniform owner policy audit, so this object inherits that decision. Whole-object admission also fails source authenticity. The private state is written as four invented file-static aggregates (rasterizer_profile_globals, rasterizer_profile_elapsed_state, rasterizer_profile_frame_state, rasterizer_profile_state). Their pad02/pad06/pad12/pad16 members only spell out VC7's per-static 4-byte alignment padding, and reserved06[6] hides one unattested 4-byte object at .bss +0x45c. Loose file statics reproduce every code byte and every other data offset, and the later /Od build places elapsed_times before callback_start_times, contradicting the elapsed_state member order. The rasterizer_profile_check NONE branch reproduces January's format/varargs defect (%s consumes the NONE profile value), which awaits the owner's original-bug ruling. Three load-bearing volatile qualifiers have no first-party attestation. The TU also still declares global_window_parameters with a consumer-local extern: moving it to the owner header rasterizer_xbox_internal.h keeps every exact section byte-identical but declares the name earlier in rasterizer_xbox_models, which moves the residual __rasterizer_model_draw by one instruction.",
+        "reopen": "Recover the genuine January private state shape: replace the invented aggregates with authentic separate file statics, or first-party-attested structures, without fabricated pad/reserved members. Identify the unreferenced 4-byte January object at .bss +0x45c from first-party evidence rather than a filler. Obtain the owner's rulings on the BUG-marked NONE-branch varargs defect and the three volatile qualifiers. Any new private names need the owner's descriptive-name policy (as for the held rasterizer_xbox .bss split). Preserve all 16 target functions and all data sections, land the pinned 132-byte .data entry only with the Matching flip, move the window extern to its owner header with a full consumer sweep (re-baselining the rasterizer_xbox_models __rasterizer_model_draw park it perturbs), and apply the owner's uniform stock SDK-table decision from the open dynavobgeom reconciliation.",
+        "symbol": "_rasterizer_profile_globals",
+        "unit": "source/rasterizer/xbox/rasterizer_xbox_profile"
+      }
+    ],
+    "remaining_functions": 0,
+    "remaining_meaningful_bytes": 0,
+    "total_functions": 16,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_profile"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_collision_move_point"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 4744,
+    "total_functions": 20,
+    "unit": "source/physics/collisions"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_actor_look_update"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 4714,
+    "total_functions": 16,
+    "unit": "source/ai/actor_looking"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_build_structure_lens_flares"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 4331,
+    "total_functions": 4,
+    "unit": "source/structures/structure_lens_flares"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "__rasterizer_environment_fog_screen_begin"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 3901,
+    "total_functions": 27,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_environment_fog"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_render_camera_build_frustum"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 3370,
+    "total_functions": 21,
+    "unit": "source/render/render_cameras"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_action_charge_perform"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 3246,
+    "total_functions": 22,
+    "unit": "source/ai/action_charge"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_lightning_submit"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 2571,
+    "total_functions": 9,
+    "unit": "source/objects/widgets/lightning"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_update_alien_scout_physics"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 2456,
+    "total_functions": 39,
+    "unit": "source/units/vehicles"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_rasterizer_sun_glow_draw"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 2338,
+    "total_functions": 14,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_lights"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_get_particle_world_position"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1729,
+    "total_functions": 25,
+    "unit": "source/objects/widgets/glow"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_weather_particle_system_render"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1665,
+    "total_functions": 20,
+    "unit": "source/effects/weather_particle_systems"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_custom_render_nav_point"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1618,
+    "total_functions": 32,
+    "unit": "source/interface/hud_nav_points"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_observer_update_positions"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1561,
+    "total_functions": 26,
+    "unit": "source/camera/observer"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_area_of_effect_cause_damage_to_object"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1316,
+    "total_functions": 34,
+    "unit": "source/objects/damage"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_cinematic_render"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1272,
+    "total_functions": 17,
+    "unit": "source/cutscene/cinematics"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_dead_camera_update"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1235,
+    "total_functions": 4,
+    "unit": "source/camera/dead_camera"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_flag_update"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 1170,
+    "total_functions": 16,
+    "unit": "source/objects/widgets/flags"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_hs_evaluate_begin_random"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 519,
+    "total_functions": 66,
+    "unit": "source/hs/hs_runtime"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_interface_get_weapon_hud_index"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 444,
+    "total_functions": 18,
+    "unit": "source/interface/interface"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_projectile_new"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 424,
+    "total_functions": 30,
+    "unit": "source/items/projectiles"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_sphere_intersects_cluster_portal"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 418,
+    "total_functions": 17,
+    "unit": "source/structures/structures"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_rasterizer_bitmap_new"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 388,
+    "total_functions": 19,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_actor_perception_aiming_vector_test_blockage"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 385,
+    "total_functions": 44,
+    "unit": "source/ai/actor_perception"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_sound_cache_debug_render"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 368,
+    "total_functions": 18,
+    "unit": "source/cache/xbox_sound_cache"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_saved_game_files_enumerate_available_to_local_player_index"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 359,
+    "total_functions": 46,
+    "unit": "source/saved games/saved_game_files"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_draw_layer_int"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 349,
+    "total_functions": 54,
+    "unit": "source/interface/progress_bar"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_bitmap_draw_string"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 296,
+    "total_functions": 28,
+    "unit": "source/text/draw_string"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_connect_async_thread_proc@4"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 294,
+    "total_functions": 30,
+    "unit": "source/bungie_net/network/transport_endpoint_winsock"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_compare_profile_sections"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 276,
+    "total_functions": 44,
+    "unit": "source/cseries/profile"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_actor_combat_plan_grenade_trajectory"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 273,
+    "total_functions": 34,
+    "unit": "source/ai/actor_combat"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "@periodic_function_build_variable_period_x_table@4"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 244,
+    "total_functions": 7,
+    "unit": "source/math/periodic_functions"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_weapon_place"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 193,
+    "total_functions": 79,
+    "unit": "source/items/weapons"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_obstacles_test_circle"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 160,
+    "total_functions": 16,
+    "unit": "source/ai/path_obstacles"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_game_set_game_variant_from_name"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 92,
+    "total_functions": 27,
+    "unit": "source/game/game"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_bink_query_analog_controller_buttons"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 70,
+    "total_functions": 24,
+    "unit": "source/bink/bink_playback"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_fast_ftol_C"
+    ],
+    "rejections": [
+      {
+        "class": "candidate-only-comdat-owner",
+        "evidence": "docs/object_matching_logs/hud_draw_obj_two_exact_leaves_integration_20260904.md#complete-owner-boundary",
+        "reason": "The exact flash-duration leaf uses the authentic shared conversion helper and naturally emits an additional unreferenced select-any32-byte fast_ftol copy absent from January HUD Draw. January's identical selected Actor Combat copy is no-duplicates; its ordinary XDK duplicate-owner failure is already documented. The two newly exact drawing helpers receive valid target-function credit, but no whole-object or linked-coalescing claim follows.",
+        "reopen": "Require authentic source topology or an ordinary base/base link with an authenticated compatible canonical selected helper before clearing this veto. Do not force inline, manually expand math, alter target/COMDAT metadata, invent a discard pass, or credit candidate-only helper bytes. All remaining HUD Draw functions/data/linkage/source checks must independently pass before whole-object Matching.",
+        "symbol": "_fast_ftol",
+        "unit": "source/interface/hud_draw"
+      }
+    ],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 56,
+    "total_functions": 23,
+    "unit": "source/interface/hud_draw"
+  },
+  {
+    "data_gap": 1424,
+    "functions": [
+      "_bitmap_group_add_bitmap"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 995,
+    "total_functions": 6,
+    "unit": "source/bitmaps/bitmap_group"
+  },
+  {
+    "data_gap": 2404,
+    "functions": [
+      "_actor_action_handle_vehicle_entry"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 954,
+    "total_functions": 63,
+    "unit": "source/ai/actions"
+  },
+  {
+    "data_gap": 54780,
+    "functions": [
+      "_real_random_range_evaluate"
+    ],
+    "rejections": [],
+    "remaining_functions": 1,
+    "remaining_meaningful_bytes": 81,
+    "total_functions": 448,
+    "unit": "source/hs/hs"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "__rasterizer_model_draw",
+      "_rasterizer_model_draw_environment_shader"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 8268,
+    "total_functions": 14,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_models"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_decal_new_from_collision",
+      "_decal_clip_to_surface"
+    ],
+    "rejections": [
+      {
+        "class": "candidate-only-comdat-owner",
+        "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+        "reason": "The exact typed decal_projection_create body naturally inlines vector_from_points2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Action Obey copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+        "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes.",
+        "symbol": "_vector_from_points2d",
+        "unit": "source/effects/decals"
+      },
+      {
+        "class": "candidate-only-comdat-owner",
+        "evidence": "docs/object_matching_logs/decals_obj_color_projection_packet_20260912.md#inline-helper-ownership-boundary",
+        "reason": "The exact typed decal_projection_create body naturally inlines cross_product2d as January requires, but VC7 also emits an unreferenced select-any helper body absent from the January Decals split. January's selected Actor Combat copy is no-duplicates. The exact target function receives valid credit; the surplus helper receives none and blocks whole-object Matching.",
+        "reopen": "Remove only when authentic source topology or an ordinary compatible canonical link preserves decal_projection_create while preventing or safely coalescing the extra helper. Do not force inline, manually expand the helper for code shaping, alter COMDAT metadata, or count the candidate-only bytes.",
+        "symbol": "_cross_product2d",
+        "unit": "source/effects/decals"
+      }
+    ],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 7930,
+    "total_functions": 33,
+    "unit": "source/effects/decals"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "__rasterizer_environment_lightmap_draw",
+      "_rasterizer_environment_specular_spot_light_begin"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 4957,
+    "total_functions": 44,
+    "unit": "source/rasterizer/xbox/rasterizer_xbox_environment"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_virtual_keyboard_render_internal",
+      "_virtual_keyboard_select"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 2686,
+    "total_functions": 20,
+    "unit": "source/interface/virtual_keyboard"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_rasterizer_lens_flares_draw",
+      "_rasterizer_lights_reset_for_new_map"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 2274,
+    "total_functions": 13,
+    "unit": "source/rasterizer/rasterizer_lights"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_ai_test_line_of_sight",
+      "_ai_test_ballistic_line_of_fire"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 1926,
+    "total_functions": 46,
+    "unit": "source/ai/ai"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_player_teleport_internal",
+      "_player_examine_nearby_device"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 1447,
+    "total_functions": 70,
+    "unit": "source/game/players"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_solo_level_select_list_update_displayed_items",
+      "_multiplayer_game_directions"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 1008,
+    "total_functions": 46,
+    "unit": "source/interface/ui_widget_game_data_input_functions"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_network_server_close_client_connection",
+      "_network_connection_connect"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 588,
+    "total_functions": 23,
+    "unit": "source/networking/network_connection"
+  },
+  {
+    "data_gap": 56,
+    "functions": [
+      "_ai_debug_render_actor",
+      "_ai_debug_render_actor_jmptable"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 24964,
+    "total_functions": 61,
+    "unit": "source/ai/ai_debug"
+  },
+  {
+    "data_gap": 276,
+    "functions": [
+      "_ai_communication_event",
+      "_ai_communication_actor_talk_weight"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 8968,
+    "total_functions": 48,
+    "unit": "source/ai/ai_communication"
+  },
+  {
+    "data_gap": 76,
+    "functions": [
+      "_EncodeBlockRGBColorKey",
+      "_DecodeBlockRGB__single_pixel"
+    ],
+    "rejections": [],
+    "remaining_functions": 2,
+    "remaining_meaningful_bytes": 2681,
+    "total_functions": 18,
+    "unit": "source/bitmaps/s3tc/s3tc"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_render_weapon_hud",
+      "_crosshairs_draw",
+      "_hud_update_weapon_local_player"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 6364,
+    "total_functions": 16,
+    "unit": "source/interface/hud_weapon"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_convex_hull3d_expand",
+      "_convex_polygon3d_clip_to_plane",
+      "_convex_polygon2d_clip_to_plane"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 3913,
+    "total_functions": 30,
+    "unit": "source/math/geometry"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_bsp3d_test_pill_recursive",
+      "_collision_surface_test_sphere",
+      "_bsp3d_test_sphere_recursive"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 3158,
+    "total_functions": 30,
+    "unit": "source/physics/collision_bsp"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_effect_generate_particles",
+      "_effect_generate_part",
+      "_effect_allowed_by_environment"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 3003,
+    "total_functions": 41,
+    "unit": "source/effects/effects"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_motion_sensor_update",
+      "_update_motion_sensor",
+      "_render_motion_sensor"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 2756,
+    "total_functions": 19,
+    "unit": "source/interface/motion_sensor"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_build_sprite",
+      "_build_sprite_rotational",
+      "_build_sprite_transform_origin_and_direction"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 2483,
+    "total_functions": 10,
+    "unit": "source/render/render_sprite"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_player_effect_get_camera_effect_matrix",
+      "_player_effect_update_camera_impulse",
+      "_player_effect_add_continuous_effect"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 2355,
+    "total_functions": 29,
+    "unit": "source/effects/player_effects"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_hs_compile_postprocess",
+      "_hs_parse_set",
+      "_hs_parse_boolean"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 1563,
+    "total_functions": 64,
+    "unit": "source/hs/hs_compile"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_player_profile_new",
+      "_player_profile_write_thread_proc@4",
+      "_player_profile_create_default_profiles_on_disk"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 1080,
+    "total_functions": 22,
+    "unit": "source/saved games/player_profile"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_poll_endpoint_set",
+      "_transport_initialize",
+      "_poll_ep_array_compare_proc"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 1008,
+    "total_functions": 26,
+    "unit": "source/bungie_net/network/transport_endpoint_set_winsock"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_triangle_coplanar",
+      "_connected_geometry_find_or_add_edge",
+      "_connected_geometry_find_or_add_vertex"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 809,
+    "total_functions": 10,
+    "unit": "source/tool/connected_geometry"
+  },
+  {
+    "data_gap": 1848,
+    "functions": [
+      "_main_update_time",
+      "_main_frame_rate_debug",
+      "_main_crash"
+    ],
+    "rejections": [],
+    "remaining_functions": 3,
+    "remaining_meaningful_bytes": 1989,
+    "total_functions": 95,
+    "unit": "source/main/main"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_physics_update_old",
+      "_physics_compute_new",
+      "_physics_compute_vehicle_collision",
+      "_compute_ground_plane"
+    ],
+    "rejections": [],
+    "remaining_functions": 4,
+    "remaining_meaningful_bytes": 9587,
+    "total_functions": 17,
+    "unit": "source/physics/physics"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_actor_move_vector_avoidance",
+      "_actor_move_update",
+      "_actor_path_refresh",
+      "_actor_destination_update",
+      "_actor_move_test_avoidance_vector"
+    ],
+    "rejections": [],
+    "remaining_functions": 5,
+    "remaining_meaningful_bytes": 10402,
+    "total_functions": 36,
+    "unit": "source/ai/actor_moving"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_widget_instance_process_one_event_recursive",
+      "_draw_bitmap_in_rect",
+      "_widget_instance_render_recursive",
+      "_ui_check_for_pause_game",
+      "_display_scenario_help",
+      "_ui_widget_launch_widget"
+    ],
+    "rejections": [],
+    "remaining_functions": 6,
+    "remaining_meaningful_bytes": 5468,
+    "total_functions": 102,
+    "unit": "source/interface/ui_widget"
+  },
+  {
+    "data_gap": 0,
+    "functions": [
+      "_biped_update_physics",
+      "_biped_update_moving",
+      "_biped_update_turning",
+      "_biped_accelerate",
+      "_biped_get_sight_position",
+      "_biped_get_autoaim_pill",
+      "_biped_check_discard",
+      "_biped_adjust_placement"
+    ],
+    "rejections": [],
+    "remaining_functions": 8,
+    "remaining_meaningful_bytes": 12606,
+    "total_functions": 51,
+    "unit": "source/units/bipeds"
+  }
+]

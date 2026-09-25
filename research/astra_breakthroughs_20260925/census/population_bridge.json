@@ -1,0 +1,162 @@
+{
+  "accepted_halo_absent_from_stable": [
+    {
+      "function": "$L7451",
+      "ledger": {
+        "code_bytes": 8,
+        "function": "$L7451",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/units/units"
+      },
+      "unit": "source/units/units"
+    },
+    {
+      "function": "$L7450",
+      "ledger": {
+        "code_bytes": 24,
+        "function": "$L7450",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/units/units"
+      },
+      "unit": "source/units/units"
+    },
+    {
+      "function": "$L8061",
+      "ledger": {
+        "code_bytes": 16,
+        "function": "$L8061",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/units/units"
+      },
+      "unit": "source/units/units"
+    },
+    {
+      "function": "$L11841",
+      "ledger": {
+        "code_bytes": 20,
+        "function": "$L11841",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/objects/objects"
+      },
+      "unit": "source/objects/objects"
+    },
+    {
+      "function": "$L9776",
+      "ledger": {
+        "code_bytes": 32,
+        "function": "$L9776",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/objects/objects"
+      },
+      "unit": "source/objects/objects"
+    },
+    {
+      "function": "$L9764",
+      "ledger": {
+        "code_bytes": 22,
+        "function": "$L9764",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/objects/objects"
+      },
+      "unit": "source/objects/objects"
+    },
+    {
+      "function": "$L10620",
+      "ledger": {
+        "code_bytes": 25,
+        "function": "$L10620",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/objects/objects"
+      },
+      "unit": "source/objects/objects"
+    },
+    {
+      "function": "$L2499",
+      "ledger": {
+        "code_bytes": 41,
+        "function": "$L2499",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/memory/zlib/infcodes"
+      },
+      "unit": "source/memory/zlib/infcodes"
+    },
+    {
+      "function": "$L2587",
+      "ledger": {
+        "code_bytes": 40,
+        "function": "$L2587",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/memory/zlib/infblock"
+      },
+      "unit": "source/memory/zlib/infblock"
+    },
+    {
+      "function": "$L2588",
+      "ledger": {
+        "code_bytes": 16,
+        "function": "$L2588",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/memory/zlib/infblock"
+      },
+      "unit": "source/memory/zlib/infblock"
+    },
+    {
+      "function": "$L1337",
+      "ledger": {
+        "code_bytes": 20,
+        "function": "$L1337",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/bitmaps/libtiff/tif_thunder"
+      },
+      "unit": "source/bitmaps/libtiff/tif_thunder"
+    },
+    {
+      "function": "$L1329",
+      "ledger": {
+        "code_bytes": 193,
+        "function": "$L1329",
+        "proof_sources": [
+          "objdiff"
+        ],
+        "unit": "source/bitmaps/libtiff/tif_thunder"
+      },
+      "unit": "source/bitmaps/libtiff/tif_thunder"
+    }
+  ],
+  "accepted_halo_nonexact_in_stable": [],
+  "residual_halo_absent_from_stable": [
+    {
+      "function": "_ai_debug_render_actor_jmptable",
+      "report": {
+        "address": "39664",
+        "metadata": {},
+        "name": "_ai_debug_render_actor_jmptable",
+        "size": "388"
+      },
+      "unit": "source/ai/ai_debug"
+    }
+  ],
+  "strict_exact_halo_not_accepted": []
+}

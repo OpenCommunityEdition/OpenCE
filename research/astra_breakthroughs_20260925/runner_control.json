@@ -1,0 +1,17 @@
+{
+  "unit": "source/math/random_math",
+  "source_sha256": "0664494866d6b522effd9597c03ef7fde9ed58a1dfd1a4702fa5fa85e4d63b49",
+  "functions": ["_get_random_seed"],
+  "factors": {
+    "A": {
+      "hypothesis": "Runner negative control only: a same-line block-comment text change has no code effect.",
+      "prediction": "All function owners remain byte-identical, not merely the selected target.",
+      "edits": [{"old": "RANDOM_MATH.C", "new": "RANDOM_MATH.C [runner control A]", "count": 1}]
+    },
+    "B": {
+      "hypothesis": "Independent runner negative control: another same-line comment change is inert.",
+      "prediction": "B and AB preserve all owner rows exactly; no progress credit.",
+      "edits": [{"old": "symbols in this file:", "new": "symbols in this file: [runner control B]", "count": 1}]
+    }
+  }
+}

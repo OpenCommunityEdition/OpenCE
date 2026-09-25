@@ -1,0 +1,20 @@
+--- a/C_canonical_context.c
++++ b/U_clip_flags_unsigned.c
+@@ -1133,7 +1133,7 @@
+ 		real_plane2d const *plane,
+ 		short maximum_count,
+ 		real_point2d *result,
+-		long *clip_flags,
++		unsigned long *clip_flags,
+ 		boolean *clipped,
+ 		real epsilon);
+ 	struct collision_bsp *collision_bsp;
+@@ -1202,7 +1202,7 @@
+ 		short edge_iteration = 0;
+ 		real_point2d const *input_points = projection->decal_points2d;
+ 		short decal_point_count = 4;
+-		long clipped_flags = 0;
++		unsigned long clipped_flags = 0;
+ 		real texture_y;
+ 
+ 		{

@@ -1,0 +1,28 @@
+--- a/source/units/vehicles.c
++++ b/source/units/vehicles.c
+@@ -2222,21 +2222,15 @@
+ 				real_vector2d level_torque;
+ 				real_vector2d alignment;
+ 				real_vector2d rate;
+-				real_vector2d up;
+-				real_vector2d angular_velocity;
+ 				long sign_a;
+ 				long sign_b;
+ 				real weight_a;
+ 				real weight_b;
+ 
+-				up.i = object_up->i;
+-				up.j = object_up->j;
+-				angular_velocity.i = object_angular_velocity->i;
+-				angular_velocity.j = object_angular_velocity->j;
+-				alignment.i = dot_product2d(&up, &forward2d);
+-				alignment.j = dot_product2d(&up, &left2d);
+-				rate.i = dot_product2d(&angular_velocity, &left2d);
+-				rate.j = -dot_product2d(&angular_velocity, &forward2d);
++				alignment.i = dot_product2d((real_vector2d const *)object_up, &forward2d);
++				alignment.j = dot_product2d((real_vector2d const *)object_up, &left2d);
++				rate.i = dot_product2d((real_vector2d const *)object_angular_velocity, &left2d);
++				rate.j = -dot_product2d((real_vector2d const *)object_angular_velocity, &forward2d);
+ 				level_torque = *global_zero_vector2d;
+ 				level_torque.i -= alignment.i;
+ 				level_torque.j -= alignment.j;

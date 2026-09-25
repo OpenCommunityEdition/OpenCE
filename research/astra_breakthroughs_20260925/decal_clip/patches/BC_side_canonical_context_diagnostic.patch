@@ -1,0 +1,20 @@
+--- a/C_canonical_context.c
++++ b/BC_side_canonical_context_diagnostic.c
+@@ -1215,7 +1215,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],
+@@ -1385,7 +1385,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],

@@ -1,0 +1,17 @@
+{
+  "read_only_program": true,
+  "rollback_transaction": true,
+  "bounded_disassembly_start": "008f80b0",
+  "bounded_disassembly_end": "008f930a",
+  "observed_function_body": "008f80b0..008f9309",
+  "exports": {
+    "ghidra_scout.asm": {
+      "path": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_20260925\\ghidra_scout.asm",
+      "sha256": "56d8cd21549169ca292f0da384ea53709999652f0a4edcb33ca1d3a71e158b4a"
+    },
+    "ghidra_scout.c": {
+      "path": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_20260925\\ghidra_scout.c",
+      "sha256": "dcc4f3a50ee882eefe4c398a1aec904b25ddaf981665ee672bbf90983b1b8ec5"
+    }
+  }
+}

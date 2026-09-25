@@ -1,0 +1,11 @@
+--- a/S4_current_headers.c
++++ b/A_counter_long_diagnostic.c
+@@ -1274,7 +1274,7 @@
+ 			decal_wrap_parameters[type].minimum_wrap_angle))
+ 	{
+ 		long edge_index = surface->first_edge_index;
+-		short edge_iteration = 0;
++		long edge_iteration = 0;
+ 		real_point2d const *input_points = projection->decal_points2d;
+ 		short decal_point_count = 4;
+ 		long clipped_flags = 0;

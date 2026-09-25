@@ -1,0 +1,104 @@
+{
+  "bridge_counts": {
+    "accepted_halo_absent_from_stable": 12,
+    "accepted_halo_nonexact_in_stable": 0,
+    "residual_halo_absent_from_stable": 1,
+    "strict_exact_halo_not_accepted": 0
+  },
+  "classifier_classes": {
+    "alias-global-ownership": 2,
+    "control-flow-return-shape": 3,
+    "no-comparison": 3,
+    "unclassified": 114
+  },
+  "errors": [
+    {
+      "error": "section-relative symbol '_ai_debug_render_actor_jmptable' not found",
+      "function": "_ai_debug_render_actor_jmptable",
+      "unit": "source/ai/ai_debug"
+    },
+    {
+      "error": "section-relative symbol '_fast_ftol_C' not found",
+      "function": "_fast_ftol_C",
+      "unit": "source/interface/hud_draw"
+    },
+    {
+      "error": "section-relative symbol '_main_crash' not found",
+      "function": "_main_crash",
+      "unit": "source/main/main"
+    }
+  ],
+  "halo_accepted_measures": {
+    "complete_code": 956998,
+    "complete_code_percent": 54.06261,
+    "complete_data": 749045,
+    "complete_data_percent": 19.091484,
+    "complete_units": 388,
+    "fuzzy_match_percent": 98.02473,
+    "matched_code": 1583050,
+    "matched_code_percent": 89.4294659370929,
+    "matched_data": 2587011,
+    "matched_data_percent": 65.93713034774743,
+    "matched_functions": 7452,
+    "matched_functions_percent": 98.38922630050172,
+    "total_code": 1770166,
+    "total_data": 3923451,
+    "total_functions": 7574,
+    "total_units": 468
+  },
+  "halo_open_objects": 80,
+  "halo_open_objects_by_function_gap": {
+    "0": 13,
+    "1": 39,
+    "2": 12,
+    "3": 12,
+    "4": 1,
+    "5": 1,
+    "6": 1,
+    "8": 1
+  },
+  "halo_remaining_functions": 122,
+  "halo_remaining_meaningful_bytes": 187116,
+  "halo_report_functions": 7574,
+  "halo_zero_function_gap_objects": [
+    "source/ai/path_obstacle_avoidance",
+    "source/ai/path_structure_bsp",
+    "source/game/game_engine",
+    "source/objects/object_lights",
+    "source/physics/breakable_surfaces",
+    "source/rasterizer/xbox/rasterizer_xbox",
+    "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
+    "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry",
+    "source/render/render_debug",
+    "source/bitmaps/bitmap_drawing",
+    "source/game/game_engine_king",
+    "source/linker_common",
+    "source/rasterizer/xbox/rasterizer_xbox_profile"
+  ],
+  "head": "20d0563d508f7836670db62514ffc3d1f1e2217e",
+  "nonzero_frame_delta_functions": 28,
+  "nonzero_frame_delta_meaningful_bytes": 59512,
+  "park_classes": {
+    "instruction-scheduling": 16,
+    "not-parked": 50,
+    "private-register-convention": 1,
+    "register-allocation": 5,
+    "tu-context-optimization": 2,
+    "unclassified": 48
+  },
+  "residuals_with_active_park": 72,
+  "strict_all": {
+    "E": 7624,
+    "R": 124,
+    "U": 504
+  },
+  "strict_all_functions": 8252,
+  "strict_halo": {
+    "E": 7440,
+    "R": 119,
+    "U": 2
+  },
+  "strict_halo_functions": 7561,
+  "top10_bytes": 72415,
+  "top20_bytes": 105388
+}

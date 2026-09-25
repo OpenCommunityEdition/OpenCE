@@ -1,0 +1,29 @@
+--- a/S4_current_headers.c
++++ b/AB_widths_diagnostic.c
+@@ -1274,7 +1274,7 @@
+ 			decal_wrap_parameters[type].minimum_wrap_angle))
+ 	{
+ 		long edge_index = surface->first_edge_index;
+-		short edge_iteration = 0;
++		long edge_iteration = 0;
+ 		real_point2d const *input_points = projection->decal_points2d;
+ 		short decal_point_count = 4;
+ 		long clipped_flags = 0;
+@@ -1290,7 +1290,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],
+@@ -1460,7 +1460,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],
