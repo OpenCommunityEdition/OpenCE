@@ -139,3 +139,127 @@ Attack outcomes (all reviewed):
 | 7 | ai_test_line_of_sight uninitialised read | +996 B (ai not complete) |
 | 8 | structures `double t`, rasterizer_geometry staged temp | structures, rasterizer_geometry (2 objects) |
 | 9 | real_math.h P2 complete January tier vs 3 count-coincident canaries | authenticity |
+
+## Wave R3-3 (two new instruments + attacks; zero credit)
+
+- **Retail-build witness (calibrated):** compiles our source in a retail configuration and compares
+  it against the Sept-25-2001 cache.exe (map bodies) and the Oct-12-2001 2276P.xbe. The retail
+  configuration is VC7 13.00.9254, the production flags minus /DDEBUG and /Oy-, plus /Gr, with
+  asserts compiled out and typed accessors inlined.
+  - Controls: 18/18 positive in 10 TUs, 12/15 negative, 13/13 invariance.
+  - Hit rates: 70.2% of source-stable exact bodies are verbatim in 2276P, against 2.8% of residuals.
+  - Harness: `scratch/w/r3w3_retail/retail_gate.py`.
+  - Blind spots: DEBUG-conditional code such as the saved_game_files mutex timeout, and register
+    zero placement across a call.
+- **HCEX line-table census:** covered 118 residuals. Its reliable evidence is aggregate `ld/std`
+  copies and textual arm order. Return-site and line counts discriminate only weakly.
+- **Attacks (11):**
+  - game_sound: the typed-accessor respell is approved at zero credit. Reviewer-amended patch B is
+    pending.
+  - bitmap_group: research only.
+  - Nine owner packets: saved_game_files, structures, bink q3, effects (x2), projectile_new, glow,
+    actor_look_update, player_profile_new, render_sprite.
+  - Pattern: every attack ended at an owner gate. In most cases the retail witness *confirmed*
+    that a held construct is authentic.
+
+## Owner rulings, 2026-09-24 (first ruling set)
+
+| Q | Item | Ruling |
+|---|---|---|
+| 1 | aim_grenade | **YES** (04, not 04b). Admit only the natural no-goto body as a narrow, target-proven original-bug exception; keep the BUG comment. Do not retire the decals rejection or touch reserved path_structure_bsp. |
+| 2 | actor_perception blockage | **HOLD.** The retail bytes and HCEX line records support the shape, but the prior empty-branch ruling requires authenticated original source. |
+| 3a | collisions stack_walk copy | **HOLD.** Header ownership is unproved; do not select a copy by byte yield. |
+| 3b | collisions bitmap_delete route | **HOLD.** Take neither the zero-regression route that contradicts HCEX nor an authentic route that loses exact functions. |
+| 3c | collisions `_valid_real_plane3d` COMDATs | Allowed under the existing narrow rule, but collisions earns **no credit** until 3a/3b have a house-rule-compliant, zero-regression resolution. |
+| 4 | first_person_weapons | **YES** (A2). Document the proved weapon-switch invariant. |
+| 5 | saved_game_files | **NO.** Keep the explicit hold on writing an indeterminate count on mutex failure. |
+| 6 | structures `double t` | **NO** (retail-contradicted). The genuine helper cleanup may land at zero credit after verification. |
+| 7 | rasterizer_geometry | **YES.** Admit the meaningful `real` temp supported by the retail builds. Test declaration-time initialisation first; document separate assignment if it is required. |
+
+## Batch R3-2 (owner rulings)
+
+- **aim_grenade** (+544 padded / +543 meaningful): r3_aim_grenade patch 01 only, i.e. the /Od
+  statement list with no goto.
+  - The vehicle-path read of the unassigned `aim_vector` keeps its BUG comment.
+  - Config: 03A (collision_features, real_math and path_smoothing set to Matching) and 04 (retires
+    the stale collision_features `_projection_from_vector3d` rejection).
+  - Not applied:
+    - 02 (the reaim /Od shape, whose local renames come only from a later build: held name class);
+    - 03b/03C (path_structure_bsp is reserved; path_obstacle_avoidance's .bss relabel is held);
+    - 04b (the decals rejection is kept);
+    - 05 (optional).
+  - Retail: the body is verbatim in Oct 2276P; the held goto candidate is not.
+  - Strip tests (reviewer):
+    - Byte-inert: the five argument view casts, the local names, and the leftover
+      `real_math_declarations.h` normalize2d prototype.
+    - Load-bearing, all inside the admitted natural /Od body: the unassigned read, the /Od
+      statement order, removal of the normalize2d redirect, and the `h` view copy
+      `*(real_vector2d const *)&aim_vector`.
+    - The `h` copy is not byte-inert (a field copy is non-exact). It is attested as an integer mov
+      pair in /Od (0x44ecc7) and as ld/std in HCEX; precedent `action_obey.c:1259`.
+  - Superseded: Codex hold probe aa2d8a96 (`codex/five-more-halo-20260925`).
+- **first_person_weapons** (+1,536 padded), patch A2:
+  - `VALID_INDEX` at all five /Od-attested constant-index sites.
+  - The two update-site NULL guards are removed.
+  - The three `REAL_MATH_EXTERNAL` magnitude/square-root redirects are removed; the resulting
+    surplus is identical to January's action_charge/action_alert copies.
+  - Invariant proof:
+    - Every write to `weapon_index` stores NONE except the one at first_person_weapons.c:1521.
+      That write is nested in `if (animation_graph->first_person_weapon_animations.count)` for the
+      graph taken from `weapon_definition->weapon.interface_definition.first_person_animations`.
+    - `first_person_weapon_update` re-derives the same graph after its `unit_index!=NONE`,
+      `weapon_index!=NONE` and `weapon_try_and_get` guards.
+    - The new-map `csmemset` leaves `weapon_index` at 0, but it sets `unit_index` to NONE.
+      `unit_index` is written only by `first_person_weapon_new_unit`, which immediately runs
+      `switch_weapons`, and that stores NONE first.
+    - So the NULL arm cannot reach either read. The comment at the moving-animation site states
+      this, and the jitter site refers to it.
+    - The completeness gap (the csmemset path) was found by the semantics reviewer.
+  - The earlier `weapon_play_first_person_weapon_sound` (6d351b35) has the same unguarded shape.
+    It is NOT covered by this invariant, because it takes an arbitrary weapon. It supports only
+    that the construct is authentic, not that it is safe (reviewer note; owner follow-up).
+  - /W3 goes from 11 to 12 warnings: one C4244 inside `real_math.h`'s `square_root` inline, which
+    is now compiled in this TU. The three new COMDATs fall in the all-inlined COMDAT class admitted
+    on 2026-09-21 (#5).
+- **rasterizer_geometry** (+144 padded): `real value = (real)(long)(compressed<<21);`.
+  - The declaration-time initialiser was tested first. It is debug EXACT and verbatim in 2276P
+    (0x129d10), and it MATCHes the Sept cache.exe body.
+  - The temp is load-bearing only at its first (i) use.
+    - Reusing it for j and k is byte-inert in debug and in both retail witnesses. Three separate
+      temps, and a separate assignment in place of the initialiser, are also inert.
+    - So the j/k staging is neither required nor attested. It is kept so the three components are
+      written the same way, which is disclosed here.
+    - A declaration-time initialiser can serve only the first use; the later uses have to be
+      assignments.
+  - Negatives that miss both retail witnesses: no temp (production), the /Od mask+division form,
+    and staging through `long`.
+- **structures** (zero credit): the helper cleanup only, i.e. a single shared FALSE and the
+  genuine `point_from_line3d` call, replacing production's hand-expanded rows (rule 6).
+  - Production's names, types and declarations are kept (`scratch/w/r3b2/structures_min/`).
+  - The residual moves from `[size 416!=432, sha]` to `[sha]` at January's 432 B.
+  - A keyed diff against HEAD shows only the target function changed. /W3 stays at 12.
+  - Not landed: round-2 patch A's extra elements.
+    - The HCEX parameter name `point` and local renames.
+    - `short projection_sign`: January-attested by `movzx ax,al` at +0xed, but it adds two C4244
+      warnings.
+    - The plane lookup inlined into the distance call, plus inner-block declarations.
+    - These move the body closer to 2276P (retail ratio 0.979 against 0.636 for the minimal
+      cleanup), but the ruling admitted only the helper cleanup. They are recorded for a future
+      ruling.
+- **Full gate** (`scratch/campaign/gate_r3b2/summary.json`):
+  - ninja exit 0 and progress OK.
+  - Halo objects **383 -> 388 / 468**.
+  - Meaningful code 1,578,820 -> **1,581,031** (+2,211); functions 7,446 -> **7,449**; data
+    2,587,011 (unchanged).
+  - Stable diff against the frozen baseline: gained 4 functions / 3,808 padded, including
+    batch 1's 1,584 B. **0 regressions.**
+  - Parks 82 -> 80 (0 stale, 0 invalid). Admission: 0 contradicted, 0 revoked.
+  - Fake-match leads: 26 (unchanged).
+  - pytest: 1,161 passed, 5 skipped, 26 subtests. `git diff --check` clean.
+- **Whole-object checks** on collision_features, real_math, path_smoothing, first_person_weapons
+  and rasterizer_geometry:
+  - object_audit PASS;
+  - pdb_storage 0 disagreements;
+  - surplus_identity 0 non-identical;
+  - selected-provider link PASS in both orders.
+- Per-function records: `scratch/w/r3b2/records.json`.
