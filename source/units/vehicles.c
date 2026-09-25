@@ -1001,8 +1001,8 @@ static void update_alien_fighter_physics_new(
 				pitch_vectors(&desired_rotation.forward, &desired_rotation.up, sine(definition->unknown364),
 					cosine(definition->unknown364));
 
-			yaw = (desired_rotation.forward.i*vehicle->object.translational_velocity.j-
-				desired_rotation.forward.j*vehicle->object.translational_velocity.i)/
+			yaw = cross_product2d((real_vector2d const *)&desired_rotation.forward,
+				(real_vector2d const *)&vehicle->object.translational_velocity)/
 				definition->unknown2f8*definition->unknown308;
 
 			yaw_vectors(&desired_rotation.up, &desired_rotation.forward, sine(yaw), cosine(yaw));
