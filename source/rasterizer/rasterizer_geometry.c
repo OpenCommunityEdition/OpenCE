@@ -538,12 +538,15 @@ real_vector3d uncompress_int32_to_real_vector3d(
 	unsigned long compressed)
 {
 	real_vector3d v;
+	real value = (real)(long)(compressed<<21);
 
-	v.i = ((real)(long)(compressed<<21) * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
+	v.i = (value * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
 	compressed >>= 11;
-	v.j = ((real)(long)(compressed<<21) * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
+	value = (real)(long)(compressed<<21);
+	v.j = (value * (1.0f/1048576.0f) + 1.0f) * (1.0f/2047.0f);
 	compressed >>= 11;
-	v.k = ((real)(long)(compressed<<22) * (1.0f/2097152.0f) + 1.0f) * (1.0f/1023.0f);
+	value = (real)(long)(compressed<<22);
+	v.k = (value * (1.0f/2097152.0f) + 1.0f) * (1.0f/1023.0f);
 
 	return v;
 }

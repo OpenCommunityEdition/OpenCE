@@ -97,9 +97,6 @@ symbols in this file:
 /* ---------- headers */
 
 #define REAL_MATH_EXTERNAL_SIGNED_ANGULAR_DIFFERENCE
-#define REAL_MATH_EXTERNAL_SQUARE_ROOT
-#define REAL_MATH_EXTERNAL_MAGNITUDE_SQUARED3D
-#define REAL_MATH_EXTERNAL_MAGNITUDE3D
 #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
 #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
 #include "interface/first_person_weapons.h"
@@ -1120,8 +1117,9 @@ static void first_person_weapon_build_node_matrices(
 					model_get_node_orientations(model, first_person_weapon->node_orientations);
 				}
 
-				firing_animation_index= (first_person_weapon_animations->animations.count>
-					_first_person_weapon_animation_ammunition) ?
+				firing_animation_index= VALID_INDEX(
+					_first_person_weapon_animation_ammunition,
+					first_person_weapon_animations->animations.count) ?
 					animation_graph_animation_index_get(
 						&first_person_weapon_animations->animations)
 							[_first_person_weapon_animation_ammunition].animation_index :
@@ -1201,8 +1199,9 @@ static void first_person_weapon_build_node_matrices(
 						first_person_weapon->node_orientations);
 				}
 
-				overlay_animation_index= (first_person_weapon_animations->animations.count>
-					_first_person_weapon_animation_overlays) ?
+				overlay_animation_index= VALID_INDEX(
+					_first_person_weapon_animation_overlays,
+					first_person_weapon_animations->animations.count) ?
 					animation_graph_animation_index_get(
 						&first_person_weapon_animations->animations)
 							[_first_person_weapon_animation_overlays].animation_index :
@@ -1479,8 +1478,9 @@ static void first_person_weapon_switch_weapons(
 						struct game_globals_first_person_interface *first_person_interface;
 
 						first_person_weapon->overlay_animation_index= NONE;
-						if (first_person_weapon_animations->animations.count>
-							_first_person_weapon_animation_overlays)
+						if (VALID_INDEX(
+							_first_person_weapon_animation_overlays,
+							first_person_weapon_animations->animations.count))
 						{
 							short overlay_animation_index= animation_graph_animation_index_get(
 								&first_person_weapon_animations->animations)
@@ -1758,9 +1758,16 @@ static void first_person_weapon_update(
 						struct animation_graph_first_person_weapon_animations);
 
 			first_person_weapon->moving_animation.frame_index= 0;
+			/* no NULL test (January, and the later first-party build at /Od 0x61fcea): a non-NONE
+			 * weapon_index is only committed by first_person_weapon_switch_weapons inside
+			 * `if (animation_graph->first_person_weapon_animations.count)` for this same graph. The
+			 * new-map reset leaves weapon_index 0 but unit_index NONE, and first_person_weapon_new_unit
+			 * runs switch_weapons (which stores NONE first) as soon as it sets unit_index, so the NULL
+			 * arm above cannot reach this read. */
 			first_person_weapon->moving_animation.index=
-				first_person_weapon_animations &&
-					first_person_weapon_animations->animations.count>_first_person_weapon_animation_moving ?
+				VALID_INDEX(
+					_first_person_weapon_animation_moving,
+					first_person_weapon_animations->animations.count) ?
 					animation_graph_animation_index_get(
 						&first_person_weapon_animations->animations)
 							[_first_person_weapon_animation_moving].animation_index :
@@ -1780,10 +1787,12 @@ static void first_person_weapon_update(
 							struct animation_graph_first_person_weapon_animations);
 
 				first_person_weapon->overcharged_jitter_animation.frame_index= 0.0f;
+				/* no NULL test: the same switch_weapons invariant as the moving animation above
+				 * (January and /Od 0x61fd96). */
 				first_person_weapon->overcharged_jitter_animation.index=
-					first_person_weapon_animations &&
-						first_person_weapon_animations->animations.count>
-						_first_person_weapon_animation_overcharged_jitter ?
+					VALID_INDEX(
+						_first_person_weapon_animation_overcharged_jitter,
+						first_person_weapon_animations->animations.count) ?
 						animation_graph_animation_index_get(
 							&first_person_weapon_animations->animations)
 								[_first_person_weapon_animation_overcharged_jitter].animation_index :

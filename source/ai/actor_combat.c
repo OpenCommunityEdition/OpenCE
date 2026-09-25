@@ -126,8 +126,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define cross_product2d cross_product2d_inline
-#define normalize2d normalize2d_inline
 #define normalize3d normalize3d_inline
 #define point_from_line3d actor_combat_point_from_line3d_inline
 #define vector_from_points3d actor_combat_vector_from_points3d_inline
@@ -166,8 +164,6 @@ symbols in this file:
 #undef vector_from_points3d
 #undef point_from_line3d
 #undef normalize3d
-#undef normalize2d
-#undef cross_product2d
 
 #include "math/real_math_declarations.h"
 
@@ -518,13 +514,6 @@ static struct projectile_definition *actor_get_grenade_definition(
 	}
 
 	return projectile_definition;
-}
-
-real cross_product2d(
-	real_vector2d const *a,
-	real_vector2d const *b)
-{
-	return a->i*b->j - a->j*b->i;
 }
 
 static void actor_combat_find_nearby_target(
@@ -1556,8 +1545,8 @@ long actor_aim_grenade(
 	real_vector3d *vector)
 {
 	struct actor_datum *actor = actor_get(actor_index);
-	real_vector3d aim_vector;
 	long target_unit_index = NONE;
+	real_vector3d aim_vector;
 
 	if (actor->control.grenade_current_prop_index != NONE)
 	{
@@ -1572,12 +1561,12 @@ long actor_aim_grenade(
 		if (prop->state < _prop_state_unacknowledged ||
 			prop->state > _prop_state_becoming_acknowledged)
 		{
-			real_point3d desired_grenade_target = prop->body_position;
+			real_point3d new_desired_target = prop->body_position;
 
-			desired_grenade_target.z += 0.2f;
+			new_desired_target.z += 0.2f;
 			actor_combat_retarget_grenade(
 				actor_index,
-				&desired_grenade_target);
+				&new_desired_target);
 		}
 	}
 
@@ -1585,33 +1574,30 @@ long actor_aim_grenade(
 
 	if (actor->input.vehicle_index == NONE)
 	{
-		real_vector2d aim_vector2d;
+		real_vector2d horizontal_aim_vector;
 
 		aim_vector = actor->control.grenade_current_aim_vector;
-		aim_vector2d.i = aim_vector.i;
-		aim_vector2d.j = aim_vector.j;
+		horizontal_aim_vector = *(real_vector2d const *)&aim_vector;
 
-		if (normalize2d(&aim_vector2d) > 0.0f &&
-			aim_vector2d.i*actor->input.facing_vector.i +
-				aim_vector2d.j*actor->input.facing_vector.j <
-					GRENADE_AIMING_ANGLE_COSINE)
+		if (normalize2d(&horizontal_aim_vector) > 0.0f &&
+			dot_product2d(
+				(real_vector2d const *)&actor->input.facing_vector,
+				&horizontal_aim_vector) < GRENADE_AIMING_ANGLE_COSINE)
 		{
-			boolean counterclockwise =
-				aim_vector2d.j*actor->input.facing_vector.i -
-					aim_vector2d.i*actor->input.facing_vector.j > 0.0f;
 			real_vector3d new_aim_vector = actor->input.facing_vector;
-			real magnitude;
+			boolean counterclockwise = cross_product2d(
+				(real_vector2d const *)&actor->input.facing_vector,
+				&horizontal_aim_vector) > 0.0f;
 
 			rotate_vector_about_axis(
 				&new_aim_vector,
 				global_up3d,
 				(counterclockwise ? 1 : -1)*GRENADE_AIMING_ANGLE_SINE,
 				GRENADE_AIMING_ANGLE_COSINE);
-
-			magnitude = square_root(
-				aim_vector.i*aim_vector.i + aim_vector.j*aim_vector.j);
-			new_aim_vector.i *= magnitude;
-			new_aim_vector.j *= magnitude;
+			scale_vector2d(
+				(real_vector2d const *)&new_aim_vector,
+				magnitude2d((real_vector2d const *)&aim_vector),
+				(real_vector2d *)&new_aim_vector);
 			new_aim_vector.k = aim_vector.k;
 
 			match_assert_valid_real_normal3d(
@@ -1623,9 +1609,16 @@ long actor_aim_grenade(
 		}
 	}
 
-	vector->i = aim_vector.i*actor->control.grenade_current_aim_speed;
-	vector->j = aim_vector.j*actor->control.grenade_current_aim_speed;
-	vector->k = aim_vector.k*actor->control.grenade_current_aim_speed;
+	/* BUG (preserved for exact matching): aim_vector is assigned only on foot.
+	 * With actor->input.vehicle_index != NONE, January branches from its vehicle
+	 * test straight to this scale and reads the unassigned local; the 2011 HCEX
+	 * and later /Od builds keep the same path. A corrected build should start
+	 * from actor->control.grenade_current_aim_vector.
+	 */
+	scale_vector3d(
+		&aim_vector,
+		actor->control.grenade_current_aim_speed,
+		vector);
 
 	return target_unit_index;
 }

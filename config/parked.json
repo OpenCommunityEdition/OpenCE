@@ -475,25 +475,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/rasterizer_geometry",
-      "function": "_uncompress_int32_to_real_vector3d",
-      "class": "instruction-scheduling",
-      "evidence": "Equal 144-byte padded size, 9/9 relocations with identical destinations, and 49/49 instructions. The sole divergence is one dependency-free transposition: January emits `fadd __real@3f800000` before `shl eax, 0x16`, the candidate emits them in the opposite order, which also shifts that one relocation's address by three bytes. The bit fields, scales, masks, destructive shift sequence and the local real_vector3d copied out through *result are all confirmed. Measured inert: folding the second shift into the k expression, long-hand assignment, hoisting the shift ahead of j, and a division form of the k scale.",
-      "measurements": {
-        "target": {
-          "size": 144,
-          "relocation_count": 9,
-          "normalized_sha256": "aa4a69683e5f1148413f6029acfc993341346b93b86809dcb5450896dcc3944d"
-        },
-        "base": {
-          "size": 144,
-          "relocation_count": 9,
-          "normalized_sha256": "8199ac81b23a4607ed8191dbe2f95cb11da85761ecf353514714f8261562b55f"
-        },
-        "objdiff_percent": 95.0
-      }
-    },
-    {
       "unit": "source/ai/actions",
       "function": "_actor_action_handle_vehicle_entry",
       "class": "register-allocation",
@@ -1251,17 +1232,6 @@
         "target": { "size": 1568, "relocation_count": 40, "normalized_sha256": "8dce5e181abf19a30fc9a87e483c1e0a16050eeb48c03c48c2b6209e7fd59deb" },
         "base": { "size": 1648, "relocation_count": 32, "normalized_sha256": "4c1641507b74dfec51939790c78503d4a27f6a22b9f1fe10d42cab2aaa1554f9" },
         "objdiff_percent": 62.452587
-      }
-    },
-    {
-      "unit": "source/interface/first_person_weapons",
-      "function": "_first_person_weapon_update",
-      "class": "unclassified",
-      "evidence": "Complete HCEA-corroborated first-person weapon state machine with the four-player January loop. Wave 2 of claude/fifty-objects-20260925 applied three /Od-attested corrections. First, a key-frame result no longer advances the state: January @0x13c jumps past next_state on _animation_key_frame, and /Od 0x61fb2e has an empty then-arm. Second, both animation updates call the TU wrapper animation_update_render_only (/Od 0x61fb22/0x61fc59); no other January object references the wrapper, so it was inlined here. Third, turning is a real_vector2d aggregate (/Od RTC descriptor turning, 8 bytes). With the null guards removed and magnitude3d inlined, the function is strictly exact (scratch/w/first_person_weapons/final_exact.c). January omits both null tests after count ? TAG_BLOCK_GET_ELEMENT(...) : NULL, and the later /Od build omits them too. That is an authentic unguarded dereference and is owner-gated. The retained defined-behaviour body keeps both guards and keeps magnitude3d out of line, so no helper COMDAT is emitted while the caller is non-exact. Zero credit. Reopen on an owner ruling admitting the unguarded dereference. See scratch/w/first_person_weapons/LEDGER.md.",
-      "measurements": {
-        "target": { "size": 1536, "relocation_count": 59, "normalized_sha256": "912d95683f14ff39699c4a1056af92441a20ceeec0584007512ce26b5d70478d" },
-        "base": { "size": 1520, "relocation_count": 60, "normalized_sha256": "ba39884c90f2ef0afbac711db26225e2b41d4fc0719a2afbe0a600883e2bf8ff" },
-        "objdiff_percent": 95.21506
       }
     },
     {
