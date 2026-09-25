@@ -324,3 +324,48 @@ Complete objects that consume the new `_negate_vector3d` surplus, re-audited:
   (not a PDB public), but bsp3d.c defines it external. This is a zero-credit storage fix.
 - items, Matching, has pdb_storage 3: `_item_maximum_impact_velocity`, `_item_update_section` and
   `_verify_item_location` are not cachebeta publics, but ours and symbols.json keep them external.
+
+## Owner rulings, 2026-09-25 (ruling list 2)
+
+- **vehicles fighter: narrowly REOPENED** on the new first-party and link evidence (lifts the
+  2026-09-21 "the fighter stays held" for this function only).
+- **bink split arms:** to get a separate ruling; presented as its own question and not landed.
+- **Held:** the parentheses-only matches (projectile_new O1, players RB2) and the other
+  bug-dependent candidates (glow, player_profile R1-R3, hs_parse_boolean, effects,
+  render_sprite, ai_test_line_of_sight). "Matching bytes alone does not lift those house-rule
+  holds."
+- **Not ruled; still pending:** actor_looking (s5 view cast + `can_look` head) and the decals
+  flag mask.
+
+## Batch R3-4 (vehicles fighter reopen)
+
+- `_update_alien_fighter_physics_new` is exact (+1,088 padded): the hand-written 2D yaw
+  expression becomes the genuine
+  `cross_product2d((real_vector2d const *)&desired_rotation.forward, (real_vector2d const *)&vehicle->object.translational_velocity)`.
+- Evidence:
+  - Debug EXACT.
+  - Verbatim in Oct-2001 2276P at 0x1529a0, and a Sept-25 cache.exe map MATCH. Production matches
+    neither.
+  - The `@cross_product2d@8` copy also matches Oct/Sept.
+  - /Od 0x8f6cbf calls the helper with the two direct 3D pointers.
+  - The view casts meet ruling 6 (2026-09-21): attested site, byte-inert cast, layout prefix,
+    exact caller.
+- Link: the new SELECT_ANY `_cross_product2d` passes the selected-provider link against
+  actor_combat. This depends on batch R3-2's NODUP -> ANY change; before R3-2 it failed with
+  LNK2005.
+  - vehicles provider link PASS in full and on the baseline.
+  - object_audit goes FAIL(2) -> FAIL(1): only the pre-existing `_update_alien_scout_physics`
+    residual remains.
+  - vehicles 38/39, so the object is not complete.
+- **Disclosure (reviewer F1):** the /Od statement at this site is a post-January revision.
+  - /Od computes `cp*unknown308/unknown2f8` (mulss, then divss).
+  - January and Oct retail compute `cp/unknown2f8*unknown308` (fdiv, then fmul), which is what the
+    landed source spells.
+  - /Od attests the helper call and its two arguments, not the arithmetic order.
+- Full gate (`scratch/campaign/gate_r3b4/summary.json`):
+  - ninja exit 0.
+  - Halo objects 388 / 468.
+  - Meaningful code **1,583,050** (+1,088); functions **7,452**.
+  - Stable diff against the frozen baseline: gained 7 functions / 5,840 padded, **0 regressions**.
+  - Parks 79. Admission: 0 contradicted, 0 revoked.
+  - Fake-match leads 26. pytest 1,161 passed. `git diff --check` clean.
