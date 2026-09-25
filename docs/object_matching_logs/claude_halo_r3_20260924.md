@@ -263,3 +263,64 @@ Attack outcomes (all reviewed):
   - surplus_identity 0 non-identical;
   - selected-provider link PASS in both orders.
 - Per-function records: `scratch/w/r3b2/records.json`.
+
+## Wave R3-3b (retail-witness follow-ups; 5 attacks + reviews)
+
+- rasterizer_lights `_rasterizer_lens_flare_submit_for_cluster`: **EXACT**, reviewer-approved.
+  - `direction`/`up` and their uses move into an inner block, following the /Od declaration order.
+  - The earlier "scheduler tie, five shapes exhausted" entry is retired.
+  - The object stays incomplete: `_rasterizer_lens_flares_draw` is a parked residual, and
+    `_rasterizer_lights_reset_for_new_map` is the owner-held overrun.
+- bipeds file-statics: a storage packet, approved with amendment 04 (the parked
+  `_ai_test_ballistic_line_of_fire` rebaseline). Zero credit.
+  - The retail private ABI and the Sept map STATIC list attest that `biped_falling_danger`,
+    `update_airborne`, `snap_facing`, `update_moving` and `fudge_vectors` are file-static.
+- vehicles `_update_alien_fighter_physics_new`:
+  - Exact through the genuine `cross_product2d` call. Verbatim in 2276P and matches the Sept map.
+  - Stays under the owner hold of 2026-09-21 ("the fighter stays held").
+  - Its provider-link dependency on actor_combat patch 01 is now satisfied.
+  - F1: the /Od form of the attested statement is a post-January reassociation.
+- Owner packets (unchanged class):
+  - hs_parse_boolean (LAW U: the uninitialised read is confirmed in both retail builds);
+  - players examine_nearby_device (RB2 parenthesis).
+
+## Batch R3-3 (approved packets that need no owner ruling)
+
+| Packet | Credit | Notes |
+|---|---|---|
+| r3w2 bipeds P1+P2+P3 | `_biped_find_nearby_support_surface` +544 padded | See below. |
+| bipeds storage 01+02+03+04 (review_r3w3b amended set) | 0 | bipeds pdb_storage now has 0 disagreements. `_ai_test_ballistic_line_of_fire` fuzzy score drifts 99.70022 -> 99.69588 through the declaration count; it is parked and no exact row is lost. |
+| lens_flare P1 scope block | `_rasterizer_lens_flare_submit_for_cluster` +400 padded | rasterizer_lights 11/13. |
+| game_sound typed accessor, patch A | 0 | `game_looping_sound_get` is January's own name (line-282 assert string). Retail OCT verbatim goes 19 -> 28/32. The optional amended AB scope patch is not landed. |
+| saved_game_files 01+02r+04a+04b | 0 | First-party static names plus storage. pdb_storage 4 -> 0. 45/46: only the owner-held (Q5) enumerate function remains residual. |
+
+Notes on the bipeds P1+P2+P3 row:
+- P1: attested `real_math.h` `plane3d_negate` body, i.e. `negate_vector3d` + d (/Od 0x56d630 and
+  the HCEX_Release line table).
+- P2: render_objects /Od shadow-volume plane pair.
+- P3: bipeds genuine helper calls.
+- Dedicated 467-unit header review: 0 exact rows lost.
+- The bipeds park is retired. The render_cameras `_render_camera_build_frustum` park is refreshed to
+  3408 / 112 / d42e420f / 88.8082; the target is unchanged, and that site is not a
+  `plane3d_negate` caller in /Od.
+
+Full gate (`scratch/campaign/gate_r3b3/summary.json`):
+- ninja exit 0.
+- Halo objects **388 / 468**; no new object completes in this batch.
+- Meaningful code **1,581,962** (+931); functions **7,451** (+2); data 2,587,011.
+- Stable diff against the frozen baseline: gained 6 functions / 4,752 padded, **0 regressions**.
+- Parks 80 -> 79 (0 stale, 0 invalid). Admission: 0 contradicted, 0 revoked.
+- Fake-match leads 26. pytest 1,161 passed. `git diff --check` clean.
+
+Complete objects that consume the new `_negate_vector3d` surplus, re-audited:
+- game_sound, units, leaf_map, render_objects, collision_features: object_audit PASS, surplus
+  identical, provider link PASS, pdb 0.
+- items: object_audit PASS and provider link PASS, but pdb 3 (see follow-ups).
+- bsp3d: see follow-ups.
+
+**Follow-ups found during the re-audit (pre-existing; identical on the pre-batch objects):**
+- bsp3d, admitted Matching, has object_audit FAIL(1) and provider link FAIL(1) on
+  `_bsp3d_clip_polygon_to_leaves_recursive`. January's split and symbols.json mark it static
+  (not a PDB public), but bsp3d.c defines it external. This is a zero-credit storage fix.
+- items, Matching, has pdb_storage 3: `_item_maximum_impact_velocity`, `_item_update_section` and
+  `_verify_item_location` are not cachebeta publics, but ours and symbols.json keep them external.
