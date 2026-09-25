@@ -72,10 +72,6 @@ void saved_game_file_generate_checksum(
 	void const *buffer,
 	word buffer_size,
 	struct _XCALCSIG_SIGNATURE *checksum);
-boolean saved_game_files_take_mapfile_mutex(
-	void);
-void saved_game_files_release_mapfile_mutex(
-	void);
 wchar_t *saved_game_file_get_display_name(
 	long profile_index);
 boolean saved_game_file_open(
@@ -87,8 +83,6 @@ boolean synchronize_metadata_display_name_with_profile_name(
 boolean saved_game_file_get_path_to_enclosing_directory(
 	long profile_index,
 	char *directory_path);
-short enumerate_default_profiles(
-	void);
 long create_enumerated_saved_game_file(
 	word saved_game_file_type,
 	short local_player_index,
@@ -110,8 +104,6 @@ void saved_game_files_delete_all_custom_profiles(
 	void);
 word saved_game_file_get_type(
 	long profile_index);
-void enumerate_memory_units(
-	void);
 void enumerate_memory_units_test(
 	void);
 

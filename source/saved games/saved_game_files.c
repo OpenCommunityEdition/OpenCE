@@ -37,17 +37,17 @@ symbols in this file:
 001B2CE0 0060:
 	_find_and_create_directory_if_necessary (0000)
 001B2D40 00d0:
-	_code_001b2d40 (0000)
+	_enumerate_saved_game_files_start (0000)
 001B2E10 0090:
-	_code_001b2e10 (0000)
+	_enumerate_saved_game_files_end (0000)
 001B2EA0 0080:
-	_code_001b2ea0 (0000)
+	_enumerate_saved_game_file (0000)
 001B2F20 00d0:
-	_code_001b2f20 (0000)
+	_enumerate_mapfile_start (0000)
 001B2FF0 00a0:
-	_code_001b2ff0 (0000)
+	_enumerate_mapfile_end (0000)
 001B3090 0070:
-	_code_001b3090 (0000)
+	_enumerate_saved_game_file_from_mapfile (0000)
 001B3100 00d0:
 	_code_001b3100 (0000)
 001B31D0 0020:
@@ -69,7 +69,7 @@ symbols in this file:
 001B3B20 01e0:
 	_code_001b3b20 (0000)
 001B3D00 01e0:
-	_code_001b3d00 (0000)
+	_append_entry_to_mapfile (0000)
 001B3EE0 0210:
 	_code_001b3ee0 (0000)
 001B40F0 00c0:
@@ -435,15 +435,15 @@ typedef char verify_saved_game_files_globals_size[
 
 static boolean find_and_create_directory_if_necessary(
 	char const *path);
-static boolean append_entry_to_mapfile(
+static boolean enumerate_saved_game_file(
 	struct enumerated_saved_game_file *file);
-static boolean enumerate_mapfile_begin(
+static boolean enumerate_saved_game_files_start(
 	word memory_unit);
-static boolean open_mapfile_for_reading(
+static boolean enumerate_mapfile_start(
 	word memory_unit_index);
-static boolean close_mapfile_after_reading(
+static boolean enumerate_mapfile_end(
 	word memory_unit_index);
-static boolean read_next_entry_in_mapfile(
+static boolean enumerate_saved_game_file_from_mapfile(
 	struct enumerated_saved_game_file *file);
 static long count_enumerated_profiles_in_mapfile(
 	word memory_unit_index);
@@ -453,7 +453,7 @@ static long build_saved_game_file_index(
 	long n,
 	boolean read_only,
 	boolean valid);
-static boolean enumerate_mapfile_end(
+static boolean enumerate_saved_game_files_end(
 	word memory_unit);
 static short enumerate_default_playlist_profiles(
 	void);
@@ -470,10 +470,18 @@ static boolean set_nth_entry_in_mapfile(
 static boolean remove_nth_entry_in_mapfile(
 	word memory_unit_index,
 	word n);
-static boolean add_new_entry_to_mapfile(
+static boolean append_entry_to_mapfile(
 	word memory_unit_index,
 	struct enumerated_saved_game_file *file,
 	long *profile_index);
+static void enumerate_memory_units(
+	void);
+static boolean saved_game_files_take_mapfile_mutex(
+	void);
+static void saved_game_files_release_mapfile_mutex(
+	void);
+static short enumerate_default_profiles(
+	void);
 
 /* ---------- globals */
 
@@ -935,13 +943,13 @@ void saved_game_file_generate_checksum(
 	return;
 }
 
-boolean saved_game_files_take_mapfile_mutex(
+static boolean saved_game_files_take_mapfile_mutex(
 	void)
 {
 	return take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT);
 }
 
-void saved_game_files_release_mapfile_mutex(
+static void saved_game_files_release_mapfile_mutex(
 	void)
 {
 	release_mutex(saved_game_files_globals.mapfile_mutex);
@@ -1268,7 +1276,7 @@ static boolean set_nth_entry_in_mapfile(
 		2021,
 		(memory_unit_index < NUMBER_OF_MEMORY_UNITS) && (file != NULL));
 
-	if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+	if (saved_game_files_take_mapfile_mutex())
 	{
 		if (file_reference_create_from_path(&saved_game_files_globals.memory_unit_mapfile,
 				memory_unit_mapfile_path[memory_unit_index], FALSE) &&
@@ -1311,7 +1319,7 @@ static boolean set_nth_entry_in_mapfile(
 			error(_error_silent, "failed to open memory unit mapfile for memory unit #%d", memory_unit_index);
 		}
 
-		release_mutex(saved_game_files_globals.mapfile_mutex);
+		saved_game_files_release_mapfile_mutex();
 	}
 	else
 	{
@@ -1321,7 +1329,7 @@ static boolean set_nth_entry_in_mapfile(
 	return success;
 }
 
-short enumerate_default_profiles(
+static short enumerate_default_profiles(
 	void)
 {
 	short number_of_playlist_files = enumerate_default_playlist_profiles();
@@ -1435,7 +1443,7 @@ long create_enumerated_saved_game_file(
 							error(_error_silent, "failed to write blank saved game file block to disk");
 						}
 
-						if (add_new_entry_to_mapfile(_memory_unit_hard_drive, &file, &profile_index))
+						if (append_entry_to_mapfile(_memory_unit_hard_drive, &file, &profile_index))
 						{
 							match_assert(
 								"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
@@ -1635,9 +1643,9 @@ void saved_game_files_enumerate_available_to_local_player_index(
 		}
 
 		number_of_entries = count_enumerated_profiles_in_mapfile(memory_unit_index);
-		if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+		if (saved_game_files_take_mapfile_mutex())
 		{
-			if (open_mapfile_for_reading(memory_unit_index))
+			if (enumerate_mapfile_start(memory_unit_index))
 			{
 				long entry_index;
 
@@ -1645,7 +1653,7 @@ void saved_game_files_enumerate_available_to_local_player_index(
 					number_of_available_profiles < *number_of_profiles && entry_index < number_of_entries;
 					entry_index++)
 				{
-					if (!read_next_entry_in_mapfile(&file))
+					if (!enumerate_saved_game_file_from_mapfile(&file))
 					{
 						break;
 					}
@@ -1660,10 +1668,10 @@ void saved_game_files_enumerate_available_to_local_player_index(
 					}
 				}
 
-				close_mapfile_after_reading(memory_unit_index);
+				enumerate_mapfile_end(memory_unit_index);
 			}
 
-			release_mutex(saved_game_files_globals.mapfile_mutex);
+			saved_game_files_release_mapfile_mutex();
 		}
 		else
 		{
@@ -1700,17 +1708,17 @@ long saved_game_file_find_profile_index_for_directory_path(
 
 	if (take_mutex(saved_game_files_globals.general_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
 	{
-		if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+		if (saved_game_files_take_mapfile_mutex())
 		{
 			long number_of_entries = count_enumerated_profiles_in_mapfile(memory_unit_index);
 
-			if (open_mapfile_for_reading(memory_unit_index))
+			if (enumerate_mapfile_start(memory_unit_index))
 			{
 				long entry_index;
 
 				for (entry_index = 0; entry_index < number_of_entries; entry_index++)
 				{
-					if (!read_next_entry_in_mapfile(&file))
+					if (!enumerate_saved_game_file_from_mapfile(&file))
 					{
 						break;
 					}
@@ -1724,10 +1732,10 @@ long saved_game_file_find_profile_index_for_directory_path(
 					}
 				}
 
-				close_mapfile_after_reading(memory_unit_index);
+				enumerate_mapfile_end(memory_unit_index);
 			}
 
-			release_mutex(saved_game_files_globals.mapfile_mutex);
+			saved_game_files_release_mapfile_mutex();
 		}
 		else
 		{
@@ -1755,7 +1763,7 @@ void saved_game_files_delete_all_custom_profiles(
 
 	while (memory_unit_index <= _memory_unit_hard_drive)
 	{
-		if (enumerate_mapfile_begin(memory_unit_index))
+		if (enumerate_saved_game_files_start(memory_unit_index))
 		{
 			if (memory_unit_index == _memory_unit_hard_drive)
 			{
@@ -1786,16 +1794,10 @@ void saved_game_files_delete_all_custom_profiles(
 					}
 				}
 
-				{
-					short number_of_playlist_files = enumerate_default_playlist_profiles();
-					short number_of_player_profile_files = enumerate_default_player_profiles();
-					short number_of_default_files = number_of_playlist_files+number_of_player_profile_files;
-
-					number_of_enumerated_files += number_of_default_files;
-				}
+				number_of_enumerated_files += enumerate_default_profiles();
 			}
 
-			enumerate_mapfile_end(memory_unit_index);
+			enumerate_saved_game_files_end(memory_unit_index);
 		}
 
 		memory_unit_index++;
@@ -1804,7 +1806,7 @@ void saved_game_files_delete_all_custom_profiles(
 	return;
 }
 
-void enumerate_memory_units(
+static void enumerate_memory_units(
 	void)
 {
 	wchar_t message[MAXIMUM_FILENAME_LENGTH+1];
@@ -1821,7 +1823,7 @@ void enumerate_memory_units(
 	{
 		if (take_mutex(saved_game_files_globals.general_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
 		{
-			if (enumerate_mapfile_begin(memory_unit_index))
+			if (enumerate_saved_game_files_start(memory_unit_index))
 			{
 				if (memory_unit_index == _memory_unit_hard_drive)
 				{
@@ -1930,7 +1932,7 @@ void enumerate_memory_units(
 										error(_error_silent, "failed to open saved game file to verify checksum");
 									}
 
-									if (!append_entry_to_mapfile(&file))
+									if (!enumerate_saved_game_file(&file))
 									{
 										break;
 									}
@@ -1946,16 +1948,10 @@ void enumerate_memory_units(
 						}
 					}
 
-					{
-						short number_of_playlist_files = enumerate_default_playlist_profiles();
-						short number_of_player_profile_files = enumerate_default_player_profiles();
-						short number_of_default_files = number_of_playlist_files+number_of_player_profile_files;
-
-						number_of_enumerated_files += number_of_default_files;
-					}
+					number_of_enumerated_files += enumerate_default_profiles();
 				}
 
-				enumerate_mapfile_end(memory_unit_index);
+				enumerate_saved_game_files_end(memory_unit_index);
 			}
 
 			release_mutex(saved_game_files_globals.general_mutex);
@@ -1993,7 +1989,7 @@ static boolean find_and_create_directory_if_necessary(
 	return success;
 }
 
-static boolean enumerate_mapfile_begin(
+static boolean enumerate_saved_game_files_start(
 	word memory_unit)
 {
 	match_assert(
@@ -2023,7 +2019,7 @@ static boolean enumerate_mapfile_begin(
 	return saved_game_files_globals.enumeration_in_progress;
 }
 
-static boolean enumerate_mapfile_end(
+static boolean enumerate_saved_game_files_end(
 	word memory_unit)
 {
 	match_assert(
@@ -2047,7 +2043,7 @@ static boolean enumerate_mapfile_end(
 	return TRUE;
 }
 
-static boolean append_entry_to_mapfile(
+static boolean enumerate_saved_game_file(
 	struct enumerated_saved_game_file *file)
 {
 	boolean success;
@@ -2071,7 +2067,7 @@ static boolean append_entry_to_mapfile(
 	return success;
 }
 
-static boolean open_mapfile_for_reading(
+static boolean enumerate_mapfile_start(
 	word memory_unit_index)
 {
 	boolean success;
@@ -2108,7 +2104,7 @@ static boolean open_mapfile_for_reading(
 	return success;
 }
 
-static boolean close_mapfile_after_reading(
+static boolean enumerate_mapfile_end(
 	word memory_unit_index)
 {
 	boolean success;
@@ -2137,7 +2133,7 @@ static boolean close_mapfile_after_reading(
 	return success;
 }
 
-static boolean read_next_entry_in_mapfile(
+static boolean enumerate_saved_game_file_from_mapfile(
 	struct enumerated_saved_game_file *file)
 {
 	match_assert(
@@ -2268,7 +2264,7 @@ static short enumerate_default_playlist_profiles(
 					error(_error_silent, "failed to open saved game variant file to verify checksum");
 				}
 
-				if (!append_entry_to_mapfile(&entry))
+				if (!enumerate_saved_game_file(&entry))
 				{
 					error(_error_silent, "failed to enumerate default playlist file '%s'", path);
 					break;
@@ -2345,7 +2341,7 @@ static short enumerate_default_player_profiles(
 					error(_error_silent, "failed to open saved game player profile file to verify checksum");
 				}
 
-				if (!append_entry_to_mapfile(&entry))
+				if (!enumerate_saved_game_file(&entry))
 				{
 					error(_error_silent, "failed to enumerate default player profile file '%s'", path);
 					break;
@@ -2363,7 +2359,7 @@ static short enumerate_default_player_profiles(
 	return profile_index;
 }
 
-static boolean add_new_entry_to_mapfile(
+static boolean append_entry_to_mapfile(
 	word memory_unit_index,
 	struct enumerated_saved_game_file *file,
 	long *profile_index)
@@ -2384,7 +2380,7 @@ static boolean add_new_entry_to_mapfile(
 		2084,
 		(memory_unit_index < NUMBER_OF_MEMORY_UNITS) && (file != NULL) && (profile_index != NULL));
 
-	if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+	if (saved_game_files_take_mapfile_mutex())
 	{
 		if (file_reference_create_from_path(&saved_game_files_globals.memory_unit_mapfile,
 				memory_unit_mapfile_path[memory_unit_index], FALSE) &&
@@ -2429,7 +2425,7 @@ static boolean add_new_entry_to_mapfile(
 			error(_error_silent, "failed to open memory unit mapfile for memory unit #%d", memory_unit_index);
 		}
 
-		release_mutex(saved_game_files_globals.mapfile_mutex);
+		saved_game_files_release_mapfile_mutex();
 	}
 	else
 	{
@@ -2463,7 +2459,7 @@ static boolean remove_nth_entry_in_mapfile(
 		2173,
 		memory_unit_index < NUMBER_OF_MEMORY_UNITS);
 
-	if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+	if (saved_game_files_take_mapfile_mutex())
 	{
 		if (file_reference_create_from_path(&saved_game_files_globals.memory_unit_mapfile,
 				memory_unit_mapfile_path[memory_unit_index], FALSE) &&
@@ -2507,7 +2503,7 @@ static boolean remove_nth_entry_in_mapfile(
 			}
 		}
 
-		release_mutex(saved_game_files_globals.mapfile_mutex);
+		saved_game_files_release_mapfile_mutex();
 	}
 	else
 	{
@@ -2538,7 +2534,7 @@ static boolean get_nth_entry_in_mapfile(
 		1962,
 		(memory_unit_index < NUMBER_OF_MEMORY_UNITS) && (file != NULL));
 
-	if (take_mutex(saved_game_files_globals.mapfile_mutex, SAVED_GAME_FILES_MUTEX_TIMEOUT))
+	if (saved_game_files_take_mapfile_mutex())
 	{
 		if (file_reference_create_from_path(&saved_game_files_globals.memory_unit_mapfile,
 				memory_unit_mapfile_path[memory_unit_index], FALSE) &&
@@ -2581,7 +2577,7 @@ static boolean get_nth_entry_in_mapfile(
 			error(_error_silent, "failed to open memory unit mapfile for memory unit #%d", memory_unit_index);
 		}
 
-		release_mutex(saved_game_files_globals.mapfile_mutex);
+		saved_game_files_release_mapfile_mutex();
 	}
 	else
 	{
