@@ -213,16 +213,15 @@ symbols in this file:
 /* ---------- headers */
 
 #define plane2d_from_points plane2d_from_points_inline
-#define REAL_MATH_EXTERNAL_PROJECT_POINT3D
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
 #undef plane2d_from_points
-#undef REAL_MATH_EXTERNAL_PROJECT_POINT3D
 
 #include "cseries/errors.h"
 #include "game/game.h"
+#include "math/geometry.h"
 #include "memory/data.h"
 #include "rasterizer/rasterizer.h"
 #include "structures/structures.h"
@@ -1127,15 +1126,6 @@ static void decal_clip_to_surface(
 	long *deviant_surface_list,
 	short *deviant_surface_count)
 {
-	short convex_polygon2d_clip_to_plane(
-		short count,
-		real_point2d const *points,
-		real_plane2d const *plane,
-		short maximum_count,
-		real_point2d *result,
-		long *clip_flags,
-		boolean *clipped,
-		real epsilon);
 	struct collision_bsp *collision_bsp;
 	struct collision_surface *surface;
 	real_plane3d surface_plane;
@@ -1148,168 +1138,97 @@ static void decal_clip_to_surface(
 		1147,
 		type>=0 && type<NUMBER_OF_DECAL_TYPES);
 
-	if (surface_index==NONE)
-		return;
-
-	collision_bsp = global_collision_bsp_get();
-	surface = TAG_BLOCK_GET_ELEMENT(
-		&collision_bsp->surfaces,
-		surface_index,
-		struct collision_surface);
-
-	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1160, projection);
-	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1161, geometry);
-
-	if (update_surface_queue)
+	if (surface_index!=NONE)
 	{
-		match_assert(
-			"c:\\halo\\SOURCE\\effects\\decals.c",
-			1165,
-			surface_queue);
-		match_assert(
-			"c:\\halo\\SOURCE\\effects\\decals.c",
-			1166,
-			surface_queue_write_index &&
-				*surface_queue_write_index>=0 &&
-				*surface_queue_write_index<=MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
-		match_assert(
-			"c:\\halo\\SOURCE\\effects\\decals.c",
-			1167,
-			deviant_surface_list);
-		match_assert(
-			"c:\\halo\\SOURCE\\effects\\decals.c",
-			1168,
-			deviant_surface_count &&
-				*deviant_surface_count>=0 &&
-				*deviant_surface_count<=MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
+		collision_bsp = global_collision_bsp_get();
+		surface = TAG_BLOCK_GET_ELEMENT(
+			&collision_bsp->surfaces,
+			surface_index,
+			struct collision_surface);
 
-		local_surface_queue_write_index = *surface_queue_write_index;
-		local_deviant_surface_count = *deviant_surface_count;
-	}
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1160, projection);
+		match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 1161, geometry);
 
-	bsp3d_get_plane_from_designator(
-		&collision_bsp->bsp3d,
-		surface->plane_designator,
-		&surface_plane);
-	surface_angle = angle_between_normals3d(
-		&surface_plane.n,
-		&projection->plane.n);
-
-	if (update_surface_queue &&
-		!(surface_angle<=DEGREES_TO_RADIANS(
-			decal_wrap_parameters[type].minimum_wrap_angle)))
-	{
-		long edge_index = surface->first_edge_index;
-
-		do
+		if (update_surface_queue)
 		{
-			struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->edges,
-				edge_index,
-				struct collision_edge);
-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
-			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->vertices,
-				edge->vertex_indices[!surface_on_right],
-				struct collision_vertex);
+			match_assert(
+				"c:\\halo\\SOURCE\\effects\\decals.c",
+				1165,
+				surface_queue);
+			match_assert(
+				"c:\\halo\\SOURCE\\effects\\decals.c",
+				1166,
+				surface_queue_write_index &&
+					*surface_queue_write_index>=0 &&
+					*surface_queue_write_index<=MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
+			match_assert(
+				"c:\\halo\\SOURCE\\effects\\decals.c",
+				1167,
+				deviant_surface_list);
+			match_assert(
+				"c:\\halo\\SOURCE\\effects\\decals.c",
+				1168,
+				deviant_surface_count &&
+					*deviant_surface_count>=0 &&
+					*deviant_surface_count<=MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
 
-			if (local_surface_queue_write_index<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE)
+			local_surface_queue_write_index = *surface_queue_write_index;
+			local_deviant_surface_count = *deviant_surface_count;
+		}
+
+		bsp3d_get_plane_from_designator(
+			&collision_bsp->bsp3d,
+			surface->plane_designator,
+			&surface_plane);
+		surface_angle = angle_between_normals3d(
+			&surface_plane.n,
+			&projection->plane.n);
+
+		if (!update_surface_queue ||
+			surface_angle<=DEGREES_TO_RADIANS(
+				decal_wrap_parameters[type].minimum_wrap_angle))
+		{
+			long edge_index = surface->first_edge_index;
+			short edge_iteration = 0;
+			real_point2d current_point;
+			real_point2d previous_point;
+			real_point2d const *input_points = projection->decal_points2d;
+			short decal_point_count = 4;
+			long clipped_flags = 0;
+
+			do
 			{
-				struct collision_vertex *edge_end = TAG_BLOCK_GET_ELEMENT(
+				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+					&collision_bsp->edges,
+					edge_index,
+					struct collision_edge);
+				boolean surface_on_right = edge->surface_indices[1]==surface_index;
+				struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
 					&collision_bsp->vertices,
-					edge->vertex_indices[surface_on_right],
+					edge->vertex_indices[!surface_on_right],
 					struct collision_vertex);
-				real_vector3d edge_vector;
+				real_plane2d clipping_plane;
+				real_point2d *output_points = decal_points2d_temp[edge_iteration&1];
 
-				vector_from_points3d(
-					&edge_start->point,
-					&edge_end->point,
-					&edge_vector);
-				if (fast_vector_intersects_sphere(
-					&edge_start->point,
-					&edge_vector,
-					&projection->basis.position,
-					radius * decal_wrap_parameters[type].radius_exclusion_multiplier))
+				if (edge_iteration==0)
 				{
-					long adjacent_surface_index =
-						edge->surface_indices[!surface_on_right];
-					short queue_index = 0;
+					struct collision_vertex *edge_end = TAG_BLOCK_GET_ELEMENT(
+						&collision_bsp->vertices,
+						edge->vertex_indices[surface_on_right],
+						struct collision_vertex);
 
-					while (adjacent_surface_index!=NONE &&
-						queue_index<local_surface_queue_write_index)
-					{
-						if (surface_queue[queue_index]==adjacent_surface_index)
-							adjacent_surface_index = NONE;
-
-						queue_index++;
-					}
-
-					if (adjacent_surface_index!=NONE)
-					{
-						surface_queue[local_surface_queue_write_index++] =
-							adjacent_surface_index;
-					}
+					project_point3d(
+						&edge_end->point,
+						projection->projection,
+						projection->sign,
+						&previous_point);
 				}
-			}
-
-			edge_index = edge->edge_indices[surface_on_right];
-		}
-		while (edge_index!=surface->first_edge_index);
-
-		if (surface_angle<=DEGREES_TO_RADIANS(
-				decal_wrap_parameters[type].minimum_skip_angle) &&
-			local_deviant_surface_count<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE)
-		{
-			deviant_surface_list[local_deviant_surface_count++] = surface_index;
-		}
-	}
-	else
-	{
-		real_point2d const *input_points = projection->decal_points2d;
-		long edge_index = surface->first_edge_index;
-		short edge_iteration = 0;
-		short decal_point_count = 4;
-		long clipped_flags = 0;
-		real_point2d *output_points;
-		real_point2d previous_point;
-		real_point2d current_point;
-		real texture_y;
-
-		do
-		{
-			struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->edges,
-				edge_index,
-				struct collision_edge);
-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
-			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
-				&collision_bsp->vertices,
-				edge->vertex_indices[!surface_on_right],
-				struct collision_vertex);
-
-			output_points = decal_points2d_temp[edge_iteration&1];
-			if (edge_iteration==0)
-			{
-				struct collision_vertex *edge_end = TAG_BLOCK_GET_ELEMENT(
-					&collision_bsp->vertices,
-					edge->vertex_indices[surface_on_right],
-					struct collision_vertex);
 
 				project_point3d(
-					&edge_end->point,
+					&edge_start->point,
 					projection->projection,
 					projection->sign,
-					&previous_point);
-			}
-
-			project_point3d(
-				&edge_start->point,
-				projection->projection,
-				projection->sign,
-				&current_point);
-
-			{
-				real_plane2d clipping_plane;
+					&current_point);
 
 				if (plane2d_from_points(
 					&clipping_plane,
@@ -1372,84 +1291,147 @@ static void decal_clip_to_surface(
 				{
 					decal_point_count = 0;
 				}
+
+				input_points = output_points;
+				edge_index = edge->edge_indices[surface_on_right];
+				edge_iteration++;
+				previous_point = current_point;
 			}
+			while (edge_index!=surface->first_edge_index && decal_point_count>0);
 
-			edge_index = edge->edge_indices[surface_on_right];
-			edge_iteration++;
-			previous_point = current_point;
-			input_points = output_points;
-		}
-		while (edge_index!=surface->first_edge_index && decal_point_count>0);
-
-		if (decal_point_count>=NUMBER_OF_VERTICES_PER_TRIANGLE &&
-			decal_point_count<=MAXIMUM_DECAL_VERTICES-geometry->decal_vertex_count &&
-			!TEST_FLAG(surface->flags, _collision_surface_two_sided_bit) &&
-			!TEST_FLAG(surface->flags, _collision_surface_invisible_bit) &&
-			!TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
-		{
-			short decal_point_index;
-
-			match_assert(
-				"c:\\halo\\SOURCE\\effects\\decals.c",
-				1365,
-				geometry->decal_surface_count<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
-			geometry->decal_surface_indices[geometry->decal_surface_count] =
-				surface_index;
-			geometry->decal_surface_vertex_counts[geometry->decal_surface_count] =
-				decal_point_count;
-			geometry->decal_surface_count++;
-
-			for (decal_point_index = 0;
-				decal_point_index<decal_point_count;
-				decal_point_index++)
+			if (decal_point_count>=NUMBER_OF_VERTICES_PER_TRIANGLE &&
+				decal_point_count<=MAXIMUM_DECAL_VERTICES-geometry->decal_vertex_count &&
+				!(surface->flags & (FLAG(_collision_surface_two_sided_bit) |
+					FLAG(_collision_surface_invisible_bit) |
+					FLAG(_collision_surface_breakable_bit))))
 			{
-				real_point2d const *point = &output_points[decal_point_index];
-				real_vector2d offset;
+				short decal_point_index;
 
-				vector_from_points2d(
-					&projection->decal_points2d[0],
-					point,
-					&offset);
-				texture_y = -cross_product2d(
-					&offset,
-					&projection->texture_u_axis) * projection->texture_scale;
-				geometry->decal_vertices[geometry->decal_vertex_count].texcoord.x =
-					cross_product2d(
-					&offset,
-					&projection->texture_v_axis) * projection->texture_scale;
-				geometry->decal_vertices[geometry->decal_vertex_count].texcoord.y =
-					texture_y;
-				geometry->decal_vertices[geometry->decal_vertex_count].clipped =
-					TEST_FLAG(clipped_flags, decal_point_index);
+				match_assert(
+					"c:\\halo\\SOURCE\\effects\\decals.c",
+					1365,
+					geometry->decal_surface_count<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
+				geometry->decal_surface_indices[geometry->decal_surface_count] =
+					surface_index;
+				geometry->decal_surface_vertex_counts[geometry->decal_surface_count] =
+					decal_point_count;
+				geometry->decal_surface_count++;
 
-				project_point2d(
-					point,
-					&surface_plane,
-					projection->projection,
-					projection->sign,
-					&geometry->decal_vertices[geometry->decal_vertex_count].position);
-
-				if (!TEST_FLAG(clipped_flags, decal_point_index))
+				for (decal_point_index = 0;
+					decal_point_index<decal_point_count;
+					decal_point_index++)
 				{
-					struct decal_vertex *vertex =
-						&geometry->decal_vertices[geometry->decal_vertex_count];
-					real zoffset = rasterizer_debug_options.zoffset;
+					real_vector2d offset;
+					real texture_y;
 
-					vertex->position.x +=
-						surface_plane.n.i * rasterizer_debug_options.zoffset;
-					vertex->position.y += surface_plane.n.j * zoffset;
-					vertex->position.z += surface_plane.n.k * zoffset;
+					vector_from_points2d(
+						&projection->decal_points2d[0],
+						&input_points[decal_point_index],
+						&offset);
+					texture_y = -cross_product2d(
+						&offset,
+						&projection->texture_u_axis) * projection->texture_scale;
+					geometry->decal_vertices[geometry->decal_vertex_count].texcoord.x =
+						cross_product2d(
+						&offset,
+						&projection->texture_v_axis) * projection->texture_scale;
+					geometry->decal_vertices[geometry->decal_vertex_count].texcoord.y =
+						texture_y;
+					geometry->decal_vertices[geometry->decal_vertex_count].clipped =
+						TEST_FLAG(clipped_flags, decal_point_index);
+
+					project_point2d(
+						&input_points[decal_point_index],
+						&surface_plane,
+						projection->projection,
+						projection->sign,
+						&geometry->decal_vertices[geometry->decal_vertex_count].position);
+
+					if (!TEST_FLAG(clipped_flags, decal_point_index))
+					{
+						point_from_line3d(
+							&geometry->decal_vertices[geometry->decal_vertex_count].position,
+							&surface_plane.n,
+							rasterizer_debug_options.zoffset,
+							&geometry->decal_vertices[geometry->decal_vertex_count].position);
+					}
+
+					geometry->decal_vertex_count++;
+				}
+			}
+		}
+		else
+		{
+			long edge_index = surface->first_edge_index;
+
+			do
+			{
+				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+					&collision_bsp->edges,
+					edge_index,
+					struct collision_edge);
+				boolean surface_on_right = edge->surface_indices[1]==surface_index;
+				struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+					&collision_bsp->vertices,
+					edge->vertex_indices[!surface_on_right],
+					struct collision_vertex);
+
+				if (local_surface_queue_write_index<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE)
+				{
+					struct collision_vertex *edge_end = TAG_BLOCK_GET_ELEMENT(
+						&collision_bsp->vertices,
+						edge->vertex_indices[surface_on_right],
+						struct collision_vertex);
+					real_vector3d edge_vector;
+
+					vector_from_points3d(
+						&edge_start->point,
+						&edge_end->point,
+						&edge_vector);
+					if (fast_vector_intersects_sphere(
+						&edge_start->point,
+						&edge_vector,
+						&projection->basis.position,
+						radius * decal_wrap_parameters[type].radius_exclusion_multiplier))
+					{
+						long adjacent_surface_index =
+							edge->surface_indices[!surface_on_right];
+						short queue_index = 0;
+
+						while (adjacent_surface_index!=NONE &&
+							queue_index<local_surface_queue_write_index)
+						{
+							if (surface_queue[queue_index]==adjacent_surface_index)
+								adjacent_surface_index = NONE;
+
+							queue_index++;
+						}
+
+						if (adjacent_surface_index!=NONE)
+						{
+							surface_queue[local_surface_queue_write_index++] =
+								adjacent_surface_index;
+						}
+					}
 				}
 
-				geometry->decal_vertex_count++;
+				edge_index = edge->edge_indices[surface_on_right];
+			}
+			while (edge_index!=surface->first_edge_index);
+
+			if (surface_angle<=DEGREES_TO_RADIANS(
+					decal_wrap_parameters[type].minimum_skip_angle) &&
+				local_deviant_surface_count<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE)
+			{
+				deviant_surface_list[local_deviant_surface_count++] = surface_index;
 			}
 		}
-	}
 
-	if (update_surface_queue)
-	{
-		*surface_queue_write_index = local_surface_queue_write_index;
-		*deviant_surface_count = local_deviant_surface_count;
+		if (update_surface_queue)
+		{
+			*surface_queue_write_index = local_surface_queue_write_index;
+			*deviant_surface_count = local_deviant_surface_count;
+		}
 	}
 
 	return;
