@@ -1,0 +1,2 @@
+# Preserve copied evidence bytes; unified-diff context whitespace is intentional.
+donor/** -text
