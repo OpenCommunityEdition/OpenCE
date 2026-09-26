@@ -1,0 +1,312 @@
+/*
+WIN32_NET.C
+
+The socket half of port/linux/src/posix.h for Windows (the Linux version is
+posix_net.c). The Xbox's Winsock and Windows' share option numbers and error
+codes, so this passes nearly everything straight through.
+*/
+
+/* select() takes as many sockets as the Linux version (FD_SETSIZE) */
+#define FD_SETSIZE 1024
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#include <iphlpapi.h>
+#include <bcrypt.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "posix.h"
+
+static __thread int last_error;
+
+static int fail(void)
+{
+	last_error = WSAGetLastError();
+	return -1;
+}
+
+static int succeed(int result)
+{
+	if (result == SOCKET_ERROR)
+		return fail();
+	last_error = 0;
+	return result;
+}
+
+/* sockets are small integers on Windows too; the Xbox's are 32-bit */
+static int from_socket(SOCKET socket)
+{
+	return socket == INVALID_SOCKET ? -1 : (int)socket;
+}
+
+static void start_winsock(void)
+{
+	static LONG started;
+
+	if (!InterlockedCompareExchange(&started, 1, 0))
+	{
+		WSADATA data;
+
+		WSAStartup(MAKEWORD(2, 2), &data);
+	}
+}
+
+int posix_socket_last_error(void)
+{
+	return last_error;
+}
+
+int posix_socket(int family, int type, int protocol)
+{
+	SOCKET result;
+
+	start_winsock();
+	result = WSASocketW(family, type, protocol, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
+	if (result == INVALID_SOCKET)
+		return fail();
+	last_error = 0;
+	return from_socket(result);
+}
+
+int posix_socket_close(int socket)
+{
+	return succeed(closesocket((SOCKET)socket));
+}
+
+int posix_socket_bind(int socket, const void *address, int address_length)
+{
+	return succeed(bind((SOCKET)socket, address, address_length));
+}
+
+int posix_socket_connect(int socket, const void *address, int address_length)
+{
+	return succeed(connect((SOCKET)socket, address, address_length));
+}
+
+int posix_socket_listen(int socket, int backlog)
+{
+	return succeed(listen((SOCKET)socket, backlog));
+}
+
+int posix_socket_accept(int socket, void *address, int *address_length)
+{
+	SOCKET result = accept((SOCKET)socket, address, address_length);
+
+	if (result == INVALID_SOCKET)
+		return fail();
+	last_error = 0;
+	return from_socket(result);
+}
+
+int posix_socket_send(int socket, const void *buffer, int length, int flags)
+{
+	return succeed(send((SOCKET)socket, buffer, length, flags));
+}
+
+int posix_socket_sendto(int socket, const void *buffer, int length, int flags,
+	const void *address, int address_length)
+{
+	return succeed(sendto((SOCKET)socket, buffer, length, flags, address, address_length));
+}
+
+int posix_socket_recv(int socket, void *buffer, int length, int flags)
+{
+	return succeed(recv((SOCKET)socket, buffer, length, flags));
+}
+
+int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
+	void *address, int *address_length)
+{
+	return succeed(recvfrom((SOCKET)socket, buffer, length, flags, address, address_length));
+}
+
+int posix_socket_shutdown(int socket, int how)
+{
+	return succeed(shutdown((SOCKET)socket, how));
+}
+
+int posix_socket_set_nonblocking(int socket, int nonblocking)
+{
+	u_long value = nonblocking ? 1 : 0;
+
+	return succeed(ioctlsocket((SOCKET)socket, FIONBIO, &value));
+}
+
+int posix_socket_bytes_available(int socket, posix_ulong *count)
+{
+	u_long available = 0;
+	int result = ioctlsocket((SOCKET)socket, FIONREAD, &available);
+
+	if (result != SOCKET_ERROR)
+		*count = (posix_ulong)available;
+	return succeed(result);
+}
+
+/* SOL_SOCKET options Windows knows; the Xbox's own (SO_ENCRYPT and the
+like) have nothing to do here */
+static int known_option(int level, int name)
+{
+	if (level != SOL_SOCKET)
+		return 1;
+	switch (name)
+	{
+	case SO_REUSEADDR:
+	case SO_KEEPALIVE:
+	case SO_BROADCAST:
+	case SO_LINGER:
+	case SO_SNDBUF:
+	case SO_RCVBUF:
+	case SO_ERROR:
+	case SO_TYPE:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+int posix_socket_setsockopt(int socket, int level, int name, const void *value, int length)
+{
+	if (!known_option(level, name))
+	{
+		last_error = 0;
+		return 0;
+	}
+	return succeed(setsockopt((SOCKET)socket, level, name, value, length));
+}
+
+int posix_socket_getsockopt(int socket, int level, int name, void *value, int *length)
+{
+	if (!known_option(level, name))
+	{
+		last_error = WSAENOPROTOOPT;
+		return -1;
+	}
+	return succeed(getsockopt((SOCKET)socket, level, name, value, length));
+}
+
+int posix_socket_getsockname(int socket, void *address, int *address_length)
+{
+	return succeed(getsockname((SOCKET)socket, address, address_length));
+}
+
+int posix_socket_getpeername(int socket, void *address, int *address_length)
+{
+	return succeed(getpeername((SOCKET)socket, address, address_length));
+}
+
+static int fill_set(fd_set *set, const int *descriptors, int count)
+{
+	int index, filled = 0;
+
+	FD_ZERO(set);
+	for (index = 0; index < count; index++)
+	{
+		if (descriptors[index] >= 0 && set->fd_count < FD_SETSIZE)
+		{
+			FD_SET((SOCKET)descriptors[index], set);
+			filled++;
+		}
+	}
+	return filled;
+}
+
+static void keep_ready(fd_set *set, int *descriptors, int *count)
+{
+	int index, kept = 0;
+
+	for (index = 0; index < *count; index++)
+	{
+		if (descriptors[index] >= 0 && FD_ISSET((SOCKET)descriptors[index], set))
+			descriptors[kept++] = descriptors[index];
+	}
+	*count = kept;
+}
+
+int posix_socket_select(int *read, int *read_count, int *write, int *write_count,
+	int *error, int *error_count, posix_long timeout_seconds, posix_long timeout_microseconds, int infinite)
+{
+	fd_set read_set, write_set, error_set;
+	struct timeval timeout;
+	int sockets = 0;
+	int result;
+
+	sockets += fill_set(&read_set, read, read ? *read_count : 0);
+	sockets += fill_set(&write_set, write, write ? *write_count : 0);
+	sockets += fill_set(&error_set, error, error ? *error_count : 0);
+	if (!sockets)
+	{
+		/* Windows rejects a select() without sockets; POSIX waits */
+		if (!infinite)
+			Sleep((DWORD)(timeout_seconds * 1000 + timeout_microseconds / 1000));
+		if (read)
+			*read_count = 0;
+		if (write)
+			*write_count = 0;
+		if (error)
+			*error_count = 0;
+		last_error = 0;
+		return 0;
+	}
+	timeout.tv_sec = timeout_seconds;
+	timeout.tv_usec = timeout_microseconds;
+	result = select(0, read ? &read_set : NULL, write ? &write_set : NULL,
+		error ? &error_set : NULL, infinite ? NULL : &timeout);
+	if (result == SOCKET_ERROR)
+		return fail();
+	if (read)
+		keep_ready(&read_set, read, read_count);
+	if (write)
+		keep_ready(&write_set, write, write_count);
+	if (error)
+		keep_ready(&error_set, error, error_count);
+	last_error = 0;
+	return result;
+}
+
+posix_ulong posix_local_ipv4_address(void)
+{
+	ULONG size = 16 * 1024;
+	IP_ADAPTER_ADDRESSES *adapters = NULL, *adapter;
+	posix_ulong result = 0;
+	ULONG status;
+
+	do
+	{
+		free(adapters);
+		adapters = malloc(size);
+		if (!adapters)
+			return 0;
+		status = GetAdaptersAddresses(AF_INET,
+			GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER, NULL, adapters, &size);
+	}
+	while (status == ERROR_BUFFER_OVERFLOW);
+	if (status == NO_ERROR)
+	{
+		for (adapter = adapters; adapter && !result; adapter = adapter->Next)
+		{
+			IP_ADAPTER_UNICAST_ADDRESS *address;
+
+			if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
+				continue;
+			for (address = adapter->FirstUnicastAddress; address; address = address->Next)
+			{
+				struct sockaddr_in *ipv4 = (struct sockaddr_in *)address->Address.lpSockaddr;
+
+				if (ipv4->sin_family == AF_INET && ipv4->sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+				{
+					result = ipv4->sin_addr.s_addr;
+					break;
+				}
+			}
+		}
+	}
+	free(adapters);
+	return result;
+}
+
+void posix_random_bytes(void *buffer, posix_ulong size)
+{
+	BCryptGenRandom(NULL, buffer, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+}

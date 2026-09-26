@@ -1,0 +1,17 @@
+{
+  "comment": "Native Windows build inputs; the game sources and most of the platform layer are the Linux build's (port/linux/port.json). See port/windows/README.md.",
+  "replaced_platform_sources": [
+    "posix_files.c",
+    "posix_net.c",
+    "memory_watch.c",
+    "msvc_crt.c",
+    "msvc_wide.c"
+  ],
+  "libraries": [
+    "ws2_32",
+    "iphlpapi",
+    "bcrypt",
+    "winmm",
+    "user32"
+  ]
+}

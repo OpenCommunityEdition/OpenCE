@@ -10,9 +10,12 @@ SDL_GL_GetProcAddress once the context exists (gl_functions_load).
 
 /* prototypes are declared only to give each pointer its exact type */
 #define GL_GLEXT_PROTOTYPES 1
-/* the XDK defines APIENTRY as __stdcall; OpenGL on Linux uses cdecl */
+/* the XDK defines APIENTRY as __stdcall; OpenGL on Linux uses cdecl (on
+Windows it is __stdcall too, and SDL would include windows.h without it) */
 #pragma push_macro("APIENTRY")
+#ifndef _WIN32
 #undef APIENTRY
+#endif
 #ifdef HALO_ANDROID
 #include <GLES3/gl32.h>
 #include <GLES2/gl2ext.h>

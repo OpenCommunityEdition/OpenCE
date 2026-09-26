@@ -132,6 +132,12 @@ const char *platform_save_root(void)
 
 		if (environment && *environment)
 			snprintf(root, sizeof(root), "%s", environment);
+#ifdef _WIN32
+		/* the Windows build (port/windows) keeps saves in the roaming
+		application data folder */
+		else if (getenv("APPDATA") && *getenv("APPDATA"))
+			snprintf(root, sizeof(root), "%s/halo", getenv("APPDATA"));
+#endif
 		else if (data_home && *data_home)
 			snprintf(root, sizeof(root), "%s/halo-linux", data_home);
 		else if (home && *home)
