@@ -1093,11 +1093,16 @@ static boolean physics_compute_vehicle_collision(
 	struct vehicle_datum *object0 = vehicle_datum_get(instance0->object_index);
 	struct vehicle_datum *object1 = vehicle_datum_get(instance1->object_index);
 	real mass_scale = square_root(instance0->physics->mass * instance1->physics->mass);
-	real_vector3d force0 = { 0.0f, 0.0f, 0.0f };
-	real_vector3d force1 = { 0.0f, 0.0f, 0.0f };
-	real_vector3d torque0 = { 0.0f, 0.0f, 0.0f };
-	real_vector3d torque1 = { 0.0f, 0.0f, 0.0f };
+	real_vector3d force0;
+	real_vector3d force1;
+	real_vector3d torque0;
+	real_vector3d torque1;
 	short mass_point0_index;
+
+	set_real_vector3d(&force0, 0.0f, 0.0f, 0.0f);
+	set_real_vector3d(&force1, 0.0f, 0.0f, 0.0f);
+	set_real_vector3d(&torque0, 0.0f, 0.0f, 0.0f);
+	set_real_vector3d(&torque1, 0.0f, 0.0f, 0.0f);
 
 	for (mass_point0_index = 0;
 		mass_point0_index < instance0->physics->mass_points.count;
@@ -1132,8 +1137,8 @@ static boolean physics_compute_vehicle_collision(
 			if (distance < radius && distance > 0.0f)
 			{
 				real penetration = (radius - distance) * 0.5f;
-				real force_magnitude = (global_gravity / global_physics_collision_depth) *
-					penetration * mass_scale * 2.0f;
+				real force_magnitude = 2.0f * mass_scale * global_gravity /
+					global_physics_collision_depth * penetration;
 				real_vector3d collision_force0;
 				real_vector3d collision_force1;
 				real_point3d collision_point;
@@ -1144,18 +1149,16 @@ static boolean physics_compute_vehicle_collision(
 
 				scale_vector3d(&direction, -force_magnitude, &collision_force0);
 				scale_vector3d(&direction, force_magnitude, &collision_force1);
-				collision_point.x = point0.x + direction.i * (mass_point0->radius - penetration);
-				collision_point.y = point0.y + direction.j * (mass_point0->radius - penetration);
-				collision_point.z = point0.z + direction.k * (mass_point0->radius - penetration);
+				point_from_line3d(&point0, &direction, mass_point0->radius - penetration, &collision_point);
 				vector_from_points3d(&object0->object.position, &collision_point, &radius0);
 				vector_from_points3d(&object1->object.position, &collision_point, &radius1);
 				cross_product3d(&radius0, &collision_force0, &collision_torque0);
-				collision = TRUE;
 				cross_product3d(&radius1, &collision_force1, &collision_torque1);
 				add_vectors3d(&force0, &collision_force0, &force0);
 				add_vectors3d(&force1, &collision_force1, &force1);
 				add_vectors3d(&torque0, &collision_torque0, &torque0);
 				add_vectors3d(&torque1, &collision_torque1, &torque1);
+				collision = TRUE;
 			}
 		}
 	}
