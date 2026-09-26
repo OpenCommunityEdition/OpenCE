@@ -16,8 +16,9 @@ Sources for the layouts, cited per structure below:
   bitmap tags and pixel data are found in bitmaps.map.
 No code from either project is used: they are documentation here, and this
 repository is CC0. Facts that neither source states were established by
-reading the stock Custom Edition maps; each is marked "observed" below and
-listed with its evidence in docs/custom_edition_caches.md.
+reading the sample Custom Edition maps; the comments below say so where they
+are used ("observed", "every map examined"), and
+docs/custom_edition_caches.md lists each with its evidence.
 */
 
 /* ---------- headers */
@@ -1162,7 +1163,11 @@ points at that header. The entry named by the tag's path repeats the header
 and then holds the pitch ranges and their permutations, whose addresses
 count from the first pitch range. (Observed in every stock map: OpenSauce
 leaves this path of cache_file_data_load unimplemented and hooks the game's
-own data_file_read instead.) */
+own data_file_read instead.) The entry's copy of the header is not used: its
+pointers and tag references belong to the editing kit and to the map that
+sounds.map was built with. Its compression, encoding and sample rate fields
+differ from the map's copy, though, and which copy Custom Edition plays from
+is not established (docs/custom_edition_caches.md). */
 static enum cache_file_status resource_sound_load(
 	struct load_state *state,
 	uint8_t *instance,

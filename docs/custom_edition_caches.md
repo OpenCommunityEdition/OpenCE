@@ -18,8 +18,8 @@ or even loading, says nothing about OpenSauce compatibility.
 
 | Milestone | What it requires | Status |
 | --- | --- | --- |
-| **1. Recognize** | Tell the format and variant from the header alone, check every header field against the file, and name what the map needs: its resource maps, an OpenSauce mod set, memory upgrades | **Done**, in the loader library, the report tool and the game |
-| **2. Load** | Put the map's tag data where its pointers expect it (`0x40440000`), read the tags kept in resource maps and relocate their pointers, and check every tag instance, name and address, every structure BSP (file range, header, place in the tag cache), every bitmap's pixels and every sound's samples (range in their file), and the header checksum | **Done in the loader library and the report tool** (`cache_file_report`). The game itself refuses these maps before loading them: loading inside the game process needs a reserved address window it does not have yet |
+| **1. Recognize** | Tell the format and variant from the header alone, check every header field against the file, and name what the map needs: its resource maps, an OpenSauce mod set, memory upgrades | **Done** in the loader library and the report tool. The game names the format from the header (Custom Edition, with or without an OpenSauce header) and refuses the map |
+| **2. Load** | Put the map's tag data where its pointers expect it (`0x40440000`), read the tags kept in resource maps and relocate their pointers, and check every tag instance, name and address, every structure BSP (file range, header, place in the tag cache), every bitmap's pixels and every sound's samples (range in their file), and the header checksum | **Done in the loader library and the report tool** (`cache_file_report`), with the limits under [Assumptions](#assumptions-not-verified). The game does not load these maps: [Next steps](#next-steps) says why loading in the game waits on tag conversion |
 | **3. Run** | The game starts the map, draws it, plays its sounds and runs its scripts | **Not done, not attempted.** The map's tags are laid out for Halo PC, not for this build; see [Blockers](#what-running-a-map-would-take) |
 
 ## What the native builds do now
@@ -212,10 +212,9 @@ nothing past the first map load was exercised.
 - Release builds (`configure.py --release`) were not built or run.
 - No OpenSauce mod set was available; the mod set file names are an
   assumption (below).
-- No sample map has more than one structure BSP, in-map sounds other than
-  `ui.map`'s, protected caches, OpenSauce compression parameters, tag symbol
-  or string id storage, or an OpenSauce minimum version; the synthetic tests
-  cover several BSPs.
+- No sample map has more than one structure BSP, a protected cache,
+  OpenSauce compression parameters, tag symbol or string id storage, or an
+  OpenSauce minimum version; the synthetic tests cover several BSPs.
 - No Halo PC retail cache (version 7) was available; such caches are reported
   as "a cache of an unknown version".
 
@@ -259,7 +258,7 @@ then checked against the sample maps.
 | Fact | Evidence |
 | --- | --- |
 | `time_t` in the OpenSauce build info is 64 bits | the build string starts 8 bytes after the timestamp in all 4 OpenSauce caches |
-| The OpenSauce tag definitions start at the file length the header declares, and are zlib data | all 4 OpenSauce caches; one decompressed to its declared size |
+| The OpenSauce tag definitions start at the file length the header declares, and are zlib data | all 4 OpenSauce caches, each decompressed to its declared size |
 | Structure BSPs load at the top of the tag cache (`address + size` = `0x41B40000`, or `0x426C0000` with memory upgrades) | all 24 caches |
 | Bitmaps, fonts, unicode string lists and HUD text held by resource maps: the tag's address field is the entry index, the entry's name is the tag's path, the entry is the whole tag with addresses counting from its start | 9,550 bitmaps, 68 fonts, 2,248 string lists, 23 HUD texts across the sample |
 | Sounds held by `sounds.map`: the map keeps the 0xA4-byte header, whose pitch range block has a count and no address; the entry named by the tag path holds the header again, then the pitch ranges and permutations, whose addresses count from the first pitch range | 7,397 sounds, 21,870 sample ranges |
@@ -282,9 +281,15 @@ then checked against the sample maps.
 - **Fields left as they are.** A resource entry's `owner_tag_index` in bitmap
   data names a tag of whatever map the resource map was built with; its
   meaning to the Custom Edition runtime is not established, so it is not
-  rewritten. A `sounds.map` entry's copy of the sound header differs from the
-  map's copy (compression, promotion reference, pitch range block); the map's
-  copy is used.
+  rewritten.
+- **Which sound header counts.** The loader keeps the map's copy of a
+  resource-held sound's header, the only one whose pointers and tag
+  references belong to the map. But the two copies disagree on fields a
+  player needs: over 1,338 sounds of four stock maps, the map's copy always
+  says compression 0 where the `sounds.map` copy says 1 (1,182) or 3 (156),
+  and the encoding and sample rate fields differ in 194 and 6 sounds. Custom
+  Edition presumably takes those fields from `sounds.map`; which ones, is not
+  established, so the loaded headers are not yet fit for playback.
 - **Editing-kit pointers are cleared.** The definition pointers of relocated
   blocks and data are set to 0: they refer to nothing in the game process.
 - **Name comparison** is exact (case-sensitive), which matched every sample
@@ -319,7 +324,8 @@ cites the evidence that makes it a blocker.
    in DXT1/3/5, 16- and 32-bit and P8 bump formats) where this build's texture cache
    expects Xbox textures; 106 of the 1,471 `sounds.map` permutations are Ogg
    Vorbis, which this build cannot decode (the other 1,365 appear to be Xbox
-   ADPCM, which it can).
+   ADPCM, which it can); and resource-held sounds' headers need their
+   playback fields settled ([Assumptions](#assumptions-not-verified)).
 5. **Scripts.** Compiled scripts call functions by their index in the
    engine's function table; Custom Edition's table and this build's are not
    established to agree, and OpenSauce raises the table to 1,024 functions
@@ -330,6 +336,39 @@ cites the evidence that makes it a blocker.
    post-processing, memory and game state upgrades) that this build does not
    have; OpenSauce also defines mod sets, protected caches, and string id and
    tag symbol storage.
+
+### Next steps
+
+In order, each needing the one before:
+
+1. **Tag conversion**, beginning with what the measurements below single
+   out: models (`mod2` to `mode`, including their vertex and index data),
+   the transparent shader types (`scex`, `sotr`), and the data held in
+   resource maps (bitmap pixels into the form this build's texture cache
+   reads, fonts and strings; Ogg Vorbis sound needs a decoder, and one with
+   a licence compatible with CC0 would have to be found). Then a field by
+   field comparison, with this build's definitions, of the groups whose
+   block data differ: weapons, globals, scenarios, UI widgets, animations.
+   Scripts need Custom Edition's function table mapped onto this build's.
+2. **Loading in the game**, once converted tags can be read. The pieces:
+   a second reserved address window at `0x40440000`–`0x426C0000` next to
+   the Xbox one (`port/linux/src/xbox_memory.c`); Custom Edition maps
+   bypass the cache partition (`cache_files_give_time_to_precache`,
+   `cache_file_open`, `cache_file_read` read the map file itself);
+   `scenario_tags_load` loads through `custom_edition_cache_load` into the
+   window and skips the Xbox vertex and index buffer registration, whose
+   fields are file offsets in these caches. Two structures already agree:
+   this build's `cache_file_structure_bsp_header` has the Custom Edition
+   structure BSP header's layout (the structure pointer, two vertex buffer
+   arrays that Custom Edition leaves empty, the signature), and its
+   `cache_file_tag_instance` has the Custom Edition tag instance's (whose
+   resource-map flag is this build's `unused[0]`), so
+   `scenario_structure_bsp_load` and `tag_get` would work on the loaded
+   data unchanged. Until tags are converted, carrying on past the load
+   would read Halo PC tags as this build's, which is undefined behaviour
+   in release builds, where `tag_get`'s group check is not enforced; so it
+   was not built.
+3. **OpenSauce runtime features**, for `.yelo` maps that depend on them.
 
 ### How far Custom Edition tags are from the Xbox tags
 
