@@ -5,6 +5,7 @@ This is a port of the decompilation of Halo: Combat Evolved build 2342 (`cachebe
 
 <img width="1284" height="989" alt="Main_Menu_Screenshot" src="https://github.com/user-attachments/assets/92e03c85-0d96-45f5-bdd9-8e69555c996d" />
 
+This is based on [bnunu](https://github.com/bnunu/halo)'s decompilation project, which itself is a fork of [punpckhdq/halo](https://github.com/punpckhdq/halo).
 
 ## Agent quick references
 
