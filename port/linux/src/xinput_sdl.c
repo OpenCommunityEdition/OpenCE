@@ -1,0 +1,465 @@
+/*
+XINPUT_SDL.C
+
+Xbox controllers and the debug keyboard for the Linux build.
+
+Port 0 is always connected: it is the keyboard and mouse, merged with the
+first SDL gamepad when one is present. Further SDL gamepads take ports 1-3.
+
+Keyboard and mouse (port 0):
+	W A S D          left stick          arrows           D-pad
+	mouse            aim (see halo_linux_mouse_look)
+	left button      right trigger       right button, G  left trigger
+	space, enter     A                   F, backspace, X1 B
+	E, R             X                   tab, wheel       Y
+	Q                white               X                black
+	left ctrl, C     left stick click    Z, middle button right stick click
+	escape           start               F1               back
+	F12              release or recapture the mouse
+
+Mouse aim does not go through the right stick: the game's look code asks
+halo_linux_mouse_look for the motion since its last call and adds it to the
+stick's facing change, so aiming is direct rather than rate based.
+
+The game's debug keyboard exists only for the console. Backquote (which
+opens it) always reaches the keystroke queue, everything else only while
+the console is open, since the game also polls a few keys directly (escape
+returns to the main menu). While the console is open the keyboard does not
+drive the controller.
+*/
+
+#include "platform.h"
+#include "sdl_platform.h"
+
+#include <SDL3/SDL.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define PORT_COUNT 4
+#define VK_OEM_3_BACKQUOTE 0xc0
+
+/* ---------- game hooks */
+
+/* main/console.c */
+extern unsigned char console_is_active(void);
+
+/* ---------- device tables */
+
+XPP_DEVICE_TYPE XDEVICE_TYPE_GAMEPAD_TABLE;
+XPP_DEVICE_TYPE XDEVICE_TYPE_MEMORY_UNIT_TABLE;
+XPP_DEVICE_TYPE XDEVICE_TYPE_DEBUG_KEYBOARD_TABLE;
+
+struct controller
+{
+	BOOL open;
+	DWORD packet_number;
+	XINPUT_GAMEPAD previous;
+};
+
+static struct controller controllers[PORT_COUNT];
+static struct controller keyboard_device;
+static DWORD reported_gamepads = 0;
+static BOOL reported_keyboard = FALSE;
+
+/* ---------- mouse */
+
+static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
+static float mouse_pending_x, mouse_pending_y;
+static unsigned long mouse_polls_unconsumed = 0;
+static float mouse_wheel_accumulated = 0.0f;
+static int wheel_press_polls = 0;
+
+static float mouse_sensitivity(void)
+{
+	static float sensitivity = -1.0f;
+
+	if (sensitivity < 0.0f)
+	{
+		const char *text = getenv("HALO_MOUSE_SENSITIVITY");
+
+		sensitivity = text ? (float)atof(text) : 1.0f;
+		if (sensitivity <= 0.0f)
+			sensitivity = 1.0f;
+	}
+	return sensitivity;
+}
+
+/* radians of yaw and pitch for the mouse motion since the last call; the
+game adds these to the facing change of the player on gamepad 0 */
+int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
+{
+	/* radians per pixel of relative motion at sensitivity 1 */
+	const float scale = 0.0022f;
+	static int invert = -1;
+	float x, y;
+
+	*yaw = 0.0f;
+	*pitch = 0.0f;
+	if (gamepad_index != 0)
+		return FALSE;
+	if (invert < 0)
+		invert = getenv("HALO_MOUSE_INVERT") != NULL;
+	pthread_mutex_lock(&mouse_lock);
+	x = mouse_pending_x;
+	y = mouse_pending_y;
+	mouse_pending_x = 0.0f;
+	mouse_pending_y = 0.0f;
+	mouse_polls_unconsumed = 0;
+	pthread_mutex_unlock(&mouse_lock);
+	if (x == 0.0f && y == 0.0f)
+		return FALSE;
+	*yaw = -x * scale * mouse_sensitivity();
+	*pitch = (invert ? y : -y) * scale * mouse_sensitivity();
+	return TRUE;
+}
+
+/* collects the motion the game has not asked for yet; motion that nobody
+consumes for a few polls (menus, cutscenes) is dropped so it cannot jerk
+the view later */
+static void mouse_poll(const struct platform_input_state *input)
+{
+	pthread_mutex_lock(&mouse_lock);
+	if (++mouse_polls_unconsumed > 4)
+	{
+		mouse_pending_x = 0.0f;
+		mouse_pending_y = 0.0f;
+	}
+	if (!input->mouse_released)
+	{
+		mouse_pending_x += input->mouse_dx;
+		mouse_pending_y += input->mouse_dy;
+		mouse_wheel_accumulated += input->mouse_wheel;
+	}
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+/* ---------- keyboard and mouse as a controller */
+
+static BYTE analog(BOOL down)
+{
+	return down ? 0xff : 0x00;
+}
+
+static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
+{
+	const unsigned char *k = input->keys;
+	BOOL mouse = !input->mouse_released;
+	const unsigned char *m = input->mouse_buttons;
+	int x = 0, y = 0;
+
+	if (k[SDL_SCANCODE_D]) x++;
+	if (k[SDL_SCANCODE_A]) x--;
+	if (k[SDL_SCANCODE_W]) y++;
+	if (k[SDL_SCANCODE_S]) y--;
+	if (x || y)
+	{
+		/* full deflection, diagonals on the unit circle */
+		float length = (x && y) ? 0.70710678f : 1.0f;
+
+		pad->sThumbLX = (SHORT)(x * 32767 * length);
+		pad->sThumbLY = (SHORT)(y * 32767 * length);
+	}
+
+	if (k[SDL_SCANCODE_UP]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_UP;
+	if (k[SDL_SCANCODE_DOWN]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_DOWN;
+	if (k[SDL_SCANCODE_LEFT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_LEFT;
+	if (k[SDL_SCANCODE_RIGHT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_RIGHT;
+	if (k[SDL_SCANCODE_ESCAPE]) pad->wButtons |= XINPUT_GAMEPAD_START;
+	if (k[SDL_SCANCODE_F1]) pad->wButtons |= XINPUT_GAMEPAD_BACK;
+	if (k[SDL_SCANCODE_LCTRL] || k[SDL_SCANCODE_C]) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
+	if (k[SDL_SCANCODE_Z] || (mouse && m[SDL_BUTTON_MIDDLE])) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+
+	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
+		k[SDL_SCANCODE_KP_ENTER]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_F] || k[SDL_SCANCODE_BACKSPACE] ||
+		(mouse && m[SDL_BUTTON_X1]));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_E] || k[SDL_SCANCODE_R]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB] || wheel_press_polls > 0);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] |= analog(k[SDL_SCANCODE_Q]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] |= analog(k[SDL_SCANCODE_X]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] |= analog(k[SDL_SCANCODE_G] || (mouse && m[SDL_BUTTON_RIGHT]));
+	pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] |= analog(mouse && m[SDL_BUTTON_LEFT]);
+}
+
+/* a wheel notch presses Y for two polls, then leaves it up for two */
+static void wheel_update(void)
+{
+	float wheel;
+
+	pthread_mutex_lock(&mouse_lock);
+	wheel = mouse_wheel_accumulated;
+	if (wheel_press_polls > -2)
+	{
+		wheel_press_polls--;
+	}
+	else if (wheel != 0.0f)
+	{
+		wheel_press_polls = 2;
+		mouse_wheel_accumulated = 0.0f;
+	}
+	if (fabsf(mouse_wheel_accumulated) > 4.0f)
+		mouse_wheel_accumulated = 0.0f;
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+/* ---------- SDL gamepads */
+
+/* the SDL gamepads in connection order, at most one per port */
+static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
+{
+	SDL_JoystickID *ids;
+	int count = 0, index, found = 0;
+
+	memset(gamepads, 0, sizeof(SDL_Gamepad *) * PORT_COUNT);
+	ids = SDL_GetGamepads(&count);
+	if (!ids)
+		return 0;
+	for (index = 0; index < count && found < PORT_COUNT; index++)
+	{
+		SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
+
+		if (gamepad)
+			gamepads[found++] = gamepad;
+	}
+	SDL_free(ids);
+	return found;
+}
+
+static SHORT stick(Sint16 value, BOOL flip)
+{
+	int result = flip ? -(int)value - 1 : value;
+
+	if (result < -32768) result = -32768;
+	if (result > 32767) result = 32767;
+	return (SHORT)result;
+}
+
+static void merge_button(XINPUT_GAMEPAD *pad, int analog_index, BOOL down)
+{
+	if (down)
+		pad->bAnalogButtons[analog_index] = 0xff;
+}
+
+static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
+{
+	static const struct
+	{
+		SDL_GamepadButton button;
+		WORD mask;
+	} digital[] =
+	{
+		{ SDL_GAMEPAD_BUTTON_DPAD_UP, XINPUT_GAMEPAD_DPAD_UP },
+		{ SDL_GAMEPAD_BUTTON_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_DOWN },
+		{ SDL_GAMEPAD_BUTTON_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_LEFT },
+		{ SDL_GAMEPAD_BUTTON_DPAD_RIGHT, XINPUT_GAMEPAD_DPAD_RIGHT },
+		{ SDL_GAMEPAD_BUTTON_START, XINPUT_GAMEPAD_START },
+		{ SDL_GAMEPAD_BUTTON_BACK, XINPUT_GAMEPAD_BACK },
+		{ SDL_GAMEPAD_BUTTON_LEFT_STICK, XINPUT_GAMEPAD_LEFT_THUMB },
+		{ SDL_GAMEPAD_BUTTON_RIGHT_STICK, XINPUT_GAMEPAD_RIGHT_THUMB },
+	};
+	int index;
+	int left_trigger, right_trigger;
+	SHORT value;
+
+	for (index = 0; index < (int)(sizeof(digital) / sizeof(digital[0])); index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, digital[index].button))
+			pad->wButtons |= digital[index].mask;
+	}
+	merge_button(pad, XINPUT_GAMEPAD_A, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH));
+	merge_button(pad, XINPUT_GAMEPAD_B, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_EAST));
+	merge_button(pad, XINPUT_GAMEPAD_X, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_WEST));
+	merge_button(pad, XINPUT_GAMEPAD_Y, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_NORTH));
+	/* the Duke's white and black buttons sit where later pads have shoulders */
+	merge_button(pad, XINPUT_GAMEPAD_WHITE, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER));
+	merge_button(pad, XINPUT_GAMEPAD_BLACK, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER));
+
+	left_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) * 255 / 32767;
+	right_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) * 255 / 32767;
+	if (left_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = (BYTE)left_trigger;
+	if (right_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = (BYTE)right_trigger;
+
+	/* a stick only overrides the keyboard when it is pushed further */
+	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX), FALSE);
+	if (abs(value) > abs(pad->sThumbLX)) pad->sThumbLX = value;
+	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY), TRUE);
+	if (abs(value) > abs(pad->sThumbLY)) pad->sThumbLY = value;
+	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX), FALSE);
+	if (abs(value) > abs(pad->sThumbRX)) pad->sThumbRX = value;
+	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY), TRUE);
+	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
+}
+
+/* ---------- XAPI */
+
+VOID WINAPI XInitDevices(DWORD preallocation_type_count, PXDEVICE_PREALLOC_TYPE preallocation_types)
+{
+	(void)preallocation_type_count;
+	(void)preallocation_types;
+	platform_sdl_initialize();
+}
+
+static DWORD connected_gamepads(void)
+{
+	SDL_Gamepad *gamepads[PORT_COUNT];
+	int count = sdl_gamepads(gamepads);
+	DWORD mask = XDEVICE_PORT0_MASK;
+	int port;
+
+	/* the first pad shares port 0 with the keyboard */
+	for (port = 1; port < count; port++)
+		mask |= 1UL << port;
+	return mask;
+}
+
+BOOL WINAPI XGetDeviceChanges(PXPP_DEVICE_TYPE device_type, PDWORD insertions, PDWORD removals)
+{
+	*insertions = 0;
+	*removals = 0;
+	if (device_type == XDEVICE_TYPE_GAMEPAD)
+	{
+		DWORD connected = connected_gamepads();
+
+		*insertions = connected & ~reported_gamepads;
+		*removals = reported_gamepads & ~connected;
+		reported_gamepads = connected;
+	}
+	else if (device_type == XDEVICE_TYPE_DEBUG_KEYBOARD)
+	{
+		if (!reported_keyboard)
+		{
+			*insertions = 1;
+			reported_keyboard = TRUE;
+		}
+	}
+	return *insertions || *removals;
+}
+
+HANDLE WINAPI XInputOpen(PXPP_DEVICE_TYPE device_type, DWORD port, DWORD slot,
+	PXINPUT_POLLING_PARAMETERS polling_parameters)
+{
+	(void)slot;
+	(void)polling_parameters;
+	if (device_type == XDEVICE_TYPE_GAMEPAD && port < PORT_COUNT)
+	{
+		memset(&controllers[port], 0, sizeof(controllers[port]));
+		controllers[port].open = TRUE;
+		return (HANDLE)&controllers[port];
+	}
+	if (device_type == XDEVICE_TYPE_DEBUG_KEYBOARD && port == 0)
+	{
+		keyboard_device.open = TRUE;
+		return (HANDLE)&keyboard_device;
+	}
+	SetLastError(ERROR_DEVICE_NOT_CONNECTED);
+	return NULL;
+}
+
+VOID WINAPI XInputClose(HANDLE device)
+{
+	struct controller *controller = (struct controller *)device;
+
+	if (controller)
+		controller->open = FALSE;
+}
+
+static int controller_port(HANDLE device)
+{
+	int port;
+
+	for (port = 0; port < PORT_COUNT; port++)
+	{
+		if (device == (HANDLE)&controllers[port] && controllers[port].open)
+			return port;
+	}
+	return -1;
+}
+
+DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
+{
+	int port = controller_port(device);
+	SDL_Gamepad *gamepads[PORT_COUNT];
+	int count;
+
+	memset(state, 0, sizeof(*state));
+	if (port < 0)
+		return ERROR_DEVICE_NOT_CONNECTED;
+	platform_pump_events();
+	count = sdl_gamepads(gamepads);
+	if (port == 0)
+	{
+		struct platform_input_state input;
+
+		platform_input_read(&input, TRUE);
+		mouse_poll(&input);
+		wheel_update();
+		if (!console_is_active())
+			keyboard_gamepad(&input, &state->Gamepad);
+		if (count > 0)
+			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+	}
+	else if (port < count)
+	{
+		sdl_gamepad_state(gamepads[port], &state->Gamepad);
+	}
+
+	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
+	{
+		controllers[port].packet_number++;
+		controllers[port].previous = state->Gamepad;
+	}
+	state->dwPacketNumber = controllers[port].packet_number;
+	return ERROR_SUCCESS;
+}
+
+DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
+{
+	int port = controller_port(device);
+	SDL_Gamepad *gamepads[PORT_COUNT];
+	int count;
+
+	if (!feedback)
+		return ERROR_INVALID_PARAMETER;
+	feedback->Header.dwStatus = ERROR_SUCCESS;
+	if (port < 0)
+		return ERROR_DEVICE_NOT_CONNECTED;
+	count = sdl_gamepads(gamepads);
+	if (port < count)
+	{
+		/* the game refreshes the motors every frame; rumble a little longer
+		than that so they do not stutter */
+		SDL_RumbleGamepad(gamepads[port], feedback->Rumble.wLeftMotorSpeed,
+			feedback->Rumble.wRightMotorSpeed, 100);
+	}
+	return ERROR_SUCCESS;
+}
+
+DWORD WINAPI XInputDebugInitKeyboardQueue(PXINPUT_DEBUG_KEYQUEUE_PARAMETERS parameters)
+{
+	(void)parameters;
+	return ERROR_SUCCESS;
+}
+
+DWORD WINAPI XInputDebugGetKeystroke(PXINPUT_DEBUG_KEYSTROKE keystroke)
+{
+	struct platform_keystroke next;
+
+	memset(keystroke, 0, sizeof(*keystroke));
+	while (platform_next_keystroke(&next))
+	{
+		BOOL key_up = (next.flags & XINPUT_DEBUG_KEYSTROKE_FLAG_KEYUP) != 0;
+
+		/* key ups always pass, so no key is left latched down */
+		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active())
+		{
+			keystroke->VirtualKey = next.virtual_key;
+			keystroke->Ascii = next.ascii;
+			keystroke->Flags = next.flags;
+			return ERROR_SUCCESS;
+		}
+	}
+	return ERROR_HANDLE_EOF;
+}

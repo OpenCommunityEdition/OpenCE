@@ -428,6 +428,17 @@ typedef char rasterizer_environment_fog_transparent_group_map_scale_offset_asser
 static short cached_node_matrix_count = 0;
 static real_matrix4x3 const *cached_node_matrices = NULL;
 static real_matrix4x3 previous_camera_matrix[MAXIMUM_WINDOWS] = {0};
+
+#ifdef HALO_LINUX
+/* rasterizer_environment_fog_screen_draw initializes a local pointer of the
+same name from this array; MSVC resolved the name in that initializer to
+the array, standard C to the new (uninitialized) local */
+static real_matrix4x3 *previous_camera_matrix_for_window(
+	short window_index)
+{
+	return &previous_camera_matrix[window_index];
+}
+#endif
 static boolean local_environment_fog_screen_model_flag = FALSE;
 static boolean local_environment_fog_screen_flag = FALSE;
 static word local_fog_screen_layer_bitmap_indices[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS] = {0};
@@ -1004,9 +1015,14 @@ void _rasterizer_environment_fog_screen_begin(
 
 		if (pass == 0)
 		{
+#ifdef HALO_LINUX
+			real_matrix4x3 *previous_camera_matrix =
+				previous_camera_matrix_for_window(global_window_parameters.window_index);
+#else
 			real_matrix4x3 *previous_camera_matrix =
 				&previous_camera_matrix[
 					global_window_parameters.window_index];
+#endif
 			real_matrix4x3 wind_matrix = *global_identity4x3;
 			real screen_constants[5][4];
 			real_matrix4x3 matrix;

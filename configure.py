@@ -65,6 +65,11 @@ parser.add_argument(
     type=Path,
     help="path to Microsoft Macro Assembler for authentic CRT .asm units",
 )
+parser.add_argument(
+    "--linux-cc",
+    metavar="BINARY",
+    help="compiler for the native Linux build, `ninja linux` (default: clang)",
+)
 if not is_windows():
     parser.add_argument(
         "--wrapper",
@@ -122,13 +127,17 @@ sln.objdiff_path = args.objdiff
 sln.csplit_path = args.csplit
 sln.ninja_path = args.ninja
 sln.ml_path = args.ml
+sln.linux_cc = args.linux_cc
 if not is_windows():
     sln.wrapper = args.wrapper
 
 # Tool versions
 sln.objdiff_tag = "v3.6.0"
 sln.csplit_tag = "v0.0.2"
+# v0.0.2 plus upstream's "Fix uninit phony section"; built from source on Linux
+sln.csplit_source_commit = "db510e7ef9f60bb09b13a3df88c7419e9b215cde"
 sln.wibo_tag = "1.0.0"
+sln.uasm_tag = "v2.57r"
 
 sln.projects = []
 for build_project in build_config["projects"]:

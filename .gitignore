@@ -36,3 +36,7 @@ compile_commands.json
 *.bndb
 xbox/
 !source/**/xbox/
+
+# Locally extracted proprietary game data (never commit)
+assets/
+original/

@@ -183,7 +183,7 @@ boolean rasterizer_bitmap_new(
 			0,
 			rasterizer_bitmap_format_table.formats[bitmap->format],
 			D3DPOOL_MANAGED,
-			&(IDirect3DTexture8 *)bitmap->hardware_format);
+			(IDirect3DTexture8 **)&bitmap->hardware_format);
 		if (result >= 0)
 		{
 			success = TRUE;
@@ -207,7 +207,7 @@ boolean rasterizer_bitmap_new(
 			0,
 			rasterizer_bitmap_format_table.formats[bitmap->format],
 			D3DPOOL_MANAGED,
-			&(IDirect3DVolumeTexture8 *)bitmap->hardware_format);
+			(IDirect3DVolumeTexture8 **)&bitmap->hardware_format);
 		if (result >= 0)
 		{
 			success = TRUE;
@@ -229,7 +229,7 @@ boolean rasterizer_bitmap_new(
 			0,
 			rasterizer_bitmap_format_table.formats[bitmap->format],
 			D3DPOOL_MANAGED,
-			&(IDirect3DCubeTexture8 *)bitmap->hardware_format);
+			(IDirect3DCubeTexture8 **)&bitmap->hardware_format);
 		if (result >= 0)
 		{
 			success = TRUE;

@@ -194,6 +194,12 @@ symbols in this file:
 
 /* ---------- macros */
 
+#ifdef HALO_LINUX
+/* other compilers do not lay the globals out as MSVC did */
+#define scenario_structure_bsp_reconnect_procs scenario_structure_bsp_reconnect_proc_table
+#define scenario_structure_bsp_disconnect_procs scenario_structure_bsp_disconnect_proc_table
+#define scenario_memory_status_attributed (&scenario_memory_status)
+#else
 #define scenario_structure_bsp_reconnect_procs \
 	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
 		2 * sizeof(global_structure_bsp_index)))
@@ -202,6 +208,7 @@ symbols in this file:
 		2 * sizeof(global_structure_bsp_index) + sizeof(scenario_structure_bsp_reconnect_proc_table)))
 #define scenario_memory_status_attributed \
 	((struct memory_status *)((byte *)&global_structure_bsp_index + 0x60))
+#endif
 
 /* ---------- structures */
 

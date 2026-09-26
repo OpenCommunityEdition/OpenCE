@@ -35,6 +35,7 @@ from .semantic_progress import (
     require_symbol_ownership_snapshots,
     revoke_incomplete_units,
 )
+from .linux_build import generate_linux_build, linux_configure_inputs
 from .parked_functions import (
     ParkedFunctionsError,
     require_valid_parked_functions,
@@ -128,10 +129,13 @@ class SolutionConfig:
         self.ml_path: Optional[Path] = None  # Microsoft Macro Assembler for .asm units
         self.csplit_tag: Optional[str] = None  # Git tag
         self.csplit_path: Optional[Path] = None  # If None, download
+        self.csplit_source_commit: Optional[str] = None  # Linux: build this commit instead
         self.objdiff_tag: Optional[str] = None  # Git tag
         self.objdiff_path: Optional[Path] = None  # If None, download
         self.wibo_tag: Optional[str] = None # Git tag
+        self.uasm_tag: Optional[str] = None  # Git tag; MASM stand-in on Linux
         self.wrapper: Optional[Path] = None  # If None, download wibo on Linux
+        self.linux_cc: Optional[str] = None  # Native Linux build compiler (default clang)
         
         # Project config
         self.baserom: Optional[Path] = None
@@ -177,6 +181,17 @@ class SolutionConfig:
             wrapper = Path("wine")
 
         return wrapper
+
+    # Determines whether the .asm units are assembled with UASM: only on a
+    # Linux x86-64 host with no Microsoft Macro Assembler configured or found.
+    def use_uasm(self) -> bool:
+        return (
+            self.uasm_tag is not None
+            and sys.platform == "linux"
+            and platform.machine() == "x86_64"
+            and self.ml_path is None
+            and find_masm() is None
+        )
 
     # Determines whether or not to use wibo as the compiler wrapper.
     def use_wibo(self) -> bool:
@@ -283,6 +298,19 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
 
     if sln.csplit_path:
         csplit = sln.csplit_path
+    elif sln.csplit_source_commit and sys.platform == "linux":
+        # The released Linux csplit writes corrupt placeholder objects; see
+        # build_csplit_from_source in download_tool.py.
+        csplit = build_tools_path / "csplit"
+        n.build(
+            outputs=csplit,
+            rule="download_tool",
+            implicit=download_tool,
+            variables={
+                "tool": "csplit-source",
+                "tag": sln.csplit_source_commit,
+            },
+        )
     elif sln.csplit_tag:
         csplit = build_tools_path / f"csplit{EXE}"
         n.build(
@@ -335,21 +363,44 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     # Without it ninja sees only the .c file, and every object built before a
     # header change silently stays stale - which is how a render_sky.c
     # regression survived five days of "whole-board" measurements.
+    # Off Windows the compiler reports Windows-style include paths, which
+    # ninja cannot stat; the filter rewrites them to the on-disk spelling.
+    deps_filter = "" if is_windows() else f"$python {sln.tools_dir / 'msvc_deps_filter.py'} "
     n.rule(
         name="cl",
-        command=f"{wrapper_cmd}xbox/bin/vc7/CL.Exe /nologo /c /showIncludes $cflags /Fo$out $in",
+        command=f"{deps_filter}{wrapper_cmd}xbox/bin/vc7/CL.Exe /nologo /c /showIncludes $cflags /Fo$out $in",
         description="CL $out",
         deps="msvc",
     )
     # Genuine vendor-assembly CRT helpers need MASM's ordinary aligned .text
     # section. A naked C/inline-asm wrapper emits different COFF flags.
-    ml_path = sln.ml_path or find_masm()
-    ml = f'"{ml_path}"' if ml_path else "ml.exe"
-    n.rule(
-        name="ml",
-        command=f"{wrapper_cmd}{ml} /nologo /c /coff $asmflags /Fo$out $in",
-        description="ML $out",
-    )
+    ml_implicit: Optional[Path] = wrapper_implicit
+    if sln.use_uasm():
+        # No MASM exists for Linux. UASM's code sections for these units are
+        # byte-identical to the MASM-built members of the XDK's libcmt.lib
+        # (same bytes and section flags); it adds one extra empty .text
+        # section. Pass --ml to use a real ml.exe through the wrapper.
+        uasm_dir = build_tools_path / "uasm"
+        n.build(
+            outputs=uasm_dir,
+            rule="download_tool",
+            implicit=download_tool,
+            variables={"tool": "uasm", "tag": sln.uasm_tag},
+        )
+        ml_implicit = uasm_dir
+        n.rule(
+            name="ml",
+            command=f"{uasm_dir / 'uasm'} -nologo -c -coff $asmflags -Fo$out $in",
+            description="UASM $out",
+        )
+    else:
+        ml_path = sln.ml_path or find_masm()
+        ml = f'"{ml_path}"' if ml_path else "ml.exe"
+        n.rule(
+            name="ml",
+            command=f"{wrapper_cmd}{ml} /nologo /c /coff $asmflags /Fo$out $in",
+            description="ML $out",
+        )
     n.newline()
     
     ###
@@ -374,7 +425,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
                         rule="ml",
                         variables={"asmflags": obj.options.get("asmflags") or []},
                         inputs=obj.file_path,
-                        implicit=wrapper_implicit,
+                        implicit=ml_implicit,
                     )
                 else:
                     cflags: List[str] = []
@@ -511,6 +562,11 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     n.newline()
 
     ###
+    # Native Linux build (not part of the matching graph)
+    ###
+    generate_linux_build(n, sln)
+
+    ###
     # Regenerate on change
     ###
     n.comment("Reconfigure on change")
@@ -528,6 +584,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             configure_script,
             python_lib,
             python_lib_dir / "ninja_syntax.py",
+            *linux_configure_inputs(),
         ],
     )
     n.newline()

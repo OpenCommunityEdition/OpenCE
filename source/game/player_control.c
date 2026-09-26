@@ -1197,6 +1197,29 @@ static void get_local_player_input_blob(
 						input->facing_delta.yaw = facing_scale * look_delta.yaw;
 						input->facing_delta.pitch = facing_scale * look_delta.pitch;
 					}
+#ifdef HALO_LINUX
+					{
+						/* direct mouse aim (port/linux/src/xinput_sdl.c) */
+						extern int halo_linux_mouse_look(short gamepad_index, real *yaw, real *pitch);
+						real mouse_yaw;
+						real mouse_pitch;
+
+						if (halo_linux_mouse_look(gamepad_index, &mouse_yaw, &mouse_pitch))
+						{
+							if (player->unit_index != NONE && control->zoom_level != NONE)
+							{
+								real inverse_zoom = 1.f / unit_get_zoom_magnification(
+									player->unit_index,
+									control->zoom_level);
+
+								mouse_yaw *= inverse_zoom;
+								mouse_pitch *= inverse_zoom;
+							}
+							input->facing_delta.yaw += mouse_yaw;
+							input->facing_delta.pitch += mouse_pitch;
+						}
+					}
+#endif
 				}
 				else
 				{

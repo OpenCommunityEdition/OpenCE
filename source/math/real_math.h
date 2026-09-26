@@ -1441,21 +1441,25 @@ __inline real dot_product4d(
 	return a->i*b->i + a->j*b->j + a->k*b->k + a->l*b->l;
 }
 
+/* the out-of-line definition in effects/decals.c is the one the game links;
+this copy must agree with it (the normal is perpendicular to the edge, and
+a degenerate edge yields NULL) */
 __inline real_plane2d *plane2d_from_points(
 	real_plane2d *plane,
 	real_point2d const *point0,
 	real_point2d const *point1)
 {
-	vector_from_points2d(point0, point1, &plane->n);
+	plane->n.i = point1->y - point0->y;
+	plane->n.j = point0->x - point1->x;
 
 	if (normalize2d(&plane->n) == 0.0f)
 	{
 		plane->d = 0.0f;
+
+		return NULL;
 	}
-	else
-	{
-		plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
-	}
+
+	plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
 
 	return plane;
 }

@@ -539,6 +539,8 @@ __declspec(naked) char *stristr(
 	const char *haystack,
 	const char *needle)
 {
+	/* parameters are addressed through the hand-built frame: clang rejects
+	named parameter references inside naked functions */
 	__asm
 	{
 		push ebp
@@ -546,16 +548,16 @@ __declspec(naked) char *stristr(
 		push ebx
 		push esi
 		push edi
-		mov edi, needle
+		mov edi, dword ptr [ebp+12] /* needle */
 		mov bl, byte ptr [edi]
 		inc edi
 		test bl, bl
 		je empty_needle
 		push edi
 		call csstrlen
-		mov esi, haystack
+		mov esi, dword ptr [ebp+8] /* haystack */
 		add esp, 4
-		mov needle, eax
+		mov dword ptr [ebp+12], eax /* needle */
 		nop
 	search:
 		mov al, byte ptr [esi]
@@ -564,7 +566,7 @@ __declspec(naked) char *stristr(
 		je no_match
 		cmp al, bl
 		jne search
-		mov eax, needle
+		mov eax, dword ptr [ebp+12] /* needle */
 		push eax
 		push edi
 		push esi
@@ -587,7 +589,7 @@ __declspec(naked) char *stristr(
 		pop ebp
 		ret
 	empty_needle:
-		mov esi, haystack
+		mov esi, dword ptr [ebp+8] /* haystack */
 		pop edi
 		mov eax, esi
 		pop esi

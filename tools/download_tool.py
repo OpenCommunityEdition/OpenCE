@@ -104,6 +104,14 @@ def csplit_url(tag: str) -> str:
     return f"{repo}/releases/download/{tag}/csplit-{system}-{arch}{suffix}"
 
 
+def uasm_url(tag: str) -> str:
+    # UASM, an open-source MASM-compatible assembler, publishes a Linux
+    # x86-64 build only. Release "v2.57r" ships "uasm257_linux64.zip".
+    version = tag.lstrip("v").rstrip("r").replace(".", "")
+    repo = "https://github.com/Terraspace/UASM"
+    return f"{repo}/releases/download/{tag}/uasm{version}_linux64.zip"
+
+
 TOOLS: Dict[str, Callable[[str], str]] = {
     "binutils": binutils_url,
     "compilers": compilers_url,
@@ -112,6 +120,7 @@ TOOLS: Dict[str, Callable[[str], str]] = {
     "sjiswrap": sjiswrap_url,
     "wibo": wibo_url,
     "csplit": csplit_url,
+    "uasm": uasm_url,
 }
 
 
@@ -132,6 +141,37 @@ def download(url, response, output) -> None:
         os.chmod(output, st.st_mode | stat.S_IEXEC)
 
 
+CSPLIT_REPOSITORY = "https://github.com/punpckhdq/csplit"
+
+
+def build_csplit_from_source(commit: str, output: Path) -> None:
+    """Build csplit for the host from a pinned source commit.
+
+    The v0.0.2 Linux release writes placeholder ("PHONY") objects with a
+    stray, uninitialised relocation block ahead of the symbol table, which
+    objdiff rejects. Upstream fixed it after the release ("Fix uninit phony
+    section"); until a release carries the fix, build that commit.
+    """
+    import subprocess
+    import tarfile
+    import tempfile
+
+    url = f"{CSPLIT_REPOSITORY}/archive/{commit}.tar.gz"
+    print(f"Building csplit {commit[:12]} from {url} into {output}")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with tempfile.TemporaryDirectory() as temporary:
+        with urllib.request.urlopen(req) as response:
+            with tarfile.open(fileobj=io.BytesIO(response.read()), mode="r:gz") as archive:
+                archive.extractall(temporary, filter="data")
+        source = next(Path(temporary).glob("*/csplit"))
+        compiler = os.environ.get("CC", "cc")
+        subprocess.run(
+            [compiler, "-O2", "-DCJSON_HIDE_SYMBOLS", "-o", str(output),
+             str(source / "main.c"), str(source / "cJSON.c"), "-lm"],
+            check=True,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("tool", help="Tool name")
@@ -139,8 +179,12 @@ def main() -> None:
     parser.add_argument("--tag", help="GitHub tag", required=True)
     args = parser.parse_args()
 
-    url = TOOLS[args.tool](args.tag)
     output = Path(args.output)
+    if args.tool == "csplit-source":
+        build_csplit_from_source(args.tag, output)
+        return
+
+    url = TOOLS[args.tool](args.tag)
 
     print(f"Downloading {url} to {output}")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})

@@ -1,0 +1,16 @@
+{
+  "comment": "Native Linux build inputs. See port/linux/README.md.",
+  "projects": [
+    "halobetacache"
+  ],
+  "exclude_sources": [
+    "source/main/d3d_intimacy.cpp"
+  ],
+  "platform_sources": "port/linux/src",
+  "libraries": [
+    "SDL3",
+    "m",
+    "pthread"
+  ],
+  "game_sources": "port/linux/game"
+}

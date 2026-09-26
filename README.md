@@ -1,21 +1,7 @@
-Halo 1 decompilation
-[![Build Status]][actions] [![Code Progress]][progress] [![Data Progress]][progress]
+Halo 1 decomp, ported to Linux
 =============
 
-<!--
-Replace with your repository's URL.
--->
-[Build Status]: https://github.com/punpckhdq/halo/actions/workflows/build.yml/badge.svg
-[actions]: https://github.com/punpckhdq/halo/actions/workflows/build.yml
-<!--
-decomp.dev progress badges
-See https://decomp.dev/api for an API overview.
--->
-[Code Progress]: https://decomp.dev/punpckhdq/halo.svg?mode=shield&measure=code&label=Code
-[Data Progress]: https://decomp.dev/punpckhdq/halo.svg?mode=shield&measure=data&label=Data
-[progress]: https://decomp.dev/punpckhdq/halo
-
-This is a work-in-progress decompilation of Halo: Combat Evolved build 2342 (`cachebeta.exe`, sha256 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
+This is a port of the decompilation of Halo: Combat Evolved build 2342 (`cachebeta.exe`, sha256 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`) to Linux.
 
 ## Agent quick references
 
@@ -27,11 +13,15 @@ This is a work-in-progress decompilation of Halo: Combat Evolved build 2342 (`ca
 
 ## Build instructions
 
-You must source the Halo 1 PAL debug build and the August 2001 Xbox SDK yourself. You also need [ninja-build](https://ninja-build.org/) on your PATH.
+You must source the August 2001 Xbox SDK yourself, and you need Python and [ninja-build](https://ninja-build.org/) on your PATH. Extract the `XDK/xbox` folder from the installer into the repository root such that `xbox/{bin,include}` are valid paths, then run `configure.py` from the repository root.
 
-Extract the `XDK/xbox` folder from the installer into the repository root such that `xbox/{bin,include}` are valid paths. Place `cachebeta.exe` from the Halo 1 build into your repository root. Navigate to the repository and run `configure.py` in the terminal.
+### Native Linux build
 
-Then, use `ninja build` to compile the game and report progress statistics, or open the `cachebeta.sln` VS2022 project under `projects` on Windows.
+`ninja linux` compiles the game with clang into a native 32-bit Linux executable, `build/linux/halo`. It needs clang, 32-bit glibc development files and 32-bit SDL3. It renders with OpenGL, plays sound through SDL3 audio, and takes keyboard, mouse and gamepad input. Put the PAL game data (build 01.01.14.2342) under `assets/` so that `assets/maps` exists, then run `build/linux/halo`. See [port/linux/README.md](port/linux/README.md) for controls and settings.
+
+### Matching build
+
+The byte-matching build also needs `cachebeta.exe` from the Halo 1 PAL debug build in the repository root. Run `ninja` to compile the game and report progress statistics. On Linux it runs the XDK compiler through [wibo](https://github.com/decompals/wibo) (downloaded automatically), assembles the CRT `.asm` units with UASM when no MASM is available, and builds csplit from source; see [port/linux/README.md](port/linux/README.md#the-matching-build-on-a-linux-host).
 
 ## Where's all the type information?
 

@@ -1,0 +1,325 @@
+/*
+SDL_PLATFORM.C
+
+The SDL3 window, OpenGL context and event loop behind the Linux build.
+
+The window is created with the Direct3D device (d3d8_gl.c) on the game's
+main thread, which is also the only thread that pumps events. Keyboard and
+mouse state gathered here feeds the controller emulation in xinput_sdl.c
+and the debug keyboard that the game's console reads.
+*/
+
+#include "platform.h"
+#include "sdl_platform.h"
+#include "gl.h"
+
+#include <SDL3/SDL.h>
+#include <stdlib.h>
+#include <string.h>
+
+static SDL_Window *platform_window;
+static SDL_GLContext platform_gl_context;
+static SDL_ThreadID platform_event_thread;
+static BOOL platform_sdl_started = FALSE;
+
+static struct platform_input_state input_state;
+static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
+
+/* debug keyboard queue */
+#define KEYSTROKE_QUEUE_SIZE 64
+static struct platform_keystroke keystroke_queue[KEYSTROKE_QUEUE_SIZE];
+static unsigned long keystroke_head, keystroke_count;
+
+BOOL platform_sdl_initialize(void)
+{
+	if (platform_sdl_started)
+		return TRUE;
+	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
+	{
+		platform_log("SDL_Init failed: %s", SDL_GetError());
+		return FALSE;
+	}
+	platform_sdl_started = TRUE;
+	return TRUE;
+}
+
+BOOL platform_video_initialize(unsigned long width, unsigned long height)
+{
+	const char *scale_text = getenv("HALO_WINDOW_SCALE");
+	int scale = scale_text ? atoi(scale_text) : 2;
+	int version;
+
+	if (platform_window)
+		return TRUE;
+	if (!platform_sdl_initialize())
+		return FALSE;
+	if (scale < 1)
+		scale = 1;
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
+	if (getenv("HALO_GL_DEBUG"))
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+
+	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
+		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (getenv("HALO_HIDDEN_WINDOW") ? SDL_WINDOW_HIDDEN : 0));
+	if (!platform_window)
+	{
+		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
+		return FALSE;
+	}
+	platform_gl_context = SDL_GL_CreateContext(platform_window);
+	if (!platform_gl_context)
+	{
+		platform_log("cannot create an OpenGL 4.5 core context: %s", SDL_GetError());
+		return FALSE;
+	}
+	SDL_GL_MakeCurrent(platform_window, platform_gl_context);
+	if (!gl_functions_load())
+		return FALSE;
+	version = SDL_GL_SetSwapInterval(getenv("HALO_NO_VSYNC") ? 0 : 1);
+	(void)version;
+	platform_event_thread = SDL_GetCurrentThreadID();
+	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
+	platform_mouse_capture(TRUE);
+	return TRUE;
+}
+
+void platform_video_drawable_size(int *width, int *height)
+{
+	SDL_GetWindowSizeInPixels(platform_window, width, height);
+}
+
+void platform_video_swap(void)
+{
+	SDL_GL_SwapWindow(platform_window);
+}
+
+void platform_mouse_capture(BOOL capture)
+{
+	if (platform_window)
+		SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
+}
+
+/* ---------- keyboard translation */
+
+/* Windows virtual key code for an SDL scancode (the Xbox debug keyboard
+reports virtual keys) */
+static BYTE virtual_key_from_scancode(SDL_Scancode scancode)
+{
+	if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z)
+		return (BYTE)('A' + (scancode - SDL_SCANCODE_A));
+	if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_9)
+		return (BYTE)('1' + (scancode - SDL_SCANCODE_1));
+	if (scancode >= SDL_SCANCODE_F1 && scancode <= SDL_SCANCODE_F12)
+		return (BYTE)(0x70 + (scancode - SDL_SCANCODE_F1));
+	if (scancode >= SDL_SCANCODE_KP_1 && scancode <= SDL_SCANCODE_KP_9)
+		return (BYTE)(0x61 + (scancode - SDL_SCANCODE_KP_1));
+	switch (scancode)
+	{
+	case SDL_SCANCODE_0: return '0';
+	case SDL_SCANCODE_KP_0: return 0x60;
+	case SDL_SCANCODE_RETURN: case SDL_SCANCODE_KP_ENTER: return 0x0d;
+	case SDL_SCANCODE_ESCAPE: return 0x1b;
+	case SDL_SCANCODE_BACKSPACE: return 0x08;
+	case SDL_SCANCODE_TAB: return 0x09;
+	case SDL_SCANCODE_SPACE: return 0x20;
+	case SDL_SCANCODE_MINUS: return 0xbd;
+	case SDL_SCANCODE_EQUALS: return 0xbb;
+	case SDL_SCANCODE_LEFTBRACKET: return 0xdb;
+	case SDL_SCANCODE_RIGHTBRACKET: return 0xdd;
+	case SDL_SCANCODE_BACKSLASH: return 0xdc;
+	case SDL_SCANCODE_SEMICOLON: return 0xba;
+	case SDL_SCANCODE_APOSTROPHE: return 0xde;
+	case SDL_SCANCODE_GRAVE: return 0xc0;
+	case SDL_SCANCODE_COMMA: return 0xbc;
+	case SDL_SCANCODE_PERIOD: return 0xbe;
+	case SDL_SCANCODE_SLASH: return 0xbf;
+	case SDL_SCANCODE_CAPSLOCK: return 0x14;
+	case SDL_SCANCODE_PRINTSCREEN: return 0x2c;
+	case SDL_SCANCODE_SCROLLLOCK: return 0x91;
+	case SDL_SCANCODE_PAUSE: return 0x13;
+	case SDL_SCANCODE_INSERT: return 0x2d;
+	case SDL_SCANCODE_HOME: return 0x24;
+	case SDL_SCANCODE_PAGEUP: return 0x21;
+	case SDL_SCANCODE_DELETE: return 0x2e;
+	case SDL_SCANCODE_END: return 0x23;
+	case SDL_SCANCODE_PAGEDOWN: return 0x22;
+	case SDL_SCANCODE_RIGHT: return 0x27;
+	case SDL_SCANCODE_LEFT: return 0x25;
+	case SDL_SCANCODE_DOWN: return 0x28;
+	case SDL_SCANCODE_UP: return 0x26;
+	case SDL_SCANCODE_NUMLOCKCLEAR: return 0x90;
+	case SDL_SCANCODE_KP_DIVIDE: return 0x6f;
+	case SDL_SCANCODE_KP_MULTIPLY: return 0x6a;
+	case SDL_SCANCODE_KP_MINUS: return 0x6d;
+	case SDL_SCANCODE_KP_PLUS: return 0x6b;
+	case SDL_SCANCODE_KP_PERIOD: return 0x6e;
+	case SDL_SCANCODE_LCTRL: return 0xa2;
+	case SDL_SCANCODE_RCTRL: return 0xa3;
+	case SDL_SCANCODE_LSHIFT: return 0xa0;
+	case SDL_SCANCODE_RSHIFT: return 0xa1;
+	case SDL_SCANCODE_LALT: return 0xa4;
+	case SDL_SCANCODE_RALT: return 0xa5;
+	default: return 0;
+	}
+}
+
+static CHAR ascii_from_key(SDL_Keycode key, SDL_Keymod modifiers)
+{
+	BOOL shift = (modifiers & SDL_KMOD_SHIFT) != 0;
+	static const char shifted_digits[] = ")!@#$%^&*(";
+
+	if (key >= 'a' && key <= 'z')
+		return (CHAR)((shift ^ ((modifiers & SDL_KMOD_CAPS) != 0)) ? key - 32 : key);
+	if (key >= '0' && key <= '9')
+		return (CHAR)(shift ? shifted_digits[key - '0'] : key);
+	if (key == SDLK_RETURN || key == SDLK_KP_ENTER)
+		return '\r';
+	if (key == SDLK_BACKSPACE)
+		return '\b';
+	if (key == SDLK_TAB)
+		return '\t';
+	if (key == SDLK_ESCAPE)
+		return 0x1b;
+	if (key >= 32 && key < 127)
+	{
+		if (!shift)
+			return (CHAR)key;
+		switch (key)
+		{
+		case '-': return '_';
+		case '=': return '+';
+		case '[': return '{';
+		case ']': return '}';
+		case '\\': return '|';
+		case ';': return ':';
+		case '\'': return '"';
+		case ',': return '<';
+		case '.': return '>';
+		case '/': return '?';
+		case '`': return '~';
+		default: return (CHAR)key;
+		}
+	}
+	return 0;
+}
+
+static void queue_keystroke(const SDL_KeyboardEvent *event)
+{
+	struct platform_keystroke *keystroke;
+	BYTE flags = 0;
+
+	if (keystroke_count == KEYSTROKE_QUEUE_SIZE)
+	{
+		keystroke_head = (keystroke_head + 1) % KEYSTROKE_QUEUE_SIZE;
+		keystroke_count--;
+	}
+	keystroke = &keystroke_queue[(keystroke_head + keystroke_count) % KEYSTROKE_QUEUE_SIZE];
+	if (event->mod & SDL_KMOD_CTRL) flags |= 0x01;
+	if (event->mod & SDL_KMOD_SHIFT) flags |= 0x02;
+	if (event->mod & SDL_KMOD_ALT) flags |= 0x04;
+	if (event->mod & SDL_KMOD_CAPS) flags |= 0x08;
+	if (event->mod & SDL_KMOD_NUM) flags |= 0x10;
+	if (!event->down) flags |= 0x40;
+	if (event->repeat) flags |= 0x80;
+	keystroke->virtual_key = virtual_key_from_scancode(event->scancode);
+	keystroke->ascii = event->down ? ascii_from_key(event->key, event->mod) : 0;
+	keystroke->flags = flags;
+	keystroke_count++;
+}
+
+BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
+{
+	BOOL result = FALSE;
+
+	pthread_mutex_lock(&input_lock);
+	if (keystroke_count)
+	{
+		*keystroke = keystroke_queue[keystroke_head];
+		keystroke_head = (keystroke_head + 1) % KEYSTROKE_QUEUE_SIZE;
+		keystroke_count--;
+		result = TRUE;
+	}
+	pthread_mutex_unlock(&input_lock);
+	return result;
+}
+
+/* ---------- events */
+
+void platform_pump_events(void)
+{
+	SDL_Event event;
+
+	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
+		return;
+	pthread_mutex_lock(&input_lock);
+	while (SDL_PollEvent(&event))
+	{
+		switch (event.type)
+		{
+		case SDL_EVENT_QUIT:
+			pthread_mutex_unlock(&input_lock);
+			platform_log("window closed");
+			exit(EXIT_SUCCESS);
+		case SDL_EVENT_KEY_DOWN:
+		case SDL_EVENT_KEY_UP:
+			if (event.key.scancode < SDL_SCANCODE_COUNT)
+				input_state.keys[event.key.scancode] = event.key.down;
+			queue_keystroke(&event.key);
+			/* F12 releases or recaptures the mouse */
+			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
+			{
+				input_state.mouse_released = !input_state.mouse_released;
+				platform_mouse_capture(!input_state.mouse_released);
+			}
+			break;
+		case SDL_EVENT_MOUSE_MOTION:
+			input_state.mouse_dx += event.motion.xrel;
+			input_state.mouse_dy += event.motion.yrel;
+			break;
+		case SDL_EVENT_MOUSE_BUTTON_DOWN:
+		case SDL_EVENT_MOUSE_BUTTON_UP:
+			if (event.button.button < PLATFORM_MOUSE_BUTTON_COUNT)
+				input_state.mouse_buttons[event.button.button] = event.button.down;
+			break;
+		case SDL_EVENT_MOUSE_WHEEL:
+			input_state.mouse_wheel += event.wheel.y;
+			break;
+		case SDL_EVENT_WINDOW_FOCUS_LOST:
+			memset(input_state.keys, 0, sizeof(input_state.keys));
+			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+			input_state.focused = FALSE;
+			break;
+		case SDL_EVENT_WINDOW_FOCUS_GAINED:
+			input_state.focused = TRUE;
+			if (!input_state.mouse_released)
+				platform_mouse_capture(TRUE);
+			break;
+		case SDL_EVENT_GAMEPAD_ADDED:
+			SDL_OpenGamepad(event.gdevice.which);
+			break;
+		default:
+			break;
+		}
+	}
+	pthread_mutex_unlock(&input_lock);
+}
+
+void platform_input_read(struct platform_input_state *state, BOOL consume_motion)
+{
+	pthread_mutex_lock(&input_lock);
+	*state = input_state;
+	if (consume_motion)
+	{
+		input_state.mouse_dx = 0;
+		input_state.mouse_dy = 0;
+		input_state.mouse_wheel = 0;
+	}
+	pthread_mutex_unlock(&input_lock);
+}

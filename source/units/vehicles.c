@@ -293,7 +293,7 @@ void aiming_screen_apply(
 	struct real_orientation *node_orientations);
 short unit_update_animation(
 	long unit_index,
-	void *update_data);
+	struct unit_animation_update_data *update_data);
 
 /* NOTE: code_001a5e50 and code_001a6290 are file statics in January, but they
 are not reconstructed yet. They are declared here rather than defined so that

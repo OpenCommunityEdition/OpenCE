@@ -4158,14 +4158,6 @@ void ai_scripting_migrate_and_speak(
 void ai_scripting_allegiance_remove(
 	short team_a,
 	unsigned short team_b);
-void ai_scripting_go_to_vehicle(
-	long ai_index,
-	long unit_index,
-	long vehicle_index);
-void ai_scripting_go_to_vehicle_override(
-	long ai_index,
-	long unit_index,
-	long vehicle_index);
 void ai_scripting_exit_vehicle(
 	long ai_index);
 void ai_scripting_braindead(
@@ -4189,12 +4181,6 @@ void ai_scripting_try_to_fight(
 	long target_ai_index);
 void ai_scripting_try_to_fight_player(
 	long ai_index);
-void ai_scripting_command_list(
-	long ai_index,
-	unsigned short command_list_index);
-void ai_scripting_command_list_by_unit(
-	long unit_index,
-	unsigned short command_list_index);
 void ai_scripting_command_list_advance(
 	long ai_index);
 void ai_scripting_command_list_advance_by_unit(
@@ -4205,12 +4191,6 @@ void ai_scripting_force_active(
 void ai_scripting_force_active_by_unit(
 	long unit_index,
 	boolean force_active);
-void ai_scripting_set_return_state(
-	long ai_index,
-	unsigned short state);
-void ai_scripting_set_current_state(
-	long ai_index,
-	unsigned short state);
 void ai_scripting_playfight(
 	long ai_index,
 	boolean playfight);
@@ -4256,9 +4236,6 @@ void ai_scripting_link_activation(
 void ai_scripting_berserk(
 	long ai_index,
 	boolean enable);
-void ai_scripting_set_team(
-	long ai_index,
-	unsigned short team);
 void ai_scripting_allow_charge(
 	long ai_index,
 	boolean allow_charge);
