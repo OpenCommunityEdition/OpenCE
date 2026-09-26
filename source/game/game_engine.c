@@ -8007,10 +8007,14 @@ struct game_engine_place game_engine_get_place(
 				score_type == _get_score_team)
 			{
 #ifdef HALO_LINUX
-				if (BIT_VECTOR_TEST_FLAG(team_mask, other_player->team_index))
-					different_player = FALSE;
-				else
-					BIT_VECTOR_SET_FLAG(team_mask, other_player->team_index, TRUE);
+				/* a team outside the mask (none yet) counts on its own */
+				if (VALID_INDEX(other_player->team_index, MULTIPLAYER_MAXIMUM_PLAYERS))
+				{
+					if (BIT_VECTOR_TEST_FLAG(team_mask, other_player->team_index))
+						different_player = FALSE;
+					else
+						BIT_VECTOR_SET_FLAG(team_mask, other_player->team_index, TRUE);
+				}
 #else
 				if (TEST_FLAG(team_mask, other_player->team_index))
 					different_player = FALSE;
