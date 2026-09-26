@@ -57,6 +57,10 @@ crashes instead (port/windows/src/win32_memory_watch.c). */
 #define __finally
 #define __leave
 
+/* ---------- multiplayer session limits of the native builds */
+
+#include "../../linux/include/halo_port_limits.h"
+
 /* ---------- Xbox functions named like Windows functions */
 
 #include "halo_windows_api_names.h"

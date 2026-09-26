@@ -72,6 +72,10 @@ always runs and the handler is compiled out. */
 #define __finally
 #define __leave
 
+/* ---------- multiplayer session limits of the native builds */
+
+#include "halo_port_limits.h"
+
 /* ---------- Winsock
 
 Game code sees the XDK's Winsock under private names (see the header). The
