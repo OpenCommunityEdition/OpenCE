@@ -143,6 +143,11 @@ silences them.
   are extracted to the gitignored `assets/custom_edition`, three more tests
   check the results in the table below.
 
+`python -m pytest tools/test_custom_edition_tag_footprints.py` (3 tests)
+checks the tag comparison tool of
+[the measurements below](#how-far-custom-edition-tags-are-from-the-xbox-tags)
+on synthetic caches.
+
 ### Maps
 
 The sample supplied for this work (`custom_edition.zip`, 28 entries): the 20
@@ -306,9 +311,9 @@ cites the evidence that makes it a blocker.
 3. **Tag layouts.** The tags are Halo PC's, not this build's: for instance
    objects refer to `mod2` (gearbox model) tags, 66 to 70 of them in each
    sample multiplayer map and no `mode` tag at all, while this build's code
-   asks for `mode`. Every tag group the game reads would have to be compared
-   field by field with this build's definitions and converted where they
-   differ; no such comparison has been made.
+   asks for `mode`. How far the rest are from the Xbox tags is
+   [measured below](#how-far-custom-edition-tags-are-from-the-xbox-tags);
+   no group has been compared field by field.
 4. **Resources.** Model vertices and indices are PC buffers in the file's
    model data; bitmap data are PC textures (every sample bitmap unswizzled,
    in DXT1/3/5, 16- and 32-bit and P8 bump formats) where this build's texture cache
@@ -325,6 +330,48 @@ cites the evidence that makes it a blocker.
    post-processing, memory and game state upgrades) that this build does not
    have; OpenSauce also defines mod sets, protected caches, and string id and
    tag symbol storage.
+
+### How far Custom Edition tags are from the Xbox tags
+
+`tools/custom_edition_tag_footprints.py` compares the tags a Custom Edition
+cache and the Xbox cache of the same level both keep (same group, same name),
+without any tag definitions. A tag's *footprint* is the distance from its
+address to the next tag's (its structure and the block data after it); its
+*structure size* is estimated as the distance to the lowest address in the
+footprint that the footprint points at (its first child block). Equal
+footprints, level after level, suggest a group's layout is unchanged; they do
+not prove it.
+
+The Xbox caches available are the retail ones, build 01.10.12.2276, not the
+01.01.14.2342 build this repository reconstructs: they stand in for it, and
+differences between the two Xbox builds are not measured. Run on the 14
+levels both sets have (13 multiplayer levels and `ui`):
+
+```
+python tools/custom_edition_tag_footprints.py assets/custom_edition "<Xbox 2276>/maps"
+```
+
+- **48 groups have the same footprint for every shared tag in every level**:
+  `Soul actv ant! bipd colo cont deca eqip flag fog font foot grhi hmt hud#
+  hudg itmc jpt! lens lifi ligh lsnd mach metr mgs2 mply part pctl phys pphy
+  scen schi senv sgla sky smet snde soso spla ssce str# swat trak udlg unhi
+  vcky vehi wind`. These are the likeliest to load as they are.
+- **Groups whose footprints differ, but whose structures match**: UI widgets
+  (`DeLa`, 464 of 657 footprints equal, 423 of 423 structures), animations
+  (`antr`, 213/239), collision models (`coll`, 331/345), effects (`effe`,
+  4140/4166), projectiles (`proj`, 197/210), weapon HUDs (`wphi`, 196/222),
+  weapons (`weap`, 39/182, structures 182/182), globals (`matg`, 1/14,
+  structures 14/14) and scenarios (`scnr`, 0/14, structures 13/14), plus, in
+  `ui` only, bitmaps, sounds and string lists. These differ in their block
+  data, whether in content or in the layout of nested elements; which, is
+  not established. The flamethrower's tags account for every `effe`, `proj`
+  and `wphi` difference and all but one `coll` difference; 11 of the 14
+  weapons (every player weapon and both vehicle guns) differ in every level.
+- **Groups only Custom Edition has**: `mod2` (models), `scex` (a transparent
+  shader type), `devc` and `tagc`, in all 14 levels; **only the Xbox has**:
+  `mode` (models) and `sotr` (a transparent shader type), besides the groups
+  Custom Edition keeps in resource maps. None of the 650 models named alike
+  (`mod2` against `mode`) has the same footprint.
 
 ## Verification
 
