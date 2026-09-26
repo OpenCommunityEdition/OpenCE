@@ -14,6 +14,17 @@ made only of 32-bit members so both sides agree on the layout.
 #ifndef __HALO_LINUX_POSIX_H
 #define __HALO_LINUX_POSIX_H
 
+/* 32-bit on both sides of the boundary. The Android port compiles these
+files into its 64-bit host, where long is 64-bit, and calls them from its
+ILP32 guest (port/android/README.md). */
+#ifdef __LP64__
+typedef int posix_long;
+typedef unsigned int posix_ulong;
+#else
+typedef long posix_long;
+typedef unsigned long posix_ulong;
+#endif
+
 enum
 {
 	_posix_file_is_directory = 1 << 0,
@@ -22,16 +33,16 @@ enum
 
 struct posix_file_information
 {
-	unsigned long flags;
-	unsigned long size_low;
-	unsigned long size_high;
+	posix_ulong flags;
+	posix_ulong size_low;
+	posix_ulong size_high;
 	/* seconds and nanoseconds since the Unix epoch */
-	unsigned long modification_seconds;
-	unsigned long modification_nanoseconds;
-	unsigned long access_seconds;
-	unsigned long access_nanoseconds;
-	unsigned long creation_seconds;
-	unsigned long creation_nanoseconds;
+	posix_ulong modification_seconds;
+	posix_ulong modification_nanoseconds;
+	posix_ulong access_seconds;
+	posix_ulong access_nanoseconds;
+	posix_ulong creation_seconds;
+	posix_ulong creation_nanoseconds;
 };
 
 /* stat()/fstat(); return 0 on success or -1 with errno set */
@@ -40,18 +51,18 @@ int posix_fstat(int descriptor, struct posix_file_information *information);
 
 /* set access and modification times; a zero seconds value leaves it alone */
 int posix_set_file_times(const char *path,
-	unsigned long access_seconds, unsigned long access_nanoseconds,
-	unsigned long modification_seconds, unsigned long modification_nanoseconds);
+	posix_ulong access_seconds, posix_ulong access_nanoseconds,
+	posix_ulong modification_seconds, posix_ulong modification_nanoseconds);
 
 /* 64-bit file positioning on a descriptor */
-int posix_seek(int descriptor, long offset_low, long offset_high, int whence,
-	unsigned long *position_low, unsigned long *position_high);
-int posix_truncate(int descriptor, unsigned long size_low, unsigned long size_high);
+int posix_seek(int descriptor, posix_long offset_low, posix_long offset_high, int whence,
+	posix_ulong *position_low, posix_ulong *position_high);
+int posix_truncate(int descriptor, posix_ulong size_low, posix_ulong size_high);
 
 /* free and total bytes on the file system holding path */
 int posix_disk_space(const char *path,
-	unsigned long *free_low, unsigned long *free_high,
-	unsigned long *total_low, unsigned long *total_high);
+	posix_ulong *free_low, posix_ulong *free_high,
+	posix_ulong *total_low, posix_ulong *total_high);
 
 /* permissions and directories */
 int posix_set_read_only(const char *path, int read_only);
@@ -60,13 +71,13 @@ int posix_make_directory(const char *path);
 /* directory enumeration; the handle is opaque */
 void *posix_directory_open(const char *path);
 /* copies the next entry name (excluding . and ..); returns 0 at the end */
-int posix_directory_next(void *directory, char *name, unsigned long name_size);
+int posix_directory_next(void *directory, char *name, posix_ulong name_size);
 void posix_directory_close(void *directory);
 
 /* case-insensitive lookup of one path component inside directory;
 copies the on-disk spelling into result and returns nonzero if found */
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
-	char *result, unsigned long result_size);
+	char *result, posix_ulong result_size);
 
 /* ---------- sockets
 
@@ -89,7 +100,7 @@ int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 	void *address, int *address_length);
 int posix_socket_shutdown(int socket, int how);
 int posix_socket_set_nonblocking(int socket, int nonblocking);
-int posix_socket_bytes_available(int socket, unsigned long *count);
+int posix_socket_bytes_available(int socket, posix_ulong *count);
 /* Winsock option levels and names are translated for SOL_SOCKET options */
 int posix_socket_setsockopt(int socket, int level, int name, const void *value, int length);
 int posix_socket_getsockopt(int socket, int level, int name, void *value, int *length);
@@ -98,10 +109,10 @@ int posix_socket_getpeername(int socket, void *address, int *address_length);
 /* select over explicit descriptor lists; each list is rewritten in place to
 hold only the ready descriptors, and its count updated */
 int posix_socket_select(int *read, int *read_count, int *write, int *write_count,
-	int *error, int *error_count, long timeout_seconds, long timeout_microseconds, int infinite);
+	int *error, int *error_count, posix_long timeout_seconds, posix_long timeout_microseconds, int infinite);
 /* the first non-loopback IPv4 address (network byte order), or 0 */
-unsigned long posix_local_ipv4_address(void);
+posix_ulong posix_local_ipv4_address(void);
 /* fills buffer with cryptographically random bytes */
-void posix_random_bytes(void *buffer, unsigned long size);
+void posix_random_bytes(void *buffer, posix_ulong size);
 
 #endif

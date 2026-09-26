@@ -17,4 +17,11 @@ rasterizer.h perturbs MSVC's register allocation elsewhere, so instead every
 declaration and call collapses to the one-parameter form here. */
 #define rasterizer_debug_drawing_begin(opaque, ...) (rasterizer_debug_drawing_begin)(opaque)
 
+#ifdef HALO_ANDROID
+/* the screen at the device's aspect ratio (port/linux/src/d3d8_gl.c) */
+long halo_android_screen_width(void);
+/* while TRUE, drawing shifts right to center 640-column layouts */
+void halo_android_ui_offset(unsigned char centered);
+#endif
+
 #endif

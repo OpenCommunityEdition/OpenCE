@@ -16,10 +16,10 @@ the host ABI and _FILE_OFFSET_BITS=64.
 
 #include "posix.h"
 
-static void split64(unsigned long long value, unsigned long *low, unsigned long *high)
+static void split64(unsigned long long value, posix_ulong *low, posix_ulong *high)
 {
-	*low = (unsigned long)(value & 0xffffffffULL);
-	*high = (unsigned long)(value >> 32);
+	*low = (posix_ulong)(value & 0xffffffffULL);
+	*high = (posix_ulong)(value >> 32);
 }
 
 static void fill_information(const struct stat *st, struct posix_file_information *information)
@@ -30,13 +30,13 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	if (!(st->st_mode & S_IWUSR))
 		information->flags |= _posix_file_is_read_only;
 	split64((unsigned long long)st->st_size, &information->size_low, &information->size_high);
-	information->modification_seconds = (unsigned long)st->st_mtim.tv_sec;
-	information->modification_nanoseconds = (unsigned long)st->st_mtim.tv_nsec;
-	information->access_seconds = (unsigned long)st->st_atim.tv_sec;
-	information->access_nanoseconds = (unsigned long)st->st_atim.tv_nsec;
+	information->modification_seconds = (posix_ulong)st->st_mtim.tv_sec;
+	information->modification_nanoseconds = (posix_ulong)st->st_mtim.tv_nsec;
+	information->access_seconds = (posix_ulong)st->st_atim.tv_sec;
+	information->access_nanoseconds = (posix_ulong)st->st_atim.tv_nsec;
 	/* Linux has no portable creation time; the change time is the closest */
-	information->creation_seconds = (unsigned long)st->st_ctim.tv_sec;
-	information->creation_nanoseconds = (unsigned long)st->st_ctim.tv_nsec;
+	information->creation_seconds = (posix_ulong)st->st_ctim.tv_sec;
+	information->creation_nanoseconds = (posix_ulong)st->st_ctim.tv_nsec;
 }
 
 int posix_stat(const char *path, struct posix_file_information *information)
@@ -60,8 +60,8 @@ int posix_fstat(int descriptor, struct posix_file_information *information)
 }
 
 int posix_set_file_times(const char *path,
-	unsigned long access_seconds, unsigned long access_nanoseconds,
-	unsigned long modification_seconds, unsigned long modification_nanoseconds)
+	posix_ulong access_seconds, posix_ulong access_nanoseconds,
+	posix_ulong modification_seconds, posix_ulong modification_nanoseconds)
 {
 	struct timespec times[2];
 
@@ -72,10 +72,10 @@ int posix_set_file_times(const char *path,
 	return utimensat(AT_FDCWD, path, times, 0);
 }
 
-int posix_seek(int descriptor, long offset_low, long offset_high, int whence,
-	unsigned long *position_low, unsigned long *position_high)
+int posix_seek(int descriptor, posix_long offset_low, posix_long offset_high, int whence,
+	posix_ulong *position_low, posix_ulong *position_high)
 {
-	off_t offset = (off_t)(((unsigned long long)(unsigned long)offset_high << 32) | (unsigned long)offset_low);
+	off_t offset = (off_t)(((unsigned long long)(posix_ulong)offset_high << 32) | (posix_ulong)offset_low);
 	off_t result = lseek(descriptor, offset, whence);
 
 	if (result == (off_t)-1)
@@ -84,14 +84,14 @@ int posix_seek(int descriptor, long offset_low, long offset_high, int whence,
 	return 0;
 }
 
-int posix_truncate(int descriptor, unsigned long size_low, unsigned long size_high)
+int posix_truncate(int descriptor, posix_ulong size_low, posix_ulong size_high)
 {
 	return ftruncate(descriptor, (off_t)(((unsigned long long)size_high << 32) | size_low));
 }
 
 int posix_disk_space(const char *path,
-	unsigned long *free_low, unsigned long *free_high,
-	unsigned long *total_low, unsigned long *total_high)
+	posix_ulong *free_low, posix_ulong *free_high,
+	posix_ulong *total_low, posix_ulong *total_high)
 {
 	struct statvfs st;
 
@@ -116,19 +116,81 @@ int posix_set_read_only(const char *path, int read_only)
 
 int posix_make_directory(const char *path)
 {
+#ifdef __ANDROID__
+	/* readable by the shell user (adb), for managing saves in the app's
+	external storage (port/android/host/host_main.c) */
+	if (mkdir(path, 0775) != 0)
+		return -1;
+	chmod(path, 02775);
+	return 0;
+#else
 	return mkdir(path, 0755);
+#endif
 }
+
+#ifdef __LP64__
+/* The Android port calls this file from 32-bit guest code, which cannot
+hold a 64-bit DIR pointer: directory streams are small handles there. */
+#include <pthread.h>
+
+#define DIRECTORY_HANDLE_COUNT 64
+
+static DIR *directory_handles[DIRECTORY_HANDLE_COUNT];
+static pthread_mutex_t directory_handle_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void *directory_handle_new(DIR *directory)
+{
+	unsigned long index;
+
+	if (!directory)
+		return NULL;
+	pthread_mutex_lock(&directory_handle_lock);
+	for (index = 0; index < DIRECTORY_HANDLE_COUNT; index++)
+	{
+		if (!directory_handles[index])
+		{
+			directory_handles[index] = directory;
+			pthread_mutex_unlock(&directory_handle_lock);
+			return (void *)(index + 1);
+		}
+	}
+	pthread_mutex_unlock(&directory_handle_lock);
+	closedir(directory);
+	return NULL;
+}
+
+static DIR *directory_from_handle(void *handle, int release)
+{
+	unsigned long index = (unsigned long)handle - 1;
+	DIR *directory = NULL;
+
+	if (index >= DIRECTORY_HANDLE_COUNT)
+		return NULL;
+	pthread_mutex_lock(&directory_handle_lock);
+	directory = directory_handles[index];
+	if (release)
+		directory_handles[index] = NULL;
+	pthread_mutex_unlock(&directory_handle_lock);
+	return directory;
+}
+#else
+#define directory_handle_new(directory) ((void *)(directory))
+#define directory_from_handle(handle, release) ((DIR *)(handle))
+#endif
 
 void *posix_directory_open(const char *path)
 {
-	return opendir(path);
+	return directory_handle_new(opendir(path));
 }
 
-int posix_directory_next(void *directory, char *name, unsigned long name_size)
+int posix_directory_next(void *directory, char *name, posix_ulong name_size)
 {
+	DIR *stream = directory_from_handle(directory, 0);
 	struct dirent *entry;
 
-	while ((entry = readdir((DIR *)directory)) != NULL)
+	if (!stream)
+		return 0;
+	while ((entry = readdir(stream)) != NULL)
 	{
 		if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
 			continue;
@@ -142,12 +204,14 @@ int posix_directory_next(void *directory, char *name, unsigned long name_size)
 
 void posix_directory_close(void *directory)
 {
-	if (directory)
-		closedir((DIR *)directory);
+	DIR *stream = directory_from_handle(directory, 1);
+
+	if (stream)
+		closedir(stream);
 }
 
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
-	char *result, unsigned long result_size)
+	char *result, posix_ulong result_size)
 {
 	DIR *handle = opendir(*directory ? directory : ".");
 	struct dirent *entry;

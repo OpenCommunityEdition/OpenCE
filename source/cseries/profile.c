@@ -322,6 +322,15 @@ enum profile_frame_value
 
 /* ---------- macros */
 
+#ifdef HALO_ANDROID
+/* the AArch64 virtual counter stands in for the time stamp counter */
+#define QUERY_TIMEBASE(timebase) \
+{ \
+	unsigned long long halo_android_counter; \
+	__asm__ __volatile__("mrs %0, cntvct_el0" : "=r"(halo_android_counter)); \
+	*(unsigned long long *)&(timebase) = halo_android_counter; \
+}
+#else
 #define QUERY_TIMEBASE(timebase) \
 { \
 	__asm push eax \
@@ -332,6 +341,7 @@ enum profile_frame_value
 	__asm pop edx \
 	__asm pop eax \
 }
+#endif
 
 /* ---------- structures */
 

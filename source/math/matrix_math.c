@@ -936,6 +936,30 @@ void matrix4x3_multiply(
 	real *result_elements = result->n[0];
 	real const *a_scale = &a->scale;
 
+#ifdef HALO_ANDROID
+	{
+		/* the SSE block below: rows of b combine the rows of a, and the
+		position is scaled by a's scale before a's own is added */
+		real product[12];
+		long row, column;
+
+		for (row = 0; row < 4; row++)
+		{
+			for (column = 0; column < 3; column++)
+			{
+				real value = b_elements[row * 3 + 0] * a_elements[column] +
+					b_elements[row * 3 + 1] * a_elements[3 + column] +
+					b_elements[row * 3 + 2] * a_elements[6 + column];
+
+				if (row == 3)
+					value = value * *a_scale + a_elements[9 + column];
+				product[row * 3 + column] = value;
+			}
+		}
+		for (row = 0; row < 12; row++)
+			result_elements[row] = product[row];
+	}
+#else
 	__asm
 	{
 		mov ecx, a_elements
@@ -1010,6 +1034,7 @@ void matrix4x3_multiply(
 		movss dword ptr [eax + 0x24], xmm3
 		movhps qword ptr [eax + 0x28], xmm3
 	}
+#endif
 
 	result->scale = a->scale * b->scale;
 

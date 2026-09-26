@@ -412,6 +412,14 @@ static void hud_draw_multitexture_overlay(
 
 /* Inspect the guarded caller's frame, not the return site of this helper.
  * A normal prologue would replace EBP and defeat the paired stack check. */
+#ifdef HALO_ANDROID
+__attribute__((noinline)) long get_return_eip(
+	void)
+{
+	/* the caller's return address, as [ebp+4] is in the naked original */
+	return (long)__builtin_return_address(1);
+}
+#else
 __declspec(naked) long get_return_eip(
 	void)
 {
@@ -421,6 +429,7 @@ __declspec(naked) long get_return_eip(
 		ret
 	}
 }
+#endif
 
 real hud_globals_get_scale(
 	boolean in_multiplayer)

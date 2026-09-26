@@ -542,9 +542,13 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 
 extern struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
+#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
+#endif
 static word processed_bsp_flags;
+#ifndef HALO_ANDROID
 #pragma bss_seg()
+#endif
 
 typedef char verify_object_type_definition_size[
 	sizeof(struct object_type_definition) == 0xA0 ? 1 : -1];

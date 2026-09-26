@@ -66,6 +66,13 @@ __inline pixel32 real_argb_color_to_pixel32(
 		long green;
 		long blue;
 
+#ifdef HALO_ANDROID
+		result = (pixel32)(
+			(long)__builtin_rint((double)color->blue * scale) |
+			((long)__builtin_rint((double)color->green * scale) << 8) |
+			((long)__builtin_rint((double)color->red * scale) << 16) |
+			((long)__builtin_rint((double)color->alpha * scale) << 24));
+#else
 		__asm
 		{
 			mov		edx, color
@@ -94,11 +101,19 @@ __inline pixel32 real_argb_color_to_pixel32(
 			or		edx, eax
 			mov		result, edx
 		}
+#endif
 	}
 
 	{
 		pixel32 verify;
 
+#ifdef HALO_ANDROID
+		verify = (pixel32)(
+			((long)__builtin_rint((double)color->blue * scale) & 0xff) |
+			(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |
+			(((long)__builtin_rint((double)color->red * scale) & 0xff) << 16) |
+			((long)__builtin_rint((double)color->alpha * scale) << 24));
+#else
 		__asm
 		{
 			mov		edx, color
@@ -127,6 +142,7 @@ __inline pixel32 real_argb_color_to_pixel32(
 			or		edx, verify
 			mov		verify, edx
 		}
+#endif
 
 		match_assert(
 			"..\\bitmaps\\bitmaps_inlines.h",
@@ -145,6 +161,12 @@ __inline pixel32 real_rgb_color_to_pixel32(
 
 	match_assert_valid_real_rgb_color("..\\bitmaps\\bitmaps_inlines.h", 0xC9, color);
 
+#ifdef HALO_ANDROID
+	result = (pixel32)(
+		((long)__builtin_rint((double)color->blue * scale) & 0xff) |
+		(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |
+		(((long)__builtin_rint((double)color->red * scale) & 0xff) << 16));
+#else
 	__asm
 	{
 		mov edx, color
@@ -168,6 +190,7 @@ __inline pixel32 real_rgb_color_to_pixel32(
 		or edx, result
 		mov result, edx
 	}
+#endif
 
 	return result;
 }
@@ -187,6 +210,9 @@ __inline pixel32 real_alpha_to_pixel32(
 		291,
 		alpha>=0.0f && alpha<=1.0f);
 
+#ifdef HALO_ANDROID
+	result = (pixel32)((long)__builtin_rint((double)alpha * scale) << 24);
+#else
 	__asm
 	{
 		fld		alpha
@@ -195,6 +221,7 @@ __inline pixel32 real_alpha_to_pixel32(
 		fistp	result
 		shl		result, 24
 	}
+#endif
 
 	return result;
 }

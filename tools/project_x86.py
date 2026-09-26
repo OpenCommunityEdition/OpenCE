@@ -36,6 +36,7 @@ from .semantic_progress import (
     revoke_incomplete_units,
 )
 from .linux_build import generate_linux_build, linux_configure_inputs
+from .android_build import generate_android_build, android_configure_inputs
 from .parked_functions import (
     ParkedFunctionsError,
     require_valid_parked_functions,
@@ -136,6 +137,8 @@ class SolutionConfig:
         self.uasm_tag: Optional[str] = None  # Git tag; MASM stand-in on Linux
         self.wrapper: Optional[Path] = None  # If None, download wibo on Linux
         self.linux_cc: Optional[str] = None  # Native Linux build compiler (default clang)
+        self.android_ndk: Optional[str] = None  # Android NDK (default: found from the environment)
+        self.android_guest_cc: Optional[str] = None  # Android guest compiler (default clang)
         
         # Project config
         self.baserom: Optional[Path] = None
@@ -567,6 +570,11 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
     generate_linux_build(n, sln)
 
     ###
+    # Android build (not part of the matching graph)
+    ###
+    generate_android_build(n, sln)
+
+    ###
     # Regenerate on change
     ###
     n.comment("Reconfigure on change")
@@ -585,6 +593,7 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             python_lib,
             python_lib_dir / "ninja_syntax.py",
             *linux_configure_inputs(),
+            *android_configure_inputs(),
         ],
     )
     n.newline()

@@ -140,11 +140,21 @@ static void operand(struct xgpu_text *text, const DWORD *instruction, char which
 }
 
 static const char shader_prologue[] =
+#ifdef HALO_ANDROID
+	/* the #version line comes first, from the context's capabilities */
+	"precision highp float;\n"
+	"precision highp int;\n"
+#else
 	"#version 450 core\n"
+#endif
 	"uniform vec4 c[192];\n"
 	"uniform vec4 viewport_scale;\n"
 	"uniform vec4 viewport_offset;\n"
 	"uniform float point_size;\n"
+#ifdef HALO_ANDROID
+	/* columns the menus shift by to center on a wide screen (d3d8_gl.c) */
+	"uniform float screen_offset;\n"
+#endif
 	"out vec4 xD0;\n"
 	"out vec4 xD1;\n"
 	"out vec4 xB0;\n"
@@ -192,6 +202,9 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 	struct xgpu_text text = { 0 };
 	unsigned long index;
 
+#ifdef HALO_ANDROID
+	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+#endif
 	xgpu_text_append(&text, "%s", shader_prologue);
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
@@ -221,6 +234,9 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tvec4 oFog = vec4(1.0), oPts = vec4(point_size), oUnused = vec4(0.0);\n"
 		"\tint a0 = 0;\n"
 		"\tvec4 A, B, C, mac, ilu;\n");
+#ifdef HALO_ANDROID
+	xgpu_text_append(&text, "\tvec4 clip_position = vec4(0.0);\n\tbool clip_captured = false;\n");
+#endif
 
 	for (index = 0; index < instruction_count; index++)
 	{
@@ -272,6 +288,15 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		case _ilu_lit: xgpu_text_append(&text, "\tilu = nv2a_lit(C);\n"); break;
 		default: xgpu_text_append(&text, "\tilu = vec4(0.0);\n"); break;
 		}
+#ifdef HALO_ANDROID
+		/* the screen-space conversion takes the reciprocal of the clip-space
+		position's w (rcc of r12.w); keep the position it converts */
+		if (ilu == _ilu_rcc && field(instruction, 3, 28, 2) == _mux_temporary &&
+			((field(instruction, 2, 0, 2) << 2) | field(instruction, 3, 30, 2)) == 12)
+		{
+			xgpu_text_append(&text, "\tclip_position = oPos;\n\tclip_captured = true;\n");
+		}
+#endif
 
 		/* results are written only after both units have read their inputs */
 		if (mac == _mac_arl)
@@ -317,8 +342,27 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		/* Direct3D 8 puts pixel centres on integer screen coordinates (the
 		game offsets its screen-space quads by -0.5 to match), OpenGL on
 		half-integers */
+#ifdef HALO_ANDROID
+		/* The conversion is screen = clip * c[-38] * rcc(w) + c[-37]; undoing
+		it by multiplying by w again is lossy near the camera plane, where
+		rcc clamps and 1/w rounds differently on each GPU (Mali put vertices
+		of the first-person weapon at the vanishing point). Where the clip
+		position was kept, the same result is computed without dividing. */
+		"\tif (clip_captured)\n"
+		"\t\tgl_Position = vec4((clip_position.xyz * c[%d].xyz + (c[%d].xyz + vec3(0.5 + screen_offset, 0.5, 0.0)\n"
+		"\t\t\t- viewport_offset.xyz) * clip_position.w) / scale, clip_position.w);\n"
+		"\telse\n"
+		"\t\tgl_Position = vec4((vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale * oPos.w, oPos.w);\n"
+#else
 		"\tvec3 ndc = (vec3(oPos.xy + 0.5, oPos.z) - viewport_offset.xyz) / scale;\n"
 		"\tgl_Position = vec4(ndc * oPos.w, oPos.w);\n"
+#endif
+#ifdef HALO_ANDROID
+		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
+		GL: rows from the top, depth 0..1 */
+		"\tgl_Position.y = -gl_Position.y;\n"
+		"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n"
+#endif
 		"\tgl_PointSize = oPts.x;\n"
 		"\txD0 = clamp(oD0, 0.0, 1.0);\n"
 		"\txD1 = clamp(oD1, 0.0, 1.0);\n"
@@ -329,6 +373,10 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT2 = oT2;\n"
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
-		"}\n");
+		"}\n"
+#ifdef HALO_ANDROID
+		, XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
+#endif
+		);
 	return text.buffer;
 }

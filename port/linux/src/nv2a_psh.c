@@ -313,18 +313,44 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	}
 }
 
+#ifdef HALO_ANDROID
+/* ES samplers have no LOD bias: pass D3DTSS_MIPMAPLODBIAS to the lookup */
+#define SAMPLE_BIAS ", texture_lod_bias[%d]"
+#define SHADER_VERSION \
+	"precision highp float;\n" \
+	"precision highp int;\n" \
+	"precision highp sampler2D;\n" \
+	"precision highp sampler3D;\n" \
+	"precision highp samplerCube;\n"
+#else
+#define SAMPLE_BIAS ""
+#define SHADER_VERSION "#version 450 core\n"
+#endif
+
 static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage, const char *coordinates)
 {
 	switch (key->sampler_type[stage])
 	{
 	case _xgpu_sampler_3d:
-		xgpu_text_append(text, "texture(tex%d, (%s).xyz)", stage, coordinates);
+		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
+#ifdef HALO_ANDROID
+			, stage
+#endif
+			);
 		break;
 	case _xgpu_sampler_cube:
-		xgpu_text_append(text, "texture(tex%d, (%s).xyz)", stage, coordinates);
+		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
+#ifdef HALO_ANDROID
+			, stage
+#endif
+			);
 		break;
 	default:
-		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy)", stage, coordinates, stage);
+		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy" SAMPLE_BIAS ")", stage, coordinates, stage
+#ifdef HALO_ANDROID
+			, stage
+#endif
+			);
 		break;
 	}
 }
@@ -503,8 +529,19 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (combiner_count > 8)
 		combiner_count = 8;
 
+#ifdef HALO_ANDROID
+	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+	if (key->count_samples)
+	{
+		/* samples that pass the depth and stencil tests, as the NV2A's
+		occlusion counter */
+		xgpu_text_append(&text,
+			"layout(early_fragment_tests) in;\n"
+			"layout(binding = 0, offset = 0) uniform atomic_uint visible_samples;\n");
+	}
+#endif
 	xgpu_text_append(&text,
-		"#version 450 core\n"
+		SHADER_VERSION
 		"in vec4 xD0;\n"
 		"in vec4 xD1;\n"
 		"in vec4 xB0;\n"
@@ -615,6 +652,10 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tresult = vec4(t0.rgb, 1.0);\n");
 	if (getenv("HALO_GPU_DEBUG_FLAT"))
 		xgpu_text_append(&text, "\tresult = xD0.a > 0.0 ? vec4(xD0.rgb, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);\n");
+#ifdef HALO_ANDROID
+	if (key->count_samples)
+		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
+#endif
 	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n}\n");
 	return text.buffer;
 }

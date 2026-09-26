@@ -1921,7 +1921,11 @@ boolean rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 		d3d_present_parameters.EnableAutoDepthStencil = TRUE;
 		d3d_present_parameters.AutoDepthStencilFormat = D3DFMT_D24S8;
 		d3d_present_parameters.BackBufferFormat = D3DFMT_A8R8G8B8;
+#ifdef HALO_ANDROID
+		d3d_present_parameters.BackBufferWidth = halo_android_screen_width();
+#else
 		d3d_present_parameters.BackBufferWidth = RASTERIZER_SCREEN_WIDTH;
+#endif
 		d3d_present_parameters.BackBufferHeight = RASTERIZER_SCREEN_HEIGHT;
 		d3d_present_parameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
@@ -2903,10 +2907,21 @@ boolean _rasterizer_initialize(
 
 		rasterizer_globals.reserved04.screen_bounds.y0 = 0;
 		rasterizer_globals.reserved04.screen_bounds.x0 = 0;
+#ifdef HALO_ANDROID
+		/* the device's aspect ratio, with the title-safe frame (the HUD)
+		widened in proportion */
+		rasterizer_globals.reserved04.screen_bounds.x1 = (short)halo_android_screen_width();
+		rasterizer_globals.reserved04.screen_bounds.y1 = RASTERIZER_SCREEN_HEIGHT;
+		rasterizer_globals.reserved04.frame_bounds.x0 =
+			(short)(RASTERIZER_FRAME_BOUNDS_X0 * halo_android_screen_width() / RASTERIZER_SCREEN_WIDTH);
+		rasterizer_globals.reserved04.frame_bounds.x1 =
+			(short)(halo_android_screen_width() - rasterizer_globals.reserved04.frame_bounds.x0);
+#else
 		rasterizer_globals.reserved04.screen_bounds.x1 = RASTERIZER_SCREEN_WIDTH;
 		rasterizer_globals.reserved04.screen_bounds.y1 = RASTERIZER_SCREEN_HEIGHT;
 		rasterizer_globals.reserved04.frame_bounds.x0 = RASTERIZER_FRAME_BOUNDS_X0;
 		rasterizer_globals.reserved04.frame_bounds.x1 = RASTERIZER_FRAME_BOUNDS_X1;
+#endif
 		rasterizer_globals.reserved04.frame_bounds.y0 = RASTERIZER_FRAME_BOUNDS_Y0;
 		rasterizer_globals.reserved04.frame_bounds.y1 = RASTERIZER_FRAME_BOUNDS_Y1;
 		rasterizer_globals.fps_accumulation_frame_index = 1;

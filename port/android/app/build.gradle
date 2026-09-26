@@ -1,0 +1,58 @@
+plugins {
+    id "com.android.application"
+}
+
+// build/android in the repository root, where `ninja android` stages the
+// native libraries (jniLibs) and the guest image (assets)
+def staged = new File(rootDir, "../../build/android")
+
+android {
+    namespace "com.halo.decomp"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.halo.decomp"
+        minSdk 28
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += new File(staged, "third_party/SDL3/android-project/app/src/main/java")
+            jniLibs.srcDirs = [new File(staged, "jniLibs")]
+            assets.srcDirs = [new File(staged, "assets")]
+        }
+    }
+
+    // the guest image is read straight from the APK
+    androidResources {
+        noCompress += ["elf"]
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging false
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

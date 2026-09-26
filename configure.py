@@ -70,6 +70,16 @@ parser.add_argument(
     metavar="BINARY",
     help="compiler for the native Linux build, `ninja linux` (default: clang)",
 )
+parser.add_argument(
+    "--android-ndk",
+    type=str,
+    help="Android NDK for `ninja android` (default: ANDROID_NDK_HOME, or the newest under the Android SDK)",
+)
+parser.add_argument(
+    "--android-guest-cc",
+    type=str,
+    help="clang with the arm64_32 target for the Android guest (default: clang)",
+)
 if not is_windows():
     parser.add_argument(
         "--wrapper",
@@ -128,6 +138,8 @@ sln.csplit_path = args.csplit
 sln.ninja_path = args.ninja
 sln.ml_path = args.ml
 sln.linux_cc = args.linux_cc
+sln.android_ndk = args.android_ndk
+sln.android_guest_cc = args.android_guest_cc
 if not is_windows():
     sln.wrapper = args.wrapper
 

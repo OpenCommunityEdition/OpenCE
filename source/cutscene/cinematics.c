@@ -470,6 +470,20 @@ void cinematic_render(
 					((pixel32)shadow_alpha << 24) |
 					(title->shadow_color & 0x00FFFFFF));
 
+#ifdef HALO_ANDROID
+				{
+					/* the bounds are for 640 columns: on a wider screen move
+					them so they keep their place relative to its sides */
+					static rectangle2d wide_bounds;
+					short shift = (short)(((title_bounds->x0 + title_bounds->x1) / 2) *
+						(halo_android_screen_width() - 640) / 640);
+
+					wide_bounds = *title_bounds;
+					wide_bounds.x0 += shift;
+					wide_bounds.x1 += shift;
+					title_bounds = &wide_bounds;
+				}
+#endif
 				rasterizer_draw_unicode_string(
 					title_bounds,
 					NULL,

@@ -106,7 +106,11 @@ enum
 
 /* ---------- macros */
 
+#ifdef HALO_ANDROID
+#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH halo_android_screen_width()
+#else
 #define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH 640
+#endif
 #define RASTERIZER_TARGET_RENDER_PRIMARY_HEIGHT 480
 
 /* ---------- structures */
@@ -227,12 +231,20 @@ static void render_nonplayer_frame(
 	switch (window_type)
 	{
 	case 0:
+		/* letterbox bars and split screen dividers: laid out from the
+		viewport, so not centered like the menus on a wide screen */
 		interface_draw_fullscreen_overlays();
 		rasterizer_debug_draw();
 		break;
 
 	case 1:
+#ifdef HALO_ANDROID
+		halo_android_ui_offset(TRUE);
 		game_engine_nonplayer_post_rasterize();
+		halo_android_ui_offset(FALSE);
+#else
+		game_engine_nonplayer_post_rasterize();
+#endif
 		break;
 
 	default:
@@ -270,7 +282,13 @@ void render_frame_pregame(
 	rasterizer_parameters.rasterizer_target = 0;
 	rasterizer_window_begin(&rasterizer_parameters);
 
+#ifdef HALO_ANDROID
+	halo_android_ui_offset(TRUE);
 	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
+	halo_android_ui_offset(FALSE);
+#else
+	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
+#endif
 	bink_playback_render();
 
 	{
@@ -423,7 +441,13 @@ static void render_window(
 		rasterizer_lens_flares_draw();
 		interface_draw_screen();
 		rasterizer_screen_flash();
+#ifdef HALO_ANDROID
+		halo_android_ui_offset(TRUE);
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
+		halo_android_ui_offset(FALSE);
+#else
+		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
+#endif
 	}
 
 	bink_playback_render();
@@ -641,7 +665,13 @@ void render_frame(
 		render_nonplayer_frame(window, window_type);
 	}
 
+#ifdef HALO_ANDROID
+	halo_android_ui_offset(TRUE);
 	progress_bar_eachframe();
+	halo_android_ui_offset(FALSE);
+#else
+	progress_bar_eachframe();
+#endif
 	rasterizer_windows_end();
 	rasterizer_frame_end();
 

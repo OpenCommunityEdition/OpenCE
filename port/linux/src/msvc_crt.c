@@ -294,6 +294,67 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
+#ifdef HALO_ANDROID
+/* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
+flags in FPSR. Precision control and exception unmasking have no
+equivalent; the rest of the MSVC control word is only remembered. */
+static unsigned int msvc_control_word = CW_DEFAULT;
+
+unsigned int _control87(unsigned int new_value, unsigned int mask)
+{
+	unsigned long long fpcr;
+
+	if (mask)
+	{
+		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
+		__asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+		fpcr &= ~(3ULL << 22);
+		switch (msvc_control_word & _MCW_RC)
+		{
+		case _RC_UP: fpcr |= 1ULL << 22; break;
+		case _RC_DOWN: fpcr |= 2ULL << 22; break;
+		case _RC_CHOP: fpcr |= 3ULL << 22; break;
+		default: break;
+		}
+		__asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+	}
+	return msvc_control_word;
+}
+
+unsigned int _controlfp(unsigned int new_value, unsigned int mask)
+{
+	/* _controlfp ignores the denormal mask */
+	return _control87(new_value, mask & ~_EM_DENORMAL);
+}
+
+unsigned int _statusfp(void)
+{
+	unsigned long long fpsr;
+	unsigned int result = 0;
+
+	__asm__ __volatile__("mrs %0, fpsr" : "=r"(fpsr));
+	/* as the x87 status word's low bits: invalid, denormal, zero divide,
+	overflow, underflow, precision */
+	if (fpsr & 0x01) result |= 0x01;
+	if (fpsr & 0x80) result |= 0x02;
+	if (fpsr & 0x02) result |= 0x04;
+	if (fpsr & 0x04) result |= 0x08;
+	if (fpsr & 0x08) result |= 0x10;
+	if (fpsr & 0x10) result |= 0x20;
+	return result;
+}
+
+unsigned int _clearfp(void)
+{
+	unsigned int status = _statusfp();
+	unsigned long long fpsr;
+
+	__asm__ __volatile__("mrs %0, fpsr" : "=r"(fpsr));
+	fpsr &= ~0x9fULL;
+	__asm__ __volatile__("msr fpsr, %0" : : "r"(fpsr));
+	return status;
+}
+#else
 unsigned int _control87(unsigned int new_value, unsigned int mask)
 {
 	unsigned short word;
@@ -331,6 +392,8 @@ unsigned int _clearfp(void)
 	__asm__ __volatile__("fnclex");
 	return status;
 }
+
+#endif
 
 int _isnan(double value)
 {

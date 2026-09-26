@@ -23,6 +23,9 @@ static SDL_ThreadID platform_event_thread;
 static BOOL platform_sdl_started = FALSE;
 
 static struct platform_input_state input_state;
+/* keys pressed since the last read, so a press and release between two
+reads still counts as a press (input injected on Android, or a slow frame) */
+static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
 static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /* debug keyboard queue */
@@ -35,6 +38,15 @@ BOOL platform_sdl_initialize(void)
 	if (platform_sdl_started)
 		return TRUE;
 	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
+#ifdef HALO_ANDROID
+	/* landscape only; the back key arrives as a key event (xinput_sdl.c)
+	instead of closing the activity */
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+	/* touching the screen must not aim or fire (the mouse drives the
+	controller emulation in xinput_sdl.c) */
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
 	{
 		platform_log("SDL_Init failed: %s", SDL_GetError());
@@ -57,26 +69,46 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	if (scale < 1)
 		scale = 1;
 
+#ifdef HALO_ANDROID
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 	if (getenv("HALO_GL_DEBUG"))
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 
+#ifdef HALO_ANDROID
+	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
+		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
+#else
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (getenv("HALO_HIDDEN_WINDOW") ? SDL_WINDOW_HIDDEN : 0));
+#endif
 	if (!platform_window)
 	{
 		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
 		return FALSE;
 	}
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
+#ifdef HALO_ANDROID
+	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
+	3.0 plus extensions */
 	if (!platform_gl_context)
 	{
-		platform_log("cannot create an OpenGL 4.5 core context: %s", SDL_GetError());
+		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+		platform_gl_context = SDL_GL_CreateContext(platform_window);
+	}
+#endif
+	if (!platform_gl_context)
+	{
+		platform_log("cannot create an OpenGL context: %s", SDL_GetError());
 		return FALSE;
 	}
 	SDL_GL_MakeCurrent(platform_window, platform_gl_context);
@@ -86,7 +118,9 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
+#ifndef HALO_ANDROID
 	platform_mouse_capture(TRUE);
+#endif
 	return TRUE;
 }
 
@@ -270,7 +304,11 @@ void platform_pump_events(void)
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
 			if (event.key.scancode < SDL_SCANCODE_COUNT)
+			{
 				input_state.keys[event.key.scancode] = event.key.down;
+				if (event.key.down)
+					keys_pressed[event.key.scancode] = 1;
+			}
 			queue_keystroke(&event.key);
 			/* F12 releases or recaptures the mouse */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
@@ -298,8 +336,10 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			input_state.focused = TRUE;
+#ifndef HALO_ANDROID
 			if (!input_state.mouse_released)
 				platform_mouse_capture(TRUE);
+#endif
 			break;
 		case SDL_EVENT_GAMEPAD_ADDED:
 			SDL_OpenGamepad(event.gdevice.which);
@@ -315,6 +355,16 @@ void platform_input_read(struct platform_input_state *state, BOOL consume_motion
 {
 	pthread_mutex_lock(&input_lock);
 	*state = input_state;
+	if (consume_motion)
+	{
+		int scancode;
+
+		for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
+		{
+			state->keys[scancode] |= keys_pressed[scancode];
+			keys_pressed[scancode] = 0;
+		}
+	}
 	if (consume_motion)
 	{
 		input_state.mouse_dx = 0;

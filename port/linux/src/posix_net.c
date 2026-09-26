@@ -192,13 +192,13 @@ int posix_socket_set_nonblocking(int socket, int nonblocking)
 	return succeed(fcntl(socket, F_SETFL, flags));
 }
 
-int posix_socket_bytes_available(int socket, unsigned long *count)
+int posix_socket_bytes_available(int socket, posix_ulong *count)
 {
 	int available = 0;
 	int result = ioctl(socket, FIONREAD, &available);
 
 	if (result >= 0)
-		*count = (unsigned long)available;
+		*count = (posix_ulong)available;
 	return succeed(result);
 }
 
@@ -303,7 +303,7 @@ static void keep_ready(fd_set *set, int *descriptors, int *count)
 }
 
 int posix_socket_select(int *read, int *read_count, int *write, int *write_count,
-	int *error, int *error_count, long timeout_seconds, long timeout_microseconds, int infinite)
+	int *error, int *error_count, posix_long timeout_seconds, posix_long timeout_microseconds, int infinite)
 {
 	fd_set read_set, write_set, error_set;
 	struct timeval timeout;
@@ -329,10 +329,10 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	return result;
 }
 
-unsigned long posix_local_ipv4_address(void)
+posix_ulong posix_local_ipv4_address(void)
 {
 	struct ifaddrs *addresses, *entry;
-	unsigned long result = 0;
+	posix_ulong result = 0;
 
 	if (getifaddrs(&addresses) != 0)
 		return 0;
@@ -353,7 +353,7 @@ unsigned long posix_local_ipv4_address(void)
 	return result;
 }
 
-void posix_random_bytes(void *buffer, unsigned long size)
+void posix_random_bytes(void *buffer, posix_ulong size)
 {
 	unsigned char *cursor = buffer;
 
@@ -368,6 +368,6 @@ void posix_random_bytes(void *buffer, unsigned long size)
 			break;
 		}
 		cursor += count;
-		size -= (unsigned long)count;
+		size -= (posix_ulong)count;
 	}
 }

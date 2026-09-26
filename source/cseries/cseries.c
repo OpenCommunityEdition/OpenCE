@@ -535,6 +535,27 @@ not_equal:
 	return c1 > c2 ? 1 : -1;
 }
 
+#ifdef HALO_ANDROID
+char *stristr(
+	const char *haystack,
+	const char *needle)
+{
+	/* as the assembly below: the first character matches exactly, the
+	rest without regard to case */
+	char first = *needle++;
+	unsigned long length;
+
+	if (!first)
+		return (char *)haystack;
+	length = csstrlen(needle);
+	for (; *haystack; haystack++)
+	{
+		if (*haystack == first && !_strnicmp(haystack + 1, needle, length))
+			return (char *)haystack;
+	}
+	return NULL;
+}
+#else
 __declspec(naked) char *stristr(
 	const char *haystack,
 	const char *needle)
@@ -598,6 +619,7 @@ __declspec(naked) char *stristr(
 		ret
 	}
 }
+#endif
 
 unsigned long string_hash(
 	const char *string)

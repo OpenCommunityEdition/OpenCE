@@ -17,6 +17,9 @@ memory_watch.c detects that by write-protecting the pages.
 #include "xgpu.h"
 
 #include <stdio.h>
+#ifdef HALO_ANDROID
+#define GL_BGRA GL_RGBA
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -391,6 +394,131 @@ static void decode_level(const struct xgpu_texture_description *description, uns
 	}
 }
 
+#ifdef HALO_ANDROID
+/* ---------- DXT decoding, for ES drivers without S3TC (Mali) */
+
+static unsigned long color565(unsigned long value)
+{
+	return argb(255, expand5(value >> 11), expand6((value >> 5) & 0x3f), expand5(value & 0x1f));
+}
+
+static unsigned long mix(unsigned long a, unsigned long b, unsigned long weight_a, unsigned long weight_b,
+	unsigned long divisor)
+{
+	unsigned long result = 0;
+	int shift;
+
+	for (shift = 0; shift < 24; shift += 8)
+	{
+		unsigned long channel = (((a >> shift) & 0xff) * weight_a + ((b >> shift) & 0xff) * weight_b) / divisor;
+
+		result |= channel << shift;
+	}
+	return result | 0xff000000UL;
+}
+
+/* one 4x4 block's colors; dxt1 selects the punch-through alpha mode */
+static void dxt_color_block(const unsigned char *block, BOOL dxt1, unsigned long colors[16])
+{
+	unsigned long c0 = block[0] | (block[1] << 8);
+	unsigned long c1 = block[2] | (block[3] << 8);
+	unsigned long palette[4];
+	unsigned long bits = block[4] | (block[5] << 8) | ((unsigned long)block[6] << 16) | ((unsigned long)block[7] << 24);
+	int index;
+
+	palette[0] = color565(c0);
+	palette[1] = color565(c1);
+	if (c0 > c1 || !dxt1)
+	{
+		palette[2] = mix(palette[0], palette[1], 2, 1, 3);
+		palette[3] = mix(palette[0], palette[1], 1, 2, 3);
+	}
+	else
+	{
+		palette[2] = mix(palette[0], palette[1], 1, 1, 2);
+		palette[3] = 0;
+	}
+	for (index = 0; index < 16; index++)
+		colors[index] = palette[(bits >> (index * 2)) & 3];
+}
+
+static void dxt_decode_level(unsigned char kind, const unsigned char *source, unsigned long width, unsigned long height,
+	unsigned long depth, unsigned long *destination)
+{
+	unsigned long blocks_x = (width + 3) / 4, blocks_y = (height + 3) / 4;
+	unsigned long block_bytes = kind == _texel_dxt1 ? 8 : 16;
+	unsigned long z, bx, by, x, y;
+
+	for (z = 0; z < depth; z++)
+	{
+		for (by = 0; by < blocks_y; by++)
+		{
+			for (bx = 0; bx < blocks_x; bx++)
+			{
+				const unsigned char *block = source + ((z * blocks_y + by) * blocks_x + bx) * block_bytes;
+				unsigned long colors[16];
+				unsigned long alpha[16];
+				int index;
+
+				if (kind == _texel_dxt1)
+				{
+					dxt_color_block(block, TRUE, colors);
+					for (index = 0; index < 16; index++)
+						alpha[index] = colors[index] >> 24;
+				}
+				else
+				{
+					dxt_color_block(block + 8, FALSE, colors);
+					if (kind == _texel_dxt3)
+					{
+						for (index = 0; index < 16; index++)
+							alpha[index] = expand4((block[index / 2] >> ((index & 1) * 4)) & 0xf);
+					}
+					else
+					{
+						unsigned long a0 = block[0], a1 = block[1], values[8];
+						unsigned long long bits = 0;
+						int bit;
+
+						for (bit = 0; bit < 6; bit++)
+							bits |= (unsigned long long)block[2 + bit] << (bit * 8);
+						values[0] = a0;
+						values[1] = a1;
+						if (a0 > a1)
+						{
+							for (index = 2; index < 8; index++)
+								values[index] = ((8 - index) * a0 + (index - 1) * a1) / 7;
+						}
+						else
+						{
+							for (index = 2; index < 6; index++)
+								values[index] = ((6 - index) * a0 + (index - 1) * a1) / 5;
+							values[6] = 0;
+							values[7] = 255;
+						}
+						for (index = 0; index < 16; index++)
+							alpha[index] = values[(bits >> (index * 3)) & 7];
+					}
+				}
+				for (y = 0; y < 4; y++)
+				{
+					for (x = 0; x < 4; x++)
+					{
+						unsigned long px = bx * 4 + x, py = by * 4 + y;
+
+						if (px < width && py < height)
+						{
+							destination[(z * height + py) * width + px] =
+								(colors[y * 4 + x] & 0x00ffffffUL) | (alpha[y * 4 + x] << 24);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+#endif
+
 static GLenum compressed_format(unsigned char kind)
 {
 	switch (kind)
@@ -406,6 +534,12 @@ static GLenum compressed_format(unsigned char kind)
 /* HALO_TEXTURE_DUMP=<dir> writes level 0 of every upload as a TGA, read back from GL */
 static void texture_dump(GLenum target, const struct xgpu_texture_description *description)
 {
+#ifdef HALO_ANDROID
+	/* ES cannot read textures back */
+	(void)target;
+	(void)description;
+}
+#else
 	static unsigned long dump_index = 0;
 	const char *directory = getenv("HALO_TEXTURE_DUMP");
 	unsigned long width = description->width, height = description->height;
@@ -434,6 +568,7 @@ static void texture_dump(GLenum target, const struct xgpu_texture_description *d
 	}
 	free(pixels);
 }
+#endif
 
 static void upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
 	const unsigned char *base, const D3DCOLOR *palette)
@@ -442,10 +577,21 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	unsigned long face_count = description->cube_map ? 6 : 1;
 	unsigned long face_size = xgpu_texture_face_size(description);
 	unsigned long largest = description->width * description->height * description->depth;
-	unsigned long *converted = description->compressed ? NULL : malloc(largest * sizeof(unsigned long));
+	BOOL decode_compressed = FALSE;
+	unsigned long *converted;
 	unsigned long face, level;
 
+#ifdef HALO_ANDROID
+	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
+#endif
+	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	glBindTexture(target, texture);
+#ifdef HALO_ANDROID
+	/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
+	RGBA */
+	glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, converted ? GL_BLUE : GL_RED);
+	glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, converted ? GL_RED : GL_BLUE);
+#endif
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (GLint)description->levels - 1);
@@ -460,7 +606,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 			GLsizei height = (GLsizei)level_dimension(description->height, level);
 			GLsizei depth = (GLsizei)level_dimension(description->depth, level);
 
-			if (description->compressed)
+			if (description->compressed && !decode_compressed)
 			{
 				if (target == GL_TEXTURE_3D)
 					glCompressedTexImage3D(image_target, (GLint)level, compressed_format(information.kind), width, height, depth, 0,
@@ -471,6 +617,12 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 			}
 			else
 			{
+#ifdef HALO_ANDROID
+				if (decode_compressed)
+					dxt_decode_level(information.kind, source, (unsigned long)width, (unsigned long)height,
+						(unsigned long)depth, converted);
+				else
+#endif
 				decode_level(description, level, source, palette, converted);
 				if (target == GL_TEXTURE_3D)
 					glTexImage3D(image_target, (GLint)level, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);

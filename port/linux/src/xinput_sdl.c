@@ -174,6 +174,10 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 		k[SDL_SCANCODE_KP_ENTER]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_F] || k[SDL_SCANCODE_BACKSPACE] ||
 		(mouse && m[SDL_BUTTON_X1]));
+#ifdef HALO_ANDROID
+	/* the system back key (gesture or button) backs out of menus */
+	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_AC_BACK]);
+#endif
 	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_E] || k[SDL_SCANCODE_R]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB] || wheel_press_polls > 0);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] |= analog(k[SDL_SCANCODE_Q]);
@@ -215,6 +219,31 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 	ids = SDL_GetGamepads(&count);
 	if (!ids)
 		return 0;
+#ifdef HALO_ANDROID
+	{
+		/* Android can list input devices with a few gamepad buttons (the
+		emulator's keyboard, some phones' key devices) as generic gamepads:
+		recognised controllers take the first ports */
+		int pass;
+
+		for (pass = 0; pass < 2; pass++)
+		{
+			for (index = 0; index < count && found < PORT_COUNT; index++)
+			{
+				SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
+				SDL_GamepadType type;
+				BOOL recognised;
+
+				if (!gamepad)
+					continue;
+				type = SDL_GetGamepadType(gamepad);
+				recognised = type != SDL_GAMEPAD_TYPE_UNKNOWN && type != SDL_GAMEPAD_TYPE_STANDARD;
+				if (recognised == (pass == 0))
+					gamepads[found++] = gamepad;
+			}
+		}
+	}
+#else
 	for (index = 0; index < count && found < PORT_COUNT; index++)
 	{
 		SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
@@ -222,6 +251,7 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 		if (gamepad)
 			gamepads[found++] = gamepad;
 	}
+#endif
 	SDL_free(ids);
 	return found;
 }

@@ -13,6 +13,30 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
+#ifdef HALO_ANDROID
+/* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
+struct xgpu_capabilities
+{
+	BOOL copy_image;
+	BOOL border_clamp;
+	BOOL anisotropy;
+	BOOL s3tc;
+	/* ES 3.1 with fragment atomic counters: exact visibility test counts */
+	BOOL atomic_counters;
+	/* "300 es" or "310 es" */
+	const char *shading_language;
+};
+
+extern struct xgpu_capabilities xgpu_capabilities;
+
+/* port/android/guest/runtime/guest_host.h */
+int host_gl_has_extension(const char *name);
+unsigned int host_gl_read_buffer_word(unsigned int buffer, unsigned int offset);
+void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
+void host_gl_fence_frame(unsigned int slot);
+void host_gl_wait_frame(unsigned int slot);
+#endif
+
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -64,10 +88,19 @@ struct nv2a_pixel_shader_key
 	unsigned long alpha_test_function;
 	unsigned char fog_enable;
 	unsigned char fog_table_mode;
-	unsigned char pad[2];
+	/* inside a visibility test: count the samples that pass (Android) */
+	unsigned char count_samples;
+	unsigned char pad;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
+
+#ifdef HALO_ANDROID
+/* ES samplers have no LOD bias of their own */
+#define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"
+#else
+#define XGPU_PIXEL_UNIFORMS_ES ""
+#endif
 
 /* the combiner registers that live in uniforms rather than in the program:
 C0/C1 of each stage and the final combiner, and texture constants */
@@ -81,7 +114,8 @@ C0/C1 of each stage and the final combiner, and texture constants */
 	"uniform float alpha_reference;\n" \
 	"uniform vec4 bump_matrix[4];\n" \
 	"uniform vec4 bump_luminance[4];\n" \
-	"uniform vec4 texture_scale[4];\n"
+	"uniform vec4 texture_scale[4];\n" \
+	XGPU_PIXEL_UNIFORMS_ES
 
 /* ---------- textures */
 

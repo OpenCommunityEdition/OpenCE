@@ -23,6 +23,10 @@ You must source the August 2001 Xbox SDK yourself, and you need Python and [ninj
 
 `ninja linux` compiles the game with clang into a native 32-bit Linux executable, `build/linux/halo`. It needs clang, 32-bit glibc development files and 32-bit SDL3. It renders with OpenGL, plays sound through SDL3 audio, and takes keyboard, mouse and gamepad input. Put the PAL game data (build 01.01.14.2342) under `assets/` so that `assets/maps` exists, then run `build/linux/halo`. See [port/linux/README.md](port/linux/README.md) for controls and settings.
 
+### Android build
+
+`ninja android_apk` builds an arm64 Android app (`port/android/app/build/outputs/apk/debug/app-debug.apk`) that runs the game natively on 64-bit ARM phones, with OpenGL ES 3 rendering at the device's aspect ratio, SDL3 audio and game controller support (including a PS5 DualSense over Bluetooth). It needs the Android NDK and a clang with the `arm64_32` target in addition to the Linux build's requirements. The game data goes in the app's storage (the app offers to import it). See [port/android/README.md](port/android/README.md).
+
 ### Matching build
 
 The byte-matching build also needs `cachebeta.exe` from the Halo 1 PAL debug build in the repository root. Run `ninja` to compile the game and report progress statistics. On Linux it runs the XDK compiler through [wibo](https://github.com/decompals/wibo) (downloaded automatically), assembles the CRT `.asm` units with UASM when no MASM is available, and builds csplit from source; see [port/linux/README.md](port/linux/README.md#the-matching-build-on-a-linux-host).

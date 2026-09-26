@@ -1,0 +1,18 @@
+// Gradle project of the Android port; the native parts are built by
+// `ninja android` from the repository root (see README.md here).
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "halo-android"
+include ":app"

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- a ring with a visor, in the app's colours -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#0C1014" android:pathData="M0,0h108v108h-108z" />
+    <path android:fillColor="#00000000" android:strokeColor="#7FB5C9" android:strokeWidth="6"
+        android:pathData="M54,20a34,34 0,1 1,-0.01 0z" />
+    <path android:fillColor="#E0A93A"
+        android:pathData="M34,50 Q54,38 74,50 L70,62 Q54,56 38,62 Z" />
+</vector>

@@ -342,7 +342,13 @@ void stack_walk_with_context(
 
 		for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
 		{
+#ifdef HALO_ANDROID
+			/* the call site (the BL before the return address), for
+			llvm-symbolizer --obj=build/android/halo_guest.elf */
+			unsigned long routine_address = routine_addresses[frame_number] - 4;
+#else
 			unsigned long routine_address = routine_addresses[frame_number] + *(long *)(routine_addresses[frame_number] - sizeof(long));
+#endif
 			char const *symbol_name;
 
 			if (stack_walk_globals.symbol_table.number_of_symbols && !stack_walk_globals.disregard_symbol_names)
@@ -756,7 +762,13 @@ static unsigned long walk_up(
 
 	if (walk_up_current_frame)
 	{
+#ifdef HALO_ANDROID
+		/* an AArch64 frame record: the caller's frame pointer, then the
+		return address, 8 bytes each (the upper halves are zero) */
+		routine_address = ((unsigned long *)walk_up_current_frame)[2];
+#else
 		routine_address = ((unsigned long *)walk_up_current_frame)[1];
+#endif
 		walk_up_current_frame = ((unsigned long *)walk_up_current_frame)[0];
 		if (!is_valid_ebp())
 		{
@@ -819,8 +831,13 @@ static void walk_stack(
 {
 	unsigned long level;
 
+#ifdef HALO_ANDROID
+	walk_up_current_frame = (unsigned long)__builtin_frame_address(0);
+	old_ebp = (unsigned long *)walk_up_current_frame;
+#else
 	__asm mov walk_up_current_frame, ebp
 	__asm mov old_ebp, esp
+#endif
 
 	if (!is_valid_ebp())
 	{
