@@ -4,13 +4,15 @@ HOST_THREAD.C
 Threads that run guest code.
 
 Guest (ILP32) code keeps stack addresses in 32-bit registers, so every
-thread that runs it needs its stack in guest memory: the guest's own threads
-are created here with such a stack, and host threads that call into the
-guest (SDL's audio thread) switch to one of their own first. The guest's
-thread pointer (its musl struct pthread) is kept per thread in host TLS.
+thread that runs it needs its stack in guest memory. Every such thread is
+created here, with its stack given to pthread_create: the stack pointer
+never leaves the thread's own stack, which is also the one ART checks on
+every call into Java (SDL). The host's main thread and SDL's audio callback
+(host_sdl.c) hand their work to threads made by host_native_thread_create.
+The guest's thread pointer (its musl struct pthread) is kept per thread in
+host TLS.
 
-Guest thread stacks are freed by a reaper thread once the thread has fully
-exited.
+Thread stacks are freed by a reaper thread once the thread has fully exited.
 */
 
 #include "host.h"
@@ -22,19 +24,9 @@ exited.
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define FOREIGN_STACK_SIZE (512 * 1024)
-#define MAIN_STACK_SIZE (16 * 1024 * 1024)
 #define GUARD_SIZE 0x4000
 
 static __thread uint32_t guest_tp;
-static __thread uint64_t foreign_stack_top;
-/* where this thread's own stack continues while it runs guest code: ART
-checks the stack pointer against the thread's stack on every call into
-Java, so SDL (which calls Java) must run there (host_run_native) */
-static __thread uint64_t native_stack_top;
-
-/* the stack below the caller's frame is unused while the guest runs */
-#define NATIVE_STACK_TOP() (((uint64_t)__builtin_frame_address(0) - 512) & ~15ULL)
 
 uint32_t host_get_tp(void)
 {
@@ -73,58 +65,18 @@ static int on_guest_stack(void)
 
 typedef uint32_t (*guest_function)(uint32_t, uint32_t, uint32_t, uint32_t);
 
-static uint32_t call_guest_here(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
-{
-	if (on_guest_stack())
-		return ((guest_function)(uintptr_t)function)(a, b, c, d);
-	if (!foreign_stack_top)
-	{
-		void *mapping;
-		size_t mapping_size;
-		void *stack = stack_allocate(FOREIGN_STACK_SIZE, &mapping, &mapping_size);
-
-		if (!stack)
-			host_fatal("cannot allocate a guest stack for a host thread");
-		foreign_stack_top = (uint64_t)stack + FOREIGN_STACK_SIZE;
-	}
-	{
-		uint64_t saved = native_stack_top;
-		uint32_t result;
-
-		native_stack_top = NATIVE_STACK_TOP();
-		result = (uint32_t)host_call_on_stack(function, a, b, c, d, foreign_stack_top);
-		native_stack_top = saved;
-		return result;
-	}
-}
-
-uint64_t host_run_native(uint64_t function, uint64_t a, uint64_t b, uint64_t c, uint64_t d)
-{
-	/* guest threads created by host_thread_create have only the guest
-	stack, which is also the one ART knows */
-	if (native_stack_top && on_guest_stack())
-		return host_call_on_stack(function, a, b, c, d, native_stack_top);
-	return ((uint64_t (*)(uint64_t, uint64_t, uint64_t, uint64_t))(uintptr_t)function)(a, b, c, d);
-}
-
 uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
 {
+	if (!on_guest_stack())
+		host_fatal("guest code called on a thread without a guest stack");
 	if (!guest_tp)
-		call_guest_here(host_image.header->thread_attach, 0, 0, 0, 0);
-	return call_guest_here(function, a, b, c, d);
+		((guest_function)(uintptr_t)host_image.header->thread_attach)(0, 0, 0, 0);
+	return ((guest_function)(uintptr_t)function)(a, b, c, d);
 }
 
 void host_run_guest_main(uint32_t boot)
 {
-	void *mapping;
-	size_t mapping_size;
-	void *stack = stack_allocate(MAIN_STACK_SIZE, &mapping, &mapping_size);
-
-	if (!stack)
-		host_fatal("cannot allocate the guest's main stack");
-	host_debug_thread_started();
-	native_stack_top = NATIVE_STACK_TOP();
-	host_call_on_stack(host_image.header->start, boot, 0, 0, 0, (uint64_t)stack + MAIN_STACK_SIZE);
+	((void (*)(uint32_t))(uintptr_t)host_image.header->start)(boot);
 	host_fatal("the guest returned from __guest_start");
 }
 
@@ -132,7 +84,8 @@ void host_run_guest_main(uint32_t boot)
 
 struct thread_start
 {
-	uint32_t guest_thread;
+	void *(*function)(void *);
+	void *argument;
 	void *mapping;
 	size_t mapping_size;
 };
@@ -177,7 +130,7 @@ static void *thread_main(void *context)
 
 	free(context);
 	host_debug_thread_started();
-	host_call_guest(host_image.header->thread_start, start.guest_thread, 0, 0, 0);
+	start.function(start.argument);
 	host_debug_thread_exited();
 	guest_tp = 0;
 
@@ -193,7 +146,7 @@ static void *thread_main(void *context)
 	return NULL;
 }
 
-int host_thread_create(uint32_t guest_thread, uint32_t stack_size)
+int host_native_thread_create(void *(*function)(void *), void *argument, size_t stack_size)
 {
 	struct thread_start *start = calloc(1, sizeof(*start));
 	pthread_attr_t attributes;
@@ -216,14 +169,15 @@ int host_thread_create(uint32_t guest_thread, uint32_t stack_size)
 	}
 	pthread_mutex_unlock(&reaper_lock);
 
-	stack_size = (stack_size + 0xffff) & ~0xffffu;
+	stack_size = (stack_size + 0xffff) & ~(size_t)0xffff;
 	stack = stack_allocate(stack_size, &start->mapping, &start->mapping_size);
 	if (!stack)
 	{
 		free(start);
 		return EAGAIN;
 	}
-	start->guest_thread = guest_thread;
+	start->function = function;
+	start->argument = argument;
 	pthread_attr_init(&attributes);
 	pthread_attr_setstack(&attributes, stack, stack_size);
 	error = pthread_create(&thread, &attributes, thread_main, start);
@@ -234,4 +188,15 @@ int host_thread_create(uint32_t guest_thread, uint32_t stack_size)
 		free(start);
 	}
 	return error;
+}
+
+static void *guest_thread_main(void *guest_thread)
+{
+	host_call_guest(host_image.header->thread_start, (uint32_t)(uintptr_t)guest_thread, 0, 0, 0);
+	return NULL;
+}
+
+int host_thread_create(uint32_t guest_thread, uint32_t stack_size)
+{
+	return host_native_thread_create(guest_thread_main, (void *)(uintptr_t)guest_thread, stack_size);
 }

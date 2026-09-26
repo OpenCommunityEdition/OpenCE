@@ -49,7 +49,7 @@ rate" there).
 The game is 32-bit code for the same reason as on Linux: its data formats
 embed 32-bit pointers. Clang's `i686-pc-windows-msvc` target gives it the
 ABI it was written against natively (MSVC structure layout, 16-bit
-`wchar_t`, `__asm` blocks, calling conventions), so much less adaptation is
+`wchar_t`, calling conventions), so much less adaptation is
 needed than on Linux. The executable is large-address-aware: the Xbox memory
 window the platform layer reserves is at 0x80000000.
 

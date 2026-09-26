@@ -53,7 +53,9 @@ static inline void a_barrier()
 #define a_spin a_spin
 static inline void a_spin()
 {
-	__asm__ __volatile__("yield" ::: "memory");
+	__builtin_arm_yield();
+	/* a compiler barrier, as the "memory" clobber of an asm yield would be */
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
 }
 
 #define a_crash a_crash

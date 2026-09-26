@@ -148,11 +148,13 @@ creation, the thread pointer and clang's emulated TLS are in
   it claims above the image first because ART keeps its own low-4 GB heaps
   at the bottom of the address space (`host/host_memory.c`);
 - loads the image and fills its import table (`host/host_loader.c`);
-- runs the game's `main` on a stack in guest memory: ILP32 code keeps stack
-  addresses in 32-bit registers (`host/host_thread.c`, `host_switch.S`);
-- runs everything that may call into Java (all of SDL) on the thread's own
-  stack rather than the guest stack it was called on, since ART checks the
-  stack pointer on every JNI call (`HOST_NATIVE`, `host_run_native`);
+- runs the game's `main`, and every guest thread, on a thread whose stack
+  is in guest memory, since ILP32 code keeps stack addresses in 32-bit
+  registers (`host/host_thread.c`); the stack is given to `pthread_create`,
+  so it is also the stack ART knows, and SDL may call into Java from it;
+- hands SDL's audio callback, which SDL calls on its own thread, to a
+  thread with a guest stack that runs the game's callback
+  (`host/host_sdl.c`);
 - serves the guest's calls: system calls, converting the few structures
   whose layout differs and keeping mappings below 4 GB
   (`host/host_syscall.c`); SDL, whose objects become small handles
@@ -212,16 +214,21 @@ x86 original had no fused multiply-add.
 
 ### Game source changes
 
-The nine x86 inline-assembly sites of the game (x87 float conversions, an
-SSE matrix multiply, the time stamp counter, frame-pointer walks, a naked
-string search) have C equivalents under `#ifdef HALO_ANDROID`, as do the
-seven `#pragma bss_seg(".bss")` lines Darwin's section syntax rejects;
-the stack walker the assertion handler uses follows AArch64 frame records,
-so an assertion's log (`debug.txt`) lists the call sites. The
-XDK's `winnt.h` has three 64-bit shift helpers written in x86 assembly;
-`tools/android_sdk_overlay.py` exposes the SDK to the Android build with a
-copy of that header whose helpers are in C, and the SDK itself is not
-modified. The MSVC build never defines `HALO_ANDROID`.
+The game's x86 inline assembly has C equivalents under `#ifdef HALO_LINUX`,
+shared by all native ports ([port/linux/README.md](../linux/README.md#game-source-edits)),
+and so has the XDK `winnt.h`'s (`tools/linux_sdk_overlay.py`). Under
+`#ifdef HALO_ANDROID` are the seven `#pragma bss_seg(".bss")` lines
+Darwin's section syntax rejects, and a stack walker for the assertion
+handler that follows AArch64 frame records, so an assertion's log
+(`debug.txt`) lists the call sites. The MSVC build defines neither.
+
+The guest's musl uses its generic C math rather than the AArch64 inline
+assembly versions, leaving the choice of instructions to the compiler. The
+only assembly the port itself contains is necessary: the generated import
+stubs through which the guest calls the host (a 32-bit guest cannot hold
+or branch to a 64-bit host address), and the symbol aliases in
+`guest/libc/src_include/features.h` (the Darwin target rejects alias
+attributes).
 
 ## Debugging
 

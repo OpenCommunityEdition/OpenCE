@@ -138,10 +138,11 @@ error (`addr2line -e build/linux/halo <address>` symbolises it).
 ### Compiling MSVC-era code with clang
 
 `tools/linux_build.py` compiles the game with
-`--target=i686-linux-gnu -fms-extensions -fasm-blocks -fshort-wchar
--malign-double -fcommon` and the other flags listed there, which reproduce
-the ABI the source was written for: MSVC inline assembly, 16-bit `wchar_t`,
-8-byte alignment of 64-bit struct members, and C89 tentative definitions.
+`--target=i686-linux-gnu -fms-extensions -fshort-wchar -malign-double
+-fcommon` and the other flags listed there, which reproduce the ABI the
+source was written for: MSVC extensions, 16-bit `wchar_t`, 8-byte alignment
+of 64-bit struct members, and C89 tentative definitions. The game's inline
+assembly is not compiled (see [Game source edits](#game-source-edits)).
 glibc is restricted to ISO C (`__STRICT_ANSI__`) so POSIX names such as
 `random` and `strnlen` cannot collide with the game's own.
 
@@ -154,9 +155,10 @@ editing the game:
 - `include/` shims extend or replace C runtime headers: MSVC names in
   `stdio.h`/`stdlib.h`/`string.h`/`math.h`/`float.h`, a complete 16-bit
   `wchar.h`, `io.h`, `direct.h`, `sys/stat.h` with the MSVC `struct _stat`.
-- The XDK's own headers are used unmodified through a case-insensitive
-  symlink overlay (`tools/linux_sdk_overlay.py`), which leaves out the XDK's
-  C runtime headers in favour of glibc.
+- The XDK's own headers are used through a case-insensitive symlink overlay
+  (`tools/linux_sdk_overlay.py`), which leaves out the XDK's C runtime
+  headers in favour of glibc. `winnt.h` is a copy whose three 64-bit shift
+  helpers are C instead of x86 assembly; the SDK itself is not modified.
 - `tools/linux_msvc_semantics.py` generates a header that forward-declares
   every struct/union tag at file scope (MSVC gives a tag first seen in a
   prototype file scope; C gives it prototype scope) and marks header inline
@@ -226,6 +228,26 @@ Linux prefix header, never by the matching build):
 | `scenario/scenario.c` | the structure BSP connection tables are named directly instead of being addressed at MSVC's offsets from `global_structure_bsp_index` |
 | `rasterizer/xbox/rasterizer_xbox_environment_fog.c` | a local pointer initialized from the file-scope array of the same name; MSVC resolved the name in the initializer to the array, standard C to the new local |
 | `game/player_control.c` | adds direct mouse aim (`halo_linux_mouse_look`) to the facing change of the player on controller 1 |
+
+The game's x86 inline assembly is also replaced under `#ifdef HALO_LINUX`,
+which every native port (Linux, Windows, Android) defines, so the compiler
+optimizes and vectorizes that code for each target like any other C:
+
+| File | Assembly | Replacement |
+| --- | --- | --- |
+| `cseries/cseries.h` | x87 `fistp` float to integer conversion (`fast_ftol`) | `__builtin_rint` |
+| `bitmaps/bitmaps_inlines.h` | x87 float to integer conversions | C conversions |
+| `math/matrix_math.c` | SSE `matrix4x3_multiply` | the C loop |
+| `effects/decals.c` | x87 float to integer conversion | C conversion |
+| `cseries/profile.c` | `rdtsc` | `QueryPerformanceCounter`, at its own frequency |
+| `cseries/cseries.c` | naked `stristr` | a C `stristr` |
+| `cseries/stack_walk_windows.c` | reads EBP | `__builtin_frame_address` |
+| `interface/hud_draw.c` | reads the caller's return address from `[ebp+4]` | `__builtin_return_address(1)` |
+| `bink/bink_playback.c` | `int 3` | `__builtin_trap` |
+
+The C runtime's x87 control and status words (`_control87`, `_statusfp`,
+`_clearfp`, `src/msvc_crt.c`) go through `fenv.h`, or the FPCR and FPSR
+builtins on Android.
 
 ## The matching build on a Linux host
 

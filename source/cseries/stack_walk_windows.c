@@ -831,7 +831,7 @@ static void walk_stack(
 {
 	unsigned long level;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 	walk_up_current_frame = (unsigned long)__builtin_frame_address(0);
 	old_ebp = (unsigned long *)walk_up_current_frame;
 #else

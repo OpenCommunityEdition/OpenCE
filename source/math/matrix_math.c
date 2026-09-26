@@ -936,7 +936,7 @@ void matrix4x3_multiply(
 	real *result_elements = result->n[0];
 	real const *a_scale = &a->scale;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 	{
 		/* the SSE block below: rows of b combine the rows of a, and the
 		position is scaled by a's scale before a's own is added */

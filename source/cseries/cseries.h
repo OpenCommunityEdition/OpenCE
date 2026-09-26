@@ -327,7 +327,7 @@ __inline long fast_ftol(
 {
 	long result;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 	/* FISTP: round to nearest under the default control word */
 	result = (long)__builtin_rint((double)value);
 #else

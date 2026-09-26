@@ -276,6 +276,10 @@ symbols in this file:
 #include "main/main_internal.h"
 #include "game/players.h"
 
+#ifdef HALO_LINUX
+#include <xtl.h>
+#endif
+
 /* ---------- constants */
 
 enum
@@ -322,13 +326,14 @@ enum profile_frame_value
 
 /* ---------- macros */
 
-#ifdef HALO_ANDROID
-/* the AArch64 virtual counter stands in for the time stamp counter */
+#ifdef HALO_LINUX
+/* the native ports: the platform's performance counter stands in for the
+time stamp counter, at its own rate (profile_initialize) */
 #define QUERY_TIMEBASE(timebase) \
 { \
-	unsigned long long halo_android_counter; \
-	__asm__ __volatile__("mrs %0, cntvct_el0" : "=r"(halo_android_counter)); \
-	*(unsigned long long *)&(timebase) = halo_android_counter; \
+	LARGE_INTEGER halo_counter; \
+	QueryPerformanceCounter(&halo_counter); \
+	*(__int64 *)&(timebase) = halo_counter.QuadPart; \
 }
 #else
 #define QUERY_TIMEBASE(timebase) \
@@ -1063,7 +1068,16 @@ void profile_initialize(
 {
 	short section_index = 0;
 
+#ifdef HALO_LINUX
+	{
+		LARGE_INTEGER frequency;
+
+		QueryPerformanceFrequency(&frequency);
+		profile_globals.timebase_frequency = frequency.QuadPart;
+	}
+#else
 	profile_globals.timebase_frequency = 733333333;
+#endif
 
 	while (section_index<profile_globals.section_count)
 	{

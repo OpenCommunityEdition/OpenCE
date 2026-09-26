@@ -6,8 +6,8 @@ more, with different contents; the game needs the Xbox ones, so they must
 come first in the include path. The Xbox SDK's C runtime headers (stdio.h,
 math.h, ...) must not: the Windows build uses the Windows C runtime. This
 copies every other Xbox SDK header into a directory of its own (the same
-selection as the Linux overlay, tools/linux_sdk_overlay.py). The supplied SDK
-is never modified.
+selection as the Linux overlay, tools/linux_sdk_overlay.py, including its C
+version of winnt.h's assembly helpers). The supplied SDK is never modified.
 """
 
 import argparse
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from linux_sdk_overlay import CRT_HEADERS  # noqa: E402
+from linux_sdk_overlay import CRT_HEADERS, patch_winnt  # noqa: E402
 
 
 def generate(sdk_include: Path, output: Path) -> int:
@@ -38,7 +38,10 @@ def generate(sdk_include: Path, output: Path) -> int:
             existing.unlink()
     for name, source in wanted.items():
         target = output / source.name
-        if not target.is_file() or target.stat().st_mtime < source.stat().st_mtime:
+        if name == "winnt.h":
+            # its shift helpers in C instead of x86 assembly (linux_sdk_overlay.py)
+            target.write_text(patch_winnt(source.read_text(encoding="latin-1")), encoding="latin-1")
+        elif not target.is_file() or target.stat().st_mtime < source.stat().st_mtime:
             shutil.copy2(source, target)
     return len(wanted)
 

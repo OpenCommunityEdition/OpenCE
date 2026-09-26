@@ -852,7 +852,7 @@ pixel32 real_a_rgb_color_to_pixel32(
 			color->green,
 			color->blue));
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 	result = (pixel32)(
 		((long)__builtin_rint((double)color->blue * scale) & 0xff) |
 		(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |

@@ -64,20 +64,17 @@ int host_load_image(const void *elf, size_t size);
 /* ---------- entering guest code (host_thread.c) */
 
 /* calls the guest function at address with up to four 32-bit arguments on
-this thread, switching to a stack in guest memory (and giving the thread a
-guest struct pthread) first if it has none; returns the guest's w0 */
+this thread, which must have been made by host_native_thread_create (giving
+the thread a guest struct pthread first if it has none); returns the
+guest's w0 */
 uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
-/* calls the host function(a, b, c, d) on this thread's own stack when it is
-running guest code on a guest stack: needed for anything that may call
-into Java (SDL), since ART checks the stack pointer */
-uint64_t host_run_native(uint64_t function, uint64_t a, uint64_t b, uint64_t c, uint64_t d);
-#define HOST_NATIVE(function, a, b, c, d) host_run_native((uint64_t)(uintptr_t)(function), \
-	(uint64_t)(a), (uint64_t)(b), (uint64_t)(c), (uint64_t)(d))
-/* runs the guest's __guest_start on the calling thread; does not return */
+/* starts a thread running function(argument) with its stack in guest
+memory, so that it can call guest code; the stack is freed after it exits.
+Returns 0 or an errno value */
+int host_native_thread_create(void *(*function)(void *), void *argument, size_t stack_size);
+/* runs the guest's __guest_start on the calling thread (one made by
+host_native_thread_create); does not return */
 void host_run_guest_main(uint32_t boot) __attribute__((noreturn));
-
-/* host_switch.S: calls function(a, b, c, d) with sp = stack_top */
-uint64_t host_call_on_stack(uint64_t function, uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t stack_top);
 
 /* ---------- debugging (host_debug.c) */
 

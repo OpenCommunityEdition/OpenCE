@@ -13,6 +13,7 @@ port/linux/include/stdio.h).
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fenv.h>
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -307,7 +308,7 @@ unsigned int _control87(unsigned int new_value, unsigned int mask)
 	if (mask)
 	{
 		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
-		__asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+		fpcr = __builtin_arm_rsr64("fpcr");
 		fpcr &= ~(3ULL << 22);
 		switch (msvc_control_word & _MCW_RC)
 		{
@@ -316,7 +317,7 @@ unsigned int _control87(unsigned int new_value, unsigned int mask)
 		case _RC_CHOP: fpcr |= 3ULL << 22; break;
 		default: break;
 		}
-		__asm__ __volatile__("msr fpcr, %0" : : "r"(fpcr));
+		__builtin_arm_wsr64("fpcr", fpcr);
 	}
 	return msvc_control_word;
 }
@@ -329,10 +330,9 @@ unsigned int _controlfp(unsigned int new_value, unsigned int mask)
 
 unsigned int _statusfp(void)
 {
-	unsigned long long fpsr;
+	unsigned long long fpsr = __builtin_arm_rsr64("fpsr");
 	unsigned int result = 0;
 
-	__asm__ __volatile__("mrs %0, fpsr" : "=r"(fpsr));
 	/* as the x87 status word's low bits: invalid, denormal, zero divide,
 	overflow, underflow, precision */
 	if (fpsr & 0x01) result |= 0x01;
@@ -347,26 +347,26 @@ unsigned int _statusfp(void)
 unsigned int _clearfp(void)
 {
 	unsigned int status = _statusfp();
-	unsigned long long fpsr;
 
-	__asm__ __volatile__("mrs %0, fpsr" : "=r"(fpsr));
-	fpsr &= ~0x9fULL;
-	__asm__ __volatile__("msr fpsr, %0" : : "r"(fpsr));
+	__builtin_arm_wsr64("fpsr", __builtin_arm_rsr64("fpsr") & ~0x9fULL);
 	return status;
 }
 #else
+/* x87: glibc's floating-point environment holds the control and status
+words (fegetenv and fesetenv save and load the whole x87 environment, and
+keep the SSE unit's rounding and masks in step) */
 unsigned int _control87(unsigned int new_value, unsigned int mask)
 {
-	unsigned short word;
+	fenv_t environment;
 	unsigned int current;
 
-	__asm__ __volatile__("fnstcw %0" : "=m"(word));
-	current = control_word_to_msvc(word);
+	fegetenv(&environment);
+	current = control_word_to_msvc(environment.__control_word);
 	if (mask)
 	{
 		current = (current & ~mask) | (new_value & mask);
-		word = msvc_to_control_word(current, word);
-		__asm__ __volatile__("fldcw %0" : : "m"(word));
+		environment.__control_word = msvc_to_control_word(current, environment.__control_word);
+		fesetenv(&environment);
 	}
 	return current;
 }
@@ -379,17 +379,22 @@ unsigned int _controlfp(unsigned int new_value, unsigned int mask)
 
 unsigned int _statusfp(void)
 {
-	unsigned short status;
+	fenv_t environment;
 
-	__asm__ __volatile__("fnstsw %0" : "=m"(status));
-	return status & 0x3f;
+	fegetenv(&environment);
+	return environment.__status_word & 0x3f;
 }
 
 unsigned int _clearfp(void)
 {
-	unsigned int status = _statusfp();
+	fenv_t environment;
+	unsigned int status;
 
-	__asm__ __volatile__("fnclex");
+	fegetenv(&environment);
+	status = environment.__status_word & 0x3f;
+	/* the exception flags, and the summary and stack fault bits with them */
+	environment.__status_word &= (unsigned short)~0xff;
+	fesetenv(&environment);
 	return status;
 }
 

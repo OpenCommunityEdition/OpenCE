@@ -6,7 +6,9 @@ own thread).
 
 It loads the guest image (the game, built as ILP32 code) from the APK's
 assets, gives it an environment describing where the game data and saves
-live, and runs its main() on this thread, on a stack in guest memory.
+live, and runs its main() on a thread of its own with its stack in guest
+memory (host_thread.c), on which everything here after startup runs; the
+SDL thread waits for it.
 
 Storage (see port/android/README.md): the game data (the directory holding
 maps/) is the app's external files directory,
@@ -50,12 +52,6 @@ void host_log(int priority, const char *text)
 	__android_log_write(priority, "halo", text);
 }
 
-static uint64_t message_box_native(uint64_t message, uint64_t b, uint64_t c, uint64_t d)
-{
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", (const char *)(uintptr_t)message, NULL);
-	return 0;
-}
-
 void host_fatal(const char *format, ...)
 {
 	char message[1024];
@@ -65,8 +61,7 @@ void host_fatal(const char *format, ...)
 	vsnprintf(message, sizeof(message), format, arguments);
 	va_end(arguments);
 	__android_log_write(ANDROID_LOG_FATAL, "halo", message);
-	/* on the thread's own stack: the message box calls into Java */
-	HOST_NATIVE(message_box_native, (uintptr_t)message, 0, 0, 0);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
 	_exit(1);
 }
 
@@ -234,7 +229,9 @@ static uint32_t make_boot(const struct environment *environment)
 
 /* ---------- main */
 
-int main(int argc, char *argv[])
+#define MAIN_STACK_SIZE (16 * 1024 * 1024)
+
+static void *game_main(void *unused)
 {
 	struct environment environment = { { 0 }, 0 };
 	const char *external;
@@ -244,11 +241,7 @@ int main(int argc, char *argv[])
 	void *image;
 	uint32_t boot;
 
-	(void)argc;
-	(void)argv;
-	host_logf(HOST_LOG_INFO, "Halo for Android starting");
-	host_install_signal_handlers();
-
+	(void)unused;
 	external = SDL_GetAndroidExternalStoragePath();
 	if (!external)
 		host_fatal("Android storage is unavailable: %s", SDL_GetError());
@@ -308,5 +301,17 @@ int main(int argc, char *argv[])
 	boot = make_boot(&environment);
 	host_logf(HOST_LOG_INFO, "data %s, saves %s", data_root, save_root);
 	host_run_guest_main(boot);
-	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
+	host_logf(HOST_LOG_INFO, "Halo for Android starting");
+	host_install_signal_handlers();
+	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
+		host_fatal("cannot start the game thread");
+	/* the game ends the process itself (host_exit) */
+	for (;;)
+		pause();
 }

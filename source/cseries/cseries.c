@@ -550,7 +550,7 @@ not_equal:
 	return c1 > c2 ? 1 : -1;
 }
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 char *stristr(
 	const char *haystack,
 	const char *needle)

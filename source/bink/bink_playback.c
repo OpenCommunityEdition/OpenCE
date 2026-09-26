@@ -877,7 +877,7 @@ static void * __stdcall bink_alloc(
 			!"bink memory allocation should not fail");
 		/* January emits a site-local int3 here; the intrinsic form sinks into the
 		   epilogue, so the original text was an inline-assembly breakpoint. */
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 		__builtin_trap();
 #else
 		__asm { int 3 }

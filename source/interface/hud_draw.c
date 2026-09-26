@@ -412,7 +412,7 @@ static void hud_draw_multitexture_overlay(
 
 /* Inspect the guarded caller's frame, not the return site of this helper.
  * A normal prologue would replace EBP and defeat the paired stack check. */
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 __attribute__((noinline)) long get_return_eip(
 	void)
 {

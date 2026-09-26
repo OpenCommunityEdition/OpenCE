@@ -32,7 +32,6 @@ LINUX_ABI_FLAGS = [
     "-m32",
     "-march=pentium3",
     "-fms-extensions",
-    "-fasm-blocks",
     "-fshort-wchar",
     "-malign-double",
     "-fcommon",
@@ -41,7 +40,8 @@ LINUX_ABI_FLAGS = [
     "-fwrapv",
     "-fno-delete-null-pointer-checks",
     "-freg-struct-return",
-    # the game keeps EBP frames (MSVC /Oy-): get_return_eip reads [ebp+4]
+    # the game keeps EBP frames (MSVC /Oy-): get_return_eip and the stack
+    # walker follow the frame chain
     "-fno-omit-frame-pointer",
     "-O2",
     "-g",
