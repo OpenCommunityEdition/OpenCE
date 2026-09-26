@@ -2583,8 +2583,15 @@ static boolean netgame_unjoin_player(
 
 			if ((short)machine_index != NONE)
 			{
+#ifdef HALO_LINUX
+				/* the native builds' session limits move and extend the players
+				(port/linux/include/halo_port_limits.h) */
+				test_player = game + HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET;
+				for (player_index = 0; player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; player_index++, test_player += 0x20)
+#else
 				test_player = game + 0x226;
 				for (player_index = 0; player_index < 16; player_index++, test_player += 0x20)
+#endif
 				{
 					if (network_player_is_valid(test_player) &&
 						(short)(signed char)test_player[0x1C] == (short)machine_index)
@@ -2935,14 +2942,25 @@ static boolean multiplayer_game_swap_teams(
 		if ((short)machine_index != NONE)
 		{
 			player_index = 0;
+#ifdef HALO_LINUX
+			/* the players' machine indices, where the native builds' session
+			limits put them (port/linux/include/halo_port_limits.h) */
+			player = game + HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + 0x1C;
+			for (; player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; player_index++, player += 0x20)
+#else
 			player = game + 0x242;
 			for (; player_index < 16; player_index++, player += 0x20)
+#endif
 			{
 				if (network_player_is_valid(player - 0x1C) &&
 					(short)(signed char)player[0] == (short)machine_index &&
 					(short)(signed char)player[1] == event->controller_index)
 				{
+#ifdef HALO_LINUX
+					player_data = *(struct network_player_data *)(game + HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + player_index * 0x20);
+#else
 					player_data = *(struct network_player_data *)(game + 0x226 + player_index * 0x20);
+#endif
 					player_data.data[0x1E] = !player_data.data[0x1E];
 					if (!network_game_client_update_local_player_data(
 						global_network_game_client_get(), &player_data))
@@ -2973,8 +2991,15 @@ static boolean network_game_start_faster(
 		machine_index = network_game_client_get_machine_index(client);
 		player_index = 0;
 		player = (byte *)game;
+#ifdef HALO_LINUX
+		/* the players' machine indices, where the native builds' session
+		limits put them (port/linux/include/halo_port_limits.h) */
+		player += HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + 0x1C;
+		for (; player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; player_index++, player += 0x20)
+#else
 		player += 0x242;
 		for (; player_index < 16; player_index++, player += 0x20)
+#endif
 		{
 			if (network_player_is_valid(player - 0x1C) &&
 				(short)(signed char)player[0] == (short)machine_index &&
@@ -3005,8 +3030,15 @@ static boolean network_game_start_slower(
 		machine_index = network_game_client_get_machine_index(client);
 		player_index = 0;
 		player = (byte *)game;
+#ifdef HALO_LINUX
+		/* the players' machine indices, where the native builds' session
+		limits put them (port/linux/include/halo_port_limits.h) */
+		player += HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + 0x1C;
+		for (; player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; player_index++, player += 0x20)
+#else
 		player += 0x242;
 		for (; player_index < 16; player_index++, player += 0x20)
+#endif
 		{
 			if (network_player_is_valid(player - 0x1C) &&
 				(short)(signed char)player[0] == (short)machine_index &&
@@ -4349,6 +4381,17 @@ static boolean netgame_join_player(
 		match_assert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1627, game);
 		if ((short)machine_index != NONE)
 		{
+#ifdef HALO_LINUX
+			/* the native builds' session limits move and extend the players
+			(port/linux/include/halo_port_limits.h) */
+			for (value = 0; value < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; value++)
+			{
+				if (network_player_is_valid(game + HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + value * 0x20) &&
+					(short)(signed char)game[HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + 0x1C + value * 0x20] == (short)machine_index &&
+					(short)(signed char)game[HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET + 0x1D + value * 0x20] == event->controller_index)
+					return TRUE;
+			}
+#else
 			for (value = 0; value < 16; value++)
 			{
 				if (network_player_is_valid(game + 0x226 + value * 0x20) &&
@@ -4356,6 +4399,7 @@ static boolean netgame_join_player(
 					(short)(signed char)game[0x243 + value * 0x20] == event->controller_index)
 					return TRUE;
 			}
+#endif
 		}
 		if (!network_game_client_add_player(client, event->controller_index))
 			network_event("failed to send join request");
