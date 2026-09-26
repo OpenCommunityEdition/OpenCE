@@ -3,6 +3,9 @@ Halo 1 decomp, ported to Linux
 
 This is a port of the decompilation of Halo: Combat Evolved build 2342 (`cachebeta.exe`, sha256 `4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`) to Linux.
 
+<img width="1284" height="989" alt="Main_Menu_Screenshot" src="https://github.com/user-attachments/assets/92e03c85-0d96-45f5-bdd9-8e69555c996d" />
+
+
 ## Agent quick references
 
 - [Current campaign house rules and batch/treemap cadence](docs/campaign_house_rules.md)
