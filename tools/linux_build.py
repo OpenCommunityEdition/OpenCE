@@ -384,6 +384,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 f"-include {semantics_header}",
                 defines,
                 f"-I{port_include}",
+                # the headers of the port's own game units (port/linux/game), for
+                # the game sources that call them under HALO_LINUX
+                f"-iquote {Path(config['game_sources'])}",
                 includes,
                 sdk_flags,
             ])

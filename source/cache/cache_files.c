@@ -132,6 +132,9 @@ symbols in this file:
 #include "sound_cache.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
+#ifdef HALO_LINUX
+#include "custom_edition_cache.h"
+#endif
 
 /* ---------- constants */
 
@@ -553,6 +556,15 @@ boolean cache_file_header_verify(
 	char const *scenario_name,
 	boolean fatal)
 {
+#ifdef HALO_LINUX
+	/* the native builds say what a Halo Custom Edition cache is instead of
+	calling it an old version of this build's caches, and still refuse it
+	(port/linux/game/custom_edition_cache.c) */
+	if (custom_edition_cache_refuse(header, header->build, scenario_name, fatal))
+	{
+		return FALSE;
+	}
+#endif
 	if (header->header_signature != CACHE_FILE_HEADER_SIGNATURE ||
 		header->footer_signature != CACHE_FILE_FOOTER_SIGNATURE ||
 		header->file_length < 0 ||
