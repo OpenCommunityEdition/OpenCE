@@ -202,6 +202,17 @@ boolean game_team_is_enemy(
 			game_allegiance_globals->friendly_bitvector,
 			NUMBER_OF_GAME_TEAMS * our_team_index + other_team_index);
 	}
+#ifdef HALO_LINUX
+	/* port: free for all gives every player a team, up to the player limit,
+	past the table's 10. Treat such a team like teams 0..9, whose diagonal is
+	friendly: it is not its own enemy, so a suicide does not score as a kill.
+	(game_team_is_ally already matches them: the ally diagonal is clear.) */
+	else if (our_team_index == other_team_index &&
+		our_team_index >= NUMBER_OF_GAME_TEAMS)
+	{
+		result = FALSE;
+	}
+#endif
 
 	return result;
 }

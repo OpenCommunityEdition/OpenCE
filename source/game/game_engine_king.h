@@ -36,9 +36,18 @@ struct render_lighting;
 
 struct king_globals
 {
+#ifdef HALO_LINUX
+	/* port: score and score_tick are indexed by team (free for all gives
+	every player a team), on_the_hill by absolute player index, so all three
+	follow the session player limit (halo_port_limits.h) */
+	long score[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	long score_tick[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	boolean on_the_hill[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+#else
 	long score[16];
 	long score_tick[16];
 	boolean on_the_hill[16];
+#endif
 	long hill_point_count;
 	real_point3d hill_points[12];
 	real_point2d convex_hull[12];
@@ -52,6 +61,8 @@ struct king_globals
 	long hill_timer;
 };
 
+/* January's layout; the port's per-player arrays are larger */
+#ifndef HALO_LINUX
 typedef char verify_king_globals_size[
 	sizeof(struct king_globals) == 0x1AC ? 1 : -1];
 typedef char verify_king_globals_on_the_hill_offset[
@@ -60,6 +71,7 @@ typedef char verify_king_globals_convex_hull_offset[
 	offsetof(struct king_globals, convex_hull) == 0x124 ? 1 : -1];
 typedef char verify_king_globals_hill_id_offset[
 	offsetof(struct king_globals, hill_id) == 0x1A4 ? 1 : -1];
+#endif
 
 /* ---------- prototypes/GAME_ENGINE_KING.C */
 

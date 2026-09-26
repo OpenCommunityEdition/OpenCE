@@ -123,7 +123,12 @@ enum
 	MAXIMUM_RACE_FLAGS = 32,
 	MAXIMUM_RACE_VEHICLES = 8,
 	MAXIMUM_RACE_VEHICLES_TO_DELETE = 32,
+#ifdef HALO_LINUX
+	/* port: the native builds' session limit (halo_port_limits.h) */
+	MULTIPLAYER_MAXIMUM_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+#endif
 };
 
 enum race_type
@@ -226,10 +231,13 @@ struct race_globals
 	byte padCD[3];
 };
 
+/* January's layout; the port's per-player arrays are larger */
+#ifndef HALO_LINUX
 typedef char verify_race_globals_size[
 	sizeof(struct race_globals) == 0xD0 ? 1 : -1];
 typedef char verify_race_globals_vehicles_have_been_added_offset[
 	offsetof(struct race_globals, vehicles_have_been_added) == 0xCC ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -1072,9 +1080,17 @@ long race_engine_get_score(
 	}
 	else
 	{
+#ifdef HALO_LINUX
+		/* port: lap_bit_vector is kept per player; January read it by team
+		index, which picks another player's flags */
+		long laps = player->statistics.multiplayer_statistics.race_statistics.laps;
+		long flags_touched = count_bits_32(
+			race_globals.lap_bit_vector[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)]);
+#else
 		long team_index = player->team_index;
 		long laps = player->statistics.multiplayer_statistics.race_statistics.laps;
 		long flags_touched = count_bits_32(race_globals.lap_bit_vector[team_index]);
+#endif
 
 		score = laps * (MAXIMUM_RACE_FLAGS + 1) + flags_touched;
 	}

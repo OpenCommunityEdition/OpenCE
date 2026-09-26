@@ -105,7 +105,12 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* port: king_globals' score slots follow the session player limit */
+	MAXIMUM_KING_SCORE_SLOTS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	MAXIMUM_KING_SCORE_SLOTS = 16,
+#endif
 	MAXIMUM_HILL_POINTS = 12,
 	MAXIMUM_HILLS = 64,
 	NUMBER_OF_DEFAULT_ANIMATION_VALUES = 4,
