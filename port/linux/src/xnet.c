@@ -253,6 +253,9 @@ int WSAAPI halo_ws_send(SOCKET socket, const char *buffer, int length, int flags
 int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int flags,
 	const struct sockaddr *address, int address_length)
 {
+	/* the rewritten destination: it must outlive the send */
+	struct sockaddr_in target;
+
 	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
 		((const struct sockaddr_in *)address)->sin_addr.s_addr == INADDR_BROADCAST)
 	{
@@ -261,7 +264,6 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 
 		if (target_count)
 		{
-			struct sockaddr_in target;
 			int index;
 			int result = 0;
 
@@ -281,8 +283,6 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	}
 	else
 	{
-		struct sockaddr_in target;
-
 		address = outgoing_address(address, address_length, &target);
 	}
 	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
