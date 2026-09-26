@@ -1,0 +1,13 @@
+CARD K1-15  (pre-registered 2026-09-26 02:34:29 -0700)  LAB: rule-28 view-copy class; if LOAD-BEARING it is outside the admitted class
+  (owner question), if byte-inert it is admissible fidelity.
+Base: k14 (11 hunks; real residual: 0xfc add-esp schedule; 0x1d49 magnitude_squared2d order - ours forwards the
+  just-stored alignment.j from st(0) (fst/fmul j first), January stores both and reloads i then j).
+Evidence (D, /Od 0x490ba0-0x490bb2 and 0x490c41-0x490c53): alignment_vector is assigned from the unit's forward
+  vector with INTEGER mov pairs (mov edx,[ecx+0x30]; mov eax,[ecx+0x34]; mov [ebp-0x1440],edx; mov [ebp-0x143c],eax)
+  both at the initialisation and at the normalize2d == 0 reset => an aggregate copy of a 2-D view
+  "alignment = *(real_vector2d *)&speaker_unit->object.forward;" (float field assignments would be movss).
+Mechanism under test: an aggregate-defined local is tracked as memory; the value forwarding of alignment.j into
+  magnitude_squared2d may not happen.
+Change: both forward copies as 2-D view aggregate copies.
+Prediction: 0x1d49 hunk resolves (i-first reload); nothing else changes; if exact except 0xfc the view copy is
+  load-bearing -> owner question.

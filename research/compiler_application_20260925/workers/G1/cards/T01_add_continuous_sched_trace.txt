@@ -1,0 +1,19 @@
+G1 card T01 - DIAGNOSTIC scheduler trace of _player_effect_add_continuous_effect (HEAD source), no candidate
+Written 2026-09-26 01:53:37 -0700 (clock-read), BEFORE the trace. Never edited.
+
+C02 OUTCOME (fact): C02a (named periodic local, HEAD expression text) and C02b (its strip) are keyed-identical to HEAD
+(0/0/0): VC7 forwards the single-use local into the expression. C02a's EXACT prediction (p 0.7) FAILED; C02b's
+'identical to C02a' held. C02c (diagnostic control at the camera-matrix site) changed only that function
+(1280 -> 1296, J 1312; 390 = J instruction count) - diagnostic, never a candidate.
+Five spellings (HEAD, C01A, C01B, C02a, C02b) give the same bytes: the in-order choice (call*w before 1-w) is not moved
+by parentheses, operand order or a named single-use local.
+
+QUESTION: after the periodic_function_evaluate call, why does VC7 select 'fmul [esi+0x60]' before 'fld 1.0' (ours),
+where January selects 'fld 1.0; fsub' first and pays an fxch? Is it (a) IL order (the SUB record is created after the
+MUL), (b) the ready-list priority keys (+0x2c/+0x36), or (c) a hidden record/int-slot effect (0x267)?
+INSTRUMENT: research/.../W6/tools/w6trace.py mode 'sched' (pinned dbg32c 32ee5e4d; stock-equal proof in manifest),
+run dir scratch/campaign/workers/G1/runs/T01_pe_HEAD_sched (fresh). Read with W6 schedread.py over our offsets
+0x9d..0xc3.
+PREDICTION: (b) - both records ready in the same cycle after the call; the MUL record carries the higher key (longer
+path to the magnitude store). No 0x267 record in this block (p 0.6). The trace creates no candidate; it only sharpens
+the reopen criterion (rule 'compiler mechanisms are diagnostic only').

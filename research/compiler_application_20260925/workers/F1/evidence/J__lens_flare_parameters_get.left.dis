@@ -1,0 +1,22 @@
+--- target (21) 
+   0: test si, si                                             
+   3: jl 0x12                                                 
+   5: mov ecx, dword ptr [0]   ; .bss                         
+   b: movsx eax, si                                           
+   e: cmp eax, ecx                                            
+  10: jl 0x2f                                                 
+  12: push 1                                                  
+  14: push 0x43                                               
+  16: push 0   ; .rdata                                       
+  1b: push 0   ; .rdata                                       
+  20: call 0x25   ; _display_assert                           
+  25: push -1                                                 
+  27: call 0x2c   ; _system_exit                              
+  2c: add esp, 0x14                                           
+  2f: movsx eax, si                                           
+  32: lea eax, [eax + eax*4]                                  
+  35: lea eax, [eax*8]   ; .bss                               
+  3c: ret                                                     
+  3d: nop                                                     
+  3e: nop                                                     
+  3f: nop                                                     

@@ -1,0 +1,4 @@
+CARD C12  (written 2026-09-26 02:09:34 -0700, before compile)
+Evidence (D, /Od 0x4a3d0c..0x4a3d65): paths colour = at_destination ? yellow : (steps_finish_path ? pink : purple)
+through two unnamed temps (-0x1914,-0x1918) copied into the named colour [ebp-0x17fc] as the block's first statement.
+Ours: if/else with an inner conditional. Correction: declaration initialiser. Prediction: block unchanged.

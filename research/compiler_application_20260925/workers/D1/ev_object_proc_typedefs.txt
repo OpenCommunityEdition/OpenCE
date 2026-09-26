@@ -1,0 +1,6 @@
+== HCEX.pdb
+<symrec>                     UDT object_deleted_proc                      void (*)(long)
+<symrec>                     UDT object_place_proc                        void (*)(long, void *)
+== HCEX_Release.pdb
+<symrec>                     UDT object_deleted_proc                      void (*)(long)
+<symrec>                     UDT object_place_proc                        void (*)(long, void *)

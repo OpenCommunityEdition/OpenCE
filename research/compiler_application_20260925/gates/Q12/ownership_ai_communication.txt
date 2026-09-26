@@ -1,0 +1,315 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618
+=== python -B scratch/tools/pdb_storage.py source/ai/ai_communication
+source/ai/ai_communication: 279 split symbols, 3 disagreements with PDB publics
+   _actor_reset_idle_vocalization_timer               split 2 ours 3 PDB-public False
+   _ai_communication_update_speech_timers             split 2 ours 3 PDB-public False
+   _ai_conversation_new                               split 2 ours 2 PDB-public False
+exit code 0
+
+=== python -B scratch/tools/object_audit.py source/ai/ai_communication
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_01BIAFAFID@F?$AA@                          size     2/2     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03CJOLJKCN@dis?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03CPELBCCM@?9lo?$AA@                       size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03DKEJHHJP@?$CFs?3?$AA@                    size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03EKLFPLOI@n?1a?$AA@                       size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03HOBIBNHG@?9hi?$AA@                       size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03KPLLINCC@HUM?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03MADNOHBP@COV?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_03NDPLAFDJ@vis?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04BBBDNBOK@dead?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04BLLOBPAA@lost?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04EJGCJLIC@yell?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04FLLHOKOG@dive?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04HBNBFOKD@talk?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04NAFIGEAM@hurt?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04PFAOODAA@?$CFs?3?5?$AA@                  size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04PJDNGLKJ@self?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04PMNENHO@leap?$AA@                        size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05DNIIFBMG@?$CFs?5?$CFs?$AA@               size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05ICAMJEGE@enemy?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05IMODGEHH@melee?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05LLNBKOOD@?$DMerr?$DO?$AA@                size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05OAIPHEDE@human?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05PBMMFKGI@death?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06BEJGECAN@PLAYER?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06BHBNKPBA@friend?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06DAIKMLH@?$CFs?9?$CFc?5?$AA@              size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06DJHOIPC@?$CFs?3?5?$CFs?$AA@              size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06EBKKMJGD@notvis?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06IKJGFCFO@?$DO?$DO?$CFs?$DM?$DM?$AA@      size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06NLCJMHIE@filler?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07BLDMICJO@exclaim?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07CEGFBHJP@traitor?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07CEJJIKE@?$CFs?$CI?$CFd?$CJ?5?$AA@        size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07CPBKJGBP@filter?5?$AA@                   size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07EFCDKMI@chatter?$AA@                     size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07GKOCGALF@non?9voc?$AA@                   size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07GPMPHPH@nobody?5?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07JKODCMP@advance?$AA@                     size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07KMLHDIFF@falling?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07LADJDDJF@retreat?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07MAJPMGLJ@blocked?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07MMOCNKBD@?$CFs?1?$CFs?3?5?$AA@           size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08BAHEMPNM@?5?$FL?$CFd?1?$CFs?$FN?$AA@     size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08ECOGDNI@unteamed?$AA@                    size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08GLNGGDPJ@DISABLED?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08HFADMLAA@shooting?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08JPJNIAAJ@betrayal?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08LMAMDFAK@u?9?$CFs?9?$CFs?5?$AA@          size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08MPLMAFLL@surprise?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08OLCLKDFA@nodanger?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08ONAJMEN@covenant?$AA@                    size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08PAHPFNGA@accident?$AA@                   size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08PJALNDK@observed?$AA@                    size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_09DFNMPCAJ@selection?$AA@                  size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_09LPKHDOHP@flee_idle?$AA@                  size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_09NBNIDDMC@nospch?9?$CFs?$AA@              size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_09PGKELFMI@0?9chance?5?$AA@                size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@ELKHLFDD@?$DMspecific?5unit?$DO?$AA@   size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@GHAABFAJ@grenade_sighted?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@HBKFDHMB@vehicle_falling?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@HJGPPPBN@ai?5conversation?$AA@         size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@ILMKIOPH@grenade_startle?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@JGHKCAMO@shout?3?$CF?41f?$DM?$CF?41f?$ size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@JKBMANAN@hiding_finished?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@KFNIENAA@alert_noncombat?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@LGNJEIF@not?9near?9player?$AA@         size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@MDFGCECJ@rand?5?$CF?42f?$DO?$CF?42f?5? size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@BILJOOCN@?$CBreply_to_player?$AA@      size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@BOBCLBAE@?$FL?$CFs?1?$CFd?5u?9?$CFs?9? size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@GDNLPHOF@flee_leader_died?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@GHLHMONC@shooting_vehicle?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@GKMIFEBC@?$FL?$CFs?1?$CFd?5host?9?$CFs size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@GKOPGPMO@shooting_traitor?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@HACOIKAB@unexpected_enemy?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@HDBKEACA@PLAYER?9REPLY?5?$CFs?5?$AA@   size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@LGDDKHGB@postcombat_alone?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@LKALKDPF@shooting_berserk?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BB@NDMOOLOJ@grenade_throwing?$AA@         size    17/17    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@FOAHPEHM@protagonist_actor?$AA@        size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@GGBDH@?$FL?$CFs?5found?9actor?$FN?5?$A size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@GOGGHGJI@?$FL?$CFs?5?$CFs?9d?9dis?1?$C size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@LGHGCJKF@no?9dialogue?9match?$AA@      size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@LJDIENED@found_dead_friend?$AA@        size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@NMDPGBEB@?$CFs?3?5finished?5?$CFs?$CFs size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@OMHOAJOH@?$FL?$CFs?1?$CFd?5nogrp?9?$CF size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@ONDNPAEP@conversation_data?$AA@        size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@FMPJDKHJ@already?9conversing?$AA@      size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@FOMCINHP@?5?$CIunable?5to?5begin?$CJ?$ size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@GACNBALB@?$FL?$CFs?1?$CFd?5nounit?9?$C size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@JHAEBNEM@allegiance_changed?$AA@       size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@MKOGOGNM@postcombat_triumph?$AA@       size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@NGEMBLCE@?$FL?$CFs?1?$CFd?5status?9?$C size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@NKCKMGKJ@?$CFs?5?$CFs?5?$CFd?1?$CFs?3? size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@NMMLILLH@?$FL?$CFs?1?$CFd?50?9playrat? size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@OKBEBJFP@postcombat_wounded?$AA@       size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@PDIGFKID@override?9scripted?5?$AA@     size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@PHFOKNBE@?$FL?$CFs?1?$CFd?5nosubrace?$ size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@DIJKKGAP@uncover_exclamation?$AA@      size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@DLAFFNAP@?$FL?$CFs?5rand?$CF?42f?$DO?$ size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@FCFFGOIN@nowhere?9near?9player?$AA@    size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@KPFKNBML@?$CFs?3?5trying?5to?5begin?$A size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@OGGIDGFC@postcombat_massacre?$AA@      size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@OMABELMA@?$FL?$CFs?1?$CFd?5noplyreply? size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@PGBJJNLI@?$FL?$CFs?1?$CFd?5nocausrace? size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@DPPMFKIF@?$FLscripted?9override?$FN?5? size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@HNJCJGJJ@search_group_abandon?$AA@     size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@JKGAIKPI@?$FL?$CFs?1?$CFd?5?$CFs?9d?9d size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@OFGIJICH@postcombat_unscathed?$AA@     size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@PLOFNBGK@postcombat_celebrate?$AA@     size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BG@IIEIONGD@sighted_friend_player?$AA@    size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BG@KFPPJIJM@?$FL?$CFs?50?9player?9chance? size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BH@JEELJBED@postcombat_check_enemy?$AA@   size    23/23    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BH@MJIAPKFJ@?$CFs?3?5begun?5successfully? size    23/23    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BI@BNIOPALA@postcombat_shoot_corpse?$AA@  size    24/24    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BI@LCABFNHO@postcombat_check_friend?$AA@  size    24/24    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BI@MOODPKBH@?$CFs?3?5unit?5died?0?5aborti size    24/24    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BJ@DEJOBHIO@ai?5communication?5replies?$A size    25/25    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BJ@DMOBOMPI@?$FL?$CFd?1?$CF?41f?5force?5? size    25/25    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BK@ELJOEOCB@?$CFs?3?5no?5more?5lines?5to? size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BK@HKKGFHIF@ai?5communication?5dialogue?$ size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BM@CBPILECH@found_variant_index?5?$CB?$DN size    28/28    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BO@LJOGJGHI@?$FLrnd?$CF?41f?5tot?$CF?41f? size    30/30    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BO@PGLKMLMB@?$CFs?3?5told?5to?5stop?5by?5 size    30/30    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CA@DKHGIOGG@total_possibility_weight?5?$D size    32/32    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CB@JPNJDDBL@?$CFs?3?5told?5to?5advance?5b size    33/33    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CF@BJPALGNB@?$CFs?3?5could?5not?5find?5pa size    37/37    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CF@ENENAALK@c?3?2halo?2SOURCE?2ai?2ai_com size    37/37    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CH@FMECNBHL@?$CFs?3?5script?5tried?5to?5s size    39/39    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CI@ICHMPFMM@conversation_definition?5?$CG size    40/40    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CI@LELOFLBG@?$CFs?3?5cannot?5start?0?5nob size    40/40    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CJ@GKFDOEJ@incident?5between?5teams?5?$CF size    41/41    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CL@IOMHDOAM@allegiance?5?$CFs?0?5?$CFd?5i size    43/43    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DA@CPDLIKLO@subject_actor?9?$DOdanger_zon size    48/48    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DA@LIHNLMLM@?$CFs?3?5cannot?5start?0?5pla size    48/48    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DA@PPIFADMI@?$CFs?3?5unable?5to?5begin?0? size    48/48    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DB@PGEHKHFC@?$CFs?3?5didn?8t?5find?5?$CFd size    49/49    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DG@BNDGFHIE@?$CFs?3?5found?5participant?5 size    54/54    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DJ@KAPPHHBA@communication_priority?5?$DM? size    57/57    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DJ@ONAPPANJ@?$CFs?3?5can?8t?5begin?5yet?5 size    57/57    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DK@CMCFHJEF@nearby_unit_count?5?$DM?5MAXI size    58/58    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DK@JAPPOFEL@?$CIplay_type?5?$DN?$DN?5_uni size    58/58    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DM@GFNDBPMM@selected_possibility?9?$DOpre size    60/60    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EA@HGHJJMBM@vocalization_type?5?$CG?$CG?5 size    64/64    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0ED@GJAAIMME@?$FL?$CFs?1?$CFd?5?$CFs?5del? size    67/67    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EH@NNNDPBEK@?$CFs?3?5could?5not?5start?0? size    71/71    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EH@ODDEEICK@?$CFs?3?5participants?5curren size    71/71    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EI@GINMJEIA@?$CIdialogue_index?5?$DO?$DN? size    72/72    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EI@HLDOMHAD@ai_communication_initialize?3 size    72/72    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EI@KMONEJAM@?$CFs?3?5this?5conversation?5 size    72/72    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EL@EAKMIEAH@?$CIreply_table_index?5?$DO?$ size    75/75    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EL@IJCKEONL@ai_communication_initialize?3 size    75/75    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FC@DCLNMHJF@?$CIdialogue_type_index?5?$DO size    82/82    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FF@FCIFJAOH@?$CIcommunication_type?5?$DO? size    85/85    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FF@NKMCJBLB@?$CIcommunication_team?5?$DO? size    85/85    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FG@DGHHBBJL@change_variant_indices_count? size    86/86    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FI@CHGNAOEL@WARNING?3?5too?5many?5executi size    88/88    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FJ@IBKDMIEO@ai_communication_event?3?5typ size    89/89    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0GN@FHAECEPL@?$CIactor_variant_index?5?$DO size   109/109   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0HC@PEHCJGNI@?$CIai_information?9?$DOdialo size   114/114   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0HP@PLIGCELE@?$CIcommunication_priority?5? size   127/127   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0JB@OPDEEEOP@?$CIconversation?9?$DOdialogu size   145/145   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0L@COMKDGN@?$DMeveryone?$DO?$AA@           size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0L@FEFLJKBC@wrong?9type?$AA@               size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0L@HPKHMDON@wrong?9dmg?5?$AA@              size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0L@LNGLDCHG@REPLY?5?$CFs?3?5?$AA@          size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0L@MCEFNCAK@unobserved?$AA@                size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0LF@IOBNLMGM@?$CIconversation?9?$DOdialogu size   181/181   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0M@CFFMKJFH@?5?5reasons?3?5?$AA@           size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@DMDFMBAG@unit?5?$CF04X?3?5?$AA@         size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@EGBKHEDG@?$CFs?9?$CFc?$CFc?$CFc?$CFs?$A size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@EJKFHLEL@found_enemy?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@EMMAIOJB@playercant?5?$AA@              size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@FJGFLLPA@information?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@HNMGEIHE@player?5?$CFd?3?5?$AA@         size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@IDKAPGFO@still?5holds?$AA@              size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@JHEHDIOO@communicate?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@PDJPHGJL@prematurely?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@EFEDAFNN@?$FL?$CFs?5nobody?$FN?5?$AA@   size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@HAEOLDAP@successfully?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@IDIKJELG@?$CFs?3?5speak?5?$CFs?$AA@     size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@IJIHJIIJ@search_start?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@JEODFMIK@lost_contact?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@KIHOLEBN@vehicle_exit?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@KOBKEGMJ@rand?9failed?5?$AA@            size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@MDODPJCI@search_query?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@CDKKCOME@sighted_enemy?$AA@             size    14/14    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@EGHFODNC@killing_spree?$AA@             size    14/14    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@EKDNJHKG@search_report?$AA@             size    14/14    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@NEANEBAA@vehicle_entry?$AA@             size    14/14    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@OAGOMGLF@uncover_start?$AA@             size    14/14    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@BLNKGMGL@?$FL?$CFs?1?$CFd?5?$CFs?5?$CFs size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@BOOLPEN@attempted_flee?$AA@             size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@EOJFLCO@vehicle_scared?$AA@             size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@GDPJMJHJ@search_abandon?$AA@            size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@IDHEPNJE@shooting_group?$AA@            size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@JEDLKPOF@chat?3?$CF?41f?$DM?$CF?41f?$AA size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@JELOHPAB@grenade_danger?$AA@            size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@LFGNPAFB@spk?$CFd?$DMtol?$CFd?$CL?$CFd? size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@NMKONCAD@talk?3?$CF?41f?$DM?$CF?41f?$AA size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@OJJDOKMB@vehicle_woohoo?$AA@            size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@OMGCNPFA@?$FL?$CFs?1?$CFd?5nodmg?$FN?5? size    15/15    flags eq align 3/3
+  ok   .rdata   sym:__real@3eaaaaab                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3eb33333                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@41a20000                                  size     4/4     flags eq align 3/3
+  ok   .text    sym:_actor_communication_team                        size    64/64    flags eq align 5/5
+  ok   .text    sym:_actor_communication_update                      size   240/240   flags eq align 5/5
+  ok   .text    sym:_actor_reset_idle_vocalization_timer             size   208/208   flags eq align 5/5
+  DIFF .text    sym:_ai_communication_actor_talk_weight              size   912/912   flags eq align 5/5
+  ok   .text    sym:_ai_communication_consider_speech                size   416/416   flags eq align 5/5
+  ok   .text    sym:_ai_communication_dispose                        size    16/16    flags eq align 5/5
+  ok   .text    sym:_ai_communication_dispose_from_old_map           size    16/16    flags eq align 5/5
+  DIFF .text    sym:_ai_communication_event                          size  8064/8096  flags eq align 5/5
+  ok   .text    sym:_ai_communication_find_actor_to_reply_to_player  size  1104/1104  flags eq align 5/5
+  ok   .text    sym:_ai_communication_find_global_actor_to_talk      size   288/288   flags eq align 5/5
+  ok   .text    sym:_ai_communication_find_specific_actor_to_talk    size   192/192   flags eq align 5/5
+  ok   .text    sym:_ai_communication_finished                       size  1584/1584  flags eq align 5/5
+  ok   .text    sym:_ai_communication_get_player_rating              size   832/832   flags eq align 5/5
+  ok   .text    sym:_ai_communication_get_type_by_name               size    64/64    flags eq align 5/5
+  ok   .text    sym:_ai_communication_get_type_name                  size    48/48    flags eq align 5/5
+  ok   .text    sym:_ai_communication_handle_received_looking        size   128/128   flags eq align 5/5
+  ok   .text    sym:_ai_communication_initialize                     size   336/336   flags eq align 5/5
+  ok   .text    sym:_ai_communication_initialize_for_new_map         size   272/272   flags eq align 5/5
+  ok   .text    sym:_ai_communication_look_secondary_at_object       size    80/80    flags eq align 5/5
+  ok   .text    sym:_ai_communication_look_secondary_at_unit         size   176/176   flags eq align 5/5
+  ok   .text    sym:_ai_communication_notify                         size   528/528   flags eq align 5/5
+  ok   .text    sym:_ai_communication_packet_new                     size    96/96    flags eq align 5/5
+  ok   .text    sym:_ai_communication_started                        size   704/704   flags eq align 5/5
+  ok   .text    sym:_ai_communication_update_speech_timers           size   672/672   flags eq align 5/5
+  ok   .text    sym:_ai_conversation                                 size   336/336   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_actor_deleted                   size   208/208   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_advance                         size   144/144   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_begin                           size  1744/1744  flags eq align 5/5
+  ok   .text    sym:_ai_conversation_find_participant                size  2048/2048  flags eq align 5/5
+  ok   .text    sym:_ai_conversation_finish                          size   400/400   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_line                            size    96/96    flags eq align 5/5
+  ok   .text    sym:_ai_conversation_line_begin                      size   432/432   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_line_end                        size    48/48    flags eq align 5/5
+  ok   .text    sym:_ai_conversation_line_perform                    size   656/656   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_new                             size   304/304   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_status                          size   272/272   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_stop                            size   144/144   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_unit_died                       size   368/368   flags eq align 5/5
+  ok   .text    sym:_ai_conversation_update                          size   608/608   flags eq align 5/5
+  ok   .rdata   sym:_communication_speech_priorities                 size  6336/6336  flags eq align 4/4
+  ok   .data    sym:_global_communication_priority_names             size   276/276   flags eq align 4/4
+  ok   .bss     sym:_global_dialogue_event_count                     size    16/16    flags eq align 3/3
+  ok   .text    sym:_reply_filter_close                              size   112/112   flags eq align 5/5
+  ok   .text    sym:_reply_filter_fighting                           size    32/32    flags eq align 5/5
+  ok   .text    sym:_reply_filter_fighting_close                     size    64/64    flags eq align 5/5
+  ok   .text    sym:_reply_filter_flee_leader                        size    64/64    flags eq align 5/5
+  ok   .text    sym:_reply_filter_no_certain_target                  size    64/64    flags eq align 5/5
+  ok   .text    sym:_reply_filter_not_close                          size   112/112   flags eq align 5/5
+  ok   .text    sym:_reply_filter_same_platoon                       size   144/144   flags eq align 5/5
+  ok   .text    sym:_reply_filter_same_target                        size   176/176   flags eq align 5/5
+  ok   .text    sym:_reply_filter_searching                          size    80/80    flags eq align 5/5
+== symbols (January)
+  DIFF     _actor_reset_idle_vocalization_timer         storage 2/3 key sym:_actor_reset_idle_vocalization_timer/sym:_actor_reset_idle_vocalization_timer value 0/0
+  DIFF     _ai_communication_update_speech_timers       storage 2/3 key sym:_ai_communication_update_speech_timers/sym:_ai_communication_update_speech_timers value 0/0
+  279 January symbols, 2 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_00CNPNBAHC@?$AA@                           size 1
+  +.rdata   sym:??_C@_04CGFJFPFD@none?$AA@                       size 5
+  +.rdata   sym:??_C@_04IMJFEJN@flee?$AA@                        size 5
+  +.rdata   sym:??_C@_04OKGDLNCL@NONE?$AA@                       size 5
+  +.rdata   sym:??_C@_05BAOFOMKD@shout?$AA@                      size 6
+  +.rdata   sym:??_C@_05DAFACFLE@never?$AA@                      size 6
+  +.rdata   sym:??_C@_05GFOLEBJA@?$CFs?1?$CFs?$AA@               size 6
+  +.rdata   sym:??_C@_05IMMFCEFO@swarm?$AA@                      size 6
+  +.rdata   sym:??_C@_05MGHOCOML@cover?$AA@                      size 6
+  +.rdata   sym:??_C@_06BALNJMNP@player?$AA@                     size 7
+  +.rdata   sym:??_C@_06GJOIPFFF@damage?$AA@                     size 7
+  +.rdata   sym:??_C@_07CBDMFKJF@?$DMerror?$DO?$AA@              size 8
+  +.rdata   sym:??_C@_07PEIBNLKE@berserk?$AA@                    size 8
+  +.rdata   sym:??_C@_0CI@OJMAHDFE@global_current_collision_user size 40
+  +.rdata   sym:??_C@_0EJ@EEKGOMEC@global_current_collision_user size 73
+  +.rdata   sym:??_C@_0P@MPLGIMAD@?$DMno?5encounter?$DO?$AA@     size 15
+  +.rdata   sym:??_C@_0P@NHABDOCD@?$CB?$CCunreachable?$CC?$AA@   size 15
+  +.rdata   sym:_D3DPRIMITIVETOVERTEXCOUNT                       size 88
+  +.rdata   sym:_D3DSIMPLERENDERSTATEENCODE                      size 328
+  +.rdata   sym:_D3DTEXTUREDIRECTENCODE                          size 16
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@38d1b717                                  size 4
+  +.rdata   sym:__real@3a91a2b4                                  size 4
+  +.rdata   sym:__real@3c888889                                  size 4
+  +.rdata   sym:__real@3d088889                                  size 4
+  +.rdata   sym:__real@3e99999a                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f333333                                  size 4
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@3fc00000                                  size 4
+  +.rdata   sym:__real@40000000                                  size 4
+  +.rdata   sym:__real@40a00000                                  size 4
+  +.rdata   sym:__real@41200000                                  size 4
+  +.rdata   sym:__real@41f00000                                  size 4
+  +.rdata   sym:__real@44610000                                  size 4
+  +.text    sym:_distance_squared3d                              size 64
+  +.text    sym:_dot_product3d                                   size 32
+  +.text    sym:_magnitude_squared3d                             size 48
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: FAIL (4)
+exit code 1

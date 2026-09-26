@@ -1,0 +1,305 @@
+--- a/source/ai/ai_debug.c
++++ b/source/ai/ai_debug.c
+@@ -856,23 +856,14 @@
+ 				actor->emotions.crouch_friends_in_line_of_fire ||
+ 				actor->emotions.crouch_blocking_player_line_of_fire)
+ 			{
+-				char const *blocking_type;
+-
+-				char const *blocking_mode = actor->emotions.crouch_friends_in_line_of_fire ? "friends-blocking" : "";
+-
+-				if (actor->emotions.crouch_blocking_player_line_of_fire)
+-				{
+-					blocking_type = "blocking-player ";
+-				}
+-				else
+-				{
+-					blocking_type = actor->emotions.crouch_blocking_line_of_fire ? "blocking " : "";
+-				}
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					ai_debug_drawstack(),
+-					csprintf(temporary, "%s%s", blocking_type, blocking_mode),
++					csprintf(
++						temporary,
++						"%s%s",
++						actor->emotions.crouch_blocking_player_line_of_fire ? "blocking-player " : (actor->emotions.crouch_blocking_line_of_fire ? "blocking " : ""),
++						actor->emotions.crouch_friends_in_line_of_fire ? "friends-blocking" : ""),
+ 					global_real_argb_orange);
+ 			}
+ 
+@@ -881,12 +872,14 @@
+ 			if (actor->emotions.moving_into_player_line_of_fire ||
+ 				actor->emotions.moving_into_fire_timer > 0)
+ 			{
+-				char const *string = actor->emotions.moving_into_player_line_of_fire ? "moving-into-fire" : "";
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					ai_debug_drawstack(),
+-					csprintf(temporary, "%sforce-stop %d", string, actor->emotions.moving_into_fire_timer),
++					csprintf(
++						temporary,
++						"%sforce-stop %d",
++						actor->emotions.moving_into_player_line_of_fire ? "moving-into-fire" : "",
++						actor->emotions.moving_into_fire_timer),
+ 					global_real_argb_pink);
+ 			}
+ 		}
+@@ -922,10 +915,7 @@
+ 							&actor->input.position.body_position,
+ 							NULL);
+ 
+-						if (blockage_type <= v0)
+-						{
+-							blockage_type = v0;
+-						}
++						blockage_type = MAX(blockage_type, v0);
+ 					}
+ 				}
+ 			}
+@@ -1272,18 +1262,7 @@
+ 						sprintf(encounterbuf, "%s (bsp %d)", encounter_definition->name, encounter_definition->runtime_structure_bsp_reference_index);
+ 					}
+ 
+-					if (encounter->active)
+-					{
+-						encounter_color = global_real_argb_green;
+-					}
+-					else if (outside_current_bsp)
+-					{
+-						encounter_color = global_real_argb_red;
+-					}
+-					else
+-					{
+-						encounter_color = global_real_argb_purple;
+-					}
++					encounter_color = encounter->active ? global_real_argb_green : (outside_current_bsp ? global_real_argb_red : global_real_argb_purple);
+ 				}
+ 				else
+ 				{
+@@ -1565,8 +1544,6 @@
+ 
+ 			if (TEST_FLAG(actor_definition->flags, _actor_definition_fixed_crouch_facing_bit))
+ 			{
+-				char const *string;
+-
+ 				if (actor->control.desire_stationary_facing)
+ 				{
+ 					if (actor->control.fixed_stationary_facing)
+@@ -1778,18 +1755,11 @@
+ 
+ 					if (ai_debug.render_props_unreachable)
+ 					{
+-						real_argb_color const *color;
+-
+-						if (prop->ignore)
+-						{
+-							color = global_real_argb_blue;
+-						}
+-						else
+-						{
+-							color = prop->preferred_target ? global_real_argb_pink : global_real_argb_red;
+-						}
+-
+-						render_debug_string_at_point(TRUE, &string_point, csprintf(temporary, "%.2f", prop->target_weight), color);
++						render_debug_string_at_point(
++							TRUE,
++							&string_point,
++							csprintf(temporary, "%.2f", prop->target_weight),
++							prop->ignore ? global_real_argb_blue : (prop->preferred_target ? global_real_argb_pink : global_real_argb_red));
+ 						point_from_line3d(&string_point, global_up3d, 0.05f, &string_point);
+ 						
+ 						if (iterator.index==actor->target.target_prop_index)
+@@ -1801,12 +1771,14 @@
+ 
+ 					if (ai_debug.render_props_unopposable && prop->unreachable_ticks>0)
+ 					{
+-						long time = prop->last_unreachable_time!=NONE ? game_time_get()-prop->last_unreachable_time : NONE;
+-
+ 						render_debug_string_at_point(
+ 							TRUE,
+ 							&string_point,
+-							csprintf(temporary, "unr %d %d", prop->unreachable_ticks, time),
++							csprintf(
++								temporary,
++								"unr %d %d",
++								prop->unreachable_ticks,
++								prop->last_unreachable_time==NONE ? NONE : game_time_get()-prop->last_unreachable_time),
+ 							global_real_argb_darkgreen);
+ 						point_from_line3d(&string_point, global_up3d, 0.05f, &string_point);
+ 					}
+@@ -2193,12 +2165,14 @@
+ 			
+ 			if (prop->unreachable_ticks>0 && (!ai_debug.render_props || !ai_debug.render_props_unopposable))
+ 			{
+-				long time = prop->last_unreachable_time!=NONE ? game_time_get()-prop->last_unreachable_time : NONE;
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					ai_debug_drawstack(),
+-					csprintf(temporary, "unr %d %d", prop->unreachable_ticks, time),
++					csprintf(
++						temporary,
++						"unr %d %d",
++						prop->unreachable_ticks,
++						prop->last_unreachable_time==NONE ? NONE : game_time_get()-prop->last_unreachable_time),
+ 					global_real_argb_darkgreen);
+ 			}
+ 		}
+@@ -2308,11 +2282,14 @@
+ 					}
+ 					else
+ 					{
+-						char const *string = actor->state.action_data.guard.cower_panicked ? "panic" : "hide";
+ 						render_debug_string_at_point(
+ 							TRUE,
+ 							ai_debug_drawstack(),
+-							csprintf(temporary, "%s %d", string, actor->state.action_data.guard.cower_ticks),
++							csprintf(
++								temporary,
++								"%s %d",
++								actor->state.action_data.guard.cower_panicked ? "panic" : "hide",
++								actor->state.action_data.guard.cower_ticks),
+ 							actor_action_debug_color(actor_index));
+ 					}
+ 				}
+@@ -2648,15 +2625,13 @@
+ 		{
+ 			if (actor_debug_info->firing_decision!=_firing_no_target)
+ 			{
+-				char const *string = actor_move_animation_busy(actor_index) ? "busy " : "";
+-				
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					ai_debug_drawstack(), 
+ 					csprintf(
+ 						temporary,
+ 						"%srof %.1f err %.1f dmg %.1f blk %d",
+-						string,
++						actor_move_animation_busy(actor_index) ? "busy " : "",
+ 						actor_debug_info->shooting_rof,
+ 						actor->control.burst_error,
+ 						actor->control.burst_damage_modifier,
+@@ -2819,13 +2794,14 @@
+ 
+ 			if (actor->control.grenade_trying_to_throw)
+ 			{
+-				real damage = unit==NULL ? 0.f : unit->object.current_body_damage;
+-				char const *string = actor->meta.unit_index==NONE || !unit_is_busy(actor->meta.unit_index) ? "not-" : "";
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					ai_debug_drawstack(),
+-					csprintf(temporary, "trying: %sbusy dmg %.1f", string, damage),
++					csprintf(
++						temporary,
++						"trying: %sbusy dmg %.1f",
++						actor->meta.unit_index!=NONE && unit_is_busy(actor->meta.unit_index) ? "" : "not-",
++						unit==NULL ? 0.f : unit->object.current_body_damage),
+ 					global_real_argb_pink);
+ 			}
+ 		}
+@@ -2834,30 +2810,9 @@
+ 
+ 		if (ai_debug.render_danger_zones && actor->danger_zone.danger_type>0)
+ 		{
+-			real_argb_color const *color;
+-
+-			if (actor->danger_zone.currently_perceived)
+-			{
+-				if (actor->danger_zone.acknowledgement_timer>0)
+-				{
+-					color = global_real_argb_white;
+-				}
+-				else
+-				{
+-					if (actor->danger_zone.noticed_danger)
+-					{
+-						color = global_real_argb_yellow;
+-					}
+-					else
+-					{
+-						color = global_real_argb_blue;
+-					}
+-				}
+-			}
+-			else
+-			{
+-				color = global_real_argb_darkgreen;
+-			}
++			real_argb_color const *color = actor->danger_zone.currently_perceived ?
++				(actor->danger_zone.acknowledgement_timer>0 ? global_real_argb_white : (actor->danger_zone.noticed_danger ? global_real_argb_yellow : global_real_argb_blue)) :
++				global_real_argb_darkgreen;
+ 
+ 			render_debug_line(TRUE, &actor->input.position.head_position, &actor->danger_zone.position, color);
+ 			render_debug_sphere(TRUE, &actor->danger_zone.position, actor->danger_zone.danger_radius, global_real_argb_red);
+@@ -2870,27 +2825,23 @@
+ 
+ 			if (actor->danger_zone.danger_type==_actor_unopposable_danger_shooting)
+ 			{
+-				char const *string = actor->danger_zone.projectile.time_until_explosion==NONE ?
+-					"NONE" :
+-					csprintf(temporary, "%d", actor->danger_zone.projectile.time_until_explosion);
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					&actor->danger_zone.position,
+-					string,
++					actor->danger_zone.projectile.time_until_explosion==NONE ?
++						"NONE" :
++						csprintf(temporary, "%d", actor->danger_zone.projectile.time_until_explosion),
+ 					color);
+ 			}
+ 
+ 			if (actor->danger_zone.danger_type==_actor_unopposable_danger_visible)
+ 			{
+-				char const *string = actor->danger_zone.projectile.time_until_explosion==NONE ?
+-					"NONE" :
+-					csprintf(temporary, "%d", actor->danger_zone.projectile.time_until_explosion);
+-
+ 				render_debug_string_at_point(
+ 					TRUE,
+ 					&actor->danger_zone.position,
+-					string,
++					actor->danger_zone.projectile.time_until_explosion==NONE ?
++						"NONE" :
++						csprintf(temporary, "%d", actor->danger_zone.projectile.time_until_explosion),
+ 					color);
+ 			}
+ 
+@@ -3355,10 +3306,10 @@
+ 			point_from_line3d(&actor_debug_info->field_C8, &v0, actor_debug_info->field_F0, &p2);
+ 			
+ 			p1 = p2;
+-			p0 = p2;
++			p0 = p1;
+ 
+-			p0.x = p2.x - 0.2f;
+-			p1.x = p2.x + 0.2f;
++			p0.x = p0.x - 0.2f;
++			p1.x = p1.x + 0.2f;
+ 			render_debug_line(TRUE, &p0, &p1, global_real_argb_blue);
+ 			
+ 			p0.x = p0.x + 0.2f;
+@@ -3717,18 +3668,9 @@
+ 			{
+ 				short step_index;
+ 				short first_index;
+-				real_argb_color const *color;
++				real_argb_color const *color = actor->control.path.at_destination ? global_real_argb_yellow : (actor->control.path.path.steps_finish_path ? global_real_argb_pink : global_real_argb_purple);
+ 				real_point3d offset_point;
+ 
+-				if (actor->control.path.at_destination)
+-				{
+-					color = global_real_argb_yellow;
+-				}
+-				else
+-				{
+-					color = actor->control.path.path.steps_finish_path ? global_real_argb_pink : global_real_argb_purple;
+-				}
+-
+ 				first_index = actor->control.path.path.step_index;
+ 
+ 				render_debug_line_offset(

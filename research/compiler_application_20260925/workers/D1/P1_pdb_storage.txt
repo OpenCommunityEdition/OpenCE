@@ -1,0 +1,10 @@
+source/items/weapons: 97 split symbols, 1 disagreements with PDB publics
+   _data_00307140                                     split 2 ours 2 PDB-public False
+Traceback (most recent call last):
+  File "C:\halo-worktrees\claude-compiler-application-20260925\scratch\tools\pdb_storage.py", line 31, in <module>
+    t = defs('build/split/%s.obj' % unit)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\halo-worktrees\claude-compiler-application-20260925\scratch\tools\pdb_storage.py", line 24, in defs
+    o = cc.load(open(path, 'rb').read())
+                ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'build/split/scratch/campaign/workers/D1/sweep/p1/source__items__weapons.obj.obj'

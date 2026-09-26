@@ -1,0 +1,20 @@
+G1 card T02 - DIAGNOSTIC traces of _custom_render_nav_point: HEAD vs N1 (single strip, EXACT) vs N3 (both, not exact)
+Written 2026-09-26 02:02:02 -0700 (clock-read), BEFORE the traces. Never edited.
+
+C03 OUTCOME (facts): N3 (both bitmap_extent decorations removed) and N4 (all five decorative groups removed) are
+NOT exact and are identical to each other: ours becomes 'push 0; push 0; mov eax,[ebp-0x10]; mov ecx,[ebp-0x14];
+push 0' (J: 'push 0; mov eax; mov ecx; push 0; push 0'). Prediction 'N3 two-push form, p 0.6' CONFIRMED. So the
+single-strip EXACT (s03/s04) is a ONE-RECORD count coincidence, not a principled source correction: NOT A CANDIDATE
+(ruling items 1 and 3; rule 'do not tune ... counts'). Owner FYI only.
+
+QUESTION (for the reopen criterion only): which scheduling structure does one removed 0x267 record change? W2 C12 read
+the +0x58A block as starting at push0#1 (IL indices 1..8), which would make an 81-record region cap in THAT block
+impossible. Either (a) the block is longer than W2's indices suggest and the region boundary moves by one record per
+removed temp (W6 mechanism), or (b) the temp shifts something else (key/height or a later temp's identity).
+INSTRUMENT: W6 w6trace.py 'region' mode (0x1074e68f region starts/ends + encoder) on HEAD (hud_nav_points.HEAD.c),
+N1 (strip s03 copy) and N3; fresh run dirs scratch/campaign/workers/G1/runs/T02_{HEAD,N1,N3}_region; stock-equal
+manifests. Then 'sched' mode on the one that shows the change if the region view is inconclusive.
+PREDICTION: (a) p 0.65 - HEAD's last region ends exactly before push0#1 ... more precisely: in HEAD a region boundary
+falls between 'fistp [ebp-0x10]' (+0x587) and the push/load group; N1 moves it one record later so push0#1 joins the
+previous region; N3 moves it two records later. (b) p 0.35.
+No candidate can come out of this card.

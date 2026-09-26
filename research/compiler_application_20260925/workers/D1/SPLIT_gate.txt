@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+        C:\halo-worktrees\claude-compiler-application-20260925\scratch\campaign\workers\D1\root_splitHW\source\items\weapons.h(267) : see declaration of 'weapon_place'
+        C:\halo-worktrees\claude-compiler-application-20260925\scratch\campaign\workers\D1\root_splitH\source\items\weapons.h(267) : see declaration of 'weapon_place'
+        c:\halo-worktrees\claude-compiler-application-20260925\scratch\campaign\workers\D1\root_splitH\source\items\weapons.h(267) : see declaration of 'weapon_place'
+C:\halo-worktrees\claude-compiler-application-20260925\scratch\campaign\workers\D1\root_splitOW\source\objects\object_types.c(383) : error C2078: too many initializers
+splitH   source/items/weapons                               FAILED rc=1 ch\campaign\workers\D1\root_splitH\source\items\weapons.c(529) : error C2371: 'weapon_place' : redefinition; different basic types
+splitH   source/objects/object_types                        FAILED rc=1 aign\workers\D1\root_splitH\source\objects\object_types.c(223) : error C2371: 'weapon_place' : redefinition; different basic types
+splitHW  source/items/weapons                               == exact 79  residual 0  unwritten 0  (of 79)
+splitHW  source/objects/object_types                        FAILED rc=1 gn\workers\D1\root_splitHW\source\objects\object_types.c(223) : error C2371: 'weapon_place' : redefinition; different basic types
+splitOW  source/items/weapons                               == exact 79  residual 0  unwritten 0  (of 79)
+splitOW  source/objects/object_types                        FAILED rc=1 (383) : warning C4047: 'initializing' : 'void (__cdecl *)(long)' differs in levels of indirection from 'object_type_definition *'
+splitS   source/items/weapons                               == exact 78  residual 1  unwritten 0  (of 79)
+splitS   source/objects/object_types                        == exact 31  residual 0  unwritten 0  (of 31)

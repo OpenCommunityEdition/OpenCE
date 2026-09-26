@@ -1,0 +1,44 @@
+--- a/source/objects/damage.h
++++ b/source/objects/damage.h
+@@ -69,6 +69,7 @@
+ void damage_initialize_for_new_map(void);
+ void damage_dispose_from_old_map(void);
+ void damage_render_debug(void);
++void render_debug_object_damage(void);
+ void object_initialize_vitality(long object_index, real *custom_body_vitality, real *custom_shield_vitality);
+ void object_can_take_damage(long object_list_index);
+ void object_cannot_take_damage(long object_list_index);
+--- a/source/cutscene/recorded_animations.h
++++ b/source/cutscene/recorded_animations.h
+@@ -37,6 +37,8 @@
+ boolean recorded_animation_play_and_hover(
+ 	long unit_index,
+ 	short animation_index);
++void render_debug_recording(
++	void);
+ 
+ /* ---------- globals */
+ 
+--- a/source/structures/structures.h
++++ b/source/structures/structures.h
+@@ -79,6 +79,8 @@
+ 	real radius,
+ 	short maximum_count,
+ 	short *intersected_indices);
++void render_debug_fog_planes(
++	void);
+ 
+ /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
+ 
+--- a/source/objects/damage.c
++++ b/source/objects/damage.c
+@@ -327,9 +327,6 @@
+ 
+ /* ---------- prototypes */
+ 
+-void render_debug_object_damage(
+-	void);
+-
+ static long get_player_index_from_object_or_parents(
+ 	long object_index);
+ 

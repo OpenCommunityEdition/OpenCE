@@ -1,0 +1,365 @@
+negative control: build/base/source/ai/ai_debug.obj linked with a byte copy of itself
+expected: LNK2005 naming _global_ai_debug_firing_position_color_count
+command: xbox\bin\vc7\Link.Exe /NOLOGO /MACHINE:X86 /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:probe_entry /OUT:C:\Users\isabe\AppData\Local\Temp\tmp83fuoxrs\probe.exe build\base\source\ai\ai_debug.obj C:\Users\isabe\AppData\Local\Temp\tmp3m9ob6yn\copy_ai_debug.obj
+exit code: 1120
+LNK2005/LNK1169 lines: 35
+owner reported: True
+verdict: CONTROL DETECTED
+--- complete linker output ---
+copy_ai_debug.obj : error LNK2005: _ai_debug_initialize already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_dispose already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_dispose_from_old_map already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_clear_storage already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_actor_deleted already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_get_last_path already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_highlight_cluster already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_sound_point_set already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_lineoffire_new already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_lineoffire_success already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_lineofsight_reset already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_idle_look_clear already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_lineoffire_addpill already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_idle_look_addprop already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_communication_suppress already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_communication_ignore already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_communication_focus already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_lineofsight already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_vocalize already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_speak_list already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_speak already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_describe_actor already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_select_encounter already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_select_actor already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_initialize_for_new_map already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_change_selected_actor already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_change_selected_encounter already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_teleport_to already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_get_path_storage already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_update already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _ai_debug_render already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _global_ai_debug_firing_position_colors already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _global_ai_debug_firing_position_color_count already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _actor_path_debug_array already defined in ai_debug.obj
+copy_ai_debug.obj : error LNK2005: _actor_debug_array already defined in ai_debug.obj
+LINK : error LNK2001: unresolved external symbol _probe_entry
+ai_debug.obj : error LNK2001: unresolved external symbol __fltused
+copy_ai_debug.obj : error LNK2001: unresolved external symbol __fltused
+ai_debug.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _object_get_bounding_sphere
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _object_get_bounding_sphere
+ai_debug.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _object_get_bounding_sphere
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _object_get_bounding_sphere
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _object_get_bounding_sphere
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _object_get_bounding_sphere
+ai_debug.obj : error LNK2019: unresolved external symbol _squad_array referenced in function _encounter_get_squad
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _squad_array referenced in function _encounter_get_squad
+ai_debug.obj : error LNK2019: unresolved external symbol _debug_malloc referenced in function _ai_debug_initialize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _debug_malloc referenced in function _ai_debug_initialize
+ai_debug.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _ai_debug_initialize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _ai_debug_initialize
+ai_debug.obj : error LNK2019: unresolved external symbol _debug_free referenced in function _ai_debug_dispose
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _debug_free referenced in function _ai_debug_dispose
+ai_debug.obj : error LNK2019: unresolved external symbol _csstrcpy referenced in function _ai_debug_dispose_from_old_map
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csstrcpy referenced in function _ai_debug_dispose_from_old_map
+ai_debug.obj : error LNK2019: unresolved external symbol _csstrncpy referenced in function _ai_debug_dispose_from_old_map
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csstrncpy referenced in function _ai_debug_dispose_from_old_map
+ai_debug.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _ai_debug_dispose_from_old_map
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _ai_debug_dispose_from_old_map
+ai_debug.obj : error LNK2019: unresolved external symbol _global_scenario_try_and_get referenced in function _ai_debug_dispose_from_old_map
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_scenario_try_and_get referenced in function _ai_debug_dispose_from_old_map
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_grey referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_grey referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_blue referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_blue referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_yellow referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_yellow referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_data referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_data referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_compute_activation_cluster_bit_vector referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_compute_activation_cluster_bit_vector referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _ai_debug_highlight_cluster
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _ai_debug_highlight_cluster
+ai_debug.obj : error LNK2019: unresolved external symbol _observer_get_camera referenced in function _ai_debug_drawstack_setup
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _observer_get_camera referenced in function _ai_debug_drawstack_setup
+ai_debug.obj : error LNK2019: unresolved external symbol _global_up3d referenced in function _ai_debug_drawstack
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_up3d referenced in function _ai_debug_drawstack
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_point referenced in function _ai_debug_highlight_unit
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_point referenced in function _ai_debug_highlight_unit
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_sphere referenced in function _ai_debug_highlight_unit
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_sphere referenced in function _ai_debug_highlight_unit
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_pill referenced in function _ai_debug_highlight_unit
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_pill referenced in function _ai_debug_highlight_unit
+ai_debug.obj : error LNK2019: unresolved external symbol _biped_get_physics_pill referenced in function _ai_debug_highlight_unit
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _biped_get_physics_pill referenced in function _ai_debug_highlight_unit
+ai_debug.obj : error LNK2019: unresolved external symbol _object_try_and_get_and_verify_type referenced in function _ai_debug_highlight_unit
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_try_and_get_and_verify_type referenced in function _ai_debug_highlight_unit
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_line_offset referenced in function _ai_debug_render_surface
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_line_offset referenced in function _ai_debug_render_surface
+ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_and referenced in function _ai_debug_communication_toggle_bits
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_and referenced in function _ai_debug_communication_toggle_bits
+ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_not referenced in function _ai_debug_communication_toggle_bits
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_not referenced in function _ai_debug_communication_toggle_bits
+ai_debug.obj : error LNK2019: unresolved external symbol _console_printf referenced in function _ai_debug_communication_toggle_bits
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _console_printf referenced in function _ai_debug_communication_toggle_bits
+ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_or referenced in function _ai_debug_communication_toggle_bits
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _bit_vector_or referenced in function _ai_debug_communication_toggle_bits
+ai_debug.obj : error LNK2019: unresolved external symbol _csstrcmp referenced in function _ai_debug_communication_toggle_bits
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csstrcmp referenced in function _ai_debug_communication_toggle_bits
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_get_type_by_name referenced in function _ai_debug_communication_suppress
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_get_type_by_name referenced in function _ai_debug_communication_suppress
+ai_debug.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_type_by_name referenced in function _ai_debug_communication_focus
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_type_by_name referenced in function _ai_debug_communication_focus
+ai_debug.obj : error LNK2019: unresolved external symbol _error referenced in function _ai_debug_lineofsight_findpoint
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _error referenced in function _ai_debug_lineofsight_findpoint
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_speak referenced in function _ai_debug_vocalize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_speak referenced in function _ai_debug_vocalize
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_packet_new referenced in function _ai_debug_vocalize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_packet_new referenced in function _ai_debug_vocalize
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_test_speech referenced in function _ai_debug_vocalize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_test_speech referenced in function _ai_debug_vocalize
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_speech_priority_by_name referenced in function _ai_debug_vocalize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_speech_priority_by_name referenced in function _ai_debug_vocalize
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_data referenced in function _ai_debug_vocalize
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_data referenced in function _ai_debug_vocalize
+ai_debug.obj : error LNK2019: unresolved external symbol __stricmp referenced in function _ai_debug_speak_list
+copy_ai_debug.obj : error LNK2019: unresolved external symbol __stricmp referenced in function _ai_debug_speak_list
+ai_debug.obj : error LNK2019: unresolved external symbol __snprintf referenced in function _ai_debug_describe_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol __snprintf referenced in function _ai_debug_describe_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _tag_name_strip_path referenced in function _ai_debug_describe_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _tag_name_strip_path referenced in function _ai_debug_describe_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _ai_debug_describe_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _ai_debug_describe_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _sprintf referenced in function _ai_debug_describe_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _sprintf referenced in function _ai_debug_describe_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _ai_debug_describe_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _ai_debug_describe_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_get_by_name referenced in function _ai_debug_initialize_for_new_map
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_get_by_name referenced in function _ai_debug_initialize_for_new_map
+ai_debug.obj : error LNK2019: unresolved external symbol _temporary referenced in function _ai_debug_change_selected_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _temporary referenced in function _ai_debug_change_selected_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_prev referenced in function _ai_debug_change_selected_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_prev referenced in function _ai_debug_change_selected_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_next referenced in function _ai_debug_change_selected_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_next referenced in function _ai_debug_change_selected_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_new referenced in function _ai_debug_change_selected_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_actor_iterator_new referenced in function _ai_debug_change_selected_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _datum_try_and_get referenced in function _ai_debug_change_selected_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _datum_try_and_get referenced in function _ai_debug_change_selected_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _data_prev_index referenced in function _ai_debug_change_selected_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _data_prev_index referenced in function _ai_debug_change_selected_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _data_next_index referenced in function _ai_debug_change_selected_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _data_next_index referenced in function _ai_debug_change_selected_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _object_set_position referenced in function _ai_debug_teleport_to
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_set_position referenced in function _ai_debug_teleport_to
+ai_debug.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _ai_debug_teleport_to
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _ai_debug_teleport_to
+ai_debug.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _ai_debug_teleport_to
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _ai_debug_teleport_to
+ai_debug.obj : error LNK2019: unresolved external symbol _player_data referenced in function _ai_debug_teleport_to
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _player_data referenced in function _ai_debug_teleport_to
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_line referenced in function _ai_debug_render_lineoffire
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_line referenced in function _ai_debug_render_lineoffire
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_red referenced in function _ai_debug_render_lineoffire
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_red referenced in function _ai_debug_render_lineoffire
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_green referenced in function _ai_debug_render_lineoffire
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_green referenced in function _ai_debug_render_lineoffire
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_orange referenced in function _ai_debug_render_ballistic_lineoffire
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_orange referenced in function _ai_debug_render_ballistic_lineoffire
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_vector referenced in function _ai_debug_render_ballistic_lineoffire
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_vector referenced in function _ai_debug_render_ballistic_lineoffire
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_string_at_point referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_string_at_point referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_white referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_white referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_magenta referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_magenta referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_pink referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_pink referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_salmon referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_salmon referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_purple referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_purple referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_cyan referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_cyan referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_lightblue referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_lightblue referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_black referenced in function _ai_debug_render_lineofsight
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_black referenced in function _ai_debug_render_lineofsight
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_looking_test_validity referenced in function _ai_debug_render_aiming_validity
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_looking_test_validity referenced in function _ai_debug_render_aiming_validity
+ai_debug.obj : error LNK2019: unresolved external symbol _csprintf referenced in function _ai_debug_render_idle_look
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csprintf referenced in function _ai_debug_render_idle_look
+ai_debug.obj : error LNK2019: unresolved external symbol _prop_data referenced in function _ai_debug_render_idle_look
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _prop_data referenced in function _ai_debug_render_idle_look
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_globals referenced in function _ai_debug_render_spatial_effects
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_globals referenced in function _ai_debug_render_spatial_effects
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_describe_speech referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_describe_speech referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_speech_priority_name referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_speech_priority_name referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_name referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_name referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _tag_get_name referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _tag_get_name referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_head_position referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_head_position referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _object_iterator_next referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_iterator_next referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _object_iterator_new referenced in function _ai_debug_render_speech
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_iterator_new referenced in function _ai_debug_render_speech
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_index_to_string referenced in function _ai_debug_render_vehicles_enterable
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_index_to_string referenced in function _ai_debug_render_vehicles_enterable
+ai_debug.obj : error LNK2019: unresolved external symbol _csstrcat referenced in function _ai_debug_render_vehicles_enterable
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csstrcat referenced in function _ai_debug_render_vehicles_enterable
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_origin referenced in function _ai_debug_render_vehicles_enterable
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_origin referenced in function _ai_debug_render_vehicles_enterable
+ai_debug.obj : error LNK2019: unresolved external symbol _strchr referenced in function _ai_debug_speech_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _strchr referenced in function _ai_debug_speech_update
+ai_debug.obj : error LNK2019: unresolved external symbol _strstr referenced in function _ai_debug_speech_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _strstr referenced in function _ai_debug_speech_update
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_tick referenced in function _ai_debug_render_path_line
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_tick referenced in function _ai_debug_render_path_line
+ai_debug.obj : error LNK2019: unresolved external symbol _collision_test_vector referenced in function _ai_debug_get_this_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _collision_test_vector referenced in function _ai_debug_get_this_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _local_player_get_player_index referenced in function _ai_debug_get_this_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _local_player_get_player_index referenced in function _ai_debug_get_this_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _director_get_perspective referenced in function _ai_debug_get_this_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _director_get_perspective referenced in function _ai_debug_get_this_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _local_player_exists referenced in function _ai_debug_get_this_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _local_player_exists referenced in function _ai_debug_get_this_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _path_attractor_weight referenced in function _ai_debug_render_path_node
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_attractor_weight referenced in function _ai_debug_render_path_node
+ai_debug.obj : error LNK2019: unresolved external symbol _global_origin3d referenced in function _ai_debug_render_path_nodes
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_origin3d referenced in function _ai_debug_render_path_nodes
+ai_debug.obj : error LNK2019: unresolved external symbol _path_get_node referenced in function _ai_debug_render_path_nodes
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_get_node referenced in function _ai_debug_render_path_nodes
+ai_debug.obj : error LNK2019: unresolved external symbol _path_node_from_hash_table referenced in function _ai_debug_render_path_nodes
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_node_from_hash_table referenced in function _ai_debug_render_path_nodes
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_path referenced in function _ai_debug_render_path_storage
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_path referenced in function _ai_debug_render_path_storage
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_obstacles referenced in function _ai_debug_render_path_storage
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_obstacles referenced in function _ai_debug_render_path_storage
+ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_index_get referenced in function _ai_debug_render_path_storage
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_index_get referenced in function _ai_debug_render_path_storage
+ai_debug.obj : error LNK2019: unresolved external symbol _game_in_editor referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _game_in_editor referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_state_build_path referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_state_build_path referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_state_find referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_state_find referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_state_destination referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_state_destination referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_state_new referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_state_new referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_attractor referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_attractor referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_search_bounds referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_search_bounds referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_start referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_input_set_start referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _path_input_new referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _path_input_new referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_profile referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_profile referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _global_down3d referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_down3d referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _biped_find_pathfinding_surface_index referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _biped_find_pathfinding_surface_index referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _player_control_get_unit_index referenced in function _ai_debug_update
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _player_control_get_unit_index referenced in function _ai_debug_update
+ai_debug.obj : error LNK2019: unresolved external symbol _rasterizer_draw_string referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _rasterizer_draw_string referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _draw_string_set_color referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _draw_string_set_color referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _draw_string_set_tab_stops referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _draw_string_set_tab_stops referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _csstrlen referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csstrlen referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_actual_body_vitality referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_actual_body_vitality referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_maximum_body_vitality referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_maximum_body_vitality referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_actual_shield_vitality referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_actual_shield_vitality referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_maximum_shield_vitality referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_maximum_shield_vitality referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _csmemcpy referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _csmemcpy referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_get_vision_distances referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_get_vision_distances referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_zero_vector3d referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_zero_vector3d referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _perpendicular3d referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _perpendicular3d referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_is_busy referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_is_busy referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_animation_busy referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_animation_busy referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _action_obey_describe_command referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _action_obey_describe_command referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _vector3d_from_angle referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _vector3d_from_angle referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_path_at_destination referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_path_at_destination referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_path_has_path referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_path_has_path referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_estimate_position referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_estimate_position referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _biped_build_flying_axes referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _biped_build_flying_axes referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_facing_vector referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_facing_vector referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_get_pursuit_location referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_get_pursuit_location referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_get_player_rating referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _ai_communication_get_player_rating referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_get referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_get referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _object_get_ultimate_parent referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _object_get_ultimate_parent referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_forward3d referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_forward3d referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _players_get_combined_pvs referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _players_get_combined_pvs referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_activation_debug_color referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_activation_debug_color referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_index referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_structure_bsp_index referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_darkgreen referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_darkgreen referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_transform_avoidance_vector referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_transform_avoidance_vector referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_get_avoidance_direction referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_move_get_avoidance_direction referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_aqua referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_real_argb_aqua referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_perception_aiming_vector_test_blockage referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_perception_aiming_vector_test_blockage referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_aiming_vector referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _unit_get_aiming_vector referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _prop_iterator_next referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _prop_iterator_next referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _prop_iterator_new referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _prop_iterator_new referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_action_debug_color referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_action_debug_color referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _swarm_data referenced in function _ai_debug_render_actor
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _swarm_data referenced in function _ai_debug_render_actor
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_iterator_next referenced in function _ai_debug_render_all_actors
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_iterator_next referenced in function _ai_debug_render_all_actors
+ai_debug.obj : error LNK2019: unresolved external symbol _actor_iterator_new referenced in function _ai_debug_render_all_actors
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _actor_iterator_new referenced in function _ai_debug_render_all_actors
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_pursuit_position_already_examined referenced in function _ai_debug_render_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_pursuit_position_already_examined referenced in function _ai_debug_render_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_polygon_edges referenced in function _ai_debug_render_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_polygon_edges referenced in function _ai_debug_render_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_polygon referenced in function _ai_debug_render_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _render_debug_polygon referenced in function _ai_debug_render_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _encounter_build_firing_position_owner_actor_indices referenced in function _ai_debug_render_encounter
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _encounter_build_firing_position_owner_actor_indices referenced in function _ai_debug_render_encounter
+ai_debug.obj : error LNK2019: unresolved external symbol _global_ai_debug_string_position referenced in function _ai_debug_render
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _global_ai_debug_string_position referenced in function _ai_debug_render
+ai_debug.obj : error LNK2019: unresolved external symbol _rasterizer_globals referenced in function _ai_debug_render
+copy_ai_debug.obj : error LNK2019: unresolved external symbol _rasterizer_globals referenced in function _ai_debug_render
+C:\Users\isabe\AppData\Local\Temp\tmp83fuoxrs\probe.exe : fatal error LNK1120: 161 unresolved externals

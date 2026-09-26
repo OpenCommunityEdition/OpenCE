@@ -1,0 +1,23 @@
+CARD H-5 (A3)  written 2026-09-26 01:09:28 -0700  -- BEFORE its first compile.  RESEARCH PROBE (zero credit; not a landing by itself)
+unit: source/hs/hs_runtime   base: copies/hs_L2
+observed: 12 converters take/return a TU-invented 'union hs_conversion_result' and are stored in
+  'hs_typecasting_procedure' = long (*)(long) slots (C4133 x55 + C4028 x64) and called through that type in hs_cast
+  (incompatible function type at the call).
+evidence: X HCEX SHIP: all 12 are 'static long f(long)' (param names l, s, n, r, e, object_index,
+  object_name_index; 'long result' locals in short_to_real, real_to_short, long_to_short, enum_to_real,
+  short_to_boolean). J: January converts in place in the argument slot [ebp+8] (except string_to_boolean: separate
+  4-byte local, low byte written, whole dword returned = 3 indeterminate bytes; data_to_void: xor eax,eax).
+correction (S1): HCEX signatures; bodies write through typed views of the long storage:
+  long_to_boolean '*(boolean *)&l= l==0; return l;'; short_to_boolean '*(boolean *)&s= *(short *)&s==0; return s;';
+  string_to_boolean 'long result; *(boolean *)&result= csstrlen((char const *)n)==0; return result;' (EXPLICIT
+  indeterminate read = January's behaviour; held class, research only); data_to_void 'return 0;';
+  short_to_real 'long result= *(short *)&s; *(real *)&result= (real)result; return result;';
+  long_to_real '*(real *)&l= (real)l; return l;';
+  enum_to_real 'long result= *(short *)&e+1; *(real *)&result= (real)result; return result;';
+  real_to_short '*(short *)&r= (short)*(real *)&r; return r;'; real_to_long 'return (long)*(real *)&r;';
+  long_to_short '*(short *)&l= (short)l; return l;'; object_to_object_list unchanged; object_name_to_object_list
+  'long object_name_index' passing (short)object_name_index.
+prediction: 11/12 converters EXACT (all in-place forms map to January's [ebp+8] workspace); string_to_boolean EXACT
+  in the explicit-indeterminate form; table warnings C4133/C4028 -> 0; other 54 rows unchanged. Confidence
+  moderate (VC7 may home 'long result' locals at [ebp-4] instead of the dead argument slot).
+decisive test: gate --all (66 rows) + /W3 census.

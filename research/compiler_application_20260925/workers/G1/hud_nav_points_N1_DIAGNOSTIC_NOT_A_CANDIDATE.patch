@@ -1,0 +1,11 @@
+--- a/source/interface/hud_nav_points.c
++++ b/source/interface/hud_nav_points.c
+@@ -953,7 +953,7 @@
+ 					FLAG(_hud_number_show_trailing_m_bit);
+ 
+ 				bitmap_extent =
+-					((clip->x1-clip->x0)*(real)bitmap->width)*0.5f;
++					(clip->x1-clip->x0)*(real)bitmap->width*0.5f;
+ 				numbers.placement.offset.x = (short)(long)(
+ 					bitmap_extent*arrow_scale*0.33000001f + (real)point.x);
+ 				bitmap_extent =

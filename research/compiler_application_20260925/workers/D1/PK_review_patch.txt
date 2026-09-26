@@ -1,0 +1,13 @@
+### review_patch weapons (weapons.c hunks of the PK packet)
+GAIN    _weapon_place                                           208 -> 208  changed
+VERDICT D1_Q7_weapons: 1 gains, 0 losses, 0 other changes (0 added, 0 removed) | gate: EXACT        16  _weapons_initialize | EXACT        16  _weapons_initialize_for_new_map | == exact 79  residual 0  unwritten 0  (of 79 listed)
+
+### review_patch object_types (object_types.c hunks; needs the weapons.h prototype, which this single-file tool cannot supply)
+scratch\_gate_88180.c(378) : warning C4133: 'initializing' : incompatible types - from 'void (__cdecl *)(long)' to 'boolean (__cdecl *)(long)'
+scratch\_gate_88180.c(380) : warning C4113: 'void (__cdecl *)(long,real_orientation *)' differs in parameter lists from 'boolean (__cdecl *)(long)'
+scratch\_gate_88180.c(380) : warning C4133: 'initializing' : incompatible types - from 'void (__cdecl *)(long,real_orientation *)' to 'boolean (__cdecl *)(long)'
+scratch\_gate_88180.c(383) : warning C4047: 'initializing' : 'void (__cdecl *)(long)' differs in levels of indirection from 'object_type_definition *'
+scratch\_gate_88180.c(383) : error C2078: too many initializers
+
+
+

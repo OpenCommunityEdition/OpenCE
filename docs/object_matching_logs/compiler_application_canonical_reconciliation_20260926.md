@@ -75,7 +75,10 @@ hs.c; this batch does not claim to finish all cross-TU cleanup.
   ANY selection and current providers. Twenty both-order provider receipts have
   no duplicate/unexpected errors; four controls detect their data owners.
   Existing fail-closed production verifier revalidates all four pinned entries.
-- `git diff --check` passes. No source holds, scorer, comparator normalization,
+- `git diff --check` passes for production changes and the new reconciliation
+  record/scripts. Archived raw donor artifacts retain existing trailing
+  whitespace (including empty trailing TSV fields); they are not mass-formatted
+  or represented as a whitespace-clean patch. No source holds, scorer, comparator normalization,
   tests, denominator or whole-program-link standard were weakened.
 
 ### Verification harness corrections

@@ -1,0 +1,33 @@
+diff --git a/source/game/players.h b/source/game/players.h
+index 34ee5f0..075999f 100644
+--- a/source/game/players.h
++++ b/source/game/players.h
+@@ -100,14 +100,14 @@ struct player_datum
+ 	struct network_player network_player_data;
+ 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+ 	real speed_multiplier;
+-	long unknown70;
++	long teleporter_index;
+ 	long state_message;
+ 	long state_message_player_index;
+-	long unknown7c;
++	long player_display_index;
+ 	union
+ 	{
+ 		byte unknown80[4];
+-		long target_hold_time;
++		long player_display_count;
+ 	};
+ 	long death_time;
+ 	long multiplayer_special;
+@@ -161,8 +161,8 @@ typedef char players_globals_size_assert[
+ 
+ typedef char player_datum_team_index_offset_assert[
+ 	offsetof(struct player_datum, team_index) == 0x20 ? 1 : -1];
+-typedef char player_datum_target_hold_time_offset_assert[
+-	offsetof(struct player_datum, target_hold_time) == 0x80 ? 1 : -1];
++typedef char player_datum_player_display_count_offset_assert[
++	offsetof(struct player_datum, player_display_count) == 0x80 ? 1 : -1];
+ typedef char player_datum_statistics_offset_assert[
+ 	offsetof(struct player_datum, statistics) == 0x8C ? 1 : -1];
+ typedef char player_datum_telefrag_timeout_offset_assert[

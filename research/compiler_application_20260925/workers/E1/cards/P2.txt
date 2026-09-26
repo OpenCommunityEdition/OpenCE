@@ -1,0 +1,11 @@
+CARD P2  (written 2026-09-26 01:27:42 -0700, before compile)  unit source/ai/path_structure_bsp  (diagnostic strip test, never landing)
+Purpose: rule 28 evidence for EVERY 3D->2D view-cast site of the admission candidate (P1c): 4 vertex casts in
+line2d (owner-admitted 3ba2eb91), the recursive `(real_point2d const *)&point_in_surface` (line2d), and the three pill2d
+sites (&left_result.point, &right_result.point, &best_result->point).
+/Od attestation (D, halo_cache_symbols.exe): line2d 0x4cee00 call 0x4cf407 pushes `lea eax,[ebp-0x44]` = the 3D
+point_in_surface as p0; pill2d 0x4cf800: +0x21c `lea edx,[ebp-0x94]` (&left_result.point, result at -0x98, point +4)
+and +0x2b8 `lea ecx,[ebp-0xb8]` (&right_result.point) pushed as the recursive p0; +0x9b..+0xa4 `mov eax,[ebp-0xc4];
+add eax,4; push eax` = &best_result->point to distance_squared2d (0x405cf9).
+Compatible prefix: real_point2d = first 8 bytes of real_point3d (real_math.h unions).
+Shape: P1c copy with all eight `(real_point2d const *)` casts deleted (operands kept).
+Prediction: object byte-identical to P1c/base except warnings C4133 (x8) at /W3; 6/6 EXACT (pointer casts emit no code).

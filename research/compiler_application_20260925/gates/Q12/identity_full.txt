@@ -1,0 +1,243 @@
+Complete, unfiltered output of tools/data_identity.py (sha256 510169fc7eae402db48027a5dc1e7639a5647dd99177d0e06509809dcfb010dd)
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618  2026-09-26 11:28:36 -0700
+
+=== python -B research/compiler_application_20260925/tools/data_identity.py source/bitmaps/bitmap_group .data _global_bitmap_reference
+PASS size 1424 vs 1424
+PASS characteristics c0400040 vs c0400040
+PASS payload (relocation fields zeroed) df5c6d69f4e13ea6
+PASS relocation count 152 vs 152
+PASS relocations (offset,type,target,addend) identical 
+PASS owner symbols (name,offset,storage class) 31 owners
+PASS literal ??_C@_00CNPNBAHC@?$AA@ January UNDEF here (selected copy in build/split/source/ai/action_obey.obj); ours defined (select-any); b'\x00'
+PASS literal ??_C@_02EMABMJMJ@y8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'y8\x00'
+PASS literal ??_C@_02FODEDLAB@a8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'a8\x00'
+PASS literal ??_C@_03BBJOFPKB@ay8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'ay8\x00'
+PASS literal ??_C@_04FMHHPEKA@dxt3?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'dxt3\x00'
+PASS literal ??_C@_04GNFAANMA@top?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'top*\x00'
+PASS literal ??_C@_04GOEBJGCC@dxt1?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'dxt1\x00'
+PASS literal ??_C@_04GPMDFGEJ@type?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'type\x00'
+PASS literal ??_C@_04KCNFDCG@dxt5?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'dxt5\x00'
+PASS literal ??_C@_04OEKPGJHF@a8y8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'a8y8\x00'
+PASS literal ??_C@_05ECAHMNDL@left?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'left*\x00'
+PASS literal ??_C@_05GECEPKB@flags?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'flags\x00'
+PASS literal ??_C@_05HCOEEHHC@32x32?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'32x32\x00'
+PASS literal ??_C@_05HLPJDIEE@name?$FO?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'name^\x00'
+PASS literal ??_C@_05HNCIIKBA@usage?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'usage\x00'
+PASS literal ??_C@_05PNPIEGAM@64x64?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'64x64\x00'
+PASS literal ??_C@_06DLEPGFEF@format?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'format\x00'
+PASS literal ??_C@_06FKODKGEF@r5g6b5?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'r5g6b5\x00'
+PASS literal ??_C@_06HPJICMPM@linear?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'linear\x00'
+PASS literal ??_C@_06MOLMBNBJ@flags?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'flags*\x00'
+PASS literal ??_C@_06NPIMMHAE@right?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'right*\x00'
+PASS literal ??_C@_06PCHFJCOP@bitmap?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap\x00'
+PASS literal ??_C@_06PMDIBCMC@v16u16?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'v16u16\x00'
+PASS literal ??_C@_07CIPBMLAN@sprites?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprites\x00'
+PASS literal ??_C@_07DLHCIBDH@default?$AA@ January UNDEF here (selected copy in build/split/source/ai/actor_looking.obj); ours defined (select-any); b'default\x00'
+PASS literal ??_C@_07ENHBDHPJ@256x256?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'256x256\x00'
+PASS literal ??_C@_07KBGOCIMM@unused5?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'unused5\x00'
+PASS literal ??_C@_07KFCNMBIK@bottom?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bottom*\x00'
+PASS literal ??_C@_07LFCKPLAB@128x128?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'128x128\x00'
+PASS literal ??_C@_07LIHFBJIN@unused4?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'unused4\x00'
+PASS literal ??_C@_07MFACONMI@unused1?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'unused1\x00'
+PASS literal ??_C@_07MGBABJNN@p8?9bump?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'p8-bump\x00'
+PASS literal ??_C@_07NGNIANIE@512x512?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'512x512\x00'
+PASS literal ??_C@_07OOCPLOAL@unused2?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'unused2\x00'
+PASS literal ??_C@_07PHDEIPEK@unused3?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'unused3\x00'
+PASS literal ??_C@_08BBPCEBFO@sprites?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprites*\x00'
+PASS literal ??_C@_08BDFHIPJK@a4r4g4b4?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'a4r4g4b4\x00'
+PASS literal ??_C@_08DBEMAEHP@a1r5g5b5?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'a1r5g5b5\x00'
+PASS literal ??_C@_08EPMFLMOE@swizzled?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'swizzled\x00'
+PASS literal ??_C@_08LCBPNCNK@cube?5map?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'cube map\x00'
+PASS literal ??_C@_08NFDKFODA@x8r8g8b8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'x8r8g8b8\x00'
+PASS literal ??_C@_08NFFJKKBK@a8r8g8b8?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'a8r8g8b8\x00'
+PASS literal ??_C@_08PODLPFBP@bitmaps?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmaps*\x00'
+PASS literal ??_C@_09GCKGAOCN@cube?5maps?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'cube maps\x00'
+PASS literal ??_C@_09LLANHIEE@light?5map?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'light map\x00'
+PASS literal ??_C@_0BA@HOHDIMNA@double?5multiply?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'double multiply\x00'
+PASS literal ??_C@_0BA@IDLEJNDG@sprite?5spacing?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprite spacing*\x00'
+PASS literal ??_C@_0BA@KFPIBANN@post?9processing?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'post-processing\x00'
+PASS literal ??_C@_0BB@FKJKINHO@color_plate_data?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'color_plate_data\x00'
+PASS literal ??_C@_0BC@DEJOGKGO@bitmap_data_block?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap_data_block\x00'
+PASS literal ??_C@_0BC@EJFOKKAM@bitmap_pixel_data?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap_pixel_data\x00'
+PASS literal ??_C@_0BC@FOKLDGHM@sprite?5processing?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprite processing\x00'
+PASS literal ??_C@_0BC@LGCCEBL@interface?5bitmaps?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'interface bitmaps\x00'
+PASS literal ??_C@_0BD@MBLHAGLG@sprite?5budget?5size?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprite budget size\x00'
+PASS literal ??_C@_0BE@DBBAACBH@registration?5point?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'registration point*\x00'
+PASS literal ??_C@_0BE@IAPINFEM@first?5bitmap?5index?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'first bitmap index*\x00'
+PASS literal ??_C@_0BE@LBDABFMB@sprite?5budget?5count?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprite budget count\x00'
+PASS literal ??_C@_0BF@IFIJLIHA@processed?5pixel?5data?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'processed pixel data\x00'
+PASS literal ??_C@_0BG@BOBOGCPF@filthy?5sprite?5bug?5fix?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'filthy sprite bug fix\x00'
+PASS literal ??_C@_0BG@DPOLDEKM@processed?5pixel?5data?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'processed pixel data*\x00'
+PASS literal ??_C@_0BH@PLGFAMGD@blend?1add?1subtract?1max?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'blend/add/subtract/max\x00'
+PASS literal ??_C@_0BI@DGLMAALD@power?5of?5two?5dimensions?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'power of two dimensions\x00'
+PASS literal ??_C@_0BJ@MGIDJLPC@uniform?5sprite?5sequences?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'uniform sprite sequences'
+PASS literal ??_C@_0BK@DBGDBACB@color?5plate?5width?$CK?3pixels?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'color plate width*:pixel'
+PASS literal ??_C@_0BK@HODJICEH@bitmap_group_sprite_block?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap_group_sprite_bloc'
+PASS literal ??_C@_0BK@PEJHLPMF@?4?4?4more?5sprite?5processing?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'...more sprite processin'
+PASS literal ??_C@_0BL@DFHBBBIO@color?5plate?5height?$CK?3pixels?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'color plate height*:pixe'
+PASS literal ??_C@_0BL@LJMPIHHF@enable?5diffusion?5dithering?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'enable diffusion ditheri'
+PASS literal ??_C@_0BM@FLKAGKOE@bitmap_group_sequence_block?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap_group_sequence_bl'
+PASS literal ??_C@_0BN@KONKDNNH@compressed?5color?5plate?5data?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'compressed color plate d'
+PASS literal ??_C@_0BP@DINLCHDL@compressed?5with?5explicit?5alpha?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'compressed with explicit'
+PASS literal ??_C@_0BP@GKLFCFJP@disable?5height?5map?5compression?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'disable height map compr'
+PASS literal ??_C@_0CD@BFJPHNAO@type?$CK?$CDdetermines?5bitmap?5?8geometr@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'type*#determines bitmap '
+PASS literal ??_C@_0CD@OMBPPCAE@compressed?5with?5interpolated?5alp@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'compressed with interpol'
+PASS literal ??_C@_0CEG@CAJOMHCD@Type?5controls?5bitmap?5?8geometry?8?4@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b"Type controls bitmap 'ge"
+PASS literal ??_C@_0CH@NDOHNPCP@compressed?5with?5color?9key?5transp@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'compressed with color-ke'
+PASS literal ??_C@_0CJO@FGMDBDDK@Usage?5controls?5how?5mipmaps?5are?5g@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'Usage controls how mipma'
+PASS literal ??_C@_0CN@MNMFNJEI@mipmap?5count?3levels?$CD0?5defaults?5t@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'mipmap count:levels#0 de'
+PASS literal ??_C@_0CO@DGGLDMI@Pixel?5data?5after?5being?5processed@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'Pixel data after being p'
+PASS literal ??_C@_0DC@IOGOKMGM@alpha?5bias?3?$FL?91?01?$FN?$CDaffects?5alpha?5@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'alpha bias:[-1,1]#affect'
+PASS literal ??_C@_0DH@NPAEDGFL@depth?$CK?3pixels?$CDdepth?5is?51?5for?52D?5@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'depth*:pixels#depth is 1'
+PASS literal ??_C@_0DI@CCFOOEFG@sharpen?5amount?3?$FL0?01?$FN?$CDsharpens?5mi@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sharpen amount:[0,1]#sha'
+PASS literal ??_C@_0DI@PNMNMEDC@The?5original?5TIFF?5file?5used?5to?5i@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'The original TIFF file u'
+PASS literal ??_C@_0DJ@BEENCLGA@These?5properties?5control?5how?5mip@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'These properties control'
+PASS literal ??_C@_0DJ@DPDJDOCI@format?$CK?$CDdetermines?5how?5pixels?5ar@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'format*#determines how p'
+PASS literal ??_C@_0DN@LIABDKDH@Sprite?5usage?5controls?5the?5backgr@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'Sprite usage controls th'
+PASS literal ??_C@_0EK@LGHFBHCF@blur?5filter?5size?3?$FL0?010?$FN?5pixels?$CDb@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'blur filter size:[0,10] '
+PASS literal ??_C@_0FFA@NKBLAKLE@Format?5controls?5how?5pixels?5will?5@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'Format controls how pixe'
+PASS literal ??_C@_0GD@GEAGIEIP@detail?5fade?5factor?3?$FL0?01?$FN?$CD0?5means@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'detail fade factor:[0,1]'
+PASS literal ??_C@_0KH@FAIFDBCJ@bump?5height?3repeats?$CDthe?5apparent@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bump height:repeats#the '
+PASS literal ??_C@_0L@CBJKOGIC@palettized?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'palettized\x00'
+PASS literal ??_C@_0L@CFACPNGJ@height?5map?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'height map\x00'
+PASS literal ??_C@_0L@DJPJAAIO@3D?5texture?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'3D texture\x00'
+PASS literal ??_C@_0L@EPCIMBHC@signature?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'signature*\x00'
+PASS literal ??_C@_0L@FEJFGKNE@monochrome?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'monochrome\x00'
+PASS literal ??_C@_0L@KNGGHDGB@vector?5map?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'vector map\x00'
+PASS literal ??_C@_0L@MHNIOAFC@sequences?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sequences*\x00'
+PASS literal ??_C@_0L@NHGFHLFK@compressed?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'compressed\x00'
+PASS literal ??_C@_0L@PIHHNPEO@2D?5texture?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'2D texture\x00'
+PASS literal ??_C@_0L@PNAKEIEN@detail?5map?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'detail map\x00'
+PASS literal ??_C@_0M@JFIODBHN@2D?5textures?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'2D textures\x00'
+PASS literal ??_C@_0M@JIBEDIPA@alpha?9blend?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'alpha-blend\x00'
+PASS literal ??_C@_0M@OCLHNBC@3D?5textures?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'3D textures\x00'
+PASS literal ??_C@_0M@OOALLIOJ@color?5plate?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'color plate\x00'
+PASS literal ??_C@_0MA@NPOIOCI@When?5creating?5a?5sprite?5group?0?5sp@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'When creating a sprite g'
+PASS literal ??_C@_0N@IHCHFFCJ@32?9bit?5color?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'32-bit color\x00'
+PASS literal ??_C@_0N@JBKPDNJN@sprite?5usage?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'sprite usage\x00'
+PASS literal ??_C@_0N@KKNPCJNO@multiply?1min?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'multiply/min\x00'
+PASS literal ??_C@_0N@OEHNNLBN@16?9bit?5color?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'16-bit color\x00'
+PASS literal ??_C@_0O@DIHOPGBD@bitmap?5index?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap index*\x00'
+PASS literal ??_C@_0O@HHLKLECM@miscellaneous?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'miscellaneous\x00'
+PASS literal ??_C@_0O@IBFLDFCG@mipmap?5count?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'mipmap count*\x00'
+PASS literal ??_C@_0O@MPNLAAPG@width?$CK?3pixels?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'width*:pixels\x00'
+PASS literal ??_C@_0O@NEMJLKKP@bitmap?5count?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'bitmap count*\x00'
+PASS literal ??_C@_0P@CIKFOMOO@pixels?5offset?$CK?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'pixels offset*\x00'
+PASS literal ??_C@_0P@CNDIOOOJ@height?$CK?3pixels?$AA@ January defined here (selected copy in build/split/source/bitmaps/bitmap_group.obj); ours defined (select-any); b'height*:pixels\x00'
+pins: january build/split/source/bitmaps/bitmap_group.obj 9c138a38b3f364d9 | ours build/base/source/bitmaps/bitmap_group.obj 754b9213d97412ee
+RESULT PASS
+exit code 0
+
+=== python -B research/compiler_application_20260925/tools/data_identity.py source/ai/ai_communication .data _global_communication_priority_names
+PASS size 276 vs 276
+PASS characteristics c0400040 vs c0400040
+PASS payload (relocation fields zeroed) d489001ff88ed206
+PASS relocation count 69 vs 69
+PASS relocations (offset,type,target,addend) identical 
+PASS owner symbols (name,offset,storage class) 3 owners
+PASS literal ??_C@_03KPLLINCC@HUM?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'HUM\x00'
+PASS literal ??_C@_03MADNOHBP@COV?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'COV\x00'
+PASS literal ??_C@_04CGFJFPFD@none?$AA@ January UNDEF here (selected copy in build/split/source/ai/actions.obj); ours defined (select-any); b'none\x00'
+PASS literal ??_C@_04EJGCJLIC@yell?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'yell\x00'
+PASS literal ??_C@_04FLLHOKOG@dive?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'dive\x00'
+PASS literal ??_C@_04HBNBFOKD@talk?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'talk\x00'
+PASS literal ??_C@_04IMJFEJN@flee?$AA@ January UNDEF here (selected copy in build/split/source/ai/actions.obj); ours defined (select-any); b'flee\x00'
+PASS literal ??_C@_04NAFIGEAM@hurt?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'hurt\x00'
+PASS literal ??_C@_04PMNENHO@leap?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'leap\x00'
+PASS literal ??_C@_05BAOFOMKD@shout?$AA@ January UNDEF here (selected copy in build/split/source/ai/ai.obj); ours defined (select-any); b'shout\x00'
+PASS literal ??_C@_05IMODGEHH@melee?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'melee\x00'
+PASS literal ??_C@_05MGHOCOML@cover?$AA@ January UNDEF here (selected copy in build/split/source/ai/actor_firing_position.obj); ours defined (select-any); b'cover\x00'
+PASS literal ??_C@_05OAIPHEDE@human?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'human\x00'
+PASS literal ??_C@_05PBMMFKGI@death?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'death\x00'
+PASS literal ??_C@_06GJOIPFFF@damage?$AA@ January UNDEF here (selected copy in build/split/source/ai/actor_looking.obj); ours defined (select-any); b'damage\x00'
+PASS literal ??_C@_06NLCJMHIE@filler?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'filler\x00'
+PASS literal ??_C@_07BLDMICJO@exclaim?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'exclaim\x00'
+PASS literal ??_C@_07EFCDKMI@chatter?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'chatter\x00'
+PASS literal ??_C@_07JKODCMP@advance?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'advance\x00'
+PASS literal ??_C@_07KMLHDIFF@falling?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'falling\x00'
+PASS literal ??_C@_07LADJDDJF@retreat?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'retreat\x00'
+PASS literal ??_C@_07MAJPMGLJ@blocked?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'blocked\x00'
+PASS literal ??_C@_07PEIBNLKE@berserk?$AA@ January UNDEF here (selected copy in build/split/source/ai/action_obey.obj); ours defined (select-any); b'berserk\x00'
+PASS literal ??_C@_08HFADMLAA@shooting?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'shooting\x00'
+PASS literal ??_C@_08MPLMAFLL@surprise?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'surprise\x00'
+PASS literal ??_C@_08ONAJMEN@covenant?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'covenant\x00'
+PASS literal ??_C@_09LPKHDOHP@flee_idle?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'flee_idle\x00'
+PASS literal ??_C@_0BA@GHAABFAJ@grenade_sighted?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'grenade_sighted\x00'
+PASS literal ??_C@_0BA@HBKFDHMB@vehicle_falling?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'vehicle_falling\x00'
+PASS literal ??_C@_0BA@ILMKIOPH@grenade_startle?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'grenade_startle\x00'
+PASS literal ??_C@_0BA@JKBMANAN@hiding_finished?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'hiding_finished\x00'
+PASS literal ??_C@_0BA@KFNIENAA@alert_noncombat?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'alert_noncombat\x00'
+PASS literal ??_C@_0BB@GDNLPHOF@flee_leader_died?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'flee_leader_died\x00'
+PASS literal ??_C@_0BB@GHLHMONC@shooting_vehicle?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'shooting_vehicle\x00'
+PASS literal ??_C@_0BB@GKOPGPMO@shooting_traitor?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'shooting_traitor\x00'
+PASS literal ??_C@_0BB@HACOIKAB@unexpected_enemy?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'unexpected_enemy\x00'
+PASS literal ??_C@_0BB@LGDDKHGB@postcombat_alone?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_alone\x00'
+PASS literal ??_C@_0BB@LKALKDPF@shooting_berserk?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'shooting_berserk\x00'
+PASS literal ??_C@_0BB@NDMOOLOJ@grenade_throwing?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'grenade_throwing\x00'
+PASS literal ??_C@_0BC@LJDIENED@found_dead_friend?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'found_dead_friend\x00'
+PASS literal ??_C@_0BD@JHAEBNEM@allegiance_changed?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'allegiance_changed\x00'
+PASS literal ??_C@_0BD@MKOGOGNM@postcombat_triumph?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_triumph\x00'
+PASS literal ??_C@_0BD@OKBEBJFP@postcombat_wounded?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_wounded\x00'
+PASS literal ??_C@_0BE@DIJKKGAP@uncover_exclamation?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'uncover_exclamation\x00'
+PASS literal ??_C@_0BE@OGGIDGFC@postcombat_massacre?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_massacre\x00'
+PASS literal ??_C@_0BF@HNJCJGJJ@search_group_abandon?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'search_group_abandon\x00'
+PASS literal ??_C@_0BF@OFGIJICH@postcombat_unscathed?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_unscathed\x00'
+PASS literal ??_C@_0BF@PLOFNBGK@postcombat_celebrate?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_celebrate\x00'
+PASS literal ??_C@_0BG@IIEIONGD@sighted_friend_player?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'sighted_friend_player\x00'
+PASS literal ??_C@_0BH@JEELJBED@postcombat_check_enemy?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_check_enemy\x00'
+PASS literal ??_C@_0BI@BNIOPALA@postcombat_shoot_corpse?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_shoot_corpse\x00'
+PASS literal ??_C@_0BI@LCABFNHO@postcombat_check_friend?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'postcombat_check_friend\x00'
+PASS literal ??_C@_0M@EJKFHLEL@found_enemy?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'found_enemy\x00'
+PASS literal ??_C@_0M@JHEHDIOO@communicate?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'communicate\x00'
+PASS literal ??_C@_0N@IJIHJIIJ@search_start?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'search_start\x00'
+PASS literal ??_C@_0N@JEODFMIK@lost_contact?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'lost_contact\x00'
+PASS literal ??_C@_0N@KIHOLEBN@vehicle_exit?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'vehicle_exit\x00'
+PASS literal ??_C@_0N@MDODPJCI@search_query?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'search_query\x00'
+PASS literal ??_C@_0O@CDKKCOME@sighted_enemy?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'sighted_enemy\x00'
+PASS literal ??_C@_0O@EGHFODNC@killing_spree?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'killing_spree\x00'
+PASS literal ??_C@_0O@EKDNJHKG@search_report?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'search_report\x00'
+PASS literal ??_C@_0O@NEANEBAA@vehicle_entry?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'vehicle_entry\x00'
+PASS literal ??_C@_0O@OAGOMGLF@uncover_start?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'uncover_start\x00'
+PASS literal ??_C@_0P@BOOLPEN@attempted_flee?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'attempted_flee\x00'
+PASS literal ??_C@_0P@EOJFLCO@vehicle_scared?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'vehicle_scared\x00'
+PASS literal ??_C@_0P@GDPJMJHJ@search_abandon?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'search_abandon\x00'
+PASS literal ??_C@_0P@IDHEPNJE@shooting_group?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'shooting_group\x00'
+PASS literal ??_C@_0P@JELOHPAB@grenade_danger?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'grenade_danger\x00'
+PASS literal ??_C@_0P@OJJDOKMB@vehicle_woohoo?$AA@ January defined here (selected copy in build/split/source/ai/ai_communication.obj); ours defined (select-any); b'vehicle_woohoo\x00'
+pins: january build/split/source/ai/ai_communication.obj 7c63a9cdfdfce1f3 | ours build/base/source/ai/ai_communication.obj 29e9cf65e6d327f7
+RESULT PASS
+exit code 0
+
+=== python -B research/compiler_application_20260925/tools/data_identity.py source/ai/ai_debug .data _global_ai_debug_firing_position_color_count
+PASS size 56 vs 56
+PASS characteristics c0300040 vs c0300040
+PASS payload (relocation fields zeroed) 3ba0a54a0875e71a
+PASS relocation count 11 vs 11
+PASS relocations (offset,type,target,addend) identical 
+PASS owner symbols (name,offset,storage class) 4 owners
+PASS literal ??_C@_04CGFJFPFD@none?$AA@ January UNDEF here (selected copy in build/split/source/ai/actions.obj); ours defined (select-any); b'none\x00'
+PASS literal ??_C@_05OINBIGHC@alone?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'alone\x00'
+PASS literal ??_C@_06IHEMHENK@run?9to?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'run-to\x00'
+PASS literal ??_C@_07MHJCBGHB@wounded?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'wounded\x00'
+PASS literal ??_C@_07OHGAOJPC@triumph?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'triumph\x00'
+PASS literal ??_C@_08DKJDLNJC@massacre?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'massacre\x00'
+PASS literal ??_C@_09GAFNOIFB@celebrate?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'celebrate\x00'
+PASS literal ??_C@_09HONAKBBM@unscathed?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'unscathed\x00'
+PASS literal ??_C@_0M@IMALKMMJ@check?9enemy?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'check-enemy\x00'
+PASS literal ??_C@_0N@BAPLNKLD@shoot?9corpse?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'shoot-corpse\x00'
+PASS literal ??_C@_0N@LPHEHHHN@check?9friend?$AA@ January defined here (selected copy in build/split/source/ai/ai_debug.obj); ours defined (select-any); b'check-friend\x00'
+pins: january build/split/source/ai/ai_debug.obj c8a62d4199a73333 | ours build/base/source/ai/ai_debug.obj ac0f934474709023
+RESULT PASS
+exit code 0
+
+=== python -B research/compiler_application_20260925/tools/data_identity.py source/game/game_engine_king .data _king_engine
+PASS size 136 vs 136
+PASS characteristics c0400040 vs c0400040
+PASS payload (relocation fields zeroed) 4009f5b6117e9f00
+PASS relocation count 23 vs 23
+PASS relocations (offset,type,target,addend) identical 
+PASS owner symbols (name,offset,storage class) 1 owners
+PASS literal ??_C@_04PJOEONHN@king?$AA@ January UNDEF here (selected copy in build/split/source/game/game_engine.obj); ours defined (select-any); b'king\x00'
+pins: january build/split/source/game/game_engine_king.obj 1977994ee6b936cf | ours build/base/source/game/game_engine_king.obj 31cbfed400a98381
+RESULT PASS
+exit code 0

@@ -1,0 +1,14 @@
+CARD RD-C4  2026-09-26 01:07:38 -0700   render_debug + owner headers   (immutable pre-registration)
+Observed: /W3 on render_debug.c: 5 inherited C4013 (ai_debug_render, render_debug_object_damage,
+  render_debug_recording, collision_debug_render, render_debug_fog_planes). All five callees are void f(void)
+  (ABI-compatible; hygiene only - rule 17). Two owner headers exist but are not included (ai/ai_debug.h,
+  physics/collision_debug.h); three callees have no header prototype (damage.h, recorded_animations.h,
+  structures.h are their owners; damage.c keeps a TU-local copy of its own public prototype).
+Proposed (LEAD-OWNED headers + my .c): include the two owner headers in render_debug.c; add the three prototypes
+  to their owner headers; variant b also drops damage.c's now-duplicate local prototype.
+Prediction: render_debug 36/36 (object identical); every includer of damage.h / recorded_animations.h /
+  structures.h shifts its C1 numbering by +1 after the insertion point. I predict AT LEAST ONE count-coincident
+  exact loss board-wide (the C1 mod-64 canaries: rasterizer_frame_statistics_draw, bitmap_copy,
+  ai_communication speech_timers, model_draw, bitmap_2d_alpha_bleed are the known fragile rows) - i.e. NOT
+  zero-loss; if so the item stays advisory (owner 09-26: only NEW C4013 disqualify).
+Decisive test: tools/sweep.py variants c4a/c4b vs ctrl2 + rowstat on changed units.

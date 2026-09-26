@@ -1,0 +1,24 @@
+CARD L2 - what the first-party /Od build's .bss placement says about the 2020 source's storage form
+Written 2026-09-26 01:57:23 -0700, BEFORE any modern-compiler compile. Worker H1. Lab only; nothing lands.
+
+Observed (halo_cache_symbols.exe as data; tools/odpe.py, odrange.py; linker 14.0, Rich header: C objects built by
+Utc1900_C build 24234 = VS2015-era 19.00, 71 C objects, 508 C++ objects):
+  0xF0AFB0 debug_permanent_decals b | B1 debug_camera b | B2 debug_player b | B3 debug_structure b
+  0xF0AFB4 short (game_time: movsx/mov word) | B6 debug_bsp b | B7 debug_input b
+  0xF0AFB8 short (entry_count; cmp 0x200) | BC short (string_offset) | C0 entries (stride 0x38, 0x7000 B)
+  0xF11FC0 strings (range check 0x400) | 0xF123C0..0xF13AF5 = 0x1736 B referenced by NOTHING (code or data)
+  0xF13AF6 entry_overflow b (movzx) | 0xF13AF7 string_overflow b (movzx) | 0xF13AF8 next object's data.
+  Toggle names come from the hs external-globals table (.data pointers 0xA236B4.. -> B0..B7).
+Compiler available for the lab: MSVC 14.51.36231 (x86) - NOT the /Od build's 19.00.24234. Version drift is a
+known limitation; a law is accepted only if it reproduces the six KNOWN toggle names' observed order.
+
+PREDICTIONS:
+Q1 Modern cl /Od keeps two buckets like VC7: uninitialised definitions sorted by a per-name key, '= 0' definitions
+   in declaration order, in one .bss. Expect YES (same C2 lineage), confidence medium.
+Q2 With the six REAL toggle names defined uninitialised (C++ mode, or C mode if tentative definitions stay in the
+   object), the modern key order equals /Od's [permanent_decals, camera, player, structure, bsp, input].
+   Expect: 40% (hash function may have changed since 19.00). A match has 1/720 chance by luck.
+Q3 If Q2 holds: the four cache shorts/arrays interleaved with the toggles are in the SAME (uninitialised) bucket
+   in the 2020 source, because a '= 0' object cannot sit between two uninitialised ones (L1 P2 analogue).
+   Expect: this is the reading; it would mean the 2020 source did NOT have '= 0' on game_time/entry_count/...
+   If Q2 fails, the /Od placement cannot speak to buckets (only to separateness and widths).

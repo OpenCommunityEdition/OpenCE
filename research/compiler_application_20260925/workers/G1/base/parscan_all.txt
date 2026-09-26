@@ -1,0 +1,386 @@
+================= source/ai/action_charge
+## action_charge_perform  lines 332..847  MIXED=1 OTHER=7
+    572 MIXED    +/   { lead_fraction = ( dot_product3d ( & prop -> velocity , & prop -> actor_to_prop ) / speed + 1.f ) * 0.5f ;
+ 
+================= source/ai/actor_combat
+## actor_combat_plan_grenade_trajectory  lines 999..1049  
+ 
+================= source/ai/actor_looking
+## actor_look_update  lines 1351..1962  OTHER=19
+ 
+================= source/ai/actor_moving
+## actor_move_test_avoidance_vector  lines 825..933  LEAF=1
+    928 LEAF          UNSIGNED_CHAR_MAX ) { ( * collision_timer ) ++ ; }
+## actor_move_vector_avoidance  lines 1396..1833  LEAF=1 NEEDED=13 OTHER=4 REGROUP=2
+   1458 NEEDED   +    short next_direction = ( current_direction + 1 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1459 NEEDED   +    short second_next_direction = ( current_direction + 2 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1460 NEEDED   +-   short previous_direction = ( current_direction + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1461 NEEDED   +-   short second_previous_direction = ( current_direction + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1561 NEEDED   -    ( 2.f * ( 1.f - avoidance_t [ ray_index ] ) , 1.f )
+   1567 NEEDED   +    short next_direction = ( direction_index + 1 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1568 NEEDED   +    short second_next_direction = ( direction_index + 2 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1569 NEEDED   +-   short previous_direction = ( direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1570 NEEDED   +-   short second_previous_direction = ( direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2 ) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ;
+   1584 NEEDED   -    = MIN ( ( angular_speed - 0.02f ) * 12.5f ,
+   1666 LEAF          ( movement_direction_approximation <= ( ( real ) VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS ) ) ) ;
+   1679 NEEDED   -    ( 1.f , ( maximum_sense_emergency - 0.6f ) / ( 1.f
+   1679 NEEDED   -    0.6f ) / ( 1.f - 0.6f ) ) ; }
+   1737 NEEDED   -    = PIN ( ( 2.f - movement_approximate_weight ) * 0.5f -
+   1758 REGROUP  /    = emergency * ( _pi / 3.f ) ; if (
+   1803 REGROUP  /    = emergency * ( _pi / 3.f ) ; rotation .
+## actor_path_refresh  lines 1835..2087  OTHER=2
+ 
+================= source/ai/actor_perception
+## actor_perception_aiming_vector_test_blockage  lines 2052..2139  OTHER=4
+ 
+================= source/ai/ai
+## ai_test_ballistic_line_of_fire  lines 2543..2692  LEFTRED=1 MIXED=1 NEEDED=1
+   2624 MIXED    *+   . z = ( segment_time * arc_velocity . k + point . z ) + ( segment_time
+   2625 LEFTRED  *    z ) + ( segment_time * segment_time ) * gravity *
+   2669 NEEDED   -    . k = ( segment_end_time - segment_start_time ) * gravity +
+## ai_test_line_of_sight  lines 2297..2541  NEEDED=1
+   2522 NEEDED   -    ; if ( ( 1.0f - collision_t ) * distance <
+ 
+================= source/ai/ai_communication
+## ai_communication_actor_talk_weight  lines 2181..2442  MIXED=2 OTHER=4
+   2376 MIXED    -/   { weight += ( 1.0f - prop -> distance / stimulus_range ) * 10.0f ;
+   2422 MIXED    -/   { weight += ( 1.0f - prop -> distance / stimulus_range ) * 10.0f ;
+## ai_communication_event  lines 5878..7331  MIXED=2 OTHER=22 REGROUP=5
+   6232 REGROUP  /    communication_team ] * ( 1.0f / TICKS_PER_SECOND ) ; talk_seconds [
+   6234 REGROUP  /    communication_team ] * ( 1.0f / TICKS_PER_SECOND ) ; chatter_seconds [
+   6236 REGROUP  /    communication_team ] * ( 1.0f / TICKS_PER_SECOND ) ; speech_disabled [
+   6239 REGROUP  *    [ 2 * ( NUMBER_OF_COMMUNICATION_PRIORITIES * communication_team ) ] = TRUE
+   6240 REGROUP  *    [ 2 * ( NUMBER_OF_COMMUNICATION_PRIORITIES * communication_team ) + 1 ]
+   6247 MIXED    *+   = 2 * ( NUMBER_OF_COMMUNICATION_PRIORITIES * communication_team + priority ) + distance_group ;
+   6769 MIXED    *+   = 2 * ( NUMBER_OF_COMMUNICATION_PRIORITIES * communication_team + communication_priority ) + near_player ;
+ 
+================= source/ai/ai_debug
+## ai_debug_render_actor  lines 776..3824  LEAF=1 MIXED=6 NEEDED=3 OTHER=7
+   1717 MIXED    *    & origin , ( ( 1.f - prop -> awareness ) * prop_start_point . x ) + ( prop
+   1717 MIXED    *    x ) + ( prop -> awareness * prop -> head_position . x ) , ( (
+   1717 NEEDED   -    origin , ( ( 1.f - prop -> awareness ) * prop_start_point .
+   1718 MIXED    *    x ) , ( ( 1.f - prop -> awareness ) * prop_start_point . y ) + ( prop
+   1718 MIXED    *    y ) + ( prop -> awareness * prop -> head_position . y ) , ( (
+   1718 NEEDED   -    ) , ( ( 1.f - prop -> awareness ) * prop_start_point .
+   1719 MIXED    *    y ) , ( ( 1.f - prop -> awareness ) * prop_start_point . z ) + ( prop
+   1719 MIXED    *    z ) + ( prop -> awareness * prop -> head_position . z ) ) ; render_debug_line
+   1719 NEEDED   -    ) , ( ( 1.f - prop -> awareness ) * prop_start_point .
+   3567 LEAF          height_index ] * ( ( real ) ( ring_index == 0 ? 1 : - 1 ) ) ; headspace_vector .
+ 
+================= source/ai/path_obstacles
+## obstacles_test_circle  lines 330..352  
+ 
+================= source/bitmaps/bitmap_group
+## bitmap_group_add_bitmap  lines 804..986  OTHER=3 WHOLE=3
+    838 WHOLE    -    ( width & ( width - 1 ) ) || (
+    839 WHOLE    -    ( height & ( height - 1 ) ) || (
+    840 WHOLE    -    ( depth & ( depth - 1 ) ) ) {
+ 
+================= source/camera/observer
+## observer_update_positions  lines 861..973  
+ 
+================= source/cseries/profile
+## compare_profile_sections  lines 1586..1640  LEAF=14
+   1594 LEAF          ; if ( ( * first ) -> active &&
+   1594 LEAF          active && ! ( * second ) -> active )
+   1598 LEAF          active && ! ( * first ) -> active )
+   1598 LEAF          else if ( ( * second ) -> active &&
+   1607 LEAF          -> name , ( * second ) -> name )
+   1607 LEAF          = csstrcmp ( ( * first ) -> name ,
+   1612 LEAF          double first_average = ( * first ) -> sample_count ==
+   1614 LEAF          -> total_elapsed_timebase / ( * first ) -> sample_count ;
+   1615 LEAF          double second_average = ( * second ) -> sample_count ==
+   1617 LEAF          -> total_elapsed_timebase / ( * second ) -> sample_count ;
+   1627 LEAF          -> recent_elapsed_timebase > ( * second ) -> recent_elapsed_timebase )
+   1627 LEAF          : if ( ( * first ) -> recent_elapsed_timebase >
+   1629 LEAF          -> recent_elapsed_timebase < ( * second ) -> recent_elapsed_timebase )
+   1629 LEAF          else if ( ( * first ) -> recent_elapsed_timebase <
+ 
+================= source/effects/decals
+## decal_new_from_collision  lines 1561..2246  NEEDED=3 OTHER=5 WHOLE=1
+   1781 WHOLE    *    y0 = - ( aspect * radius ) ; extent .
+   2079 NEEDED   -    short ) ( ( decal_geometry . decal_surface_vertex_counts [ decal_surface_index ] - 1 ) / 2 )
+   2115 NEEDED   -    = PIN ( ( sprite_bounds . x1 - sprite_bounds . x0 ) * decal_vertex ->
+   2116 NEEDED   -    = PIN ( ( sprite_bounds . y1 - sprite_bounds . y0 ) * decal_vertex ->
+ 
+================= source/effects/player_effects
+## player_effect_add_continuous_effect  lines 358..394  LEFTRED=1 MIXED=1 NEEDED=1 REGROUP=1
+    370 NEEDED   -    falloff_radius ) / ( definition -> falloff_radius - definition -> cutoff_radius ) , 0.0f ,
+    370 REGROUP  -    ( 1.0f - ( distance - definition -> falloff_radius ) / ( definition
+    373 LEFTRED  -    magnitude = ( ( 1.0f - definition -> camera_shake . periodic_weight ) + periodic_function_evaluate (
+    375 MIXED    *+   ; magnitude = ( ( 1.0f - definition -> camera_shake . periodic_weight ) + periodic_function_evaluate ( definition -> camera_shake . periodic_function , game_time_get ( ) / definition -> camera_shake . periodic_period ) * definition -> camera_shake . periodic_weight ) * scale ;
+## player_effect_get_camera_effect_matrix  lines 813..1039  LEFTRED=1 MIXED=2 NEEDED=1 REGROUP=1
+    837 LEFTRED  /    ) intensity = ( ( real ) scripted_effect -> timer / scripted_effect -> total_time ) * intensity ;
+    839 MIXED    -/   else intensity = ( 1.0f - ( real ) scripted_effect -> timer / scripted_effect -> total_time ) * intensity ;
+    991 NEEDED   -    . periodic_function , ( effect -> camera_shake . duration - effect -> camera_shake_time_left ) / effect ->
+    994 MIXED    *+   } magnitude = ( periodic_function_evaluate ( effect -> camera_shake . periodic_function , ( effect -> camera_shake . duration - effect -> camera_shake_time_left ) / effect -> camera_shake . periodic_period ) * effect -> camera_shake . periodic_weight + ( 1.0f - effect -> camera_shake . periodic_weight ) ) * scale ;
+    994 REGROUP  -    . periodic_weight + ( 1.0f - effect -> camera_shake . periodic_weight ) ) * scale
+## player_effect_update_camera_impulse  lines 1041..1145  OTHER=1
+ 
+================= source/effects/weather_particle_systems
+## weather_particle_system_render  lines 545..733  NEEDED=4
+    670 NEEDED   -    = PIN ( ( depth - type_definition -> distance_fadein_start ) / ( type_definition
+    670 NEEDED   -    distance_fadein_start ) / ( type_definition -> distance_fadein_end - type_definition -> distance_fadein_start ) , 0.f ,
+    673 NEEDED   -    - PIN ( ( depth - type_definition -> distance_fadeout_start ) / ( far_clip_distance
+    673 NEEDED   -    distance_fadeout_start ) / ( far_clip_distance - type_definition -> distance_fadeout_start ) , 0.f ,
+ 
+================= source/game/game
+## game_set_game_variant_from_name  lines 1060..1070  
+ 
+================= source/game/players
+## player_examine_nearby_device  lines 3013..3042  
+## player_teleport_internal  lines 1618..1874  OTHER=1
+ 
+================= source/hs/hs
+## real_random_range_evaluate  lines 14719..14740  
+ 
+================= source/interface/hud_draw
+## fast_ftol_C: NOT FOUND
+ 
+================= source/interface/hud_nav_points
+## custom_render_nav_point  lines 772..992  LEAF=3 LEFTRED=3 MIXED=4 NEEDED=8 OTHER=3 REGROUP=3
+    815 MIXED    *+   * delta_x + ( delta_y * delta_y + delta_z * delta_z ) ) ; }
+    825 REGROUP  /    - distance * ( 1.0f / 15.0f ) , 0.7 )
+    848 MIXED    /    real ) ( ( ( render . camera . viewport_bounds . x1 - render . camera . viewport_bounds . x0 ) / 2 ) + render .
+    848 NEEDED   -    ) ( ( ( render . camera . viewport_bounds . x1 - render . camera . viewport_bounds . x0 ) / 2 )
+    851 MIXED    /    real ) ( ( ( render . camera . viewport_bounds . y1 - render . camera . viewport_bounds . y0 ) / 2 ) + render .
+    851 NEEDED   -    ) ( ( ( render . camera . viewport_bounds . y1 - render . camera . viewport_bounds . y0 ) / 2 )
+    857 NEEDED   -    } horizontal_radius = ( ( real ) ( render . camera . window_bounds . x1 - render . camera . window_bounds . x0 ) - ( hud_globals -> waypoint . right_offset + hud_globals -> waypoint . left_offset ) ) * 0.5f ;
+    857 REGROUP  +    x0 ) - ( hud_globals -> waypoint . right_offset + hud_globals -> waypoint . left_offset ) ) * 0.5f
+    860 NEEDED   -    ; vertical_radius = ( ( real ) ( render . camera . window_bounds . y1 - render . camera . window_bounds . y0 ) - ( hud_globals -> waypoint . bottom_offset + hud_globals -> waypoint . top_offset ) ) * 0.5f ;
+    860 REGROUP  +    y0 ) - ( hud_globals -> waypoint . bottom_offset + hud_globals -> waypoint . top_offset ) ) * 0.5f
+    871 LEFTRED  *    = square_root ( ( radius_product * radius_product ) / ( vertical_component
+    872 MIXED    *+   radius_product ) / ( vertical_component * vertical_component + horizontal_component * horizontal_component ) ) ; waypoint_type
+    885 NEEDED   -    real ) ( ( render . camera . viewport_bounds . x1 - render . camera . viewport_bounds . x0 ) / 2 )
+    887 NEEDED   -    real ) ( ( render . camera . viewport_bounds . y1 - render . camera . viewport_bounds . y0 ) / 2 )
+    930 LEAF          theta , ( ( pixel32 ) alpha << 24
+    946 LEAF          color = ( ( pixel32 ) alpha << 24
+    948 LEAF          flash_color = ( ( pixel32 ) alpha << 24
+    956 LEFTRED  *    ; bitmap_extent = ( ( clip -> x1 - clip -> x0 ) * ( real ) bitmap -> width ) * 0.5f ;
+    956 NEEDED   -    bitmap_extent = ( ( clip -> x1 - clip -> x0 ) * ( real
+    960 LEFTRED  *    ; bitmap_extent = ( ( clip -> y1 - clip -> y0 ) * ( real ) bitmap -> height ) * 0.5f ;
+    960 NEEDED   -    bitmap_extent = ( ( clip -> y1 - clip -> y0 ) * ( real
+ 
+================= source/interface/hud_weapon
+## crosshairs_draw  lines 967..1284  LEFTRED=3 MIXED=2 NEEDED=1 OTHER=2 REGROUP=2
+   1163 NEEDED   -    ) ( ( ( game_time_get ( ) - state -> value . reference_data ) / item ->
+   1164 LEFTRED  /    short ) ( ( ( game_time_get ( ) - state -> value . reference_data ) / item -> frame_rate / TICKS_PER_SECOND ) % sequence ->
+   1231 LEFTRED  /    ? 1.0 : ( 1.0f / bitmap -> width ) * 1.25 ;
+   1232 LEFTRED  /    ? 1.0 : ( 1.0f / bitmap -> height ) * 1.25 ;
+   1236 MIXED    *-   ; expand_u = ( bitmap -> width - ( render . camera . viewport_bounds . x1 - render . camera . viewport_bounds . x0 ) * inverse_scale ) * texel_scale_u *
+   1236 REGROUP  -    -> width - ( render . camera . viewport_bounds . x1 - render . camera . viewport_bounds . x0 ) * inverse_scale )
+   1238 MIXED    *-   ; expand_v = ( bitmap -> height - ( render . camera . viewport_bounds . y1 - render . camera . viewport_bounds . y0 ) * inverse_scale ) * texel_scale_v *
+   1238 REGROUP  -    -> height - ( render . camera . viewport_bounds . y1 - render . camera . viewport_bounds . y0 ) * inverse_scale )
+## render_weapon_hud  lines 1286..1784  NEEDED=4
+   1384 NEEDED   -    , _hud_draw_flashing_bit , ( 1.0f - weapon_state -> age ) * 100.0f <=
+   1513 NEEDED   -    , _weapon_overlay_on_flashing_bit , ( 1.0f - weapon_state -> age ) * 100.0f <=
+   1577 NEEDED   -    short ) ( ( 1.0f - weapon_state -> age ) * 100.0f )
+   1608 NEEDED   -    7 ] = ( target_position . z - camera_position . z ) * 3.0480001f ;
+ 
+================= source/interface/interface
+## interface_get_weapon_hud_index  lines 551..620  
+ 
+================= source/interface/motion_sensor
+## motion_sensor_update  lines 308..504  NEEDED=2 WHOLE=1
+    322 NEEDED   +    short ) ( ( motion_sensor_globals -> active_sensor_index + 1 ) % MOTION_SENSOR_HISTORY_COUNT )
+    326 WHOLE    %    ; if ( ( current_time % MOTION_SENSOR_UPDATE_PERIOD ) && current_time )
+    329 NEEDED   +-   short ) ( ( active_sensor_index + MOTION_SENSOR_HISTORY_COUNT - 1 ) % MOTION_SENSOR_HISTORY_COUNT )
+## render_motion_sensor  lines 634..762  NEEDED=1
+    669 NEEDED   +-   short ) ( ( motion_sensor_globals -> active_sensor_index - history_index + MOTION_SENSOR_HISTORY_COUNT ) % MOTION_SENSOR_HISTORY_COUNT )
+ 
+================= source/interface/progress_bar
+## draw_layer_int  lines 1885..1916  
+ 
+================= source/interface/ui_widget
+## display_scenario_help  lines 4421..4501  
+## draw_bitmap_in_rect  lines 1649..1814  OTHER=1 WHOLE=1
+   1740 WHOLE    %    . x = ( vertex_index % 3 ) ? texture_width :
+## ui_check_for_pause_game  lines 6215..6414  
+## ui_widget_launch_widget  lines 2338..2424  
+## widget_instance_process_one_event_recursive  lines 5720..6213  OTHER=4
+## widget_instance_render_recursive  lines 5210..5364  LEFTRED=1 NEEDED=1 OTHER=2
+   5287 LEFTRED  *    { alpha = ( ( ( real ) cos ( widget_globals . current_system_milliseconds * SECONDS_PER_MILLISECOND * 3.0f ) + 1.0f ) * 0.5f ) * alpha_modifier ;
+   5287 NEEDED   +    alpha = ( ( ( real ) cos ( widget_globals . current_system_milliseconds * SECONDS_PER_MILLISECOND * 3.0f ) + 1.0f ) * 0.5f )
+ 
+================= source/interface/ui_widget_game_data_input_functions
+## multiplayer_game_directions  lines 2808..2885  
+## solo_level_select_list_update_displayed_items  lines 3883..4011  
+ 
+================= source/interface/virtual_keyboard
+## virtual_keyboard_render_internal  lines 625..904  OTHER=3 WHOLE=1
+    708 WHOLE    /    != NONE && ( system_milliseconds ( ) / 1000 ) & 1 )
+## virtual_keyboard_select  lines 965..1141  NEEDED=1 REGROUP=2
+   1070 REGROUP  -    . buffer_size - ( ( byte * ) virtual_keyboard_globals . cursor - ( byte * ) virtual_keyboard_globals . text_buffer ) - sizeof (
+   1096 NEEDED   +    - 2 * ( ustrlen ( virtual_keyboard_globals . text_buffer ) + 1 ) ; if (
+   1103 REGROUP  -    , buffer_size - ( ( byte * ) virtual_keyboard_globals . cursor - ( byte * ) virtual_keyboard_globals . text_buffer ) - sizeof (
+ 
+================= source/items/projectiles
+## projectile_new  lines 556..642  
+ 
+================= source/math/geometry
+## convex_hull3d_expand  lines 1680..1933  OTHER=3
+## convex_polygon2d_clip_to_plane  lines 1120..1262  OTHER=6
+## convex_polygon3d_clip_to_plane  lines 1286..1430  OTHER=6
+ 
+================= source/objects/damage
+## area_of_effect_cause_damage_to_object  lines 2193..2466  OTHER=1 REGROUP=1
+   2394 REGROUP  -    ( 1.f - ( distance - damage_effect -> falloff_radius ) / radius_delta ,
+ 
+================= source/objects/widgets/flags
+## flag_update  lines 475..632  NEEDED=3 OTHER=2 REGROUP=3
+    623 NEEDED   -    . i = ( new_position . x - vertex -> position . x ) * ( 1.0f
+    623 REGROUP  /    x ) * ( 1.0f / delta ) ; vertex ->
+    624 NEEDED   -    . j = ( new_position . y - vertex -> position . y ) * ( 1.0f
+    624 REGROUP  /    y ) * ( 1.0f / delta ) ; vertex ->
+    625 NEEDED   -    . k = ( new_position . z - vertex -> position . z ) * ( 1.0f
+    625 REGROUP  /    z ) * ( 1.0f / delta ) ; vertex ->
+ 
+================= source/physics/collision_bsp
+## bsp3d_test_pill_recursive  lines 2023..2229  MIXED=1 OTHER=4
+   2112 MIXED    *    t = - ( inverse * distance0 ) - fabs (
+## bsp3d_test_sphere_recursive  lines 1618..1734  OTHER=2
+## collision_surface_test_sphere  lines 1070..1215  
+ 
+================= source/physics/collisions
+## collision_move_point  lines 1161..1439  OTHER=1 WHOLE=1
+   1394 WHOLE    /    clip_line_vector , - ( clip_line_vector . k / magnitude_squared3d ( & clip_line_vector ) ) , ( real_point3d
+ 
+================= source/physics/physics
+## compute_ground_plane  lines 566..612  OTHER=2
+## physics_compute_new  lines 670..947  MIXED=2
+    761 MIXED    *-/  -> mass * ( global_gravity / ground_depth * mass_point -> ground_depth - normal_velocity * ground_damp_fraction ) ; scale_vector3d (
+    922 MIXED    *-   real magnitude = ( ground_effect * ground_effect * global_gravity - dot_product3d ( & collision . plane . n , & mass_point -> velocity ) * powered_mass_point_definition -> antigrav_damp_fraction ) * powered_mass_point ->
+## physics_update_old  lines 1539..2095  MIXED=3
+   1688 MIXED    *-/  -> mass * ( global_gravity / physics -> ground_depth * mass_point -> ground_depth - normal_velocity * physics -> ground_damp_fraction ) ; scale_vector3d (
+   1940 MIXED    *-   real magnitude = ( ground_effect * ground_effect * global_gravity - dot_product3d ( & collision . plane . n , & mass_point -> velocity ) * powered_mass_point_definition -> antigrav_damp_fraction ) * powered_mass_point ->
+   1995 MIXED    *+   ; moment_of_inertia += ( magnitude_squared3d ( & perpendicular_radius ) + mass_point_definition -> radius * mass_point_definition -> radius * 0.4f ) * mass_point_definition ->
+ 
+================= source/rasterizer/xbox/rasterizer_xbox_environment
+## rasterizer_environment_lightmap_draw: NOT FOUND
+## rasterizer_environment_specular_spot_light_begin  lines 3315..3419  MIXED=1 REGROUP=1 WHOLE=1
+   3353 MIXED    *-   = 1.0f / ( radius - radius * 0.5f ) ; vertex_constants [
+   3374 REGROUP  *    ( cone_scale * ( radius * 0.5f ) ) ; D3DDevice_SetVertexShaderConstant
+   3374 WHOLE    *    l = - ( cone_scale * ( radius * 0.5f ) ) ; D3DDevice_SetVertexShaderConstant (
+ 
+================= source/rasterizer/xbox/rasterizer_xbox_environment_fog
+## rasterizer_environment_fog_screen_begin: NOT FOUND
+ 
+================= source/rasterizer/xbox/rasterizer_xbox_lights
+## rasterizer_sun_glow_draw  lines 192..716  LEFTRED=3 MIXED=3 NEEDED=1
+    227 MIXED    *+-  ; intensity = ( direction . i * global_window_parameters . camera_forward . i + direction . j * global_window_parameters . camera_forward . j + direction . k * global_window_parameters . camera_forward . k - ( real ) cos ( 0.7853981634f ) ) / ( 1.0f
+    228 NEEDED   -    ) ) / ( 1.0f - ( real ) cos ( 0.7853981634f ) ) ; if (
+    247 LEFTRED  /    0 ] = ( 1.0f / ( real ) viewport_width ) * 2.0f ;
+    250 MIXED    /    - 1.0f - ( 1.0f / ( real ) viewport_width ) ; vertex_constants [
+    252 LEFTRED  /    1 ] = ( 1.0f / ( real ) viewport_height ) * - 2.0f
+    254 MIXED    /    3 ] = ( 1.0f / ( real ) viewport_height ) + 1.0f ;
+    535 LEFTRED  *    { r = ( ( real ) pass * 0.0625f ) * 80.0f -
+ 
+================= source/rasterizer/xbox/rasterizer_xbox_models
+## rasterizer_model_draw: NOT FOUND
+## rasterizer_model_draw_environment_shader  lines 1164..1696  MIXED=5 NEEDED=4
+   1498 MIXED    *+-  = PIN ( ( global_window_parameters . camera . position . x * global_window_parameters . fog . plane . n . i + global_window_parameters . camera . position . y * global_window_parameters . fog . plane . n . j + global_window_parameters . camera . position . z * global_window_parameters . fog . plane . n . k - global_window_parameters . fog . plane . d ) / global_window_parameters .
+   1509 MIXED    *+-  = PIN ( ( camera_to_model . i * global_window_parameters . camera . forward . i + camera_to_model . j * global_window_parameters . camera . forward . j + camera_to_model . k * global_window_parameters . camera . forward . k - global_window_parameters . fog . atmospheric_minimum_distance ) / ( global_window_parameters
+   1511 NEEDED   -    atmospheric_minimum_distance ) / ( global_window_parameters . fog . atmospheric_maximum_distance - global_window_parameters . fog . atmospheric_minimum_distance ) , 0.0f ,
+   1529 MIXED    *+   - fog_density * ( global_window_parameters . fog . planar_color . red * planar_fog_fraction + global_window_parameters . fog . atmospheric_color . red * ( 1.0f - planar_fog_fraction ) ) ; cc0 .
+   1529 NEEDED   -    . red * ( 1.0f - planar_fog_fraction ) ) ; cc0
+   1535 MIXED    *+   - fog_density * ( global_window_parameters . fog . planar_color . green * planar_fog_fraction + global_window_parameters . fog . atmospheric_color . green * ( 1.0f - planar_fog_fraction ) ) ; cc0 .
+   1535 NEEDED   -    . green * ( 1.0f - planar_fog_fraction ) ) ; cc0
+   1541 MIXED    *+   - fog_density * ( global_window_parameters . fog . planar_color . blue * planar_fog_fraction + global_window_parameters . fog . atmospheric_color . blue * ( 1.0f - planar_fog_fraction ) ) ; cc0_error .
+   1541 NEEDED   -    . blue * ( 1.0f - planar_fog_fraction ) ) ; cc0_error
+ 
+================= source/render/render_cameras
+## render_camera_build_frustum  lines 1107..1544  NEEDED=9 REGROUP=3 WHOLE=8
+   1156 NEEDED   -    } half_bounds_width = ( frustum -> frustum_bounds . x1 - frustum -> frustum_bounds . x0 ) * 0.5f ;
+   1158 NEEDED   -    ; half_bounds_height = ( frustum -> frustum_bounds . y1 - frustum -> frustum_bounds . y0 ) * 0.5f ;
+   1160 NEEDED   +    ; bounds_center_x = ( frustum -> frustum_bounds . x0 + frustum -> frustum_bounds . x1 ) / half_bounds_width *
+   1163 NEEDED   +    ; bounds_center_y = ( frustum -> frustum_bounds . y0 + frustum -> frustum_bounds . y1 ) / half_bounds_height *
+   1168 REGROUP  */   = 1.0f / ( half_bounds_width / viewport_height * viewport_width * field_of_view_tangent ) ; projection_y_scale =
+   1170 REGROUP  *    = 1.0f / ( field_of_view_tangent * half_bounds_height ) ; match_assert (
+   1297 NEEDED   +    ; half_z = ( camera -> z_far + camera -> z_near ) * 0.5f ;
+   1298 WHOLE    *    left_plane_z * - ( inverse_projection_x_scale * camera -> z_far ) ; far_right =
+   1300 NEEDED   -    ; far_right = ( bounds_center_x - 1.0f ) * - (
+   1300 WHOLE    *    ) * - ( inverse_projection_x_scale * camera -> z_far ) ; far_bottom =
+   1302 WHOLE    *    bottom_plane_z * - ( inverse_projection_y_scale * camera -> z_far ) ; far_top =
+   1304 NEEDED   -    ; far_top = ( bounds_center_y - 1.0f ) * - (
+   1304 WHOLE    *    ) * - ( inverse_projection_y_scale * camera -> z_far ) ; view_point .
+   1336 WHOLE    *    x = - ( inverse_projection_x_scale * half_z * bounds_center_x ) ; view_point .
+   1337 WHOLE    *    y = - ( inverse_projection_y_scale * half_z * bounds_center_y ) ; view_point .
+   1386 WHOLE    *    clip_offset = - ( view_plane . d * inverse_plane_z ) ; projection_scale =
+   1388 NEEDED   -    z_far / ( ( camera -> z_far - clip_offset ) * ( fabs
+   1390 NEEDED   +    clip_offset ) * ( fabs ( inverse_plane_z * view_plane . n . i ) + fabs ( inverse_plane_z * view_plane . n . j ) + 1.0 ) ) ) ;
+   1390 REGROUP  *    -> z_far / ( ( camera -> z_far - clip_offset ) * ( fabs ( inverse_plane_z * view_plane . n . i ) + fabs ( inverse_plane_z * view_plane . n . j ) + 1.0 ) ) ) ; view_plane
+   1394 WHOLE    *    d = - ( projection_scale * clip_offset ) ; if (
+ 
+================= source/structures/structure_lens_flares
+## build_structure_lens_flares  lines 165..701  LEAF=6 OTHER=5 REGROUP=6
+    244 LEAF          ; lens_flare_spacing = ( ( struct shader_lens_flare_fields_environment * ) shader_get_and_verify_type ( shader , _shader_type_environment ) ) -> lens_flare_spacing ;
+    252 LEAF          ; lens_flare_spacing = ( ( struct shader_lens_flare_fields_transparent * ) shader_get_and_verify_type ( shader , _shader_type_transparent_generic ) ) -> lens_flare_spacing ;
+    260 LEAF          ; lens_flare_spacing = ( ( struct shader_lens_flare_fields_transparent * ) shader_get_and_verify_type ( shader , _shader_type_transparent_chicago ) ) -> lens_flare_spacing ;
+    371 LEAF          . points , ( ( struct connected_geometry_edge * ) dynamic_array_get_element ( & geometry . edges , triangle -> edge_designators [ 0 ] & LONG_MAX , sizeof ( struct connected_geometry_edge ) ) ) -> point_indices [
+    379 LEAF          . points , ( ( struct connected_geometry_edge * ) dynamic_array_get_element ( & geometry . edges , triangle -> edge_designators [ 1 ] & LONG_MAX , sizeof ( struct connected_geometry_edge ) ) ) -> point_indices [
+    387 LEAF          . points , ( ( struct connected_geometry_edge * ) dynamic_array_get_element ( & geometry . edges , triangle -> edge_designators [ 2 ] & LONG_MAX , sizeof ( struct connected_geometry_edge ) ) ) -> point_indices [
+    452 REGROUP  /    . x * ( 1.f / ( real ) hull_count ) ; origin .
+    453 REGROUP  /    . y * ( 1.f / ( real ) hull_count ) ; origin .
+    454 REGROUP  /    . z * ( 1.f / ( real ) hull_count ) ; { real_plane3d
+    595 REGROUP  /    0 ] * ( 1.f / 127.f ) ; direction .
+    596 REGROUP  /    1 ] * ( 1.f / 127.f ) ; direction .
+    597 REGROUP  /    2 ] * ( 1.f / 127.f ) ; offset =
+ 
+================= source/structures/structures
+## sphere_intersects_cluster_portal  lines 328..400  NEEDED=2
+    356 NEEDED   +    centroid ) < ( portal -> bounding_radius + radius ) * ( portal
+    356 NEEDED   +    radius ) * ( portal -> bounding_radius + radius ) ) { plane_normal
+ 
+================= source/text/draw_string
+## bitmap_draw_string  lines 1468..1525  
+ 
+================= source/units/bipeds
+## biped_accelerate  lines 1625..1683  REGROUP=1
+   1663 REGROUP  /    acceleration ) * ( _pi / 2 ) ; biped ->
+## biped_adjust_placement  lines 922..941  
+## biped_check_discard  lines 4121..4153  OTHER=1
+## biped_get_autoaim_pill  lines 1048..1090  
+## biped_get_sight_position  lines 973..1046  NEEDED=1 OTHER=4
+   1041 NEEDED   -    -> z += ( 1.f - crouch ) * definition ->
+## biped_update_moving  lines 3466..4096  MIXED=1 NEEDED=3 OTHER=3 REGROUP=1
+   3533 REGROUP  *    = difficulty * ( ( real ) stagger_ordinal * 0.00729927f ) + 1.f ;
+   3747 MIXED    *-   stun_scale = - ( player_information -> stun_movement_penalty * biped -> unit . body_stun - 1.f ) * body_stun_scale *
+   3815 NEEDED   -    { crouch_modifier = ( definition -> biped . flying_crouch_velocity_modifier - 1.f ) * biped ->
+   3828 NEEDED   -    ; acceleration = ( 1.f - deceleration_scale ) * definition ->
+   3893 NEEDED   -    . crouch_velocity = ( definition -> biped . collision_height_standing - definition -> biped . collision_height_crouching ) * crouch_delta ;
+## biped_update_physics  lines 2342..3038  LEFTRED=1 MIXED=2 NEEDED=8 OTHER=4 REGROUP=7 WHOLE=2
+   2470 MIXED    *+   . k - ( move_direction . j * ground_normal -> j + move_direction . i * ground_normal -> i ) / ground_normal ->
+   2515 NEEDED   -    { speed *= ( move_direction . k - physics -> downhill_k0 ) * ( physics
+   2516 NEEDED   -    downhill_k0 ) * ( physics -> downhill_velocity_scale - 1.f ) / ( physics
+   2517 NEEDED   -    1.f ) / ( physics -> downhill_k1 - physics -> downhill_k0 ) + 1.f ;
+   2525 NEEDED   -    { speed *= ( move_direction . k - physics -> uphill_k0 ) * ( physics
+   2526 NEEDED   -    uphill_k0 ) * ( physics -> uphill_velocity_scale - 1.f ) / ( physics
+   2527 NEEDED   -    1.f ) / ( physics -> uphill_k1 - physics -> uphill_k0 ) + 1.f ;
+   2538 NEEDED   -    , speed * ( 1.f - physics -> movement_penalty ) , & desired_velocity
+   2554 REGROUP  /    -> i * ( 1.f / 128.f ) ; velocity_change .
+   2555 REGROUP  /    -> j * ( 1.f / 128.f ) ; velocity_change .
+   2556 REGROUP  /    -> k * ( 1.f / 128.f ) ; physics ->
+   2651 WHOLE    *+-  distance = - ( plane . n . i * clipped_position . x + plane . n . j * clipped_position . y + plane . n . k * clipped_position . z - plane . d ) ; point .
+   2702 NEEDED   -    t = ( ( point . x - vertex0 -> point . x ) * edge_vector .
+   2703 REGROUP  -    . i + ( point . y - vertex0 -> point . y ) * edge_vector .
+   2704 MIXED    *+   ; t = ( ( point . x - vertex0 -> point . x ) * edge_vector . i + ( point . y - vertex0 -> point . y ) * edge_vector . j + ( point . z - vertex0 -> point . z ) * edge_vector . k ) / magnitude_squared3d (
+   2704 REGROUP  -    . j + ( point . z - vertex0 -> point . z ) * edge_vector .
+   2730 LEFTRED  *    && best_distance_squared <= ( physics -> width * 2.f ) * ( physics
+   2730 REGROUP  *    2.f ) * ( physics -> width * 2.f ) && best_velocity_dot <=
+   2736 REGROUP  +    . z - ( best_plane . d + physics -> width ) ; if (
+   2749 WHOLE    +/   n , - ( new_velocity_dot + 1.f / TICKS_PER_SECOND ) , ( real_point3d
+## biped_update_turning  lines 3180..3464  NEEDED=2 OTHER=2 REGROUP=3
+   3237 REGROUP  /    desired_facing_vector ) * ( 10.f / 3.f ) * biped ->
+   3256 NEEDED   -    . flying_bank_decay_time * ( 1.f - bank_blend ) ; if (
+   3260 NEEDED   -    . bank += ( target_bank - biped -> biped . bank ) / ( bank_time
+   3260 REGROUP  *    bank ) / ( bank_time * TICKS_PER_SECOND ) ; } else
+   3275 REGROUP  *    . flying_angular_acceleration / ( TICKS_PER_SECOND * TICKS_PER_SECOND ) ; if (
+ 
+================= source/units/vehicles
+## update_alien_scout_physics  lines 2100..2388  NEEDED=3 OTHER=3 REGROUP=1 WHOLE=1
+   2256 NEEDED   -    real level_scale = ( 1.0f - object_up -> k ) * 0.0038785094f ;
+   2275 WHOLE    *    forward_scale = - ( physics -> xx_moment * torque_b ) ; real scale
+   2323 REGROUP  /    . airborne_ticks * ( 1.0f / 30 ) , 0.0f ,
+   2324 NEEDED   -    real axis_scale = ( 1.0f - vehicle -> vehicle . hover ) * physics ->
+   2332 NEEDED   -    ; up_scale = ( 1.0f - vehicle -> vehicle . hover ) * physics ->
+ 

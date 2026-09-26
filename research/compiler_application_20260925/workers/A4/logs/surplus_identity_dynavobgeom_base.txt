@@ -1,0 +1,5 @@
+  _vector_from_points3d          vs source\ai\action_alert.obj               IDENTICAL
+  _dot_product3d                 vs source\ai\action_charge.obj              IDENTICAL
+  _real_argb_color_to_pixel32    vs source\interface\hud_draw.obj            IDENTICAL
+  _real_alpha_to_pixel32         vs source\rasterizer\xbox\rasterizer_xbox_active_camouflage.obj IDENTICAL
+source/rasterizer/xbox/rasterizer_xbox_dynavobgeom: 4 candidate-only code COMDATs, 0 not identical

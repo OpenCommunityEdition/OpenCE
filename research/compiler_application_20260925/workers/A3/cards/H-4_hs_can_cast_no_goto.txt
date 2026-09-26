@@ -1,0 +1,14 @@
+CARD H-4 (A3)  written 2026-09-26 01:02:37 -0700  -- BEFORE its first compile
+observed: hs_can_cast uses 'goto cast_object_type;' from the object branch into the object_name branch's return.
+evidence: D /Od 0x600a30: no goto; object branch computes desired object type [ebp-8] and actual object type
+  [ebp-4] (actual-0x25 if object, actual-0x2b if object_name, else return FALSE) then ONE call; object_name branch
+  has its own call. J (January): two call sites; the 'actual-0x2b' call (0xcc) is shared by both branches (tail
+  shape), object branch 'actual-0x25' call at 0x96.
+variants (bounded, 2):
+  H-4a: no goto, two textual returns: object branch 'else if (HS_TYPE_IS_OBJECT_NAME(actual_type)) return
+        hs_object_type_can_cast(actual_type-_hs_type_object_name, object_type); else return FALSE;'
+  H-4b: /Od shape: object branch with local 'short actual_object_type' assigned in if/else-if, else return FALSE,
+        then one call.
+prediction: H-4a EXACT (VC7 tail-merges the identical 'lea eax,[edi-0x2b]; call' tails); H-4b NOT exact (single
+  call site in the object branch vs January's two).
+decisive test: gate --fn _hs_can_cast + keyed_diff whole TU.

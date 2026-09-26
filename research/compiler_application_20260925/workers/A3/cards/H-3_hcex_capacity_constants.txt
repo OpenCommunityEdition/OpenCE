@@ -1,0 +1,12 @@
+CARD H-3 (A3)  written 2026-09-26 01:02:37 -0700  -- BEFORE its first compile
+observed: raw 0x100 / 0x400 / 0x218 / 8 in hs_runtime_initialize; the vassert message (January string) says
+  "raise MAXIMUM_NUMBER_OF_HS_GLOBALS.".
+evidence: J string names MAXIMUM_NUMBER_OF_HS_GLOBALS; X: HCEX SHIP enum {MAXIMUM_NUMBER_OF_HS_THREADS=0x100,
+  MAXIMUM_NUMBER_OF_HS_GLOBALS=0x400, HS_THREAD_STACK_SIZE=0x200} (one enum, this order); TU already asserts
+  sizeof(struct hs_thread_datum)==0x218 and struct hs_global_datum is 8 bytes. Precedent for sizeof into the short
+  'size' parameter: reference_lists.h:42.
+correction: replace the TU's 'enum { HS_THREAD_STACK_SIZE = 0x200 };' by the HCEX three-constant enum; use the
+  constants and sizeof(struct hs_thread_datum)/sizeof(struct hs_global_datum) in the two game_state_data_new calls
+  and the vassert expression.
+prediction: byte-inert, 66/66, 0 changed; /W3 unchanged (constant sizeof fits short).
+risk: two more declared names (C1 count) -> distant tie flip.

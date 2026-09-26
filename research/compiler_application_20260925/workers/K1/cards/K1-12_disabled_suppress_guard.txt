@@ -1,0 +1,10 @@
+CARD K1-12  (pre-registered 2026-09-26 02:28:46 -0700)
+Base: k10 (21 hunks). Target hunk: 0x8b7-0x8e7 DISABLED block (January: ai_globals -> eax, flag byte -> cl, debug
+  buffer lea -> ecx then edx; ours: edx, al, eax, ecx).
+Evidence (D, /Od 0x48e7da-0x48e823): "if (!ai_globals->dialogue_triggers_enabled) { if (print_communication) {
+  csstrcat(debug_string, "DISABLED"); if (!suppress_output) error(2, debug_string); } return; }" - the /Od build has
+  an "if (!suppress_output)" guard around error(). At that point suppress_output is the constant FALSE initialiser,
+  so the guard folds away in optimised code (January shows an unconditional error call, consistent with folding).
+Change: add the guard.
+Prediction: code outside the block unchanged; the folded guard changes the block's IL temp order -> the 0x8b7
+  register hunk may resolve (uncertain; if inert, record and stop on this block).

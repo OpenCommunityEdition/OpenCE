@@ -1,0 +1,32 @@
+== finalA
+== source/game/game_engine.c
+    922 defined-here       void game_engine_playlist_next( long parameter0, long parameter1, long playlist_type);
+    933 defined-here       int __cdecl sort_statistic_buffer( void const *entry0_pointer, void const *entry1_pointer);
+    937 defined-here       int __cdecl sort_statistic_buffer_ranking( void const *entry0_pointer, void const *entry1_pointer);
+    975 defined-here       long game_engine_did_player_win_default( long player_index);
+    978 defined-here       void game_show_score_extended( long player_index, long score, long team_index);
+    983 defined-here       boolean multiple_teams_alive( void);
+    999 defined-here       void game_engine_post_rasterize_post_game( void);
+   1021 defined-here       boolean team_has_players( long team_index);
+   1027 defined-here       long postgame_statistic_get_rating( long player_index, enum postgame_statistic statistic, boolean inverse);
+   1032 defined-here       long populate_statistic_buffer( struct statistic_buffer *statistic_buffer, enum postgame_statistic statistic, boolean inverse);
+
+== HEAD (for comparison: NOT DEFINED HERE rows)
+    750 NOT DEFINED HERE   long hud_get_nav_point_render_type( long local_player_index, real_point3d const *position, struct game_engine_goal const *goal, long object_index);
+    756 NOT DEFINED HERE   void custom_render_nav_point( long local_player_index, struct game_engine_goal const *goal, word nav_point_index, long render_type);
+    826 NOT DEFINED HERE   struct network_game_server *global_network_game_server_get( void);
+    829 NOT DEFINED HERE   boolean player_ui_game_variant_specified( struct game_variant *variant);
+    845 NOT DEFINED HERE   void game_engine_intialize_queued_sounds( void);
+    851 NOT DEFINED HERE   void rasterizer_draw_unicode_string( rectangle2d const *bounds, short parameter1, short parameter2, short parameter3, wchar_t const *string);
+    858 NOT DEFINED HERE   struct bitmap_data *bitmap_group_try_and_get_bitmap( long bitmap_group_index, short bitmap_index);
+    862 NOT DEFINED HERE   long hud_get_font_index( void);
+    865 NOT DEFINED HERE   real_argb_color *hud_get_text_color( real_argb_color *color);
+    887 NOT DEFINED HERE   void game_engine_update_multiplayer_sound( void);
+    890 NOT DEFINED HERE   void sound_class_set_gain( char const *name, real gain, short interpolation_ticks);
+    895 NOT DEFINED HERE   void network_game_server_switch_to_postgame( struct network_game_server *server);
+    898 NOT DEFINED HERE   void player_effect_screen_flash( long player_index, struct screen_flash_definition const *screen_flash, real scale);
+    903 NOT DEFINED HERE   short unit_get_local_player_index( long unit_index);
+    906 NOT DEFINED HERE   boolean game_team_is_enemy( short team_index0, short team_index1);
+    910 NOT DEFINED HERE   short player_get_starting_location_count( void);
+    913 NOT DEFINED HERE   struct player_starting_location *player_get_starting_location( short starting_location_index);
+    919 NOT DEFINED HERE   short find_nav_point( char const *name);

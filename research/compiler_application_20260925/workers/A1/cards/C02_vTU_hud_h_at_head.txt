@@ -1,0 +1,20 @@
+CARD C02 - nav-point trio in the genuine owner header hud.h (no new hud_nav_points.h), on top of npA at HEAD
+written: 2026-09-26 00:41:50 -0700 (BEFORE the compile)
+
+Observed discrepancy: npA creates source/interface/hud_nav_points.h, a NEW header whose only non-owner consumer is
+game_engine.c. Rulebook rule 16 (HALO_HOUSE_RULES_20260926, "Put shared prototypes ... in their genuine owner
+headers ... Do not invent a one-consumer header") and the lead's brief ("no one-consumer headers").
+Source evidence: X - HCEX's hud.h holds the nav-point API (pick_game_engine S5); J/tree - our hud.h already
+declares hud_nav_points.c's public functions (hud_initialize_nav_points .. hud_render_nav_points) and
+hud_nav_points.c includes interface/hud.h.
+Proposed correction: hud.h gains `union real_point3d;` and a prototypes/HUD_NAV_POINTS.C block with the trio
+(find_nav_point, hud_get_nav_point_render_type, custom_render_nav_point; texts identical to F02-NP);
+game_engine.c includes interface/hud.h instead of interface/hud_nav_points.h; hud_nav_points.c drops the
+F04 include line; hud_nav_points.h is not created.
+Compiler-state prediction: this is pick_game_engine's vTU, which at cdc8ebd3 flipped _populate_statistic_buffer
+(K=8..12 count band; vTU = vTUnp + D with D mod 64 in 8..12). At HEAD every variant carries +3 names from
+game_allegiance.h, so vTU@HEAD flips iff D in {8,9} and is EXACT iff D in {10,11,12}. D is unmeasured.
+PREDICTION: uncertain, leaning EXACT (3 of 5 admissible D values): game_engine 180/180 with p~0.6;
+otherwise 179/180 with only _populate_statistic_buffer residual (a one-slot mov edi,[ebp+8] schedule tie).
+Collateral risk: the 9 other hud.h consumers get +4 names (3 prototypes + union forward decl) - sweep them (C03).
+Decisive test: revgate.py roots/vTU source/game/game_engine + keyed_diff vs build/base.

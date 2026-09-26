@@ -1,0 +1,15 @@
+CARD K1-01  (pre-registered 2026-09-26 01:58:53 -0700)
+Unit: source/ai/ai_communication   Target: _ai_communication_event (January 8,064 B, frame 0x126c)
+Base: r3all = HEAD source + r3 patches 02 (incident ternary) + 03 (actor-arm polarity) + 04 (/Od team scope, HCEX
+[2][8][2] arrays). Measured before this card: [size 8112!=8064, sha], 46/2, normalised hunks 92.
+Change (LAB, contains HELD forms): splice the structural lane's v10h event body onto r3all:
+  (a) /Od-attested continue structure: every rejection = any_protagonist_considered = TRUE; continue;
+  (b) HELD: FALSE-initialised block-scoped protagonist_invalid flag (/Od byte [ebp-0xf45] 0 + six sets; January
+      0xf09 xor bl,bl / 0xf54 mov bl,1 / 0xf75 test bl,bl) - rejected 2026-09-20 as "invented"; lab only;
+  (c) HELD: uninitialised recipient_look_data aggregate (/Od RTC [ebp-0xdfc] size 4 recipient_look_data, never
+      initialised; January prologue has no NONE store for [ebp-0x5c]) + possibility look_data struct field;
+  (d) /Od delay locals (delay_time/ai_delay_time accumulate).
+Evidence: D (/Od 0x48d470), J (January prologue stores, 0x1993 loop-tail store target).
+Prediction: event [sha] with size 8064 == January and frame 0x126c (structural lane v10h reproduction on the new
+base; no other row changes: 46 exact / 2 residual; talk_weight row unchanged).
+Decisive test: gate --all size field; alndiff frame line.

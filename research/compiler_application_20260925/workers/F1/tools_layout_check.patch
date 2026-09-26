@@ -1,0 +1,272 @@
+diff --git a/tools/test_rasterizer_lights_reset_overrun_layout.py b/tools/test_rasterizer_lights_reset_overrun_layout.py
+new file mode 100644
+--- /dev/null
++++ b/tools/test_rasterizer_lights_reset_overrun_layout.py
+@@ -0,0 +1,267 @@
++"""Pin where January's lens-flare reset overrun lands, in January's split and in our built object.
++
++January's `rasterizer_lights_reset_for_new_map` clears 0x7722 bytes (897 records of 0x22) from
++`local_lens_flare_occlusion_test_results`, an array of 0x7700 bytes (896 records).  The last 0x22 bytes land in
++the next object of the same `.bss` section.  The source keeps that original bug only while every fact below holds
++in BOTH objects; a C typedef cannot check them because they are layout, not sizes:
++
++* the clear length, read from the reset's own code, is 0x7722 and starts at the array (DIR32, addend 0);
++* the array's extent (distance to the next symbol) is exactly 0x7700;
++* the next object is `local_lens_flare_parameters`, at exactly array + 0x7700, in the same uninitialised,
++  non-COMDAT section (the linker places a section contribution whole, so object adjacency is image adjacency);
++* its extent is at least 0x22, and its record stride (from the getter's `lea [eax+eax*4]; lea [eax*8+base]`)
++  is at least 0x22, so the overwritten bytes lie inside `local_lens_flare_parameters[0]`;
++* no other symbol starts in [array + 0x7700, array + 0x7722);
++* the built object's section size and offsets equal January's.
++
++Missing private objects skip.  A present object that cannot be parsed into these facts fails.  The synthetic
++cases at the bottom are the negative controls: each perturbs one layout fact and must be rejected.
++"""
++
++from pathlib import Path
++import struct
++import sys
++
++import pytest
++
++try:
++    from tools import coff_compare as cc
++except ImportError:  # run as a script from the repository root
++    sys.path.insert(0, str(Path(__file__).resolve().parent))
++    import coff_compare as cc
++
++
++ROOT = Path(__file__).resolve().parents[1]
++UNIT = "source/rasterizer/rasterizer_lights"
++TARGET = ROOT / ("build/split/" + UNIT + ".obj")
++BUILT = ROOT / ("build/base/" + UNIT + ".obj")
++
++ARRAY = "_local_lens_flare_occlusion_test_results"
++NEIGHBOUR = "_local_lens_flare_parameters"
++RESET = "_rasterizer_lights_reset_for_new_map"
++GETTER = "_lens_flare_parameters_get"
++MEMSET = "_csmemset"
++
++ARRAY_BYTES = 0x7700      # MAXIMUM_LIGHTS_PER_MAP (896) * sizeof(struct lens_flare_occlusion_test_results) (0x22)
++OVERRUN_BYTES = 0x22      # January: push 0x7722 = 897 * 0x22
++STRIDE_LEA = bytes.fromhex("8d04808d04c5")  # lea eax,[eax+eax*4]; lea eax,[eax*8+disp32] -> stride 5*8
++
++SCN_UNINITIALIZED_DATA = 0x00000080
++SCN_LNK_COMDAT = 0x00001000
++REL_DIR32 = 0x0006
++REL_REL32 = 0x0014
++
++
++class LayoutViolation(AssertionError):
++    pass
++
++
++def _require(condition, message):
++    if not condition:
++        raise LayoutViolation(message)
++
++
++def _defined(obj, name):
++    owners = [item for item in obj["symbols"] if item["name"] == name and item["section"] > 0]
++    _require(len(owners) == 1, f"{name}: expected exactly one definition, found {len(owners)}")
++    return owners[0]
++
++
++def _relocations(obj, section):
++    data = obj["data"]
++    result = {}
++    for index in range(section["reloc_count"]):
++        address, symbol_index, kind = struct.unpack_from(
++            "<LLH", data, section["reloc"] + index * cc.RELOC_ENTRY_SIZE)
++        _require(address not in result, f"{section['name']}: two relocations at 0x{address:X}")
++        _require(symbol_index in obj["by_index"], f"{section['name']}: bad symbol index {symbol_index}")
++        result[address] = (kind, obj["by_index"][symbol_index])
++    return result
++
++
++def _resolved_dir32(obj, code, relocations, address):
++    """(section, offset) addressed by a DIR32 field, or a violation."""
++    _require(address in relocations, f"no relocation at +0x{address:X}")
++    kind, target = relocations[address]
++    _require(kind == REL_DIR32, f"relocation at +0x{address:X} is type {kind}, not DIR32")
++    _require(target["section"] > 0, f"relocation at +0x{address:X} targets undefined {target['name']}")
++    addend = struct.unpack_from("<l", code, address)[0]
++    return target["section"], target["value"] + addend
++
++
++def measure(obj):
++    """Every fact the check needs, read from one COFF object."""
++    array = _defined(obj, ARRAY)
++    neighbour = _defined(obj, NEIGHBOUR)
++    _require(array["section"] == neighbour["section"],
++             f"{ARRAY} and {NEIGHBOUR} are in different sections "
++             f"({array['section']} and {neighbour['section']})")
++    section = obj["sections"][array["section"] - 1]
++    _require(section["flags"] & SCN_UNINITIALIZED_DATA,
++             f"section {section['index']} ({section['name']}) is not uninitialised data")
++    _require(not section["flags"] & SCN_LNK_COMDAT,
++             f"section {section['index']} ({section['name']}) is a COMDAT")
++    labels = sorted(
++        (item["value"], item["name"]) for item in obj["symbols"]
++        if item["section"] == section["index"] and item["name"] != section["name"])
++    for value, name in labels:
++        _require(value <= section["size"], f"{name} at 0x{value:X} lies past the section end")
++
++    def extent(symbol):
++        later = [value for value, _ in labels if value > symbol["value"]]
++        return (min(later) if later else section["size"]) - symbol["value"]
++
++    reset = _defined(obj, RESET)
++    reset_section = obj["sections"][reset["section"] - 1]
++    code = cc._section_bytes(obj, reset_section)
++    relocations = _relocations(obj, reset_section)
++    at = reset["value"]
++    _require(code[at:at + 1] == b"\x68" and code[at + 5:at + 8] == b"\x6a\x00\x68"
++             and code[at + 12:at + 13] == b"\xe8",
++             f"{RESET} does not begin with push imm32; push 0; push addr; call")
++    clear_bytes = struct.unpack_from("<L", code, at + 1)[0]
++    _require(_resolved_dir32(obj, code, relocations, at + 8) == (section["index"], array["value"]),
++             f"{RESET}'s first clear does not start at {ARRAY}+0")
++    call = relocations.get(at + 13)
++    _require(call is not None and call[0] == REL_REL32 and call[1]["name"] == MEMSET,
++             f"{RESET}'s first call is not {MEMSET}")
++
++    getter = _defined(obj, GETTER)
++    getter_section = obj["sections"][getter["section"] - 1]
++    getter_code = cc._section_bytes(obj, getter_section)
++    getter_end = min([item["value"] for item in obj["symbols"]
++                      if item["section"] == getter["section"] and item["type"] == 0x20
++                      and item["value"] > getter["value"]] + [getter_section["size"]])
++    lea = getter_code.find(STRIDE_LEA, getter["value"], getter_end)
++    _require(lea >= 0, f"{GETTER}: record stride (lea [eax+eax*4]; lea [eax*8+base]) not found")
++    _require(_resolved_dir32(obj, getter_code, _relocations(obj, getter_section), lea + 6)
++             == (section["index"], neighbour["value"]),
++             f"{GETTER}'s indexed base is not {NEIGHBOUR}+0")
++
++    return {
++        "section_size": section["size"],
++        "labels": labels,
++        "array_offset": array["value"],
++        "array_extent": extent(array),
++        "neighbour_offset": neighbour["value"],
++        "neighbour_extent": extent(neighbour),
++        "clear_bytes": clear_bytes,
++        "stride": 5 * 8,
++    }
++
++
++def check_confined(layout):
++    """Raise LayoutViolation unless the overrun lands only in the first record of the neighbour."""
++    start = layout["array_offset"] + ARRAY_BYTES
++    end = layout["array_offset"] + layout["clear_bytes"]
++    _require(layout["array_extent"] == ARRAY_BYTES,
++             f"{ARRAY} extent is 0x{layout['array_extent']:X}, expected 0x{ARRAY_BYTES:X}")
++    _require(layout["clear_bytes"] == ARRAY_BYTES + OVERRUN_BYTES,
++             f"{RESET} clears 0x{layout['clear_bytes']:X}, January clears 0x{ARRAY_BYTES + OVERRUN_BYTES:X}")
++    _require(layout["neighbour_offset"] == start,
++             f"{NEIGHBOUR} is at 0x{layout['neighbour_offset']:X}, expected {ARRAY}+0x{ARRAY_BYTES:X} = 0x{start:X}")
++    _require(layout["neighbour_extent"] >= OVERRUN_BYTES,
++             f"{NEIGHBOUR} extent 0x{layout['neighbour_extent']:X} < 0x{OVERRUN_BYTES:X}")
++    _require(layout["stride"] >= OVERRUN_BYTES,
++             f"{NEIGHBOUR} record stride 0x{layout['stride']:X} < 0x{OVERRUN_BYTES:X}")
++    inside = [(value, name) for value, name in layout["labels"] if start <= value < end]
++    _require(inside == [(start, NEIGHBOUR)],
++             f"symbols in the overwritten span [0x{start:X}, 0x{end:X}): {inside}")
++
++
++def _offsets(layout):
++    return (layout["section_size"], layout["labels"])
++
++
++def _load_or_skip(path, what):
++    if not path.is_file():
++        pytest.skip(f"the locally supplied {what} is unavailable")
++    return cc.load(path)
++
++
++def test_january_reset_overrun_lands_in_first_parameters_record():
++    check_confined(measure(_load_or_skip(TARGET, "January split object")))
++
++
++def test_built_reset_overrun_lands_where_january_does():
++    january = measure(_load_or_skip(TARGET, "January split object"))
++    built = measure(_load_or_skip(BUILT, "built object"))
++    check_confined(built)
++    assert _offsets(built) == _offsets(january)
++
++
++# ---------- negative controls (synthetic objects; no private assets needed)
++
++def _fixture(array=0x0, neighbour=0x7700, extra=(), neighbour_section_apart=False,
++             clear=0x7722, stride_lea=STRIDE_LEA, size=0x7700 + 0xA000 + 4):
++    reset_code = bytearray(b"\x68" + struct.pack("<L", clear) + b"\x6a\x00\x68" + b"\0" * 4
++                           + b"\xe8" + b"\0" * 4 + b"\xc3")
++    getter_code = bytearray(stride_lea + b"\0" * 4 + b"\xc3")
++    neighbour_section = 4 if neighbour_section_apart else 3
++    symbols = [
++        {"name": RESET, "value": 0, "section": 1, "type": 0x20, "storage": 2},
++        {"name": GETTER, "value": 0, "section": 2, "type": 0x20, "storage": 3},
++        {"name": ARRAY, "value": array, "section": 3, "storage": 3},
++        {"name": NEIGHBOUR, "value": neighbour, "section": neighbour_section, "storage": 3},
++        {"name": MEMSET, "value": 0, "section": 0, "type": 0x20, "storage": 2},
++    ]
++    for name, value in extra:
++        symbols.append({"name": name, "value": value, "section": 3, "storage": 3})
++    reset_relocs = struct.pack("<LLH", 8, 2, REL_DIR32) + struct.pack("<LLH", 13, 4, REL_REL32)
++    getter_relocs = struct.pack("<LLH", len(stride_lea), 3, REL_DIR32)
++    bss = {"name": ".bss", "size": size, "flags": 0xC0400080}
++    sections = [
++        {"name": ".text", "size": len(reset_code), "raw_data": bytes(reset_code),
++         "reloc_data": reset_relocs, "flags": 0x60501020},
++        {"name": ".text", "size": len(getter_code), "raw_data": bytes(getter_code),
++         "reloc_data": getter_relocs, "flags": 0x60501020},
++        dict(bss),
++    ]
++    if neighbour_section_apart:
++        sections.append(dict(bss))
++    return cc.load(cc.build_coff(sections=sections, symbols=symbols))
++
++
++def test_negative_control_fixture_itself_passes():
++    check_confined(measure(_fixture()))
++
++
++@pytest.mark.parametrize("perturbation, reason", [
++    ({"neighbour": 0x7704}, "extent is 0x7704"),                               # gap after the array
++    ({"neighbour": 0x7800, "extra": [("_other_array", 0x7700)]}, "is at 0x7800"),  # a different object follows
++    ({"extra": [("_small_static", 0x7710)]}, "extent 0x10 < 0x22"),            # a symbol inside the span
++    ({"extra": [("_aliased_object", 0x7700)]}, "symbols in the overwritten span"),  # a second object at the span
++    ({"neighbour_section_apart": True}, "different sections"),                 # neighbour in another section
++    ({"stride_lea": bytes.fromhex("c1e0058d80")}, "stride"),                   # shl eax,5: stride 0x20 not proven
++    ({"clear": 0x7744}, "clears 0x7744"),                                      # two records past the array
++    ({"neighbour": 0x7722, "clear": 0x7722}, "extent is 0x7722"),              # array declared one record larger
++    ({"size": 0x7710}, "extent 0x10 < 0x22"),                                  # neighbour cut by the section end
++])
++def test_negative_control_rejects_perturbed_layout(perturbation, reason):
++    with pytest.raises(LayoutViolation, match=reason):
++        check_confined(measure(_fixture(**perturbation)))
++
++
++def main(argv):
++    status = 0
++    for path in argv:
++        layout = None
++        try:
++            layout = measure(cc.load(path))
++            check_confined(layout)
++            verdict = "PASS"
++        except (LayoutViolation, cc.CoffError) as error:
++            verdict, status = f"VIOLATION: {error}", 1
++        print(f"{path}: {verdict}")
++        if layout:
++            print(f"  array 0x{layout['array_offset']:X}+0x{layout['array_extent']:X}, "
++                  f"clear 0x{layout['clear_bytes']:X}, "
++                  f"neighbour 0x{layout['neighbour_offset']:X}+0x{layout['neighbour_extent']:X}, "
++                  f"stride 0x{layout['stride']:X}, section 0x{layout['section_size']:X}")
++            for value, name in layout["labels"]:
++                print(f"    +0x{value:06X} {name}")
++    return status
++
++
++if __name__ == "__main__":
++    sys.exit(main(sys.argv[1:]))

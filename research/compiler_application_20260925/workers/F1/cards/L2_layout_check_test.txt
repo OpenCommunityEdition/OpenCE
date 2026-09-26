@@ -1,0 +1,27 @@
+Card L2 - object-layout check (tools test proposal) and its negative controls
+Clock (date, written before the test file is written or any perturbed object is compiled): 2026-09-26 01:21:13 -0700
+
+Design: tools/test_rasterizer_lights_reset_overrun_layout.py (lead-owned path; delivered as a separate patch).
+ The checker reads a COFF object and derives every fact from the object itself, fail-closed:
+  - the clear length from the reset's own code (`push imm32; push 0; push <DIR32 results+0>; call _csmemset`);
+  - the record stride from the getter's `lea eax,[eax+eax*4]; lea eax,[eax*8+<DIR32 parameters+0>]`;
+  - results/parameters offsets and extents from the symbols of their (single, uninitialised, non-COMDAT) section.
+ It raises LayoutViolation unless: results extent == 0x7700; clear == 0x7722; parameters offset ==
+ results + 0x7700; parameters extent >= 0x22; stride >= 0x22; the only symbol in [results+0x7700,
+ results+0x7722) is parameters itself; the span ends inside the section. Built-vs-January: section size and
+ all four offsets equal. Missing private assets -> skip; present-but-unparseable -> fail.
+
+Predictions:
+ T1. January split: PASS. W2-patched build (w2.obj): PASS. build/base (HEAD, unpatched): FAIL on exactly one
+     assertion, the clear length (0x7700 != 0x7722); layout facts pass. (So the test must land WITH the source patch.)
+ T2. Synthetic negative controls (in-test, no private assets): positive fixture passes; each of these raises:
+     parameters shifted +4; a foreign array at results+0x7700 (parameters later); a foreign symbol inside the span;
+     parameters in another section; stride 0x20; clear 0x7744; results declared one record larger (extent 0x7722).
+ T3. Compiled perturbations of the W2 source (evidence runs of the same checker via its CLI):
+     N1 = W2 + results WITHOUT `= {0}` (the pre-P1 layout behind the 2026-09-22 exclusion): FAIL (a different
+          object follows results, or results moves into the uninitialised name-hash bucket);
+     N2 = W2 + `static long local_lens_flare_probe = 0;` declared between results and parameters: FAIL (a foreign
+          symbol at results+0x7700, parameters shifted);
+     N3 = W2 + MAXIMUM_LENS_FLARES_PER_FRAME records of parameters left unchanged but results declared
+          [MAXIMUM_LIGHTS_PER_MAP+1] (the rejected "bigger array" fix): FAIL (results extent 0x7722).
+ Refutation: any negative control that passes, or January/w2 failing.

@@ -1,0 +1,17 @@
+--- a/config/object_admission_rejections.json
++++ b/config/object_admission_rejections.json
+@@ -10,14 +10,6 @@
+       "reopen": "Recover the genuine January private state shape: replace the invented aggregates with authentic separate file statics, or first-party-attested structures, without fabricated pad/reserved members. Identify the unreferenced 4-byte January object at .bss +0x45c from first-party evidence rather than a filler. Obtain the owner's rulings on the BUG-marked NONE-branch varargs defect and the three volatile qualifiers. Any new private names need the owner's descriptive-name policy (as for the held rasterizer_xbox .bss split). Preserve all 16 target functions and all data sections, land the pinned 132-byte .data entry only with the Matching flip, move the window extern to its owner header with a full consumer sweep (re-baselining the rasterizer_xbox_models __rasterizer_model_draw park it perturbs), and apply the owner's uniform stock SDK-table decision from the open dynavobgeom reconciliation."
+     },
+     {
+-      "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom",
+-      "class": "candidate-only-comdat-owner",
+-      "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+-      "reason": "All 17 January code functions and all 31 January-owned sections/symbols match after replacing local debug, window and pixel-shader views with genuine owner types. Nine D3DINLINE wrappers have January's file-static storage. The two surplus color-conversion helpers are byte-identical to January's selected providers, and all 17 surplus symbols pass selected-provider links in both orders. The global_window_parameters extern still lives in consumer C files, with incompatible partial views in other consumers rather than a common owner declaration. Three stock SDK tables and other candidate-only constants/literals remain absent from January's split; the selected-provider test ignores unrelated unresolved symbols. A complete ordinary final-link ownership proof has not been established, so exact function credit does not imply Matching.",
+-      "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_owner_layout_reconciliation.md",
+-      "reopen": "Move global_window_parameters to its authentic owner declaration and reconcile the partial consumer views with a full regression sweep. Establish selected ownership/coalescing of candidate-only SDK tables and helper data through a complete compatible ordinary link or equally decisive January source/link evidence, without losing target exactness. Do not suppress genuine header emissions, alter selection metadata, force-inline, hand-copy helpers or count candidate-only bytes as January-owned."
+-    },
+-    {
+       "unit": "source/interface/hud_draw",
+       "class": "candidate-only-comdat-owner",
+       "symbol": "_fast_ftol",

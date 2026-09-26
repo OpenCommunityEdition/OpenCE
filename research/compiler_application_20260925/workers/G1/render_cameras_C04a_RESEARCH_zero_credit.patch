@@ -1,0 +1,31 @@
+--- a/source/render/render_cameras.c
++++ b/source/render/render_cameras.c
+@@ -1133,6 +1133,8 @@
+ 	real inverse_projection_x_scale;
+ 	real inverse_projection_y_scale;
+ 	real half_z;
++	real far_x_extent;
++	real far_y_extent;
+ 	real far_left;
+ 	real far_right;
+ 	real far_bottom;
+@@ -1295,13 +1297,12 @@
+ 	inverse_projection_x_scale = 1.0f / projection_x_scale;
+ 	inverse_projection_y_scale = 1.0f / projection_y_scale;
+ 	half_z = (camera->z_far + camera->z_near) * 0.5f;
+-	far_left = left_plane_z * -(inverse_projection_x_scale * camera->z_far);
+-	far_right =
+-		(bounds_center_x - 1.0f) * -(inverse_projection_x_scale * camera->z_far);
+-	far_bottom =
+-		bottom_plane_z * -(inverse_projection_y_scale * camera->z_far);
+-	far_top =
+-		(bounds_center_y - 1.0f) * -(inverse_projection_y_scale * camera->z_far);
++	far_x_extent = -(inverse_projection_x_scale * camera->z_far);
++	far_y_extent = -(inverse_projection_y_scale * camera->z_far);
++	far_left = left_plane_z * far_x_extent;
++	far_right = (bounds_center_x - 1.0f) * far_x_extent;
++	far_bottom = bottom_plane_z * far_y_extent;
++	far_top = (bounds_center_y - 1.0f) * far_y_extent;
+ 
+ 	view_point.x = far_left;
+ 	view_point.y = far_bottom;

@@ -1,0 +1,45 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618  2026-09-26 11:30:22 -0700
+=== python -B scratch/tools/provider_link.py source/ai/ai_communication   (all surplus external definitions vs January's split object; both orders; tool sha256 bc854a32244cd42830696d0d4b35f8e46278ac4791a8e24f52b2bb6ae6fb188d)
+??_C@_00CNPNBAHC@?$AA@                       provider source/ai/action_obey                            PASS
+??_C@_04CGFJFPFD@none?$AA@                   provider source/ai/actions                                PASS
+??_C@_04IMJFEJN@flee?$AA@                    provider source/ai/actions                                PASS
+??_C@_04OKGDLNCL@NONE?$AA@                   provider source/ai/action_obey                            PASS
+??_C@_05BAOFOMKD@shout?$AA@                  provider source/ai/ai                                     PASS
+??_C@_05DAFACFLE@never?$AA@                  provider source/ai/actor_perception                       PASS
+??_C@_05GFOLEBJA@?$CFs?1?$CFs?$AA@           provider source/ai/action_obey                            PASS
+??_C@_05IMMFCEFO@swarm?$AA@                  provider source/ai/actors                                 PASS
+??_C@_05MGHOCOML@cover?$AA@                  provider source/ai/actor_firing_position                  PASS
+??_C@_06BALNJMNP@player?$AA@                 provider source/ai/actor_types                            PASS
+??_C@_06GJOIPFFF@damage?$AA@                 provider source/ai/actor_looking                          PASS
+??_C@_07CBDMFKJF@?$DMerror?$DO?$AA@          provider source/ai/action_obey                            PASS
+??_C@_07PEIBNLKE@berserk?$AA@                provider source/ai/action_obey                            PASS
+??_C@_0CI@OJMAHDFE@global_current_collision_user_de@ provider source/ai/action_charge                          PASS
+??_C@_0EJ@EEKGOMEC@global_current_collision_user_de@ provider source/ai/action_charge                          PASS
+??_C@_0P@MPLGIMAD@?$DMno?5encounter?$DO?$AA@ provider source/ai/action_obey                            PASS
+??_C@_0P@NHABDOCD@?$CB?$CCunreachable?$CC?$AA@ provider source/ai/actor_moving                           PASS
+_D3DPRIMITIVETOVERTEXCOUNT                   provider source/rasterizer/xbox/rasterizer_xbox_decals    PASS
+_D3DSIMPLERENDERSTATEENCODE                  provider source/interface/progress_bar                    PASS
+_D3DTEXTUREDIRECTENCODE                      provider source/cseries/headers                           PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@38d1b717                              provider source/ai/action_vehicle                         PASS
+__real@3a91a2b4                              provider source/ai/actor_perception                       PASS
+__real@3c888889                              provider source/ai/actor_perception                       PASS
+__real@3d088889                              provider source/ai/actions                                PASS
+__real@3e99999a                              provider source/ai/action_charge                          PASS
+__real@3f000000                              provider source/ai/action_alert                           PASS
+__real@3f1a36e2e0000000                      provider source/ai/action_charge                          PASS
+__real@3f333333                              provider source/ai/action_charge                          PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+__real@3fc00000                              provider source/ai/action_charge                          PASS
+__real@40000000                              provider source/ai/action_vehicle                         PASS
+__real@40a00000                              provider source/ai/actor_firing_position                  PASS
+__real@41200000                              provider source/ai/action_vehicle                         PASS
+__real@41f00000                              provider source/ai/action_alert                           PASS
+__real@44610000                              provider source/ai/actor_firing_position                  PASS
+_distance_squared3d                          provider source/ai/action_alert                           PASS
+_dot_product3d                               provider source/ai/action_charge                          PASS
+_magnitude_squared3d                         provider source/ai/action_alert                           PASS
+_square_root                                 provider source/ai/action_charge                          PASS
+_vector_from_points3d                        provider source/ai/action_alert                           PASS
+SELECTED-PROVIDER LINK: PASS
+exit code 0

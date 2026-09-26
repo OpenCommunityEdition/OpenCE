@@ -1,0 +1,10 @@
+CARD T3c (written 2026-09-26 01:47:54 -0700, before the traces)  lab copy labs/cine_lab10_copy.c (fifty-objects lab10, never landing)
+Compare the OR sort keys in lab_min0 (0 MIN clamps; SHL-first = January order, OR at +0x428) and lab_min3 (3 clamps
+= production shape; AND-first, OR at +0x466), children chains as T3b.
+Decomposition from T3/T3b (production): key(kind-13) = (0x100 | (max child level + 1)) << 16 | inner16 with
+inner = sum(child_inner << i) + opcode - 0x248 (16-bit); SHL = [alpha kind-2 id 30 -> 0x103c0, const 24 -> 0x18] ->
+0x1020421; AND = [shadow_color memory operand f, const 0xffffff -> 0xff00] -> inner = f + 0xfe32 (mod 2^16):
+f = 0x2ad (level 2, round 1) -> 0x10300df; f = 0x0008 (level 1, round 2) -> 0x102fe3a.
+Prediction: in lab_min0 the final AND key is SMALLER than SHL's because the memory operand keeps a base-subtree hash
+(f >= 0x1ce so the 16-bit sum wraps, or level 2 kept) at the last sort - i.e. the difference is the field operand's
+base (title pointer) representation at the final sort, not alpha's id.

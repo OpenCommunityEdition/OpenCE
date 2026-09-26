@@ -1,0 +1,6 @@
+CARD T2  (written 2026-09-26 01:36:37 -0700, before the trace)  periodic builder, production source: identity of the 0-byte unit-0 nodes
+Observation-only encoder census with node words (opcode/kind/type, src/dst operand kind/type) for offsets 0x58..0xc8.
+Prediction: the 0-byte nodes at +0x69/+0x8b/+0xa4/+0xbd are FP-typed (type code 4 or 8) value-transfer nodes
+(assign/copy or conversion, opcode 0x001 assign at emission) whose src and dst are the same x87 register web, i.e.
+a copy coalesced away (0 bytes) that the scheduler still sees as an integer-unit (class 0) op. Alternative: an
+explicit float->float conversion (the C semantics of real_random()'s `real` return value), encoded as nothing.

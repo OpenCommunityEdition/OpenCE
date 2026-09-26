@@ -1,0 +1,38 @@
+diff --git a/source/game/game_engine.c b/source/game/game_engine.c
+index bc3e703..4e50185 100644
+--- a/source/game/game_engine.c
++++ b/source/game/game_engine.c
+@@ -716,8 +716,6 @@ enum
+ 		HUD_GLOBALS_DEFINITION_TAG, \
+ 		(index)))
+ 
+-#define item_collection_definition_get(index) ((struct item_collection_definition *)tag_get(ITEM_COLLECTION_DEFINITION_TAG, index))
+-
+ /* ---------- structures */
+ 
+ /* HUD globals ('hudg') tag layout, as recorded by the HCEX PDB */
+@@ -808,24 +806,6 @@ struct hud_globals_definition
+ 	long unused2[24];
+ };
+ 
+-/* item collection ('itmc') tag layout, as recorded by the HCEX PDB */
+-
+-struct item_permutation_definition
+-{
+-	long unused1[8];
+-	real weight;
+-	struct tag_reference item;
+-	long unused2[8];
+-};
+-
+-struct item_collection_definition
+-{
+-	struct tag_block permutations;
+-	short spawn_time;
+-	short pad;
+-	long unused[19];
+-};
+-
+ /* scenario multiplayer blocks, as recorded by the HCEX PDB */
+ 
+ struct scenario_netgame_flag

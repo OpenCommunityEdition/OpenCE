@@ -1,0 +1,136 @@
+EXACT       400  _rasterizer_lens_flare_submit_for_cluster
+== exact 1  residual 0  unwritten 0  (of 1 listed)
+--- target (133) | ours (133) : _rasterizer_lens_flare_submit_
+   0: push ebp                                                
+   1: mov ebp, esp                                            
+   3: sub esp, 0x54                                           
+   6: mov al, byte ptr [0x1f]   ; _rasterizer_debug_options   
+   b: test al, al                                             
+   d: je 0x182                                                
+  13: mov ax, word ptr [0]   ; _global_screenshot_count       
+  19: cmp ax, 1                                               
+  1d: jg 0x182                                                
+  23: jne 0x33                                                
+  25: cmp word ptr [0], 1   ; _global_screenshot_size         
+  2d: jg 0x182                                                
+  33: push ebx                                                
+  34: push esi                                                
+  35: call 0x3a   ; _global_structure_bsp_get                 
+  3a: mov esi, eax                                            
+  3c: movsx eax, word ptr [ebp + 8]                           
+  40: push 0x68                                               
+  42: push eax                                                
+  43: lea ecx, [esi + 0x134]                                  
+  49: push ecx                                                
+  4a: call 0x4f   ; _tag_block_get_element_with_size          
+  4f: xor ebx, ebx                                            
+  51: add esp, 0xc                                            
+  54: cmp word ptr [eax + 0x42], bx                           
+  58: mov dword ptr [ebp - 4], eax                            
+  5b: jbe 0x180                                               
+  61: lea edx, [esi + 0x128]                                  
+  67: add esi, 0x11c                                          
+  6d: push edi                                                
+  6e: mov dword ptr [ebp - 8], edx                            
+  71: mov dword ptr [ebp - 0xc], esi                          
+  74: jmp 0x80                                                
+  76: mov eax, dword ptr [ebp - 4]                            
+  79: lea esp, [esp]                                          
+  80: movzx edi, word ptr [eax + 0x40]                        
+  84: mov eax, dword ptr [ebp - 8]                            
+  87: push 0x10                                               
+  89: add edi, ebx                                            
+  8b: push edi                                                
+  8c: push eax                                                
+  8d: call 0x92   ; _tag_block_get_element_with_size          
+  92: mov edx, dword ptr [ebp - 0xc]                          
+  95: mov esi, eax                                            
+  97: movzx ecx, byte ptr [esi + 0xf]                         
+  9b: push 0x10                                               
+  9d: push ecx                                                
+  9e: push edx                                                
+  9f: call 0xa4   ; _tag_block_get_element_with_size          
+  a4: movsx ecx, byte ptr [esi + 0xd]                         
+  a8: movsx edx, byte ptr [esi + 0xe]                         
+  ac: mov dword ptr [ebp - 0x14], eax                         
+  af: movsx eax, byte ptr [esi + 0xc]                         
+  b3: mov dword ptr [ebp - 0x10], eax                         
+  b6: lea eax, [ebp - 0x2c]                                   
+  b9: push eax                                                
+  ba: fild dword ptr [ebp - 0x10]                             
+  bd: mov dword ptr [ebp - 0x10], ecx                         
+  c0: lea ecx, [ebp - 0x20]                                   
+  c3: push ecx                                                
+  c4: fmul dword ptr [0]   ; __real@3c010204                  
+  ca: fstp dword ptr [ebp - 0x20]                             
+  cd: fild dword ptr [ebp - 0x10]                             
+  d0: mov dword ptr [ebp - 0x10], edx                         
+  d3: fmul dword ptr [0]   ; __real@3c010204                  
+  d9: fstp dword ptr [ebp - 0x1c]                             
+  dc: fild dword ptr [ebp - 0x10]                             
+  df: fmul dword ptr [0]   ; __real@3c010204                  
+  e5: fstp dword ptr [ebp - 0x18]                             
+  e8: call 0xed   ; _perpendicular3d                          
+  ed: lea edx, [ebp - 0x20]                                   
+  f0: push edx                                                
+  f1: call 0xf6   ; _normalize3d                              
+  f6: fstp st(0)                                              
+  f8: lea eax, [ebp - 0x2c]                                   
+  fb: push eax                                                
+  fc: call 0x101   ; _normalize3d                             
+ 101: fstp st(0)                                              
+ 103: lea ecx, [ebp - 0x20]                                   
+ 106: push ecx                                                
+ 107: call 0x10c   ; _compress_real_vector3d_to_int32_clamp   
+ 10c: lea edx, [ebp - 0x2c]                                   
+ 10f: push edx                                                
+ 110: mov dword ptr [ebp - 0x44], eax                         
+ 113: call 0x118   ; _compress_real_vector3d_to_int32_clamp   
+ 118: mov dword ptr [ebp - 0x40], eax                         
+ 11b: mov eax, dword ptr [ebp - 0x14]                         
+ 11e: mov ecx, dword ptr [eax + 0xc]                          
+ 121: push ecx                                                
+ 122: push 0x6c656e73                                         
+ 127: call 0x12c   ; _tag_get                                 
+ 12c: mov dword ptr [ebp - 0x54], eax                         
+ 12f: mov edx, dword ptr [esi]                                
+ 131: mov dword ptr [ebp - 0x50], edx                         
+ 134: mov eax, dword ptr [esi + 4]                            
+ 137: mov dword ptr [ebp - 0x4c], eax                         
+ 13a: mov ecx, dword ptr [esi + 8]                            
+ 13d: or eax, 0xffffffff                                      
+ 140: mov dword ptr [ebp - 0x48], ecx                         
+ 143: mov dword ptr [ebp - 0x3c], eax                         
+ 146: mov word ptr [ebp - 0x38], ax                           
+ 14a: mov al, byte ptr [0xa]   ; _render                      
+ 14f: mov edx, edi                                            
+ 151: lea ecx, [ebp - 0x54]                                   
+ 154: sar edx, 0x10                                           
+ 157: push ecx                                                
+ 158: mov byte ptr [ebp - 0x31], 0                            
+ 15c: mov word ptr [ebp - 0x36], dx                           
+ 160: mov word ptr [ebp - 0x34], di                           
+ 164: mov byte ptr [ebp - 0x32], al                           
+ 167: call 0x16c   ; _rasterizer_lens_flare_submit            
+ 16c: mov edx, dword ptr [ebp - 4]                            
+ 16f: add esp, 0x3c                                           
+ 172: inc ebx                                                 
+ 173: movzx eax, word ptr [edx + 0x42]                        
+ 177: cmp ebx, eax                                            
+ 179: jl 0x76                                                 
+ 17f: pop edi                                                 
+ 180: pop esi                                                 
+ 181: pop ebx                                                 
+ 182: mov esp, ebp                                            
+ 184: pop ebp                                                 
+ 185: ret                                                     
+ 186: nop                                                     
+ 187: nop                                                     
+ 188: nop                                                     
+ 189: nop                                                     
+ 18a: nop                                                     
+ 18b: nop                                                     
+ 18c: nop                                                     
+ 18d: nop                                                     
+ 18e: nop                                                     
+ 18f: nop                                                     

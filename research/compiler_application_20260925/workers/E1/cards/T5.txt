@@ -1,0 +1,10 @@
+CARD T5  (written 2026-09-26 01:56:24 -0700, before the trace)  unit rasterizer_xbox_hardware_bitmaps fn _rasterizer_bitmap_new (388 B, parked)
+NEW evidence class since the park: the post-MARK label tail-merge (fable5 phase-vk S3-3: backend step #2
+0x10747812(label) pairs each later JMP ref with the HEAD (outer) ref; default: the OUTER copy hosts, inner JMP
+retargeted, inner copy deleted; SWAP only when the outer stop node is a jmp/eligible branch and the inner's is not).
+Residual: J +0x159 `jne 0x171` (the copy after the error block) vs ours `jne 0x17e` (the copy after the no-device
+arm). Observation-only: the IL at the first post-MARK walk (MARK ordinal 14) with every label's first 3 refs.
+Predictions: (a) at MARK the two return paths are still separate (each ends in a JMP to a common exit label) and
+the exit label's ref list has the no-device JMP at the HEAD (prepended last: reverse source order); (b) hence the
+no-device copy is the outer/host, and the if(!success)-skip branch ends up targeting it (ours); January needs the
+success-path JMP ahead of the no-device JMP on that list.

@@ -1,0 +1,21 @@
+CARD C08 - R9 callback signature (no function-pointer cast) + R10 update_purge's two HCEX iterators, on top of c4q3d
+written: 2026-09-26 01:21:49 -0700 (BEFORE the compiles)
+
+R9 observed: find_closest_player_callback is declared (long object_index, long const *excluded_player_index) and passed
+as `(boolean (*)(long, void *))find_closest_player_callback` - a function-pointer representation cast (rule 27).
+Evidence: X HCEX `static unsigned char find_closest_player_callback(long object_index, void *custom_data)`;
+D /Od 0x59aa30: first statement loads *(long *)[ebp+0xc] into a local, byte result local, and find_closest_player_index
+pushes 0x59aa30 directly with &player_index.
+Correction: `(long object_index, void *custom_data)` in prototype and definition, first statement
+`long excluded_player = *(long *)custom_data;`, the call passes find_closest_player_callback uncast.
+Prediction: byte-identical (the callee's loads do not depend on the pointee type); C1: one cast moves from the call
+to the callee, parameter name text changes -> count-neutral. 180/180.
+
+R10 observed: game_engine_update_purge reuses ONE `iterator` for the item loop and the biped loop.
+Evidence: X HCEX locals `struct object_iterator item_iterator` and `biped_iterator`, both at frame +0x50 (disjoint
+scopes sharing a slot); D /Od 0x5af9b0 two iterators ([ebp-0x1c], [ebp-0x38]); J January frame is 0x10 = ONE
+16-byte slot, i.e. two address-taken iterators in DISJOINT block scopes (escape-scope law), not one reused variable.
+Correction: `{ struct object_iterator item_iterator; ... }` and `{ struct object_iterator biped_iterator; ... }`,
+cutoff_time stays at function scope (its 900 re-store is unchanged; noted separately).
+Prediction: frame stays 0x10 (disjoint scopes share the slot); +1 declared name after populate -> 180/180.
+PREDICTION overall: R9 180/180, R10 180/180, R9+R10 180/180.

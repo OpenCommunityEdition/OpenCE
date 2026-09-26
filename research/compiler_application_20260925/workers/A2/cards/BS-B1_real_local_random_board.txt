@@ -1,0 +1,17 @@
+CARD BS-B1  2026-09-26 00:49:11 -0700   board-wide (real_math.h) + effects   (immutable pre-registration)
+Observed: breakable's surplus _real_local_random DIFFERENT vs January's selected copy (effects) and LNK2005 vs
+  effects' NODUP hand copy. Header body = direct return (pop ecx; ret); January effects copy = add esp,4; ret.
+Evidence (fifty-objects wave2 F1/F2, double attested): J January effects _real_local_random bytes (named-local
+  form); D /Od real_local_random 0x573ae0 has a push-ecx slot (named local); /Od effect_generate_particles
+  calls real_local_random (0x56fdee) and real_local_random_range (0x56fd6d).
+Proposed correction (LEAD-OWNED header + other-unit effects.c): real_math.h body 'real result= real_seed_random(
+  get_global_local_random_seed_address()); return result;'; effects.c drops the #define rename/#undef and the
+  NODUP hand copy and restores the /Od-attested real_local_random() / real_local_random_range(0.0f, 2.f*_pi).
+Prediction at HEAD 455dffad (re-measure; 931ed8dc result was 2 losses):
+  H (header only): changes exactly the TUs that emit _real_local_random (breakable_surfaces,
+     weather_particle_systems; +the declaration-count victims). I predict the SAME two victims as at 931ed8dc:
+     rasterizer_frame_statistics _rasterizer_frame_statistics_draw (4176) and bitmap_drawing _bitmap_copy (2784)
+     EXACT -> residual, plus physics _physics_update_old residual moving. Confidence moderate (canonical moved
+     ~10 commits; any header count change since then shifts the mod-64 phase).
+  B (header + effects): as H, and effects' _real_local_random becomes the SELECT_ANY header copy, still EXACT.
+Decisive test: tools/sweep.py variants b1h, b1 vs ctrl; per-changed-unit strict rows vs January.

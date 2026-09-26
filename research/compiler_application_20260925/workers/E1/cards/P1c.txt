@@ -1,0 +1,5 @@
+CARD P1c (written 2026-09-26 01:18:27 -0700, before compile)  unit source/ai/path_structure_bsp  fn _structure_test_ray2d
+Evidence: P1b alndiff isolates the only difference to the enter compare operand order; J loads distance first.
+Shape: P1b with the enter guard spelled `distance < surface_result.enter_t &&` (the exact production spelling).
+Prediction: EXACT, whole object byte-identical to build/base (p ~0.9). If exact, P1c is the proposed admission
+cleanup (no goto, no flags local, /Od flag loop).

@@ -1,0 +1,11 @@
+CARD PAO-D (A3)  written 2026-09-26 01:25:22 -0700  -- BEFORE its first compile.  DIAGNOSTIC ONLY (never a landing; names not proposed)
+question: are the descriptive static names debug_path / debug_obstacles load-bearing for January's .bss order
+  (path snapshot at +0, obstacles snapshot at +0x1538)? Memory law: VC7 orders UNINITIALISED statics by name hash,
+  '= 0' statics by declaration order.
+variants (on final/pao; only the two identifiers renamed everywhere in the TU):
+  D1: obstacle_path_snapshot / obstacles_snapshot
+  D2: failed_path / failed_obstacles
+  D3: debug_path / debug_obstacles with the two declarations swapped (declaration-order control)
+measurement: .bss symbol offsets in our object (not credit): path object offset 0 and obstacles 0x1538 = January.
+prediction: at least one of D1/D2 flips the order (name-hash law) -> the current names are layout-coupled; D3 keeps
+  the order (uninitialised -> declaration order irrelevant).

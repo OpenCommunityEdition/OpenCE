@@ -1,0 +1,156 @@
+negative control: build/base/source/game/game_engine_king.obj linked with a byte copy of itself
+expected: LNK2005 naming _king_engine
+command: xbox\bin\vc7\Link.Exe /NOLOGO /MACHINE:X86 /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:probe_entry /OUT:C:\Users\isabe\AppData\Local\Temp\tmpe32ebx7x\probe.exe build\base\source\game\game_engine_king.obj C:\Users\isabe\AppData\Local\Temp\tmphkn9jcwd\copy_game_engine_king.obj
+exit code: 1120
+LNK2005/LNK1169 lines: 26
+owner reported: True
+verdict: CONTROL DETECTED
+--- complete linker output ---
+copy_game_engine_king.obj : error LNK2005: _king_engine_dispose already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_dispose_from_old_map already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_game_ending already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_statistics_append already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_handle_client_message already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_handle_server_message already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_pregame_post_rasterize already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_player_damaged_player already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_player_killed_player already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_prespawn_player_update already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_player_added already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_game_starting already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_get_score_string already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_get_team_score_string already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_display_score already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_get_score already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _render_dynamic_quad_initialize already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _render_dynamic_quad already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_get_score_header_string already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_goal_matches_player already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_post_rasterize already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_initialize_for_new_map already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_player_update already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine_update already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_engine already defined in game_engine_king.obj
+copy_game_engine_king.obj : error LNK2005: _king_globals already defined in game_engine_king.obj
+LINK : error LNK2001: unresolved external symbol _probe_entry
+game_engine_king.obj : error LNK2001: unresolved external symbol __fltused
+copy_game_engine_king.obj : error LNK2001: unresolved external symbol __fltused
+game_engine_king.obj : error LNK2019: unresolved external symbol _seed_random_range referenced in function _random_range
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _seed_random_range referenced in function _random_range
+game_engine_king.obj : error LNK2019: unresolved external symbol _get_global_random_seed_address referenced in function _random_range
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _get_global_random_seed_address referenced in function _random_range
+game_engine_king.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _king_engine_player_added
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _king_engine_player_added
+game_engine_king.obj : error LNK2019: unresolved external symbol _player_data referenced in function _king_engine_player_added
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _player_data referenced in function _king_engine_player_added
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_play_multiplayer_sound referenced in function _king_engine_game_starting
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_play_multiplayer_sound referenced in function _king_engine_game_starting
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_has_teams referenced in function _king_engine_game_starting
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_has_teams referenced in function _king_engine_game_starting
+game_engine_king.obj : error LNK2019: unresolved external symbol _ticks_to_unicode_time_string referenced in function _king_get_score_string
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _ticks_to_unicode_time_string referenced in function _king_get_score_string
+game_engine_king.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _usnprintf referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _usnprintf referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _unicode_string_list_get_string referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _unicode_string_list_get_string referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _tag_loaded referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _tag_loaded referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _get_place_name referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _get_place_name referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_get_place referenced in function _king_engine_display_score
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_get_place referenced in function _king_engine_display_score
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_default_animation_values referenced in function _render_dynamic_quad_initialize
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_default_animation_values referenced in function _render_dynamic_quad_initialize
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_default_animation_colors referenced in function _render_dynamic_quad_initialize
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_default_animation_colors referenced in function _render_dynamic_quad_initialize
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_rgb_white referenced in function _render_dynamic_quad_initialize
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_rgb_white referenced in function _render_dynamic_quad_initialize
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_delete referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_delete referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_delete referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_delete referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_models_end referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_models_end referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_end referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_end referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_draw referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_draw referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_transparent_geometry_submit referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_transparent_geometry_submit referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _shader_type_is_transparent referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _shader_type_is_transparent referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_begin referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_model_begin referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_models_begin referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_models_begin referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_profile_enable referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_profile_enable referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_rgb_black referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_rgb_black referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_argb_white referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_real_argb_white referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_identity4x3 referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_identity4x3 referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_unlock referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_unlock referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_unlock referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_unlock referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_geometry_compress_vertices referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_geometry_compress_vertices referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_lock referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_lock referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_lock referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_lock referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_new referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_vertices_new referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_new referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_dynamic_triangles_new referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_globals referenced in function _render_dynamic_quad
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _rasterizer_globals referenced in function _render_dynamic_quad
+game_engine_king.obj : error LNK2019: unresolved external symbol _ustrcpy referenced in function _king_get_score_header_string
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _ustrcpy referenced in function _king_get_score_header_string
+game_engine_king.obj : error LNK2019: unresolved external symbol _convex_hull2d referenced in function _find_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _convex_hull2d referenced in function _find_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _find_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _find_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _find_netgame_flags referenced in function _find_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _find_netgame_flags referenced in function _find_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _find_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _find_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _convex_hull2d_test_point referenced in function _player_inside_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _convex_hull2d_test_point referenced in function _player_inside_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _player_inside_hill
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _player_inside_hill
+game_engine_king.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _king_calculate_hill_state
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _king_calculate_hill_state
+game_engine_king.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _king_calculate_hill_state
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _king_calculate_hill_state
+game_engine_king.obj : error LNK2019: unresolved external symbol _floor referenced in function _king_engine_post_rasterize
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _floor referenced in function _king_engine_post_rasterize
+game_engine_king.obj : error LNK2019: unresolved external symbol _scenario_get_game_globals referenced in function _king_engine_post_rasterize
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _scenario_get_game_globals referenced in function _king_engine_post_rasterize
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_end_game referenced in function _king_engine_player_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_end_game referenced in function _king_engine_player_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_get_variant referenced in function _king_engine_player_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_get_variant referenced in function _king_engine_player_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _king_engine_player_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _king_engine_player_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_can_score referenced in function _king_engine_player_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_can_score referenced in function _king_engine_player_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_state_message referenced in function _king_engine_player_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_state_message referenced in function _king_engine_player_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _console_printf referenced in function _king_engine_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _console_printf referenced in function _king_engine_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_set_goal_position referenced in function _king_engine_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _game_engine_set_goal_position referenced in function _king_engine_update
+game_engine_king.obj : error LNK2019: unresolved external symbol _error referenced in function _king_engine_update
+copy_game_engine_king.obj : error LNK2019: unresolved external symbol _error referenced in function _king_engine_update
+C:\Users\isabe\AppData\Local\Temp\tmpe32ebx7x\probe.exe : fatal error LNK1120: 61 unresolved externals

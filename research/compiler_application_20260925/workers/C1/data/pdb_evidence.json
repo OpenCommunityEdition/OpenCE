@@ -1,0 +1,4276 @@
+{
+ "_rdata_00242ed0": {
+  "cachebeta_public": false,
+  "cachebeta_public_rvas": [],
+  "cachebeta_rva_equals_symbols_json": false
+ },
+ "_rdata_002b6a2c": {
+  "cachebeta_public": false,
+  "cachebeta_public_rvas": [],
+  "cachebeta_rva_equals_symbols_json": false
+ },
+ "_debug_sound_channels": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5128608
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152612,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_looping_sound": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5128609
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152620,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_sound": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5128610
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152613,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_loud_dialog_hack": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5128611
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159004,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_sound_channels": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5128640
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152640,
+     "scope": "Global",
+     "type": "struct sound_channel_datum[0x100]"
+    }
+   ],
+   "public_length": 6144,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_looping_sound_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5134784
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152616,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_sound_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5134788
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159008,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_interrupt_result": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5134792
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_dsound_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5134816
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_sound_class_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165740
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151924,
+     "scope": "Global",
+     "type": "struct sound_class_datum *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_combined_pas": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165760
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159040,
+     "scope": "Global",
+     "type": "unsigned long[0x10]"
+    }
+   ],
+   "public_length": 64,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_game_sound_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165824
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159108,
+     "scope": "Global",
+     "type": "struct game_sound_global_data *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_game_looping_sound_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165828
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159104,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_recover_saved_games_hack": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165832
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26809336,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_sound_cache": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165833
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695080,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_assertion_count": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165834
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_sound_reference_counts": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165836
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 24235380,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "..\\..\\..\\build\\x360\\SHIP\\halo\\pc_sound_cache.obj"
+   ]
+  }
+ },
+ "_global_tag_instances": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165840
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804780,
+     "scope": "Global",
+     "type": "struct cache_file_tag_instance *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_objects_vehicle_powered_mass_points": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165844
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_unit_mouth_apeture": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165845
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_unit_seats": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165846
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_unit_vectors": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165847
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_stun_enable": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165848
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804852,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_damage_taken": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165849
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_unit_illumination": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165850
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_unit_animations": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165851
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_unit_all_animations": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165852
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_objects_biped_autoaim_pills": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165853
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_biped_physics_pills": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165854
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_file_location_volume_names": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5165856
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "char[0x100][0x3]"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_fog_planes": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166368
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_structures_use_pvs_for_vs": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166369
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25696029,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_portals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166370
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_leaf_portals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166371
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25696028,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_window_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166400
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "struct window_data"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_wind_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5166560
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25696032,
+     "scope": "Global",
+     "type": "struct <unnamed-tag>"
+    }
+   ],
+   "public_length": 3340,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_sound_environment": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169900
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_scenario_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169904
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802880,
+     "scope": "Global",
+     "type": "struct scenario_global_data *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_game_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169908
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802892,
+     "scope": "Global",
+     "type": "struct game_globals *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_bsp3d": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169912
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802876,
+     "scope": "Global",
+     "type": "struct bsp3d *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_collision_bsp": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169916
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802884,
+     "scope": "Global",
+     "type": "struct collision_bsp *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_structure_bsp": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169920
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802888,
+     "scope": "Global",
+     "type": "struct structure_bsp *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_scenario": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169924
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802872,
+     "scope": "Global",
+     "type": "struct scenario *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_sprites": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169928
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695028,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_build_sprite_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169952
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695040,
+     "scope": "Global",
+     "type": "struct <unnamed-tag>"
+    }
+   ],
+   "public_length": 40,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_objects": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169992
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804832,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_cached_object_render_states": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5169996
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804836,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_permanent_decals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170000
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_input": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170001
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_bsp": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170002
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_structure": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170003
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_player": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170004
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_camera": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170005
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5170016
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159136,
+     "scope": "Global",
+     "type": "struct render_globals"
+    }
+   ],
+   "public_length": 643736,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_rasterizer_lights": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5813760
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25699392,
+     "scope": "Global",
+     "type": "struct rasterizer_lights"
+    }
+   ],
+   "public_length": 7176,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_rasterizer_frame_statistics": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5820960
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25706592,
+     "scope": "Global",
+     "type": "struct rasterizer_frame_statistics_s"
+    }
+   ],
+   "public_length": 28,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_rasterizer_model_cortana_hack": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5821328
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25706644,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_texture_table": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5821344
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_texturestagestate_table": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5821376
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_renderstate_table": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5821888
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_d3d_caps": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5822464
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26807680,
+     "scope": "Global",
+     "type": "struct _D3DCAPS9"
+    }
+   ],
+   "public_length": 304,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_pixel_shader": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5822688
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_window_parameters": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5822944
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152000,
+     "scope": "Global",
+     "type": "struct rasterizer_window_begin_parameters"
+    }
+   ],
+   "public_length": 600,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_frame_parameters": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5823544
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151968,
+     "scope": "Global",
+     "type": "struct rasterizer_frame_begin_parameters"
+    }
+   ],
+   "public_length": 16,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_point_physics": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5823552
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_collision_usage_buffer": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5823584
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_usage_current": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5832448
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_current_collision_users": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835424
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_phantom_bsp_point": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835488
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flags": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835500
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_radius": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835504
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_center": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835520
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_vector": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835536
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_point": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835552
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_use_vehicle_physics": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835564
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_skip_passthrough_bipeds": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835565
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_try_to_keep_location_valid": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835566
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_placeholders": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835567
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_light_fixtures": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835568
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_controls": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835569
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_machines": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835570
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_scenery": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835571
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_projectiles": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835572
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_equipment": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835573
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_weapons": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835574
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_vehicles": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835575
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_objects_bipeds": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835576
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_ignore_breakable_surfaces": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835577
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_ignore_two_sided_surfaces": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835578
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_flag_back_facing_surfaces": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835579
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_repeat": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835580
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_features": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835581
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug_spray": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835582
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_collision_debug": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835583
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_node_count": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835584
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "long"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_objects_names": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835588
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_pathfinding_spheres": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835589
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_physics": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835590
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_objects_root_node": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835591
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_object_marker": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835592
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804812,
+     "scope": "Global",
+     "type": "long"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_noncollideable_object_cluster_partition": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835600
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804800,
+     "scope": "Global",
+     "type": "struct cluster_partition"
+    }
+   ],
+   "public_length": 12,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_collideable_object_cluster_partition": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835616
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804816,
+     "scope": "Global",
+     "type": "struct cluster_partition"
+    }
+   ],
+   "public_length": 12,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_object_garbage_collection": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835628
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_object_header_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835632
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804784,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_first_object_type_definition": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835636
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26802896,
+     "scope": "Global",
+     "type": "struct object_type_definition *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_lights": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835640
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_object_lights": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835641
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_rasterizer_light_count": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835642
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804752,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": 2,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_lights_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5835648
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26803904,
+     "scope": "Global",
+     "type": "struct <unnamed-tag>"
+    }
+   ],
+   "public_length": 848,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_light_cluster_partition": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836496
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804768,
+     "scope": "Global",
+     "type": "struct cluster_partition"
+    }
+   ],
+   "public_length": 12,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_light_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836508
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804756,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_damage": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836512
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_widget_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836516
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151584,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_glow_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836520
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25694952,
+     "scope": "Global",
+     "type": "struct <unnamed-tag>"
+    }
+   ],
+   "public_length": 8,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_flag_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836528
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25694944,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_antenna_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836532
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25694948,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_network_game_server_memory_do_not_use_directly": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5836544
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_network_game_client_dont_use_directly": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5837760
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render_model_no_geometry": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841008
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render_model_markers": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841009
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render_model_index_counts": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841010
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render_model_vertex_counts": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841011
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_render_model_nodes": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841012
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_render_freeze": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841013
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26807984,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": 1,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_cached_variant_profile": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841024
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26142880,
+     "scope": "Global",
+     "type": "struct _cached_variant_profile[0x3]"
+    }
+   ],
+   "public_length": 468,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_cached_player_profile": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841376
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26136928,
+     "scope": "Global",
+     "type": "struct _cached_player_profile[0x3]"
+    }
+   ],
+   "public_length": 5952,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_local_player_index_for_draw_string_and_hack_in_icons": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841532
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151952,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": 2,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_ui_plasma_effect_color": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841536
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151936,
+     "scope": "Global",
+     "type": "union real_argb_color"
+    }
+   ],
+   "public_length": 16,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_light_z": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841552
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_light_y": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841556
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_light_x": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841560
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_blur_shader": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841568
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_regular_shader": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5841824
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_current_time": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842064
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": []
+  }
+ },
+ "_profile_graph": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842068
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_profile_display": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842069
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_blip_player_index": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842070
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25699372,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": 2,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_num_drawn": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842072
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_num_triangles": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842074
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "short"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_center_point": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842080
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25699376,
+     "scope": "Global",
+     "type": "union real_point2d"
+    }
+   ],
+   "public_length": 8,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_color32": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842088
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned long"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_hud_msg_def": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842092
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26805452,
+     "scope": "Global",
+     "type": "struct hud_messaging_parameters_definition *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_temporary_hud": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842096
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_object_list_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842100
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26147472,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_object_list_header_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842104
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26147468,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_trigger_volumes": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842108
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_debug_scripting": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842109
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_hs_debug_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842112
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_hs_global_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842144
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26809156,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_hs_thread_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842148
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26809160,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_hs_syntax_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842152
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151956,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_players_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842156
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804864,
+     "scope": "Global",
+     "type": "struct players_global_data *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_team_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842160
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804868,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_player_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842164
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804872,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_default_animation_colors": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842176
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25692000,
+     "scope": "Global",
+     "type": "union real_rgb_color[0x4]"
+    }
+   ],
+   "public_length": 48,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_default_animation_values": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842224
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25692048,
+     "scope": "Global",
+     "type": "float[0x4]"
+    }
+   ],
+   "public_length": 16,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_game_engine_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842240
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151616,
+     "scope": "Global",
+     "type": "struct _game_engine_globals"
+    }
+   ],
+   "public_length": 36,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_timeout_for_endgame_sound": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842276
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151652,
+     "scope": "Global",
+     "type": "long"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_stage": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842304
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151680,
+     "scope": "Global",
+     "type": "struct play_stage"
+    }
+   ],
+   "public_length": 216,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_game_variant_global": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842496
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26809184,
+     "scope": "Global",
+     "type": "struct game_variant"
+    }
+   ],
+   "public_length": 152,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_cheat": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842608
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26805504,
+     "scope": "Global",
+     "type": "struct cheat_globals"
+    }
+   ],
+   "public_length": 10,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_weather_particle_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842620
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151912,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_particle_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842624
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151908,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_system_particles": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842628
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151920,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_particle_systems": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842632
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151916,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_effect_location_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842636
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804848,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_effect_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842640
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804844,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_decals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842644
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_global_decal_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842648
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151896,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_contrail_point_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842652
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151900,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_contrail_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842656
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26151904,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_objects_devices": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842660
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_device_groups_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842664
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25699384,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_error_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5842688
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26143360,
+     "scope": "Global",
+     "type": "struct error_global_data"
+    }
+   ],
+   "public_length": 4106,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_temporary": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5844768
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "char[0x100]"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_director_camera_scripted": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845024
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804840,
+     "scope": "Global",
+     "type": "unsigned char *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_server_transport_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845028
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_key": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845040
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_key_id": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845056
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_nonce": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845064
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_address": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845072
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_prop_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845084
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695084,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_debug_obstacle_path_radius": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845088
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_ignore_broken_surfaces": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845092
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_obstacle_path_finishing": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845093
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_obstacle_path_goal_surface_index": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845096
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_obstacle_path_goal_point": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845104
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_obstacle_path_start_surface_index": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845116
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_debug_obstacle_path_start_point": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845120
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_pursuit_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845132
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159124,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_encounter_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845136
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159116,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_platoon_array": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845140
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159112,
+     "scope": "Global",
+     "type": "struct platoon_datum *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_squad_array": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845144
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26159120,
+     "scope": "Global",
+     "type": "struct squad_datum *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_profilestring": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5845152
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_ai_profile_string_position": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5847200
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_ai_profile": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5847232
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_ai_debug_string_position": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5851052
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_ai_debug_drawstack_height": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5851056
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_ai_debug_drawstack_last_position": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5851072
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_global_ai_debug_drawstack_next_position": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5851088
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_ai_debug": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   5851104
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_conversation_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398732
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695088,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_communication_table_indices": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398752
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695104,
+     "scope": "Global",
+     "type": "short[0x39]"
+    }
+   ],
+   "public_length": 114,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_ai_globals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398868
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26804828,
+     "scope": "Global",
+     "type": "struct ai_globals *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_continuous_damage_reference": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398880
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "struct tag_reference_definition"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_global_damage_reference": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398896
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "struct tag_reference_definition"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_swarm_component_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398908
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152600,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_swarm_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398912
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152604,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_actor_data": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398916
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26152608,
+     "scope": "Global",
+     "type": "struct data_array *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_avoidance_rays": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6398944
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695232,
+     "scope": "Global",
+     "type": "struct vector_avoidance_ray[0x2][0x8]"
+    }
+   ],
+   "public_length": 448,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_avoidance_directions": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399392
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695680,
+     "scope": "Global",
+     "type": "union real_vector3d[0x8]"
+    }
+   ],
+   "public_length": 96,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_sense_rays": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399488
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25695776,
+     "scope": "Global",
+     "type": "struct vector_avoidance_ray[0x9]"
+    }
+   ],
+   "public_length": 252,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_global_temporary_render_color": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399744
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "union real_argb_color"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_OHCD_GlobalPool": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399776
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_OHCD_InterruptObject": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399840
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_XapiAutoPowerDownGlobals": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6399968
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "_CheckHeapFillPattern": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400048
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "unsigned char[0x10]"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "_NtGlobalFlag": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400064
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25661624,
+     "scope": "Global",
+     "type": "unsigned long"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "___@@_PchSym_@00@UcylcRurmzouivUkirezgvUmglhUczkrUpDCUoryUlyqUrDIGUyzhvwooOlyq@Xapi_k32": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400068
+  ],
+  "cachebeta_rva_equals_symbols_json": true
+ },
+ "_XapiProcessHeap": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400072
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25661612,
+     "scope": "Global",
+     "type": "void *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_XapiCurrentTopLevelFilter": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400076
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 25661628,
+     "scope": "Global",
+     "type": "function  *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "_XapiTlsSize": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400080
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "___@@_PchSym_@00@UcylcRurmzouivUkirezgvUdrmwldhUwrivxgcUwhlfmwUwhlfmwUlyqUrDIGUwhlfmwrOlyq@dsound": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400084
+  ],
+  "cachebeta_rva_equals_symbols_json": true
+ },
+ "___mblcid": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400088
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 24310804,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "___ptmbcinfo": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400092
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 21504144,
+     "scope": "Global",
+     "type": "struct threadmbcinfostruct *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "___ismbcodepage": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400096
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 24310800,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "__mbctype": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400128
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 21503624,
+     "scope": "Global",
+     "type": "unsigned char[0x101]"
+    }
+   ],
+   "public_length": 264,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "___mbcodepage": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400388
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 24310796,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "___mbulinfo": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400416
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 24310780,
+     "scope": "Global",
+     "type": "unsigned short[0x6]"
+    }
+   ],
+   "public_length": 12,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "__mbcasemap": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400448
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 21503888,
+     "scope": "Global",
+     "type": "unsigned char[0x100]"
+    }
+   ],
+   "public_length": 256,
+   "public": true,
+   "contrib_modules": [
+    "obj\\xbox\\mbctype.obj"
+   ]
+  }
+ },
+ "___active_heap": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400704
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "___ptd_glob": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400708
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": []
+  }
+ },
+ "__nhandle": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400712
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26822724,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "___pioinfo": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400736
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26822752,
+     "scope": "Global",
+     "type": "struct ioinfo *[0x0]"
+    },
+    {
+     "rva": 26822752,
+     "scope": "Global",
+     "type": "struct ioinfo *[0x40]"
+    },
+    {
+     "rva": 26822752,
+     "scope": "Global",
+     "type": "struct ioinfo *[0x0]"
+    }
+   ],
+   "public_length": 256,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *",
+    "* Linker *",
+    "* Linker *"
+   ]
+  }
+ },
+ "___piob": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400992
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26823008,
+     "scope": "Global",
+     "type": "void * *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "__nstream": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6400996
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26823012,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "___env_initialized": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6401000
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 0,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": null,
+   "public": false,
+   "contrib_modules": [
+    null
+   ]
+  }
+ },
+ "___onexitend": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6401004
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26823016,
+     "scope": "Global",
+     "type": "function  * *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "___onexitbegin": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6401008
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26823020,
+     "scope": "Global",
+     "type": "function  * *"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ },
+ "___mbctype_initialized": {
+  "cachebeta_public": true,
+  "cachebeta_public_rvas": [
+   6401012
+  ],
+  "cachebeta_rva_equals_symbols_json": true,
+  "hcex": {
+   "data": [
+    {
+     "rva": 26823024,
+     "scope": "Global",
+     "type": "int"
+    }
+   ],
+   "public_length": 4,
+   "public": true,
+   "contrib_modules": [
+    "* Linker *"
+   ]
+  }
+ }
+}

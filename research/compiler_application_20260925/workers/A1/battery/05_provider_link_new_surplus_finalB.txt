@@ -1,0 +1,1 @@
+no surplus external definitions: PASS (nothing to link)

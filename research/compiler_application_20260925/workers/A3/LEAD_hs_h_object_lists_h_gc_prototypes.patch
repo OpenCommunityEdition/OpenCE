@@ -1,0 +1,22 @@
+--- a/source/hs/hs.h
++++ b/source/hs/hs.h
+@@ -153,6 +153,8 @@
+ 	void);
+ void hs_update(
+ 	void);
++void hs_node_gc(
++	void);
+ void hs_dispose(
+ 	void);
+ boolean hs_evaluate_by_name(
+--- a/source/hs/object_lists.h
++++ b/source/hs/object_lists.h
+@@ -44,6 +44,8 @@
+ 	long object_list_index);
+ void object_list_remove_reference(
+ 	long object_list_index);
++void object_list_gc(
++	void);
+ 
+ 
+ /* ---------- globals */

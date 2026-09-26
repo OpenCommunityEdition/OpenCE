@@ -1,0 +1,27 @@
+PROC control_place void ()(long, struct scenario_control_datum *)
+  REGISTER r4 control_index                    long
+  REGISTER r5 scenario_control                 struct scenario_control_datum *
+PROC light_fixture_place void ()(long, struct scenario_light_fixture_datum *)
+  REGISTER r4 light_fixture_index              long
+  REGISTER r5 scenario_light_fixture           struct scenario_light_fixture_datum *
+PROC machine_place void ()(long, struct scenario_machine_datum *)
+  REGISTER r4 machine_index                    long
+  REGISTER r5 scenario_machine                 struct scenario_machine_datum *
+PROC placeholder_place void ()(long, struct scenario_placeholder_datum *)
+  REGISTER r4 placeholder_index                long
+  REGISTER r5 scenario_placeholder             struct scenario_placeholder_datum *
+PROC scenery_place void ()(long, struct scenario_scenery_datum *)
+  REGISTER r4 scenery_index                    long
+  REGISTER r5 scenario_scenery                 struct scenario_scenery_datum *
+PROC biped_place void ()(long, struct scenario_biped_datum *)
+  REGISTER r4 biped_index                      long
+  REGISTER r5 scenario_biped                   struct scenario_biped_datum *
+PROC vehicle_place void ()(long, struct scenario_vehicle_datum *)
+  REGISTER r4 vehicle_index                    long
+  REGISTER r5 scenario_vehicle                 struct scenario_vehicle_datum *
+PROC equipment_place void ()(long, struct scenario_equipment_datum *)
+  REGISTER r4 equipment_index                  long
+  REGISTER r5 scenario_equipment               struct scenario_equipment_datum *
+PROC unit_place void ()(long, struct scenario_unit_datum *)
+  REGISTER r4 unit_index                       long
+  REGISTER r5 scenario_unit                    struct scenario_unit_datum *

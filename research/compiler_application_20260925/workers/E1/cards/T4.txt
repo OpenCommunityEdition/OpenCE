@@ -1,0 +1,9 @@
+CARD T4  (written 2026-09-26 01:53:00 -0700, before the trace)  unit source/objects/widgets/lightning fn _lightning_submit (2,571 B, unclassified park)
+Residual 2 of 2 (the x87-store transposition): J +0x876 `mov ecx,[ebp-8]; fstp [esi+0xc]` vs ours `fstp [esi+0xc];
+mov ecx,[ebp-8]` (vertex_index reload for `if (vertex_index == 0)` vs the texture.x store of the 2nd vertex).
+(Residual 1, the global_z_axis3d component copy register choice at +0x38e, is not traced here. HCEX types
+global_z_axis3d as `const union real_point3d *`, so the component-wise copy is the correctly typed form.)
+Observation-only list-scheduler trace (T1 tool) of production, offsets 0x840..0x8b0.
+Predictions: (a) the reload (u0) and the fstp (u2) are not in the same cycle in ours - the reload is ready later or
+refused on unit 0 by another unit-0 node (possibly a 0-byte 0x267 barrier from the named real locals u/width, or the
+0x3f800000 immediate store); (b) its key is high (it feeds the block-ending branch).

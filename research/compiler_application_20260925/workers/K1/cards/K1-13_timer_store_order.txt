@@ -1,0 +1,10 @@
+CARD K1-13  (pre-registered 2026-09-26 02:32:18 -0700)
+Base: k10 (21 hunks). Target hunk: 0x838-0x847 in the timer loop - January loads the speech_disabled pointer temp
+  (mov ecx,[ebp-0x50]) BEFORE the reason load/store; ours after. Emitted store order is reason, delay, disabled in
+  both (stores to three distinct local arrays - store/store order is not evidence).
+Evidence (D, /Od 0x48e746-0x48e7c7): source statement order is speech_disabled[..] = disabled;
+  speech_enable_after_ticks[..] = delay; speech_disabled_reason[..] = reason; (ours: reason, delay, disabled).
+Mechanism under test: scheduler tie-break +0x36 = original IL order; the disabled-pointer load becomes earlier in
+  IL order when its store is the first statement.
+Change: reorder the three final stores to the /Od order.
+Prediction: the 0x838 hunk resolves; nothing else changes (stores may stay reason/delay/disabled).

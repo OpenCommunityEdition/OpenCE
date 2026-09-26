@@ -1,0 +1,133 @@
+## protoscan base object_types.c
+== scratch/campaign/workers/D1/root_base/source/objects/object_types.c
+    149 defined-here       void object_types_place_objects( boolean reconnecting);
+    153 NOT DEFINED HERE   void prefix##_initialize( \ void); \ void prefix##_dispose( \ void); \ void prefix##_initialize_for_new_map( \ void); \ void prefix##_dispose_from_old
+    163 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(bipeds);
+    164 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(vehicles);
+    165 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(items);
+    166 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(weapons);
+    167 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(scenery);
+    168 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(devices);
+    169 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(machines);
+    170 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(controls);
+    171 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(light_fixtures);
+    172 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(placeholder);
+    176 NOT DEFINED HERE   void object_export_function_values( long object_index);
+    178 NOT DEFINED HERE   void object_render_debug( long object_index);
+    181 NOT DEFINED HERE   boolean unit_new( long object_index);
+    183 NOT DEFINED HERE   void unit_delete( long object_index);
+    185 NOT DEFINED HERE   boolean unit_update( long object_index);
+    187 NOT DEFINED HERE   void unit_export_function_values( long object_index);
+    189 NOT DEFINED HERE   void unit_handle_deleted_object( long object_index, long deleted_object_index);
+    192 NOT DEFINED HERE   void unit_handle_region_destroyed( long object_index, short region_index, unsigned long damage_flags);
+    196 NOT DEFINED HERE   void unit_postprocess_node_matrices( long object_index, struct real_matrix4x3 *node_matrices);
+    199 NOT DEFINED HERE   void unit_render_debug( long object_index);
+    202 NOT DEFINED HERE   boolean vehicle_new( long object_index);
+    204 NOT DEFINED HERE   void vehicle_place( long object_index, struct scenario_object_datum *scenario_object);
+    207 NOT DEFINED HERE   void vehicle_delete( long object_index);
+    209 NOT DEFINED HERE   boolean vehicle_update( long object_index);
+    211 NOT DEFINED HERE   void vehicle_export_function_values( long object_index);
+    213 NOT DEFINED HERE   void vehicle_preprocess_node_orientations( long object_index, struct real_orientation *node_orientations);
+    216 NOT DEFINED HERE   void vehicle_reset( long object_index);
+    218 NOT DEFINED HERE   void vehicle_render_debug( long object_index);
+    221 NOT DEFINED HERE   void weapon_place( long object_index, struct scenario_object_datum *scenario_object);
+    224 NOT DEFINED HERE   void weapon_delete( long object_index);
+    226 NOT DEFINED HERE   boolean weapon_update( long object_index);
+    228 NOT DEFINED HERE   void weapon_preprocess_node_orientations( long object_index, struct real_orientation *node_orientations);
+    232 NOT DEFINED HERE   void equipment_place( long object_index, struct scenario_object_datum *scenario_object);
+    235 NOT DEFINED HERE   boolean garbage_new( long object_index);
+    237 NOT DEFINED HERE   boolean garbage_update( long object_index);
+    240 NOT DEFINED HERE   boolean scenery_new( long object_index);
+    242 NOT DEFINED HERE   void scenery_place( long object_index, struct scenario_object_datum *scenario_object);
+    245 NOT DEFINED HERE   void scenery_delete( long object_index);
+    247 NOT DEFINED HERE   boolean scenery_update( long object_index);
+    250 NOT DEFINED HERE   boolean sound_scenery_new( long object_index);
+    252 NOT DEFINED HERE   void sound_scenery_delete( long object_index);
+    255 NOT DEFINED HERE   boolean device_new( long object_index);
+    257 NOT DEFINED HERE   void device_delete( long object_index);
+    260 NOT DEFINED HERE   boolean machine_new( long object_index);
+    262 NOT DEFINED HERE   void machine_place( long object_index, struct scenario_object_datum *scenario_object);
+    265 NOT DEFINED HERE   void machine_delete( long object_index);
+    267 NOT DEFINED HERE   boolean machine_update( long object_index);
+    270 NOT DEFINED HERE   boolean control_new( long object_index);
+    272 NOT DEFINED HERE   void control_place( long object_index, struct scenario_object_datum *scenario_object);
+    275 NOT DEFINED HERE   void control_delete( long object_index);
+    277 NOT DEFINED HERE   boolean control_update( long object_index);
+    280 NOT DEFINED HERE   boolean light_fixture_new( long object_index);
+    282 NOT DEFINED HERE   void light_fixture_place( long object_index, struct scenario_object_datum *scenario_object);
+    285 NOT DEFINED HERE   void light_fixture_delete( long object_index);
+    287 NOT DEFINED HERE   boolean light_fixture_update( long object_index);
+    290 NOT DEFINED HERE   boolean placeholder_new( long object_index);
+    292 NOT DEFINED HERE   void placeholder_place( long object_index, struct scenario_object_datum *scenario_object);
+    295 NOT DEFINED HERE   void placeholder_delete( long object_index);
+
+## protoscan PK object_types.c
+== scratch/campaign/workers/D1/root_p2/source/objects/object_types.c
+    149 defined-here       void object_types_place_objects( boolean reconnecting);
+    153 NOT DEFINED HERE   void prefix##_initialize( \ void); \ void prefix##_dispose( \ void); \ void prefix##_initialize_for_new_map( \ void); \ void prefix##_dispose_from_old
+    163 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(bipeds);
+    164 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(vehicles);
+    165 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(items);
+    166 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(weapons);
+    167 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(scenery);
+    168 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(devices);
+    169 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(machines);
+    170 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(controls);
+    171 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(light_fixtures);
+    172 NOT DEFINED HERE   DECLARE_OBJECT_TYPE_LIFECYCLE(placeholder);
+    176 NOT DEFINED HERE   void object_export_function_values( long object_index);
+    178 NOT DEFINED HERE   void object_render_debug( long object_index);
+    181 NOT DEFINED HERE   boolean unit_new( long object_index);
+    183 NOT DEFINED HERE   void unit_delete( long object_index);
+    185 NOT DEFINED HERE   boolean unit_update( long object_index);
+    187 NOT DEFINED HERE   void unit_export_function_values( long object_index);
+    189 NOT DEFINED HERE   void unit_handle_deleted_object( long object_index, long deleted_object_index);
+    192 NOT DEFINED HERE   void unit_handle_region_destroyed( long object_index, short region_index, unsigned long damage_flags);
+    196 NOT DEFINED HERE   void unit_postprocess_node_matrices( long object_index, struct real_matrix4x3 *node_matrices);
+    199 NOT DEFINED HERE   void unit_render_debug( long object_index);
+    202 NOT DEFINED HERE   boolean vehicle_new( long object_index);
+    204 NOT DEFINED HERE   void vehicle_place( long object_index, struct scenario_object_datum *scenario_object);
+    207 NOT DEFINED HERE   void vehicle_delete( long object_index);
+    209 NOT DEFINED HERE   boolean vehicle_update( long object_index);
+    211 NOT DEFINED HERE   void vehicle_export_function_values( long object_index);
+    213 NOT DEFINED HERE   void vehicle_preprocess_node_orientations( long object_index, struct real_orientation *node_orientations);
+    216 NOT DEFINED HERE   void vehicle_reset( long object_index);
+    218 NOT DEFINED HERE   void vehicle_render_debug( long object_index);
+    221 NOT DEFINED HERE   void weapon_delete( long object_index);
+    223 NOT DEFINED HERE   boolean weapon_update( long object_index);
+    225 NOT DEFINED HERE   void weapon_preprocess_node_orientations( long object_index, struct real_orientation *node_orientations);
+    229 NOT DEFINED HERE   void equipment_place( long object_index, struct scenario_object_datum *scenario_object);
+    232 NOT DEFINED HERE   boolean garbage_new( long object_index);
+    234 NOT DEFINED HERE   boolean garbage_update( long object_index);
+    237 NOT DEFINED HERE   boolean scenery_new( long object_index);
+    239 NOT DEFINED HERE   void scenery_place( long object_index, struct scenario_object_datum *scenario_object);
+    242 NOT DEFINED HERE   void scenery_delete( long object_index);
+    244 NOT DEFINED HERE   boolean scenery_update( long object_index);
+    247 NOT DEFINED HERE   boolean sound_scenery_new( long object_index);
+    249 NOT DEFINED HERE   void sound_scenery_delete( long object_index);
+    252 NOT DEFINED HERE   boolean device_new( long object_index);
+    254 NOT DEFINED HERE   void device_delete( long object_index);
+    257 NOT DEFINED HERE   boolean machine_new( long object_index);
+    259 NOT DEFINED HERE   void machine_place( long object_index, struct scenario_object_datum *scenario_object);
+    262 NOT DEFINED HERE   void machine_delete( long object_index);
+    264 NOT DEFINED HERE   boolean machine_update( long object_index);
+    267 NOT DEFINED HERE   boolean control_new( long object_index);
+    269 NOT DEFINED HERE   void control_place( long object_index, struct scenario_object_datum *scenario_object);
+    272 NOT DEFINED HERE   void control_delete( long object_index);
+    274 NOT DEFINED HERE   boolean control_update( long object_index);
+    277 NOT DEFINED HERE   boolean light_fixture_new( long object_index);
+    279 NOT DEFINED HERE   void light_fixture_place( long object_index, struct scenario_object_datum *scenario_object);
+    282 NOT DEFINED HERE   void light_fixture_delete( long object_index);
+    284 NOT DEFINED HERE   boolean light_fixture_update( long object_index);
+    287 NOT DEFINED HERE   boolean placeholder_new( long object_index);
+    289 NOT DEFINED HERE   void placeholder_place( long object_index, struct scenario_object_datum *scenario_object);
+    292 NOT DEFINED HERE   void placeholder_delete( long object_index);
+
+## protoscan base weapons.c
+== scratch/campaign/workers/D1/root_base/source/items/weapons.c
+    360 NOT DEFINED HERE   real transition_function_evaluate( short function_type, real value);
+    363 NOT DEFINED HERE   void unit_handle_weapon_state_change( long object_index, short new_state);
+## protoscan PK weapons.c
+== scratch/campaign/workers/D1/root_p2/source/items/weapons.c
+    360 NOT DEFINED HERE   real transition_function_evaluate( short function_type, real value);
+    363 NOT DEFINED HERE   void unit_handle_weapon_state_change( long object_index, short new_state);
