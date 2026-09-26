@@ -722,25 +722,6 @@
       }
     },
     {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_evaluate_begin_random",
-      "class": "private-register-convention",
-      "evidence": "Fuzzy-parked after reconstructing the complete begin-random evaluator in ordinary typed C from January's instruction and relocation topology. Target and candidate share the 528-byte padded envelope and all 30 relocation identities; objdiff reports 99.89011 percent similarity. The residual is only four ModRM register-selection bytes in the random-child selection loop, with identical operations and control flow. Donor and reconciliation experiments exhausted natural declaration, initialization, and statement-order forms without moving this tie independently. No register or volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the private register assignment.",
-      "measurements": {
-        "target": {
-          "size": 528,
-          "relocation_count": 30,
-          "normalized_sha256": "fce47f8f054751af9bd8b16e2e3e11e5c3a2afbe506383b41aff2a61a6f3b573"
-        },
-        "base": {
-          "size": 528,
-          "relocation_count": 30,
-          "normalized_sha256": "c10e869c67180ba3040bc35040e0e9a4329b841c05599c61583c5114a84b5cf1"
-        },
-        "objdiff_percent": 99.89011
-      }
-    },
-    {
       "unit": "source/effects/effects",
       "function": "_effect_allowed_by_environment",
       "class": "unclassified",
