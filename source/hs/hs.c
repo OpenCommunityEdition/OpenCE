@@ -3333,12 +3333,6 @@ struct hs_arguments_long_long_long
 	long value2;
 };
 
-struct hs_external_global_definition
-{
-	char const *name;
-	short type;
-};
-
 struct hud_globals_definition
 {
 	byte reserved_000[0x160];

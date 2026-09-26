@@ -327,9 +327,6 @@ typedef char object_damage_body_body_destroyed_threshold_offset_assert[
 
 /* ---------- prototypes */
 
-void render_debug_object_damage(
-	void);
-
 static long get_player_index_from_object_or_parents(
 	long object_index);
 

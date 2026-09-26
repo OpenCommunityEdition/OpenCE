@@ -908,14 +908,6 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct hs_external_global_definition
-{
-	char const *name;
-	short type;
-	short pad;
-	void *address;
-};
-
 typedef char verify_hs_external_global_definition_size[
 	sizeof(struct hs_external_global_definition) == 0xC ? 1 : -1];
 
