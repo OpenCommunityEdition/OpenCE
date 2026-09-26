@@ -2112,15 +2112,17 @@ void actor_destination_update(
 			step_reached = FALSE;
 			if (step_index + 1 < path->step_count)
 			{
-				real_point3d *step_point = &path->steps[step_index].point;
-				real_point3d *next_step_point = &path->steps[step_index + 1].point;
-				real_vector2d to_step;
-				real_vector2d step_vector;
+				real_vector2d actor_to_point;
+				real_vector2d next_step;
 
-				to_step.i = step_point->x - actor->input.position.body_position.x;
-				to_step.j = step_point->y - actor->input.position.body_position.y;
-				step_vector.i = next_step_point->x - step_point->x;
-				step_vector.j = next_step_point->y - step_point->y;
+				vector_from_points2d(
+					(real_point2d const *)&actor->input.position.body_position,
+					(real_point2d const *)&path->steps[step_index].point,
+					&actor_to_point);
+				vector_from_points2d(
+					(real_point2d const *)&path->steps[step_index].point,
+					(real_point2d const *)&path->steps[step_index + 1].point,
+					&next_step);
 
 				if (actor->control.movement_complete)
 				{
@@ -2128,22 +2130,22 @@ void actor_destination_update(
 				}
 				else if (actor->control.moving && actor->control.movement_thwarted)
 				{
-					real distance_along_step = step_vector.i*to_step.i + step_vector.j*to_step.j;
+					real facing_dot = dot_product2d((real_vector2d const *)&actor->input.facing_vector, &next_step);
+					real distance_along_step = dot_product2d(&actor_to_point, &next_step);
 
-					if (step_vector.i*actor->input.facing_vector.i + step_vector.j*actor->input.facing_vector.j > 0.f &&
-						distance_along_step < 0.f)
+					if (facing_dot > 0.f && distance_along_step < 0.f)
 					{
-						double t = -distance_along_step;
-						real_vector2d offset;
-
-						offset.i = step_vector.i*t + to_step.i;
-						offset.j = step_vector.j*t + to_step.j;
-						step_reached = magnitude_squared2d(&offset) < 0.25f*0.25f;
+						point_from_line2d(
+							(real_point2d const *)&actor_to_point,
+							&next_step,
+							-distance_along_step,
+							(real_point2d *)&actor_to_point);
+						step_reached = magnitude_squared2d(&actor_to_point) < 0.25f*0.25f;
 					}
 				}
 				else
 				{
-					step_reached = magnitude_squared2d(&to_step) < 0.15f*0.15f;
+					step_reached = magnitude_squared2d(&actor_to_point) < 0.15f*0.15f;
 				}
 
 				if (step_reached)
