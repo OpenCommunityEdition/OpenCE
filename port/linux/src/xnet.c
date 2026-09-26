@@ -18,7 +18,11 @@ Two settings adjust the addressing:
   instead of every interface, and reports it as this machine's system link
   address. Several instances can then share one computer, each on its own
   loopback address (127.0.0.2, 127.0.0.3, ...), or system link can be
-  pinned to one network interface.
+  pinned to one network interface. That address then stands in for
+  127.0.0.1, which the game uses for itself (a host joins its own game
+  through it, and admits only it to a split screen game): connections and
+  datagrams to 127.0.0.1 go to the address, and traffic from the address
+  is reported as coming from 127.0.0.1.
 - HALO_NET_BROADCAST=a.b.c.d[,e.f.g.h...] sends the game's broadcasts (a
   client's system link game search, a host's game advertisement) to those
   addresses instead of 255.255.255.255, to reach machines that broadcasts
@@ -52,6 +56,42 @@ static int address_setting(const char *name, unsigned long *address)
 static int local_address_setting(unsigned long *address)
 {
 	return address_setting("HALO_NET_ADDRESS", address);
+}
+
+/* 127.0.0.1 in network byte order */
+static unsigned long loopback_address(void)
+{
+	return halo_ws_htonl(0x7F000001);
+}
+
+/* a destination of 127.0.0.1 means the HALO_NET_ADDRESS address */
+static const struct sockaddr *outgoing_address(const struct sockaddr *address, int address_length,
+	struct sockaddr_in *storage)
+{
+	unsigned long local;
+
+	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(*storage) &&
+		((const struct sockaddr_in *)address)->sin_addr.s_addr == loopback_address() &&
+		local_address_setting(&local))
+	{
+		memcpy(storage, address, sizeof(*storage));
+		storage->sin_addr.s_addr = local;
+		return (const struct sockaddr *)storage;
+	}
+	return address;
+}
+
+/* traffic from the HALO_NET_ADDRESS address comes from 127.0.0.1 */
+static void incoming_address(struct sockaddr *address, const int *address_length)
+{
+	unsigned long local;
+
+	if (address && address_length && *address_length >= (int)sizeof(struct sockaddr_in) &&
+		address->sa_family == AF_INET && local_address_setting(&local) &&
+		((struct sockaddr_in *)address)->sin_addr.s_addr == local)
+	{
+		((struct sockaddr_in *)address)->sin_addr.s_addr = loopback_address();
+	}
 }
 
 enum
@@ -164,8 +204,10 @@ int WSAAPI halo_ws_bind(SOCKET socket, const struct sockaddr *address, int addre
 
 int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int address_length)
 {
+	struct sockaddr_in target;
 	unsigned long override;
 
+	address = outgoing_address(address, address_length, &target);
 	/* a connection from an unbound socket would leave from whichever address
 	the route picks; with HALO_NET_ADDRESS it leaves from that address */
 	if (address && address->sa_family == AF_INET && local_address_setting(&override))
@@ -199,6 +241,7 @@ SOCKET WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int *addre
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	incoming_address(address, address_length);
 	return (SOCKET)result;
 }
 
@@ -236,6 +279,12 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 			return winsock_result(result);
 		}
 	}
+	else
+	{
+		struct sockaddr_in target;
+
+		address = outgoing_address(address, address_length, &target);
+	}
 	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 }
 
@@ -247,7 +296,11 @@ int WSAAPI halo_ws_recv(SOCKET socket, char *buffer, int length, int flags)
 int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 	struct sockaddr *address, int *address_length)
 {
-	return winsock_result(posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length));
+	int result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
+
+	if (result >= 0)
+		incoming_address(address, address_length);
+	return winsock_result(result);
 }
 
 int WSAAPI halo_ws_shutdown(SOCKET socket, int how)
@@ -286,7 +339,11 @@ int WSAAPI halo_ws_getsockname(SOCKET socket, struct sockaddr *address, int *add
 
 int WSAAPI halo_ws_getpeername(SOCKET socket, struct sockaddr *address, int *address_length)
 {
-	return winsock_result(posix_socket_getpeername((int)socket, address, address_length));
+	int result = posix_socket_getpeername((int)socket, address, address_length);
+
+	if (result >= 0)
+		incoming_address(address, address_length);
+	return winsock_result(result);
 }
 
 /* ---------- select and fd_set */
