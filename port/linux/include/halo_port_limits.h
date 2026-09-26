@@ -28,6 +28,10 @@ Winsock headers default to 64 (the prefix headers define FD_SETSIZE from
 this before any of them is read) */
 #define HALO_PORT_FD_SETSIZE 256
 
+/* ---------- memory capacity for these limits (game state and pools) */
+
+#include "halo_port_capacity.h"
+
 /* ---------- struct network_game layout
 
 The game settings record (struct network_game) is declared separately in

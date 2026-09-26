@@ -1781,7 +1781,13 @@ void area_of_effect_cause_damage(
 {
 	struct damage_effect_definition *definition =
 		damage_effect_definition_get(damage->definition_index);
+#ifdef HALO_LINUX
+	/* the native builds damage more objects per explosion
+	(halo_port_capacity.h): 64 runs out in a crowd of 128 players */
+	long object_indices[HALO_PORT_MAXIMUM_AREA_OF_EFFECT_OBJECTS];
+#else
 	long object_indices[64];
+#endif
 	short object_count;
 
 	object_count = objects_in_sphere(
