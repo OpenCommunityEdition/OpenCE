@@ -1,0 +1,27 @@
+{
+  "helper": "_point_from_line2d",
+  "size": 48,
+  "normalized_sha256": "d90e91bc9340636a11d9fe06c53bd87fad47428860899fd41c08c65be2cbe273",
+  "exact_to_january_selected_provider": true,
+  "exact_to_current_selected_provider": true,
+  "incoming_runtime_relocations": [],
+  "link_attempts": [
+    {
+      "order": [
+        "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_20260925\\held_aggregate_control.obj",
+        "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\build\\base\\source\\ai\\action_vehicle.obj"
+      ],
+      "returncode": 1120,
+      "duplicate_errors": []
+    },
+    {
+      "order": [
+        "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\build\\base\\source\\ai\\action_vehicle.obj",
+        "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_20260925\\held_aggregate_control.obj"
+      ],
+      "returncode": 1120,
+      "duplicate_errors": []
+    }
+  ],
+  "meaning": "No duplicate definition in either order; unresolved externals expected. Not a whole-program link or admission."
+}

@@ -722,25 +722,6 @@
       }
     },
     {
-      "unit": "source/hs/hs_runtime",
-      "function": "_hs_evaluate_begin_random",
-      "class": "private-register-convention",
-      "evidence": "Fuzzy-parked after reconstructing the complete begin-random evaluator in ordinary typed C from January's instruction and relocation topology. Target and candidate share the 528-byte padded envelope and all 30 relocation identities; objdiff reports 99.89011 percent similarity. The residual is only four ModRM register-selection bytes in the random-child selection loop, with identical operations and control flow. Donor and reconciliation experiments exhausted natural declaration, initialization, and statement-order forms without moving this tie independently. No register or volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, undefined behavior, forced inline, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining the private register assignment.",
-      "measurements": {
-        "target": {
-          "size": 528,
-          "relocation_count": 30,
-          "normalized_sha256": "fce47f8f054751af9bd8b16e2e3e11e5c3a2afbe506383b41aff2a61a6f3b573"
-        },
-        "base": {
-          "size": 528,
-          "relocation_count": 30,
-          "normalized_sha256": "c10e869c67180ba3040bc35040e0e9a4329b841c05599c61583c5114a84b5cf1"
-        },
-        "objdiff_percent": 99.89011
-      }
-    },
-    {
       "unit": "source/effects/effects",
       "function": "_effect_allowed_by_environment",
       "class": "unclassified",
@@ -1183,25 +1164,6 @@
           "normalized_sha256": "de9701add36aae941c423d716aa79a2424877703ac03d1ae582683e955bf397a"
         },
         "objdiff_percent": 94.24545
-      }
-    },
-    {
-      "unit": "source/interface/motion_sensor",
-      "function": "_update_motion_sensor",
-      "class": "unclassified",
-      "evidence": "Best reviewed natural reconstruction retained with zero exact credit. Two decompiler-style 0.0f products were removed in favor of the typed magnitude_squared2d helper already used by this TU; January's two zero-real relocations reflect unresolved x87 scheduling and are not recreated with fake source pressure. The otherwise-discarded game_time_get call and the return-EIP/0x62 stack-sentinel diagnostics are present in January and independently authenticated by the later first-party HCEA build/PDB. Current target/base COFFs remain non-identical; objdiff similarity is diagnostic only. See docs/object_matching_logs/lane_reconciliation_batch5_fuzzy_ui_world_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, wave w1, adversarially verified) the reopened private callees fixed their January ABIs; this parked caller follows and moves strictly closer to January (816 of 864 bytes, 37 relocations), still fuzzy. See docs/object_matching_logs/motion_sensor_obj_opus5_150k_w1_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 864,
-          "relocation_count": 39,
-          "normalized_sha256": "b37814ed8aaa3427a5d8e1fe1327e22cc80190383562143e94c35df03f5db06b"
-        },
-        "base": {
-          "size": 816,
-          "relocation_count": 37,
-          "normalized_sha256": "5bae910d9c27cad0c50ecad905a614a6bc13edc3c450c1717918dbeea76355aa"
-        },
-        "objdiff_percent": 76.04444
       }
     },
     {

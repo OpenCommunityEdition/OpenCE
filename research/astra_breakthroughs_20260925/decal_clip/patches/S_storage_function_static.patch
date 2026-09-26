@@ -1,0 +1,18 @@
+--- a/C_canonical_context.c
++++ b/S_storage_function_static.c
+@@ -466,7 +466,6 @@
+ extern struct data_array *global_decal_data;
+ 
+ boolean decals_enabled= TRUE;
+-static real_point2d decal_points2d_temp[2][12];
+ static struct decal_globals *decal_globals;
+ static struct decal_geometry decal_geometry = {0};
+ static boolean decal_locked_count_reported = FALSE;
+@@ -1136,6 +1135,7 @@
+ 		long *clip_flags,
+ 		boolean *clipped,
+ 		real epsilon);
++	static real_point2d decal_points2d_temp[2][12];
+ 	struct collision_bsp *collision_bsp;
+ 	struct collision_surface *surface;
+ 	real_plane3d surface_plane;

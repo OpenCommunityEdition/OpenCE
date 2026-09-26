@@ -1,0 +1,396 @@
+{
+  "scalar": {
+    "source": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\control_scalar.c",
+    "source_sha256": "d8caf94e645e2f44818de1e996c33cedfec3d0f0c37720c500119742b8d0270a",
+    "unit": "source/units/vehicles",
+    "function": "_frame_control",
+    "sites": [
+      "0x107595c5",
+      "0x1075954a",
+      "0x1076b13b",
+      "0x1076b57e",
+      "0x1076b43a",
+      "0x10814497"
+    ],
+    "scope": "observation only; no force; no source credit",
+    "ordering": [
+      {
+        "ptr": 37584028,
+        "rank": 0,
+        "size": 4,
+        "flags": "0x20805",
+        "count": 1,
+        "internal_id": 1,
+        "observed_addition_sum": 1,
+        "final": {
+          "name": "_mode",
+          "flags": "0x22805",
+          "offset": 12
+        }
+      },
+      {
+        "ptr": 37584124,
+        "rank": 1,
+        "size": 4,
+        "flags": "0xe0805",
+        "count": 1,
+        "internal_id": 2,
+        "observed_addition_sum": 1,
+        "final": {
+          "name": "_a",
+          "flags": "0xe2805",
+          "offset": 8
+        }
+      },
+      {
+        "ptr": 37585180,
+        "rank": 2,
+        "size": 8,
+        "flags": "0x20604",
+        "count": 3,
+        "internal_id": 13,
+        "observed_addition_sum": 3,
+        "final": {
+          "name": "_horizontal",
+          "flags": "0x22604",
+          "offset": -8
+        }
+      },
+      {
+        "ptr": 37584220,
+        "rank": 3,
+        "size": 8,
+        "flags": "0x20604",
+        "count": 3,
+        "internal_id": 3,
+        "observed_addition_sum": 3,
+        "final": {
+          "name": "_alpha",
+          "flags": "0x22604",
+          "offset": -16
+        }
+      },
+      {
+        "ptr": 37585564,
+        "rank": 4,
+        "size": 12,
+        "flags": "0x20604",
+        "count": 5,
+        "internal_id": 17,
+        "observed_addition_sum": 5,
+        "final": {
+          "name": "_forward",
+          "flags": "0x22604",
+          "offset": -20
+        }
+      },
+      {
+        "ptr": 37584604,
+        "rank": 5,
+        "size": 12,
+        "flags": "0x20604",
+        "count": 4,
+        "internal_id": 7,
+        "observed_addition_sum": 4,
+        "final": {
+          "name": "_left",
+          "flags": "0x22604",
+          "offset": -32
+        }
+      }
+    ],
+    "packing": [
+      {
+        "kind": "new",
+        "rank": 2,
+        "group": 2,
+        "name": "_horizontal"
+      },
+      {
+        "kind": "new",
+        "rank": 3,
+        "group": 3,
+        "name": "_alpha"
+      },
+      {
+        "kind": "expand",
+        "rank": 4,
+        "group": 3,
+        "name": "_forward"
+      },
+      {
+        "kind": "new",
+        "rank": 5,
+        "group": 4,
+        "name": "_left"
+      }
+    ],
+    "section": {
+      "size": 192,
+      "relocation_count": 5,
+      "normalized_sha256": "f760621874fdc1cd946b024cabafbe6accfe118a8de3788d44447074f2306f68",
+      "relocations": [
+        {
+          "address": 94,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use2",
+            0
+          ]
+        },
+        {
+          "address": 103,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use2",
+            0
+          ]
+        },
+        {
+          "address": 112,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use3",
+            0
+          ]
+        },
+        {
+          "address": 155,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use3",
+            0
+          ]
+        },
+        {
+          "address": 164,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use1",
+            0
+          ]
+        }
+      ]
+    },
+    "stock_check": {
+      "command": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\xbox\\bin\\vc7\\CL.Exe /nologo /c /nologo /c /O2 /Oy- /DDEBUG /Dxbox /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\xbox\\include /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\main /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cseries /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\sound /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bink \"/IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\saved films\" \"/IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\saved games\" /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cache /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\units /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\text /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\tag_files /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\structures /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\shell /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\shaders /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\scenario /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\render /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\rasterizer /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\physics /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\objects /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\objects\\widgets /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\networking /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\models /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\memory /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\memory\\zlib /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\math /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\tool /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\items /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\interface /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\input /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\hs /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\game /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\effects /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\editor /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\dialogs /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\devices /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cutscene /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\camera /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bungie_net /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bitmaps /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\ai /FAsc /FaC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\generic_control_scalar\\listing.asm /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source/units /FoC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\generic_control_scalar\\trace.obj C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\control_scalar.c",
+      "cwd": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920",
+      "raw_equal": true,
+      "full_object_timestamp_only": true,
+      "observed_sha256": "12c31286d836e02468da229f0b1c8df2b482c4bf507d9befe9d72c5d4a0c33af",
+      "stock_sha256": "12c31286d836e02468da229f0b1c8df2b482c4bf507d9befe9d72c5d4a0c33af",
+      "timestamp_masked_sha256": "3b54f14ffd79300fce7f07eb75bf5275789676be8499fcb79857236e32f0173b",
+      "differing_offsets": []
+    },
+    "compiler_sha256": {
+      "CL.Exe": "483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11",
+      "C1.Dll": "02843d31ae15775aaf185c97f2da9b178e98ca44cd8066bc132b8db48a286af2",
+      "C2.Dll": "9dbf908b9437dbb42902ffe29ae14c6305bb5ff4f33ff01a95cc9060b7d16a5c"
+    },
+    "compiler_disk_hashes_unchanged": true,
+    "debugger_sha256": "32ee5e4da72d4b49511f278acc35d81bd5c96a7bd6f37273bf088fa779effd96",
+    "raw_log_sha256": "5f63f179d3428cc9be08f0659f8be0d5655533cb362a1cb2f7a890aba8c3aa31"
+  },
+  "aggregate": {
+    "source": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\control_aggregate.c",
+    "source_sha256": "7eab5a3d92ffef28d31f756461211df1c5955a61e5f5193ac07613dcb6688fdf",
+    "unit": "source/units/vehicles",
+    "function": "_frame_control",
+    "sites": [
+      "0x107595c5",
+      "0x1075954a",
+      "0x1076b13b",
+      "0x1076b57e",
+      "0x1076b43a",
+      "0x10814497"
+    ],
+    "scope": "observation only; no force; no source credit",
+    "ordering": [
+      {
+        "ptr": 36469996,
+        "rank": 0,
+        "size": 4,
+        "flags": "0x20805",
+        "count": 1,
+        "internal_id": 1,
+        "observed_addition_sum": 1,
+        "final": {
+          "name": "_mode",
+          "flags": "0x22805",
+          "offset": 12
+        }
+      },
+      {
+        "ptr": 36470092,
+        "rank": 1,
+        "size": 4,
+        "flags": "0xe0805",
+        "count": 1,
+        "internal_id": 2,
+        "observed_addition_sum": 1,
+        "final": {
+          "name": "_a",
+          "flags": "0xe2805",
+          "offset": 8
+        }
+      },
+      {
+        "ptr": 36471148,
+        "rank": 2,
+        "size": 8,
+        "flags": "0x20604",
+        "count": 3,
+        "internal_id": 13,
+        "observed_addition_sum": 3,
+        "final": {
+          "name": "_horizontal",
+          "flags": "0x22604",
+          "offset": -8
+        }
+      },
+      {
+        "ptr": 36470188,
+        "rank": 3,
+        "size": 8,
+        "flags": "0x20604",
+        "count": 3,
+        "internal_id": 3,
+        "observed_addition_sum": 3,
+        "final": {
+          "name": "_alpha",
+          "flags": "0x22604",
+          "offset": -16
+        }
+      },
+      {
+        "ptr": 36470572,
+        "rank": 4,
+        "size": 12,
+        "flags": "0x20604",
+        "count": 6,
+        "internal_id": 7,
+        "observed_addition_sum": 6,
+        "final": {
+          "name": "_left",
+          "flags": "0x22604",
+          "offset": -28
+        }
+      },
+      {
+        "ptr": 36471340,
+        "rank": 5,
+        "size": 12,
+        "flags": "0x20604",
+        "count": 5,
+        "internal_id": 15,
+        "observed_addition_sum": 5,
+        "final": {
+          "name": "_forward",
+          "flags": "0x22604",
+          "offset": -28
+        }
+      }
+    ],
+    "packing": [
+      {
+        "kind": "new",
+        "rank": 2,
+        "group": 2,
+        "name": "_horizontal"
+      },
+      {
+        "kind": "new",
+        "rank": 3,
+        "group": 3,
+        "name": "_alpha"
+      },
+      {
+        "kind": "new",
+        "rank": 4,
+        "group": 4,
+        "name": "_left"
+      },
+      {
+        "kind": "expand",
+        "rank": 5,
+        "group": 4,
+        "name": "_forward"
+      }
+    ],
+    "section": {
+      "size": 192,
+      "relocation_count": 5,
+      "normalized_sha256": "5e6cd74c0902bf9c9ec3df433506227b4db07b090337b8c643cd784e262c6e0e",
+      "relocations": [
+        {
+          "address": 98,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use2",
+            0
+          ]
+        },
+        {
+          "address": 107,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use2",
+            0
+          ]
+        },
+        {
+          "address": 116,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use3",
+            0
+          ]
+        },
+        {
+          "address": 159,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use3",
+            0
+          ]
+        },
+        {
+          "address": 168,
+          "type": 20,
+          "target": [
+            "symbol",
+            "_use1",
+            0
+          ]
+        }
+      ]
+    },
+    "stock_check": {
+      "command": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\xbox\\bin\\vc7\\CL.Exe /nologo /c /nologo /c /O2 /Oy- /DDEBUG /Dxbox /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\xbox\\include /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\main /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cseries /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\sound /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bink \"/IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\saved films\" \"/IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\saved games\" /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cache /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\units /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\text /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\tag_files /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\structures /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\shell /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\shaders /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\scenario /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\render /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\rasterizer /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\physics /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\objects /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\objects\\widgets /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\networking /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\models /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\memory /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\memory\\zlib /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\math /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\tool /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\items /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\interface /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\input /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\hs /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\game /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\effects /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\editor /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\dialogs /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\devices /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\cutscene /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\camera /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bungie_net /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\bitmaps /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source\\ai /FAsc /FaC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\generic_control_aggregate\\listing.asm /IC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\source/units /FoC:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\generic_control_aggregate\\trace.obj C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920\\scratch\\astra_scout_r2_20260925\\control_aggregate.c",
+      "cwd": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\worktrees\\astra-reconcile-20260920",
+      "raw_equal": true,
+      "full_object_timestamp_only": true,
+      "observed_sha256": "881d5e2e2ad10739fa138cf60d54e9c3833b06df5f1f2786bdfe7095d9ac9ac7",
+      "stock_sha256": "881d5e2e2ad10739fa138cf60d54e9c3833b06df5f1f2786bdfe7095d9ac9ac7",
+      "timestamp_masked_sha256": "4c86423da9246d5d8eb93d9f1287215032082e38429bf3fd2e68cd41e1796835",
+      "differing_offsets": []
+    },
+    "compiler_sha256": {
+      "CL.Exe": "483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11",
+      "C1.Dll": "02843d31ae15775aaf185c97f2da9b178e98ca44cd8066bc132b8db48a286af2",
+      "C2.Dll": "9dbf908b9437dbb42902ffe29ae14c6305bb5ff4f33ff01a95cc9060b7d16a5c"
+    },
+    "compiler_disk_hashes_unchanged": true,
+    "debugger_sha256": "32ee5e4da72d4b49511f278acc35d81bd5c96a7bd6f37273bf088fa779effd96",
+    "raw_log_sha256": "6e7fcfe6d32dcd8621b24955a0e63103befb9556ac661e017e9368c8a71e322d"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "origin_directory": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle",
+  "source_snapshots": [
+    {
+      "name": "trace.py",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\trace.py",
+      "origin_sha256": "aa1a4064588b6849ecd7b4ddce4661d4ef4266edf34cb5c0788b5293bb9bb5a0",
+      "snapshot_sha256": "07c36a533639d8a3591ea2be7ca0149011cf469053496a3db0d2da1ffa5af35c",
+      "adaptation": "Line ending normalization plus DEBUGGER path injection only"
+    },
+    {
+      "name": "oracle.py",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\oracle.py",
+      "origin_sha256": "d68fdee0c8d7ada8d5d86ca6b1e1b73b7cb27d4d31dee04d9e3d462b8b1b3bee",
+      "snapshot_sha256": "27d06c86fea09b40248551bccbdeeaafbf5c205ba725e876c4ff808c7ab4d40e",
+      "adaptation": "Line ending normalization only"
+    },
+    {
+      "name": "objfns.py",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\objfns.py",
+      "origin_sha256": "2fac2ed20f6d99296e04407521583a09b969a5fb1f0c78df96917d5d64b4c1ca",
+      "snapshot_sha256": "dd1bd2ed7971c10834a241e5e2921c736bbba9684f288898b5a5b21bc63c7e28",
+      "adaptation": "Line ending normalization only"
+    },
+    {
+      "name": "forcesearch.py",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\forcesearch.py",
+      "origin_sha256": "a114e7fd04b97c8ec72050e47c1f453c17b64806418ef12e5af4eadd1996c9cd",
+      "snapshot_sha256": "39cd52df929f1208da14005c6de35adc0431d791f9d4a51421ba0111742d0a81",
+      "adaptation": "Line ending normalization only"
+    },
+    {
+      "name": "mapweb.py",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\mapweb.py",
+      "origin_sha256": "49346d1dd68b386a6b371cf1097277cd234d3edd6001f1fda043b98d43881f68",
+      "snapshot_sha256": "ddd86fb4ffecfd13f7d91aa8bd1b47e35dbe26a0cd091bb6110ed9ced2b7d329",
+      "adaptation": "Line ending normalization only"
+    },
+    {
+      "name": "dbg32c.c",
+      "origin_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\dbg32c.c",
+      "origin_sha256": "b4a3c02bfb5350e2a017aabdf0bea036f6debd4a4fe69eaea9c65935cc43b094",
+      "snapshot_sha256": "7a39d9f8dae7272ce7abf13aa0e2044e29be2c909c9b27b75ec48c47b74fb8e3",
+      "adaptation": "Line ending normalization only"
+    }
+  ],
+  "debugger": {
+    "default_path": "C:\\halo-worktrees\\claude-lane-a-ai-core-20260920\\scratch\\res9\\alloc-oracle\\dbg32c.exe",
+    "sha256": "32ee5e4da72d4b49511f278acc35d81bd5c96a7bd6f37273bf088fa779effd96"
+  },
+  "compiler_sha256": {
+    "CL.Exe": "483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11",
+    "C1.Dll": "02843d31ae15775aaf185c97f2da9b178e98ca44cd8066bc132b8db48a286af2",
+    "C2.Dll": "9dbf908b9437dbb42902ffe29ae14c6305bb5ff4f33ff01a95cc9060b7d16a5c"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "candidates": [
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 44,
+      "total_functions": 2,
+      "unit": "libs/libcmt/ioinit"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 9570,
+      "total_functions": 24,
+      "unit": "source/ai/path_obstacle_avoidance"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 200,
+      "total_functions": 6,
+      "unit": "source/ai/path_structure_bsp"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 3792,
+      "total_functions": 180,
+      "unit": "source/game/game_engine"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 2645,
+      "total_functions": 43,
+      "unit": "source/objects/object_lights"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 685,
+      "total_functions": 12,
+      "unit": "source/physics/breakable_surfaces"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 9048,
+      "total_functions": 95,
+      "unit": "source/rasterizer/xbox/rasterizer_xbox"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 584,
+      "total_functions": 17,
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_geometry"
+    },
+    {
+      "data_gap": 0,
+      "decision": "audit-coff-ownership-before-admission",
+      "function_gap": 0,
+      "total_data": 30236,
+      "total_functions": 36,
+      "unit": "source/render/render_debug"
+    }
+  ],
+  "contradicted": [],
+  "rejected": [
+    {
+      "data_gap": 0,
+      "decision": "object-admission-rejected",
+      "function_gap": 0,
+      "rejections": [
+        {
+          "class": "candidate-only-comdat-owner",
+          "evidence": "docs/object_matching_logs/rasterizer_xbox_dynavobgeom_owner_layout_reconciliation.md",
+          "reason": "All 17 January code functions and all 31 January-owned sections/symbols match after replacing local debug, window and pixel-shader views with genuine owner types. Nine D3DINLINE wrappers have January's file-static storage. The two surplus color-conversion helpers are byte-identical to January's selected providers, and all 17 surplus symbols pass selected-provider links in both orders. The global_window_parameters extern still lives in consumer C files, with incompatible partial views in other consumers rather than a common owner declaration. Three stock SDK tables and other candidate-only constants/literals remain absent from January's split; the selected-provider test ignores unrelated unresolved symbols. A complete ordinary final-link ownership proof has not been established, so exact function credit does not imply Matching.",
+          "reopen": "Move global_window_parameters to its authentic owner declaration and reconcile the partial consumer views with a full regression sweep. Establish selected ownership/coalescing of candidate-only SDK tables and helper data through a complete compatible ordinary link or equally decisive January source/link evidence, without losing target exactness. Do not suppress genuine header emissions, alter selection metadata, force-inline, hand-copy helpers or count candidate-only bytes as January-owned.",
+          "symbol": "_D3DSIMPLERENDERSTATEENCODE",
+          "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom"
+        }
+      ],
+      "total_data": 525,
+      "total_functions": 17,
+      "unit": "source/rasterizer/xbox/rasterizer_xbox_dynavobgeom"
+    }
+  ],
+  "revoked": []
+}

@@ -1,0 +1,35 @@
+{
+  "kind": "generic_frame_probe_read_only_smoke",
+  "unit": "source/units/bipeds",
+  "function": "_biped_update_physics",
+  "source_sha256": "0a761d3720cfa254a2f62f2935f8c11a51de71f93d845098d1473e4f0eaa8039",
+  "report": "scratch/astra_header_r2_20260925/biped_frame_smoke/frame_report.json",
+  "report_sha256": "4f97f53d0c086e5785f94cc5907a383b893d0552f6b40ba2432cb286ebe06d04",
+  "ranks": 73,
+  "packing_events": 73,
+  "all_reference_addition_sums_equal_ranked_counts": true,
+  "all_rank_and_final_identities_unique": true,
+  "stock_check": {
+    "raw_equal": true,
+    "full_object_timestamp_only": true,
+    "observed_sha256": "556851ec9451bbec56e809a18938c345cdcc174f496bccccc5dfed18e9d1c083",
+    "stock_sha256": "556851ec9451bbec56e809a18938c345cdcc174f496bccccc5dfed18e9d1c083",
+    "timestamp_masked_sha256": "90931407d58718639ffa624dcbe405751388acd10db6f518b241cecb39097216",
+    "differing_offsets": []
+  },
+  "matches_production_function": true,
+  "matches_january_function": false,
+  "production_section": {
+    "size": 5376,
+    "relocation_count": 124,
+    "normalized_sha256": "bf945c9301d7848f33e0c5a7765f3b3d820380a2310a576d768b2e7fd0968b64"
+  },
+  "allocation": {
+    "method": "relocation-verified-chkstk-eax",
+    "january": 44972,
+    "production": 44980,
+    "gap": 8
+  },
+  "limits": "No source edit or proof that the scout ranking cause explains the biped gap. Repeated local names have distinct scope/internal identities.",
+  "new_matching_credit": 0
+}

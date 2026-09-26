@@ -1,0 +1,26 @@
+{
+  "kind": "research_handoff_not_admission",
+  "baseline": "20d0563d508f7836670db62514ffc3d1f1e2217e",
+  "new_meaningful_exact_code_bytes": 0,
+  "new_object_admissions": 0,
+  "policy_holds_lifted": [],
+  "canonical_halo": {
+    "credited_meaningful_code_bytes": 1583050,
+    "total_meaningful_code_bytes": 1770166,
+    "remaining_meaningful_code_bytes": 187116,
+    "accepted_functions": 7452,
+    "report_function_rows": 7574,
+    "complete_objects": 388,
+    "halo_objects": 468
+  },
+  "packets": [
+    {"path": "census/README.md", "status": "fresh_measured_inventory", "allocation_mismatch_functions": 28, "overlapping_meaningful_bytes": 59512},
+    {"path": "scout/README.md", "status": "materialization_and_frame_packing_isolated_candidate_held"},
+    {"path": "decal_clip/README.md", "status": "spill_operand_rewrite_traced_downstream_reload_order_open"},
+    {"path": "abi/README.md", "status": "positive_controlled_no_new_pattern_candidates"},
+    {"path": "NEXT_MODEL_TASKS.md", "status": "five_scoped_research_tasks_no_admission_authority"}
+  ],
+  "shared_runner": "coupled_probe.py",
+  "test_command": "python -m pytest -q tools research/astra_breakthroughs_20260925",
+  "credit_note": "Research weights overlap; no diagnostic, candidate or comparator result here creates matching credit."
+}

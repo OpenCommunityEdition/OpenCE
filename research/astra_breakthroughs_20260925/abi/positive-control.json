@@ -1,0 +1,56 @@
+{
+  "summary": {
+    "units": 1,
+    "exact_functions": 36,
+    "paired_calls": 460,
+    "residual_functions": 8,
+    "residual_findings": 1,
+    "functions_skipped_incomplete_linear_decode": 2
+  },
+  "findings": [
+    {
+      "unit": "source/ai/actor_perception",
+      "function": "_actor_perception_update",
+      "callee": "_actor_get_perception_knowledge",
+      "strict_exact": false,
+      "reasons": [
+        "narrow-compare-cleanup-order"
+      ],
+      "target": {
+        "callee": "_actor_get_perception_knowledge",
+        "offset": 1694,
+        "extension": null,
+        "narrow_compare_width": 16,
+        "cleanup_before_copy": true,
+        "instructions": [
+          "6a3: add esp, 8",
+          "6a6: mov edi, eax",
+          "6a8: cmp di, bx"
+        ]
+      },
+      "ours": {
+        "callee": "_actor_get_perception_knowledge",
+        "offset": 1694,
+        "extension": null,
+        "narrow_compare_width": 16,
+        "cleanup_before_copy": false,
+        "instructions": [
+          "6a3: mov edi, eax",
+          "6a5: add esp, 8",
+          "6a8: cmp di, bx"
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "limits": [
+    "Pattern evidence is not a declaration or proof of original source.",
+    "Repeated calls are paired only with identical complete direct-call sequences.",
+    "Only direct symbolic REL32 calls and bounded straight-line continuations are observed.",
+    "This is linear decoding, not complete CFG recovery; indirect-switch reachability is not inferred.",
+    "Register redefinitions and branch entries terminate return-value provenance.",
+    "Stack adjustment order is a scheduling cue, not proof of the callee's type or cleanup ownership.",
+    "Unobserved indirect/addend calls disable repeated-name sequence pairing; unique names remain heuristic correspondences.",
+    "No production source, declarations, or matching credit is modified."
+  ]
+}

@@ -1,0 +1,3 @@
+# Evidence hashes require byte-preserving checkout, regardless of core.autocrlf.
+*.patch -text
+decal_clip/dependencies/* -text

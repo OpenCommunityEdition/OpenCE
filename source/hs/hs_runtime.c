@@ -2227,7 +2227,7 @@ void hs_evaluate_begin_random(
 		csmemset(evaluated, 0, BIT_VECTOR_SIZE_IN_BYTES(*argument_count));
 	}
 
-	random = seed_random_range(get_global_random_seed_address(), 0, *argument_count);
+	random = random_range(0, *argument_count);
 	for (index = 0; index<*argument_count; index++)
 	{
 		short choice = (short)((random+index)%*argument_count);

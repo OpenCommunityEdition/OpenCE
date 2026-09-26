@@ -1,0 +1,22 @@
+{
+  "summary": {
+    "units": 467,
+    "exact_functions": 7440,
+    "paired_calls": 43445,
+    "residual_functions": 119,
+    "functions_skipped_incomplete_linear_decode": 62,
+    "units_without_comparison_pair": 1
+  },
+  "findings": [],
+  "errors": [],
+  "limits": [
+    "Pattern evidence is not a declaration or proof of original source.",
+    "Repeated calls are paired only with identical complete direct-call sequences.",
+    "Only direct symbolic REL32 calls and bounded straight-line continuations are observed.",
+    "This is linear decoding, not complete CFG recovery; indirect-switch reachability is not inferred.",
+    "Register redefinitions and branch entries terminate return-value provenance.",
+    "Stack adjustment order is a scheduling cue, not proof of the callee's type or cleanup ownership.",
+    "Unobserved indirect/addend calls disable repeated-name sequence pairing; unique names remain heuristic correspondences.",
+    "No production source, declarations, or matching credit is modified."
+  ]
+}

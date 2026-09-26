@@ -1,0 +1,20 @@
+--- a/S4_current_headers.c
++++ b/B_side_long_diagnostic.c
+@@ -1290,7 +1290,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],
+@@ -1460,7 +1460,7 @@
+ 				&collision_bsp->edges,
+ 				edge_index,
+ 				struct collision_edge);
+-			boolean surface_on_right = edge->surface_indices[1]==surface_index;
++			long surface_on_right = edge->surface_indices[1]==surface_index;
+ 			struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+ 				&collision_bsp->vertices,
+ 				edge->vertex_indices[!surface_on_right],
