@@ -2440,7 +2440,10 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	color_to_vec4(color, rgba);
 	if (flags & D3DCLEAR_TARGET)
 	{
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		/* the Xbox clears the channels named (D3DCLEAR_TARGET_R, _G, _B, _A):
+		the fog screen clears only alpha, leaving the picture under the fog */
+		glColorMask((flags & D3DCLEAR_TARGET_R) != 0, (flags & D3DCLEAR_TARGET_G) != 0,
+			(flags & D3DCLEAR_TARGET_B) != 0, (flags & D3DCLEAR_TARGET_A) != 0);
 		glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
 		mask |= GL_COLOR_BUFFER_BIT;
 	}
