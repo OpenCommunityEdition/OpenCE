@@ -41,18 +41,10 @@ SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 #  - tentative definitions shared between units (-fcommon),
 #  - no optimisations that assume the absence of MSVC-tolerated UB,
 #  - EBP frames (MSVC /Oy-): get_return_eip and the stack walker follow the
-#    frame chain,
-#  - x87 floating point, as MSVC 7 generated for the Xbox: expressions keep
-#    the FPU's precision (53 bits once real_math_reset_precision has run)
-#    instead of rounding every step to single precision as SSE does. The
-#    game asserts on results that only hold with that precision, such as
-#    biped_limp_noodle.c's point-on-plane check far from the world origin.
-#    Clang allows x87 code only with SSE code generation off.
+#    frame chain.
 WINDOWS_ABI_FLAGS = [
     "--target=i686-pc-windows-msvc",
     "-march=pentium3",
-    "-mno-sse",
-    "-mfpmath=387",
     "-fms-extensions",
     "-fcommon",
     "-fno-strict-aliasing",
