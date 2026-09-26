@@ -2597,10 +2597,19 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	platform_pump_events();
 
 	pthread_mutex_lock(&vertical_blank_lock);
-	/* the Xbox keeps at most two frames queued behind the display */
-	while (pending_flips >= 2)
-		pthread_cond_wait(&vertical_blank_condition, &vertical_blank_lock);
-	pending_flips++;
+	/* the Xbox keeps at most two frames queued behind its 60 Hz display;
+	with interpolation, frames come at the real display's rate instead,
+	paced by vsync (platform_video_swap) */
+	if (halo_interpolation_enabled())
+	{
+		flip_count++;
+	}
+	else
+	{
+		while (pending_flips >= 2)
+			pthread_cond_wait(&vertical_blank_condition, &vertical_blank_lock);
+		pending_flips++;
+	}
 	pthread_mutex_unlock(&vertical_blank_lock);
 }
 

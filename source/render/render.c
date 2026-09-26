@@ -628,7 +628,12 @@ void render_frame(
 	render.frame_index++;
 	render.time_delta_since_tick_sec = time_delta_since_tick_sec;
 	memset(&parameters, 0, sizeof(parameters));
+#ifdef HALO_LINUX
+	/* continuous between ticks (render_interpolation.c) */
+	parameters.game_time_sec = render_interpolation_game_time_sec(game_time_get());
+#else
 	parameters.game_time_sec = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
+#endif
 	rasterizer_frame_begin(&parameters);
 	rasterizer_windows_begin();
 

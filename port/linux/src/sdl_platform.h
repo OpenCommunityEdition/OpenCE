@@ -34,6 +34,9 @@ BOOL platform_sdl_initialize(void);
 BOOL platform_video_initialize(unsigned long width, unsigned long height);
 void platform_video_drawable_size(int *width, int *height);
 void platform_video_swap(void);
+/* frames between the 30 Hz ticks at the display's refresh rate, unless
+HALO_INTERPOLATION=0 (port/linux/game/render_interpolation.c) */
+int halo_interpolation_enabled(void);
 void platform_mouse_capture(BOOL capture);
 
 /* main thread only; a no-op elsewhere */

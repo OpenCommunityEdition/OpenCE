@@ -1235,6 +1235,14 @@ short object_get_first_cluster(
 real_matrix4x3 *object_get_node_matrices(
 	long object_index)
 {
+#ifdef HALO_LINUX
+	/* while a frame is drawn, the pose between the last two ticks
+	(port/linux/game/render_interpolation.c) */
+	real_matrix4x3 *interpolated = render_interpolation_object_node_matrices(object_index);
+
+	if (interpolated)
+		return interpolated;
+#endif
 	return (real_matrix4x3 *)object_header_block_get(object_index, &object_get(object_index)->object.node_matrices);
 }
 
@@ -1817,6 +1825,14 @@ real_matrix4x3 *object_get_node_matrix(
 {
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 1060, object_has_node(object_index, node_index));
 
+#ifdef HALO_LINUX
+	{
+		real_matrix4x3 *interpolated = render_interpolation_object_node_matrices(object_index);
+
+		if (interpolated)
+			return &interpolated[node_index];
+	}
+#endif
 	return &((real_matrix4x3 *)object_header_block_get(object_index, &object_get(object_index)->object.node_matrices))[node_index];
 }
 

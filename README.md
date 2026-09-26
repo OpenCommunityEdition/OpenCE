@@ -27,6 +27,10 @@ You must source the August 2001 Xbox SDK yourself, and you need Python and [ninj
 
 The native builds (Linux, Windows, Android) are debug builds by default: like the build the decompilation reproduces, they stop at the first failed assertion and log it. `python configure.py --release` configures release builds instead, which, like the retail game, do not check assertions. The byte-matching build is unaffected.
 
+### Frame rate
+
+The native builds draw a frame at every refresh of the display (60, 90, 120, 240 Hz, ...), paced by vsync, while the game still simulates at 30 Hz as on the Xbox: each frame blends the last two ticks. To see the frame rate, open the developer console (the \` key) and enter `display_framerate true`; the frames per second, averaged over half a second, appear at the bottom right of the screen. `HALO_INTERPOLATION=0` restores the original 30 frames per second. See [port/linux/README.md](port/linux/README.md#frame-rate).
+
 ### Native Windows build
 
 `ninja windows`, run on Windows, compiles the game with clang into a native 32-bit Windows executable, `build/windows/halo.exe` (with `SDL3.dll`), sharing the Linux build's platform layer. It needs LLVM, Python and ninja, plus Visual Studio's x86 C++ libraries and a Windows SDK. Put the game data under `assets/` as for Linux. See [port/windows/README.md](port/windows/README.md).

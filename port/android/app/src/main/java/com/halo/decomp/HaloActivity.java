@@ -1,6 +1,7 @@
 package com.halo.decomp;
 
 import android.os.Bundle;
+import android.view.Display;
 import android.view.WindowManager;
 
 import org.libsdl.app.SDLActivity;
@@ -19,5 +20,28 @@ public class HaloActivity extends SDLActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        preferHighestRefreshRate();
+    }
+
+    /**
+     * The game draws a frame at every display refresh, between its 30 Hz
+     * ticks (port/linux/game/render_interpolation.c); Android otherwise
+     * often keeps an app at 60 Hz on a faster display.
+     */
+    private void preferHighestRefreshRate() {
+        Display display = getWindowManager().getDefaultDisplay();
+        Display.Mode current = display.getMode();
+        Display.Mode best = current;
+
+        for (Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() == current.getPhysicalWidth() &&
+                mode.getPhysicalHeight() == current.getPhysicalHeight() &&
+                mode.getRefreshRate() > best.getRefreshRate()) {
+                best = mode;
+            }
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        attributes.preferredDisplayModeId = best.getModeId();
+        getWindow().setAttributes(attributes);
     }
 }

@@ -83,9 +83,34 @@ further gamepads become controllers 2-4.
 | `HALO_VOLUME` | master volume (default 1.0) |
 | `HALO_NO_AUDIO` | do not open an audio device (sound still runs, silently) |
 | `HALO_LANGUAGE` | dashboard language: `en`, `ja`, `de`, `fr`, `es`, `it` |
+| `HALO_INTERPOLATION=0` | the original 30 frames per second (see Frame rate) |
+| `HALO_NO_VSYNC` | do not wait for the display between frames |
 | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | write every Nth presented frame as a BMP |
 | `HALO_GPU_STATS`, `HALO_GPU_TRACE=<frame>` (with `HALO_GPU_TRACE_CONSTANTS`), `HALO_GPU_DUMP_SHADERS=<dir>`, `HALO_TEXTURE_DUMP=<dir>`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | renderer debugging: per-frame counts, a full state trace of one frame, the generated GLSL, uploaded textures |
 | `HALO_GPU_SKIP_VS=<id>,...`, `HALO_GPU_DEBUG_EXPR=<glsl>`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | renderer debugging: drop draws by vertex shader, or replace every pixel shader's output with a GLSL expression (for example `t0.rgb` or `xD0.rgb`) |
+
+### Frame rate
+
+The game simulates in 30 Hz ticks and originally drew one frame per tick.
+The native builds (Linux, Windows, Android) draw a frame at every refresh
+of the display instead, paced by vsync: 60, 90, 120, 240 Hz or whatever the
+display runs at. Each frame shows the world between the last two ticks
+(`game/render_interpolation.c`): after every tick the camera, every
+object's node matrices and the first-person weapon's pose are kept, and a
+frame blends the previous and the latest by how far the clock has run into
+the next tick. Rotations are blended as quaternions (normalised lerp, the
+shorter way round), positions and scales linearly; teleports, respawns and
+camera cuts snap. What is drawn is therefore one tick (33 ms) behind the
+simulation. Particles, contrails and other effects already moved every
+frame. The simulation itself is unchanged: 30 Hz, as on the Xbox.
+
+`HALO_INTERPOLATION=0` restores the original behaviour: one frame per
+tick, throttled to 30 per second.
+
+`display_framerate true` in the developer console shows the frame rate at
+the bottom right of the screen: in the native builds the frames per second
+averaged over half a second (the Xbox showed each frame's own rate, which
+cannot read above 100).
 
 ## What works
 

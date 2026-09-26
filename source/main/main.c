@@ -2166,6 +2166,52 @@ static boolean main_framerate_throttle_enabled(
 	return rasterizer_globals.framerate_throttle;
 }
 
+#ifdef HALO_LINUX
+/* The native ports draw a frame whenever the display can show one, paced
+by vsync, and frames fall between the 30 Hz ticks
+(port/linux/game/render_interpolation.c): no vertical blank throttle, and
+the frame is timed with the performance counter. */
+static void main_update_time_unthrottled(
+	void)
+{
+	static LARGE_INTEGER previous_counter;
+	LARGE_INTEGER counter;
+	LARGE_INTEGER frequency;
+	real seconds_elapsed = 0.0f;
+
+	QueryPerformanceCounter(&counter);
+	QueryPerformanceFrequency(&frequency);
+	if (previous_counter.QuadPart && frequency.QuadPart)
+	{
+		seconds_elapsed = (real)((double)(counter.QuadPart - previous_counter.QuadPart) /
+			(double)frequency.QuadPart);
+	}
+	previous_counter = counter;
+
+	if (main_globals.movie)
+	{
+		seconds_elapsed = main_globals.recording_dt;
+	}
+	else
+	{
+		seconds_elapsed = PIN(seconds_elapsed, 0.0f, 1.0f);
+		if (main_globals.connection == _game_connection_local)
+		{
+			if (debug_force_frame_rate_update)
+				seconds_elapsed = CEILING(seconds_elapsed, 0.03333333507180214f);
+			else
+				seconds_elapsed = CEILING(seconds_elapsed, 0.06666667014360428f);
+		}
+	}
+
+	main_globals.frame_start_milliseconds = system_milliseconds();
+	main_globals.seconds_elapsed = seconds_elapsed;
+	profile_seconds_elapsed(seconds_elapsed);
+	main_globals.rasterizer_initial_index =
+		rasterizer_globals.frame_and_vertical_blank_index;
+}
+
+#endif
 static void main_update_time(
 	void)
 {
@@ -2181,6 +2227,13 @@ static void main_update_time(
 	short short_target_index;
 	real seconds_elapsed;
 
+#ifdef HALO_LINUX
+	if (halo_interpolation_enabled())
+	{
+		main_update_time_unthrottled();
+		return;
+	}
+#endif
 	end_milliseconds = system_milliseconds();
 	minimum_target_index = MAX(
 		main_globals.rasterizer_target_index,
@@ -2425,7 +2478,11 @@ void main_rasterizer_throttle(
 	did_throttle = FALSE;
 	main_globals.rasterizer_throttle_start_index =
 		rasterizer_globals.frame_and_vertical_blank_index + 1;
+#ifdef HALO_LINUX
+	if (rasterizer_globals.framerate_throttle && !halo_interpolation_enabled())
+#else
 	if (rasterizer_globals.framerate_throttle)
+#endif
 	{
 		target_index = main_globals.rasterizer_target_index;
 		target_index--;
@@ -2658,14 +2715,49 @@ void main_framerate_render(
 			real frame_rate_real;
 			long frame_rate;
 			rectangle2d bounds;
+#ifdef HALO_LINUX
+			/* room for three digits under C99 snprintf, which (unlike MSVC's
+			_snprintf) keeps a byte of the count for the terminator */
+			char frame_rate_string[8];
+#else
 			char frame_rate_string[4];
+#endif
 
 			bounds = render.camera.window_bounds;
+#ifdef HALO_LINUX
+			/* The native ports draw at the display's refresh rate, up to
+			hundreds of frames a second: show frames per second averaged over
+			half a second, counting each frame once (split screen draws this
+			once per view), with no 100 cap. */
+			{
+				static unsigned long counted_frame_start = 0;
+				static real window_seconds = 0.0f;
+				static long window_frames = 0;
+				static long average_frame_rate = 0;
+
+				if (main_globals.frame_start_milliseconds != counted_frame_start)
+				{
+					counted_frame_start = main_globals.frame_start_milliseconds;
+					window_seconds += main_globals.seconds_elapsed;
+					window_frames++;
+					if (window_seconds >= 0.5f)
+					{
+						average_frame_rate = fast_ftol(window_frames / window_seconds);
+						window_seconds = 0.0f;
+						window_frames = 0;
+					}
+				}
+				frame_rate = PIN(average_frame_rate, 0, 999);
+				(void)frame_seconds;
+				(void)frame_rate_real;
+			}
+#else
 			frame_seconds = MAX(main_globals.seconds_elapsed, 0.01f);
 			frame_rate_real = 1.0f / frame_seconds;
 			frame_rate = fast_ftol(frame_rate_real);
 			if (main_globals.vblank_interval_held)
 				frame_rate = 60 / main_globals.vblank_interval_current;
+#endif
 
 			_snprintf(
 				frame_rate_string,
@@ -2952,6 +3044,9 @@ void main_game_render(
 
 			window->local_player_index = last_local_player_index;
 			observer = observer_get_camera(window->local_player_index);
+#ifdef HALO_LINUX
+			observer = render_interpolation_camera(window->local_player_index, observer);
+#endif
 		}
 		else
 		{
@@ -3182,6 +3277,11 @@ void main_loop(
 					render_frame = main_globals.main_menu_scenario_loaded ||
 						(main_globals.halt_time_scale &&
 							(game_time_get_paused() || game_time_get_elapsed()>0 || game_time_get_speed()<1.0f));
+#ifdef HALO_LINUX
+					/* frames between ticks too (render_interpolation.c) */
+					if (halo_interpolation_enabled())
+						render_frame = main_globals.main_menu_scenario_loaded || main_globals.halt_time_scale;
+#endif
 					render_frame &= !game_engine_running() || game_time_get()>=3;
 
 					collision_log_continue_period(1);
@@ -3199,7 +3299,13 @@ void main_loop(
 				if (render_frame && !debug_no_drawing)
 				{
 					profile_render_start();
+#ifdef HALO_LINUX
+					render_interpolation_frame_begin();
 					main_game_render((double)main_globals.seconds_elapsed);
+					render_interpolation_frame_end();
+#else
+					main_game_render((double)main_globals.seconds_elapsed);
+#endif
 					profile_render_end();
 				}
 			}

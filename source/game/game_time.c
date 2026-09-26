@@ -275,6 +275,21 @@ void game_time_set_paused(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* how far the clock has run into the next tick, 0 to 1: the native ports
+draw frames between ticks (port/linux/game/render_interpolation.c) */
+real game_time_get_tick_fraction(
+	void)
+{
+	real fraction;
+
+	if (!game_time_globals || !game_time_globals->active || game_time_globals->paused)
+		return 1.0f;
+	fraction = game_time_globals->leftover_dt * game_time_globals->speed * TICKS_PER_SECOND;
+	return PIN(fraction, 0.0f, 1.0f);
+}
+
+#endif
 real game_time_get_speed(
 	void)
 {
@@ -576,6 +591,9 @@ void game_time_update(
 					for (update_index = 0; update_index < server_updates; update_index++)
 					{
 						game_tick();
+#ifdef HALO_LINUX
+						render_interpolation_tick();
+#endif
 						game_time_globals->server_time++;
 						game_time_globals->local_time++;
 					}

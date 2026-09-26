@@ -56,6 +56,19 @@ BOOL platform_sdl_initialize(void)
 	return TRUE;
 }
 
+int halo_interpolation_enabled(void)
+{
+	static int enabled = -1;
+
+	if (enabled < 0)
+	{
+		const char *setting = getenv("HALO_INTERPOLATION");
+
+		enabled = !(setting && !strcmp(setting, "0"));
+	}
+	return enabled;
+}
+
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
 	const char *scale_text = getenv("HALO_WINDOW_SCALE");

@@ -84,6 +84,7 @@ the Linux README (volume, language, renderer debugging), plus:
 | Variable | Effect |
 | --- | --- |
 | `HALO_SCREEN_WIDTH` | columns of the 480-line picture; by default the display's aspect ratio (1068 on a 20:9 phone), `640` for the Xbox's 4:3 |
+| `HALO_INTERPOLATION` | `0`: the original 30 frames per second instead of one per display refresh (port/linux/README.md, "Frame rate") |
 | `HALO_SAMPLE` | see Debugging |
 
 ## Widescreen

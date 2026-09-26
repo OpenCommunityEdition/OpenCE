@@ -1054,8 +1054,24 @@ static void first_person_weapon_build_node_matrices(
 		euler_angles2d_from_vector3d(&first_person_weapon->render_facing, &render.camera.forward);
 		first_person_weapon->render_position= render.camera.position;
 	}
+#ifdef HALO_LINUX
+	/* The native ports draw several frames per tick. The turning sway
+	(first_person_weapon_update) takes the facing change since the last
+	frame as a tick's worth: move the last facing on once a tick. */
+	{
+		static long last_render_ticks[MAXIMUM_LOCAL_PLAYERS] = { NONE, NONE, NONE, NONE };
+
+		if (!halo_interpolation_enabled() || last_render_ticks[local_player_index] != game_time_get())
+		{
+			first_person_weapon->last_render_facing= first_person_weapon->render_facing;
+			first_person_weapon->last_render_position= first_person_weapon->render_position;
+			last_render_ticks[local_player_index]= game_time_get();
+		}
+	}
+#else
 	first_person_weapon->last_render_facing= first_person_weapon->render_facing;
 	first_person_weapon->last_render_position= first_person_weapon->render_position;
+#endif
 	euler_angles2d_from_vector3d(&first_person_weapon->render_facing, &render.camera.forward);
 	first_person_weapon->render_position= render.camera.position;
 	first_person_weapon->render_forward= render.camera.forward;
@@ -1313,6 +1329,14 @@ static void first_person_weapon_build_node_matrices(
 			&render.camera.position,
 			&render.camera.forward,
 			&render.camera.up);
+#ifdef HALO_LINUX
+		/* the pose between the last two ticks (render_interpolation.c) */
+		render_interpolation_first_person(
+			local_player_index,
+			first_person_weapon->node_matrices,
+			(short)animation_graph->nodes.count,
+			&render.camera);
+#endif
 	}
 
 	return;
