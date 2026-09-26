@@ -14,7 +14,16 @@ group's layout is the same in both builds; they do not prove it. A group
 whose structures match but whose footprints differ differs in its block data:
 in content, or in the layout of nested elements.
 
-    python tools/custom_edition_tag_footprints.py CUSTOM_EDITION_MAPS XBOX_MAPS
+With --blocks, the top-level blocks of every tag whose footprints differ are
+compared too. They are found without definitions, as (count, address,
+definition) fields of the structure whose address points into the tag's
+footprint and whose definition pointer is 0, as caches leave it. Each block
+that differs is counted by kind: present in one build only, a different
+element count (content), or the same count over a different span of data up
+to the next block's data (element size or nested content: the walk cannot
+tell which).
+
+    python tools/custom_edition_tag_footprints.py [--blocks] CUSTOM_EDITION_MAPS XBOX_MAPS
 
 Both arguments are folders; levels present in both are compared. Xbox caches
 may be compressed as on the disc. No map is read beyond its header and tag
@@ -35,6 +44,8 @@ CUSTOM_EDITION_TAG_CACHE_ADDRESS = 0x40440000
 CUSTOM_EDITION_TAG_INDEX_BYTES = 0x28
 XBOX_TAG_INDEX_BYTES = 0x24
 TAG_INSTANCE_BYTES = 0x20
+TAG_BLOCK_BYTES = 12
+MAXIMUM_BLOCK_COUNT = 0xFFFF
 RESOURCE_MAP_NAMES = ("bitmaps.map", "sounds.map", "loc.map")
 
 
@@ -99,16 +110,57 @@ class Cache:
         inside = [value for value in values if address < value < address + self.footprints[key]]
         return min(inside) - address if inside else None
 
+    def top_level_blocks(self, key):
+        """The tag's blocks, by offset in its structure: (element count, span
+        of data per element up to the next block's data)."""
+        address = self.addresses[key]
+        footprint = self.footprints[key]
+        structure = self.structure_size(key)
+        if structure is None:
+            return {}
+        start = address - self.base
+        found = {}
+        for offset in range(0, structure - TAG_BLOCK_BYTES + 1, 4):
+            count, pointer, definition = struct.unpack_from("<iII", self.tag_data, start + offset)
+            if 0 < count <= MAXIMUM_BLOCK_COUNT and address < pointer < address + footprint and not definition:
+                found[offset] = (count, pointer - address)
+        starts = sorted({relative for _, relative in found.values()}) + [footprint]
+        return {offset: (count, (starts[starts.index(relative) + 1] - relative) // count)
+                for offset, (count, relative) in found.items()}
 
-def compare(custom_edition, xbox):
+
+def block_differences(custom_edition, xbox, key):
+    """How a tag's top-level blocks differ between the two caches: blocks
+    present in one only, with other element counts, or with the same count
+    over another span of data."""
+    left, right = custom_edition.top_level_blocks(key), xbox.top_level_blocks(key)
+    kinds = collections.Counter()
+    for offset in set(left) | set(right):
+        ours, theirs = left.get(offset), right.get(offset)
+        if ours == theirs:
+            continue
+        if ours is None or theirs is None:
+            kinds["presence"] += 1
+        elif ours[0] != theirs[0]:
+            kinds["count"] += 1
+        else:
+            kinds["span"] += 1
+    return kinds
+
+
+def compare(custom_edition, xbox, blocks=False):
     """Per group: how many tags both caches keep, how many have the same
-    footprint, how many the same estimated structure size."""
+    footprint, how many the same estimated structure size, and with
+    `blocks`, how the blocks of the others differ."""
     result = collections.defaultdict(collections.Counter)
     for key in set(custom_edition.footprints) & set(xbox.footprints):
         counts = result[key[0]]
         counts["shared"] += 1
         if custom_edition.footprints[key] == xbox.footprints[key]:
             counts["same footprint"] += 1
+        elif blocks:
+            for kind, number in block_differences(custom_edition, xbox, key).items():
+                counts[f"block {kind}"] += number
         sizes = custom_edition.structure_size(key), xbox.structure_size(key)
         if None not in sizes:
             counts["structures measured"] += 1
@@ -128,6 +180,8 @@ def model_pairs(custom_edition, xbox):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--blocks", action="store_true",
+                        help="also compare the top-level blocks of tags whose footprints differ")
     parser.add_argument("custom_edition", type=Path, help="folder of Custom Edition caches")
     parser.add_argument("xbox", type=Path, help="folder of Xbox caches of the same levels")
     arguments = parser.parse_args(argv)
@@ -146,7 +200,7 @@ def main(argv=None):
     for level in levels:
         custom_edition = Cache(arguments.custom_edition / level)
         xbox = Cache(arguments.xbox / level)
-        for group, counts in compare(custom_edition, xbox).items():
+        for group, counts in compare(custom_edition, xbox, arguments.blocks).items():
             totals[group].update(counts)
             present_in[group] += 1
             if counts["same footprint"] == counts["shared"]:
@@ -166,9 +220,13 @@ def main(argv=None):
     print("groups with differences (footprints equal / tags shared; structures equal / measured):")
     for group in sorted(set(present_in) - set(identical)):
         counts = totals[group]
+        blocks = ""
+        if arguments.blocks:
+            blocks = (f"; blocks differing in count {counts['block count']}, "
+                      f"presence {counts['block presence']}, span {counts['block span']}")
         print(f"  {group!r}: footprints {counts['same footprint']}/{counts['shared']}, "
               f"structures {counts['same structure']}/{counts['structures measured']}, "
-              f"identical in {identical_in[group]} of {present_in[group]} levels")
+              f"identical in {identical_in[group]} of {present_in[group]} levels{blocks}")
     print(f"groups only in Custom Edition caches (levels): {dict(sorted(only_custom_edition.items()))}")
     print(f"groups only in Xbox caches (levels): {dict(sorted(only_xbox.items()))}")
     print(f"models named alike, 'mod2' vs 'mode': {model_totals[0]}, with the same footprint: {model_totals[1]}")

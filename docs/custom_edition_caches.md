@@ -143,7 +143,7 @@ silences them.
   are extracted to the gitignored `assets/custom_edition`, three more tests
   check the results in the table below.
 
-`python -m pytest tools/test_custom_edition_tag_footprints.py` (3 tests)
+`python -m pytest tools/test_custom_edition_tag_footprints.py` (4 tests)
 checks the tag comparison tool of
 [the measurements below](#how-far-custom-edition-tags-are-from-the-xbox-tags)
 on synthetic caches.
@@ -349,7 +349,10 @@ In order, each needing the one before:
    a licence compatible with CC0 would have to be found). Then a field by
    field comparison, with this build's definitions, of the groups whose
    block data differ: weapons, globals, scenarios, UI widgets, animations.
-   Scripts need Custom Edition's function table mapped onto this build's.
+   The measurements below found content differences there, not layout
+   ones, so these may well need no conversion; that is what the comparison
+   would settle. Scripts need Custom Edition's function table mapped onto
+   this build's.
 2. **Loading in the game**, once converted tags can be read. The pieces:
    a second reserved address window at `0x40440000`–`0x426C0000` next to
    the Xbox one (`port/linux/src/xbox_memory.c`); Custom Edition maps
@@ -387,7 +390,7 @@ differences between the two Xbox builds are not measured. Run on the 14
 levels both sets have (13 multiplayer levels and `ui`):
 
 ```
-python tools/custom_edition_tag_footprints.py assets/custom_edition "<Xbox 2276>/maps"
+python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<Xbox 2276>/maps"
 ```
 
 - **48 groups have the same footprint for every shared tag in every level**:
@@ -402,10 +405,26 @@ python tools/custom_edition_tag_footprints.py assets/custom_edition "<Xbox 2276>
   weapons (`weap`, 39/182, structures 182/182), globals (`matg`, 1/14,
   structures 14/14) and scenarios (`scnr`, 0/14, structures 13/14), plus, in
   `ui` only, bitmaps, sounds and string lists. These differ in their block
-  data, whether in content or in the layout of nested elements; which, is
-  not established. The flamethrower's tags account for every `effe`, `proj`
-  and `wphi` difference and all but one `coll` difference; 11 of the 14
-  weapons (every player weapon and both vehicle guns) differ in every level.
+  data. The flamethrower's tags account for every `effe`, `proj` and `wphi`
+  difference and all but one `coll` difference; 11 of the 14 weapons (every
+  player weapon and both vehicle guns) differ in every level.
+- **What differs in those blocks** (`--blocks`: the top-level blocks of each
+  differing tag, found without definitions and compared): almost always
+  the number of elements, or whether a block has any, which is content:
+  weapons 143 count and 26 presence differences, UI widgets 158 and 63,
+  scenarios 36 and 13, projectiles 13, weapon HUDs 78 presence, collision
+  models 26 count. Every weapon difference checked in Blood
+  Gulch lies in a predicted-resources list (8-byte elements, weapon
+  offset `0x4E4`; OpenSauce `weapon_definitions.hpp`), or, for the
+  flamethrower, also in its attachments; the globals differ in their
+  cheat powerups (16 against 14). The rest (flamethrower effects 26,
+  globals 13, animations 39, one collision model, and 3 in `ui`) keep their element counts but
+  span a different amount of data up to the next block, which this method
+  cannot split into element size and nested content: for the globals, the
+  block in question (`player_info`, 0xF4-byte elements without blocks of
+  their own) spans more than its elements, so other data sits in the span.
+  No difference found has to be a layout change; none has been ruled one
+  out field by field either.
 - **Groups only Custom Edition has**: `mod2` (models), `scex` (a transparent
   shader type), `devc` and `tagc`, in all 14 levels; **only the Xbox has**:
   `mode` (models) and `sotr` (a transparent shader type), besides the groups
