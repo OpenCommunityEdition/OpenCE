@@ -397,15 +397,27 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
+	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
 	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
 	MAXIMUM_NUMBER_OF_PLAYERS = 16,
+#endif
 	MAXIMUM_MACHINE_NAME_LENGTH = 32,
 	NETWORK_GAME_NAME_LENGTH = 16,
 	TRANSPORT_NONCE_LENGTH = 8,
 	NETWORK_PLAYER_NAME_LENGTH = 12,
 	NETWORK_GAME_MAP_NAME_LENGTH = 0x100,
+#ifdef HALO_LINUX
+	/* the client's buffer for any message from the server */
+	MAXIMUM_NETWORK_MESSAGE_SIZE = HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE,
+#else
 	MAXIMUM_NETWORK_MESSAGE_SIZE = 0x800,
+#endif
 };
 
 enum network_game_client_state
@@ -497,7 +509,12 @@ struct network_game
 	struct game_variant variant;
 	byte __padding10C;
 	byte game_mode;
+#ifdef HALO_LINUX
+	/* 128 does not fit a signed char */
+	byte maximum_player_count;
+#else
 	char maximum_player_count;
+#endif
 	byte __padding10F;
 	short difficulty;
 	short machine_count;
@@ -700,26 +717,49 @@ typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
 typedef char player_profile_size_assert[
 	sizeof(struct player_profile) == 0x30 ? 1 : -1];
+#ifdef HALO_LINUX
+/* the update and settings layouts follow the session limits
+(port/linux/include/halo_port_limits.h) */
+typedef char message_server_game_update_size_assert[
+	sizeof(struct message_server_game_update) == 0x10 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
+typedef char server_update_size_assert[
+	sizeof(struct server_update) == 4 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
+#else
 typedef char message_server_game_update_size_assert[
 	sizeof(struct message_server_game_update) == 0x210 ? 1 : -1];
 typedef char server_update_size_assert[
 	sizeof(struct server_update) == 0x204 ? 1 : -1];
+#endif
 typedef char message_server_machine_accepted_size_assert[
 	sizeof(struct message_server_machine_accepted) == 8 ? 1 : -1];
 typedef char message_client_settings_request_size_assert[
 	sizeof(struct message_client_settings_request) == 0x44 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+#else
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
+#endif
 typedef char network_game_map_name_offset_assert[
 	offsetof(struct network_game, map.name) == 0x24 ? 1 : -1];
 typedef char network_game_machine_count_offset_assert[
 	offsetof(struct network_game, machine_count) == 0x112 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char network_game_local_data_offset_assert[
+	offsetof(struct network_game, local_data) == HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET ? 1 : -1];
+typedef char network_game_player_count_offset_assert[
+	offsetof(struct network_game, player_count) == HALO_PORT_NETWORK_GAME_PLAYER_COUNT_OFFSET ? 1 : -1];
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+#else
 typedef char network_game_local_data_offset_assert[
 	offsetof(struct network_game, local_data) == 0x430 ? 1 : -1];
 typedef char network_game_player_count_offset_assert[
 	offsetof(struct network_game, player_count) == 0x224 ? 1 : -1];
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+#endif
 typedef char network_advertised_game_update_time_offset_assert[
 	offsetof(struct network_advertised_game, update_time) == 0x2C ? 1 : -1];
 typedef char network_advertised_game_size_assert2[
@@ -756,6 +796,22 @@ typedef char network_game_client_join_parameters_offset_assert[
 	offsetof(struct network_game_client, join_parameters) == 0x838 ? 1 : -1];
 typedef char network_game_client_game_offset_assert[
 	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
+#ifdef HALO_LINUX
+/* the fields after the game settings record move with its size */
+#define NETWORK_GAME_CLIENT_TAIL_OFFSET (0x85C + HALO_PORT_NETWORK_GAME_SIZE)
+typedef char network_game_client_join_in_progress_offset_assert[
+	offsetof(struct network_game_client, join_in_progress) == NETWORK_GAME_CLIENT_TAIL_OFFSET ? 1 : -1];
+typedef char network_game_client_next_update_number_offset_assert[
+	offsetof(struct network_game_client, next_update_number) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 8 ? 1 : -1];
+typedef char network_game_client_last_broadcast_search_time_offset_assert[
+	offsetof(struct network_game_client, last_broadcast_search_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 4 ? 1 : -1];
+typedef char network_game_client_last_update_time_offset_assert[
+	offsetof(struct network_game_client, last_update_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0xC ? 1 : -1];
+typedef char network_game_client_flags_offset_assert[
+	offsetof(struct network_game_client, flags) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1A ? 1 : -1];
+typedef char network_game_client_last_precache_time_offset_assert[
+	offsetof(struct network_game_client, last_precache_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
+#else
 typedef char network_game_client_join_in_progress_offset_assert[
 	offsetof(struct network_game_client, join_in_progress) == 0xC90 ? 1 : -1];
 typedef char network_game_client_next_update_number_offset_assert[
@@ -768,12 +824,23 @@ typedef char network_game_client_flags_offset_assert[
 	offsetof(struct network_game_client, flags) == 0xCAA ? 1 : -1];
 typedef char network_game_client_last_precache_time_offset_assert[
 	offsetof(struct network_game_client, last_precache_time) == 0xCA0 ? 1 : -1];
+#endif
 typedef char message_client_broadcast_game_search_size_assert[
 	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
 typedef char message_client_join_game_request_size_assert[
 	sizeof(struct message_client_join_game_request) == 0x50 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char network_game_client_seconds_to_game_start_offset_assert[
+	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x14 ? 1 : -1];
+typedef char network_game_client_error_offset_assert[
+	offsetof(struct network_game_client, error) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x18 ? 1 : -1];
+typedef char network_game_client_out_of_sync_offset_assert[
+	offsetof(struct network_game_client, out_of_sync) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1C ? 1 : -1];
+typedef char network_game_client_connection_silent_offset_assert[
+	offsetof(struct network_game_client, connection_silent) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1D ? 1 : -1];
+#else
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == 0xCA4 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -782,6 +849,7 @@ typedef char network_game_client_out_of_sync_offset_assert[
 	offsetof(struct network_game_client, out_of_sync) == 0xCAC ? 1 : -1];
 typedef char network_game_client_connection_silent_offset_assert[
 	offsetof(struct network_game_client, connection_silent) == 0xCAD ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -2588,7 +2656,12 @@ static boolean network_game_client_idle_searching(
 				message_header *message;
 
 				broadcast_game_search.port = NETWORK_GAME_CLIENT_PORT;
+#ifdef HALO_LINUX
+				/* the search version: the native builds' games are not the Xbox's */
+				broadcast_game_search.__unknown2 = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION;
+#else
 				broadcast_game_search.__unknown2 = 1;
+#endif
 				transport_get_nonce(
 					broadcast_game_search.nonce,
 					sizeof(broadcast_game_search.nonce));

@@ -207,7 +207,11 @@ struct network_game_message_packet_definitions
 	struct data_packet_definition server_machine_accepted;
 	struct data_packet_field server_machine_rejected_fields[2];
 	struct data_packet_definition server_machine_rejected;
+#ifdef HALO_LINUX
+	struct data_packet_field server_game_settings_update_fields[4];
+#else
 	struct data_packet_field server_game_settings_update_fields[2];
+#endif
 	struct data_packet_definition server_game_settings_update;
 	struct data_packet_field server_pregame_countdown_fields[2];
 	struct data_packet_definition server_pregame_countdown;
@@ -283,7 +287,13 @@ DEFINE_NETWORK_GAME_MESSAGE(message_server_game_advertise, 0x114);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_pong, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_machine_accepted, 0x08);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_machine_rejected, 0x02);
+#ifdef HALO_LINUX
+/* one piece of the game settings record: total size, offset, length, then the
+bytes (network_server_message_handler.c) */
+DEFINE_NETWORK_GAME_MESSAGE(message_server_game_settings_update, 8 + HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE);
+#else
 DEFINE_NETWORK_GAME_MESSAGE(message_server_game_settings_update, 0x434);
+#endif
 DEFINE_NETWORK_GAME_MESSAGE(message_server_pregame_countdown, 0x02);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_begin_game, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_graceful_game_exit_pregame, 0x04);
@@ -297,7 +307,12 @@ DEFINE_NETWORK_GAME_MESSAGE(message_client_player_settings_request, 0x20);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_game_start_request, 0x02);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_graceful_game_exit_pregame, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_map_is_precached_pregame, 0x100);
+#ifdef HALO_LINUX
+/* one 0x20-byte action per player */
+DEFINE_NETWORK_GAME_MESSAGE(message_server_game_update, 0x10 + HALO_PORT_MAXIMUM_NETWORK_PLAYERS * 0x20);
+#else
 DEFINE_NETWORK_GAME_MESSAGE(message_server_game_update, 0x210);
+#endif
 DEFINE_NETWORK_GAME_MESSAGE(message_server_add_player_ingame, 0x20);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_remove_player_ingame, 0x24);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_game_over, 0x04);
@@ -357,8 +372,15 @@ struct network_game_message_packet_definitions data_0030aa68 =
 	},
 	NETWORK_GAME_MESSAGE_DEFINITION(server_machine_rejected, "message_server_machine_rejected_packet", message_server_machine_rejected),
 	{
+#ifdef HALO_LINUX
+		DATA_PACKET_FIELD(_data_packet_field_shorts, 3),
+		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+		DATA_PACKET_FIELD(_data_packet_field_raw, HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE),
+		DATA_PACKET_FIELD_END,
+#else
 		DATA_PACKET_FIELD(_data_packet_field_raw, 1076),
 		DATA_PACKET_FIELD_END,
+#endif
 	},
 	NETWORK_GAME_MESSAGE_DEFINITION(server_game_settings_update, "message_server_game_settings_update_packet", message_server_game_settings_update),
 	{
@@ -438,7 +460,11 @@ struct network_game_message_packet_definitions data_0030aa68 =
 	{
 		DATA_PACKET_FIELD(_data_packet_field_longs, 3),
 		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
+#ifdef HALO_LINUX
+		DATA_PACKET_FIELD(_data_packet_field_array, HALO_PORT_MAXIMUM_NETWORK_PLAYERS),
+#else
 		DATA_PACKET_FIELD(_data_packet_field_array, 16),
+#endif
 		DATA_PACKET_FIELD(_data_packet_field_longs, 6),
 		DATA_PACKET_FIELD(_data_packet_field_shorts, 3),
 		DATA_PACKET_FIELD(_data_packet_field_pad, 2),
@@ -578,13 +604,23 @@ struct network_game_message_packet_definitions data_0030aa68 =
 		"network_game_messages_group",
 		35,
 		8,
+#ifdef HALO_LINUX
+		/* the per-tick update of 128 players decodes to 0x1010 bytes */
+		HALO_PORT_NETWORK_PACKET_SIZE,
+		HALO_PORT_NETWORK_PACKET_SIZE,
+#else
 		0x600,
 		0x800,
+#endif
 		data_0030aa68.packets,
 	},
 };
 
+#ifdef HALO_LINUX
+static byte network_game_message_buffer[HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE + 4];
+#else
 static byte network_game_message_buffer[0x604];
+#endif
 
 /* ---------- public code */
 
@@ -632,7 +668,12 @@ void *create_network_game_message(
 	const void *message_struct,
 	short message_struct_size)
 {
+#ifdef HALO_LINUX
+	/* as large as the packet group lets the encoder write */
+	byte encoded_message[HALO_PORT_NETWORK_PACKET_SIZE];
+#else
 	byte encoded_message[0x600];
+#endif
 	union network_game_message_size encoded_message_size;
 	void *message;
 

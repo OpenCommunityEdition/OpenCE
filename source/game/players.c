@@ -280,8 +280,14 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
+	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+#else
 	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = 16,
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+#endif
 	MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED = 183,
 	_collision_test_for_player_teleport_flags =
 		FLAG(_collision_test_front_facing_surfaces_bit) |
@@ -477,7 +483,12 @@ void players_initialize(
 {
 	player_data = game_state_data_new(
 		"players",
+#ifdef HALO_LINUX
+		/* a player's datum index is also its action slot in every update */
+		NETWORK_GAME_MAXIMUM_PLAYER_COUNT,
+#else
 		16,
+#endif
 		sizeof(struct player_datum));
 	team_data = game_state_data_new(
 		"teams",
@@ -527,7 +538,11 @@ void players_initialize_for_new_map(
 	csmemset(
 		machine_to_player_table,
 		NONE,
+#ifdef HALO_LINUX
+		sizeof(machine_to_player_table));
+#else
 		0x40);
+#endif
 
 	return;
 }

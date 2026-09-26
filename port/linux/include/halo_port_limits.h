@@ -23,6 +23,11 @@ a finishing place in 7 bits.
 #define HALO_PORT_MAXIMUM_NETWORK_PLAYERS 128
 #define HALO_PORT_MAXIMUM_NETWORK_MACHINES 128
 
+/* a host polls its listening socket and one socket per machine; the Xbox's
+Winsock headers default to 64 (the prefix headers define FD_SETSIZE from
+this before any of them is read) */
+#define HALO_PORT_FD_SETSIZE 256
+
 /* ---------- struct network_game layout
 
 The game settings record (struct network_game) is declared separately in
@@ -41,5 +46,26 @@ machines, 16 players) are 0x226 and 0x434. */
 #define HALO_PORT_NETWORK_GAME_RANDOM_SEED_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 2)
 #define HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xA)
 #define HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xE)
+
+/* ---------- system link protocol
+
+The native builds' messages differ from the Xbox game's (longer arrays, the
+game settings record in fragments), so they search for games with their own
+protocol version and never see the Xbox game's, or it theirs. */
+
+#define HALO_PORT_NETWORK_GAME_MESSAGE_VERSION 2
+
+/* a message header's 12-bit length allows messages of up to 0xFFF bytes,
+header included; the per-tick update of 128 players is 3,857 */
+#define HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE 0x1000
+
+/* the packet codec's limit on a decoded or encoded packet; the per-tick
+update of 128 players decodes to 0x1010 bytes */
+#define HALO_PORT_NETWORK_PACKET_SIZE 0x1100
+
+/* the game settings record (HALO_PORT_NETWORK_GAME_SIZE, 13,092 bytes at 128
+machines and players) does not fit one message; it is sent in pieces of
+this many bytes (4 pieces), each 3,594 bytes on the wire */
+#define HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE 0xE00
 
 #endif /* __HALO_PORT_LIMITS_H */

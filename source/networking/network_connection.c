@@ -217,9 +217,26 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* the client connections a server accepts: one per machine, the host's own
+included. The Xbox game uses the split screen player count (4), which is
+also its machine count; the native builds use their machine limit
+(port/linux/include/halo_port_limits.h). */
+#ifdef HALO_LINUX
+#define NETWORK_CONNECTION_MAXIMUM_CLIENTS HALO_PORT_MAXIMUM_NETWORK_MACHINES
+#else
+#define NETWORK_CONNECTION_MAXIMUM_CLIENTS MAXIMUM_NUMBER_OF_LOCAL_PLAYERS
+#endif
+
 enum
 {
+#ifdef HALO_LINUX
+	/* the per-tick update of 128 players is 3,857 bytes */
+	RELIABLE_MESSAGE_MAXIMUM_SIZE = HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE,
+	/* how long a stream write waits for a peer that is not reading */
+	NETWORK_CONNECTION_WRITE_TIMEOUT = 2000,
+#else
 	RELIABLE_MESSAGE_MAXIMUM_SIZE = 2048,
+#endif
 	MAXIMUM_RESERVED_NETWORK_PORT = 1023,
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
@@ -266,7 +283,7 @@ struct network_server_connection
 {
 	struct network_connection connection;
 	struct transport_endpoint_set *endpoint_set;
-	struct network_connection *client_list[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+	struct network_connection *client_list[NETWORK_CONNECTION_MAXIMUM_CLIENTS];
 	boolean allow_client_connections;
 };
 
@@ -753,7 +770,7 @@ void network_connection_delete(
 			client = server->client_list;
 			if (client)
 			{
-				for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++, client++)
+				for (client_index = 0; client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS; client_index++, client++)
 				{
 					if (*client)
 					{
@@ -877,6 +894,46 @@ boolean network_connection_write(
 			(connection->flags&FLAG(_connection_create_clientside_client_bit)) ||
 			(connection->flags&FLAG(_connection_create_serverside_client_bit)));
 
+#ifdef HALO_LINUX
+		/* A stream socket may take only part of a message (the per-tick
+		update of 128 players is 3.9 KB): send the rest too, or the peer
+		loses its place in the stream. A peer that stops reading for
+		NETWORK_CONNECTION_WRITE_TIMEOUT is dropped rather than stalling
+		everyone else. */
+		{
+			long bytes_sent = 0;
+			unsigned long start_time = system_milliseconds();
+
+			bytes_written = 0;
+			while (bytes_sent < buffer_size)
+			{
+				long sent = write_endpoint(
+					connection->reliable_endpoint,
+					(byte *)message + bytes_sent,
+					buffer_size - bytes_sent);
+
+				if (sent > 0)
+				{
+					bytes_sent += sent;
+				}
+				else if (sent != _transport_result_operation_would_block ||
+					system_milliseconds() - start_time >= NETWORK_CONNECTION_WRITE_TIMEOUT)
+				{
+					bytes_written = sent < 0 ? sent : _transport_error_endpoint_io;
+					break;
+				}
+			}
+			if (bytes_sent == buffer_size)
+			{
+				bytes_written = bytes_sent;
+			}
+			else if (bytes_sent > 0)
+			{
+				/* part of a message is on its way: the stream cannot recover */
+				SET_FLAG(connection->flags, _connection_closed_bit, TRUE);
+			}
+		}
+#else
 		do
 		{
 			bytes_written = write_endpoint(
@@ -885,6 +942,7 @@ boolean network_connection_write(
 				buffer_size);
 		}
 		while (bytes_written <= 0 && bytes_written == _transport_result_operation_would_block);
+#endif
 
 		if (bytes_written > 0)
 		{
@@ -1095,12 +1153,17 @@ struct network_connection *network_connection_new(
 		if (server)
 		{
 			server->allow_client_connections = TRUE;
-			server->endpoint_set = create_endpoint_set(MAXIMUM_NUMBER_OF_LOCAL_PLAYERS + 1);
+			server->endpoint_set = create_endpoint_set(NETWORK_CONNECTION_MAXIMUM_CLIENTS + 1);
 			if (server->endpoint_set)
 			{
 				connection = &server->connection;
 				reliable_queue_size = 0;
+#ifdef HALO_LINUX
+				/* room for every machine's input datagrams between two idles */
+				unreliable_queue_size = 0x20000;
+#else
 				unreliable_queue_size = 0x1900;
+#endif
 			}
 			else
 			{
@@ -1117,7 +1180,12 @@ struct network_connection *network_connection_new(
 			0xB6);
 		if (connection)
 		{
+#ifdef HALO_LINUX
+			/* a few seconds of per-tick updates of 128 players (3.9 KB each) */
+			reliable_queue_size = 0x40000;
+#else
 			reliable_queue_size = 0x8000;
+#endif
 			unreliable_queue_size = 0x640;
 		}
 	}
@@ -1347,7 +1415,7 @@ boolean network_server_close_client_connection(
 		0x1FB,
 		server->client_list);
 
-	for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++)
+	for (client_index = 0; client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS; client_index++)
 	{
 		if (server->client_list[client_index] &&
 			server->client_list[client_index] == client_connection)
@@ -1443,7 +1511,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 				if (endpoint == connection->connection.reliable_endpoint)
 				{
 					if (connection->allow_client_connections &&
-						count_endpoints_in_set(connection->endpoint_set) < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS + 1)
+						count_endpoints_in_set(connection->endpoint_set) < NETWORK_CONNECTION_MAXIMUM_CLIENTS + 1)
 					{
 						struct transport_endpoint *accepted_endpoint = accept_endpoint(endpoint);
 						struct network_connection *client_connection = NULL;
@@ -1457,7 +1525,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 						{
 							long client_index;
 
-							for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++)
+							for (client_index = 0; client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS; client_index++)
 							{
 								if (!connection->client_list[client_index])
 								{
@@ -1466,7 +1534,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 									break;
 								}
 							}
-							if (client_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+							if (client_index >= NETWORK_CONNECTION_MAXIMUM_CLIENTS)
 							{
 								error(_error_silent, "error adding new client");
 							}
@@ -1495,7 +1563,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 				{
 					long client_index;
 
-					for (client_index = 0; client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; client_index++)
+					for (client_index = 0; client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS; client_index++)
 					{
 						if (connection->client_list[client_index] &&
 							connection->client_list[client_index]->reliable_endpoint == endpoint)
@@ -1520,7 +1588,7 @@ static boolean network_connection_idle_server_reliable_endpoint(
 					match_vassert(
 						"c:\\halo\\SOURCE\\networking\\network_connection.c",
 						0x469,
-						client_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS,
+						client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS,
 						"rogue endpoint connected to the server");
 				}
 			}
