@@ -138,6 +138,7 @@ class SolutionConfig:
         self.uasm_tag: Optional[str] = None  # Git tag; MASM stand-in on Linux
         self.wrapper: Optional[Path] = None  # If None, download wibo on Linux
         self.linux_cc: Optional[str] = None  # Native Linux build compiler (default clang)
+        self.port_release: bool = False  # native ports without assertion checks (configure.py --release)
         self.android_ndk: Optional[str] = None  # Android NDK (default: found from the environment)
         self.android_guest_cc: Optional[str] = None  # Android guest compiler (default clang)
         

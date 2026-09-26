@@ -190,7 +190,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         rspfile_content="$in_newline",
     )
 
-    abi = " ".join(LINUX_ABI_FLAGS)
+    abi = " ".join(LINUX_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {overlay_dir}"
     excluded = set(config.get("exclude_sources", []))

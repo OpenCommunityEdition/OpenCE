@@ -71,6 +71,11 @@ parser.add_argument(
     help="compiler for the native Linux build, `ninja linux` (default: clang)",
 )
 parser.add_argument(
+    "--release",
+    action="store_true",
+    help="release builds of the native ports (Linux, Windows, Android): assertions are not checked",
+)
+parser.add_argument(
     "--android-ndk",
     type=str,
     help="Android NDK for `ninja android` (default: ANDROID_NDK_HOME, or the newest under the Android SDK)",
@@ -138,6 +143,7 @@ sln.csplit_path = args.csplit
 sln.ninja_path = args.ninja
 sln.ml_path = args.ml
 sln.linux_cc = args.linux_cc
+sln.port_release = args.release
 sln.android_ndk = args.android_ndk
 sln.android_guest_cc = args.android_guest_cc
 if not is_windows():

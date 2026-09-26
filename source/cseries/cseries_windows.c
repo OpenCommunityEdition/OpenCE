@@ -116,6 +116,15 @@ void display_debug_string(
 void system_exit(
 	long code)
 {
+#ifdef HALO_RELEASE
+	/* an assertion a release build skipped (display_assert) carries on; a
+	fatal error (errors.c exits with -4998) still stops */
+	if (code == -1 && display_assert_skipped)
+	{
+		display_assert_skipped = FALSE;
+		return;
+	}
+#endif
 	halt_and_catch_fire();
 	return;
 }

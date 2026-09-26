@@ -23,6 +23,10 @@ You must source the August 2001 Xbox SDK yourself, and you need Python and [ninj
 
 `ninja linux` compiles the game with clang into a native 32-bit Linux executable, `build/linux/halo`. It needs clang, 32-bit glibc development files and 32-bit SDL3. It renders with OpenGL, plays sound through SDL3 audio, and takes keyboard, mouse and gamepad input. Put the PAL game data (build 01.01.14.2342) under `assets/` so that `assets/maps` exists, then run `build/linux/halo`. See [port/linux/README.md](port/linux/README.md) for controls and settings.
 
+### Debug and release
+
+The native builds (Linux, Windows, Android) are debug builds by default: like the build the decompilation reproduces, they stop at the first failed assertion and log it. `python configure.py --release` configures release builds instead, which, like the retail game, do not check assertions. The byte-matching build is unaffected.
+
 ### Native Windows build
 
 `ninja windows`, run on Windows, compiles the game with clang into a native 32-bit Windows executable, `build/windows/halo.exe` (with `SDL3.dll`), sharing the Linux build's platform layer. It needs LLVM, Python and ninja, plus Visual Studio's x86 C++ libraries and a Windows SDK. Put the game data under `assets/` as for Linux. See [port/windows/README.md](port/windows/README.md).

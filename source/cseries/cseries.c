@@ -155,7 +155,11 @@ enum
 
 /* ---------- macros */
 
+#ifdef HALO_RELEASE
+#define cseries_match_assert(file, line, expr) { (void)(expr); }
+#else
 #define cseries_match_assert(file, line, expr) if (!(expr)) { stack_walk(0); error(_error_silent, "EXCEPTION %s in %s,#%d: %s", "halt", MATCH_FILE(file), MATCH_LINE(line), STRINGIFY(expr)); system_exit(-1); }
+#endif
 #define cseries_assert(expr) cseries_match_assert(__FILE__, __LINE__, expr)
 
 /* ---------- structures */
@@ -349,18 +353,29 @@ char *csprintf(
 	return buffer;
 }
 
+#ifdef HALO_RELEASE
+__thread boolean display_assert_skipped = FALSE;
+#endif
+
 void display_assert(
 	char *information,
 	char *file,
 	long line,
 	boolean fatal)
 {
+#ifdef HALO_RELEASE
+	/* release builds skip assertions (cseries.h), including the ones
+	written out as display_assert followed by system_exit(-1), which then
+	returns (cseries_windows.c) */
+	display_assert_skipped = fatal;
+#else
 	if (fatal)
 	{
 		stack_walk(0);
 	}
 	
 	error(_error_silent, "EXCEPTION %s in %s,#%d: %s", fatal ? "halt" : "warn", file, line, information ? information : "<no reason given>");
+#endif
 }
 
 long csmemcmp(

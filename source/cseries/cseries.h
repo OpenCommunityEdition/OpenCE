@@ -104,11 +104,23 @@ enum
 
 #define match_halt(file, line) do { display_assert(NULL, MATCH_FILE(file), MATCH_LINE(line), TRUE); halt_and_catch_fire(); } while (FALSE);
 #define match_vhalt(file, line, string) do { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); halt_and_catch_fire(); } while (FALSE);
+#ifdef HALO_RELEASE
+/* release builds of the native ports (configure.py --release): like the
+retail game, nothing is checked; the expressions are still evaluated, since a
+few do work the game relies on (heap_insert in path_obstacle_avoidance.c,
+hs_parse_variable in hs_compile.c). Each is a statement ending in a
+brace, like the checked form, which some uses rely on (no semicolon). */
+#define match_assert(file, line, expr) { (void)(expr); }
+#define match_vassert(file, line, expr, string) { (void)(expr); }
+#define match_warn(file, line, expr) { (void)(expr); }
+#define match_vwarn(file, line, expr, string) { (void)(expr); }
+#else
 #define match_assert(file, line, expr) if (!(expr)) { display_assert(#expr, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
 #define match_vassert(file, line, expr, string) if (!(expr)) { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
-#define match_dassert(file, line, expr, diagnostic) do { match_vassert(file, line, expr, diagnostic); } while (FALSE)
 #define match_warn(file, line, expr) if (!(expr)) { display_assert(#expr, MATCH_FILE(file), MATCH_LINE(line), FALSE); }
 #define match_vwarn(file, line, expr, string) if (!(expr)) { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), FALSE); }
+#endif
+#define match_dassert(file, line, expr, diagnostic) do { match_vassert(file, line, expr, diagnostic); } while (FALSE)
 #define match_dwarn(file, line, expr, diagnostic) do { match_vwarn(file, line, expr, diagnostic); } while (FALSE)
 #define match_dhalt(file, line, diagnostic) do { match_vhalt(file, line, diagnostic); } while (FALSE)
 
@@ -198,6 +210,10 @@ unsigned long string_hash(char const *string);
 /* ---------- prototypes/CSERIES_WINDOWS.C */
 
 void system_exit(long code);
+#ifdef HALO_RELEASE
+/* set by display_assert when a release build skips a fatal assertion */
+extern __thread boolean display_assert_skipped;
+#endif
 
 /* ---------- prototypes/MAIN.C */
 

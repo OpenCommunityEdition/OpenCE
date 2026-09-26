@@ -238,7 +238,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         description="WINDOWS COPY $out",
     )
 
-    abi = " ".join(WINDOWS_ABI_FLAGS)
+    abi = " ".join(WINDOWS_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     sdl_include = SDL_DIR / "include"
     excluded = set(linux_config.get("exclude_sources", []))
     objects: List[Path] = []
