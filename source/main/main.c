@@ -2172,7 +2172,7 @@ static void main_update_time(
 	unsigned long end_milliseconds;
 	long milliseconds_elapsed;
 	short requested_rate;
-	short selected_interval;
+	short requested_interval;
 	short elapsed_game_ticks;
 	short slot;
 	boolean framerate_throttle;
@@ -2193,9 +2193,9 @@ static void main_update_time(
 		csstrcpy(main_globals.vblank_debug_string, "");
 		if (global_frame_rate_throttle && rasterizer_globals.framerate_throttle_target >= 0)
 		{
-			selected_interval = (short)(
+			requested_interval = (short)(
 				60 / (rasterizer_globals.framerate_throttle_target ? rasterizer_globals.framerate_throttle_target : 30));
-			main_globals.vblank_interval_requested = selected_interval;
+			main_globals.vblank_interval_requested = requested_interval;
 
 			if (rasterizer_globals.framerate_throttle_debug)
 			{
@@ -2335,11 +2335,14 @@ static void main_update_time(
 					" des %d targ%6I64d",
 					best_interval,
 					minimum_target_index + best_interval);
-				selected_interval = best_interval;
+				main_globals.vblank_interval_current = best_interval;
+			}
+			else
+			{
+				main_globals.vblank_interval_current = requested_interval;
 			}
 
-			main_globals.vblank_interval_current = selected_interval;
-			target_index += selected_interval;
+			target_index += main_globals.vblank_interval_current;
 		}
 	}
 	else

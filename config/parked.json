@@ -1118,17 +1118,6 @@
       }
     },
     {
-      "unit": "source/main/main",
-      "function": "_main_update_time",
-      "class": "unclassified",
-      "evidence": "Complete natural Main timing and vblank-throttle reconstruction retained from the 2026-09-09 packet. It uses named fields in the authenticated rasterizer/Main state and the genuine profiler APIs. Target and candidate are both 1,440 padded bytes, but January has 117 relocations and the candidate has 118 with different normalized code. The rejected compiler-barrier experiment is not retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md.",
-      "measurements": {
-        "target": { "size": 1440, "relocation_count": 117, "normalized_sha256": "b32677fb6c4cc6bcd664b98bfc5cc962b68bdf65228a31759b52574becdf200b" },
-        "base": { "size": 1440, "relocation_count": 117, "normalized_sha256": "ad56536c5eb119b981a9d0b89feb8bc57be3d72a21b4fcdfac4b4939db97ccdc" },
-        "objdiff_percent": 98.986336
-      }
-    },
-    {
       "unit": "source/interface/motion_sensor",
       "function": "_motion_sensor_update",
       "class": "unclassified",
