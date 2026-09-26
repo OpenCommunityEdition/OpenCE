@@ -85,6 +85,8 @@ further gamepads become controllers 2-4.
 | `HALO_LANGUAGE` | dashboard language: `en`, `ja`, `de`, `fr`, `es`, `it` |
 | `HALO_INTERPOLATION=0` | the original 30 frames per second (see Frame rate) |
 | `HALO_NO_VSYNC` | do not wait for the display between frames |
+| `HALO_NET_ADDRESS=<IPv4>` | this machine's system link address: sockets bind to it instead of to every address, other machines see games at it, and traffic to 127.0.0.1 goes to it. Lets several copies of the game play together on one computer, each on its own loopback address (see System link) |
+| `HALO_NET_BROADCAST=<IPv4>,...` | send the game search broadcast to these addresses instead of 255.255.255.255, for example to the loopback address of a host on the same computer |
 | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | write every Nth presented frame as a BMP |
 | `HALO_GPU_STATS`, `HALO_GPU_TRACE=<frame>` (with `HALO_GPU_TRACE_CONSTANTS`), `HALO_GPU_DUMP_SHADERS=<dir>`, `HALO_TEXTURE_DUMP=<dir>`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | renderer debugging: per-frame counts, a full state trace of one frame, the generated GLSL, uploaded textures |
 | `HALO_GPU_SKIP_VS=<id>,...`, `HALO_GPU_DEBUG_EXPR=<glsl>`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | renderer debugging: drop draws by vertex shader, or replace every pixel shader's output with a GLSL expression (for example `t0.rgb` or `xD0.rgb`) |
@@ -112,6 +114,62 @@ the bottom right of the screen: in the native builds the frames per second
 averaged over half a second (the Xbox showed each frame's own rate, which
 cannot read above 100).
 
+### System link
+
+The native builds play system link games of up to 128 players on up to
+128 machines, where the Xbox game allows 16 players on up to 4. Split
+screen stays at 4 players per machine. The two limits are constants in
+`include/halo_port_limits.h`; the memory they need, a 16 MB game state at
+`0x81A00000` instead of 3.3 MB and larger pools of objects, effects,
+particles, contrails, lights and sounds, is set in
+`include/halo_port_capacity.h`. The byte-matching build keeps the Xbox
+limits: every change is under `#ifdef HALO_LINUX`.
+
+- Every machine in a game must run a build with the same limits and
+  capacities: the game runs in lockstep on every machine, and a pool that
+  fills on one machine and not on another changes the game. The native
+  builds' messages differ from the Xbox game's (longer arrays, and the
+  13 KB game settings record sent in four pieces), so they search for
+  games with protocol version 2: they see neither the Xbox game nor older
+  native builds, and those do not see them.
+- The host sends every machine every player's input each tick: 3.9 KB per
+  tick with 128 players, about 0.9 Mbit/s to each machine and 118 Mbit/s
+  of upload for a host of 128 machines (measured). The traffic grows with
+  the square of the session; a host of 32 machines with one player each
+  sends about 8 Mbit/s.
+- The host waits up to 60 seconds (15 on the Xbox) for slower machines to
+  load the map, and keeps the machines that have loaded connected
+  meanwhile.
+- The lobby has panels for the local machine and three remote machines,
+  and shows the first three remote machines to join; the others are in
+  the game all the same. Finishing places past 16th, which the game's
+  string lists lack, are written out in English (17th, 21st, 22nd, ...),
+  and in free-for-all games every player is a team of one.
+
+Several copies of the game can play together on one computer. The host
+tells machines apart by address, so every copy needs its own loopback
+address, the host included: for example
+`HALO_NET_ADDRESS=127.0.0.200` for the host, and
+`HALO_NET_ADDRESS=127.0.0.201` (`.202`, ...) with
+`HALO_NET_BROADCAST=127.0.0.200` for the others, which then find the
+host's game. Never give a copy 127.0.0.1: every copy reaches its own
+address through 127.0.0.1. Linux and Windows route all of 127.0.0.0/8 to
+the loopback interface without configuration.
+
+`tools/system_link_bots.py` fills a session without a hundred copies of the
+game. It joins a host with lightweight stand-in machines, one player each,
+that speak the system link protocol, acknowledge every tick and send input,
+but do not simulate the game. On the host's computer (each stand-in binds
+its own loopback address, 127.0.0.2 and up), create a game on the host and
+run
+
+```sh
+python tools/system_link_bots.py --host 127.0.0.200 --machines 127 --start
+```
+
+`--start` starts the game once every stand-in is in the lobby. A host
+without `HALO_NET_ADDRESS` is found at the default `--host 127.0.0.1`.
+
 ## What works
 
 | Area | Status |
@@ -126,7 +184,7 @@ cannot read above 100).
 | Time | Tick count, performance counter (1 MHz), system time, x87 control word (`_control87`). |
 | Save games and signatures | `XCreateSaveGame` & co. with the Xbox `UDATA` layout; SHA-1 content signatures. |
 | C runtime | MSVC-only functions, and a 16-bit `wchar_t` runtime (UTF-16 like the Xbox) including MSVC-style wide `printf`. |
-| Networking | Winsock over BSD sockets; XNet addresses collapse to plain IPv4 (system link on a LAN). |
+| Networking | Winsock over BSD sockets; XNet addresses collapse to plain IPv4 (system link on a LAN), with games of up to 128 players on up to 128 machines (see System link). |
 | Bink video | Not supported (the RAD SDK is proprietary); `BinkOpen` fails and the game skips the movie. |
 | Debug monitor (`xbdm`) | Empty module lists. |
 
@@ -220,14 +278,16 @@ structure visibility (whole areas of a level vanished depending on the view).
 The header copy now agrees with the real function; the matching report is
 unchanged.
 
-Three more changes exist only under `#ifdef HALO_LINUX` (defined by the
-Linux prefix header, never by the matching build):
+Some changes exist only under `#ifdef HALO_LINUX` (defined by the Linux
+prefix header, never by the matching build):
 
 | File | Change |
 | --- | --- |
 | `scenario/scenario.c` | the structure BSP connection tables are named directly instead of being addressed at MSVC's offsets from `global_structure_bsp_index` |
 | `rasterizer/xbox/rasterizer_xbox_environment_fog.c` | a local pointer initialized from the file-scope array of the same name; MSVC resolved the name in the initializer to the array, standard C to the new local |
 | `game/player_control.c` | adds direct mouse aim (`halo_linux_mouse_look`) to the facing change of the player on controller 1 |
+| `networking/`, `game/` (players, player queues, game engine and its game types), `interface/` (lobby, HUD, motion sensor), `bungie_net/network/`, and the pools in `objects/`, `effects/`, `render/`, `sound/`, `hs/`, `structures/`, `cache/physical_memory_map.c` and `saved games/` | the system link limits and the memory they need (see System link); sizes and offsets that followed from the Xbox limits come from `include/halo_port_limits.h` and `include/halo_port_capacity.h` |
+| `cseries/errors.c` | `debug.txt` stays open between lines (opening and closing it for each line took milliseconds on Windows, and a large session logs thousands of lines at once) |
 
 The game's x86 inline assembly is also replaced under `#ifdef HALO_LINUX`,
 which every native port (Linux, Windows, Android) defines, so the compiler
