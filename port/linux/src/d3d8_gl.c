@@ -975,10 +975,32 @@ void D3DFASTCALL D3DDevice_SetRenderState_Deferred(D3DRENDERSTATETYPE state, DWO
 		D3D__RenderState[state] = value;
 }
 
+void WINAPI D3DDevice_SetRenderState_ZBias(DWORD value);
+
 void WINAPI D3DDevice_SetRenderStateNotInline(D3DRENDERSTATETYPE state, DWORD value)
 {
-	if ((unsigned long)state < D3DRS_MAX)
+	if (state == D3DRS_ZBIAS)
+		D3DDevice_SetRenderState_ZBias(value);
+	else if ((unsigned long)state < D3DRS_MAX)
 		D3D__RenderState[state] = value;
+}
+
+/* As the Xbox's D3D8 does it: a z bias is a polygon offset of -bias depth
+units plus -bias/4 times the polygon's depth slope, enabled for every fill
+mode. Without the slope term, decals (biased by 8) fight with the surface
+under them wherever it is seen at an angle. */
+void WINAPI D3DDevice_SetRenderState_ZBias(DWORD value)
+{
+	float offset = -(float)value;
+	float slope = offset * 0.25f;
+	DWORD enable = value != 0;
+
+	memcpy(&D3D__RenderState[D3DRS_POLYGONOFFSETZSLOPESCALE], &slope, sizeof(slope));
+	memcpy(&D3D__RenderState[D3DRS_POLYGONOFFSETZOFFSET], &offset, sizeof(offset));
+	D3D__RenderState[D3DRS_POINTOFFSETENABLE] = enable;
+	D3D__RenderState[D3DRS_WIREFRAMEOFFSETENABLE] = enable;
+	D3D__RenderState[D3DRS_SOLIDOFFSETENABLE] = enable;
+	D3D__RenderState[D3DRS_ZBIAS] = value;
 }
 
 #define COMPLEX_RENDER_STATE(name, state) \
@@ -997,7 +1019,6 @@ COMPLEX_RENDER_STATE(StencilFail, D3DRS_STENCILFAIL)
 COMPLEX_RENDER_STATE(FrontFace, D3DRS_FRONTFACE)
 COMPLEX_RENDER_STATE(CullMode, D3DRS_CULLMODE)
 COMPLEX_RENDER_STATE(TextureFactor, D3DRS_TEXTUREFACTOR)
-COMPLEX_RENDER_STATE(ZBias, D3DRS_ZBIAS)
 COMPLEX_RENDER_STATE(LogicOp, D3DRS_LOGICOP)
 COMPLEX_RENDER_STATE(EdgeAntiAlias, D3DRS_EDGEANTIALIAS)
 COMPLEX_RENDER_STATE(MultiSampleAntiAlias, D3DRS_MULTISAMPLEANTIALIAS)
@@ -1703,13 +1724,12 @@ static void apply_raster_state(BOOL has_depth)
 		rs[D3DRS_FILLMODE] == D3DFILL_POINT ? GL_POINT : GL_FILL);
 #endif
 
-	if (rs[D3DRS_SOLIDOFFSETENABLE] || rs[D3DRS_ZBIAS])
+	/* D3DRS_ZBIAS is expressed in these states (D3DDevice_SetRenderState_ZBias) */
+	if (rs[D3DRS_SOLIDOFFSETENABLE])
 	{
-		float slope = rs[D3DRS_SOLIDOFFSETENABLE] ? dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]) : 0.0f;
-		float offset = rs[D3DRS_SOLIDOFFSETENABLE] ? dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]) : 0.0f;
+		float slope = dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]);
+		float offset = dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]);
 
-		/* a D3D z bias pulls geometry towards the viewer */
-		offset -= (float)(LONG)rs[D3DRS_ZBIAS];
 		glEnable(GL_POLYGON_OFFSET_FILL);
 #ifndef HALO_ANDROID
 		glEnable(GL_POLYGON_OFFSET_LINE);
