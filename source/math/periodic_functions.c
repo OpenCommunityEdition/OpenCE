@@ -274,7 +274,11 @@ real periodic_function_evaluate(
 			return result;
 		}
 
-		return (1.0f-fraction)*first_value + second_value*fraction;
+		/* port: the native builds' x87 code can carry 255*(1.0f/255.0f) at
+		more than single precision, a hair past 1, and the game asserts that
+		colours driven by these functions stay within [0, 1] */
+		result = (1.0f-fraction)*first_value + second_value*fraction;
+		return PIN(result, 0.0f, 1.0f);
 	}
 
 	return 0.0f;
