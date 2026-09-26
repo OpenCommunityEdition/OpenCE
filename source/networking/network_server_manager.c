@@ -1603,6 +1603,9 @@ void network_game_server_client_machine_game_loading_complete(
 {
 	boolean all_machines_loaded = TRUE;
 	long client_machine_index;
+#ifdef HALO_LINUX
+	long loading_machine_count = 0;
+#endif
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x4ED, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x4EE, machine);
@@ -1620,12 +1623,25 @@ void network_game_server_client_machine_game_loading_complete(
 			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT &&
 			!TEST_FLAG(client_machine->flags, _network_client_machine_level_loaded_bit))
 		{
+#ifdef HALO_LINUX
+			loading_machine_count++;
+#else
 			network_event(
 				"still waiting on machine #%d to finish loading",
 				client_machine->machine_index);
+#endif
 			all_machines_loaded = FALSE;
 		}
 	}
+
+#ifdef HALO_LINUX
+	/* a line per machine still loading, each time one finishes, is 8,000
+	lines as 128 machines load, and the host writes its log a line at a time */
+	if (loading_machine_count)
+	{
+		network_event("still waiting for machines to finish loading (%ld left)", loading_machine_count);
+	}
+#endif
 
 	if (all_machines_loaded == TRUE)
 		network_game_server_all_machines_have_loaded(server);
@@ -3102,7 +3118,12 @@ static boolean network_game_server_handle_client_machines(
 					network_event(
 						"client machine %x removed from game",
 						server->client_machines[i].machine_index);
+					/* the native builds skip this dump: it lists every machine
+					and player, and when many machines leave at once the
+					dumps keep the host writing its log for minutes */
+#ifndef HALO_LINUX
 					network_game_server_dump(server);
+#endif
 				}
 				else
 				{
@@ -3415,6 +3436,26 @@ static boolean network_game_server_idle_pregame_tasks(
 	}
 	else if (server->time_of_first_client_loading_completion)
 	{
+#ifdef HALO_LINUX
+		/* machines that have loaded wait for the others in silence, and a
+		client drops a connection it hears nothing on for 15 seconds, less than
+		the wait for the others: keep their connections alive (a client in game
+		ignores a pregame keep-alive) */
+		if ((unsigned long)now - server->time_of_last_keep_alive >
+			5UL * MILLISECONDS_PER_SECOND)
+		{
+			struct message_server_pregame_keep_alive message_packet = { 0 };
+			struct network_message *message;
+
+			message = create_network_game_message(
+				_message_server_pregame_keep_alive,
+				&message_packet,
+				sizeof(message_packet));
+			network_game_server_send_message_to_all_machines(server, message);
+
+			server->time_of_last_keep_alive = now;
+		}
+#endif
 		if (system_milliseconds() - server->time_of_first_client_loading_completion >=
 			NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING)
 		{
