@@ -249,20 +249,12 @@ void player_add_equipment(
 	short starting_profile_index,
 	boolean reset_equipment);
 
-boolean player_teleport_internal(
-	long player_index,
-	long source_unit_index,
-	real_point3d const *position);
-
 void players_update_before_game(
 	void);
 void players_update_after_game(
 	void);
 void players_debug_render(
 	void);
-void player_handle_powerup_equipment(
-	long player_index,
-	long equipment_index);
 
 /* ---------- globals */
 
