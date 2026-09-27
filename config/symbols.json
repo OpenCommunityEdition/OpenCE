@@ -3925,7 +3925,7 @@
 { "file_offset": 937728, "flags": 32, "name": "_virtual_keyboard_tab_down", "static": true },
 { "file_offset": 937808, "flags": 32, "name": "_virtual_keyboard_cancel", "static": true },
 { "file_offset": 937904, "flags": 32, "name": "_virtual_keyboard_get_character", "static": true },
-{ "file_offset": 938112, "flags": 32, "name": "_virtual_keyboard_get_current_character" },
+{ "file_offset": 938112, "flags": 32, "name": "_virtual_keyboard_get_current_character", "static": true },
 { "file_offset": 938160, "flags": 32, "name": "_virtual_keyboard_render_internal", "static": true },
 { "file_offset": 939776, "flags": 32, "name": "_virtual_keyboard_free_space_in_text_buffer" },
 { "file_offset": 939808, "flags": 32, "name": "_virtual_keyboard_backspace", "static": true },

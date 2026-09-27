@@ -274,7 +274,7 @@ static boolean virtual_keyboard_cancel(
 	void);
 static wchar_t virtual_keyboard_get_character(
 	word keycode);
-wchar_t virtual_keyboard_get_current_character(
+static wchar_t virtual_keyboard_get_current_character(
 	void);
 static void virtual_keyboard_render_internal(
 	void);
@@ -615,7 +615,7 @@ static wchar_t virtual_keyboard_get_character(
 	return character;
 }
 
-wchar_t virtual_keyboard_get_current_character(
+static wchar_t virtual_keyboard_get_current_character(
 	void)
 {
 	return virtual_keyboard_get_character(virtual_keyboard_key_layout[
@@ -1101,8 +1101,7 @@ static boolean virtual_keyboard_select(
 					virtual_keyboard_globals.cursor + 1,
 					virtual_keyboard_globals.cursor,
 					buffer_size - ((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) - sizeof(wchar_t));
-				*virtual_keyboard_globals.cursor++ = virtual_keyboard_get_character(
-					virtual_keyboard_key_layout[virtual_keyboard_globals.row][virtual_keyboard_globals.column]);
+				*virtual_keyboard_globals.cursor++ = virtual_keyboard_get_current_character();
 				if (ustrcmp(virtual_keyboard_globals.text_buffer, L".fortune") == 0)
 				{
 					unsigned long fortune_index = system_milliseconds() % NUMBER_OF_VIRTUAL_KEYBOARD_FORTUNES;
