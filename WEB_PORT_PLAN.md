@@ -148,8 +148,10 @@ A first version is in `port/web/` (`index.html`, `app.js`, `xiso.js`).
   anything. The `head`/`foot` signatures, cache version 5 and build
   `01.01.14.2342` must all match, as `cache_files.c` requires. A wrong
   image is refused with a per-file reason.
-- **Storing it:** it copies every file on the disc into OPFS under
-  `halo-data/`, which becomes `d:\` (lane 5). It requests persistent
+- **Storing it:** it copies `maps/` (1.7 GB of the 3.1 GB game partition) into OPFS under
+  `halo-data/`, which becomes `d:\` (lane 5). It skips `bink/` (cutscenes,
+  which the port does not play yet), `Xdemos/` and `default.xbe`, since
+  browsers can limit a site to under 3 GB. It requests persistent
   storage, checks the quota and shows a progress bar. A later visit reuses the
   data, and "Delete imported data" removes it.
 - **Serving it locally:** `python3 port/web/serve.py` serves the page at

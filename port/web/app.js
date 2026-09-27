@@ -11,6 +11,11 @@ import {
 } from "./xiso.js";
 
 const DATA_DIRECTORY = "halo-data";
+// Only maps/ is imported: bink/ holds the cutscene movies, which the port does
+// not play yet (port/linux/src/bink_null.c), Xdemos/ is the demo-disc
+// launcher and default.xbe is the Xbox executable the port replaces.
+// Together they are about 1.2 GB the game never reads.
+const IMPORTED_PATH = /^maps\//i;
 const COPY_CHUNK = 8 * 1024 * 1024;
 
 const $ = (id) => document.getElementById(id);
@@ -78,9 +83,10 @@ async function importIso(blob) {
 		log(`reading ${blob.name ?? "image"} (${formatBytes(blob.size)})`);
 		const image = await openXiso(blob);
 		log(`game partition at offset 0x${image.partition.toString(16)}`);
-		const files = await listFiles(image);
+		const allFiles = await listFiles(image);
+		const files = allFiles.filter((file) => IMPORTED_PATH.test(file.path));
 		const total = files.reduce((sum, file) => sum + file.size, 0);
-		log(`${files.length} files, ${formatBytes(total)}`);
+		log(`${allFiles.length} files on the disc; importing ${files.length} from maps/ (${formatBytes(total)})`);
 
 		const { maps, problems } = await validate(image, files);
 		if (problems.length) {
@@ -88,13 +94,14 @@ async function importIso(blob) {
 			throw new Error(`this is not the PAL ${EXPECTED_BUILD} disc the game needs`);
 		}
 
+		// a previous import is replaced, so it must not count against the quota
+		await forget(false);
 		if (navigator.storage.persist) await navigator.storage.persist();
 		const estimate = await navigator.storage.estimate();
 		if (estimate.quota && estimate.quota - estimate.usage < total) {
-			throw new Error(`not enough browser storage: need ${formatBytes(total)}, have ${formatBytes(estimate.quota - estimate.usage)}`);
+			throw new Error(`not enough browser storage: need ${formatBytes(total)}, have ${formatBytes(estimate.quota - estimate.usage)}; free up disk space and try again`);
 		}
 
-		await forget(false);
 		const root = await dataRoot(true);
 		let copied = 0;
 		for (const file of files) {
