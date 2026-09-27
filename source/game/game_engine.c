@@ -547,11 +547,14 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "game_globals.h"
 #include "interface/interface.h"
+#include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/terminal.h"
 #include "interface/ui_widget.h"
 #include "input/input.h"
 #include "items/equipment_definitions.h"
+#include "items/item_definitions.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "main/main.h"
@@ -584,8 +587,8 @@ enum
 
 /* ---------- macros */
 
-#define game_engine_postgame_hud_definition_get(index) \
-	((struct game_engine_postgame_hud_definition *)tag_get('hudg', (index)))
+#define hud_globals_definition_get(index) \
+	((struct hud_globals_definition *)tag_get('hudg', (index)))
 #define item_collection_definition_get(index) \
 	((struct item_collection_definition *)tag_get( \
 		ITEM_COLLECTION_DEFINITION_TAG, \
@@ -633,40 +636,26 @@ struct rasterizer_debug_options
 	short postgame_player_list_debug;
 };
 
-struct game_engine_hud_globals
-{
-	byte unused00[0x54];
-	long no_local_player_message_font_index;
-	byte unused58[0xC];
-	long local_player_message_font_index;
-};
-
 union game_engine_update_iterator
 {
 	struct data_iterator data;
 	struct object_iterator object;
 };
 
-struct game_engine_postgame_hud_definition
-{
-	byte unused00[0x3D4];
-	long bitmap_group_index;
-};
-
 typedef char verify_postgame_statistic_entry_size[
 	sizeof(struct postgame_statistic_entry) == 0x1C ? 1 : -1];
-typedef char verify_game_engine_hud_globals_no_local_player_message_font_index_offset[
+typedef char verify_hud_globals_single_player_font_index_offset[
 	offsetof(
-		struct game_engine_hud_globals,
-		no_local_player_message_font_index) == 0x54 ? 1 : -1];
-typedef char verify_game_engine_hud_globals_local_player_message_font_index_offset[
+		struct hud_globals_definition,
+		messaging.single_player_font.index) == 0x54 ? 1 : -1];
+typedef char verify_hud_globals_multi_player_font_index_offset[
 	offsetof(
-		struct game_engine_hud_globals,
-		local_player_message_font_index) == 0x64 ? 1 : -1];
-typedef char verify_game_engine_postgame_hud_definition_bitmap_group_index_offset[
+		struct hud_globals_definition,
+		messaging.multi_player_font.index) == 0x64 ? 1 : -1];
+typedef char verify_hud_globals_carnage_report_bitmap_index_offset[
 	offsetof(
-		struct game_engine_postgame_hud_definition,
-		bitmap_group_index) == 0x3D4 ? 1 : -1];
+		struct hud_globals_definition,
+		carnage_report_bitmap.index) == 0x3D4 ? 1 : -1];
 typedef char verify_game_engine_goal_size[sizeof(struct game_engine_goal) == 0x20 ? 1 : -1];
 typedef char verify_game_engine_globals_postgame_timer_offset[
 	offsetof(struct game_engine_globals, postgame_timer) == 0x8 ? 1 : -1];
@@ -684,66 +673,16 @@ typedef char verify_game_engine_stage_variant_offset[
 	offsetof(struct game_engine_stage, variant) == 0x40 ? 1 : -1];
 typedef char verify_game_engine_stage_size[
 	sizeof(struct game_engine_stage) == 0xA8 ? 1 : -1];
-struct scenario_netgame_flag
-{
-	real_point3d position;
-	real facing;
-	short type;
-	short team_index;
-	byte unused[0x80];
-};
-
 typedef char verify_scenario_netgame_flag_size[
 	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
-
-struct scenario_netgame_equipment
-{
-	unsigned long flags;
-	short game_types[4];
-	byte unusedC[2];
-	short respawn_time;
-	byte unused10[0x30];
-	real_point3d position;
-	byte unused4C[0x10];
-	long item_collection_index;
-	byte unused60[0x30];
-};
 
 typedef char verify_scenario_netgame_equipment_size[
 	sizeof(struct scenario_netgame_equipment) == 0x90 ? 1 : -1];
 
-struct scenario_starting_equipment
-{
-	unsigned long flags;
-	short game_types[4];
-	byte unusedC[0x3C];
-	struct
-	{
-		long item_collection_index;
-		byte unused4[0xC];
-	} item_collections[5];
-	byte unused98[0x34];
-};
-
-struct item_collection_permutation
-{
-	byte unused0[0x20];
-	real weight;
-	byte unused24[0xC];
-	long item_index;
-	byte unused34[0x20];
-};
-
-struct item_collection_definition
-{
-	struct tag_block permutations;
-	short respawn_time;
-};
-
 typedef char verify_scenario_starting_equipment_size[
 	sizeof(struct scenario_starting_equipment) == 0xCC ? 1 : -1];
-typedef char verify_item_collection_permutation_size[
-	sizeof(struct item_collection_permutation) == 0x54 ? 1 : -1];
+typedef char verify_item_permutation_definition_size[
+	sizeof(struct item_permutation_definition) == 0x54 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -979,39 +918,16 @@ struct game_variant *build_game_variant_team_king(
 
 /* ---------- globals */
 
-struct
-{
-	short value;
-	word pad;
-	short teleporter_flash_type;
-	word teleporter_flash_pad;
-	real teleporter_flash_maximum_intensity;
-	real_argb_color teleporter_flash_color;
-	real teleporter_flash_duration;
-} debug_player_color =
-{
-	NONE,
-	0,
-	6,
-	0,
-	1.0f,
-	{ 0.5f, 0.35f, 1.0f, 0.35f },
-	1.0f
-};
+short debug_player_color = NONE;
 
 struct game_engine_goal global_goal[32] = { 0 };
 struct game_variant global_variant = { 0 };
 struct game_engine *game_engine = NULL;
-static long game_engine_teleport_message_ticks = 0;
-static short game_engine_teleport_flash_fade_function = 0;
-void *global_autogenerate_list = NULL;
-long global_autogenerate_count = 0;
 
 extern struct game_engine_globals game_engine_globals;
 extern struct game_engine_stage global_stage;
 extern struct game_engine *game_engines[];
 extern long timeout_for_endgame_sound;
-extern struct game_engine_hud_globals *hud_globals;
 extern struct rasterizer_debug_options rasterizer_debug_options;
 
 /* ---------- public code */
@@ -1950,7 +1866,7 @@ void game_engine_post_rasterize_post_game(
 	tab_stops[4] = 410;
 	tab_stops[5] = 500;
 
-	font_index = hud_globals->no_local_player_message_font_index;
+	font_index = hud_globals->messaging.single_player_font.index;
 	get_postgame_hilite_colors(
 		&winner_color,
 		&normal_color,
@@ -1965,8 +1881,8 @@ void game_engine_post_rasterize_post_game(
 	draw_string_set_format(NONE, 0, 0);
 
 	{
-		struct game_engine_postgame_hud_definition *hud_definition =
-			game_engine_postgame_hud_definition_get(
+		struct hud_globals_definition *hud_definition =
+			hud_globals_definition_get(
 				interface_get_tag_index(_interface_hud_globals));
 		rectangle2d bounds;
 
@@ -1974,10 +1890,10 @@ void game_engine_post_rasterize_post_game(
 		bounds.y0 = 0;
 		bounds.x1 = 640;
 		bounds.y1 = 480;
-		if (bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0))
+		if (bitmap_group_try_and_get_bitmap(hud_definition->carnage_report_bitmap.index, 0))
 		{
 			draw_bitmap_in_rect(
-				bitmap_group_try_and_get_bitmap(hud_definition->bitmap_group_index, 0),
+				bitmap_group_try_and_get_bitmap(hud_definition->carnage_report_bitmap.index, 0),
 				&bounds,
 				&bounds,
 				NULL,
@@ -3154,9 +3070,9 @@ void game_engine_rasterize_message(
 	long terminal_font_index;
 
 	if (local_player_count())
-		font_index = hud_globals->local_player_message_font_index;
+		font_index = hud_globals->messaging.multi_player_font.index;
 	else
-		font_index = hud_globals->no_local_player_message_font_index;
+		font_index = hud_globals->messaging.single_player_font.index;
 
 	bounds = render.camera.window_bounds;
 
@@ -3615,6 +3531,15 @@ void game_engine_nonplayer_post_rasterize(
 static void game_engine_update_teleporter(
 	long player_index)
 {
+	static int blocked_message_delay = 0;
+	static long fade_function = 0;
+	static long screen_flash_type = 6;
+	static real max_intensity = 1.0f;
+	static real alpha = 0.5f;
+	static real red = 0.35f;
+	static real green = 1.0f;
+	static real blue = 0.35f;
+	static real duration = 1.0f;
 	struct scenario *scenario = global_scenario_get();
 	struct player_datum *player = player_get(player_index);
 	struct unit_datum *unit;
@@ -3731,13 +3656,13 @@ static void game_engine_update_teleporter(
 						}
 					}
 
-					if (game_engine_teleport_message_ticks > 0)
+					if (blocked_message_delay > 0)
 					{
-						game_engine_teleport_message_ticks--;
+						blocked_message_delay--;
 						return;
 					}
 
-					game_engine_teleport_message_ticks = 120;
+					blocked_message_delay = 120;
 					{
 						long string_list_index =
 							tag_loaded('ustr', "ui\\multiplayer_game_text");
@@ -3765,18 +3690,16 @@ static void game_engine_update_teleporter(
 			{
 				struct screen_flash_definition screen_flash = { 0 };
 
-				screen_flash.fade_function =
-					game_engine_teleport_flash_fade_function;
-				screen_flash.type =
-					debug_player_color.teleporter_flash_type;
-				screen_flash.duration =
-					debug_player_color.teleporter_flash_duration;
+				screen_flash.fade_function = fade_function;
+				screen_flash.type = screen_flash_type;
+				screen_flash.duration = duration;
 				screen_flash.priority = 2;
-				screen_flash.max_intensity =
-					debug_player_color.teleporter_flash_maximum_intensity;
+				screen_flash.max_intensity = max_intensity;
 				screen_flash.zero_scale_factor = 0.0f;
-				screen_flash.screen_flash_color =
-					debug_player_color.teleporter_flash_color;
+				screen_flash.screen_flash_color.alpha = alpha;
+				screen_flash.screen_flash_color.red = red;
+				screen_flash.screen_flash_color.green = green;
+				screen_flash.screen_flash_color.blue = blue;
 				player_effect_screen_flash(
 					player_index,
 					&screen_flash,
@@ -4478,6 +4401,12 @@ long find_netgame_flag(
 
 	return flag_index;
 }
+
+/* playlist data: in the Aug-15-2001 build the playlist functions were the only users of these two globals;
+   this build no longer reads them. their definition point here, with the playlist code, is inferred (the
+   Aug-2001 users and the later builds' layout), not attested */
+void *global_autogenerate_list = NULL;
+long global_autogenerate_count = 0;
 
 void game_engine_playlist_next(
 	long parameter0,
@@ -5984,8 +5913,8 @@ real_rgb_color *game_engine_player_get_change_color(
 	{
 		long color_index = player->network_player_data.primary_color_index;
 
-		if (debug_player_color.value != NONE)
-			color_index = debug_player_color.value;
+		if (debug_player_color != NONE)
+			color_index = debug_player_color;
 
 		result = player_profile_get_rgb_color(color_index);
 	}
@@ -6861,7 +6790,7 @@ static void netgame_verify_equipment(
 		if (match_game_type(
 			game_type,
 			4,
-			equipment->game_types))
+			equipment->game_type))
 		{
 			matching_count++;
 		}
@@ -7345,8 +7274,8 @@ static long adjust_score_for_ranking(
 static long item_collection_get_total(
 	struct tag_block const *permutations)
 {
-	struct item_collection_permutation const *permutation =
-		(struct item_collection_permutation const *)permutations->address;
+	struct item_permutation_definition const *permutation =
+		(struct item_permutation_definition const *)permutations->address;
 	long permutation_count = permutations->count;
 	long result = 0;
 	long permutation_index;
@@ -7373,7 +7302,7 @@ static long random_item(
 		get_global_random_seed_address(),
 		0,
 		(short)item_collection_get_total(permutations));
-	struct item_collection_permutation const *permutation =
+	struct item_permutation_definition const *permutation =
 		permutations->address;
 	long permutation_index = 0;
 
@@ -7383,7 +7312,7 @@ static long random_item(
 			(long)((real)remaining_weight -
 				permutation[permutation_index].weight);
 		if (remaining_weight < 0)
-			return permutation[permutation_index].item_index;
+			return permutation[permutation_index].item.index;
 
 		permutation_index++;
 	}
@@ -7409,21 +7338,21 @@ static void game_engine_update_item_spawn(
 				struct scenario_netgame_equipment);
 		if (match_game_type(
 			game_engine_get_type(),
-			NUMBEROF(equipment->game_types),
-			equipment->game_types))
+			NUMBEROF(equipment->game_type),
+			equipment->game_type))
 		{
 			long respawn_period = 30 * TICKS_PER_SECOND;
-			short respawn_time = equipment->respawn_time;
+			short respawn_time = equipment->spawn_time;
 
 			if (respawn_time == 0)
 			{
-				if (equipment->item_collection_index != NONE)
+				if (equipment->item_collection.index != NONE)
 				{
 					struct item_collection_definition *item_collection =
 						item_collection_definition_get(
-							equipment->item_collection_index);
+							equipment->item_collection.index);
 
-					respawn_time = item_collection->respawn_time;
+					respawn_time = item_collection->spawn_time;
 					if (respawn_time != 0)
 						respawn_period = respawn_time * TICKS_PER_SECOND;
 				}
@@ -7436,7 +7365,7 @@ static void game_engine_update_item_spawn(
 			if (game_time_get() % respawn_period == 0)
 			{
 				long definition_index =
-					random_item(equipment->item_collection_index);
+					random_item(equipment->item_collection.index);
 				struct object_placement_data placement_data;
 				long object_index;
 
@@ -7488,7 +7417,7 @@ static void handle_custom_starting_equipment(
 		if (match_game_type(
 			game_engine_get_type(),
 			4,
-			starting_equipment->game_types))
+			starting_equipment->game_type))
 		{
 			break;
 		}
@@ -7505,7 +7434,7 @@ static void handle_custom_starting_equipment(
 		boolean first_weapon = TRUE;
 		long remaining_item_collection_count = 5;
 		long *item_collection =
-			&starting_equipment->item_collections[0].item_collection_index;
+			&starting_equipment->item_collection[0].index;
 
 		do
 		{
@@ -7544,7 +7473,7 @@ static void handle_custom_starting_equipment(
 				}
 			}
 
-			item_collection += sizeof(starting_equipment->item_collections[0]) /
+			item_collection += sizeof(starting_equipment->item_collection[0]) /
 				sizeof(*item_collection);
 			remaining_item_collection_count--;
 		}

@@ -209,6 +209,38 @@ struct encounter_player_starting_location
 	char __unknown1c[24];
 };
 
+struct scenario_netgame_flag
+{
+	real_point3d position;
+	real facing;
+	short type;
+	short team_index;
+	long unused[32];
+};
+
+struct scenario_netgame_equipment
+{
+	long flags;
+	short game_type[4];
+	short team_index;
+	short spawn_time;
+	long run_time_spawned_item_index;
+	long unused1[11];
+	real_point3d position;
+	real facing;
+	struct tag_reference item_collection;
+	long unused2[12];
+};
+
+struct scenario_starting_equipment
+{
+	long flags;
+	short game_type[4];
+	long unused1[12];
+	struct tag_reference item_collection[6];
+	long unused2[12];
+};
+
 struct scenario
 {
 	struct tag_reference ugly_structure_bsp;

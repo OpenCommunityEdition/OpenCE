@@ -12,6 +12,7 @@ See docs/object_matching_logs/input_hud_player_ui_followup_20260904.md.
 /* ---------- headers */
 
 #include "math/real_math.h"
+#include "interface/hud_definitions.h"
 #include "tag_files/tag_groups.h"
 
 /* ---------- constants */
@@ -50,47 +51,6 @@ enum auxilary_overlay_use_team_color_flags
 		(index)))
 
 /* ---------- structures */
-
-struct hud_absolute_placement_definition
-{
-	short corner;
-	short pad;
-	long unused[8];
-};
-
-struct hud_placement_definition
-{
-	point2d offset;
-	real_vector2d scale;
-	short multiplayer_scaling_flags;
-	short pad;
-	long unused0[5];
-};
-
-struct hud_objective_color_definition
-{
-	short up_ticks;
-	short fade_ticks;
-};
-
-union hud_color_custom_definition
-{
-	long unused;
-	struct hud_objective_color_definition objective;
-};
-
-struct hud_color_definition
-{
-	unsigned long color;
-	unsigned long flash_color;
-	real flash_period;
-	real flash_delay;
-	short number_of_flashes;
-	word flash_flags;
-	real flash_length;
-	unsigned long disabled_color;
-	union hud_color_custom_definition custom;
-};
 
 struct static_hud_element_definition
 {
@@ -206,12 +166,6 @@ struct unit_hud_interface_definition
 	long unused2[12];
 };
 
-typedef char hud_absolute_placement_definition_size_assert[
-	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
-typedef char hud_placement_definition_size_assert[
-	sizeof(struct hud_placement_definition) == 0x24 ? 1 : -1];
-typedef char hud_color_definition_size_assert[
-	sizeof(struct hud_color_definition) == 0x20 ? 1 : -1];
 typedef char static_hud_element_definition_size_assert[
 	sizeof(struct static_hud_element_definition) == 0x68 ? 1 : -1];
 typedef char meter_hud_element_definition_size_assert[

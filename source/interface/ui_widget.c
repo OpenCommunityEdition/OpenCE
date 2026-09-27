@@ -645,6 +645,7 @@ struct widget_instance;
 #include "input/input.h"
 #include "input/input_abstraction.h"
 #include "interface/attract_mode.h"
+#include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
@@ -970,17 +971,6 @@ struct icon_hud_element_definition
 	char frame_rate;
 	byte flags;
 	short text_index;
-};
-
-struct hud_messaging_parameters_definition
-{
-	byte reserved000[0xC4];
-	struct tag_block button_icons;			/* icon_hud_element_definition */
-};
-
-struct hud_globals_definition
-{
-	struct hud_messaging_parameters_definition messaging;
 };
 
 struct interface_tag_references_definition
@@ -1460,7 +1450,6 @@ static struct ui_widget_bss_prefix ui_widget_globals_storage;
 #define we_are_at_the_main_menu ui_widget_globals_storage.we_are_at_the_main_menu
 #define dpad_event_times ui_widget_globals_storage.dpad_event_times
 extern real_argb_color ui_plasma_effect_color;
-extern struct hud_globals_definition *hud_globals;
 extern short local_player_index_for_draw_string_and_hack_in_icons;
 
 /* January defines this and never references it, as we do not */

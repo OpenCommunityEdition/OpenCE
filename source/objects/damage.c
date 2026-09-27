@@ -95,7 +95,8 @@ symbols in this file:
 002896BC 0004:
 	__real@3a422e45 (0000)
 00456E48 004c:
-	_damage_globals (0000)
+	?default_damage_material@?1??object_cause_damage@@9@9 (0000)
+	_global_debug_damage_object_index (0048)
 */
 
 /* ---------- headers */
@@ -242,12 +243,6 @@ enum
 
 /* ---------- structures */
 
-struct damage_globals
-{
-	struct damage_resistance_material default_damage_material;
-	long debug_object_index;
-};
-
 struct damage_region
 {
 	char name[TAG_STRING_LENGTH+1];
@@ -362,7 +357,12 @@ static void object_destroy_region(
 
 extern boolean debug_damage;
 
-static struct damage_globals damage_globals = { 0 };
+/* Name and type from the 2003 PC demo PDB ONLY (file static long); HCEX has no such static, so
+   the name is singly attested. January corroborates the storage: .bss +0x48, after
+   object_cause_damage's default material. Both statics are uninitialised and VC7 orders
+   uninitialised statics by a hash of their names, so this name takes part in producing
+   January's order; no other name was tested. */
+static long global_debug_damage_object_index;
 
 /* ---------- public code */
 
@@ -378,7 +378,7 @@ void damage_dispose(void)
 
 void damage_initialize_for_new_map(void)
 {
-	damage_globals.debug_object_index = NONE;
+	global_debug_damage_object_index = NONE;
 	return;
 }
 
@@ -669,7 +669,7 @@ void render_debug_object_damage(
 		rectangle2d bounds = render.camera.window_bounds;
 
 		bounds.x0 += 320;
-		if (damage_globals.debug_object_index == NONE)
+		if (global_debug_damage_object_index == NONE)
 		{
 			_snprintf(
 				buffer,
@@ -679,7 +679,7 @@ void render_debug_object_damage(
 		else
 		{
 			struct object_datum *object =
-				object_try_and_get(damage_globals.debug_object_index);
+				object_try_and_get(global_debug_damage_object_index);
 
 			if (object)
 			{
@@ -697,7 +697,7 @@ void render_debug_object_damage(
 			}
 			else
 			{
-				damage_globals.debug_object_index = NONE;
+				global_debug_damage_object_index = NONE;
 			}
 		}
 
@@ -728,7 +728,7 @@ void render_debug_object_damage(
 					"c:\\halo\\SOURCE\\objects\\damage.c",
 					0x794,
 					collision.type==_collision_result_object);
-				damage_globals.debug_object_index = collision.object_index;
+				global_debug_damage_object_index = collision.object_index;
 			}
 		}
 	}
@@ -1337,6 +1337,11 @@ void object_cause_damage(
 	short material_index,
 	real_vector3d const *object_normal)
 {
+	/* Name and function scope from the 2003 PC demo PDB and the HCEX PDB (static local of
+	   object_cause_damage; their type is named damage_material). Neither PDB records the block:
+	   placing it at the top of the function is unattested. January corroborates: .bss +0, and only
+	   this function takes its address. */
+	static struct damage_resistance_material default_damage_material;
 	struct damage_effect_definition *damage_effect;
 	struct damage_definition const *damage_definition;
 	boolean damage_was_modified;
@@ -1367,7 +1372,7 @@ void object_cause_damage(
 			(region_index>=0 && region_index<MAXIMUM_REGIONS_PER_OBJECT));
 
 	if (damage->owner_player_index != NONE)
-		damage_globals.debug_object_index = object_index;
+		global_debug_damage_object_index = object_index;
 
 	{
 		real random_damage = real_random_range(
@@ -1628,7 +1633,7 @@ void object_cause_damage(
 				}
 				else
 				{
-					damage_material = &damage_globals.default_damage_material;
+					damage_material = &default_damage_material;
 				}
 
 				damage->material_type = damage_material->material_type;
@@ -1734,7 +1739,7 @@ void object_cause_damage(
 					}
 
 					if (debug_damage &&
-						current_object_index == damage_globals.debug_object_index)
+						current_object_index == global_debug_damage_object_index)
 					{
 						console_printf(
 							FALSE,

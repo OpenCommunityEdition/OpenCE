@@ -414,6 +414,7 @@ symbols in this file:
 #include "hs/hs.h"
 #include "hs/hs_library_internal_compile.h"
 #include "hs/hs_scenario_definitions.h"
+#include "interface/hud_definitions.h"
 #include "interface/interface.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
@@ -496,12 +497,6 @@ struct hs_tokenizer
 
 typedef char verify_hs_syntax_node_size[
 	sizeof(struct hs_syntax_node) == 0x14 ? 1 : -1];
-
-struct hud_globals_definition
-{
-	byte reserved000[0x160];
-	struct tag_block waypoint_arrows;
-};
 
 struct hud_message_text_definition
 {
@@ -1842,7 +1837,7 @@ static boolean hs_parse_navpoint(
 		result = hs_parse_scenario_datum(
 			expression_index,
 			0,
-			&hud_globals->waypoint_arrows,
+			&hud_globals->waypoint.arrows,
 			hud_waypoint_arrow_size);
 	}
 

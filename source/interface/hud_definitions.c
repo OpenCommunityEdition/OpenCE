@@ -16,6 +16,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "cseries/cseries.h"
 #include "hud_definitions.h"
 
 /* ---------- constants */

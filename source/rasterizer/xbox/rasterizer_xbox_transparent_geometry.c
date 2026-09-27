@@ -145,6 +145,8 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "text/draw_string.h"
+#include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
 #include "bitmaps/bitmap_group.h"
@@ -694,12 +696,6 @@ typedef char transparent_geometry_group_active_camouflage_offset_assert[
 	offsetof(struct transparent_geometry_group,
 		active_camouflage_transparent_source_object_index) == 0x98 ? 1 : -1];
 
-struct rasterizer_transparent_geometry_hud_globals_prefix
-{
-	byte reserved00[0x54];
-	long single_player_font_index;
-};
-
 struct rasterizer_xbox_transparent_geometry_globals
 {
 	long last_source_object_index;
@@ -720,7 +716,6 @@ static struct rasterizer_xbox_transparent_geometry_globals
 extern struct rasterizer_transparent_geometry_debug_options_prefix
 	rasterizer_debug_options;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
-extern struct rasterizer_transparent_geometry_hud_globals_prefix *hud_globals;
 
 /* ---------- public code */
 
@@ -865,7 +860,7 @@ void rasterizer_transparent_geometry_groups_end(
 
 		if (global_window_parameters.window_index == main_get_window_count()-1)
 		{
-			long font_index = hud_globals->single_player_font_index;
+			long font_index = hud_globals->messaging.single_player_font.index;
 
 			if (font_index != NONE)
 			{
@@ -2216,6 +2211,10 @@ void rasterizer_transparent_geometry_group_draw(
 											combiner_constant = 0x05;
 											break;
 
+										/* combiner_constant is left unassigned only by this default arm. Not reached unassigned: the
+										 * arm's assertion failure calls system_exit, which does not return in January
+										 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+										 * Source-policy approval pending (2026-09-27 audit). */
 										default:
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
@@ -2727,6 +2726,10 @@ void rasterizer_transparent_geometry_group_draw(
 											combiner_constant = 0x05;
 											break;
 
+										/* combiner_constant is left unassigned only by this default arm. Not reached unassigned: the
+										 * arm's assertion failure calls system_exit, which does not return in January
+										 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+										 * Source-policy approval pending (2026-09-27 audit). */
 										default:
 											match_vassert(
 												"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",

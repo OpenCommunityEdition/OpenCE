@@ -195,27 +195,6 @@ static void collision_fix_pill_nudge_collision(
 	struct collision_plane *collision);
 /* ---------- globals */
 
-static real_vector3d collision_fix_pill_offsets[17] =
-{
-	{ { -1.0f, 0.0f, 0.0f } },
-	{ { 1.0f, 0.0f, 0.0f } },
-	{ { 0.0f, -1.0f, 0.0f } },
-	{ { 0.0f, 1.0f, 0.0f } },
-	{ { -0.70710677f, -0.70710677f, 0.0f } },
-	{ { 0.70710677f, 0.70710677f, 0.0f } },
-	{ { 0.70710677f, -0.70710677f, 0.0f } },
-	{ { -0.70710677f, 0.70710677f, 0.0f } },
-	{ { 0.0f, 0.0f, 1.0f } },
-	{ { -0.70710677f, 0.0f, 0.70710677f } },
-	{ { 0.70710677f, 0.0f, 0.70710677f } },
-	{ { 0.0f, -0.70710677f, 0.70710677f } },
-	{ { 0.0f, 0.70710677f, 0.70710677f } },
-	{ { -0.57735026f, -0.57735026f, 0.57735026f } },
-	{ { 0.57735026f, 0.57735026f, 0.57735026f } },
-	{ { 0.57735026f, -0.57735026f, 0.57735026f } },
-	{ { -0.57735026f, 0.57735026f, 0.57735026f } },
-};
-
 static struct collision_usage_times collision_usage_times;
 boolean debug_collision_skip_objects = FALSE;
 boolean debug_collision_skip_vectors = FALSE;
@@ -904,6 +883,30 @@ boolean collision_fix_pill(
 	long ignore_object_index,
 	real_point3d *new_position)
 {
+	/* Name, type and function scope: PC demo and HCEX PDBs.
+	 * January confirms the 204-byte array and this function as its sole user.
+	 * The declaration's precise block position is not independently attested.
+	 */
+	static real_vector3d offsets[17] =
+	{
+		{ { -1.0f, 0.0f, 0.0f } },
+		{ { 1.0f, 0.0f, 0.0f } },
+		{ { 0.0f, -1.0f, 0.0f } },
+		{ { 0.0f, 1.0f, 0.0f } },
+		{ { -0.70710677f, -0.70710677f, 0.0f } },
+		{ { 0.70710677f, 0.70710677f, 0.0f } },
+		{ { 0.70710677f, -0.70710677f, 0.0f } },
+		{ { -0.70710677f, 0.70710677f, 0.0f } },
+		{ { 0.0f, 0.0f, 1.0f } },
+		{ { -0.70710677f, 0.0f, 0.70710677f } },
+		{ { 0.70710677f, 0.0f, 0.70710677f } },
+		{ { 0.0f, -0.70710677f, 0.70710677f } },
+		{ { 0.0f, 0.70710677f, 0.70710677f } },
+		{ { -0.57735026f, -0.57735026f, 0.57735026f } },
+		{ { 0.57735026f, 0.57735026f, 0.57735026f } },
+		{ { 0.57735026f, -0.57735026f, 0.57735026f } },
+		{ { -0.57735026f, 0.57735026f, 0.57735026f } },
+	};
 	boolean result = FALSE;
 	struct collision_feature_list features;
 	struct collision_plane first_collision;
@@ -948,10 +951,10 @@ boolean collision_fix_pill(
 
 		have_fallback = FALSE;
 		for (offset_index = 0;
-			offset_index < NUMBEROF(collision_fix_pill_offsets);
+			offset_index < NUMBEROF(offsets);
 			offset_index++)
 		{
-			real_vector3d const *offset = &collision_fix_pill_offsets[offset_index];
+			real_vector3d const *offset = &offsets[offset_index];
 			real_point3d candidate;
 
 			candidate.x = offset->i * distance + old_position->x;

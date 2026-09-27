@@ -267,6 +267,12 @@ boolean rasterizer_triangle_buffer_new(
 					result,
 					"IDirect3DDevice8_CreateIndexBuffer(global_d3d_device, buffer_size, RASTERIZER_STATIC_BUFFER_USAGE, D3DFMT_INDEX16, RASTERIZER_STATIC_BUFFER_POOL, &d3d_index_buffer)");
 			}
+			/* BUG (preserved for exact matching): as in rasterizer_vertex_buffer_new, the
+			 * January XDK CreateIndexBuffer failure path (0x5de5d3..0x5de5d8) returns without
+			 * writing d3d_index_buffer, so after a failed call this test reads it unassigned.
+			 * success is already FALSE on that path and the pointer is cleared below, so the
+			 * result does not depend on the value. Source-policy approval pending (2026-09-27
+			 * audit). */
 			if (!d3d_index_buffer)
 				success = FALSE;
 			if (!success)

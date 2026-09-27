@@ -367,6 +367,10 @@ static void transition_function_build_table(
 		case _transition_function_cosine:
 			result = ((real)sin(value*3.1415927f-1.5707964f)+1.0f)*0.5f;
 			break;
+		/* result is left unassigned only by this default arm. Not reached unassigned: the
+		 * arm's assertion failure calls system_exit, which does not return in January
+		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 411, TRUE);
 			system_exit(-1);
@@ -455,6 +459,10 @@ static void periodic_function_build_table(
 			result = (real)fmod((double)random_x, 1.0);
 			result *= result;
 			break;
+		/* result is left unassigned only by this default arm. Not reached unassigned: the
+		 * arm's assertion failure calls system_exit, which does not return in January
+		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			display_assert(NULL, "c:\\halo\\SOURCE\\math\\periodic_functions.c", 499, TRUE);
 			system_exit(-1);

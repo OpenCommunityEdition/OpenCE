@@ -203,8 +203,6 @@ struct tag_enum_definition global_sprite_render_orientations_enum =
 
 real const one_over_full_circle = 1.f / (2.f*_pi);
 
-static boolean build_sprite_vertex_allocation_failure_reported;
-
 /* ---------- public code */
 
 void build_sprites_begin(
@@ -769,6 +767,10 @@ static short build_sprite_get_group(
 	struct build_sprite_data *data,
 	struct bitmap_data *bitmap)
 {
+	/* Name, type and function scope from the 2003 PC demo PDB and the HCEX PDB (static local
+	   unsigned char warned). Neither PDB records the block: placing it at the top of the function
+	   is unattested. January corroborates: its one-byte .bss is referenced only here. */
+	static boolean warned;
 	short group_index;
 
 	for (group_index = 0; group_index < data->group_count; group_index++)
@@ -813,12 +815,12 @@ static short build_sprite_get_group(
 				}
 				else
 				{
-					if (!build_sprite_vertex_allocation_failure_reported)
+					if (!warned)
 					{
 						error(
 							_error_silent,
 							"build_sprite failed to allocate dynamic vertices");
-						build_sprite_vertex_allocation_failure_reported = TRUE;
+						warned = TRUE;
 					}
 					group->vertices = NULL;
 				}
