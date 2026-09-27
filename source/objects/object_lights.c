@@ -238,7 +238,7 @@ enum
 	((struct light_datum *)datum_get(light_data, (index)))
 
 #define light_definition_get(index) \
-	((struct light_definition *)tag_get(LIGHT_DEFINITION_TAG, (index)))
+	((struct point_light_definition *)tag_get(LIGHT_DEFINITION_TAG, (index)))
 
 #define lens_flare_definition_get(index) \
 	((struct lens_flare_definition *)tag_get(LENS_FLARE_DEFINITION_TAG, (index)))
@@ -289,7 +289,7 @@ struct lights_game_globals
 	byte reserved01[3];
 };
 
-struct light_definition
+struct point_light_definition
 {
 	long flags;
 	real radius;
@@ -360,16 +360,6 @@ struct rasterizer_lens_flare_submit_parameters
 	long internal_occlusion_pixels;
 };
 
-struct rasterizer_light_submit_parameters
-{
-	struct light_definition *definition;
-	real_point3d position;
-	real_vector3d forward;
-	real_vector3d up;
-	real_rgb_color color;
-	real radius;
-};
-
 struct lights_globals
 {
 	boolean marker_initialized;
@@ -390,13 +380,13 @@ typedef char verify_light_datum_flags_offset[
 typedef char verify_light_datum_cluster_reference_offset[
 	offsetof(struct light_datum, cluster_reference) == 0x10 ? 1 : -1];
 typedef char verify_light_definition_lens_flare_offset[
-	offsetof(struct light_definition, lens_flare) == 0xAC ? 1 : -1];
+	offsetof(struct point_light_definition, lens_flare) == 0xAC ? 1 : -1];
 typedef char verify_light_definition_color_offset[
-	offsetof(struct light_definition, color_interpolation_flags) == 0x34 ? 1 : -1];
+	offsetof(struct point_light_definition, color_interpolation_flags) == 0x34 ? 1 : -1];
 typedef char verify_light_definition_transition_duration_offset[
-	offsetof(struct light_definition, transition_duration) == 0xF4 ? 1 : -1];
+	offsetof(struct point_light_definition, transition_duration) == 0xF4 ? 1 : -1];
 typedef char verify_light_definition_falloff_function_offset[
-	offsetof(struct light_definition, falloff_function) == 0xFA ? 1 : -1];
+	offsetof(struct point_light_definition, falloff_function) == 0xFA ? 1 : -1];
 typedef char verify_light_datum_size[
 	sizeof(struct light_datum) == 0x7C ? 1 : -1];
 typedef char verify_rasterizer_light_submit_parameters_size[
@@ -727,7 +717,7 @@ long light_new(
 	short object_function_index,
 	short object_change_color_index)
 {
-	struct light_definition *definition = light_definition_get(definition_index);
+	struct point_light_definition *definition = light_definition_get(definition_index);
 	long light_index = NONE;
 
 	if (TEST_FLAG(definition->flags, _light_definition_dynamic_bit)
@@ -772,7 +762,7 @@ long light_new_unattached(
 	if (light_index != NONE)
 	{
 		struct light_datum *light = light_get(light_index);
-		struct light_definition *definition = light_definition_get(definition_index);
+		struct point_light_definition *definition = light_definition_get(definition_index);
 
 		light->flags = 0;
 		light->parent_light_index = game_time_get();
@@ -824,7 +814,7 @@ void lights_preprocess_scene(
 		light->rasterizer_light_index = NONE;
 		if (light->parent_light_index != NONE)
 		{
-			struct light_definition *definition = light_definition_get(
+			struct point_light_definition *definition = light_definition_get(
 				light->definition_index);
 			real elapsed = (real)(current_time - light->parent_light_index);
 
@@ -869,7 +859,7 @@ void lights_preprocess_scene(
 	{
 		long scene_light_handle = lights_globals.scene_point_lights[scene_light_index];
 		struct light_datum *light = light_get(scene_light_handle);
-		struct light_definition *definition = light_definition_get(
+		struct point_light_definition *definition = light_definition_get(
 			light->definition_index);
 		struct object_datum *object;
 		real intensity;
@@ -1442,7 +1432,7 @@ static void render_debug_light(
 	if (debug_lights)
 	{
 		struct light_datum *light = light_get(light_index);
-		struct light_definition *definition = light_definition_get(light->definition_index);
+		struct point_light_definition *definition = light_definition_get(light->definition_index);
 		real radius = definition->radius_modifier_upper_bound * definition->radius;
 		real_argb_color color = *global_real_argb_orange;
 
@@ -1541,7 +1531,7 @@ static void light_compute_bounding_sphere(
 	real *radius)
 {
 	struct light_datum *light = light_get(light_index);
-	struct light_definition *definition = light_definition_get(light->definition_index);
+	struct point_light_definition *definition = light_definition_get(light->definition_index);
 	real light_radius = maximum
 		? definition->radius_modifier_upper_bound * definition->radius
 		: light->radius;
@@ -1745,7 +1735,7 @@ void light_reconnect_to_map(
 	long light_index)
 {
 	struct light_datum *light = light_get(light_index);
-	struct light_definition *definition = light_definition_get(light->definition_index);
+	struct point_light_definition *definition = light_definition_get(light->definition_index);
 	struct object_marker markers[1];
 	struct location location;
 	real_point3d position;

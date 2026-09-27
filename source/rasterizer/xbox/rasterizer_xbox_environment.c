@@ -156,6 +156,7 @@ symbols in this file:
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_lights.h"
 #include "rasterizer/rasterizer_memory_pool.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "shaders/shader_definitions.h"
@@ -429,22 +430,6 @@ struct point_light_definition
 	struct point_light_gel_parameters gel;
 };
 
-struct rasterizer_light_submit_parameters
-{
-	struct point_light_definition *definition;
-	real_point3d position;
-	real_vector3d forward;
-	real_vector3d up;
-	real_rgb_color color;
-	real radius;
-};
-
-struct rasterizer_lights_globals
-{
-	long light_count;
-	struct rasterizer_light_submit_parameters lights[128];
-};
-
 struct shader_environment_diffuse_properties
 {
 	word flags;
@@ -572,7 +557,6 @@ extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 static boolean warned = FALSE;
 extern struct pixel_shader_definition pixel_shader;
-extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 short specular_light_vertex_shader_permutation_index= NONE;
 

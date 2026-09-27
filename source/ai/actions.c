@@ -4440,6 +4440,13 @@ static boolean actor_action_find_escape_from_danger(
 		system_exit(-1);
 	}
 
+	/* BUG (preserved for exact matching): alignment_vector is assigned only when the
+	 * unit's dive_distance is positive; otherwise it is stored below unassigned (January
+	 * 0x40c970 +0x386..+0x38f). Reachable for any unit whose dive distance is not
+	 * positive; escape_direction is then NONE, and the only caller,
+	 * actor_action_handle_danger_avoidance, leaves that block without reading the vector.
+	 * A corrected build should store a defined vector on that path. Source-policy
+	 * approval pending (2026-09-27 audit). */
 	*escape_direction_reference = escape_direction;
 	*escape_distance_reference = evade_distance;
 	*escape_is_ledge_reference = selected_is_ledge;

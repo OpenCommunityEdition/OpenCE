@@ -62,6 +62,8 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_globals.h"
 #include "game/players.h"
+#include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/ui_widget.h"
 #include "items/projectiles.h"
 #include "rasterizer/rasterizer.h"
@@ -103,14 +105,6 @@ struct scenario_cutscene_title
 	byte unused50[0x10];
 };
 
-struct hud_global_data
-{
-	byte unused000[0x54];
-	long single_player_font_index;
-	byte unused058[0x284];
-	rectangle2d default_title_bounds;
-};
-
 typedef char verify_scenario_cutscene_title_size[
 	sizeof(struct scenario_cutscene_title) == 0x60 ? 1 : -1];
 typedef char verify_scenario_cutscene_title_name_offset[
@@ -120,9 +114,9 @@ typedef char verify_scenario_cutscene_title_bounds_offset[
 typedef char verify_scenario_cutscene_title_fade_offset[
 	offsetof(struct scenario_cutscene_title, fade_in_time) == 0x44 ? 1 : -1];
 typedef char verify_hud_global_single_player_font_offset[
-	offsetof(struct hud_global_data, single_player_font_index) == 0x54 ? 1 : -1];
+	offsetof(struct hud_globals_definition, messaging.single_player_font.index) == 0x54 ? 1 : -1];
 typedef char verify_hud_global_default_title_bounds_offset[
-	offsetof(struct hud_global_data, default_title_bounds) == 0x2DC ? 1 : -1];
+	offsetof(struct hud_globals_definition, defaults.default_title_bounds) == 0x2DC ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -132,7 +126,6 @@ void draw_quad(
 
 /* ---------- globals */
 
-extern struct hud_global_data *hud_globals;
 struct cinematic_global_data *cinematic_globals = NULL;
 
 /* ---------- public code */
@@ -384,7 +377,7 @@ void cinematic_render(
 			if (active_title->title_index == NONE)
 				continue;
 
-			font_index = hud_globals->single_player_font_index;
+			font_index = hud_globals->messaging.single_player_font.index;
 			if (font_index == NONE)
 				continue;
 
@@ -411,7 +404,7 @@ void cinematic_render(
 			if (title_bounds->x1 == title_bounds->x0 ||
 				title_bounds->y1 == title_bounds->y0)
 			{
-				title_bounds = &hud_globals->default_title_bounds;
+				title_bounds = &hud_globals->defaults.default_title_bounds;
 			}
 
 			if (!game_in_editor())

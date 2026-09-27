@@ -771,6 +771,11 @@ short convex_hull2d(
 				break;
 			}
 
+			/* current_index and best_index are assigned only inside the scans. For finite
+			 * points with dimension 2 both scans assign them; a NaN or infinite coordinate can
+			 * leave either unassigned. Not shown reachable: the callers' points (king hill
+			 * markers, lens flare projections) were not traced for non-finite values.
+			 * Source-policy approval pending (2026-09-27 audit). */
 			hull_indices[hull_count++] = current_index;
 
 			for (index = 0; index < vertex_count; index++)

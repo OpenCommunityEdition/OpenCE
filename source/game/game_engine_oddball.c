@@ -232,15 +232,6 @@ typedef char verify_oddball_globals_ball_spawn_timer_offset[
 typedef char verify_oddball_globals_current_ball_owner_offset[
 	offsetof(struct oddball_globals, current_ball_owner) == 0xC4 ? 1 : -1];
 
-struct scenario_netgame_flag
-{
-	real_point3d position;
-	real facing;
-	short type;
-	short team_index;
-	byte unused[0x80];
-};
-
 typedef char verify_scenario_netgame_flag_size[
 	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
 

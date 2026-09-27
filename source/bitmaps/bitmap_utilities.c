@@ -2453,6 +2453,10 @@ struct rgb_color *hsv_color_to_rgb_color(
 		}
 	}
 
+	/* The sector switch has no default. Not reached unassigned: for a word hue,
+	 * scaled_hue = hue * 6 / 65536 is at most 393210 / 65536 < 6 (exact in real), so
+	 * sector is 0..5 and each of those cases assigns red, green and blue. Source-policy
+	 * approval pending (2026-09-27 audit). */
 	rgb->red = (word)(long)(red * 65535.0f);
 	rgb->green = (word)(long)(green * 65535.0f);
 	rgb->blue = (word)(long)(blue * 65535.0f);

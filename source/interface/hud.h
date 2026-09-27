@@ -14,6 +14,7 @@ header included in hcex build.
 
 /* ---------- structures */
 
+struct hud_globals_definition;
 struct tag_block;
 union real_argb_color;
 
@@ -83,6 +84,8 @@ void hud_play_sound(
 	word *played_flags);
 
 /* ---------- globals */
+
+extern struct hud_globals_definition *hud_globals;
 
 /* ---------- public code */
 
