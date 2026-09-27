@@ -22718,7 +22718,7 @@
 { "file_offset": 3198336, "flags": 0, "name": "_global_collision_user_names" },
 { "file_offset": 3198428, "flags": 0, "name": "_global_collision_log_enable" },
 { "file_offset": 3198432, "flags": 0, "name": "_collision_usage_current_period" },
-{ "file_offset": 3198440, "flags": 0, "name": "_collision_fix_pill_offsets", "static": true },
+{ "file_offset": 3198440, "flags": 0, "name": "?offsets@?1??collision_fix_pill@@9@9", "static": true },
 { "file_offset": 3198644, "flags": 0, "name": "_global_gravity" },
 { "file_offset": 3198648, "flags": 0, "name": "_global_water_density" },
 { "file_offset": 3198652, "flags": 0, "name": "_global_air_density" },
