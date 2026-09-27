@@ -1,0 +1,68 @@
+# candidate verification (CAND_hb.c = HEAD + patches/rasterizer_bitmap_new_single_exit_B5.patch), 2026-09-26 20:03:10 -0700
+## gate --all
+EXACT        16  _D3DCubeTexture_UnlockRect@12
+EXACT        16  _D3DTexture_UnlockRect@8
+EXACT        16  _D3DVolumeTexture_UnlockBox@8
+EXACT        16  _IDirect3DBaseTexture8_Release@4
+EXACT        32  _IDirect3DCubeTexture8_LockRect@24
+EXACT        16  _IDirect3DCubeTexture8_UnlockRect@12
+EXACT        32  _IDirect3DDevice8_CreateCubeTexture@28
+EXACT        32  _IDirect3DDevice8_CreateTexture@32
+EXACT        48  _IDirect3DDevice8_CreateVolumeTexture@36
+EXACT        32  _IDirect3DTexture8_LockRect@20
+EXACT        16  _IDirect3DTexture8_UnlockRect@8
+EXACT        32  _IDirect3DVolumeTexture8_LockBox@20
+EXACT        16  _IDirect3DVolumeTexture8_UnlockBox@8
+EXACT       448  _rasterizer_bitmap_2d_changed
+EXACT       528  _rasterizer_bitmap_3d_changed
+EXACT       176  _rasterizer_bitmap_changed
+EXACT       528  _rasterizer_bitmap_cm_changed
+EXACT        48  _rasterizer_bitmap_delete
+EXACT       400  _rasterizer_bitmap_new
+== exact 19  residual 0  unwritten 0  (of 19 listed)
+## keyed diff vs build/base
+sections: before 37, after 37
+CHANGED  _rasterizer_bitmap_new                             400 -> 400 bytes  [EXACT vs January]
+summary: 1 changed, 0 added, 0 removed
+## /W3 HEAD
+source\cseries\cseries.h(45) : warning C4146: unary minus operator applied to unsigned type, result still unsigned
+source\math\real_math.h(900) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(906) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(912) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(924) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(931) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(937) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(972) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(986) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1135) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1136) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1137) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+<SRC>(314) : warning C4102: 'failed_lock' : unreferenced label
+<SRC>(442) : warning C4102: 'failed_lock' : unreferenced label
+count 14
+## /W3 CAND
+source\cseries\cseries.h(45) : warning C4146: unary minus operator applied to unsigned type, result still unsigned
+source\math\real_math.h(900) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(906) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(912) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(924) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(931) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(937) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(972) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(986) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1135) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1136) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1137) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+<SRC>(317) : warning C4102: 'failed_lock' : unreferenced label
+<SRC>(445) : warning C4102: 'failed_lock' : unreferenced label
+count 14
+## fake_match_scan HEAD
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan CAND
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## normalized shas
+build/base/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.obj 400 26 719469460357f06cde7f452e16e02ba79ac639e85e0fad244f8e01cb7bd5efcd
+scratch/rf/workers/RF-U/b/CAND_hb.obj 400 26 041cef84e2a13eeae0fccfaef6e8e897a5c5926bf850bc6c10bc245f3df8a82d
+build/split/source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.obj 400 26 041cef84e2a13eeae0fccfaef6e8e897a5c5926bf850bc6c10bc245f3df8a82d
