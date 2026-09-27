@@ -137,7 +137,19 @@ void write_to_error_file(
 
 	if (error_globals.output_to_debug_file)
 	{
+#ifdef HALO_LINUX
+		/* the native builds keep the log open and flush each line: opening
+		and closing it per line takes milliseconds on Windows, and a host logs
+		thousands of lines when a hundred machines join, load or leave */
+		static FILE *handle = NULL;
+
+		if (!handle)
+		{
+			handle = fopen("d:\\debug.txt", "a+b");
+		}
+#else
 		FILE *handle = fopen("d:\\debug.txt", "a+b");
+#endif
 		if (handle)
 		{
 			if (date)
@@ -165,7 +177,11 @@ void write_to_error_file(
 				}
 			}
 			fprintf(handle, "%s", string);
+#ifdef HALO_LINUX
+			fflush(handle);
+#else
 			fclose(handle);
+#endif
 		}
 	}
 

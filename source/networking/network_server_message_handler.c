@@ -262,14 +262,26 @@ symbols in this file:
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
 #include "text/unicode.h"
+#ifdef HALO_LINUX
+/* system_milliseconds(), for the settings update interval */
+#include "cseries/cseries_windows.h"
+#endif
 
 /* ---------- constants */
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' session limits and protocol
+	(port/linux/include/halo_port_limits.h) */
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	NETWORK_MESSAGE_BUFFER_SIZE = HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE,
+	NETWORK_GAME_MESSAGE_VERSION = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION,
+#else
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
 	NETWORK_MESSAGE_BUFFER_SIZE = 0x600,
 	NETWORK_GAME_MESSAGE_VERSION = 1,
+#endif
 	MAXIMUM_MACHINE_NAME_LENGTH = 32,
 	NETWORK_GAME_MAP_NAME_LENGTH = 0x100,
 	JOIN_GAME_TOKEN_LENGTH = 16,
@@ -278,7 +290,11 @@ enum
 	REMOVE_PLAYER_INGAME_GAME_TIME_DELAY = 33,
 	TRANSPORT_NONCE_LENGTH = 8,
 	NETWORK_GAME_NAME_LENGTH = 16,
+#ifdef HALO_LINUX
+	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	MAXIMUM_NUMBER_OF_PLAYERS = 16,
+#endif
 };
 
 enum
@@ -356,7 +372,12 @@ struct network_game
 	struct game_variant variant;
 	byte unknown;
 	char minimum_player_count;
+#ifdef HALO_LINUX
+	/* 128 does not fit a signed char */
+	byte maximum_player_count;
+#else
 	char maximum_player_count;
+#endif
 	byte team_count;
 	short difficulty;
 	short machine_count;
@@ -368,6 +389,13 @@ struct network_game
 	long number_of_games_played;
 	struct network_game_local_data local_data;
 };
+
+#ifdef HALO_LINUX
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+#endif
 
 struct network_message
 {
@@ -393,7 +421,12 @@ struct message_client_game_update
 	unsigned long update_number;
 	short unknown;
 	short player_count;
+#ifdef HALO_LINUX
+	/* a machine's players, which 16 players / 4 machines only happened to give */
+	struct player_action actions[MAXIMUM_LOCAL_PLAYERS];
+#else
 	struct player_action actions[MAXIMUM_NUMBER_OF_PLAYERS / MAXIMUM_NETWORK_MACHINE_COUNT];
+#endif
 };
 
 struct message_server_pong
@@ -473,10 +506,23 @@ struct message_server_machine_rejected
 	short reason;
 };
 
+#ifdef HALO_LINUX
+/* the game settings record no longer fits one message: it goes out as
+consecutive pieces, which the clients put back together */
+struct message_server_game_settings_update
+{
+	word total_size;
+	word offset;
+	word length;
+	word pad;
+	byte data[HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE];
+};
+#else
 struct message_server_game_settings_update
 {
 	struct network_game game;
 };
+#endif
 
 struct message_server_remove_player_ingame
 {
@@ -690,6 +736,103 @@ boolean network_game_server_send_player_joined_info_ingame(
 	return FALSE;
 }
 
+#ifdef HALO_LINUX
+/* With up to 128 machines, sending the whole settings record (13 KB) to every
+machine on each lobby change would flood the network while a lobby fills, so
+changes are collected and sent at most this often; the server's pregame idle
+sends what is pending. */
+enum
+{
+	NETWORK_GAME_SETTINGS_UPDATE_INTERVAL = MILLISECONDS_PER_SECOND / 4,
+};
+
+static boolean network_game_settings_update_pending = FALSE;
+static unsigned long network_game_settings_update_time = 0;
+
+boolean network_game_server_send_game_settings_to_all_machines(
+	struct network_game_server *server,
+	void const *game,
+	long game_size)
+{
+	struct message_server_game_settings_update message;
+	long offset;
+	boolean result = TRUE;
+
+	match_assert(
+		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
+		0x1C8,
+		server);
+
+	for (offset = 0; result && offset < game_size; offset += sizeof(message.data))
+	{
+		void *encoded_message;
+
+		message.total_size = (word)game_size;
+		message.offset = (word)offset;
+		message.length = (word)MIN((long)sizeof(message.data), game_size - offset);
+		message.pad = 0;
+		csmemset(message.data, 0, sizeof(message.data));
+		csmemcpy(message.data, (byte const *)game + offset, message.length);
+		encoded_message = create_network_game_message(
+			_message_server_game_settings_update,
+			&message,
+			sizeof(message));
+		if (encoded_message)
+		{
+			result = network_game_server_send_message_to_all_machines(server, encoded_message);
+			if (!result)
+			{
+				network_event(
+					"failed to send message_server_game_settings_update message to all machines");
+			}
+		}
+		else
+		{
+			network_event("failed to create a message_server_game_settings_update message");
+			result = FALSE;
+		}
+	}
+
+	network_game_settings_update_pending = FALSE;
+	network_game_settings_update_time = system_milliseconds();
+
+	return result;
+}
+
+boolean network_game_server_flush_game_data_pregame(
+	struct network_game_server *server)
+{
+	boolean result = TRUE;
+
+	if (network_game_settings_update_pending &&
+		system_milliseconds() - network_game_settings_update_time >= NETWORK_GAME_SETTINGS_UPDATE_INTERVAL)
+	{
+		struct network_game *game = network_game_server_get_game(server);
+
+		if (game)
+		{
+			result = network_game_server_send_game_settings_to_all_machines(server, game, sizeof(*game));
+		}
+		else
+		{
+			network_event(
+				"failed to handle a message_server_game_settings_update because their was no server game");
+			network_game_settings_update_pending = FALSE;
+			result = FALSE;
+		}
+	}
+
+	return result;
+}
+
+boolean network_game_server_send_game_data_pregame(
+	struct network_game_server *server)
+{
+	network_game_settings_update_pending = TRUE;
+
+	return network_game_server_flush_game_data_pregame(server);
+}
+#else
 boolean network_game_server_send_game_data_pregame(
 	struct network_game_server *server)
 {
@@ -733,6 +876,7 @@ boolean network_game_server_send_game_data_pregame(
 
 	return result;
 }
+#endif
 
 boolean network_game_server_handle_client_message(
 	struct network_game_server *server,

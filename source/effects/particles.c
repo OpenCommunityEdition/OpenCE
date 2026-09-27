@@ -220,7 +220,14 @@ static char const *particle_effect_marker_names[NUMBER_OF_PARTICLE_EFFECT_MARKER
 void particles_initialize(
 	void)
 {
+#ifdef HALO_LINUX
+	/* the native builds' larger particle pool (halo_port_capacity.h);
+	render_particles sizes its unchecked list of visible particles by the same
+	value */
+	particle_data = game_state_data_new("particle", HALO_PORT_MAXIMUM_PARTICLES, 0x70);
+#else
 	particle_data = game_state_data_new("particle", 1024, 0x70);
+#endif
 	if (!particle_data)
 		error(_error_immediate, "couldn't allocate particle globals");
 

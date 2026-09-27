@@ -137,6 +137,12 @@ struct transport_endpoint_set
 	long needs_compaction;
 };
 
+#ifdef HALO_LINUX
+/* the native builds raise FD_SETSIZE (port prefix headers) so that a server's
+set holds its listening socket and a socket for every machine */
+typedef char winsock_fd_set_size_assert[
+	FD_SETSIZE >= HALO_PORT_MAXIMUM_NETWORK_MACHINES + 1 ? 1 : -1];
+#else
 typedef char winsock_fd_set_size_assert[
 	sizeof(fd_set) == 0x104 ? 1 : -1];
 typedef char transport_endpoint_set_ep_array_offset_assert[
@@ -151,6 +157,7 @@ typedef char transport_endpoint_set_needs_compaction_offset_assert[
 	offsetof(struct transport_endpoint_set, needs_compaction) == 0x114 ? 1 : -1];
 typedef char transport_endpoint_set_size_assert[
 	sizeof(struct transport_endpoint_set) == 0x118 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -187,7 +194,12 @@ static long get_next_available_set_array_index(
 		0x39,
 		set);
 	/* January permits one-past-capacity here; preserve the original boundary. */
+#ifdef HALO_LINUX
+	/* ... except in the native builds, which keep to the array */
+	if (set->last_endpoint_index >= set->max_endpoints - 1)
+#else
 	if (set->last_endpoint_index > set->max_endpoints - 1)
+#endif
 	{
 		return NONE;
 	}

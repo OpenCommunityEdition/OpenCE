@@ -579,7 +579,14 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* port: the native builds' session limit (halo_port_limits.h) */
+	MULTIPLAYER_MAXIMUM_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+	/* ui\multiplayer_game_text only has strings for the first 16 places */
+	NUMBER_OF_PLACE_STRINGS = 16,
+#else
 	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
+#endif
 };
 
 /* ---------- macros */
@@ -999,7 +1006,13 @@ struct
 	1.0f
 };
 
+#ifdef HALO_LINUX
+/* port: slayer's kill-in-order target uses the player's absolute index as
+its goal index, so every player needs a goal slot */
+struct game_engine_goal global_goal[MAX(32, MULTIPLAYER_MAXIMUM_PLAYERS)] = { 0 };
+#else
 struct game_engine_goal global_goal[32] = { 0 };
+#endif
 struct game_variant global_variant = { 0 };
 struct game_engine *game_engine = NULL;
 static long game_engine_teleport_message_ticks = 0;
@@ -1073,6 +1086,45 @@ static void initialize_player_multiplayer_data(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* port: English ordinal for a zero-based place past the string list's 16
+("17th", "22nd", "111th"; "tied for 17th" when tied), in a static buffer */
+static wchar_t *place_ordinal_string(
+	long place,
+	boolean tied)
+{
+	static wchar_t string[32];
+	long number = place + 1;
+	wchar_t const *suffix = L"th";
+
+	if (number % 100 < 11 || number % 100 > 13)
+	{
+		switch (number % 10)
+		{
+		case 1:
+			suffix = L"st";
+			break;
+		case 2:
+			suffix = L"nd";
+			break;
+		case 3:
+			suffix = L"rd";
+			break;
+		}
+	}
+
+	usnprintf(
+		string,
+		NUMBEROF(string),
+		tied ? L"tied for %d%s" : L"%d%s",
+		number,
+		suffix);
+	string[NUMBEROF(string) - 1] = 0;
+
+	return string;
+}
+#endif
+
 static wchar_t *get_place_string(
 	struct postgame_statistic_entry *entry)
 {
@@ -1080,6 +1132,12 @@ static wchar_t *get_place_string(
 	long string_index;
 	long string_list_index;
 
+#ifdef HALO_LINUX
+	/* port: places past the 16th are spelled out instead of clamped (the
+	caller's format string marks a tie) */
+	if (raw_index >= NUMBER_OF_PLACE_STRINGS)
+		return place_ordinal_string(raw_index, FALSE);
+#endif
 	if (raw_index < 0)
 		string_index = 0;
 	else if (raw_index > 15)
@@ -1877,6 +1935,12 @@ static void game_engine_rasterize_in_game_score(
 				}
 				else
 					place_string = L"";
+#ifdef HALO_LINUX
+				/* port: places past the 16th are spelled out instead of
+				clamped (the rows never marked ties) */
+				if (raw_place >= NUMBER_OF_PLACE_STRINGS)
+					place_string = place_ordinal_string(raw_place, FALSE);
+#endif
 
 				usprintf(
 					row_string,
@@ -1930,7 +1994,12 @@ static void drawline(
 void game_engine_post_rasterize_post_game(
 	void)
 {
+#ifdef HALO_LINUX
+	/* port: sized like every buffer handed to populate_statistic_buffer */
+	struct postgame_statistic_entry entries[MULTIPLAYER_MAXIMUM_PLAYERS];
+#else
 	struct postgame_statistic_entry entries[16];
+#endif
 	wchar_t score_string[256];
 	wchar_t row_string[256];
 	short tab_stops[6];
@@ -2103,6 +2172,16 @@ void game_engine_post_rasterize_post_game(
 				string_list_index != NONE ?
 					unicode_string_list_get_string(string_list_index, place + 36) :
 					L"";
+#ifdef HALO_LINUX
+			/* port: places past the 16th are spelled out instead of clamped
+			(the rows never marked ties) */
+			if ((entries[entry_index].values[6] & 0x7F) >= NUMBER_OF_PLACE_STRINGS)
+			{
+				place_string = place_ordinal_string(
+					entries[entry_index].values[6] & 0x7F,
+					FALSE);
+			}
+#endif
 			usnprintf(row_string, NUMBEROF(row_string), L" \t%s", place_string);
 			row_string[NUMBEROF(row_string) - 1] = 0;
 			drawline(row_string, draw_row, 0);
@@ -4370,11 +4449,20 @@ wchar_t *get_place_name(
 	long lookup_index;
 	long string_list_index;
 
+#ifdef HALO_LINUX
+	/* port: a session can have more places than the string list names */
+	match_vassert(
+		"c:\\halo\\SOURCE\\game\\game_engine.c",
+		0x1316,
+		place.place < MULTIPLAYER_MAXIMUM_PLAYERS,
+		"place.place < maximum_places");
+#else
 	match_vassert(
 		"c:\\halo\\SOURCE\\game\\game_engine.c",
 		0x1316,
 		place.place < 16,
 		"place.place < maximum_places");
+#endif
 
 	if ((place.flags & FLAG(2)) && TEST_FLAG(place.flags, 0))
 		lookup_index = 35;
@@ -4384,6 +4472,12 @@ wchar_t *get_place_name(
 		lookup_index = 34;
 	else if (TEST_FLAG(place.flags, 1))
 		lookup_index = 32;
+#ifdef HALO_LINUX
+	/* port: places past the 16th are spelled out; a tie is marked like the
+	string list's tied places */
+	else if (place.place >= NUMBER_OF_PLACE_STRINGS)
+		return place_ordinal_string(place.place, TEST_FLAG(place.flags, _place_tied));
+#endif
 	else
 	{
 		lookup_index = place.place;
@@ -4706,7 +4800,13 @@ short game_engine_player_get_custom_motion_sensor_positions(
 			goal_index++;
 		}
 		/* January uses the adjacent global_variant address as the signed loop bound. */
+#ifdef HALO_LINUX
+		/* port: bounded by the goal array itself, which is larger here and
+		need not sit next to global_variant */
+		while (goal < global_goal + NUMBEROF(global_goal));
+#else
 		while ((long)goal < (long)&global_variant);
+#endif
 	}
 
 	return count;
@@ -4754,7 +4854,12 @@ void game_engine_render_nav_points(
 						goal++;
 						goal_index++;
 					}
+#ifdef HALO_LINUX
+					/* port: bounded by the goal array itself, as above */
+					while (goal < global_goal + NUMBEROF(global_goal));
+#else
 					while ((long)goal < (long)&global_variant);
+#endif
 				}
 			}
 		}
@@ -4893,7 +4998,12 @@ static struct postgame_statistic_entry *game_engine_get_player_place(
 	struct postgame_statistic_entry *entry,
 	long player_index)
 {
+#ifdef HALO_LINUX
+	/* port: populate_statistic_buffer writes an entry per player */
+	struct postgame_statistic_entry entries[MULTIPLAYER_MAXIMUM_PLAYERS];
+#else
 	struct postgame_statistic_entry entries[16];
+#endif
 	long place = 0;
 
 	populate_statistic_buffer(entries, 0, 0);
@@ -5666,7 +5776,12 @@ long postgame_statistic_get_rating(
 	long parameter1,
 	long parameter2)
 {
+#ifdef HALO_LINUX
+	/* port: populate_statistic_buffer writes an entry per player */
+	struct postgame_statistic_entry entries[MULTIPLAYER_MAXIMUM_PLAYERS];
+#else
 	struct postgame_statistic_entry entries[16];
+#endif
 	long rating;
 	long entry_count;
 	long entry_index;
@@ -6340,11 +6455,22 @@ void game_engine_player_added(
 		}
 		else
 		{
+#ifdef HALO_LINUX
+			/* port: a free-for-all team is the player's own slot, which stays
+			below the player limit and is the same on every machine */
+			long team_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+			player->network_player_data.team_index =
+				(char)team_index;
+			player->team_index =
+				(signed char)team_index;
+#else
 			player->network_player_data.team_index =
 				(char)*next_team_index;
 			player->team_index =
 				(signed char)*next_team_index;
 			(*next_team_index)++;
+#endif
 		}
 
 		if (player_index != NONE)
@@ -7855,7 +7981,12 @@ struct game_engine_place game_engine_get_place(
 	{
 		struct data_iterator iterator;
 		struct player_datum *other_player;
+#ifdef HALO_LINUX
+		/* port: free-for-all team indices run up to the player limit */
+		unsigned long team_mask[BIT_VECTOR_SIZE_IN_LONGS(MULTIPLAYER_MAXIMUM_PLAYERS)] = { 0 };
+#else
 		unsigned long team_mask = 0;
+#endif
 		long score = game_engine->get_player_score(player_index, score_type);
 
 		data_iterator_new(&iterator, player_data);
@@ -7875,10 +8006,21 @@ struct game_engine_place game_engine_get_place(
 			if (different_player &&
 				score_type == _get_score_team)
 			{
+#ifdef HALO_LINUX
+				/* a team outside the mask (none yet) counts on its own */
+				if (VALID_INDEX(other_player->team_index, MULTIPLAYER_MAXIMUM_PLAYERS))
+				{
+					if (BIT_VECTOR_TEST_FLAG(team_mask, other_player->team_index))
+						different_player = FALSE;
+					else
+						BIT_VECTOR_SET_FLAG(team_mask, other_player->team_index, TRUE);
+				}
+#else
 				if (TEST_FLAG(team_mask, other_player->team_index))
 					different_player = FALSE;
 				else
 					SET_FLAG(team_mask, other_player->team_index, TRUE);
+#endif
 			}
 
 			if (different_player)

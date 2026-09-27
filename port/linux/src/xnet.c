@@ -11,12 +11,121 @@ XNet's secure addressing collapses to plain IPv4: a host's XNADDR carries its
 real address, key exchange keys are random but unused, and XNADDR to
 IN_ADDR translation is the identity. That is enough for system link play on
 a LAN.
+
+Two settings adjust the addressing:
+
+- HALO_NET_ADDRESS=a.b.c.d binds the game's sockets to that local address
+  instead of every interface, and reports it as this machine's system link
+  address. Several instances can then share one computer, each on its own
+  loopback address (127.0.0.2, 127.0.0.3, ...), or system link can be
+  pinned to one network interface. That address then stands in for
+  127.0.0.1, which the game uses for itself (a host joins its own game
+  through it, and admits only it to a split screen game): connections and
+  datagrams to 127.0.0.1 go to the address, and traffic from the address
+  is reported as coming from 127.0.0.1.
+- HALO_NET_BROADCAST=a.b.c.d[,e.f.g.h...] sends the game's broadcasts (a
+  client's system link game search, a host's game advertisement) to those
+  addresses instead of 255.255.255.255, to reach machines that broadcasts
+  do not: other loopback addresses, or machines across a VPN.
 */
 
 #include "platform.h"
 #include "posix.h"
 
+#include <stdlib.h>
 #include <string.h>
+
+/* ---------- address settings */
+
+static int address_setting(const char *name, unsigned long *address)
+{
+	const char *text = getenv(name);
+	unsigned long value;
+
+	if (!text || !*text)
+		return 0;
+	/* INADDR_NONE (also 255.255.255.255) is no use as either setting */
+	value = halo_ws_inet_addr(text);
+	if (value == INADDR_NONE)
+		return 0;
+	*address = value;
+	return 1;
+}
+
+/* the address to use in place of INADDR_ANY, if HALO_NET_ADDRESS is set */
+static int local_address_setting(unsigned long *address)
+{
+	return address_setting("HALO_NET_ADDRESS", address);
+}
+
+/* 127.0.0.1 in network byte order */
+static unsigned long loopback_address(void)
+{
+	return halo_ws_htonl(0x7F000001);
+}
+
+/* a destination of 127.0.0.1 means the HALO_NET_ADDRESS address */
+static const struct sockaddr *outgoing_address(const struct sockaddr *address, int address_length,
+	struct sockaddr_in *storage)
+{
+	unsigned long local;
+
+	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(*storage) &&
+		((const struct sockaddr_in *)address)->sin_addr.s_addr == loopback_address() &&
+		local_address_setting(&local))
+	{
+		memcpy(storage, address, sizeof(*storage));
+		storage->sin_addr.s_addr = local;
+		return (const struct sockaddr *)storage;
+	}
+	return address;
+}
+
+/* traffic from the HALO_NET_ADDRESS address comes from 127.0.0.1 */
+static void incoming_address(struct sockaddr *address, const int *address_length)
+{
+	unsigned long local;
+
+	if (address && address_length && *address_length >= (int)sizeof(struct sockaddr_in) &&
+		address->sa_family == AF_INET && local_address_setting(&local) &&
+		((struct sockaddr_in *)address)->sin_addr.s_addr == local)
+	{
+		((struct sockaddr_in *)address)->sin_addr.s_addr = loopback_address();
+	}
+}
+
+enum
+{
+	MAXIMUM_BROADCAST_TARGETS = 256,
+};
+
+/* the addresses to send broadcasts to instead, if HALO_NET_BROADCAST is
+set; returns their count */
+static int broadcast_targets(unsigned long *targets, int maximum_count)
+{
+	const char *text = getenv("HALO_NET_BROADCAST");
+	int count = 0;
+
+	while (text && *text && count < maximum_count)
+	{
+		char address[16];
+		size_t length = strcspn(text, ",");
+		unsigned long value;
+
+		if (length < sizeof(address))
+		{
+			memcpy(address, text, length);
+			address[length] = 0;
+			value = halo_ws_inet_addr(address);
+			if (value != INADDR_NONE)
+				targets[count++] = value;
+		}
+		text += length;
+		if (*text == ',')
+			text++;
+	}
+	return count;
+}
 
 /* ---------- Winsock */
 
@@ -79,11 +188,42 @@ int WSAAPI halo_ws_closesocket(SOCKET socket)
 
 int WSAAPI halo_ws_bind(SOCKET socket, const struct sockaddr *address, int address_length)
 {
+	struct sockaddr_in local;
+	unsigned long override;
+
+	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(local) &&
+		((const struct sockaddr_in *)address)->sin_addr.s_addr == INADDR_ANY &&
+		local_address_setting(&override))
+	{
+		memcpy(&local, address, sizeof(local));
+		local.sin_addr.s_addr = override;
+		address = (const struct sockaddr *)&local;
+	}
 	return winsock_result(posix_socket_bind((int)socket, address, address_length));
 }
 
 int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int address_length)
 {
+	struct sockaddr_in target;
+	unsigned long override;
+
+	address = outgoing_address(address, address_length, &target);
+	/* a connection from an unbound socket would leave from whichever address
+	the route picks; with HALO_NET_ADDRESS it leaves from that address */
+	if (address && address->sa_family == AF_INET && local_address_setting(&override))
+	{
+		struct sockaddr_in bound;
+		int bound_length = sizeof(bound);
+
+		if (posix_socket_getsockname((int)socket, &bound, &bound_length) < 0 ||
+			(bound.sin_port == 0 && bound.sin_addr.s_addr == INADDR_ANY))
+		{
+			memset(&bound, 0, sizeof(bound));
+			bound.sin_family = AF_INET;
+			bound.sin_addr.s_addr = override;
+			posix_socket_bind((int)socket, &bound, sizeof(bound));
+		}
+	}
 	return winsock_result(posix_socket_connect((int)socket, address, address_length));
 }
 
@@ -101,6 +241,7 @@ SOCKET WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int *addre
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	incoming_address(address, address_length);
 	return (SOCKET)result;
 }
 
@@ -112,6 +253,38 @@ int WSAAPI halo_ws_send(SOCKET socket, const char *buffer, int length, int flags
 int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int flags,
 	const struct sockaddr *address, int address_length)
 {
+	/* the rewritten destination: it must outlive the send */
+	struct sockaddr_in target;
+
+	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
+		((const struct sockaddr_in *)address)->sin_addr.s_addr == INADDR_BROADCAST)
+	{
+		unsigned long targets[MAXIMUM_BROADCAST_TARGETS];
+		int target_count = broadcast_targets(targets, MAXIMUM_BROADCAST_TARGETS);
+
+		if (target_count)
+		{
+			int index;
+			int result = 0;
+
+			/* one datagram per target; the broadcast counts as sent if any is */
+			memcpy(&target, address, sizeof(target));
+			for (index = 0; index < target_count; index++)
+			{
+				int sent;
+
+				target.sin_addr.s_addr = targets[index];
+				sent = posix_socket_sendto((int)socket, buffer, length, flags, &target, sizeof(target));
+				if (sent >= 0 || index == 0)
+					result = sent;
+			}
+			return winsock_result(result);
+		}
+	}
+	else
+	{
+		address = outgoing_address(address, address_length, &target);
+	}
 	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 }
 
@@ -123,7 +296,11 @@ int WSAAPI halo_ws_recv(SOCKET socket, char *buffer, int length, int flags)
 int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 	struct sockaddr *address, int *address_length)
 {
-	return winsock_result(posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length));
+	int result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
+
+	if (result >= 0)
+		incoming_address(address, address_length);
+	return winsock_result(result);
 }
 
 int WSAAPI halo_ws_shutdown(SOCKET socket, int how)
@@ -162,7 +339,11 @@ int WSAAPI halo_ws_getsockname(SOCKET socket, struct sockaddr *address, int *add
 
 int WSAAPI halo_ws_getpeername(SOCKET socket, struct sockaddr *address, int *address_length)
 {
-	return winsock_result(posix_socket_getpeername((int)socket, address, address_length));
+	int result = posix_socket_getpeername((int)socket, address, address_length);
+
+	if (result >= 0)
+		incoming_address(address, address_length);
+	return winsock_result(result);
 }
 
 /* ---------- select and fd_set */
@@ -319,9 +500,20 @@ INT WSAAPI XNetXnAddrToInAddr(const XNADDR *address, const XNKID *key_identifier
 	return 0;
 }
 
+/* this machine's system link address: HALO_NET_ADDRESS, else the first
+non-loopback IPv4 address */
+static unsigned long title_address(void)
+{
+	unsigned long override;
+
+	if (local_address_setting(&override))
+		return override;
+	return posix_local_ipv4_address();
+}
+
 DWORD WSAAPI XNetGetTitleXnAddr(XNADDR *address)
 {
-	unsigned long ip = posix_local_ipv4_address();
+	unsigned long ip = title_address();
 
 	memset(address, 0, sizeof(*address));
 	address->bSizeOfStruct = sizeof(*address);
@@ -331,6 +523,6 @@ DWORD WSAAPI XNetGetTitleXnAddr(XNADDR *address)
 
 DWORD WSAAPI XNetGetEthernetLinkStatus(void)
 {
-	return posix_local_ipv4_address() ?
+	return title_address() ?
 		(XNET_ETHERNET_LINK_ACTIVE | XNET_ETHERNET_LINK_100MBPS | XNET_ETHERNET_LINK_FULL_DUPLEX) : 0;
 }

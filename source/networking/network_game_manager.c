@@ -91,15 +91,25 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* the machine and player slots of a network game: the Xbox's 4 and 16, or the
+native builds' session limits (port/linux/include/halo_port_limits.h) */
+#ifdef HALO_LINUX
+#define NETWORK_GAME_MACHINE_SLOTS HALO_PORT_MAXIMUM_NETWORK_MACHINES
+#define NETWORK_GAME_PLAYER_SLOTS HALO_PORT_MAXIMUM_NETWORK_PLAYERS
+#else
+#define NETWORK_GAME_MACHINE_SLOTS 4
+#define NETWORK_GAME_PLAYER_SLOTS 16
+#endif
+
 enum
 {
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+	MAXIMUM_NETWORK_MACHINE_COUNT = NETWORK_GAME_MACHINE_SLOTS,
 };
 
 /* ---------- macros */
 
 #define network_machine_is_valid(machine) \
-	((machine) && (machine)->machine_index >= 0 && (machine)->machine_index < 4)
+	((machine) && (machine)->machine_index >= 0 && (machine)->machine_index < NETWORK_GAME_MACHINE_SLOTS)
 
 /* ---------- structures */
 
@@ -138,18 +148,30 @@ struct network_game
 	struct game_variant variant;
 	byte __padding10C;
 	byte game_mode;
+#ifdef HALO_LINUX
+	/* 128 does not fit a signed char */
+	byte maximum_player_count;
+#else
 	char maximum_player_count;
+#endif
 	byte __padding10F;
 	short difficulty;
 	short machine_count;
-	struct network_machine machines[4];
+	struct network_machine machines[NETWORK_GAME_MACHINE_SLOTS];
 	short player_count;
-	struct network_player players[16];
+	struct network_player players[NETWORK_GAME_PLAYER_SLOTS];
 	short __unknown426;
 	unsigned long random_seed;
 	byte __unknown42C[4];
 	struct network_game_local_data local_data;
 };
+
+#ifdef HALO_LINUX
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -173,7 +195,7 @@ boolean network_game_add_machine(
 		0x6A,
 		game && machine && network_machine_is_valid(machine));
 
-	for (machine_index = 0; machine_index < 4; machine_index++)
+	for (machine_index = 0; machine_index < NETWORK_GAME_MACHINE_SLOTS; machine_index++)
 	{
 		if (!network_machine_is_valid(&game->machines[machine_index]))
 		{
@@ -199,7 +221,7 @@ boolean network_game_update_machine(
 		0x81,
 		game && machine && network_machine_is_valid(machine));
 
-	for (machine_index = 0; machine_index < 4; machine_index++)
+	for (machine_index = 0; machine_index < NETWORK_GAME_MACHINE_SLOTS; machine_index++)
 	{
 		if (game->machines[machine_index].machine_index == machine->machine_index)
 		{
@@ -311,7 +333,7 @@ boolean network_game_add_player(
 		if (VALID_INDEX(player->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
 			VALID_INDEX(player->controller_index, MAXIMUM_LOCAL_PLAYERS))
 		{
-			for (player_index = 0; player_index < 16; player_index++)
+			for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 			{
 				if (game->players[player_index].machine_index == player->machine_index &&
 					game->players[player_index].controller_index == player->controller_index)
@@ -320,10 +342,10 @@ boolean network_game_add_player(
 				}
 			}
 
-			if (player_index == 16 && network_player_is_valid(player))
+			if (player_index == NETWORK_GAME_PLAYER_SLOTS && network_player_is_valid(player))
 			{
 				new_player_index = NONE;
-				for (player_index = 0; player_index < 16; player_index++)
+				for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 				{
 					if (game->players[player_index].player_list_index == NONE)
 					{
@@ -358,7 +380,13 @@ boolean network_player_is_valid(
 		player->controller_index >= 0 &&
 		player->controller_index < MAXIMUM_LOCAL_PLAYERS &&
 		player->machine_index >= 0 &&
+#ifdef HALO_LINUX
+		/* the Xbox game checks the machine against the split screen limit,
+		which only works while both are 4 */
+		(long)player->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+#else
 		player->machine_index < MAXIMUM_LOCAL_PLAYERS)
+#endif
 	{
 		return TRUE;
 	}
@@ -380,7 +408,7 @@ void network_game_invalidate_machine(
 	game->machines[machine_index].machine_index = NONE;
 	game->machines[machine_index].name[0] = 0;
 
-	for (player_index = 0; player_index < 16; player_index++)
+	for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 	{
 		if (game->players[player_index].machine_index == machine_index)
 			network_game_invalidate_player(&game->players[player_index]);
@@ -427,7 +455,7 @@ boolean network_game_player_is_valid(
 	if (network_player_is_valid(player))
 	{
 		current_player = &game->players[0];
-		for (player_index = 0; player_index < 16; player_index++, current_player++)
+		for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++, current_player++)
 		{
 			if (current_player->machine_index == player->machine_index &&
 				current_player->controller_index == player->controller_index)
@@ -483,12 +511,12 @@ void network_game_invalidate(
 	game->machine_count = 0;
 	game->player_count = 0;
 
-	for (machine_index = 0; machine_index < 4; machine_index++)
+	for (machine_index = 0; machine_index < NETWORK_GAME_MACHINE_SLOTS; machine_index++)
 		network_game_invalidate_machine(game, (short)machine_index);
 
 	csmemset(game->players, NONE, sizeof(game->players));
 	game->game_mode = 2;
-	game->maximum_player_count = 16;
+	game->maximum_player_count = NETWORK_GAME_PLAYER_SLOTS;
 	game->local_data.game_objects_loaded = FALSE;
 
 	return;
@@ -537,7 +565,7 @@ boolean network_game_remove_player(
 
 	if (network_game_player_is_valid(player, game))
 	{
-		for (player_index = 0; player_index < 16; player_index++)
+		for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 		{
 			if (network_player_is_valid(&game->players[player_index]) &&
 				game->players[player_index].machine_index == player->machine_index &&
@@ -573,11 +601,11 @@ boolean network_game_remove_machine(
 
 	if (network_machine_is_valid(machine))
 	{
-		for (machine_index = 0; machine_index < 4; machine_index++)
+		for (machine_index = 0; machine_index < NETWORK_GAME_MACHINE_SLOTS; machine_index++)
 		{
 			if (game->machines[machine_index].machine_index == machine->machine_index)
 			{
-				for (player_index = 0; player_index < 16; player_index++)
+				for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 				{
 					if (network_player_is_valid(&game->players[player_index]) &&
 						game->players[player_index].machine_index == machine->machine_index)
@@ -651,11 +679,11 @@ boolean network_game_create_game_objects(
 
 		qsort(
 			game->players,
-			16,
+			NETWORK_GAME_PLAYER_SLOTS,
 			sizeof(struct network_player),
 			(int(__cdecl *)(const void *, const void *))compare_network_players);
 
-		for (player_index = 0; player_index < 16; player_index++)
+		for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 		{
 			if (!network_player_is_valid(&game->players[player_index]))
 				break;

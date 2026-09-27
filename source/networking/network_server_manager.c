@@ -485,8 +485,14 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	MAXIMUM_NETWORK_PLAYER_COUNT = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
 	MAXIMUM_NETWORK_PLAYER_COUNT = 16,
+#endif
 	NETWORK_GAME_NAME_LENGTH = 16,
 	NETWORK_GAME_MAP_NAME_LENGTH = 0x80,
 	NETWORK_PLAYER_NAME_LENGTH = 12,
@@ -494,11 +500,24 @@ enum
 	NUMBER_OF_MULTIPLAYER_TEAMS = 2,
 	NETWORK_GAME_PLAYER_QUIT_DELAY = 33,
 	NETWORK_GAME_CLIENT_STALL_TIMEOUT = 2000,
+#ifdef HALO_LINUX
+	/* the time the other machines have to load the map once the first has
+	finished, allowing for many machines of mixed speed */
+	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING =
+		60 * MILLISECONDS_PER_SECOND,
+#else
 	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING =
 		15 * MILLISECONDS_PER_SECOND,
+#endif
 	MAXIMUM_PLAYERS_PER_MACHINE = MAXIMUM_LOCAL_PLAYERS,
 	PLAYER_UPDATE_SIZE = 0x20,
 	MAXIMUM_GOOD_COLOR_ATTEMPTS = 10,
+#ifdef HALO_LINUX
+	/* with more players than random names or colours, the pickers settle for a
+	numbered name or a shared colour after this many tries */
+	MAXIMUM_UNIQUE_NAME_ATTEMPTS = 64,
+	MAXIMUM_UNIQUE_COLOR_ATTEMPTS = 64,
+#endif
 	_client_update_out_of_sync_bit = 31,
 	CLIENT_UPDATE_SEQUENCE_NUMBER_MASK = 0x7FFFFFFF,
 	NETWORK_GAME_COUNTDOWN_TIME = 30999,
@@ -699,19 +718,41 @@ struct network_game_server
 	boolean queued_player_valid;
 	boolean sent_start_game_message;
 	byte padding4BA[2];
+#ifdef HALO_LINUX
+	/* in-game joins waiting behind queued_player (the Xbox game keeps one
+	and drops any other that arrives meanwhile) */
+	struct network_player waiting_players[MAXIMUM_NETWORK_PLAYER_COUNT];
+	long waiting_player_count;
+#endif
 };
 
+#ifdef HALO_LINUX
+/* the layout follows the session limits (port/linux/include/halo_port_limits.h) */
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+#else
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
+#endif
 typedef char network_game_variant_has_teams_offset_assert[
 	offsetof(struct network_game, variant) +
 		offsetof(struct game_variant, universal_variant.teams) == 0xC0 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+typedef char network_game_server_client_machines_offset_assert[
+	offsetof(struct network_game_server, client_machines) == 8 + HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+typedef char network_game_server_countdown_state_offset_assert[
+	offsetof(struct network_game_server, countdown_state) ==
+		8 + HALO_PORT_NETWORK_GAME_SIZE + MAXIMUM_NETWORK_MACHINE_COUNT * 0x10 + 0xC ? 1 : -1];
+#else
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == 0x434 ? 1 : -1];
 typedef char network_game_server_client_machines_offset_assert[
 	offsetof(struct network_game_server, client_machines) == 0x43C ? 1 : -1];
 typedef char network_game_server_countdown_state_offset_assert[
 	offsetof(struct network_game_server, countdown_state) == 0x488 ? 1 : -1];
+#endif
 
 /* ---------- prototypes */
 
@@ -1230,12 +1271,18 @@ boolean network_game_server_start_network_game(
 		struct message_server_begin_game begin_game = { 0 };
 		void *message;
 
+#ifdef HALO_LINUX
+		/* the settings record goes out in pieces */
+		(void)game_settings;
+		if (network_game_server_send_game_settings_to_all_machines(server, &server->game, sizeof(server->game)) &&
+#else
 		csmemcpy(&game_settings, &server->game, sizeof(game_settings));
 		if (((message = create_network_game_message(
 			_message_server_game_settings_update,
 			&game_settings,
 			sizeof(game_settings))) != NULL) &&
 			network_game_server_send_message_to_all_machines(server, message) &&
+#endif
 			((message = create_network_game_message(
 				_message_server_begin_game,
 				&begin_game,
@@ -1556,6 +1603,9 @@ void network_game_server_client_machine_game_loading_complete(
 {
 	boolean all_machines_loaded = TRUE;
 	long client_machine_index;
+#ifdef HALO_LINUX
+	long loading_machine_count = 0;
+#endif
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x4ED, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x4EE, machine);
@@ -1573,12 +1623,25 @@ void network_game_server_client_machine_game_loading_complete(
 			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT &&
 			!TEST_FLAG(client_machine->flags, _network_client_machine_level_loaded_bit))
 		{
+#ifdef HALO_LINUX
+			loading_machine_count++;
+#else
 			network_event(
 				"still waiting on machine #%d to finish loading",
 				client_machine->machine_index);
+#endif
 			all_machines_loaded = FALSE;
 		}
 	}
+
+#ifdef HALO_LINUX
+	/* a line per machine still loading, each time one finishes, is 8,000
+	lines as 128 machines load, and the host writes its log a line at a time */
+	if (loading_machine_count)
+	{
+		network_event("still waiting for machines to finish loading (%ld left)", loading_machine_count);
+	}
+#endif
 
 	if (all_machines_loaded == TRUE)
 		network_game_server_all_machines_have_loaded(server);
@@ -1740,6 +1803,18 @@ void network_game_server_update_ticks(
 				}
 			}
 
+#ifdef HALO_LINUX
+			if (!server->queued_player_valid && server->waiting_player_count > 0)
+			{
+				csmemcpy(&server->queued_player, &server->waiting_players[0], sizeof(server->queued_player));
+				server->waiting_player_count--;
+				csmemmove(
+					&server->waiting_players[0],
+					&server->waiting_players[1],
+					server->waiting_player_count * sizeof(struct network_player));
+				server->queued_player_valid = TRUE;
+			}
+#endif
 			if (server->queued_player_valid)
 			{
 				for (client_machine_index = 0;
@@ -1797,6 +1872,13 @@ void network_game_server_queue_player_for_addition(
 		csmemcpy(&server->queued_player, player, sizeof(server->queued_player));
 		server->queued_player_valid = TRUE;
 	}
+#ifdef HALO_LINUX
+	else if (network_player_is_valid(player) &&
+		server->waiting_player_count < MAXIMUM_NETWORK_PLAYER_COUNT)
+	{
+		csmemcpy(&server->waiting_players[server->waiting_player_count++], player, sizeof(struct network_player));
+	}
+#endif
 
 	return;
 }
@@ -2416,6 +2498,14 @@ static void dump_network_game_data(
 		long itr;
 		for (itr = 0; itr < MAXIMUM_NETWORK_MACHINE_COUNT; itr++)
 		{
+#ifdef HALO_LINUX
+			/* the native builds log only the slots in use, a line each: each
+			line reopens the log, and 128 empty slots took seconds */
+			if (network_game_data->machines[itr].machine_index == NONE)
+			{
+				continue;
+			}
+#endif
 			network_event(
 				"\t%smachine %d %x",
 				prefix,
@@ -2429,6 +2519,19 @@ static void dump_network_game_data(
 		long itr;
 		for (itr = 0; itr < MAXIMUM_NETWORK_PLAYER_COUNT; itr++)
 		{
+#ifdef HALO_LINUX
+			if (network_game_data->players[itr].machine_index == NONE)
+			{
+				continue;
+			}
+			network_event("%splayer %d: machine_index %x controller_index %x team_index %x player_list_index %x",
+				prefix,
+				itr,
+				network_game_data->players[itr].machine_index,
+				network_game_data->players[itr].controller_index,
+				network_game_data->players[itr].team_index,
+				network_game_data->players[itr].player_list_index);
+#else
 			network_event("%splayer %d", prefix, itr);
 			network_event("%s\tmachine_index %x", prefix,
 				network_game_data->players[itr].machine_index);
@@ -2438,6 +2541,7 @@ static void dump_network_game_data(
 				network_game_data->players[itr].team_index);
 			network_event("%s\tplayer_list_index %x", prefix,
 				network_game_data->players[itr].player_list_index);
+#endif
 		}
 	}
 
@@ -2475,6 +2579,20 @@ static void network_game_server_dump(
 				? "(active)" : "(dead)";
 		}
 
+#ifdef HALO_LINUX
+		if (client_machine->connection == NULL && client_machine->machine_index == NONE)
+		{
+			continue;
+		}
+		network_event("\tclient %d: connection %x %s last_received_update_sequence_number %d stall_start_time %d machine_index %x flags %x",
+			itr,
+			client_machine->connection,
+			connection_status,
+			client_machine->last_received_update_sequence_number,
+			client_machine->stall_start_time,
+			client_machine->machine_index,
+			client_machine->flags);
+#else
 		network_event("\tclient %d", itr);
 		network_event("\t\tconnection %x %s", client_machine->connection,
 			connection_status);
@@ -2483,6 +2601,7 @@ static void network_game_server_dump(
 		network_event("\t\tstall_start_time %d", client_machine->stall_start_time);
 		network_event("\t\tmachine_index %x", client_machine->machine_index);
 		network_event("\t\tflags %x", client_machine->flags);
+#endif
 	}
 
 	network_event("\tnext_update_number %d", server->next_update_number);
@@ -2681,6 +2800,9 @@ void get_unique_random_name(
 {
 	wchar_t const *name;
 	long duplicate_count;
+#ifdef HALO_LINUX
+	long attempt_count = 0;
+#endif
 
 	do
 	{
@@ -2703,10 +2825,45 @@ void get_unique_random_name(
 			}
 		}
 	}
+#ifdef HALO_LINUX
+	while (duplicate_count != 0 && ++attempt_count < MAXIMUM_UNIQUE_NAME_ATTEMPTS);
+#else
 	while (duplicate_count != 0);
+#endif
 
 	ustrncpy(player->name, name, NETWORK_PLAYER_NAME_LENGTH - 1);
 	player->name[NETWORK_PLAYER_NAME_LENGTH - 1] = 0;
+
+#ifdef HALO_LINUX
+	/* every random name is taken: number this one ("Name2", "Name3", ...)
+	until it is unique */
+	if (duplicate_count != 0)
+	{
+		wchar_t base_name[NETWORK_PLAYER_NAME_LENGTH];
+		long number;
+
+		csmemcpy(base_name, player->name, sizeof(base_name));
+		for (number = 2; number < 1000 && !player_name_is_unique(server, player->name); number++)
+		{
+			wchar_t digits[4];
+			long digit_count = 0;
+			long base_length = (long)ustrlen(base_name);
+			long value;
+
+			for (value = number; value; value /= 10)
+			{
+				digits[digit_count++] = (wchar_t)(L'0' + value % 10);
+			}
+			base_length = MIN(base_length, NETWORK_PLAYER_NAME_LENGTH - 1 - digit_count);
+			csmemcpy(player->name, base_name, base_length * sizeof(wchar_t));
+			while (digit_count > 0)
+			{
+				player->name[base_length++] = digits[--digit_count];
+			}
+			player->name[base_length] = 0;
+		}
+	}
+#endif
 
 	return;
 }
@@ -2743,7 +2900,11 @@ void get_unique_random_color(
 
 		attempt_count++;
 	}
+#ifdef HALO_LINUX
+	while (!unique && attempt_count < MAXIMUM_UNIQUE_COLOR_ATTEMPTS);
+#else
 	while (!unique);
+#endif
 
 	player->primary_color_index = (short)color_index;
 
@@ -2957,7 +3118,12 @@ static boolean network_game_server_handle_client_machines(
 					network_event(
 						"client machine %x removed from game",
 						server->client_machines[i].machine_index);
+					/* the native builds skip this dump: it lists every machine
+					and player, and when many machines leave at once the
+					dumps keep the host writing its log for minutes */
+#ifndef HALO_LINUX
 					network_game_server_dump(server);
+#endif
 				}
 				else
 				{
@@ -3160,6 +3326,11 @@ static boolean network_game_server_idle_pregame_tasks(
 	{
 		long itr;
 
+#ifdef HALO_LINUX
+		/* send the lobby changes collected since the last settings update */
+		network_game_server_flush_game_data_pregame(server);
+#endif
+
 		for (itr = 0; itr < MAXIMUM_NETWORK_MACHINE_COUNT; itr++)
 		{
 			struct network_game_server_client_machine *client_machine =
@@ -3265,6 +3436,26 @@ static boolean network_game_server_idle_pregame_tasks(
 	}
 	else if (server->time_of_first_client_loading_completion)
 	{
+#ifdef HALO_LINUX
+		/* machines that have loaded wait for the others in silence, and a
+		client drops a connection it hears nothing on for 15 seconds, less than
+		the wait for the others: keep their connections alive (a client in game
+		ignores a pregame keep-alive) */
+		if ((unsigned long)now - server->time_of_last_keep_alive >
+			5UL * MILLISECONDS_PER_SECOND)
+		{
+			struct message_server_pregame_keep_alive message_packet = { 0 };
+			struct network_message *message;
+
+			message = create_network_game_message(
+				_message_server_pregame_keep_alive,
+				&message_packet,
+				sizeof(message_packet));
+			network_game_server_send_message_to_all_machines(server, message);
+
+			server->time_of_last_keep_alive = now;
+		}
+#endif
 		if (system_milliseconds() - server->time_of_first_client_loading_completion >=
 			NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING)
 		{
@@ -3320,6 +3511,9 @@ boolean network_game_server_reset_to_pregame(
 	server->time_of_first_client_loading_completion = 0;
 	server->sent_start_game_message = FALSE;
 	server->queued_player_valid = FALSE;
+#ifdef HALO_LINUX
+	server->waiting_player_count = 0;
+#endif
 	/* Preserve January's 32-bit wrap without overflowing signed arithmetic.
 	 * VC7 converts the unsigned result back to the same signed bit pattern.
 	 */
@@ -3368,6 +3562,10 @@ boolean network_game_server_reset_to_pregame(
 			network_game_reset_for_next_round(&server->game, FALSE);
 			if (network_game_server_setup_game_from_playlist(server))
 			{
+#ifdef HALO_LINUX
+				/* the settings record goes out in pieces */
+				if (network_game_server_send_game_settings_to_all_machines(server, &server->game, sizeof(server->game)))
+#else
 				struct network_game game_settings;
 
 				csmemcpy(&game_settings, &server->game, sizeof(server->game));
@@ -3376,6 +3574,7 @@ boolean network_game_server_reset_to_pregame(
 					&game_settings,
 					sizeof(game_settings));
 				if (message && network_game_server_send_message_to_all_machines(server, message))
+#endif
 				{
 					server->state = _network_game_server_state_pregame;
 					success = TRUE;

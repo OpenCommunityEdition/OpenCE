@@ -191,8 +191,15 @@ struct local_network_player
 
 struct network_game
 {
+#ifdef HALO_LINUX
+	/* the players follow the machines, which follow the native builds'
+	session limits (port/linux/include/halo_port_limits.h) */
+	byte __unknown0[HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET];
+	struct network_player players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+#else
 	byte __unknown0[0x226];
 	struct network_player players[16];
+#endif
 	byte __unknown426[2];
 	long random_seed;
 	long number_of_games_played;
@@ -200,10 +207,17 @@ struct network_game
 
 typedef char network_machine_index_offset_assert[
 	offsetof(struct network_machine, machine_index) == 0x40 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+typedef char network_game_random_seed_offset_assert[
+	offsetof(struct network_game, random_seed) == HALO_PORT_NETWORK_GAME_RANDOM_SEED_OFFSET ? 1 : -1];
+#else
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
 typedef char network_game_random_seed_offset_assert[
 	offsetof(struct network_game, random_seed) == 0x428 ? 1 : -1];
+#endif
 
 struct network_game_globals
 {
@@ -658,7 +672,11 @@ void network_game_client_local_player_quit(
 		{
 			player_index = 0;
 			player_machine_index = &game->players[0].machine_index;
+#ifdef HALO_LINUX
+			while (player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+#else
 			while (player_index < 16)
+#endif
 			{
 				test_player = (struct network_player *)(
 					player_machine_index - offsetof(struct network_player, machine_index));

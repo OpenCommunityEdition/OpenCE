@@ -122,7 +122,12 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' larger pool of object looping sounds (halo_port_capacity.h) */
+	MAXIMUM_GAME_LOOPING_SOUNDS = HALO_PORT_MAXIMUM_GAME_LOOPING_SOUNDS,
+#else
 	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
+#endif
 	_cluster_sound_distance_unreachable_bit = 7,
 	CLUSTER_SOUND_DISTANCE_VALUE_MASK = 0x7F,
 	_game_looping_sound_unattached_bit = 0,

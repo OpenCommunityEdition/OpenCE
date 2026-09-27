@@ -66,7 +66,13 @@ symbols in this file:
 enum
 {
 	MAXIMUM_OBJECT_LISTS_PER_MAP = 48,
+#ifdef HALO_LINUX
+	/* the native builds' larger pool of listed objects (halo_port_capacity.h):
+	a (players) list alone takes one per living player */
+	MAXIMUM_LISTED_OBJECTS_PER_MAP = HALO_PORT_MAXIMUM_LISTED_OBJECTS_PER_MAP,
+#else
 	MAXIMUM_LISTED_OBJECTS_PER_MAP = 128,
+#endif
 };
 
 /* ---------- macros */

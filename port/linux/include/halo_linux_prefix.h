@@ -72,6 +72,16 @@ always runs and the handler is compiled out. */
 #define __finally
 #define __leave
 
+/* ---------- multiplayer session limits of the native builds */
+
+#include "halo_port_limits.h"
+
+/* the Xbox Winsock headers' fd_set in game units (platform units see glibc's,
+which is larger) */
+#ifndef HALO_LINUX_PLATFORM_LAYER
+#define FD_SETSIZE HALO_PORT_FD_SETSIZE
+#endif
+
 /* ---------- Winsock
 
 Game code sees the XDK's Winsock under private names (see the header). The

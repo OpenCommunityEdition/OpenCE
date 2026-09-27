@@ -989,7 +989,13 @@ void objects_initialize(
 	}
 	else
 	{
+#ifdef HALO_LINUX
+		/* five times the native builds' object limit would not fit a data
+		array's short count */
+		object_header_data = data_new("object", SHORT_MAX, sizeof(struct object_header_datum));
+#else
 		object_header_data = data_new("object", MAXIMUM_OBJECTS_PER_MAP*5, sizeof(struct object_header_datum));
+#endif
 		object_memory_pool = memory_pool_new("objects", OBJECT_MEMORY_POOL_SIZE*5);
 	}
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 216, object_header_data && object_memory_pool);

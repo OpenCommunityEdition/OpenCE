@@ -120,8 +120,14 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
+	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+#else
 	MAXIMUM_NUMBER_OF_PLAYERS = 16,
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
+#endif
 
 	MAXIMUM_SERVER_UPDATES = 32,
 	MAXIMUM_CLIENT_UPDATES = 128,
@@ -200,20 +206,39 @@ struct update_client_globals
 
 typedef char player_action_collection_size_assert[
 	sizeof(struct player_action_collection) == 0x80 ? 1 : -1];
+#ifdef HALO_LINUX
+/* the update arrays follow the session limit (the networking units' copies
+of struct server_update must have the same size) */
+typedef char server_update_size_assert[
+	sizeof(struct server_update) == 4 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
+typedef char update_size_assert[
+	sizeof(struct update) == 4 + sizeof(struct server_update) ? 1 : -1];
+#else
 typedef char server_update_size_assert[
 	sizeof(struct server_update) == 0x204 ? 1 : -1];
 typedef char update_size_assert[
 	sizeof(struct update) == 0x208 ? 1 : -1];
+#endif
 typedef char update_server_queue_datum_size_assert[
 	sizeof(struct update_server_queue_datum) == 0x28 ? 1 : -1];
 typedef char update_client_queue_datum_size_assert[
 	sizeof(struct update_client_queue_datum) == 0x28 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char update_server_globals_size_assert[
+	sizeof(struct update_server_globals) == 0xC + MAXIMUM_SERVER_UPDATES * sizeof(struct update) ? 1 : -1];
+#else
 typedef char update_server_globals_size_assert[
 	sizeof(struct update_server_globals) == 0x410C ? 1 : -1];
+#endif
 typedef char update_server_globals_queues_offset_assert[
 	offsetof(struct update_server_globals, queues) == 0x8 ? 1 : -1];
+#ifdef HALO_LINUX
+typedef char update_client_globals_size_assert[
+	sizeof(struct update_client_globals) == 0x94 + MAXIMUM_CLIENT_UPDATES * sizeof(struct update) ? 1 : -1];
+#else
 typedef char update_client_globals_size_assert[
 	sizeof(struct update_client_globals) == 0x10494 ? 1 : -1];
+#endif
 typedef char update_client_globals_saved_actions_offset_assert[
 	offsetof(struct update_client_globals, saved_action_collection) == 0xC ? 1 : -1];
 typedef char update_client_globals_current_local_player_offset_assert[

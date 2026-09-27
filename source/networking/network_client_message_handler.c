@@ -206,12 +206,23 @@ symbols in this file:
 
 enum
 {
+#ifdef HALO_LINUX
+	/* the native builds' protocol and session limits
+	(port/linux/include/halo_port_limits.h) */
+	NETWORK_GAME_MESSAGE_VERSION = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION,
+	TRANSPORT_NONCE_LENGTH = 8,
+	TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH = 0x80,
+	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	NETWORK_GAME_NAME_LENGTH = 16,
+	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
+#else
 	NETWORK_GAME_MESSAGE_VERSION = 1,
 	TRANSPORT_NONCE_LENGTH = 8,
 	TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH = 0x80,
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
 	NETWORK_GAME_NAME_LENGTH = 16,
 	MAXIMUM_NUMBER_OF_PLAYERS = 16,
+#endif
 	JOIN_GAME_TOKEN_LENGTH = 16,
 };
 
@@ -273,7 +284,12 @@ struct network_game
 	struct game_variant variant;
 	byte unknown10C;
 	char minimum_player_count;
+#ifdef HALO_LINUX
+	/* 128 does not fit a signed char */
+	byte maximum_player_count;
+#else
 	char maximum_player_count;
+#endif
 	byte team_count;
 	short difficulty;
 	short machine_count;
@@ -285,6 +301,24 @@ struct network_game
 	long number_of_games_played;
 	struct network_game_local_data local_data;
 };
+
+#ifdef HALO_LINUX
+typedef char network_game_players_offset_assert[
+	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
+typedef char network_game_size_assert[
+	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
+
+/* one piece of the game settings record, which no longer fits one message
+(network_server_message_handler.c sends them in order) */
+struct message_server_game_settings_update
+{
+	word total_size;
+	word offset;
+	word length;
+	word pad;
+	byte data[HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE];
+};
+#endif
 
 struct message_server_game_advertise
 {
@@ -884,6 +918,61 @@ static boolean network_game_client_handle_message_server_machine_rejected(
 	return result;
 }
 
+#ifdef HALO_LINUX
+/* the game settings record as its pieces arrive; it is applied once the last
+piece is in */
+static struct network_game network_game_client_settings_staging;
+static long network_game_client_settings_staging_size = 0;
+
+static boolean network_game_client_receive_game_settings_piece(
+	struct network_game_client *client,
+	struct message_server_game_settings_update const *piece)
+{
+	boolean result = TRUE;
+
+	if (piece->total_size != sizeof(network_game_client_settings_staging) ||
+		piece->length > sizeof(piece->data) ||
+		piece->offset + piece->length > sizeof(network_game_client_settings_staging))
+	{
+		network_event("got a message_server_game_settings_update piece for a different game layout");
+		network_game_client_settings_staging_size = 0;
+		result = FALSE;
+	}
+	else
+	{
+		/* each record is sent in order from its start, over a stream */
+		if (piece->offset == 0)
+		{
+			network_game_client_settings_staging_size = 0;
+		}
+		if (piece->offset != network_game_client_settings_staging_size)
+		{
+			network_event("got a message_server_game_settings_update piece out of order; waiting for the next record");
+			network_game_client_settings_staging_size = 0;
+		}
+		else
+		{
+			csmemcpy(
+				(byte *)&network_game_client_settings_staging + piece->offset,
+				piece->data,
+				piece->length);
+			network_game_client_settings_staging_size += piece->length;
+			if (network_game_client_settings_staging_size == piece->total_size)
+			{
+				network_game_client_settings_staging_size = 0;
+				result = network_game_client_game_settings_updated(client, &network_game_client_settings_staging);
+				if (!result)
+				{
+					network_event("network_game_client_game_settings_updated() failed");
+				}
+			}
+		}
+	}
+
+	return result;
+}
+#endif
+
 static boolean network_game_client_handle_message_server_game_settings_update(
 	struct network_game_client *client,
 	word *message,
@@ -899,6 +988,27 @@ static boolean network_game_client_handle_message_server_game_settings_update(
 	{
 		if (network_game_client_get_state(client, NULL) == _network_game_client_state_pregame)
 		{
+#ifdef HALO_LINUX
+			struct message_server_game_settings_update piece;
+			short packet_type = _message_server_game_settings_update;
+			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
+
+			message_size -= sizeof(word);
+			if (decode_network_game_message(
+				&piece,
+				message + 1,
+				&message_size,
+				&packet_type,
+				&packet_version,
+				_network_game_packet_class_pregame))
+			{
+				result = network_game_client_receive_game_settings_piece(client, &piece);
+			}
+			else
+			{
+				network_event("failed to decode a message_server_game_settings_update packet");
+			}
+#else
 			struct network_game game_settings;
 			short packet_type = _message_server_game_settings_update;
 			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
@@ -922,6 +1032,7 @@ static boolean network_game_client_handle_message_server_game_settings_update(
 			{
 				network_event("failed to decode a message_server_game_settings_update packet");
 			}
+#endif
 		}
 		else
 		{

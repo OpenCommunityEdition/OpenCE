@@ -439,10 +439,24 @@ static void motion_sensor_update(
 								object_position.z -
 								camera_positions[scan_player_index].z;
 
+#ifdef HALO_LINUX
+							/* test the range before taking a blip slot in multiplayer
+							too: with the native builds' larger sessions, units out of
+							range would otherwise fill the slots (update_motion_sensor
+							only drops them later) and crowd nearby ones out. Like that
+							test, the multiplayer range ignores height. */
+							if (game_engine_running())
+								displacement.k = 0.0f;
+
+							if (magnitude_squared3d(&displacement) <=
+								hud_globals->defaults.motion_sensor_range *
+									hud_globals->defaults.motion_sensor_range)
+#else
 							if (game_engine_running() ||
 								magnitude_squared3d(&displacement) <=
 									hud_globals->defaults.motion_sensor_range *
 										hud_globals->defaults.motion_sensor_range)
+#endif
 							{
 								struct motion_sensor_player *player =
 									&motion_sensor_globals->players[scan_player_index];
