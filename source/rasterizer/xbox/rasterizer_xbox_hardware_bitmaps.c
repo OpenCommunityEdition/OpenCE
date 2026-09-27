@@ -172,100 +172,103 @@ boolean rasterizer_bitmap_new(
 		rasterizer_xbox_bitmap_get_max_mipmap_count(bitmap);
 	if (global_d3d_device)
 	{
-	switch (bitmap->type)
-	{
-	case _bitmap_type_2d:
-		result = IDirect3DDevice8_CreateTexture(
-			global_d3d_device,
-			bitmap->width,
-			bitmap->height,
-			(short)bitmap->mipmap_count + 1,
-			0,
-			rasterizer_bitmap_format_table.formats[bitmap->format],
-			D3DPOOL_MANAGED,
-			&(IDirect3DTexture8 *)bitmap->hardware_format);
-		if (result >= 0)
+		switch (bitmap->type)
 		{
-			success = TRUE;
-		}
-		else
-		{
-			success = FALSE;
-			rasterizer_error(
-				result,
-				"IDirect3DDevice8_CreateTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DTexture8*)bitmap->hardware_format)");
-		}
-		break;
+		case _bitmap_type_2d:
+			result = IDirect3DDevice8_CreateTexture(
+				global_d3d_device,
+				bitmap->width,
+				bitmap->height,
+				(short)bitmap->mipmap_count + 1,
+				0,
+				rasterizer_bitmap_format_table.formats[bitmap->format],
+				D3DPOOL_MANAGED,
+				&(IDirect3DTexture8 *)bitmap->hardware_format);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DDevice8_CreateTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DTexture8*)bitmap->hardware_format)");
+			}
+			break;
 
-	case _bitmap_type_3d:
-		result = IDirect3DDevice8_CreateVolumeTexture(
-			global_d3d_device,
-			bitmap->width,
-			bitmap->height,
-			(short)bitmap->depth,
-			(short)bitmap->mipmap_count + 1,
-			0,
-			rasterizer_bitmap_format_table.formats[bitmap->format],
-			D3DPOOL_MANAGED,
-			&(IDirect3DVolumeTexture8 *)bitmap->hardware_format);
-		if (result >= 0)
-		{
-			success = TRUE;
-		}
-		else
-		{
-			success = FALSE;
-			rasterizer_error(
-				result,
-				"IDirect3DDevice8_CreateVolumeTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->depth, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DVolumeTexture8*)bitmap->hardware_format)");
-		}
-		break;
+		case _bitmap_type_3d:
+			result = IDirect3DDevice8_CreateVolumeTexture(
+				global_d3d_device,
+				bitmap->width,
+				bitmap->height,
+				(short)bitmap->depth,
+				(short)bitmap->mipmap_count + 1,
+				0,
+				rasterizer_bitmap_format_table.formats[bitmap->format],
+				D3DPOOL_MANAGED,
+				&(IDirect3DVolumeTexture8 *)bitmap->hardware_format);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DDevice8_CreateVolumeTexture(global_d3d_device, bitmap->width, bitmap->height, bitmap->depth, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DVolumeTexture8*)bitmap->hardware_format)");
+			}
+			break;
 
-	case _bitmap_type_cube_map:
-		result = IDirect3DDevice8_CreateCubeTexture(
-			global_d3d_device,
-			bitmap->width,
-			(short)bitmap->mipmap_count + 1,
-			0,
-			rasterizer_bitmap_format_table.formats[bitmap->format],
-			D3DPOOL_MANAGED,
-			&(IDirect3DCubeTexture8 *)bitmap->hardware_format);
-		if (result >= 0)
-		{
-			success = TRUE;
-		}
-		else
-		{
-			success = FALSE;
-			rasterizer_error(
-				result,
-				"IDirect3DDevice8_CreateCubeTexture(global_d3d_device, bitmap->width, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DCubeTexture8*)bitmap->hardware_format)");
-		}
-		break;
+		case _bitmap_type_cube_map:
+			result = IDirect3DDevice8_CreateCubeTexture(
+				global_d3d_device,
+				bitmap->width,
+				(short)bitmap->mipmap_count + 1,
+				0,
+				rasterizer_bitmap_format_table.formats[bitmap->format],
+				D3DPOOL_MANAGED,
+				&(IDirect3DCubeTexture8 *)bitmap->hardware_format);
+			if (result >= 0)
+			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
+				rasterizer_error(
+					result,
+					"IDirect3DDevice8_CreateCubeTexture(global_d3d_device, bitmap->width, bitmap->mipmap_count+1, 0, rasterizer_bitmap_format_table[bitmap->format], D3DPOOL_MANAGED, &(IDirect3DCubeTexture8*)bitmap->hardware_format)");
+			}
+			break;
 
-	default:
-		match_vassert(
-			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
-			91,
-			FALSE,
-			"### ERROR unsupported bitmap type");
-		break;
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_hardware_bitmaps.c",
+				91,
+				FALSE,
+				"### ERROR unsupported bitmap type");
+			break;
+		}
+
+		if (!bitmap->hardware_format)
+			success = FALSE;
+		if (!success)
+			bitmap->hardware_format = NULL;
 	}
-
-	if (!bitmap->hardware_format)
-		success = FALSE;
-	if (!success)
+	else
 	{
 		bitmap->hardware_format = NULL;
+	}
+
+	if (!success)
+	{
 		error(
 			_error_silent,
 			"### ERROR failed to create bitmap hardware format");
 	}
 	return success;
-	}
-
-	bitmap->hardware_format = NULL;
-	return TRUE;
 }
 
 /* ---------- private code */

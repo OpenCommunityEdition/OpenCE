@@ -1073,6 +1073,8 @@ void biped_get_autoaim_pill(
 			*base = pelvis_matrix->position;
 			vector_from_points3d(&pelvis_matrix->position, &head_matrix->position, height);
 		}
+
+		*width = definition->biped.autoaim_width;
 	}
 	else
 	{
@@ -1082,9 +1084,8 @@ void biped_get_autoaim_pill(
 		biped_get_physics_pill(biped_index, base, &pill_height, &pill_width);
 		base->z += pill_height*0.5f;
 		scale_vector3d(global_up3d, pill_height*0.5f, height);
+		*width = definition->biped.autoaim_width;
 	}
-
-	*width = definition->biped.autoaim_width;
 
 	return;
 }
