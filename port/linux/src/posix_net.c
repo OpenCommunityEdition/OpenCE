@@ -130,7 +130,20 @@ int posix_socket_bind(int socket, const void *address, int address_length)
 
 int posix_socket_connect(int socket, const void *address, int address_length)
 {
-	return succeed(connect(socket, address, (socklen_t)address_length));
+	/* A non-blocking connect that is under way is EINPROGRESS here but
+	WSAEWOULDBLOCK in Winsock, which is what the game waits on before it
+	selects for the socket becoming writeable (connect_endpoint,
+	transport_endpoint_winsock.c); as WSAEINPROGRESS it gave up at once,
+	and every system link join failed, a split screen game's join of its
+	own host included. */
+	int result = connect(socket, address, (socklen_t)address_length);
+
+	if (result < 0 && errno == EINPROGRESS)
+	{
+		last_error = WSAEWOULDBLOCK;
+		return -1;
+	}
+	return succeed(result);
 }
 
 int posix_socket_listen(int socket, int backlog)
@@ -319,13 +332,41 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 		error ? &error_set : NULL, infinite ? NULL : &timeout);
 	if (result < 0)
 		return fail();
+	if (write)
+	{
+		/* Winsock reports a socket writeable once its connect has succeeded;
+		one whose connect failed is not (it is in the error set), where
+		POSIX reports it writeable with the failure in SO_ERROR. The game
+		takes writeable as connected (connect_endpoint). */
+		int index;
+
+		for (index = 0; index < *write_count; index++)
+		{
+			int descriptor = write[index];
+			int pending = 0;
+			socklen_t length = sizeof(pending);
+
+			if (descriptor >= 0 && descriptor < FD_SETSIZE && FD_ISSET(descriptor, &write_set) &&
+				getsockopt(descriptor, SOL_SOCKET, SO_ERROR, &pending, &length) == 0 && pending)
+			{
+				FD_CLR(descriptor, &write_set);
+				result--;
+				errno = pending;
+				fail();
+			}
+		}
+	}
 	if (read)
 		keep_ready(&read_set, read, read_count);
 	if (write)
 		keep_ready(&write_set, write, write_count);
 	if (error)
 		keep_ready(&error_set, error, error_count);
-	last_error = 0;
+	/* like Winsock, a select with nothing ready leaves the last error as it
+	was: after a connect under way, still WSAEWOULDBLOCK, which the game
+	reads as not connected yet */
+	if (result > 0)
+		last_error = 0;
 	return result;
 }
 
