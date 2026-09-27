@@ -43,6 +43,33 @@ Local, unpublished receipts are in `scratch/astra_publish_20260927/`, including
 the independent `main_review/` control/candidate objects and comparisons.
 Private reference/compiler assets are not publication artifacts.
 
+## Q11: independently verified HS data, not code
+
+The approved PA+PC and PB tool changes are separate no-credit commits,
+reconciled from `c32e53c2` and `dccd2e95`. Only the HS entry from `e3c053cd`
+is appended here; all preceding canonical entries and the shell generated-name
+binding remain unchanged. There is no actions entry or scorer upgrade.
+
+Fresh independent review verified 910 full data sections, 2,207 relocations,
+and 20 surplus literals against unique January and current providers in 17
+units, with the 833-object target census sealed. Member coverage, section
+symbol identity, COMDAT selection, complete payloads and resolved targets
+are checked; missing-member, missing-surplus and wrong-provider controls fail.
+The live report is rebound to a fresh run of SHA256-pinned objdiff 3.3.1
+(`090987aa22c0fe9b7d252b2b44c2c0c92c5dd3e9b5965d353060802226a13677`).
+PB alone leaves the complete report unchanged. The HS-only entry supplies
+53,122 raw data bytes plus 1,658 modeled alignment-padding bytes: **54,780
+additional data credit**, no code/function/object credit. HS remains incomplete.
+
+Production full gates after each stage preserve all 8,252 function verdicts,
+72 valid parks and the admission results. Final tool suite: 1,318 passed,
+5 skipped, 100 subtests. Halo data becomes 2,645,479 / 3,923,451. The separately
+reviewed verifier cases exercised all 205 tests, including an isolated-run
+scorer-path skip subsequently closed against the actual pinned binary.
+Receipts: `scratch/astra_publish_20260927/q11_review/` and `q11.*` logs.
+This review is specific to the approved HS entry, not blanket permission for
+future extent-model entries or surplus definitions.
+
 ## Scope boundary
 
 B3 and INC-3 are not imported by this packet. B3's two new incompatible-pointer
