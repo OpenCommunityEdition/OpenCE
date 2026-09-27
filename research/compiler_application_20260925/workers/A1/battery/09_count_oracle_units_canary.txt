@@ -1,0 +1,11 @@
+== units canary, root head
+K= 12  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 13  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 14  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+== units canary, root finalA
+K=  8  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K=  9  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 10  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 13  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 14  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations
+K= 15  == exact 188  residual 1  unwritten 0  (of 189)  _unit_preprocess_node_orientations

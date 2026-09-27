@@ -222,12 +222,6 @@ struct rasterizer_decals_debug_options
 	boolean filthy_decal_fog_hack_enabled;
 };
 
-struct rasterizer_decals_window_parameters
-{
-	byte reserved0000[0x1f8];
-	real atmospheric_fog_maximum_density;
-};
-
 struct pixel_shader_definition
 {
 	unsigned long alpha_inputs[8];
@@ -328,7 +322,7 @@ static boolean locked_decal_reported = FALSE;
 static boolean permanent_decal_reported = FALSE;
 static boolean local_filthy_decal_fog_hack_enabled = FALSE;
 extern struct rasterizer_decals_debug_options rasterizer_debug_options;
-extern struct rasterizer_decals_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 long last_decal_index_queried_by_lruv_cache = NONE;
@@ -625,7 +619,7 @@ void _rasterizer_decals_begin(
 	else
 	{
 		if (rasterizer_debug_options.filthy_decal_fog_hack_enabled &&
-			global_window_parameters.atmospheric_fog_maximum_density == 1.0f)
+			global_window_parameters.fog.atmospheric_maximum_density == 1.0f)
 			local_filthy_decal_fog_hack_enabled = TRUE;
 		if (local_filthy_decal_fog_hack_enabled)
 		{

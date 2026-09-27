@@ -1,0 +1,4 @@
+CARD PAO-4 (A3)  written 2026-09-26 01:05:03 -0700  -- BEFORE its first compile
+base: pao3. D: /Od RTC descriptor 0x4ca678 of path_add_step names its 8-byte vector local 'desired_direction'
+  ([ebp-0x14]); ours is 'direction'. correction: rename the local (4 uses in path_add_step).
+prediction: byte-inert (0 changed).

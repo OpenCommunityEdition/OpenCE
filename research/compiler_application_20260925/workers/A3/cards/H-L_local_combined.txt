@@ -1,0 +1,4 @@
+CARD H-L (A3)  written 2026-09-26 01:07:00 -0700  -- BEFORE its first compile
+H-1 + H-2 + H-3 + H-4b + H-4c combined (each independently evidenced and individually byte-inert).
+prediction: 66/66; keyed_diff vs build/base 0 changed/0 added/0 removed; /W3 multiset unchanged (C4013 x2, C4028
+  x64, C4133 x55, C4090 x1 remain: those belong to cards H-5/H-6); fake_match_scan 0 leads.

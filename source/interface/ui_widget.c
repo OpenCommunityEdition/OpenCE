@@ -4483,7 +4483,7 @@ void display_scenario_help(
 			match_vassert(
 				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 				2438,
-				text_box,
+				text_box && text_box->type == _ui_widget_type_text_box,
 				"expected text box widget in player help screen");
 			text_box->parameters.text_box.string_list_index = string_index;
 		}
@@ -4718,10 +4718,13 @@ static __inline real widget_instance_get_cumulative_alpha_modifier(
 	struct widget_instance *widget)
 {
 	real alpha_modifier = widget->alpha_modifier;
-	struct widget_instance *parent;
 
-	for (parent = widget->parent; parent; parent = parent->parent)
-		alpha_modifier *= parent->alpha_modifier;
+	widget = widget->parent;
+	while (widget)
+	{
+		alpha_modifier *= widget->alpha_modifier;
+		widget = widget->parent;
+	}
 
 	return alpha_modifier;
 }
@@ -5251,8 +5254,9 @@ static void widget_instance_render_recursive(
 		real alpha = alpha_modifier;
 		rectangle2d bounds = definition->bounds;
 		rectangle2d *clip = clip_rect;
-		rectangle2d clipped;
-		struct rasterizer_dynamic_screen_geometry_parameters parameters;
+		rectangle2d local_clip;
+		pixel32 color;
+		struct rasterizer_dynamic_screen_geometry_parameters multitexture_params;
 		struct bitmap_group *bitmap_group =
 			bitmap_group_get(definition->background_bitmap.index);
 		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
@@ -5271,14 +5275,14 @@ static void widget_instance_render_recursive(
 		bounds.x1 += offset.x;
 		bounds.y0 += offset.y;
 		bounds.y1 += offset.y;
-		if (clip_rect)
+		if (clip)
 		{
-			clipped = *clip_rect;
-			clipped.x0 += offset.x;
-			clipped.y0 += offset.y;
-			clipped.x1 += offset.x;
-			clipped.y1 += offset.y;
-			clip = &clipped;
+			local_clip = *clip;
+			clip = &local_clip;
+			clip->x0 += offset.x;
+			clip->x1 += offset.x;
+			clip->y0 += offset.y;
+			clip->y1 += offset.y;
 		}
 		if (TEST_FLAG(definition->flags, _widget_flash_background_bitmap_bit))
 		{
@@ -5287,14 +5291,14 @@ static void widget_instance_render_recursive(
 					SECONDS_PER_MILLISECOND * 3.0f) + 1.0f) * 0.5f) *
 				alpha_modifier;
 		}
-		alpha *= 255.0f;
+		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
 		draw_bitmap_in_rect(
 			bitmap,
 			&bounds,
 			&bounds,
 			clip,
-			(fast_ftol(alpha) << 24) | 0x00FFFFFF,
-			&parameters,
+			color,
+			&multitexture_params,
 			FALSE);
 		if (use_nifty_plasma_fx)
 		{

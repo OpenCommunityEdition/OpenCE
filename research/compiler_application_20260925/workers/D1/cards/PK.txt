@@ -1,0 +1,11 @@
+CARD PK  (clock-read at writing: 2026-09-26 01:21:50 -0700)
+Proposed coherent packet = P1 + P2 (root_p2): weapons.h owner prototype, weapons.c long return, object_types.c
+facade removed + uncast binding + BUG disclosure, object_types.h datum_place typed as HCEX void (*)(long, void *).
+Outcome already known before this card (P1, P2 object_types lab): P1 19-TU sweep = only _weapon_place changes;
+P2 object_types.obj identical to base and the C4028 of P1 disappears (VC7 accepts struct* callees in a void* slot and
+never diagnoses a long-vs-void return, verified in lab/fnptr.c).
+Predictions for the full sweep (156 transitive consumers of object_types.h, a superset of the 19 weapons.h ones):
+  (a) root_base control == build/base for every unit (objcmp, .debug$ ignored);
+  (b) base -> PK: exactly one changed section in the whole set (weapons _weapon_place, EXACT); every other object
+      identical including symbol tables; gate rows unchanged elsewhere;
+  (c) /W3: identical warning multisets in all 156 (object_types 12 -> 12).

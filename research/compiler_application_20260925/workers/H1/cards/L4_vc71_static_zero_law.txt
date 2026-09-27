@@ -1,0 +1,18 @@
+CARD L4 - does VC7.1 (Sapien) move STATIC zero-initialised objects into the hashed bucket? - 2026-09-26 02:26:48 -0700
+Worker H1. Data only for Sapien; lab compiles (if any) use production VC7 only.
+
+H-c: VC7.1 canonicalises a zero initialiser on an INTERNAL-linkage object (static) to "uninitialised" (hashed
+bucket), but must keep an EXTERNAL '= 0' definition as an initialised definition (declaration-order bucket),
+because without it the object would become COMMON.
+Test: census of every January object with >= 2 .bss owners uniquely located in Sapien (names NOT required to be
+authentic - only January order vs Sapien order is compared), classified by OUR Matching source's form:
+  EZ external '= 0/NULL/{0}'; SZ static '= 0/NULL/{0}/FALSE'; SU static uninitialised; mixed.
+PREDICTIONS:
+S1 EZ-only TUs keep January's order in Sapien in (nearly) all cases (declaration order both builds).
+S2 SZ-only TUs with n >= 3 are REORDERED in Sapien in most cases (hashed in VC7.1), n = 2 in about half.
+S3 motion_sensor (static '= NULL' + static '= 0.f') is the exception to watch: if SZ with integer/pointer zero
+   reorders but '= 0.f' does not, H-c needs a float carve-out; record, do not fit silently.
+If S1 and S2 hold, render_debug's seven (all STATIC, cachebeta publics) are hashed in Sapien whatever their
+initialisers, so Sapien's entries-before-strings is the hash order of the (shared) names, which excludes
+"strings and entries both uninitialised in January" (their January order is the reverse). If S2 fails
+(SZ keeps order), H-c is refuted and the Sapien swap stays uninformative.

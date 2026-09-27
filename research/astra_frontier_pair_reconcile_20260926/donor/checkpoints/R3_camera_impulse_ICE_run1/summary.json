@@ -1,0 +1,70 @@
+{
+ "label": "R3_camera_impulse",
+ "head": "262dcfa6b0119d6de829c0a4f2d46173de14bea6",
+ "exit_codes": {
+  "clean": 0,
+  "build": 2,
+  "objdiff": 0,
+  "stable": 0,
+  "stable_diff": 1,
+  "parks": 1,
+  "admission": 1,
+  "fake": 0,
+  "pytest": 0,
+  "diffcheck": 0,
+  "diffcheck_cached": 0
+ },
+ "failures": [
+  "build/semantic_report.json missing",
+  "parks output unreadable: [Errno 2] No such file or directory: 'C:\\\\halo-worktrees\\\\claude-remaining-frontier-20260926\\\\scratch\\\\rf\\\\checkpoints\\\\R3_camera_impulse\\\\parks.json'",
+  "admission output unreadable: [Errno 2] No such file or directory: 'C:\\\\halo-worktrees\\\\claude-remaining-frontier-20260926\\\\scratch\\\\rf\\\\checkpoints\\\\R3_camera_impulse\\\\admission.json'",
+  "build exited 2",
+  "parks exited 1",
+  "admission exited 1"
+ ],
+ "progress": {
+  "parks_validated": null,
+  "data_exceptions": []
+ },
+ "warnings_total": 199,
+ "objdiff_version": "objdiff-cli.exe 3.3.1",
+ "objdiff_sha256": "090987aa22c0fe9b7d252b2b44c2c0c92c5dd3e9b5965d353060802226a13677",
+ "strict_section_owners": [
+  0,
+  0
+ ],
+ "stable_diff_tail": [
+  "REGRESSION source/units/vehicles::section:8 _vehicle_build_update -> GONE",
+  "REGRESSION source/units/vehicles::section:9 _vehicle_parse_update -> GONE",
+  "gained 0 0 bytes; regressions 7636"
+ ],
+ "stable_diff": {
+  "gained": 0,
+  "gained_bytes": 0,
+  "regressions": 7636
+ },
+ "new_warnings": [],
+ "removed_warnings": [],
+ "fake_leads": 26,
+ "pytest_tail": "990 passed, 176 skipped, 26 subtests passed in 13.99s",
+ "pytest": {
+  "passed": 990,
+  "failed": 0,
+  "skipped": 176,
+  "errors": 0,
+  "subtests": 26
+ },
+ "log_sha256": {
+  "admission.log": "c2bba2ef5667cab27f95cecb83518eddbc262860b81799b83648293a7779c566",
+  "build.log": "854ea1f4bcad06281f520a6b798d7f9b5bb15d2866c27a80ff2eebf9c45a6f1a",
+  "clean.log": "1394588538f48a7022ae1aee2ade4317240b62e2f21618e5a793a67bc101c2a7",
+  "diffcheck.log": "d42ffc7ae19fb33e66fd263aa73e7aaccc28549d71d388b8de9b1d6d003e576f",
+  "diffcheck_cached.log": "c2a20eb664068604e4a1a7557049c370e3694ae9f6a2e1f4536596691b2e9948",
+  "fake.log": "f4f20bd99c897e12e1ddc287102ea3fd81282eafaa54728632802bf3c20b2540",
+  "objdiff.log": "58bdf05b885aa7b9b5c8a7637cc6e2dd569258ae742c58fd6970d5370619343f",
+  "parks.log": "f4298d2708f1bb4988b2dae0f1ba4ae90f2ef460af142db920ac6978d4a1c50c",
+  "pytest.log": "ef0015f6cc912bbd1d46572400ee762eb576ab6bc160a8c017db2cadcac8fc16",
+  "stable.log": "b0d33de1f80e4c604ead131fa176165c7756907c0a9aff073bdc79f671db9e61",
+  "stable_diff.log": "0acce5e6030000ec63879255c6acbf037a23c0bd0cbeeb4aa0bbb8711f9e3a89"
+ }
+}

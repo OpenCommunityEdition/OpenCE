@@ -1,0 +1,148 @@
+literal: ??_C@_06GJOIPFFF@damage?$AA@
+unit object: build/base/source/ai/ai_communication.obj (sha256 29e9cf65e6d327f7e6fe475c1218f9486cfe9addec9ecc267ee308a5ea3669ff)
+provider (January selected: build/split/source/ai/actor_looking.obj): build/base/source/ai/actor_looking.obj (sha256 81bc8f79bb9b8c6f80a03a01ca85c41d371ec6fd117bb016e5694f206a2be548)
+provider currently defines it: yes, COMDAT ANY, bytes sha256 9fd51a23b096fee7ad0b20a3d218c3b4f8e6d4a8736c16429554caf17d0f8903
+order: unit_first
+command: xbox\bin\vc7\Link.Exe /NOLOGO /MACHINE:X86 /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:probe_entry /OUT:C:\Users\isabe\AppData\Local\Temp\tmp5hj1vmki\probe.exe build\base\source\ai\ai_communication.obj build\base\source\ai\actor_looking.obj
+exit code: 1120
+LNK2005/LNK1169 lines: 0
+verdict: PASS
+--- complete linker output ---
+LINK : error LNK2001: unresolved external symbol _probe_entry
+ai_communication.obj : error LNK2001: unresolved external symbol __fltused
+actor_looking.obj : error LNK2019: unresolved external symbol __fltused referenced in function _actor_look_find_random_vector
+ai_communication.obj : error LNK2019: unresolved external symbol _conversation_data referenced in function _ai_communication_initialize
+ai_communication.obj : error LNK2019: unresolved external symbol _game_state_data_new referenced in function _ai_communication_initialize
+ai_communication.obj : error LNK2019: unresolved external symbol _global_communication_table_indices referenced in function _ai_communication_initialize
+ai_communication.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _ai_communication_initialize
+actor_looking.obj : error LNK2001: unresolved external symbol _system_exit
+ai_communication.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _ai_communication_initialize
+actor_looking.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _actor_look_decode_direction
+ai_communication.obj : error LNK2019: unresolved external symbol _game_state_malloc referenced in function _ai_communication_initialize
+ai_communication.obj : error LNK2019: unresolved external symbol _data_make_valid referenced in function _ai_communication_initialize_for_new_map
+ai_communication.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _ai_communication_initialize_for_new_map
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_globals referenced in function _ai_communication_initialize_for_new_map
+ai_communication.obj : error LNK2019: unresolved external symbol _data_make_invalid referenced in function _ai_communication_dispose_from_old_map
+ai_communication.obj : error LNK2019: unresolved external symbol _csstrcmp referenced in function _ai_communication_get_type_by_name
+ai_communication.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _reply_filter_close
+actor_looking.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _actor_look_decode_direction
+ai_communication.obj : error LNK2019: unresolved external symbol _prop_data referenced in function _reply_filter_close
+actor_looking.obj : error LNK2019: unresolved external symbol _prop_data referenced in function _actor_look_decode_direction
+ai_communication.obj : error LNK2019: unresolved external symbol _prop_get_base_by_unit_index referenced in function _reply_filter_close
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_data referenced in function _reply_filter_searching
+actor_looking.obj : error LNK2001: unresolved external symbol _actor_data
+ai_communication.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _reply_filter_same_platoon
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_is_fighting referenced in function _reply_filter_fighting
+ai_communication.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _ai_communication_consider_speech
+actor_looking.obj : error LNK2001: unresolved external symbol _game_time_get
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_debug referenced in function _ai_communication_consider_speech
+actor_looking.obj : error LNK2019: unresolved external symbol _ai_debug referenced in function _actor_look_update
+ai_communication.obj : error LNK2019: unresolved external symbol _game_connection referenced in function _ai_communication_consider_speech
+ai_communication.obj : error LNK2019: unresolved external symbol _sprintf referenced in function _ai_communication_consider_speech
+actor_looking.obj : error LNK2001: unresolved external symbol _sprintf
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_get_speech_priority_name referenced in function _ai_communication_consider_speech
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_test_speech referenced in function _ai_communication_consider_speech
+ai_communication.obj : error LNK2019: unresolved external symbol __ftol2 referenced in function _ai_communication_consider_speech
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_type_get_race referenced in function _actor_communication_team
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_get_head_position referenced in function _ai_communication_look_secondary_at_unit
+actor_looking.obj : error LNK2019: unresolved external symbol _unit_get_head_position referenced in function _actor_look_update
+ai_communication.obj : error LNK2019: unresolved external symbol _prop_get_active_by_unit_index referenced in function _ai_communication_look_secondary_at_unit
+ai_communication.obj : error LNK2019: unresolved external symbol _object_try_and_get_and_verify_type referenced in function _ai_communication_look_secondary_at_unit
+actor_looking.obj : error LNK2001: unresolved external symbol _object_try_and_get_and_verify_type
+ai_communication.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _ai_conversation_status
+ai_communication.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _ai_conversation_status
+ai_communication.obj : error LNK2019: unresolved external symbol _real_seed_random_range referenced in function _actor_reset_idle_vocalization_timer
+actor_looking.obj : error LNK2001: unresolved external symbol _real_seed_random_range
+ai_communication.obj : error LNK2019: unresolved external symbol _get_global_random_seed_address referenced in function _actor_reset_idle_vocalization_timer
+actor_looking.obj : error LNK2001: unresolved external symbol _get_global_random_seed_address
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_in_combat referenced in function _actor_reset_idle_vocalization_timer
+ai_communication.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _actor_reset_idle_vocalization_timer
+actor_looking.obj : error LNK2001: unresolved external symbol _tag_get
+ai_communication.obj : error LNK2019: unresolved external symbol _console_printf referenced in function _ai_conversation_advance
+actor_looking.obj : error LNK2001: unresolved external symbol _console_printf
+ai_communication.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _ai_conversation_advance
+ai_communication.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _ai_conversation_advance
+ai_communication.obj : error LNK2019: unresolved external symbol _datum_delete referenced in function _ai_conversation_finish
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_get_aiming_vector referenced in function _ai_communication_get_player_rating
+ai_communication.obj : error LNK2019: unresolved external symbol _collision_test_vector referenced in function _ai_communication_get_player_rating
+actor_looking.obj : error LNK2001: unresolved external symbol _collision_test_vector
+ai_communication.obj : error LNK2019: unresolved external symbol _global_current_collision_users referenced in function _ai_communication_get_player_rating
+actor_looking.obj : error LNK2001: unresolved external symbol _global_current_collision_users
+ai_communication.obj : error LNK2019: unresolved external symbol _global_current_collision_user_depth referenced in function _ai_communication_get_player_rating
+actor_looking.obj : error LNK2001: unresolved external symbol _global_current_collision_user_depth
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_profile referenced in function _ai_communication_get_player_rating
+actor_looking.obj : error LNK2001: unresolved external symbol _ai_profile
+ai_communication.obj : error LNK2019: unresolved external symbol _scenario_test_pvs referenced in function _ai_communication_get_player_rating
+ai_communication.obj : error LNK2019: unresolved external symbol _object_get_ultimate_parent referenced in function _ai_communication_get_player_rating
+ai_communication.obj : error LNK2019: unresolved external symbol _player_data referenced in function _ai_communication_get_player_rating
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_speak referenced in function _actor_communication_update
+ai_communication.obj : error LNK2019: unresolved external symbol _error referenced in function _ai_communication_update_speech_timers
+actor_looking.obj : error LNK2001: unresolved external symbol _error
+ai_communication.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_name referenced in function _ai_communication_update_speech_timers
+ai_communication.obj : error LNK2019: unresolved external symbol _csstrlen referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _csstrcpy referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_index_to_string referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _seed_random_range referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _game_team_is_enemy referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_iterator_next referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_index_actor_iterator_next referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_iterator_new referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_index_actor_iterator_new referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _object_index_from_name_index referenced in function _ai_conversation_find_participant
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_debug_describe_actor referenced in function _ai_communication_started
+actor_looking.obj : error LNK2001: unresolved external symbol _ai_debug_describe_actor
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_describe_speech referenced in function _ai_communication_started
+ai_communication.obj : error LNK2019: unresolved external symbol _csstrcat referenced in function _ai_communication_started
+ai_communication.obj : error LNK2019: unresolved external symbol _temporary referenced in function _ai_communication_started
+actor_looking.obj : error LNK2001: unresolved external symbol _temporary
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_type_get_name referenced in function _ai_communication_started
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_handle_communication referenced in function _ai_communication_notify
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_audibility_at_point referenced in function _ai_communication_notify
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_perception_find_sense_position referenced in function _ai_communication_notify
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_handle_allegiance_broken_notification referenced in function _ai_communication_notify
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_action_change referenced in function _ai_conversation_begin
+ai_communication.obj : error LNK2019: unresolved external symbol _action_converse_setup referenced in function _ai_conversation_begin
+ai_communication.obj : error LNK2019: unresolved external symbol _object_set_object_index_for_name_index referenced in function _ai_conversation_begin
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_can_see_point referenced in function _ai_conversation_begin
+ai_communication.obj : error LNK2019: unresolved external symbol _datum_new_at_index referenced in function _ai_conversation_new
+ai_communication.obj : error LNK2019: unresolved external symbol _datum_new referenced in function _ai_conversation_new
+ai_communication.obj : error LNK2019: unresolved external symbol _scripted_sound_time referenced in function _ai_conversation_line_perform
+ai_communication.obj : error LNK2019: unresolved external symbol _scripted_sound_new referenced in function _ai_conversation_line_perform
+ai_communication.obj : error LNK2019: unresolved external symbol _tag_get_name referenced in function _ai_conversation_line_perform
+ai_communication.obj : error LNK2019: unresolved external symbol _sound_scripted_dialog_is_playing referenced in function _ai_conversation_line_perform
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_visibility_at_point referenced in function _ai_communication_actor_talk_weight
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_get_perception_knowledge referenced in function _ai_communication_actor_talk_weight
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_test_animation_impulse referenced in function _ai_communication_actor_talk_weight
+ai_communication.obj : error LNK2019: unresolved external symbol _csprintf referenced in function _ai_communication_find_actor_to_reply_to_player
+actor_looking.obj : error LNK2001: unresolved external symbol _csprintf
+ai_communication.obj : error LNK2019: unresolved external symbol _real_seed_random referenced in function _ai_communication_find_actor_to_reply_to_player
+ai_communication.obj : error LNK2019: unresolved external symbol _strupr referenced in function _ai_communication_finished
+ai_communication.obj : error LNK2019: unresolved external symbol _unit_start_animation_impulse referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _actor_action_class referenced in function _ai_communication_event
+actor_looking.obj : error LNK2001: unresolved external symbol _actor_action_class
+ai_communication.obj : error LNK2019: unresolved external symbol _game_allegiance_get_incidents referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _game_allegiance_incident referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _global_game_team_names referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _game_team_is_ally referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _encounter_data referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol _ai_get_race_from_team_index referenced in function _ai_communication_event
+ai_communication.obj : error LNK2019: unresolved external symbol __chkstk referenced in function _ai_communication_event
+actor_looking.obj : error LNK2019: unresolved external symbol _datum_try_and_get referenced in function _actor_look_secondary
+actor_looking.obj : error LNK2019: unresolved external symbol _ai_debug_idle_look_addprop referenced in function _actor_look_idle_find_prop
+actor_looking.obj : error LNK2019: unresolved external symbol _prop_iterator_next referenced in function _actor_look_idle_find_prop
+actor_looking.obj : error LNK2019: unresolved external symbol _prop_iterator_new referenced in function _actor_look_idle_find_prop
+actor_looking.obj : error LNK2019: unresolved external symbol _ai_debug_idle_look_clear referenced in function _actor_look_idle_find_prop
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_get_weapon_definition referenced in function _actor_look_idle_timer
+actor_looking.obj : error LNK2019: unresolved external symbol _global_up3d referenced in function _actor_look_find_random_vector
+actor_looking.obj : error LNK2019: unresolved external symbol _rotate_vector_about_axis referenced in function _actor_look_find_random_vector
+actor_looking.obj : error LNK2019: unresolved external symbol _global_left3d referenced in function _actor_look_find_random_vector
+actor_looking.obj : error LNK2019: unresolved external symbol _object_get_origin referenced in function _actor_look_decode_direction
+actor_looking.obj : error LNK2019: unresolved external symbol _global_forward3d referenced in function _actor_look_idle_new_major_direction
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_unit_control_exact_facing referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_stimulus_abandon_stationary_facing referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _unit_is_busy referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_move_force_stop referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_combat_currently_firing_burst referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_get_weapon referenced in function _actor_look_update
+actor_looking.obj : error LNK2019: unresolved external symbol _actor_path_has_path referenced in function _actor_look_affect_movement
+C:\Users\isabe\AppData\Local\Temp\tmp5hj1vmki\probe.exe : fatal error LNK1120: 113 unresolved externals

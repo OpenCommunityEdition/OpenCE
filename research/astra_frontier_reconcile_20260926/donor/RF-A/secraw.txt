@@ -1,0 +1,21 @@
+=== build/base vs floor
+sections 151 151   symbols 415 415
+section 2 .debug$S [] size 161/148 ['header', 'bytes']
+symbol tables identical (name, section, value, storage): True
+differing sections: 1
+=== build/base vs P02
+sections 151 151   symbols 415 415
+section 2 .debug$S [] size 161/148 ['header', 'bytes']
+section 77 .text ['_actor_move_try_evasion_direction'] size 416/416 ['relocs']
+section 98 .text ['_actor_path_refresh'] size 1440/1440 ['bytes', 'relocs']
+section 129 .text ['_actor_move_calculate_movement'] size 2752/2752 ['relocs']
+symbol tables identical (name, section, value, storage): False
+differing sections: 4
+=== build/base vs P03
+sections 151 151   symbols 415 415
+section 2 .debug$S [] size 161/148 ['header', 'bytes']
+section 77 .text ['_actor_move_try_evasion_direction'] size 416/416 ['relocs']
+section 98 .text ['_actor_path_refresh'] size 1440/1440 ['bytes', 'relocs']
+section 129 .text ['_actor_move_calculate_movement'] size 2752/2752 ['relocs']
+symbol tables identical (name, section, value, storage): False
+differing sections: 4

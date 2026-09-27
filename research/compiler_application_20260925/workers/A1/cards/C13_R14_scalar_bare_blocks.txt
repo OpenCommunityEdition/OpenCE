@@ -1,0 +1,12 @@
+CARD C13 - R14: two scalar-only bare blocks (review4 advisory: not /Od-audited) hoisted into their function scope (on top of finalA+R13)
+written: 2026-09-26 01:38:23 -0700 (BEFORE the compiles)
+
+B1 post_rasterize_post_game: `{ long entry_index; for (...) {...} }` right after the select_players_to_display call.
+B2 update_player_no_shield: `if (has_shield) return; { struct player_datum *player; player = player_get(...); ... }`.
+Both blocks declare only scalars (no address escapes), so the escape-scope law gives them no frame role; /Od cannot
+attest or refute a scope. Correction: declare the scalar with the function's other locals and drop the braces.
+Prediction: scalar live ranges are computed from use, not scope -> byte-identical.
+PREDICTION: B1 180/180, B2 180/180 (p 0.8 each). Stance: adopt if 180/180 (a scope with no role is decoration);
+if a hoist changes bytes, the block is load-bearing and stays (disclosed as an unattested load-bearing scope).
+(The declaration-with-initialiser blocks in update_teleporter and the address-taken postspawn block are C89
+declare-near-use idiom / escape-scope blocks and are left as they are.)

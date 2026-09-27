@@ -1,0 +1,7 @@
+source\items\weapons.obj: _weapon_place DEF .text storage=2
+source\objects\object_types.obj: _object_type_place DEF .text storage=2
+source\objects\object_types.obj: _weapon_place UNDEF storage=2
+   reloc .text(sec31)+0x164 type 0x14 -> _object_type_place
+   reloc .data(sec49)+0x348 type 0x6 -> _weapon_place
+source\objects\objects.obj: _object_type_place UNDEF storage=2
+   reloc .text(sec113)+0xc8 type 0x14 -> _object_type_place

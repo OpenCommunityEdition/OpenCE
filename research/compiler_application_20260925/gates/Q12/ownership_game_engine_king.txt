@@ -1,0 +1,95 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618
+=== python -B scratch/tools/pdb_storage.py source/game/game_engine_king
+source/game/game_engine_king: 39 split symbols, 23 disagreements with PDB publics
+   _king_engine_display_score                         split 2 ours 2 PDB-public False
+   _king_engine_dispose                               split 2 ours 2 PDB-public False
+   _king_engine_dispose_from_old_map                  split 2 ours 2 PDB-public False
+   _king_engine_game_ending                           split 2 ours 2 PDB-public False
+   _king_engine_game_starting                         split 2 ours 2 PDB-public False
+   _king_engine_goal_matches_player                   split 2 ours 2 PDB-public False
+   _king_engine_handle_client_message                 split 2 ours 2 PDB-public False
+   _king_engine_handle_server_message                 split 2 ours 2 PDB-public False
+   _king_engine_initialize_for_new_map                split 2 ours 2 PDB-public False
+   _king_engine_player_added                          split 2 ours 2 PDB-public False
+   _king_engine_player_damaged_player                 split 2 ours 2 PDB-public False
+   _king_engine_player_killed_player                  split 2 ours 2 PDB-public False
+   _king_engine_player_update                         split 2 ours 2 PDB-public False
+   _king_engine_post_rasterize                        split 2 ours 2 PDB-public False
+   _king_engine_pregame_post_rasterize                split 2 ours 2 PDB-public False
+   _king_engine_prespawn_player_update                split 2 ours 2 PDB-public False
+   _king_engine_statistics_append                     split 2 ours 2 PDB-public False
+   _king_engine_update                                split 2 ours 2 PDB-public False
+   _king_get_score                                    split 2 ours 2 PDB-public False
+   _king_get_score_header_string                      split 2 ours 2 PDB-public False
+   _king_get_score_string                             split 2 ours 2 PDB-public False
+   _king_get_team_score_string                        split 2 ours 2 PDB-public False
+   _king_globals                                      split 2 ours 2 PDB-public False
+exit code 0
+
+=== python -B scratch/tools/object_audit.py source/game/game_engine_king
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_0BE@EEOONBNI@FAILED?5TO?5FIND?5HILL?$AA@   size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CD@DHKICDEA@king_globals?4hill_point_coun size    35/35    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CH@IHPMMFJJ@c?3?2halo?2SOURCE?2game?2game size    39/39    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DI@GPEOKAOO@failed?5to?5find?5hill?5?$CD? size    56/56    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0L@HEFOOJCG@crown_blue?$AA@                size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@DGPCNCJC@NULL?5?$CB?$DN?5flag?$AA@      size    13/13    flags eq align 3/3
+  ok   .text    sym:_find_hill                                       size   848/848   flags eq align 5/5
+  ok   .text    sym:_find_next_hill                                  size   112/112   flags eq align 5/5
+  ok   .text    sym:_king_calculate_hill_state                       size   448/448   flags eq align 5/5
+  ok   .data    sym:_king_engine                                     size   136/136   flags eq align 4/4
+  ok   .text    sym:_king_engine_display_score                       size   400/400   flags eq align 5/5
+  ok   .text    sym:_king_engine_dispose                             size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_dispose_from_old_map                size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_game_ending                         size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_game_starting                       size    32/32    flags eq align 5/5
+  ok   .text    sym:_king_engine_goal_matches_player                 size    32/32    flags eq align 5/5
+  ok   .text    sym:_king_engine_handle_client_message               size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_handle_server_message               size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_initialize_for_new_map              size   272/272   flags eq align 5/5
+  ok   .text    sym:_king_engine_player_added                        size    32/32    flags eq align 5/5
+  ok   .text    sym:_king_engine_player_damaged_player               size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_player_killed_player                size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_player_update                       size   352/352   flags eq align 5/5
+  ok   .text    sym:_king_engine_post_rasterize                      size   928/928   flags eq align 5/5
+  ok   .text    sym:_king_engine_pregame_post_rasterize              size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_prespawn_player_update              size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_statistics_append                   size    16/16    flags eq align 5/5
+  ok   .text    sym:_king_engine_update                              size   272/272   flags eq align 5/5
+  ok   .text    sym:_king_get_score                                  size    64/64    flags eq align 5/5
+  ok   .text    sym:_king_get_score_header_string                    size    96/96    flags eq align 5/5
+  ok   .text    sym:_king_get_score_string                           size    64/64    flags eq align 5/5
+  ok   .text    sym:_king_get_team_score_string                      size    48/48    flags eq align 5/5
+  ok   .bss     sym:_king_globals                                    size   560/560   flags eq align 4/4
+  ok   .text    sym:_player_inside_hill                              size   144/144   flags eq align 5/5
+  ok   .text    sym:_point3d_to_point2d                              size    32/32    flags eq align 5/5
+  ok   .text    sym:_render_dynamic_quad                             size   688/688   flags eq align 5/5
+  ok   .text    sym:_render_dynamic_quad_initialize                  size   144/144   flags eq align 5/5
+== symbols (January)
+  39 January symbols, 0 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_04PJOEONHN@king?$AA@                       size 5
+  +.rdata   sym:??_C@_0BJ@IAIEOKNM@ui?2multiplayer_game_text?$AA size 25
+  +.rdata   sym:??_C@_0P@NHABDOCD@?$CB?$CCunreachable?$CC?$AA@   size 15
+  +.rdata   sym:??_C@_11LOCGONAA@?$AA?$AA@                       size 2
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3dcccccd                                  size 4
+  +.rdata   sym:__real@3e800000                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f4ccccd                                  size 4
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@3ff0000000000000                          size 8
+  +.text    sym:_cross_product3d                                 size 64
+  +.text    sym:_distance3d                                      size 64
+  +.text    sym:_distance_squared3d                              size 64
+  +.text    sym:_magnitude3d                                     size 48
+  +.text    sym:_magnitude_squared3d                             size 48
+  +.text    sym:_normalize3d                                     size 96
+  +.text    sym:_random_range                                    size 32
+  +.text    sym:_scale_vector3d                                  size 48
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: PASS
+exit code 0

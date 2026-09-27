@@ -1,0 +1,26 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618  2026-09-26 11:30:37 -0700
+=== python -B scratch/tools/provider_link.py source/game/game_engine_king   (all surplus external definitions vs January's split object; both orders; tool sha256 bc854a32244cd42830696d0d4b35f8e46278ac4791a8e24f52b2bb6ae6fb188d)
+??_C@_04PJOEONHN@king?$AA@                   provider source/game/game_engine                          PASS
+??_C@_0BJ@IAIEOKNM@ui?2multiplayer_game_text?$AA@ provider source/game/game_engine                          PASS
+??_C@_0P@NHABDOCD@?$CB?$CCunreachable?$CC?$AA@ provider source/ai/actor_moving                           PASS
+??_C@_11LOCGONAA@?$AA?$AA@                   provider source/game/game_engine                          PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@3dcccccd                              provider source/ai/actor_combat                           PASS
+__real@3e800000                              provider source/ai/action_alert                           PASS
+__real@3f000000                              provider source/ai/action_alert                           PASS
+__real@3f1a36e2e0000000                      provider source/ai/action_charge                          PASS
+__real@3f4ccccd                              provider source/ai/action_charge                          PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+__real@3ff0000000000000                      provider source/ai/actors                                 PASS
+_cross_product3d                             provider source/ai/action_obey                            PASS
+_distance3d                                  provider source/ai/action_vehicle                         PASS
+_distance_squared3d                          provider source/ai/action_alert                           PASS
+_magnitude3d                                 provider source/ai/action_charge                          PASS
+_magnitude_squared3d                         provider source/ai/action_alert                           PASS
+_normalize3d                                 provider source/ai/action_charge                          PASS
+_random_range                                provider source/ai/action_obey                            PASS
+_scale_vector3d                              provider source/ai/action_charge                          PASS
+_square_root                                 provider source/ai/action_charge                          PASS
+_vector_from_points3d                        provider source/ai/action_alert                           PASS
+SELECTED-PROVIDER LINK: PASS
+exit code 0

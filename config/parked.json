@@ -301,36 +301,6 @@
       }
     },
     {
-      "unit": "source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps",
-      "function": "_rasterizer_bitmap_new",
-      "class": "instruction-scheduling",
-      "evidence": "Target and candidate have equal 0x190 padded size and all 26 relocation identities/addresses. They are instruction-identical through +0x159 and differ in exactly one normalized byte: VC7 directs the final failure JNE to a second byte-identical bitmap->hardware_format = NULL / return TRUE epilogue, while January directs it to the first epilogue. More than 50 ordinary-C control-flow shapes covering shared and split returns, branch polarity, goto topology, success materialization, and local lifetimes either preserve this one-byte duplicate-epilogue branch-threading choice or regress earlier exact code. The retained source is the plain semantic form; no asm, volatile/register forcing, pragmas, barriers, undefined behavior, byte patch, or comparator exception is used.",
-      "measurements": {
-        "target": {
-          "size": 400,
-          "relocation_count": 26,
-          "normalized_sha256": "041cef84e2a13eeae0fccfaef6e8e897a5c5926bf850bc6c10bc245f3df8a82d"
-        },
-        "base": {
-          "size": 400,
-          "relocation_count": 26,
-          "normalized_sha256": "719469460357f06cde7f452e16e02ba79ac639e85e0fad244f8e01cb7bd5efcd"
-        },
-        "objdiff_percent": 99.96377
-      }
-    },
-    {
-      "unit": "source/math/periodic_functions",
-      "function": "@periodic_function_build_variable_period_x_table@4",
-      "class": "instruction-scheduling",
-      "evidence": "2026-09-24 rebaseline: the retained zero-credit fuzzy body now follows the later /Od first-party builder's indexed loops, short index, x_table parameter, real_random() helper calls and one accumulation expression, with January's attested waveform constants. The prior hand-expanded helper and invented amplitude/cosine/destination locals are removed. The exact sibling periodic_function_build_table uses real_random() in its noise arm as the later /Od build does; its bytes remain unchanged and the emitted _real_random COMDAT is byte-identical to January's selected copy and passes both provider link orders. January and the rebuilt builder are both 256 padded bytes with 18 relocations. One independent VC7 scheduling choice remains: January issues inc edx before fld [ebp-4] at +0x6f, while ours issues the load first. The function is not exact and earns zero code credit. About 150 natural source-shape probes and compiler controls in research/fifty_objects_20260925/w/periodic_functions/LEDGER.md did not close the tie; no volatile, barrier, pragma, dead dependency, inline assembly, or hand-expanded helper is retained. Reopen for authenticated January source or a decoded VC7 DAG scheduler rule for this ready-node choice.",
-      "measurements": {
-        "target": { "size": 256, "relocation_count": 18, "normalized_sha256": "802ef4da9736bcaf8a616c56d03ba3e9322b229ad4b3814c60909462d7ebacf3" },
-        "base": { "size": 256, "relocation_count": 18, "normalized_sha256": "c5280305149a6466d123f479355c2a15167f284c1c358403a9d5b4f20e48a54d" },
-        "objdiff_percent": 96.623375
-      }
-    },
-    {
       "unit": "libs/libcmt/stream",
       "function": "__getstream",
       "class": "unclassified",
@@ -798,25 +768,6 @@
       }
     },
     {
-      "unit": "source/effects/player_effects",
-      "function": "_player_effect_update_camera_impulse",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed camera-impulse path from January's ABI, control flow, constants, fields, calls, and relocation topology, with the preserved Opus donor at 608c66380 and independent HCEA code at 570c83fd corroborating the source-level behavior. Target and candidate both occupy 752 padded bytes, contain 267 instructions, and carry the same 24 ordered relocation identities; objdiff reports 96.454544 percent similarity. The retained source performs the temporary impulse acceptance test, flattens and validates the hit/facing vectors, installs the scaled definition, generates and rotates jitter under the global random seed, and applies the permanent facing impulse. The remaining differences are confined to commutative x87 operand-load/evaluation order inside naturally inlined cross-product and dot-product helpers; changing shared helper definitions would risk the authenticated January inline schedule in unrelated objects, while spelling per-call manual arithmetic would violate the source-quality rule. No raw offset, false type or prototype, representation pun, volatile/register forcing, barrier, pragma, assembly, fake dependency, forced inline, undefined behavior, or nonsensical branch is retained. Reopen only for authoritative January source/local records or a natural same-compiler helper definition/context that explains the operand schedule without collateral regressions.",
-      "measurements": {
-        "target": {
-          "size": 752,
-          "relocation_count": 24,
-          "normalized_sha256": "c3d56bbfe28c780c2c47aad44ac2078c456d952cb5e1427d630e3b05d4ec0ba4"
-        },
-        "base": {
-          "size": 752,
-          "relocation_count": 24,
-          "normalized_sha256": "71ee3ca41d2b6a3073ce8e9ed25236dbb24aa4e6e8e086e08889e608ffe9d9fa"
-        },
-        "objdiff_percent": 96.454544
-      }
-    },
-    {
       "unit": "source/objects/damage",
       "function": "_area_of_effect_cause_damage_to_object",
       "class": "unclassified",
@@ -976,17 +927,6 @@
     },
     {
       "unit": "source/units/bipeds",
-      "function": "_biped_get_autoaim_pill",
-      "class": "instruction-scheduling",
-      "evidence": "Best complete typed autoaim-pill reconstruction retained at 336 padded bytes and all nine relocation identities on both sides. It uses biped definition accessors, named flags, project real types and genuine vector helpers; the remaining spherical-branch difference is a pointer/value register schedule, with 98.08264% objdiff. No raw casts, fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the register schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
-      "measurements": {
-        "target": { "size": 336, "relocation_count": 9, "normalized_sha256": "c232d22b9b72f5355e3496cafe1fbfb7985a69515dfa2d0df1f2f9052a116600" },
-        "base": { "size": 336, "relocation_count": 9, "normalized_sha256": "6b5e592092e374eea419480375447ba0dc54ddf8f01b5c37f07a5a18b9eb99f2" },
-        "objdiff_percent": 98.08264
-      }
-    },
-    {
-      "unit": "source/units/bipeds",
       "function": "_biped_accelerate",
       "class": "instruction-scheduling",
       "evidence": "Best complete typed acceleration reconstruction retained at 480 padded bytes and all 18 relocations on both sides. It uses biped accessors, named object/biped flags, project real types, and existing vector helpers; the remaining normalized-code delta is compiler scheduling. No raw offsets, fake anchors, register steering, or source-implausible logic is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
@@ -1099,11 +1039,11 @@
       "unit": "source/rasterizer/xbox/rasterizer_xbox_models",
       "function": "__rasterizer_model_draw",
       "class": "tu-context-optimization",
-      "evidence": "Best complete typed model draw reconstruction retained from the Opus rasterizer lane after house-rule reconciliation. January and the candidate are both 5,168 padded bytes; January has 350 relocations and the candidate has 348 at 95.32371 percent similarity. The established REAL_MATH_EXTERNAL_POINT_FROM_LINE3D include schedule remains in force and this TU emits no point_from_line3d COMDAT. The shader-plasma access now uses its authentic enclosing definition instead of a raw byte offset, texture-animation outputs use true real_vector4d storage, self-illumination colors are interpolated component by component without incompatible point/vector/color casts, and the atmosphere-dominant test uses the named flag. These defined semantic choices account for part of the measured residual and are retained rather than restoring the closer prohibited representation-cast form. The correctly owned environment-fog backend declaration changes only compiler scheduling in this already-fuzzy owner and adds no exact credit. Semantic model-effect enums and render_lighting fields replace misleading donor placeholders. No forced inline, fake dependency, raw offset, representation pun, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, header packet P6) the real_math.h real_local_random_range named-result correction changed only this unchanged, already-fuzzy body's allocation hash at identical size and relocations (5168/348, sha 112b4321...), the same alternate hash measured under the P7, P8 and P9 real_math.h evaluations (header-inline definition effect). No source change. Re-measured 2026-09-19 after restoring real_rgb_color_to_pixel32 to its authentic bitmaps inline/header ownership: the unchanged zero-credit body returns to the previously documented 5,168/348 hash and 95.32371 percent state, with no inherited exact-function regression.",
+      "evidence": "Best complete typed model draw reconstruction retained from the Opus rasterizer lane after house-rule reconciliation. January and the candidate are both 5,168 padded bytes; January has 350 relocations and the candidate has 348 at 95.32371 percent similarity. The established REAL_MATH_EXTERNAL_POINT_FROM_LINE3D include schedule remains in force and this TU emits no point_from_line3d COMDAT. The shader-plasma access now uses its authentic enclosing definition instead of a raw byte offset, texture-animation outputs use true real_vector4d storage, self-illumination colors are interpolated component by component without incompatible point/vector/color casts, and the atmosphere-dominant test uses the named flag. These defined semantic choices account for part of the measured residual and are retained rather than restoring the closer prohibited representation-cast form. The correctly owned environment-fog backend declaration changes only compiler scheduling in this already-fuzzy owner and adds no exact credit. Semantic model-effect enums and render_lighting fields replace misleading donor placeholders. No forced inline, fake dependency, raw offset, representation pun, undefined behavior, or nonsensical branch is retained. Zero exact credit. See docs/object_matching_logs/rasterizer_xbox_models_obj_opus_reconciliation_20260909.md. On September 14 (lane opus/150k-house-clean-20260914, header packet P6) the real_math.h real_local_random_range named-result correction changed only this unchanged, already-fuzzy body's allocation hash at identical size and relocations (5168/348, sha 112b4321...), the same alternate hash measured under the P7, P8 and P9 real_math.h evaluations (header-inline definition effect). No source change. Re-measured 2026-09-19 after restoring real_rgb_color_to_pixel32 to its authentic bitmaps inline/header ownership: the unchanged zero-credit body returns to the previously documented 5,168/348 hash and 95.32371 percent state, with no inherited exact-function regression. 2026-09-26 (compiler-application lane, worker A2, render_debug owner-prototype packet): adding the genuine render_debug_fog_planes prototype to structures/structures.h, which this TU includes directly, shifts its declaration context by one C1 number; the retained body moves 89b0d7ea -> cbfa8585 at the same 5,168 padded bytes and 348 relocations, objdiff 3.3.1 95.08453 -> 95.07629. Zero exact-row change in the 447-unit shadow sweep; zero exact credit, reopen criterion unchanged.",
       "measurements": {
         "target": { "size": 5168, "relocation_count": 350, "normalized_sha256": "99d8b95f1ce011781cedc3a123887065a0f8af4a54c842194fcd90c22fa2cc4e" },
-        "base": { "size": 5168, "relocation_count": 348, "normalized_sha256": "89b0d7ea77a71d69d21eda1926e973006f54ed531bf346aaa87a18718e225c01" },
-        "objdiff_percent": 95.08453
+        "base": { "size": 5168, "relocation_count": 348, "normalized_sha256": "cbfa85852c836af123fe93a3f15f22f2f43ba574fbff9add3c28f0e0275ed4d4" },
+        "objdiff_percent": 95.07629
       }
     },
     {

@@ -1,0 +1,43 @@
+G1 card C03 - _custom_render_nav_point (interface/hud_nav_points, 1618 meaningful / 1632 padded B, PARKED
+'instruction-scheduling'): removal of DECORATIVE parentheses around the two bitmap_extent products
+Written 2026-09-26 02:00:56 -0700 (clock-read), BEFORE any compile of this card. Never edited.
+Unit taken by G1 from this card on: source/interface/hud_nav_points (W2 wave 1 released it; not in the wave-3
+owned list). Park: config/parked.json '_custom_render_nav_point' (reopen: 'a January-attested construct that ... splits
+the region after the first push' - W2 C12; fifty-objects wave 2 reopen (a)/(b)).
+
+NEW FACT (S01 sweep, diagnostic, 2026-09-26 ~01:59, objects scratch/campaign/workers/G1/strip/hud_nav_points/):
+  s03 = only L956's outer pair removed:  ((clip->x1-clip->x0)*(real)bitmap->width)*0.5f -> (...)*(real)...*0.5f
+        -> _custom_render_nav_point STRICT EXACT (gate section_infos_equal).
+  s04 = only L960's pair removed (the y twin) -> STRICT EXACT as well.
+  s00/s01 (L848/851, integer-rooted groups) and s02 (L871 radius_product^2) inert.
+  None of the prior 40+ recorded shapes (fifty-objects wave 2 ledger, opus5 150k w2/w3, W2 C12) touched these
+  groups; the park's recorded mechanism (W2 C12: 'the first push must sit in the previous region') is exactly what a
+  one-record change before the 81-record region cap (W6 0x1074e31e) produces.
+
+EVIDENCE for the source shape (owner ruling 2026-09-26, S and J separated; D does not discriminate):
+  S: 'bitmap_extent = (clip->x1 - clip->x0) * (real)bitmap->width * 0.5f;' is the natural spelling; the outer
+     group in our source is DECORATIVE (tree-identical: C already groups ((x1-x0)*w)*0.5f). Ruling item 4: no
+     decorative parentheses. The change REMOVES decoration; the parse tree is unchanged.
+  J: January T+0x4d2..0x4e3 and +0x50c..0x51b compute fld x1; fsub x0; fimul width; fmul 0.5 - exactly the tree
+     ((x1 - x0) * width) * 0.5, then * arrow_scale * 0.33/0.66 + point: the tree is J-corroborated. Whether the
+     decoration existed is NOT visible in January's arithmetic; its only visible effect is the region/schedule at
+     +0x58A (ruling item 3: schedule alone does not qualify a grouping change - here the grouping is unchanged).
+  D: /Od 0x62fcf0 is a later revision (5th parameter); its SSE order for the same tree cannot show decoration.
+
+SHAPES:
+  N3 both twins stripped (L956 AND L960) - the only principled form: the two statements are written identically;
+     stripping one is an arbitrary count choice (rule 'do not tune declaration/name/VN counts').
+  N4 every decorative group in the function stripped (L848, L851, L871, L956, L960).
+  (N1 = s03 and N2 = s04 are already measured single strips: diagnostic only, never candidates.)
+
+PREDICTION (mechanism = diagnostic only): each decorative FP group is one hidden 0x267 record in the block that
+holds the +0x58A window; W2 C12 IL order there is push0#1, push0#2, push0#3, mov eax, push eax, mov ecx, push ecx,
+call. Removing ONE record lets the previous region absorb exactly push0#1 (January). Removing TWO lets it absorb
+push0#1 and push0#2 -> 'push 0; push 0; mov eax; mov ecx; push 0' (NOT January).
+  N3: NOT exact, residual moves to a two-push form, p 0.6; EXACT p 0.35.
+  N4: same as N3 (L848/851 are integer groups, no FP temp; L871 lies in an earlier block), p 0.6.
+If N3/N4 are NOT exact while single strips are, the single-strip EXACT is a count coincidence and is NOT a candidate
+(recorded as mechanism evidence and an owner FYI only). If N3 is EXACT, it becomes an owner question (parenthesis-only
+edit, decoration removed, tree unchanged) with the full admission battery.
+DECISIVE TEST: gate --all (31 exact must stay), keyed_diff vs build/base, alndiff; then (if EXACT) /W3, fake scan,
+object_audit, pdb_storage, surplus_identity, provider_link.

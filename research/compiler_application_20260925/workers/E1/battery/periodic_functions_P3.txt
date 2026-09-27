@@ -1,0 +1,148 @@
+######## periodic_functions P3 candidate (periodic_functions.patch) - battery 2026-09-26 01:40:34 -0700 ########
+### gate --all
+EXACT       256  @periodic_function_build_variable_period_x_table@4
+EXACT       688  _periodic_function_build_table
+EXACT       304  _periodic_function_evaluate
+EXACT       112  _periodic_functions_dispose
+EXACT       192  _periodic_functions_initialize
+EXACT       304  _transition_function_build_table
+EXACT       288  _transition_function_evaluate
+== exact 7  residual 0  unwritten 0  (of 7 listed)
+### keyed_diff vs build/base
+sections: before 58, after 58
+CHANGED  @periodic_function_build_variable_period_x_table@4 256 -> 256 bytes  [EXACT vs January]
+summary: 1 changed, 0 added, 0 removed
+### object_audit
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_03OHDNLOHO@one?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04DDFHDMOL@zero?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04KNPHFNKG@late?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05GILPFPMI@spark?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05IODDPPOI@slide?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05MMFAAGKE@early?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06EJKHKJBM@wander?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06IDPAJACI@cosine?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06NJLEAOMD@jitter?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_09PFNFPFNK@very?5late?$AA@                 size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BI@LODCFJBP@slide?5?$CIvariable?5period?$ size    24/24    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BJ@LIPGHGNF@cosine?5?$CIvariable?5period? size    25/25    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BN@IGAJMLPO@?$CBfunction_tables_initializ size    29/29    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CA@POBCGHPD@diagonal?5wave?5?$CIvariable? size    32/32    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CJ@OKNGCK@c?3?2halo?2SOURCE?2math?2period size    41/41    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DP@JEKDFHEF@function_type?$DO?$DN0?5?$CG? size    63/63    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EB@CENGDIOD@function_type?$DO?$DN0?5?$CG? size    65/65    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0L@JFLLBJBL@very?5early?$AA@               size    11/11    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0O@JLGDFEJA@diagonal?5wave?$AA@            size    14/14    flags eq align 3/3
+  ok   .text    sym:@periodic_function_build_variable_period_x_table size   256/256   flags eq align 5/5
+  ok   .rdata   sym:__real@3a802008                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3cce16a7                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3cdfffff                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3d002d4f                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3d377812                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3f65c8fa                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3fd0000000000000                          size     8/8     flags eq align 4/4
+  ok   .rdata   sym:__real@4000000000000000                          size     8/8     flags eq align 4/4
+  ok   .rdata   sym:__real@41c90fdb                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@41cccccd                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@41e00000                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@422fede0                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@447fc000                                  size     4/4     flags eq align 3/3
+  ok   .bss     sym:_function_tables_initialized                     size    76/76    flags eq align 3/3
+  ok   .data    sym:_global_periodic_functions_enum_strings          size    96/96    flags eq align 3/3
+  ok   .text    sym:_periodic_function_build_table                   size   688/688   flags eq align 5/5
+  ok   .text    sym:_periodic_function_evaluate                      size   304/304   flags eq align 5/5
+  ok   .text    sym:_periodic_functions_dispose                      size   112/112   flags eq align 5/5
+  ok   .text    sym:_periodic_functions_initialize                   size   192/192   flags eq align 5/5
+  ok   .text    sym:_transition_function_build_table                 size   304/304   flags eq align 5/5
+  ok   .text    sym:_transition_function_evaluate                    size   288/288   flags eq align 5/5
+== symbols (January)
+  46 January symbols, 0 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_05GPLCCBII@noise?$AA@                      size 6
+  +.rdata   sym:??_C@_06HPJICMPM@linear?$AA@                     size 7
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3b808081                                  size 4
+  +.rdata   sym:__real@3e800000                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f400000                                  size 4
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@3fc90fdb                                  size 4
+  +.rdata   sym:__real@3fe0000000000000                          size 8
+  +.rdata   sym:__real@3ff0000000000000                          size 8
+  +.rdata   sym:__real@4010000000000000                          size 8
+  +.rdata   sym:__real@40490fdb                                  size 4
+  +.rdata   sym:__real@40c90fdb                                  size 4
+  +.rdata   sym:__real@437f0000                                  size 4
+  +.text    sym:_fast_ftol                                       size 32
+  +.text    sym:_real_random                                     size 16
+OBJECT AUDIT: PASS
+exit=0
+### pdb_storage
+source/math/periodic_functions: 46 split symbols, 0 disagreements with PDB publics
+### surplus_identity
+  _fast_ftol                     vs source\ai\actor_combat.obj               IDENTICAL
+  _real_random                   vs source\ai\action_charge.obj              IDENTICAL
+source/math/periodic_functions: 2 candidate-only code COMDATs, 0 not identical
+### provider_link
+??_C@_05GPLCCBII@noise?$AA@                  provider source/ai/ai_debug                               PASS
+??_C@_06HPJICMPM@linear?$AA@                 provider source/bitmaps/bitmap_group                      PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@3b808081                              provider source/bitmaps/s3tc/s3tc                         PASS
+__real@3e800000                              provider source/ai/action_alert                           PASS
+__real@3f000000                              provider source/ai/action_alert                           PASS
+__real@3f400000                              provider source/ai/ai_debug                               PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+__real@3fc90fdb                              provider source/ai/actor_type_infection                   PASS
+__real@3fe0000000000000                      provider source/bitmaps/libtiff/tif_dirwrite              PASS
+__real@3ff0000000000000                      provider source/ai/actors                                 PASS
+__real@4010000000000000                      provider source/interface/hud_nav_points                  PASS
+__real@40490fdb                              provider source/ai/actor_type_infection                   PASS
+__real@40c90fdb                              provider source/ai/actor_moving                           PASS
+__real@437f0000                              provider source/bitmaps/libtiff/tif_getimage              PASS
+_fast_ftol                                   provider source/ai/actor_combat                           PASS
+_real_random                                 provider source/ai/action_charge                          PASS
+SELECTED-PROVIDER LINK: PASS
+exit=0
+### provider_link --baseline (new surplus only)
+no surplus external definitions: PASS (nothing to link)
+### /W3 P3
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+source\cseries\cseries.h(45) : warning C4146: unary minus operator applied to unsigned type, result still unsigned
+source\math\real_math.h(900) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(906) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(912) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(924) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(931) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(937) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(972) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(986) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1135) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1136) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1137) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+### /W3 HEAD
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+### fake_match_scan
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+### protoscan
+== research/compiler_application_20260925/workers/E1/copies/periodic_functions_P3.c
+
+######## P3c (P3 + cosine()) ########
+  +.rdata   sym:__real@437f0000                                  size 4
+  +.text    sym:_cosine                                          size 16
+  +.text    sym:_fast_ftol                                       size 32
+  +.text    sym:_real_random                                     size 16
+OBJECT AUDIT: PASS
+source/math/periodic_functions: 46 split symbols, 0 disagreements with PDB publics
+  _fast_ftol                     vs source\ai\actor_combat.obj               IDENTICAL
+  _cosine                        vs source\ai\actor_combat.obj               IDENTICAL
+  _real_random                   vs source\ai\action_charge.obj              IDENTICAL
+source/math/periodic_functions: 3 candidate-only code COMDATs, 0 not identical
+_cosine                                      provider source/ai/actor_combat                           PASS
+SELECTED-PROVIDER LINK: PASS
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+P3   section_infos_equal=True size 256/256 relocs 18/18 sha J 802ef4da9736bcaf ours 802ef4da9736bcaf
+P3c  section_infos_equal=True size 256/256 relocs 18/18 sha J 802ef4da9736bcaf ours 802ef4da9736bcaf
+HEAD section_infos_equal=False size 256/256 relocs 18/18 sha J 802ef4da9736bcaf ours c5280305149a6466

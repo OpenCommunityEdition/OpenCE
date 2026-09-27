@@ -143,7 +143,13 @@ struct hs_function_definition
 	short parameter_types[1];
 };
 
-struct hs_external_global_definition;
+struct hs_external_global_definition
+{
+	char const *name;
+	short type;
+	short pad;
+	void *address;
+};
 
 /* ---------- prototypes/HS.C */
 
@@ -152,6 +158,8 @@ void hs_initialize(
 void hs_initialize_for_new_map(
 	void);
 void hs_update(
+	void);
+void hs_node_gc(
 	void);
 void hs_dispose(
 	void);

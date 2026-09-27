@@ -1,0 +1,23 @@
+0082f3f5 +0000  mov edx, dword ptr [0xeaa0c0]
+0082f3fb +0006  mov dword ptr [ebp - 0x20], edx
+0082f3fe +0009  mov eax, dword ptr [0xeaa0c0]
+0082f403 +000e  add eax, 1
+0082f406 +0011  mov dword ptr [0xeaa0c0], eax
+0082f40b +0016  movzx ecx, word ptr [ebp - 0x20]
+0082f40f +001a  push ecx
+0082f410 +001b  call 0x82f200
+0082f415 +0020  add esp, 4
+0082f418 +0023  mov dword ptr [ebp - 0x24], eax
+0082f41b +0026  push 0x30
+0082f41d +0028  mov edx, dword ptr [ebp + 8]
+0082f420 +002b  push edx
+0082f421 +002c  mov eax, dword ptr [ebp - 0x24]
+0082f424 +002f  push eax
+0082f425 +0030  call 0x408af3
+0082f42a +0035  add esp, 0xc
+0082f42d +0038  mov ecx, dword ptr [ebp + 8]
+0082f430 +003b  movsx edx, word ptr [ecx + 0x1c]
+0082f434 +003f  cmp edx, -1
+0082f437 +0042  jne 0x82f501
+0082f43d +0048  mov eax, dword ptr [ebp + 8]
+0082f440 +004b  movsx ecx, word ptr [eax + 0x1e]

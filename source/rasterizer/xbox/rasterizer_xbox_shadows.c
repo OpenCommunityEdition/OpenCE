@@ -82,16 +82,12 @@ symbols in this file:
 /* January retains the stock XDK D3DINLINE out-of-line wrappers emitted by
  * the real device calls below. Keep the stock inline definitions and do not
  * replace these wrappers with handwritten bodies. */
+#include "rasterizer/rasterizer.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 
 /* ---------- constants */
-
-enum
-{
-	_rasterizer_profile_environment_shadows = 4,
-};
 
 enum
 {
@@ -144,11 +140,6 @@ struct rasterizer_shadows_debug_options_prefix
 	byte reserved13[0x2B];
 	boolean shadows_convolution;
 	boolean shadows_debug;
-};
-
-struct rasterizer_shadows_window_parameters_prefix
-{
-	word rasterizer_target;
 };
 
 struct pixel_shader_definition
@@ -221,12 +212,6 @@ struct shader_model_definition
 	struct shader_texture_animation animation;
 };
 
-struct rasterizer_shadows_frame_parameters
-{
-	real game_time_sec;
-	real dt;
-};
-
 typedef char verify_rasterizer_shadows_draw_shadows_offset[
 	offsetof(
 		struct rasterizer_shadows_debug_options_prefix,
@@ -263,9 +248,8 @@ static void rasterizer_shadow_convolve(
 
 extern D3DDevice *global_d3d_device;
 extern struct rasterizer_shadows_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_shadows_window_parameters_prefix global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
-extern struct rasterizer_shadows_frame_parameters global_frame_parameters;
 
 static boolean shadow_restored = TRUE;
 

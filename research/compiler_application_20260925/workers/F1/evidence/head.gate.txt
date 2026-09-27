@@ -1,0 +1,14 @@
+EXACT       592  _lens_flare_evaluate_corona_rotation_function
+EXACT       240  _lens_flare_occlusion_test_results_get
+EXACT        64  _lens_flare_parameters_get
+EXACT       656  _rasterizer_lens_flare_submit
+EXACT       400  _rasterizer_lens_flare_submit_for_cluster
+residual   2240  _rasterizer_lens_flares_draw  [sha]
+EXACT       400  _rasterizer_lens_flares_submit_occlusion_tests
+EXACT       336  _rasterizer_light_submit
+EXACT        16  _rasterizer_lights_begin
+EXACT       304  _rasterizer_lights_begin_for_new_frame
+EXACT        16  _rasterizer_lights_end
+residual     48  _rasterizer_lights_reset_for_new_map  [sha]
+EXACT        48  _screenshot_in_progress
+== exact 11  residual 2  unwritten 0  (of 13 listed)

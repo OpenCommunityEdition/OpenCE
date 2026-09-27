@@ -134,13 +134,6 @@ struct rasterizer_debug_options_prefix
 	boolean debug_geometry;
 };
 
-struct rasterizer_debug_window_parameters_prefix
-{
-	byte reserved00[8];
-	real_point3d camera_position;
-	real_vector3d camera_forward;
-};
-
 typedef char rasterizer_debug_data_size_assert[
 	sizeof(struct rasterizer_debug_data) == 0x21 ? 1 : -1];
 typedef char rasterizer_debug_primitive_size_assert[
@@ -173,7 +166,7 @@ void rasterizer_debug_triangle_shaded(
 static struct rasterizer_debug_data debug_data;
 
 extern struct rasterizer_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_debug_window_parameters_prefix global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -578,12 +571,12 @@ void rasterizer_debug_line_shaded(
 				real_vector3d delta0;
 				real_vector3d delta1;
 
-				delta0.i = global_window_parameters.camera_position.x-p0->x;
-				delta0.j = global_window_parameters.camera_position.y-p0->y;
-				delta0.k = global_window_parameters.camera_position.z-p0->z;
-				delta1.i = global_window_parameters.camera_position.x-p1->x;
-				delta1.j = global_window_parameters.camera_position.y-p1->y;
-				delta1.k = global_window_parameters.camera_position.z-p1->z;
+				delta0.i = global_window_parameters.camera.position.x-p0->x;
+				delta0.j = global_window_parameters.camera.position.y-p0->y;
+				delta0.k = global_window_parameters.camera.position.z-p0->z;
+				delta1.i = global_window_parameters.camera.position.x-p1->x;
+				delta1.j = global_window_parameters.camera.position.y-p1->y;
+				delta1.k = global_window_parameters.camera.position.z-p1->z;
 
 				primitive->vertex_count = 2;
 				primitive->vertices[0].point = *p0;
@@ -592,8 +585,8 @@ void rasterizer_debug_line_shaded(
 				primitive->vertices[1].color = real_argb_color_to_pixel32(color1);
 
 				primitive->distance = MIN(
-					dot_product3d(&global_window_parameters.camera_forward, &delta0),
-					dot_product3d(&global_window_parameters.camera_forward, &delta1));
+					dot_product3d(&global_window_parameters.camera.forward, &delta0),
+					dot_product3d(&global_window_parameters.camera.forward, &delta1));
 				primitive->opaque = opaque;
 			}
 		}
@@ -645,15 +638,15 @@ void rasterizer_debug_triangle_shaded(
 				real_vector3d delta1;
 				real_vector3d delta2;
 
-				delta0.i = global_window_parameters.camera_position.x-p0->x;
-				delta0.j = global_window_parameters.camera_position.y-p0->y;
-				delta0.k = global_window_parameters.camera_position.z-p0->z;
-				delta1.i = global_window_parameters.camera_position.x-p1->x;
-				delta1.j = global_window_parameters.camera_position.y-p1->y;
-				delta1.k = global_window_parameters.camera_position.z-p1->z;
-				delta2.i = global_window_parameters.camera_position.x-p2->x;
-				delta2.j = global_window_parameters.camera_position.y-p2->y;
-				delta2.k = global_window_parameters.camera_position.z-p2->z;
+				delta0.i = global_window_parameters.camera.position.x-p0->x;
+				delta0.j = global_window_parameters.camera.position.y-p0->y;
+				delta0.k = global_window_parameters.camera.position.z-p0->z;
+				delta1.i = global_window_parameters.camera.position.x-p1->x;
+				delta1.j = global_window_parameters.camera.position.y-p1->y;
+				delta1.k = global_window_parameters.camera.position.z-p1->z;
+				delta2.i = global_window_parameters.camera.position.x-p2->x;
+				delta2.j = global_window_parameters.camera.position.y-p2->y;
+				delta2.k = global_window_parameters.camera.position.z-p2->z;
 
 				primitive->vertex_count = 3;
 				primitive->vertices[0].point = *p0;
@@ -664,10 +657,10 @@ void rasterizer_debug_triangle_shaded(
 				primitive->vertices[2].color = real_argb_color_to_pixel32(color2);
 
 				primitive->distance = MIN(
-					dot_product3d(&global_window_parameters.camera_forward, &delta0),
+					dot_product3d(&global_window_parameters.camera.forward, &delta0),
 					MIN(
-						dot_product3d(&global_window_parameters.camera_forward, &delta1),
-						dot_product3d(&global_window_parameters.camera_forward, &delta2)));
+						dot_product3d(&global_window_parameters.camera.forward, &delta1),
+						dot_product3d(&global_window_parameters.camera.forward, &delta2)));
 				primitive->opaque = opaque;
 			}
 		}

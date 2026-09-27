@@ -1,0 +1,9 @@
+CARD B7 (RF-U) written 2026-09-26 19:45:41 -0700 (clock-read), BEFORE compiling. Immutable; outcome appended.
+Kind: STRIP TEST for B5 (keep only the error() split, no /Od single exit). Source b/B7.c = HEAD early-return
+  structure; device arm ends 'if (!hw) success = FALSE; if (!success) hw = NULL; if (!success) error(...); return
+  success;' then 'hw = NULL; return TRUE;'.
+Prediction: == HEAD bytes (the second test is threaded into the same blocks as HEAD; ND keeps its own return TRUE
+  block laid out last and still falls into EXIT as the matching tail). Confidence ~60%.
+
+OUTCOME B7 (appended 2026-09-26 19:46:07 -0700): residual 400, sha 719469460357 == HEAD. Prediction CORRECT: splitting error() into its own
+  'if (!success)' without the single exit is inert.

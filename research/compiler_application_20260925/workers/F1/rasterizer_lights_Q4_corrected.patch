@@ -1,0 +1,46 @@
+diff --git a/source/rasterizer/rasterizer_lights.c b/source/rasterizer/rasterizer_lights.c
+--- a/source/rasterizer/rasterizer_lights.c
++++ b/source/rasterizer/rasterizer_lights.c
+@@ -366,6 +366,9 @@
+ 	offsetof(
+ 		struct rasterizer_frame_statistics_globals,
+ 		lens_flare_count) == 0x14C ? 1 : -1];
++typedef char verify_lens_flare_reset_overrun_record_sizes[
++	sizeof(struct lens_flare_occlusion_test_results) == 0x22 &&
++	sizeof(struct rasterizer_lens_flare_submit_parameters) == 0x28 ? 1 : -1];
+ 
+ /* ---------- prototypes */
+ 
+@@ -534,10 +537,31 @@
+ void rasterizer_lights_reset_for_new_map(
+ 	void)
+ {
++	/* BUG (preserved for exact matching): January clears MAXIMUM_LIGHTS_PER_MAP+1 records here
++	 * (push 0x7722 = 897*0x22), one more than local_lens_flare_occlusion_test_results holds (0x7700 bytes),
++	 * so it also zeroes the 0x22 bytes that follow the array in this file's .bss. In January's image and in
++	 * our object those are the first bytes of local_lens_flare_parameters[0], definition through
++	 * lens_flare_index (+0x00..+0x21); compressed_window_index, compressed_light_scale and
++	 * internal__occlusion_pixels are not touched.
++	 * verify_lens_flare_reset_overrun_record_sizes only checks the record sizes; C cannot check which
++	 * object follows the array. tools/test_rasterizer_lights_reset_overrun_layout.py checks that on the
++	 * built object and on January's split (neighbour at exactly +0x7700, at least 0x22 bytes long, nothing
++	 * else in the span); if it fails, this length must not stay.
++	 * Lifecycle, from January's code: local_lens_flare_count is zeroed below with no read in between;
++	 * every read of a parameters record uses an index below local_lens_flare_count; and the count only
++	 * grows in rasterizer_lens_flare_submit, which copies the whole 0x28-byte record before anything reads
++	 * it. So the zeroed bytes are not read before they are overwritten, provided that: all users run on
++	 * one thread; nothing called from the lens flare loops re-enters this file (this function is also the
++	 * hs command rasterizer_lights_reset_for_new_map, so it runs whenever scripts or the console do, not
++	 * only at map load); no non-local exit leaves the count raised without the copy; and code outside this
++	 * file reaches the records only through the pointers these loops pass down during the call. The code
++	 * does not prove those conditions.
++	 * A corrected build should clear sizeof(local_lens_flare_occlusion_test_results).
++	 */
+ 	memset(
+ 		local_lens_flare_occlusion_test_results,
+ 		0,
+-		sizeof(local_lens_flare_occlusion_test_results));
++		(MAXIMUM_LIGHTS_PER_MAP+1)*sizeof(struct lens_flare_occlusion_test_results));
+ 	memset(local_lens_flare_occlusion_test_results2, 0, sizeof(local_lens_flare_occlusion_test_results2));
+ 	local_lens_flare_count = 0;
+ 

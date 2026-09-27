@@ -1,0 +1,9 @@
+CARD K1-22  (pre-registered 2026-09-26 10:30:50 -0700)  - owner ruling 2026-09-26: K1-E APPROVED; packet P1
+Base: worktree HEAD source/ai/ai_communication.c (unchanged since a8854940), HEAD commit recorded in PACKETS.md.
+Change: actor arm (no encounter) enemy_status[5] = target_type >= _actor_target_visible_enemy &&
+  target_really_alive (positive test; was !target_really_alive).
+Evidence (J): January 0x534 cmp word [esi+0x268],0xa; jl 0x5ee; test dl,dl; jmp 0x5e8 / 0x5e8 mov byte [ebp-0x17],1;
+  jne 0x5f2 / 0x5ee mov byte [ebp-0x17],0 with dl = byte [actor+0x27c] (target_really_alive); the actor arm tail-merges
+  into the encounter arm's test/mov 1/jne tail, only possible with equal polarity.
+Prediction: event [size 8112!=8064, sha] (from 8128; r3 lane measured 8128 -> 8112 for this change on top of 02);
+  normalised hunks 97 -> ~94; every other row identical; talk_weight byte-identical; no new symbols.

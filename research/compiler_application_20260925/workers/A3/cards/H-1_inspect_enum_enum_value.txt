@@ -1,0 +1,14 @@
+CARD H-1 (A3)  written 2026-09-26 01:02:37 -0700  -- BEFORE its first compile
+unit: source/hs/hs_runtime   base: HEAD 455dffad
+observed: hs_inspect_enum asserts 'value.short_integer>=0 && value.short_integer<enum_definition->count' but passes
+  the literal text "enum_value>=0 && enum_value<enum_definition->count" through match_vassert (reported text !=
+  evaluated expression; house rule 'authenticate diagnostic text' / fake stringification).
+evidence: J: January string ??_C@_0DD@LFJLKEGO@enum_value... at assert 0x27c; January code loads the dword param
+  into edi and tests/compares di (a 16-bit enum value held in a register). X: HCEX lists only the params (short
+  type, long value, char *buffer); enregistered scalar locals are not listed, so a short enum_value local is not
+  contradicted.
+correction: 'short enum_value= value.short_integer;' after enum_definition; match_assert(..., 0x27c,
+  enum_value>=0 && enum_value<enum_definition->count); sprintf uses enum_definition->values[enum_value].
+prediction: byte-identical function (edi = enum_value); same string literal (stringified text identical);
+  66/66; keyed_diff vs build/base 0 changed.
+risk: one more declared name -> C1-number/declaration-count tie flips elsewhere in the TU.

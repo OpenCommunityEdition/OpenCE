@@ -1,0 +1,17 @@
+CARD C11 - vGenS2 at HEAD: scenario_netgame_equipment + scenario_starting_equipment (+ their HCEX flag enums) into the genuine owner scenario/scenario_definitions.h; scenario_netgame_flag stays TU-local (king/oddball/race define their own copies) - on top of vGenI
+written: 2026-09-26 01:34:53 -0700 (BEFORE the compiles)
+
+Evidence: scenario_definitions.h owns struct scenario (tag blocks netgame_equipment / scenario_starting_equipment),
+enum netgame_flag_type and the scenario WEAPON placement flags {_weapon_created_at_rest_bit, _obsolete, _does_accelerate,
+NUMBER_OF_SCENARIO_WEAPON_FLAGS}; HCEX has the sibling unnamed enum {_equipment_created_at_rest_bit, _equipment_obsolete_bit,
+_equipment_does_accelerate_bit, NUMBER_OF_SCENARIO_EQUIPMENT_FLAGS} and {_netgame_starting_equipment_flag_no_grenades_bit,
+_netgame_starting_equipment_flag_plasma_greandes_bit}; no other TU defines the two equipment structs.
+Correction: move both structs verbatim, the starting-equipment flag enum, and the complete HCEX scenario-equipment flag enum
+(mirroring the existing weapon-flag enum) into scenario_definitions.h; game_engine.c drops its TU copies (its mid-file
+`enum { _equipment_created_at_rest_bit = 0 };` included).
+Prediction: game_engine.c count: the moved names now come earlier (inside an include) - still before every function; the
+equipment enum grows by 3 names (obsolete, does_accelerate, NUMBER) -> game_engine +3 before populate -> c3-style band
+margin says safe (+54 up). Other scenario_definitions.h consumers get ~+25 C1 numbers; at cdc8ebd3 the (larger) vGenS
+regressed ai_communication _ai_communication_update_speech_timers and moved the parked _ai_test_ballistic_line_of_fire.
+PREDICTION: game_engine 180/180; full sweep: likely >=1 consumer changes (ai_communication talk/speech ties are known
+count-sensitive) -> stance fixed in advance: any exact loss or parked-body move => NOT adopted (TU-local stays).

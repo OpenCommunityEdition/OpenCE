@@ -1,0 +1,25 @@
+Card V1-C01 - extent-model verifier review lab: predictions (written 2026-09-26 10:40:19 -0700, BEFORE any lab run)
+Base: lane HEAD bb57160f (tools/semantic_progress.py blob 9a7a5129 = f0e52c8b); build snapshot
+scratch/campaign/workers/V1/repo/build (report.json sha256 afc46aff...), taken 2026-09-26 10:34:26 -0700.
+Candidate: fc53d5f6 (DV2). V1 = fc53d5f6 minus the global-default knob plus hardening (coverage on every grouped
+path, surplus declaration, per-section symbol tables, owner identity, COMDAT selection, image-address resolution,
+report/target binding, strict entry keys, one entry per unit).
+
+P1  STOCK verifier + production + an hs SUBSET entry (no extent_model; drop .rdata members whose legacy padded
+    sizes sum to 44) CREDITS +54,780 (the subset loophole). It still credits when one dropped literal's bytes are
+    corrupted in a scratch copy of our hs.obj.
+P2  fc53d5f6 verifier: the same subset WITH extent_model is rejected (coverage); WITHOUT extent_model it still
+    credits +54,780 (fc53d5f6 leaves the legacy grouped path open).
+P3  V1 verifier rejects the subset in both forms.
+P4  V1 + production manifest == STOCK + production (42 notes, every unit/category/total measure, revocations,
+    ownership, parks).
+P5  V1 + production + hs and actions entries WITH surplus declarations (hs 20, actions 15): Halo data +57,184
+    exactly (hs +54,780, actions +2,404); no other unit changes; code/functions/complete units unchanged.
+P6  V1 + the entries as proposed (B1 hs, fc53d5f6 actions; no surplus declared) FAILS CLOSED (undeclared base section).
+P7  January-vs-January control (base_path := January object for hs and actions, surplus []) PASSES with the same
+    credit.
+P8  The two legacy grouped entries (shell_xbox, editor_flying_camera) pass the new target-coverage check unchanged.
+P9  regression_gate._exception_records raises KeyError('symbol') for any grouped entry whose unit is selected
+    (pre-existing for shell_xbox/editor_flying_camera; would also hit hs/actions).
+P10 Board binding: for every unit in the report, total_data == sum of modelled extents of the target's objdiff
+    data groups, and each target group appears in the report at its modelled size.

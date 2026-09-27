@@ -1,0 +1,23 @@
+CARD V02 (RF-V) written 2026-09-26 19:39:44 -0700 (clock-read), BEFORE the run. Immutable.
+Kind: DIAGNOSTIC TRACE (stock-equal IL capture of HEAD at the post-MARK node walk 0x10720b39; no source change).
+Source: scratch/rf/workers/RF-V/src/bipeds_head.c. Tool: tools/rfe/ilcap.py (RF-E copy).
+Question: the IL of the spherical arm and the three '*width = ...' tail copies at MARK: are the copies already
+  separate at MARK (C1/pre-MARK tail duplication) or one return block (backend split, RF-R R3)? Which temps hold the
+  width pointer and the autoaim_width value, and in what list order relative to the '*height = *global_zero_vector3d'
+  copy and the midpoint3d call's stack adjust?
+Prediction P2a: at MARK there is ONE tail block ('*width = ...' then the return) that the spherical and non-spherical
+  arms reach by JMP and the physics arm falls into (single exit; RF-H: one if/else, single exit).
+Prediction P2b: in the tail block the IL order is value load (definition+0x458) before the pointer param load,
+  matching January's emitted order in the spherical copy (value first) and not ours.
+Basis: RF-R R3 (backend return split post-MARK); RF-H NOTES (/Od 0x8bffb0 single exit, no flags).
+
+OUTCOME V02 (appended 2026-09-26 19:40:45 -0700; logs/V02_pill_ilcap.txt; traced object keyed-equal to the stock copy 0/0/0):
+  P2a CONFIRMED: at MARK there is ONE tail block: N110 LABEL 279e36c (line+32), N111 ASSIGN [definition+0x458] -> s65,
+  N112 ASSIGN s65 -> [width] (the width parameter is only a memory-operand base; no separate pointer load exists at
+  MARK). Spherical arm N38..N54 (ARG base, &head+0x28, &pelvis+0x28, CALL midpoint3d, op02d, s27->s28, s29->s30, three
+  dword copy pairs N48..N53) ends in JMP N54 -> L279e36c; the non-spherical arm N55..N79 ends in JMP N79; the physics arm
+  N80..N108 falls into the label.
+  P2b CONFIRMED only trivially (value node before the store; the pointer load is materialised later in the backend).
+  Reading: the three emitted tails are backend copies of N110..N112. Final registers: spherical copy = physics copy
+  (ours: ptr EDX, value ECX) but January's spherical copy = non-spherical copy (ptr ECX, value EAX). So the residual
+  is WHICH allocated tail the spherical arm receives (or how its own copy is coloured), decided after MARK.

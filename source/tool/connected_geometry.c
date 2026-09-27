@@ -276,78 +276,83 @@ static long connected_geometry_find_or_add_edge(
 	long point_index0,
 	long point_index1)
 {
-	struct connected_geometry_edge *edge;
-	long *edge_triangle;
+	/* BUG (preserved for exact matching): January declares `direction` without an
+	 * initializer. It is written only at the two matches (+0x47, +0x4d) and on edge
+	 * creation (+0x67), and read once, at +0xbe. The only path that reaches that read
+	 * without a write requires geometry->edges.count < 0 (a deleted array, whose count is
+	 * NONE, is one way this can arise). On that path edge_index stays 0, so the
+	 * dynamic_array_get_element call (+0x9b) runs first: its unconditional
+	 * `array->count>=0` assertion fails, and match_assert's failure path (display_assert,
+	 * then system_exit -> halt_and_catch_fire, which never returns: it loops on the error
+	 * screen, or calls exit on re-entry) ends this build before `direction` is read.
+	 * The later /Od+/RTC build attests the declaration with _RTC_UninitUse("direction").
+	 * A corrected build should initialize direction to TRUE.
+	 */
+	boolean direction;
 	long edge_index;
-	long edge_triangle_index;
-	boolean forward = TRUE;
 
-	edge_index = 0;
-	if (geometry->edges.count > 0)
+	for (edge_index = 0; edge_index < geometry->edges.count; edge_index++)
 	{
-		do
+		struct connected_geometry_edge *edge = dynamic_array_get_element(
+			&geometry->edges,
+			edge_index,
+			sizeof(*edge));
+
+		if (edge->point_indices[0] == point_index0 &&
+			edge->point_indices[1] == point_index1)
 		{
-			edge = dynamic_array_get_element(
-				&geometry->edges,
-				edge_index,
-				sizeof(*edge));
-			if (edge->point_indices[0] == point_index0 &&
-				edge->point_indices[1] == point_index1)
-			{
-				forward = TRUE;
-				break;
-			}
-			if (edge->point_indices[0] == point_index1 &&
-				edge->point_indices[1] == point_index0)
-			{
-				forward = FALSE;
-				break;
-			}
-			edge_index++;
+			direction = TRUE;
+			break;
 		}
-		while (edge_index < geometry->edges.count);
+		else if (edge->point_indices[0] == point_index1 &&
+			edge->point_indices[1] == point_index0)
+		{
+			direction = FALSE;
+			break;
+		}
 	}
 
 	if (edge_index == geometry->edges.count)
 	{
 		edge_index = dynamic_array_add_element(&geometry->edges);
-		forward = TRUE;
-		if (edge_index == NONE)
+		direction = TRUE;
+		if (edge_index != NONE)
 		{
-			return NONE;
+			struct connected_geometry_edge *edge = dynamic_array_get_element(
+				&geometry->edges,
+				edge_index,
+				sizeof(*edge));
+
+			dynamic_array_new(&edge->triangle_indices, sizeof(long));
+			edge->point_indices[0] = point_index0;
+			edge->point_indices[1] = point_index1;
 		}
-		edge = dynamic_array_get_element(
+	}
+
+	if (edge_index != NONE)
+	{
+		struct connected_geometry_edge *edge = dynamic_array_get_element(
 			&geometry->edges,
 			edge_index,
 			sizeof(*edge));
-		dynamic_array_new(&edge->triangle_indices, sizeof(long));
-		edge->point_indices[0] = point_index0;
-		edge->point_indices[1] = point_index1;
+		long edge_triangle_index = dynamic_array_add_element(&edge->triangle_indices);
+
+		if (edge_triangle_index != NONE)
+		{
+			*(long *)dynamic_array_get_element(
+				&edge->triangle_indices,
+				edge_triangle_index,
+				sizeof(long)) = triangle_index;
+		}
+		else
+		{
+			edge_index = NONE;
+		}
 	}
 
-	if (edge_index == NONE)
-	{
-		return NONE;
-	}
-
-	edge = dynamic_array_get_element(
-		&geometry->edges,
-		edge_index,
-		sizeof(*edge));
-	edge_triangle_index = dynamic_array_add_element(&edge->triangle_indices);
-	if (edge_triangle_index != NONE)
-	{
-		edge_triangle = dynamic_array_get_element(
-			&edge->triangle_indices,
-			edge_triangle_index,
-			sizeof(*edge_triangle));
-		*edge_triangle = triangle_index;
-		SET_FLAG(edge_index, _connected_geometry_edge_designator_forward_bit, forward);
-
-		return edge_index;
-	}
-
-	return NONE;
+	return edge_index == NONE ?
+		NONE :
+		SET_FLAG(edge_index, _connected_geometry_edge_designator_forward_bit, direction);
 }
 
 long connected_geometry_add_triangle(

@@ -1,0 +1,12 @@
+  _sine                          vs source\ai\actor_combat.obj               IDENTICAL
+  _cosine                        vs source\ai\actor_combat.obj               IDENTICAL
+  _arctangent                    vs source\ai\actor_perception.obj           IDENTICAL
+  _square_root                   vs source\ai\action_charge.obj              IDENTICAL
+  _vector_from_points3d          vs source\ai\action_alert.obj               IDENTICAL
+  _scale_vector3d                vs source\ai\action_charge.obj              IDENTICAL
+  _magnitude_squared3d           vs source\ai\action_alert.obj               IDENTICAL
+  _magnitude3d                   vs source\ai\action_charge.obj              IDENTICAL
+  _normalize3d                   vs source\ai\action_charge.obj              IDENTICAL
+  _distance_squared3d            vs source\ai\action_alert.obj               IDENTICAL
+  _distance3d                    vs source\ai\action_vehicle.obj             IDENTICAL
+source/game/game_engine: 11 candidate-only code COMDATs, 0 not identical

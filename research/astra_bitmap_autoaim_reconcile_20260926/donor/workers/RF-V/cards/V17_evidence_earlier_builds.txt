@@ -1,0 +1,12 @@
+CARD V17 (RF-V) written 2026-09-26 20:05:26 -0700 (clock-read). Kind: READ-ONLY EVIDENCE (no compile): RF-P's xbecmp.py / xbedis.py over the
+first-party Aug-15-2001 DEBUG 1749betaP.xbe and Sept-25-2001 DEBUG cachebeta.xbe (cachebeta.map names).
+Outcome (files in evidence/):
+ - _biped_get_autoaim_pill: January = Aug-15 = Sept-25 (0 hunks each): the source is stable Aug..Jan. Our V04
+   candidate object equals Sept-25 (0 hunks); HEAD differs in the same 3 rows as vs January. Corroboration only
+   (retail/earlier-build equality is not admissibility).
+ - _render_motion_sensor: Sept-25 = January (only relocated-immediate masking artifacts 'push X' vs 'push 0');
+   Aug-15 is an earlier revision (frame 0x230, active sensor index kept in DI, sensor stride 0xb4, object-list inner
+   loop). Its loop head reloads history_index ('mov esi,[ebp-0x1c]; sub eax,esi', NOT folded) yet still emits the
+   whole sensor-index statement, idiv and the player reload BEFORE the x87 weight chain (January's order).
+   => the fold (January only) and the x87-after-idiv order (Aug and January) are independent facts; the order is a
+   property shared by two different source revisions and absent from our reconstruction.

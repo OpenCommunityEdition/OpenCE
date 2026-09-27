@@ -533,5 +533,49 @@
       "relocation_count": 1,
       "normalized_sha256": "527b43a173f528444fa4423af92d7d58a83f2afe7fc1661b6d297401b2760f71"
     }
+  },
+  {
+    "unit": "source/bitmaps/bitmap_group",
+    "symbol": "_global_bitmap_reference",
+    "allow_incomplete_unit": true,
+    "reason": "January and rebuilt bitmap_group writable .data (the public global_bitmap_reference/_optional, bitmap_pixel_data, color_plate_data and bitmap_group tag definitions plus their static field/enum tables, 31 owners) have identical 1,424-byte payload, flags (c0400040) and owner storage, and all 152 relocations independently resolve to the same image destinations. January's split leaves the empty-string and 'default' literals undefined (linker-selected in other objects) while the rebuilt object emits identical select-any copies, so objdiff 3.3.1's '$'-literal name defect undercredits this sole unmatched section; renaming only the '$' inside literal names on both sides scores it 100.0 with the production objdiff binary. The parked _bitmap_group_add_bitmap residual keeps the unit incomplete, so this entry opts in explicitly as an incomplete unit and grants no function or object credit.",
+    "measurements": {
+      "size": 1424,
+      "relocation_count": 152,
+      "normalized_sha256": "df5c6d69f4e13ea6df9398e2b5cc5c4455410b077b5ba6763930c4dd748505cb"
+    }
+  },
+  {
+    "unit": "source/ai/ai_communication",
+    "symbol": "_global_communication_priority_names",
+    "allow_incomplete_unit": true,
+    "reason": "January and rebuilt ai_communication .data (the public global_communication_priority_names, global_communication_team_names and global_communication_type_names string tables at +0/+32/+48) have identical 276-byte payload, flags (c0400040) and owner storage, and all 69 relocations independently resolve to the same image destinations. January's split leaves six literals ('none', 'shout', 'damage', 'cover', 'flee', 'berserk') undefined because the linker selected other objects' copies, while the rebuilt object emits identical select-any copies, so objdiff 3.3.1's '$'-literal name defect undercredits this sole unmatched section; renaming only the '$' inside literal names on both sides scores it 100.0 with the production objdiff binary. _ai_communication_actor_talk_weight (parked) and _ai_communication_event remain residual, so this entry opts in explicitly as an incomplete unit and grants no function or object credit.",
+    "measurements": {
+      "size": 276,
+      "relocation_count": 69,
+      "normalized_sha256": "d489001ff88ed206b56f44bd0789a8332510f33bf40a312a7b2e5d60c3fe3e03"
+    }
+  },
+  {
+    "unit": "source/ai/ai_debug",
+    "symbol": "_global_ai_debug_firing_position_color_count",
+    "allow_incomplete_unit": true,
+    "reason": "January and rebuilt ai_debug .data (the public global_ai_debug_firing_position_color_count at +0, the file-static postcombat type-name table at +4 and the two file-static selected-squad globals at +48/+52) have identical 56-byte payload, flags (c0300040) and owner storage, and all 11 relocations independently resolve to the same image destinations. January's split leaves the 'none' literal undefined because the linker selected another object's copy, while the rebuilt object emits an identical select-any copy, so objdiff 3.3.1's '$'-literal name defect undercredits this sole unmatched section; renaming only the '$' inside literal names on both sides scores it 100.0 with the production objdiff binary. _ai_debug_render_actor remains residual, so this entry opts in explicitly as an incomplete unit and grants no function or object credit.",
+    "measurements": {
+      "size": 56,
+      "relocation_count": 11,
+      "normalized_sha256": "3ba0a54a0875e71a01972b13dcf574a4d16d0f1ea3531ef51d98311b5ac7eee5"
+    }
+  },
+  {
+    "unit": "source/game/game_engine_king",
+    "symbol": "_king_engine",
+    "allow_incomplete_unit": true,
+    "reason": "January and rebuilt King engine tables have identical 136-byte payload, section flags (c0400040) and public owner storage (_king_engine is a cachebeta.pdb public), and all 23 relocations (22 engine callbacks and the 'king' name literal) independently resolve to the same image destinations. January's split leaves the 'king' literal undefined because the linker selected game_engine's copy, while the rebuilt object emits an identical select-any copy, so objdiff 3.3.1's '$'-literal name defect undercredits this sole unmatched section; renaming only the '$' inside literal names on both sides scores it 100.0 with the production objdiff binary. All 29 functions are strict exact; the unit stays NonMatching until the owner rules on the whole-object packet (owner queue #13: _find_next_hill's preserved uninitialised no-candidate return, plus the cachebeta storage fix), so this entry opts in explicitly as an incomplete unit, credits only the table's data bytes and certifies nothing about _find_next_hill or object completion.",
+    "measurements": {
+      "size": 136,
+      "relocation_count": 23,
+      "normalized_sha256": "4009f5b6117e9f00cb001a23b9a56b9dc51a694206c442ce715e2bed2d5465a7"
+    }
   }
 ]

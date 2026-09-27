@@ -1,0 +1,20 @@
+--- a/source/ai/path_obstacle_avoidance.c
++++ b/source/ai/path_obstacle_avoidance.c
+@@ -239,7 +239,7 @@
+ 	return disc_index!=NONE ? obstacles_get_disc(obstacles, disc_index)->obstacle_index : NONE;
+ }
+ 
+-struct obstacle_path_step *path_get_step(
++__inline struct obstacle_path_step *path_get_step(
+ 	struct obstacle_path *path,
+ 	short step_index)
+ {
+@@ -248,7 +248,7 @@
+ 	return &path->steps[step_index];
+ }
+ 
+-unsigned short path_get_step_index(
++__inline unsigned short path_get_step_index(
+ 	struct obstacle_path *path,
+ 	short heap_index)
+ {

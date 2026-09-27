@@ -1,0 +1,6 @@
+CARD H-8 (A3)  written 2026-09-26 01:24:07 -0700  -- BEFORE its first compile
+observed: struct hs_runtime_globals {boolean initialized; byte pad; short executing_thread_index;} - explicit,
+  unreferenced pad member. X: HCEX SHIP runtime-globals UDT {uchar initialized @0; short executing_thread_index @2}
+  (no pad; natural alignment gives the same layout). House rule: no fabricated padding.
+correction: delete 'byte pad;' (on top of final/hs_runtime).
+prediction: byte-inert (layout identical: short at +2, size 4); 66/66; keyed_diff 0/0/0 (incl. .bss).

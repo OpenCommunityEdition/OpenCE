@@ -1,0 +1,10 @@
+CARD K1-24  (pre-registered 2026-09-26 10:31:35 -0700)  - owner ruling 2026-09-26 item 3 (K1-A narrowly admitted); packet P3 (on top of P2)
+Base: P2 ([size 8096!=8064, sha], frame 0x1270, 72 hunks).
+Change: the block-scoped TRUE-initialised "valid" becomes the /Od FALSE-initialised protagonist-validity flag,
+  "boolean protagonist_invalid = FALSE;", set TRUE in the six /Od places (unit NONE; dead; vehicle; player without the
+  player-usage flag; braindead; obey without allow_communication), tested once ("if (protagonist_invalid)").
+  Name descriptive, not attested (the /Od build has no scalar names).
+Evidence: D /Od 0x48f39f "mov byte [ebp-0xf45],0", six "mov byte [ebp-0xf45],1", one test at 0x48f498;
+  J January 0xf09 "xor bl,bl", 0xf54 "mov bl,1", 0xf75 "test bl,bl".
+Prediction (K1-21 add-one-in "+f" on the admissible base): [size 8096!=8064], frame 0x1270, ~67 hunks; the 0xf06-0xf75
+  flag region matches January (xor bl,bl / mov bl,1 / test bl,bl).

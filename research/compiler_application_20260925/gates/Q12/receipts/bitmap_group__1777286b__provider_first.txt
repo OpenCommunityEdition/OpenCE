@@ -1,0 +1,102 @@
+literal: ??_C@_00CNPNBAHC@?$AA@
+unit object: build/base/source/bitmaps/bitmap_group.obj (sha256 754b9213d97412eedbf81d21e939c91f187ba9c5276e31289c2644c5b333f5b0)
+provider (January selected: build/split/source/ai/action_obey.obj): build/base/source/ai/action_obey.obj (sha256 0d84a39abca5d379eb5fea9682d6225dc3967adad32001e30e4b6dcbb82e7a21)
+provider currently defines it: yes, COMDAT ANY, bytes sha256 6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d
+order: provider_first
+command: xbox\bin\vc7\Link.Exe /NOLOGO /MACHINE:X86 /SUBSYSTEM:CONSOLE /NODEFAULTLIB /ENTRY:probe_entry /OUT:C:\Users\isabe\AppData\Local\Temp\tmpu9uiv5bx\probe.exe build\base\source\ai\action_obey.obj build\base\source\bitmaps\bitmap_group.obj
+exit code: 1120
+LNK2005/LNK1169 lines: 0
+verdict: PASS
+--- complete linker output ---
+LINK : error LNK2001: unresolved external symbol _probe_entry
+action_obey.obj : error LNK2001: unresolved external symbol __fltused
+action_obey.obj : error LNK2019: unresolved external symbol _seed_random_range referenced in function _random_range
+action_obey.obj : error LNK2019: unresolved external symbol _get_global_random_seed_address referenced in function _random_range
+action_obey.obj : error LNK2019: unresolved external symbol _real_seed_random_range referenced in function _real_random_range
+action_obey.obj : error LNK2019: unresolved external symbol _datum_get referenced in function _action_obey_flush_structure_indices
+action_obey.obj : error LNK2019: unresolved external symbol _actor_data referenced in function _action_obey_flush_structure_indices
+action_obey.obj : error LNK2019: unresolved external symbol _sprintf referenced in function _action_obey_describe_command
+action_obey.obj : error LNK2019: unresolved external symbol _csstrcpy referenced in function _action_obey_describe_command
+action_obey.obj : error LNK2019: unresolved external symbol _dialogue_get_vocalization_name referenced in function _action_obey_describe_command
+action_obey.obj : error LNK2019: unresolved external symbol _tag_block_get_element_with_size referenced in function _action_obey_describe_command
+bitmap_group.obj : error LNK2001: unresolved external symbol _tag_block_get_element_with_size
+action_obey.obj : error LNK2019: unresolved external symbol __snprintf referenced in function _action_obey_describe_command
+action_obey.obj : error LNK2019: unresolved external symbol _global_forward2d referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _unit_is_busy referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _ai_communication_event referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _actor_move_animation_impulse referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _actor_move_animation_busy referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _actor_path_at_destination referenced in function _action_obey_control
+action_obey.obj : error LNK2019: unresolved external symbol _system_exit referenced in function _action_obey_control
+bitmap_group.obj : error LNK2001: unresolved external symbol _system_exit
+action_obey.obj : error LNK2019: unresolved external symbol _display_assert referenced in function _action_obey_control
+bitmap_group.obj : error LNK2001: unresolved external symbol _display_assert
+action_obey.obj : error LNK2019: unresolved external symbol _actor_look_secondary_stop referenced in function _action_obey_command_end
+action_obey.obj : error LNK2019: unresolved external symbol _object_try_and_get_and_verify_type referenced in function _action_obey_command_end
+action_obey.obj : error LNK2019: unresolved external symbol _error referenced in function _action_obey_command_end
+bitmap_group.obj : error LNK2001: unresolved external symbol _error
+action_obey.obj : error LNK2019: unresolved external symbol _ai_debug_describe_actor referenced in function _action_obey_command_end
+action_obey.obj : error LNK2019: unresolved external symbol _actor_move_halt referenced in function _action_obey_command_end
+action_obey.obj : error LNK2019: unresolved external symbol _global_scenario_get referenced in function _action_obey_command_end
+action_obey.obj : error LNK2019: unresolved external symbol _csmemset referenced in function _action_obey_individual_setup
+bitmap_group.obj : error LNK2001: unresolved external symbol _csmemset
+action_obey.obj : error LNK2019: unresolved external symbol _object_get_and_verify_type referenced in function _action_obey_individual_begin
+action_obey.obj : error LNK2019: unresolved external symbol _swarm_component_data referenced in function _action_obey_individuals_iterate
+action_obey.obj : error LNK2019: unresolved external symbol _swarm_data referenced in function _action_obey_individuals_iterate
+action_obey.obj : error LNK2019: unresolved external symbol _global_forward3d referenced in function _action_obey_directmovement_update_facing
+action_obey.obj : error LNK2019: unresolved external symbol _global_up3d referenced in function _action_obey_directmovement_update_facing
+action_obey.obj : error LNK2019: unresolved external symbol _unit_get_facing_vector referenced in function _action_obey_directmovement_update_facing
+action_obey.obj : error LNK2019: unresolved external symbol _temporary referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _ai_debug referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _actor_input_sample_position referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_compute_node_matrices_recursive referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_reset referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_set_position referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _unit_speak referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _ai_communication_packet_new referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _unit_test_speech referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _hs_wake_by_name referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _recorded_animation_play referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _scenario_get_animation_by_name referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _unit_start_user_animation referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _actor_action_try_to_enter_vehicle referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _qsort referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_iterator_next referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_iterator_new referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _unit_add_grenade_type_to_inventory referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _vector3d_from_angle referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_get_origin referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _actor_look_secondary referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _prop_get_active_by_unit_index referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _object_index_from_name_index referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _unit_get_head_position referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _data_iterator_next referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _data_iterator_new referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _player_data referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _prop_iterator_next referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _prop_iterator_new referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _actor_move_keep_moving_past_destination referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _actor_move_to_point referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _tag_get referenced in function _action_obey_command_begin
+bitmap_group.obj : error LNK2001: unresolved external symbol _tag_get
+action_obey.obj : error LNK2019: unresolved external symbol __ftol2 referenced in function _action_obey_command_begin
+action_obey.obj : error LNK2019: unresolved external symbol _recorded_animation_controlling_unit referenced in function _action_obey_command_perform
+action_obey.obj : error LNK2019: unresolved external symbol _actor_combat_plan_grenade_trajectory referenced in function _action_obey_command_perform
+action_obey.obj : error LNK2019: unresolved external symbol _unit_flying_through_air referenced in function _action_obey_command_perform
+action_obey.obj : error LNK2019: unresolved external symbol _actor_destination_tolerance referenced in function _action_obey_command_perform
+action_obey.obj : error LNK2019: unresolved external symbol _global_structure_bsp_index referenced in function _action_obey_command_list_setup
+action_obey.obj : error LNK2019: unresolved external symbol _actor_action_change referenced in function _action_obey_flush_command_indices
+action_obey.obj : error LNK2019: unresolved external symbol _game_time_get referenced in function _action_obey_perform
+bitmap_group.obj : error LNK2019: unresolved external symbol _csmemcpy referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _tag_data_resize referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _tag_block_resize referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _bitmap_get_pixel_data_size referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _fflush referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _fprintf referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol __iob referenced in function _bitmap_group_add_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _bitmap_delete referenced in function _delete_bitmap
+bitmap_group.obj : error LNK2019: unresolved external symbol _find_all_fucked_up_shit referenced in function _postprocess_bitmap_group
+bitmap_group.obj : error LNK2019: unresolved external symbol _tag_get_name referenced in function _postprocess_bitmap_group
+bitmap_group.obj : error LNK2019: unresolved external symbol _texture_cache_bitmap_new referenced in function _postprocess_bitmap_group
+bitmap_group.obj : error LNK2019: unresolved external symbol _bitmap_verify referenced in function _postprocess_bitmap_group
+C:\Users\isabe\AppData\Local\Temp\tmpu9uiv5bx\probe.exe : fatal error LNK1120: 85 unresolved externals

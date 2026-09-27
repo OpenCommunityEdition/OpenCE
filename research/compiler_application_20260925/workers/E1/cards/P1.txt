@@ -1,0 +1,21 @@
+CARD P1  (written 2026-09-26 01:15:57 -0700, before compile)  unit source/ai/path_structure_bsp  fn _structure_test_ray2d (480, EXACT at base)
+Purpose: admission source review. Canonical ray2d uses an unattested `goto continue_from_surface;` (rule 20: no invented
+gotos). Test whether the first-party /Od topology (halo_cache_symbols.exe fn 0x4cfe60, located by the
+"ai\path_structure_bsp.c" assert xrefs +0xf1/+0x1c1 = lines 0x69/0x7e = 105/126) reproduces January without it.
+Observed /Od facts (D): +0x82 `mov [ebp-0x34],-1` = `long next_surface_index = NONE;` at the TOP of the while(TRUE) body;
+enter arm: block-scoped passable [ebp-0x35]=1, block-scoped collision surface [ebp-0x3c], assert line 105,
+`if (passable) next = enter_surface_index` (+0x141..+0x14c); exit arm guarded by `next == NONE` (+0x14f cmp -1; jne);
+tail `if (next == NONE) break; else { surface_index = next; collision_surface_test_line2d(...) }` (+0x21f..+0x24f).
+The /Od build has NO separate `!= NONE` test of enter/exit_surface_index: the sentinel test is the next==NONE flag.
+January facts (J): +0xc9 `mov eax,[ebp-0x10]; cmp eax,-1; jne +0x15e` (enter index tested against NONE only on the
+passable path, then falls to the exit arm) and +0x156 `mov eax,[ebp-4]; cmp eax,-1; je +0x180` = exactly the /Od flag
+semantics after copy-propagation/threading of `next = enter; if (next == NONE)`.
+Proposed correction: replace the goto/label with the /Od flag loop; keep every January-proven expression spelling of the
+exact body (comparison spellings `distance < enter_t`, `distance > exit_t`, the byte flags local, TEST_FLAG macros,
+BIT_VECTOR_TEST_FLAG, match_assert lines) - only the control topology changes.
+Compiler-state prediction: C1 builds next=NONE / next=enter / next==NONE; C2 sub-pass-1 copy/constant propagation
+(0x1070575a) folds next==NONE to constant on the NONE paths and to `enter == NONE` on the assignment path; the jump
+threader then yields January's layout. Expected emitted effect: 480/14 relocs, EXACT (p ~0.5). Risk: an extra
+register/stack home for next_surface_index (frame 0x18 -> 0x1c) or a different block order -> residual.
+Collateral: none (single function edited; other five functions untouched; no header change).
+Decisive test: gate --all on copies/path_structure_bsp_P1.c; keyed_diff vs build/base.

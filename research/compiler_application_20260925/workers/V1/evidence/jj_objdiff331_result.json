@@ -1,0 +1,103 @@
+{
+ "objdiff_sha1": "3130e4288d483d259d1588092c8159f8e0230e08",
+ "scorer_units": {
+  "source/hs/hs": {
+   "measures": {
+    "total_data": "54798",
+    "matched_data": "18",
+    "matched_data_percent": 0.032847915
+   },
+   "sections": [
+    [
+     ".bss",
+     "18",
+     100.0
+    ],
+    [
+     ".data",
+     "3496",
+     99.52327
+    ],
+    [
+     ".rdata",
+     "51284",
+     99.908806
+    ],
+    [
+     ".text",
+     "29728",
+     100.0
+    ]
+   ]
+  },
+  "source/ai/actions": {
+   "measures": {
+    "total_data": "2404",
+    "matched_data": "2388",
+    "matched_data_percent": 99.33444
+   },
+   "sections": [
+    [
+     ".data",
+     "16",
+     71.42857
+    ],
+    [
+     ".rdata",
+     "2388",
+     100.0
+    ],
+    [
+     ".text",
+     "19728",
+     100.0
+    ]
+   ]
+  }
+ },
+ "full_hs": {
+  "status": "OK",
+  "notes": [
+   "source/hs/hs:hs-objdiff331-literal-relocations (+54780 data bytes)"
+  ],
+  "after": {
+   "source/hs/hs": {
+    "total_data": "54798",
+    "matched_data": 54798,
+    "matched_data_percent": 100.0
+   },
+   "source/ai/actions": {
+    "total_data": "2404",
+    "matched_data": "2388",
+    "matched_data_percent": 99.33444
+   }
+  }
+ },
+ "full_actions": {
+  "status": "REJECTED",
+  "error": "semantic data group does not cover the reported unmatched sections: source/ai/actions:actions-objdiff331-literal-relocations"
+ },
+ "scoped_member_counts": {
+  "source/hs/hs": 910,
+  "source/ai/actions": 1
+ },
+ "scoped": {
+  "status": "OK",
+  "notes": [
+   "source/hs/hs:hs-objdiff331-literal-relocations (+54780 data bytes)",
+   "source/ai/actions:actions-objdiff331-literal-relocations (+16 data bytes)"
+  ],
+  "after": {
+   "source/hs/hs": {
+    "total_data": "54798",
+    "matched_data": 54798,
+    "matched_data_percent": 100.0
+   },
+   "source/ai/actions": {
+    "total_data": "2404",
+    "matched_data": 2404,
+    "matched_data_percent": 100.0
+   }
+  }
+ }
+}

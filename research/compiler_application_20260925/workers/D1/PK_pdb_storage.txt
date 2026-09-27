@@ -1,0 +1,11 @@
+### pdb_storage (tool reads build/base; PK changes no storage: objcmp PK vs base weapons.obj differs only in .text sec40 bytes/relocs, symbol tables identical)
+source/items/weapons: 97 split symbols, 1 disagreements with PDB publics
+   _data_00307140                                     split 2 ours 2 PDB-public False
+source/objects/object_types: 66 split symbols, 0 disagreements with PDB publics
+rc=0
+
+### symbol-table check PK vs build/base (weapons, object_types)
+sec40 .text raw bytes differ
+sec40 .text relocations differ (4 vs 4)
+objcmp DIFFERENT: 2 difference(s)
+objcmp IDENTICAL: 0 difference(s)

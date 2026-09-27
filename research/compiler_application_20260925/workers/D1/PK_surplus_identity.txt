@@ -1,0 +1,24 @@
+### surplus_identity (PK weapons.obj via D1_OBJ; copy of scratch/tools/surplus_identity.py with only the object path parameterised)
+  _fast_ftol                     vs source\ai\actor_combat.obj               IDENTICAL
+  _sine                          vs source\ai\actor_combat.obj               IDENTICAL
+  _cosine                        vs source\ai\actor_combat.obj               IDENTICAL
+  _square_root                   vs source\ai\action_charge.obj              IDENTICAL
+  _point_from_line3d             vs source\ai\action_charge.obj              IDENTICAL
+  _scale_vector3d                vs source\ai\action_charge.obj              IDENTICAL
+  _magnitude_squared3d           vs source\ai\action_alert.obj               IDENTICAL
+  _magnitude3d                   vs source\ai\action_charge.obj              IDENTICAL
+  _normalize3d                   vs source\ai\action_charge.obj              IDENTICAL
+  _cross_product3d               vs source\ai\action_obey.obj                IDENTICAL
+  _negate_vector3d               vs source\ai\action_obey.obj                IDENTICAL
+  _random_range                  vs source\ai\action_obey.obj                IDENTICAL
+  _real_random                   vs source\ai\action_charge.obj              IDENTICAL
+  _random_vector_in_cone3d       vs source\items\projectiles.obj             IDENTICAL
+  _valid_real                    vs source\ai\actor_combat.obj               IDENTICAL
+  _valid_realcmp                 vs source\ai\actor_combat.obj               IDENTICAL
+  _valid_real_normal3d           vs source\ai\actor_combat.obj               IDENTICAL
+source/items/weapons: 17 candidate-only code COMDATs, 0 not identical
+
+### surplus_identity build/base (before)
+  _valid_realcmp                 vs source\ai\actor_combat.obj               IDENTICAL
+  _valid_real_normal3d           vs source\ai\actor_combat.obj               IDENTICAL
+source/items/weapons: 17 candidate-only code COMDATs, 0 not identical

@@ -1,0 +1,15 @@
+CARD LAB2  written 2026-09-26 01:25:50 -0700 (clock-read; BEFORE the library lab)
+trigger: January's vendor tail (pool 216-242, 27 records, each with a unique defining XDK-3911-era library
+  member) is NOT in ascending cachebeta module index (0x1F0,0x1EF,0x1FF,0x214?,0x006,0x1F9,0x1FC,0x002,0x309,
+  0x324,0x2EF,0x30D,0x2E6,0x2F5), while LAB1 showed plain objects pooled in ascending module index.
+  LAB1 also fits a simpler model M2: pool = REVERSE of first-COMMON-definition encounter order.
+question: how do library members' COMMONs and module indexes order relative to command-line objects?
+lab: b.obj + c.obj archived into bc.lib (pinned Lib.Exe); link a.obj m.obj bc.lib (and m.obj a.obj bc.lib).
+predictions:
+  Q1 (M2) the lib members' COMMONs are encountered AFTER a.obj/m.obj, so they sit at the START of the pool
+     (before m's and a's runs).
+  Q2 lib members get module indexes that do NOT follow the plain-object reverse-command-line pattern
+     (so "ascending module index" is not a link-wide law).
+  Q3 if Q1 holds, January's placement of vendor records at the END of the pool means January's Halo objects'
+     COMMONs were encountered after the vendor members' (e.g. Halo objects themselves pulled from a library,
+     or a different link recipe) - a fact about the link, not about any Halo owner.

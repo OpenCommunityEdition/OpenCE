@@ -1,0 +1,6 @@
+K= 53  == exact 179  residual 1  unwritten 0  (of 180)  _populate_statistic_buffer
+K= 54  == exact 179  residual 1  unwritten 0  (of 180)  _populate_statistic_buffer
+K= 55  == exact 179  residual 1  unwritten 0  (of 180)  _populate_statistic_buffer
+K= 56  == exact 179  residual 1  unwritten 0  (of 180)  _populate_statistic_buffer
+K= 57  == exact 179  residual 1  unwritten 0  (of 180)  _populate_statistic_buffer
+(finalA oracle K=0..63, only non-180 shown)

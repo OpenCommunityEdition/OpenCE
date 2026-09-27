@@ -1,0 +1,34 @@
+diff --git a/source/interface/hud.h b/source/interface/hud.h
+index f5a3842..cacd0a6 100644
+--- a/source/interface/hud.h
++++ b/source/interface/hud.h
+@@ -16,6 +16,7 @@ header included in hcex build.
+ 
+ struct tag_block;
+ union real_argb_color;
++union real_point3d;
+ 
+ /* ---------- prototypes/HUD.C */
+ 
+@@ -73,6 +74,21 @@ void temporary_hud_draw(
+ void hud_draw_screen(
+ 	void);
+ 
++/* ---------- prototypes/HUD_NAV_POINTS.C */
++
++short find_nav_point(
++	char const *name);
++short hud_get_nav_point_render_type(
++	short local_player_index,
++	union real_point3d const *head,
++	union real_point3d const *position,
++	long reference_object_index);
++void custom_render_nav_point(
++	short local_player_index,
++	union real_point3d const *position,
++	short nav_index,
++	short waypoint_type);
++
+ /* ---------- prototypes/HUD_SOUNDS.C */
+ 
+ void hud_play_sound(

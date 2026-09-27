@@ -1,0 +1,14 @@
+CARD K1-08  (pre-registered 2026-09-26 02:21:46 -0700)
+Base: k07 (held lab: frame 0x126c, 24 hunks).
+Observed: January 0x1d2b-0x1d58: alignment.i/j computed with fld/fsub/fstp pairs, then magnitude_squared2d RELOADS
+  both (fld i; fmul i; fld j; fmul j; faddp) - i first. Ours keeps j on the stack (fst j; fmul j; fld i; fmul i):
+  the direct local store "alignment.j = ..." is forwarded into the helper's read.
+Source evidence (D, /Od 0x490bfa-0x490c1e): a REAL call vector_from_points2d(&protagonist_head_position,
+  &target_head_position, &alignment_vector) (fn 0x42e350, 3 args, the 3-D head points passed directly) followed by
+  normalize2d(&alignment_vector) (fn 0x42e020). Ours hand-expands vector_from_points2d (rule "Preserve January's
+  genuine helper calls ... do not hand-expand"). Precedent for the cast spelling: action_obey.c 2585,
+  action_vehicle.c 388, actor_moving.c 2118 pass (real_point2d const *)&<real_point3d> to vector_from_points2d.
+Change: vector_from_points2d((real_point2d const *)&speaker_head, (real_point2d const *)&target_head, &alignment);
+Class: 3D->2D view cast (rule 28): /Od per-site attestation yes; prefix layout x,y yes; admissible only with a
+  strictly exact function + ledger disclosure.
+Prediction: the 0x1d49 hunk vanishes (i-first reload order); 24 -> 23 hunks; the 0x1d7d scale hunk unknown.

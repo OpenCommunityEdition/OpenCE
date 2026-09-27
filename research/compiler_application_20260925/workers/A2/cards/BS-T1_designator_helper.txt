@@ -1,0 +1,13 @@
+CARD BS-T1  2026-09-26 00:45:40 -0700   unit source/physics/breakable_surfaces   (immutable pre-registration)
+Observed: static __inline breakable_surface_get_plane_from_designator is a verbatim TU-local copy of
+  physics/bsp3d.h's non-static __inline bsp3d_get_plane_from_designator; emitted as candidate-only STATIC code
+  (96 B) that January's object lacks (January text = exactly the 12 functions, contiguous).
+Evidence: D = /Od breakable_surface_effect 0x7a0ca0 calls the SHARED helper 0x5666f0 (planes at +0xc,
+  &0x7fffffff, calls plane3d_negate 0x56d630) at 0x7a0e64 - not a TU-local copy. Rule 41 (no hand copies).
+Proposed correction: delete the local copy; call bsp3d_get_plane_from_designator(&collision_bsp->bsp3d,
+  surface->plane_designator, &surface_plane). bsp3d.h is reached via collision_bsp_definitions.h? (check include).
+Prediction: 12/12 EXACT under production flags AND under default flags; static designator section disappears;
+  new external COMDAT _bsp3d_get_plane_from_designator: under default flags IDENTICAL to January's selected copy
+  (wave1: decals); under /Ow DIFFERENT (wave2 A1). Declared-name count of the TU drops by the local copy's
+  names (function + 3 params + 1 local) - risk: breakable ties flip (none expected: wave2 measured 12/12).
+Decisive test: lab_gate (+/- --drop /Ow /QIfist), objcmp vs production, surplus_cand, provider_link.

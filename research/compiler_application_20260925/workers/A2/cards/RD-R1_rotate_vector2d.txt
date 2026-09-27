@@ -1,0 +1,15 @@
+CARD RD-R1  2026-09-26 00:48:16 -0700   unit source/render/render_debug   (immutable pre-registration)
+Observed: build_circle_points (render_debug.c:1956-1962) writes rotate_vector2d out by hand through
+  set_real_point2d(&points[index+1], cos*p.x - sin*p.y, sin*p.x + cos*p.y). Brief admission criterion:
+  "no hand-expanded helpers the /Od build calls"; rule 41.
+Evidence: D = /Od build_circle_points 0x8450c0 calls 0x4c9a90 in the loop with pushes
+  (&points[index+1], cosine_of_angle, sine_of_angle, &points[index]) = rotate_vector2d(&points[index], sine,
+  cosine, &points[index+1]); 0x4c9a90 body = real_math.h rotate_vector2d (j = s*i + c*j; i = c*i - s*j).
+  J = January build_circle_points (112 B) is exact today; atlas mangled name gives points as real_point2d *.
+Proposed correction: r2 reviewer's 05b: rotate_vector2d((real_vector2d const *)&points[index], sine_of_angle,
+  cosine_of_angle, (real_vector2d *)&points[index+1]) - two point2d->vector2d view casts (ruling 3 per-site:
+  /Od attestation above, identical layout, strip test, strict exact, disclosure).
+Prediction: 36/36 EXACT; build_circle_points byte-identical; one NEW external COMDAT _rotate_vector2d,
+  IDENTICAL to January's selected copy (path_obstacles per r2 review) and link PASS both orders; strip test
+  (casts removed) byte-identical object with 2 new C4133 warnings; no other section changes.
+Decisive test: lab_gate --all, objcmp vs production, surplus_cand, provider_link --baseline, strip-test objcmp.

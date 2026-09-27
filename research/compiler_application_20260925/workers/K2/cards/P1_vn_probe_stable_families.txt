@@ -1,0 +1,12 @@
+CARD P1  (written 2026-09-26 02:14:11 -0700, before compile) — INSTRUMENT ONLY, NEVER A LANDING (rule 20/21)
+Question: are the 13/13-stable families (fst/fstp 0x1046.., t-copy 0x2ae2.., gun cross-jump 0x2cde.., 0x1ee7 group,
+push order 0x4cb7.., vehicle-avoidance 0x4f3a..) value-number-ordinal sensitive (the bipeds S3-V6 mechanism: a folded
+code-neutral statement adds VN entries and shifts every later temp's class mod 4)? C1..C12 changed symbol counts, not
+(necessarily) VN counts, and moved none of them.
+Probe: on HEAD, insert k in {1,2,3} code-neutral folded statements right after
+`boolean player_prop_found = FALSE;` (aiming block, line ~903, upstream of every stable family):
+  blockage_type &= 1;  [k>=2: blockage_type &= 2;]  [k=3: blockage_type &= 4;]
+(blockage_type is the known-zero short initialised on the line above; VC7 folds each AND to 0.)
+Prediction (hypothesis H-VN): at least one of k=1..3 moves at least one stable family (any direction); if none moves in
+all three, the stable families are not reachable by upstream VN-count shifts at this position (record as negative).
+Collateral: ID-sensitive sites may move; bytes of the aiming block should be unchanged (folded).

@@ -1,0 +1,7 @@
+CARD PAO-7 (A3)  written 2026-09-26 01:29:15 -0700  -- comment-only hygiene (byte-inert by construction; verified by compile)
+observed: the 'symbols in this file' header comment of path_obstacle_avoidance.c still lists 12 address
+  placeholders _code_0004e8d0.._code_0004fd50 for functions whose names are authenticated (symbols.json + January
+  map atlas 4cc87b45 exact tier, off = file_offset + 0x400000).
+correction: replace the 12 placeholder names in the comment with the symbols.json names (same line count); the
+  .bss line '_bss_00319d08' is left unchanged (its naming is the open owner question).
+prediction: keyed-identical to final/pao.

@@ -37,6 +37,8 @@ boolean recorded_animation_play_and_delete(
 boolean recorded_animation_play_and_hover(
 	long unit_index,
 	short animation_index);
+void render_debug_recording(
+	void);
 
 /* ---------- globals */
 

@@ -1,0 +1,162 @@
+--- a/adm2.c
++++ b/lab2.c
+@@ -860,7 +860,7 @@
+ 	short recipient_look_priority;
+ 	short look_type;
+ 	word pad2A;
+-	long look_unit_index;
++	struct ai_information_look_data look_data;
+ 	long sound_definition_index;
+ 	short dialogue_type_index;
+ 	word pad36;
+@@ -6465,7 +6465,7 @@
+ 				struct actor_datum *protagonist_actor = NULL;
+ 				long recipient_unit_index = NONE;
+ 				short look_type = _ai_information_none;
+-				long look_unit_index = NONE;
++				struct ai_information_look_data recipient_look_data;
+ 				short protagonist_look_priority = 0;
+ 				short recipient_look_priority = 0;
+ 				boolean *protagonist_groups = NULL;
+@@ -6597,11 +6597,11 @@
+ 				}
+ 
+ 				{
+-					boolean valid = TRUE;
++					boolean protagonist_invalid = FALSE;
+ 
+ 					if (protagonist_unit_index == NONE)
+ 					{
+-						valid = FALSE;
++						protagonist_invalid = TRUE;
+ 					}
+ 					else
+ 					{
+@@ -6609,11 +6609,11 @@
+ 
+ 						if (TEST_FLAG(protagonist_unit->object.damage_flags, _object_dead_bit))
+ 						{
+-							valid = FALSE;
++							protagonist_invalid = TRUE;
+ 						}
+ 						else if (protagonist_unit->object.type == _object_type_vehicle)
+ 						{
+-							valid = FALSE;
++							protagonist_invalid = TRUE;
+ 						}
+ 						else if (protagonist_unit->unit.player_index != NONE &&
+ 							protagonist_unit->unit.actor_index == NONE)
+@@ -6625,7 +6625,7 @@
+ 							}
+ 							else
+ 							{
+-								valid = FALSE;
++								protagonist_invalid = TRUE;
+ 							}
+ 						}
+ 					}
+@@ -6634,16 +6634,16 @@
+ 					{
+ 						if (protagonist_actor->state.mode == _actor_mode_braindead)
+ 						{
+-							valid = FALSE;
++							protagonist_invalid = TRUE;
+ 						}
+ 						else if (protagonist_actor->state.action == _actor_action_obey &&
+ 							!protagonist_actor->state.action_data.obey.allow_communication)
+ 						{
+-							valid = FALSE;
++							protagonist_invalid = TRUE;
+ 						}
+ 					}
+ 
+-					if (!valid)
++					if (protagonist_invalid)
+ 					{
+ 						if (ai_debug.print_communication)
+ 						{
+@@ -6911,7 +6911,7 @@
+ 					if (subject_unit_index != NONE)
+ 					{
+ 						look_type = _ai_information_look_unit;
+-						look_unit_index = subject_unit_index;
++						recipient_look_data.unit.unit_index = subject_unit_index;
+ 					}
+ 					break;
+ 
+@@ -6919,7 +6919,7 @@
+ 					if (protagonist_unit_index != NONE)
+ 					{
+ 						look_type = _ai_information_look_unit;
+-						look_unit_index = protagonist_unit_index;
++						recipient_look_data.unit.unit_index = protagonist_unit_index;
+ 					}
+ 					break;
+ 
+@@ -6927,7 +6927,7 @@
+ 					if (recipient_unit_index != NONE)
+ 					{
+ 						look_type = _ai_information_look_unit;
+-						look_unit_index = recipient_unit_index;
++						recipient_look_data.unit.unit_index = recipient_unit_index;
+ 					}
+ 					break;
+ 
+@@ -6943,7 +6943,7 @@
+ 								0x6B0,
+ 								subject_actor->danger_zone.object_index != NONE);
+ 							look_type = _ai_information_look_object;
+-							look_unit_index = subject_actor->danger_zone.object_index;
++							recipient_look_data.object.object_index = subject_actor->danger_zone.object_index;
+ 						}
+ 					}
+ 					break;
+@@ -6974,7 +6974,7 @@
+ 					long sound_definition_index = NONE;
+ 					real speech_weight = 1.0f;
+ 					real animation_weight = 1.0f;
+-					short play_type = _unit_play_speech_none;
++					short play_type;
+ 
+ 					if (!is_reply)
+ 					{
+@@ -7067,7 +7067,7 @@
+ 							possibilities[possibility_count].sound_definition_index = sound_definition_index;
+ 							possibilities[possibility_count].recipient_look_priority = recipient_look_priority;
+ 							possibilities[possibility_count].look_type = look_type;
+-							possibilities[possibility_count].look_unit_index = look_unit_index;
++							possibilities[possibility_count].look_data = recipient_look_data;
+ 							possibilities[possibility_count].play_type = play_type;
+ 							possibilities[possibility_count].protagonist_look_priority = protagonist_look_priority;
+ 							possibilities[possibility_count].interrupts =
+@@ -7196,7 +7196,7 @@
+ 		information.updated_dialogue_timers = TRUE;
+ 		information.look_priority = selected_possibility->recipient_look_priority;
+ 		information.look_type = selected_possibility->look_type;
+-		information.look_data.unit.unit_index = selected_possibility->look_unit_index;
++		information.look_data = selected_possibility->look_data;
+ 		information.information_type = information_type == NONE ?
+ 			_ai_information_none : information_type;
+ 		if (!information_data)
+@@ -7263,20 +7263,12 @@
+ 				{
+ 					real_point3d speaker_head;
+ 					real_point3d target_head;
+-					real magnitude;
+ 
+ 					unit_get_head_position(selected_possibility->protagonist_unit_index, &speaker_head);
+ 					unit_get_head_position(selected_possibility->recipient_unit_index, &target_head);
+ 					alignment.i = target_head.x - speaker_head.x;
+ 					alignment.j = target_head.y - speaker_head.y;
+-					magnitude = square_root(
+-						alignment.i * alignment.i + alignment.j * alignment.j);
+-					if (fabs(magnitude) >= _real_epsilon && magnitude != 0.0f)
+-					{
+-						alignment.i /= magnitude;
+-						alignment.j /= magnitude;
+-					}
+-					else
++					if (normalize2d(&alignment) == 0.0f)
+ 					{
+ 						alignment.i = speaker_unit->object.forward.i;
+ 						alignment.j = speaker_unit->object.forward.j;

@@ -1,0 +1,17 @@
+CARD D1  written 2026-09-26 00:42:29 -0700  (before compile)
+unit: source/rasterizer/xbox/rasterizer_xbox_dynavobgeom
+observed: object_audit FAIL(2): .bss owner ?warned@?1??_rasterizer_dynamic_unlit_geometry_draw@@9@9 size 1/2,
+  symbol value 0/1; pdb_storage: _reported_too_many_transparent_geometry_groups candidate-only external.
+evidence: J - January split .bss = 1 byte, warned at +0, no reported_too_many symbol; cachebeta publics have no
+  _reported_too_many_transparent_geometry_groups; X - HCEX unlit draw has Static Local unsigned char warned (already
+  in source). History: canonical merge f6d00a8c kept parent dbcea3d6's global definition line while taking the
+  donor's static local (git show 4e84c212/dbcea3d6/f6d00a8c).
+correction: delete the dead line 'boolean reported_too_many_transparent_geometry_groups = FALSE;' (line 240) and
+  nothing else.
+prediction: 17/17 stay EXACT (the unlit draw relocates via the ?warned symbol; displacement bytes are 0 either way).
+  .bss becomes 1 byte with warned at +0. object_audit PASS; pdb_storage 0 disagreements. One fewer declared name in
+  the TU (C1 record count -1): a distant-tie flip is possible but no function in this TU is a residual, so any
+  flip would show as a lost EXACT.
+expected emitted effect: symbol _reported_too_many_transparent_geometry_groups disappears; no other section changes.
+collateral: none outside the TU (no header touched; no other TU references the name).
+decisive test: gate --all 17/17; keyed_diff base->cand shows only the .bss change; object_audit PASS.

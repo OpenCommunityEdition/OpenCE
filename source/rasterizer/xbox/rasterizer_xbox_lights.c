@@ -84,6 +84,7 @@ symbols in this file:
 /* The January translation unit retains the XDK's out-of-line D3D wrappers.
  * Keep the stock D3DINLINE definition: the real calls below make VC7 emit
  * the target's complete wrapper bodies. */
+#include "rasterizer/rasterizer.h"
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
@@ -151,20 +152,6 @@ struct rasterizer_lens_flare_submit_parameters
 	long internal__occlusion_pixels;
 };
 
-struct rasterizer_lights_window_parameters
-{
-	short rasterizer_target;
-	byte reserved02[0x6];
-	real_point3d camera_position;
-	real_vector3d camera_forward;
-	byte reserved20[0x14];
-	rectangle2d viewport_bounds;
-	byte reserved3C[0x30];
-	real_matrix4x3 world_to_view;
-	byte reservedA0[0x100];
-	real projection_matrix[4][4];
-};
-
 /* ---------- prototypes */
 
 static boolean rasterizer_project_billboard(
@@ -184,7 +171,7 @@ static short rasterizer_sun_glow_convolve(
 
 /* ---------- globals */
 
-extern struct rasterizer_lights_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
@@ -215,15 +202,15 @@ void rasterizer_sun_glow_draw(
 		583,
 		global_d3d_device);
 
-	direction.i = parameters->position.x - global_window_parameters.camera_position.x;
-	direction.j = parameters->position.y - global_window_parameters.camera_position.y;
-	direction.k = parameters->position.z - global_window_parameters.camera_position.z;
+	direction.i = parameters->position.x - global_window_parameters.camera.position.x;
+	direction.j = parameters->position.y - global_window_parameters.camera.position.y;
+	direction.k = parameters->position.z - global_window_parameters.camera.position.z;
 	normalize3d(&direction);
 
 	intensity =
-		(direction.i * global_window_parameters.camera_forward.i +
-		direction.j * global_window_parameters.camera_forward.j +
-		direction.k * global_window_parameters.camera_forward.k -
+		(direction.i * global_window_parameters.camera.forward.i +
+		direction.j * global_window_parameters.camera.forward.j +
+		direction.k * global_window_parameters.camera.forward.k -
 		(real)cos(0.7853981634f)) /
 		(1.0f - (real)cos(0.7853981634f));
 	if (intensity < 0.0f)
@@ -239,10 +226,10 @@ void rasterizer_sun_glow_draw(
 		brightness = intensity;
 	}
 
-	viewport_width = global_window_parameters.viewport_bounds.x1 -
-		global_window_parameters.viewport_bounds.x0;
-	viewport_height = global_window_parameters.viewport_bounds.y1 -
-		global_window_parameters.viewport_bounds.y0;
+	viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
+		global_window_parameters.camera.viewport_bounds.x0;
+	viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+		global_window_parameters.camera.viewport_bounds.y0;
 
 	vertex_constants[0][0] = (1.0f / (real)viewport_width) * 2.0f;
 	vertex_constants[0][1] = 0.0f;
@@ -292,15 +279,15 @@ void rasterizer_sun_glow_draw(
 		bounds.x1 = center_x + 32.0f;
 		bounds.y1 = center_y + 32.0f;
 
-		screen_bounds.x0 = (real)global_window_parameters.viewport_bounds.x0 + bounds.x0;
-		screen_bounds.y0 = (real)global_window_parameters.viewport_bounds.y0 + bounds.y0;
-		screen_bounds.x1 = (real)global_window_parameters.viewport_bounds.x0 + bounds.x1;
-		screen_bounds.y1 = (real)global_window_parameters.viewport_bounds.y0 + bounds.y1;
+		screen_bounds.x0 = (real)global_window_parameters.camera.viewport_bounds.x0 + bounds.x0;
+		screen_bounds.y0 = (real)global_window_parameters.camera.viewport_bounds.y0 + bounds.y0;
+		screen_bounds.x1 = (real)global_window_parameters.camera.viewport_bounds.x0 + bounds.x1;
+		screen_bounds.y1 = (real)global_window_parameters.camera.viewport_bounds.y0 + bounds.y1;
 
-		if (screen_bounds.x0 < (real)global_window_parameters.viewport_bounds.x1 &&
-			screen_bounds.y0 < (real)global_window_parameters.viewport_bounds.y1 &&
-			screen_bounds.x1 > (real)global_window_parameters.viewport_bounds.x0 &&
-			screen_bounds.y1 > (real)global_window_parameters.viewport_bounds.y0)
+		if (screen_bounds.x0 < (real)global_window_parameters.camera.viewport_bounds.x1 &&
+			screen_bounds.y0 < (real)global_window_parameters.camera.viewport_bounds.y1 &&
+			screen_bounds.x1 > (real)global_window_parameters.camera.viewport_bounds.x0 &&
+			screen_bounds.y1 > (real)global_window_parameters.camera.viewport_bounds.y0)
 		{
 			rasterizer_set_vertex_shader_permutation(0x38, 6, FALSE);
 			IDirect3DDevice8_SetRenderState(
@@ -735,39 +722,39 @@ static boolean rasterizer_project_billboard(
 
 	if (radius > 0.0f)
 	{
-		viewport_width = global_window_parameters.viewport_bounds.x1 -
-			global_window_parameters.viewport_bounds.x0;
-		viewport_height = global_window_parameters.viewport_bounds.y1 -
-			global_window_parameters.viewport_bounds.y0;
+		viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
+			global_window_parameters.camera.viewport_bounds.x0;
+		viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+			global_window_parameters.camera.viewport_bounds.y0;
 		matrix4x3_transform_point(
-			&global_window_parameters.world_to_view,
+			&global_window_parameters.frustum.world_to_view,
 			point,
 			&view_point);
 
 		clip_y =
-			global_window_parameters.projection_matrix[0][1] * view_point.x +
-			global_window_parameters.projection_matrix[1][1] * view_point.y +
-			global_window_parameters.projection_matrix[2][1] * view_point.z +
-			global_window_parameters.projection_matrix[3][1];
+			global_window_parameters.frustum.projection_matrix[0][1] * view_point.x +
+			global_window_parameters.frustum.projection_matrix[1][1] * view_point.y +
+			global_window_parameters.frustum.projection_matrix[2][1] * view_point.z +
+			global_window_parameters.frustum.projection_matrix[3][1];
 		clip_z =
-			global_window_parameters.projection_matrix[0][2] * view_point.x +
-			global_window_parameters.projection_matrix[1][2] * view_point.y +
-			global_window_parameters.projection_matrix[2][2] * view_point.z +
-			global_window_parameters.projection_matrix[3][2];
-		projected_radius_x = global_window_parameters.projection_matrix[0][0] * radius;
-		projected_radius_y = global_window_parameters.projection_matrix[1][1] * radius;
+			global_window_parameters.frustum.projection_matrix[0][2] * view_point.x +
+			global_window_parameters.frustum.projection_matrix[1][2] * view_point.y +
+			global_window_parameters.frustum.projection_matrix[2][2] * view_point.z +
+			global_window_parameters.frustum.projection_matrix[3][2];
+		projected_radius_x = global_window_parameters.frustum.projection_matrix[0][0] * radius;
+		projected_radius_y = global_window_parameters.frustum.projection_matrix[1][1] * radius;
 		if (clip_z > 0.0f)
 		{
 			inverse_w = 1.0f / (
-				global_window_parameters.projection_matrix[0][3] * view_point.x +
-				global_window_parameters.projection_matrix[1][3] * view_point.y +
-				global_window_parameters.projection_matrix[2][3] * view_point.z +
-				global_window_parameters.projection_matrix[3][3]);
+				global_window_parameters.frustum.projection_matrix[0][3] * view_point.x +
+				global_window_parameters.frustum.projection_matrix[1][3] * view_point.y +
+				global_window_parameters.frustum.projection_matrix[2][3] * view_point.z +
+				global_window_parameters.frustum.projection_matrix[3][3]);
 			projected_center->x = (((
-				global_window_parameters.projection_matrix[0][0] * view_point.x +
-				global_window_parameters.projection_matrix[1][0] * view_point.y +
-				global_window_parameters.projection_matrix[2][0] * view_point.z +
-				global_window_parameters.projection_matrix[3][0]) * inverse_w + 1.0f) *
+				global_window_parameters.frustum.projection_matrix[0][0] * view_point.x +
+				global_window_parameters.frustum.projection_matrix[1][0] * view_point.y +
+				global_window_parameters.frustum.projection_matrix[2][0] * view_point.z +
+				global_window_parameters.frustum.projection_matrix[3][0]) * inverse_w + 1.0f) *
 				viewport_width - 1.0f) * 0.5f;
 			projected_center->y = ((1.0f - clip_y * inverse_w) * viewport_height - 1.0f) * 0.5f;
 			projected_center->z = MIN(1.0f, clip_z * inverse_w);

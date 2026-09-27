@@ -1,0 +1,79 @@
+--- target (78) 
+   0: push edi                                                
+   1: mov edi, eax                                            
+   3: test edi, edi                                           
+   5: jne 0x24                                                
+   7: push 1                                                  
+   9: push 0x4c                                               
+   b: push 0   ; .rdata                                       
+  10: push 0   ; .rdata                                       
+  15: call 0x1a   ; _display_assert                           
+  1a: push -1                                                 
+  1c: call 0x21   ; _system_exit                              
+  21: add esp, 0x14                                           
+  24: xor eax, eax                                            
+  26: mov ax, word ptr [edi + 0x1e]                           
+  2a: test ah, ah                                             
+  2c: jns 0xa2                                                
+  2e: movsx ecx, word ptr [edi + 0x20]                        
+  32: push esi                                                
+  33: movzx esi, byte ptr [edi + 0x22]                        
+  37: and eax, 0x7fff                                         
+  3c: shl eax, 0x10                                           
+  3f: and esi, 0xffffff7f                                     
+  45: or eax, ecx                                             
+  47: test esi, esi                                           
+  49: mov edi, eax                                            
+  4b: jl 0x52                                                 
+  4d: cmp esi, 4                                              
+  50: jl 0x6f                                                 
+  52: push 1                                                  
+  54: push 0x57                                               
+  56: push 0   ; .rdata                                       
+  5b: push 0   ; ??_C@_0DA@PEPFBGPF@window_index?$DO?$DN0?5?$C
+  60: call 0x65   ; _display_assert                           
+  65: push -1                                                 
+  67: call 0x6c   ; _system_exit                              
+  6c: add esp, 0x14                                           
+  6f: test edi, edi                                           
+  71: jl 0x7b                                                 
+  73: cmp edi, 0x10008                                        
+  79: jl 0x98                                                 
+  7b: push 1                                                  
+  7d: push 0x58                                               
+  7f: push 0   ; .rdata                                       
+  84: push 0   ; .rdata                                       
+  89: call 0x8e   ; _display_assert                           
+  8e: push -1                                                 
+  90: call 0x95   ; _system_exit                              
+  95: add esp, 0x14                                           
+  98: lea eax, [esi + edi*4]   ; .bss                         
+  9f: pop esi                                                 
+  a0: pop edi                                                 
+  a1: ret                                                     
+  a2: test ax, ax                                             
+  a5: jl 0xad                                                 
+  a7: cmp ax, 0x380                                           
+  ab: jl 0xca                                                 
+  ad: push 1                                                  
+  af: push 0x5e                                               
+  b1: push 0   ; .rdata                                       
+  b6: push 0   ; .rdata                                       
+  bb: call 0xc0   ; _display_assert                           
+  c0: push -1                                                 
+  c2: call 0xc7   ; _system_exit                              
+  c7: add esp, 0x14                                           
+  ca: movzx edx, byte ptr [edi + 0x22]                        
+  ce: movsx eax, word ptr [edi + 0x20]                        
+  d2: and edx, 0xffffff7f                                     
+  d8: lea ecx, [edx + eax*4]                                  
+  db: movsx edx, word ptr [edi + 0x1e]                        
+  df: imul edx, edx, 0x22                                     
+  e2: lea eax, [ecx + edx + 2]   ; .bss                       
+  e9: pop edi                                                 
+  ea: ret                                                     
+  eb: nop                                                     
+  ec: nop                                                     
+  ed: nop                                                     
+  ee: nop                                                     
+  ef: nop                                                     

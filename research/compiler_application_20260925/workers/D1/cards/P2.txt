@@ -1,0 +1,14 @@
+CARD P2  (clock-read at writing: 2026-09-26 01:20:21 -0700)
+Kind: LAB / alternative, not the primary packet. Question: what does adopting the HCEX-typed slot cost?
+Evidence: HCEX.pdb and HCEX_Release.pdb both type object_type_definition.datum_place as void (*)(long, void *)
+(LF_PROCEDURE 0x628d9 / 0x6f9cd, arglist [long, 0x403 = void *]); both also carry the global typedef
+object_place_proc = void (*)(long, void *). Ours: void (*datum_place)(long, struct scenario_object_datum *).
+Change: root_p2 = root_p1 + object_types.h field 'void (*datum_place)(long, void *);' (no typedef added, no other edit).
+Predictions:
+  (a) object_types.obj byte/symbol-identical to root_base (pointer parameter type is codegen-inert here).
+  (b) /W3: every place binding whose declared parameter is a struct pointer now mismatches the void * slot, so
+      C4028 fires at all 9 bindings in object_types.c (biped via bipeds.h, weapon via weapons.h, 7 facades), i.e.
+      +8 over P1; warnings in every other TU unchanged.
+  (c) object_types.h has 156 transitive consumers; prediction: zero function-section changes in all of them
+      (only a member type changes; no declaration added or removed).
+Decisive test: revgate + objcmp + w3root on object_types first; the 156-TU sweep only if (a)/(b) are as predicted.

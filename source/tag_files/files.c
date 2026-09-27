@@ -9,7 +9,7 @@ FILES.C
 
 /* ---------- globals */
 
-char file_location_volume_names[NUMBER_OF_FILE_REFERENCE_LOCATIONS-1][256];
+char file_location_volume_names[NUMBER_OF_FILE_REFERENCE_LOCATIONS][256];
 
 /* ---------- public code */
 

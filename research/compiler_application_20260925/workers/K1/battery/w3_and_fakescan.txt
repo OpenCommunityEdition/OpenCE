@@ -1,0 +1,7 @@
+== adm2
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+== lab2
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+== base (HEAD) rc 0 {'warning C4146': 1, 'warning C4244': 11}

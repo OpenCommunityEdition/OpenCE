@@ -1,0 +1,8 @@
+COMMAND: C:\Users\isabe\AppData\Local\Programs\Python\Python312\python.exe -B -m tools.campaign.stable_verdicts diff C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R0_baseline\stable.json C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R1_P02_DSH\stable.json
+EXIT: 0
+--- stdout ---
+gained source/ai/actor_moving::section:27 _actor_path_refresh -> _actor_path_refresh 1440
+gained source/interface/ui_widget::section:99 _display_scenario_help -> _display_scenario_help 608
+gained 2 2048 bytes; regressions 0
+
+--- stderr ---

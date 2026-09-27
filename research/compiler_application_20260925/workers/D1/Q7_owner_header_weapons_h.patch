@@ -1,0 +1,16 @@
+--- a/source/items/weapons.h
++++ b/source/items/weapons.h
+@@ -260,9 +260,13 @@
+ 
+ void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
+ 
++struct scenario_weapon_datum;
+ struct weapon_interface_state;
+ 
+ boolean weapon_new(long weapon_index);
++long weapon_place(
++	long weapon_index,
++	struct scenario_weapon_datum *scenario_weapon);
+ void weapon_export_function_values(
+ 	long weapon_index);
+ 

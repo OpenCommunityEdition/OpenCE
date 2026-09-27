@@ -1,0 +1,24 @@
+objects scanned 833, DIR32 relocations 60769, block [0x4A6BA0, 0x4B82A4)
+source/rasterizer/rasterizer_lights.obj .text +0x7 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x8 -> _local_lens_flare_occlusion_test_results+0 = 0x4A6BA0
+source/rasterizer/rasterizer_lights.obj .text +0x27 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x2F -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x38 -> _local_lens_flare_parameters+0 = 0x4AE2A0
+source/rasterizer/rasterizer_lights.obj .text +0x3C -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x48 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x4F -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x63 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x7E -> _local_lens_flare_parameters+0 = 0x4AE2A0
+source/rasterizer/rasterizer_lights.obj .text +0x8C -> _local_lens_flare_parameters+0 = 0x4AE2A0
+source/rasterizer/rasterizer_lights.obj .text +0xBF -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0xE5 -> _local_lens_flare_occlusion_test_results+2 = 0x4A6BA2
+source/rasterizer/rasterizer_lights.obj .text +0xFA -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x10A -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x148 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x158 -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x207 -> _local_lens_flare_occlusion_test_results+0 = 0x4A6BA0
+source/rasterizer/rasterizer_lights.obj .text +0x7EB -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x81B -> _local_lens_flare_count+0 = 0x4B82A0
+source/rasterizer/rasterizer_lights.obj .text +0x85C -> _local_lens_flare_parameters+36 = 0x4AE2C4
+source/rasterizer/rasterizer_lights.obj .text +0x865 -> _local_lens_flare_parameters+0 = 0x4AE2A0
+source/rasterizer/rasterizer_lights.obj .text +0x895 -> _local_lens_flare_count+0 = 0x4B82A0

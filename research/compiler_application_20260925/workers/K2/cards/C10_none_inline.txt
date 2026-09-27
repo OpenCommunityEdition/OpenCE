@@ -1,0 +1,4 @@
+CARD C10  (written 2026-09-26 02:09:34 -0700, before compile)
+Evidence (D, /Od 0x4a1789..0x4a17d4 and 0x4a17f8..0x4a1843): both danger 'NONE' strings are unnamed temps
+(-0x18dc, -0x18e0) pushed directly as the string argument; select polarity ==NONE first, as ours.
+Ours: named char const *string (x2). Correction: inline both. Prediction: block unchanged.

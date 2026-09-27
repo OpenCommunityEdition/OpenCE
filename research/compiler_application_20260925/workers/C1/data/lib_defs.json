@@ -1,0 +1,4475 @@
+{
+ "libdir": "C:\\Users\\isabe\\Documents\\Codex\\2026-07-13\\i-w\\work\\data-encoding-final\\xbox\\lib",
+ "defs": {
+  "___@@_PchSym_@00@UcylcRurmzouivUkirezgvUdrmwldhUwrivxgcUwhlfmwUwhlfmwUlyqUrDIGUwhlfmwrOlyq@dsound": [
+   {
+    "lib": "dsound.lib",
+    "member": "obj\\i386\\dsoundi.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "___active_heap": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\calloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\expand.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\heapinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\malloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\realloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\calloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\expand.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\free.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\heapinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\malloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\msize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\realloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\dbgheap.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\calloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\expand.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\free.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\heapchk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\heapinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\heapmin.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\malloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\msize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\realloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\calloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\expand.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\free.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\heapchk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\heapinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\heapmin.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\malloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\msize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\realloc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\dbgheap.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___pioinfo": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\open.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\wopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\wrt2err.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fgetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fputwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_filbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_filwbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_flsbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_flswbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\clearerr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ftell.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ftelli64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\rewind.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ungetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\open.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\wopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\wrt2err.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fgetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fputwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_filbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_filwbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_flsbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_flswbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\clearerr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ftell.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ftelli64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\rewind.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ungetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libci.lib",
+    "member": "obj\\i386\\filebuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libci.lib",
+    "member": "obj\\i386\\stdiostr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcid.lib",
+    "member": "obj\\i386\\filebuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcid.lib",
+    "member": "obj\\i386\\stdiostr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcimt.lib",
+    "member": "obj\\i386\\filebuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcimt.lib",
+    "member": "obj\\i386\\stdiostr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcimtd.lib",
+    "member": "obj\\i386\\filebuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcimtd.lib",
+    "member": "obj\\i386\\stdiostr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\open.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\wopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\wrt2err.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fgetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fputwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_filbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_filwbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_flsbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_flswbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\clearerr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ftell.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ftelli64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\rewind.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ungetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\open.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\wopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\wrt2err.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fgetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fputwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_filbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_filwbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_flsbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_flswbuf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\clearerr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ftell.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ftelli64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\rewind.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ungetwc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "__nhandle": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\chsize.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\close.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\commit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\dup.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\dup2.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\eof.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\flength.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\isatty.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\lseek.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\osfinfo.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\read.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\setmode.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\write.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fleni64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstat64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fstati64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ioinit.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\lseeki64.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\wfdopen.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "__mbctype": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbgrph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismblgl.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbprn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbpunc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbccpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbclen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 257
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsinc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnccnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnextc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\splitpat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbgrph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismblgl.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbprn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbpunc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbccpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbclen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 257
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsinc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnccnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnextc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\splitpat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbccpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbclen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 257
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsinc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnextc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\splitpat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbccpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbclen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 257
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsinc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnextc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\splitpat.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___mbulinfo": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbdgt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 24
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbdgt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 24
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbdgt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 24
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbdgt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 24
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___mbcodepage": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbknj.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\tombbmbc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbknj.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\tombbmbc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbknj.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\tombbmbc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbbyte.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbknj.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\tombbmbc.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___ismbcodepage": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsset.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "__mbcasemap": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 256
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 256
+   }
+  ],
+  "___mblcid": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "___mbctype_initialized": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\wincmdln.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\wincmdln.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\wincmdln.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\wincmdln.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___onexitend": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "___onexitbegin": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\onexit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "___env_initialized": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\crt0dat.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "__nstream": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___piob": [
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libc.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcd.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\_file.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\closeall.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\fflush.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\rmtmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\setmaxf.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\stream.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___ptmbcinfo": [
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbgrph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismblgl.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbprn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbpunc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbcnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnccnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\tidtable.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbalnm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbalph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbgrph.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismblgl.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismblwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbprn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbpunc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbsle.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\ismbupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbclevel.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbctype.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsbtype.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbschr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbscmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbscspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsdec.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbslen.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbslwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbcat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbcmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbcnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbcpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnbicm.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsncat.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnccnt.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsncmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsncpy.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnicmp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsnset.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbspbrk.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsrchr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsrev.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsspn.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsspnp.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsstr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbstok.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbsupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbtolwr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\mbtoupr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\tojisjms.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\tidtable.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "___ptd_glob": [
+   {
+    "lib": "libcmt.lib",
+    "member": "obj\\i386\\tidtable.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "libcmtd.lib",
+    "member": "obj\\i386\\tidtable.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "_NtGlobalFlag": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\heap.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\heap.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "_CheckHeapFillPattern": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\heap.obj",
+    "form": "COMMON",
+    "value": 16
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\heap.obj",
+    "form": "DEFINED",
+    "value": 16
+   }
+  ],
+  "___@@_PchSym_@00@UcylcRurmzouivUkirezgvUmglhUczkrUpDCUoryUlyqUrDIGUyzhvwooOlyq@Xapi_k32": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\basedll.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "_XapiProcessHeap": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\pathmisc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\xapiheap.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\xapiinit.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\pathmisc.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\xapiheap.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\xapiinit.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "_XapiAutoPowerDownGlobals": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\powerdwn.obj",
+    "form": "COMMON",
+    "value": 80
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\powerdwn.obj",
+    "form": "COMMON",
+    "value": 88
+   }
+  ],
+  "_XapiTlsSize": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\thread.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\xapi0.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\thread.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\xapi0.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "_XapiCurrentTopLevelFilter": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\thread.obj",
+    "form": "COMMON",
+    "value": 4
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\thread.obj",
+    "form": "COMMON",
+    "value": 4
+   }
+  ],
+  "_OHCD_GlobalPool": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\pool.obj",
+    "form": "COMMON",
+    "value": 48
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\ohcd.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\isr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\schedule.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\transfer.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\isoch.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\pool.obj",
+    "form": "COMMON",
+    "value": 48
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\ohcd.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\isr.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\schedule.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\transfer.obj",
+    "form": "UNDEF",
+    "value": 0
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\isoch.obj",
+    "form": "UNDEF",
+    "value": 0
+   }
+  ],
+  "_OHCD_InterruptObject": [
+   {
+    "lib": "xapilib.lib",
+    "member": "obj\\i386\\ohcd.obj",
+    "form": "COMMON",
+    "value": 112
+   },
+   {
+    "lib": "xapilibd.lib",
+    "member": "obj\\i386\\ohcd.obj",
+    "form": "COMMON",
+    "value": 112
+   }
+  ]
+ }
+}

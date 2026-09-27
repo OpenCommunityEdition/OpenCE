@@ -1,0 +1,32 @@
+# R10: update_purge's two iterators (HCEX item_iterator / biped_iterator) in disjoint block scopes
+def edit(sub, rm, write, read):
+    G = 'source/game/game_engine.c'
+    old = ('static void game_engine_update_purge(\n\tvoid)\n{\n\tstruct object_iterator iterator;\n'
+           '\tlong cutoff_time = game_time_get() - 900;\n\n'
+           '\tobject_iterator_new(&iterator, _object_mask_item, 0);\n\twhile (object_iterator_next(&iterator))\n\t{\n'
+           '\t\tstruct item_datum *item = item_get(iterator.index);\n\n'
+           '\t\tif (item->item.last_owned_time < cutoff_time &&\n'
+           '\t\t\t!TEST_FLAG(item->item.flags, _item_attached_to_unit_bit))\n\t\t{\n'
+           '\t\t\tlong item_index = iterator.index;\n\t\t\tif (can_delete_item(item_index))\n'
+           '\t\t\t\tobject_delete(iterator.index);\n\t\t}\n\t}\n\n'
+           '\tobject_iterator_new(&iterator, _object_mask_biped, 0);\n\twhile (object_iterator_next(&iterator))\n\t{\n'
+           '\t\tstruct object_datum *object;\n\n\t\tcutoff_time = 900;\n\t\tobject = object_get(iterator.index);\n\n'
+           '\t\tif (object->object.idle_ticks > (short)cutoff_time &&\n'
+           '\t\t\tTEST_FLAG(object->object.damage_flags, _object_dead_bit))\n\t\t{\n'
+           '\t\t\tobject_delete(iterator.index);\n\t\t}\n\t}\n\n\treturn;\n}\n')
+    new = ('static void game_engine_update_purge(\n\tvoid)\n{\n'
+           '\tlong cutoff_time = game_time_get() - 900;\n\n'
+           '\t{\n\t\tstruct object_iterator item_iterator;\n\n'
+           '\t\tobject_iterator_new(&item_iterator, _object_mask_item, 0);\n\t\twhile (object_iterator_next(&item_iterator))\n\t\t{\n'
+           '\t\t\tstruct item_datum *item = item_get(item_iterator.index);\n\n'
+           '\t\t\tif (item->item.last_owned_time < cutoff_time &&\n'
+           '\t\t\t\t!TEST_FLAG(item->item.flags, _item_attached_to_unit_bit))\n\t\t\t{\n'
+           '\t\t\t\tlong item_index = item_iterator.index;\n\t\t\t\tif (can_delete_item(item_index))\n'
+           '\t\t\t\t\tobject_delete(item_iterator.index);\n\t\t\t}\n\t\t}\n\t}\n\n'
+           '\t{\n\t\tstruct object_iterator biped_iterator;\n\n'
+           '\t\tobject_iterator_new(&biped_iterator, _object_mask_biped, 0);\n\t\twhile (object_iterator_next(&biped_iterator))\n\t\t{\n'
+           '\t\t\tstruct object_datum *object;\n\n\t\t\tcutoff_time = 900;\n\t\t\tobject = object_get(biped_iterator.index);\n\n'
+           '\t\t\tif (object->object.idle_ticks > (short)cutoff_time &&\n'
+           '\t\t\t\tTEST_FLAG(object->object.damage_flags, _object_dead_bit))\n\t\t\t{\n'
+           '\t\t\t\tobject_delete(biped_iterator.index);\n\t\t\t}\n\t\t}\n\t}\n\n\treturn;\n}\n')
+    sub(G, old, new)
