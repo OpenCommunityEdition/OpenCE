@@ -548,7 +548,7 @@ void interface_draw_bitmap(
 	return;
 }
 
-long interface_get_weapon_hud_index(
+static long interface_get_weapon_hud_index(
 	real *flashlight_power)
 {
 	long player_index = local_player_get_player_index(render.local_player_index);
