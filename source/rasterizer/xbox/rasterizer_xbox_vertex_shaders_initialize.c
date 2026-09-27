@@ -69,8 +69,8 @@ unsigned long const vertex_shader_declarations[] =
 
 /* ---------- public code */
 
-/* NonMatching: the declaration table and SDK wrappers are exact; VC7 schedules
-the table-address loads differently in the initializer. */
+/* Exact: the declaration table, the SDK wrappers and this initializer match January (an
+earlier note here recorded a table-address load-schedule difference that no longer exists). */
 boolean rasterizer_vertex_shaders_initialize(
 	void)
 {
