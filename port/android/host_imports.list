@@ -10,6 +10,7 @@ host_thread_create
 host_memory_watch_initialize
 host_memory_watch_protect
 host_memory_watch_generation
+host_memory_watch_serial
 host_memory_watch_prepare_write
 host_memory_watch_forget
 host_sdl_init

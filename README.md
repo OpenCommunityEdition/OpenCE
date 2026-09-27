@@ -27,6 +27,33 @@ You must source the August 2001 Xbox SDK yourself, and you need Python and [ninj
 
 The native builds (Linux, Windows, Android) are debug builds by default: like the build the decompilation reproduces, they stop at the first failed assertion and log it. `python configure.py --release` configures release builds instead, which, like the retail game, do not check assertions. The byte-matching build is unaffected.
 
+### Optimisation
+
+The Linux and Windows builds are optimised for the processor of the computer that builds them (`-march=native`), and may not start on another. `python configure.py --portable` targets the x86-64 baseline instead (SSE2, which every 64-bit x86 processor has): use it for builds you share.
+
+They also use full link-time optimisation by default, which makes the final link take a minute or so; `--lto=thin` links in parallel and incrementally, `--lto=off` not at all.
+
+They are also optimised with profiles of the game at play, recorded by an instrumented build playing the main menu and the opening minute of every campaign level by itself: `pgo/halo_linux.profdata` for Linux (and Android, whose code is almost the same) and `pgo/halo_windows.profdata` for Windows. The profiles need clang 22 or later; with an older clang, and with `--pgo=off`, the builds do without. A profile stays useful as the code changes (functions it does not know simply go without). To record a new one, delete it and configure with `--pgo=train`: `ninja linux` or `ninja windows` then builds the instrumented game and plays the levels (about fifteen minutes, in a window, silently; it needs the game data in `assets/`) before the real build. Over ssh, Windows plays them on the logged-in user's desktop, through a scheduled task. `--pgo-profile <file>` uses another profile.
+
+With Mesa drivers the Linux build makes its GL calls through Mesa's GL thread (`mesa_glthread`), which takes them off the game's thread.
+
+Frames per second at the opening of a30, uncapped (`HALO_NO_VSYNC=1`), about 510 draws per frame; each row adds one change to the one above (Linux: a laptop with an Intel Core i7-1355U and Iris Xe graphics, median of three runs; Android: a Pixel 9 Pro XL, Tensor G4, median of three runs):
+
+| Change | Linux | Android |
+| --- | ---: | ---: |
+| Original | 103 | 132 |
+| GL state set only when it changes | 139 | 156 |
+| Vertex and index buffers from a GL copy of the Xbox memory | 171 | 193 |
+| Full link-time optimisation | 189 | not applicable |
+| Profile-guided optimisation | 201 | 197 |
+| `-march=native` (`--portable`, x86-64: 212; Android: `-mcpu=cortex-x3`, not used) | 224 | 191 |
+| Mesa's GL thread | 257 | not applicable |
+| Sound obstruction tested once per game tick, cheaper per-draw bookkeeping | 303 | 220 |
+
+Android has no equivalent of `-march=native`: the build runs on any 64-bit phone, and compiling for the Pixel's big cores made it slower there anyway, so its last row builds on the profile-guided one. On the laptop the game's own thread no longer sets the frame rate: it spends about as long waiting for the GL and driver threads and the GPU (which the laptop's power management keeps at a low clock for this load) as they spend waiting for it. The same holds in heavier scenes such as b30, at about 190.
+
+Unity ("jumbo") builds, which compile many files as one, would give the compiler nothing full link-time optimisation does not already see, and the decompiled sources declare too many conflicting local types for it anyway. `-O3` and profile-driven function splitting measured no faster than `-O2`.
+
 ### Frame rate
 
 The native builds draw a frame at every refresh of the display (60, 90, 120, 240 Hz, ...), paced by vsync, while the game still simulates at 30 Hz as on the Xbox: each frame blends the last two ticks. To see the frame rate, open the developer console (the \` key) and enter `display_framerate true`; the frames per second, averaged over half a second, appear at the bottom right of the screen. `HALO_INTERPOLATION=0` restores the original 30 frames per second. See [port/linux/README.md](port/linux/README.md#frame-rate).

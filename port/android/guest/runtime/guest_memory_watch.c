@@ -25,6 +25,11 @@ unsigned long memory_watch_generation(unsigned long address, unsigned long size)
 	return host_memory_watch_generation(address, size);
 }
 
+unsigned long memory_watch_serial(void)
+{
+	return host_memory_watch_serial();
+}
+
 void memory_watch_prepare_write(void *address, unsigned long size)
 {
 	host_memory_watch_prepare_write((unsigned int)address, size);

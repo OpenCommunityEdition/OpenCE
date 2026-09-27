@@ -75,9 +75,38 @@ def test_render_skips_tags_used_as_both_struct_and_union():
 # ---------- SDK header overlay
 
 
+# winnt.h's shift helpers, written in x86 assembly as the XDK's are
+WINNT_HELPERS = "".join(
+    f"""
+__inline ULONGLONG NTAPI {name}(ULONGLONG Value, DWORD ShiftCount)
+{{
+    __asm {{
+        mov ecx, ShiftCount
+        mov eax, dword ptr [Value]
+        mov edx, dword ptr [Value+4]
+        {instruction}
+    }}
+}}
+"""
+    for name, instruction in (
+        ("Int64ShllMod32", "shld edx, eax, cl"),
+        ("Int64ShraMod32", "shrd eax, edx, cl"),
+        ("Int64ShrlMod32", "shrd eax, edx, cl"),
+    )
+)
+
+
+def test_sdk_overlay_writes_winnt_helpers_in_c():
+    patched = linux_sdk_overlay.patch_winnt(WINNT_HELPERS)
+    assert "__asm" not in patched
+    for name, body in linux_sdk_overlay.C_BODIES.items():
+        assert f"{name}(ULONGLONG Value, DWORD ShiftCount)\n{{\n    {body}\n}}" in patched
+
+
 def test_sdk_overlay_links_every_spelling_but_not_crt_headers(tmp_path):
     sdk = tmp_path / "sdk"
-    write(sdk / "WinNT.h", "")
+    write(sdk / "WinNT.h", WINNT_HELPERS)
+    write(sdk / "WinBase.h", "")
     write(sdk / "StdIO.h", "")
     write(sdk / "Vector", "")  # extensionless C++ header
     output = tmp_path / "overlay"
@@ -87,11 +116,15 @@ def test_sdk_overlay_links_every_spelling_but_not_crt_headers(tmp_path):
     linux_sdk_overlay.generate(sdk, output)
 
     names = {path.name for path in output.iterdir()}
-    assert {"WinNT.h", "winnt.h", "WINNT.H"} <= names
+    assert {"WinNT.h", "winnt.h", "WINNT.H", "WinBase.h", "winbase.h", "WINBASE.H"} <= names
     assert not {"StdIO.h", "stdio.h", "Vector", "gone.h"} & names
     # regular files in the output are left alone, stale links removed
     assert "stale.h" in names
-    assert (output / "winnt.h").resolve() == (sdk / "WinNT.h").resolve()
+    assert (output / "winbase.h").resolve() == (sdk / "WinBase.h").resolve()
+    # winnt.h is a copy with its helpers in C
+    for spelling in ("WinNT.h", "winnt.h", "WINNT.H"):
+        assert not (output / spelling).is_symlink()
+        assert "__asm" not in (output / spelling).read_text()
 
 
 # ---------- /showIncludes filter

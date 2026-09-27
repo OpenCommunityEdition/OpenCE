@@ -29,6 +29,16 @@ ninja windows
 
 `configure.py` generates the Windows build only when it runs on Windows.
 
+The executable is optimised for the processor of the computer that builds
+it (`-march=native`) and may not start on another; `python configure.py
+--portable` builds one that runs on any x86-64 processor, for sharing. Full
+link-time optimisation makes the final link take a while; see
+[Optimisation](../../README.md#optimisation) for this and for the
+profile-guided optimisation with `pgo/halo_windows.profdata`, which
+`--pgo=train` records again (the instrumented build uses LLVM's profile
+runtime, compiled for 32-bit x86 from its sources, since LLVM for Windows
+ships it for x86-64 only: `pgo/halo_profile_runtime.c`).
+
 ## Running
 
 ```bat

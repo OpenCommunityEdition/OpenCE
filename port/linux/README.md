@@ -85,6 +85,8 @@ further gamepads become controllers 2-4.
 | `HALO_LANGUAGE` | dashboard language: `en`, `ja`, `de`, `fr`, `es`, `it` |
 | `HALO_INTERPOLATION=0` | the original 30 frames per second (see Frame rate) |
 | `HALO_NO_VSYNC` | do not wait for the display between frames |
+| `HALO_EXIT_AFTER=<seconds>` | quit that long after the window opens (profile training, benchmarks) |
+| `mesa_glthread=false` | with Mesa drivers, make the GL calls on the game's own thread (the game turns Mesa's GL thread on otherwise) |
 | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | write every Nth presented frame as a BMP |
 | `HALO_GPU_STATS`, `HALO_GPU_TRACE=<frame>` (with `HALO_GPU_TRACE_CONSTANTS`), `HALO_GPU_DUMP_SHADERS=<dir>`, `HALO_TEXTURE_DUMP=<dir>`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | renderer debugging: per-frame counts, a full state trace of one frame, the generated GLSL, uploaded textures |
 | `HALO_GPU_SKIP_VS=<id>,...`, `HALO_GPU_DEBUG_EXPR=<glsl>`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | renderer debugging: drop draws by vertex shader, or replace every pixel shader's output with a GLSL expression (for example `t0.rgb` or `xD0.rgb`) |
@@ -117,7 +119,7 @@ cannot read above 100).
 | Area | Status |
 | --- | --- |
 | Game code | All 466 C translation units of the game project, unmodified apart from the edits listed below. |
-| Graphics | Direct3D 8 on OpenGL 4.5 core through SDL3 (`src/d3d8_gl.c`): NV2A vertex shader microcode and register combiner pixel shaders are translated to GLSL, Xbox textures (swizzled, linear, DXT, palettized, cube and volume) are decoded and cached with page-protection write tracking, render targets are framebuffer objects, and the picture is presented letterboxed in a resizable window. |
+| Graphics | Direct3D 8 on OpenGL 4.5 core through SDL3 (`src/d3d8_gl.c`): NV2A vertex shader microcode and register combiner pixel shaders are translated to GLSL, Xbox textures (swizzled, linear, DXT, palettized, cube and volume) are decoded and cached with page-protection write tracking, vertex and index buffers are drawn from a copy of the Xbox's contiguous memory in GL buffers kept current the same way, GL state is set only when it changes, render targets are framebuffer objects, and the picture is presented letterboxed in a resizable window. |
 | Sound | Xbox DirectSound over SDL3 audio (`src/dsound_sdl.c`): PCM and Xbox ADPCM streams mixed at 48 kHz with volume, pitch, mix bins, distance rolloff, stereo panning and I3DL2 occlusion/obstruction levels. Doppler, cones and reverb are not modelled. |
 | Input | XInput over SDL3 (`src/xinput_sdl.c`): keyboard and mouse as controller 1, SDL gamepads with rumble, and the debug keyboard for the console. |
 | Files | Win32 file API over POSIX (`CreateFile`, overlapped/`ReadFileEx` with completion APCs, find, attributes, times, free space), MSVC `fopen`/`open`/`_stat` families with Xbox path translation. |
@@ -179,7 +181,9 @@ definition, since the linker would otherwise resolve it to address 0.
 
 Files named `posix_*.c` talk to glibc and are compiled with the host ABI:
 glibc structures with 64-bit members (`struct stat`, `struct dirent`) have a
-different layout under `-malign-double`. Everything else includes the XDK
+different layout under `-malign-double`. With link-time optimisation they
+stay native objects, as LLVM will not optimise code with glibc's 32-bit
+`wchar_t` together with the game's 16-bit one. Everything else includes the XDK
 headers through `platform.h`, so each definition is type-checked against the
 SDK prototype it implements, calling convention included.
 `src/halo_linker_common.c` holds weak, zero-filled storage for globals that
@@ -228,6 +232,7 @@ Linux prefix header, never by the matching build):
 | `scenario/scenario.c` | the structure BSP connection tables are named directly instead of being addressed at MSVC's offsets from `global_structure_bsp_index` |
 | `rasterizer/xbox/rasterizer_xbox_environment_fog.c` | a local pointer initialized from the file-scope array of the same name; MSVC resolved the name in the initializer to the array, standard C to the new local |
 | `game/player_control.c` | adds direct mouse aim (`halo_linux_mouse_look`) to the facing change of the player on controller 1 |
+| `sound/game_sound.c` | `compute_sound_obstruction` (a collision test from the camera to each audible sound) runs once per game tick and its result is reused by the tick's other frames: the sound manager refreshes sounds every frame, which on the Xbox was once per tick |
 
 The game's x86 inline assembly is also replaced under `#ifdef HALO_LINUX`,
 which every native port (Linux, Windows, Android) defines, so the compiler

@@ -904,12 +904,57 @@ void game_sound_set_mouth_aperture(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* The native ports draw several frames per game tick (port/linux/game/
+render_interpolation.c), and the sound manager refreshes every sound each
+frame; on the Xbox, frames and ticks were one. A sound's obstruction, a
+collision test from the camera, is computed once per tick and reused by the
+tick's other frames. */
+#define OBSTRUCTION_CACHE_SLOTS 128
+
+static struct
+{
+	boolean valid;
+	long game_time;
+	short local_player_index;
+	real_point3d position;
+	real obstruction;
+	real occlusion;
+} obstruction_cache[OBSTRUCTION_CACHE_SLOTS];
+
+static long obstruction_cache_slot(
+	short local_player_index,
+	real_point3d const *position)
+{
+	unsigned long const *words = (unsigned long const *)position;
+
+	return (long)(((words[0] * 73856093UL) ^ (words[1] * 19349663UL) ^ (words[2] * 83492791UL) ^
+		(unsigned long)local_player_index) % OBSTRUCTION_CACHE_SLOTS);
+}
+#endif
+
 void compute_sound_obstruction(
 	short local_player_index,
 	struct sound_source *source,
 	real distance)
 {
 	struct observer_result const *camera = observer_get_camera(local_player_index);
+#ifdef HALO_LINUX
+	long slot = obstruction_cache_slot(local_player_index, &source->location.position);
+	long now = game_time_get();
+
+	if (obstruction_cache[slot].valid &&
+		obstruction_cache[slot].game_time == now &&
+		obstruction_cache[slot].local_player_index == local_player_index &&
+		obstruction_cache[slot].position.x == source->location.position.x &&
+		obstruction_cache[slot].position.y == source->location.position.y &&
+		obstruction_cache[slot].position.z == source->location.position.z)
+	{
+		source->obstruction = obstruction_cache[slot].obstruction;
+		source->occlusion = obstruction_cache[slot].occlusion;
+		return;
+	}
+#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\game_sound.c",
@@ -982,6 +1027,14 @@ void compute_sound_obstruction(
 		926,
 		global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;
+#ifdef HALO_LINUX
+	obstruction_cache[slot].valid = TRUE;
+	obstruction_cache[slot].game_time = now;
+	obstruction_cache[slot].local_player_index = local_player_index;
+	obstruction_cache[slot].position = source->location.position;
+	obstruction_cache[slot].obstruction = source->obstruction;
+	obstruction_cache[slot].occlusion = source->occlusion;
+#endif
 
 	return;
 }

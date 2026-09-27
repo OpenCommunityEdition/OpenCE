@@ -182,12 +182,16 @@ targets OpenGL ES 3.0 with optional 3.2 features under `HALO_ANDROID`:
 - the sampler LOD bias (used by water ripples) is applied in the pixel
   shaders;
 - `D3DCOLOR` vertex attributes are byte-swapped on upload;
-- vertex and index data stream into a ring of three buffers, one per frame
-  in flight, with unsynchronized mapped writes: Mali copies a whole buffer
-  for every `glBufferSubData` into one that queued draws still use, and
-  orphaning a large buffer each frame costs as much, which exhausted the
-  phone's memory within seconds;
-- indexed draws are rebased on the CPU instead of using base-vertex draws;
+- vertex and index data that is not drawn from the copy of the contiguous
+  memory (`d3d8_gl.c`, dynamic vertices and colour streams) streams into a
+  ring of three buffers, one per frame in flight, with unsynchronized mapped
+  writes: Mali copies a whole buffer for every `glBufferSubData` into one
+  that queued draws still use, and orphaning a large buffer each frame costs
+  as much, which exhausted the phone's memory within seconds. For the same
+  reason pages enter the copy with unsynchronized writes too (no queued draw
+  reads a page before its first upload);
+- indexed draws use base-vertex draws on ES 3.2, and are rebased on the CPU
+  before that;
 - border clamping, anisotropy and image copies are used where available;
 - visibility tests (lens flare occlusion) count samples with a fragment
   shader atomic counter on OpenGL ES 3.1 and later, as the NV2A did; ES 3.0

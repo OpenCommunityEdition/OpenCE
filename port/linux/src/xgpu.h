@@ -21,6 +21,8 @@ struct xgpu_capabilities
 	BOOL border_clamp;
 	BOOL anisotropy;
 	BOOL s3tc;
+	/* ES 3.2: glDrawElementsBaseVertex */
+	BOOL base_vertex;
 	/* ES 3.1 with fragment atomic counters: exact visibility test counts */
 	BOOL atomic_counters;
 	/* "300 es" or "310 es" */
@@ -36,6 +38,14 @@ void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
 #endif
+
+/* ---------- GL state
+
+The device caches the GL state it sets for draws (d3d8_gl.c); code that
+changes GL state behind it (binding a texture to upload it, deleting one)
+must call this afterwards. */
+
+void xgpu_gl_state_invalidate(void);
 
 /* ---------- generated source text */
 

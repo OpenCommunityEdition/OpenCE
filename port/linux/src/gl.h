@@ -105,6 +105,7 @@ this list to generate the guest's entry points */
 	X(glVertexAttribI4ui) \
 	X(glDrawArrays) \
 	X(glDrawElements) \
+	X(glDrawElementsBaseVertex) \
 	X(glCreateShader) \
 	X(glShaderSource) \
 	X(glCompileShader) \
@@ -195,6 +196,8 @@ this list to generate the guest's entry points */
 	X(glBindBuffer) \
 	X(glBufferData) \
 	X(glBufferSubData) \
+	X(glBufferStorage) \
+	X(glMapBufferRange) \
 	X(glBindBufferBase) \
 	X(glGenVertexArrays) \
 	X(glBindVertexArray) \
@@ -317,6 +320,7 @@ pointers, sees the declarations without these aliases */
 #define glVertexAttribI4ui halo_glVertexAttribI4ui
 #define glDrawArrays halo_glDrawArrays
 #define glDrawElements halo_glDrawElements
+#define glDrawElementsBaseVertex halo_glDrawElementsBaseVertex
 #define glCreateShader halo_glCreateShader
 #define glShaderSource halo_glShaderSource
 #define glCompileShader halo_glCompileShader
@@ -405,6 +409,8 @@ pointers, sees the declarations without these aliases */
 #define glBindBuffer halo_glBindBuffer
 #define glBufferData halo_glBufferData
 #define glBufferSubData halo_glBufferSubData
+#define glBufferStorage halo_glBufferStorage
+#define glMapBufferRange halo_glMapBufferRange
 #define glBindBufferBase halo_glBindBufferBase
 #define glGenVertexArrays halo_glGenVertexArrays
 #define glBindVertexArray halo_glBindVertexArray

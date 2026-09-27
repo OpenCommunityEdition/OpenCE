@@ -76,6 +76,36 @@ parser.add_argument(
     help="release builds of the native ports (Linux, Windows, Android): assertions are not checked",
 )
 parser.add_argument(
+    "--lto",
+    choices=["full", "thin", "off"],
+    default="full",
+    help="link-time optimisation of the native ports (Linux, Windows): full (the default: the whole game "
+    "optimised as one module, the fastest code and the slowest links), thin (parallel and incremental) or off",
+)
+parser.add_argument(
+    "--portable",
+    action="store_true",
+    help="native x86 ports (Linux, Windows): code for any x86-64 processor (SSE2) rather than for this "
+    "machine's (-march=native, the default); use it for builds that run on other computers",
+)
+parser.add_argument(
+    "--pgo",
+    nargs="?",
+    const="train",
+    default="use",
+    choices=["use", "train", "off"],
+    help="profile-guided optimisation of the native ports: use (the default) optimises with the profiles in pgo/, "
+    "train (or plain --pgo) first records this platform's profile if it is missing, by letting an instrumented "
+    "build play every campaign level (needs the game data in assets/ and a display; Linux and Windows), off does "
+    "without",
+)
+parser.add_argument(
+    "--pgo-profile",
+    metavar="PROFDATA",
+    type=Path,
+    help="native ports: profile-guided optimisation from this profile instead",
+)
+parser.add_argument(
     "--android-ndk",
     type=str,
     help="Android NDK for `ninja android` (default: ANDROID_NDK_HOME, or the newest under the Android SDK)",
@@ -144,6 +174,10 @@ sln.ninja_path = args.ninja
 sln.ml_path = args.ml
 sln.linux_cc = args.linux_cc
 sln.port_release = args.release
+sln.port_lto = args.lto
+sln.port_portable = args.portable
+sln.port_pgo = args.pgo
+sln.port_pgo_profile = args.pgo_profile
 sln.android_ndk = args.android_ndk
 sln.android_guest_cc = args.android_guest_cc
 if not is_windows():

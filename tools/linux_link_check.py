@@ -15,6 +15,7 @@ Usage: linux_link_check.py <response file listing the objects> [executable]
 
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from typing import Dict, List, Set
@@ -31,10 +32,14 @@ RUNTIME_WEAK_REFERENCES = {
 }
 
 
+# llvm-nm also reads the LLVM bitcode objects of link-time optimised builds
+NM = shutil.which("llvm-nm") or "nm"
+
+
 def symbol_table(objects: List[str]) -> Dict[str, Set[str]]:
     """Map each object symbol name to the set of nm type letters seen."""
     output = subprocess.run(
-        ["nm", "--format=posix", *objects],
+        [NM, "--format=posix", *objects],
         check=True, capture_output=True, text=True,
     ).stdout
     symbols: Dict[str, Set[str]] = {}
@@ -62,7 +67,7 @@ def main() -> None:
     )
     if len(sys.argv) > 2:
         imports = subprocess.run(
-            ["nm", "--undefined-only", sys.argv[2]],
+            [NM, "--undefined-only", sys.argv[2]],
             check=True, capture_output=True, text=True,
         ).stdout.split()
         wide = sorted(

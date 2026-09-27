@@ -98,6 +98,11 @@ void memory_watch_protect(unsigned long address, unsigned long size)
 	}
 }
 
+unsigned long memory_watch_serial(void)
+{
+	return (unsigned long)current_generation;
+}
+
 unsigned long memory_watch_generation(unsigned long address, unsigned long size)
 {
 	unsigned long first, last, page, newest = 0;

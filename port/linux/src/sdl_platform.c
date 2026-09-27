@@ -96,6 +96,13 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 	if (getenv("HALO_GL_DEBUG"))
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#if !defined(HALO_ANDROID) && !defined(_WIN32)
+	/* Mesa's GL thread: the renderer makes thousands of GL calls a frame
+	and never waits for their results, so handing them to a thread of
+	their own takes a fifth of the main thread's time off it. It leaves an
+	explicit mesa_glthread setting alone and other drivers ignore it. */
+	setenv("mesa_glthread", "true", 0);
+#endif
 
 #ifdef HALO_ANDROID
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
@@ -301,10 +308,24 @@ BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
 
 void platform_pump_events(void)
 {
+	/* HALO_EXIT_AFTER=<seconds> ends the game that long after the window
+	opens, as closing it does (tools/pgo_train.py) */
+	static Uint64 exit_ticks = (Uint64)-1;
 	SDL_Event event;
 
 	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
 		return;
+	if (exit_ticks == (Uint64)-1)
+	{
+		const char *setting = getenv("HALO_EXIT_AFTER");
+
+		exit_ticks = setting ? SDL_GetTicks() + (Uint64)(atof(setting) * 1000.0) : 0;
+	}
+	if (exit_ticks && SDL_GetTicks() >= exit_ticks)
+	{
+		platform_log("exiting after HALO_EXIT_AFTER");
+		exit(EXIT_SUCCESS);
+	}
 	pthread_mutex_lock(&input_lock);
 	while (SDL_PollEvent(&event))
 	{

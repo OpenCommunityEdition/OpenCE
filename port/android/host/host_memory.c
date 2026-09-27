@@ -496,6 +496,11 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 	}
 }
 
+uint32_t host_memory_watch_serial(void)
+{
+	return current_generation;
+}
+
 uint32_t host_memory_watch_generation(uint32_t address, uint32_t size)
 {
 	uint64_t first, last, page;

@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .linux_build import LINUX_PROFILE, pgo_mode, pgo_profile, profile_use_flags
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -342,6 +343,13 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     guest_abi = " ".join(GUEST_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
+    # profile-guided optimisation with the Linux build's profile (committed,
+    # or trained by the Linux build with --pgo=train): the game and platform
+    # code are the same, and functions that differ simply go without
+    profile = pgo_profile(sln, LINUX_PROFILE if pgo_mode(sln) == "train" else None, [LINUX_PROFILE], guest_cc)
+    profile_flags = " ".join(profile_use_flags(profile))
+    if profile:
+        tool_implicit.append(profile)
 
     def guest_object(source: Path, cflags: str, prefix: str = "") -> Path:
         obj = obj_dir / prefix / Path(str(source).lstrip("/")).with_suffix(".o")
@@ -390,7 +398,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
             f"-I{_quote(d)}" for d in options.get("include_dirs") or [] if Path(d) != Path("xbox/include")
         )
         game_cflags = " ".join([
-            guest_abi, guest_code, " ".join(game_flags),
+            guest_abi, guest_code, " ".join(game_flags), profile_flags,
             f"-include {prefix_header}", f"-include {semantics_header}", defines,
             f"-I{LINUX_DIR}/include", includes, *libc_includes, f"-idirafter {sdk_overlay}",
         ])
@@ -407,7 +415,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
 
     # the platform layer shared with Linux, and the guest runtime
     platform_cflags = " ".join([
-        guest_abi, guest_code, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-w",
+        guest_abi, guest_code, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-w", profile_flags,
         f"-include {prefix_header}", f"-include {platform_semantics_header}",
         f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
         f"-I{PORT_DIR}/include", "-Isource -Isource/cseries",

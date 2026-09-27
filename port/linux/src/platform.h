@@ -129,6 +129,9 @@ void memory_watch_initialize(void);
 void memory_watch_protect(unsigned long address, unsigned long size);
 /* newest write generation of any page in the range */
 unsigned long memory_watch_generation(unsigned long address, unsigned long size);
+/* changes whenever any page's generation does: while it stays the same, so
+do all generations */
+unsigned long memory_watch_serial(void);
 /* call before the host itself (read(), the kernel) writes into the range */
 void memory_watch_prepare_write(void *address, unsigned long size);
 /* the range was remapped or reprotected: treat it as written and unwatched */

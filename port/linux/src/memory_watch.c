@@ -150,6 +150,10 @@ unsigned long memory_watch_generation(unsigned long address, unsigned long size)
 	return newest;
 }
 
+unsigned long memory_watch_serial(void)
+{
+	return current_generation;
+}
 
 void memory_watch_prepare_write(void *address, unsigned long size)
 {
