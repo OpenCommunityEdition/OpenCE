@@ -73,6 +73,8 @@ further gamepads become controllers 2-4.
 | F12 | releases or recaptures the mouse |
 | F11 | switches between fullscreen and the window |
 
+In the menus (the main menu, the pause menu and the dialogs), the mouse is released and drives a pointer: the item under it takes the focus, a left click selects it (on a setting with a value, clicking its left or right half steps the value; on the rows of profiles and levels, clicking one moves to it and selects it; on a button in a screen's key, such as "B = Back", presses that button), a right click goes back and the wheel moves through the items. The keyboard keeps working alongside it. When the game resumes the mouse aims again; a button held from the click that resumed it does not fire until pressed again.
+
 ### Settings
 
 | Variable | Effect |

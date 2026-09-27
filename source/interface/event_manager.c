@@ -162,6 +162,28 @@ unsigned long event_manager_time_of_last_event(
 	return event_manager_globals.state.time_of_last_event;
 }
 
+#ifdef HALO_LINUX
+void event_manager_post_button(
+	short controller_index,
+	short button_index)
+{
+	struct event_record event = {0};
+
+	if (!event_manager_globals.state.initialized ||
+		controller_index < 0 ||
+		controller_index >= MAXIMUM_GAMEPADS)
+	{
+		return;
+	}
+	event.type = _event_type_button;
+	event.data.button.index = (byte)button_index;
+	event.data.button.value = 1;
+	queue_event(&event, controller_index);
+
+	return;
+}
+
+#endif
 /* ---------- private code */
 
 static void queue_event(

@@ -17,6 +17,10 @@ Keyboard and mouse (port 0):
 	escape           start               F1               back
 	F12              release or recapture the mouse
 
+In the menus the mouse is free and drives a pointer instead
+(port/linux/include/halo_ui_pointer.h, source/interface/ui_widget.c): its
+motion, buttons and wheel do not reach the controller then.
+
 Mouse aim does not go through the right stick: the game's look code asks
 halo_linux_mouse_look for the motion since its last call and adds it to the
 stick's facing change, so aiming is direct rather than rate based.

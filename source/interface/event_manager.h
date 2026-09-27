@@ -56,6 +56,14 @@ void event_manager_flush(
 void event_manager_update(
 	void);
 
+#ifdef HALO_LINUX
+/* a press of a button, as if the controller had just pressed it (the menus'
+mouse pointer, ui_widget.c) */
+void event_manager_post_button(
+	short controller_index,
+	short button_index);
+#endif
+
 /* ---------- globals */
 
 /* ---------- public code */

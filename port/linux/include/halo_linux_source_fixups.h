@@ -42,5 +42,7 @@ long halo_screen_width(void);
 long halo_screen_commit(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* the mouse in the menus (source/interface/ui_widget.c) */
+#include "halo_ui_pointer.h"
 
 #endif

@@ -23,6 +23,7 @@ Conventions carried over from the Xbox:
 
 #include "xgpu.h"
 #include "sdl_platform.h"
+#include "halo_ui_pointer.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1113,6 +1114,65 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 	*returned_device = device_pointer();
 	return S_OK;
 }
+
+/* ---------- the menus' pointer */
+
+#ifdef HALO_ANDROID
+int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
+{
+	(void)menus_active;
+	(void)pointer;
+	return 0;
+}
+#else
+/* a point in the window, as SDL reports it, in the menus' coordinates: the
+inverse of the letterboxed display blit at presentation, the screen's
+width and the menus' centering (halo_screen_ui_offset) */
+static void ui_point_from_window(float window_x, float window_y, short *x, short *y)
+{
+	struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
+	int window_width, window_height, pixel_width, pixel_height, width, height, left, top;
+	float screen_x, screen_y;
+
+	*x = *y = -1;
+	if (!back_buffer)
+		return;
+	platform_video_window_size(&window_width, &window_height);
+	platform_video_drawable_size(&pixel_width, &pixel_height);
+	if (window_width <= 0 || window_height <= 0)
+		return;
+	width = pixel_width;
+	height = (int)((long)pixel_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
+	if (height > pixel_height)
+	{
+		height = pixel_height;
+		width = (int)((long)pixel_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
+	}
+	left = (pixel_width - width) / 2;
+	top = (pixel_height - height) / 2;
+	screen_x = (window_x * pixel_width / window_width - left) * (float)back_buffer->target.width / (float)width;
+	screen_y = (window_y * pixel_height / window_height - top) * (float)back_buffer->target.height / (float)height;
+	*x = (short)floorf(screen_x - (float)(halo_screen_width() - 640) / 2.0f);
+	*y = (short)floorf(screen_y);
+}
+
+int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
+{
+	struct platform_ui_pointer state;
+
+	platform_ui_pointer_set_active(menus_active != 0);
+	if (!menus_active || !device.gl_ready || !platform_ui_pointer_read(&state))
+		return 0;
+	memset(pointer, 0, sizeof(*pointer));
+	ui_point_from_window(state.x, state.y, &pointer->x, &pointer->y);
+	ui_point_from_window(state.click_x, state.click_y, &pointer->click_x, &pointer->click_y);
+	pointer->moved = state.moved != FALSE;
+	pointer->left_clicks = (unsigned char)(state.left_clicks < 255 ? state.left_clicks : 255);
+	pointer->right_clicks = (unsigned char)(state.right_clicks < 255 ? state.right_clicks : 255);
+	pointer->wheel_steps = (signed char)(state.wheel_steps < -8 ? -8 : state.wheel_steps > 8 ? 8 : state.wheel_steps);
+	return 1;
+}
+#endif
 
 /* takes up the display's shape and resolution, or the window's, if they
 have changed; between frames, since the game's layout and the targets must

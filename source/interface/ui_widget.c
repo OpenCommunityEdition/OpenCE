@@ -5210,6 +5210,525 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* ---------- the mouse (desktop builds)
+
+The menus were made for a controller: the d-pad moves the focus through a
+screen's items and A activates the focused one. With the mouse
+(port/linux/include/halo_ui_pointer.h) the item under the pointer takes the
+focus, a left click presses A on it (on a spinner list, left or right by the
+half clicked), a right click presses B and the wheel the d-pad. The items and
+where they are drawn are noted while the menus draw (ui_mouse_note_target),
+for the next frame's processing (ui_widgets_process_mouse), which forgets
+them: widgets can be deleted from then on. */
+
+#define UI_MOUSE_MAXIMUM_TARGETS 96
+
+enum ui_mouse_target_kind
+{
+	/* an item the d-pad moves the focus to: a click presses A on it */
+	_ui_mouse_target_item,
+	/* a list showing one value at a time: a click on either half steps it
+	that way */
+	_ui_mouse_target_value,
+	/* one of the items a list shows side by side (profiles, levels): the
+	list steps to it, and a click then presses A */
+	_ui_mouse_target_list_slot,
+	/* a button's icon and label in a screen's key: a click presses it */
+	_ui_mouse_target_button
+};
+
+struct ui_mouse_target
+{
+	struct widget_instance *widget;
+	rectangle2d bounds;
+	short kind;
+	short button_index;
+};
+
+static struct ui_mouse_target ui_mouse_targets[UI_MOUSE_MAXIMUM_TARGETS];
+static long ui_mouse_target_count = 0;
+static boolean ui_mouse_noting_targets = FALSE;
+
+/* The presses the mouse makes, posted one a frame: the event queue keeps
+only the latest event posted between two frames (queue_event). What they
+lead to (the focus, a list's position) is only known once they have been
+processed, so the pointer's next hover or click waits for them. */
+#define UI_MOUSE_MAXIMUM_PRESSES 16
+
+static short ui_mouse_presses[UI_MOUSE_MAXIMUM_PRESSES];
+static long ui_mouse_press_count = 0;
+static boolean ui_mouse_hover_pending = FALSE;
+static boolean ui_mouse_click_pending = FALSE;
+static short ui_mouse_hover_x, ui_mouse_hover_y;
+static short ui_mouse_click_x, ui_mouse_click_y;
+
+static void ui_mouse_press(
+	short button_index)
+{
+	if (ui_mouse_press_count < UI_MOUSE_MAXIMUM_PRESSES)
+		ui_mouse_presses[ui_mouse_press_count++] = button_index;
+
+	return;
+}
+
+/* the widget's place among its parent's children, or NONE */
+static long ui_mouse_child_index(
+	struct widget_instance *widget)
+{
+	struct widget_instance *child;
+	long index = 0;
+
+	for (child = widget->parent ? widget->parent->child : NULL; child; child = child->next, index++)
+	{
+		if (child == widget)
+			return index;
+	}
+
+	return NONE;
+}
+
+/* a list that shows several of its items at once */
+static boolean ui_mouse_list_shows_several(
+	struct widget_instance *widget)
+{
+	return widget->type == _ui_widget_type_spinner_list &&
+		ui_widget_definition_get(widget->definition_tag_index)->child_widgets.count > 1;
+}
+
+/* the button a screen key's icon stands for ("a_butn" and so on), or NONE */
+static short ui_mouse_key_button(
+	struct widget_instance *widget)
+{
+	static struct
+	{
+		char const *name;
+		short button_index;
+	} const keys[] =
+	{
+		{ "a_butn", _gamepad_analog_button_a },
+		{ "b_butn", _gamepad_analog_button_b },
+		{ "x_butn", _gamepad_analog_button_x },
+		{ "y_butn", _gamepad_analog_button_y },
+		{ "black_butn", _gamepad_analog_button_black },
+		{ "white_butn", _gamepad_analog_button_white },
+		{ "start_butn", _gamepad_binary_button_start },
+		{ "back_butn", _gamepad_binary_button_back },
+	};
+	char const *name = tag_get_name(widget->definition_tag_index);
+	char const *leaf = name ? strrchr(name, '\\') : NULL;
+	long key_index;
+
+	leaf = leaf ? leaf + 1 : name;
+	for (key_index = 0; leaf && key_index < NUMBEROF(keys); key_index++)
+	{
+		long length = (long)strlen(keys[key_index].name);
+
+		/* and the smaller icons of the dialogs, "a_butn_sm" */
+		if (!strncmp(leaf, keys[key_index].name, length) &&
+			(leaf[length] == '\0' || leaf[length] == '_'))
+		{
+			return keys[key_index].button_index;
+		}
+	}
+
+	return NONE;
+}
+
+/* whether the d-pad moves the focus to a widget: an item of a column list,
+or a child its parent tabs through */
+static boolean ui_mouse_widget_is_item(
+	struct widget_instance *widget)
+{
+	struct widget_instance *parent = widget->parent;
+	struct ui_widget_definition *definition;
+	long index;
+
+	if (!parent || parent->type == _ui_widget_type_spinner_list)
+		return FALSE;
+	index = ui_mouse_child_index(widget);
+	if (index == NONE || !widget_instance_can_receive_events(widget))
+		return FALSE;
+	if (parent->type == _ui_widget_type_column_list)
+	{
+		return !parent->parameters.list.list_items ||
+			index < parent->parameters.list.number_of_items;
+	}
+	definition = ui_widget_definition_get(parent->definition_tag_index);
+	if (!TEST_FLAG(definition->flags, _widget_dpad_updown_tabs_thru_children_bit) &&
+		!TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_children_bit))
+	{
+		return FALSE;
+	}
+	definition = ui_widget_definition_get(widget->definition_tag_index);
+
+	return definition->event_handlers.count > 0 ||
+		TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
+		widget->type == _ui_widget_type_spinner_list ||
+		widget->type == _ui_widget_type_column_list;
+}
+
+static void ui_mouse_note_target(
+	struct widget_instance *widget,
+	struct ui_widget_definition const *definition,
+	point2d offset)
+{
+	struct widget_instance *parent = widget->parent;
+	struct ui_mouse_target *target;
+	rectangle2d bounds = definition->bounds;
+	short button_index;
+	short kind;
+
+	if (!ui_mouse_noting_targets ||
+		ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS ||
+		widget->disabled)
+	{
+		return;
+	}
+	bounds.x0 += offset.x;
+	bounds.x1 += offset.x;
+	bounds.y0 += offset.y;
+	bounds.y1 += offset.y;
+	button_index = ui_mouse_key_button(widget);
+	if (button_index != NONE)
+	{
+		/* the icon and its label: the text beginning just right of it */
+		struct widget_instance *sibling;
+		rectangle2d label_bounds;
+		short best_distance = 17;
+
+		kind = _ui_mouse_target_button;
+		for (sibling = parent ? parent->child : NULL; sibling; sibling = sibling->next)
+		{
+			struct ui_widget_definition *sibling_definition;
+			rectangle2d sibling_bounds;
+			short distance;
+
+			if (sibling->type != _ui_widget_type_text_box || !sibling->visible)
+				continue;
+			sibling_definition = ui_widget_definition_get(sibling->definition_tag_index);
+			sibling_bounds = sibling_definition->bounds;
+			sibling_bounds.x0 += offset.x - widget->horizontal_offset + sibling->horizontal_offset;
+			sibling_bounds.x1 += offset.x - widget->horizontal_offset + sibling->horizontal_offset;
+			sibling_bounds.y0 += offset.y - widget->vertical_offset + sibling->vertical_offset;
+			sibling_bounds.y1 += offset.y - widget->vertical_offset + sibling->vertical_offset;
+			distance = (short)ABS(sibling_bounds.x0 - bounds.x1);
+			if (distance < best_distance &&
+				sibling_bounds.y0 < bounds.y1 && sibling_bounds.y1 > bounds.y0)
+			{
+				best_distance = distance;
+				label_bounds = sibling_bounds;
+			}
+		}
+		if (best_distance < 17)
+		{
+			bounds.x1 = MAX(bounds.x1, label_bounds.x1);
+			bounds.y0 = MIN(bounds.y0, label_bounds.y0);
+			bounds.y1 = MAX(bounds.y1, label_bounds.y1);
+		}
+	}
+	else if (parent && ui_mouse_list_shows_several(parent))
+	{
+		if (parent->disabled ||
+			ui_mouse_child_index(widget) == NONE ||
+			!widget_instance_can_receive_events(parent))
+		{
+			return;
+		}
+		kind = _ui_mouse_target_list_slot;
+	}
+	else if (widget->type == _ui_widget_type_spinner_list)
+	{
+		/* a list showing several items is picked through them */
+		if (!parent || ui_mouse_list_shows_several(widget) || !widget_instance_can_receive_events(widget))
+			return;
+		kind = _ui_mouse_target_value;
+	}
+	else if (ui_mouse_widget_is_item(widget))
+	{
+		kind = _ui_mouse_target_item;
+	}
+	else
+	{
+		return;
+	}
+	target = &ui_mouse_targets[ui_mouse_target_count++];
+	target->widget = widget;
+	target->bounds = bounds;
+	target->kind = kind;
+	target->button_index = button_index;
+
+	return;
+}
+
+/* the target drawn last (so on top, and the innermost) under a point */
+static struct ui_mouse_target *ui_mouse_target_at(
+	short x,
+	short y)
+{
+	long index;
+
+	for (index = ui_mouse_target_count - 1; index >= 0; index--)
+	{
+		rectangle2d const *bounds = &ui_mouse_targets[index].bounds;
+
+		if (x >= bounds->x0 && x < bounds->x1 && y >= bounds->y0 && y < bounds->y1)
+			return &ui_mouse_targets[index];
+	}
+
+	return NULL;
+}
+
+static boolean ui_mouse_widget_has_focus(
+	struct widget_instance *widget)
+{
+	for (; widget->parent; widget = widget->parent)
+	{
+		if (widget->parent->focused_child != widget)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* moves the focus to the widget as the d-pad would, with the selection of
+the column lists on the way (widget_event_function_list_widget_goto_next_item) */
+static void ui_mouse_give_focus(
+	struct widget_instance *widget)
+{
+	struct widget_instance *ancestor;
+
+	if (ui_mouse_widget_has_focus(widget))
+		return;
+	widget_instance_give_focus_directly(widget_instance_get_topmost_parent(widget), widget);
+	for (ancestor = widget; ancestor->parent; ancestor = ancestor->parent)
+	{
+		if (ancestor->parent->type == _ui_widget_type_column_list)
+			ancestor->parent->parameters.list.selected_index = (short)ui_mouse_child_index(ancestor);
+	}
+	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
+
+	return;
+}
+
+/* the d-pad buttons that step a widget back and forward */
+static void ui_mouse_list_directions(
+	struct widget_instance *widget,
+	short *back,
+	short *forward)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+
+	if (TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_list_items_bit) ||
+		TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_children_bit))
+	{
+		*back = _widget_event_dpad_left;
+		*forward = _widget_event_dpad_right;
+	}
+	else
+	{
+		*back = _widget_event_dpad_up;
+		*forward = _widget_event_dpad_down;
+	}
+
+	return;
+}
+
+/* steps a list that shows several items to the one shown in a slot, as
+pressing the d-pad that many times would */
+static void ui_mouse_step_list_to_slot(
+	struct widget_instance *slot)
+{
+	struct widget_instance *list = slot->parent;
+	long steps;
+	short back, forward;
+
+	ui_mouse_give_focus(list);
+	if (!list->focused_child)
+		return;
+	steps = ui_mouse_child_index(slot) - ui_mouse_child_index(list->focused_child);
+	ui_mouse_list_directions(list, &back, &forward);
+	for (; steps > 0; steps--)
+		ui_mouse_press(forward);
+	for (; steps < 0; steps++)
+		ui_mouse_press(back);
+
+	return;
+}
+
+/* the widget the wheel steps: the innermost on the focus's way that the
+d-pad steps through */
+static struct widget_instance *ui_mouse_wheel_widget(
+	struct widget_instance *root)
+{
+	struct widget_instance *result = NULL;
+	struct widget_instance *widget;
+
+	for (widget = root; widget; widget = widget->focused_child)
+	{
+		struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+
+		if (definition->flags & (FLAG(_widget_dpad_updown_tabs_thru_children_bit) |
+			FLAG(_widget_dpad_leftright_tabs_thru_children_bit) |
+			FLAG(_widget_dpad_updown_tabs_thru_list_items_bit) |
+			FLAG(_widget_dpad_leftright_tabs_thru_list_items_bit)))
+		{
+			result = widget;
+		}
+	}
+
+	return result;
+}
+
+/* the menu the mouse drives: the first player's, or everyone's */
+static struct widget_instance *ui_mouse_menu(
+	void)
+{
+	long widget_index;
+
+	for (widget_index = 0; widget_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; widget_index++)
+	{
+		struct widget_instance *widget = widget_globals.active_widgets[widget_index];
+
+		if (widget && (widget->local_player_index == NONE || widget->local_player_index == 0))
+			return widget;
+	}
+
+	return NULL;
+}
+
+static boolean ui_mouse_menus_active(
+	void)
+{
+	if (widget_globals.initialization_thread || progress_bar_is_active())
+		return FALSE;
+
+	return virtual_keyboard_active() || ui_mouse_menu() != NULL;
+}
+
+/* the pointer's motion, clicks and wheel since the last frame, as the first
+player's controller events */
+static void ui_widgets_process_mouse(
+	void)
+{
+	struct halo_ui_pointer pointer;
+	struct ui_mouse_target *target;
+	short controller_index = 0;
+
+	if (!halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) ||
+		virtual_keyboard_active())
+	{
+		ui_mouse_press_count = 0;
+		ui_mouse_hover_pending = FALSE;
+		ui_mouse_click_pending = FALSE;
+	}
+	else
+	{
+		if (pointer.moved)
+		{
+			ui_mouse_hover_pending = TRUE;
+			ui_mouse_hover_x = pointer.x;
+			ui_mouse_hover_y = pointer.y;
+		}
+		if (pointer.left_clicks)
+		{
+			ui_mouse_click_pending = TRUE;
+			ui_mouse_click_x = pointer.click_x;
+			ui_mouse_click_y = pointer.click_y;
+		}
+		if (pointer.right_clicks)
+			ui_mouse_press(_widget_event_b_button);
+		if (pointer.wheel_steps && ui_mouse_menu())
+		{
+			struct widget_instance *widget = ui_mouse_wheel_widget(ui_mouse_menu());
+			short back = _widget_event_dpad_up, forward = _widget_event_dpad_down;
+			long step;
+
+			if (widget)
+				ui_mouse_list_directions(widget, &back, &forward);
+			for (step = 0; step < ABS(pointer.wheel_steps) && step < 4; step++)
+				ui_mouse_press(pointer.wheel_steps > 0 ? back : forward);
+		}
+		if (!ui_mouse_press_count && ui_mouse_hover_pending)
+		{
+			ui_mouse_hover_pending = FALSE;
+			target = ui_mouse_target_at(ui_mouse_hover_x, ui_mouse_hover_y);
+			if (target)
+			{
+				switch (target->kind)
+				{
+				case _ui_mouse_target_item:
+				case _ui_mouse_target_value:
+					ui_mouse_give_focus(target->widget);
+					break;
+				case _ui_mouse_target_list_slot:
+					ui_mouse_step_list_to_slot(target->widget);
+					break;
+				}
+			}
+		}
+		if (!ui_mouse_press_count && ui_mouse_click_pending)
+		{
+			ui_mouse_click_pending = FALSE;
+			target = ui_mouse_target_at(ui_mouse_click_x, ui_mouse_click_y);
+			if (target)
+			{
+				switch (target->kind)
+				{
+				case _ui_mouse_target_item:
+					ui_mouse_give_focus(target->widget);
+					ui_mouse_press(_gamepad_analog_button_a);
+					break;
+				case _ui_mouse_target_value:
+				{
+					short back, forward;
+					boolean first_half;
+
+					ui_mouse_give_focus(target->widget);
+					ui_mouse_list_directions(target->widget, &back, &forward);
+					first_half = back == _widget_event_dpad_left ?
+						ui_mouse_click_x < (target->bounds.x0 + target->bounds.x1) / 2 :
+						ui_mouse_click_y < (target->bounds.y0 + target->bounds.y1) / 2;
+					ui_mouse_press(first_half ? back : forward);
+					break;
+				}
+				case _ui_mouse_target_list_slot:
+					ui_mouse_step_list_to_slot(target->widget);
+					ui_mouse_press(_gamepad_analog_button_a);
+					break;
+				case _ui_mouse_target_button:
+					ui_mouse_press(target->button_index);
+					break;
+				}
+			}
+			else
+			{
+				long index;
+
+				/* a screen with nothing to pick (a message to dismiss): the
+				click is its A */
+				for (index = 0; index < ui_mouse_target_count; index++)
+				{
+					if (ui_mouse_targets[index].kind != _ui_mouse_target_button)
+						break;
+				}
+				if (index == ui_mouse_target_count)
+					ui_mouse_press(_gamepad_analog_button_a);
+			}
+		}
+		if (ui_mouse_press_count)
+		{
+			event_manager_post_button(controller_index, ui_mouse_presses[0]);
+			csmemmove(ui_mouse_presses, ui_mouse_presses + 1, --ui_mouse_press_count * sizeof(ui_mouse_presses[0]));
+		}
+	}
+	ui_mouse_target_count = 0;
+
+	return;
+}
+
+#endif
+
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -5245,6 +5764,9 @@ static void widget_instance_render_recursive(
 	}
 	if (!widget->visible)
 		return;
+#ifdef HALO_LINUX
+	ui_mouse_note_target(widget, definition, offset);
+#endif
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -5500,12 +6022,20 @@ void render_ui_widgets(
 				bounds.y1 = window_bounds->y1 - window_bounds->y0;
 				offset.x = 0;
 				offset.y = 0;
+#ifdef HALO_LINUX
+				/* the mouse drives the first player's menus */
+				ui_mouse_noting_targets = widget->local_player_index == NONE ||
+					widget->local_player_index == 0;
+#endif
 				widget_instance_render_recursive(
 					widget_globals.active_widgets[widget_index],
 					&bounds,
 					offset,
 					TRUE,
 					FALSE);
+#ifdef HALO_LINUX
+				ui_mouse_noting_targets = FALSE;
+#endif
 				if (widget_globals.debug_show_path)
 				{
 					real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -6454,6 +6984,9 @@ void process_ui_widgets(
 		644,
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
+#ifdef HALO_LINUX
+	ui_widgets_process_mouse();
+#endif
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))
