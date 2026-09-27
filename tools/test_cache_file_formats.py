@@ -228,12 +228,12 @@ def sound_item(samples_offset, samples_size, pitch_ranges=1, compression=1):
     return bytes(header + body.bytes)
 
 
-def string_list_item():
+def string_list_item(strings=("hello", "world!")):
     item = Blob()
     group = item.reserve(0x0C)
-    references = item.reserve(2 * 20)
-    item.block(group, 2, references)
-    for index, text in enumerate(("hello", "world!")):
+    references = item.reserve(len(strings) * 20)
+    item.block(group, len(strings), references)
+    for index, text in enumerate(strings):
         encoded = text.encode("utf-16-le") + b"\0\0"
         item.data(references + index * 20, len(encoded), data_address=item.add(encoded))
     return bytes(item.bytes)
@@ -315,6 +315,27 @@ def add_shader(blob, group, options):
     return shader
 
 
+def add_hud_placement(blob, placement, scale, flags):
+    struct.pack_into("<ff", blob.bytes, placement + 4 - blob.base, *scale)
+    blob.u16(placement + 0x0C, flags)
+
+
+def add_weapon_hud(blob, placements):
+    """A weapon HUD interface with a static element for each of the first two
+    placements and a crosshair of one item for the third, each (scale, flags)."""
+    hud = blob.reserve(0x17C)
+    statics = blob.reserve(2 * 0xB4)
+    crosshairs = blob.reserve(0x68)
+    items = blob.reserve(0x6C)
+    blob.block(hud + 0x60, 2, statics)
+    blob.block(hud + 0x84, 1, crosshairs)
+    blob.block(crosshairs + 0x34, 1, items)
+    add_hud_placement(blob, statics + 0x24, *placements[0])
+    add_hud_placement(blob, statics + 0xB4 + 0x24, *placements[1])
+    add_hud_placement(blob, items, *placements[2])
+    return hud
+
+
 def add_animation_graph(blob, overlay_animation_index):
     """An animation graph of one animation and one object overlay."""
     graph = blob.reserve(0x80)
@@ -381,7 +402,8 @@ class Map:
     def __init__(self, opensauce=None, mod_name="", definitions=b"", trailing=b"",
                  extra_tags=(), bsp_gap=None, bitmap_pixels_size=16, sound_samples_size=32,
                  font_style_reference=NONE, pitch_ranges=1, bsp_sizes=(0x1000,), sound_compression=1,
-                 model=None, bsp_material=None, shaders=(), animation_overlay=None, script_nodes=None):
+                 model=None, bsp_material=None, shaders=(), animation_overlay=None, script_nodes=None,
+                 weapon_hud=None, strings_name="test\\strings", strings=("hello", "world!")):
         self.bsp_sizes = bsp_sizes
         self.sound_compression = sound_compression
         # opt-in tags and content, so the defaults above keep their counts
@@ -390,6 +412,9 @@ class Map:
         self.shaders = shaders
         self.animation_overlay = animation_overlay
         self.script_nodes = script_nodes
+        self.weapon_hud = weapon_hud
+        self.strings_name = strings_name
+        self.strings = strings
         self.addresses = {}
         self.opensauce = opensauce
         self.mod_name = mod_name
@@ -421,7 +446,7 @@ class Map:
                                        self.sound_compression)),
         ])
         loc, _ = resource_map_file(3, [
-            ("test\\strings", string_list_item()),
+            (self.strings_name, string_list_item(self.strings)),
             ("test\\font", font_item(self.font_style_reference)),
             ("test\\hud messages", hud_message_text_item()),
         ])
@@ -434,7 +459,7 @@ class Map:
             ("bitm", "test\\in map bitmap", False),
             ("bitm", "test\\external bitmap", True),
             ("snd!", "test\\sound", True),
-            ("ustr", "test\\strings", True),
+            ("ustr", self.strings_name, True),
             ("font", "test\\font", True),
             ("hmt ", "test\\hud messages", True),
             ("weap", "test\\weapon", False),
@@ -444,10 +469,12 @@ class Map:
         tags += [(group, f"test\\shader {index}", False) for index, (group, _) in enumerate(self.shaders)]
         if self.animation_overlay is not None:
             tags.append(("antr", "test\\animations", False))
+        if self.weapon_hud is not None:
+            tags.append(("wphi", "test\\weapon hud", False))
         # further structure BSPs go last, so the indices above never move
         bsp_tag_indices = [1] + [len(tags) + extra for extra in range(len(self.bsp_sizes) - 1)]
         tags += [("sbsp", f"test\\bsp {extra + 2}", False) for extra in range(len(self.bsp_sizes) - 1)]
-        resource_indices = {"test\\external bitmap": 1, "test\\strings": 0, "test\\font": 1,
+        resource_indices = {"test\\external bitmap": 1, self.strings_name: 0, "test\\font": 1,
                             "test\\hud messages": 2}
         salt = 0xE174
 
@@ -523,6 +550,8 @@ class Map:
             address_of[f"test\\shader {index}"] = add_shader(tag_data, group, options)
         if self.animation_overlay is not None:
             address_of["test\\animations"] = add_animation_graph(tag_data, self.animation_overlay)
+        if self.weapon_hud is not None:
+            address_of["test\\weapon hud"] = add_weapon_hud(tag_data, self.weapon_hud)
         if self.script_nodes is not None:
             add_script_nodes(tag_data, scenario, *self.script_nodes)
         for tag_index, (group_name, name, external) in enumerate(tags):
@@ -983,6 +1012,53 @@ def test_animation_overlays_naming_real_animations_are_kept(report_tool, tmp_pat
     assert s16_at(tags, u32_at(tags, cache.addresses["test\\animations"] + 0x04)) == 0
 
 
+def f32_at(tags, address):
+    return struct.unpack_from("<f", tags, address - BASE)[0]
+
+
+def test_hud_elements_with_the_high_resolution_scale_are_halved(report_tool, tmp_path):
+    """Halo PC draws them from bitmaps at twice the Xbox's size; this build
+    ignores the flag, so the scale takes it in and the flag goes."""
+    cache = Map(weapon_hud=[((1.0, 0.5), 4 | 1), ((1.0, 1.0), 1), ((2.0, 2.0), 4)])
+    returncode, report, tags = converted(report_tool, cache, tmp_path)
+    assert returncode == 0 and report["hud_placements_rescaled"] == "2"
+    hud = cache.addresses["test\\weapon hud"]
+    statics = u32_at(tags, hud + 0x64)
+    items = u32_at(tags, u32_at(tags, hud + 0x88) + 0x38)
+    assert (f32_at(tags, statics + 0x28), f32_at(tags, statics + 0x2C), u16_at(tags, statics + 0x30)) == (0.5, 0.25, 1)
+    assert (f32_at(tags, items + 4), f32_at(tags, items + 8), u16_at(tags, items + 0x0C)) == (1.0, 1.0, 0)
+
+
+def test_hud_elements_without_the_high_resolution_scale_keep_theirs(report_tool, tmp_path):
+    cache = Map(weapon_hud=[((1.0, 1.0), 0), ((0.75, 0.75), 3), ((1.0, 1.0), 2)])
+    returncode, report, tags = converted(report_tool, cache, tmp_path)
+    assert returncode == 0 and report["hud_placements_rescaled"] == "0"
+    statics = u32_at(tags, cache.addresses["test\\weapon hud"] + 0x64)
+    assert (f32_at(tags, statics + 0xB4 + 0x28), u16_at(tags, statics + 0xB4 + 0x30)) == (0.75, 3)
+
+
+SCORE_HINT = 'Hold "%s" for score'
+
+
+def test_the_score_hint_names_the_back_button(report_tool, tmp_path):
+    """Halo PC formats the hint with its score key's name; this build copies
+    it as it is, so the placeholder becomes the Xbox button."""
+    cache = Map(strings_name="ui\\multiplayer_game_text", strings=[""] * 100 + [SCORE_HINT])
+    returncode, report, tags = converted(report_tool, cache, tmp_path)
+    assert returncode == 0 and report["score_hint_converted"] == "1"
+    assert "Hold BACK for score".encode("utf-16-le") in tags
+    assert SCORE_HINT.encode("utf-16-le") not in tags
+
+
+def test_other_strings_keep_their_placeholders(report_tool, tmp_path):
+    for strings_name, strings in (("test\\strings", [""] * 100 + [SCORE_HINT]),
+                                  ("ui\\multiplayer_game_text", [SCORE_HINT] * 100)):
+        cache = Map(strings_name=strings_name, strings=strings)
+        returncode, report, tags = converted(report_tool, cache, tmp_path / str(len(strings_name)))
+        assert returncode == 0 and report["score_hint_converted"] == "0"
+        assert SCORE_HINT.encode("utf-16-le") in tags
+
+
 # ---------- the original (Xbox) format
 
 
@@ -1407,11 +1483,13 @@ def test_real_maps_convert_as_recorded(report_tool, real_maps):
         "bloodgulch.map": {"structure_bsp_materials_checked": "79", "shaders_renumbered": "21",
                            "chicago_extended_shaders_converted": "10", "bitmaps_prepared": "676",
                            "script_nodes_reduced": "0", "animation_overlays_disabled": "0",
-                           "sounds_undecodable": "39"},
+                           "sounds_undecodable": "39", "hud_placements_rescaled": "32",
+                           "score_hint_converted": "1"},
         "beavercreek_halo3.yelo": {"structure_bsp_materials_checked": "67", "shaders_renumbered": "14",
                                    "chicago_extended_shaders_converted": "4", "bitmaps_prepared": "1005",
                                    "script_nodes_reduced": "1", "animation_overlays_disabled": "2",
-                                   "sounds_undecodable": "10"},
+                                   "sounds_undecodable": "10", "hud_placements_rescaled": "14",
+                                   "score_hint_converted": "1"},
     }
     present = [real_maps / name for name in recorded if (real_maps / name).is_file()]
     if not present:

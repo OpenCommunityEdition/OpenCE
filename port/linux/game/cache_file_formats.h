@@ -281,6 +281,27 @@ struct custom_edition_load_report
 	uint32_t warnings;
 };
 
+/* Where Halo PC keeps what a texture holds in other channels than this
+build reads it from (docs/custom_edition_caches.md). The renderer samples a
+texture in the order the game names for it (port/linux/src/xbox_textures.c,
+halo_custom_edition_texels_channels). */
+enum custom_edition_channel_order
+{
+	/* as this build reads them */
+	_custom_edition_channels_xbox,
+	/* a model shader's multipurpose masks: the auxiliary (detail) mask,
+	self-illumination, specular and color change in red, green, blue and
+	alpha, which this build's model shaders read from alpha, green, red and
+	blue */
+	_custom_edition_channels_multipurpose,
+	/* a HUD meter: its shape in color and the order it fills in alpha,
+	where this build's meters take the fill order from color and discard
+	what has no alpha */
+	_custom_edition_channels_hud_meter,
+
+	NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS
+};
+
 /* what custom_edition_cache_convert changed */
 struct custom_edition_conversion_report
 {
@@ -299,6 +320,12 @@ struct custom_edition_conversion_report
 	/* sounds in a compression this build cannot decode (Ogg Vorbis), made
 	unplayable */
 	int32_t sounds_undecodable;
+	/* HUD element placements with Halo PC's high resolution scale, whose
+	scale was halved */
+	int32_t hud_placements_rescaled;
+	/* 1 when the multiplayer hint that a key shows the score was made to
+	name the Xbox button */
+	int32_t score_hint_converted;
 	/* the tag of the problem, when there was one, else NONE (-1) */
 	int32_t problem_tag_index;
 };
@@ -391,6 +418,17 @@ void *custom_edition_cache_tag_get(
 	uint32_t handle,
 	uint32_t group_tag,
 	uint32_t definition_bytes);
+
+/* The element `element_index` of `element_bytes` bytes of the tag block at
+`block`, in a tag of a tag cache custom_edition_cache_load filled, or NULL
+unless the block's elements lie within the tag cache: any value may be asked
+about. */
+void *custom_edition_cache_block_element(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	void const *block,
+	int32_t element_index,
+	uint32_t element_bytes);
 
 /* The path of tag `tag_index` of a tag cache custom_edition_cache_load
 filled, for messages. */

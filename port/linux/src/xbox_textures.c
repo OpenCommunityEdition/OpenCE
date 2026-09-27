@@ -16,6 +16,7 @@ memory_watch.c detects that by write-protecting the pages.
 
 #include "xgpu.h"
 #include "port_config.h"
+#include "../game/cache_file_formats.h"
 
 #include <stdio.h>
 #ifdef HALO_ANDROID
@@ -572,8 +573,105 @@ static void texture_dump(GLenum target, const struct xgpu_texture_description *d
 }
 #endif
 
+/* ---------- Custom Edition channel orders
+
+Halo PC keeps what some textures hold in other channels than the game reads
+it from (enum custom_edition_channel_order): a model shader's multipurpose
+masks, and a HUD meter's shape and fill order. The experimental Custom
+Edition map loading says which texels hold which order as they arrive
+(port/linux/game/custom_edition_bitmaps.c), and textures made of them are
+sampled with each channel taken from where Halo PC keeps it, which leaves
+them as compressed as they were. Addresses stay listed until other texels
+arrive there, which the loading also says, or the map goes; the game and the
+renderer share a thread. */
+
+/* for each order, the channel (red, green, blue, alpha) of the texels each
+channel is sampled from */
+static const unsigned char custom_edition_channel_sources[NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS][4] =
+{
+	{ 0, 1, 2, 3 },
+	/* specular, self-illumination, color change and the auxiliary mask */
+	{ 2, 1, 3, 0 },
+	/* the fill order in color, the shape in alpha */
+	{ 3, 3, 3, 0 },
+};
+
+struct custom_edition_texels
+{
+	unsigned long address;
+	unsigned char channel_order;
+};
+
+static struct custom_edition_texels *custom_edition_texels;
+static unsigned long custom_edition_texel_count;
+static unsigned long custom_edition_texel_capacity;
+
+/* the order of the texels at `address` */
+static unsigned char custom_edition_texels_order(unsigned long address)
+{
+	unsigned long index;
+
+	for (index = 0; index < custom_edition_texel_count; index++)
+	{
+		if (custom_edition_texels[index].address == address)
+			return custom_edition_texels[index].channel_order;
+	}
+	return _custom_edition_channels_xbox;
+}
+
+void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order)
+{
+	unsigned long address = (unsigned long)texels;
+	unsigned long index;
+
+	if (channel_order >= NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS)
+	{
+		platform_log("the texels at %08lx have channel order %u, which there is none of: they are sampled as they are",
+			address, (unsigned)channel_order);
+		channel_order = _custom_edition_channels_xbox;
+	}
+	for (index = 0; index < custom_edition_texel_count && custom_edition_texels[index].address != address; index++)
+	{
+	}
+	if (index < custom_edition_texel_count)
+	{
+		if (channel_order == _custom_edition_channels_xbox)
+			custom_edition_texels[index] = custom_edition_texels[--custom_edition_texel_count];
+		else
+			custom_edition_texels[index].channel_order = channel_order;
+	}
+	else if (channel_order != _custom_edition_channels_xbox)
+	{
+		if (custom_edition_texel_count == custom_edition_texel_capacity)
+		{
+			unsigned long capacity = custom_edition_texel_capacity ? custom_edition_texel_capacity * 2 : 64;
+			struct custom_edition_texels *grown = realloc(custom_edition_texels, capacity * sizeof(*grown));
+
+			if (!grown)
+			{
+				platform_log("no memory to list the texels at %08lx: they are sampled in Halo PC's channel order",
+					address);
+				return;
+			}
+			custom_edition_texels = grown;
+			custom_edition_texel_capacity = capacity;
+		}
+		custom_edition_texels[custom_edition_texel_count].address = address;
+		custom_edition_texels[custom_edition_texel_count].channel_order = channel_order;
+		custom_edition_texel_count++;
+	}
+}
+
+void halo_custom_edition_texels_forget(void)
+{
+	free(custom_edition_texels);
+	custom_edition_texels = NULL;
+	custom_edition_texel_count = 0;
+	custom_edition_texel_capacity = 0;
+}
+
 static void upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
-	const unsigned char *base, const D3DCOLOR *palette)
+	const unsigned char *base, const D3DCOLOR *palette, unsigned char channel_order)
 {
 	struct format_information information = format_information(description->format);
 	unsigned long face_count = description->cube_map ? 6 : 1;
@@ -589,12 +687,33 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
+	/* the channel of the texture each channel is sampled from, set on every
+	upload: a texture object can be reused for different texels */
+	{
+		GLint channels[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
+
 #ifdef HALO_ANDROID
-	/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
-	RGBA */
-	glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, converted ? GL_BLUE : GL_RED);
-	glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, converted ? GL_RED : GL_BLUE);
+		/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
+		RGBA */
+		if (converted)
+		{
+			channels[0] = GL_BLUE;
+			channels[2] = GL_RED;
+		}
 #endif
+		if (channel_order != _custom_edition_channels_xbox)
+		{
+			GLint stored[4] = { channels[0], channels[1], channels[2], channels[3] };
+			unsigned long channel;
+
+			for (channel = 0; channel < 4; channel++)
+				channels[channel] = stored[custom_edition_channel_sources[channel_order][channel]];
+		}
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, channels[0]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, channels[1]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, channels[2]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, channels[3]);
+	}
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (GLint)description->levels - 1);
@@ -637,6 +756,7 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	free(converted);
 	texture_dump(target, description);
 }
+
 
 /* ---------- cache */
 
@@ -785,7 +905,8 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 					entry->description.height, entry->size, entry->generation,
 					ones * 100 / entry->size, zeros * 100 / entry->size);
 			}
-			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)entry->address, palette);
+			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)entry->address, palette,
+				custom_edition_texels_order(entry->address));
 		}
 	}
 	entry->last_used_frame = texture_frame;

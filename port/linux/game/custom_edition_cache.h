@@ -77,6 +77,17 @@ boolean custom_edition_bitmaps_verify(
 	byte *tag_cache,
 	unsigned long loaded_bytes);
 
+/* Finds the bitmaps of a tag cache custom_edition_cache_load filled whose
+channels Halo PC keeps elsewhere (multipurpose maps and HUD meters), which
+the renderer is to sample in this build's order as their pixels arrive;
+FALSE after logging why it cannot. custom_edition_bitmaps_dispose forgets
+them either way. */
+boolean custom_edition_reordered_bitmaps_find(
+	byte *tag_cache,
+	unsigned long loaded_bytes);
+void custom_edition_bitmaps_dispose(
+	void);
+
 /* Called when `pixels` were read from `offset` for the tag `tag_index`
 names: when those are the pixels of one of its bitmaps, lays them out as
 the texture cache expects of an Xbox bitmap. */

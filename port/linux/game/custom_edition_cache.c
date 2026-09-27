@@ -42,6 +42,13 @@ largest map is 0x24000000 bytes long (cache_file_formats.h) */
 #define COMBINED_SOUNDS_OFFSET 0x60000000UL
 #define COMBINED_OFFSET_LIMIT 0x80000000UL
 
+/* The renderer write-protects the memory it has made textures of and learns
+of changes to it from the faults writes take (port/linux/src/memory_watch.c);
+the kernel fails a read into such memory instead of faulting. Reads for the
+game therefore land here first and are copied, as the platform's own file
+layer does (port/linux/src/xbox_files.c, read_at). */
+#define READ_STAGING_BYTES 0x10000
+
 /* ---------- structures */
 
 struct custom_edition_file
@@ -60,6 +67,7 @@ struct custom_edition_cache_globals
 	struct custom_edition_file resource_files[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct resource_map resource_map_storage[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct resource_map *resource_maps[NUMBER_OF_RESOURCE_MAP_TYPES];
+	byte read_staging[READ_STAGING_BYTES];
 };
 
 /* ---------- globals */
@@ -271,8 +279,20 @@ static boolean custom_edition_cache_tags_convert(
 			"custom edition: %ld sounds use a compression this build cannot decode (Custom Edition's Ogg Vorbis) and will not play",
 			(long)conversion.sounds_undecodable);
 	}
+	if (conversion.hud_placements_rescaled)
+	{
+		error(
+			_error_silent,
+			"custom edition: %ld HUD elements drawn from Halo PC's double resolution bitmaps were given half their scale",
+			(long)conversion.hud_placements_rescaled);
+	}
+	if (conversion.score_hint_converted)
+	{
+		error(_error_silent, "custom edition: the multiplayer score hint names the BACK button where Halo PC names a key");
+	}
 
 	return custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&
+		custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes) &&
 		custom_edition_cache_models_convert(tag_cache, report);
 }
 
@@ -472,6 +492,7 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	{
 		error(_error_silent, "custom edition: cannot run '%s'", path);
 		custom_edition_models_dispose();
+		custom_edition_bitmaps_dispose();
 		custom_edition_cache_files_close();
 		return NULL;
 	}
@@ -495,6 +516,7 @@ void custom_edition_cache_tags_unload(
 	have released it */
 	custom_edition_structure_bsp_unload();
 	custom_edition_models_dispose();
+	custom_edition_bitmaps_dispose();
 	custom_edition_cache_files_close();
 	custom_edition_cache_globals.tags_loaded = FALSE;
 	custom_edition_cache_globals.tag_cache = NULL;
@@ -512,6 +534,7 @@ void custom_edition_cache_read(
 	struct custom_edition_cache_globals *globals = &custom_edition_cache_globals;
 	struct custom_edition_file *file;
 	unsigned long file_offset;
+	long read_bytes;
 	boolean read;
 
 	if ((unsigned long)offset >= COMBINED_SOUNDS_OFFSET)
@@ -531,10 +554,19 @@ void custom_edition_cache_read(
 	}
 
 	/* the game reads its map from its main thread only (scenario and
-	structure BSP loading, the texture and sound caches), so the streams
-	need no lock */
-	read = file->stream && size >= 0 &&
-		file->source.read(file->source.context, file_offset, (uint32_t)size, buffer);
+	structure BSP loading, the texture and sound caches), so the streams and
+	the staging buffer need no lock */
+	read = file->stream && size >= 0;
+	for (read_bytes = 0; read && read_bytes < size; read_bytes += READ_STAGING_BYTES)
+	{
+		long chunk_bytes = MIN(size - read_bytes, READ_STAGING_BYTES);
+
+		read = file->source.read(file->source.context, file_offset + read_bytes, (uint32_t)chunk_bytes, globals->read_staging);
+		if (read)
+		{
+			csmemcpy((byte *)buffer + read_bytes, globals->read_staging, chunk_bytes);
+		}
+	}
 	if (!read)
 	{
 		/* the loader checked every range the tags give, so this is an I/O

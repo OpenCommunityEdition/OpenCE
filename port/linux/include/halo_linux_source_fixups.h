@@ -38,6 +38,13 @@ float render_interpolation_game_time_sec(long ticks);
 /* the Custom Edition tag cache window, or NULL unless HALO_CUSTOM_EDITION
 reserved it (port/linux/src/xbox_memory.c) */
 void *halo_custom_edition_tag_cache(void);
+/* where Halo PC keeps the channels of the pixels a Custom Edition bitmap
+just arrived at (an enum custom_edition_channel_order,
+port/linux/game/cache_file_formats.h), which the renderer then samples in
+this build's order; forgotten together when the map goes
+(port/linux/src/xbox_textures.c) */
+void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order);
+void halo_custom_edition_texels_forget(void);
 
 /* the width of the screen the game draws, 480 lines tall: the device's or
 the display's shape, or 640 (port/linux/src/d3d8_gl.c) */
