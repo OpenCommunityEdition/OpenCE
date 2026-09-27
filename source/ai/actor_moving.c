@@ -1710,13 +1710,20 @@ static void actor_move_vector_avoidance(
 
 		if (sharp_turn)
 		{
-			real_vector3d best_direction;
-			real_vector3d rotation_axis;
-
 			if (actor->control.vector_avoidance_sharp_turn_timer == NONE)
 				actor->control.vector_avoidance_sharp_turn_timer = 0;
 			else
 				actor->control.vector_avoidance_sharp_turn_timer++;
+		}
+		else
+		{
+			actor->control.vector_avoidance_sharp_turn_timer = NONE;
+		}
+
+		if (sharp_turn)
+		{
+			real_vector3d best_direction;
+			real_vector3d rotation_axis;
 
 			actor_move_transform_avoidance_vector(
 				&avoidance_data,
@@ -1740,7 +1747,6 @@ static void actor_move_vector_avoidance(
 		}
 		else
 		{
-			actor->control.vector_avoidance_sharp_turn_timer = NONE;
 			if (forward_dot < 0.5f)
 			{
 				if (weight_difference > 1.3f)
