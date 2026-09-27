@@ -35,6 +35,10 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
+/* the Custom Edition tag cache window, or NULL unless HALO_CUSTOM_EDITION
+reserved it (port/linux/src/xbox_memory.c) */
+void *halo_custom_edition_tag_cache(void);
+
 /* the width of the screen the game draws, 480 lines tall: the device's or
 the display's shape, or 640 (port/linux/src/d3d8_gl.c) */
 long halo_screen_width(void);
