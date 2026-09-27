@@ -1,0 +1,20 @@
+Card L-D2 (DIAGNOSTIC ONLY: debugger-forced, never a candidate) - written 2026-09-26 17:04:24 -0700 (clock-read) BEFORE running
+Function: _widget_instance_render_recursive, source rr2.c unchanged.
+Question (perturbation test of the KEY route R1): if the post-strength-reduction sort sees the address load's key as
+it would be with id(t_183) & 3 == 0 (0x10008 instead of 0x1c008), does the SR IV temp (0x19300) become input 1 and
+the builder give January's [IV + address] with nothing else changed?
+Intervention: at 0x1070d420 (EAX = input-1 entry of the node being sorted), on hits 432, 433, 434 of window (k-1,k)
+(= the three post-SR sorts of the loop ADD, from ss_rr2 events: in1 key 0x1c008 / in2 key 0x19300), FORCE
+[EAX+0x10] := 0x10008. No swap force.
+Prediction: sorted [SR temp, load]; builder path in1 kind 1 -> COMMON; base = SR IV (ecx), index = address (eax);
+render_recursive section_infos_equal to January and no other function changes - 70%. 20%: the forced key is also
+read elsewhere (e.g. node hash 0x1070ddcb / CSE) and perturbs another decision. 10%: the key is recomputed after
+the sort and the order does not change.
+
+OUTCOME (appended 2026-09-26 17:06:26 -0700): PREDICTION FAILED (the 10% branch, refined). The forced keys took effect
+at 0x1070d41d (hit 432 flipped the list to [SR, load]), but keys are RECOMPUTED before every sort and a later sort
+of the same node at a second site, 0x107105ab (same comparator 0x10710ed9, window hit 79), restored [load 0x1c008,
+SR 0x19300] from the fresh keys; the object was identical to stock (0 functions changed). listwatch.py (observation,
+stock-equal) shows the head writes after the last 0x1070d41d sort: 0x107105bb (sort), 0x107103b9/0x10707c50
+(unlink + append, load first), then the builder. => the LAST sort before lowering is 0x107105ab; the decisive keys
+are the ones computed there. Follow-up card L-D2b forces there.

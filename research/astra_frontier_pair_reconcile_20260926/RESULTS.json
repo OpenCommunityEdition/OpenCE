@@ -1,0 +1,101 @@
+{
+  "base": "cdf1c42ba6687083da2c7ad2730fdce57628d72d",
+  "donor_commits": [
+    "b659a777e4086d34ff3036b30bdf8bc6dcd92ce8",
+    "06645ef469cbe43d3617f42e2f79f9b2f925f736"
+  ],
+  "functions": [
+    {
+      "unit": "source/interface/ui_widget",
+      "function": "_widget_instance_render_recursive",
+      "strict_exact": true,
+      "padded_bytes": 752,
+      "non_tail_padding_bytes": 743,
+      "trailing_nops": 9,
+      "ledger_code_bytes": 743,
+      "relocations": 27,
+      "normalized_sha256": "3be047db499880358c7494730c048a9109b4798bce707a6dbece4967b60bfabe",
+      "sections_compared": 372,
+      "changed_sections": [
+        327
+      ],
+      "new_or_removed_code_data_common_owners": 0,
+      "warnings": {
+        "before": 17,
+        "after": 17,
+        "new": []
+      },
+      "objects_sha256": {
+        "scratch\\reconcile_frontier_pair_20260926\\before_ui_widget.obj": "cff5e9a0b843a45d19d1a82af4468e010cac3fb1e05c6e63202958ae65be2177",
+        "build\\base\\source\\interface\\ui_widget.obj": "86e5c1db1168dc6784e6186725fa165608eb22f398ce5a616ad8224c7e34f689",
+        "build\\split\\source\\interface\\ui_widget.obj": "9a3e1518ab0ae613a4e74cd73e515a8fc41840a73ab28272cb460265cf97c75a"
+      }
+    },
+    {
+      "unit": "source/effects/player_effects",
+      "function": "_player_effect_update_camera_impulse",
+      "strict_exact": true,
+      "padded_bytes": 752,
+      "non_tail_padding_bytes": 738,
+      "trailing_nops": 14,
+      "ledger_code_bytes": 738,
+      "relocations": 24,
+      "normalized_sha256": "c3d56bbfe28c780c2c47aad44ac2078c456d952cb5e1427d630e3b05d4ec0ba4",
+      "sections_compared": 74,
+      "changed_sections": [
+        68
+      ],
+      "new_or_removed_code_data_common_owners": 0,
+      "warnings": {
+        "before": 13,
+        "after": 13,
+        "new": []
+      },
+      "objects_sha256": {
+        "scratch\\reconcile_frontier_pair_20260926\\before_player_effects.obj": "ca77228337bf86d983ff3d51711216ee787077a3ee5f72f4f0558a5033cd1a9a",
+        "build\\base\\source\\effects\\player_effects.obj": "6a3c833eb4c39140e6070ab04142b77d4460e2c00c367239407852411b166dd8",
+        "build\\split\\source\\effects\\player_effects.obj": "0be29d1bc38199f6b3b3339245a1e731d1bd2df5e5377f2514168e4641ca7c6e"
+      }
+    }
+  ],
+  "new_non_tail_padding_bytes": 1481,
+  "new_padded_bytes": 1504,
+  "new_ledger_bytes": 1481,
+  "stable_gains": [
+    "_player_effect_update_camera_impulse",
+    "_widget_instance_render_recursive"
+  ],
+  "regressions": [],
+  "parks": {
+    "active": 74,
+    "stale": 0,
+    "invalid": 0
+  },
+  "admission": {
+    "candidate_count": 11,
+    "contradicted_count": 0,
+    "rejected_count": 1,
+    "revoked_count": 0
+  },
+  "unchanged_fake_leads": 26,
+  "pins_sha256": {
+    "source\\interface\\ui_widget.c": "e4d9ece9d3b6f71d6dbd3224304a5701241010e6e03f7f71ab14d6a29d2a713a",
+    "source\\effects\\player_effects.c": "df11f7b70635f4d7e50ee73a8a7d8d4e34dd839462e1a7553102a50765fe3c4d",
+    "config\\parked.json": "a5839be4c687101f97441aac101a3ef59e8f3a0f3b6c4f503da443f955ea8c1f",
+    "build\\tools\\objdiff-cli.exe": "090987aa22c0fe9b7d252b2b44c2c0c92c5dd3e9b5965d353060802226a13677",
+    "xbox\\bin\\vc7\\CL.Exe": "483e00c47bb08d699475a642bcff15b5b2036350b31c540e88a506baf101da11",
+    "tools\\coff_compare.py": "e64960d96960776b26c924333a8a94b6ca62d35c09e93b7b7dc151231dbb4c13",
+    "build.ninja": "7e9563d1d968f9129d444f8aff6ba9fd9bf2270d7584c577df66808aa07fa465",
+    "scratch\\reconcile_frontier_pair_20260926\\before.json": "435f8db727eaba5562e1f8e76613b089b047c0aec4baa4181bf50ca2ab30d8bc",
+    "scratch\\reconcile_frontier_pair_20260926\\after.json": "06f8743b247ffaadd9271429e86b88f093984e3aacafefb7067a4a2815717c82",
+    "scratch\\reconcile_frontier_pair_20260926\\before_semantic_report.json": "e67c271b95ab2313b56a8bb392a823f013a8cf0b85c842df3455154c703454cd",
+    "scratch\\reconcile_frontier_pair_20260926\\before_build.log": "24d8609e740ec67e5517f8c2afc546a45ce1e919280d29db378b1d5e49bb8d61",
+    "scratch\\reconcile_frontier_pair_20260926\\after_build.log": "c4e2d533d207c4a896be78449a3a0f519c6c95ea38492903c0d7f23b65431ee1",
+    "scratch\\reconcile_frontier_pair_20260926\\before_pytest.log": "e2e45d60339b3b6aff4ac02b8acb522e6c8800735c5c193f7b88c68185a052b4",
+    "scratch\\reconcile_frontier_pair_20260926\\after_pytest.log": "868476f641fb4f636ee5e373d81e4205f4d6c8adcb5f471883c1057a43d817cf",
+    "scratch\\reconcile_frontier_pair_20260926\\after_admission.json": "bd79a37ee4869015d5c9857d61af9d7428652c14603465983bb5cb27b1008acd",
+    "scratch\\reconcile_frontier_pair_20260926\\after_parks.json": "6907d7a4765ab0111fdcbd718698b443a70aaba3011809582c57ebee188f6552",
+    "scratch\\reconcile_frontier_pair_20260926\\after_fake.json": "7d7f079a00f48b4db211592e5b1d1b319a0c13d36ff8a10570ab4ae2b99cf43b",
+    "scratch\\reconcile_frontier_pair_20260926\\stable_diff.log": "1ab4db74abbd61f4f3f1ee5ab994da49ccb443ee1bb1a016e1d8160c08904b2e"
+  }
+}
