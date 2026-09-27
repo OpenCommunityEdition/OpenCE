@@ -32,6 +32,18 @@ vertices, as on the Xbox. */
 #define HALO_PORT_GAME_STATE_GPU_SIZE 0x40000 /* (0x40000) */
 #define HALO_PORT_GAME_STATE_SIZE (HALO_PORT_GAME_STATE_CPU_SIZE+HALO_PORT_GAME_STATE_GPU_SIZE)
 
+/* ---------- textures
+
+The texture cache holds the textures being drawn in 16 KB pages, 22 MB of
+them on the Xbox, which Xbox maps were made to fit. Halo Custom Edition maps
+were made for Halo PC, which has no such bound: a frame of
+beavercreek_halo3.yelo draws more than 22 MB of textures, and a texture that
+does not fit is drawn as the default one. The native builds' cache is twice
+the Xbox's; with that map loaded 52 MB of the memory window were free. */
+
+#define HALO_PORT_TEXTURE_CACHE_PAGE_COUNT 0xB00 /* (0x580) */
+#define HALO_PORT_TEXTURE_CACHE_SIZE (HALO_PORT_TEXTURE_CACHE_PAGE_COUNT*0x4000) /* (0x1600000) */
+
 /* ---------- objects */
 
 #define HALO_PORT_MAXIMUM_OBJECTS_PER_MAP 8192 /* (2048) */

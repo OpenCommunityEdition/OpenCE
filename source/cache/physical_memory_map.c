@@ -53,7 +53,12 @@ symbols in this file:
 #endif
 #define TAG_CACHE_BASE_ADDRESS 0x803A6000
 #define TAG_CACHE_SIZE 0x1600000
+#ifdef HALO_LINUX
+/* the native builds' larger texture cache (halo_port_capacity.h) */
+#define TEXTURE_CACHE_SIZE HALO_PORT_TEXTURE_CACHE_SIZE
+#else
 #define TEXTURE_CACHE_SIZE 0x1600000
+#endif
 #define SOUND_CACHE_SIZE 0x400000
 
 /* ---------- macros */
