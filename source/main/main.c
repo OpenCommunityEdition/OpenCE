@@ -1649,6 +1649,16 @@ void main_movie_stop(
 	return;
 }
 
+void main_crash(
+	char const *str)
+{
+	/* BUG (original, deliberate): the "crash" script command ("crashes (for debugging).")
+	 * faults on purpose by storing this literal through the null pointer; the August and
+	 * September 2001 builds (debug and retail) and January all emit this one store. */
+	*(char **)NULL = "chucky was here!  NULL belongs to me!!!!!";
+	return;
+}
+
 void main_print_version(
 	void)
 {
