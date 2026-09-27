@@ -83,6 +83,17 @@ void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned lon
 		((height - 1) << D3DSIZE_HEIGHT_SHIFT) | (width - 1);
 }
 
+/* changes the size a surface describes, keeping its memory, which must
+hold the new size (the back buffer, when the screen's width changes) */
+void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height)
+{
+	unsigned long pitch = (width * bytes_per_texel(format) + D3DTEXTURE_PITCH_ALIGNMENT - 1) &
+		~(unsigned long)(D3DTEXTURE_PITCH_ALIGNMENT - 1);
+
+	surface->Size = ((pitch / D3DTEXTURE_PITCH_ALIGNMENT - 1) << D3DSIZE_PITCH_SHIFT) |
+		((height - 1) << D3DSIZE_HEIGHT_SHIFT) | (width - 1);
+}
+
 /* ---------- registration and release */
 
 void WINAPI D3DResource_Register(D3DResource *resource, void *base)

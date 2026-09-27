@@ -151,10 +151,8 @@ static const char shader_prologue[] =
 	"uniform vec4 viewport_scale;\n"
 	"uniform vec4 viewport_offset;\n"
 	"uniform float point_size;\n"
-#ifdef HALO_ANDROID
 	/* columns the menus shift by to center on a wide screen (d3d8_gl.c) */
 	"uniform float screen_offset;\n"
-#endif
 	"out vec4 xD0;\n"
 	"out vec4 xD1;\n"
 	"out vec4 xB0;\n"
@@ -354,7 +352,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\telse\n"
 		"\t\tgl_Position = vec4((vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale * oPos.w, oPos.w);\n"
 #else
-		"\tvec3 ndc = (vec3(oPos.xy + 0.5, oPos.z) - viewport_offset.xyz) / scale;\n"
+		"\tvec3 ndc = (vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale;\n"
 		"\tgl_Position = vec4(ndc * oPos.w, oPos.w);\n"
 #endif
 #ifdef HALO_ANDROID

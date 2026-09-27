@@ -71,13 +71,15 @@ further gamepads become controllers 2-4.
 | F1 | back |
 | \` | opens the developer console (typing then goes to the console) |
 | F12 | releases or recaptures the mouse |
+| F11 | switches between fullscreen and the window |
 
 ### Settings
 
 | Variable | Effect |
 | --- | --- |
 | `HALO_DATA_ROOT`, `HALO_SAVE_ROOT` | see above |
-| `HALO_WINDOW_SCALE` | initial window size as a multiple of 640x480 (default 2); the window is resizable and the picture is letterboxed |
+| `HALO_FULLSCREEN` | `0` opens the game in a window instead of fullscreen (F11 switches between the two). Fullscreen draws at the display's resolution and shape: 480 of the game's lines, as wide as the display (the view widens, the HUD keeps to the screen's edges, menus stay centered), each drawn at as many pixels as the display has; a window draws the Xbox's 640x480 |
+| `HALO_WINDOW_SCALE` | window size as a multiple of 640x480 (default 2); the window is resizable and the picture is letterboxed |
 | `HALO_MOUSE_SENSITIVITY` | mouse aim multiplier (default 1.0) |
 | `HALO_MOUSE_INVERT` | set to invert vertical mouse aim |
 | `HALO_VOLUME` | master volume (default 1.0) |

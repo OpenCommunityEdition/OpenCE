@@ -31,6 +31,7 @@ Conventions carried over from the Xbox:
 #include <time.h>
 
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
+void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 
 #ifdef HALO_ANDROID
 /* OpenGL ES 3 (port/android/README.md): the desktop formats, enumerants
@@ -54,43 +55,78 @@ struct xgpu_capabilities xgpu_capabilities;
 
 /* ---------- the screen's width
 
-The Xbox screen is 640x480. On Android the game renders at the device's
-aspect ratio instead: 480 lines, and as many columns as the display's shape
-gives (HALO_SCREEN_WIDTH, set by the host; 640 keeps 4:3). The game's
-camera derives its horizontal field of view from the viewport, so the 3D
-view simply widens. The menus and full-screen overlays are laid out for 640
-columns; while they draw (halo_android_ui_offset), everything shifts right
-to center them. */
+The Xbox screen is 640x480. The native ports can draw a wider one: 480
+lines, and as many columns as the display's shape gives. On Android that is
+HALO_SCREEN_WIDTH, set by the host (640 keeps 4:3); on the desktop, the
+display's shape while the game is fullscreen, and 640 in a window. The
+game's camera derives its horizontal field of view from the viewport, so the
+3D view simply widens. The menus and full-screen overlays are laid out for
+640 columns; while they draw (halo_screen_ui_offset), everything shifts right
+to center them.
 
-#ifdef HALO_ANDROID
+Fullscreen on the desktop also draws at the display's resolution: render
+targets the size of the screen get that many pixels (screen_scale), and
+viewports, clears and visibility counts are scaled to match, so the game
+still works in its 480 lines. The width and the scale change only between
+frames, after one is presented (halo_screen_commit). */
+
+#define SCREEN_HEIGHT 480
+#define SCREEN_MAXIMUM_WIDTH 1920
+
+/* the width the game draws, 0 until first asked, and how many pixels a
+render target the size of the screen has per unit of it */
+static long screen_width;
+static float screen_scale[2] = { 1.0f, 1.0f };
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
-long halo_android_screen_width(void)
+static void screen_mode_choose(long *width, float scale[2])
 {
-	static long width;
+#ifdef HALO_ANDROID
+	const char *text = getenv("HALO_SCREEN_WIDTH");
 
-	if (!width)
-	{
-		const char *text = getenv("HALO_SCREEN_WIDTH");
-
-		width = text ? atol(text) : 640;
-		if (width < 640)
-			width = 640;
-		if (width > 1600)
-			width = 1600;
-		width &= ~1L;
-	}
-	return width;
-}
-
-void halo_android_ui_offset(unsigned char centered)
-{
-	ui_offset = centered ? (halo_android_screen_width() - 640) / 2 : 0;
-}
+	*width = text ? atol(text) : 640;
+	if (*width < 640)
+		*width = 640;
+	if (*width > 1600)
+		*width = 1600;
+	*width &= ~1L;
+	scale[0] = scale[1] = 1.0f;
 #else
-#define UI_OFFSET 0
+	long display_width, display_height;
+
+	*width = 640;
+	scale[0] = scale[1] = 1.0f;
+	if (platform_screen_mode(&display_width, &display_height) && display_width > 0 && display_height > 0)
+	{
+		long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
+
+		*width = wanted < 640 ? 640 : wanted > SCREEN_MAXIMUM_WIDTH ? SCREEN_MAXIMUM_WIDTH : wanted & ~1L;
+		scale[0] = (float)display_width / (float)*width;
+		scale[1] = (float)display_height / (float)SCREEN_HEIGHT;
+		/* a display narrower or wider than the game can be: the picture
+		keeps its shape and the display blit letterboxes it */
+		if (*width != wanted && *width != (wanted & ~1L))
+			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+	}
 #endif
+}
+
+long halo_screen_width(void)
+{
+	if (!screen_width)
+	{
+		screen_mode_choose(&screen_width, screen_scale);
+		platform_log("screen: %ldx%d drawn at %.0fx%.0f", screen_width, SCREEN_HEIGHT,
+			screen_width * screen_scale[0], SCREEN_HEIGHT * screen_scale[1]);
+	}
+	return screen_width;
+}
+
+void halo_screen_ui_offset(unsigned char centered)
+{
+	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
+}
 
 /* ---------- state the XDK header's inline functions read and write */
 
@@ -295,6 +331,9 @@ struct gl_device
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
+	/* the pixels each of the game's pixels covered in the test's target
+	(render_target_get), which its count is divided by */
+	float query_area[VISIBILITY_TEST_SLOTS];
 	GLuint active_query;
 	BOOL visibility_test_active;
 #ifdef HALO_ANDROID
@@ -702,11 +741,20 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 
 	if (!surface || !surface->Data)
 		return NULL;
+	float scale[2] = { 1.0f, 1.0f };
+
 	surface_dimensions(surface, &width, &height, &depth);
+	/* the screen's targets are drawn at the screen's scale */
+	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
+	{
+		scale[0] = screen_scale[0];
+		scale[1] = screen_scale[1];
+	}
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
 		if (entry->target.data == surface->Data && entry->target.width == width &&
-			entry->target.height == height && entry->target.depth == depth)
+			entry->target.height == height && entry->target.depth == depth &&
+			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
 		{
 			return entry;
 		}
@@ -716,14 +764,19 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.width = width;
 	entry->target.height = height;
 	entry->target.depth = depth;
+	entry->target.scale[0] = scale[0];
+	entry->target.scale[1] = scale[1];
+	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
+	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	if (depth)
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)width, (GLsizei)height, 0,
-			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)entry->target.gl_width,
+			(GLsizei)entry->target.gl_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
+			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -772,6 +825,15 @@ static GLuint framebuffer_get(GLuint color, GLuint depth)
 	return entry->framebuffer;
 }
 
+/* the pixels per unit of the bound targets (render_target_get) */
+static float target_scale[2] = { 1.0f, 1.0f };
+
+/* the pixel edge of a coordinate in the bound targets' units */
+static GLint target_pixel(float coordinate, int axis)
+{
+	return (GLint)floorf(coordinate * target_scale[axis] + 0.5f);
+}
+
 /* binds the framebuffer for the current targets; returns FALSE if there is
 nothing to draw into */
 static BOOL bind_targets(BOOL *has_depth)
@@ -785,6 +847,9 @@ static BOOL bind_targets(BOOL *has_depth)
 		return FALSE;
 	if (color)
 		color->last_rendered = device.frame + 1;
+	/* viewports and clears are in the targets' units (render_target_get) */
+	target_scale[0] = color ? color->target.scale[0] : depth->target.scale[0];
+	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
 	state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
 	*has_depth = depth != NULL;
 	return TRUE;
@@ -987,8 +1052,17 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 			device.presentation = *presentation_parameters;
 		width = device.presentation.BackBufferWidth ? device.presentation.BackBufferWidth : 640;
 		height = device.presentation.BackBufferHeight ? device.presentation.BackBufferHeight : 480;
+#ifdef HALO_ANDROID
 		d3d8_surface_initialize(&device.back_buffer, D3DFMT_LIN_A8R8G8B8, width, height);
 		d3d8_surface_initialize(&device.depth_buffer, D3DFMT_LIN_D24S8, width, height);
+#else
+		/* room for the widest screen, which F11 can switch to (the screen's
+		width, above) */
+		d3d8_surface_initialize(&device.back_buffer, D3DFMT_LIN_A8R8G8B8, SCREEN_MAXIMUM_WIDTH, height);
+		d3d8_surface_initialize(&device.depth_buffer, D3DFMT_LIN_D24S8, SCREEN_MAXIMUM_WIDTH, height);
+		d3d8_surface_resize(&device.back_buffer, D3DFMT_LIN_A8R8G8B8, width, height);
+		d3d8_surface_resize(&device.depth_buffer, D3DFMT_LIN_D24S8, width, height);
+#endif
 		device.render_target = &device.back_buffer;
 		device.depth_stencil = &device.depth_buffer;
 		for (index = 0; index < D3DTS_MAX; index++)
@@ -1038,6 +1112,36 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 	}
 	*returned_device = device_pointer();
 	return S_OK;
+}
+
+/* takes up the display's shape and resolution, or the window's, if they
+have changed; between frames, since the game's layout and the targets must
+agree for a whole frame. Returns the width the game draws. */
+long halo_screen_commit(void)
+{
+	long width;
+	float scale[2];
+
+	if (!screen_width)
+		return halo_screen_width();
+	screen_mode_choose(&width, scale);
+	if (width != screen_width || scale[0] != screen_scale[0] || scale[1] != screen_scale[1])
+	{
+		platform_log("screen: %ldx%d drawn at %.0fx%.0f", width, SCREEN_HEIGHT,
+			width * scale[0], SCREEN_HEIGHT * scale[1]);
+		screen_width = width;
+		screen_scale[0] = scale[0];
+		screen_scale[1] = scale[1];
+#ifndef HALO_ANDROID
+		if (device.created)
+		{
+			device.presentation.BackBufferWidth = (UINT)width;
+			d3d8_surface_resize(&device.back_buffer, D3DFMT_LIN_A8R8G8B8, (unsigned long)width, SCREEN_HEIGHT);
+			d3d8_surface_resize(&device.depth_buffer, D3DFMT_LIN_D24S8, (unsigned long)width, SCREEN_HEIGHT);
+		}
+#endif
+	}
+	return screen_width;
 }
 
 ULONG WINAPI D3DDevice_Release(void)
@@ -1208,6 +1312,7 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
+	device.query_area[index] = target_scale[0] * target_scale[1];
 	/* swap the scratch query into the requested slot */
 	scratch = device.queries[0];
 	device.queries[0] = device.queries[index];
@@ -1225,6 +1330,16 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	return S_OK;
 }
 
+#ifndef HALO_ANDROID
+/* a count of pixels in the game's pixels */
+static GLuint visibility_unscaled(GLuint samples, DWORD index)
+{
+	float area = device.query_area[index];
+
+	return area > 1.0f ? (GLuint)(samples / area + 0.5f) : samples;
+}
+
+#endif
 HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULONGLONG *time_stamp)
 {
 	GLuint available = 0, samples = 0;
@@ -1257,7 +1372,7 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 		/* the latest count the GPU has written: from this test, or while
 		the GPU is still behind, from the slot's earlier ones */
 		if (result)
-			*result = device.visibility_results[index];
+			*result = visibility_unscaled(device.visibility_results[index], index);
 		return S_OK;
 	}
 #endif
@@ -1271,6 +1386,8 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	more than any test covers, well below what would overflow there. */
 	if (samples)
 		samples = VISIBILITY_ALL_SAMPLES;
+#else
+	samples = visibility_unscaled(samples, index);
 #endif
 	if (result)
 		*result = samples;
@@ -1933,7 +2050,8 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 		struct xgpu_render_target *target =
 			xgpu_render_target_find(data + xgpu_texture_level_offset(description, level));
 
-		if (!target || target->width != width || target->height != height)
+		if (!target || target->width != width || target->height != height ||
+			target->gl_width != width || target->gl_height != height)
 			break;
 #ifdef HALO_ANDROID
 		if (!xgpu_capabilities.copy_image)
@@ -2046,10 +2164,10 @@ static void apply_raster_state(BOOL has_depth)
 	unsigned char color_mask;
 	BOOL depth_test = has_depth && rs[D3DRS_ZENABLE];
 
-	viewport[0] = (GLint)device.viewport.X;
-	viewport[1] = (GLint)device.viewport.Y;
-	viewport[2] = (GLint)device.viewport.Width;
-	viewport[3] = (GLint)device.viewport.Height;
+	viewport[0] = target_pixel((float)device.viewport.X, 0);
+	viewport[1] = target_pixel((float)device.viewport.Y, 1);
+	viewport[2] = target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - viewport[0];
+	viewport[3] = target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - viewport[1];
 	if (memcmp(gl_state.viewport, viewport, sizeof(viewport)))
 	{
 		memcpy(gl_state.viewport, viewport, sizeof(viewport));
@@ -3313,8 +3431,11 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	glEnable(GL_SCISSOR_TEST);
 	for (index = 0; index < count; index++)
 	{
-		glScissor(rectangles[index].x1 + UI_OFFSET, rectangles[index].y1,
-			rectangles[index].x2 - rectangles[index].x1, rectangles[index].y2 - rectangles[index].y1);
+		GLint x0 = target_pixel((float)(rectangles[index].x1 + UI_OFFSET), 0);
+		GLint y0 = target_pixel((float)rectangles[index].y1, 1);
+
+		glScissor(x0, y0, target_pixel((float)(rectangles[index].x2 + UI_OFFSET), 0) - x0,
+			target_pixel((float)rectangles[index].y2, 1) - y0);
 		glClear(mask);
 	}
 	glDisable(GL_SCISSOR_TEST);
@@ -3326,7 +3447,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 static void write_screenshot(struct render_target_entry *target)
 {
 	const char *directory = getenv("HALO_SCREENSHOT_DIR");
-	unsigned long width = target->target.width, height = target->target.height;
+	unsigned long width = target->target.gl_width, height = target->target.gl_height;
 	unsigned char *pixels;
 	char path[512];
 	FILE *file;
@@ -3397,11 +3518,11 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */
 		width = window_width;
-		height = (int)((long)window_width * back_buffer->target.height / back_buffer->target.width);
+		height = (int)((long)window_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
 		if (height > window_height)
 		{
 			height = window_height;
-			width = (int)((long)window_height * back_buffer->target.width / back_buffer->target.height);
+			width = (int)((long)window_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
 		}
 		x = (window_width - width) / 2;
 		y = (window_height - height) / 2;
@@ -3412,7 +3533,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
 		/* row 0 of the render target is the top of the picture */
-		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.width, (GLint)back_buffer->target.height,
+		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
 			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		platform_video_swap();
 		xgpu_gl_state_invalidate();

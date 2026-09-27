@@ -159,6 +159,10 @@ struct xgpu_render_target
 	unsigned long width, height;
 	BOOL depth;
 	GLuint texture;
+	/* pixels per unit of width and height: more than 1 for the screen's
+	targets when the game draws at the display's resolution (d3d8_gl.c) */
+	float scale[2];
+	unsigned long gl_width, gl_height;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */

@@ -177,6 +177,7 @@ def main() -> None:
             "HALO_SAVE_ROOT": str(saves.resolve()),
             "HALO_EXIT_AFTER": str(seconds),
             "HALO_NO_VSYNC": "1",
+            "HALO_FULLSCREEN": "0",
             "HALO_VOLUME": "0",
             "LLVM_PROFILE_FILE": str((raw / f"{name}-%p.profraw").resolve()),
         }

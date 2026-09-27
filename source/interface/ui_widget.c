@@ -5535,10 +5535,10 @@ void render_ui_widgets(
 		{
 			real alpha;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 			/* the whole screen, around the centered 640 columns */
-			bounds.x0 = (short)(-(halo_android_screen_width() - 640) / 2);
-			bounds.x1 = (short)(640 + (halo_android_screen_width() - 640) / 2);
+			bounds.x0 = (short)(-(halo_screen_width() - 640) / 2);
+			bounds.x1 = (short)(640 + (halo_screen_width() - 640) / 2);
 #else
 			bounds.x0 = 0;
 			bounds.x1 = 640;

@@ -95,7 +95,7 @@ viewport's shape with a fixed vertical one, so the 3D view simply widens
 ("Hor+"). The HUD anchors to the title-safe frame, which widens with the
 screen; the menus, the loading bar and the post-game screens are laid out
 for 640 columns and are drawn centered (the vertex shaders shift them,
-`halo_android_ui_offset`); chapter titles keep their place relative to the
+`halo_screen_ui_offset`); chapter titles keep their place relative to the
 screen's sides; letterbox bars and fades cover the whole width. The
 changes are in `rasterizer_xbox.c`, `render.c`, `ui_widget.c`,
 `cinematics.c`, `main.c` and `rasterizer_xbox_screen_effect.c`, under

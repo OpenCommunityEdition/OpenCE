@@ -69,6 +69,38 @@ int halo_interpolation_enabled(void)
 	return enabled;
 }
 
+#ifndef HALO_ANDROID
+/* whether the window opens fullscreen: yes unless HALO_FULLSCREEN=0, and
+never when it is hidden */
+static BOOL platform_fullscreen_setting(void)
+{
+	const char *setting = getenv("HALO_FULLSCREEN");
+
+	return !getenv("HALO_HIDDEN_WINDOW") && !(setting && !strcmp(setting, "0"));
+}
+
+/* whether the game is, or is to be, fullscreen, and if so the size in
+pixels of the display it fills (d3d8_gl.c draws at that resolution) */
+BOOL platform_screen_mode(long *width, long *height)
+{
+	SDL_DisplayID display;
+	const SDL_DisplayMode *mode;
+
+	if (platform_window ? !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) :
+		!platform_fullscreen_setting() || !platform_sdl_initialize())
+	{
+		return FALSE;
+	}
+	display = platform_window ? SDL_GetDisplayForWindow(platform_window) : SDL_GetPrimaryDisplay();
+	mode = display ? SDL_GetDesktopDisplayMode(display) : NULL;
+	if (!mode)
+		return FALSE;
+	*width = (long)(mode->w * mode->pixel_density + 0.5f);
+	*height = (long)(mode->h * mode->pixel_density + 0.5f);
+	return TRUE;
+}
+
+#endif
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
 	const char *scale_text = getenv("HALO_WINDOW_SCALE");
@@ -108,8 +140,14 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
 		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 #else
+	/* fullscreen at the desktop's resolution unless HALO_FULLSCREEN=0, where
+	the game draws the display's shape at its resolution (d3d8_gl.c); the
+	window size is the windowed mode F11 switches to and from, where it
+	draws 640x480 */
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
-		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (getenv("HALO_HIDDEN_WINDOW") ? SDL_WINDOW_HIDDEN : 0));
+		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
+		(getenv("HALO_HIDDEN_WINDOW") ? SDL_WINDOW_HIDDEN : 0) |
+		(platform_fullscreen_setting() ? SDL_WINDOW_FULLSCREEN : 0));
 #endif
 	if (!platform_window)
 	{
@@ -350,6 +388,15 @@ void platform_pump_events(void)
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released);
 			}
+#ifndef HALO_ANDROID
+			/* F11 switches between fullscreen and the window (SDL keeps the
+			window's size and place while fullscreen) */
+			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
+			{
+				SDL_SetWindowFullscreen(platform_window,
+					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+			}
+#endif
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
 			input_state.mouse_dx += event.motion.xrel;

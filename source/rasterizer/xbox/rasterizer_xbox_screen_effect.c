@@ -994,11 +994,11 @@ void _rasterizer_screen_effect(
 
 			if (pass == 0 && main_get_window_count() > 1 && pass_count != 1)
 			{
-#ifdef HALO_ANDROID
+#ifdef HALO_LINUX
 				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
-					(1.0f / (real)halo_android_screen_width()) - 1.0f;
+					(1.0f / (real)halo_screen_width()) - 1.0f;
 				vertex_bounds.x1 = 2 * global_window_parameters.camera.viewport_bounds.x1 *
-					(1.0f / (real)halo_android_screen_width()) - 1.0f;
+					(1.0f / (real)halo_screen_width()) - 1.0f;
 #else
 				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
 					(1.0f / 640.0f) - 1.0f;

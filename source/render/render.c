@@ -106,8 +106,8 @@ enum
 
 /* ---------- macros */
 
-#ifdef HALO_ANDROID
-#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH halo_android_screen_width()
+#ifdef HALO_LINUX
+#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH halo_screen_width()
 #else
 #define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH 640
 #endif
@@ -238,10 +238,10 @@ static void render_nonplayer_frame(
 		break;
 
 	case 1:
-#ifdef HALO_ANDROID
-		halo_android_ui_offset(TRUE);
+#ifdef HALO_LINUX
+		halo_screen_ui_offset(TRUE);
 		game_engine_nonplayer_post_rasterize();
-		halo_android_ui_offset(FALSE);
+		halo_screen_ui_offset(FALSE);
 #else
 		game_engine_nonplayer_post_rasterize();
 #endif
@@ -282,10 +282,10 @@ void render_frame_pregame(
 	rasterizer_parameters.rasterizer_target = 0;
 	rasterizer_window_begin(&rasterizer_parameters);
 
-#ifdef HALO_ANDROID
-	halo_android_ui_offset(TRUE);
+#ifdef HALO_LINUX
+	halo_screen_ui_offset(TRUE);
 	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
-	halo_android_ui_offset(FALSE);
+	halo_screen_ui_offset(FALSE);
 #else
 	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
 #endif
@@ -441,10 +441,10 @@ static void render_window(
 		rasterizer_lens_flares_draw();
 		interface_draw_screen();
 		rasterizer_screen_flash();
-#ifdef HALO_ANDROID
-		halo_android_ui_offset(TRUE);
+#ifdef HALO_LINUX
+		halo_screen_ui_offset(TRUE);
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
-		halo_android_ui_offset(FALSE);
+		halo_screen_ui_offset(FALSE);
 #else
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
 #endif
@@ -670,10 +670,10 @@ void render_frame(
 		render_nonplayer_frame(window, window_type);
 	}
 
-#ifdef HALO_ANDROID
-	halo_android_ui_offset(TRUE);
+#ifdef HALO_LINUX
+	halo_screen_ui_offset(TRUE);
 	progress_bar_eachframe();
-	halo_android_ui_offset(FALSE);
+	halo_screen_ui_offset(FALSE);
 #else
 	progress_bar_eachframe();
 #endif

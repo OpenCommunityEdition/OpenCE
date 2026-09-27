@@ -2904,8 +2904,8 @@ void halt_and_catch_fire(
 					1.0f);
 			window_parameters.camera.z_near = rasterizer_globals.near_clip_distance;
 			window_parameters.camera.viewport_bounds.x0 = 0;
-#ifdef HALO_ANDROID
-			window_parameters.camera.viewport_bounds.x1 = (short)halo_android_screen_width();
+#ifdef HALO_LINUX
+			window_parameters.camera.viewport_bounds.x1 = (short)halo_screen_width();
 #else
 			window_parameters.camera.viewport_bounds.x1 = 640;
 #endif
