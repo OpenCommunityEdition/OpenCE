@@ -1765,10 +1765,20 @@ void object_reconnect_to_map(
 	}
 	else
 	{
+#ifdef HALO_LINUX
+		/* location may point here after the if below: declared inside it,
+		the location would be read after its lifetime ended, which an
+		optimising compiler is free to break (release builds crashed placing
+		objects at level start, reading a stack slot reused meanwhile) */
+		struct location bounding_sphere_location;
+
+#endif
 		if (!location)
 		{
+#ifndef HALO_LINUX
 			struct location bounding_sphere_location;
-			
+#endif
+
 			scenario_location_from_point(&bounding_sphere_location, &object->object.bounding_sphere_center);
 			location = &bounding_sphere_location;
 
