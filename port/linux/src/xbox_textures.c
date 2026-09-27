@@ -15,6 +15,7 @@ memory_watch.c detects that by write-protecting the pages.
 */
 
 #include "xgpu.h"
+#include "port_config.h"
 
 #include <stdio.h>
 #ifdef HALO_ANDROID
@@ -531,7 +532,7 @@ static GLenum compressed_format(unsigned char kind)
 
 /* ---------- upload */
 
-/* HALO_TEXTURE_DUMP=<dir> writes level 0 of every upload as a TGA, read back from GL */
+/* debug.texture_dump_directory writes level 0 of every upload as a TGA, read back from GL */
 static void texture_dump(GLenum target, const struct xgpu_texture_description *description)
 {
 #ifdef HALO_ANDROID
@@ -541,7 +542,8 @@ static void texture_dump(GLenum target, const struct xgpu_texture_description *d
 }
 #else
 	static unsigned long dump_index = 0;
-	const char *directory = getenv("HALO_TEXTURE_DUMP");
+	const char *directory = *config_string("debug.texture_dump_directory") ?
+		config_string("debug.texture_dump_directory") : NULL;
 	unsigned long width = description->width, height = description->height;
 	unsigned char header[18];
 	unsigned char *pixels;
@@ -756,7 +758,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	}
 
 	if (no_cache < 0)
-		no_cache = getenv("HALO_TEXTURE_NO_CACHE") != NULL;
+		no_cache = config_boolean("debug.texture_no_cache");
 	generation = memory_watch_generation(entry->address, entry->size);
 	if (!entry->generation || generation > entry->generation || no_cache)
 	{
@@ -768,7 +770,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		if (platform_is_contiguous((void *)entry->address) &&
 			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
 		{
-			if (getenv("HALO_TEXTURE_LOG"))
+			if (config_boolean("debug.texture_log"))
 			{
 				const unsigned char *bytes = (const unsigned char *)entry->address;
 				unsigned long index, ones = 0, zeros = 0;

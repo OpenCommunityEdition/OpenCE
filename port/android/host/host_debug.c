@@ -2,8 +2,8 @@
 HOST_DEBUG.C
 
 A sampler for finding where the guest spends its time (or hangs) on a
-device without root, where debuggerd cannot attach: with HALO_SAMPLE=<seconds>
-in halo.env, every guest thread is interrupted that often and its program
+device without root, where debuggerd cannot attach: with sample_seconds in
+config.toml's [debug], every guest thread is interrupted that often and its program
 counter, link register and frame chain are written to logcat. The addresses
 symbolize against build/android/halo_guest.elf (llvm-symbolizer
 --obj=build/android/halo_guest.elf 0x...).

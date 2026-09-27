@@ -12,6 +12,7 @@ and the debug keyboard that the game's console reads.
 #include "platform.h"
 #include "sdl_platform.h"
 #include "gl.h"
+#include "port_config.h"
 
 #include <SDL3/SDL.h>
 #include <stdlib.h>
@@ -66,22 +67,16 @@ int halo_interpolation_enabled(void)
 	static int enabled = -1;
 
 	if (enabled < 0)
-	{
-		const char *setting = getenv("HALO_INTERPOLATION");
-
-		enabled = !(setting && !strcmp(setting, "0"));
-	}
+		enabled = config_boolean("display.interpolation");
 	return enabled;
 }
 
 #ifndef HALO_ANDROID
-/* whether the window opens fullscreen: yes unless HALO_FULLSCREEN=0, and
-never when it is hidden */
+/* whether the window opens fullscreen (display.fullscreen), never when it
+is hidden */
 static BOOL platform_fullscreen_setting(void)
 {
-	const char *setting = getenv("HALO_FULLSCREEN");
-
-	return !getenv("HALO_HIDDEN_WINDOW") && !(setting && !strcmp(setting, "0"));
+	return !config_boolean("debug.hidden_window") && config_boolean("display.fullscreen");
 }
 
 /* whether the game is, or is to be, fullscreen, and if so the size in
@@ -108,8 +103,7 @@ BOOL platform_screen_mode(long *width, long *height)
 #endif
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
-	const char *scale_text = getenv("HALO_WINDOW_SCALE");
-	int scale = scale_text ? atoi(scale_text) : 2;
+	int scale = (int)config_integer("display.window_scale");
 	int version;
 
 	if (platform_window)
@@ -131,7 +125,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
-	if (getenv("HALO_GL_DEBUG"))
+	if (config_boolean("debug.gl_debug"))
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #if !defined(HALO_ANDROID) && !defined(_WIN32)
 	/* Mesa's GL thread: the renderer makes thousands of GL calls a frame
@@ -145,13 +139,13 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
 		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 #else
-	/* fullscreen at the desktop's resolution unless HALO_FULLSCREEN=0, where
-	the game draws the display's shape at its resolution (d3d8_gl.c); the
-	window size is the windowed mode F11 switches to and from, where it
-	draws 640x480 */
+	/* fullscreen at the desktop's resolution unless display.fullscreen is
+	false, where the game draws the display's shape at its resolution
+	(d3d8_gl.c); the window size is the windowed mode F11 switches to and
+	from, where it draws 640x480 */
 	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
-		(getenv("HALO_HIDDEN_WINDOW") ? SDL_WINDOW_HIDDEN : 0) |
+		(config_boolean("debug.hidden_window") ? SDL_WINDOW_HIDDEN : 0) |
 		(platform_fullscreen_setting() ? SDL_WINDOW_FULLSCREEN : 0));
 #endif
 	if (!platform_window)
@@ -177,7 +171,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_MakeCurrent(platform_window, platform_gl_context);
 	if (!gl_functions_load())
 		return FALSE;
-	version = SDL_GL_SetSwapInterval(getenv("HALO_NO_VSYNC") ? 0 : 1);
+	version = SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
@@ -351,7 +345,7 @@ BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
 
 void platform_pump_events(void)
 {
-	/* HALO_EXIT_AFTER=<seconds> ends the game that long after the window
+	/* debug.exit_after (seconds) ends the game that long after the window
 	opens, as closing it does (tools/pgo_train.py) */
 	static Uint64 exit_ticks = (Uint64)-1;
 	SDL_Event event;
@@ -360,13 +354,13 @@ void platform_pump_events(void)
 		return;
 	if (exit_ticks == (Uint64)-1)
 	{
-		const char *setting = getenv("HALO_EXIT_AFTER");
+		double seconds = config_real("debug.exit_after");
 
-		exit_ticks = setting ? SDL_GetTicks() + (Uint64)(atof(setting) * 1000.0) : 0;
+		exit_ticks = seconds > 0.0 ? SDL_GetTicks() + (Uint64)(seconds * 1000.0) : 0;
 	}
 	if (exit_ticks && SDL_GetTicks() >= exit_ticks)
 	{
-		platform_log("exiting after HALO_EXIT_AFTER");
+		platform_log("exiting after debug.exit_after");
 		exit(EXIT_SUCCESS);
 	}
 	pthread_mutex_lock(&input_lock);

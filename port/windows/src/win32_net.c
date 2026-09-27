@@ -74,7 +74,7 @@ int posix_socket(int family, int type, int protocol)
 	if (type == SOCK_DGRAM)
 	{
 		/* Windows reports an ICMP port unreachable (a datagram to an address
-		nothing listens on, such as a HALO_NET_BROADCAST machine not running)
+		nothing listens on, such as a network.broadcast machine not running)
 		as a WSAECONNRESET from the socket's next recvfrom; neither the Xbox
 		nor Linux does */
 		BOOL report = FALSE;

@@ -45,12 +45,13 @@ ships it for x86-64 only: `pgo/halo_profile_runtime.c`).
 build\windows\halo.exe
 ```
 
-The game data is found as on Linux: `HALO_DATA_ROOT` if set, else the
+The game data is found as on Linux: `paths.data` in `config.toml` if set, else the
 current directory when it has `maps\`, else `assets\` in the current
 directory or in the repository that holds the executable. It must be the PAL
 data of this build (01.01.14.2342). Saves go to `%APPDATA%\halo`
-(`HALO_SAVE_ROOT` overrides it). Controls and the `HALO_*` settings are
-those of the Linux build (`port/linux/README.md`); like it, the game draws
+(`paths.saves` overrides it). The settings are in `config.toml` next to
+`halo.exe`, written with the defaults on the first run; they and the
+controls are those of the Linux build (`port/linux/README.md`); like it, the game draws
 a frame at every refresh of the display, between its 30 Hz ticks ("Frame
 rate" there).
 

@@ -26,12 +26,13 @@ the game's completion callback is not meant to run concurrently with it.
 Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.
 
-HALO_VOLUME sets the master volume (default 1.0); HALO_NO_AUDIO skips
-opening a device.
+audio.volume sets the master volume (default 1.0); audio.enabled = false
+skips opening a device (port_config.c).
 */
 
 #include "platform.h"
 #include "sdl_platform.h"
+#include "port_config.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -474,15 +475,13 @@ static void *silent_clock_thread(void *parameter)
 static void audio_start(void)
 {
 	SDL_AudioSpec spec;
-	const char *volume = getenv("HALO_VOLUME");
 
 	if (audio_started)
 		return;
 	audio_started = TRUE;
-	if (volume)
-		master_volume = (float)atof(volume);
+	master_volume = (float)config_real("audio.volume");
 
-	if (!getenv("HALO_NO_AUDIO") && platform_sdl_initialize())
+	if (config_boolean("audio.enabled") && platform_sdl_initialize())
 	{
 		spec.format = SDL_AUDIO_F32;
 		spec.channels = OUTPUT_CHANNELS;

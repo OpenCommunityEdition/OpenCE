@@ -34,6 +34,7 @@ drive the controller.
 
 #include "platform.h"
 #include "sdl_platform.h"
+#include "port_config.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -84,9 +85,7 @@ static float mouse_sensitivity(void)
 
 	if (sensitivity < 0.0f)
 	{
-		const char *text = getenv("HALO_MOUSE_SENSITIVITY");
-
-		sensitivity = text ? (float)atof(text) : 1.0f;
+		sensitivity = (float)config_real("input.mouse_sensitivity");
 		if (sensitivity <= 0.0f)
 			sensitivity = 1.0f;
 	}
@@ -107,7 +106,7 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	if (gamepad_index != 0)
 		return FALSE;
 	if (invert < 0)
-		invert = getenv("HALO_MOUSE_INVERT") != NULL;
+		invert = config_boolean("input.invert_mouse");
 	pthread_mutex_lock(&mouse_lock);
 	x = mouse_pending_x;
 	y = mouse_pending_y;

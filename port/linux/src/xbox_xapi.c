@@ -15,6 +15,7 @@ reported as inserted, so the game runs with no input devices.
 */
 
 #include "platform.h"
+#include "port_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,9 +44,9 @@ DWORD WINAPI XLaunchNewImageA(LPCSTR image_path, PLAUNCH_DATA launch_data)
 
 DWORD WINAPI XGetLanguage(void)
 {
-	const char *language = getenv("HALO_LANGUAGE");
+	const char *language = config_string("game.language");
 
-	if (language)
+	if (*language)
 	{
 		if (!strncmp(language, "ja", 2)) return XC_LANGUAGE_JAPANESE;
 		if (!strncmp(language, "de", 2)) return XC_LANGUAGE_GERMAN;

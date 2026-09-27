@@ -45,6 +45,9 @@ SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 #  - no optimisations that assume the absence of MSVC-tolerated UB,
 #  - EBP frames (MSVC /Oy-): get_return_eip and the stack walker follow the
 #    frame chain.
+# the TOML parser the platform layer reads config.toml with (port_config.c)
+TOML_DIR = Path("port/third_party/tomlc17")
+
 WINDOWS_ABI_FLAGS = [
     "--target=i686-pc-windows-msvc",
     "-fms-extensions",
@@ -354,6 +357,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             f"-I{crt_include}",
             f"-I{linux_platform}",
             f"-I{PORT_DIR / 'include'}",
+            f"-I{TOML_DIR}",
             # halo_linux_winsock_names.h, but not the Linux build's C runtime
             # wrappers next to it
             f"-iquote {LINUX_DIR / 'include'}",
@@ -375,6 +379,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             add_object(source, platform_cflags)
         for source in sorted((PORT_DIR / "src").glob("*.c")):
             add_object(source, win32_cflags if source.name.startswith("win32_") else platform_cflags)
+        # the settings file's parser (port/third_party/tomlc17), with the
+        # platform layer's ABI and nothing else
+        add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
 
         n.build(
             outputs=output,

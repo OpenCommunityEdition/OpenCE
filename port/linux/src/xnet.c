@@ -12,9 +12,10 @@ real address, key exchange keys are random but unused, and XNADDR to
 IN_ADDR translation is the identity. That is enough for system link play on
 a LAN.
 
-Two settings adjust the addressing:
+Two settings in config.toml's [network] (port_config.c) adjust the
+addressing:
 
-- HALO_NET_ADDRESS=a.b.c.d binds the game's sockets to that local address
+- address = "a.b.c.d" binds the game's sockets to that local address
   instead of every interface, and reports it as this machine's system link
   address. Several instances can then share one computer, each on its own
   loopback address (127.0.0.2, 127.0.0.3, ...), or system link can be
@@ -23,12 +24,12 @@ Two settings adjust the addressing:
   through it, and admits only it to a split screen game): connections and
   datagrams to 127.0.0.1 go to the address, and traffic from the address
   is reported as coming from 127.0.0.1.
-- HALO_NET_BROADCAST=a.b.c.d[,e.f.g.h...] sends the game's broadcasts (a
+- broadcast = "a.b.c.d[,e.f.g.h...]" sends the game's broadcasts (a
   client's system link game search, a host's game advertisement) to those
   addresses instead of 255.255.255.255, to reach machines that broadcasts
   do not: other loopback addresses, or machines across a VPN (listing
   255.255.255.255 too still broadcasts). A socket bound to one address
-  receives no broadcasts, so machines with HALO_NET_ADDRESS find each
+  receives no broadcasts, so machines with an address find each
   other only through these lists: each must list the others.
 
 Both are read once, when the game starts its networking; a value that is
@@ -37,6 +38,7 @@ not an IPv4 address is reported and ignored.
 
 #include "platform.h"
 #include "posix.h"
+#include "port_config.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +50,7 @@ enum
 	MAXIMUM_BROADCAST_TARGETS = 256,
 };
 
-/* HALO_NET_ADDRESS and HALO_NET_BROADCAST, read once (net_settings_read),
+/* network.address and network.broadcast, read once (net_settings_read),
 in network byte order */
 static struct
 {
@@ -102,7 +104,7 @@ static void net_settings_read(void)
 
 	if (net_settings.read)
 		return;
-	text = getenv("HALO_NET_ADDRESS");
+	text = config_string("network.address");
 	if (text && *text)
 	{
 		unsigned long address;
@@ -115,10 +117,10 @@ static void net_settings_read(void)
 		}
 		else
 		{
-			platform_log("HALO_NET_ADDRESS=%s is not a usable IPv4 address: ignored", text);
+			platform_log("network.address \"%s\" is not a usable IPv4 address: ignored", text);
 		}
 	}
-	text = getenv("HALO_NET_BROADCAST");
+	text = config_string("network.broadcast");
 	while (text && *text)
 	{
 		const char *end = text + strcspn(text, ",");
@@ -129,11 +131,11 @@ static void net_settings_read(void)
 			if (net_settings.broadcast_count < MAXIMUM_BROADCAST_TARGETS)
 				net_settings.broadcast_targets[net_settings.broadcast_count++] = address;
 			else if (net_settings.broadcast_count++ == MAXIMUM_BROADCAST_TARGETS)
-				platform_log("HALO_NET_BROADCAST: only the first %d addresses are used", MAXIMUM_BROADCAST_TARGETS);
+				platform_log("network.broadcast: only the first %d addresses are used", MAXIMUM_BROADCAST_TARGETS);
 		}
 		else if (end > text)
 		{
-			platform_log("HALO_NET_BROADCAST: %.*s is not an IPv4 address: ignored", (int)(end - text), text);
+			platform_log("network.broadcast: %.*s is not an IPv4 address: ignored", (int)(end - text), text);
 		}
 		text = *end ? end + 1 : end;
 	}
@@ -141,14 +143,14 @@ static void net_settings_read(void)
 		net_settings.broadcast_count = MAXIMUM_BROADCAST_TARGETS;
 	if (net_settings.has_local_address && !net_settings.broadcast_count)
 	{
-		platform_log("HALO_NET_ADDRESS without HALO_NET_BROADCAST: sockets bound to one address "
+		platform_log("network.address without network.broadcast: sockets bound to one address "
 			"receive no broadcasts, so this machine sees other machines' games and searches only if "
-			"they list its address in their HALO_NET_BROADCAST");
+			"they list its address in their network.broadcast");
 	}
 	net_settings.read = 1;
 }
 
-/* the address to use in place of INADDR_ANY, if HALO_NET_ADDRESS is set */
+/* the address to use in place of INADDR_ANY, if network.address is set */
 static int local_address_setting(unsigned long *address)
 {
 	net_settings_read();
@@ -164,7 +166,7 @@ static unsigned long loopback_address(void)
 	return halo_ws_htonl(0x7F000001);
 }
 
-/* a destination of 127.0.0.1 means the HALO_NET_ADDRESS address */
+/* a destination of 127.0.0.1 means the network.address address */
 static const struct sockaddr *outgoing_address(const struct sockaddr *address, int address_length,
 	struct sockaddr_in *storage)
 {
@@ -181,7 +183,7 @@ static const struct sockaddr *outgoing_address(const struct sockaddr *address, i
 	return address;
 }
 
-/* traffic from the HALO_NET_ADDRESS address comes from 127.0.0.1 */
+/* traffic from the network.address address comes from 127.0.0.1 */
 static void incoming_address(struct sockaddr *address, const int *address_length)
 {
 	unsigned long local;
@@ -194,7 +196,7 @@ static void incoming_address(struct sockaddr *address, const int *address_length
 	}
 }
 
-/* the addresses to send broadcasts to instead, if HALO_NET_BROADCAST is
+/* the addresses to send broadcasts to instead, if network.broadcast is
 set (255.255.255.255 among them sends a real broadcast too); returns their
 count */
 static int broadcast_targets(unsigned long *targets, int maximum_count)
@@ -291,7 +293,7 @@ int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int ad
 
 	address = outgoing_address(address, address_length, &target);
 	/* a connection from an unbound socket would leave from whichever address
-	the route picks; with HALO_NET_ADDRESS it leaves from that address */
+	the route picks; with network.address it leaves from that address */
 	if (address && address->sa_family == AF_INET && local_address_setting(&override))
 	{
 		struct sockaddr_in bound;
@@ -582,7 +584,7 @@ INT WSAAPI XNetXnAddrToInAddr(const XNADDR *address, const XNKID *key_identifier
 	return 0;
 }
 
-/* this machine's system link address: HALO_NET_ADDRESS, else the first
+/* this machine's system link address: network.address, else the first
 non-loopback IPv4 address */
 static unsigned long title_address(void)
 {

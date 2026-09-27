@@ -18,7 +18,7 @@ declaration and call collapses to the one-parameter form here. */
 #define rasterizer_debug_drawing_begin(opaque, ...) (rasterizer_debug_drawing_begin)(opaque)
 
 /* frames between the 30 Hz ticks (port/linux/game/render_interpolation.c);
-the platform layer reads the HALO_INTERPOLATION setting */
+the platform layer reads the display.interpolation setting */
 struct observer_result;
 struct render_camera;
 struct real_matrix4x3;

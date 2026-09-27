@@ -80,7 +80,8 @@ void host_run_guest_main(uint32_t boot) __attribute__((noreturn));
 
 void host_debug_thread_started(void);
 void host_debug_thread_exited(void);
-/* HALO_SAMPLE: seconds between samples of the guest threads, or NULL */
+/* config.toml's debug.sample_seconds: seconds between samples of the guest
+threads, as text */
 void host_debug_start_sampler(const char *setting);
 
 /* ---------- import table (host_imports.c) */

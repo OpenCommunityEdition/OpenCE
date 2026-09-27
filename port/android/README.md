@@ -77,15 +77,19 @@ and a Bluetooth or USB keyboard works as described in the Linux README.
 
 ## Settings
 
-A text file `files/halo.env` (next to `maps`) sets any of the port's
-environment variables, one `NAME=value` per line: the `HALO_*` settings of
-the Linux README (volume, language, renderer debugging), plus:
+The settings are in `files/config.toml`, next to `maps`
+(`adb pull /sdcard/Android/data/com.halo.decomp/files/config.toml`, edit,
+`adb push` it back). The game writes it with the defaults and a comment on
+each setting the first time it runs; delete it to get the defaults back.
+The settings are those of the Linux README's Settings (volume, language,
+vsync, renderer debugging) without the desktop's window, mouse and paths,
+plus:
 
-| Variable | Effect |
+| Setting | Effect |
 | --- | --- |
-| `HALO_SCREEN_WIDTH` | columns of the 480-line picture; by default the display's aspect ratio (1068 on a 20:9 phone), `640` for the Xbox's 4:3 |
-| `HALO_INTERPOLATION` | `0`: the original 30 frames per second instead of one per display refresh (port/linux/README.md, "Frame rate") |
-| `HALO_SAMPLE` | see Debugging |
+| `display.screen_width` | columns of the 480-line picture; `0` (the default) for the display's aspect ratio (1068 on a 20:9 phone), `640` for the Xbox's 4:3 |
+| `display.interpolation` | `false`: the original 30 frames per second instead of one per display refresh (port/linux/README.md, "Frame rate") |
+| `debug.sample_seconds` | see Debugging |
 
 ## Widescreen
 
@@ -241,10 +245,10 @@ attributes).
 - A crash in guest code is logged with its registers and frame chain;
   `llvm-symbolizer --obj=build/android/halo_guest.elf <address>` names the
   functions.
-- `HALO_SAMPLE=<seconds>` in `halo.env` logs every guest thread's program
+- `sample_seconds = <seconds>` in `config.toml`'s `[debug]` logs every guest thread's program
   counter and frame chain that often, which finds hangs on devices without
   root.
-- `HALO_GL_DEBUG=1` reports OpenGL ES errors around draws.
+- `gl_debug = true` in `config.toml`'s `[debug]` reports OpenGL ES errors around draws.
 
 ## Known limitations
 

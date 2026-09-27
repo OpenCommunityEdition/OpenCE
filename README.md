@@ -37,7 +37,7 @@ They are also optimised with profiles of the game at play, recorded by an instru
 
 With Mesa drivers the Linux build makes its GL calls through Mesa's GL thread (`mesa_glthread`), which takes them off the game's thread.
 
-Frames per second at the opening of a30, uncapped (`HALO_NO_VSYNC=1`), about 510 draws per frame; each row adds one change to the one above (Linux: a laptop with an Intel Core i7-1355U and Iris Xe graphics, median of three runs; Android: a Pixel 9 Pro XL, Tensor G4, median of three runs):
+Frames per second at the opening of a30, uncapped (`vsync = false` in `config.toml`, or `HALO_NO_VSYNC=1`), about 510 draws per frame; each row adds one change to the one above (Linux: a laptop with an Intel Core i7-1355U and Iris Xe graphics, median of three runs; Android: a Pixel 9 Pro XL, Tensor G4, median of three runs):
 
 | Change | Linux | Android |
 | --- | ---: | ---: |
@@ -56,7 +56,7 @@ Unity ("jumbo") builds, which compile many files as one, would give the compiler
 
 ### Frame rate
 
-The native builds draw a frame at every refresh of the display (60, 90, 120, 240 Hz, ...), paced by vsync, while the game still simulates at 30 Hz as on the Xbox: each frame blends the last two ticks. To see the frame rate, open the developer console (the \` key) and enter `display_framerate true`; the frames per second, averaged over half a second, appear at the bottom right of the screen. `HALO_INTERPOLATION=0` restores the original 30 frames per second. See [port/linux/README.md](port/linux/README.md#frame-rate).
+The native builds draw a frame at every refresh of the display (60, 90, 120, 240 Hz, ...), paced by vsync, while the game still simulates at 30 Hz as on the Xbox: each frame blends the last two ticks. To see the frame rate, open the developer console (the \` key) and enter `display_framerate true`; the frames per second, averaged over half a second, appear at the bottom right of the screen. `interpolation = false` in `config.toml` (written next to the executable, or in the data folder on Android, on the first run) restores the original 30 frames per second. See [port/linux/README.md](port/linux/README.md#frame-rate).
 
 ### Native Windows build
 

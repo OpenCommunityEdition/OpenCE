@@ -24,6 +24,7 @@ Conventions carried over from the Xbox:
 #include "xgpu.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
+#include "port_config.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -58,7 +59,7 @@ struct xgpu_capabilities xgpu_capabilities;
 
 The Xbox screen is 640x480. The native ports can draw a wider one: 480
 lines, and as many columns as the display's shape gives. On Android that is
-HALO_SCREEN_WIDTH, set by the host (640 keeps 4:3); on the desktop, the
+display.screen_width (port_config.c; 640 keeps 4:3); on the desktop, the
 display's shape while the game is fullscreen, and 640 in a window. The
 game's camera derives its horizontal field of view from the viewport, so the
 3D view simply widens. The menus and full-screen overlays are laid out for
@@ -84,9 +85,13 @@ static long ui_offset;
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
-	const char *text = getenv("HALO_SCREEN_WIDTH");
+	/* display.screen_width, or 0 for the display's shape, which the app
+	passes (port/android/host/host_main.c) */
+	const char *display = getenv("HALO_DISPLAY_WIDTH");
 
-	*width = text ? atol(text) : 640;
+	*width = config_integer("display.screen_width");
+	if (*width <= 0)
+		*width = display ? atol(display) : 640;
 	if (*width < 640)
 		*width = 640;
 	if (*width > 1600)
@@ -361,7 +366,7 @@ struct gl_device
 
 static struct gl_device device;
 
-/* HALO_GPU_STATS prints these once a second */
+/* debug.gpu_stats prints these once a second */
 static struct
 {
 	unsigned long draws, immediate_draws, clears, presents;
@@ -396,8 +401,8 @@ static void color_to_vec4(D3DCOLOR color, float *out)
 
 static struct
 {
-	/* HALO_GPU_SKIP_VS=<id>,<id>... drops draws by vertex shader, for
-	finding which pass produces something */
+	/* debug.gpu_skip_vertex_shaders "<id>,<id>..." drops draws by vertex
+	shader, for finding which pass produces something (port_config.c) */
 	const char *skip_vertex_shaders;
 	const char *dump_shaders;
 	BOOL statistics;
@@ -893,7 +898,7 @@ static void gl_initialize(void)
 			xgpu_capabilities.anisotropy, xgpu_capabilities.s3tc, xgpu_capabilities.atomic_counters);
 	}
 #else
-	if (getenv("HALO_GL_DEBUG"))
+	if (config_boolean("debug.gl_debug"))
 	{
 		glEnable(GL_DEBUG_OUTPUT);
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -956,9 +961,10 @@ static void gl_initialize(void)
 		glVertexAttrib4fv(index, device.attributes[index]);
 	}
 	memory_watch_initialize();
-	debug_settings.skip_vertex_shaders = getenv("HALO_GPU_SKIP_VS");
-	debug_settings.dump_shaders = getenv("HALO_GPU_DUMP_SHADERS");
-	debug_settings.statistics = getenv("HALO_GPU_STATS") != NULL;
+	debug_settings.skip_vertex_shaders = config_string("debug.gpu_skip_vertex_shaders");
+	debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
+		config_string("debug.gpu_dump_shaders") : NULL;
+	debug_settings.statistics = config_boolean("debug.gpu_stats");
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
 }
@@ -1105,7 +1111,7 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 		}
 		viewport_update_constants();
 
-		if (!getenv("HALO_NULL_RENDERER") && platform_video_initialize(width, height))
+		if (!config_boolean("debug.null_renderer") && platform_video_initialize(width, height))
 			gl_initialize();
 		else
 			platform_log("Direct3D: running without a window (nothing is displayed)");
@@ -2383,7 +2389,7 @@ static void apply_raster_state(BOOL has_depth)
 }
 
 #ifdef HALO_ANDROID
-/* ES has no debug callback in 3.0; HALO_GL_DEBUG polls glGetError around
+/* ES has no debug callback in 3.0; debug.gl_debug polls glGetError around
 each draw instead, reporting each distinct error a few times */
 static void gl_check_errors(const char *where)
 {
@@ -2392,7 +2398,7 @@ static void gl_check_errors(const char *where)
 	GLenum error;
 
 	if (enabled < 0)
-		enabled = getenv("HALO_GL_DEBUG") != NULL;
+		enabled = config_boolean("debug.gl_debug");
 	if (!enabled)
 		return;
 	while ((error = glGetError()) != GL_NO_ERROR)
@@ -2643,14 +2649,14 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	return entry;
 }
 
-/* ---------- tracing (HALO_GPU_TRACE=<frame>) */
+/* ---------- tracing (debug.gpu_trace_frame) */
 
 static BOOL trace_frame(void)
 {
 	static long frame = -2;
 
 	if (frame == -2)
-		frame = getenv("HALO_GPU_TRACE") ? atol(getenv("HALO_GPU_TRACE")) : -1;
+		frame = config_integer("debug.gpu_trace_frame");
 	return frame >= 0 && device.frame == (unsigned long)frame;
 }
 
@@ -2693,7 +2699,7 @@ static void trace_draw(const char *kind, D3DPRIMITIVETYPE type, unsigned long co
 		dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]), (long)rs[D3DRS_ZBIAS], rs[D3DRS_STENCILENABLE],
 		rs[D3DRS_STENCILFUNC], rs[D3DRS_STENCILREF], rs[D3DRS_STENCILMASK], rs[D3DRS_STENCILWRITEMASK],
 		rs[D3DRS_STENCILFAIL], rs[D3DRS_STENCILZFAIL], rs[D3DRS_STENCILPASS]);
-	if (getenv("HALO_GPU_TRACE_CONSTANTS"))
+	if (config_boolean("debug.gpu_trace_constants"))
 	{
 		int constant;
 
@@ -3506,7 +3512,8 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 
 static void write_screenshot(struct render_target_entry *target)
 {
-	const char *directory = getenv("HALO_SCREENSHOT_DIR");
+	const char *directory = *config_string("debug.screenshot_directory") ?
+		config_string("debug.screenshot_directory") : NULL;
 	unsigned long width = target->target.gl_width, height = target->target.gl_height;
 	unsigned char *pixels;
 	char path[512];
@@ -3562,7 +3569,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	(void)unused;
 	(void)unused2;
 	if (screenshot_every < 0)
-		screenshot_every = getenv("HALO_SCREENSHOT_EVERY") ? atol(getenv("HALO_SCREENSHOT_EVERY")) : 0;
+		screenshot_every = config_integer("debug.screenshot_every");
 
 	if (device.gl_ready)
 	{

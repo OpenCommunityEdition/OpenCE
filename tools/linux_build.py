@@ -74,6 +74,9 @@ GAME_FLAGS = [
     "-Wno-error=return-type",
 ]
 
+# the TOML parser the platform layer reads config.toml with (port_config.c)
+TOML_DIR = Path("port/third_party/tomlc17")
+
 PLATFORM_FLAGS = [
     "-std=gnu11",
     "-D_GNU_SOURCE",
@@ -359,6 +362,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-include {platform_semantics_header}",
             f"-I{platform_dir}",
             f"-I{port_include}",
+            f"-I{TOML_DIR}",
             "-Isource -Isource/cseries",
             sdk_flags,
         ])
@@ -368,6 +372,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 add_object(source, posix_cflags, posix=True)
             else:
                 add_object(source, platform_cflags)
+        # the settings file's parser (port/third_party/tomlc17), with the
+        # platform layer's ABI (its structs hold doubles) and nothing else
+        add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
 
         n.build(
             outputs=output,

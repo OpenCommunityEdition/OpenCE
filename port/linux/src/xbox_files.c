@@ -4,17 +4,18 @@ XBOX_FILES.C
 Win32 file API for the Linux build, over POSIX descriptors.
 
 Xbox paths are translated below two roots. d:\ is the data root, the
-directory holding the game's maps/ folder: HALO_DATA_ROOT, else the current
+directory holding the game's maps/ folder: paths.data (port_config.c), else the current
 directory when it has maps/, else assets/ in the current directory or two
 levels above the executable (the repository root for build/linux/halo).
 Every other drive letter X:\ is the subdirectory X/ of the save root (z:\ holds the persistent cache and saves,
-u:\ user data, t:\ title data): HALO_SAVE_ROOT, else
+u:\ user data, t:\ title data): paths.saves, else
 $XDG_DATA_HOME/halo-linux or ~/.local/share/halo-linux. Path components are
 matched case-insensitively, like the Xbox's FATX volumes.
 */
 
 #include "platform.h"
 #include "posix.h"
+#include "port_config.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -54,9 +55,9 @@ const char *platform_data_root(void)
 
 	if (!root[0])
 	{
-		const char *environment = getenv("HALO_DATA_ROOT");
+		const char *environment = config_string("paths.data");
 
-		if (environment && *environment)
+		if (*environment)
 		{
 			snprintf(root, sizeof(root), "%s", environment);
 		}
@@ -91,7 +92,7 @@ const char *platform_data_root(void)
 				}
 			}
 			if (!has_maps(root))
-				platform_log("no maps/ folder found; set HALO_DATA_ROOT to the directory that holds maps/");
+				platform_log("no maps/ folder found; set paths.data in config.toml to the folder that holds maps/");
 		}
 		trim_separators(root);
 		platform_log("data root: %s", root);
@@ -126,11 +127,11 @@ const char *platform_save_root(void)
 
 	if (!root[0])
 	{
-		const char *environment = getenv("HALO_SAVE_ROOT");
+		const char *environment = config_string("paths.saves");
 		const char *data_home = getenv("XDG_DATA_HOME");
 		const char *home = getenv("HOME");
 
-		if (environment && *environment)
+		if (*environment)
 			snprintf(root, sizeof(root), "%s", environment);
 #ifdef _WIN32
 		/* the Windows build (port/windows) keeps saves in the roaming
