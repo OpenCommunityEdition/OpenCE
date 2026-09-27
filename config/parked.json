@@ -21,25 +21,6 @@
       }
     },
     {
-      "unit": "source/interface/interface",
-      "function": "_interface_get_weapon_hud_index",
-      "class": "unclassified",
-      "evidence": "Best complete typed ordinary-C weapon-HUD resolver reconstructed from the HCEA semantic donor and January disassembly/relocation authority. It owns its public prototype in interface.h, uses player_get, unit_get, weapon_get and typed definition accessors, preserves the complete gunner-seat/default-HUD/flashlight behavior, and contains no representation punning, assembly or source-pressure steering. Target and candidate share the 448-byte padded envelope and all 20 relocation identities, scoring 94.96429% objdiff. January performs the final real out-parameter copies through integer registers while natural VC7 C uses x87 loads/stores; reproducing that choice through a wrong ABI, memcpy facade, volatile access or inline assembly is rejected. This is zero-credit fuzzy source. Reopen only with authoritative January source or independently attested source that naturally selects the integer copy. See docs/object_matching_logs/interface_obj_weapon_hud_best_fuzzy_20260912.md.",
-      "measurements": {
-        "target": {
-          "size": 448,
-          "relocation_count": 20,
-          "normalized_sha256": "0673f867b219cdbd399685310736ae3de8263479cb2104edd5c56f48930c6549"
-        },
-        "base": {
-          "size": 448,
-          "relocation_count": 20,
-          "normalized_sha256": "57151d28c46aeee1fc2bb715ebde2fbc994b52447a4ba273d624aa56e7749e72"
-        },
-        "objdiff_percent": 94.96429
-      }
-    },
-    {
       "unit": "source/units/bipeds",
       "function": "_biped_check_discard",
       "class": "instruction-scheduling",

@@ -3,45 +3,47 @@ RASTERIZER_XBOX_HARDWARE_BITMAPS.C
 
 symbols in this file:
 00157A80 0020:
-	_code_00157a80 (0000)
+	_IDirect3DDevice8_CreateTexture@32 (0000)
 00157AA0 0030:
-	_code_00157aa0 (0000)
+	_IDirect3DDevice8_CreateVolumeTexture@36 (0000)
 00157AD0 0020:
-	_code_00157ad0 (0000)
+	_IDirect3DDevice8_CreateCubeTexture@28 (0000)
 00157AF0 0190:
 	_rasterizer_bitmap_new (0000)
 00157C80 0010:
-	_code_00157c80 (0000)
+	_IDirect3DBaseTexture8_Release@4 (0000)
 00157C90 0010:
-	_code_00157c90 (0000)
+	_D3DTexture_UnlockRect@8 (0000)
 00157CA0 0020:
-	_code_00157ca0 (0000)
+	_IDirect3DTexture8_LockRect@20 (0000)
 00157CC0 0010:
-	_code_00157cc0 (0000)
+	_IDirect3DTexture8_UnlockRect@8 (0000)
 00157CD0 0010:
-	_code_00157cd0 (0000)
+	_D3DVolumeTexture_UnlockBox@8 (0000)
 00157CE0 0020:
-	_code_00157ce0 (0000)
+	_IDirect3DVolumeTexture8_LockBox@20 (0000)
 00157D00 0010:
-	_code_00157d00 (0000)
+	_IDirect3DVolumeTexture8_UnlockBox@8 (0000)
 00157D10 0010:
-	_code_00157d10 (0000)
+	_D3DCubeTexture_UnlockRect@12 (0000)
 00157D20 0020:
-	_code_00157d20 (0000)
+	_IDirect3DCubeTexture8_LockRect@24 (0000)
 00157D40 0010:
-	_code_00157d40 (0000)
+	_IDirect3DCubeTexture8_UnlockRect@12 (0000)
 00157D50 01c0:
-	_code_00157d50 (0000)
+	_rasterizer_bitmap_2d_changed (0000)
 00157F10 0210:
-	_code_00157f10 (0000)
+	_rasterizer_bitmap_3d_changed (0000)
 00158120 0210:
 	_rasterizer_bitmap_cm_changed (0000)
 00158330 0030:
 	_rasterizer_bitmap_delete (0000)
 00158360 00b0:
 	_rasterizer_bitmap_changed (0000)
-00290958 0054:
-	_rdata_00290958 (0000)
+00290958 0048:
+	_rasterizer_bitmap_format_table (0000)
+002909A0 000c:
+	_face_mapping_table (0000)
 002909AC 0032:
 	??_C@_0DC@CBFADDNN@?$CD?$CD?$CD?5ERROR?5failed?5to?5create?5bitma@ (0000)
 002909E0 00db:
@@ -75,10 +77,12 @@ symbols in this file:
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps_mipmap.h"
+#include "cache/texture_cache.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_swizzle.h"
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- constants */
 
@@ -98,12 +102,6 @@ enum
 
 /* ---------- prototypes */
 
-void texture_cache_bitmap_delete(
-	struct bitmap_data *bitmap);
-void rasterizer_error(
-	long error_result,
-	char const *format,
-	...);
 static void rasterizer_bitmap_2d_changed(
 	struct bitmap_data *bitmap);
 static void rasterizer_bitmap_3d_changed(
@@ -113,42 +111,36 @@ static void rasterizer_bitmap_cm_changed(
 
 /* ---------- globals */
 
-extern D3DDevice *global_d3d_device;
+static D3DFORMAT const rasterizer_bitmap_format_table[NUMBER_OF_BITMAP_FORMATS] =
+{
+	D3DFMT_A8,
+	D3DFMT_L8,
+	D3DFMT_AL8,
+	D3DFMT_A8L8,
+	D3DFMT_UNKNOWN,
+	D3DFMT_UNKNOWN,
+	D3DFMT_R5G6B5,
+	D3DFMT_UNKNOWN,
+	D3DFMT_A1R5G5B5,
+	D3DFMT_A4R4G4B4,
+	D3DFMT_X8R8G8B8,
+	D3DFMT_A8R8G8B8,
+	D3DFMT_UNKNOWN,
+	D3DFMT_UNKNOWN,
+	D3DFMT_DXT1,
+	D3DFMT_DXT3,
+	D3DFMT_DXT5,
+	D3DFMT_P8,
+};
 
-static struct
+static short const face_mapping_table[NUMBER_OF_FACES_PER_CUBE] =
 {
-	D3DFORMAT formats[NUMBER_OF_BITMAP_FORMATS];
-	short face_mappings[NUMBER_OF_FACES_PER_CUBE];
-} const rasterizer_bitmap_format_table =
-{
-	{
-		D3DFMT_A8,
-		D3DFMT_L8,
-		D3DFMT_AL8,
-		D3DFMT_A8L8,
-		D3DFMT_UNKNOWN,
-		D3DFMT_UNKNOWN,
-		D3DFMT_R5G6B5,
-		D3DFMT_UNKNOWN,
-		D3DFMT_A1R5G5B5,
-		D3DFMT_A4R4G4B4,
-		D3DFMT_X8R8G8B8,
-		D3DFMT_A8R8G8B8,
-		D3DFMT_UNKNOWN,
-		D3DFMT_UNKNOWN,
-		D3DFMT_DXT1,
-		D3DFMT_DXT3,
-		D3DFMT_DXT5,
-		D3DFMT_P8,
-	},
-	{
-		D3DCUBEMAP_FACE_POSITIVE_X,
-		D3DCUBEMAP_FACE_POSITIVE_Y,
-		D3DCUBEMAP_FACE_NEGATIVE_X,
-		D3DCUBEMAP_FACE_NEGATIVE_Y,
-		D3DCUBEMAP_FACE_POSITIVE_Z,
-		D3DCUBEMAP_FACE_NEGATIVE_Z,
-	},
+	D3DCUBEMAP_FACE_POSITIVE_X,
+	D3DCUBEMAP_FACE_POSITIVE_Y,
+	D3DCUBEMAP_FACE_NEGATIVE_X,
+	D3DCUBEMAP_FACE_NEGATIVE_Y,
+	D3DCUBEMAP_FACE_POSITIVE_Z,
+	D3DCUBEMAP_FACE_NEGATIVE_Z,
 };
 
 /* ---------- public code */
@@ -179,9 +171,9 @@ boolean rasterizer_bitmap_new(
 				global_d3d_device,
 				bitmap->width,
 				bitmap->height,
-				(short)bitmap->mipmap_count + 1,
+				bitmap->mipmap_count + 1,
 				0,
-				rasterizer_bitmap_format_table.formats[bitmap->format],
+				rasterizer_bitmap_format_table[bitmap->format],
 				D3DPOOL_MANAGED,
 				(IDirect3DTexture8 **)&bitmap->hardware_format);
 			if (result >= 0)
@@ -202,10 +194,10 @@ boolean rasterizer_bitmap_new(
 				global_d3d_device,
 				bitmap->width,
 				bitmap->height,
-				(short)bitmap->depth,
-				(short)bitmap->mipmap_count + 1,
+				bitmap->depth,
+				bitmap->mipmap_count + 1,
 				0,
-				rasterizer_bitmap_format_table.formats[bitmap->format],
+				rasterizer_bitmap_format_table[bitmap->format],
 				D3DPOOL_MANAGED,
 				(IDirect3DVolumeTexture8 **)&bitmap->hardware_format);
 			if (result >= 0)
@@ -225,9 +217,9 @@ boolean rasterizer_bitmap_new(
 			result = IDirect3DDevice8_CreateCubeTexture(
 				global_d3d_device,
 				bitmap->width,
-				(short)bitmap->mipmap_count + 1,
+				bitmap->mipmap_count + 1,
 				0,
-				rasterizer_bitmap_format_table.formats[bitmap->format],
+				rasterizer_bitmap_format_table[bitmap->format],
 				D3DPOOL_MANAGED,
 				(IDirect3DCubeTexture8 **)&bitmap->hardware_format);
 			if (result >= 0)
@@ -293,35 +285,28 @@ static void rasterizer_bitmap_2d_changed(
 		bitmap->base_address &&
 		bitmap->hardware_format)
 	{
-		mipmap_index = 0;
-check_mipmap:
-		if (mipmap_index > (short)bitmap->mipmap_count)
-			goto mipmaps_done;
+		for (mipmap_index = 0;
+			success && mipmap_index <= bitmap->mipmap_count;
+			mipmap_index++)
 		{
-			if (!(IDirect3DTexture8_LockRect(
+			if (IDirect3DTexture8_LockRect(
 					(IDirect3DTexture8 *)bitmap->hardware_format,
 					mipmap_index,
 					&d3d_locked_rect,
 					NULL,
-					D3DLOCK_NOOVERWRITE) >= 0 && success))
+					D3DLOCK_NOOVERWRITE) >= 0 && success)
 			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
 				rasterizer_error(
 					0,
 					"IDirect3DTexture8_LockRect((IDirect3DTexture8*)bitmap->hardware_format, mipmap_index, &d3d_locked_rect, NULL, D3DLOCK_NOOVERWRITE)");
 			}
-			else if (d3d_locked_rect.pBits)
-			{
-				goto check_surface;
-			}
 
-failed_lock:
-			error(
-				_error_silent,
-				"### ERROR failed to lock surface");
-			success = FALSE;
-			goto loop_continue;
-
-check_surface:
+			if (success && d3d_locked_rect.pBits)
 			{
 				source = bitmap_mipmap_address(bitmap, mipmap_index);
 				destination = d3d_locked_rect.pBits;
@@ -339,7 +324,7 @@ check_surface:
 				else
 				{
 					switch (bitmap_format_get_bits_per_pixel(
-						(unsigned short)bitmap->format) / 8)
+						bitmap->format) / 8)
 					{
 					case 4:
 						rasterizer_xbox_bitmap_swizzle2d_long(
@@ -374,18 +359,29 @@ check_surface:
 						break;
 					}
 				}
-				success = TRUE;
-			}
 
-			IDirect3DTexture8_UnlockRect(
-				(IDirect3DTexture8 *)bitmap->hardware_format,
-				mipmap_index);
-		loop_continue:
-			mipmap_index++;
-			if (success)
-				goto check_mipmap;
+				if (IDirect3DTexture8_UnlockRect(
+						(IDirect3DTexture8 *)bitmap->hardware_format,
+						mipmap_index) >= 0 && success)
+				{
+					success = TRUE;
+				}
+				else
+				{
+					success = FALSE;
+					rasterizer_error(
+						0,
+						"IDirect3DTexture8_UnlockRect((IDirect3DTexture8*)bitmap->hardware_format, mipmap_index)");
+				}
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"### ERROR failed to lock surface");
+				success = FALSE;
+			}
 		}
-mipmaps_done:
 
 		if (!success)
 		{
@@ -421,35 +417,28 @@ static void rasterizer_bitmap_3d_changed(
 		bitmap->base_address &&
 		bitmap->hardware_format)
 	{
-		mipmap_index = 0;
-check_mipmap:
-		if (mipmap_index > (short)bitmap->mipmap_count)
-			goto mipmaps_done;
+		for (mipmap_index = 0;
+			success && mipmap_index <= bitmap->mipmap_count;
+			mipmap_index++)
 		{
-			if (!(IDirect3DVolumeTexture8_LockBox(
+			if (IDirect3DVolumeTexture8_LockBox(
 					(IDirect3DVolumeTexture8 *)bitmap->hardware_format,
 					mipmap_index,
 					&d3d_locked_box,
 					NULL,
-					D3DLOCK_NOOVERWRITE) >= 0 && success))
+					D3DLOCK_NOOVERWRITE) >= 0 && success)
 			{
+				success = TRUE;
+			}
+			else
+			{
+				success = FALSE;
 				rasterizer_error(
 					0,
 					"IDirect3DVolumeTexture8_LockBox((IDirect3DVolumeTexture8*)bitmap->hardware_format, mipmap_index, &d3d_locked_box, NULL, D3DLOCK_NOOVERWRITE)");
 			}
-			else if (d3d_locked_box.pBits)
-			{
-				goto check_surface;
-			}
 
-failed_lock:
-			error(
-				_error_silent,
-				"### ERROR failed to lock surface");
-			success = FALSE;
-			goto loop_continue;
-
-check_surface:
+			if (success && d3d_locked_box.pBits)
 			{
 				source = bitmap_mipmap_address(bitmap, mipmap_index);
 				destination = d3d_locked_box.pBits;
@@ -480,7 +469,7 @@ check_surface:
 				else
 				{
 					switch (bitmap_format_get_bits_per_pixel(
-						(unsigned short)bitmap->format) / 8)
+						bitmap->format) / 8)
 					{
 					case 4:
 						rasterizer_xbox_bitmap_swizzle3d_long(
@@ -518,18 +507,29 @@ check_surface:
 						break;
 					}
 				}
-				success = TRUE;
-			}
 
-			IDirect3DVolumeTexture8_UnlockBox(
-				(IDirect3DVolumeTexture8 *)bitmap->hardware_format,
-				mipmap_index);
-		loop_continue:
-			mipmap_index++;
-			if (success)
-				goto check_mipmap;
+				if (IDirect3DVolumeTexture8_UnlockBox(
+						(IDirect3DVolumeTexture8 *)bitmap->hardware_format,
+						mipmap_index) >= 0 && success)
+				{
+					success = TRUE;
+				}
+				else
+				{
+					success = FALSE;
+					rasterizer_error(
+						0,
+						"IDirect3DVolumeTexture8_UnlockBox((IDirect3DVolumeTexture8*)bitmap->hardware_format, mipmap_index)");
+				}
+			}
+			else
+			{
+				error(
+					_error_silent,
+					"### ERROR failed to lock surface");
+				success = FALSE;
+			}
 		}
-mipmaps_done:
 
 		if (!success)
 		{
@@ -563,39 +563,33 @@ static void rasterizer_bitmap_cm_changed(
 		bitmap->base_address &&
 		bitmap->hardware_format)
 	{
-		mipmap_index = 0;
-check_mipmap:
-		if (mipmap_index > (short)bitmap->mipmap_count)
-			goto mipmaps_done;
+		for (mipmap_index = 0;
+			success && mipmap_index <= bitmap->mipmap_count;
+			mipmap_index++)
 		{
 			for (face_index = 0;
 				success && face_index < NUMBER_OF_FACES_PER_CUBE;
 				face_index++)
 			{
-				if (!(IDirect3DCubeTexture8_LockRect(
+				if (IDirect3DCubeTexture8_LockRect(
 						(IDirect3DCubeTexture8 *)bitmap->hardware_format,
-						(D3DCUBEMAP_FACES)rasterizer_bitmap_format_table.face_mappings[face_index],
+						face_mapping_table[face_index],
 						mipmap_index,
 						&d3d_locked_rect,
 						NULL,
-						D3DLOCK_NOOVERWRITE) >= 0 && success))
+						D3DLOCK_NOOVERWRITE) >= 0 && success)
 				{
+					success = TRUE;
+				}
+				else
+				{
+					success = FALSE;
 					rasterizer_error(
 						0,
 						"IDirect3DCubeTexture8_LockRect((IDirect3DCubeTexture8*)bitmap->hardware_format, face_mapping_table[face_index], mipmap_index, &d3d_locked_rect, NULL, D3DLOCK_NOOVERWRITE)");
 				}
-				else if (d3d_locked_rect.pBits)
-				{
-					goto check_surface;
-				}
 
-				error(
-					_error_silent,
-					"### ERROR failed to lock surface");
-				success = FALSE;
-				continue;
-
-check_surface:
+				if (success && d3d_locked_rect.pBits)
 				{
 					source = bitmap_cube_map_address(
 						bitmap,
@@ -619,7 +613,7 @@ check_surface:
 					else
 					{
 						switch (bitmap_format_get_bits_per_pixel(
-							(unsigned short)bitmap->format) / 8)
+							bitmap->format) / 8)
 						{
 						case 4:
 							rasterizer_xbox_bitmap_swizzle2d_long(
@@ -654,19 +648,31 @@ check_surface:
 							break;
 						}
 					}
-					success = TRUE;
-				}
 
-				IDirect3DCubeTexture8_UnlockRect(
-					(IDirect3DCubeTexture8 *)bitmap->hardware_format,
-					(D3DCUBEMAP_FACES)rasterizer_bitmap_format_table.face_mappings[face_index],
-					mipmap_index);
+					if (IDirect3DCubeTexture8_UnlockRect(
+							(IDirect3DCubeTexture8 *)bitmap->hardware_format,
+							face_mapping_table[face_index],
+							mipmap_index) >= 0 && success)
+					{
+						success = TRUE;
+					}
+					else
+					{
+						success = FALSE;
+						rasterizer_error(
+							0,
+							"IDirect3DCubeTexture8_UnlockRect((IDirect3DCubeTexture8*)bitmap->hardware_format, face_mapping_table[face_index], mipmap_index)");
+					}
+				}
+				else
+				{
+					error(
+						_error_silent,
+						"### ERROR failed to lock surface");
+					success = FALSE;
+				}
 			}
-			mipmap_index++;
-			if (success)
-				goto check_mipmap;
 		}
-mipmaps_done:
 
 		if (!success)
 		{
