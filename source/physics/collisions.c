@@ -1209,7 +1209,7 @@ short collision_move_point(
 			match_vassert(
 				"c:\\halo\\SOURCE\\physics\\collisions.c",
 				0x3CE,
-				valid_real_normal3d(&collision->plane.n) && valid_real(collision->plane.d),
+				valid_real_plane3d(&collision->plane),
 				csprintf(
 					temporary,
 					"%s: assert_valid_real_plane3d(%f, %f, %f / %f)",
