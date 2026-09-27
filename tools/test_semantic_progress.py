@@ -1,12 +1,15 @@
 import copy
 import hashlib
 import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
 
-from tools.coff_compare import build_coff, make_section_raw
+from tools import semantic_progress
+from tools.coff_compare import build_coff, load, make_section_raw
 from tools.semantic_progress import (
+    OBJDIFF_331_COMBINED_EXTENT,
     SemanticProgressError,
     apply_semantic_accepted_ledger,
     apply_semantic_data_matches,
@@ -14,7 +17,25 @@ from tools.semantic_progress import (
     apply_semantic_rejections,
     require_symbol_ownership_snapshots,
     revoke_incomplete_units,
+    rescore_unit_with_pinned_scorer,
 )
+
+
+def trust_fixture_report(report):
+    """FIXTURE ONLY: stand in for the pinned scorer with the fixture's own report.
+
+    Fixture objects are synthetic and their reports are written by hand, so
+    these tests deliberately do not exercise the rescoring binding.  It is
+    tested by RescoredReportBindingTests and, on the real build, by
+    ProductionSemanticDataManifestTests.  Never use this outside tests.
+    """
+    def rescore(project_root, objdiff_config, config_unit, extent_model):
+        units = [unit for unit in report["units"]
+                 if unit["name"] == config_unit["name"]]
+        if len(units) != 1:
+            raise SemanticProgressError("fixture report lacks the unit")
+        return copy.deepcopy(units[0])
+    return rescore
 
 
 class SemanticProgressTests(unittest.TestCase):
@@ -493,6 +514,11 @@ class SemanticDataProgressTests(unittest.TestCase):
             "units": [{
                 "name": "data_unit",
                 "measures": self._measures(16, 0),
+                "sections": [{
+                    "name": ".data",
+                    "size": 16,
+                    "fuzzy_match_percent": 0.0,
+                }],
                 "metadata": {"progress_categories": ["game"]},
             }],
         }
@@ -503,12 +529,51 @@ class SemanticDataProgressTests(unittest.TestCase):
     @staticmethod
     def _object(raw):
         return build_coff(
-            sections=[{"name": ".data", "size": 16, "raw_data": raw}],
+            sections=[{"name": ".data", "size": 16, "raw_data": raw,
+                       "flags": 0xC0300040}],
             symbols=[{
                 "name": "_data", "value": 0, "section": 1,
                 "type": 0, "storage": 2,
             }],
         )
+
+    def test_single_entry_naming_a_matched_section_is_refused(self):
+        # Worker M counterexample A1: the named .data is identical and
+        # already matched; the unit gap is a different, unverified .rdata of
+        # the same size.  Equal size must not transfer the credit.
+        def two_sections(other):
+            return build_coff(
+                sections=[
+                    {"name": ".data", "size": 16, "raw_data": b"\x00" * 16,
+                     "flags": 0xC0300040},
+                    {"name": ".rdata", "size": 16, "raw_data": other,
+                     "flags": 0x40300040},
+                ],
+                symbols=[
+                    {"name": "_data", "value": 0, "section": 1,
+                     "type": 0, "storage": 2},
+                    {"name": "_other", "value": 0, "section": 2,
+                     "type": 0, "storage": 2},
+                ],
+            )
+        self.target_path.write_bytes(two_sections(b"\x11" * 16))
+        self.base_path.write_bytes(two_sections(b"\x22" * 16))
+        self.report["units"][0]["measures"] = self._measures(32, 16)
+        self.report["units"][0]["sections"] = [
+            {"name": ".data", "size": 16, "fuzzy_match_percent": 100.0},
+            {"name": ".rdata", "size": 16, "fuzzy_match_percent": 0.0},
+        ]
+        with self.assertRaisesRegex(
+                SemanticProgressError,
+                "not the unit's unmatched report section"):
+            self._apply()
+
+    def test_embedded_nul_data_section_name_is_refused(self):
+        # Worker M M4: the loader keeps bytes after an embedded NUL, objdiff
+        # stops at it, so the two group the section differently.
+        from tools.semantic_progress import _objdiff_base_name
+        with self.assertRaisesRegex(SemanticProgressError, "embedded NUL"):
+            _objdiff_base_name({"name": ".data\x00xy"})
 
     @staticmethod
     def _measures(total_data, matched_data):
@@ -525,6 +590,7 @@ class SemanticDataProgressTests(unittest.TestCase):
             self.manifest_path,
             self.config_path,
             self.symbols_path,
+            rescore_report_unit=trust_fixture_report(self.report),
         )
 
     def test_verified_data_false_negative_is_credited_everywhere(self):
@@ -748,6 +814,1691 @@ class SemanticDataProgressTests(unittest.TestCase):
             SemanticProgressError, "does not cover the reported"
         ):
             self._apply()
+
+
+_EXTENT_KIND_FLAGS = {"data": 0xC0000040, "rdata": 0x40000040, "bss": 0xC0000080}
+
+
+def _extent_section(name, raw, code, kind, symbol, relocs=(), storage=2,
+                    flags=None):
+    return {
+        "name": name, "raw": raw, "code": code, "kind": kind,
+        "symbol": symbol, "relocs": list(relocs), "storage": storage,
+        "flags": flags if flags is not None
+        else _EXTENT_KIND_FLAGS[kind] | code << 20,
+    }
+
+
+def _extent_object(sections, externals=("_ext", "_other")):
+    names = [section["symbol"] for section in sections] + list(externals)
+    specs = []
+    for section in sections:
+        raw = bytearray(section["raw"])
+        relocation_data = bytearray()
+        for address, destination, relocation_type, addend in section["relocs"]:
+            struct.pack_into("<i", raw, address, addend)
+            relocation_data += struct.pack(
+                "<LLH", address, names.index(destination), relocation_type)
+        specs.append({
+            "name": section["name"], "size": len(raw),
+            "raw_data": bytes(raw), "reloc_data": bytes(relocation_data),
+            "flags": section["flags"],
+        })
+    symbols = [{
+        "name": section["symbol"], "value": 0, "section": index + 1,
+        "type": 0, "storage": section["storage"],
+    } for index, section in enumerate(sections)]
+    symbols += [{
+        "name": name, "value": 0, "section": 0, "type": 0, "storage": 2,
+    } for name in externals]
+    return build_coff(sections=specs, symbols=symbols)
+
+
+def _extent_snapshot(section):
+    """Independently recompute a member snapshot (legacy padded_size rule)."""
+    raw = bytearray(section["raw"])
+    for address, _, _, _ in section["relocs"]:
+        raw[address:address + 4] = b"\0\0\0\0"
+    code = (section["flags"] >> 20) & 0xF
+    alignment = 1 << (code - 1) if code else 1
+    return {
+        "section": section["name"],
+        "size": len(raw),
+        "padded_size": (len(raw) + alignment - 1) & ~(alignment - 1),
+        "flags": section["flags"],
+        "relocation_count": len(section["relocs"]),
+        "normalized_sha256": hashlib.sha256(bytes(raw)).hexdigest(),
+        "owner": {"value": 0, "type": 0, "storage": section["storage"]},
+    }
+
+
+def _mixed_sections():
+    """Three report sections, alignment codes 0-5, an empty and a lone one."""
+    return [
+        _extent_section(".rdata", b"abc", 0, "rdata", "_r0"),
+        _extent_section(".data", b"xyz", 3, "data", "_d0"),
+        _extent_section(".rdata", b"12345", 1, "rdata", "_r1"),
+        _extent_section(".rdata", b"123456", 2, "rdata", "_r2"),
+        _extent_section(".bss", b"\0" * 3, 1, "bss", "_b0"),
+        _extent_section(".rdata", b"123456789", 3, "rdata", "_r3",
+                        relocs=[(4, "_ext", 6, 0x10)]),
+        _extent_section(".rdata", b"m" * 13, 4, "rdata", "_r4"),
+        _extent_section(".bss", b"\0" * 10, 4, "bss", "_b1"),
+        _extent_section(".rdata", b"n" * 17, 5, "rdata", "_r5"),
+        _extent_section(".rdata", b"zz", 3, "rdata", "_r6"),
+        _extent_section(".rdata", b"", 5, "rdata", "_r7"),
+    ]
+
+
+class SemanticDataExtentModelTests(unittest.TestCase):
+    """Grouped entries pinned to the objdiff 3.3.1 combined-extent model.
+
+    Every expected report size here was measured by running the frozen
+    objdiff-cli 3.3.1 (sha1 3130e4288d483d259d1588092c8159f8e0230e08) on
+    the same section tables: research/opus_data_verifier_20260925/
+    extent_lab.py, cases ``test_*``.  The mixed fixture is 131 bytes to
+    objdiff, 101 to the legacy per-member padded sum and 100 to the
+    unpinned running-offset proposal, so it discriminates all three.
+    """
+
+    PIN = True
+    MIXED_REPORT = {".bss": 16, ".data": 3, ".rdata": 112}
+
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name)
+        self.target_path = self.root / "target.obj"
+        self.base_path = self.root / "base.obj"
+        self.manifest_path = self.root / "semantic_data_matches.json"
+        self.config_path = self.root / "objdiff.json"
+        self.symbols_path = self.root / "symbols.json"
+        self.symbols_path.write_text("[]", encoding="utf-8")
+        self.set_complete(False)
+        self.use(_mixed_sections())
+
+    def tearDown(self):
+        self.temporary_directory.cleanup()
+
+    def set_complete(self, complete):
+        self.config_path.write_text(json.dumps({"units": [{
+            "name": "data_unit",
+            "target_path": "target.obj",
+            "base_path": "base.obj",
+            "metadata": {"complete": complete},
+        }]}), encoding="utf-8")
+
+    def use(self, target_sections, base_sections=None):
+        self.target_sections = target_sections
+        self.base_sections = (
+            base_sections if base_sections is not None
+            else copy.deepcopy(target_sections))
+        self.target_path.write_bytes(_extent_object(self.target_sections))
+        self.base_path.write_bytes(_extent_object(self.base_sections))
+        names = sorted(
+            {section["symbol"] for section in
+             self.target_sections + self.base_sections}
+            | {"_ext", "_other"})
+        self.symbols_path.write_text(json.dumps([
+            {"name": name, "file_offset": 0x1000 + 0x100 * index}
+            for index, name in enumerate(names)]), encoding="utf-8")
+
+    def entry(self, symbols=None, **extra):
+        target = {section["symbol"]: section for section in self.target_sections}
+        base = {section["symbol"]: section for section in self.base_sections}
+        if symbols is None:
+            symbols = [section["symbol"] for section in self.target_sections]
+        entry = {
+            "unit": "data_unit",
+            "group": "lab-group",
+            "allow_incomplete_unit": True,
+            "reason": "test",
+            "members": [{
+                "symbol": symbol,
+                "measurements": {
+                    "target": _extent_snapshot(target[symbol]),
+                    "base": _extent_snapshot(base[symbol]),
+                },
+            } for symbol in symbols],
+        }
+        if self.PIN:
+            entry["extent_model"] = OBJDIFF_331_COMBINED_EXTENT
+        entry.update(extra)
+        return entry
+
+    def write(self, *entries):
+        self.manifest_path.write_text(json.dumps(list(entries)), encoding="utf-8")
+
+    def report(self, sections, matched=0, fuzzy=None, total=None):
+        fuzzy = fuzzy or {}
+        if total is None:
+            total = str(sum(sections.values()))
+        if isinstance(matched, int) and not isinstance(matched, bool):
+            matched = str(matched)  # objdiff writes unit byte counts as strings
+        unit_sections = [{
+            "name": name, "size": str(size),
+            "fuzzy_match_percent": fuzzy.get(name, 50.0), "metadata": {},
+        } for name, size in sorted(sections.items())]
+        unit_sections.append({
+            "name": ".text", "size": "40", "fuzzy_match_percent": 90.0,
+            "metadata": {},
+        })
+        self.report_data = {
+            "measures": {"total_data": 5000, "matched_data": 500,
+                         "matched_code": 7, "matched_functions": 3},
+            "categories": [{"id": "game", "name": "game", "measures": {
+                "total_data": 1000, "matched_data": 50,
+                "matched_code": 7, "matched_functions": 3}}],
+            "units": [{
+                "name": "data_unit",
+                "measures": {
+                    "total_data": total,
+                    "matched_data": matched,
+                    "total_functions": 2, "matched_functions": 1,
+                    "total_code": "40", "matched_code": "7",
+                },
+                "sections": unit_sections,
+                "metadata": {"progress_categories": ["game"]},
+            }],
+        }
+        return self.report_data
+
+    def apply(self):
+        return apply_semantic_data_matches(
+            self.report_data, self.root, self.manifest_path,
+            self.config_path, self.symbols_path,
+            rescore_report_unit=trust_fixture_report(self.report_data))
+
+    def credit(self, entry, sections, expected):
+        self.write(entry)
+        self.report(sections)
+        self.assertEqual(
+            self.apply(), [f"data_unit:lab-group (+{expected} data bytes)"])
+
+    def reject(self, entry, sections, pattern, **report):
+        self.write(entry)
+        self.report(sections, **report)
+        with self.assertRaisesRegex(SemanticProgressError, pattern):
+            self.apply()
+
+    # -- the model -------------------------------------------------------
+
+    def test_mixed_alignment_group_credits_measured_objdiff_span(self):
+        self.credit(self.entry(), self.MIXED_REPORT, 131)
+        unit = self.report_data["units"][0]["measures"]
+        self.assertEqual(unit["matched_data"], 131)
+        self.assertEqual(self.report_data["measures"]["matched_data"], 631)
+        self.assertEqual(
+            self.report_data["categories"][0]["measures"]["matched_data"], 181)
+        # data-only credit: no code, function or completion change
+        self.assertEqual(
+            (unit["matched_code"], unit["matched_functions"]), ("7", 1))
+        self.assertEqual(
+            (self.report_data["measures"]["matched_code"],
+             self.report_data["measures"]["matched_functions"]), (7, 3))
+        self.assertNotIn("complete_units", unit)
+        self.assertEqual(
+            sum(_extent_snapshot(s)["padded_size"] for s in self.target_sections),
+            101)
+
+    def test_legacy_group_without_model_keeps_per_member_sum(self):
+        entry = self.entry()
+        entry.pop("extent_model")
+        self.reject(entry, self.MIXED_REPORT, "does not cover the reported")
+        self.credit(entry, {".bss": 19, ".data": 4, ".rdata": 78}, 101)
+
+    def test_member_list_order_does_not_matter(self):
+        entry = self.entry()
+        entry["members"].reverse()
+        self.credit(entry, self.MIXED_REPORT, 131)
+
+    def test_extent_follows_section_table_order(self):
+        wide = _extent_section(".rdata", b"a", 5, "rdata", "_wide")
+        narrow = _extent_section(".rdata", b"b", 3, "rdata", "_narrow")
+        self.use([wide, narrow])
+        entry = self.entry()
+        self.credit(entry, {".rdata": 20}, 20)
+        self.use([copy.deepcopy(narrow), copy.deepcopy(wide)])
+        self.reject(entry, {".rdata": 20}, "does not cover the reported")
+        self.credit(entry, {".rdata": 16}, 16)
+
+    def test_alignment_codes_0_1_2_4_8_16(self):
+        measured = {0: 20, 1: 8, 2: 8, 3: 8, 4: 12, 5: 20}
+        for code, size in measured.items():
+            with self.subTest(code=code):
+                self.use([
+                    _extent_section(".rdata", b"abc", code, "rdata", "_x"),
+                    _extent_section(".rdata", b"d", 3, "rdata", "_y"),
+                ])
+                self.credit(self.entry(), {".rdata": size}, size)
+
+    def test_lone_section_reports_raw_size(self):
+        self.use([_extent_section(".data", b"xyz", 3, "data", "_d")])
+        self.credit(self.entry(), {".data": 3}, 3)
+        self.reject(self.entry(), {".data": 4}, "does not cover the reported")
+
+    def test_empty_section_still_aligns_running_offset(self):
+        self.use([
+            _extent_section(".rdata", b"12345", 3, "rdata", "_a"),
+            _extent_section(".rdata", b"", 5, "rdata", "_empty"),
+            _extent_section(".rdata", b"12345", 3, "rdata", "_b"),
+        ])
+        self.credit(self.entry(), {".rdata": 24}, 24)
+
+    def test_dollar_sections_fold_into_base_report_section(self):
+        self.use([
+            _extent_section(".rdata", b"a", 5, "rdata", "_plain"),
+            _extent_section(".rdata$z", b"b", 3, "rdata", "_suffix"),
+        ])
+        self.credit(self.entry(), {".rdata": 16}, 16)
+        self.use([_extent_section(".rdata$z", b"abc", 3, "rdata", "_suffix")])
+        self.credit(self.entry(), {".rdata$z": 3}, 3)
+
+    def test_malformed_alignment_code_is_rejected(self):
+        sections = _mixed_sections()
+        sections[2]["flags"] = _EXTENT_KIND_FLAGS["rdata"] | 15 << 20
+        self.use(sections)
+        self.reject(self.entry(), self.MIXED_REPORT,
+                    "invalid COFF section alignment code 15")
+
+    def test_long_section_name_is_rejected(self):
+        self.use([
+            _extent_section("/4", b"abc", 3, "rdata", "_long"),
+            _extent_section(".rdata", b"abcd", 3, "rdata", "_short"),
+        ])
+        self.reject(self.entry(), {".rdata": 4, ".rdata$x": 3},
+                    "unsupported long COFF data section name")
+
+    def test_member_outside_objdiff_data_is_rejected(self):
+        self.use([
+            _extent_section(".rdata", b"abcd", 3, "rdata", "_data"),
+            _extent_section(".debug$S", b"abcd", 1, "rdata", "_debug",
+                            flags=0x42100040),
+        ])
+        self.reject(self.entry(), {".rdata": 4},
+                    "not an objdiff data section")
+
+    # -- mutations that must fail closed ---------------------------------
+
+    def test_omitted_member_is_rejected(self):
+        symbols = [s["symbol"] for s in self.target_sections if s["symbol"] != "_r4"]
+        self.reject(self.entry(symbols), self.MIXED_REPORT,
+                    "does not cover every target .rdata section")
+
+    def test_duplicate_member_is_rejected(self):
+        entry = self.entry()
+        entry["members"].append(copy.deepcopy(entry["members"][0]))
+        self.reject(entry, self.MIXED_REPORT, "repeats a section")
+
+    def test_changed_byte_is_rejected(self):
+        base = _mixed_sections()
+        base[6]["raw"] = b"M" + b"m" * 12
+        entry = self.entry()
+        self.use(_mixed_sections(), base)
+        self.reject(entry, self.MIXED_REPORT, "no longer exact")
+
+    def test_changed_relocation_type_destination_or_addend_is_rejected(self):
+        entry = self.entry()
+        for label, relocation in (
+                ("type", (4, "_ext", 7, 0x10)),
+                ("destination", (4, "_other", 6, 0x10)),
+                ("addend", (4, "_ext", 6, 0x14))):
+            with self.subTest(label=label):
+                base = _mixed_sections()
+                base[5]["relocs"] = [relocation]
+                self.use(_mixed_sections(), base)
+                self.reject(entry, self.MIXED_REPORT, "no longer exact")
+
+    def test_stale_snapshot_is_rejected(self):
+        entry = self.entry()
+        changed = _mixed_sections()
+        changed[6]["raw"] = b"q" * 13
+        self.use(changed)
+        self.reject(entry, self.MIXED_REPORT, "snapshot changed")
+
+    def test_owner_change_is_rejected(self):
+        entry = self.entry()
+        base = _mixed_sections()
+        base[2]["storage"] = 3
+        self.use(_mixed_sections(), base)
+        self.reject(entry, self.MIXED_REPORT, "snapshot changed")
+
+    def test_layout_change_is_rejected(self):
+        entry = self.entry()
+        base = _mixed_sections()
+        base[6]["flags"] = _EXTENT_KIND_FLAGS["rdata"] | 5 << 20
+        self.use(_mixed_sections(), base)
+        self.reject(entry, self.MIXED_REPORT, r"layout differs.*\(flags\)")
+
+    def test_wrong_report_span_is_rejected(self):
+        for label, sections in (
+                ("short .rdata", {".bss": 16, ".data": 3, ".rdata": 108}),
+                ("legacy sum", {".bss": 19, ".data": 4, ".rdata": 78}),
+                ("unpinned proposal", {".bss": 16, ".data": 4, ".rdata": 80}),
+                ("missing .bss", {".data": 3, ".rdata": 112}),
+                ("extra section", {".bss": 16, ".data": 3, ".rdata": 112,
+                                   ".CRT": 4})):
+            with self.subTest(label=label):
+                self.reject(self.entry(), sections,
+                            "does not cover the reported")
+
+    def test_incomplete_unit_requires_explicit_opt_in(self):
+        entry = self.entry()
+        del entry["allow_incomplete_unit"]
+        self.reject(entry, self.MIXED_REPORT, "not marked complete")
+        self.set_complete(True)
+        self.credit(entry, self.MIXED_REPORT, 131)
+
+    def test_unknown_extent_model_is_rejected(self):
+        self.reject(self.entry(extent_model="objdiff-3.6.0-guess"),
+                    self.MIXED_REPORT, "unknown semantic data extent model")
+
+    def test_extent_model_must_be_a_string_when_present(self):
+        # Only an ABSENT key selects the legacy path; a present key must be a
+        # known model string.  Null, empty and non-string JSON values fail
+        # cleanly with SemanticProgressError (never TypeError, never legacy).
+        for value in (None, "", [], {}, True, False, 0, 1, 3.3,
+                      [OBJDIFF_331_COMBINED_EXTENT],
+                      {"model": OBJDIFF_331_COMBINED_EXTENT}):
+            with self.subTest(value=value):
+                self.reject(self.entry(extent_model=value), self.MIXED_REPORT,
+                            "extent.model")
+
+    def test_explicit_null_extent_model_never_selects_legacy(self):
+        # Review reproduction: a null pin plus a legacy-sized report used to
+        # credit 101 bytes through the legacy per-member path.
+        self.reject(self.entry(extent_model=None),
+                    {".bss": 19, ".data": 4, ".rdata": 78},
+                    "must be a string when present")
+
+    def test_invalid_extent_model_on_single_entry_is_rejected(self):
+        section = self.target_sections[0]
+        snapshot = _extent_snapshot(section)
+        for value in (None, [], {}):
+            with self.subTest(value=value):
+                self.reject({
+                    "unit": "data_unit", "symbol": section["symbol"],
+                    "allow_incomplete_unit": True,
+                    "extent_model": value,
+                    "measurements": {key: snapshot[key] for key in (
+                        "size", "relocation_count", "normalized_sha256")},
+                }, {".rdata": 112}, "must be a string when present")
+
+    def test_extent_model_conflicts_with_raw_size(self):
+        self.reject(
+            self.entry(extent_model=OBJDIFF_331_COMBINED_EXTENT,
+                       credit_raw_size=True),
+            self.MIXED_REPORT, "conflicts with credit_raw_size")
+
+    def test_extent_model_requires_grouped_entry(self):
+        section = self.target_sections[0]
+        snapshot = _extent_snapshot(section)
+        self.reject({
+            "unit": "data_unit", "symbol": section["symbol"],
+            "allow_incomplete_unit": True,
+            "extent_model": OBJDIFF_331_COMBINED_EXTENT,
+            "measurements": {key: snapshot[key] for key in (
+                "size", "relocation_count", "normalized_sha256")},
+        }, {".rdata": 112}, "needs a grouped entry")
+
+    # -- report states ---------------------------------------------------
+
+    def test_fully_matched_report_is_zero_credit_noop(self):
+        self.write(self.entry())
+        self.report(self.MIXED_REPORT, matched=131,
+                    fuzzy={name: 100.0 for name in self.MIXED_REPORT})
+        before = copy.deepcopy(self.report_data)
+        self.assertEqual(self.apply(), [])
+        self.assertEqual(self.report_data, before)
+
+    def test_fully_matched_report_still_verifies_members(self):
+        base = _mixed_sections()
+        base[6]["raw"] = b"M" + b"m" * 12
+        entry = self.entry()
+        self.use(_mixed_sections(), base)
+        self.reject(entry, self.MIXED_REPORT, "no longer exact", matched=131,
+                    fuzzy={name: 100.0 for name in self.MIXED_REPORT})
+
+    def test_repeated_application_credits_once(self):
+        self.credit(self.entry(), self.MIXED_REPORT, 131)
+        after_first = copy.deepcopy(self.report_data)
+        self.assertEqual(self.apply(), [])
+        self.assertEqual(self.report_data, after_first)
+        self.assertEqual(self.report_data["measures"]["matched_data"], 631)
+
+    def test_objdiff_partially_matched_unit_credits_only_remaining_sections(self):
+        partial = {".data": 100.0}
+        self.reject(self.entry(), self.MIXED_REPORT,
+                    "does not cover the reported", matched=3, fuzzy=partial)
+        remaining = [s["symbol"] for s in self.target_sections if s["symbol"] != "_d0"]
+        self.write(self.entry(remaining))
+        self.report(self.MIXED_REPORT, matched=3, fuzzy=partial)
+        self.assertEqual(self.apply(), ["data_unit:lab-group (+128 data bytes)"])
+        self.assertEqual(self.report_data["units"][0]["measures"]["matched_data"], 131)
+
+    def test_partially_credited_totals_are_rejected(self):
+        self.reject(self.entry(), self.MIXED_REPORT,
+                    "does not cover all unmatched data", matched=50)
+
+    def test_malformed_totals_are_rejected(self):
+        for label, report in (
+                ("matched above total", {"matched": 132}),
+                ("negative matched", {"matched": -1}),
+                ("non-numeric total", {"total": "13x"}),
+                ("empty total", {"total": ""}),
+                ("non-ASCII digit total", {"total": "１３１"}),
+                ("float total", {"total": 131.0}),
+                ("boolean matched", {"matched": True})):
+            with self.subTest(label=label):
+                self.reject(self.entry(), self.MIXED_REPORT,
+                            "malformed report", **report)
+
+    def test_raw_size_group_is_unchanged(self):
+        entry = self.entry(credit_raw_size=True)
+        entry.pop("extent_model", None)
+        self.credit(entry, {".bss": 13, ".data": 3, ".rdata": 55}, 71)
+        self.reject(entry, self.MIXED_REPORT, "does not cover the reported")
+
+
+# -- V1 adversarial fixtures -------------------------------------------------
+#
+# A small January/rebuilt object pair shaped like hs.obj: a lone .data section
+# with several symbols, relocations and alignment padding; a combined .rdata
+# report section made of a non-COMDAT table and select-any string literals;
+# a .bss section the report already matches; a literal January only
+# references (undefined) and the rebuilt object defines (declared surplus).
+# Every expected size below is derived by hand in the comments.
+
+_SCN_DATA = 0xC0000040
+_SCN_RDATA = 0x40000040
+_SCN_BSS = 0xC0000080
+_SCN_COMDAT = 0x00001000
+_SELECT_NODUPLICATES = 1
+_SELECT_ANY = 2
+_REL32 = 0x14
+_DIR32 = 0x06
+_DIR32NB = 0x07
+
+_ABC = "??_C@_03ABC@abc?$AA@"
+_HELLO = "??_C@_05HELLO@hello?$AA@"
+_W = "??_C@_01W@w?$AA@"
+_XYZ = "??_C@_03XYZ@xyz?$AA@"
+_REAL = "__real@3f800000"
+
+
+def _align(code):
+    return code << 20
+
+
+def _v1_section(name, raw, flags, symbols, relocs=(), selection=0):
+    return {
+        "name": name, "raw": bytes(raw), "flags": flags,
+        "symbols": [list(item) for item in symbols],
+        "relocs": [list(item) for item in relocs], "selection": selection,
+    }
+
+
+def _v1_coff(sections, externals):
+    """COFF-i386 object with section-definition symbols and aux records."""
+    table = []
+    for number, section in enumerate(sections, 1):
+        auxiliary = struct.pack(
+            "<LHHLHB3x", len(section["raw"]), len(section["relocs"]), 0, 0,
+            0, section["selection"])
+        table.append((section["name"], 0, number, 0, 3, auxiliary))
+        for name, value, storage in section["symbols"]:
+            table.append((name, value, number, 0, storage, None))
+    for name in externals:
+        table.append((name, 0, 0, 0, 2, None))
+    index, position = {}, 0
+    for name, _, _, _, _, auxiliary in table:
+        if auxiliary is None:
+            index.setdefault(name, position)
+        position += 2 if auxiliary is not None else 1
+
+    header_size = 20 + 40 * len(sections)
+    payload, relocations, headers = bytearray(), bytearray(), []
+    raw_offsets = []
+    for section in sections:
+        raw = bytearray(section["raw"])
+        for address, destination, kind, addend in section["relocs"]:
+            struct.pack_into("<i", raw, address, addend)
+        if section["flags"] & _SCN_BSS == _SCN_BSS and not any(raw):
+            raw_offsets.append(None)
+        else:
+            raw_offsets.append(len(payload))
+            payload += raw
+    relocation_base = header_size + len(payload)
+    relocation_offsets = []
+    for section in sections:
+        relocation_offsets.append(relocation_base + len(relocations))
+        for address, destination, kind, addend in section["relocs"]:
+            relocations += struct.pack("<LLH", address, index[destination], kind)
+    symbol_offset = relocation_base + len(relocations)
+    strings = bytearray()
+    symbol_bytes = bytearray()
+    for name, value, number, kind, storage, auxiliary in table:
+        encoded = name.encode("ascii")
+        if len(encoded) <= 8:
+            symbol_bytes += encoded.ljust(8, b"\0")
+        else:
+            symbol_bytes += struct.pack("<LL", 0, 4 + len(strings))
+            strings += encoded + b"\0"
+        symbol_bytes += struct.pack(
+            "<LhHBB", value, number, kind, storage, 1 if auxiliary else 0)
+        if auxiliary:
+            symbol_bytes += auxiliary
+    string_table = struct.pack("<L", 4 + len(strings)) + bytes(strings)
+    for number, section in enumerate(sections):
+        raw_pointer = (0 if raw_offsets[number] is None
+                       else header_size + raw_offsets[number])
+        headers.append(struct.pack(
+            "<8sLLLLLLHHL", section["name"].encode("ascii").ljust(8, b"\0"),
+            0, 0, len(section["raw"]), raw_pointer,
+            relocation_offsets[number] if section["relocs"] else 0, 0,
+            len(section["relocs"]), 0, section["flags"]))
+    header = struct.pack(
+        "<HHLLLHH", 0x14C, len(sections), 0, symbol_offset,
+        position, 0, 0)
+    return (header + b"".join(headers) + bytes(payload) + bytes(relocations)
+            + bytes(symbol_bytes) + string_table)
+
+
+def _v1_data_section(storage_static=3):
+    # 28 bytes: four relocated pointers, a short, 2 bytes of alignment padding
+    # and two longs holding the same value (so they can be swapped unseen).
+    raw = bytearray(28)
+    raw[16:18] = b"\x34\x12"
+    raw[20:24] = struct.pack("<L", 5)
+    raw[24:28] = struct.pack("<L", 5)
+    return _v1_section(
+        ".data", raw, _SCN_DATA | _align(3),
+        [("_table", 0, 2), ("_static_names", 8, storage_static),
+         ("_counter", 16, 2), ("_min", 20, 2), ("_max", 24, 2)],
+        [(0, _ABC, _DIR32, 0), (4, _XYZ, _DIR32, 0),
+         (8, "_table", _DIR32, 16), (12, "_ext_function", _DIR32, 0)])
+
+
+def _v1_literal(name, text, code=3, selection=_SELECT_ANY, flags=None):
+    return _v1_section(
+        ".rdata", text, flags if flags is not None
+        else _SCN_RDATA | _SCN_COMDAT | _align(code),
+        [(name, 0, 2)], selection=selection)
+
+
+def _v1_target_sections():
+    # .rdata in table order: abc (4, align 4), table (12, align 8),
+    # hello (6, align 4), w (2, align 4).
+    # objdiff: 4 -> 4; +12 = 16 -> 16; +6 = 22 -> 24; +2 = 26 -> 28 = 28.
+    # legacy per-member padded sum: 4 + 16 + 8 + 4 = 32.  raw sum 24.
+    table = bytearray(12)
+    table[0:4] = struct.pack("<L", 7)
+    table[8:12] = struct.pack("<L", 9)
+    return [
+        _v1_data_section(),
+        _v1_literal(_ABC, b"abc\0"),
+        _v1_section(".rdata", table, _SCN_RDATA | _align(4),
+                    [("_const_table", 0, 2)], [(4, _HELLO, _DIR32, 0)]),
+        _v1_literal(_HELLO, b"hello\0"),
+        _v1_literal(_W, b"w\0"),
+        _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
+                    [("_bss_var", 0, 2)]),
+    ]
+
+
+def _v1_base_sections():
+    # The rebuilt object defines the literal January only references, as a
+    # select-any COMDAT placed before the others (declared surplus).
+    sections = _v1_target_sections()
+    sections.insert(1, _v1_literal(_XYZ, b"xyz\0"))
+    return sections
+
+
+_V1_ADDRESSES = {
+    "_table": 0x2000, "_static_names": 0x2008, "_counter": 0x2010,
+    "_min": 0x2014, "_max": 0x2018, _ABC: 0x3000, "_const_table": 0x3008,
+    _HELLO: 0x3018, _W: 0x3020, _XYZ: 0x5000, "_ext_function": 0x6000,
+    "_other_function": 0x6100, "_bss_var": 0x7000, _REAL: 0x5100,
+}
+
+
+def _v1_normalized_snapshot(section, owner):
+    """Recompute a member snapshot independently of the verifier."""
+    raw = bytearray(section["raw"])
+    for address, _, _, _ in section["relocs"]:
+        raw[address:address + 4] = b"\0\0\0\0"
+    code = (section["flags"] >> 20) & 0xF
+    alignment = 1 << (code - 1) if code else 1
+    name, value, storage = owner
+    return {
+        "section": section["name"],
+        "size": len(raw),
+        "padded_size": (len(raw) + alignment - 1) & ~(alignment - 1),
+        "flags": section["flags"],
+        "relocation_count": len(section["relocs"]),
+        "normalized_sha256": hashlib.sha256(bytes(raw)).hexdigest(),
+        "owner": {"value": value, "type": 0, "storage": storage},
+    }
+
+
+def _v1_find(sections, symbol):
+    for section in sections:
+        for owner in section["symbols"]:
+            if owner[0] == symbol:
+                return section, owner
+    raise KeyError(symbol)
+
+
+class V1Fixture:
+    """Materialises one January/rebuilt pair, its report and its manifest."""
+
+    MEMBERS = ["_table", _ABC, "_const_table", _HELLO, _W]
+    SURPLUS = [_XYZ]
+
+    def __init__(self):
+        self.target = _v1_target_sections()
+        self.base = _v1_base_sections()
+        self.target_externals = [_XYZ, "_ext_function"]
+        self.base_externals = ["_ext_function"]
+        # The surplus literal's selected provider: another unit whose January
+        # and rebuilt objects define it as a single-symbol select-any COMDAT.
+        self.provider_target = [_v1_literal(_XYZ, b"xyz\0")]
+        self.provider_base = [_v1_literal(_XYZ, b"xyz\0")]
+        self.provider = "provider_unit"
+        self.addresses = dict(_V1_ADDRESSES)
+        # report: .bss 8 (100%), .data 28, .rdata 28, .text (code) 16
+        self.report_sections = {".bss": 8, ".data": 28, ".rdata": 28}
+        self.matched_sections = {".bss"}
+        self.total_data = None
+        self.matched_data = None
+        self.complete = False
+        self.entries = None
+
+    def entry(self, members=None, surplus=None, model=True, **extra):
+        members = self.MEMBERS if members is None else members
+        surplus = self.SURPLUS if surplus is None else surplus
+        entry = {
+            "unit": "data_unit",
+            "group": "v1-group",
+            "allow_incomplete_unit": True,
+            "reason": "fixture",
+            "members": [{
+                "symbol": symbol,
+                "measurements": {
+                    "target": _v1_normalized_snapshot(*_v1_find(self.target, symbol)),
+                    "base": _v1_normalized_snapshot(*_v1_find(self.base, symbol)),
+                },
+            } for symbol in members],
+        }
+        if model:
+            entry["extent_model"] = OBJDIFF_331_COMBINED_EXTENT
+            entry["surplus"] = [{
+                "symbol": symbol,
+                "provider": self.provider,
+                "measurements": {
+                    "base": _v1_normalized_snapshot(*_v1_find(self.base, symbol))},
+            } for symbol in surplus]
+        entry.update(extra)
+        return entry
+
+    def report(self):
+        total = self.total_data
+        if total is None:
+            total = sum(self.report_sections.values())
+        matched = self.matched_data
+        if matched is None:
+            matched = sum(size for name, size in self.report_sections.items()
+                          if name in self.matched_sections)
+        sections = [{
+            "name": name, "size": str(size),
+            "fuzzy_match_percent": 100.0 if name in self.matched_sections else 97.5,
+            "metadata": {},
+        } for name, size in sorted(self.report_sections.items())]
+        sections.append({"name": ".text", "size": "16",
+                         "fuzzy_match_percent": 90.0, "metadata": {}})
+        other = {"name": "other_unit", "measures": {
+            "total_data": "8", "matched_data": "0"},
+            "sections": [{"name": ".bss", "size": "8",
+                          "fuzzy_match_percent": 0.0, "metadata": {}}],
+            "metadata": {"progress_categories": ["game"]}}
+        return {
+            "measures": {"total_data": 5000, "matched_data": 500},
+            "categories": [{"id": "game", "name": "game", "measures": {
+                "total_data": 1000, "matched_data": 50}}],
+            "units": [{
+                "name": "data_unit",
+                "measures": {"total_data": str(total), "matched_data": str(matched),
+                             "total_functions": 2, "matched_functions": 1},
+                "sections": sections,
+                "metadata": {"progress_categories": ["game"]},
+            }, other],
+        }
+
+    def materialize(self, root):
+        root = Path(root)
+        (root / "target.obj").write_bytes(
+            _v1_coff(self.target, self.target_externals))
+        (root / "base.obj").write_bytes(_v1_coff(self.base, self.base_externals))
+        other = getattr(self, "other_sections", None) or [
+            _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
+                        [("_bss_var", 0, 2)])]
+        (root / "other.obj").write_bytes(_v1_coff(other, []))
+        (root / "provider_target.obj").write_bytes(
+            _v1_coff(self.provider_target, []))
+        (root / "provider_base.obj").write_bytes(
+            _v1_coff(self.provider_base, []))
+        (root / "objdiff.json").write_text(json.dumps({"units": [
+            {"name": "data_unit", "target_path": "target.obj",
+             "base_path": "base.obj", "metadata": {"complete": self.complete}},
+            {"name": "other_unit", "target_path": "other.obj",
+             "base_path": "other.obj", "metadata": {"complete": False}},
+            {"name": "provider_unit", "target_path": "provider_target.obj",
+             "base_path": "provider_base.obj", "metadata": {"complete": True}},
+        ]}), encoding="utf-8")
+        (root / "symbols.json").write_text(json.dumps([
+            {"name": name, "file_offset": address}
+            for name, address in sorted(self.addresses.items())]),
+            encoding="utf-8")
+        entries = self.entries if self.entries is not None else [self.entry()]
+        (root / "semantic_data_matches.json").write_text(
+            json.dumps(entries), encoding="utf-8")
+        return self.report()
+
+
+def _swap_symbol_offsets(section, first, second):
+    values = {name: value for name, value, _ in section["symbols"]}
+    for item in section["symbols"]:
+        if item[0] == first:
+            item[1] = values[second]
+        elif item[0] == second:
+            item[1] = values[first]
+
+
+def _set_symbol(sections, symbol, **fields):
+    section, owner = _v1_find(sections, symbol)
+    position = {"name": 0, "value": 1, "storage": 2}
+    for key, value in fields.items():
+        owner[position[key]] = value
+
+
+def _base_reloc(fixture, section_symbol, address, **fields):
+    section, _ = _v1_find(fixture.base, section_symbol)
+    for relocation in section["relocs"]:
+        if relocation[0] == address:
+            if "destination" in fields:
+                relocation[1] = fields["destination"]
+            if "kind" in fields:
+                relocation[2] = fields["kind"]
+
+
+def _scenario(expect):
+    def decorate(function):
+        function.expect = expect
+        return function
+    return decorate
+
+
+# Each scenario mutates a fresh V1Fixture.  ``credit N`` must credit exactly N
+# bytes; ``noop`` must credit nothing and leave the report unchanged; any
+# other string is the rejection message the V1 verifier must raise.  Unless a
+# scenario says "pinned before", the entry is (re)generated AFTER the mutation,
+# so a rejection never rests on a stale snapshot.
+
+@_scenario("credit 56")
+def control_rebuilt_object(fixture):
+    pass
+
+
+@_scenario("credit 56")
+def control_january_vs_january(fixture):
+    fixture.base = copy.deepcopy(fixture.target)
+    fixture.base_externals = list(fixture.target_externals)
+    fixture.entries = [fixture.entry(surplus=[])]
+
+
+@_scenario("credit 56")
+def control_member_list_reordered(fixture):
+    fixture.entries = [fixture.entry(members=list(reversed(fixture.MEMBERS)))]
+
+
+@_scenario("credit 56")
+def control_rebuilt_comdat_order_differs(fixture):
+    # Documented design: COMDAT section ORDER in the rebuilt object is not
+    # graded (each COMDAT is compared by identity); January's order sizes
+    # the credit.
+    hello = fixture.base.pop(4)
+    fixture.base.insert(2, hello)
+
+
+@_scenario("noop")
+def control_already_complete_unit(fixture):
+    fixture.matched_sections = {".bss", ".data", ".rdata"}
+
+
+@_scenario("credit 28")
+def control_partially_matched_unit_credits_only_rest(fixture):
+    fixture.matched_sections = {".bss", ".data"}
+    fixture.entries = [fixture.entry(members=[_ABC, "_const_table", _HELLO, _W])]
+
+
+@_scenario("no longer exact")
+def member_byte_changed(fixture):
+    section, _ = _v1_find(fixture.base, _HELLO)
+    section["raw"] = b"hellp\0"
+
+
+@_scenario("no longer exact")
+def relocation_retargeted_outside(fixture):
+    fixture.base_externals.append("_other_function")
+    _base_reloc(fixture, "_table", 12, destination="_other_function")
+
+
+@_scenario("no longer exact")
+def relocation_retargeted_inside_group(fixture):
+    _base_reloc(fixture, "_table", 0, destination=_HELLO)
+
+
+@_scenario("no longer exact")
+def relocation_type_changed(fixture):
+    _base_reloc(fixture, "_table", 12, kind=_DIR32NB)
+
+
+@_scenario("has no image address")
+def relocation_destination_unresolvable(fixture):
+    del fixture.addresses["_ext_function"]
+
+
+@_scenario("cannot verify semantic data group member")
+def owner_renamed_pinned_before(fixture):
+    fixture.entries = [fixture.entry()]
+    _set_symbol(fixture.base, "_const_table", name="_const_table_renamed")
+
+
+@_scenario("malformed semantic data extent-model member")
+def owner_renamed_with_base_alias(fixture):
+    fixture.entries = [fixture.entry()]
+    _set_symbol(fixture.base, "_const_table", name="_const_table_renamed")
+    fixture.entries[0]["members"][2]["base_symbol"] = "_const_table_renamed"
+
+
+@_scenario("snapshot changed")
+def owner_external_to_static_pinned_before(fixture):
+    fixture.entries = [fixture.entry()]
+    _set_symbol(fixture.base, "_const_table", storage=3)
+
+
+@_scenario("owner differs")
+def owner_external_to_static_repinned(fixture):
+    _set_symbol(fixture.base, "_const_table", storage=3)
+
+
+@_scenario("owner differs")
+def owner_static_to_external_repinned(fixture):
+    _set_symbol(fixture.target, "_const_table", storage=3)
+
+
+@_scenario("symbol table differs")
+def non_owner_symbol_storage_changed(fixture):
+    _set_symbol(fixture.base, "_static_names", storage=2)
+
+
+@_scenario("does not cover every target .rdata section")
+def missing_member(fixture):
+    fixture.entries = [fixture.entry(members=["_table", _ABC, "_const_table", _HELLO])]
+
+
+@_scenario("does not cover every target .rdata section")
+def subset_summing_to_extent_legacy(fixture):
+    # Legacy per-member padded sizes of table + hello + w = 16 + 8 + 4 = 28,
+    # exactly objdiff's .rdata extent: the stock grouped check credits this
+    # subset although the abc literal is never compared.
+    fixture.entries = [fixture.entry(
+        members=["_table", "_const_table", _HELLO, _W], model=False)]
+
+
+@_scenario("does not cover every target .rdata section")
+def subset_summing_to_extent_model(fixture):
+    fixture.entries = [fixture.entry(members=["_table", "_const_table", _HELLO, _W])]
+
+
+@_scenario("no longer exact")
+def padding_bytes_nonzero(fixture):
+    section, _ = _v1_find(fixture.base, "_table")
+    raw = bytearray(section["raw"])
+    raw[18] = 0xCC  # the alignment padding after the 2-byte _counter
+    section["raw"] = bytes(raw)
+
+
+@_scenario("no longer exact")
+def padding_raw_size_differs_padded_size_equal(fixture):
+    section, _ = _v1_find(fixture.base, _HELLO)
+    section["raw"] = b"hello\0\0\0"  # padded size 8 either way
+
+
+@_scenario("does not cover every target .rdata section")
+def extra_unlisted_section_in_target(fixture):
+    fixture.target.insert(5, _v1_literal("??_C@_01Q@q?$AA@", b"q\0"))
+    fixture.base.insert(6, _v1_literal("??_C@_01Q@q?$AA@", b"q\0"))
+    fixture.addresses["??_C@_01Q@q?$AA@"] = 0x3024
+
+
+@_scenario("leaves rebuilt sections undeclared")
+def extra_undeclared_section_in_rebuilt(fixture):
+    fixture.base.insert(3, _v1_literal(_REAL, struct.pack("<f", 1.0)))
+
+
+@_scenario("symbol table differs")
+def extra_symbol_inside_member_section(fixture):
+    section, _ = _v1_find(fixture.base, "_table")
+    section["symbols"].append(["_table_alias", 8, 2])
+
+
+@_scenario("symbol table differs")
+def reordered_symbols_inside_member_section(fixture):
+    # _min and _max hold the same bytes: swapping them changes no byte and no
+    # relocation, only which name owns which offset.
+    section, _ = _v1_find(fixture.base, "_table")
+    _swap_symbol_offsets(section, "_min", "_max")
+
+
+@_scenario(r"layout differs.*\(flags\)")
+def section_flags_changed_writable(fixture):
+    section, _ = _v1_find(fixture.base, _ABC)
+    section["flags"] = _SCN_DATA | _SCN_COMDAT | _align(3)
+
+
+@_scenario("layout differs")
+def section_alignment_changed(fixture):
+    section, _ = _v1_find(fixture.base, "_const_table")
+    section["flags"] = _SCN_RDATA | _align(3)
+
+
+@_scenario("COMDAT selection differs")
+def comdat_selection_changed(fixture):
+    section, _ = _v1_find(fixture.base, _ABC)
+    section["selection"] = _SELECT_NODUPLICATES
+
+
+@_scenario("repeats a section")
+def duplicate_member(fixture):
+    entry = fixture.entry()
+    entry["members"].append(copy.deepcopy(entry["members"][1]))
+    fixture.entries = [entry]
+
+
+@_scenario("repeats a section")
+def duplicate_member_same_section(fixture):
+    fixture.entries = [fixture.entry(members=fixture.MEMBERS + ["_min"])]
+
+
+@_scenario("more than one entry")
+def duplicate_entry_for_unit(fixture):
+    fixture.entries = [fixture.entry(), fixture.entry()]
+
+
+@_scenario("cannot verify semantic data group member")
+def wrong_unit(fixture):
+    entry = fixture.entry()
+    entry["unit"] = "other_unit"
+    fixture.entries = [entry]
+
+
+@_scenario("does not cover the reported unmatched sections")
+def extent_mismatch_plus_one(fixture):
+    fixture.report_sections[".rdata"] = 29
+
+
+@_scenario("does not cover the reported unmatched sections")
+def extent_mismatch_minus_one(fixture):
+    fixture.report_sections[".rdata"] = 27
+
+
+@_scenario("report total_data is not the target's modelled data extent")
+def total_data_off_by_one(fixture):
+    fixture.total_data = 65
+    fixture.matched_data = 9
+
+
+@_scenario("report section .bss is not the target's modelled extent")
+def matched_section_missized(fixture):
+    fixture.report_sections[".bss"] = 9
+
+
+@_scenario("does not cover the reported unmatched sections")
+def already_complete_section_included(fixture):
+    fixture.matched_sections = {".bss", ".data"}
+
+
+@_scenario("does not cover the reported unmatched sections")
+def only_already_complete_section(fixture):
+    fixture.matched_sections = {".bss", ".data"}
+    fixture.entries = [fixture.entry(members=["_table"])]
+
+
+@_scenario("defined by the target")
+def surplus_defined_by_target(fixture):
+    fixture.entries = [fixture.entry(surplus=[_XYZ, _ABC])]
+
+
+@_scenario("not a select-any COMDAT")
+def surplus_not_comdat(fixture):
+    section, _ = _v1_find(fixture.base, _XYZ)
+    section["flags"] = _SCN_RDATA | _align(3)
+
+
+@_scenario("not a select-any COMDAT")
+def surplus_not_select_any(fixture):
+    section, _ = _v1_find(fixture.base, _XYZ)
+    section["selection"] = _SELECT_NODUPLICATES
+
+
+@_scenario("holds other symbols")
+def surplus_holds_other_symbols(fixture):
+    section, _ = _v1_find(fixture.base, _XYZ)
+    section["symbols"].append(["_hidden", 2, 2])
+
+
+@_scenario("surplus snapshot changed")
+def surplus_stale_snapshot(fixture):
+    fixture.entries = [fixture.entry()]
+    section, _ = _v1_find(fixture.base, _XYZ)
+    section["raw"] = b"xyw\0"
+
+
+@_scenario("outside the covered report sections")
+def surplus_outside_covered_sections(fixture):
+    fixture.base.append(_v1_section(
+        ".CRT$XCU", bytes(4), _SCN_RDATA | _SCN_COMDAT | _align(3),
+        [("_initializer", 0, 2)], selection=_SELECT_ANY))
+    fixture.entries = [fixture.entry(surplus=[_XYZ, "_initializer"])]
+
+
+@_scenario("repeats a section")
+def surplus_duplicate(fixture):
+    fixture.entries = [fixture.entry(surplus=[_XYZ, _XYZ])]
+
+
+@_scenario("surplus needs an extent_model entry")
+def surplus_on_legacy_entry(fixture):
+    entry = fixture.entry()
+    del entry["extent_model"]
+    fixture.entries = [entry]
+
+
+@_scenario("unknown semantic data entry keys")
+def entry_unknown_key(fixture):
+    fixture.entries = [fixture.entry(allow_incomplete_units=True)]
+
+
+@_scenario("malformed semantic data extent-model entry")
+def entry_empty_reason(fixture):
+    fixture.entries = [fixture.entry(reason=" ")]
+
+
+@_scenario("malformed semantic data extent-model entry")
+def entry_non_boolean_opt_in(fixture):
+    fixture.entries = [fixture.entry(allow_incomplete_unit="yes")]
+
+
+V1_SCENARIOS = [
+    value for name, value in sorted(globals().items())
+    if callable(value) and hasattr(value, "expect")
+    and getattr(value, "__module__", None) == __name__
+]
+
+
+def run_v1_scenario(scenario, verifier, root):
+    """Apply one scenario with ``verifier`` (a semantic_progress module)."""
+    fixture = V1Fixture()
+    scenario(fixture)
+    report = fixture.materialize(root)
+    before = copy.deepcopy(report)
+    notes = verifier.apply_semantic_data_matches(
+        report, Path(root), Path(root) / "semantic_data_matches.json",
+        Path(root) / "objdiff.json", Path(root) / "symbols.json",
+        rescore_report_unit=trust_fixture_report(report))
+    return notes, report, before
+
+
+class SemanticDataExtentModelAdversarialTests(unittest.TestCase):
+    """Adversarial fixtures for the pinned objdiff-3.3.1 extent model (V1)."""
+
+    def run_scenario(self, scenario):
+        with tempfile.TemporaryDirectory() as root:
+            expect = scenario.expect
+            if expect.startswith("credit ") or expect == "noop":
+                notes, report, before = run_v1_scenario(
+                    scenario, semantic_progress, root)
+                if expect == "noop":
+                    self.assertEqual(notes, [])
+                    self.assertEqual(report, before)
+                    return report
+                size = int(expect.split()[1])
+                self.assertEqual(notes, [f"data_unit:v1-group (+{size} data bytes)"])
+                unit = report["units"][0]["measures"]
+                self.assertEqual(
+                    unit["matched_data"],
+                    int(before["units"][0]["measures"]["matched_data"]) + size)
+                self.assertEqual(unit["matched_data"], 64)
+                self.assertEqual(report["measures"]["matched_data"], 500 + size)
+                self.assertEqual(
+                    report["categories"][0]["measures"]["matched_data"], 50 + size)
+                return report
+            with self.assertRaisesRegex(SemanticProgressError, expect):
+                run_v1_scenario(scenario, semantic_progress, root)
+            return None
+
+    def test_every_scenario_has_a_test(self):
+        names = {scenario.__name__ for scenario in V1_SCENARIOS}
+        tests = {name[len("test_"):] for name in dir(self) if name.startswith("test_")}
+        self.assertEqual(names - tests, set())
+
+    def test_fixture_arithmetic(self):
+        # Hand arithmetic behind the expected sizes (see _v1_target_sections).
+        fixture = V1Fixture()
+        rdata = [s for s in fixture.target if s["name"] == ".rdata"]
+        self.assertEqual(sum(len(s["raw"]) for s in rdata), 24)
+        legacy = sum(_v1_normalized_snapshot(s, s["symbols"][0])["padded_size"]
+                     for s in rdata)
+        self.assertEqual(legacy, 32)
+        subset = [s for s in rdata if s["symbols"][0][0] != _ABC]
+        self.assertEqual(
+            sum(_v1_normalized_snapshot(s, s["symbols"][0])["padded_size"]
+                for s in subset), 28)
+
+    def test_subset_loophole_shape_passes_the_legacy_sum(self):
+        # The subset's legacy per-member sums equal the report exactly, so
+        # only complete section coverage can reject it.
+        fixture = V1Fixture()
+        subset_legacy_members = ["_table", "_const_table", _HELLO, _W]
+        sums = {}
+        for symbol in subset_legacy_members:
+            snapshot = _v1_normalized_snapshot(*_v1_find(fixture.target, symbol))
+            sums[snapshot["section"]] = sums.get(snapshot["section"], 0) \
+                + snapshot["padded_size"]
+        self.assertEqual(sums, {".data": 28, ".rdata": 28})
+        self.assertEqual(sums, {k: v for k, v in fixture.report_sections.items()
+                                if k not in fixture.matched_sections})
+
+    def test_repeated_application_credits_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = V1Fixture()
+            report = fixture.materialize(root)
+            arguments = (Path(root), Path(root) / "semantic_data_matches.json",
+                         Path(root) / "objdiff.json", Path(root) / "symbols.json")
+            trusted = trust_fixture_report(report)
+            self.assertEqual(apply_semantic_data_matches(
+                report, *arguments, rescore_report_unit=trusted),
+                ["data_unit:v1-group (+56 data bytes)"])
+            after = copy.deepcopy(report)
+            self.assertEqual(apply_semantic_data_matches(
+                report, *arguments, rescore_report_unit=trusted), [])
+            self.assertEqual(report, after)
+
+
+def _add_scenario_test(scenario):
+    def test(self):
+        self.run_scenario(scenario)
+    test.__name__ = f"test_{scenario.__name__}"
+    test.__doc__ = f"{scenario.__name__}: expect {scenario.expect}"
+    setattr(SemanticDataExtentModelAdversarialTests, test.__name__, test)
+
+
+for _scenario_function in V1_SCENARIOS:
+    _add_scenario_test(_scenario_function)
+
+
+def _materialize(fixture, root):
+    report = fixture.materialize(root)
+    arguments = (Path(root), Path(root) / "semantic_data_matches.json",
+                 Path(root) / "objdiff.json", Path(root) / "symbols.json")
+    return report, arguments
+
+
+_SCN_CODE_ALIGN16 = 0x60000020 | _align(5)
+
+
+def _aux_record_offset(data, obj, symbol):
+    """File offset of the section-definition aux record of ``symbol``'s section."""
+    number = [item for item in obj["symbols"]
+              if item["name"] == symbol and item["section"] > 0][0]["section"]
+    name = obj["sections"][number - 1]["name"]
+    definition = [item for item in obj["symbols"]
+                  if item["section"] == number and item["name"] == name
+                  and item["storage"] == 3 and item["value"] == 0][0]
+    symbol_offset = struct.unpack_from("<L", data, 8)[0]
+    return symbol_offset + 18 * definition["index"] + 18
+
+
+def _run_fixture(fixture, post_target=None, post_base=None):
+    """Materialise a V1 fixture, optionally byte-patch its objects, verify."""
+    with tempfile.TemporaryDirectory() as root:
+        report = fixture.materialize(root)
+        for name, post in (("target.obj", post_target), ("base.obj", post_base)):
+            if post:
+                path = Path(root) / name
+                data = bytearray(path.read_bytes())
+                post(data, load(bytes(data)))
+                path.write_bytes(bytes(data))
+        return apply_semantic_data_matches(
+            report, Path(root), Path(root) / "semantic_data_matches.json",
+            Path(root) / "objdiff.json", Path(root) / "symbols.json",
+            rescore_report_unit=trust_fixture_report(report))
+
+
+class IdentityCounterexampleTests(unittest.TestCase):
+    """Real identity differences the submitted V1 credited (review worker I)."""
+
+    def test_imported_target_resolved_to_local_static_is_rejected(self):
+        fixture = V1Fixture()
+        fixture.base.append(_v1_section(
+            ".text", b"\xc3" + b"\xcc" * 15, _SCN_CODE_ALIGN16,
+            [("_ext_function", 0, 3)]))
+        fixture.base_externals = [name for name in fixture.base_externals
+                                  if name != "_ext_function"]
+        with self.assertRaisesRegex(SemanticProgressError, "target linkage differs"):
+            _run_fixture(fixture)
+
+    def test_local_static_target_resolved_to_import_is_rejected(self):
+        fixture = V1Fixture()
+        fixture.target.append(_v1_section(
+            ".text", b"\xc3" + b"\xcc" * 15, _SCN_CODE_ALIGN16,
+            [("_ext_function", 0, 3)]))
+        fixture.target_externals = [name for name in fixture.target_externals
+                                    if name != "_ext_function"]
+        with self.assertRaisesRegex(SemanticProgressError, "target linkage differs"):
+            _run_fixture(fixture)
+
+    def test_static_surplus_owner_is_rejected(self):
+        fixture = V1Fixture()
+        _, owner = _v1_find(fixture.base, _XYZ)
+        owner[2] = 3
+        fixture.entries = [fixture.entry()]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "not an external|target linkage"):
+            _run_fixture(fixture)
+
+    def test_surplus_bytes_differing_from_january_provider_are_rejected(self):
+        fixture = V1Fixture()
+        section, _ = _v1_find(fixture.base, _XYZ)
+        section["raw"] = b"xyw\0"
+        fixture.entries = [fixture.entry()]
+        with self.assertRaisesRegex(SemanticProgressError, "January provider"):
+            _run_fixture(fixture)
+
+    def test_associative_member_is_rejected(self):
+        fixture = V1Fixture()
+        for sections in (fixture.target, fixture.base):
+            section, _ = _v1_find(sections, _ABC)
+            section["selection"] = 5
+
+        def associated(value):
+            def post(data, obj):
+                struct.pack_into(
+                    "<H", data, _aux_record_offset(data, obj, _ABC) + 12, value)
+            return post
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "selection is not supported"):
+            _run_fixture(fixture, associated(1), associated(2))
+
+    def test_exact_match_member_with_other_checksum_is_rejected(self):
+        fixture = V1Fixture()
+        for sections in (fixture.target, fixture.base):
+            section, _ = _v1_find(sections, _ABC)
+            section["selection"] = 4
+
+        def checksum(value):
+            def post(data, obj):
+                struct.pack_into(
+                    "<L", data, _aux_record_offset(data, obj, _ABC) + 8, value)
+            return post
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "selection is not supported"):
+            _run_fixture(fixture, checksum(1), checksum(2))
+
+    def test_comdat_key_symbol_order_is_rejected(self):
+        fixture = V1Fixture()
+        target, _ = _v1_find(fixture.target, _ABC)
+        target["symbols"] = [[_ABC, 0, 2], ["_abc_alias", 0, 2]]
+        base, _ = _v1_find(fixture.base, _ABC)
+        base["symbols"] = [["_abc_alias", 0, 2], [_ABC, 0, 2]]
+        fixture.entries = [fixture.entry()]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "COMDAT key symbol differs"):
+            _run_fixture(fixture)
+
+    def test_non_ascii_name_collapse_is_rejected(self):
+        fixture = V1Fixture()
+
+        def rename(byte):
+            def post(data, obj):
+                at = data.rfind(b"_static_names\0")
+                data[at + len(b"_static_names") - 1] = byte
+            return post
+        with self.assertRaisesRegex(SemanticProgressError, "undecodable COFF name"):
+            _run_fixture(fixture, rename(0x80), rename(0x81))
+
+
+class PreviouslyUntestedCheckTests(unittest.TestCase):
+    """V1 checks whose single-check mutants survived V1's own suite (worker I)."""
+
+    def test_resolved_list_mismatch_is_rejected(self):
+        fixture = V1Fixture()
+        for sections in (fixture.target, fixture.base):
+            section, _ = _v1_find(sections, _ABC)
+            section["symbols"] = [[_ABC, 0, 2], ["_abc_end", 4, 2]]
+        target, _ = _v1_find(fixture.target, "_const_table")
+        target["relocs"] = [[4, _ABC, _DIR32, 4]]
+        base, _ = _v1_find(fixture.base, "_const_table")
+        base["relocs"] = [[4, "_abc_end", _DIR32, 0]]
+        fixture.addresses["_abc_end"] = fixture.addresses[_ABC] + 5
+        fixture.entries = [fixture.entry()]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "resolved relocations differ"):
+            _run_fixture(fixture)
+        fixture.addresses["_abc_end"] = fixture.addresses[_ABC] + 4
+        self.assertEqual(_run_fixture(fixture),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_duplicate_report_section_is_rejected(self):
+        fixture = V1Fixture()
+        with tempfile.TemporaryDirectory() as root:
+            report = fixture.materialize(root)
+            report["units"][0]["sections"].append(
+                copy.deepcopy(report["units"][0]["sections"][0]))
+            with self.assertRaisesRegex(SemanticProgressError,
+                                        "duplicate report section"):
+                apply_semantic_data_matches(
+                    report, Path(root), Path(root) / "semantic_data_matches.json",
+                    Path(root) / "objdiff.json", Path(root) / "symbols.json",
+                    rescore_report_unit=trust_fixture_report(report))
+
+    def test_ambiguous_report_name_is_rejected(self):
+        flags = 0x40000040 | _align(3)
+        sections = [{"index": index + 1, "name": name, "size": 4, "flags": flags}
+                    for index, name in enumerate(
+                        ["foo$bar", "foo$bar$1", "foo$bar$2"])]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "ambiguous objdiff data section name"):
+            semantic_progress._objdiff_report_data_groups({"sections": sections})
+
+    def test_extent_rejects_alignment_code_15(self):
+        sections = [
+            {"index": 1, "name": ".rdata", "size": 4, "flags": 0x40000040 | (15 << 20)},
+            {"index": 2, "name": ".rdata", "size": 4, "flags": 0x40000040 | (3 << 20)}]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "invalid COFF section alignment code 15"):
+            semantic_progress._objdiff_report_extent(sections)
+
+    def test_surplus_must_be_a_list(self):
+        fixture = V1Fixture()
+        entry = fixture.entry()
+        entry["surplus"] = {}
+        fixture.entries = [entry]
+        with self.assertRaisesRegex(SemanticProgressError, "surplus must be a list"):
+            _run_fixture(fixture)
+
+    def test_model_entry_must_name_its_group(self):
+        fixture = V1Fixture()
+        entry = fixture.entry()
+        del entry["group"]
+        fixture.entries = [entry]
+        with self.assertRaisesRegex(SemanticProgressError, "needs a group"):
+            _run_fixture(fixture)
+
+    def test_malformed_manifest_fails_with_the_verifier_error(self):
+        for entries in ([{"unit": ["source/hs/hs"]}], ["source/hs/hs"],
+                        {"unit": "data_unit"}):
+            with self.subTest(entries=repr(entries)):
+                fixture = V1Fixture()
+                fixture.entries = entries
+                with self.assertRaisesRegex(SemanticProgressError,
+                                            "must be a list of entries"):
+                    _run_fixture(fixture)
+
+
+class RescoredReportBindingTests(unittest.TestCase):
+    """A model entry binds the live report to a fresh report of its objects."""
+
+    def _apply(self, fixture, rescore):
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(fixture, root)
+            return apply_semantic_data_matches(
+                report, *arguments, rescore_report_unit=rescore(report))
+
+    def _mutated(self, change):
+        def factory(report):
+            trusted = trust_fixture_report(report)
+
+            def rescore(*arguments):
+                fresh = trusted(*arguments)
+                change(fresh)
+                return fresh
+            return rescore
+        return factory
+
+    def test_identical_fresh_report_binds(self):
+        self.assertEqual(self._apply(V1Fixture(), trust_fixture_report),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_stale_or_foreign_reports_fail_closed(self):
+        def resize(fresh):
+            fresh["sections"][1]["size"] = "29"
+
+        def rematch(fresh):
+            fresh["measures"]["matched_data"] = "36"
+
+        def reratio(fresh):
+            fresh["sections"][1]["fuzzy_match_percent"] = 99.0
+
+        def other_unit(fresh):
+            fresh["name"] = "other_unit"
+
+        def extra_section(fresh):
+            fresh["sections"].append(
+                {"name": ".tls", "size": "4", "fuzzy_match_percent": 0.0,
+                 "metadata": {}})
+        for change in (resize, rematch, reratio, other_unit, extra_section):
+            with self.subTest(change=change.__name__):
+                with self.assertRaisesRegex(
+                        SemanticProgressError,
+                        "report is not the pinned scorer's report"):
+                    self._apply(V1Fixture(), self._mutated(change))
+
+    def test_missing_scorer_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(V1Fixture(), root)
+            with self.assertRaisesRegex(SemanticProgressError,
+                                        "pinned scorer is missing"):
+                apply_semantic_data_matches(report, *arguments)
+
+    def test_unpinned_scorer_binary_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(V1Fixture(), root)
+            scorer = Path(root) / semantic_progress.DEFAULT_SCORER_PATH
+            scorer.parent.mkdir(parents=True)
+            scorer.write_bytes(b"not the pinned objdiff-cli 3.3.1")
+            with self.assertRaisesRegex(SemanticProgressError,
+                                        "is not the binary pinned"):
+                apply_semantic_data_matches(report, *arguments)
+
+    def test_unknown_model_has_no_pinned_scorer(self):
+        with self.assertRaisesRegex(SemanticProgressError, "no scorer is pinned"):
+            rescore_unit_with_pinned_scorer(
+                Path("."), {}, {"name": "u"}, "objdiff-9.9.9-combined")
+
+    def test_real_pinned_scorer_rejects_a_hand_written_fixture_report(self):
+        scorer = Path(__file__).resolve().parents[1] / \
+            semantic_progress.DEFAULT_SCORER_PATH
+        if not scorer.is_file():
+            self.skipTest(f"SKIPPED: pinned scorer not present at {scorer}")
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(V1Fixture(), root)
+
+            def real(project_root, objdiff_config, config_unit, extent_model):
+                return rescore_unit_with_pinned_scorer(
+                    project_root, objdiff_config, config_unit, extent_model,
+                    scorer_path=scorer)
+            with self.assertRaisesRegex(
+                    SemanticProgressError,
+                    "report is not the pinned scorer's report"):
+                apply_semantic_data_matches(
+                    report, *arguments, rescore_report_unit=real)
+
+
+class SurplusProviderProofTests(unittest.TestCase):
+    """Every declared surplus literal is a folded copy of one January provider."""
+
+    def _apply(self, fixture):
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(fixture, root)
+            return apply_semantic_data_matches(
+                report, *arguments,
+                rescore_report_unit=trust_fixture_report(report))
+
+    def _rejects(self, mutate, pattern):
+        fixture = V1Fixture()
+        mutate(fixture)
+        with self.assertRaisesRegex(SemanticProgressError, pattern):
+            self._apply(fixture)
+
+    def test_control_provider_proof_passes(self):
+        self.assertEqual(self._apply(V1Fixture()),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_surplus_not_referenced_by_january_unit(self):
+        # The actions shape: a rebuilt-only literal January's object for this
+        # unit never references (here pulled in by nothing January has),
+        # even though another unit provides it.
+        unreferenced = "??_C@_03NEW@new?$AA@"
+
+        def mutate(fixture):
+            fixture.base.insert(1, _v1_literal(unreferenced, b"new\0"))
+            fixture.provider_target.append(_v1_literal(unreferenced, b"new\0"))
+            fixture.provider_base.append(_v1_literal(unreferenced, b"new\0"))
+            fixture.SURPLUS = [_XYZ, unreferenced]
+        self._rejects(mutate, "not a January undefined reference")
+
+    def test_invalid_or_self_provider(self):
+        for provider in ("missing_unit", "data_unit"):
+            with self.subTest(provider=provider):
+                def mutate(fixture, provider=provider):
+                    fixture.provider = provider
+                self._rejects(mutate, "invalid provider")
+
+    def test_provider_is_not_the_unique_january_definer(self):
+        def wrong_provider(fixture):
+            fixture.provider = "other_unit"
+        self._rejects(wrong_provider, "not January's unique definer")
+        # other_unit's January object defines the literal too: two definers.
+        fixture = V1Fixture()
+        fixture.other_sections = [
+            _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
+                        [("_bss_var", 0, 2)]),
+            _v1_literal(_XYZ, b"xyz\0")]
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "not January's unique definer"):
+            self._apply(fixture)
+
+    def test_provider_copies_must_be_identical_select_any(self):
+        cases = {
+            "January provider": lambda f: f.provider_target.__setitem__(
+                0, _v1_literal(_XYZ, b"xyZ\0")),
+            "rebuilt provider": lambda f: f.provider_base.__setitem__(
+                0, _v1_literal(_XYZ, b"xyZ\0")),
+            "not a select-any": lambda f: f.provider_base.__setitem__(
+                0, _v1_literal(_XYZ, b"xyz\0", selection=_SELECT_NODUPLICATES)),
+            "alignment": lambda f: f.provider_base.__setitem__(
+                0, _v1_literal(_XYZ, b"xyz\0", code=5)),
+        }
+        patterns = {
+            "January provider": "differs from January provider",
+            "rebuilt provider": "differs from rebuilt provider",
+            "not a select-any": "not a select-any COMDAT",
+            "alignment": "differs from rebuilt provider",
+        }
+        for name, mutate in cases.items():
+            with self.subTest(case=name):
+                self._rejects(mutate, patterns[name])
+
+    def test_provider_copy_sharing_its_section_fails(self):
+        def mutate(fixture):
+            fixture.provider_base[0]["symbols"].append(["_neighbour", 0, 2])
+        self._rejects(mutate, "shares its section")
+
+    def test_missing_january_object_fails(self):
+        fixture = V1Fixture()
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(fixture, root)
+            (Path(root) / "provider_target.obj").unlink()
+            with self.assertRaisesRegex(SemanticProgressError,
+                                        "January object missing"):
+                apply_semantic_data_matches(
+                    report, *arguments,
+                    rescore_report_unit=trust_fixture_report(report))
+
+
+class ProductionSemanticDataManifestTests(unittest.TestCase):
+    """The local build's manifest verifies; a verification failure FAILS.
+
+    Missing build inputs are an explicitly reported skip.  Once they exist,
+    any verification error is a test failure, never a skip.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def setUp(self):
+        self.paths = {
+            "report": self.ROOT / "build" / "report.json",
+            "objdiff": self.ROOT / "objdiff.json",
+            "manifest": self.ROOT / "config" / "semantic_data_matches.json",
+            "symbols": self.ROOT / "config" / "symbols.json",
+        }
+        missing = [str(path) for path in self.paths.values() if not path.is_file()]
+        if missing:
+            self.skipTest("SKIPPED: local build inputs are unavailable: "
+                          + ", ".join(missing))
+
+    def test_pinned_scorer_reproduces_the_live_report(self):
+        scorer = self.ROOT / semantic_progress.DEFAULT_SCORER_PATH
+        if not scorer.is_file():
+            self.skipTest(f"SKIPPED: pinned scorer not present at {scorer}")
+        report = json.loads(self.paths["report"].read_text(encoding="utf-8"))
+        objdiff = json.loads(self.paths["objdiff"].read_text(encoding="utf-8"))
+        config_units = {unit["name"]: unit for unit in objdiff["units"]}
+        live = {unit["name"]: unit for unit in report["units"]}
+        for name in ("source/hs/hs", "source/shell/shell_xbox"):
+            with self.subTest(unit=name):
+                fresh = rescore_unit_with_pinned_scorer(
+                    self.ROOT, objdiff, config_units[name],
+                    OBJDIFF_331_COMBINED_EXTENT)
+                self.assertEqual(
+                    semantic_progress._report_data_view(fresh, name),
+                    semantic_progress._report_data_view(live[name], name))
+
+    def test_manifest_verifies_and_model_entries_credit_their_gap(self):
+        report = json.loads(self.paths["report"].read_text(encoding="utf-8"))
+        before = {unit["name"]: copy.deepcopy(unit["measures"])
+                  for unit in report["units"]}
+        entries = json.loads(self.paths["manifest"].read_text(encoding="utf-8"))
+        try:
+            notes = apply_semantic_data_matches(
+                report, self.ROOT, self.paths["manifest"],
+                self.paths["objdiff"], self.paths["symbols"])
+        except SemanticProgressError as error:
+            self.fail(f"current build does not verify: {error}")
+        units = {unit["name"]: unit for unit in report["units"]}
+        for entry in entries:
+            if "extent_model" not in entry:
+                continue
+            measures = before[entry["unit"]]
+            gap = int(measures.get("total_data", 0)) \
+                - int(measures.get("matched_data", 0))
+            after = units[entry["unit"]]["measures"]
+            self.assertEqual(int(after["matched_data"]),
+                             int(measures.get("total_data", 0)))
+            if gap:
+                self.assertIn(
+                    f"{entry['unit']}:{entry['group']} (+{gap} data bytes)", notes)
 
 
 class SymbolOwnershipSnapshotTests(unittest.TestCase):
