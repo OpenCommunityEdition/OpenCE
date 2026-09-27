@@ -61,7 +61,7 @@ further gamepads become controllers 2-4.
 | space, enter | A (jump, accept) |
 | F, backspace, mouse button 4 | B (melee, back) |
 | E, R | X (action, reload) |
-| tab, mouse wheel | Y (switch weapon) |
+| tab, mouse wheel | Y (switch weapon; one scroll of the wheel switches once, and scrolling again after a moment's pause switches again) |
 | Q | white (flashlight) |
 | X | black |
 | left ctrl, C | left stick click (crouch) |

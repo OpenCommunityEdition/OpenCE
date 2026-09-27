@@ -68,7 +68,11 @@ static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
-static int wheel_press_polls = 0;
+/* the wheel's switch (wheel_update): when the wheel last moved, until when
+Y is held, and whether a scroll is under way */
+static Uint64 wheel_moved_ms = 0;
+static Uint64 wheel_press_until_ms = 0;
+static BOOL wheel_scrolling = FALSE;
 
 static float mouse_sensitivity(void)
 {
@@ -130,6 +134,8 @@ static void mouse_poll(const struct platform_input_state *input)
 		mouse_pending_x += input->mouse_dx;
 		mouse_pending_y += input->mouse_dy;
 		mouse_wheel_accumulated += input->mouse_wheel;
+		if (input->mouse_wheel != 0.0f)
+			wheel_moved_ms = SDL_GetTicks();
 	}
 	pthread_mutex_unlock(&mouse_lock);
 }
@@ -179,31 +185,41 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_AC_BACK]);
 #endif
 	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_E] || k[SDL_SCANCODE_R]);
-	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB] || wheel_press_polls > 0);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB] || SDL_GetTicks() < wheel_press_until_ms);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] |= analog(k[SDL_SCANCODE_Q]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] |= analog(k[SDL_SCANCODE_X]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] |= analog(k[SDL_SCANCODE_G] || (mouse && m[SDL_BUTTON_RIGHT]));
 	pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] |= analog(mouse && m[SDL_BUTTON_LEFT]);
 }
 
-/* a wheel notch presses Y for two polls, then leaves it up for two */
+/* A scroll of the wheel switches weapons once: it holds Y for WHEEL_PRESS_MS
+once the wheel has turned a notch, and the scroll lasts until the wheel has
+been still for WHEEL_SCROLL_GAP_MS. One notch often arrives as several events
+over a few tens of milliseconds (high-resolution and smooth-scrolling
+wheels), and one flick turns several notches; switching for each would bring
+the same weapon straight back. Timed in milliseconds, not polls: polls come
+once a frame, at the display's refresh rate. */
+#define WHEEL_PRESS_MS 50
+#define WHEEL_SCROLL_GAP_MS 200
+
 static void wheel_update(void)
 {
-	float wheel;
+	Uint64 now = SDL_GetTicks();
 
 	pthread_mutex_lock(&mouse_lock);
-	wheel = mouse_wheel_accumulated;
-	if (wheel_press_polls > -2)
+	if (!wheel_scrolling)
 	{
-		wheel_press_polls--;
+		if (fabsf(mouse_wheel_accumulated) >= 1.0f)
+		{
+			wheel_scrolling = TRUE;
+			wheel_press_until_ms = now + WHEEL_PRESS_MS;
+		}
 	}
-	else if (wheel != 0.0f)
+	else if (now >= wheel_press_until_ms && now - wheel_moved_ms >= WHEEL_SCROLL_GAP_MS)
 	{
-		wheel_press_polls = 2;
+		wheel_scrolling = FALSE;
 		mouse_wheel_accumulated = 0.0f;
 	}
-	if (fabsf(mouse_wheel_accumulated) > 4.0f)
-		mouse_wheel_accumulated = 0.0f;
 	pthread_mutex_unlock(&mouse_lock);
 }
 
