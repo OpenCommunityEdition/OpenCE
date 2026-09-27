@@ -1,0 +1,20 @@
+Card RR-2 - written 2026-09-26 16:03:26 -0700 (clock-read) BEFORE compiling
+Function: _widget_instance_render_recursive. Change: RR-1 + the recorded structural R1 clip shape (coupled test,
+rule 24; both /Od-attested): `if (clip) { clipped = *clip; clip = &clipped; clip->x0 += offset.x; clip->x1 +=
+offset.x; clip->y0 += offset.y; clip->y1 += offset.y; }`. File w2/rr2.c.
+Evidence: /Od 0x66a020 +0x220..+0x2a4 (tests, copies and writes through the pointer local [ebp-0x3c] that was
+initialised from clip_rect, adds in order +2,+6,+0,+4 = x0,x1,y0,y1; aggregate RTC name "local_clip"); RR-1 as card.
+Basis: R1 alone (structural lane) made clip memory-homed but left alpha in the widget home [ebp+8] (January: clip
+there); RR-1 alone moved clip into [ebp+8] and alpha out, but left the clip phi in a register. Each fixes the other's
+remaining difference.
+Prediction: clip written through memory at [ebp+8] in the branch and reloaded at the call (January) -> remaining
+differences = frame-slot order of alpha_modifier/bounds/clipped/alpha (-4/-0xc/-0x14/-0x18 in January) and the
+[ecx+eax] operand order. P(EXACT) 25%; P(fewer differences than RR-1) 70%.
+
+OUTCOME (appended 2026-09-26 16:03:36 -0700): PREDICTION HELD (better than predicted on the frame): every frame slot now equals January
+(alpha_modifier -4, bounds -0xc, clipped -0x14, alpha -0x18, clip in the widget home [ebp+8] written in the branch and
+reloaded at the call). ONE instruction differs: game-data-input loop  (January) vs 
+(ours) - the commutative base/index order of  (address in eax, strength-reduced
+input_index*0x24 in ecx). Everything else identical.
+NOTE (appended right after; outcome text above lost three quoted snippets to shell backticks). They read:
+`mov dx,[ecx+eax]` (January) vs `[eax+ecx]` (ours); the commutative base/index order of `address + input_index`.
