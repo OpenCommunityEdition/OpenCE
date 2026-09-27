@@ -1,0 +1,27 @@
+CARD V04 (RF-V) written 2026-09-26 19:52:02 -0700 (clock-read), BEFORE the compile. Immutable. Card-driven compile 1 for _biped_get_autoaim_pill.
+Kind: CANDIDATE (first-party /Od form).
+Evidence (Step 2, first-party): /Od halo_cache_symbols.exe 0x8bffb0 (evidence/od_biped_get_autoaim_pill_0x8bffb0.txt):
+  the store '*width = definition->biped.autoaim_width' exists TWICE in the source structure: at +0x10c..+0x118 at the
+  end of the outer if-arm, AFTER the inner spherical/non-spherical if/else join (the spherical arm 'jmp 0x8c00bc' at
+  +0xd7 lands on it; the non-spherical arm falls into it), followed by 'jmp 0x8c0134' to the common epilogue; and at
+  +0x176..+0x182 at the end of the else (physics pill) arm, falling into the epilogue. /Od never merges or duplicates
+  statements, so the source has one store per OUTER arm. HEAD has a single store after the outer if/else.
+  Not a repeat: Lane B aa1 put the store at the end of each of the THREE innermost arms (byte-identical to base);
+  waveD ap1 was a head_node_index local; nothing recorded the two-store /Od structure.
+January corroboration: January's spherical tail has the SAME colours as the non-spherical tail (value EAX, pointer
+  ECX), the physics tail its own (ECX/EDX): consistent with ONE shared store block for the two inner arms and a
+  separate one in the physics arm.
+Change: move '*width = definition->biped.autoaim_width;' into the end of the outer if-arm (after the inner if/else)
+  and the end of the else-arm (after scale_vector3d); nothing else changes.
+Mechanism prediction (V03 + RF-R R1-R3): at MARK the return block is then only the epilogue; the inner join block
+  (store; JMP EXIT) is reached by the spherical JMP and the non-spherical fall-through, so the pre-allocation return
+  split no longer copies the store into the spherical arm; the step-#2 tail duplication clones the ALLOCATED join
+  block into the spherical arm (same colours as the non-spherical copy = January).
+Prediction P4a: gate _biped_get_autoaim_pill EXACT (336, sha = January) with P = 0.55; else P4b: the spherical tail
+  changes colours to EAX/ECX but a residual schedule/binding difference remains.
+Prediction P4c: no other bipeds function changes (keyed diff 1 changed).
+
+OUTCOME V04 (appended 2026-09-26 19:52:17 -0700; logs/V04_gate.txt, V04_keyed.txt): P4a CONFIRMED.
+  gate: EXACT 336 _biped_get_autoaim_pill; bipeds exact 43 -> 44, residual 8 -> 7; the only changed gate row is this
+  function. keyed diff vs build/base: 195 -> 195 sections, 1 changed (_biped_get_autoaim_pill 336 -> 336, EXACT vs
+  January), 0 added, 0 removed. P4c CONFIRMED. Full candidate checks follow (cards V05..).

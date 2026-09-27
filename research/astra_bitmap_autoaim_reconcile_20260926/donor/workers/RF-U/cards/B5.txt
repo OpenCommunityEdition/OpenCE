@@ -1,0 +1,9 @@
+CARD B5 (RF-U) written 2026-09-26 19:43:48 -0700 (clock-read), BEFORE compiling. Immutable; outcome appended.
+Kind: STRIP of B3's redundant 'success = TRUE' in the no-device else arm (success is initialised TRUE and unchanged
+  on that path; /Od dx9 0x7ea7d0's else arm is 'hw = NULL' only). Source b/B5.c = B3 minus that one line.
+Prediction: EXACT 400 if B3 is exact (the assignment is redundant after constant propagation; the IL at MARK is the
+  same). Confidence ~55% (VN/constant temps could differ).
+
+OUTCOME B5 (appended 2026-09-26 19:44:05 -0700): EXACT 400 (sha 041cef84 = January); keyed vs build/base 1 changed (EXACT), 0 added,
+  0 removed. Prediction CORRECT: the else arm's 'success = TRUE' is not load-bearing; the /Od-dx9-shaped else arm
+  ('hw = NULL' only) with the error() test moved after the if/else is exact.

@@ -1,0 +1,29 @@
+CARD T1 (RF-U) written 2026-09-26 19:49:29 -0700 (clock-read), BEFORE tracing. Immutable; outcome appended.
+Kind: STOCK-EQUAL TRACED READOUT (RF-R tools copied to scratch/rf/workers/RF-U/tools/rfr; dbg32c sha 32ee5e4d) of
+  b/CAND_hb.c (= B5) for _rasterizer_bitmap_new (function ordinal k = 14, as RF-R's HEAD readout): MARK IL
+  (ilsnap.py site 0x10720b39 esi) and the backend step walk (stepwalk.py).
+Prediction (from RF-R's decoded R1-R3): at MARK there is ONE return block 'return success' (no separate ND
+  'ret #1' block, because ND now assigns nothing and flows to the shared 'if (!success) error()' test which is
+  threaded away on ND's path); the error block (hw = NULL; error()) falls through into L_ret; ND reaches L_ret by a
+  JMP (or its own R3 copy). At step #2 the cross-jump for ND's JMP finds the ERROR block as the fall-through host,
+  so L_ret stays after the error block and the final jne binds to the first copy (+0x171). ND's tail becomes the
+  unlabelled clone at the end. Confidence ~55% on the exact route (R1 vs R2/R3), ~85% that L_ret is hosted by the
+  error block.
+
+OUTCOME T1 (appended 2026-09-26 19:51:28 -0700): traced objects stock-equal (rt.stock_equal True for t1_mark and t1_step); k = 14 is
+  _rasterizer_bitmap_new (fns_in_order). Records: scratch/rf/workers/RF-U/runs/t1_mark.txt, t1_step_all.txt,
+  t1_gt.txt (REGIONS/MATCH/RETGT for k=14), t1_cj.txt / t1_cj_head.txt (per-function cross-jump census).
+  MARK IL (+N = lines from the definition): N170 L_switch_end 'if (!hw)' (+98); N175 success=FALSE (+99), N176 JMP
+  -> N182 (the 'if (!success)' test threaded); N178/N180 CMP success, JCC -> N196 L_ret (+100; the final jne; BOTH
+  later 'if (!success)' tests threaded away on the TRUE path); N182 hw=NULL (+101), JMP -> N190 (second test
+  threaded); N186 ND hw=NULL (+105), JMP -> N196 (ND threads past the error test: success known TRUE); N190 error()
+  call (+112) FALLS INTO N196 L_ret: ASSIGN s63 = success (+114), ret marker. => ONE return block, no ND 'ret #1'
+  block (HEAD, RF-R b1_mark: two return blocks, L_ret 's63 = success' + ND 's64 = #1' falling into EXIT).
+  Backend: R3 split gives ND and the error block inline 'al = success' copies + JMP EXIT and puts the JCC-edge copy
+  (label N55, 'al = success') after the error call, falling into EXIT. Step #2 (t1_gt): for ND's JMP N188 the
+  fall-through host is that N55 copy (1-node match 'al = bl', RETGT N188 -> N55); the error block's JMP likewise
+  (RETGT -> N55). The host N55 sits right after the error call, so the JCC (jne) keeps binding there = January's
+  first copy (+0x171); ND is later given an unlabelled tail copy and laid out last (+0x177).
+  Prediction 'L_ret hosted after the error block' CORRECT; route detail: it is R3's JCC-edge copy (N55) that hosts,
+  not the MARK L_ret label itself (partly WRONG on the route; same as RF-R's D1 correction for A3).
+  Contrast: in HEAD, ND's own 'ret #1' block falls into EXIT and hosts (R1), dragging L_ret and the jne into ND.

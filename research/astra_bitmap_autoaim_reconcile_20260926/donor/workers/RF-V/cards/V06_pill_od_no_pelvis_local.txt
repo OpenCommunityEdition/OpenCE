@@ -1,0 +1,13 @@
+CARD V06 (RF-V) written 2026-09-26 19:54:21 -0700 (clock-read), BEFORE the compile. Immutable. Card-driven compile 2 for the pill.
+Kind: DIAGNOSTIC (fidelity information for the owner; not required by the candidate).
+Source: src/bipeds_v06.c = V04 + the /Od condition shape: no 'pelvis_node_index' local; the test reads
+  'definition->biped.runtime_pelvis_node_index!=NONE' and the object_get_node_matrix call passes the field.
+Evidence: /Od 0x8bffb0 frame 0x28 holds biped [-4], definition [-8], pelvis_matrix [-0xc], head_matrix [-0x10] and the
+  two pill outputs; no node-index local; the condition re-reads [definition+0x4e4] (movsx/cmp -1) and the call
+  re-reads it (movzx/push).
+Prediction P6: byte-identical to V04 (VC7 CSEs the two field reads into the one 'xor eax,eax; mov ax,[esi+0x4e4]'
+  load, as January's bytes show), P = 0.6; if not, the HEAD local is load-bearing and stays (V04 is the candidate).
+
+OUTCOME V06 (appended 2026-09-26 19:54:53 -0700; logs/V06_gate.txt): P6 CONFIRMED. gate 44/7, _biped_get_autoaim_pill EXACT; keyed diff V04 vs
+  V06: 0 changed / 0 added / 0 removed (whole object byte-identical). The HEAD pelvis_node_index local is inert; the
+  /Od-faithful no-local condition is an owner-choice alternative with the same bytes (not needed for the candidate).
