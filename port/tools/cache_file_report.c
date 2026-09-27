@@ -5,7 +5,7 @@ Reports what the native builds can do with Halo 1 map files: which format
 each file is, whether it can be loaded, and why not
 (port/linux/game/cache_file_formats.c; docs/custom_edition_caches.md).
 
-	cache_file_report [--maps DIRECTORY] [--stock-data-files] FILE...
+	cache_file_report [--maps DIRECTORY] [--stock-data-files] [--dump-tags FILE] FILE...
 
 A Custom Edition cache is loaded with the resource maps it needs, looked for
 in DIRECTORY (by default the cache's own directory): bitmaps.map, sounds.map
@@ -13,8 +13,11 @@ and loc.map, or data_files\<mod>-bitmaps.map and so on for OpenSauce caches
 built with mod data files. --stock-data-files loads such caches with the
 stock resource maps instead, for inspection only: OpenSauce itself refuses to
 load them without their mod set, and the report says the substitution was
-made. Every file gets a block of "key: value" lines; the exit status is 0
-when every file was recognized and every Custom Edition cache loaded.
+made. A cache that loads is then converted for this build as far as its
+bytes alone go (custom_edition_cache_convert), and --dump-tags writes the
+converted tags, as they would sit at 0x40440000, to FILE. Every file gets a
+block of "key: value" lines; the exit status is 0 when every file was
+recognized and every Custom Edition cache loaded and converted.
 */
 
 /* ---------- headers */
@@ -223,7 +226,8 @@ static int report_custom_edition_cache(
 	struct cache_file_source *source,
 	struct cache_file_identity const *identity,
 	char const *maps_directory,
-	int use_stock_data_files)
+	int use_stock_data_files,
+	char const *dump_path)
 {
 	static char const *const warning_names[NUMBER_OF_CUSTOM_EDITION_WARNINGS] =
 	{
@@ -295,17 +299,52 @@ static int report_custom_edition_cache(
 		printf("structure_bsps: %" PRId32 "\n", report.structure_bsp_count);
 		printf("largest_structure_bsp_bytes: 0x%" PRIx32 "\n", report.largest_structure_bsp_bytes);
 		printf("lowest_structure_bsp_address: 0x%" PRIx32 "\n", report.lowest_structure_bsp_address);
+		printf("structure_bsp_materials_checked: %" PRId32 "\n", report.structure_bsp_materials_checked);
+		printf("model_data: 0x%" PRIx32 " bytes at 0x%" PRIx32 ", strips from 0x%" PRIx32 "\n",
+			report.model_data_bytes,
+			report.model_data_offset,
+			report.model_index_data_offset);
 		printf("bitmap_data_ranges_checked: %" PRId32 "\n", report.bitmap_data_ranges_checked);
 		printf("sound_sample_ranges_checked: %" PRId32 "\n", report.sound_sample_ranges_checked);
 		printf("relocated_pointers: %" PRId32 "\n", report.relocated_pointer_count);
 		printf("computed_checksum: 0x%08" PRIx32 "\n", report.computed_checksum);
 		printf("trailing_bytes: 0x%" PRIx32 "\n", report.trailing_bytes);
 		print_flags("warnings", report.warnings, warning_names, NUMBER_OF_CUSTOM_EDITION_WARNINGS);
+		if (status == _cache_file_status_ok)
+		{
+			uint32_t loaded_bytes = report.tag_data_bytes + report.resource_tag_bytes;
+			struct custom_edition_conversion_report conversion;
+			enum cache_file_status conversion_status = custom_edition_cache_convert(tag_cache, loaded_bytes, &conversion);
+
+			printf("convert: %s\n", cache_file_status_describe(conversion_status));
+			if (conversion_status != _cache_file_status_ok)
+			{
+				printf("convert_problem_tag: %" PRId32 "\n", conversion.problem_tag_index);
+			}
+			printf("shaders_renumbered: %" PRId32 "\n", conversion.shaders_retyped);
+			printf("chicago_extended_shaders_converted: %" PRId32 "\n", conversion.chicago_extended_shaders);
+			printf("bitmaps_prepared: %" PRId32 "\n", conversion.bitmaps_prepared);
+			printf("script_nodes_reduced: %" PRId32 "\n", conversion.script_nodes_reduced);
+			printf("animation_overlays_disabled: %" PRId32 "\n", conversion.animation_overlays_disabled);
+			printf("sounds_undecodable: %" PRId32 "\n", conversion.sounds_undecodable);
+			if (dump_path)
+			{
+				FILE *dump = fopen(dump_path, "wb");
+				int written = dump && fwrite(tag_cache, 1, loaded_bytes, dump) == loaded_bytes;
+
+				if (dump && fclose(dump))
+				{
+					written = 0;
+				}
+				printf("dump: %s\n", written ? dump_path : "failed");
+			}
+			status = conversion_status;
+		}
 		free(tag_cache);
 	}
 	printf("milestone.recognize: yes\n");
 	printf("milestone.load: %s\n", status == _cache_file_status_ok ? "yes" : "no");
-	printf("milestone.run: no (Custom Edition tags are not converted to this build's layouts)\n");
+	printf("milestone.run: not observed by this tool (the game converts the rest as it loads a map; docs/custom_edition_caches.md)\n");
 
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
 	{
@@ -322,7 +361,8 @@ static int report_custom_edition_cache(
 static int report_file(
 	char const *path,
 	char const *maps_directory_option,
-	int use_stock_data_files)
+	int use_stock_data_files,
+	char const *dump_path)
 {
 	struct stdio_source source;
 	struct cache_file_identity identity;
@@ -354,7 +394,7 @@ static int report_file(
 		{
 			directory_of(path, maps_directory);
 		}
-		succeeded = report_custom_edition_cache(&source.source, &identity, maps_directory, use_stock_data_files);
+		succeeded = report_custom_edition_cache(&source.source, &identity, maps_directory, use_stock_data_files, dump_path);
 	}
 	else if (succeeded && identity.format == _cache_file_format_resource_map)
 	{
@@ -381,6 +421,7 @@ int main(
 	char **arguments)
 {
 	char const *maps_directory = NULL;
+	char const *dump_path = NULL;
 	int use_stock_data_files = 0;
 	int all_succeeded = 1;
 	int file_count = 0;
@@ -398,7 +439,12 @@ int main(
 			use_stock_data_files = 1;
 			continue;
 		}
-		if (!report_file(arguments[argument_index], maps_directory, use_stock_data_files))
+		if (!strcmp(arguments[argument_index], "--dump-tags") && argument_index + 1 < argument_count)
+		{
+			dump_path = arguments[++argument_index];
+			continue;
+		}
+		if (!report_file(arguments[argument_index], maps_directory, use_stock_data_files, dump_path))
 		{
 			all_succeeded = 0;
 		}
@@ -406,7 +452,7 @@ int main(
 	}
 	if (!file_count)
 	{
-		fprintf(stderr, "usage: cache_file_report [--maps DIRECTORY] [--stock-data-files] FILE...\n");
+		fprintf(stderr, "usage: cache_file_report [--maps DIRECTORY] [--stock-data-files] [--dump-tags FILE] FILE...\n");
 		return 2;
 	}
 

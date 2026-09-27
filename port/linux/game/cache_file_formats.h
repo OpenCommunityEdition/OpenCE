@@ -138,6 +138,14 @@ enum cache_file_status
 	_cache_file_status_bad_structure_bsp_block,
 	_cache_file_status_bad_structure_bsp_range,
 	_cache_file_status_bad_structure_bsp_header,
+	_cache_file_status_bad_structure_bsp_geometry,
+
+	/* model geometry */
+	_cache_file_status_bad_model_part,
+
+	/* conversion */
+	_cache_file_status_bad_shader_type,
+	_cache_file_status_bad_script_nodes,
 
 	/* resource maps and the tags they hold */
 	_cache_file_status_bad_resource_map_header,
@@ -251,6 +259,11 @@ struct custom_edition_load_report
 	uint32_t tag_cache_bytes;
 	int32_t tag_count;
 	int32_t scenario_tag_index;
+	/* the model vertex and strip data, which no tag holds: its offset in the
+	file, where its strips start within it, and its size */
+	uint32_t model_data_offset;
+	uint32_t model_index_data_offset;
+	uint32_t model_data_bytes;
 	/* bytes of tag data read from the map, then of tags read from resource
 	maps and placed after it */
 	uint32_t tag_data_bytes;
@@ -259,12 +272,35 @@ struct custom_edition_load_report
 	int32_t structure_bsp_count;
 	uint32_t largest_structure_bsp_bytes;
 	uint32_t lowest_structure_bsp_address;
+	int32_t structure_bsp_materials_checked;
 	int32_t bitmap_data_ranges_checked;
 	int32_t sound_sample_ranges_checked;
 	int32_t relocated_pointer_count;
 	uint32_t computed_checksum;
 	uint32_t trailing_bytes;
 	uint32_t warnings;
+};
+
+/* what custom_edition_cache_convert changed */
+struct custom_edition_conversion_report
+{
+	/* shaders whose type this build numbers differently, and transparent
+	chicago extended shaders made transparent chicago ones */
+	int32_t shaders_retyped;
+	int32_t chicago_extended_shaders;
+	/* bitmaps given their own tag and the state of a bitmap not yet drawn */
+	int32_t bitmaps_prepared;
+	/* 1 when the scenario's script syntax nodes, upgraded by OpenSauce, were
+	made this build's number */
+	int32_t script_nodes_reduced;
+	/* animation graph object overlays that named an animation the graph
+	does not have, made to name none */
+	int32_t animation_overlays_disabled;
+	/* sounds in a compression this build cannot decode (Ogg Vorbis), made
+	unplayable */
+	int32_t sounds_undecodable;
+	/* the tag of the problem, when there was one, else NONE (-1) */
+	int32_t problem_tag_index;
 };
 
 /* ---------- prototypes */
@@ -317,5 +353,70 @@ enum cache_file_status custom_edition_cache_load(
 	uint8_t *tag_cache,
 	uint32_t tag_cache_bytes,
 	struct custom_edition_load_report *report);
+
+/* Gives the tags of a tag cache custom_edition_cache_load filled
+(`loaded_bytes` of it in use) this build's layouts and values where only
+their bytes need to change: every shader's type as this build numbers them,
+transparent chicago extended shaders made transparent chicago shaders,
+bitmaps and sound permutations in the state of ones not yet drawn or played
+and naming their own tags, sounds this build cannot decode made unplayable,
+animation overlays naming animations that do not exist made to name none,
+and OpenSauce's upgraded script node array made this build's size when its
+nodes fit. Returns the first problem: tags already converted stay
+converted. */
+enum cache_file_status custom_edition_cache_convert(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	struct custom_edition_conversion_report *report);
+
+/* In a tag cache custom_edition_cache_load filled (`loaded_bytes` of it in
+use), the definition of the next tag of group `group_tag` after tag
+`*tag_index` (NONE, -1, to start from the first): `*tag_index` becomes its
+index, and NULL is returned when no tag after it has a definition of
+`definition_bytes` bytes within the tag cache. */
+void *custom_edition_cache_tag_next(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t group_tag,
+	uint32_t definition_bytes,
+	int32_t *tag_index);
+
+/* The definition of the tag `handle` names in a tag cache
+custom_edition_cache_load filled, or NULL unless that is a tag of group
+`group_tag` whose definition of `definition_bytes` bytes lies within the tag
+cache: any value may be asked about. */
+void *custom_edition_cache_tag_get(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t handle,
+	uint32_t group_tag,
+	uint32_t definition_bytes);
+
+/* The path of tag `tag_index` of a tag cache custom_edition_cache_load
+filled, for messages. */
+char const *custom_edition_cache_tag_name(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	int32_t tag_index);
+
+/* Makes every tag of group `group_tag` a tag of `new_group_tag` (their parent
+groups stay as they are), returning how many there were. */
+int32_t custom_edition_cache_tags_regroup(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t group_tag,
+	uint32_t new_group_tag);
+
+/* In a tag cache custom_edition_cache_load filled (`loaded_bytes` of it in
+use), moves the file offsets of bitmap pixels and sound samples kept in
+bitmaps.map and sounds.map by `bitmaps_offset` and `sounds_offset`, and
+clears the flags that said they were kept there: afterwards every offset
+counts in one combined space (the map, then bitmaps.map, then sounds.map)
+that a single read function can serve. */
+void custom_edition_cache_combine_resource_offsets(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t bitmaps_offset,
+	uint32_t sounds_offset);
 
 #endif

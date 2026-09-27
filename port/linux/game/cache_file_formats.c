@@ -44,6 +44,7 @@ docs/custom_edition_caches.md lists each with its evidence.
 #define HUD_MESSAGE_TEXT_GROUP_TAG 'hmt '
 #define SCENARIO_GROUP_TAG 'scnr'
 #define STRUCTURE_BSP_GROUP_TAG 'sbsp'
+#define GBXMODEL_GROUP_TAG 'mod2'
 #define PROJECT_YELLOW_GROUP_TAG 'yelo'
 #define PROJECT_YELLOW_GLOBALS_GROUP_TAG 'gelo'
 
@@ -130,6 +131,22 @@ cache_files_structures.hpp, s_cache_tag_header and s_cache_tag_instance) */
 the offset holds in every map examined) */
 #define SCENARIO_STRUCTURE_BSPS_OFFSET 0x5A4
 #define SCENARIO_BYTES 0x5B0
+
+/* The scenario's script syntax data (OpenSauce scenario_definitions.hpp,
+hs_syntax_data): a data array (this build's memory/data.h) of 20-byte
+syntax nodes. This build has room for 19001 nodes (hs.c,
+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO), as stock Custom Edition does;
+OpenSauce's memory upgrades make room for 1.5 times as many (OpenSauce
+blam_memory_upgrades.hpp, k_maximum_hs_syntax_nodes_per_scenario_upgrade). */
+#define SCENARIO_HS_SYNTAX_DATA_OFFSET 0x474
+#define DATA_ARRAY_HEADER_BYTES 0x38
+#define DATA_ARRAY_MAXIMUM_COUNT_OFFSET 0x20
+#define DATA_ARRAY_ELEMENT_BYTES_OFFSET 0x22
+#define DATA_ARRAY_FIRST_FREE_INDEX_OFFSET 0x2C
+#define DATA_ARRAY_COUNT_OFFSET 0x2E
+#define HS_SYNTAX_NODE_BYTES 20
+#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
+#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED 28501
 #define STRUCTURE_BSP_REFERENCE_BYTES 0x20
 #define STRUCTURE_BSP_REFERENCE_FILE_OFFSET_OFFSET 0x00
 #define STRUCTURE_BSP_REFERENCE_SIZE_OFFSET 0x04
@@ -144,6 +161,93 @@ pointer, two vertex buffer arrays (Xbox only) and the signature */
 #define STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET 0x04
 #define STRUCTURE_BSP_HEADER_LIGHTMAP_VERTEX_BUFFERS_OFFSET 0x0C
 #define STRUCTURE_BSP_HEADER_SIGNATURE_OFFSET 0x14
+/* the structure BSP's lightmaps and their materials (OpenSauce
+structure_bsp_definitions.hpp: structure_bsp 0x288, structure_bsp_lightmap
+0x20, structure_bsp_material 0x100; this build's structure_bsp_definitions.h
+has the same offsets). A material's vertices are uncompressed in Custom
+Edition caches (environment vertices of 56 bytes, then lightmap vertices of
+20), and it has lightmap vertices exactly when its lightmap has a bitmap
+(every map examined). */
+#define STRUCTURE_BSP_BYTES 0x288
+#define STRUCTURE_BSP_LIGHTMAPS_OFFSET 0x104
+#define STRUCTURE_BSP_LIGHTMAP_BYTES 0x20
+#define STRUCTURE_BSP_LIGHTMAP_BITMAP_INDEX_OFFSET 0x00
+#define STRUCTURE_BSP_LIGHTMAP_MATERIALS_OFFSET 0x14
+#define STRUCTURE_BSP_MATERIAL_BYTES 0x100
+#define STRUCTURE_BSP_MATERIAL_VERTEX_TYPE_OFFSET 0xB0
+#define STRUCTURE_BSP_MATERIAL_VERTEX_COUNT_OFFSET 0xB4
+#define STRUCTURE_BSP_MATERIAL_LIGHTMAP_VERTEX_COUNT_OFFSET 0xC8
+#define STRUCTURE_BSP_MATERIAL_UNCOMPRESSED_VERTICES_OFFSET 0xD8
+#define STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES 56
+#define STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES 20
+/* the unit vectors of an environment vertex (normal, binormal and tangent,
+after its position) and of a lightmap vertex (its incident radiosity) */
+#define STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTORS_OFFSET 12
+#define STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTOR_COUNT 3
+#define STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTORS_OFFSET 0
+#define STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTOR_COUNT 1
+/* This build compresses those vectors, and its compressor asserts that each
+component is within [-1, 1] give or take its rounding: this far past 1 is
+safely within that. Every vector of the maps examined is within 1.0001. */
+#define MAXIMUM_UNIT_VECTOR_COMPONENT 1.005f
+/* the vertex and triangle buffer types of this build's
+rasterizer_geometry.h */
+#define VERTEX_TYPE_ENVIRONMENT_UNCOMPRESSED 0
+#define VERTEX_TYPE_MODEL_UNCOMPRESSED 4
+#define TRIANGLE_BUFFER_TYPE_PRECOMPILED_STRIP 1
+/* strips index vertices with 16 bits */
+#define MAXIMUM_VERTICES_PER_BUFFER 0xFFFF
+
+/* gbxmodel (OpenSauce model_definitions.hpp: gbxmodel_definition 0xE8, its
+markers 0x40 and their instances 0x20, nodes 0x9C, regions 0x4C,
+permutations 0x58 and their markers 0x50, geometries 0x30, parts 0x84 and
+shader references 0x20). A part's triangle and vertex buffer fields say
+where its strip and its vertices lie in the model data (Reclaimer
+Halo1/GbxmodelTag.cs, ReadPCMeshes): the strip, count + 2 16-bit indices, at
+its offset from the index data, the vertices, uncompressed and 68 bytes each,
+at theirs from the vertex data. */
+#define GBXMODEL_BYTES 0xE8
+#define GBXMODEL_GEOMETRY_BYTES 0x30
+#define GBXMODEL_PART_BYTES 0x84
+#define GBXMODEL_PART_TRIANGLE_BUFFER_TYPE_OFFSET 0x44
+#define GBXMODEL_PART_STRIP_TRIANGLE_COUNT_OFFSET 0x48
+#define GBXMODEL_PART_STRIP_OFFSET_OFFSET 0x4C
+#define GBXMODEL_PART_VERTEX_BUFFER_TYPE_OFFSET 0x54
+#define GBXMODEL_PART_VERTEX_COUNT_OFFSET 0x58
+#define GBXMODEL_PART_VERTEX_OFFSET_OFFSET 0x64
+#define GBXMODEL_PART_LOCAL_NODE_COUNT_OFFSET 0x6B
+#define GBXMODEL_MAXIMUM_LOCAL_NODES 22
+#define GBXMODEL_VERTEX_BYTES 0x44
+#define STRIP_INDEX_BYTES 2
+
+/* shaders (OpenSauce shader_definitions.hpp): every shader starts with the
+0x28-byte base, whose type is at 0x24. A transparent chicago extended shader
+('scex', 0x78 bytes) is a transparent chicago shader ('schi', 0x6C) up to its
+maps, which it has twice, for four and for two texture stages, before its
+extra flags. */
+#define SHADER_BYTES 0x28
+#define SHADER_TYPE_OFFSET 0x24
+#define TRANSPARENT_CHICAGO_GROUP_TAG 'schi'
+#define TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG 'scex'
+#define TRANSPARENT_CHICAGO_BYTES 0x6C
+#define TRANSPARENT_CHICAGO_EXTENDED_BYTES 0x78
+#define TRANSPARENT_CHICAGO_EXTRA_LAYERS_OFFSET 0x48
+#define TRANSPARENT_CHICAGO_MAPS_OFFSET 0x54
+#define TRANSPARENT_CHICAGO_EXTRA_FLAGS_OFFSET 0x60
+#define TRANSPARENT_CHICAGO_EXTENDED_TWO_STAGE_MAPS_OFFSET 0x60
+#define TRANSPARENT_CHICAGO_EXTENDED_EXTRA_FLAGS_OFFSET 0x6C
+#define TRANSPARENT_CHICAGO_MAP_BYTES 0xDC
+
+/* animation graphs (OpenSauce model_animation_definitions.hpp; this
+build's model_animation_definitions.h has the same offsets): the object
+overlays, whose first field names an animation of the graph or none */
+#define ANIMATION_GRAPH_GROUP_TAG 'antr'
+#define ANIMATION_GRAPH_BYTES 0x80
+#define ANIMATION_GRAPH_OBJECT_OVERLAYS_OFFSET 0x00
+#define ANIMATION_GRAPH_ANIMATIONS_OFFSET 0x74
+#define ANIMATION_GRAPH_OBJECT_OVERLAY_BYTES 0x14
+#define ANIMATION_GRAPH_OBJECT_OVERLAY_ANIMATION_INDEX_OFFSET 0x00
+#define NO_BLOCK_INDEX (-1)
 
 /* resource maps (OpenSauce data_file_structures.hpp, s_data_file_header and
 s_data_file_item) */
@@ -159,9 +263,18 @@ s_data_file_item) */
 /* bitmap group (OpenSauce bitmap_group.hpp: s_bitmap_group 0x6C,
 s_bitmap_group_sequence 0x40, s_bitmap_group_sprite 0x20, s_bitmap_data 0x30) */
 #define BITMAP_GROUP_BYTES 0x6C
+#define BITMAP_GROUP_BITMAPS_OFFSET 0x60
+#define BITMAP_DATA_BYTES 0x30
 #define BITMAP_DATA_FLAGS_OFFSET 0x0E
 #define BITMAP_DATA_PIXELS_OFFSET_OFFSET 0x18
 #define BITMAP_DATA_PIXELS_SIZE_OFFSET 0x1C
+/* the fields the game fills while it draws a bitmap (bitmap_group.h): the
+tag the bitmap belongs to, its texture cache block, and its hardware
+texture and pixels once they are loaded */
+#define BITMAP_DATA_TAG_INDEX_OFFSET 0x20
+#define BITMAP_DATA_CACHE_BLOCK_INDEX_OFFSET 0x24
+#define BITMAP_DATA_HARDWARE_FORMAT_OFFSET 0x28
+#define BITMAP_DATA_BASE_ADDRESS_OFFSET 0x2C
 /* s_bitmap_data::_flags::in_data_file: the pixels are in bitmaps.map */
 #define BITMAP_DATA_IN_RESOURCE_MAP_BIT 8
 
@@ -170,10 +283,31 @@ s_sound_pitch_range 0x48, s_sound_permutation 0x7C) */
 #define SOUND_DEFINITION_BYTES 0xA4
 #define SOUND_PITCH_RANGES_OFFSET 0x98
 #define SOUND_PITCH_RANGE_BYTES 0x48
+#define SOUND_PITCH_RANGE_PERMUTATIONS_OFFSET 0x3C
 #define SOUND_PERMUTATION_BYTES 0x7C
 #define SOUND_PERMUTATION_SAMPLES_OFFSET 0x40
 /* s_sound_permutation::_samples_in_data_file_bit */
 #define SOUND_SAMPLES_IN_RESOURCE_MAP_BIT 0
+/* The fields of a sound held by sounds.map that the map's copy of its
+header leaves zero (every such sound of the maps examined), and that the
+entry's copy holds as the Xbox maps of build 2276 do for the same sounds
+(this build's sound_definitions.h names them) */
+#define SOUND_SAMPLE_RATE_OFFSET 0x06
+#define SOUND_ENCODING_OFFSET 0x6C
+#define SOUND_COMPRESSION_OFFSET 0x6E
+#define SOUND_LONGEST_PERMUTATION_LENGTH_OFFSET 0x84
+/* a permutation's compression, and the fields the game fills while it plays
+it (xbox_sound_cache.c: its cache block and base address, and the tag it
+names in reads and messages) */
+#define SOUND_PERMUTATION_COMPRESSION_OFFSET 0x28
+#define SOUND_PERMUTATION_CACHE_BLOCK_INDEX_OFFSET 0x2C
+#define SOUND_PERMUTATION_CACHE_BASE_ADDRESS_OFFSET 0x30
+#define SOUND_PERMUTATION_CACHE_TAG_INDEX_OFFSET 0x34
+#define SOUND_PERMUTATION_RUNTIME_TAG_INDEX_OFFSET 0x3C
+/* the compressions this build plays or refuses cleanly (sound_manager.c:
+none and Xbox ADPCM; Custom Edition also has Ogg Vorbis, 3) */
+#define SOUND_COMPRESSION_NONE 0
+#define SOUND_COMPRESSION_XBOX_ADPCM 1
 
 /* font (BlamLib Misc.cs, font_group: 156 bytes, 36 bytes of padding after
 the heights; the block offsets below hold for every font in loc.map) */
@@ -206,6 +340,13 @@ struct block_layout
 
 struct load_state;
 
+struct shader_group_type
+{
+	uint32_t group_tag;
+	int16_t custom_edition_type;
+	int16_t type;
+};
+
 typedef enum cache_file_status (*element_check_proc)(
 	struct load_state *state,
 	uint32_t element_offset);
@@ -232,6 +373,11 @@ struct load_state
 	uint32_t used_bytes;
 	uint32_t usable_bytes;
 	uint32_t file_length;
+	/* the model data in the file: vertices, then from `index_data_offset`
+	the strips */
+	uint32_t model_data_offset;
+	uint32_t model_index_data_offset;
+	uint32_t model_data_size;
 	int32_t tag_index;
 };
 
@@ -241,6 +387,9 @@ static enum cache_file_status bitmap_data_check(
 	struct load_state *state,
 	uint32_t element_offset);
 static enum cache_file_status sound_permutation_check(
+	struct load_state *state,
+	uint32_t element_offset);
+static enum cache_file_status gbxmodel_part_check(
 	struct load_state *state,
 	uint32_t element_offset);
 
@@ -265,7 +414,7 @@ static struct block_layout const bitmap_group_blocks[] =
 {
 	/* sequences, bitmaps */
 	{ 0x54, 0x40, &bitmap_sequence_layout },
-	{ 0x60, 0x30, &bitmap_data_layout },
+	{ BITMAP_GROUP_BITMAPS_OFFSET, BITMAP_DATA_BYTES, &bitmap_data_layout },
 };
 static uint32_t const bitmap_group_data[] =
 {
@@ -291,7 +440,7 @@ static struct element_layout const sound_permutation_layout =
 static struct block_layout const sound_pitch_range_blocks[] =
 {
 	/* permutations */
-	{ 0x3C, SOUND_PERMUTATION_BYTES, &sound_permutation_layout },
+	{ SOUND_PITCH_RANGE_PERMUTATIONS_OFFSET, SOUND_PERMUTATION_BYTES, &sound_permutation_layout },
 };
 static struct element_layout const sound_pitch_range_layout =
 {
@@ -364,6 +513,108 @@ static struct element_layout const hud_message_text_layout =
 	HUD_MESSAGE_TEXT_BYTES, hud_message_text_blocks, 2, hud_message_text_data, 1, NULL
 };
 
+static struct block_layout const model_marker_blocks[] =
+{
+	/* instances */
+	{ 0x34, 0x20, &plain_element_layout },
+};
+static struct element_layout const model_marker_layout =
+{
+	0x40, model_marker_blocks, 1, NULL, 0, NULL
+};
+static struct block_layout const model_permutation_blocks[] =
+{
+	/* markers */
+	{ 0x4C, 0x50, &plain_element_layout },
+};
+static struct element_layout const model_permutation_layout =
+{
+	0x58, model_permutation_blocks, 1, NULL, 0, NULL
+};
+static struct block_layout const model_region_blocks[] =
+{
+	/* permutations */
+	{ 0x40, 0x58, &model_permutation_layout },
+};
+static struct element_layout const model_region_layout =
+{
+	0x4C, model_region_blocks, 1, NULL, 0, NULL
+};
+static struct block_layout const gbxmodel_part_blocks[] =
+{
+	/* uncompressed vertices, compressed vertices, triangles: empty in every
+	map examined, the geometry being in the model data */
+	{ 0x20, GBXMODEL_VERTEX_BYTES, &plain_element_layout },
+	{ 0x2C, 0x20, &plain_element_layout },
+	{ 0x38, 3 * STRIP_INDEX_BYTES, &plain_element_layout },
+};
+static struct element_layout const gbxmodel_part_layout =
+{
+	GBXMODEL_PART_BYTES, gbxmodel_part_blocks, 3, NULL, 0, gbxmodel_part_check
+};
+static struct block_layout const gbxmodel_geometry_blocks[] =
+{
+	/* parts */
+	{ 0x24, GBXMODEL_PART_BYTES, &gbxmodel_part_layout },
+};
+static struct element_layout const gbxmodel_geometry_layout =
+{
+	GBXMODEL_GEOMETRY_BYTES, gbxmodel_geometry_blocks, 1, NULL, 0, NULL
+};
+static struct block_layout const gbxmodel_blocks[] =
+{
+	/* markers, nodes, regions, geometries, shaders */
+	{ 0xAC, 0x40, &model_marker_layout },
+	{ 0xB8, 0x9C, &plain_element_layout },
+	{ 0xC4, 0x4C, &model_region_layout },
+	{ 0xD0, GBXMODEL_GEOMETRY_BYTES, &gbxmodel_geometry_layout },
+	{ 0xDC, 0x20, &plain_element_layout },
+};
+static struct element_layout const gbxmodel_layout =
+{
+	GBXMODEL_BYTES, gbxmodel_blocks, 5, NULL, 0, NULL
+};
+
+static struct block_layout const transparent_chicago_blocks[] =
+{
+	/* extra layers (shader references), maps */
+	{ TRANSPARENT_CHICAGO_EXTRA_LAYERS_OFFSET, TAG_REFERENCE_BYTES, &plain_element_layout },
+	{ TRANSPARENT_CHICAGO_MAPS_OFFSET, TRANSPARENT_CHICAGO_MAP_BYTES, &plain_element_layout },
+};
+static struct element_layout const transparent_chicago_layout =
+{
+	TRANSPARENT_CHICAGO_BYTES, transparent_chicago_blocks, 2, NULL, 0, NULL
+};
+static struct block_layout const transparent_chicago_extended_blocks[] =
+{
+	/* extra layers, four-stage maps, two-stage maps */
+	{ TRANSPARENT_CHICAGO_EXTRA_LAYERS_OFFSET, TAG_REFERENCE_BYTES, &plain_element_layout },
+	{ TRANSPARENT_CHICAGO_MAPS_OFFSET, TRANSPARENT_CHICAGO_MAP_BYTES, &plain_element_layout },
+	{ TRANSPARENT_CHICAGO_EXTENDED_TWO_STAGE_MAPS_OFFSET, TRANSPARENT_CHICAGO_MAP_BYTES, &plain_element_layout },
+};
+static struct element_layout const transparent_chicago_extended_layout =
+{
+	TRANSPARENT_CHICAGO_EXTENDED_BYTES, transparent_chicago_extended_blocks, 3, NULL, 0, NULL
+};
+
+/* The value of the type field each shader group has in Custom Edition, which
+inserted transparent chicago extended at 7 (OpenSauce
+shader_definitions.hpp, e_shader_type), and in this build (shaders.c); a
+chicago extended shader becomes a chicago shader. The Xbox maps of build 2276
+have this build's values for the groups they hold. */
+static struct shader_group_type const shader_group_types[] =
+{
+	{ 'senv', 3, 3 },
+	{ 'soso', 4, 4 },
+	{ 'sotr', 5, 5 },
+	{ TRANSPARENT_CHICAGO_GROUP_TAG, 6, 6 },
+	{ TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG, 7, 6 },
+	{ 'swat', 8, 7 },
+	{ 'sgla', 9, 8 },
+	{ 'smet', 10, 9 },
+	{ 'spla', 11, 10 },
+};
+
 static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STATUSES] =
 {
 	"ok",
@@ -392,6 +643,10 @@ static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STA
 	"the scenario's structure BSP block is not valid",
 	"a structure BSP does not fit in the file or in the tag cache",
 	"a structure BSP header is not valid",
+	"a structure BSP's lightmaps or their materials do not have the documented layout",
+	"a model part's strip or vertices lie outside the model data or are not of the kind Custom Edition writes",
+	"a shader's type is not the one Custom Edition gives its group",
+	"the scenario's scripts use more syntax nodes than this build has room for, or are not a syntax node array",
 	"a resource map header is not valid",
 	"a resource map is not of the type needed",
 	"a resource map entry lies outside the file or its name is not terminated",
@@ -465,6 +720,16 @@ static float read_f32(
 	memcpy(&value, &bits, sizeof(value));
 
 	return value;
+}
+
+static void write_u16(
+	uint8_t *bytes,
+	uint16_t value)
+{
+	bytes[0] = (uint8_t)value;
+	bytes[1] = (uint8_t)(value >> 8);
+
+	return;
 }
 
 static void write_u32(
@@ -910,6 +1175,40 @@ static enum cache_file_status sound_permutation_check(
 	return _cache_file_status_ok;
 }
 
+/* A gbxmodel part's strip and vertices: of the kinds Custom Edition writes,
+within the index and vertex parts of the model data, aligned for reading as
+16-bit indices and floats, and few enough vertices for 16-bit indices. What
+the strip and the vertices hold is checked when they are converted
+(custom_edition_cache.h). */
+static enum cache_file_status gbxmodel_part_check(
+	struct load_state *state,
+	uint32_t element_offset)
+{
+	uint8_t const *part = state->tag_cache + element_offset;
+	int32_t strip_triangle_count = read_s32(part + GBXMODEL_PART_STRIP_TRIANGLE_COUNT_OFFSET);
+	uint32_t strip_offset = read_u32(part + GBXMODEL_PART_STRIP_OFFSET_OFFSET);
+	int32_t vertex_count = read_s32(part + GBXMODEL_PART_VERTEX_COUNT_OFFSET);
+	uint32_t vertex_offset = read_u32(part + GBXMODEL_PART_VERTEX_OFFSET_OFFSET);
+	uint32_t index_data_bytes = state->model_data_size - state->model_index_data_offset;
+
+	if (read_s16(part + GBXMODEL_PART_TRIANGLE_BUFFER_TYPE_OFFSET) != TRIANGLE_BUFFER_TYPE_PRECOMPILED_STRIP ||
+		read_s16(part + GBXMODEL_PART_VERTEX_BUFFER_TYPE_OFFSET) != VERTEX_TYPE_MODEL_UNCOMPRESSED ||
+		part[GBXMODEL_PART_LOCAL_NODE_COUNT_OFFSET] > GBXMODEL_MAXIMUM_LOCAL_NODES ||
+		strip_triangle_count < 1 ||
+		(uint32_t)strip_triangle_count + 2 > index_data_bytes / STRIP_INDEX_BYTES ||
+		!range_fits(strip_offset, ((uint32_t)strip_triangle_count + 2) * STRIP_INDEX_BYTES, index_data_bytes) ||
+		((state->model_index_data_offset + strip_offset) & (STRIP_INDEX_BYTES - 1)) ||
+		vertex_count < 1 ||
+		vertex_count > MAXIMUM_VERTICES_PER_BUFFER ||
+		!range_fits(vertex_offset, (uint32_t)vertex_count * GBXMODEL_VERTEX_BYTES, state->model_index_data_offset) ||
+		(vertex_offset & 3))
+	{
+		return load_fail(state, _cache_file_status_bad_model_part, element_offset);
+	}
+
+	return _cache_file_status_ok;
+}
+
 /* Walks the element at `element_offset` of the tag cache and everything its
 blocks hold, requiring every block and every present tag data field to lie
 within the bytes in use. Tag data with a size but no address is data the
@@ -1163,11 +1462,11 @@ points at that header. The entry named by the tag's path repeats the header
 and then holds the pitch ranges and their permutations, whose addresses
 count from the first pitch range. (Observed in every stock map: OpenSauce
 leaves this path of cache_file_data_load unimplemented and hooks the game's
-own data_file_read instead.) The entry's copy of the header is not used: its
-pointers and tag references belong to the editing kit and to the map that
-sounds.map was built with. Its compression, encoding and sample rate fields
-differ from the map's copy, though, and which copy Custom Edition plays from
-is not established (docs/custom_edition_caches.md). */
+own data_file_read instead.) The entry's copy of the header is used for the
+fields the map's copy leaves zero, its sample rate, encoding, compression
+and longest permutation length, which it holds as the Xbox maps of build
+2276 do. Its pointers and tag references belong to the editing kit and to
+the map that sounds.map was built with (docs/custom_edition_caches.md). */
 static enum cache_file_status resource_sound_load(
 	struct load_state *state,
 	uint8_t *instance,
@@ -1176,6 +1475,8 @@ static enum cache_file_status resource_sound_load(
 	struct resource_map const *map = state->resource_maps[_resource_map_sounds];
 	uint32_t header_address = read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET);
 	struct resource_map_item const *item;
+	uint8_t entry_header[SOUND_DEFINITION_BYTES];
+	uint8_t *header;
 	uint8_t *pitch_ranges_field;
 	uint32_t header_offset;
 	uint32_t data_bytes;
@@ -1211,14 +1512,20 @@ static enum cache_file_status resource_sound_load(
 	{
 		return status;
 	}
-	if (!map->source->read(
-		map->source->context,
-		item->data_offset + SOUND_DEFINITION_BYTES,
-		data_bytes,
-		state->tag_cache + offset))
+	if (!map->source->read(map->source->context, item->data_offset, SOUND_DEFINITION_BYTES, entry_header) ||
+		!map->source->read(
+			map->source->context,
+			item->data_offset + SOUND_DEFINITION_BYTES,
+			data_bytes,
+			state->tag_cache + offset))
 	{
 		return load_fail(state, _cache_file_status_read_failed, item->data_offset);
 	}
+	header = state->tag_cache + header_offset;
+	memcpy(header + SOUND_SAMPLE_RATE_OFFSET, entry_header + SOUND_SAMPLE_RATE_OFFSET, 2);
+	memcpy(header + SOUND_ENCODING_OFFSET, entry_header + SOUND_ENCODING_OFFSET, 2);
+	memcpy(header + SOUND_COMPRESSION_OFFSET, entry_header + SOUND_COMPRESSION_OFFSET, 2);
+	memcpy(header + SOUND_LONGEST_PERMUTATION_LENGTH_OFFSET, entry_header + SOUND_LONGEST_PERMUTATION_LENGTH_OFFSET, 4);
 	for (pitch_range_index = 0; pitch_range_index < pitch_range_count; pitch_range_index++)
 	{
 		status = element_relocate(
@@ -1244,7 +1551,9 @@ static enum cache_file_status resource_sound_load(
 	return _cache_file_status_ok;
 }
 
-static struct element_layout const *group_layout(
+/* the layout of a group whose tags resource maps may hold, or NULL: only
+these groups ever are (OpenSauce cache_files.cpp, cache_file_data_load) */
+static struct element_layout const *resource_group_layout(
 	uint32_t group_tag)
 {
 	switch (group_tag)
@@ -1262,6 +1571,172 @@ static struct element_layout const *group_layout(
 	default:
 		return NULL;
 	}
+}
+
+/* the layout of a group whose tags are checked after loading, or NULL: the
+groups resource maps hold, and those converted for this build */
+static struct element_layout const *checked_group_layout(
+	uint32_t group_tag)
+{
+	switch (group_tag)
+	{
+	case GBXMODEL_GROUP_TAG:
+		return &gbxmodel_layout;
+	case TRANSPARENT_CHICAGO_GROUP_TAG:
+		return &transparent_chicago_layout;
+	case TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG:
+		return &transparent_chicago_extended_layout;
+	default:
+		return resource_group_layout(group_tag);
+	}
+}
+
+/* The `count` elements of `element_bytes` a tag block points to, in memory
+of `size` bytes loaded at `address` (a structure BSP, or the tag cache):
+nonzero when they lie within it, aligned for the game to read as
+structures, with `*offset` their offset in it. */
+static int loaded_block_get(
+	uint8_t const *block,
+	uint32_t address,
+	uint32_t size,
+	uint32_t element_bytes,
+	int32_t *count,
+	uint32_t *offset)
+{
+	uint32_t block_address = read_u32(block + TAG_BLOCK_ADDRESS_OFFSET);
+
+	*count = read_s32(block + TAG_BLOCK_COUNT_OFFSET);
+	*offset = block_address - address;
+
+	return *count == 0 ||
+		(*count > 0 &&
+		(uint32_t)*count <= size / element_bytes &&
+		block_address >= address &&
+		range_fits(*offset, (uint32_t)*count * element_bytes, size) &&
+		!(*offset & 3));
+}
+
+/* nonzero when the `vector_count` vectors at `vectors_offset` of each of
+the `vertex_count` vertices of `vertex_bytes` at `vertices` are unit-range */
+static int unit_vectors_valid(
+	uint8_t const *vertices,
+	int32_t vertex_count,
+	uint32_t vertex_bytes,
+	uint32_t vectors_offset,
+	int vector_count)
+{
+	int32_t vertex_index;
+
+	for (vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+	{
+		uint8_t const *vectors = vertices + (uint32_t)vertex_index * vertex_bytes + vectors_offset;
+		int component_index;
+
+		for (component_index = 0; component_index < 3 * vector_count; component_index++)
+		{
+			float component = read_f32(vectors + component_index * 4);
+
+			/* a NaN fails both comparisons */
+			if (!(component >= -MAXIMUM_UNIT_VECTOR_COMPONENT && component <= MAXIMUM_UNIT_VECTOR_COMPONENT))
+			{
+				return 0;
+			}
+		}
+	}
+
+	return 1;
+}
+
+/* The lightmaps of a structure BSP (`size` bytes read from the file into
+`bsp`, which load at `address`) and their materials, whose vertices are
+converted for this build when the BSP is loaded (custom_edition_cache.h):
+each material's uncompressed vertices within the BSP, of the size its vertex
+counts give, and lightmap vertices exactly when its lightmap has a bitmap. */
+static enum cache_file_status structure_bsp_geometry_verify(
+	struct load_state *state,
+	uint8_t const *bsp,
+	uint32_t size,
+	uint32_t address)
+{
+	uint32_t structure_offset = read_u32(bsp + STRUCTURE_BSP_HEADER_BSP_OFFSET) - address;
+	uint32_t lightmaps_offset;
+	int32_t lightmap_count;
+	int32_t lightmap_index;
+
+	if (!range_fits(structure_offset, STRUCTURE_BSP_BYTES, size) ||
+		!loaded_block_get(
+			bsp + structure_offset + STRUCTURE_BSP_LIGHTMAPS_OFFSET,
+			address,
+			size,
+			STRUCTURE_BSP_LIGHTMAP_BYTES,
+			&lightmap_count,
+			&lightmaps_offset))
+	{
+		return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, address);
+	}
+	for (lightmap_index = 0; lightmap_index < lightmap_count; lightmap_index++)
+	{
+		uint8_t const *lightmap = bsp + lightmaps_offset + (uint32_t)lightmap_index * STRUCTURE_BSP_LIGHTMAP_BYTES;
+		int has_bitmap = read_s16(lightmap + STRUCTURE_BSP_LIGHTMAP_BITMAP_INDEX_OFFSET) != -1;
+		uint32_t materials_offset;
+		int32_t material_count;
+		int32_t material_index;
+
+		if (!loaded_block_get(
+			lightmap + STRUCTURE_BSP_LIGHTMAP_MATERIALS_OFFSET,
+			address,
+			size,
+			STRUCTURE_BSP_MATERIAL_BYTES,
+			&material_count,
+			&materials_offset))
+		{
+			return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, address + lightmaps_offset);
+		}
+		for (material_index = 0; material_index < material_count; material_index++)
+		{
+			uint32_t material_offset = materials_offset + (uint32_t)material_index * STRUCTURE_BSP_MATERIAL_BYTES;
+			uint8_t const *material = bsp + material_offset;
+			uint8_t const *vertices = material + STRUCTURE_BSP_MATERIAL_UNCOMPRESSED_VERTICES_OFFSET;
+			int32_t vertex_count = read_s32(material + STRUCTURE_BSP_MATERIAL_VERTEX_COUNT_OFFSET);
+			int32_t lightmap_vertex_count = read_s32(material + STRUCTURE_BSP_MATERIAL_LIGHTMAP_VERTEX_COUNT_OFFSET);
+			int32_t vertices_size = read_s32(vertices + TAG_DATA_SIZE_OFFSET);
+			uint32_t vertices_address = read_u32(vertices + TAG_DATA_ADDRESS_OFFSET);
+
+			/* the counts bound the size, which bounds the counts */
+			if (read_s16(material + STRUCTURE_BSP_MATERIAL_VERTEX_TYPE_OFFSET) != VERTEX_TYPE_ENVIRONMENT_UNCOMPRESSED ||
+				vertex_count < 0 ||
+				vertex_count > MAXIMUM_VERTICES_PER_BUFFER ||
+				lightmap_vertex_count != (has_bitmap ? vertex_count : 0) ||
+				vertices_size != vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES +
+					lightmap_vertex_count * STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES ||
+				(vertices_size &&
+				(vertices_address < address ||
+				!range_fits(vertices_address - address, (uint32_t)vertices_size, size) ||
+				(vertices_address & 3))))
+			{
+				return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, address + material_offset);
+			}
+			if (vertices_size &&
+				(!unit_vectors_valid(
+					bsp + (vertices_address - address),
+					vertex_count,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTORS_OFFSET,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTOR_COUNT) ||
+				!unit_vectors_valid(
+					bsp + (vertices_address - address) + (uint32_t)vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES,
+					lightmap_vertex_count,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTORS_OFFSET,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTOR_COUNT)))
+			{
+				return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, vertices_address);
+			}
+			state->report->structure_bsp_materials_checked++;
+		}
+	}
+
+	return _cache_file_status_ok;
 }
 
 static enum cache_file_status structure_bsps_verify(
@@ -1295,7 +1770,7 @@ static enum cache_file_status structure_bsps_verify(
 		uint32_t bsp_address = read_u32(reference + STRUCTURE_BSP_REFERENCE_ADDRESS_OFFSET);
 		uint32_t tag_handle = read_u32(reference + STRUCTURE_BSP_REFERENCE_TAG_INDEX_OFFSET);
 		uint32_t tag_index = tag_handle & ABSOLUTE_INDEX_MASK;
-		uint8_t header[STRUCTURE_BSP_HEADER_BYTES];
+		uint8_t *bsp;
 		uint32_t bsp_pointer;
 		enum cache_file_status status;
 
@@ -1317,19 +1792,32 @@ static enum cache_file_status structure_bsps_verify(
 		{
 			return load_fail(state, _cache_file_status_bad_structure_bsp_range, (uint32_t)file_offset);
 		}
-		if (!state->map->read(state->map->context, (uint32_t)file_offset, sizeof(header), header))
+		bsp = malloc((size_t)size);
+		if (!bsp)
 		{
+			return load_fail(state, _cache_file_status_out_of_memory, (uint32_t)size);
+		}
+		if (!state->map->read(state->map->context, (uint32_t)file_offset, (uint32_t)size, bsp))
+		{
+			free(bsp);
 			return load_fail(state, _cache_file_status_read_failed, (uint32_t)file_offset);
 		}
-		bsp_pointer = read_u32(header + STRUCTURE_BSP_HEADER_BSP_OFFSET);
+		bsp_pointer = read_u32(bsp + STRUCTURE_BSP_HEADER_BSP_OFFSET);
 		/* PC caches have no Xbox vertex buffer arrays */
-		if (read_u32(header + STRUCTURE_BSP_HEADER_SIGNATURE_OFFSET) != STRUCTURE_BSP_SIGNATURE ||
-			read_u32(header + STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET) ||
-			read_u32(header + STRUCTURE_BSP_HEADER_LIGHTMAP_VERTEX_BUFFERS_OFFSET) ||
+		if (read_u32(bsp + STRUCTURE_BSP_HEADER_SIGNATURE_OFFSET) != STRUCTURE_BSP_SIGNATURE ||
+			read_u32(bsp + STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET) ||
+			read_u32(bsp + STRUCTURE_BSP_HEADER_LIGHTMAP_VERTEX_BUFFERS_OFFSET) ||
 			bsp_pointer < bsp_address + STRUCTURE_BSP_HEADER_BYTES ||
 			bsp_pointer - bsp_address >= (uint32_t)size)
 		{
+			free(bsp);
 			return load_fail(state, _cache_file_status_bad_structure_bsp_header, (uint32_t)file_offset);
+		}
+		status = structure_bsp_geometry_verify(state, bsp, (uint32_t)size, bsp_address);
+		free(bsp);
+		if (status != _cache_file_status_ok)
+		{
+			return status;
 		}
 		if ((uint32_t)size > state->report->largest_structure_bsp_bytes)
 		{
@@ -1556,8 +2044,6 @@ enum cache_file_status custom_edition_cache_load(
 	uint32_t instances_offset;
 	uint32_t scenario_offset;
 	uint32_t scenario_handle;
-	uint32_t vertex_data_offset;
-	uint32_t model_data_size;
 	uint32_t checksum = CRC32_INITIAL;
 	uint32_t data_end;
 	int32_t tag_count;
@@ -1623,14 +2109,18 @@ enum cache_file_status custom_edition_cache_load(
 
 	/* the model vertex and index data (in the file; the index data offset
 	counts from the vertex data) */
-	vertex_data_offset = read_u32(tag_index + TAG_INDEX_VERTEX_DATA_OFFSET_OFFSET);
-	model_data_size = read_u32(tag_index + TAG_INDEX_MODEL_DATA_SIZE_OFFSET);
-	if (vertex_data_offset < CACHE_FILE_HEADER_BYTES ||
-		!range_fits(vertex_data_offset, model_data_size, identity->file_length) ||
-		read_u32(tag_index + TAG_INDEX_INDEX_DATA_OFFSET_OFFSET) > model_data_size)
+	state.model_data_offset = read_u32(tag_index + TAG_INDEX_VERTEX_DATA_OFFSET_OFFSET);
+	state.model_index_data_offset = read_u32(tag_index + TAG_INDEX_INDEX_DATA_OFFSET_OFFSET);
+	state.model_data_size = read_u32(tag_index + TAG_INDEX_MODEL_DATA_SIZE_OFFSET);
+	if (state.model_data_offset < CACHE_FILE_HEADER_BYTES ||
+		!range_fits(state.model_data_offset, state.model_data_size, identity->file_length) ||
+		state.model_index_data_offset > state.model_data_size)
 	{
-		return load_fail(&state, _cache_file_status_bad_model_data_range, vertex_data_offset);
+		return load_fail(&state, _cache_file_status_bad_model_data_range, state.model_data_offset);
 	}
+	report->model_data_offset = state.model_data_offset;
+	report->model_index_data_offset = state.model_index_data_offset;
+	report->model_data_bytes = state.model_data_size;
 
 	/* every tag instance, and the tags held by resource maps */
 	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
@@ -1656,9 +2146,7 @@ enum cache_file_status custom_edition_cache_load(
 		}
 		if (read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET))
 		{
-			/* only these groups are ever held by resource maps
-			(OpenSauce cache_files.cpp, cache_file_data_load) */
-			if (!group_layout(group_tag))
+			if (!resource_group_layout(group_tag))
 			{
 				return load_fail(&state, _cache_file_status_unexpected_external_tag, group_tag);
 			}
@@ -1701,10 +2189,10 @@ enum cache_file_status custom_edition_cache_load(
 
 	/* the header checksum covers the structure BSPs, the model data and the
 	tag data as the map holds it, before anything below changes it */
-	status = crc32_update_from_file(map, &checksum, vertex_data_offset, model_data_size);
+	status = crc32_update_from_file(map, &checksum, state.model_data_offset, state.model_data_size);
 	if (status != _cache_file_status_ok)
 	{
-		return load_fail(&state, status, vertex_data_offset);
+		return load_fail(&state, status, state.model_data_offset);
 	}
 	checksum = crc32_update(checksum, tag_cache, identity->tag_data_size);
 	report->computed_checksum = checksum;
@@ -1755,12 +2243,13 @@ enum cache_file_status custom_edition_cache_load(
 	}
 
 	/* every tag whose layout this module knows, wherever it came from: each
-	address must now lie within the loaded tags, and each bitmap's pixels
-	and sound's samples within their file */
+	address must now lie within the loaded tags, each bitmap's pixels and
+	sound's samples within their file, and each model part's geometry
+	within the model data */
 	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
 	{
 		uint8_t const *instance = tag_instances + (uint32_t)tag_index_value * TAG_INSTANCE_BYTES;
-		struct element_layout const *layout = group_layout(read_u32(instance + TAG_INSTANCE_GROUP_OFFSET));
+		struct element_layout const *layout = checked_group_layout(read_u32(instance + TAG_INSTANCE_GROUP_OFFSET));
 		uint32_t offset;
 
 		if (!layout)
@@ -1794,4 +2283,601 @@ enum cache_file_status custom_edition_cache_load(
 	report->status = _cache_file_status_ok;
 
 	return _cache_file_status_ok;
+}
+
+/* The tag instances of a tag cache custom_edition_cache_load filled (the
+state's tag_cache and used_bytes), and their count, or NULL. The walks of the
+public functions below take that image as checked, but still check every
+block they follow. */
+static uint8_t *loaded_tag_instances(
+	struct load_state const *state,
+	int32_t *tag_count)
+{
+	uint32_t instances_offset;
+
+	if (state->used_bytes < TAG_INDEX_BYTES)
+	{
+		return NULL;
+	}
+	*tag_count = read_s32(state->tag_cache + TAG_INDEX_COUNT_OFFSET);
+	if (*tag_count <= 0 ||
+		(uint32_t)*tag_count > ABSOLUTE_INDEX_MASK + 1 ||
+		!tag_cache_offset(
+			state,
+			read_u32(state->tag_cache + TAG_INDEX_INSTANCES_OFFSET),
+			(uint32_t)*tag_count * TAG_INSTANCE_BYTES,
+			&instances_offset))
+	{
+		return NULL;
+	}
+
+	return state->tag_cache + instances_offset;
+}
+
+static void loaded_state_initialize(
+	struct load_state *state,
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes)
+{
+	memset(state, 0, sizeof(*state));
+	state->tag_cache = tag_cache;
+	state->used_bytes = loaded_bytes;
+	state->tag_index = NO_TAG_INDEX;
+
+	return;
+}
+
+void *custom_edition_cache_tag_next(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t group_tag,
+	uint32_t definition_bytes,
+	int32_t *tag_index)
+{
+	struct load_state state;
+	uint8_t const *instances;
+	int32_t tag_count;
+	int32_t index;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances || *tag_index >= tag_count)
+	{
+		return NULL;
+	}
+	for (index = *tag_index < 0 ? 0 : *tag_index + 1; index < tag_count; index++)
+	{
+		uint8_t const *instance = instances + (uint32_t)index * TAG_INSTANCE_BYTES;
+		uint32_t offset;
+
+		if (read_u32(instance + TAG_INSTANCE_GROUP_OFFSET) == group_tag &&
+			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), definition_bytes, &offset))
+		{
+			*tag_index = index;
+			return tag_cache + offset;
+		}
+	}
+	*tag_index = tag_count;
+
+	return NULL;
+}
+
+void *custom_edition_cache_tag_get(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t handle,
+	uint32_t group_tag,
+	uint32_t definition_bytes)
+{
+	struct load_state state;
+	uint8_t const *instances;
+	uint8_t const *instance;
+	uint32_t offset;
+	int32_t tag_count;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances || (handle & ABSOLUTE_INDEX_MASK) >= (uint32_t)tag_count)
+	{
+		return NULL;
+	}
+	instance = instances + (handle & ABSOLUTE_INDEX_MASK) * TAG_INSTANCE_BYTES;
+
+	return read_u32(instance + TAG_INSTANCE_HANDLE_OFFSET) == handle &&
+		read_u32(instance + TAG_INSTANCE_GROUP_OFFSET) == group_tag &&
+		tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), definition_bytes, &offset) ?
+		tag_cache + offset :
+		NULL;
+}
+
+char const *custom_edition_cache_tag_name(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	int32_t tag_index)
+{
+	struct load_state state;
+	uint8_t const *instances;
+	uint32_t name_offset;
+	int32_t tag_count;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances ||
+		tag_index < 0 ||
+		tag_index >= tag_count ||
+		!tag_cache_offset(
+			&state,
+			read_u32(instances + (uint32_t)tag_index * TAG_INSTANCE_BYTES + TAG_INSTANCE_NAME_OFFSET),
+			1,
+			&name_offset) ||
+		!memchr(tag_cache + name_offset, 0, loaded_bytes - name_offset))
+	{
+		return "<no name>";
+	}
+
+	return (char const *)tag_cache + name_offset;
+}
+
+int32_t custom_edition_cache_tags_regroup(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t group_tag,
+	uint32_t new_group_tag)
+{
+	struct load_state state;
+	uint8_t *instances;
+	int32_t tag_count;
+	int32_t tag_index;
+	int32_t regrouped_count = 0;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances)
+	{
+		return 0;
+	}
+	for (tag_index = 0; tag_index < tag_count; tag_index++)
+	{
+		uint8_t *instance = instances + (uint32_t)tag_index * TAG_INSTANCE_BYTES;
+
+		if (read_u32(instance + TAG_INSTANCE_GROUP_OFFSET) == group_tag)
+		{
+			write_u32(instance + TAG_INSTANCE_GROUP_OFFSET, new_group_tag);
+			regrouped_count++;
+		}
+	}
+
+	return regrouped_count;
+}
+
+static struct shader_group_type const *shader_group_type_get(
+	uint32_t group_tag)
+{
+	size_t index;
+
+	for (index = 0; index < sizeof(shader_group_types) / sizeof(shader_group_types[0]); index++)
+	{
+		if (shader_group_types[index].group_tag == group_tag)
+		{
+			return &shader_group_types[index];
+		}
+	}
+
+	return NULL;
+}
+
+/* Makes the chicago extended shader `shader` a chicago shader: it keeps its
+four-stage maps, or its two-stage maps when it has no four-stage ones (this
+build's renderer draws four stages), and its extra flags move to where a
+chicago shader has them. The two-stage maps are left unreferenced. */
+static void transparent_chicago_extended_convert(
+	uint8_t *shader)
+{
+	uint8_t two_stage_maps[TAG_BLOCK_BYTES];
+	uint32_t extra_flags = read_u32(shader + TRANSPARENT_CHICAGO_EXTENDED_EXTRA_FLAGS_OFFSET);
+
+	memcpy(two_stage_maps, shader + TRANSPARENT_CHICAGO_EXTENDED_TWO_STAGE_MAPS_OFFSET, TAG_BLOCK_BYTES);
+	if (!read_s32(shader + TRANSPARENT_CHICAGO_MAPS_OFFSET + TAG_BLOCK_COUNT_OFFSET))
+	{
+		memcpy(shader + TRANSPARENT_CHICAGO_MAPS_OFFSET, two_stage_maps, TAG_BLOCK_BYTES);
+	}
+	write_u32(shader + TRANSPARENT_CHICAGO_EXTRA_FLAGS_OFFSET, extra_flags);
+	/* the rest of a chicago shader is padding */
+	memset(
+		shader + TRANSPARENT_CHICAGO_EXTRA_FLAGS_OFFSET + 4,
+		0,
+		TRANSPARENT_CHICAGO_BYTES - (TRANSPARENT_CHICAGO_EXTRA_FLAGS_OFFSET + 4));
+
+	return;
+}
+
+/* Gives every bitmap of the bitmap tag at `group_offset` (tag `handle`) the
+state the game expects of a bitmap it has not drawn yet: its tag is its own
+(bitmaps.map holds the handles of whatever map it was built with), and it
+has no texture cache block, hardware texture or pixels. */
+static void bitmaps_prepare(
+	struct load_state const *state,
+	uint32_t group_offset,
+	uint32_t handle,
+	struct custom_edition_conversion_report *report)
+{
+	int32_t bitmap_count;
+	uint32_t bitmaps_offset;
+	int32_t bitmap_index;
+
+	if (!loaded_block_get(
+		state->tag_cache + group_offset + BITMAP_GROUP_BITMAPS_OFFSET,
+		CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+		state->used_bytes,
+		BITMAP_DATA_BYTES,
+		&bitmap_count,
+		&bitmaps_offset))
+	{
+		return;
+	}
+	for (bitmap_index = 0; bitmap_index < bitmap_count; bitmap_index++)
+	{
+		uint8_t *bitmap = state->tag_cache + bitmaps_offset + (uint32_t)bitmap_index * BITMAP_DATA_BYTES;
+
+		write_u32(bitmap + BITMAP_DATA_TAG_INDEX_OFFSET, handle);
+		write_u32(bitmap + BITMAP_DATA_CACHE_BLOCK_INDEX_OFFSET, (uint32_t)NO_TAG_INDEX);
+		write_u32(bitmap + BITMAP_DATA_HARDWARE_FORMAT_OFFSET, 0);
+		write_u32(bitmap + BITMAP_DATA_BASE_ADDRESS_OFFSET, 0);
+		report->bitmaps_prepared++;
+	}
+
+	return;
+}
+
+/* Gives every permutation of the sound at `sound_offset` (tag `handle`)
+the state the game expects of one it has not played: its tag is its own
+(sounds.map holds the handles of whatever map it was built with), with no
+cache block or samples. A sound whose compression this build cannot decode
+is made unplayable: this build plays Xbox ADPCM (and refuses uncompressed
+sounds), and Custom Edition also has Ogg Vorbis, which would be decoded as
+ADPCM noise. With no pitch ranges the game neither plays nor loads it
+(sound_manager.c, sound_definition_is_playable). */
+static void sound_prepare(
+	struct load_state const *state,
+	uint32_t sound_offset,
+	uint32_t handle,
+	struct custom_edition_conversion_report *report)
+{
+	uint8_t *sound = state->tag_cache + sound_offset;
+	int16_t compression = read_s16(sound + SOUND_COMPRESSION_OFFSET);
+	int decodable = compression == SOUND_COMPRESSION_NONE || compression == SOUND_COMPRESSION_XBOX_ADPCM;
+	int32_t pitch_range_count;
+	uint32_t pitch_ranges_offset;
+	int32_t pitch_range_index;
+
+	if (!loaded_block_get(
+		sound + SOUND_PITCH_RANGES_OFFSET,
+		CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+		state->used_bytes,
+		SOUND_PITCH_RANGE_BYTES,
+		&pitch_range_count,
+		&pitch_ranges_offset))
+	{
+		return;
+	}
+	for (pitch_range_index = 0; pitch_range_index < pitch_range_count; pitch_range_index++)
+	{
+		uint8_t const *pitch_range = state->tag_cache + pitch_ranges_offset + (uint32_t)pitch_range_index * SOUND_PITCH_RANGE_BYTES;
+		int32_t permutation_count;
+		uint32_t permutations_offset;
+		int32_t permutation_index;
+
+		if (!loaded_block_get(
+			pitch_range + SOUND_PITCH_RANGE_PERMUTATIONS_OFFSET,
+			CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+			state->used_bytes,
+			SOUND_PERMUTATION_BYTES,
+			&permutation_count,
+			&permutations_offset))
+		{
+			continue;
+		}
+		for (permutation_index = 0; permutation_index < permutation_count; permutation_index++)
+		{
+			uint8_t *permutation = state->tag_cache + permutations_offset + (uint32_t)permutation_index * SOUND_PERMUTATION_BYTES;
+			int16_t permutation_compression = read_s16(permutation + SOUND_PERMUTATION_COMPRESSION_OFFSET);
+
+			write_u32(permutation + SOUND_PERMUTATION_CACHE_BLOCK_INDEX_OFFSET, (uint32_t)NO_TAG_INDEX);
+			write_u32(permutation + SOUND_PERMUTATION_CACHE_BASE_ADDRESS_OFFSET, 0);
+			write_u32(permutation + SOUND_PERMUTATION_CACHE_TAG_INDEX_OFFSET, handle);
+			write_u32(permutation + SOUND_PERMUTATION_RUNTIME_TAG_INDEX_OFFSET, handle);
+			if (permutation_compression != SOUND_COMPRESSION_NONE && permutation_compression != SOUND_COMPRESSION_XBOX_ADPCM)
+			{
+				decodable = 0;
+			}
+		}
+	}
+	if (!decodable)
+	{
+		write_u32(sound + SOUND_PITCH_RANGES_OFFSET + TAG_BLOCK_COUNT_OFFSET, 0);
+		report->sounds_undecodable++;
+	}
+
+	return;
+}
+
+/* Object overlays of the animation graph at `graph_offset` that name an
+animation the graph does not have are made to name none, which the game
+skips (objects.c, object_compute_node_matrices). Maps built with the editing
+kit can have them (beavercreek_halo3.yelo has two); Custom Edition reads
+past the graph's animations there, and this build asserts. */
+static void animation_graph_overlays_repair(
+	struct load_state const *state,
+	uint32_t graph_offset,
+	struct custom_edition_conversion_report *report)
+{
+	uint8_t const *graph = state->tag_cache + graph_offset;
+	int32_t animation_count = read_s32(graph + ANIMATION_GRAPH_ANIMATIONS_OFFSET + TAG_BLOCK_COUNT_OFFSET);
+	int32_t overlay_count;
+	uint32_t overlays_offset;
+	int32_t overlay_index;
+
+	if (!loaded_block_get(
+		graph + ANIMATION_GRAPH_OBJECT_OVERLAYS_OFFSET,
+		CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+		state->used_bytes,
+		ANIMATION_GRAPH_OBJECT_OVERLAY_BYTES,
+		&overlay_count,
+		&overlays_offset))
+	{
+		return;
+	}
+	for (overlay_index = 0; overlay_index < overlay_count; overlay_index++)
+	{
+		uint8_t *overlay = state->tag_cache + overlays_offset + (uint32_t)overlay_index * ANIMATION_GRAPH_OBJECT_OVERLAY_BYTES;
+		int16_t animation_index = read_s16(overlay + ANIMATION_GRAPH_OBJECT_OVERLAY_ANIMATION_INDEX_OFFSET);
+
+		if (animation_index != NO_BLOCK_INDEX && (animation_index < 0 || animation_index >= animation_count))
+		{
+			write_u16(overlay + ANIMATION_GRAPH_OBJECT_OVERLAY_ANIMATION_INDEX_OFFSET, (uint16_t)NO_BLOCK_INDEX);
+			report->animation_overlays_disabled++;
+		}
+	}
+
+	return;
+}
+
+/* This build's hs_allocate takes the scenario's syntax nodes only when they
+are its own number, and otherwise frees them as if they had been allocated:
+an upgraded array whose nodes in use fit in this build's number is made
+that number. */
+static enum cache_file_status scenario_script_nodes_convert(
+	struct load_state const *state,
+	uint8_t const *instances,
+	int32_t tag_count,
+	struct custom_edition_conversion_report *report)
+{
+	uint32_t scenario_handle = read_u32(state->tag_cache + TAG_INDEX_SCENARIO_OFFSET);
+	uint32_t stock_bytes = DATA_ARRAY_HEADER_BYTES + MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO * HS_SYNTAX_NODE_BYTES;
+	uint32_t upgraded_bytes = DATA_ARRAY_HEADER_BYTES + MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED * HS_SYNTAX_NODE_BYTES;
+	uint8_t *syntax_data;
+	uint8_t *nodes;
+	uint32_t scenario_offset;
+	uint32_t nodes_offset;
+	int32_t size;
+
+	/* custom_edition_cache_load checked the scenario */
+	if ((scenario_handle & ABSOLUTE_INDEX_MASK) >= (uint32_t)tag_count ||
+		!tag_cache_offset(
+			state,
+			read_u32(instances + (scenario_handle & ABSOLUTE_INDEX_MASK) * TAG_INSTANCE_BYTES + TAG_INSTANCE_ADDRESS_OFFSET),
+			SCENARIO_BYTES,
+			&scenario_offset))
+	{
+		return _cache_file_status_bad_scenario_tag;
+	}
+	syntax_data = state->tag_cache + scenario_offset + SCENARIO_HS_SYNTAX_DATA_OFFSET;
+	size = read_s32(syntax_data + TAG_DATA_SIZE_OFFSET);
+	if (size < 0 || (uint32_t)size != upgraded_bytes)
+	{
+		return _cache_file_status_ok;
+	}
+	report->problem_tag_index = (int32_t)(scenario_handle & ABSOLUTE_INDEX_MASK);
+	if (!tag_cache_offset(state, read_u32(syntax_data + TAG_DATA_ADDRESS_OFFSET), (uint32_t)size, &nodes_offset))
+	{
+		return _cache_file_status_bad_script_nodes;
+	}
+	nodes = state->tag_cache + nodes_offset;
+	if (read_s16(nodes + DATA_ARRAY_MAXIMUM_COUNT_OFFSET) != MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED ||
+		read_s16(nodes + DATA_ARRAY_ELEMENT_BYTES_OFFSET) != HS_SYNTAX_NODE_BYTES ||
+		read_s16(nodes + DATA_ARRAY_COUNT_OFFSET) > MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO ||
+		read_s16(nodes + DATA_ARRAY_FIRST_FREE_INDEX_OFFSET) > MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO)
+	{
+		return _cache_file_status_bad_script_nodes;
+	}
+	report->problem_tag_index = NO_TAG_INDEX;
+	write_u16(nodes + DATA_ARRAY_MAXIMUM_COUNT_OFFSET, MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO);
+	write_u32(syntax_data + TAG_DATA_SIZE_OFFSET, stock_bytes);
+	report->script_nodes_reduced = 1;
+
+	return _cache_file_status_ok;
+}
+
+enum cache_file_status custom_edition_cache_convert(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	struct custom_edition_conversion_report *report)
+{
+	struct load_state state;
+	uint8_t const *instances;
+	int32_t tag_count;
+	int32_t tag_index;
+
+	memset(report, 0, sizeof(*report));
+	report->problem_tag_index = NO_TAG_INDEX;
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances)
+	{
+		return _cache_file_status_bad_tag_instances_range;
+	}
+	for (tag_index = 0; tag_index < tag_count; tag_index++)
+	{
+		uint8_t const *instance = instances + (uint32_t)tag_index * TAG_INSTANCE_BYTES;
+		uint32_t group_tag = read_u32(instance + TAG_INSTANCE_GROUP_OFFSET);
+		struct shader_group_type const *shader_type = shader_group_type_get(group_tag);
+		uint32_t offset;
+
+		if (group_tag == BITMAP_GROUP_TAG &&
+			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), BITMAP_GROUP_BYTES, &offset))
+		{
+			bitmaps_prepare(&state, offset, read_u32(instance + TAG_INSTANCE_HANDLE_OFFSET), report);
+		}
+		if (group_tag == ANIMATION_GRAPH_GROUP_TAG &&
+			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), ANIMATION_GRAPH_BYTES, &offset))
+		{
+			animation_graph_overlays_repair(&state, offset, report);
+		}
+		if (group_tag == SOUND_GROUP_TAG &&
+			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), SOUND_DEFINITION_BYTES, &offset))
+		{
+			sound_prepare(&state, offset, read_u32(instance + TAG_INSTANCE_HANDLE_OFFSET), report);
+		}
+		if (!shader_type)
+		{
+			continue;
+		}
+		if (!tag_cache_offset(
+				&state,
+				read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET),
+				group_tag == TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG ? TRANSPARENT_CHICAGO_EXTENDED_BYTES : SHADER_BYTES,
+				&offset) ||
+			read_s16(tag_cache + offset + SHADER_TYPE_OFFSET) != shader_type->custom_edition_type)
+		{
+			report->problem_tag_index = tag_index;
+			return _cache_file_status_bad_shader_type;
+		}
+		write_u16(tag_cache + offset + SHADER_TYPE_OFFSET, (uint16_t)shader_type->type);
+		if (shader_type->type != shader_type->custom_edition_type)
+		{
+			report->shaders_retyped++;
+		}
+		if (group_tag == TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG)
+		{
+			transparent_chicago_extended_convert(tag_cache + offset);
+		}
+	}
+	report->chicago_extended_shaders = custom_edition_cache_tags_regroup(
+		tag_cache,
+		loaded_bytes,
+		TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG,
+		TRANSPARENT_CHICAGO_GROUP_TAG);
+
+	return scenario_script_nodes_convert(&state, instances, tag_count, report);
+}
+
+void custom_edition_cache_combine_resource_offsets(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	uint32_t bitmaps_offset,
+	uint32_t sounds_offset)
+{
+	struct load_state state;
+	uint8_t const *instances;
+	int32_t tag_count;
+	int32_t tag_index;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	instances = loaded_tag_instances(&state, &tag_count);
+	if (!instances)
+	{
+		return;
+	}
+	for (tag_index = 0; tag_index < tag_count; tag_index++)
+	{
+		uint8_t const *instance = instances + (uint32_t)tag_index * TAG_INSTANCE_BYTES;
+		uint32_t group_tag = read_u32(instance + TAG_INSTANCE_GROUP_OFFSET);
+		uint32_t address = read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET);
+		uint32_t tag_offset;
+
+		if (group_tag == BITMAP_GROUP_TAG && tag_cache_offset(&state, address, BITMAP_GROUP_BYTES, &tag_offset))
+		{
+			uint8_t const *bitmaps = tag_cache + tag_offset + BITMAP_GROUP_BITMAPS_OFFSET;
+			int32_t bitmap_count = read_s32(bitmaps + TAG_BLOCK_COUNT_OFFSET);
+			uint32_t bitmaps_block_offset;
+			int32_t bitmap_index;
+
+			if (bitmap_count <= 0 ||
+				(uint32_t)bitmap_count > UINT32_MAX / BITMAP_DATA_BYTES ||
+				!tag_cache_offset(
+					&state,
+					read_u32(bitmaps + TAG_BLOCK_ADDRESS_OFFSET),
+					(uint32_t)bitmap_count * BITMAP_DATA_BYTES,
+					&bitmaps_block_offset))
+			{
+				continue;
+			}
+			for (bitmap_index = 0; bitmap_index < bitmap_count; bitmap_index++)
+			{
+				uint8_t *bitmap = tag_cache + bitmaps_block_offset + (uint32_t)bitmap_index * BITMAP_DATA_BYTES;
+				uint16_t flags = read_u16(bitmap + BITMAP_DATA_FLAGS_OFFSET);
+
+				if (flag_is_set(flags, BITMAP_DATA_IN_RESOURCE_MAP_BIT))
+				{
+					write_u32(
+						bitmap + BITMAP_DATA_PIXELS_OFFSET_OFFSET,
+						read_u32(bitmap + BITMAP_DATA_PIXELS_OFFSET_OFFSET) + bitmaps_offset);
+					write_u16(bitmap + BITMAP_DATA_FLAGS_OFFSET, (uint16_t)(flags & ~(1U << BITMAP_DATA_IN_RESOURCE_MAP_BIT)));
+				}
+			}
+		}
+		else if (group_tag == SOUND_GROUP_TAG && tag_cache_offset(&state, address, SOUND_DEFINITION_BYTES, &tag_offset))
+		{
+			uint8_t const *pitch_ranges = tag_cache + tag_offset + SOUND_PITCH_RANGES_OFFSET;
+			int32_t pitch_range_count = read_s32(pitch_ranges + TAG_BLOCK_COUNT_OFFSET);
+			uint32_t pitch_ranges_offset;
+			int32_t pitch_range_index;
+
+			if (pitch_range_count <= 0 ||
+				(uint32_t)pitch_range_count > UINT32_MAX / SOUND_PITCH_RANGE_BYTES ||
+				!tag_cache_offset(
+					&state,
+					read_u32(pitch_ranges + TAG_BLOCK_ADDRESS_OFFSET),
+					(uint32_t)pitch_range_count * SOUND_PITCH_RANGE_BYTES,
+					&pitch_ranges_offset))
+			{
+				continue;
+			}
+			for (pitch_range_index = 0; pitch_range_index < pitch_range_count; pitch_range_index++)
+			{
+				uint8_t const *permutations = tag_cache + pitch_ranges_offset +
+					(uint32_t)pitch_range_index * SOUND_PITCH_RANGE_BYTES + SOUND_PITCH_RANGE_PERMUTATIONS_OFFSET;
+				int32_t permutation_count = read_s32(permutations + TAG_BLOCK_COUNT_OFFSET);
+				uint32_t permutations_offset;
+				int32_t permutation_index;
+
+				if (permutation_count <= 0 ||
+					(uint32_t)permutation_count > UINT32_MAX / SOUND_PERMUTATION_BYTES ||
+					!tag_cache_offset(
+						&state,
+						read_u32(permutations + TAG_BLOCK_ADDRESS_OFFSET),
+						(uint32_t)permutation_count * SOUND_PERMUTATION_BYTES,
+						&permutations_offset))
+				{
+					continue;
+				}
+				for (permutation_index = 0; permutation_index < permutation_count; permutation_index++)
+				{
+					uint8_t *samples = tag_cache + permutations_offset +
+						(uint32_t)permutation_index * SOUND_PERMUTATION_BYTES + SOUND_PERMUTATION_SAMPLES_OFFSET;
+					uint32_t flags = read_u32(samples + TAG_DATA_FLAGS_OFFSET);
+
+					if (flag_is_set(flags, SOUND_SAMPLES_IN_RESOURCE_MAP_BIT))
+					{
+						write_u32(
+							samples + TAG_DATA_FILE_OFFSET_OFFSET,
+							read_u32(samples + TAG_DATA_FILE_OFFSET_OFFSET) + sounds_offset);
+						write_u32(samples + TAG_DATA_FLAGS_OFFSET, flags & ~(1UL << SOUND_SAMPLES_IN_RESOURCE_MAP_BIT));
+					}
+				}
+			}
+		}
+	}
+
+	return;
 }
