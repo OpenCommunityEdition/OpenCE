@@ -915,8 +915,8 @@ void physics_compute_new(
 						mass_point->up.k,
 						powered_mass_point_definition->antigrav_normal_k0,
 						powered_mass_point_definition->antigrav_normal_k1);
-					real ground_effect = height <= 0.0f ?
-						1.0f : 1.0f - height/powered_mass_point_definition->antigrav_height;
+					real ground_effect = height > 0.0f ?
+						1.0f - height/powered_mass_point_definition->antigrav_height : 1.0f;
 					real magnitude = (ground_effect*ground_effect*global_gravity -
 						dot_product3d(&collision.plane.n, &mass_point->velocity)*
 							powered_mass_point_definition->antigrav_damp_fraction)*
@@ -1532,7 +1532,7 @@ void physics_update_new(
 	return;
 }
 
-/* NonMatching: the owner-safe natural reconstruction is 0x14A0 bytes with 114
+/* NonMatching: the owner-safe natural reconstruction is 0x1500 bytes with 116
  * relocations versus the January target's 0x1430 bytes and 115 relocations.
  * Its final axes predicate also falls out of line after the earlier codegen
  * divergence, so this coherent candidate is parked without schedule tuning. */
@@ -1933,8 +1933,8 @@ static void physics_update_old(
 						mass_point->up.k,
 						powered_mass_point_definition->antigrav_normal_k0,
 						powered_mass_point_definition->antigrav_normal_k1);
-					real ground_effect = height <= 0.0f ?
-						1.0f : 1.0f - height/powered_mass_point_definition->antigrav_height;
+					real ground_effect = height > 0.0f ?
+						1.0f - height/powered_mass_point_definition->antigrav_height : 1.0f;
 					real magnitude = (ground_effect*ground_effect*global_gravity -
 						dot_product3d(&collision.plane.n, &mass_point->velocity)*
 							powered_mass_point_definition->antigrav_damp_fraction)*
