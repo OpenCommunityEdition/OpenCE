@@ -1994,20 +1994,20 @@ int widget_instance_get_child_index_from_parent(
 	struct widget_instance *widget)
 {
 	int result = NONE;
-	struct widget_instance *parent = widget->parent;
 
-	if (parent)
+	if (widget->parent)
 	{
+		struct widget_instance *child = widget->parent->child;
 		int index = 0;
-		struct widget_instance *child;
 
-		for (child = parent->child; child; child = child->next)
+		while (child)
 		{
 			if (child == widget)
 			{
 				result = index;
 				break;
 			}
+			child = child->next;
 			index++;
 		}
 	}
@@ -2340,11 +2340,8 @@ static struct widget_instance *ui_widget_launch_widget(
 	long widget_tag_index)
 {
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget_tag_index);
-	struct widget_instance *parent;
 	struct widget_instance *root;
 	struct widget_instance *new_widget;
-	long parent_widget_tag_index;
-	long focused_child_index;
 	short local_player_index;
 
 	if (TEST_FLAG(definition->flags, _widget_always_use_tag_controller_index_bit))
@@ -2403,20 +2400,15 @@ static struct widget_instance *ui_widget_launch_widget(
 			break;
 		}
 	}
-	parent = widget->parent;
 	root = widget_instance_get_topmost_parent(widget);
-	parent_widget_tag_index = NONE;
-	if (parent)
-		parent_widget_tag_index = parent->definition_tag_index;
-	focused_child_index = widget_instance_get_child_index_from_parent(widget);
 	new_widget = ui_widget_load_by_name_or_tag(
 		NULL,
 		widget_tag_index,
 		NULL,
 		local_player_index,
 		root->definition_tag_index,
-		parent_widget_tag_index,
-		(short)focused_child_index);
+		widget->parent ? widget->parent->definition_tag_index : NONE,
+		(short)widget_instance_get_child_index_from_parent(widget));
 	if (!new_widget)
 		error(_error_silent, "event handler failed to spawn widget");
 
