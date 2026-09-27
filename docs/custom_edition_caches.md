@@ -2,30 +2,58 @@
 
 Experimental work on branch `experimental/custom-edition-yelo-loading`,
 based on `bnunu/halo-ce-universal` `main` at `f2fa457f`. It teaches the
-native builds (Windows, Linux, Android) to recognize and load Halo Custom
-Edition caches (`.map`, cache version 609), OpenSauce caches (`.yelo`, and
-`.map` files with an OpenSauce header), and the Custom Edition resource maps
-`bitmaps.map`, `sounds.map` and `loc.map`. The byte-matching build is not
-affected: every game-source change is under `#ifdef HALO_LINUX`, and the two
-game units that changed compile to the same MSVC objects as before (see
-[Verification](#verification)).
+native builds (Windows, Linux, Android) to recognize, load and, with
+`HALO_CUSTOM_EDITION` set, run Halo Custom Edition caches (`.map`, cache
+version 609), OpenSauce caches (`.yelo`, and `.map` files with an OpenSauce
+header), with the Custom Edition resource maps `bitmaps.map`, `sounds.map`
+and `loc.map`. The byte-matching build is not affected: every game-source
+change is under `#ifdef HALO_LINUX`, and all 621 matching objects compile to
+the same bytes as before (see [Verification](#verification)).
 
-**These maps do not run.** Recognizing a map, loading its data and running it
-are separate milestones, and only the first two are reached. A map parsing,
-or even loading, says nothing about OpenSauce compatibility.
+**Two maps have been seen running, with limits.** In the Windows debug build,
+the stock Custom Edition `bloodgulch.map` and the OpenSauce
+`beavercreek_halo3.yelo` load, draw their levels, models, sky and HUD with
+their textures, spawn a player in a slayer game, and run with sound enabled
+without an error. That is what was observed, from screenshots and
+`debug.txt`; [Tested](#tested) lists what was not (nobody played either
+map). Running one map says nothing about the next: Custom Edition maps can
+use features this build does not have, and OpenSauce ones usually do.
 
 ## What "support" means
 
 | Milestone | What it requires | Status |
 | --- | --- | --- |
-| **1. Recognize** | Tell the format and variant from the header alone, check every header field against the file, and name what the map needs: its resource maps, an OpenSauce mod set, memory upgrades | **Done** in the loader library and the report tool. The game names the format from the header (Custom Edition, with or without an OpenSauce header) and refuses the map |
-| **2. Load** | Put the map's tag data where its pointers expect it (`0x40440000`), read the tags kept in resource maps and relocate their pointers, and check every tag instance, name and address, every structure BSP (file range, header, place in the tag cache), every bitmap's pixels and every sound's samples (range in their file), and the header checksum | **Done in the loader library and the report tool** (`cache_file_report`), with the limits under [Assumptions](#assumptions-not-verified). The game does not load these maps: [Next steps](#next-steps) says why loading in the game waits on tag conversion |
-| **3. Run** | The game starts the map, draws it, plays its sounds and runs its scripts | **Not done, not attempted.** The map's tags are laid out for Halo PC, not for this build; see [Blockers](#what-running-a-map-would-take) |
+| **1. Recognize** | Tell the format and variant from the header alone, check every header field against the file, and name what the map needs: its resource maps, an OpenSauce mod set, memory upgrades | **Done**, in the loader, the report tool and the game (which, by default, names the format and refuses the map) |
+| **2. Load** | Put the map's tag data where its pointers expect it (`0x40440000`), read the tags kept in resource maps and relocate their pointers, and check every tag instance, name and address, every structure BSP (file range, header, lightmap materials), every model part's geometry, every bitmap's pixels and every sound's samples (range in their file), and the header checksum | **Done** in the loader, the report tool (`cache_file_report`) and the game, with the limits under [Assumptions](#assumptions-not-verified) |
+| **3. Run** | The game starts the map, draws it, plays its sounds and runs its scripts | **Reached for `bloodgulch.map` and `beavercreek_halo3.yelo`, as far as observed** (below); not established for any other map, and not for scripts, Ogg Vorbis sounds or OpenSauce's own features |
 
-## What the native builds do now
+## Running a map
 
-- **A Custom Edition cache in `maps\`** is named and refused, instead of being
-  rejected as "an old version" of this build's caches:
+Custom Edition maps run only when the environment variable
+`HALO_CUSTOM_EDITION` is set (to anything); without it they are refused as
+before. Put the map and the stock resource maps in the data root's `maps`
+folder (an OpenSauce map built with a mod set needs its
+`maps\data_files\<mod>-bitmaps.map` and so on instead), and start a
+multiplayer map without the menus from `init.txt` in the data root:
+
+```
+game_variant slayer
+map_name levels\test\bloodgulch\bloodgulch
+```
+
+`map_name` takes the scenario's tag path; only its last part names the file,
+`bloodgulch.map`, or `bloodgulch.yelo` when there is no `.map`. A
+multiplayer scenario needs a game variant, or no starting location
+qualifies and no player spawns (`match_game_type` in `game_engine.c`
+accepts none of a map's typed starting locations without a game engine).
+`beavercreek_halo3.yelo`'s scenario is
+`zteam\scenarios\multi_player\beavercreek\beavercreek_halo3`.
+
+## What the native builds do
+
+- **Without `HALO_CUSTOM_EDITION`**, a Custom Edition cache in `maps\` is
+  named and refused, instead of being rejected as "an old version" of this
+  build's caches:
 
   ```
   'd:\maps\ui.map' is a Halo Custom Edition cache (build 01.00.00.0609): this build recognizes it but cannot run it (docs/custom_edition_caches.md)
@@ -37,40 +65,46 @@ or even loading, says nothing about OpenSauce compatibility.
   `cache_file_header_verify` in `source/cache/cache_files.c`).
 - **An OpenSauce `.yelo` file** is found when there is no `.map` of that name,
   as OpenSauce looks for one (`cache_file_get_map_path` in
-  `source/cache/cache_files_windows.c`), and refused the same way:
-
-  ```
-  'd:\maps\ui.yelo' is a Halo Custom Edition cache with an OpenSauce header (build 01.00.00.0609): this build recognizes it but cannot run it (docs/custom_edition_caches.md)
-  ```
-
+  `source/cache/cache_files_windows.c`), and refused the same way.
+- **With `HALO_CUSTOM_EDITION` set**, the platform reserves the address
+  window Custom Edition tag data is linked to, `0x40440000`–`0x426C0000`
+  (`port/linux/src/xbox_memory.c`; 36 MB of address space, backed as it is
+  touched), and a Custom Edition map is loaded into it, converted as below,
+  and run. It is read in place: it is never copied to the cache partition,
+  and every read the game makes of it (structure BSPs, bitmap pixels, sound
+  samples) is served from the map, `bitmaps.map` or `sounds.map` according to
+  where the offset falls in their combined offset space
+  (`custom_edition_cache_read`). A map that fails any check is logged and not
+  loaded.
 - **Xbox caches** take exactly the path they took before: the new code
   returns at once for them, and the original checks and messages follow
-  unchanged (`the cache file 'ui' belongs to a different build
-  (01.10.12.2276)` for an Xbox cache of another build, observed).
+  unchanged.
 
-## The loader and the report tool
+## Loading and conversion
 
-- `port/linux/game/cache_file_formats.c` (`cache_file_formats.h`): the format
-  code, standalone C with fixed-width types and no game dependencies, compiled
-  into the native builds (as every `port/linux/game` unit is) and into the
-  tool. Map files are untrusted input: every field is read little-endian from
-  a bounds-checked buffer, never through a structure laid over the file, and
-  every offset, count and size is checked before use, with overflow-safe
-  arithmetic.
-- `port/tools/cache_file_report.c`: reports what can be done with each file.
+### The loader (`cache_file_formats.c`)
 
-  ```sh
-  clang --target=i686-pc-windows-msvc -fuse-ld=lld -Iport/linux/game \
-      port/linux/game/cache_file_formats.c port/tools/cache_file_report.c -o cache_file_report.exe
-  cache_file_report [--maps DIRECTORY] [--stock-data-files] FILE...
-  ```
+`port/linux/game/cache_file_formats.c` (`cache_file_formats.h`) holds the
+format code: standalone C with fixed-width types and no game dependencies,
+compiled into the native builds (as every `port/linux/game` unit is) and
+into the report tool. Map files are untrusted input: every field is read
+little-endian from a bounds-checked buffer, never through a structure laid
+over the file, and every offset, count and size is checked before use, with
+overflow-safe arithmetic. `port/tools/cache_file_report.c` reports what can
+be done with each file:
 
-  Resource maps are looked for next to the cache (or in `--maps`):
-  `bitmaps.map`, `sounds.map`, `loc.map`, or `data_files\<mod>-bitmaps.map`
-  and so on for an OpenSauce cache built with a mod set. A cache that needs a
-  mod set that is not there is not loaded. `--stock-data-files` loads it with
-  the stock resource maps instead, for inspection only (OpenSauce itself
-  refuses such a map), and the report says it did.
+```sh
+clang --target=i686-pc-windows-msvc -fuse-ld=lld -Iport/linux/game \
+    port/linux/game/cache_file_formats.c port/tools/cache_file_report.c -o cache_file_report.exe
+cache_file_report [--maps DIRECTORY] [--stock-data-files] [--dump-tags FILE] FILE...
+```
+
+Resource maps are looked for next to the cache (or in `--maps`):
+`bitmaps.map`, `sounds.map`, `loc.map`, or `data_files\<mod>-bitmaps.map` and
+so on for an OpenSauce cache built with a mod set. `--stock-data-files` loads
+a mod-set cache with the stock resource maps instead, for inspection only
+(OpenSauce itself refuses such a map). `--dump-tags` writes the converted
+tags to a file, as they would sit at `0x40440000`.
 
 Loading, step by step (`custom_edition_cache_load`):
 
@@ -88,30 +122,96 @@ Loading, step by step (`custom_edition_cache_load`):
    match its position, its name must lie in the tag data and be terminated,
    its address must lie in the tag data; only structure BSPs may have none;
    only bitmaps, sounds, fonts, unicode string lists and HUD message text may
-   be held by resource maps), the model vertex and index data range, and the
-   scenario tag.
+   be held by resource maps), the model data range, and the scenario tag.
 4. Every structure BSP: its tag, its range in the file, its place in the tag
-   cache (above the tag data, within the tag cache), and its header (`sbsp`
-   signature, no Xbox vertex buffers, its structure pointer inside it).
+   cache (above the tag data, within the tag cache), its header (`sbsp`
+   signature, no Xbox vertex buffers, its structure pointer inside it), and
+   its lightmaps and their materials: every block within the BSP and aligned,
+   every material's uncompressed environment vertices (56 bytes) and
+   lightmap vertices (20 bytes) within the BSP and of the size their counts
+   give, lightmap vertices exactly when the lightmap has a bitmap, and every
+   normal, binormal, tangent and incident radiosity within ±1.005 (the game's
+   vertex compressor asserts on anything further out).
 5. The header checksum is computed as OpenSauce computes it, before anything
    changes the tag data; a mismatch is reported, not refused.
 6. The tags held by resource maps are read into the tag cache after the tag
-   data, below the lowest structure BSP, and their pointers relocated.
-7. Every bitmap, sound, font, unicode string list and HUD message text tag,
-   from the map or from a resource map, is walked through its blocks: every
-   block and data pointer must now lie within the loaded tags, and every
-   bitmap's pixels and sound's samples within their file.
+   data, below the lowest structure BSP, and their pointers relocated. A
+   sound's header in the map lacks its sample rate, encoding, compression
+   and longest permutation length; they are taken from the header's copy in
+   `sounds.map` ([Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)).
+7. Every bitmap, sound, font, unicode string list, HUD message text, model
+   (`mod2`) and transparent chicago shader (`schi`, `scex`) is walked through
+   its blocks: every block and data pointer must lie within the loaded tags,
+   every bitmap's pixels and sound's samples within their file, and every
+   model part's strip and vertices within the model data, of the kinds Custom
+   Edition writes (a precompiled strip, uncompressed 68-byte vertices), with
+   at most 65535 vertices and at most 22 local nodes.
 
-What loading does not do: it does not load the structure BSPs (the game loads
-one at a time when it switches to it), bitmap pixels or sound samples (the
-texture and sound caches stream them), or the OpenSauce tag definitions; and
-it does not interpret any other tag group.
+Then `custom_edition_cache_convert` changes what only needs its bytes
+changed:
+
+- **Shader types.** Custom Edition inserted *transparent chicago extended*
+  as shader type 7, so its water, glass, meter and plasma shaders are types
+  8 to 11 where this build has 7 to 10 (and would draw a Custom Edition glass
+  shader as meter, and so on, unnoticed). Every shader gets this build's
+  number; a shader whose type is not its group's is refused.
+- **Transparent chicago extended shaders** (`scex`) become transparent
+  chicago shaders (`schi`): the two layouts agree up to the maps, of which
+  `scex` has two sets, for four and for two texture stages; the four-stage
+  maps are kept (this build draws four stages), or the two-stage ones when
+  there are no others, and the extra flags move to where `schi` has them.
+- **Bitmaps and sound permutations** get the state of ones not yet drawn or
+  played, and name their own tags: `bitmaps.map` and `sounds.map` hold the
+  tag handles of whatever map they were built with.
+- **Sounds this build cannot decode** (Custom Edition's Ogg Vorbis) are made
+  unplayable, by emptying their pitch ranges, which the game skips.
+- **OpenSauce's script nodes.** OpenSauce's memory upgrades make room for
+  28501 script syntax nodes instead of 19001, and OpenSauce patches the game
+  to accept that. This build takes the scenario's nodes only at its own
+  number, so an upgraded array whose nodes in use fit in 19001 is made that
+  size; one that uses more is refused.
+- **Animation overlays naming animations that do not exist** are made to
+  name none, which the game skips. `beavercreek_halo3.yelo` has two; Custom
+  Edition reads past the graph's animations there, and this build's debug
+  builds stop on it.
+
+### In the game (`custom_edition_cache.c`, `custom_edition_geometry.c`, `custom_edition_bitmaps.c`)
+
+- **Models.** Every `mod2` part is given this build's part layout (the first
+  0x68 bytes of the 0x84-byte Custom Edition part are the same fields; the
+  parts are repacked in place), its vertices are compressed from the map's
+  model data by the game's own `rasterizer_geometry_compress_vertices`, its
+  node indices made the model's when its model's parts have local nodes, and
+  its strip copied unchanged; the game's own `rasterizer_vertex_buffer_new`
+  and `rasterizer_triangle_buffer_new` make its buffers, and the tags become
+  `mode` tags. Before any of that, every index a part holds is checked
+  against what it names (shaders, nodes, parts, vertices), and a model with
+  44 nodes or more is refused, since this build's renderer skins at most 43.
+- **Structure BSPs.** When the game loads a BSP, every material's vertices
+  are compressed the same way (environment and lightmap vertices), and the
+  material gets buffers and the compressed vertices the game reads for
+  visibility, collision and lights (`scenario_structure_bsp_load` in
+  `cache_files.c` calls `custom_edition_structure_bsp_load`).
+- **Bitmaps.** Every bitmap must pass the game's own `bitmap_verify` and be
+  of a kind the texture cache and the swizzling code handle (a format with a
+  hardware texture, a compressed flag that agrees with the format,
+  power-of-two sizes unless linear, square cube maps, all its pixels
+  present). Its pixels are laid out for Halo PC, levels as the tag stores
+  them, unswizzled; as they arrive, the game's own
+  `rasterizer_xbox_bitmap_rebuild_hardware_format` lays them out as an Xbox
+  cache would (swizzled, cube maps face by face, padded).
+- **Chicago extra layers.** January's transparent chicago shader draws its
+  extra layers in a loop that never advances
+  (`rasterizer_xbox_transparent_geometry.c`, marked as a preserved bug). No
+  Xbox map has such layers, so January never hung on it, but Custom Edition
+  maps do (`beavercreek_halo3.yelo` has two shaders with them): the native
+  builds advance the loop.
 
 ## Tested
 
 ### Automated tests
 
-`python -m pytest tools/test_cache_file_formats.py` (91 tests; needs clang).
+`python -m pytest tools/test_cache_file_formats.py` (127 tests; needs clang).
 The tests build complete synthetic caches and resource maps in memory (no
 game data is stored in the repository) and run the report tool, compiled with
 `-Wall -Wextra -Wpedantic -Werror` and undefined-behaviour trapping
@@ -121,32 +221,38 @@ compiles it (`-std=gnu89`) with warnings enabled, since the game build
 silences them.
 
 - Supported formats: a complete Custom Edition cache with every kind of
-  resource-held tag; several pitch ranges; three structure BSPs; OpenSauce
-  caches with memory upgrades, appended tag definitions, OpenSauce tags, a mod
-  set present, absent, and substituted; resource maps of each type; the
-  `--maps` option.
-- Malformed input: every check in the list above, with at least one case
-  each (69 tests: header fields, OpenSauce fields, tag index, instances,
-  names, addresses, scenario, structure BSP block, range and header, resource
-  map headers and entries, resource layouts, pixel and sample ranges, font
-  style references, tag cache overflow), plus 120 seeded random corruptions
-  of a valid cache and its resource maps, each of which must end in a clean
-  verdict. The random corruptions are sampled evidence of robustness, not
-  proof.
+  resource-held tag; several pitch ranges; three structure BSPs; a model;
+  a structure BSP material with and without a lightmap; OpenSauce caches with
+  memory upgrades, appended tag definitions, OpenSauce tags, a mod set
+  present, absent, and substituted; resource maps of each type; the `--maps`
+  option.
+- Conversion: every shader group's type; chicago extended shaders with and
+  without four-stage maps; a shader with another group's type (refused);
+  bitmaps and sound permutations naming their own tags; sound header fields
+  taken from `sounds.map`; an Ogg Vorbis sound made unplayable; upgraded
+  script nodes reduced, stock ones kept, too many refused; animation overlays
+  kept and disabled.
+- Malformed input: every check of the loader and the conversion, with at
+  least one case each (94 tests: header fields, OpenSauce fields, tag index, instances, names,
+  addresses, scenario, structure BSP block, range, header and materials,
+  model parts, resource map headers and entries, resource layouts, pixel and
+  sample ranges, font style references, tag cache overflow, shader types,
+  script nodes), plus 120 seeded
+  random corruptions of a valid cache and its resource maps, each of which
+  must end in a clean verdict. The random corruptions are sampled evidence
+  of robustness, not proof.
 - Original format: Xbox caches of build 01.01.14.2342 and 01.10.12.2276, and
   a compressed Xbox cache, are recognized and left to the original loader;
   other cache versions and unrelated files are named, not loaded.
-- The tests were checked against deliberately broken checks: disabling the
-  tag handle check or the structure BSP signature check fails exactly the
-  test for it.
 - Real maps: when `HALO_CUSTOM_EDITION_MAPS` names a folder of maps, or they
-  are extracted to the gitignored `assets/custom_edition`, three more tests
-  check the results in the table below.
+  are extracted to the gitignored `assets/custom_edition`, four more tests
+  check the results in the tables below.
 
-`python -m pytest tools/test_custom_edition_tag_footprints.py` (4 tests)
-checks the tag comparison tool of
-[the measurements below](#how-far-custom-edition-tags-are-from-the-xbox-tags)
-on synthetic caches.
+The game-side conversion (models, structure BSPs, bitmap pixels) uses the
+game's own functions and was tested by running the game (below); it has no
+automated test. `python -m pytest tools/test_custom_edition_tag_footprints.py`
+(4 tests) checks the tag comparison tool of
+[the measurements below](#how-far-custom-edition-tags-are-from-the-xbox-tags).
 
 ### Maps
 
@@ -188,35 +294,59 @@ checked):
 valid resource maps. Two retail Xbox caches of build 01.10.12.2276 (`ui.map`,
 `bloodgulch.map`) were recognized as Xbox caches.
 
+Conversion of the two maps that were run:
+
+| Map | BSP materials | Shaders renumbered | `scex` made `schi` | Bitmaps | Ogg Vorbis sounds silenced | Script nodes reduced | Overlays disabled | Model parts (vertices) |
+|---|---|---|---|---|---|---|---|---|
+| `bloodgulch.map` | 79 | 21 | 10 | 676 | 39 | no | 0 | 447 (100,945) |
+| `beavercreek_halo3.yelo` | 67 | 14 | 4 | 1005 | 10 | yes | 2 | 673 (201,787) |
+
+Of the other maps: `celer_exile_odst_v2.yelo` loads and converts in the
+report tool, but the game refuses it for a model of 46 nodes; the two
+mod-set maps need their mod sets, which were not available.
+
 ### In the game
 
 Built with `ninja windows` (clang 22.1.8, Visual Studio 2026 x86 libraries,
-SDL 3.4.16) and run from a data root holding only one map each time (debug
-build; the game loads `ui` first):
+SDL 3.4.16; a debug build) and run with `HALO_CUSTOM_EDITION=1`, a data root
+holding one map and the stock resource maps, and the `init.txt` above, for
+30 to 60 seconds each, with `HALO_SCREENSHOT_DIR` saving the screen:
 
-| `maps\` held | Observed in `debug.txt` |
-| --- | --- |
-| the Custom Edition `ui.map` | the Custom Edition message above, then the stop on it |
-| `fy_killzone.yelo` renamed `ui.yelo`, no `ui.map` | the `.yelo` was found; the OpenSauce message above |
-| the Xbox 01.10.12.2276 `ui.map` | the original `the cache file 'ui' belongs to a different build (01.10.12.2276)`, from the original line |
+| Map | Sound | Observed |
+| --- | --- | --- |
+| `bloodgulch.map` | off (`HALO_NO_AUDIO`) | loaded and converted as in the table above; 3,900 frames drawn in 35 s with no error: the level, its sky, scenery and base, the first-person arms holding a plasma pistol, and the HUD (health, shield, motion sensor), all textured |
+| `bloodgulch.map` | on | the same, plus one `attempt to play a sound that was not a mono 22k compressed sound ...` in 40 s |
+| `beavercreek_halo3.yelo` | off | loaded and converted as above; the level, the map's Halo 3 style HUD, and its first-person arms and plasma pistol, all textured, with no error in 40 s |
+| `beavercreek_halo3.yelo` | on | the same for 60 s, with no sound refused |
 
-No map ran, and no game data of build 01.01.14.2342 was available, so
-nothing past the first map load was exercised.
+Before the sound conversion, the log filled with that message: the map's
+copy of every resource-held sound's header says it is uncompressed. The game
+checks a sound's format before its pitch ranges (`sound_new_impulse` in
+`sound_manager.c`), so a silenced Ogg Vorbis sound still logs the message
+when played; that the one left is such a sound is likely but was not
+checked. The sound system accepting sounds is what was observed; whether
+they are heard right was not checked, on a machine whose audio output could
+not be listened to.
 
-### Not tested
+### Not tested or not observed
 
-- The Linux and Android builds were not built (no 32-bit Linux sysroot or
-  SDL3, no Android NDK on the machine used). Their build scripts gained the
-  same include directory as the Windows one; the units they compile are the
-  same.
-- Release builds (`configure.py --release`) were not built or run.
-- No OpenSauce mod set was available; the mod set file names are an
-  assumption (below).
-- No sample map has more than one structure BSP, a protected cache,
-  OpenSauce compression parameters, tag symbol or string id storage, or an
-  OpenSauce minimum version; the synthetic tests cover several BSPs.
-- No Halo PC retail cache (version 7) was available; such caches are reported
-  as "a cache of an unknown version".
+- **Playing.** No input was given: the player spawned and stood still. No
+  weapon was fired, no vehicle driven, no second player joined, and no game
+  was played to its end.
+- **Sound output** was not listened to (above).
+- **Scripts.** Neither map runs a script (both have no script nodes in use);
+  whether Custom Edition's compiled scripts call the functions this build
+  has at the same indices is not established.
+- **Other maps.** Only the two above were run. The stock maps load and
+  convert in the report tool with the same code; the game-side conversion
+  was not tried on them.
+- **Release builds** (`configure.py --release`), and the **Linux and Android
+  builds**, were not built (no 32-bit Linux sysroot or SDL3, no Android NDK
+  on the machine used). Their build scripts compile the same units.
+- **OpenSauce itself**: mod sets (none available; the file names are an
+  assumption, below), protected caches, OpenSauce compression parameters,
+  tag symbol or string id storage, and the runtime features `project_yellow`
+  tags drive.
 
 ## Evidence
 
@@ -229,10 +359,14 @@ nothing past the first map load was exercised.
 - **Reclaimer** (GPL-3.0, Gravemind2401): the `Reclaimer-master.zip` archive
   (SHA-256 `72fd5270abbdf662ff07a54e9cce80a6158e479c51ecfdcd979f7f9fbd6c2d03`;
   newest entry dated 2026-09-20).
+- **The Xbox maps of retail build 01.10.12.2276** (`bloodgulch.map`,
+  decompressed): not the 01.01.14.2342 build this repository reconstructs,
+  but their model parts have its 0x68-byte layout and their shader types its
+  numbering, which makes them a check on what the conversion produces.
 
-Both are GPL-3.0 and this repository is CC0: no code from either was copied.
-They were read as documentation of the file formats, and every layout used was
-then checked against the sample maps.
+OpenSauce and Reclaimer are GPL-3.0 and this repository is CC0: no code from
+either was copied. They were read as documentation of the file formats, and
+every layout used was then checked against the sample maps.
 
 ### Documented facts (source, checked against the sample maps)
 
@@ -244,9 +378,13 @@ then checked against the sample maps.
 | Tag cache at `0x40440000`, 23 MB; memory upgrades ×1.5; file size limits | OpenSauce `cache_constants.hpp`, `saved_game_constants.hpp`, `blam_memory_upgrades.hpp` |
 | Resource map header and entries | OpenSauce `data_file_structures.hpp` |
 | Groups held by resource maps: bitmaps, sounds, fonts, unicode string lists, HUD message text | OpenSauce `blamlib/Halo1/cache/cache_files.cpp` (`cache_file_data_load`) |
-| Structure BSP reference (0x20) and header (0x18) | OpenSauce `scenario_definitions.hpp`, `structure_bsp_definitions.hpp` |
+| Structure BSP reference (0x20), header (0x18), structure, lightmap and material layouts | OpenSauce `scenario_definitions.hpp`, `structure_bsp_definitions.hpp`; this build's `structure_bsp_definitions.h` agrees |
 | Bitmap, sequence, sprite, bitmap data layouts; pixels in `bitmaps.map` flag | OpenSauce `bitmaps/bitmap_group.hpp` |
 | Sound definition, pitch range, permutation layouts; samples-in-`sounds.map` flag | OpenSauce `sound/sound_definitions.hpp` |
+| Gbxmodel layout: the part (0x84 bytes) is this build's 0x68-byte part followed by a local node count and a 22-entry node table | OpenSauce `models/model_definitions.hpp` (`gbxmodel_geometry_part`) |
+| Where a part's strip and vertices lie in the model data (triangle count, strip offset, vertex count and offset in the buffer fields; 68-byte vertices) | Reclaimer `Blam/Halo1/GbxmodelTag.cs` (`ReadPCMeshes`) |
+| Shader types: *transparent chicago extended* inserted at 7, before water, glass, meter and plasma; its two map sets | OpenSauce `shaders/shader_definitions.hpp` |
+| Script syntax nodes: 19001 in the stock engine, ×1.5 with memory upgrades, which OpenSauce patches the engine to accept | OpenSauce `hs_constants.hpp`, `blam_memory_upgrades.hpp`, `Halo1_CE/Game/Scripting.cpp` |
 | HUD message text layout | OpenSauce `interface/hud_messaging_definitions.hpp` |
 | Font (156 bytes) and unicode string list layouts | BlamLib `Blam/Halo1/Tags/Definitions/Misc.cs`, `Resources.cs` |
 | Bitmap tags in `bitmaps.map` by index, pixels by absolute offset | Reclaimer `Blam/Halo1/CacheFile.cs`, `BitmapTag.cs`, `BitmapsAddressTranslator.cs` |
@@ -262,116 +400,67 @@ then checked against the sample maps.
 | Structure BSPs load at the top of the tag cache (`address + size` = `0x41B40000`, or `0x426C0000` with memory upgrades) | all 24 caches |
 | Bitmaps, fonts, unicode string lists and HUD text held by resource maps: the tag's address field is the entry index, the entry's name is the tag's path, the entry is the whole tag with addresses counting from its start | 9,550 bitmaps, 68 fonts, 2,248 string lists, 23 HUD texts across the sample |
 | Sounds held by `sounds.map`: the map keeps the 0xA4-byte header, whose pitch range block has a count and no address; the entry named by the tag path holds the header again, then the pitch ranges and permutations, whose addresses count from the first pitch range | 7,397 sounds, 21,870 sample ranges |
+| The map's copy of a resource-held sound's header has its compression and longest permutation length zero, and its encoding and sample rate zero too; the entry's copy has them as the Xbox has them | in `bloodgulch.map` and `beavercreek_halo3.yelo`, the two copies of all 527 resource-held sounds differ only in those four fields, in pointers, and in the map's own promotion sound reference; for the 315 sounds the Xbox `bloodgulch.map` shares, the entry's sample rate, encoding and the runtime fields after the longest permutation length equal the Xbox's; its compression does except for the 38 that Custom Edition has as Ogg Vorbis, and its longest permutation length for 273 (the others differ by a few milliseconds or more, among them the Ogg Vorbis ones); its pitch ranges' runtime fields all do |
+| Sound permutations and resource-held bitmaps name tags of another map (the one the resource map was built with) | 632 of 676 bitmaps of `bloodgulch.map`; every resource-held permutation differs from the Xbox's own sound handle |
+| Model parts: the strip and vertex data are in the model data, never in the part's blocks; the triangle buffer is a precompiled strip and the vertices uncompressed; the part flag 2 is set on exactly the parts that have a node table | all 24 maps (10,934 parts) |
+| Converting a part's vertices with the game's compressor reproduces the Xbox's | for the 335 parts of the 60 models the Custom Edition and the Xbox `bloodgulch.map` share: identical strips; positions equal to within float rounding; texture coordinates and node weights exactly what the compressor makes of the Custom Edition values (clamped to ±1, as the Xbox also has them: `plant_broadleaf_short` has coordinates up to 3.0 in both); node indices the Custom Edition ones times 3, except that the Xbox writes an unweighted second node as -1 where the compressor writes the node Custom Edition names; normals within 0.002 |
+| Every node index of a vertex names a node of its part's table (in models whose parts have local nodes) or of its model, every table entry a node of the model, and every vector is within ±1.0001 | all 24 maps |
+| Structure BSP materials: environment vertices uncompressed (type 0), with lightmap vertices (as many as the environment ones) exactly in lightmaps that have a bitmap, and no compressed vertices | all 24 maps (the lightmap vertex type field is 0 or 2 regardless) |
+| Custom Edition shader type values are 7 to 11 for `scex`, `swat`, `sgla`, `smet`, `spla`; the Xbox's are 8, 9, 10 for `sgla`, `smet`, `spla` | every shader of the 24 maps, and of the Xbox `bloodgulch.map` |
+| Chicago shaders with extra layers: none in the stock maps or the Xbox `bloodgulch.map`; 2 in `beavercreek_halo3.yelo`, 2 in `celer_exile_odst_v2.yelo`, 4 in `extinctionrevanepic2.map`, 1 in `fy_killzone.yelo` | every `schi` and `scex` of the sample |
+| Maps with OpenSauce memory upgrades have script node arrays of 28501 | all 4, and `extinctionrevanepic2.map` uses 637 of them |
 | Compressed color plates are left out of caches: size kept, address 0 | every bitmap in `bitmaps.map` |
 | Font style references in `loc.map` are all `NONE` | all 3 fonts |
 | Sound compression value 3 is Ogg Vorbis, value 1 is Xbox ADPCM | in `sounds.map`, all 106 value-3 permutations start with `OggS`; all 1,365 value-1 permutations are whole 36-byte blocks |
-| `bitmaps.map` bitmaps are not swizzled | all 1,467 |
+| `bitmaps.map` bitmaps are not swizzled, and cube maps hold each level's six faces together | all 1,467; 38 of 40 cube maps match that order when checked against their next level (one is uniform, one does not match) |
 
 ### Assumptions (not verified)
 
 - **Mod set file names.** OpenSauce keeps mod sets under `maps\data_files\`
-  (`data_file_yelo.cpp`). The tool expects `data_files\<mod>-bitmaps.map`
+  (`data_file_yelo.cpp`). The loader expects `data_files\<mod>-bitmaps.map`
   and so on; but the examined source's `BuildName` never appends the mod
   name, which looks like a defect in that snapshot. No mod set was available
   to check either.
 - **Placement of resource-held tags.** They are placed after the tag data,
   aligned to 4 bytes, as OpenSauce's unimplemented loader outlines
   (`s_cache_file_data_load_state`); how Custom Edition itself places them is
-  not known, and nothing depends on it yet.
-- **Fields left as they are.** A resource entry's `owner_tag_index` in bitmap
-  data names a tag of whatever map the resource map was built with; its
-  meaning to the Custom Edition runtime is not established, so it is not
-  rewritten.
-- **Which sound header counts.** The loader keeps the map's copy of a
-  resource-held sound's header, the only one whose pointers and tag
-  references belong to the map. But the two copies disagree on fields a
-  player needs: over 1,338 sounds of four stock maps, the map's copy always
-  says compression 0 where the `sounds.map` copy says 1 (1,182) or 3 (156),
-  and the encoding and sample rate fields differ in 194 and 6 sounds. Custom
-  Edition presumably takes those fields from `sounds.map`; which ones, is not
-  established, so the loaded headers are not yet fit for playback.
+  not known, and nothing found depends on it.
+- **Which chicago extended maps.** The four-stage maps are kept, as the
+  renderer draws four stages; that Custom Edition's two-stage maps are a
+  fallback for older hardware is an inference (BlamLib's exporter makes the
+  same choice).
+- **Centroid nodes of local-node parts** are taken to be the model's nodes:
+  they are within the model's node count in every map, and they are only
+  used to sort transparent parts.
 - **Editing-kit pointers are cleared.** The definition pointers of relocated
   blocks and data are set to 0: they refer to nothing in the game process.
 - **Name comparison** is exact (case-sensitive), which matched every sample
   sound.
 
-## What running a map would take
+## Limits and remaining work
 
-Milestone 3 needs at least the following, none of which exists. Each item
-cites the evidence that makes it a blocker.
-
-1. **An address window for the tags.** Custom Edition tag data holds absolute
-   pointers based at `0x40440000` (from 2.2 MB of it in `ui.map` to 10.6 MB
-   in `celer_exile_odst_v2.yelo`, in a tag cache of up to 36 MB). The native builds
-   reserve only the Xbox window at `0x80000000`
-   (`port/linux/src/xbox_memory.c`); loading in the game needs a second
-   reserved window, `0x40440000`–`0x426C0000`, on every platform.
-2. **The loader in the game.** `scenario_tags_load` reads Xbox tag data to
-   `0x803A6000` and registers Xbox vertex and index buffer arrays from the
-   tag index (`tags_header_register_vertex_and_index_buffers`), whose
-   `+0x14`/`+0x1C` fields hold pointers in this build but file offsets in
-   Custom Edition caches. The game copies each map into a fixed-size cache
-   partition slot (multiplayer slots are 0x2F00000 bytes; the sample `.yelo`
-   files are up to 255 MB), which Custom Edition caches do not need.
-3. **Tag layouts.** The tags are Halo PC's, not this build's: for instance
-   objects refer to `mod2` (gearbox model) tags, 66 to 70 of them in each
-   sample multiplayer map and no `mode` tag at all, while this build's code
-   asks for `mode`. How far the rest are from the Xbox tags is
-   [measured below](#how-far-custom-edition-tags-are-from-the-xbox-tags);
-   no group has been compared field by field.
-4. **Resources.** Model vertices and indices are PC buffers in the file's
-   model data; bitmap data are PC textures (every sample bitmap unswizzled,
-   in DXT1/3/5, 16- and 32-bit and P8 bump formats) where this build's texture cache
-   expects Xbox textures; 106 of the 1,471 `sounds.map` permutations are Ogg
-   Vorbis, which this build cannot decode (the other 1,365 appear to be Xbox
-   ADPCM, which it can); and resource-held sounds' headers need their
-   playback fields settled ([Assumptions](#assumptions-not-verified)).
-5. **Scripts.** Compiled scripts call functions by their index in the
-   engine's function table; Custom Edition's table and this build's are not
-   established to agree, and OpenSauce raises the table to 1,024 functions
-   (`blam_memory_upgrades.hpp`).
-6. **OpenSauce itself.** Every OpenSauce cache in the sample holds
-   `project_yellow` (`yelo`) and `project_yellow_globals` (`gelo`) tags,
-   which drive OpenSauce runtime features (scripting extensions,
-   post-processing, memory and game state upgrades) that this build does not
-   have; OpenSauce also defines mod sets, protected caches, and string id and
-   tag symbol storage.
-
-### Next steps
-
-In order, each needing the one before:
-
-1. **Tag conversion**, beginning with what the measurements below single
-   out: models (`mod2` to `mode`, including their vertex and index data),
-   the transparent shader types (`scex`, `sotr`), and the data held in
-   resource maps (bitmap pixels into the form this build's texture cache
-   reads, fonts and strings; Ogg Vorbis sound needs a decoder, and one with
-   a licence compatible with CC0 would have to be found). Then a field by
-   field comparison, with this build's definitions, of the groups whose
-   block data differ: weapons, globals, scenarios, UI widgets, animations.
-   The measurements below found content differences there, not layout
-   ones, so these may well need no conversion; that is what the comparison
-   would settle. Scripts need Custom Edition's function table mapped onto
-   this build's.
-2. **Loading in the game**, once converted tags can be read. The pieces:
-   a second reserved address window at `0x40440000`–`0x426C0000` next to
-   the Xbox one (`port/linux/src/xbox_memory.c`); Custom Edition maps
-   bypass the cache partition (`cache_files_give_time_to_precache`,
-   `cache_file_open`, `cache_file_read` read the map file itself);
-   `scenario_tags_load` loads through `custom_edition_cache_load` into the
-   window and skips the Xbox vertex and index buffer registration, whose
-   fields are file offsets in these caches. Two structures already agree:
-   this build's `cache_file_structure_bsp_header` has the Custom Edition
-   structure BSP header's layout (the structure pointer, two vertex buffer
-   arrays that Custom Edition leaves empty, the signature), and its
-   `cache_file_tag_instance` has the Custom Edition tag instance's (whose
-   resource-map flag is this build's `unused[0]`), so
-   `scenario_structure_bsp_load` and `tag_get` would work on the loaded
-   data unchanged. Until tags are converted, carrying on past the load
-   would read Halo PC tags as this build's, which is undefined behaviour
-   in release builds, where `tag_get`'s group check is not enforced; so it
-   was not built.
-3. **OpenSauce runtime features**, for `.yelo` maps that depend on them.
+- **Validation stops at what the loader reads.** The loader checks the
+  container, the resource-held tags and everything it converts; the game
+  reads every other tag as it reads Xbox caches, trusting it. A map made to
+  crash the game can still do so, as an Xbox map could; debug builds also
+  stop on data that Custom Edition's release build reads past unchecked, as
+  with the animation overlays above, and other such data may turn up.
+- **Ogg Vorbis sounds do not play** (39 of `bloodgulch.map`'s sounds, among
+  them announcer and dialogue lines): a decoder, under a licence that fits a
+  CC0 repository, would be needed.
+- **Models of 44 nodes or more** cannot be drawn by this build's renderer:
+  such maps are refused (`celer_exile_odst_v2.yelo`).
+- **Linear bitmaps whose rows are not a multiple of 64 bytes** are drawn with
+  the wrong row pitch: the texture cache gives the texture header the
+  unpadded pitch rounded down. They are logged; none is in the maps run (the
+  6 known are in `extinctionrevanepic2.map`).
+- **HUD text.** `bloodgulch.map`'s "Hold "%s" for score" is drawn with the
+  `%s` as it stands; how Custom Edition fills it in was not investigated.
+- **Scripts** of Custom Edition maps are untested (above), and OpenSauce's
+  script extensions and other runtime features (`project_yellow`) do not
+  exist here.
+- **The conversions are one-way and in memory:** nothing is written to the
+  map files.
 
 ### How far Custom Edition tags are from the Xbox tags
 
@@ -397,7 +486,8 @@ python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<X
   `Soul actv ant! bipd colo cont deca eqip flag fog font foot grhi hmt hud#
   hudg itmc jpt! lens lifi ligh lsnd mach metr mgs2 mply part pctl phys pphy
   scen schi senv sgla sky smet snde soso spla ssce str# swat trak udlg unhi
-  vcky vehi wind`. These are the likeliest to load as they are.
+  vcky vehi wind`. The shader groups among them have the same layout, but
+  not the same type values (above).
 - **Groups whose footprints differ, but whose structures match**: UI widgets
   (`DeLa`, 464 of 657 footprints equal, 423 of 423 structures), animations
   (`antr`, 213/239), collision models (`coll`, 331/345), effects (`effe`,
@@ -423,21 +513,28 @@ python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<X
   cannot split into element size and nested content: for the globals, the
   block in question (`player_info`, 0xF4-byte elements without blocks of
   their own) spans more than its elements, so other data sits in the span.
-  No difference found has to be a layout change; none has been ruled one
-  out field by field either.
+  No difference found has to be a layout change, and the two maps run did
+  not show one.
 - **Groups only Custom Edition has**: `mod2` (models), `scex` (a transparent
   shader type), `devc` and `tagc`, in all 14 levels; **only the Xbox has**:
   `mode` (models) and `sotr` (a transparent shader type), besides the groups
-  Custom Edition keeps in resource maps. None of the 650 models named alike
-  (`mod2` against `mode`) has the same footprint.
+  Custom Edition keeps in resource maps.
 
 ## Verification
 
-- The two game units with new `HALO_LINUX` code were compiled with the
-  byte-matching toolchain (`ninja all_source`, XDK `CL.exe`) with and
-  without the change: the objects differ only in byte 4, part of the COFF
-  time stamp. The other 619 matching objects were not recompiled between the
-  two builds. No matching tool, reference binary or scoring rule was touched.
+- **The byte-matched build is unchanged.** All 621 matching objects
+  (`ninja all_source`, XDK `CL.exe`) were built from the January sources as
+  they are on this branch and as they are at `f2fa457f`: every section and
+  symbol table is identical, and the files differ only in byte 4, part of the
+  COFF time stamp, in the 55 objects the changed files made the second build
+  recompile. The game-source changes are all under `#ifdef HALO_LINUX`:
+  `cache/cache_files.c`, `cache/cache_files_windows.c`,
+  `rasterizer/rasterizer_geometry.h` (declarations of the buffer functions)
+  and `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` (the chicago
+  extra layers). No matching tool, reference binary or scoring rule was
+  touched.
+- The new game units (`custom_edition_*.c`) compile without warnings under
+  `-Wall -Wextra` as well as the game's usual flags, which silence warnings.
 - `tools/test_linux_port.py` fails 3 tests on this Windows host before and
-  after the change alike (symlink privilege, a case-insensitive file system,
-  a Linux-only UASM rule).
+  after these changes alike (symlink privilege, a case-insensitive file
+  system, a Linux-only UASM rule).
