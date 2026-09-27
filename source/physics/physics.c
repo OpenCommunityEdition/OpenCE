@@ -834,7 +834,7 @@ void physics_compute_new(
 				TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_water_lift_bit) &&
 				powered_mass_point->water_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->water_lift_ratio*physics->mass*depth_fraction;
 				real_vector3d lift_force;
 
@@ -871,7 +871,7 @@ void physics_compute_new(
 				TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_air_lift_bit) &&
 				powered_mass_point->air_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					physics->mass*powered_mass_point->air_lift_ratio;
 				real_vector3d lift_force;
 
@@ -1821,7 +1821,7 @@ static void physics_update_old(
 					_powered_mass_point_water_lift_bit) &&
 				powered_mass_point->water_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->water_lift_ratio*physics->mass*depth_fraction;
 				real_vector3d lift_force;
 
@@ -1873,7 +1873,7 @@ static void physics_update_old(
 					_powered_mass_point_air_lift_bit) &&
 				powered_mass_point->air_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->air_lift_ratio*physics->mass;
 				real_vector3d lift_force;
 

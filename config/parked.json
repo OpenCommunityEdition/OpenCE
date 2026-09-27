@@ -888,11 +888,22 @@
       "unit": "source/physics/physics",
       "function": "_physics_compute_new",
       "class": "unclassified",
-      "evidence": "Best complete typed new-vehicle physics force/torque reconstruction retained from January disassembly and independently corroborating HCEA behavior. January is 2,944 padded bytes with 49 relocations; canonical is 3,120 with 51. Named flags, project real/vector types, typed tag accessors, and existing math macros are used. The broad residual is not attributed to a speculative compiler mechanism and receives zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
+      "evidence": "Best complete typed new-vehicle physics force/torque reconstruction retained from January disassembly and independently corroborating HCEA behavior. January is 2,944 padded bytes with 49 relocations; canonical is 3,120 with 51. Named flags, project real/vector types, typed tag accessors, and existing math macros are used. The broad residual is not attributed to a speculative compiler mechanism and receives zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md. 2026-09-27: independently verified water/air lift fabs corrections replace conditional ABS at January +0x629/+0x748, isolated from the older held helper expansions. Current size is now 2992 with 49 relocations, still nonexact. Later /Od corroborates fabs but its float-wrapper rounding and extra locals are not imported. The ordinary C double result produces two explained /W3 narrowing diagnostics at existing real lift initializers; stock flags remain warning-free. No helper, header, cast, local or expression-order change; all siblings and storage preserved. Reopen remaining differences only on independently supported source/precision/inline evidence, not declaration or VN filler. All prior helper and source-form holds stand. See docs/object_matching_logs/physics_lift_fabs_fidelity_20260927.md.",
       "measurements": {
         "target": { "size": 2944, "relocation_count": 49, "normalized_sha256": "a6981d09eed87ceb8354fee9fb65b3c36a21dfadc01e5d030db3d4d40fdf7b21" },
-        "base": { "size": 3120, "relocation_count": 51, "normalized_sha256": "4ab3824496cb67710db63c85795b6d85e8419656d3217b3ea330c7371a906155" },
-        "objdiff_percent": 71.987724
+        "base": { "size": 2992, "relocation_count": 49, "normalized_sha256": "acd0df16915ce7cf9b6bc0abfff5cb62bbe5339285eaf796989568ab4db08d3e" },
+        "objdiff_percent": 77.08705
+      }
+    },
+    {
+      "unit": "source/physics/physics",
+      "function": "_physics_update_old",
+      "class": "unclassified",
+      "evidence": "Inherited complete typed old-vehicle physics reconstruction remains nonexact and receives zero code credit. On 2026-09-27 two conditional ABS lift expressions were corrected to ordinary fabs, independently proven by January +0x7ad/+0x8d5 and corroborating later /Od calls; no other statement, local, header or helper was changed. Candidate improves from 5456/118 to 5376/116 padded bytes/relocations versus January 5168/115. All 14 exact physics functions and all data/storage are preserved. Existing scale/add topology and every prior helper/source-form hold remain untouched; this park does not admit the larger real-helper or manual-expansion candidates. Stock flags are warning-free; two added /W3 C4244 diagnostics explicitly record double-to-real conversion at existing lift initializers. Reopen with independently supported source/precision/inline evidence explaining the remaining size, relocation and ordering differences; do not replay held helper copies, local-count or operand-order steering. Historical evidence and held candidates remain in physics_obj_opus5_150k_w1_20260914.md, the Lane B physics report/review, and the claude-decals-physics-20260924 lane. See docs/object_matching_logs/physics_lift_fabs_fidelity_20260927.md for fresh measurements and all failed controls.",
+      "measurements": {
+        "target": { "size": 5168, "relocation_count": 115, "normalized_sha256": "bee483283d8e9c3aa3c752e1a6097b5322604fc5c9379bf60528256d2dab08ed" },
+        "base": { "size": 5376, "relocation_count": 116, "normalized_sha256": "1dec5f5b73451138ca09709ccf7baf12925f2688a27416417f7251f8c96a685d" },
+        "objdiff_percent": 82.04146
       }
     },
     {
