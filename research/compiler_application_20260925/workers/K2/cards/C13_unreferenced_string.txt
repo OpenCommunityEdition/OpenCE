@@ -1,0 +1,4 @@
+CARD C13  (written 2026-09-26 02:17:45 -0700, before compile)
+Observed: /W3 C4101 'string' unreferenced local in the fixed-crouch-facing block (ours line 1568); /Od has no slot for it.
+Correction: delete the unreferenced declaration (rule 20 hygiene). Prediction: object byte-identical (unused locals never
+enter the C2 pool, S3-2), both alone on HEAD and on top of C12. C4101 count 1 -> 0.

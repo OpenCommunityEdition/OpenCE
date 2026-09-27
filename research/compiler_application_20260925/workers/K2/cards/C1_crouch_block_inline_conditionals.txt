@@ -1,0 +1,14 @@
+CARD C1  (written 2026-09-26 01:57:23 -0700, before compile)
+Observed discrepancy: x87 operand order at J 0x46b (fld [eax]/fadd [edi-4] vs ours swapped) and J 0x630 (same, second
+ray loop). Structural-lane M8 sweep: +1..5 initialised dead locals at function scope flip BOTH to January (n>=4 worsens the
+0xf52 group / 0x2772). So January differs from us by a code-neutral symbol-count shift upstream of 0x46b.
+Source evidence (class D, /Od halo_cache_symbols.exe 0x49c6be..0x49c848): the crouch-line-of-fire block has NO named
+locals. The three string choices are unnamed compiler temps at the bottom of the /Od frame (-0x1820 friends,
+-0x1824/-0x1828 player/blocking nested, -0x182c moving-into-fire), i.e. inline ?: arguments of csprintf; named locals
+would be ordinary frame slots above -0x180c. January bytes 0x1da..0x2ad are identical for both spellings (evaluation
+order friends-first follows from right-to-left argument evaluation, as /Od shows).
+Proposed correction: inline the three ?: expressions as csprintf arguments; delete blocking_type, blocking_mode, string.
+Compiler-state prediction: removes 3 named locals (≈ +5 mod 8 on later non-temp slot IDs) but adds ?: temps of unknown
+kind; PREDICT: 0x46b and 0x630 flip to January order (4 insns), block 0x1da..0x2ad unchanged; 0xf52/0xf62 may move.
+Collateral risk: other ID-sensitive sites flip either way; the 59 exact siblings cannot change (function-local).
+Decisive test: gate --all; exact-row list identical; sdiff region list vs head.

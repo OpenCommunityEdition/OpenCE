@@ -1,0 +1,187 @@
+EXACT       656  _rasterizer_lens_flare_submit
+== exact 1  residual 0  unwritten 0  (of 1 listed)
+--- target (184) | ours (184) : _rasterizer_lens_flare_submit
+   0: push ebp                                                   0: pu
+   1: mov ebp, esp                                               1: mo
+   3: push edi                                                   3: pu
+   4: mov edi, dword ptr [ebp + 8]                               4: mo
+   7: test edi, edi                                              7: te
+   9: jne 0x2b                                                   9: jn
+   b: push 1                                                     b: pu
+   d: push 0x10a                                                 d: pu
+  12: push 0   ; .rdata                                         12: pu
+  17: push 0   ; ??_C@_0L@HHPOFMCB@parameters?$AA@              17: pu
+  1c: call 0x21   ; _display_assert                             1c: ca
+  21: push -1                                                   21: pu
+  23: call 0x28   ; _system_exit                                23: ca
+  28: add esp, 0x14                                             28: ad
+  2b: cmp dword ptr [edi], 0                                    2b: cm
+  2e: jne 0x50                                                  2e: jn
+  30: push 1                                                    30: pu
+  32: push 0x10b                                                32: pu
+  37: push 0   ; .rdata                                         37: pu
+  3c: push 0   ; .rdata                                         3c: pu
+  41: call 0x46   ; _display_assert                             41: ca
+  46: push -1                                                   46: pu
+  48: call 0x4d   ; _system_exit                                48: ca
+  4d: add esp, 0x14                                             4d: ad
+  50: movzx eax, byte ptr [edi + 0x22]                          50: mo
+  54: and eax, 0xffffff7f                                       54: an
+  59: cmp ax, word ptr [2]   ; _global_window_parameters        59: cm
+  60: je 0x82                                                   60: je
+  62: push 1                                                    62: pu
+  64: push 0x10c                                                64: pu
+  69: push 0   ; .rdata                                         69: pu
+  6e: push 0   ; .rdata                                         6e: pu
+  73: call 0x78   ; _display_assert                             73: ca
+  78: push -1                                                   78: pu
+  7a: call 0x7f   ; _system_exit                                7a: ca
+  7f: add esp, 0x14                                             7f: ad
+  82: mov al, byte ptr [0x1f]   ; _rasterizer_debug_options     82: mo
+  87: test al, al                                               87: te
+  89: je 0x28a                                                  89: je
+  8f: mov ax, word ptr [0]   ; _global_screenshot_count         8f: mo
+  95: cmp ax, 1                                                 95: cm
+  99: jg 0x28a                                                  99: jg
+  9f: jne 0xaf                                                  9f: jn
+  a1: cmp word ptr [0], 1   ; _global_screenshot_size           a1: cm
+  a9: jg 0x28a                                                  a9: jg
+  af: cmp word ptr [0], 0   ; _global_window_parameters         af: cm
+  b7: jne 0x28a                                                 b7: jn
+  bd: mov ecx, dword ptr [0]   ; .bss                           bd: mo
+  c3: cmp ecx, 0x400                                            c3: cm
+  c9: jge 0x26b                                                 c9: jg
+  cf: fld dword ptr [edi + 4]                                   cf: fl
+  d2: mov edx, dword ptr [edi]                                  d2: mo
+  d4: fsub dword ptr [8]   ; _global_window_parameters          d4: fs
+  da: fld dword ptr [edi + 8]                                   da: fl
+  dd: fsub dword ptr [0xc]   ; _global_window_parameters        dd: fs
+  e3: fld dword ptr [edi + 0xc]                                 e3: fl
+  e6: fsub dword ptr [0x10]   ; _global_window_parameters       e6: fs
+  ec: fld dword ptr [edx + 0x1c]                                ec: fl
+  ef: fcomp dword ptr [0]   ; __real@00000000                   ef: fc
+  f5: fnstsw ax                                                 f5: fn
+  f7: test ah, 0x44                                             f7: te
+  fa: jnp 0x12e                                                 fa: jn
+  fc: fld dword ptr [0x1c]   ; _global_window_parameters        fc: fl
+ 102: fmul st(1)                                               102: fm
+ 104: fld dword ptr [0x18]   ; _global_window_parameters       104: fl
+ 10a: fmul st(3)                                               10a: fm
+ 10c: faddp st(1)                                              10c: fa
+ 10e: fld dword ptr [0x14]   ; _global_window_parameters       10e: fl
+ 114: fmul st(4)                                               114: fm
+ 116: faddp st(1)                                              116: fa
+ 118: fcomp dword ptr [edx + 0x1c]                             118: fc
+ 11b: fstp st(0)                                               11b: fs
+ 11d: fnstsw ax                                                11d: fn
+ 11f: fstp st(0)                                               11f: fs
+ 121: test ah, 5                                               121: te
+ 124: fstp st(0)                                               124: fs
+ 126: jp 0x28a                                                 126: jp
+ 12c: jmp 0x134                                                12c: jm
+ 12e: fstp st(0)                                               12e: fs
+ 130: fstp st(0)                                               130: fs
+ 132: fstp st(0)                                               132: fs
+ 134: test dword ptr [edi + 0x18], 0xff000000                  134: te
+ 13b: jbe 0x28a                                                13b: jb
+ 141: push ebx                                                 141: pu
+ 142: push esi                                                 142: pu
+ 143: mov esi, ecx                                             143: mo
+ 145: inc ecx                                                  145: in
+ 146: mov dword ptr [0], ecx   ; .bss                          146: mo
+ 14c: call 0x151   ; _lens_flare_parameters_get                14c: ca
+ 151: push 0x28                                                151: pu
+ 153: mov ebx, eax                                             153: mo
+ 155: push edi                                                 155: pu
+ 156: push ebx                                                 156: pu
+ 157: call 0x15c   ; _csmemcpy                                 157: ca
+ 15c: mov ax, word ptr [edi + 0x1e]                            15c: mo
+ 160: add esp, 0xc                                             160: ad
+ 163: cmp word ptr [edi + 0x1c], -1                            163: cm
+ 168: jne 0x1fe                                                168: jn
+ 16e: cmp ax, 0xffff                                           16e: cm
+ 172: jne 0x1b2                                                172: jn
+ 174: mov word ptr [ebx + 0x1e], 0x8000                        174: mo
+ 17a: mov di, word ptr [edi + 0x20]                            17a: mo
+ 17e: test di, di                                              17e: te
+ 181: jl 0x18d                                                 181: jl
+ 183: cmp di, 8                                                183: cm
+ 187: jl 0x256                                                 187: jl
+ 18d: push 1                                                   18d: pu
+ 18f: push 0x136                                               18f: pu
+ 194: push 0   ; .rdata                                        194: pu
+ 199: push 0   ; .rdata                                        199: pu
+ 19e: call 0x1a3   ; _display_assert                           19e: ca
+ 1a3: push -1                                                  1a3: pu
+ 1a5: call 0x1aa   ; _system_exit                              1a5: ca
+ 1aa: add esp, 0x14                                            1aa: ad
+ 1ad: jmp 0x256                                                1ad: jm
+ 1b2: movsx ecx, word ptr [edi + 0x20]                         1b2: mo
+ 1b6: movsx esi, ax                                            1b6: mo
+ 1b9: shl esi, 0x10                                            1b9: sh
+ 1bc: or esi, ecx                                              1bc: or
+ 1be: jl 0x1c8                                                 1be: jl
+ 1c0: cmp esi, 0x10000                                         1c0: cm
+ 1c6: jl 0x1e8                                                 1c6: jl
+ 1c8: push 1                                                   1c8: pu
+ 1ca: push 0x141                                               1ca: pu
+ 1cf: push 0   ; .rdata                                        1cf: pu
+ 1d4: push 0   ; .rdata                                        1d4: pu
+ 1d9: call 0x1de   ; _display_assert                           1d9: ca
+ 1de: push -1                                                  1de: pu
+ 1e0: call 0x1e5   ; _system_exit                              1e0: ca
+ 1e5: add esp, 0x14                                            1e5: ad
+ 1e8: lea edx, [esi + 8]                                       1e8: le
+ 1eb: sar esi, 0x10                                            1eb: sa
+ 1ee: or esi, 0xffff8000                                       1ee: or
+ 1f4: mov word ptr [ebx + 0x20], dx                            1f4: mo
+ 1f8: mov word ptr [ebx + 0x1e], si                            1f8: mo
+ 1fc: jmp 0x256                                                1fc: jm
+ 1fe: movsx esi, word ptr [ebx + 0x1e]                         1fe: mo
+ 202: imul esi, esi, 0x22                                      202: im
+ 205: add esi, 0   ; .bss                                      205: ad
+ 20b: test ax, ax                                              20b: te
+ 20e: jl 0x216                                                 20e: jl
+ 210: cmp ax, 0x380                                            210: cm
+ 214: jl 0x236                                                 214: jl
+ 216: push 1                                                   216: pu
+ 218: push 0x152                                               218: pu
+ 21d: push 0   ; .rdata                                        21d: pu
+ 222: push 0   ; .rdata                                        222: pu
+ 227: call 0x22c   ; _display_assert                           227: ca
+ 22c: push -1                                                  22c: pu
+ 22e: call 0x233   ; _system_exit                              22e: ca
+ 233: add esp, 0x14                                            233: ad
+ 236: mov ax, word ptr [edi + 0x1c]                            236: mo
+ 23a: cmp ax, word ptr [esi]                                   23a: cm
+ 23d: je 0x256                                                 23d: je
+ 23f: push 0x20                                                23f: pu
+ 241: lea ecx, [esi + 2]                                       241: le
+ 244: push 0                                                   244: pu
+ 246: push ecx                                                 246: pu
+ 247: call 0x24c   ; _csmemset                                 247: ca
+ 24c: mov dx, word ptr [ebx + 0x1c]                            24c: mo
+ 250: add esp, 0xc                                             250: ad
+ 253: mov word ptr [esi], dx                                   253: mo
+ 256: cmp word ptr [2], 2   ; _rasterizer_debug_options        256: cm
+ 25e: pop esi                                                  25e: po
+ 25f: pop ebx                                                  25f: po
+ 260: jne 0x28a                                                260: jn
+ 262: inc dword ptr [0x14c]   ; _rasterizer_frame_statistics   262: in
+ 268: pop edi                                                  268: po
+ 269: pop ebp                                                  269: po
+ 26a: ret                                                      26a: re
+ 26b: mov al, byte ptr [0]   ; .bss                            26b: mo
+ 270: test al, al                                              270: te
+ 272: jne 0x28a                                                272: jn
+ 274: push 0   ; .rdata                                        274: pu
+ 279: push 2                                                   279: pu
+ 27b: call 0x280   ; _error                                    27b: ca
+ 280: add esp, 8                                               280: ad
+ 283: mov byte ptr [0], 1   ; .bss                             283: mo
+ 28a: pop edi                                                  28a: po
+ 28b: pop ebp                                                  28b: po
+ 28c: ret                                                      28c: re
+ 28d: nop                                                      28d: no
+ 28e: nop                                                      28e: no
+ 28f: nop                                                      28f: no

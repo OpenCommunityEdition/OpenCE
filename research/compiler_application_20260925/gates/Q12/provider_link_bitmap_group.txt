@@ -1,0 +1,7 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618  2026-09-26 11:30:21 -0700
+=== python -B scratch/tools/provider_link.py source/bitmaps/bitmap_group   (all surplus external definitions vs January's split object; both orders; tool sha256 bc854a32244cd42830696d0d4b35f8e46278ac4791a8e24f52b2bb6ae6fb188d)
+??_C@_00CNPNBAHC@?$AA@                       provider source/ai/action_obey                            PASS
+??_C@_05MGJOOGAJ@group?$AA@                  provider source/bitmaps/bitmap_extract                    PASS
+??_C@_07DLHCIBDH@default?$AA@                provider source/ai/actor_looking                          PASS
+SELECTED-PROVIDER LINK: PASS
+exit code 0

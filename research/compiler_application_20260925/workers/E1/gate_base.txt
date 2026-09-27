@@ -1,0 +1,125 @@
+===== source/tool/connected_geometry
+EXACT       128  _connected_geometry_add_intermediate_triangle
+EXACT       416  _connected_geometry_add_triangle
+EXACT        80  _connected_geometry_delete
+residual    240  _connected_geometry_find_or_add_edge  [size 256!=240, sha]
+residual    192  _connected_geometry_find_or_add_vertex  [sha]
+EXACT       304  _connected_geometry_group_coplanar
+EXACT       208  _connected_geometry_group_recursive
+EXACT        48  _connected_geometry_new
+EXACT       176  _plane3d_from_points
+residual    384  _triangle_coplanar  [sha]
+== exact 7  residual 3  unwritten 0  (of 10 listed)
+===== source/math/periodic_functions
+residual    256  @periodic_function_build_variable_period_x_table@4  [sha]
+EXACT       688  _periodic_function_build_table
+EXACT       304  _periodic_function_evaluate
+EXACT       112  _periodic_functions_dispose
+EXACT       192  _periodic_functions_initialize
+EXACT       304  _transition_function_build_table
+EXACT       288  _transition_function_evaluate
+== exact 6  residual 1  unwritten 0  (of 7 listed)
+===== source/cache/xbox_sound_cache
+EXACT       352  __sound_cache_sound_request
+EXACT        64  _cache_block_get_sound_permutation_name
+EXACT       256  _render_inverse_transform_screen_point
+EXACT        96  _sound_cache_close
+residual    368  _sound_cache_debug_render  [sha]
+EXACT        48  _sound_cache_delete
+EXACT       192  _sound_cache_delete_block_proc
+EXACT        96  _sound_cache_flush
+EXACT        64  _sound_cache_idle
+EXACT        64  _sound_cache_locked_block_proc
+EXACT       176  _sound_cache_new
+EXACT        16  _sound_cache_open
+EXACT       304  _sound_cache_sound_delete
+EXACT       112  _sound_cache_sound_finished
+EXACT        64  _sound_cache_sound_hardware_lock
+EXACT        48  _sound_cache_sound_hardware_unlock
+EXACT        80  _sound_cache_sound_new
+EXACT       304  _sound_cache_start_loading_sound
+== exact 17  residual 1  unwritten 0  (of 18 listed)
+===== source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps
+EXACT        16  _D3DCubeTexture_UnlockRect@12
+EXACT        16  _D3DTexture_UnlockRect@8
+EXACT        16  _D3DVolumeTexture_UnlockBox@8
+EXACT        16  _IDirect3DBaseTexture8_Release@4
+EXACT        32  _IDirect3DCubeTexture8_LockRect@24
+EXACT        16  _IDirect3DCubeTexture8_UnlockRect@12
+EXACT        32  _IDirect3DDevice8_CreateCubeTexture@28
+EXACT        32  _IDirect3DDevice8_CreateTexture@32
+EXACT        48  _IDirect3DDevice8_CreateVolumeTexture@36
+EXACT        32  _IDirect3DTexture8_LockRect@20
+EXACT        16  _IDirect3DTexture8_UnlockRect@8
+EXACT        32  _IDirect3DVolumeTexture8_LockBox@20
+EXACT        16  _IDirect3DVolumeTexture8_UnlockBox@8
+EXACT       448  _rasterizer_bitmap_2d_changed
+EXACT       528  _rasterizer_bitmap_3d_changed
+EXACT       176  _rasterizer_bitmap_changed
+EXACT       528  _rasterizer_bitmap_cm_changed
+EXACT        48  _rasterizer_bitmap_delete
+residual    400  _rasterizer_bitmap_new  [sha]
+== exact 18  residual 1  unwritten 0  (of 19 listed)
+===== source/camera/dead_camera
+EXACT       288  _dead_camera_new
+residual   1248  _dead_camera_update  [sha]
+EXACT       176  _player_get_next_player_with_a_unit
+EXACT       112  _player_has_allies
+== exact 3  residual 1  unwritten 0  (of 4 listed)
+===== source/cutscene/cinematics
+EXACT        16  _cinematic_can_be_skipped
+EXACT        16  _cinematic_dispose
+EXACT        32  _cinematic_dispose_from_old_map
+EXACT        32  _cinematic_force_title
+EXACT        16  _cinematic_in_progress
+EXACT        64  _cinematic_initialize
+EXACT        48  _cinematic_initialize_for_new_map
+residual   1280  _cinematic_render  [sha]
+EXACT        32  _cinematic_set_title
+EXACT       144  _cinematic_set_title_delayed
+EXACT        48  _cinematic_show_letterbox
+EXACT        16  _cinematic_skip_start
+EXACT        16  _cinematic_skip_stop
+EXACT        64  _cinematic_start
+EXACT        80  _cinematic_stop
+EXACT        32  _cinematic_suppress_bsp_object_creation
+EXACT       336  _draw_quad
+== exact 16  residual 1  unwritten 0  (of 17 listed)
+===== source/objects/widgets/lightning
+EXACT        32  _lightning_delete
+EXACT        64  _lightning_new
+EXACT       240  _lightning_offset_marker_position
+EXACT        16  _lightning_render
+residual   2576  _lightning_submit  [sha]
+EXACT        16  _lightnings_dispose
+EXACT        32  _lightnings_dispose_from_old_map
+EXACT        64  _lightnings_initialize
+EXACT        32  _lightnings_initialize_for_new_map
+== exact 8  residual 1  unwritten 0  (of 9 listed)
+===== source/ai/path_structure_bsp
+EXACT       112  _clip_empty_interval_by_solid_interval
+EXACT        96  _structure_surface_index_from_point
+EXACT       128  _structure_surfaces_are_equivalent
+EXACT      1104  _structure_test_line2d
+EXACT       624  _structure_test_pill2d
+EXACT       480  _structure_test_ray2d
+== exact 6  residual 0  unwritten 0  (of 6 listed)
+===== source/rasterizer/xbox/rasterizer_xbox_hardware_geometry
+EXACT        16  _D3DIndexBuffer_Lock@20
+EXACT        32  _IDirect3DDevice8_CreateIndexBuffer@24
+EXACT        32  _IDirect3DDevice8_CreateVertexBuffer@24
+EXACT        32  _IDirect3DIndexBuffer8_Lock@20
+EXACT        16  _IDirect3DIndexBuffer8_Release@4
+EXACT        32  _IDirect3DVertexBuffer8_Lock@20
+EXACT        16  _IDirect3DVertexBuffer8_Release@4
+EXACT        16  _code_00158450@8
+EXACT        16  _code_00158460@8
+EXACT        16  _code_00158470@4
+EXACT        16  _code_001584b0@4
+EXACT        16  _code_001584d0@4
+EXACT        16  _code_00158510@4
+EXACT        48  _rasterizer_triangle_buffer_delete
+EXACT       352  _rasterizer_triangle_buffer_new
+EXACT        48  _rasterizer_vertex_buffer_delete
+EXACT       368  _rasterizer_vertex_buffer_new
+== exact 17  residual 0  unwritten 0  (of 17 listed)

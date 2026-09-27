@@ -1,0 +1,19 @@
+CARD LAB1  written 2026-09-26 01:22:03 -0700 (clock-read; BEFORE any lab compile/link)
+question: what can a VC7 (13.00.9254 CL / XDK Link.Exe in xbox/bin/vc7) link artefact say about which TU
+  defined a COMMON (tentative) global?  This decides which evidence classes could ever PLACE a pooled record.
+lab: 4 tiny C TUs compiled with the pinned CL.Exe (/c /Zi and without /Zi), linked with the pinned Link.Exe
+  (/NODEFAULTLIB /ENTRY /DEBUG /MAP) in two command-line orders; read .map, DIA2Dump -c/-g/-m/-compiland.
+predictions:
+  P1  the /MAP line of a COMMON variable names "<common>" (or equivalent), NOT the defining object.
+  P2  DIA2Dump -c attributes each COMMON variable's contribution to "* Linker *" (as January's contribs do,
+      module 847).
+  P3  the pooled .bss holds COMMON variables in contiguous per-object runs, in object PROCESSING order; a
+      symbol tentatively defined in two TUs sits in the run of the first-processed definer.
+  P4  PDB module index increases with command-line order (so January's ascending-module pool order =
+      command-line order of first definers).  Low confidence: January's .text runs in DESCENDING module
+      index, which would contradict this unless .text is laid out in reverse.
+  P5  with /Zi the global does NOT appear among the defining compiland's symbols (S_GDATA32 moves to the
+      global stream), so a PDB module stream cannot name the definer.
+  P6  a TU that only has 'extern T x;' and a TU with 'T x;' produce indistinguishable IMPORT-side
+      relocations; only the defining object's own symbol table (sec 0, value=size) differs.
+decisive: map text, DIA dumps, dumpbin-equivalent COFF symbol tables (coffio).

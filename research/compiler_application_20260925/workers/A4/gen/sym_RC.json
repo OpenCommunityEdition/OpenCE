@@ -1,0 +1,201 @@
+[
+ {
+  "line": 5495,
+  "find": "{ \"file_offset\": 1329392, \"flags\": 32, \"name\": \"_Direct3D_Release@0\" },",
+  "replace": [
+   "{ \"file_offset\": 1329392, \"flags\": 32, \"name\": \"_Direct3D_Release@0\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5496,
+  "find": "{ \"file_offset\": 1329408, \"flags\": 32, \"name\": \"_IDirect3D8_Release@4\" },",
+  "replace": [
+   "{ \"file_offset\": 1329408, \"flags\": 32, \"name\": \"_IDirect3D8_Release@4\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5497,
+  "find": "{ \"file_offset\": 1329424, \"flags\": 32, \"name\": \"_IDirect3D8_CreateDevice@28\" },",
+  "replace": [
+   "{ \"file_offset\": 1329424, \"flags\": 32, \"name\": \"_IDirect3D8_CreateDevice@28\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5502,
+  "find": "{ \"file_offset\": 1329536, \"flags\": 32, \"name\": \"_D3DDevice_SetRenderState\" },",
+  "replace": [
+   "{ \"file_offset\": 1329536, \"flags\": 32, \"name\": \"_D3DDevice_SetRenderState\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5503,
+  "find": "{ \"file_offset\": 1329968, \"flags\": 32, \"name\": \"_D3DDevice_SetTextureStageState\" },",
+  "replace": [
+   "{ \"file_offset\": 1329968, \"flags\": 32, \"name\": \"_D3DDevice_SetTextureStageState\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5504,
+  "find": "{ \"file_offset\": 1330048, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Release@4\" },",
+  "replace": [
+   "{ \"file_offset\": 1330048, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Release@4\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5505,
+  "find": "{ \"file_offset\": 1330064, \"flags\": 32, \"name\": \"_IDirect3DDevice8_GetDeviceCaps@8\" },",
+  "replace": [
+   "{ \"file_offset\": 1330064, \"flags\": 32, \"name\": \"_IDirect3DDevice8_GetDeviceCaps@8\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5506,
+  "find": "{ \"file_offset\": 1330080, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Present@20\" },",
+  "replace": [
+   "{ \"file_offset\": 1330080, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Present@20\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5507,
+  "find": "{ \"file_offset\": 1330112, \"flags\": 32, \"name\": \"_IDirect3DDevice8_GetBackBuffer@16\" },",
+  "replace": [
+   "{ \"file_offset\": 1330112, \"flags\": 32, \"name\": \"_IDirect3DDevice8_GetBackBuffer@16\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5512,
+  "find": "{ \"file_offset\": 1330256, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetRenderTarget@12\" },",
+  "replace": [
+   "{ \"file_offset\": 1330256, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetRenderTarget@12\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5517,
+  "find": "{ \"file_offset\": 1330608, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Clear@28\" },",
+  "replace": [
+   "{ \"file_offset\": 1330608, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Clear@28\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5518,
+  "find": "{ \"file_offset\": 1330640, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetViewport@8\" },",
+  "replace": [
+   "{ \"file_offset\": 1330640, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetViewport@8\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5520,
+  "find": "{ \"file_offset\": 1330816, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetRenderState@12\" },",
+  "replace": [
+   "{ \"file_offset\": 1330816, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetRenderState@12\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5525,
+  "find": "{ \"file_offset\": 1331440, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetTextureStageState@16\" },",
+  "replace": [
+   "{ \"file_offset\": 1331440, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetTextureStageState@16\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5533,
+  "find": "{ \"file_offset\": 1331648, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetVertexData2s@16\" },",
+  "replace": [
+   "{ \"file_offset\": 1331648, \"flags\": 32, \"name\": \"_IDirect3DDevice8_SetVertexData2s@16\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5534,
+  "find": "{ \"file_offset\": 1331664, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Begin@8\" },",
+  "replace": [
+   "{ \"file_offset\": 1331664, \"flags\": 32, \"name\": \"_IDirect3DDevice8_Begin@8\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5535,
+  "find": "{ \"file_offset\": 1331680, \"flags\": 32, \"name\": \"_IDirect3DDevice8_End@4\" },",
+  "replace": [
+   "{ \"file_offset\": 1331680, \"flags\": 32, \"name\": \"_IDirect3DDevice8_End@4\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5568,
+  "find": "{ \"file_offset\": 1335472, \"flags\": 32, \"name\": \"_IDirect3DSurface8_Release@4\" },",
+  "replace": [
+   "{ \"file_offset\": 1335472, \"flags\": 32, \"name\": \"_IDirect3DSurface8_Release@4\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5570,
+  "find": "{ \"file_offset\": 1335872, \"flags\": 32, \"name\": \"_IDirect3DSurface8_GetDesc@8\" },",
+  "replace": [
+   "{ \"file_offset\": 1335872, \"flags\": 32, \"name\": \"_IDirect3DSurface8_GetDesc@8\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5571,
+  "find": "{ \"file_offset\": 1335888, \"flags\": 32, \"name\": \"_IDirect3DSurface8_LockRect@16\" },",
+  "replace": [
+   "{ \"file_offset\": 1335888, \"flags\": 32, \"name\": \"_IDirect3DSurface8_LockRect@16\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 22725,
+  "find": "{ \"file_offset\": 3198700, \"flags\": 0, \"name\": \"_rasterizer_state_cache\" },",
+  "replace": [
+   "{ \"file_offset\": 3198700, \"flags\": 0, \"name\": \"_rasterizer_state_cache\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 23143,
+  "find": "{ \"file_offset\": 4581588, \"flags\": 0, \"name\": \"_d3d_palette\" },",
+  "replace": [
+   "{ \"file_offset\": 4581588, \"flags\": 0, \"name\": \"_d3d_palette\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 5578,
+  "find": "{ \"file_offset\": 1336912, \"flags\": 32, \"name\": \"_rasterizer_filthy_bitmap_default_initialize\" },",
+  "replace": [
+   "{ \"file_offset\": 1336912, \"flags\": 32, \"name\": \"_rasterizer_filthy_bitmap_defaults_initialize\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 19677,
+  "find": "{ \"file_offset\": 2670508, \"flags\": 0, \"name\": \"_framebuffer_blend_function_states\" },",
+  "replace": [
+   "{ \"file_offset\": 2670508, \"flags\": 0, \"name\": \"?srcblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9\", \"static\": true },",
+   "{ \"file_offset\": 2670544, \"flags\": 0, \"name\": \"?destblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9\", \"static\": true },",
+   "{ \"file_offset\": 2670580, \"flags\": 0, \"name\": \"?blendop_table@?1??rasterizer_set_framebuffer_blend_function@@9@9\", \"static\": true },"
+  ]
+ },
+ {
+  "line": 23141,
+  "find": "{ \"file_offset\": 4579368, \"flags\": 0, \"name\": \"_rasterizer_xbox_d3d_globals\" },",
+  "replace": [
+   "{ \"file_offset\": 4579368, \"flags\": 0, \"name\": \"_node_matrix_constants\", \"static\": true },",
+   "{ \"file_offset\": 4581480, \"flags\": 0, \"name\": \"_bitmap_dimensions_non_blocking\", \"static\": true },",
+   "{ \"file_offset\": 4581484, \"flags\": 0, \"name\": \"_bitmap_dimensions\", \"static\": true },",
+   "{ \"file_offset\": 4581488, \"flags\": 0, \"name\": \"_d3d\", \"static\": true },",
+   "{ \"file_offset\": 4581492, \"flags\": 0, \"name\": \"_global_d3d_texture_render_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581500, \"flags\": 0, \"name\": \"_global_d3d_surface_render_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581504, \"flags\": 0, \"name\": \"_global_d3d_surface_render_primary_z\", \"static\": true },",
+   "{ \"file_offset\": 4581508, \"flags\": 0, \"name\": \"_global_d3d_texture_render_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581512, \"flags\": 0, \"name\": \"_global_d3d_texture_render_secondary_z\", \"static\": true },",
+   "{ \"file_offset\": 4581516, \"flags\": 0, \"name\": \"_global_d3d_surface_render_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581520, \"flags\": 0, \"name\": \"_global_d3d_surface_render_secondary_z\", \"static\": true },",
+   "{ \"file_offset\": 4581524, \"flags\": 0, \"name\": \"_global_d3d_texture_shadow_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581528, \"flags\": 0, \"name\": \"_global_d3d_surface_shadow_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581532, \"flags\": 0, \"name\": \"_global_d3d_texture_shadow_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581536, \"flags\": 0, \"name\": \"_global_d3d_surface_shadow_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581540, \"flags\": 0, \"name\": \"_global_d3d_texture_sun_glow_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581544, \"flags\": 0, \"name\": \"_global_d3d_surface_sun_glow_primary\", \"static\": true },",
+   "{ \"file_offset\": 4581548, \"flags\": 0, \"name\": \"_global_d3d_texture_sun_glow_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581552, \"flags\": 0, \"name\": \"_global_d3d_surface_sun_glow_secondary\", \"static\": true },",
+   "{ \"file_offset\": 4581556, \"flags\": 0, \"name\": \"_global_d3d_texture_water\", \"static\": true },",
+   "{ \"file_offset\": 4581560, \"flags\": 0, \"name\": \"_global_d3d_surface_water\", \"static\": true },",
+   "{ \"file_offset\": 4581576, \"flags\": 0, \"name\": \"_global_d3d_texture_render_primary_copy\", \"static\": true },",
+   "{ \"file_offset\": 4581580, \"flags\": 0, \"name\": \"_global_d3d_surface_render_primary_copy\", \"static\": true },"
+  ]
+ }
+]

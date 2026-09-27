@@ -1,0 +1,5 @@
+CARD K1-20  (pre-registered 2026-09-26 02:40:16 -0700)
+Base: k16. Question: is the /Od dead store "else { animation_type = NONE; }" (part of K1-06) load-bearing?
+Change: remove only that else arm.
+Prediction: byte-inert (the local is never read after it; dead-store elimination) -> the K1-06 gain comes from the
+  single "animation_weight = 2.0f" store; the dead arm can be dropped from the admissible patch.

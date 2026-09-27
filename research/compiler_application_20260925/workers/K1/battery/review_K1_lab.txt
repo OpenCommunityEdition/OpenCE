@@ -1,0 +1,6 @@
+change  _ai_communication_event                                 8128 -> 8064  changed
+change  _magnitude2d                                            None -> 32  ADDED  [absent in January]
+change  _magnitude_squared2d                                    None -> 32  ADDED  [absent in January]
+change  _normalize2d                                            None -> 80  ADDED  [absent in January]
+change  _scale_vector2d                                         None -> 32  ADDED  [absent in January]
+VERDICT K1_lab: 0 gains, 0 losses, 5 other changes (4 added, 0 removed) | gate: EXACT       176  _reply_filter_same_target | EXACT        80  _reply_filter_searching | == exact 46  residual 2  unwritten 0  (of 48 listed)

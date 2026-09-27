@@ -1,0 +1,12 @@
+CARD C09 - R12 boolean variant members stored as TRUE/FALSE; R11 find_netgame_flags for-loop initialiser (on top of c5)
+written: 2026-09-26 01:23:01 -0700 (BEFORE the compiles)
+
+R12 observed: the builders store 0/1 into boolean members (king.moving_hill, slayer.no_death_bonus/no_kill_penalty/
+kill_in_order, ctf.assault/reset_on_capture/flag_must_reset/flag_at_home_to_score, oddball.random_start/
+ball_spawn_delay) while the same builders store FALSE into universal_variant.odd_man_out/teams (rule 10/14:
+genuine types, do not blur concepts). Correction: FALSE/TRUE for those members only (the long members keep
+numbers). Prediction: byte-identical, count-neutral (macros) -> 180/180.
+R11 observed: find_netgame_flags writes `flag_index = 0; for (; flag_index < count; flag_index++)`.
+Correction: `for (flag_index = 0; ...)`. Prediction: probably byte-identical (the store is the same statement
+position); if RESIDUAL, the split initialiser is load-bearing and stays (disclosed), per rule 62.
+PREDICTION: R12 180/180; R11 uncertain (0.6 EXACT).

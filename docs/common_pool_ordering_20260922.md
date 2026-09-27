@@ -15,8 +15,13 @@ falls between two apparently owned records.
 
 The original Lane C packet applied that inference too strongly. Canonical
 reconciliation excluded its 116-definition COMMON wave. An existing owner test
-proved that `rasterizer_frame_statistics.c` **imports** its eponymous global,
-despite the pool-order hypothesis assigning it to that TU. The same lack of
+reads January's split `rasterizer_frame_statistics` object, where its eponymous
+global appears only as an UNDEF external. That does **not** prove an import:
+csplit renders a pooled COMMON record as UNDEF (value 0) in a defining TU and in
+an importing TU alike, so the test cannot tell them apart and the owner of
+`_rasterizer_frame_statistics` remains **undetermined** (correction recorded
+2026-09-26; the test itself and its ownership checks are unchanged). The pool-order
+hypothesis does not settle it either. The same lack of
 independent proof affects `hs_syntax_data`, `ai_globals`, and
 `rasterizer_model_cortana_hack`; their Lane C moves were also not integrated.
 These are unresolved ownership questions, not credited reconstructions.

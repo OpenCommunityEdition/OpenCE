@@ -69,6 +69,8 @@ void damage_dispose(void);
 void damage_initialize_for_new_map(void);
 void damage_dispose_from_old_map(void);
 void damage_render_debug(void);
+void render_debug_object_damage(
+	void);
 void object_initialize_vitality(long object_index, real *custom_body_vitality, real *custom_shield_vitality);
 void object_can_take_damage(long object_list_index);
 void object_cannot_take_damage(long object_list_index);

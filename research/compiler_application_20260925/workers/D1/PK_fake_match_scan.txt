@@ -1,0 +1,24 @@
+## fake_match_scan root_base/source/items/weapons.c
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_base/source/objects/object_types.c
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_base/source/items/weapons.h
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_base/source/objects/object_types.h
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_p2/source/items/weapons.c
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_p2/source/objects/object_types.c
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_p2/source/items/weapons.h
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+## fake_match_scan root_p2/source/objects/object_types.h
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).

@@ -1,0 +1,109 @@
+### object_audit
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_06KJFADLGN@result?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CH@JLKIDLBA@c?3?2halo?2SOURCE?2ai?2path_s size    39/39    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EI@IFBLLPMB@surface_index?$DO?$DN0?5?$CG? size    72/72    flags eq align 4/4
+  ok   .rdata   sym:__real@3c000000                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3fa99999a0000000                          size     8/8     flags eq align 4/4
+  ok   .text    sym:_clip_empty_interval_by_solid_interval           size   112/112   flags eq align 5/5
+  ok   .rdata   sym:_quantized_pathfinding_surface_widths            size    64/64    flags eq align 3/3
+  ok   .text    sym:_structure_surface_index_from_point              size    96/96    flags eq align 5/5
+  ok   .text    sym:_structure_surfaces_are_equivalent               size   128/128   flags eq align 5/5
+  ok   .text    sym:_structure_test_line2d                           size  1104/1104  flags eq align 5/5
+  ok   .text    sym:_structure_test_pill2d                           size   624/624   flags eq align 5/5
+  ok   .text    sym:_structure_test_ray2d                            size   480/480   flags eq align 5/5
+== symbols (January)
+  13 January symbols, 0 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_0EG@DGPBJLIB@TEST_FLAG?$CIcollision_surfac size 70
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.text    sym:_cross_product2d                                 size 32
+  +.text    sym:_distance_squared2d                              size 48
+  +.text    sym:_magnitude2d                                     size 32
+  +.text    sym:_magnitude_squared2d                             size 32
+  +.text    sym:_normalize2d                                     size 80
+  +.text    sym:_point_from_line2d                               size 48
+  +.text    sym:_scale_vector2d                                  size 32
+  +.text    sym:_set_real_vector2d                               size 32
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points2d                            size 32
+OBJECT AUDIT: PASS
+exit=0
+### pdb_storage
+source/ai/path_structure_bsp: 13 split symbols, 0 disagreements with PDB publics
+exit=0
+### surplus_identity
+  _square_root                   vs source\ai\action_charge.obj              IDENTICAL
+  _set_real_vector2d             vs source\ai\actions.obj                    IDENTICAL
+  _point_from_line2d             vs source\ai\action_vehicle.obj             IDENTICAL
+  _vector_from_points2d          vs source\ai\action_obey.obj                IDENTICAL
+  _scale_vector2d                vs source\ai\action_charge.obj              IDENTICAL
+  _magnitude_squared2d           vs source\ai\action_charge.obj              IDENTICAL
+  _magnitude2d                   vs source\ai\action_charge.obj              IDENTICAL
+  _normalize2d                   vs source\ai\action_charge.obj              IDENTICAL
+  _distance_squared2d            vs source\ai\action_vehicle.obj             IDENTICAL
+  _cross_product2d               vs source\ai\actor_combat.obj               IDENTICAL
+source/ai/path_structure_bsp: 10 candidate-only code COMDATs, 0 not identical
+exit=0
+### provider_link
+??_C@_0EG@DGPBJLIB@TEST_FLAG?$CIcollision_surface?9?$DOfla@ provider source/ai/path_smoothing                         PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@3f1a36e2e0000000                      provider source/ai/action_charge                          PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+_cross_product2d                             provider source/ai/actor_combat                           PASS
+_distance_squared2d                          provider source/ai/action_vehicle                         PASS
+_magnitude2d                                 provider source/ai/action_charge                          PASS
+_magnitude_squared2d                         provider source/ai/action_charge                          PASS
+_normalize2d                                 provider source/ai/action_charge                          PASS
+_point_from_line2d                           provider source/ai/action_vehicle                         PASS
+_scale_vector2d                              provider source/ai/action_charge                          PASS
+_set_real_vector2d                           provider source/ai/actions                                PASS
+_square_root                                 provider source/ai/action_charge                          PASS
+_vector_from_points2d                        provider source/ai/action_obey                            PASS
+SELECTED-PROVIDER LINK: PASS
+exit=0
+### protoscan
+== source/ai/path_structure_bsp.c
+exit=0
+### /W3 census
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+source\cseries\cseries.h(45) : warning C4146: unary minus operator applied to unsigned type, result still unsigned
+source\math\real_math.h(900) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(906) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(912) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(924) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(931) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(937) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(972) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(986) : warning C4244: 'return' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1135) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1136) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+source\math\real_math.h(1137) : warning C4244: 'initializing' : conversion from 'double' to 'real', possible loss of data
+### fake_match_scan
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 2 file(s); 0 review lead(s); skipped 0 vendored path(s).
+exit=0
+
+######## P1c candidate (path_structure_bsp.patch) ########
+### object_audit P1c
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points2d                            size 32
+OBJECT AUDIT: PASS
+### pdb_storage (P1c obj)
+source/ai/path_structure_bsp: 13 split symbols, 0 disagreements with PDB publics
+### surplus_identity (P1c obj)
+source/ai/path_structure_bsp: 10 candidate-only code COMDATs, 0 not identical
+### provider_link P1c
+SELECTED-PROVIDER LINK: PASS
+### /W3 P1c
+rc 0 {'warning C4146': 1, 'warning C4244': 11}
+### fake_match_scan P1c
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+### protoscan P1c
+== research/compiler_application_20260925/workers/E1/copies/path_structure_bsp_P1c.c
+### goto count HEAD vs P1c
+2
+0

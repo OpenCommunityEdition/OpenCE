@@ -1,0 +1,23 @@
+CARD P02 - /Od shape B alone: refresh flag `boolean build_path = TRUE; if (actor_test_destination(actor_index)) { build_path = have_previous_destination && distance_squared3d(...) > 0.1f*0.1f; } if (build_path) {...}`
+Written 2026-09-26T21:12:02Z (clock-read, date -u), BEFORE compiling. Source: scratch/rf/workers/RF-A/P02.c
+(tools/mkvar.py v_P02). Immutable above the OUTCOME line.
+
+Change vs lane source: the combined `if (!actor_test_destination(...) || (have_previous_destination && ...))`
+becomes a flag set TRUE, overwritten when the destination test passes, then `if (flag)`. Kept inside the existing
+second `if (success)` (A not applied). Name `build_path` is DESCRIPTIVE/INFERRED (the /Od build has no scalar
+names; RTC names only aggregates) - disclosed per house rule 15.
+
+Evidence (/Od 0x46cbc1-0x46cc2b): `mov byte [ebp-0x4d],1` BEFORE the actor_test_destination call; `je 0x46cc25`
+on a FALSE result skips straight to the flag test; on TRUE the `have_previous && distance_squared3d > 0.01f
+(0x3c23d70b = folded 0.1f*0.1f)` value is materialised through the && temp into [ebp-0x4d]; 0x46cc25 tests the flag.
+A `!a || (b && c)` expression would not store TRUE before calling `a`.
+
+Prediction: body identical (421 insns, 0 masked diffs). Binding INERT (~80%): Lane A s12 (a named value for the
+LATE guard) was inert and a boolean flag of this kind folds into the same branch graph; the flag lives in the
+threaded region before the refresh block and does not touch the clear/exit adjacency.
+
+OUTCOME (appended after compile):
+2026-09-26T21:12:51Z gate --all: _actor_path_refresh EXACT (1440/52, normalized sha16 b6b01d01147885d0 = January).
+unit exact 33 / residual 3 (other three residuals unchanged, all 32 previously exact still EXACT).
+Real code end 0x583 = January; 421/421 insns; branch widths 2Bx24 5Bx6 6Bx13 = January; the three float jcc bind
+-> 0x542 short. PREDICTION REFUTED: I predicted INERT (~80%). B alone flips the binding.

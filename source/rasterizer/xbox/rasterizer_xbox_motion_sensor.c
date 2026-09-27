@@ -44,6 +44,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/interface.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer.h"
 #include <xtl.h>
 
 /* ---------- constants */
@@ -56,16 +57,6 @@ struct motion_sensor_debug_options
 {
 	byte reserved00[0x23];
 	boolean motion_sensor;
-};
-
-struct motion_sensor_window_parameters
-{
-	word rasterizer_target;
-	byte reserved02[0x32];
-	short left;
-	short top;
-	short right;
-	short bottom;
 };
 
 struct pixel_shader_definition
@@ -133,7 +124,7 @@ void SetRenderStateSmart(
 
 extern void *global_d3d_device;
 extern struct motion_sensor_debug_options rasterizer_debug_options;
-extern struct motion_sensor_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 boolean bss_00465e27 = {0};
@@ -353,8 +344,8 @@ void _rasterizer_hud_motion_sensor_blip_end(
 	real high;
 	real low;
 	real radius;
-	short width;
 	short height;
+	short width;
 
 	sweep_bitmap = bitmap_group_try_and_get_bitmap(
 		interface_get_tag_index(_interface_bitmap_motion_sweep),
@@ -572,16 +563,16 @@ void _rasterizer_hud_motion_sensor_blip_end(
 			IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ZBIAS, 0);
 			rasterizer_set_vertex_shader_permutation(4, 8, FALSE);
 
-			height = global_window_parameters.bottom - global_window_parameters.top;
-			width = global_window_parameters.right - global_window_parameters.left;
-			vertex_constants[0][0] = 2.0f / height;
+			width = global_window_parameters.camera.viewport_bounds.x1 - global_window_parameters.camera.viewport_bounds.x0;
+			height = global_window_parameters.camera.viewport_bounds.y1 - global_window_parameters.camera.viewport_bounds.y0;
+			vertex_constants[0][0] = 2.0f / width;
 			vertex_constants[0][1] = 0.0f;
 			vertex_constants[0][2] = 0.0f;
-			vertex_constants[0][3] = -1.0f - 1.0f / height;
+			vertex_constants[0][3] = -1.0f - 1.0f / width;
 			vertex_constants[1][0] = 0.0f;
-			vertex_constants[1][1] = -2.0f / width;
+			vertex_constants[1][1] = -2.0f / height;
 			vertex_constants[1][2] = 0.0f;
-			vertex_constants[1][3] = 1.0f + 1.0f / width;
+			vertex_constants[1][3] = 1.0f + 1.0f / height;
 			vertex_constants[2][0] = 0.0f;
 			vertex_constants[2][1] = 0.0f;
 			vertex_constants[2][2] = 0.0f;

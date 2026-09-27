@@ -1,0 +1,13 @@
+image base 0x400000, HIGHLOW base relocations 60922
+reset @0x5709A0: 68227700006a0068a06b8a00e83fb8f0ff68200004006a0068806b8600e82eb8f0ff83c418c705a0828b0000000000c3
+  push 0x7722 (reloc@+1: False); results VA 0x8A6BA0 (reloc@+8: True); results2 VA 0x866B80; count VA 0x8B82A0 (reloc: True)
+getter @0x570870: lea eax,[eax+eax*4]; lea eax,[eax*8+0x8AE2A0] at +0x35 (reloc: True) => stride 0x28
+  params VA - results VA = 0x7700; overrun end = results + 0x7722 = params + 0x22
+submit @0x570EC0 +0x151: 6a288bd85753e804b7f0ff66
+image-wide relocated references into [0x8A6BA0, 0x8B82A4): 23
+ by function: {'_lens_flare_parameters_get': 2, '_lens_flare_occlusion_test_results_get': 1, '_rasterizer_lights_reset_for_new_map': 2, '_rasterizer_lights_begin_for_new_frame': 4, '_rasterizer_lens_flare_submit': 3, '_rasterizer_lens_flares_submit_occlusion_tests': 3, '_rasterizer_lens_flares_draw': 8}
+ references landing in the overwritten span [0x8AE2A0, 0x8AE2C2):
+   site 0x5708A8 (_lens_flare_parameters_get+0x38) -> 0x8AE2A0 = params+0x0
+   site 0x570A4E (_rasterizer_lights_begin_for_new_frame+0x7E) -> 0x8AE2A0 = params+0x0
+   site 0x5714FC (_rasterizer_lens_flares_draw+0x8C) -> 0x8AE2A0 = params+0x0
+   site 0x571CD5 (_rasterizer_lens_flares_draw+0x865) -> 0x8AE2A0 = params+0x0

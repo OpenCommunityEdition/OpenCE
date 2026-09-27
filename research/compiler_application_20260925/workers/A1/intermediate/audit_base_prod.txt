@@ -1,0 +1,308 @@
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_03JHHHHEKD@ctf?$AA@                        size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04GLEOMBLA@race?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_04PJOEONHN@king?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_05GCEFBECL@rally?$AA@                      size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06CBFFIGEC@slayer?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_06IEOJBDIK@object?$AA@                     size     7/7     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07IAHNGGND@stalker?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07JHGHBFJP@oddball?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_07LIOCHKOH@ironctf?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_09DOOCKEDN@team_king?$AA@                  size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_09KMEIIIPA@team_race?$AA@                  size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@FNEEDLLE@ambient_computers?$AA@        size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BC@GOFPLFEH@ambient_machinery?$AA@        size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@EGHPGJBP@found?5local?5player?$AA@     size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@JDPLED@player_index?$CB?$DNNONE?$AA@   size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@CKCLKIJA@variant?5?$CG?$CG?5map_name?$ size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BE@PEGHDBAP@NULL?5?$CB?$DN?5game_engine?$ size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@IHIEPAI@NONE?5?$CB?$DN?5player_index?$ size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BF@MOJDLNAG@NONE?5?$CB?$DN?5lookup_index? size    21/21    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BG@OJNPNGFL@failed?5to?5teleport?5?$CFd?$ size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BJ@IAIEOKNM@ui?2multiplayer_game_text?$AA size    25/25    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BK@EKPIBKAB@dead_player_index?5?$CB?$DN?5 size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BK@LOIEOAAE@global_goal?$FLindex?$FN?4in_ size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BL@FBPHGMEB@player?9?$DOteam_index?5?$CB? size    27/27    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BL@NPJONDMM@NONE?5?$CB?$DN?5local_player_ size    27/27    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BN@BLHEDFPC@weapon_is_flag?$CIweapon_inde size    29/29    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BN@LMCPNAFN@player_count?$DN?$CFd?0?5maxc size    29/29    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BN@OIBHHACP@place?4place?5?$DM?5maximum_p size    29/29    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BO@HPNHAHOG@levels?2test?2carousel?2carou size    30/30    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CC@FPLNHLNP@place?$DMMULTIPLAYER_MAXIMUM_ size    34/34    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CC@HKAICMNO@c?3?2halo?2SOURCE?2game?2game size    34/34    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CL@DLMKKJM@player_count?5?$DM?5MULTIPLAYE size    43/43    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CM@IEEKPKHB@?$CI?$CBall_tied?5?$HM?$HM?5? size    44/44    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DA@LKKJMHEH@NETGAME?5MAP?5FAILURE?3?5miss size    48/48    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DB@IKODHNKI@NETGAME?5MAP?5FAILURE?3?5miss size    49/49    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DB@KDFIELID@NETGAME?5MAP?5FAILURE?3?5miss size    49/49    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DC@DCAAPLNK@NETGAME?5MAP?5FAILURE?3?5dupl size    50/50    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DE@KIBANADL@NETGAME?5MAP?5FAILURE?3?5miss size    52/52    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DF@EHBELDKM@NETGAME?5MAP?5FAILURE?3?5ctf? size    53/53    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DJ@MPJKFIIJ@NETGAME?5MAP?5FAILURE?3?5dupl size    57/57    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DK@COLEDOMN@NETGAME?5MAP?5FAILURE?3?5fail size    58/58    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DL@FDFHGCGI@NETGAME?5MAP?5FAILURE?3?5fail size    59/59    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DL@MBPNEOKF@NETGAME?5MAP?5FAILURE?3?5fail size    59/59    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DM@INOFLLBD@?$CIitem?9?$DOobject?4scale?5 size    60/60    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DN@GLOHFEFE@NETGAME?5MAP?5FAILURE?3?5fail size    61/61    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DO@GDPJBCBM@NETGAME?5MAP?5FAILURE?3?5fail size    62/62    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EG@GDPJDEHO@NETGAME?5CODE?5FAILURE?3?5gam size    70/70    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EH@BMGHBGKH@NETGAME?5MAP?5FAILURE?3?5fail size    71/71    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EH@GJGBEMDH@NETGAME?5MAP?5FAILURE?3?5fail size    71/71    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EJ@FACIONE@NETGAME?5MAP?5FAILURE?3?5faile size    73/73    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EK@DHDLIGMN@NETGAME?5MAP?5FAILURE?3?5fail size    74/74    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EP@CGHPHLAM@NETGAME?5MAP?5FAILURE?3?5fail size    79/79    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EP@MJLNBADC@NETGAME?5MAP?5FAILURE?3?5fail size    79/79    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FH@ODDMDCIB@failed?5to?5initialize?5custo size    87/87    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0JH@PNHLNBOL@?$CBallow_pick_up?5?$HM?$HM?5 size   151/151   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0M@CLNODINK@game_engine?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@MLMHALFL@elimination?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0M@NOCMPHHF@team_slayer?$AA@               size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@CPCFMJOB@team_oddball?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@JBNPINGA@accumulation?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0N@MABFIMPF@title_string?$AA@              size    13/13    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0P@PLBDAHNN@ambient_nature?$AA@            size    15/15    flags eq align 3/3
+  ok   .rdata   sym:??_C@_11LOCGONAA@?$AA?$AA@                       size     2/2     flags eq align 3/3
+  ok   .rdata   sym:??_C@_13HOIJIPNN@?$AA?5?$AA?$AA@                 size     4/4     flags eq align 3/3
+  ok   .rdata   sym:??_C@_15KNBIKKIN@?$AA?$CF?$AAd?$AA?$AA@          size     6/6     flags eq align 3/3
+  ok   .rdata   sym:??_C@_17PMDFIHDK@?$AA0?$AA?$CF?$AAd?$AA?$AA@     size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_19GCIMBEIF@?$AA?5?$AA?7?$AA?$CF?$AAs?$AA?$ size    10/10    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1BC@DGONEHBJ@?$AA?5?$AA?7?$AA?5?$AA?7?$AA? size    18/18    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1BE@EFJKLKFF@?$AA?7?$AA?$CF?$AAs?$AA?7?$AA size    20/20    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1BG@EEDCCJKF@?$AA?5?$AA?7?$AA?5?$AA?7?$AA? size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1BK@JPAKMPFP@?$AA?5?$AA?7?$AA?5?$AA?7?$AA? size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1BO@NNCACCCJ@?$AA?5?$AA?7?$AA?5?$AA?7?$AA? size    30/30    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1CG@MDCDIADO@?$AA?7?$AA?$CF?$AAs?$AA?7?$AA size    38/38    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1M@CDCAHPKB@?$AA?$CF?$AAs?$AA?3?$AA?$CF?$A size    12/12    flags eq align 3/3
+  ok   .rdata   sym:??_C@_1O@HAEHHN@?$AA?5?$AA?7?$AA?5?$AA?7?$AA?$CF size    14/14    flags eq align 3/3
+  ok   .rdata   sym:__real@3f0ccccd                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3f2147ae                                  size     4/4     flags eq align 3/3
+  ok   .rdata   sym:__real@3f53104b57cf969e                          size     8/8     flags eq align 4/4
+  ok   .rdata   sym:__real@3fc0bf25a0000000                          size     8/8     flags eq align 4/4
+  ok   .rdata   sym:__real@3fe3333340000000                          size     8/8     flags eq align 4/4
+  ok   .rdata   sym:__real@3ffe666660000000                          size     8/8     flags eq align 4/4
+  ok   .text    sym:_adjust_score_for_ranking                        size   128/128   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_accumulation                 size   160/160   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_crazy_king                   size   128/128   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_ctf                          size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_ctf_pro                      size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_elimination                  size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_endurance                    size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_invasion                     size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_iron_ctf                     size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_juggernaut                   size   160/160   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_king                         size   128/128   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_king_pro                     size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_oddball                      size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_phantoms                     size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_race                         size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_rally                        size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_reverse_tag                  size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_rockets                      size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_slayer                       size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_slayer_pro                   size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_snipers                      size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_stalker                      size   160/160   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_team_king                    size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_team_oddball                 size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_team_race                    size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_team_rally                   size   144/144   flags eq align 5/5
+  ok   .text    sym:_build_game_variant_team_slayer                  size   144/144   flags eq align 5/5
+  ok   .text    sym:_can_delete_item                                 size    48/48    flags eq align 5/5
+  ok   .data    sym:_debug_player_color                              size    32/32    flags eq align 3/3
+  ok   .text    sym:_default_starting_location_rate_function         size   176/176   flags eq align 5/5
+  ok   .text    sym:_drawline                                        size   112/112   flags eq align 5/5
+  ok   .text    sym:_find_closest_player_callback                    size    96/96    flags eq align 5/5
+  ok   .text    sym:_find_closest_player_index                       size   448/448   flags eq align 5/5
+  ok   .text    sym:_find_netgame_flag                               size    64/64    flags eq align 5/5
+  ok   .text    sym:_find_netgame_flags                              size   272/272   flags eq align 5/5
+  ok   .text    sym:_game_engine_allow_dynamic_lighting              size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_allow_integrated_lights             size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_allow_pause                         size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_engine_allow_pick_up                       size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_build_lighting                      size   288/288   flags eq align 5/5
+  ok   .text    sym:_game_engine_can_score                           size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_clear_goal_position                 size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_did_player_win                      size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_did_player_win_default              size   192/192   flags eq align 5/5
+  ok   .text    sym:_game_engine_did_team_win                        size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_engine_display_team_indicators             size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_dispose                             size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_dispose_from_old_map                size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_draw_object_in_motion_sensor        size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_end_game                            size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_flag_reset                          size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_force_autopickup                    size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_force_single_screen                 size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_game_ending                         size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_game_starting                       size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_generate_title_string               size  1152/1152  flags eq align 5/5
+  ok   .text    sym:_game_engine_get_current_stage                   size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_damage_multiplier               size   208/208   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_distance_rating_for_spawn       size   368/368   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_friendly_bonus                  size   288/288   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_goal_in_use                     size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_goal_position                   size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_place                           size   368/368   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_player_place                    size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_starting_location_rating        size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_state_message                   size   320/320   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_team_score                      size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_get_type                            size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_variant                         size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_engine_get_variant_by_name                 size   544/544   flags eq align 5/5
+  ok   .text    sym:_game_engine_handle_client_message               size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_handle_server_message               size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_has_shield                          size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_has_teams                           size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_hud_draw_messages                   size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_hud_draw_motion_sensor              size    64/64    flags eq align 5/5
+  ok   .text    sym:_game_engine_infinite_grenades                   size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_infinite_grenades_internal          size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_initialize                          size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_initialize_for_new_map              size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_engine_load_stage                          size    80/80    flags eq align 5/5
+  ok   .text    sym:_game_engine_man_out                             size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_nonplayer_post_rasterize            size   160/160   flags eq align 5/5
+  ok   .text    sym:_game_engine_override_game_variant               size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_override_map_name                   size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_picking_up                          size   224/224   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_added                        size   320/320   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_damaged_player               size    80/80    flags eq align 5/5
+  ok   .text    sym:_game_engine_player_depower_active_camo          size    80/80    flags eq align 5/5
+  ok   .text    sym:_game_engine_player_get_change_color             size   144/144   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_get_custom_motion_sensor_pos size   160/160   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_get_team_index               size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_has_flag                     size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_has_stealth_weapon           size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_is_odd_man_out               size   160/160   flags eq align 5/5
+  ok   .text    sym:_game_engine_player_is_out_of_lives              size    64/64    flags eq align 5/5
+  ok   .text    sym:_game_engine_player_killed                       size   832/832   flags eq align 5/5
+  ok   .text    sym:_game_engine_playlist_begin                      size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_playlist_initialize                 size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_engine_playlist_next                       size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_post_rasterize                      size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_post_rasterize_in_game              size   320/320   flags eq align 5/5
+  ok   .text    sym:_game_engine_post_rasterize_objects              size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_post_rasterize_post_game            size  2528/2528  flags eq align 5/5
+  ok   .text    sym:_game_engine_postspawn_player_update             size   336/336   flags eq align 5/5
+  ok   .text    sym:_game_engine_predict_resources                   size   624/624   flags eq align 5/5
+  ok   .text    sym:_game_engine_prespawn_player_update              size    64/64    flags eq align 5/5
+  ok   .text    sym:_game_engine_press_start_to_begin                size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_engine_rasterize_in_game_score             size   848/848   flags eq align 5/5
+  ok   .text    sym:_game_engine_rasterize_message                   size   256/256   flags eq align 5/5
+  ok   .text    sym:_game_engine_remap_equipment                     size   304/304   flags eq align 5/5
+  ok   .text    sym:_game_engine_remap_object_definition             size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_remap_vehicle                       size   192/192   flags eq align 5/5
+  ok   .text    sym:_game_engine_remap_weapon                        size   400/400   flags eq align 5/5
+  ok   .text    sym:_game_engine_render_nav_points                   size   208/208   flags eq align 5/5
+  ok   .text    sym:_game_engine_running                             size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_engine_set_goal_position                   size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_engine_should_end_game                     size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_should_spawn_player                 size   256/256   flags eq align 5/5
+  ok   .text    sym:_game_engine_state_message                       size    48/48    flags eq align 5/5
+  ok   .text    sym:_game_engine_statistics_append                   size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_switch_to_postgame                  size    64/64    flags eq align 5/5
+  ok   .text    sym:_game_engine_test_flag                           size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_test_trait                          size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_engine_update                              size   752/752   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_item_spawn                   size   336/336   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_non_deterministic            size   224/224   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_player_always_invis          size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_engine_update_player_no_shield             size   112/112   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_purge                        size   256/256   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_teleporter                   size   992/992   flags eq align 5/5
+  ok   .text    sym:_game_engine_update_weapons                      size   336/336   flags eq align 5/5
+  ok   .text    sym:_game_engine_variant_cleanup                     size   432/432   flags eq align 5/5
+  ok   .text    sym:_game_engine_verify_current_map                  size   640/640   flags eq align 5/5
+  ok   .text    sym:_game_engine_weapon_fired                        size   272/272   flags eq align 5/5
+  ok   .text    sym:_game_globals_get_weapon                         size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_show_score                                 size    32/32    flags eq align 5/5
+  ok   .text    sym:_game_show_score_extended                        size   128/128   flags eq align 5/5
+  ok   .text    sym:_game_show_score_one_player                      size    16/16    flags eq align 5/5
+  ok   .text    sym:_game_show_score_team                            size    96/96    flags eq align 5/5
+  ok   .text    sym:_game_show_score_you_ally_enemy                  size   208/208   flags eq align 5/5
+  ok   .text    sym:_get_ball_definition_index                       size    48/48    flags eq align 5/5
+  ok   .text    sym:_get_blink_alpha                                 size    48/48    flags eq align 5/5
+  ok   .text    sym:_get_flag_definition_index                       size    48/48    flags eq align 5/5
+  ok   .text    sym:_get_place_name                                  size   224/224   flags eq align 5/5
+  ok   .text    sym:_get_place_string                                size    80/80    flags eq align 5/5
+  ok   .text    sym:_get_postgame_hilite_colors                      size    80/80    flags eq align 5/5
+  ok   .text    sym:_get_selected_color                              size    32/32    flags eq align 5/5
+  ok   .bss     sym:_global_goal                                     size  1148/1148  flags eq align 4/4
+  ok   .text    sym:_goal_matches_player                             size   128/128   flags eq align 5/5
+  ok   .text    sym:_handle_custom_starting_equipment                size   304/304   flags eq align 5/5
+  ok   .text    sym:_initialize_player_multiplayer_data              size    64/64    flags eq align 5/5
+  ok   .text    sym:_internal_rasterize_score                        size  2336/2336  flags eq align 5/5
+  ok   .text    sym:_internal_rasterize_target_name                  size   256/256   flags eq align 5/5
+  ok   .text    sym:_is_place_tied                                   size    16/16    flags eq align 5/5
+  ok   .text    sym:_item_collection_get_total                       size   176/176   flags eq align 5/5
+  ok   .text    sym:_linear_to_non_linear_alpha                      size    32/32    flags eq align 5/5
+  ok   .text    sym:_list_index_to_weapon_definition_index           size    48/48    flags eq align 5/5
+  ok   .text    sym:_match_game_type                                 size   160/160   flags eq align 5/5
+  ok   .text    sym:_multiplayer_message                             size   144/144   flags eq align 5/5
+  ok   .text    sym:_multiplayer_message_internal                    size    64/64    flags eq align 5/5
+  ok   .text    sym:_multiple_teams_alive                            size   256/256   flags eq align 5/5
+  ok   .text    sym:_nearby_vehicle                                  size   240/240   flags eq align 5/5
+  ok   .text    sym:_netgame_flag_verify_no_team_duplicates          size   160/160   flags eq align 5/5
+  ok   .text    sym:_netgame_flag_verify_team_exists                 size    64/64    flags eq align 5/5
+  ok   .text    sym:_netgame_flag_verify_team_range                  size   112/112   flags eq align 5/5
+  ok   .text    sym:_netgame_verify_equipment                        size   112/112   flags eq align 5/5
+  ok   .text    sym:_netgame_verify_spawn_points                     size    96/96    flags eq align 5/5
+  ok   .text    sym:_place_get_position                              size    16/16    flags eq align 5/5
+  ok   .text    sym:_players_in_game                                 size    64/64    flags eq align 5/5
+  ok   .text    sym:_populate_statistic_buffer                       size   560/560   flags eq align 5/5
+  ok   .text    sym:_postgame_statistic_get_rating                   size    96/96    flags eq align 5/5
+  ok   .text    sym:_random_item                                     size   128/128   flags eq align 5/5
+  ok   .text    sym:_rasterize_in_game_score_draw_line               size   416/416   flags eq align 5/5
+  ok   .text    sym:_select_players_to_display                       size   496/496   flags eq align 5/5
+  ok   .text    sym:_sort_statistic_buffer                           size    48/48    flags eq align 5/5
+  ok   .text    sym:_sort_statistic_buffer_ranking                   size    80/80    flags eq align 5/5
+  ok   .text    sym:_team_has_players                                size   240/240   flags eq align 5/5
+  ok   .text    sym:_test_any_gamepad_button                         size    48/48    flags eq align 5/5
+  ok   .text    sym:_ticks_to_unicode_time_string                    size   192/192   flags eq align 5/5
+  ok   .text    sym:_update_weapon_inventory                         size   160/160   flags eq align 5/5
+  ok   .text    sym:_weapon_definition_index_to_list_index           size    96/96    flags eq align 5/5
+== symbols (January)
+  269 January symbols, 0 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_00CNPNBAHC@?$AA@                           size 1
+  +.rdata   sym:??_C@_07CJDNLGID@vehicle?$AA@                    size 8
+  +.rdata   sym:??_C@_0BF@GLLAMKHP@weapon_index?5?$CB?$DN?5NONE? size 21
+  +.rdata   sym:??_C@_0P@NHABDOCD@?$CB?$CCunreachable?$CC?$AA@   size 15
+  +.rdata   sym:_D3DPRIMITIVETOVERTEXCOUNT                       size 88
+  +.rdata   sym:_D3DSIMPLERENDERSTATEENCODE                      size 328
+  +.rdata   sym:_D3DTEXTUREDIRECTENCODE                          size 16
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3d088889                                  size 4
+  +.rdata   sym:__real@3d4ccccd                                  size 4
+  +.rdata   sym:__real@3d888889                                  size 4
+  +.rdata   sym:__real@3dcccccd                                  size 4
+  +.rdata   sym:__real@3e4ccccd                                  size 4
+  +.rdata   sym:__real@3e800000                                  size 4
+  +.rdata   sym:__real@3e99999a                                  size 4
+  +.rdata   sym:__real@3eaaaaab                                  size 4
+  +.rdata   sym:__real@3ecccccd                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@3fc00000                                  size 4
+  +.rdata   sym:__real@40000000                                  size 4
+  +.rdata   sym:__real@40400000                                  size 4
+  +.rdata   sym:__real@40800000                                  size 4
+  +.rdata   sym:__real@40a00000                                  size 4
+  +.rdata   sym:__real@40c00000                                  size 4
+  +.rdata   sym:__real@43c80000                                  size 4
+  +.rdata   sym:__real@44610000                                  size 4
+  +.text    sym:_arctangent                                      size 16
+  +.text    sym:_cosine                                          size 16
+  +.text    sym:_distance3d                                      size 64
+  +.text    sym:_distance_squared3d                              size 64
+  +.text    sym:_magnitude3d                                     size 48
+  +.text    sym:_magnitude_squared3d                             size 48
+  +.text    sym:_normalize3d                                     size 96
+  +.text    sym:_scale_vector3d                                  size 48
+  +.text    sym:_sine                                            size 16
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: PASS

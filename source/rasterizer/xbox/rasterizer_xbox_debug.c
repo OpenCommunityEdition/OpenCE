@@ -19,6 +19,7 @@ RASTERIZER_XBOX_DEBUG.C
  * The emitted owners are D3DDevice_SetRenderState and the corresponding
  * IDirect3DDevice8 render-state, vertex-data, begin, and end wrappers.
  */
+#include "rasterizer/rasterizer.h"
 #include <xtl.h>
 
 #include "rasterizer/xbox/rasterizer_xbox.h"
@@ -35,15 +36,6 @@ struct rasterizer_xbox_debug_options_prefix
 	boolean debug_geometry;
 	byte reserved26[0x2E];
 	long zbias;
-};
-
-struct rasterizer_xbox_debug_window_parameters_prefix
-{
-	byte reserved00[0x34];
-	short left;
-	short top;
-	short right;
-	short bottom;
 };
 
 struct pixel_shader_definition
@@ -73,7 +65,7 @@ struct pixel_shader_definition
 /* ---------- globals */
 
 extern struct rasterizer_xbox_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_xbox_debug_window_parameters_prefix global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -353,8 +345,8 @@ void _rasterizer_debug_immediate_begin_screenspace(
 	void)
 {
 	real vertex_constants[5][4];
-	short window_width;
 	short window_height;
+	short window_width;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_debug.c",
@@ -384,19 +376,19 @@ void _rasterizer_debug_immediate_begin_screenspace(
 
 	rasterizer_set_vertex_shader_permutation(4, 8, 0);
 
-	window_height = global_window_parameters.bottom -
-		global_window_parameters.top;
-	window_width = global_window_parameters.right -
-		global_window_parameters.left;
+	window_width = global_window_parameters.camera.viewport_bounds.x1 -
+		global_window_parameters.camera.viewport_bounds.x0;
+	window_height = global_window_parameters.camera.viewport_bounds.y1 -
+		global_window_parameters.camera.viewport_bounds.y0;
 
-	vertex_constants[0][0] = 2.0f / window_height;
+	vertex_constants[0][0] = 2.0f / window_width;
 	vertex_constants[0][1] = 0.0f;
 	vertex_constants[0][2] = 0.0f;
-	vertex_constants[0][3] = -1.0f - 1.0f / window_height;
+	vertex_constants[0][3] = -1.0f - 1.0f / window_width;
 	vertex_constants[1][0] = 0.0f;
-	vertex_constants[1][1] = -2.0f / window_width;
+	vertex_constants[1][1] = -2.0f / window_height;
 	vertex_constants[1][2] = 0.0f;
-	vertex_constants[1][3] = 1.0f / window_width + 1.0f;
+	vertex_constants[1][3] = 1.0f / window_height + 1.0f;
 	vertex_constants[2][0] = 0.0f;
 	vertex_constants[2][1] = 0.0f;
 	vertex_constants[2][2] = 0.0f;

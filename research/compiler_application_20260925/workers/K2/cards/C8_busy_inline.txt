@@ -1,0 +1,3 @@
+CARD C8  (written 2026-09-26 02:09:34 -0700, before compile)
+Evidence (D, /Od 0x4a1095..0x4a10be): 'busy ' select is an unnamed temp (-0x18bc) pushed directly as the first %s
+argument. Ours: named char const *string. Correction: inline. Prediction: block unchanged.

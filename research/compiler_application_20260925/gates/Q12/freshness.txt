@@ -1,0 +1,57 @@
+HEAD dba492ac1dafd1d261d8818b0791b7d76eacf618  2026-09-26 11:27:25 -0700
+build/base produced by the FINAL full gate at ae434c14 (gates/fourth_set/gate_FINAL.out); later commits are research-only.
+
+=== source/bitmaps/bitmap_group
+residual   1008  _bitmap_group_add_bitmap  [size 992!=1008, sha]
+== exact 5  residual 1  unwritten 0  (of 6 listed)
+--- keyed_diff build/base -> fresh compile at HEAD:
+sections: before 147, after 147
+summary: 0 changed, 0 added, 0 removed
+--- secdiff --norm-labels (every section and symbol):
+  .debug$S                                                                raw
+sections differing: 1; symbol-table differences: 0 []
+
+=== source/ai/ai_communication
+residual    912  _ai_communication_actor_talk_weight  [sha]
+residual   8064  _ai_communication_event  [size 8096!=8064, sha]
+== exact 46  residual 2  unwritten 0  (of 48 listed)
+--- keyed_diff build/base -> fresh compile at HEAD:
+sections: before 297, after 297
+summary: 0 changed, 0 added, 0 removed
+--- secdiff --norm-labels (every section and symbol):
+  .debug$S                                                                raw
+sections differing: 1; symbol-table differences: 0 []
+
+=== source/ai/ai_debug
+residual  24976  _ai_debug_render_actor  [size 25008!=24976, sha]
+== exact 59  residual 1  unwritten 0  (of 60 listed)
+--- keyed_diff build/base -> fresh compile at HEAD:
+sections: before 486, after 486
+summary: 0 changed, 0 added, 0 removed
+--- secdiff --norm-labels (every section and symbol):
+  .debug$S                                                                raw
+sections differing: 1; symbol-table differences: 0 []
+
+=== source/game/game_engine_king
+== exact 29  residual 0  unwritten 0  (of 29 listed)
+--- keyed_diff build/base -> fresh compile at HEAD:
+sections: before 59, after 59
+summary: 0 changed, 0 added, 0 removed
+--- secdiff --norm-labels (every section and symbol):
+  .debug$S                                                                raw
+sections differing: 1; symbol-table differences: 0 []
+
+--- .debug$S check (tools/debugs_objname.py): the section holds S_OBJNAME (0x9, the output .obj path) and the
+    compiler record (0x1013) only; gate.py compiles to scratch\_gate_*.obj, the build to build\base\...
+build/base/source/bitmaps/bitmap_group.obj
+  records ['0x9', '0x1013'] | S_OBJNAME ['C:\\halo-worktrees\\claude-compiler-application-20260925\\build\\base\\source\\bitmaps\\bitmap_group.obj'] vs ['C:\\halo-worktrees\\claude-compiler-application-20260925\\scratch\\_gate_51112.obj']
+  equal after masking S_OBJNAME path: True
+build/base/source/ai/ai_communication.obj
+  records ['0x9', '0x1013'] | S_OBJNAME ['C:\\halo-worktrees\\claude-compiler-application-20260925\\build\\base\\source\\ai\\ai_communication.obj'] vs ['C:\\halo-worktrees\\claude-compiler-application-20260925\\scratch\\_gate_114904.obj']
+  equal after masking S_OBJNAME path: True
+build/base/source/ai/ai_debug.obj
+  records ['0x9', '0x1013'] | S_OBJNAME ['C:\\halo-worktrees\\claude-compiler-application-20260925\\build\\base\\source\\ai\\ai_debug.obj'] vs ['C:\\halo-worktrees\\claude-compiler-application-20260925\\scratch\\_gate_84600.obj']
+  equal after masking S_OBJNAME path: True
+build/base/source/game/game_engine_king.obj
+  records ['0x9', '0x1013'] | S_OBJNAME ['C:\\halo-worktrees\\claude-compiler-application-20260925\\build\\base\\source\\game\\game_engine_king.obj'] vs ['C:\\halo-worktrees\\claude-compiler-application-20260925\\scratch\\_gate_91236.obj']
+  equal after masking S_OBJNAME path: True

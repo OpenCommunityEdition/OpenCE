@@ -63,6 +63,7 @@ symbols in this file:
  * code_00163370 = IDirect3DDevice8_Begin
  * code_00163380 = IDirect3DDevice8_End
  */
+#include "rasterizer/rasterizer.h"
 #include <xtl.h>
 
 /* ---------- constants */
@@ -84,16 +85,6 @@ struct rasterizer_text_debug_options
 {
 	byte reserved00[0x22];
 	boolean render_text;
-};
-
-struct rasterizer_text_window_parameters
-{
-	short rasterizer_target;
-	byte reserved02[0x32];
-	short left;
-	short top;
-	short right;
-	short bottom;
 };
 
 struct bitmap_data;
@@ -169,7 +160,7 @@ void rasterizer_set_pixel_shader(
 
 extern void *global_d3d_device;
 extern struct rasterizer_text_debug_options rasterizer_debug_options;
-extern struct rasterizer_text_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
@@ -185,8 +176,8 @@ void rasterizer_text_begin(
 {
 	real vertex_constants[5][4];
 	real texture_constants[6][4];
-	short window_width;
 	short window_height;
+	short window_width;
 	real_vector2d scale;
 	short map_index;
 
@@ -239,27 +230,27 @@ void rasterizer_text_begin(
 		rasterizer_set_framebuffer_blend_function(
 			parameters->framebuffer_blend_function);
 
-		window_height = global_window_parameters.bottom -
-			global_window_parameters.top;
-		window_width = global_window_parameters.right -
-			global_window_parameters.left;
+		window_width = global_window_parameters.camera.viewport_bounds.x1 -
+			global_window_parameters.camera.viewport_bounds.x0;
+		window_height = global_window_parameters.camera.viewport_bounds.y1 -
+			global_window_parameters.camera.viewport_bounds.y0;
 		if (parameters->scale)
-			scale.i = 2.0f * parameters->scale->i / window_height;
+			scale.i = 2.0f * parameters->scale->i / window_width;
 		else
 			scale.i = 0.0f;
 		if (parameters->scale)
-			scale.j = -2.0f * parameters->scale->j / window_width;
+			scale.j = -2.0f * parameters->scale->j / window_height;
 		else
 			scale.j = 0.0f;
 
-		vertex_constants[0][0] = 2.0f / window_height;
+		vertex_constants[0][0] = 2.0f / window_width;
 		vertex_constants[0][1] = 0.0f;
 		vertex_constants[0][2] = 0.0f;
-		vertex_constants[0][3] = scale.i - (1.0f + 1.0f / window_height);
+		vertex_constants[0][3] = scale.i - (1.0f + 1.0f / window_width);
 		vertex_constants[1][0] = 0.0f;
-		vertex_constants[1][1] = -2.0f / window_width;
+		vertex_constants[1][1] = -2.0f / window_height;
 		vertex_constants[1][2] = 0.0f;
-		vertex_constants[1][3] = scale.j + 1.0f / window_width + 1.0f;
+		vertex_constants[1][3] = scale.j + 1.0f / window_height + 1.0f;
 		vertex_constants[2][0] = 0.0f;
 		vertex_constants[2][1] = 0.0f;
 		vertex_constants[2][2] = 0.0f;

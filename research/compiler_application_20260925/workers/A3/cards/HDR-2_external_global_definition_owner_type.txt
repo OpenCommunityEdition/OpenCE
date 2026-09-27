@@ -1,0 +1,15 @@
+CARD HDR-2 (A3)  written 2026-09-26 01:27:20 -0700  -- BEFORE its first compile.  LEAD-OWNED proposal (touches hs.h, hs.c [B1 this
+wave], hs_globals_external.c [not A3], hs_runtime.c [A3]); tested on an alternate root only.
+observed: struct hs_external_global_definition is defined in three .c files: hs.c:3336 partial prefix view
+  {name; type}; hs_globals_external.c:911 {name; type; short pad; void *address} + size assert 0xC;
+  hs_runtime.c:419 {name; type; short unused; void *address}; hs.h:146 only forward-declares it. This is the
+  'incompatible partial views instead of a common owner declaration' pattern cited in canonical's
+  rasterizer_xbox_dynavobgeom rejection.
+evidence: X HCEX SHIP UDT hs_global_external {const char *name @0; short type @4; void *pointer @8; uchar
+  console_flags @0xC} (2011 adds console_flags); J: January hs_globals_external data = 12-byte records (size
+  assert), padding bytes zero.
+correction: hs.h replaces the forward declaration by the complete definition (hs_globals_external.c's current
+  body: name, type, short pad, void *address); the three .c definitions are deleted (the size assert stays in
+  hs_globals_external.c). Applied on top of HDR-1 and final/hs_runtime.
+prediction: all 17 consumers keyed-identical to build/base (member names add declared names to 10 hs.h consumers
+  that saw only the tag: C1-count risk); hs_globals_external data unchanged.

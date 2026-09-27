@@ -1,0 +1,14 @@
+CARD C01 - NP-variant alias packet (pick_game_engine 01A+02+03+04+05) rebased onto HEAD 455dffad
+written: 2026-09-26 00:36:17 -0700 (BEFORE the compile; rewritten once at this time because the first write lost a backtick span)
+
+Observed discrepancy: none in bytes (HEAD 180/180); source blockers (a)-(e) + review3/4 constructs.
+Packet: fifty-objects owner_queue/pick_game_engine/variant_no_single_consumer_headers (alias pick), verified at
+cdc8ebd3: 180/180, 447-TU sweep 446 SAME + game_engine (order, _global_goal+0x400 alias spelling, $L).
+Change since cdc8ebd3 relevant to it: game_allegiance.h (4f236e9f) +3 declared enum constants; F01R includes
+game_allegiance.h -> game_engine.c C1 number shifts by +3 before every function (real_math.h P1a claimed zero-count).
+Compiler-state prediction: pick_game_engine S5 count oracle (vTUnp, names at TU top): K=1-7 EXACT, K=8-12
+_populate_statistic_buffer RESIDUAL, K=13-40 EXACT. +3 lies in the exact band.
+PREDICTION: game_engine 180/180 EXACT at HEAD; keyed diff vs build/base = 0 content changes except the known
+_global_goal+0x400 relocation spelling in 2 functions (EXACT by resolved target) and always_invis order.
+Collateral risk: consumers of game_engine.h/player_control.h/hud_messaging.h/sound_classes.h (sweep follows, C02).
+Decisive test: revgate.py roots/npA source/game/game_engine + keyed_diff vs build/base.

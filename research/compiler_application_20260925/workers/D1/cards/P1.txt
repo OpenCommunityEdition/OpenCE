@@ -1,0 +1,22 @@
+CARD P1  (clock-read at writing: 2026-09-26 01:14:59 -0700)
+Target: source/items/weapons::_weapon_place (193 meaningful / 208 padded). Owner Q7 (2026-09-26): coherent
+owner-header/declaration/callback packet; no weapons-only patch; no byte-inert local declaration or cast.
+Base: HEAD 09f5208f (= a8854940 canonical + lane batches 1-5); weapons.c/object_types.c/weapons.h/object_types.h
+unchanged since a8854940.
+Change (scratch root scratch/campaign/workers/D1/root_p1, built from git archive HEAD):
+  weapons.h  : 'struct scenario_weapon_datum;' + 'long weapon_place(long weapon_index, struct scenario_weapon_datum
+               *scenario_weapon);' (placement = the fifty-objects p2 hunk the round-1 reviewer found technically clean)
+  weapons.c  : 'long weapon_place(' + 'return weapon_index;'
+  object_types.c: delete the consumer-local 'void weapon_place(long, struct scenario_object_datum *)' facade; the
+               table binds weapon_place UNCAST (type now from weapons.h); 3-line BUG disclosure comment replaces the 3
+               removed lines so every later __LINE__ is unchanged. object_types.h (datum_place slot) UNCHANGED.
+Predictions:
+  (a) weapons gate 79/0/0; keyed_diff vs build/base: only _weapon_place changes and becomes EXACT; 0 added/removed.
+  (b) object_types gate 31/0/0; every section byte-identical to build/base (same .data relocation to _weapon_place).
+  (c) /W3: object_types.c gains exactly one new warning, C4113 (weapon_place 'differs in parameter lists' from the
+      datum_place slot) at the weapon_data_definition initializer; weapons.c unchanged warning set.
+  (d) the other 17 weapons.h consumers: zero exact losses; function sections identical to the root_base control
+      (label renumbering allowed). Risk named in advance: declaration-count/C1-number tie flips (units
+      _unit_preprocess_node_orientations regressed in astra research12 through a weapons.h prototype).
+Decisive test: revgate for all 19 weapons.h includers in root_base and root_p1, keyed per-section diff of each pair,
+plus control = root_base vs build/base.

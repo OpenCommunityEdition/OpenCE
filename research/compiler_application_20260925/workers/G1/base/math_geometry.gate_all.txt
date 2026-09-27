@@ -1,0 +1,31 @@
+EXACT       768  _build_torus
+EXACT       336  _calculate_vertex
+EXACT       784  _convex_hull2d
+EXACT        96  _convex_hull2d_area
+EXACT       528  _convex_hull2d_intersect
+EXACT        96  _convex_hull2d_perimeter
+EXACT       208  _convex_hull2d_test_circle
+EXACT       144  _convex_hull2d_test_point
+EXACT       160  _convex_hull2d_test_point_indexed
+EXACT       288  _convex_hull2d_test_vector
+EXACT       256  _convex_hull2d_verify
+EXACT       272  _convex_hull3d
+EXACT      1488  _convex_hull3d_begin
+residual   1808  _convex_hull3d_expand  [sha]
+EXACT       112  _convex_hull3d_test_point
+EXACT       272  _convex_hull3d_test_vector
+EXACT        16  _convex_hull3d_verify
+residual   1008  _convex_polygon2d_clip_to_plane  [sha]
+EXACT        96  _convex_polygon2d_verify
+residual   1120  _convex_polygon3d_clip_to_plane  [sha]
+EXACT       400  _convex_polygon3d_verify
+EXACT       176  _geosphere_dispose
+EXACT       496  _geosphere_new
+EXACT       416  _get_edge_vertex
+EXACT       400  _get_face_vertex
+EXACT        32  _plane2d_distance_to_point
+EXACT       160  _points_dimension2d
+EXACT       944  _subdivide_triangle
+EXACT        48  _vector_intersect_plane2d
+EXACT        64  _vector_intersect_plane3d
+== exact 27  residual 3  unwritten 0  (of 30 listed)

@@ -1,0 +1,14 @@
+CARD K1-14  (pre-registered 2026-09-26 02:34:01 -0700)
+Base: k13 (13 hunks; real residual: 0xfc add-esp schedule; normalize2d x87 at 0x1d49 (j-first magnitude via fst
+  forwarding) and 0x1d7d (scale consumes the reciprocal in the last fmul)).
+Evidence (D, /Od 0x490a3b-0x490cf0): the possibility block has NO speaker_unit_index / speech_priority /
+  dialogue_type_index / vocalization_type locals: started/notify/finished, unit_speak, unit_get, head positions,
+  unit_start_animation_impulse, update_speech_timers and the final >>%s<< print all read selected_possibility->field
+  at the use. Speech item statement order: priority, vocalization_type, sound_definition_index, delay_time,
+  ai_notification_delay, pause_time = 0x18, ai = packet (rep movsd), then unit_speak.
+  J: January CSEs those loads (dead parameter homes [ebp+0x14], [ebp+0x18], [ebp-0x64], edi) - consistent with
+  either spelling.
+Mechanism under test: K1-10/K1-13 showed IL order and first-reference order drive the remaining ties (x87 sort
+  keys on slot/symbol ids); four extra named locals precede alignment/heads in our text.
+Change: /Od form of the possibility block (locals removed, field reads at each use, /Od speech statement order).
+Prediction: frame unchanged; the normalize x87 hunks may resolve; risk of new CSE/register hunks in this block.

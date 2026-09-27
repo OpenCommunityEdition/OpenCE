@@ -1,0 +1,18 @@
+--- a/source/render/render_debug.c
++++ b/source/render/render_debug.c
+@@ -139,6 +139,7 @@
+ #include "ai/path.h"
+ #include "cache/sound_cache.h"
+ #include "cache/texture_cache.h"
++#include "cutscene/recorded_animations.h"
+ #include "effects/decal_definitions.h"
+ #include "effects/decals.h"
+ #include "game/game.h"
+@@ -147,6 +148,7 @@
+ #include "interface/interface.h"
+ #include "input/input.h"
+ #include "math/real_math.h"
++#include "objects/damage.h"
+ #include "physics/bsp3d.h"
+ #include "physics/collision_bsp_definitions.h"
+ #include "physics/collision_debug.h"

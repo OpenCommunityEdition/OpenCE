@@ -1,0 +1,7 @@
+CARD L1  (written 2026-09-26 01:37:28 -0700, before compiling)  lab labs/lab_paren.c (never landing), periodic_functions unit flags
+Question: what is C2 opcode 0x267 (FP-typed, src/dst kind 1, encodes to 0 bytes, scheduler unit class 0) found
+between every `fadd [1.0]` and its multiply in the periodic builder (T2)?
+Hypothesis H-PAREN: it is C1's parenthesised-expression marker (a reassociation barrier) carried into C2.
+Predictions: lab_paren_sum_times ((a+1)*b) HAS a 0x267 between fadd and fmul; lab_local_sum_times (named t) has
+NONE (or an assign 0x261/0x001 instead); lab_no_paren (a*b+b) NONE; lab_paren_plain ((a*b)+b) HAS one between
+fmul and fadd. If lab_local_sum_times also has 0x267, H-PAREN is refuted (then: a generic FP temp copy).

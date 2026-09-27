@@ -1,0 +1,7 @@
+CARD L7 - re-verify A2's OWNER_D1 pair at HEAD fe283cc5 (lab copy only; nothing lands) - 2026-09-26 02:34:39 -0700
+Both patches pass `git apply --check` at fe283cc5. Copy = HEAD render_debug.c + OWNER_D1_render_debug_separate_statics
+applied in scratch; split = A2's csplit emulation scratch/campaign/workers/A2/cfg_RD1/split_RD1 (render_debug.obj
+only differs from build/split by the 1 rename + 6 static rows).
+PREDICTIONS: gate --all vs split_RD1 36/36 EXACT; object_audit (SPLIT_ROOT=split_RD1) PASS 69 symbols 0 differ;
+.bss 0x740C align 8 with the seven offsets; keyed diff vs production build/base: only the .bss symbol table changes
+(1 owner -> 7 owners), no code section changes; vs build/split (unmodified): 33/36 (reloc-name only), as A2 measured.

@@ -1,0 +1,8 @@
+COMMAND: C:\Users\isabe\AppData\Local\Programs\Python\Python312\python.exe -B -m tools.campaign.stable_verdicts diff C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R3_camera_impulse\stable.json C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R4_bitmap_autoaim\stable.json
+EXIT: 0
+--- stdout ---
+gained source/rasterizer/xbox/rasterizer_xbox_hardware_bitmaps::section:4 _rasterizer_bitmap_new -> _rasterizer_bitmap_new 400
+gained source/units/bipeds::section:24 _biped_get_autoaim_pill -> _biped_get_autoaim_pill 336
+gained 2 736 bytes; regressions 0
+
+--- stderr ---

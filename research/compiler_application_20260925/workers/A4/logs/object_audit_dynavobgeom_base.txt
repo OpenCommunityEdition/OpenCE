@@ -1,0 +1,57 @@
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_04BHIIPFEC@base?$AA@                       size     5/5     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08JOJIKHG@centroid?$AA@                    size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BA@KKBHHCGF@multitex_params?$AA@          size    16/16    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@BMLFIAIE@meter?9?$DOtint_mode_2?$AA@   size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BD@LBFDNODJ@parameters?9?$DOmap?$FL0?$FN? size    19/19    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BG@MMAGMAFI@meter?9?$DOgradient?$DN?$DN1? size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CH@DLHDBKLI@shader?9?$DObase?4type?$DN?$D size    39/39    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CK@NCHEDINN@?$CBparameters?9?$DOmap?$FL2? size    42/42    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CP@PIDBCAKH@?$CD?$CD?$CD?5ERROR?5too?5man size    47/47    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DF@MDAHAMMD@?$CBparameters?9?$DOmap?$FL1? size    53/53    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DN@KLLFPFFH@c?3?2halo?2SOURCE?2rasterizer size    61/61    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DO@GMEFDNIN@_rasterizer_dynamic_screen_ge size    62/62    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0GJ@OKAOIPGM@?$CBTEST_FLAG?$CIgeometry_fla size   105/105   flags eq align 4/4
+  DIFF .bss     sym:?warned@?1??_rasterizer_dynamic_unlit_geometry_d size     1/2     flags eq align 1/1
+  ok   .text    sym:_D3DDevice_SetRenderState                        size   432/432   flags eq align 5/5
+  ok   .text    sym:_D3DDevice_SetTextureStageState                  size    80/80    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_Begin@8                        size    16/16    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_End@4                          size    16/16    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_SetRenderState@12              size   544/544   flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_SetTextureStageState@16        size    96/96    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_SetVertexData2f@16             size    32/32    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_SetVertexDataColor@12          size    16/16    flags eq align 5/5
+  ok   .text    sym:_IDirect3DDevice8_SetVertexShaderConstant@16     size    16/16    flags eq align 5/5
+  ok   .text    sym:__rasterizer_dynamic_lit_geometry_draw           size    16/16    flags eq align 5/5
+  ok   .text    sym:__rasterizer_dynamic_screen_geometry_add_multite size   256/256   flags eq align 5/5
+  ok   .text    sym:__rasterizer_dynamic_screen_geometry_draw        size    48/48    flags eq align 5/5
+  ok   .text    sym:__rasterizer_dynamic_unlit_geometry_draw         size   624/624   flags eq align 5/5
+  ok   .text    sym:__rasterizer_hud_begin                           size    16/16    flags eq align 5/5
+  ok   .text    sym:__rasterizer_hud_end                             size    16/16    flags eq align 5/5
+  ok   .text    sym:__rasterizer_psuedo_dynamic_screen_quad_draw     size  2960/2960  flags eq align 5/5
+  ok   .text    sym:_submit_screen_vertex                            size    64/64    flags eq align 5/5
+== symbols (January)
+  DIFF     ?warned@?1??_rasterizer_dynamic_unlit_geometry_draw@@9@9 storage 3/3 key sym:?warned@?1??_rasterizer_dynamic_unlit_geometry_draw@@9@9/sym:?warned@?1??_rasterizer_dynamic_unlit_geometry_draw@@9@9 value 0/1
+  31 January symbols, 1 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_05PEENBMOG@color?$AA@                      size 6
+  +.rdata   sym:??_C@_0BB@NLHGFKHK@verify?5?$DN?$DN?5result?$AA@ size 17
+  +.rdata   sym:??_C@_0BC@EFLMEHLA@global_d3d_device?$AA@        size 18
+  +.rdata   sym:??_C@_0BL@NGHLOACP@alpha?$DO?$DN0?40f?5?$CG?$CG? size 27
+  +.rdata   sym:??_C@_0BN@KCHNANLB@?4?4?2bitmaps?2bitmaps_inline size 29
+  +.rdata   sym:??_C@_0DB@EEHLCDHM@?$CFs?3?5assert_valid_real_ar size 49
+  +.rdata   sym:??_C@_0L@HHPOFMCB@parameters?$AA@                size 11
+  +.rdata   sym:_D3DPRIMITIVETOVERTEXCOUNT                       size 88
+  +.rdata   sym:_D3DSIMPLERENDERSTATEENCODE                      size 328
+  +.rdata   sym:_D3DTEXTUREDIRECTENCODE                          size 16
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3e800000                                  size 4
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@41000000                                  size 4
+  +.rdata   sym:__real@c0000000                                  size 4
+  +.text    sym:_dot_product3d                                   size 32
+  +.text    sym:_real_alpha_to_pixel32                           size 112
+  +.text    sym:_real_argb_color_to_pixel32                      size 320
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: FAIL (2)

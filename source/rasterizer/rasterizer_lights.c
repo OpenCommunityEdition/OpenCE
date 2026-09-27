@@ -291,17 +291,6 @@ struct structure_lens_flare_marker
 	byte lens_flare_index;
 };
 
-struct rasterizer_lights_window_parameters
-{
-	short rasterizer_target;
-	short window_index;
-	byte reserved04[4];
-	real_point3d camera_position;
-	real_vector3d camera_forward;
-	byte reserved20[0x80];
-	real_matrix4x3 view_to_world;
-};
-
 struct lens_flare_occlusion_test_results
 {
 	short light_identifier;
@@ -352,10 +341,6 @@ typedef char verify_lens_flare_definition_far_fade_distance_offset[
 	offsetof(
 		struct lens_flare_definition,
 		far_fade_distance) == 0x1C ? 1 : -1];
-typedef char verify_rasterizer_lights_window_parameters_camera_forward_offset[
-	offsetof(
-		struct rasterizer_lights_window_parameters,
-		camera_forward) == 0x14 ? 1 : -1];
 typedef char verify_rasterizer_light_submit_parameters_size[
 	sizeof(struct rasterizer_light_submit_parameters) == 0x38 ? 1 : -1];
 typedef char verify_rasterizer_lights_frame_statistics_dynamic_light_count_offset[
@@ -386,7 +371,7 @@ static byte local_lens_flare_occlusion_test_results2[MAXIMUM_LENS_FLARE_MARKERS_
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
 extern struct rasterizer_lights_globals rasterizer_lights;
-extern struct rasterizer_lights_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern short global_screenshot_count;
 extern short global_screenshot_size;
 
@@ -473,11 +458,11 @@ static real lens_flare_evaluate_corona_rotation_function(
 		{
 			real_vector3d plane;
 
-			cross_product3d(&direction, &global_window_parameters.view_to_world.forward, &plane);
+			cross_product3d(&direction, &global_window_parameters.frustum.view_to_world.forward, &plane);
 			cross_product3d(&plane, &direction, &plane);
-			offset.i = global_window_parameters.camera_forward.i;
-			offset.j = global_window_parameters.camera_forward.j;
-			offset.k = global_window_parameters.camera_forward.k;
+			offset.i = global_window_parameters.camera.forward.i;
+			offset.j = global_window_parameters.camera.forward.j;
+			offset.k = global_window_parameters.camera.forward.k;
 			sine = dot_product3d(&plane, &offset);
 			cosine = -dot_product3d(&direction, &offset);
 			break;
@@ -487,18 +472,18 @@ static real lens_flare_evaluate_corona_rotation_function(
 			offset.i = -direction.i;
 			offset.j = -direction.j;
 			offset.k = -direction.k;
-			sine = dot_product3d(&global_window_parameters.view_to_world.forward, &offset);
-			cosine = -dot_product3d(&global_window_parameters.view_to_world.up, &offset);
+			sine = dot_product3d(&global_window_parameters.frustum.view_to_world.forward, &offset);
+			cosine = -dot_product3d(&global_window_parameters.frustum.view_to_world.up, &offset);
 			break;
 
 		case _lens_flare_corona_rotation_function_eye_to_light_in_light_space:
 		{
 			real_vector3d plane;
 
-			cross_product3d(&direction, &global_window_parameters.view_to_world.forward, &plane);
+			cross_product3d(&direction, &global_window_parameters.frustum.view_to_world.forward, &plane);
 			cross_product3d(&plane, &direction, &plane);
 			vector_from_points3d(
-				&global_window_parameters.camera_position,
+				&global_window_parameters.camera.position,
 				&lens_flare_parameters->position,
 				&offset);
 			sine = dot_product3d(&plane, &offset);
@@ -508,11 +493,11 @@ static real lens_flare_evaluate_corona_rotation_function(
 
 		case _lens_flare_corona_rotation_function_eye_to_light_in_eye_space:
 			vector_from_points3d(
-				&global_window_parameters.camera_position,
+				&global_window_parameters.camera.position,
 				&lens_flare_parameters->position,
 				&offset);
-			sine = dot_product3d(&global_window_parameters.view_to_world.forward, &offset);
-			cosine = -dot_product3d(&global_window_parameters.view_to_world.up, &offset);
+			sine = dot_product3d(&global_window_parameters.frustum.view_to_world.forward, &offset);
+			cosine = -dot_product3d(&global_window_parameters.frustum.view_to_world.up, &offset);
 			break;
 
 		default:
@@ -571,10 +556,10 @@ void rasterizer_lens_flare_submit(
 			real camera_distance;
 
 			vector_from_points3d(
-				&global_window_parameters.camera_position,
+				&global_window_parameters.camera.position,
 				&parameters->position,
 				&camera_offset);
-			camera_distance= dot_product3d(&global_window_parameters.camera_forward, &camera_offset);
+			camera_distance= dot_product3d(&global_window_parameters.camera.forward, &camera_offset);
 
 			if ((parameters->definition->far_fade_distance==0.0f ||
 				camera_distance<parameters->definition->far_fade_distance) &&
@@ -836,7 +821,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 				case _lens_flare_occlusion_offset_direction_toward_viewer:
 					point_from_line3d(
 						&lens_flare_parameters->position,
-						&global_window_parameters.camera_forward,
+						&global_window_parameters.camera.forward,
 						-definition->occlusion_radius,
 						&occlusion_point);
 					break;
@@ -919,12 +904,12 @@ void rasterizer_lens_flares_draw(
 					short reflection_index;
 
 					vector_from_points3d(
-						&global_window_parameters.camera_position,
+						&global_window_parameters.camera.position,
 						&position,
 						&camera_offset);
-					depth = dot_product3d(&global_window_parameters.camera_forward, &camera_offset);
+					depth = dot_product3d(&global_window_parameters.camera.forward, &camera_offset);
 
-					scale_vector3d(&global_window_parameters.camera_forward, depth, &mirror);
+					scale_vector3d(&global_window_parameters.camera.forward, depth, &mirror);
 					subtract_vectors3d(&mirror, &camera_offset, &mirror);
 					scale_vector3d(&mirror, 2.0f, &mirror);
 
@@ -950,8 +935,8 @@ void rasterizer_lens_flares_draw(
 						definition->corona_rotation_function,
 						lens_flare_parameters)*definition->corona_rotation_function_scale;
 					screen_rotation = (real)atan2(
-						dot_product3d(&global_window_parameters.view_to_world.forward, &camera_offset),
-						dot_product3d(&global_window_parameters.view_to_world.left, &camera_offset))*(180.0f/((real)M_PI));
+						dot_product3d(&global_window_parameters.frustum.view_to_world.forward, &camera_offset),
+						dot_product3d(&global_window_parameters.frustum.view_to_world.left, &camera_offset))*(180.0f/((real)M_PI));
 
 					cosine_scale = 1.0f/
 						(definition->runtime_cosine_falloff_angle-definition->runtime_cosine_cutoff_angle);
@@ -961,7 +946,7 @@ void rasterizer_lens_flares_draw(
 
 					scale_functions[_lens_flare_reflection_scale_function_none] = 1.0f;
 					scale_functions[_lens_flare_reflection_scale_function_light_direction] = PIN(
-						-dot_product3d(&global_window_parameters.camera_forward, &direction)*cosine_scale+cosine_offset,
+						-dot_product3d(&global_window_parameters.camera.forward, &direction)*cosine_scale+cosine_offset,
 						0.0f,
 						1.0f);
 					scale_functions[_lens_flare_reflection_scale_function_light_to_camera] = PIN(
@@ -969,7 +954,7 @@ void rasterizer_lens_flares_draw(
 						0.0f,
 						1.0f);
 					scale_functions[_lens_flare_reflection_scale_function_camera_direction] = PIN(
-						dot_product3d(&global_window_parameters.camera_forward, &camera_offset)*cosine_scale+cosine_offset,
+						dot_product3d(&global_window_parameters.camera.forward, &camera_offset)*cosine_scale+cosine_offset,
 						0.0f,
 						1.0f);
 

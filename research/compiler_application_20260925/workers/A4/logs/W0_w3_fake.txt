@@ -1,0 +1,10 @@
+same  source/rasterizer/rasterizer  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/rasterizer_debug  base[rc 0 {'warning C4031': 1, 'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4031': 1, 'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/rasterizer_lights  base[rc 0 {'warning C4146': 1, 'warning C4244': 11, 'warning C4305': 1}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11, 'warning C4305': 1}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_debug  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_decals  base[rc 0 {'warning C4146': 1, 'warning C4244': 15}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 15}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_lights  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_motion_sensor  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_shadows  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_text  base[rc 0 {'warning C4146': 1, 'warning C4244': 11}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 11}]  fake:0 review lead
+same  source/rasterizer/xbox/rasterizer_xbox_widgets  base[rc 0 {'warning C4146': 1, 'warning C4244': 15}] W0[rc 0 {'warning C4146': 1, 'warning C4244': 15}]  fake:0 review lead

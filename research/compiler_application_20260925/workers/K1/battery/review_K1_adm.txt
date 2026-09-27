@@ -1,0 +1,2 @@
+change  _ai_communication_event                                 8128 -> 8096  changed
+VERDICT K1_adm: 0 gains, 0 losses, 1 other changes (0 added, 0 removed) | gate: EXACT       176  _reply_filter_same_target | EXACT        80  _reply_filter_searching | == exact 46  residual 2  unwritten 0  (of 48 listed)

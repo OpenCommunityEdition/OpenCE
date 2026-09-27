@@ -1,0 +1,20 @@
+CARD PAO-1 (A3)  written 2026-09-26 00:42:35 -0700  -- BEFORE its first compile
+unit: source/ai/path_obstacle_avoidance   base: HEAD 455dffad (file blob as in worktree)
+observed: TU renames real_math.h's __inline valid_real_point2d (-> valid_real_point2d_inline) and defines its own
+  out-of-line valid_real_point2d from memcpy bit tests (#undef memcpy, <string.h>). 2026-08-26 ledger: the natural
+  body valid_real(point->x) && valid_real(point->y) (E1) was EXACT but rejected for emitting _valid_real and moving
+  section ordinals; E2 memcpy expansion was chosen to avoid the emission (hand expansion to evade an emission check).
+evidence: J = January split: _valid_real_point2d DEF only in path_obstacle_avoidance.obj, REF by no object
+  (emitted-but-unreferenced header-inline COMDAT, same class as actor_combat _valid_real / players
+  _valid_real_vector2d). HEAD object already emits _valid_real (surplus, identical, link PASS). Header body
+  (real_math.h:1849) == E1 body.
+correction: delete the two #define/#undef valid_real_point2d lines, the TU definition of valid_real_point2d, and
+  the #undef memcpy + #include <string.h> that only served it (keep <stddef.h>).
+prediction: _valid_real_point2d is emitted from the header inline as the unreferenced external COMDAT, 64 B / 0
+  relocs, EXACT (E1 result). path_new keeps inlining the two match_assert_valid_real_point2d uses; path_new stays
+  EXACT (inlined header body = the two valid_real bit tests on p->x/p->y).
+expected emitted effect: 0 symbols added/removed (_valid_real_point2d and _valid_real already defined); only
+  possible change = section order.
+collateral risks: path_new inlined assert code differs from the memcpy inline (instruction selection) -> loss;
+  __fltused/literal changes; /W3 new warnings.
+decisive test: gate --all on the copy == 24/24; keyed_diff vs build/base = 0 changed/0 added/0 removed.

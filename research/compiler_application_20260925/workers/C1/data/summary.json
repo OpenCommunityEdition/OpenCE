@@ -1,0 +1,47 @@
+{
+ "verdicts": {
+  "CONSTRAINED/halo": [
+   1,
+   1
+  ],
+  "PLACED/linker": [
+   2,
+   88
+  ],
+  "PLACED/vendor": [
+   27,
+   1125
+  ],
+  "UNPLACED/halo": [
+   212,
+   1270476
+  ]
+ },
+ "our_tree_emits": {
+  "halo/COMMON": [
+   67,
+   1215429
+  ],
+  "halo/absent": [
+   10,
+   60
+  ],
+  "halo/extern-only": [
+   136,
+   54988
+  ],
+  "linker/absent": [
+   2,
+   88
+  ],
+  "vendor/absent": [
+   20,
+   845
+  ],
+  "vendor/extern-only": [
+   7,
+   280
+  ]
+ },
+ "total_bytes": 1271690
+}

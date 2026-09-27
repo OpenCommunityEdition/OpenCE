@@ -1,0 +1,12 @@
+CARD R2 (RF-U) written 2026-09-26 19:47:18 -0700 (clock-read), BEFORE compiling. Immutable; outcome appended.
+Kind: RETAIL WITNESS LAB (diagnostic) on the strip-test forms, same method as R1: B6-retail (/Od single exit,
+  error() kept in the device arm's hw = NULL block) and B7-retail (HEAD early return, error() split into its own if).
+Question: does the retail witness single out the error() placement after the join, or only the single exit?
+Prediction: B7-retail == HEAD-retail (224, no match). B6-retail: p ~0.5 MATCH (the single exit alone may suffice in
+  retail, where success is only cleared by !hw).
+
+OUTCOME R2 (appended 2026-09-26 19:47:38 -0700): B6-retail size 208, SEP=MATCH, OCT hit 0x115de0 (same as B5-retail); B7-retail size 224,
+  no match (== HEAD-retail). Predictions: B7 CORRECT; B6 MATCH (p ~0.5) - it matched. MEANING: the retail witness
+  corroborates the SINGLE-EXIT/else structure (B5, B6 match; HEAD, B7 do not) but does NOT discriminate where the
+  error() call sits (B5 vs B6); that placement is decided only by January's debug bytes (B5 exact, B6 loses the
+  EBX pin).

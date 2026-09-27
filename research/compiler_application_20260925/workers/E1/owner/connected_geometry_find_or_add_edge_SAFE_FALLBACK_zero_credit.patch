@@ -1,0 +1,152 @@
+diff --git a/source/tool/connected_geometry.c b/source/tool/connected_geometry.c
+--- a/source/tool/connected_geometry.c
++++ b/source/tool/connected_geometry.c
+@@ -36,11 +36,6 @@
+ #include "tool/error_geometry.h"
+ 
+ /* ---------- constants */
+-
+-enum
+-{
+-	_connected_geometry_edge_designator_forward_bit = 31
+-};
+ 
+ #define CONNECTED_GEOMETRY_POINT_EPSILON 0.001f
+ 
+@@ -276,78 +271,71 @@
+ 	long point_index0,
+ 	long point_index1)
+ {
+-	struct connected_geometry_edge *edge;
+-	long *edge_triangle;
++	boolean direction = TRUE;
+ 	long edge_index;
+-	long edge_triangle_index;
+-	boolean forward = TRUE;
+-
+-	edge_index = 0;
+-	if (geometry->edges.count > 0)
+-	{
+-		do
+-		{
+-			edge = dynamic_array_get_element(
++
++	for (edge_index = 0; edge_index < geometry->edges.count; edge_index++)
++	{
++		struct connected_geometry_edge *edge = dynamic_array_get_element(
++			&geometry->edges,
++			edge_index,
++			sizeof(*edge));
++
++		if (edge->point_indices[0] == point_index0 &&
++			edge->point_indices[1] == point_index1)
++		{
++			direction = TRUE;
++			break;
++		}
++		else if (edge->point_indices[0] == point_index1 &&
++			edge->point_indices[1] == point_index0)
++		{
++			direction = FALSE;
++			break;
++		}
++	}
++
++	if (edge_index == geometry->edges.count)
++	{
++		edge_index = dynamic_array_add_element(&geometry->edges);
++		direction = TRUE;
++		if (edge_index != NONE)
++		{
++			struct connected_geometry_edge *edge = dynamic_array_get_element(
+ 				&geometry->edges,
+ 				edge_index,
+ 				sizeof(*edge));
+-			if (edge->point_indices[0] == point_index0 &&
+-				edge->point_indices[1] == point_index1)
+-			{
+-				forward = TRUE;
+-				break;
+-			}
+-			if (edge->point_indices[0] == point_index1 &&
+-				edge->point_indices[1] == point_index0)
+-			{
+-				forward = FALSE;
+-				break;
+-			}
+-			edge_index++;
+-		}
+-		while (edge_index < geometry->edges.count);
+-	}
+-
+-	if (edge_index == geometry->edges.count)
+-	{
+-		edge_index = dynamic_array_add_element(&geometry->edges);
+-		forward = TRUE;
+-		if (edge_index == NONE)
+-		{
+-			return NONE;
+-		}
+-		edge = dynamic_array_get_element(
++
++			dynamic_array_new(&edge->triangle_indices, sizeof(long));
++			edge->point_indices[0] = point_index0;
++			edge->point_indices[1] = point_index1;
++		}
++	}
++
++	if (edge_index != NONE)
++	{
++		struct connected_geometry_edge *edge = dynamic_array_get_element(
+ 			&geometry->edges,
+ 			edge_index,
+ 			sizeof(*edge));
+-		dynamic_array_new(&edge->triangle_indices, sizeof(long));
+-		edge->point_indices[0] = point_index0;
+-		edge->point_indices[1] = point_index1;
+-	}
+-
+-	if (edge_index == NONE)
+-	{
+-		return NONE;
+-	}
+-
+-	edge = dynamic_array_get_element(
+-		&geometry->edges,
+-		edge_index,
+-		sizeof(*edge));
+-	edge_triangle_index = dynamic_array_add_element(&edge->triangle_indices);
+-	if (edge_triangle_index != NONE)
+-	{
+-		edge_triangle = dynamic_array_get_element(
+-			&edge->triangle_indices,
+-			edge_triangle_index,
+-			sizeof(*edge_triangle));
+-		*edge_triangle = triangle_index;
+-		SET_FLAG(edge_index, _connected_geometry_edge_designator_forward_bit, forward);
+-
+-		return edge_index;
+-	}
+-
+-	return NONE;
++		long edge_triangle_index = dynamic_array_add_element(&edge->triangle_indices);
++
++		if (edge_triangle_index != NONE)
++		{
++			*(long *)dynamic_array_get_element(
++				&edge->triangle_indices,
++				edge_triangle_index,
++				sizeof(long)) = triangle_index;
++		}
++		else
++		{
++			edge_index = NONE;
++		}
++	}
++
++	return edge_index == NONE ?
++		NONE :
++		(direction ? edge_index | LONG_MIN : edge_index & LONG_MAX);
+ }
+ 
+ long connected_geometry_add_triangle(

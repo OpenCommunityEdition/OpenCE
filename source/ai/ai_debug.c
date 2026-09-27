@@ -1565,8 +1565,6 @@ static void ai_debug_render_actor(
 
 			if (TEST_FLAG(actor_definition->flags, _actor_definition_fixed_crouch_facing_bit))
 			{
-				char const *string;
-
 				if (actor->control.desire_stationary_facing)
 				{
 					if (actor->control.fixed_stationary_facing)

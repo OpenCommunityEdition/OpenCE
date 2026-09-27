@@ -1,0 +1,4 @@
+ss..........                                                             [100%]
+=========================== short test summary info ===========================
+SKIPPED [2] tools\test_rasterizer_lights_reset_overrun_layout.py:178: the locally supplied January split object is unavailable
+10 passed, 2 skipped in 0.02s

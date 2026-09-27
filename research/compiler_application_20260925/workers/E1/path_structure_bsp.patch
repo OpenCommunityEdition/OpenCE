@@ -1,0 +1,156 @@
+diff --git a/source/ai/path_structure_bsp.c b/source/ai/path_structure_bsp.c
+--- a/source/ai/path_structure_bsp.c
++++ b/source/ai/path_structure_bsp.c
+@@ -108,80 +108,80 @@
+ 
+ 	while (TRUE)
+ 	{
+-		long next_surface_index;
+-		byte pathfinding_surface_flags;
+-		boolean surface_passable;
+-
+-		if (distance < surface_result.enter_t)
+-		{
+-			pathfinding_surface_flags = pathfinding_surfaces[surface_result.enter_surface_index];
+-			if (pathfinding_surface_flags)
+-			{
+-				surface_passable = TRUE;
+-				if (!ignore_broken_surfaces &&
+-					TEST_FLAG(pathfinding_surface_flags, _pathfinding_surface_breakable_bit))
+-				{
+-					struct collision_surface const *collision_surface;
+-
+-					collision_surface = TAG_BLOCK_GET_ELEMENT(
+-						&bsp->surfaces,
+-						surface_result.enter_surface_index,
+-						struct collision_surface);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
+-						105,
+-						TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
+-					surface_passable = BIT_VECTOR_TEST_FLAG(
+-						(long *)breakable_surface_flags,
+-						collision_surface->breakable_surface_index);
+-				}
+-
+-				if (surface_passable && surface_result.enter_surface_index != NONE)
+-				{
+-					next_surface_index = surface_result.enter_surface_index;
+-					goto continue_from_surface;
+-				}
+-			}
+-		}
+-
+-		if (distance > surface_result.exit_t)
+-		{
+-			pathfinding_surface_flags = pathfinding_surfaces[surface_result.exit_surface_index];
+-			if (pathfinding_surface_flags)
+-			{
+-				surface_passable = TRUE;
+-				if (!ignore_broken_surfaces &&
+-					TEST_FLAG(pathfinding_surface_flags, _pathfinding_surface_breakable_bit))
+-				{
+-					struct collision_surface const *collision_surface;
+-
+-					collision_surface = TAG_BLOCK_GET_ELEMENT(
+-						&bsp->surfaces,
+-						surface_result.exit_surface_index,
+-						struct collision_surface);
+-					match_assert(
+-						"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
+-						126,
+-						TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
+-					surface_passable = BIT_VECTOR_TEST_FLAG(
+-						(long *)breakable_surface_flags,
+-						collision_surface->breakable_surface_index);
+-				}
+-
+-				if (surface_passable && surface_result.exit_surface_index != NONE)
+-				{
+-					next_surface_index = surface_result.exit_surface_index;
+-					goto continue_from_surface;
+-				}
+-			}
+-		}
+-
+-		break;
+-
+-continue_from_surface:
++		long next_surface_index = NONE;
++
++		if (distance < surface_result.enter_t &&
++			pathfinding_surfaces[surface_result.enter_surface_index])
++		{
++			boolean surface_passable = TRUE;
++
++			if (!ignore_broken_surfaces &&
++				TEST_FLAG(
++					pathfinding_surfaces[surface_result.enter_surface_index],
++					_pathfinding_surface_breakable_bit))
++			{
++				struct collision_surface const *collision_surface;
++
++				collision_surface = TAG_BLOCK_GET_ELEMENT(
++					&bsp->surfaces,
++					surface_result.enter_surface_index,
++					struct collision_surface);
++				match_assert(
++					"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
++					105,
++					TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
++				surface_passable = BIT_VECTOR_TEST_FLAG(
++					(long *)breakable_surface_flags,
++					collision_surface->breakable_surface_index);
++			}
++
++			if (surface_passable)
++			{
++				next_surface_index = surface_result.enter_surface_index;
++			}
++		}
++
++		if (next_surface_index == NONE &&
++			distance > surface_result.exit_t &&
++			pathfinding_surfaces[surface_result.exit_surface_index])
++		{
++			boolean surface_passable = TRUE;
++
++			if (!ignore_broken_surfaces &&
++				TEST_FLAG(
++					pathfinding_surfaces[surface_result.exit_surface_index],
++					_pathfinding_surface_breakable_bit))
++			{
++				struct collision_surface const *collision_surface;
++
++				collision_surface = TAG_BLOCK_GET_ELEMENT(
++					&bsp->surfaces,
++					surface_result.exit_surface_index,
++					struct collision_surface);
++				match_assert(
++					"c:\\halo\\SOURCE\\ai\\path_structure_bsp.c",
++					126,
++					TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit));
++				surface_passable = BIT_VECTOR_TEST_FLAG(
++					(long *)breakable_surface_flags,
++					collision_surface->breakable_surface_index);
++			}
++
++			if (surface_passable)
++			{
++				next_surface_index = surface_result.exit_surface_index;
++			}
++		}
++
++		if (next_surface_index == NONE)
++		{
++			break;
++		}
++
++		surface_index = next_surface_index;
+ 		collision_surface_test_line2d(
+ 			bsp,
+-			surface_index = next_surface_index,
++			surface_index,
+ 			_z,
+ 			TRUE,
+ 			point,

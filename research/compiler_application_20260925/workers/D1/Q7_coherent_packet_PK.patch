@@ -1,0 +1,69 @@
+--- a/source/items/weapons.c
++++ b/source/items/weapons.c
+@@ -523,7 +523,7 @@
+ 	return;
+ }
+ 
+-void weapon_place(
++long weapon_place(
+ 	long weapon_index,
+ 	struct scenario_weapon_datum *scenario_weapon)
+ {
+@@ -545,7 +545,7 @@
+ 	if (!TEST_FLAG(scenario_weapon->flags, _weapon_created_at_rest_bit))
+ 		weapon->object.position.z += 0.05f;
+ 
+-	return;
++	return weapon_index;
+ }
+ 
+ void weapon_ready(
+--- a/source/items/weapons.h
++++ b/source/items/weapons.h
+@@ -260,9 +260,13 @@
+ 
+ void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
+ 
++struct scenario_weapon_datum;
+ struct weapon_interface_state;
+ 
+ boolean weapon_new(long weapon_index);
++long weapon_place(
++	long weapon_index,
++	struct scenario_weapon_datum *scenario_weapon);
+ void weapon_export_function_values(
+ 	long weapon_index);
+ 
+--- a/source/objects/object_types.c
++++ b/source/objects/object_types.c
+@@ -218,9 +218,6 @@
+ void vehicle_render_debug(
+ 	long object_index);
+ 
+-void weapon_place(
+-	long object_index,
+-	struct scenario_object_datum *scenario_object);
+ void weapon_delete(
+ 	long object_index);
+ boolean weapon_update(
+@@ -370,6 +367,9 @@
+ 	NULL
+ };
+ 
++/* BUG: weapon_place returns long (HCEX weapons.obj: long (long, struct scenario_weapon_datum *); January
++   returns weapon_index in eax), but it is bound here, uncast, to the void-returning datum_place slot, and
++   object_type_place calls it through that slot and discards the result. */
+ struct object_type_definition weapon_data_definition =
+ {
+ 	"weapon", 'weap', 0x27C, 0x270, 0x27C, 0x5C,
+--- a/source/objects/object_types.h
++++ b/source/objects/object_types.h
+@@ -68,7 +68,7 @@
+ 	void (*dispose_from_old_map)();
+ 	void (*datum_adjust_placement)(long, struct object_placement_data *);
+ 	boolean (*datum_new)(long);
+-	void (*datum_place)(long, struct scenario_object_datum *);
++	void (*datum_place)(long, void *);
+ 	void (*datum_delete)(long);
+ 	boolean(*datum_update)(long);
+ 	void (*datum_export_function_values)(long);

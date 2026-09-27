@@ -1,0 +1,27 @@
+Card L3 - corrected source packet (f1.c) re-verification
+Clock (date, written before f1.c is compiled): 2026-09-26 01:26:36 -0700
+
+Change vs W2's packet (source only; the tools test is the separate patch from card L2):
+ - W2's typedef `verify_lens_flare_reset_overrun_stays_in_first_parameters_record` (a size check whose NAME claims
+   adjacency) becomes `verify_lens_flare_reset_overrun_record_sizes`: sizeof(struct lens_flare_occlusion_test_results)
+   == 0x22 && sizeof(struct rasterizer_lens_flare_submit_parameters) == 0x28 (both January-evidenced: push
+   0x7722 = 897 x 0x22 over a 0x7700 array; getter stride 5 x 8 and submit's csmemcpy 0x28). Same count of declared
+   names as W2's r1_check (+1 vs HEAD).
+ - The BUG comment is rewritten: no "harmless"; states the covered fields, what the typedef does and does not
+   check, the tools layout test and its fail condition, the lifecycle as a conditional argument with its
+   assumptions, and the corrected-build length.
+ - The memset length stays W2's `(MAXIMUM_LIGHTS_PER_MAP+1)*sizeof(struct lens_flare_occlusion_test_results)`.
+
+Compiler-state prediction: comments are inert; the typedef spelling/condition change keeps the declared-name count
+ of W2's r1_check, which W2 measured as inert in this TU. Expected object == W2 build except the COFF timestamp.
+
+Predictions:
+ V1. gate --all: 12 exact / 1 residual (only `_rasterizer_lens_flares_draw`, parked), reset EXACT 48.
+ V2. keyed_diff vs build/base: 1 changed section (reset, EXACT vs January), 0 added, 0 removed; draw's sha equals
+     base's; every other section identical to build/base. f1.obj sections identical to w2.obj.
+ V3. /W3 census (W2's w3.py) identical to HEAD: {C4146:1, C4244:11, C4305:1}; no C4013, nothing new.
+ V4. fake_match_scan: no lead in the changed lines (compare to HEAD's output for this file).
+ V5. object_audit: same result as for build/base apart from the reset row (the object stays incomplete: draw).
+ V6. review_patch.py (lead reviewer): GAINS = reset only, LOSSES = 0, ADDED/REMOVED = 0.
+ V7. the tools layout test (card L2) passes on f1.obj.
+Refutation: any other section change, any new warning, any loss, or a scanner lead attributable to the patch.

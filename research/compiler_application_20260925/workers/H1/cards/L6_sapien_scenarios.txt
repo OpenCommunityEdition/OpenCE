@@ -1,0 +1,22 @@
+CARD L6 - which January storage forms can turn into the Sapien layout by ONE line-neutral 2004 edit?
+Written 2026-09-26 02:32:54 -0700, before the lab. Worker H1. Production VC7 stands in for VC7.1 (L4: same two-bucket
+law, same hash - 7 SZ/EZ TUs keep order, objects/periodic land on the VC7 hash order of authentic names).
+
+New fact (no compile): January, Sapien (\halopc\haloce\source\render\render_debug.c) and the 2020 /Od build carry the
+SAME 58 assert line immediates for render_debug.c (0xDB .. 0x652, value for value). The three files are line-aligned
+through line 1618; any 2002->2004 difference is line-neutral (an initialiser, a name, or two swapped lines).
+Sapien layout (relative): entries +0, strings +0x7000, game_time +0x7400, entry_count +0x7404, string_offset
++0x7408, entry_overflow +0x740A, string_overflow +0x740B. January: strings +0, entries +0x400, rest identical.
+
+Scenarios (unchanged names unless stated), with the layout VC7 must produce if the reasoning is right:
+(a) Jan all '= 0' (D1) ; 2004 drops the two arrays' initialisers, array names hash entries < strings
+    -> Sapien layout exactly. PREDICT: lab reproduces Sapien offsets.
+(b) Jan arrays uninitialised (hash strings < entries), scalars '= 0', declared entries before strings ; 2004 adds
+    '= { 0 }' to the arrays -> Sapien layout exactly. PREDICT: reproduces.
+(c) Jan all '= 0' ; 2004 swaps the two array declaration lines -> Sapien exactly. PREDICT: reproduces.
+(d) Jan all 7 uninitialised (hash = January order) ; 2004 adds an initialiser to ANY one or both arrays
+    -> arrays move BEHIND the uninitialised scalars. PREDICT: does NOT reproduce Sapien.
+(e) Jan all 7 uninitialised ; 2004 drops/adds nothing but the scalars stay uninitialised: only a RENAME of an array
+    (hash moves it) can swap the arrays while keeping both ahead of the scalars. Not simulated (needs chosen names).
+Reading if (a)-(d) behave as predicted: every single-edit explanation except an array rename requires January's
+game_time, entry_count, string_offset and both flags to be '= 0'. The arrays stay undetermined ((a)/(c) vs (b)).

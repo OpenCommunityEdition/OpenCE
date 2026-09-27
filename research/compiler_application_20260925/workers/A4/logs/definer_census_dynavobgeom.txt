@@ -1,0 +1,8 @@
+_D3DSIMPLERENDERSTATEENCODE                    definers 134  (selection, identical-to-January): {(2, True): 134}
+_D3DTEXTUREDIRECTENCODE                        definers 134  (selection, identical-to-January): {(2, True): 134}
+_D3DPRIMITIVETOVERTEXCOUNT                     definers 134  (selection, identical-to-January): {(2, True): 134}
+_real_alpha_to_pixel32                         definers   6  (selection, identical-to-January): {(2, True): 6}
+_real_argb_color_to_pixel32                    definers   3  (selection, identical-to-January): {(2, True): 3}
+_dot_product3d                                 definers  74  (selection, identical-to-January): {(2, True): 74}
+_vector_from_points3d                          definers  79  (selection, identical-to-January): {(2, True): 78, (2, False): 1}
+        NOTE ('source\\physics\\breakable_surfaces', 2, False)

@@ -1,0 +1,16 @@
+??_C@_06CGBPGGIE@bounds?$AA@                 provider source/bitmaps/bitmap_extract                    PASS
+??_C@_06PCHFJCOP@bitmap?$AA@                 provider source/bitmaps/bitmap_group                      PASS
+??_C@_08OEDKDIOB@lighting?$AA@               provider source/models/models                             PASS
+??_C@_0CC@DECIGGNF@?$CD?$CD?$CD?5ERROR?5unsupported?5bitmap?5typ@ provider source/bitmaps/bitmap_extract                    PASS
+??_C@_0CH@BDFKHBGO@type?$DO?$DN0?5?$CG?$CG?5type?$DMNUMBER_OF_BITMAP@ provider source/bitmaps/bitmaps                           PASS
+_D3DPRIMITIVETOVERTEXCOUNT                   provider source/rasterizer/xbox/rasterizer_xbox_decals    PASS
+_D3DSIMPLERENDERSTATEENCODE                  provider source/interface/progress_bar                    PASS
+_D3DTEXTUREDIRECTENCODE                      provider source/cseries/headers                           PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+__real@bf800000                              provider source/ai/actor_moving                           PASS
+__real@c0000000                              provider source/ai/path_obstacles                         PASS
+_dot_product3d                               provider source/ai/action_charge                          PASS
+_plane3d_distance_to_point                   provider source/effects/decals                            PASS
+_plane3d_from_point_and_normal               provider source/effects/decals                            PASS
+SELECTED-PROVIDER LINK: PASS

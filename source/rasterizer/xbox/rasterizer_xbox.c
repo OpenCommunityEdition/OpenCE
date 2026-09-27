@@ -169,7 +169,7 @@ symbols in this file:
 001465D0 0080:
 	_SetupSmartStates (0000)
 00146650 0210:
-	_rasterizer_filthy_bitmap_default_initialize (0000)
+	_rasterizer_filthy_bitmap_defaults_initialize (0000)
 00146860 0930:
 	__rasterizer_initialize (0000)
 00147190 0090:
@@ -193,7 +193,9 @@ symbols in this file:
 001487E0 00e0:
 	__rasterizer_window_end (0000)
 0028BFAC 006c:
-	_framebuffer_blend_function_states (0000)
+	?srcblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0000)
+	?destblend_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0024)
+	?blendop_table@?1??rasterizer_set_framebuffer_blend_function@@9@9 (0048)
 0028C018 0026:
 	??_C@_0CG@LJAEJIHF@?$CD?$CD?$CD?5ERROR?5failed?5to?5create?5D3D?5d@ (0000)
 0028C040 0096:
@@ -400,6 +402,7 @@ symbols in this file:
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "rasterizer/rasterizer_debug.h"
+#include "rasterizer/rasterizer_debug_options.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_lights.h"
 #include "rasterizer/rasterizer_text.h"
@@ -433,14 +436,6 @@ enum
 	_shader_framebuffer_blend_function_component_max,
 	_shader_framebuffer_blend_function_alpha_multiply_add,
 	NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS
-};
-
-enum
-{
-	_framebuffer_blend_state_source_blend = 0,
-	_framebuffer_blend_state_destination_blend,
-	_framebuffer_blend_state_blend_operation,
-	NUMBER_OF_FRAMEBUFFER_BLEND_STATES
 };
 
 enum
@@ -674,32 +669,6 @@ struct rasterizer_hardware_state_cache
 	short stencil_mode;
 };
 
-/* The debug-option field names and offsets are the ones the scripting engine
- * publishes for this global in hs_globals_external.c. */
-struct rasterizer_debug_options
-{
-	byte reserved00[2];
-	short stats;
-	short mode;
-	boolean wireframe;
-	byte reserved07[8];
-	boolean stencil_mask;
-	byte reserved10[5];
-	boolean environment_decals;
-	byte reserved16[17];
-	boolean fog_atmosphere;
-	boolean fog_plane;
-	boolean bump_mapping;
-	byte reserved2A[8];
-	short pad3;
-	byte reserved34[4];
-	real model_lighting_ambient;
-	byte reserved3C[13];
-	boolean DXTC_noise;
-	boolean soft_filter;
-	boolean secondary_render_target_debug;
-};
-
 /* the model-lighting vertex shader constant block: 11 four-component
  * registers, three per point light, two per distant light, one ambient */
 struct rasterizer_point_light_constants
@@ -786,6 +755,9 @@ struct rasterizer_model_skinning_parameters
 
 /* ---------- prototypes */
 
+static void rasterizer_filthy_bitmap_defaults_initialize(
+	void);
+
 void SetupSmartStates(
 	void);
 
@@ -857,9 +829,8 @@ D3DDevice *global_d3d_device = NULL;
 
 /* the shared 256-entry palette; January's own
  * IDirect3DDevice8_CreatePalette(global_d3d_device, D3DPALETTE_256,
- * &d3d_palette) error string names it, and csplit anchors it on
- * _global_d3d_device + 4. */
-D3DPalette *d3d_palette = NULL;
+ * &d3d_palette) error string names it. */
+static D3DPalette *d3d_palette = NULL;
 
 /* owned by another object; named by this object's own
  * D3DDevice_GetDeviceCaps() call site. */
@@ -872,19 +843,17 @@ extern D3DCAPS8 global_d3d_caps;
 static boolean suppress_window_begin_end = FALSE;
 static short previous_window_index = 0;
 
-struct rasterizer_hardware_state_cache rasterizer_state_cache =
+static struct rasterizer_hardware_state_cache rasterizer_state_cache =
 {
 	INVALID_RASTERIZER_HARDWARE_STATE,
 	0,
 	INVALID_RASTERIZER_HARDWARE_STATE,
 };
 
-extern struct pixel_shader_definition pixel_shader;
 
 extern struct window_globals_prefix window_globals;
 
 extern struct rasterizer_window_begin_parameters global_window_parameters;
-extern struct rasterizer_debug_options rasterizer_debug_options;
 extern struct rasterizer_lights_globals_prefix rasterizer_lights;
 
 /* owned by source/bitmaps/bitmaps.c */
@@ -895,44 +864,6 @@ extern pixel32 global_vector_palette[NUMBER_OF_ENTRIES_IN_PALETTE];
 extern unsigned long renderstate_table[D3DRS_MAX];
 extern unsigned long texturestagestate_table[D3DTSS_MAXSTAGES][D3DTSS_MAX];
 extern D3DBaseTexture *texture_table[D3DTSS_MAXSTAGES];
-
-static const long framebuffer_blend_function_states
-	[NUMBER_OF_FRAMEBUFFER_BLEND_STATES][NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
-{
-	{
-		D3DBLEND_SRCALPHA,
-		D3DBLEND_DESTCOLOR,
-		D3DBLEND_DESTCOLOR,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		NONE
-	},
-	{
-		D3DBLEND_INVSRCALPHA,
-		D3DBLEND_ZERO,
-		D3DBLEND_SRCCOLOR,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_ONE,
-		D3DBLEND_INVSRCALPHA,
-		NONE
-	},
-	{
-		D3DBLENDOP_ADD,
-		D3DBLENDOP_ADD,
-		D3DBLENDOP_ADD,
-		D3DBLENDOP_ADD,
-		D3DBLENDOP_REVSUBTRACT,
-		D3DBLENDOP_MIN,
-		D3DBLENDOP_MAX,
-		D3DBLENDOP_ADD,
-		NONE
-	}
-};
 
 /* ---------- public code */
 
@@ -2203,6 +2134,48 @@ union point2d *rasterizer_set_texture(
 void rasterizer_set_framebuffer_blend_function(
 	short framebuffer_blend_function)
 {
+	/* three separate NONE-terminated tables (January .rdata is 4-byte aligned, so
+	 * no single 108-byte array); names, scope and type follow HCEX.pdb's static
+	 * locals of this function (const unsigned long srcblend_table[9], ...). */
+	static const unsigned long srcblend_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
+	{
+		D3DBLEND_SRCALPHA,
+		D3DBLEND_DESTCOLOR,
+		D3DBLEND_DESTCOLOR,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		NONE
+	};
+
+	static const unsigned long destblend_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
+	{
+		D3DBLEND_INVSRCALPHA,
+		D3DBLEND_ZERO,
+		D3DBLEND_SRCCOLOR,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_ONE,
+		D3DBLEND_INVSRCALPHA,
+		NONE
+	};
+
+	static const unsigned long blendop_table[NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS + 1] =
+	{
+		D3DBLENDOP_ADD,
+		D3DBLENDOP_ADD,
+		D3DBLENDOP_ADD,
+		D3DBLENDOP_ADD,
+		D3DBLENDOP_REVSUBTRACT,
+		D3DBLENDOP_MIN,
+		D3DBLENDOP_MAX,
+		D3DBLENDOP_ADD,
+		NONE
+	};
+
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		1907,
@@ -2210,15 +2183,15 @@ void rasterizer_set_framebuffer_blend_function(
 	IDirect3DDevice8_SetRenderState(
 		global_d3d_device,
 		D3DRS_SRCBLEND,
-		framebuffer_blend_function_states[_framebuffer_blend_state_source_blend][framebuffer_blend_function]);
+		srcblend_table[framebuffer_blend_function]);
 	IDirect3DDevice8_SetRenderState(
 		global_d3d_device,
 		D3DRS_DESTBLEND,
-		framebuffer_blend_function_states[_framebuffer_blend_state_destination_blend][framebuffer_blend_function]);
+		destblend_table[framebuffer_blend_function]);
 	IDirect3DDevice8_SetRenderState(
 		global_d3d_device,
 		D3DRS_BLENDOP,
-		framebuffer_blend_function_states[_framebuffer_blend_state_blend_operation][framebuffer_blend_function]);
+		blendop_table[framebuffer_blend_function]);
 	return;
 }
 
@@ -3423,13 +3396,13 @@ boolean _rasterizer_initialize(
 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 1, D3DTSS_TEXCOORDINDEX, 1);
 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 2, D3DTSS_TEXCOORDINDEX, 2);
 					IDirect3DDevice8_SetTextureStageState(global_d3d_device, 3, D3DTSS_TEXCOORDINDEX, 3);
-					IDirect3DDevice8_SetFlickerFilter(global_d3d_device, RASTERIZER_FLICKER_FILTER_LEVEL);
-					IDirect3DDevice8_SetSoftDisplayFilter(global_d3d_device, FALSE);
+					D3DDevice_SetFlickerFilter(RASTERIZER_FLICKER_FILTER_LEVEL);
+					D3DDevice_SetSoftDisplayFilter(FALSE);
 				}
 			}
 		}
 	}
-	rasterizer_filthy_bitmap_default_initialize();
+	rasterizer_filthy_bitmap_defaults_initialize();
 	success = success &&
 		rasterizer_memory_pool_initialize() &&
 		rasterizer_dynamic_geometry_initialize() &&
@@ -3531,7 +3504,7 @@ void *rasterizer_get_bitmap_default_hardware_format(
 	return hardware_format;
 }
 
-void rasterizer_filthy_bitmap_default_initialize(
+static void rasterizer_filthy_bitmap_defaults_initialize(
 	void)
 {
 	IDirect3DTexture8 *default_2d_hardware_format;

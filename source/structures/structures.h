@@ -79,6 +79,8 @@ short structure_clusters_in_sphere(
 	real radius,
 	short maximum_count,
 	short *intersected_indices);
+void render_debug_fog_planes(
+	void);
 
 /* ---------- prototypes/STRUCTURE_DETAIL_OBJECTS.C */
 

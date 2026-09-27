@@ -148,23 +148,6 @@ struct transparent_geometry_group
 typedef char transparent_geometry_group_size_assert[
 	sizeof(struct transparent_geometry_group) == 0xA0 ? 1 : -1];
 
-struct rasterizer_widget_window_parameters
-{
-	byte reserved00[8];
-	real_point3d camera_position;
-	real_vector3d camera_forward;
-	byte reserved20[0x14];
-	rectangle2d viewport_bounds;
-	byte reserved3C[0x30];
-	real_matrix4x3 world_to_view;
-	byte reservedA0[0x100];
-	real projection_matrix[4][4];
-};
-
-typedef char rasterizer_widget_window_parameters_offset_assert[
-	offsetof(
-		struct rasterizer_widget_window_parameters,
-		projection_matrix) == 0x1A0 ? 1 : -1];
 
 struct rasterizer_debug_options
 {
@@ -215,7 +198,7 @@ static boolean rasterizer_widget_project_billboard(
 
 extern D3DDevice *global_d3d_device;
 extern struct rasterizer_debug_options rasterizer_debug_options;
-extern struct rasterizer_widget_window_parameters global_window_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 static boolean warned_about_too_many_transparent_geometry_groups;
@@ -309,9 +292,9 @@ void _rasterizer_widget_submit(
 			centroid);
 		if (group)
 		{
-			camera_to_centroid.i = centroid->x - global_window_parameters.camera_position.x;
-			camera_to_centroid.j = centroid->y - global_window_parameters.camera_position.y;
-			camera_to_centroid.k = centroid->z - global_window_parameters.camera_position.z;
+			camera_to_centroid.i = centroid->x - global_window_parameters.camera.position.x;
+			camera_to_centroid.j = centroid->y - global_window_parameters.camera.position.y;
+			camera_to_centroid.k = centroid->z - global_window_parameters.camera.position.z;
 			group->geometry_flags = 0;
 			group->object_index = 0;
 			group->source_object_index = 0;
@@ -330,9 +313,9 @@ void _rasterizer_widget_submit(
 			null_plane.n.k = 0.0f;
 			null_plane.d = 0.0f;
 			group->z_sort = -(
-				global_window_parameters.camera_forward.i * camera_to_centroid.i +
-				global_window_parameters.camera_forward.j * camera_to_centroid.j +
-				global_window_parameters.camera_forward.k * camera_to_centroid.k);
+				global_window_parameters.camera.forward.i * camera_to_centroid.i +
+				global_window_parameters.camera.forward.j * camera_to_centroid.j +
+				global_window_parameters.camera.forward.k * camera_to_centroid.k);
 			group->centroid = *centroid;
 			group->plane = null_plane;
 			group->model_base_map_scale.i = group->model_base_map_scale.j = 1.0f;
@@ -410,10 +393,10 @@ void _rasterizer_widget_begin(
 				0x38,
 				_rasterizer_vertex_type_dynamic_unlit,
 				0);
-			viewport_width = global_window_parameters.viewport_bounds.x1 -
-				global_window_parameters.viewport_bounds.x0;
-			viewport_height = global_window_parameters.viewport_bounds.y1 -
-				global_window_parameters.viewport_bounds.y0;
+			viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
+				global_window_parameters.camera.viewport_bounds.x0;
+			viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+				global_window_parameters.camera.viewport_bounds.y0;
 			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
 			vertex_constants[0][1] = 0.0f;
 			vertex_constants[0][2] = 0.0f;
@@ -501,10 +484,10 @@ void _rasterizer_widget_begin(
 				0x38,
 				_rasterizer_vertex_type_dynamic_unlit,
 				0);
-			viewport_width = global_window_parameters.viewport_bounds.x1 -
-				global_window_parameters.viewport_bounds.x0;
-			viewport_height = global_window_parameters.viewport_bounds.y1 -
-				global_window_parameters.viewport_bounds.y0;
+			viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
+				global_window_parameters.camera.viewport_bounds.x0;
+			viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+				global_window_parameters.camera.viewport_bounds.y0;
 			vertex_constants[0][0] = 1.0f / viewport_width * 2.0f;
 			vertex_constants[0][1] = 0.0f;
 			vertex_constants[0][2] = 0.0f;
@@ -1036,41 +1019,41 @@ static boolean rasterizer_widget_project_billboard(
 
 	if (radius > 0.0f)
 	{
-		viewport_width = global_window_parameters.viewport_bounds.x1 -
-			global_window_parameters.viewport_bounds.x0;
-		viewport_height = global_window_parameters.viewport_bounds.y1 -
-			global_window_parameters.viewport_bounds.y0;
+		viewport_width = global_window_parameters.camera.viewport_bounds.x1 -
+			global_window_parameters.camera.viewport_bounds.x0;
+		viewport_height = global_window_parameters.camera.viewport_bounds.y1 -
+			global_window_parameters.camera.viewport_bounds.y0;
 		matrix4x3_transform_point(
-			&global_window_parameters.world_to_view,
+			&global_window_parameters.frustum.world_to_view,
 			point,
 			&view_point);
 
 		clip_y =
-			global_window_parameters.projection_matrix[0][1] * view_point.x +
-			global_window_parameters.projection_matrix[1][1] * view_point.y +
-			global_window_parameters.projection_matrix[2][1] * view_point.z +
-			global_window_parameters.projection_matrix[3][1];
+			global_window_parameters.frustum.projection_matrix[0][1] * view_point.x +
+			global_window_parameters.frustum.projection_matrix[1][1] * view_point.y +
+			global_window_parameters.frustum.projection_matrix[2][1] * view_point.z +
+			global_window_parameters.frustum.projection_matrix[3][1];
 		clip_z =
-			global_window_parameters.projection_matrix[0][2] * view_point.x +
-			global_window_parameters.projection_matrix[1][2] * view_point.y +
-			global_window_parameters.projection_matrix[2][2] * view_point.z +
-			global_window_parameters.projection_matrix[3][2];
+			global_window_parameters.frustum.projection_matrix[0][2] * view_point.x +
+			global_window_parameters.frustum.projection_matrix[1][2] * view_point.y +
+			global_window_parameters.frustum.projection_matrix[2][2] * view_point.z +
+			global_window_parameters.frustum.projection_matrix[3][2];
 		projected_radius_x =
-			global_window_parameters.projection_matrix[0][0] * radius;
+			global_window_parameters.frustum.projection_matrix[0][0] * radius;
 		projected_radius_y =
-			global_window_parameters.projection_matrix[1][1] * radius;
+			global_window_parameters.frustum.projection_matrix[1][1] * radius;
 		if (clip_z > 0.0f)
 		{
 			inverse_w = 1.0f / (
-				global_window_parameters.projection_matrix[0][3] * view_point.x +
-				global_window_parameters.projection_matrix[1][3] * view_point.y +
-				global_window_parameters.projection_matrix[2][3] * view_point.z +
-				global_window_parameters.projection_matrix[3][3]);
+				global_window_parameters.frustum.projection_matrix[0][3] * view_point.x +
+				global_window_parameters.frustum.projection_matrix[1][3] * view_point.y +
+				global_window_parameters.frustum.projection_matrix[2][3] * view_point.z +
+				global_window_parameters.frustum.projection_matrix[3][3]);
 			projected_center->x = (((
-				global_window_parameters.projection_matrix[0][0] * view_point.x +
-				global_window_parameters.projection_matrix[1][0] * view_point.y +
-				global_window_parameters.projection_matrix[2][0] * view_point.z +
-				global_window_parameters.projection_matrix[3][0]) *
+				global_window_parameters.frustum.projection_matrix[0][0] * view_point.x +
+				global_window_parameters.frustum.projection_matrix[1][0] * view_point.y +
+				global_window_parameters.frustum.projection_matrix[2][0] * view_point.z +
+				global_window_parameters.frustum.projection_matrix[3][0]) *
 				inverse_w + 1.0f) * viewport_width - 1.0f) * 0.5f;
 			projected_center->y =
 				((1.0f - clip_y * inverse_w) * viewport_height - 1.0f) * 0.5f;

@@ -798,6 +798,9 @@ static void hud_update_weapon_local_player(
 					break;
 
 				case _crosshair_state_flash_ammo:
+					/* The redundant (remaining || loaded) && remaining tests of the four ammo states are first-party:
+					   January tests rounds_remaining twice (T+0x205..0x21b) and the later /Od build spells them the
+					   same way (0x638534..0x638599). */
 					result = (weapon_state->magazines[0].rounds_remaining || weapon_state->magazines[0].rounds_loaded) &&
 						weapon_state->magazines[0].rounds_remaining &&
 						weapon_state->magazines[0].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
@@ -895,9 +898,10 @@ static void hud_update_weapon_local_player(
 						"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 						0x16E,
 						!"unreachable");
-					/* BUG (preserved for exact matching): January and the later /Od build
-					   (0x638ac2) leave result unassigned here, so it is read uninitialised
-					   below if system_exit returns (T+0x144 loads its never-stored home). */
+					/* BUG (preserved for exact matching): January (T+0x404) and the later /Od build (0x638ac2)
+					   leave result unassigned in this arm. The arm is unreachable in defined execution:
+					   crosshair_index only takes the values 0..NUMBER_OF_CROSSHAIR_STATES-1 (0..18), and each of
+					   those 19 states has a case above that assigns result. */
 					break;
 				}
 

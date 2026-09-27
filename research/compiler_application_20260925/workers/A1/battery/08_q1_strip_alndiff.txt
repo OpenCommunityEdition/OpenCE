@@ -1,0 +1,13 @@
+target 69 instructions, ours 69 instructions
+--- replace target[24:25] ours[24:25] @T 0x3e @O 0x3e
+   T    3e  mov esi, 0 ; rel+0x3f type=0x0006 target=defined-noncode:.bss:_global_goal:0
+   O    3e  mov esi, 0 ; rel+0x3f type=0x0006 target=defined-noncode:.bss:_global_goal:4
+--- replace target[38:39] ours[38:39] @T 0x67 @O 0x67
+   T    67  mov edi, dword ptr [esi]
+   O    67  mov edi, dword ptr [esi - 4]
+--- replace target[41:42] ours[41:42] @T 0x6f @O 0x70
+   T    6f  mov edi, dword ptr [esi + 4]
+   O    70  mov edi, dword ptr [esi]
+--- replace target[48:49] ours[48:49] @T 0x81 @O 0x81
+   T    81  cmp esi, 0 ; rel+0x83 type=0x0006 target=defined-noncode:.bss:_global_variant:0
+   O    81  cmp esi, 0 ; rel+0x83 type=0x0006 target=defined-noncode:.bss:_global_variant:4

@@ -1,0 +1,3 @@
+	if (distance < surface_result.enter_t)
+	{
+		result->distance

@@ -1,0 +1,304 @@
+{
+ "label": "R1_P02_DSH",
+ "head": "b62f74c12ea5eccf2e02e9736760c4b1e1b0c40d",
+ "exit_codes": {
+  "clean": 0,
+  "build": 0,
+  "objdiff": 0,
+  "stable": 0,
+  "stable_diff": 0,
+  "parks": 0,
+  "admission": 0,
+  "fake": 0,
+  "pytest": 0,
+  "diffcheck": 0,
+  "diffcheck_cached": 0
+ },
+ "failures": [],
+ "progress": {
+  "objects": [
+   389,
+   468
+  ],
+  "code": [
+   1593739,
+   1770166
+  ],
+  "functions": [
+   7463,
+   7574
+  ],
+  "data": [
+   2588903,
+   3923451
+  ],
+  "all_code": [
+   1660475,
+   2198102
+  ],
+  "all_functions": [
+   8113,
+   11060
+  ],
+  "all_data": [
+   2595217,
+   4176062
+  ],
+  "parks_validated": 75,
+  "data_exceptions": [
+   [
+    "source/shell/shell_xbox:aligned-rdata",
+    "32"
+   ],
+   [
+    "libs/libcmt/crt0msg:_rterrs",
+    "144"
+   ],
+   [
+    "source/camera/editor_flying_camera:camera-static-sections",
+    "176"
+   ],
+   [
+    "source/units/unit_dialogue:_global_speech_priority_names",
+    "44"
+   ],
+   [
+    "source/game/game_allegiance:_global_game_team_names",
+    "40"
+   ],
+   [
+    "source/game/game_engine_slayer:_slayer_engine",
+    "136"
+   ],
+   [
+    "source/interface/hud_definitions:_global_hud_anchor_names",
+    "20"
+   ],
+   [
+    "source/structures/leaf_map:_leaf_map_initialize_section",
+    "2512"
+   ],
+   [
+    "source/game/game_engine_race:_race_engine",
+    "136"
+   ],
+   [
+    "source/game/game_engine_ctf:_ctf_engine",
+    "136"
+   ],
+   [
+    "source/bitmaps/libtiff/tif_print:_tif_print_rcsid",
+    "164"
+   ],
+   [
+    "source/memory/zlib/zutil:_z_errmsg",
+    "44"
+   ],
+   [
+    "source/memory/zlib/deflate:?my_version@?1??deflateInit2_@@9@9",
+    "4"
+   ],
+   [
+    "source/networking/network_server_manager:_network_game_server_memory_do_not_use_directly_in_use",
+    "8"
+   ],
+   [
+    "source/game/game_engine_oddball:_oddball_engine",
+    "136"
+   ],
+   [
+    "source/game/game_globals:_global_material_type_strings",
+    "132"
+   ],
+   [
+    "source/items/projectile_definitions:_default_projectile_material_response",
+    "160"
+   ],
+   [
+    "source/memory/byte_swapping:_byte_bs_codes",
+    "144"
+   ],
+   [
+    "source/physics/collision_bsp_definitions:_global_collision_bsp_definition_data",
+    "900"
+   ],
+   [
+    "source/physics/collision_usage:_global_collision_function_names",
+    "138"
+   ],
+   [
+    "source/render/render_particles:_render_particles_section",
+    "1528"
+   ],
+   [
+    "source/bitmaps/bitmaps:_global_vector_palette",
+    "1116"
+   ],
+   [
+    "source/game/cheats:_cheat_strings",
+    "3201"
+   ],
+   [
+    "source/interface/hud:_default_string",
+    "4"
+   ],
+   [
+    "source/effects/particles:_particles_update_section",
+    "1536"
+   ],
+   [
+    "source/ai/ai_scenario_definitions:_global_ai_default_state_names",
+    "48"
+   ],
+   [
+    "source/ai/ai_profile:_global_ai_meter_definitions",
+    "236"
+   ],
+   [
+    "source/shaders/shader_definitions:_global_shader_effect_additive",
+    "364"
+   ],
+   [
+    "source/units/dialogue_definitions:_dialogue_vocalization_type_name",
+    "1672"
+   ],
+   [
+    "source/ai/actor_types:_global_actor_type_names",
+    "128"
+   ],
+   [
+    "source/cutscene/recorded_animation_definitions:_recorded_animation_event_stream_data",
+    "180"
+   ],
+   [
+    "source/models/model_animation_definitions:_weapon_type_animation_list",
+    "1288"
+   ],
+   [
+    "source/sound/sound_classes:_sound_classes",
+    "2452"
+   ],
+   [
+    "source/objects/object_types:_object_data_definition",
+    "2608"
+   ],
+   [
+    "source/hs/hs_scenario_definitions:_hs_script_types_enum",
+    "628"
+   ],
+   [
+    "source/hs/hs_globals_external:_screenshot_size_definition",
+    "7076"
+   ],
+   [
+    "source/interface/ui_widget_event_handler_functions:_event_handler_functions",
+    "934"
+   ],
+   [
+    "source/objects/objects:?section@?1??objects_update@@9@9",
+    "1530"
+   ],
+   [
+    "source/units/units:_magic_base_animation_seat_index",
+    "1564"
+   ],
+   [
+    "source/items/projectiles:_projectile_update_section",
+    "1548"
+   ],
+   [
+    "source/math/periodic_functions:_global_periodic_functions_enum_strings",
+    "96"
+   ],
+   [
+    "source/objects/object_lights:_lights_section",
+    "1541"
+   ],
+   [
+    "source/bitmaps/bitmap_group:_global_bitmap_reference",
+    "1424"
+   ],
+   [
+    "source/ai/ai_communication:_global_communication_priority_names",
+    "276"
+   ],
+   [
+    "source/ai/ai_debug:_global_ai_debug_firing_position_color_count",
+    "56"
+   ],
+   [
+    "source/game/game_engine_king:_king_engine",
+    "136"
+   ]
+  ]
+ },
+ "warnings_total": 199,
+ "objdiff_version": "objdiff-cli.exe 3.3.1",
+ "objdiff_sha256": "090987aa22c0fe9b7d252b2b44c2c0c92c5dd3e9b5965d353060802226a13677",
+ "strict_section_owners": [
+  7635,
+  8252
+ ],
+ "stable_diff_tail": [
+  "gained source/ai/actor_moving::section:27 _actor_path_refresh -> _actor_path_refresh 1440",
+  "gained source/interface/ui_widget::section:99 _display_scenario_help -> _display_scenario_help 608",
+  "gained 2 2048 bytes; regressions 0"
+ ],
+ "stable_diff": {
+  "gained": 2,
+  "gained_bytes": 2048,
+  "regressions": 0
+ },
+ "new_warnings": [],
+ "removed_warnings": [],
+ "semantic_summary": {
+  "units_scanned": 521,
+  "functions_evaluated": 8298,
+  "missing_base_symbol": 317,
+  "semantic_exact": 8093,
+  "hidden_exact": 257,
+  "hidden_code_bytes": 219460,
+  "ordinary_only": 11,
+  "ordinary_structural": 8,
+  "ordinary_rejected": 3,
+  "manual_rejected": 0,
+  "unit_errors": 0,
+  "local_symbols_skipped": 12,
+  "accepted_exact": 8113
+ },
+ "semantic_report_sha256": "e67c271b95ab2313b56a8bb392a823f013a8cf0b85c842df3455154c703454cd",
+ "parks": {
+  "active": 75,
+  "stale": 0,
+  "invalid": 0
+ },
+ "admission": {
+  "candidates": 11,
+  "contradicted": 0,
+  "rejected": 1,
+  "summary": 4,
+  "revoked": 0
+ },
+ "fake_leads": 26,
+ "pytest_tail": "1161 passed, 5 skipped, 26 subtests passed in 19.65s",
+ "pytest": {
+  "passed": 1161,
+  "failed": 0,
+  "skipped": 5,
+  "errors": 0,
+  "subtests": 26
+ },
+ "log_sha256": {
+  "admission.log": "2c735a1f4eb7647e2c364ff3e5861b81ae3768e73075e153002f875f66eb9efd",
+  "build.log": "6d4adbf8d14dd8caa08e6e6743d3a785d836f423846d11a08d84fec228c89fce",
+  "clean.log": "1394588538f48a7022ae1aee2ade4317240b62e2f21618e5a793a67bc101c2a7",
+  "diffcheck.log": "d42ffc7ae19fb33e66fd263aa73e7aaccc28549d71d388b8de9b1d6d003e576f",
+  "diffcheck_cached.log": "c2a20eb664068604e4a1a7557049c370e3694ae9f6a2e1f4536596691b2e9948",
+  "fake.log": "f4f20bd99c897e12e1ddc287102ea3fd81282eafaa54728632802bf3c20b2540",
+  "objdiff.log": "58bdf05b885aa7b9b5c8a7637cc6e2dd569258ae742c58fd6970d5370619343f",
+  "parks.log": "860badd4ed178f3241335eb5f3d18aea85c364db4d50d714f82cb2dbdbfbe1d1",
+  "pytest.log": "acb536f6e27aa7cd1e26b4dc187981f6e0d68abb1f8ab26bbbc7662ae26f8c07",
+  "stable.log": "7fe1a70f73542fccd29b2c1e0eeab93b24613bfa7f789e86a30e197503041ac0",
+  "stable_diff.log": "d4600cb10f821e9c584a81050f278bb7bcc5d7ca8a9dce2e103fdb76b3bb7244"
+ }
+}

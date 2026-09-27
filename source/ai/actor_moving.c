@@ -1983,11 +1983,17 @@ boolean actor_path_refresh(
 
 		if (success)
 		{
-			if (!actor_test_destination(actor_index) ||
-				(have_previous_destination &&
+			boolean build_path = TRUE;
+
+			if (actor_test_destination(actor_index))
+			{
+				build_path = have_previous_destination &&
 					distance_squared3d(
 						&previous_destination,
-						&actor->control.path.destination.point) > 0.1f*0.1f))
+						&actor->control.path.destination.point) > 0.1f*0.1f;
+			}
+
+			if (build_path)
 			{
 				struct actor_definition *definition =
 					actor_definition_get(actor->meta.definition_index);

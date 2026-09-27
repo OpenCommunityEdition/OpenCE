@@ -1,0 +1,855 @@
+diff --git a/tools/test_semantic_progress.py b/tools/test_semantic_progress.py
+index 6849998..f679582 100644
+--- a/tools/test_semantic_progress.py
++++ b/tools/test_semantic_progress.py
+@@ -5,7 +5,6 @@ import struct
+ import tempfile
+ import unittest
+ from pathlib import Path
+-from unittest import mock
+ 
+ from tools import semantic_progress
+ from tools.coff_compare import build_coff, make_section_raw
+@@ -840,15 +839,9 @@ class SemanticDataExtentModelTests(unittest.TestCase):
+     """
+ 
+     PIN = True
+-    DEFAULT_MODEL = None  # the pinned variant: unpinned groups stay legacy
+     MIXED_REPORT = {".bss": 16, ".data": 3, ".rdata": 112}
+ 
+     def setUp(self):
+-        patcher = mock.patch.object(
+-            semantic_progress, "DEFAULT_PADDED_GROUP_EXTENT_MODEL",
+-            self.DEFAULT_MODEL)
+-        patcher.start()
+-        self.addCleanup(patcher.stop)
+         self.temporary_directory = tempfile.TemporaryDirectory()
+         self.root = Path(self.temporary_directory.name)
+         self.target_path = self.root / "target.obj"
+@@ -878,6 +871,13 @@ class SemanticDataExtentModelTests(unittest.TestCase):
+             else copy.deepcopy(target_sections))
+         self.target_path.write_bytes(_extent_object(self.target_sections))
+         self.base_path.write_bytes(_extent_object(self.base_sections))
++        names = sorted(
++            {section["symbol"] for section in
++             self.target_sections + self.base_sections}
++            | {"_ext", "_other"})
++        self.symbols_path.write_text(json.dumps([
++            {"name": name, "file_offset": 0x1000 + 0x100 * index}
++            for index, name in enumerate(names)]), encoding="utf-8")
+ 
+     def entry(self, symbols=None, **extra):
+         target = {section["symbol"]: section for section in self.target_sections}
+@@ -1235,44 +1235,739 @@ class SemanticDataExtentModelTests(unittest.TestCase):
+         self.reject(entry, self.MIXED_REPORT, "does not cover the reported")
+ 
+ 
+-class SemanticDataExtentGlobalVariantTests(SemanticDataExtentModelTests):
+-    """The same suite with the model as every padded group's default.
++# -- V1 adversarial fixtures -------------------------------------------------
++#
++# A small January/rebuilt object pair shaped like hs.obj: a lone .data section
++# with several symbols, relocations and alignment padding; a combined .rdata
++# report section made of a non-COMDAT table and select-any string literals;
++# a .bss section the report already matches; a literal January only
++# references (undefined) and the rebuilt object defines (declared surplus).
++# Every expected size below is derived by hand in the comments.
+ 
+-    This is the global variant: DEFAULT_PADDED_GROUP_EXTENT_MODEL set to
+-    objdiff-3.3.1-combined and no ``extent_model`` field in the entries.
+-    """
++_SCN_DATA = 0xC0000040
++_SCN_RDATA = 0x40000040
++_SCN_BSS = 0xC0000080
++_SCN_COMDAT = 0x00001000
++_SELECT_NODUPLICATES = 1
++_SELECT_ANY = 2
++_REL32 = 0x14
++_DIR32 = 0x06
++_DIR32NB = 0x07
+ 
+-    PIN = False
+-    DEFAULT_MODEL = OBJDIFF_331_COMBINED_EXTENT
++_ABC = "??_C@_03ABC@abc?$AA@"
++_HELLO = "??_C@_05HELLO@hello?$AA@"
++_W = "??_C@_01W@w?$AA@"
++_XYZ = "??_C@_03XYZ@xyz?$AA@"
++_REAL = "__real@3f800000"
+ 
+-    def test_legacy_group_without_model_keeps_per_member_sum(self):
+-        # Global variant: an unpinned padded group uses the combined model.
+-        entry = self.entry()
+-        self.assertNotIn("extent_model", entry)
+-        self.credit(entry, self.MIXED_REPORT, 131)
+-        self.reject(entry, {".bss": 19, ".data": 4, ".rdata": 78},
+-                    "does not cover the reported")
+ 
+-    def test_existing_aligned_group_fixture_still_credits(self):
+-        first, second = b"1234567", b"abcdefghijkl"
+-        self.target_path.write_bytes(
+-            SemanticDataProgressTests._group_object(first, second))
+-        self.base_path.write_bytes(
+-            SemanticDataProgressTests._group_object(first, second))
+-        self.set_complete(True)
+-        self.write({
+-            "unit": "data_unit", "group": "lab-group", "members": [
+-                SemanticDataProgressTests._group_member(
+-                    "_first", first, 0x40301040, 8),
+-                SemanticDataProgressTests._group_member(
+-                    "_second", second, 0x40401040, 16),
+-            ]})
+-        self.report({".rdata": 24})
+-        self.assertEqual(self.apply(), ["data_unit:lab-group (+24 data bytes)"])
++def _align(code):
++    return code << 20
++
++
++def _v1_section(name, raw, flags, symbols, relocs=(), selection=0):
++    return {
++        "name": name, "raw": bytes(raw), "flags": flags,
++        "symbols": [list(item) for item in symbols],
++        "relocs": [list(item) for item in relocs], "selection": selection,
++    }
++
++
++def _v1_coff(sections, externals):
++    """COFF-i386 object with section-definition symbols and aux records."""
++    table = []
++    for number, section in enumerate(sections, 1):
++        auxiliary = struct.pack(
++            "<LHHLHB3x", len(section["raw"]), len(section["relocs"]), 0, 0,
++            0, section["selection"])
++        table.append((section["name"], 0, number, 0, 3, auxiliary))
++        for name, value, storage in section["symbols"]:
++            table.append((name, value, number, 0, storage, None))
++    for name in externals:
++        table.append((name, 0, 0, 0, 2, None))
++    index, position = {}, 0
++    for name, _, _, _, _, auxiliary in table:
++        if auxiliary is None:
++            index.setdefault(name, position)
++        position += 2 if auxiliary is not None else 1
++
++    header_size = 20 + 40 * len(sections)
++    payload, relocations, headers = bytearray(), bytearray(), []
++    raw_offsets = []
++    for section in sections:
++        raw = bytearray(section["raw"])
++        for address, destination, kind, addend in section["relocs"]:
++            struct.pack_into("<i", raw, address, addend)
++        if section["flags"] & _SCN_BSS == _SCN_BSS and not any(raw):
++            raw_offsets.append(None)
++        else:
++            raw_offsets.append(len(payload))
++            payload += raw
++    relocation_base = header_size + len(payload)
++    relocation_offsets = []
++    for section in sections:
++        relocation_offsets.append(relocation_base + len(relocations))
++        for address, destination, kind, addend in section["relocs"]:
++            relocations += struct.pack("<LLH", address, index[destination], kind)
++    symbol_offset = relocation_base + len(relocations)
++    strings = bytearray()
++    symbol_bytes = bytearray()
++    for name, value, number, kind, storage, auxiliary in table:
++        encoded = name.encode("ascii")
++        if len(encoded) <= 8:
++            symbol_bytes += encoded.ljust(8, b"\0")
++        else:
++            symbol_bytes += struct.pack("<LL", 0, 4 + len(strings))
++            strings += encoded + b"\0"
++        symbol_bytes += struct.pack(
++            "<LhHBB", value, number, kind, storage, 1 if auxiliary else 0)
++        if auxiliary:
++            symbol_bytes += auxiliary
++    string_table = struct.pack("<L", 4 + len(strings)) + bytes(strings)
++    for number, section in enumerate(sections):
++        raw_pointer = (0 if raw_offsets[number] is None
++                       else header_size + raw_offsets[number])
++        headers.append(struct.pack(
++            "<8sLLLLLLHHL", section["name"].encode("ascii").ljust(8, b"\0"),
++            0, 0, len(section["raw"]), raw_pointer,
++            relocation_offsets[number] if section["relocs"] else 0, 0,
++            len(section["relocs"]), 0, section["flags"]))
++    header = struct.pack(
++        "<HHLLLHH", 0x14C, len(sections), 0, symbol_offset,
++        position, 0, 0)
++    return (header + b"".join(headers) + bytes(payload) + bytes(relocations)
++            + bytes(symbol_bytes) + string_table)
++
++
++def _v1_data_section(storage_static=3):
++    # 28 bytes: four relocated pointers, a short, 2 bytes of alignment padding
++    # and two longs holding the same value (so they can be swapped unseen).
++    raw = bytearray(28)
++    raw[16:18] = b"\x34\x12"
++    raw[20:24] = struct.pack("<L", 5)
++    raw[24:28] = struct.pack("<L", 5)
++    return _v1_section(
++        ".data", raw, _SCN_DATA | _align(3),
++        [("_table", 0, 2), ("_static_names", 8, storage_static),
++         ("_counter", 16, 2), ("_min", 20, 2), ("_max", 24, 2)],
++        [(0, _ABC, _DIR32, 0), (4, _XYZ, _DIR32, 0),
++         (8, "_table", _DIR32, 16), (12, "_ext_function", _DIR32, 0)])
++
++
++def _v1_literal(name, text, code=3, selection=_SELECT_ANY, flags=None):
++    return _v1_section(
++        ".rdata", text, flags if flags is not None
++        else _SCN_RDATA | _SCN_COMDAT | _align(code),
++        [(name, 0, 2)], selection=selection)
++
++
++def _v1_target_sections():
++    # .rdata in table order: abc (4, align 4), table (12, align 8),
++    # hello (6, align 4), w (2, align 4).
++    # objdiff: 4 -> 4; +12 = 16 -> 16; +6 = 22 -> 24; +2 = 26 -> 28 = 28.
++    # legacy per-member padded sum: 4 + 16 + 8 + 4 = 32.  raw sum 24.
++    table = bytearray(12)
++    table[0:4] = struct.pack("<L", 7)
++    table[8:12] = struct.pack("<L", 9)
++    return [
++        _v1_data_section(),
++        _v1_literal(_ABC, b"abc\0"),
++        _v1_section(".rdata", table, _SCN_RDATA | _align(4),
++                    [("_const_table", 0, 2)], [(4, _HELLO, _DIR32, 0)]),
++        _v1_literal(_HELLO, b"hello\0"),
++        _v1_literal(_W, b"w\0"),
++        _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
++                    [("_bss_var", 0, 2)]),
++    ]
++
++
++def _v1_base_sections():
++    # The rebuilt object defines the literal January only references, as a
++    # select-any COMDAT placed before the others (declared surplus).
++    sections = _v1_target_sections()
++    sections.insert(1, _v1_literal(_XYZ, b"xyz\0"))
++    return sections
++
++
++_V1_ADDRESSES = {
++    "_table": 0x2000, "_static_names": 0x2008, "_counter": 0x2010,
++    "_min": 0x2014, "_max": 0x2018, _ABC: 0x3000, "_const_table": 0x3008,
++    _HELLO: 0x3018, _W: 0x3020, _XYZ: 0x5000, "_ext_function": 0x6000,
++    "_other_function": 0x6100, "_bss_var": 0x7000, _REAL: 0x5100,
++}
++
++
++def _v1_normalized_snapshot(section, owner):
++    """Recompute a member snapshot independently of the verifier."""
++    raw = bytearray(section["raw"])
++    for address, _, _, _ in section["relocs"]:
++        raw[address:address + 4] = b"\0\0\0\0"
++    code = (section["flags"] >> 20) & 0xF
++    alignment = 1 << (code - 1) if code else 1
++    name, value, storage = owner
++    return {
++        "section": section["name"],
++        "size": len(raw),
++        "padded_size": (len(raw) + alignment - 1) & ~(alignment - 1),
++        "flags": section["flags"],
++        "relocation_count": len(section["relocs"]),
++        "normalized_sha256": hashlib.sha256(bytes(raw)).hexdigest(),
++        "owner": {"value": value, "type": 0, "storage": storage},
++    }
++
++
++def _v1_find(sections, symbol):
++    for section in sections:
++        for owner in section["symbols"]:
++            if owner[0] == symbol:
++                return section, owner
++    raise KeyError(symbol)
++
++
++class V1Fixture:
++    """Materialises one January/rebuilt pair, its report and its manifest."""
++
++    MEMBERS = ["_table", _ABC, "_const_table", _HELLO, _W]
++    SURPLUS = [_XYZ]
++
++    def __init__(self):
++        self.target = _v1_target_sections()
++        self.base = _v1_base_sections()
++        self.target_externals = [_XYZ, "_ext_function"]
++        self.base_externals = ["_ext_function"]
++        self.addresses = dict(_V1_ADDRESSES)
++        # report: .bss 8 (100%), .data 28, .rdata 28, .text (code) 16
++        self.report_sections = {".bss": 8, ".data": 28, ".rdata": 28}
++        self.matched_sections = {".bss"}
++        self.total_data = None
++        self.matched_data = None
++        self.complete = False
++        self.entries = None
++
++    def entry(self, members=None, surplus=None, model=True, **extra):
++        members = self.MEMBERS if members is None else members
++        surplus = self.SURPLUS if surplus is None else surplus
++        entry = {
++            "unit": "data_unit",
++            "group": "v1-group",
++            "allow_incomplete_unit": True,
++            "reason": "fixture",
++            "members": [{
++                "symbol": symbol,
++                "measurements": {
++                    "target": _v1_normalized_snapshot(*_v1_find(self.target, symbol)),
++                    "base": _v1_normalized_snapshot(*_v1_find(self.base, symbol)),
++                },
++            } for symbol in members],
++        }
++        if model:
++            entry["extent_model"] = OBJDIFF_331_COMBINED_EXTENT
++            entry["surplus"] = [{
++                "symbol": symbol,
++                "measurements": {
++                    "base": _v1_normalized_snapshot(*_v1_find(self.base, symbol))},
++            } for symbol in surplus]
++        entry.update(extra)
++        return entry
++
++    def report(self):
++        total = self.total_data
++        if total is None:
++            total = sum(self.report_sections.values())
++        matched = self.matched_data
++        if matched is None:
++            matched = sum(size for name, size in self.report_sections.items()
++                          if name in self.matched_sections)
++        sections = [{
++            "name": name, "size": str(size),
++            "fuzzy_match_percent": 100.0 if name in self.matched_sections else 97.5,
++            "metadata": {},
++        } for name, size in sorted(self.report_sections.items())]
++        sections.append({"name": ".text", "size": "16",
++                         "fuzzy_match_percent": 90.0, "metadata": {}})
++        other = {"name": "other_unit", "measures": {
++            "total_data": "8", "matched_data": "0"},
++            "sections": [{"name": ".bss", "size": "8",
++                          "fuzzy_match_percent": 0.0, "metadata": {}}],
++            "metadata": {"progress_categories": ["game"]}}
++        return {
++            "measures": {"total_data": 5000, "matched_data": 500},
++            "categories": [{"id": "game", "name": "game", "measures": {
++                "total_data": 1000, "matched_data": 50}}],
++            "units": [{
++                "name": "data_unit",
++                "measures": {"total_data": str(total), "matched_data": str(matched),
++                             "total_functions": 2, "matched_functions": 1},
++                "sections": sections,
++                "metadata": {"progress_categories": ["game"]},
++            }, other],
++        }
++
++    def materialize(self, root):
++        root = Path(root)
++        (root / "target.obj").write_bytes(
++            _v1_coff(self.target, self.target_externals))
++        (root / "base.obj").write_bytes(_v1_coff(self.base, self.base_externals))
++        other = [_v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
++                             [("_bss_var", 0, 2)])]
++        (root / "other.obj").write_bytes(_v1_coff(other, []))
++        (root / "objdiff.json").write_text(json.dumps({"units": [
++            {"name": "data_unit", "target_path": "target.obj",
++             "base_path": "base.obj", "metadata": {"complete": self.complete}},
++            {"name": "other_unit", "target_path": "other.obj",
++             "base_path": "other.obj", "metadata": {"complete": False}},
++        ]}), encoding="utf-8")
++        (root / "symbols.json").write_text(json.dumps([
++            {"name": name, "file_offset": address}
++            for name, address in sorted(self.addresses.items())]),
++            encoding="utf-8")
++        entries = self.entries if self.entries is not None else [self.entry()]
++        (root / "semantic_data_matches.json").write_text(
++            json.dumps(entries), encoding="utf-8")
++        return self.report()
++
++
++def _swap_symbol_offsets(section, first, second):
++    values = {name: value for name, value, _ in section["symbols"]}
++    for item in section["symbols"]:
++        if item[0] == first:
++            item[1] = values[second]
++        elif item[0] == second:
++            item[1] = values[first]
++
++
++def _set_symbol(sections, symbol, **fields):
++    section, owner = _v1_find(sections, symbol)
++    position = {"name": 0, "value": 1, "storage": 2}
++    for key, value in fields.items():
++        owner[position[key]] = value
++
++
++def _base_reloc(fixture, section_symbol, address, **fields):
++    section, _ = _v1_find(fixture.base, section_symbol)
++    for relocation in section["relocs"]:
++        if relocation[0] == address:
++            if "destination" in fields:
++                relocation[1] = fields["destination"]
++            if "kind" in fields:
++                relocation[2] = fields["kind"]
++
++
++def _scenario(expect):
++    def decorate(function):
++        function.expect = expect
++        return function
++    return decorate
++
++
++# Each scenario mutates a fresh V1Fixture.  ``credit N`` must credit exactly N
++# bytes; ``noop`` must credit nothing and leave the report unchanged; any
++# other string is the rejection message the V1 verifier must raise.  Unless a
++# scenario says "pinned before", the entry is (re)generated AFTER the mutation,
++# so a rejection never rests on a stale snapshot.
++
++@_scenario("credit 56")
++def control_rebuilt_object(fixture):
++    pass
++
++
++@_scenario("credit 56")
++def control_january_vs_january(fixture):
++    fixture.base = copy.deepcopy(fixture.target)
++    fixture.base_externals = list(fixture.target_externals)
++    fixture.entries = [fixture.entry(surplus=[])]
++
++
++@_scenario("credit 56")
++def control_member_list_reordered(fixture):
++    fixture.entries = [fixture.entry(members=list(reversed(fixture.MEMBERS)))]
++
++
++@_scenario("credit 56")
++def control_rebuilt_comdat_order_differs(fixture):
++    # Documented design: COMDAT section ORDER in the rebuilt object is not
++    # graded (each COMDAT is compared by identity); January's order sizes
++    # the credit.
++    hello = fixture.base.pop(4)
++    fixture.base.insert(2, hello)
++
++
++@_scenario("noop")
++def control_already_complete_unit(fixture):
++    fixture.matched_sections = {".bss", ".data", ".rdata"}
++
++
++@_scenario("credit 28")
++def control_partially_matched_unit_credits_only_rest(fixture):
++    fixture.matched_sections = {".bss", ".data"}
++    fixture.entries = [fixture.entry(members=[_ABC, "_const_table", _HELLO, _W])]
++
++
++@_scenario("no longer exact")
++def member_byte_changed(fixture):
++    section, _ = _v1_find(fixture.base, _HELLO)
++    section["raw"] = b"hellp\0"
++
++
++@_scenario("no longer exact")
++def relocation_retargeted_outside(fixture):
++    fixture.base_externals.append("_other_function")
++    _base_reloc(fixture, "_table", 12, destination="_other_function")
++
++
++@_scenario("no longer exact")
++def relocation_retargeted_inside_group(fixture):
++    _base_reloc(fixture, "_table", 0, destination=_HELLO)
++
++
++@_scenario("no longer exact")
++def relocation_type_changed(fixture):
++    _base_reloc(fixture, "_table", 12, kind=_DIR32NB)
++
++
++@_scenario("has no image address")
++def relocation_destination_unresolvable(fixture):
++    del fixture.addresses["_ext_function"]
++
++
++@_scenario("cannot verify semantic data group member")
++def owner_renamed_pinned_before(fixture):
++    fixture.entries = [fixture.entry()]
++    _set_symbol(fixture.base, "_const_table", name="_const_table_renamed")
++
++
++@_scenario("malformed semantic data extent-model member")
++def owner_renamed_with_base_alias(fixture):
++    fixture.entries = [fixture.entry()]
++    _set_symbol(fixture.base, "_const_table", name="_const_table_renamed")
++    fixture.entries[0]["members"][2]["base_symbol"] = "_const_table_renamed"
++
++
++@_scenario("snapshot changed")
++def owner_external_to_static_pinned_before(fixture):
++    fixture.entries = [fixture.entry()]
++    _set_symbol(fixture.base, "_const_table", storage=3)
++
++
++@_scenario("owner differs")
++def owner_external_to_static_repinned(fixture):
++    _set_symbol(fixture.base, "_const_table", storage=3)
++
++
++@_scenario("owner differs")
++def owner_static_to_external_repinned(fixture):
++    _set_symbol(fixture.target, "_const_table", storage=3)
++
++
++@_scenario("symbol table differs")
++def non_owner_symbol_storage_changed(fixture):
++    _set_symbol(fixture.base, "_static_names", storage=2)
++
++
++@_scenario("does not cover every target .rdata section")
++def missing_member(fixture):
++    fixture.entries = [fixture.entry(members=["_table", _ABC, "_const_table", _HELLO])]
++
++
++@_scenario("does not cover every target .rdata section")
++def subset_summing_to_extent_legacy(fixture):
++    # Legacy per-member padded sizes of table + hello + w = 16 + 8 + 4 = 28,
++    # exactly objdiff's .rdata extent: the stock grouped check credits this
++    # subset although the abc literal is never compared.
++    fixture.entries = [fixture.entry(
++        members=["_table", "_const_table", _HELLO, _W], model=False)]
++
++
++@_scenario("does not cover every target .rdata section")
++def subset_summing_to_extent_model(fixture):
++    fixture.entries = [fixture.entry(members=["_table", "_const_table", _HELLO, _W])]
++
++
++@_scenario("no longer exact")
++def padding_bytes_nonzero(fixture):
++    section, _ = _v1_find(fixture.base, "_table")
++    raw = bytearray(section["raw"])
++    raw[18] = 0xCC  # the alignment padding after the 2-byte _counter
++    section["raw"] = bytes(raw)
++
++
++@_scenario("no longer exact")
++def padding_raw_size_differs_padded_size_equal(fixture):
++    section, _ = _v1_find(fixture.base, _HELLO)
++    section["raw"] = b"hello\0\0\0"  # padded size 8 either way
++
++
++@_scenario("does not cover every target .rdata section")
++def extra_unlisted_section_in_target(fixture):
++    fixture.target.insert(5, _v1_literal("??_C@_01Q@q?$AA@", b"q\0"))
++    fixture.base.insert(6, _v1_literal("??_C@_01Q@q?$AA@", b"q\0"))
++    fixture.addresses["??_C@_01Q@q?$AA@"] = 0x3024
++
++
++@_scenario("leaves rebuilt sections undeclared")
++def extra_undeclared_section_in_rebuilt(fixture):
++    fixture.base.insert(3, _v1_literal(_REAL, struct.pack("<f", 1.0)))
++
++
++@_scenario("symbol table differs")
++def extra_symbol_inside_member_section(fixture):
++    section, _ = _v1_find(fixture.base, "_table")
++    section["symbols"].append(["_table_alias", 8, 2])
++
++
++@_scenario("symbol table differs")
++def reordered_symbols_inside_member_section(fixture):
++    # _min and _max hold the same bytes: swapping them changes no byte and no
++    # relocation, only which name owns which offset.
++    section, _ = _v1_find(fixture.base, "_table")
++    _swap_symbol_offsets(section, "_min", "_max")
++
++
++@_scenario(r"layout differs.*\(flags\)")
++def section_flags_changed_writable(fixture):
++    section, _ = _v1_find(fixture.base, _ABC)
++    section["flags"] = _SCN_DATA | _SCN_COMDAT | _align(3)
++
++
++@_scenario("layout differs")
++def section_alignment_changed(fixture):
++    section, _ = _v1_find(fixture.base, "_const_table")
++    section["flags"] = _SCN_RDATA | _align(3)
++
++
++@_scenario("COMDAT selection differs")
++def comdat_selection_changed(fixture):
++    section, _ = _v1_find(fixture.base, _ABC)
++    section["selection"] = _SELECT_NODUPLICATES
++
++
++@_scenario("repeats a section")
++def duplicate_member(fixture):
++    entry = fixture.entry()
++    entry["members"].append(copy.deepcopy(entry["members"][1]))
++    fixture.entries = [entry]
++
++
++@_scenario("repeats a section")
++def duplicate_member_same_section(fixture):
++    fixture.entries = [fixture.entry(members=fixture.MEMBERS + ["_min"])]
++
++
++@_scenario("more than one entry")
++def duplicate_entry_for_unit(fixture):
++    fixture.entries = [fixture.entry(), fixture.entry()]
++
++
++@_scenario("cannot verify semantic data group member")
++def wrong_unit(fixture):
++    entry = fixture.entry()
++    entry["unit"] = "other_unit"
++    fixture.entries = [entry]
++
++
++@_scenario("does not cover the reported unmatched sections")
++def extent_mismatch_plus_one(fixture):
++    fixture.report_sections[".rdata"] = 29
++
++
++@_scenario("does not cover the reported unmatched sections")
++def extent_mismatch_minus_one(fixture):
++    fixture.report_sections[".rdata"] = 27
++
++
++@_scenario("report total_data is not the target's modelled data extent")
++def total_data_off_by_one(fixture):
++    fixture.total_data = 65
++    fixture.matched_data = 9
++
++
++@_scenario("report section .bss is not the target's modelled extent")
++def matched_section_missized(fixture):
++    fixture.report_sections[".bss"] = 9
++
++
++@_scenario("does not cover the reported unmatched sections")
++def already_complete_section_included(fixture):
++    fixture.matched_sections = {".bss", ".data"}
++
++
++@_scenario("does not cover the reported unmatched sections")
++def only_already_complete_section(fixture):
++    fixture.matched_sections = {".bss", ".data"}
++    fixture.entries = [fixture.entry(members=["_table"])]
++
++
++@_scenario("defined by the target")
++def surplus_defined_by_target(fixture):
++    fixture.entries = [fixture.entry(surplus=[_XYZ, _ABC])]
++
++
++@_scenario("not a select-any COMDAT")
++def surplus_not_comdat(fixture):
++    section, _ = _v1_find(fixture.base, _XYZ)
++    section["flags"] = _SCN_RDATA | _align(3)
++
++
++@_scenario("not a select-any COMDAT")
++def surplus_not_select_any(fixture):
++    section, _ = _v1_find(fixture.base, _XYZ)
++    section["selection"] = _SELECT_NODUPLICATES
++
++
++@_scenario("holds other symbols")
++def surplus_holds_other_symbols(fixture):
++    section, _ = _v1_find(fixture.base, _XYZ)
++    section["symbols"].append(["_hidden", 2, 2])
++
++
++@_scenario("surplus snapshot changed")
++def surplus_stale_snapshot(fixture):
++    fixture.entries = [fixture.entry()]
++    section, _ = _v1_find(fixture.base, _XYZ)
++    section["raw"] = b"xyw\0"
++
++
++@_scenario("outside the covered report sections")
++def surplus_outside_covered_sections(fixture):
++    fixture.base.append(_v1_section(
++        ".CRT$XCU", bytes(4), _SCN_RDATA | _SCN_COMDAT | _align(3),
++        [("_initializer", 0, 2)], selection=_SELECT_ANY))
++    fixture.entries = [fixture.entry(surplus=[_XYZ, "_initializer"])]
++
++
++@_scenario("repeats a section")
++def surplus_duplicate(fixture):
++    fixture.entries = [fixture.entry(surplus=[_XYZ, _XYZ])]
++
++
++@_scenario("surplus needs an extent_model entry")
++def surplus_on_legacy_entry(fixture):
++    entry = fixture.entry()
++    del entry["extent_model"]
++    fixture.entries = [entry]
++
++
++@_scenario("unknown semantic data entry keys")
++def entry_unknown_key(fixture):
++    fixture.entries = [fixture.entry(allow_incomplete_units=True)]
++
++
++@_scenario("malformed semantic data extent-model entry")
++def entry_empty_reason(fixture):
++    fixture.entries = [fixture.entry(reason=" ")]
++
++
++@_scenario("malformed semantic data extent-model entry")
++def entry_non_boolean_opt_in(fixture):
++    fixture.entries = [fixture.entry(allow_incomplete_unit="yes")]
++
++
++V1_SCENARIOS = [
++    value for name, value in sorted(globals().items())
++    if callable(value) and hasattr(value, "expect")
++    and getattr(value, "__module__", None) == __name__
++]
++
++
++def run_v1_scenario(scenario, verifier, root):
++    """Apply one scenario with ``verifier`` (a semantic_progress module)."""
++    fixture = V1Fixture()
++    scenario(fixture)
++    report = fixture.materialize(root)
++    before = copy.deepcopy(report)
++    notes = verifier.apply_semantic_data_matches(
++        report, Path(root), Path(root) / "semantic_data_matches.json",
++        Path(root) / "objdiff.json", Path(root) / "symbols.json")
++    return notes, report, before
++
++
++class SemanticDataExtentModelAdversarialTests(unittest.TestCase):
++    """Adversarial fixtures for the pinned objdiff-3.3.1 extent model (V1)."""
++
++    def run_scenario(self, scenario):
++        with tempfile.TemporaryDirectory() as root:
++            expect = scenario.expect
++            if expect.startswith("credit ") or expect == "noop":
++                notes, report, before = run_v1_scenario(
++                    scenario, semantic_progress, root)
++                if expect == "noop":
++                    self.assertEqual(notes, [])
++                    self.assertEqual(report, before)
++                    return report
++                size = int(expect.split()[1])
++                self.assertEqual(notes, [f"data_unit:v1-group (+{size} data bytes)"])
++                unit = report["units"][0]["measures"]
++                self.assertEqual(
++                    unit["matched_data"],
++                    int(before["units"][0]["measures"]["matched_data"]) + size)
++                self.assertEqual(unit["matched_data"], 64)
++                self.assertEqual(report["measures"]["matched_data"], 500 + size)
++                self.assertEqual(
++                    report["categories"][0]["measures"]["matched_data"], 50 + size)
++                return report
++            with self.assertRaisesRegex(SemanticProgressError, expect):
++                run_v1_scenario(scenario, semantic_progress, root)
++            return None
++
++    def test_every_scenario_has_a_test(self):
++        names = {scenario.__name__ for scenario in V1_SCENARIOS}
++        tests = {name[len("test_"):] for name in dir(self) if name.startswith("test_")}
++        self.assertEqual(names - tests, set())
++
++    def test_fixture_arithmetic(self):
++        # Hand arithmetic behind the expected sizes (see _v1_target_sections).
++        fixture = V1Fixture()
++        rdata = [s for s in fixture.target if s["name"] == ".rdata"]
++        self.assertEqual(sum(len(s["raw"]) for s in rdata), 24)
++        legacy = sum(_v1_normalized_snapshot(s, s["symbols"][0])["padded_size"]
++                     for s in rdata)
++        self.assertEqual(legacy, 32)
++        subset = [s for s in rdata if s["symbols"][0][0] != _ABC]
++        self.assertEqual(
++            sum(_v1_normalized_snapshot(s, s["symbols"][0])["padded_size"]
++                for s in subset), 28)
++
++    def test_subset_loophole_shape_passes_the_legacy_sum(self):
++        # The subset's legacy per-member sums equal the report exactly, so
++        # only complete section coverage can reject it.
++        fixture = V1Fixture()
++        subset_legacy_members = ["_table", "_const_table", _HELLO, _W]
++        sums = {}
++        for symbol in subset_legacy_members:
++            snapshot = _v1_normalized_snapshot(*_v1_find(fixture.target, symbol))
++            sums[snapshot["section"]] = sums.get(snapshot["section"], 0) \
++                + snapshot["padded_size"]
++        self.assertEqual(sums, {".data": 28, ".rdata": 28})
++        self.assertEqual(sums, {k: v for k, v in fixture.report_sections.items()
++                                if k not in fixture.matched_sections})
++
++    def test_repeated_application_credits_once(self):
++        with tempfile.TemporaryDirectory() as root:
++            fixture = V1Fixture()
++            report = fixture.materialize(root)
++            arguments = (Path(root), Path(root) / "semantic_data_matches.json",
++                         Path(root) / "objdiff.json", Path(root) / "symbols.json")
++            self.assertEqual(apply_semantic_data_matches(report, *arguments),
++                             ["data_unit:v1-group (+56 data bytes)"])
++            after = copy.deepcopy(report)
++            self.assertEqual(apply_semantic_data_matches(report, *arguments), [])
++            self.assertEqual(report, after)
++
++
++def _add_scenario_test(scenario):
++    def test(self):
++        self.run_scenario(scenario)
++    test.__name__ = f"test_{scenario.__name__}"
++    test.__doc__ = f"{scenario.__name__}: expect {scenario.expect}"
++    setattr(SemanticDataExtentModelAdversarialTests, test.__name__, test)
++
++
++for _scenario_function in V1_SCENARIOS:
++    _add_scenario_test(_scenario_function)
+ 
+ 
+ class ProductionSemanticDataManifestTests(unittest.TestCase):
+-    """Existing manifest entries credit identically under either variant."""
++    """The local build's manifest verifies (skips without a build)."""
+ 
+     ROOT = Path(__file__).resolve().parents[1]
+ 
+@@ -1286,23 +1981,30 @@ class ProductionSemanticDataManifestTests(unittest.TestCase):
+         if not all(path.is_file() for path in self.paths.values()):
+             self.skipTest("local build report and objdiff.json are unavailable")
+ 
+-    def _run(self, default):
++    def test_manifest_verifies_and_model_entries_credit_their_gap(self):
+         report = json.loads(self.paths["report"].read_text(encoding="utf-8"))
+-        with mock.patch.object(
+-                semantic_progress, "DEFAULT_PADDED_GROUP_EXTENT_MODEL", default):
++        before = {unit["name"]: copy.deepcopy(unit["measures"])
++                  for unit in report["units"]}
++        entries = json.loads(self.paths["manifest"].read_text(encoding="utf-8"))
++        try:
+             notes = apply_semantic_data_matches(
+                 report, self.ROOT, self.paths["manifest"],
+                 self.paths["objdiff"], self.paths["symbols"])
+-        return notes, report
+-
+-    def test_existing_entries_credit_identically_under_both_variants(self):
+-        entries = json.loads(self.paths["manifest"].read_text(encoding="utf-8"))
+-        self.assertFalse(any("extent_model" in entry for entry in entries))
+-        try:
+-            legacy = self._run(None)
+         except SemanticProgressError as error:
+             self.skipTest(f"current build does not verify: {error}")
+-        self.assertEqual(self._run(OBJDIFF_331_COMBINED_EXTENT), legacy)
++        units = {unit["name"]: unit for unit in report["units"]}
++        for entry in entries:
++            if "extent_model" not in entry:
++                continue
++            measures = before[entry["unit"]]
++            gap = int(measures.get("total_data", 0)) \
++                - int(measures.get("matched_data", 0))
++            after = units[entry["unit"]]["measures"]
++            self.assertEqual(int(after["matched_data"]),
++                             int(measures.get("total_data", 0)))
++            if gap:
++                self.assertIn(
++                    f"{entry['unit']}:{entry['group']} (+{gap} data bytes)", notes)
+ 
+ 
+ class SymbolOwnershipSnapshotTests(unittest.TestCase):

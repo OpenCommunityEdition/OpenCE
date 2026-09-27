@@ -1,0 +1,5 @@
+CARD L3  (written 2026-09-26 01:39:42 -0700, before compiling)  lab labs/lab_factor.c (never landing)
+Question: does VC7 /O2 (periodic_functions flags) compile the /Od-attested `real_random()*0.25f + 0.25f` as
+January's `fadd [1.0]; fmul [0.25]` (factoring c*a + c -> (a+1)*c), i.e. without a 0x267 barrier?
+Prediction: NO - it emits fmul [0.25]; fadd [0.25] (no algebraic factoring without a source 1.0f), p ~0.9.
+If YES: the /Od spelling is January's term 1 and removes the barrier - test it in the builder (card P3).

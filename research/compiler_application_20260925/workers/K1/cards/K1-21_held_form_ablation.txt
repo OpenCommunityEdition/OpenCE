@@ -1,0 +1,5 @@
+CARD K1-21  (pre-registered 2026-09-26 02:41:30 -0700)  - owner-packet measurement, not a new shape
+Base: k20 (best lab). Leave-one-out (already run at 03:50: revert f/l/p/n/v individually) and add-one-in on the
+  admissible base adm = k20 with f,l,p,n,v all reverted (8096, frame 0x1270, 72 hunks).
+Prediction (add-one-in): p (uninitialised play_type) carries most of the gain; no single held form reaches 8064
+  alone; f+l+p together restore frame 0x126c.

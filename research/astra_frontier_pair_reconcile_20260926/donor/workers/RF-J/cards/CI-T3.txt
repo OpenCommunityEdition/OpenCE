@@ -1,0 +1,11 @@
+Card CI-T3 - written 2026-09-26 18:08:02 -0700 (clock-read) BEFORE tracing. DIAGNOSTIC confirmation (stock-equal), zero credit.
+vnjoin.py on pe4_c1.c (CI-C1) vs HEAD (CI-T2). Prediction: exactly two extra VN entries, both opcode 0x267 (C1 paren
+records), located in the two unit-length tests (between HEAD ordinals 28 and 46); every later entry identical in
+opcode sequence and shifted by +2, so the decisive temps become ids 444/446 (a.j/a.k), 532/536 (dot j/k bases),
+615/634 (up3d j/k) with classes 0/2, 0/0 (wait: 532&3=0, 536&3=0), 3/2.
+
+OUTCOME (appended 2026-09-26 18:08:19 -0700): stock-equal traces. 304 -> 306 VN entries; the ONLY differences are two
+inserted 0x267 entries (caller 0x10707987) at ordinal 34 (first test, before its -1.0 SUB) and at ordinal 44 (second
+test); the rest of the opcode/caller sequence is identical, shifted by +2. Decisive temps: a.j 442->444 (&3 0),
+a.k 444->446 (2), dot bases 530->532 and 534->536 (0, 0), b.j 613->615 (3), b.k 632->634 (2) = exactly the CI-T1
+derived solution. Prediction held.

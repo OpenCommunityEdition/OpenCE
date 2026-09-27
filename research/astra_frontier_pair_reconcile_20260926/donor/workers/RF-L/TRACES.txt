@@ -1,0 +1,13 @@
+RF-L instrument runs (observation of UNCHANGED sources unless noted; every one stock-equal, receipts in
+scratch/rf/workers/RF-L/work/<label>/equality.json). These are not source experiments and have no cards; forced
+runs and candidate/strip compiles have cards (cards/).
+ rr2.c (HEAD + RF-E RR2): enc_rr2, enc_rr2b (encoder view), aj_rr2 (allocation join), w_rr2_a (field watches),
+   am_rr2, am2_rr2 (builder step trace), k1_rr2 (swap test), ss_rr2, ss_rr2b, sf_rr2 (sorts with symbol records),
+   tid_rr2 (VN temp ids per function), sl_rr2 (symbol allocations), ilw_rr2 (IL entry walk), vn_rr2 (VN join),
+   tl_rr2 (sort/VN timeline), lw_rr2 (input-list watch), s2_rr2 (second sort site), av_rr2 (builder readout).
+ head.c (HEAD): sf_<fn> for the 7 survey functions, am2_lc, am2_tb, aj_lc, aj_tb, av_tb.
+ control TUs (copies of lane sources): sf_rumble / am2_rumble (player_rumble), av_ai (ai), av_aic (ai_communication),
+   sf_ra / av_ra (recorded_animations).
+ l1.c (candidate): sf_l1, vn_l1 (record L-1V).
+ Forced (not stock-equal by design; cards L-D1, L-D2, L-D2b): fd1_rr2, fd2_rr2, fd2b_rr2.
+Card-driven compiles: L-1 (1), strip S-1..S-3 (3), forced diagnostics (3). Total 7 of 30.

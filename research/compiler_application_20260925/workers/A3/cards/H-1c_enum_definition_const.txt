@@ -1,0 +1,5 @@
+CARD H-1c (A3)  written 2026-09-26 01:07:31 -0700  -- BEFORE its first compile
+observed: /W3 C4090 (hs_runtime.c:1524 at HEAD): 'struct hs_enum_definition *enum_definition' receives
+  &hs_enum_table[...], and the owner header hs.h:242 declares 'extern struct hs_enum_definition const hs_enum_table[];'.
+correction: 'struct hs_enum_definition const *enum_definition;' (owner-type const correctness).
+prediction: byte-inert; /W3 loses the single C4090; 66/66.

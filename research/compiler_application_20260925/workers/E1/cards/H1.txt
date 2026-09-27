@@ -1,0 +1,18 @@
+CARD H1  (written 2026-09-26 01:23:55 -0700, before compile)  unit source/rasterizer/xbox/rasterizer_xbox_hardware_geometry (zero credit)
+Observed (J + our object): January 0x158470/4b0/4d0/510 are one 16-byte function each. Our object emits BOTH the hand
+stubs code_00158470/4b0/4d0/510 (external) AND the genuine XDK header wrappers _D3DVertexBuffer_Unlock@4,
+_IDirect3DVertexBuffer8_Unlock@4, _D3DIndexBuffer_Unlock@4, _IDirect3DIndexBuffer8_Unlock@4 (static, emitted by the
+source's own IDirect3D*8_Unlock calls) = 4 candidate-only surplus sections (object_audit list). pdb_storage: all 13
+wrappers absent from cachebeta publics (static in January); split has them external (symbols.json lacks "static").
+Evidence classes: J (bytes/relocs identical 16-byte bodies), C (R2 reviewer + fifty-objects hg0 census: our emission
+order = d3d8.h definition order = January slot order; the wrapper names at these slots are the only emitted ones).
+Proposed correction (source, my unit): delete the four hand-written Unlock stubs; refresh the stale "symbols in this
+file" comment to the symbols.json names. Lead-owned companion: symbols.json line surgery on lines 5813-5825 only:
+"static": true on the 7 named wrappers + rename 470/4b0/4d0/510 to the four XDK names with "static": true.
+0x158450/0x158460 (the MoveResourceMemory pair) are NOT touched: owner hold (4d1ebf17) retained.
+Prediction: with a scratch csplit of the proposed symbols.json, ONLY rasterizer_xbox_hardware_geometry.obj changes
+(833 objects compared); candidate gates 17/17 vs that split; object_audit storage DIFFs drop 7 -> 0 for the renamed/
+static wrappers, surplus loses the 4 Unlock wrappers; pdb_storage disagreements 13 -> 2 (450/460 stubs, external in
+source, whose January storage is static - unresolvable without the held call). Against the CURRENT split, the
+candidate gates 13/17 (4 UNWRITTEN) - so source and symbols.json must land together.
+Collateral: none outside this object (no header touched).

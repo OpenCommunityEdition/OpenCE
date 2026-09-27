@@ -1,0 +1,188 @@
+# battery BS1_final_T1_noOverride_B1  unit source/physics/breakable_surfaces
+# candidate obj scratch/campaign/workers/A2/sweep/finB/source/physics/breakable_surfaces.obj
+# candidate src research/compiler_application_20260925/workers/A2/copies/breakable_surfaces_final.c
+# split root scratch/campaign/workers/A2/split_BS
+# provider root scratch/campaign/workers/A2/sweep/finB
+# shadow scratch/campaign/workers/A2/sh/finB  drop ['/Ow', '/QIfist']
+## 1 strict rows (gate.py row logic) vs split root
+EXACT       336  _breakable_surface_damage
+EXACT       352  _breakable_surface_damage_area_of_effect
+EXACT      4032  _breakable_surface_effect
+EXACT       112  _breakable_surface_extant
+EXACT       128  _breakable_surface_flags_get
+EXACT       176  _breakable_surface_get
+EXACT        16  _breakable_surfaces_dispose
+EXACT        16  _breakable_surfaces_dispose_from_old_map
+EXACT        64  _breakable_surfaces_enable
+EXACT        64  _breakable_surfaces_initialize
+EXACT       144  _breakable_surfaces_initialize_for_new_map
+EXACT        16  _breakable_surfaces_reset
+== exact 12 of 12
+
+## 2 object_audit
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_07NAPALOBA@globals?$AA@                    size     8/8     flags eq align 3/3
+  ok   .rdata   sym:??_C@_08MGFBODDH@?$CBglobals?$AA@                size     9/9     flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BK@PPOEFNHB@breakable?5surface?5globals?$ size    26/26    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CM@FEDBGPHC@c?3?2halo?2SOURCE?2physics?2b size    44/44    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DM@KLOGEIAJ@surface_vertex_index?$DMMAXIM size    60/60    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DP@FBAGGLGN@surface_queue_write_index?$DM size    63/63    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EA@JDLKLEHK@WARNING?3?5area?5of?5effect?5 size    64/64    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0EE@FAAJLBKB@collision_surface?9?$DObreaka size    68/68    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FJ@IEDCGCIO@breakable_surface_index?$DO?$ size    89/89    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0GA@KKPNNAGN@global_structure_bsp_index?$D size    96/96    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0HM@EEAAKHF@breakable_surface_index?$DN?$D size   124/124   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0M@GPGLJGHL@damage_data?$AA@               size    12/12    flags eq align 3/3
+  ok   .text    sym:_breakable_surface_damage                        size   336/336   flags eq align 5/5
+  ok   .text    sym:_breakable_surface_damage_area_of_effect         size   352/352   flags eq align 5/5
+  ok   .text    sym:_breakable_surface_effect                        size  4032/4032  flags eq align 5/5
+  ok   .data    sym:_breakable_surface_effect_enabled                size     1/1     flags eq align 1/1
+  ok   .text    sym:_breakable_surface_extant                        size   112/112   flags eq align 5/5
+  ok   .text    sym:_breakable_surface_flags_get                     size   128/128   flags eq align 5/5
+  ok   .text    sym:_breakable_surface_get                           size   176/176   flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_dispose                      size    16/16    flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_dispose_from_old_map         size    16/16    flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_enable                       size    64/64    flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_initialize                   size    64/64    flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_initialize_for_new_map       size   144/144   flags eq align 5/5
+  ok   .text    sym:_breakable_surfaces_reset                        size    16/16    flags eq align 5/5
+  ok   .bss     sym:_globals                                         size     4/4     flags eq align 3/3
+== symbols (January)
+  26 January symbols, 0 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_0BE@DKJODJEH@?4?4?2math?2real_math?4h?$AA@ size 20
+  +.rdata   sym:??_C@_0CB@FEGCJDLB@projection?$DO?$DN_x?5?$CG?$C size 33
+  +.rdata   sym:??_C@_0L@LKENDBEE@?$HO?$CIsign?$CG?$HO1?$CJ?$AA@ size 11
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@40800000                                  size 4
+  +.rdata   sym:__real@447a0000                                  size 4
+  +.rdata   sym:__real@c47a0000                                  size 4
+  +.text    sym:_breakable_surface_plane_distance                size 32
+  +.text    sym:_bsp3d_get_plane_from_designator                 size 112
+  +.text    sym:_cross_product3d                                 size 64
+  +.text    sym:_distance_squared3d                              size 64
+  +.text    sym:_dot_product3d                                   size 32
+  +.text    sym:_fast_ftol                                       size 32
+  +.text    sym:_local_random_direction3d                        size 32
+  +.text    sym:_magnitude3d                                     size 48
+  +.text    sym:_magnitude_squared3d                             size 48
+  +.text    sym:_negate_vector3d                                 size 48
+  +.text    sym:_normalize3d                                     size 96
+  +.text    sym:_plane3d_from_point_and_normal                   size 64
+  +.text    sym:_plane3d_negate                                  size 48
+  +.text    sym:_point_from_line3d                               size 48
+  +.text    sym:_point_in_sphere                                 size 80
+  +.text    sym:_power                                           size 16
+  +.text    sym:_project_point2d                                 size 224
+  +.text    sym:_project_point3d                                 size 144
+  +.text    sym:_projection_from_vector3d                        size 80
+  +.text    sym:_projection_sign_from_vector3d                   size 96
+  +.text    sym:_real_local_random                               size 16
+  +.text    sym:_real_local_random_range                         size 32
+  +.text    sym:_real_random_range                               size 32
+  +.text    sym:_scale_vector3d                                  size 48
+  +.text    sym:_set_real_point2d                                size 32
+  +.text    sym:_set_real_point3d                                size 32
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: PASS
+[exit 0]
+
+## 3 pdb_storage
+source/physics/breakable_surfaces: 26 split symbols, 0 disagreements with PDB publics
+[exit 0]
+
+## 4 surplus identity
+  _fast_ftol                         vs source\ai\actor_combat.obj               IDENTICAL
+  _square_root                       vs source\ai\action_charge.obj              IDENTICAL
+  _power                             vs source\items\weapons.obj                 IDENTICAL
+  _set_real_point2d                  vs source\ai\path_obstacles.obj             IDENTICAL
+  _projection_from_vector3d          vs source\effects\decals.obj                IDENTICAL
+  _projection_sign_from_vector3d     vs source\effects\decals.obj                IDENTICAL
+  _project_point3d                   vs source\ai\path_obstacles.obj             IDENTICAL
+  _project_point2d                   vs source\effects\decals.obj                IDENTICAL
+  _set_real_point3d                  vs source\ai\ai_debug.obj                   IDENTICAL
+  _point_from_line3d                 vs source\ai\action_charge.obj              IDENTICAL
+  _vector_from_points3d              vs source\ai\action_alert.obj               IDENTICAL
+  _scale_vector3d                    vs source\ai\action_charge.obj              IDENTICAL
+  _magnitude_squared3d               vs source\ai\action_alert.obj               IDENTICAL
+  _magnitude3d                       vs source\ai\action_charge.obj              IDENTICAL
+  _normalize3d                       vs source\ai\action_charge.obj              IDENTICAL
+  _distance_squared3d                vs source\ai\action_alert.obj               IDENTICAL
+  _dot_product3d                     vs source\ai\action_charge.obj              IDENTICAL
+  _cross_product3d                   vs source\ai\action_obey.obj                IDENTICAL
+  _negate_vector3d                   vs source\ai\action_obey.obj                IDENTICAL
+  _plane3d_from_point_and_normal     vs source\effects\decals.obj                IDENTICAL
+  _plane3d_negate                    vs source\effects\decals.obj                IDENTICAL
+  _point_in_sphere                   vs source\ai\path_obstacles.obj             IDENTICAL
+  _real_random_range                 vs source\ai\action_alert.obj               IDENTICAL
+  _real_local_random                 vs source\effects\effects.obj               IDENTICAL
+  _real_local_random_range           vs source\camera\bored_camera.obj           IDENTICAL
+  _local_random_direction3d          vs source\effects\effects.obj               IDENTICAL
+  _bsp3d_get_plane_from_designator   vs source\effects\decals.obj                IDENTICAL
+source/physics/breakable_surfaces: 27 candidate-only code COMDATs, 0 not identical
+  STATIC candidate-only code _breakable_surface_plane_distance        32
+1 candidate-only static code sections
+[exit 0]
+
+## 5 selected-provider link (both orders)
+??_C@_0BE@DKJODJEH@?4?4?2math?2real_math?4h?$AA@ provider source/ai/path_obstacles                         PASS
+??_C@_0CB@FEGCJDLB@projection?$DO?$DN_x?5?$CG?$CG?5projection?$DM?$DN_z@ provider source/ai/path_obstacles                         PASS
+??_C@_0L@LKENDBEE@?$HO?$CIsign?$CG?$HO1?$CJ?$AA@ provider source/ai/path_obstacles                         PASS
+__real@00000000                              provider source/ai/action_charge                          PASS
+__real@3f000000                              provider source/ai/action_alert                           PASS
+__real@3f1a36e2e0000000                      provider source/ai/action_charge                          PASS
+__real@3f800000                              provider source/ai/action_charge                          PASS
+__real@40800000                              provider source/ai/action_charge                          PASS
+__real@447a0000                              provider source/ai/actor_firing_position                  PASS
+__real@c47a0000                              provider source/ai/encounters                             PASS
+_bsp3d_get_plane_from_designator             provider source/effects/decals                            PASS
+_cross_product3d                             provider source/ai/action_obey                            PASS
+_distance_squared3d                          provider source/ai/action_alert                           PASS
+_dot_product3d                               provider source/ai/action_charge                          PASS
+_fast_ftol                                   provider source/ai/actor_combat                           PASS
+_local_random_direction3d                    provider source/effects/effects                           PASS
+_magnitude3d                                 provider source/ai/action_charge                          PASS
+_magnitude_squared3d                         provider source/ai/action_alert                           PASS
+_negate_vector3d                             provider source/ai/action_obey                            PASS
+_normalize3d                                 provider source/ai/action_charge                          PASS
+_plane3d_from_point_and_normal               provider source/effects/decals                            PASS
+_plane3d_negate                              provider source/effects/decals                            PASS
+_point_from_line3d                           provider source/ai/action_charge                          PASS
+_point_in_sphere                             provider source/ai/path_obstacles                         PASS
+_power                                       provider source/items/weapons                             PASS
+_project_point2d                             provider source/effects/decals                            PASS
+_project_point3d                             provider source/ai/path_obstacles                         PASS
+_projection_from_vector3d                    provider source/effects/decals                            PASS
+_projection_sign_from_vector3d               provider source/effects/decals                            PASS
+_real_local_random                           provider source/effects/effects                           PASS
+_real_local_random_range                     provider source/camera/bored_camera                       PASS
+_real_random_range                           provider source/ai/action_alert                           PASS
+_scale_vector3d                              provider source/ai/action_charge                          PASS
+_set_real_point2d                            provider source/ai/path_obstacles                         PASS
+_set_real_point3d                            provider source/ai/ai_debug                               PASS
+_square_root                                 provider source/ai/action_charge                          PASS
+_vector_from_points3d                        provider source/ai/action_alert                           PASS
+SELECTED-PROVIDER LINK: PASS
+[exit 0]
+
+## 6 protoscan
+== research/compiler_application_20260925/workers/A2/copies/breakable_surfaces_final.c
+[exit 0]
+
+## 7 /W3 /Zs census
+rc 0 {'C4146': 1, 'C4244': 15, 'C4305': 1}
+   source\physics\breakable_surfaces.c(419) : warning C4244: 'function' : conversion from 'double' to 'real', possible loss of data
+   source\physics\breakable_surfaces.c(420) : warning C4244: 'function' : conversion from 'double' to 'real', possible loss of data
+   source\physics\breakable_surfaces.c(421) : warning C4244: 'function' : conversion from 'double' to 'real', possible loss of data
+   source\physics\breakable_surfaces.c(422) : warning C4244: 'function' : conversion from 'double' to 'real', possible loss of data
+   source\physics\breakable_surfaces.c(520) : warning C4305: 'function' : truncation from 'double' to 'real'
+
+## 8 fake_match_scan
+Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
+Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).
+[exit 0]

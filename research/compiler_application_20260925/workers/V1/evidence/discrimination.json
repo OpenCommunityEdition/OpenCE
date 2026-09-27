@@ -1,0 +1,1335 @@
+{
+ "summary": {
+  "scenarios": 50,
+  "v1_meets_all": true,
+  "stock_wrong": [
+   "comdat_selection_changed",
+   "control_already_complete_unit",
+   "control_january_vs_january",
+   "control_member_list_reordered",
+   "control_partially_matched_unit_credits_only_rest",
+   "control_rebuilt_comdat_order_differs",
+   "control_rebuilt_object",
+   "duplicate_entry_for_unit",
+   "entry_empty_reason",
+   "entry_non_boolean_opt_in",
+   "entry_unknown_key",
+   "extra_symbol_inside_member_section",
+   "extra_undeclared_section_in_rebuilt",
+   "extra_unlisted_section_in_target",
+   "matched_section_missized",
+   "missing_member",
+   "non_owner_symbol_storage_changed",
+   "owner_external_to_static_repinned",
+   "owner_renamed_with_base_alias",
+   "owner_static_to_external_repinned",
+   "relocation_destination_unresolvable",
+   "reordered_symbols_inside_member_section",
+   "subset_summing_to_extent_legacy",
+   "subset_summing_to_extent_model",
+   "surplus_defined_by_target",
+   "surplus_duplicate",
+   "surplus_holds_other_symbols",
+   "surplus_not_comdat",
+   "surplus_not_select_any",
+   "surplus_on_legacy_entry",
+   "surplus_outside_covered_sections",
+   "surplus_stale_snapshot",
+   "total_data_off_by_one"
+  ],
+  "dv2_wrong": [
+   "comdat_selection_changed",
+   "duplicate_entry_for_unit",
+   "entry_empty_reason",
+   "entry_non_boolean_opt_in",
+   "entry_unknown_key",
+   "extra_symbol_inside_member_section",
+   "extra_undeclared_section_in_rebuilt",
+   "matched_section_missized",
+   "non_owner_symbol_storage_changed",
+   "owner_external_to_static_repinned",
+   "owner_renamed_with_base_alias",
+   "owner_static_to_external_repinned",
+   "relocation_destination_unresolvable",
+   "reordered_symbols_inside_member_section",
+   "subset_summing_to_extent_legacy",
+   "surplus_defined_by_target",
+   "surplus_duplicate",
+   "surplus_holds_other_symbols",
+   "surplus_not_comdat",
+   "surplus_not_select_any",
+   "surplus_on_legacy_entry",
+   "surplus_outside_covered_sections",
+   "surplus_stale_snapshot",
+   "total_data_off_by_one"
+  ],
+  "stock_credits_a_negative": [
+   "missing_member",
+   "subset_summing_to_extent_legacy",
+   "subset_summing_to_extent_model"
+  ],
+  "dv2_credits_a_negative": [
+   "comdat_selection_changed",
+   "duplicate_entry_for_unit",
+   "entry_empty_reason",
+   "entry_non_boolean_opt_in",
+   "entry_unknown_key",
+   "extra_symbol_inside_member_section",
+   "extra_undeclared_section_in_rebuilt",
+   "matched_section_missized",
+   "non_owner_symbol_storage_changed",
+   "owner_external_to_static_repinned",
+   "owner_renamed_with_base_alias",
+   "owner_static_to_external_repinned",
+   "relocation_destination_unresolvable",
+   "reordered_symbols_inside_member_section",
+   "subset_summing_to_extent_legacy",
+   "surplus_defined_by_target",
+   "surplus_duplicate",
+   "surplus_holds_other_symbols",
+   "surplus_not_comdat",
+   "surplus_not_select_any",
+   "surplus_outside_covered_sections",
+   "surplus_stale_snapshot",
+   "total_data_off_by_one"
+  ],
+  "mutants_survived": []
+ },
+ "matrix": {
+  "already_complete_section_included": {
+   "expect": "does not cover the reported unmatched sections",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "comdat_selection_changed": {
+   "expect": "COMDAT selection differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member COMDAT selection differs: data_unit:??_C@_03ABC@abc?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "control_already_complete_unit": {
+   "expect": "noop",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "noop",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "noop",
+    "meets_expectation": true
+   }
+  },
+  "control_january_vs_january": {
+   "expect": "credit 56",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   }
+  },
+  "control_member_list_reordered": {
+   "expect": "credit 56",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   }
+  },
+  "control_partially_matched_unit_credits_only_rest": {
+   "expect": "credit 28",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 28,
+    "notes": [
+     "data_unit:v1-group (+28 data bytes)"
+    ],
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "credit",
+    "bytes": 28,
+    "notes": [
+     "data_unit:v1-group (+28 data bytes)"
+    ],
+    "meets_expectation": true
+   }
+  },
+  "control_rebuilt_comdat_order_differs": {
+   "expect": "credit 56",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   }
+  },
+  "control_rebuilt_object": {
+   "expect": "credit 56",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": true
+   }
+  },
+  "duplicate_entry_for_unit": {
+   "expect": "more than one entry",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data unit has more than one entry: data_unit",
+    "meets_expectation": true
+   }
+  },
+  "duplicate_member": {
+   "expect": "repeats a section",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:??_C@_03ABC@abc?$AA@",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:??_C@_03ABC@abc?$AA@",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:??_C@_03ABC@abc?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "duplicate_member_same_section": {
+   "expect": "repeats a section",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:_min",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:_min",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group repeats a section: data_unit:_min",
+    "meets_expectation": true
+   }
+  },
+  "entry_empty_reason": {
+   "expect": "malformed semantic data extent-model entry",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "malformed semantic data extent-model entry: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "entry_non_boolean_opt_in": {
+   "expect": "malformed semantic data extent-model entry",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "malformed semantic data extent-model entry: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "entry_unknown_key": {
+   "expect": "unknown semantic data entry keys",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "unknown semantic data entry keys ['allow_incomplete_units']: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "extent_mismatch_minus_one": {
+   "expect": "does not cover the reported unmatched sections",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "extent_mismatch_plus_one": {
+   "expect": "does not cover the reported unmatched sections",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "extra_symbol_inside_member_section": {
+   "expect": "symbol table differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member symbol table differs: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "extra_undeclared_section_in_rebuilt": {
+   "expect": "leaves rebuilt sections undeclared",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group leaves rebuilt sections undeclared: data_unit:v1-group (sections [4], symbols ['__real@3f800000'])",
+    "meets_expectation": true
+   }
+  },
+  "extra_unlisted_section_in_target": {
+   "expect": "does not cover every target .rdata section",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [6])",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [6])",
+    "meets_expectation": true
+   }
+  },
+  "matched_section_missized": {
+   "expect": "report section .bss is not the target's modelled extent",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "report section .bss is not the target's modelled extent 8: data_unit:v1-group (report 9)",
+    "meets_expectation": true
+   }
+  },
+  "member_byte_changed": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "missing_member": {
+   "expect": "does not cover every target .rdata section",
+   "stock": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [5])",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [5])",
+    "meets_expectation": true
+   }
+  },
+  "non_owner_symbol_storage_changed": {
+   "expect": "symbol table differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member symbol table differs: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "only_already_complete_section": {
+   "expect": "does not cover the reported unmatched sections",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "owner_external_to_static_pinned_before": {
+   "expect": "snapshot changed",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member snapshot changed: data_unit:_const_table",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member snapshot changed: data_unit:_const_table",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member snapshot changed: data_unit:_const_table",
+    "meets_expectation": true
+   }
+  },
+  "owner_external_to_static_repinned": {
+   "expect": "owner differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member owner differs: data_unit:_const_table (storage)",
+    "meets_expectation": true
+   }
+  },
+  "owner_renamed_pinned_before": {
+   "expect": "cannot verify semantic data group member",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member data_unit:_const_table: section-relative symbol '_const_table' not found",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member data_unit:_const_table: section-relative symbol '_const_table' not found",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member data_unit:_const_table: section-relative symbol '_const_table' not found",
+    "meets_expectation": true
+   }
+  },
+  "owner_renamed_with_base_alias": {
+   "expect": "malformed semantic data extent-model member",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "malformed semantic data extent-model member: data_unit:v1-group",
+    "meets_expectation": true
+   }
+  },
+  "owner_static_to_external_repinned": {
+   "expect": "owner differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member owner differs: data_unit:_const_table (storage)",
+    "meets_expectation": true
+   }
+  },
+  "padding_bytes_nonzero": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "padding_raw_size_differs_padded_size_equal": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:??_C@_05HELLO@hello?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "relocation_destination_unresolvable": {
+   "expect": "has no image address",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member relocation has no image address: data_unit:_table at 0xc",
+    "meets_expectation": true
+   }
+  },
+  "relocation_retargeted_inside_group": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "relocation_retargeted_outside": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "relocation_type_changed": {
+   "expect": "no longer exact",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member is no longer exact: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "reordered_symbols_inside_member_section": {
+   "expect": "symbol table differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member symbol table differs: data_unit:_table",
+    "meets_expectation": true
+   }
+  },
+  "section_alignment_changed": {
+   "expect": "layout differs",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:_const_table (padded_size)",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:_const_table (padded_size)",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:_const_table (padded_size)",
+    "meets_expectation": true
+   }
+  },
+  "section_flags_changed_writable": {
+   "expect": "layout differs.*\\(flags\\)",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:??_C@_03ABC@abc?$AA@ (flags)",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:??_C@_03ABC@abc?$AA@ (flags)",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group member layout differs: data_unit:??_C@_03ABC@abc?$AA@ (flags)",
+    "meets_expectation": true
+   }
+  },
+  "subset_summing_to_extent_legacy": {
+   "expect": "does not cover every target .rdata section",
+   "stock": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [2])",
+    "meets_expectation": true
+   }
+  },
+  "subset_summing_to_extent_model": {
+   "expect": "does not cover every target .rdata section",
+   "stock": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [2])",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover every target .rdata section: data_unit:v1-group (missing [2])",
+    "meets_expectation": true
+   }
+  },
+  "surplus_defined_by_target": {
+   "expect": "defined by the target",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus is defined by the target: data_unit:??_C@_03ABC@abc?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "surplus_duplicate": {
+   "expect": "repeats a section",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus repeats a section: data_unit:??_C@_03XYZ@xyz?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "surplus_holds_other_symbols": {
+   "expect": "holds other symbols",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus section holds other symbols: data_unit:??_C@_03XYZ@xyz?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "surplus_not_comdat": {
+   "expect": "not a select-any COMDAT",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus is not a select-any COMDAT: data_unit:??_C@_03XYZ@xyz?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "surplus_not_select_any": {
+   "expect": "not a select-any COMDAT",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus is not a select-any COMDAT: data_unit:??_C@_03XYZ@xyz?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "surplus_on_legacy_entry": {
+   "expect": "surplus needs an extent_model entry",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus needs an extent_model entry: data_unit",
+    "meets_expectation": true
+   }
+  },
+  "surplus_outside_covered_sections": {
+   "expect": "outside the covered report sections",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus is outside the covered report sections: data_unit:_initializer",
+    "meets_expectation": true
+   }
+  },
+  "surplus_stale_snapshot": {
+   "expect": "surplus snapshot changed",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data surplus snapshot changed: data_unit:??_C@_03XYZ@xyz?$AA@",
+    "meets_expectation": true
+   }
+  },
+  "total_data_off_by_one": {
+   "expect": "report total_data is not the target's modelled data extent",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "semantic data group does not cover the reported unmatched sections: data_unit:v1-group",
+    "meets_expectation": false
+   },
+   "dv2": {
+    "kind": "credit",
+    "bytes": 56,
+    "notes": [
+     "data_unit:v1-group (+56 data bytes)"
+    ],
+    "meets_expectation": false
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "report total_data is not the target's modelled data extent: data_unit:v1-group (65 != 64)",
+    "meets_expectation": true
+   }
+  },
+  "wrong_unit": {
+   "expect": "cannot verify semantic data group member",
+   "stock": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member other_unit:_table: section-relative symbol '_table' not found",
+    "meets_expectation": true
+   },
+   "dv2": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member other_unit:_table: section-relative symbol '_table' not found",
+    "meets_expectation": true
+   },
+   "v1": {
+    "kind": "reject",
+    "error_type": "SemanticProgressError",
+    "message": "cannot verify semantic data group member other_unit:_table: section-relative symbol '_table' not found",
+    "meets_expectation": true
+   }
+  }
+ },
+ "mutants": {
+  "no_coverage_any_path": {
+   "killed_by": [
+    "extra_unlisted_section_in_target",
+    "missing_member",
+    "subset_summing_to_extent_legacy",
+    "subset_summing_to_extent_model"
+   ],
+   "survived": false
+  },
+  "no_owner_identity": {
+   "killed_by": [
+    "owner_external_to_static_repinned",
+    "owner_static_to_external_repinned"
+   ],
+   "survived": false
+  },
+  "no_symbol_table_check": {
+   "killed_by": [
+    "extra_symbol_inside_member_section",
+    "non_owner_symbol_storage_changed",
+    "reordered_symbols_inside_member_section"
+   ],
+   "survived": false
+  },
+  "no_comdat_selection_check": {
+   "killed_by": [
+    "comdat_selection_changed"
+   ],
+   "survived": false
+  },
+  "no_image_address_requirement": {
+   "killed_by": [
+    "relocation_destination_unresolvable"
+   ],
+   "survived": false
+  },
+  "no_report_binding": {
+   "killed_by": [
+    "matched_section_missized",
+    "total_data_off_by_one"
+   ],
+   "survived": false
+  },
+  "no_surplus_verification": {
+   "killed_by": [
+    "extra_undeclared_section_in_rebuilt",
+    "surplus_defined_by_target",
+    "surplus_duplicate",
+    "surplus_holds_other_symbols",
+    "surplus_not_comdat",
+    "surplus_not_select_any",
+    "surplus_outside_covered_sections",
+    "surplus_stale_snapshot"
+   ],
+   "survived": false
+  },
+  "no_undeclared_scan": {
+   "killed_by": [
+    "extra_undeclared_section_in_rebuilt"
+   ],
+   "survived": false
+  },
+  "no_one_entry_per_unit": {
+   "killed_by": [
+    "duplicate_entry_for_unit"
+   ],
+   "survived": false
+  },
+  "no_entry_key_whitelist": {
+   "killed_by": [
+    "entry_unknown_key"
+   ],
+   "survived": false
+  },
+  "no_member_key_whitelist": {
+   "killed_by": [
+    "owner_renamed_with_base_alias"
+   ],
+   "survived": false
+  },
+  "model_sum_instead_of_extent": {
+   "killed_by": [
+    "control_january_vs_january",
+    "control_member_list_reordered",
+    "control_partially_matched_unit_credits_only_rest",
+    "control_rebuilt_comdat_order_differs",
+    "control_rebuilt_object"
+   ],
+   "survived": false
+  },
+  "no_surplus_target_definition_check": {
+   "killed_by": [
+    "surplus_defined_by_target"
+   ],
+   "survived": false
+  },
+  "no_surplus_comdat_check": {
+   "killed_by": [
+    "surplus_not_comdat",
+    "surplus_not_select_any"
+   ],
+   "survived": false
+  },
+  "no_surplus_single_symbol_check": {
+   "killed_by": [
+    "surplus_holds_other_symbols"
+   ],
+   "survived": false
+  },
+  "no_surplus_snapshot_pin": {
+   "killed_by": [
+    "surplus_stale_snapshot"
+   ],
+   "survived": false
+  }
+ }
+}

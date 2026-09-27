@@ -1,0 +1,30 @@
+--- a/source/camera/dead_camera.c
++++ b/source/camera/dead_camera.c
+@@ -174,6 +174,13 @@
+ 	if (0.f == camera->switch_timer && !game_time_get_paused())
+ 	{
+ 		long next_player_index;
++		/* BUG (preserved for exact matching): January never initializes
++		 * next_unit_index, so when no next player is found the test below
++		 * reads an indeterminate value (January's +0x176 loads [ebp+0x10],
++		 * the `result` parameter's home, which still holds the command pointer).
++		 * A corrected build should initialize next_unit_index to NONE, as
++		 * the later /Od build does.
++		 */
+ 		long next_unit_index;
+ 		boolean match_team;
+ 
+@@ -188,13 +195,6 @@
+ 		{
+ 			next_unit_index = player_get(next_player_index)->unit_index;
+ 		}
+-		else
+-		{
+-			next_unit_index = (long)result;
+-		}
+-		/* January preserves the command pointer as the fallback object index
+-		 * when no player is found. This is a bug; a corrected build should
+-		 * initialize next_unit_index to NONE instead. */
+ 
+ 		if (next_unit_index != camera->unit_index && next_unit_index != NONE)
+ 		{

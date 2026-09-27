@@ -1,0 +1,15 @@
+CARD K1-11  (pre-registered 2026-09-26 02:28:11 -0700)
+Base: k10 (held lab: 8064 [sha], frame/slots == January, 21 hunks: 0xfc add-esp, 0x838 store order, 0x8b7 DISABLED
+  regs, 0x91c bit-test regs, 0x1d49/0x1d7d normalize x87, plus address-consequence pads).
+Evidence: K1-10 showed /Od declaration order is load-bearing for the x87 operand sort (symbol ids = first textual
+  reference). /Od FUNCTION-level frame addresses (declaration order): event_time, possibility_count,
+  total_possibility_weight, any_forced_possibility, possibilities, usage, dialogue_index, printbuffer(debug_string),
+  silent_printbuffer(requirements_string), time_since_shout/talk/chatter, seconds_since_shout/talk/chatter,
+  speech_disabled_reason, enemy_status_enabled, hostility_enabled, subject/cause_comm_groups_enabled,
+  speech_disabled, speech_enable_after_ticks, subject_encounter_index, subject_encounter, subject_actor_index,
+  subject_unit, subject_actor, cause_actor_index, cause_unit, cause_actor, friend_actor_index, other_actor_index,
+  subject_team, cause_team, subject_race, cause_race, find_friend_actor, find_other_actor, suppress_output,
+  player_involved, any_requirements_failed, any_protagonist_considered, [0xd40] group-loop counter.
+Change: reorder our function-level declarations to that order (scopes unchanged; the declarations that /Od keeps in
+  nested blocks - team/timer/speech strings, selected_possibility, team_index, priority - stay at the end).
+Prediction: frame unchanged; some of the early register hunks (0x8b7, 0x91c) change; normalize x87 unknown.

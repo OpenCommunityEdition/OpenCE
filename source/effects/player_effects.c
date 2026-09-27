@@ -1073,8 +1073,8 @@ static void player_effect_update_camera_impulse(
 		facing.k = 0.0f;
 		normalize3d(&facing);
 
-		if (fabs(magnitude_squared3d(&flattened_direction) - 1.0f) < _real_epsilon &&
-			fabs(magnitude_squared3d(&facing) - 1.0f) < _real_epsilon)
+		if (realcmp(magnitude_squared3d(&flattened_direction), 1.0f) &&
+			realcmp(magnitude_squared3d(&facing), 1.0f))
 		{
 			real angle = signed_angle_between_vectors2d(
 				(real_vector2d const *)&facing,

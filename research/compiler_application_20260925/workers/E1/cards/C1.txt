@@ -1,0 +1,9 @@
+CARD C1  (written 2026-09-26 01:31:31 -0700, before compile)  unit source/tool/connected_geometry  fn _connected_geometry_find_or_add_edge
+Purpose: owner-question candidate hygiene (rule 12: project macros; rule 13: keep the named bit). Lane D's exact packet
+(candidate_ruling_direction.c = e15) spells the tail `direction ? edge_index | LONG_MIN : edge_index & LONG_MAX` and
+deletes the `_connected_geometry_edge_designator_forward_bit` enum; Lane D's e6 (older topology) was exact with
+`SET_FLAG(edge_index, _connected_geometry_edge_designator_forward_bit, direction)` (cseries.h SET_FLAG: ?: of |= / &=).
+Shape: e15 topology (for loop, else-if, block-scoped edges, uninitialised `boolean direction;` + BUG comment, single
+ternary return) with e6's SET_FLAG tail; the enum kept. Base production enum/comment block untouched.
+Prediction: EXACT 240 (same IL as e8/e3: C1 folds FLAG(31) to 0x80000000 and the ?: arms to or/and) -> gate exact 8,
+keyed diff 1 changed (find_or_add_edge EXACT), no symbol change (p ~0.85).

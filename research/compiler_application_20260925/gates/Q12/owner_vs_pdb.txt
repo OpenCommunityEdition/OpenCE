@@ -1,0 +1,9 @@
+Data-section owners vs pdb_storage disagreements (from gates/Q12/ownership_<unit>.txt, unfiltered)
+source/bitmaps/bitmap_group    data owners 31; pdb_storage disagreements  2; owners among them: none
+    owners: _bitmap_block, _bitmap_data_block, _bitmap_data_block_fields, _bitmap_fields, _bitmap_flags, _bitmap_flags_strings, _bitmap_formats, _bitmap_formats_strings, _bitmap_group, _bitmap_group_flags, _bitmap_group_flags_strings, _bitmap_group_formats, _bitmap_group_formats_strings, _bitmap_group_sequence_block, _bitmap_group_sequence_block_fields, _bitmap_group_sprite_block, _bitmap_group_sprite_block_fields, _bitmap_group_sprite_budgets, _bitmap_group_sprite_budgets_strings, _bitmap_group_sprite_usages, _bitmap_group_sprite_usages_strings, _bitmap_group_types, _bitmap_group_types_strings, _bitmap_group_usages, _bitmap_group_usages_strings, _bitmap_pixel_data, _bitmap_types, _bitmap_types_strings, _color_plate_data, _global_bitmap_reference, _global_bitmap_reference_optional
+source/ai/ai_communication     data owners  3; pdb_storage disagreements  3; owners among them: none
+    owners: _global_communication_priority_names, _global_communication_team_names, _global_communication_type_names
+source/ai/ai_debug             data owners  4; pdb_storage disagreements  1; owners among them: none
+    owners: _global_ai_debug_firing_position_color_count, _global_ai_debug_selected_squad_index, _global_ai_debug_selected_squad_time, _postcombat_type_strings
+source/game/game_engine_king   data owners  1; pdb_storage disagreements 23; owners among them: none
+    owners: _king_engine

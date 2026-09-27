@@ -1,0 +1,70 @@
+== sections (January-owned)
+  ok   .rdata   sym:??_C@_0BG@JFBJFIEK@lens_flare_parameters?$AA@    size    22/22    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0BH@FDNIDAHL@parameters?9?$DOdefinition?$A size    23/23    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CD@LGKNCBJE@reflection?9?$DOanimation_per size    35/35    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CO@FCEOCGFK@?$CD?$CD?$CD?5ERROR?5too?5man size    46/46    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0CO@MGBADAON@c?3?2halo?2SOURCE?2rasterizer size    46/46    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DC@BJJPKDMH@?$CD?$CD?$CD?5ERROR?5too?5man size    50/50    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DJ@NIJDHHFP@animation_color?4red?5?$DO?$D size    57/57    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DK@NODNGFKL@?$CD?$CD?$CD?5ERROR?5unsuppor size    58/58    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DL@CLPEFPIB@animation_color?4green?$DO?$D size    59/59    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DL@EPCOBKHO@animation_color?4blue?5?$DO?$ size    59/59    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DL@HIJLAENC@animation_color?4alpha?$DO?$D size    59/59    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DM@DJHNIOGP@?$CD?$CD?$CD?5ERROR?5unsuppor size    60/60    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DN@IFBOCEFD@parameters?9?$DOcolor?4red?5? size    61/61    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DP@CJDDDBGK@parameters?9?$DOcolor?4blue?5 size    63/63    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DP@IFBCMKNP@parameters?9?$DOcolor?4green? size    63/63    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0DP@MMPMMAFC@lens_flare_index?$DO?$DN0?5?$ size    63/63    flags eq align 3/3
+  ok   .rdata   sym:??_C@_0EN@OMGAKMEG@parameters?9?$DOlight_index?$ size    77/77    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0FL@ECFOOILG@parameters?9?$DOlens_flare_in size    91/91    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0GD@JPCGFHAO@lens_flare_parameters?9?$DOli size    99/99    flags eq align 4/4
+  ok   .rdata   sym:??_C@_0GF@CKCJNIMD@structure_lens_flare_index?$D size   101/101   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0GL@HCLLBKGN@?$CIparameters?9?$DOcompresse size   107/107   flags eq align 4/4
+  ok   .rdata   sym:??_C@_0IC@IBFAKJOH@structure_lens_flare_index?$D size   130/130   flags eq align 4/4
+  ok   .rdata   sym:__real@42652ee1                                  size     4/4     flags eq align 3/3
+  ok   .text    sym:_lens_flare_evaluate_corona_rotation_function    size   592/592   flags eq align 5/5
+  ok   .text    sym:_lens_flare_occlusion_test_results_get           size   240/240   flags eq align 5/5
+  ok   .text    sym:_lens_flare_parameters_get                       size    64/64    flags eq align 5/5
+  ok   .bss     sym:_local_lens_flare_occlusion_test_results2        size 333605/333605 flags eq align 4/4
+  ok   .text    sym:_rasterizer_lens_flare_submit                    size   656/656   flags eq align 5/5
+  ok   .text    sym:_rasterizer_lens_flare_submit_for_cluster        size   400/400   flags eq align 5/5
+  DIFF .text    sym:_rasterizer_lens_flares_draw                     size  2240/2240  flags eq align 5/5
+  ok   .text    sym:_rasterizer_lens_flares_submit_occlusion_tests   size   400/400   flags eq align 5/5
+  ok   .text    sym:_rasterizer_light_submit                         size   336/336   flags eq align 5/5
+  ok   .text    sym:_rasterizer_lights_begin                         size    16/16    flags eq align 5/5
+  ok   .text    sym:_rasterizer_lights_begin_for_new_frame           size   304/304   flags eq align 5/5
+  ok   .text    sym:_rasterizer_lights_end                           size    16/16    flags eq align 5/5
+  ok   .text    sym:_rasterizer_lights_reset_for_new_map             size    48/48    flags eq align 5/5
+  ok   .text    sym:_screenshot_in_progress                          size    48/48    flags eq align 5/5
+== symbols (January)
+  DIFF     _local_lens_flare_occlusion_test_results     storage 3/3 key sym:_local_lens_flare_occlusion_test_results2/sym:_local_lens_flare_occlusion_test_results2 value 262176/0
+  DIFF     _local_lens_flare_occlusion_test_results2    storage 3/3 key sym:_local_lens_flare_occlusion_test_results2/sym:_local_lens_flare_occlusion_test_results2 value 0/30464
+  41 January symbols, 2 differ
+== candidate-only surplus (no credit; needs provider link)
+  +.drectve sec:.drectve#0                                       size 42
+  +.rdata   sym:??_C@_0DA@PEPFBGPF@window_index?$DO?$DN0?5?$CG?$ size 48
+  +.rdata   sym:??_C@_0L@HHPOFMCB@parameters?$AA@                size 11
+  +.rdata   sym:_D3DPRIMITIVETOVERTEXCOUNT                       size 88
+  +.rdata   sym:_D3DSIMPLERENDERSTATEENCODE                      size 328
+  +.rdata   sym:_D3DTEXTUREDIRECTENCODE                          size 16
+  +.rdata   sym:__real@00000000                                  size 4
+  +.rdata   sym:__real@3b808081                                  size 4
+  +.rdata   sym:__real@3c010204                                  size 4
+  +.rdata   sym:__real@3c8efa35                                  size 4
+  +.rdata   sym:__real@3e22f983                                  size 4
+  +.rdata   sym:__real@3f000000                                  size 4
+  +.rdata   sym:__real@3f1a36e2e0000000                          size 8
+  +.rdata   sym:__real@3f800000                                  size 4
+  +.rdata   sym:__real@3fb504f3                                  size 4
+  +.text    sym:_cross_product3d                                 size 64
+  +.text    sym:_dot_product3d                                   size 32
+  +.text    sym:_magnitude3d                                     size 48
+  +.text    sym:_magnitude_squared3d                             size 48
+  +.text    sym:_normalize3d                                     size 96
+  +.text    sym:_point_from_line3d                               size 48
+  +.text    sym:_scale_vector3d                                  size 48
+  +.text    sym:_set_real_vector3d                               size 32
+  +.text    sym:_square_root                                     size 16
+  +.text    sym:_subtract_vectors3d                              size 48
+  +.text    sym:_vector_from_points3d                            size 48
+OBJECT AUDIT: FAIL (3)
