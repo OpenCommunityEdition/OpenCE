@@ -2,8 +2,9 @@
 
 Goal: run the decompiled game in a browser as WebAssembly, built with
 Emscripten, reusing the native ports' platform layer (`port/linux/src`) the
-same way the Windows and Android builds do. The player supplies their own game
-data; nothing copyrighted ships with the page.
+same way the Windows and Android builds do. The release is hosted on itch.io.
+The player supplies their own Halo: Combat Evolved PAL disc image; nothing
+copyrighted ships with the page.
 
 wasm32 has 32-bit pointers, which suits the game: its tag data, cache files and
 saved games embed 32-bit pointers, which is why every native build is 32-bit
@@ -134,14 +135,29 @@ either single-threaded or with browser threads.
 Create the browser-side mechanism for supplying whatever game data users are
 legally expected to provide.
 
-- On first run, show a folder picker (`<input webkitdirectory>` or the File
-  System Access API) for the PAL 01.01.14.2342 data directory.
-- Validate the files before copying anything: check the expected files in
-  `maps/` and the cache file build string, since the game rejects other
-  builds.
-- Import into OPFS or IndexedDB once, with a progress bar, and reuse the data
-  on later visits. Add a "forget data" button.
-- This mirrors the Android app's in-app import (`port/android/README.md`).
+The player supplies only their Halo: Combat Evolved PAL disc image, and the
+page extracts it. There is no separate extraction step and no server.
+A first version is in `port/web/` (`index.html`, `app.js`, `xiso.js`).
+
+- **Reading the image:** `xiso.js` reads the Xbox disc filesystem (XDVDFS)
+  straight from the chosen file, one slice at a time, so a multi-gigabyte
+  image is never loaded whole. It finds the game partition whether the image
+  is an extract-xiso "xiso" (offset 0) or a full XGD1/2/3 dump (for example
+  `0x18300000` for XGD1, Halo's disc).
+- **Checking it:** it reads the header of every `maps/*.map` before copying
+  anything. The `head`/`foot` signatures, cache version 5 and build
+  `01.01.14.2342` must all match, as `cache_files.c` requires. A wrong
+  image is refused with a per-file reason.
+- **Storing it:** it copies every file on the disc into OPFS under
+  `halo-data/`, which becomes `d:\` (lane 5). It requests persistent
+  storage, checks the quota and shows a progress bar. A later visit reuses the
+  data, and "Delete imported data" removes it.
+- **Serving it locally:** `python3 port/web/serve.py` serves the page at
+  `http://localhost:8000` with the COOP/COEP headers a threaded build needs.
+- **Still to do:** a Safari fallback, since Safari's OPFS has no
+  `createWritable` on the main thread (move the copy into a worker), and
+  mounting `halo-data/` into the Emscripten FS once the WebAssembly build
+  exists.
 
 ## 8. Integration/release
 
@@ -172,5 +188,5 @@ logging, crash reproduction, and continuous merging of the other lanes' work.
 
 - Emscripten (`emcc`), plus ninja and Python.
 - The XDK's `xbox/include`, as for every other build.
-- The PAL game data (build 01.01.14.2342) for testing. It is never committed
-  or shipped.
+- A Halo: Combat Evolved PAL disc image (build 01.01.14.2342) for testing.
+  It is never committed or shipped.
