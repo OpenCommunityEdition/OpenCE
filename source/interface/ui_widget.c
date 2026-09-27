@@ -6417,8 +6417,24 @@ static boolean ui_check_for_pause_game(
 			}
 		}
 	}
+#ifdef HALO_LINUX
+	/* This runs once a frame, several frames per tick on the native builds
+	(port/linux/game/render_interpolation.c): count the lock down in 30 Hz
+	ticks of real time, not in frames. */
+	{
+		static real leftover_ticks = 0.f;
+		long ticks;
+
+		leftover_ticks += main_get_seconds_elapsed() * TICKS_PER_SECOND;
+		ticks = (long)leftover_ticks;
+		leftover_ticks -= (real)ticks;
+		widget_globals.pause_disabled_ticks =
+			FLOOR(widget_globals.pause_disabled_ticks - ticks, 0);
+	}
+#else
 	widget_globals.pause_disabled_ticks =
 		FLOOR(widget_globals.pause_disabled_ticks - 1, 0);
+#endif
 
 	return pause_pressed;
 }

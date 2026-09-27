@@ -426,6 +426,16 @@ static void code_00120c40(
 				struct antenna_vertex_definition);
 			real spring = definition->spring_coefficient * definition_vertex->spring_coefficient;
 			real inverse_delta = 1.0f / delta;
+#ifdef HALO_LINUX
+			/* The spring pulls the same fraction of the way each update, an
+			update a tick on the Xbox; the native builds update every frame,
+			several a tick (port/linux/game/render_interpolation.c), so pull
+			as far as a tick's worth would. */
+			if (spring > 0.0f)
+			{
+				spring = (real)pow(spring, delta * TICKS_PER_SECOND);
+			}
+#endif
 			real_point3d position;
 			real_vector3d segment;
 			real_vector3d up_axis;

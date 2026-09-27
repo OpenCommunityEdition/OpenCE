@@ -331,6 +331,14 @@ real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS] = {0};
 boolean controls_enable_crouch = FALSE;
 boolean controls_enable_doubled_spin = FALSE;
 boolean controls_swap_doubled_spin_state = FALSE;
+#ifdef HALO_LINUX
+/* The native builds read input once a frame and draw several frames per
+30 Hz tick (port/linux/game/render_interpolation.c). The pitch autolevel and
+limits were stepped once per input update, a tick on the Xbox, so they step
+by the ticks the frame lasted; an impulse applied from a tick steps by one. */
+static real player_control_angle_step_ticks = 1.f;
+static real player_control_autolevel_time[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+#endif
 
 /* ---------- public code */
 
@@ -667,10 +675,16 @@ static void handle_one_player_input(
 
 		if (!director_inhibited_facing(local_player_index))
 		{
+#ifdef HALO_LINUX
+			player_control_angle_step_ticks = time_delta_sec * TICKS_PER_SECOND;
+#endif
 			player_control_modify_desired_angles(
 				local_player_index,
 				input.facing_delta.yaw,
 				input.facing_delta.pitch);
+#ifdef HALO_LINUX
+			player_control_angle_step_ticks = 1.f;
+#endif
 		}
 
 		if (unit->object.parent_object_index == NONE)
@@ -680,15 +694,31 @@ static void handle_one_player_input(
 				input.facing_delta.pitch < 0.0001f &&
 				player->magnetism_level < 0.0001f)
 			{
+#ifdef HALO_LINUX
+				/* count ticks, not frames (see player_control_angle_step_ticks) */
+				long ticks;
+
+				player_control_autolevel_time[local_player_index] += time_delta_sec * TICKS_PER_SECOND;
+				ticks = (long)player_control_autolevel_time[local_player_index];
+				player_control_autolevel_time[local_player_index] -= (real)ticks;
+				player->autolevel_ticks = (char)PIN(
+					player->autolevel_ticks + ticks,
+					0,
+					127);
+#else
 				player->autolevel_ticks = (char)PIN(
 					player->autolevel_ticks + 1,
 					0,
 					127);
+#endif
 				player->use_autolevel =
 					player->autolevel_ticks > constants->minimum_autolevel_enabled_ticks;
 			}
 			else
 			{
+#ifdef HALO_LINUX
+				player_control_autolevel_time[local_player_index] = 0.f;
+#endif
 				player->autolevel_ticks = 0;
 				player->use_autolevel = FALSE;
 			}
@@ -1902,6 +1932,9 @@ static void player_control_modify_desired_angles(
 				"c:\\halo\\SOURCE\\game\\player_control.c",
 				0x4F2,
 				player->desired_angles.pitch);
+#ifdef HALO_LINUX
+			error *= player_control_angle_step_ticks;
+#endif
 			if (pitch_autolevel != 0.f)
 			{
 				interpolate_scalar(
@@ -1924,8 +1957,13 @@ static void player_control_modify_desired_angles(
 		}
 	}
 
+#ifdef HALO_LINUX
+	interpolate_scalar(&player->pitch_minimum, pitch_minimum, _pi / 256.f * player_control_angle_step_ticks);
+	interpolate_scalar(&player->pitch_maximum, pitch_maximum, _pi / 256.f * player_control_angle_step_ticks);
+#else
 	interpolate_scalar(&player->pitch_minimum, pitch_minimum, _pi / 256.f);
 	interpolate_scalar(&player->pitch_maximum, pitch_maximum, _pi / 256.f);
+#endif
 
 	player->desired_angles.pitch += delta_pitch;
 	player->desired_angles.pitch = PIN(

@@ -503,11 +503,41 @@ void update_client_add_player(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* The native builds draw several frames per 30 Hz tick
+(port/linux/game/render_interpolation.c) and build an action every frame, and
+only the last one before a tick reaches it: a button pressed and released
+between two ticks, or a press seen only on its first frame (zoom, grenade
+and weapon switches), would be lost. Every control held on any frame since
+the last tick stays held until a tick has run, and the trigger stays as far
+down as it went (weapons with an analog rate of fire read that, not the
+flag). */
+static unsigned long update_client_pending_control_flags[MAXIMUM_LOCAL_PLAYERS];
+static real update_client_pending_primary_triggers[MAXIMUM_LOCAL_PLAYERS];
+static long update_client_pending_game_time = NONE;
+
+#endif
 void update_client_queue(
 	struct player_action const *action)
 {
 	update_client_globals.saved_action_collection.actions[
 		update_client_globals.current_local_player] = *action;
+#ifdef HALO_LINUX
+	if (update_client_globals.current_local_player < MAXIMUM_LOCAL_PLAYERS)
+	{
+		struct player_action *saved = &update_client_globals.saved_action_collection.actions[
+			update_client_globals.current_local_player];
+		unsigned long *pending = &update_client_pending_control_flags[
+			update_client_globals.current_local_player];
+		real *pending_primary_trigger = &update_client_pending_primary_triggers[
+			update_client_globals.current_local_player];
+
+		*pending |= action->control_flags;
+		*pending_primary_trigger = MAX(*pending_primary_trigger, action->primary_trigger);
+		saved->control_flags = *pending;
+		saved->primary_trigger = *pending_primary_trigger;
+	}
+#endif
 	++update_client_globals.current_local_player;
 
 	return;
@@ -516,6 +546,22 @@ void update_client_queue(
 void update_client_queue_push(
 	void)
 {
+#ifdef HALO_LINUX
+	/* while the clock is stopped no tick will take them */
+	if (update_client_pending_game_time != game_time_get() ||
+		game_time_get_paused())
+	{
+		update_client_pending_game_time = game_time_get();
+		csmemset(
+			update_client_pending_control_flags,
+			0,
+			sizeof(update_client_pending_control_flags));
+		csmemset(
+			update_client_pending_primary_triggers,
+			0,
+			sizeof(update_client_pending_primary_triggers));
+	}
+#endif
 	update_client_globals.current_local_player = 0;
 	csmemset(
 		&update_client_globals.saved_action_collection,

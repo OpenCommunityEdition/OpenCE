@@ -129,6 +129,9 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "effects/decals.h"
 #include "game/game_globals.h"
+#ifdef HALO_LINUX
+#include "main/main.h"
+#endif
 #include "interface/hud_draw.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/common/rasterizer_common.h"
@@ -932,12 +935,26 @@ static void rasterizer_environment_fog_screen_wind_update(
 	if (screen->wind_velocity.upper > 0.0f)
 	{
 		real_vector2d *target_direction = &wind->target_direction;
+#ifdef HALO_LINUX
+		/* This runs once a frame, several frames per tick on the native
+		builds (port/linux/game/render_interpolation.c): turn toward the
+		target as far per 30 Hz tick as the Xbox turned per frame. */
+		real weight = (real)pow(
+			PIN(1.0f - screen->wind_acceleration_weight, 0.0f, 1.0f),
+			main_get_seconds_elapsed() * TICKS_PER_SECOND);
+		real acceleration_weight;
+
+		wind->direction.i *= weight;
+		wind->direction.j *= weight;
+		acceleration_weight = 1.0f - weight;
+#else
 		real weight = 1.0f - screen->wind_acceleration_weight;
 		real acceleration_weight;
 
 		wind->direction.i *= weight;
 		wind->direction.j *= weight;
 		acceleration_weight = screen->wind_acceleration_weight;
+#endif
 		wind->direction.i += target_direction->i * acceleration_weight;
 		wind->direction.j += target_direction->j * acceleration_weight;
 		if (normalize2d(&wind->direction) == 0.0f)
@@ -945,11 +962,19 @@ static void rasterizer_environment_fog_screen_wind_update(
 			wind->direction.i = 1.0f;
 			wind->direction.j = 0.0f;
 		}
+#ifdef HALO_LINUX
+		scalars_interpolate(
+			wind->magnitude,
+			wind->target_magnitude,
+			acceleration_weight,
+			&wind->magnitude);
+#else
 		scalars_interpolate(
 			wind->magnitude,
 			wind->target_magnitude,
 			screen->wind_acceleration_weight,
 			&wind->magnitude);
+#endif
 		if (global_frame_parameters.game_time_sec - wind->change_time >= wind->change_period)
 		{
 			real_vector2d perpendicular;

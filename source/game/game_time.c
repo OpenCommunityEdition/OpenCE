@@ -466,6 +466,18 @@ void game_time_update(
 		long ticks_elapsed;
 		real ticks_per_second = game_time_globals->speed*TICKS_PER_SECOND;
 
+#ifdef HALO_LINUX
+		/* The native builds draw several frames per tick
+		(port/linux/game/render_interpolation.c). A frame that runs no tick has
+		elapsed no game time: without this, the ticks of the last frame that
+		ran some would count again on every frame after it, and whatever
+		advances by game_time_get_elapsed() once a frame (chapter titles, HUD
+		messages and flashes, screen flashes, camera shake and impulses) would
+		run as many times too fast as there are frames per tick. On the Xbox
+		every frame ran at least one tick. */
+		game_time_globals->last_local_time_elapsed = 0;
+#endif
+
 		if (ticks_per_second > 0.f)
 		{
 			boolean discard_leftover_time;

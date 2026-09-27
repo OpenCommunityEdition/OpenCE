@@ -208,6 +208,18 @@ static boolean particle_update_physics(
 real const particle_collision_effect_scale_bounds[2] = {1.5f, 0.5f};
 
 static struct profile_section particles_update_section = {"particles_update", NONE, TRUE};
+#ifdef HALO_LINUX
+/* A frame was a tick on the Xbox. The native builds draw several frames per
+tick (port/linux/game/render_interpolation.c), so what counted frames counts
+30 Hz ticks of game time instead: particles that animate once a frame step
+once a tick, and a particle is deleted once it has gone unrendered for
+MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT ticks, the frame index drawn at each
+of the last ones kept here. */
+static real particles_leftover_ticks = 0.f;
+static long particles_update_ticks = 0;
+static long particles_tick_frame_indices[MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT + 1];
+static long particles_tick_frame_head = 0;
+#endif
 
 static char const *particle_effect_marker_names[NUMBER_OF_PARTICLE_EFFECT_MARKERS] =
 {
@@ -589,7 +601,11 @@ static boolean particle_update_frame_time(
 	{
 		if (TEST_FLAG(definition->flags, _particle_definition_animate_once_per_frame_bit))
 		{
+#ifdef HALO_LINUX
+			if (dt != 0.0f && particles_update_ticks > 0)
+#else
 			if (dt != 0.0f)
+#endif
 				return particle_next_frame(particle_index);
 		}
 		else
@@ -1002,6 +1018,24 @@ void particles_update(
 
 	profile_enter(particles_update_section);
 
+#ifdef HALO_LINUX
+	{
+		long tick;
+
+		particles_leftover_ticks += dt * TICKS_PER_SECOND;
+		particles_update_ticks = (long)particles_leftover_ticks;
+		particles_leftover_ticks -= (real)particles_update_ticks;
+		for (tick = 0;
+			tick < MIN(particles_update_ticks, (long)NUMBEROF(particles_tick_frame_indices));
+			tick++)
+		{
+			particles_tick_frame_head =
+				(particles_tick_frame_head + 1) % NUMBEROF(particles_tick_frame_indices);
+			particles_tick_frame_indices[particles_tick_frame_head] = render.frame_index;
+		}
+	}
+
+#endif
 	for (particle_index = data_next_index(particle_data, NONE);
 		particle_index != NONE;
 		particle_index = data_next_index(particle_data, particle_index))
@@ -1010,8 +1044,15 @@ void particles_update(
 		struct particle_definition *definition = particle_definition_get(particle->definition_index);
 		boolean was_new = (particle->age == 0.0f);
 
+#ifdef HALO_LINUX
+		if (render.frame_index - particle->last_rendered_frame_index >
+			MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT &&
+			particle->last_rendered_frame_index < particles_tick_frame_indices[
+				(particles_tick_frame_head + 1) % NUMBEROF(particles_tick_frame_indices)])
+#else
 		if (render.frame_index - particle->last_rendered_frame_index >
 			MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT)
+#endif
 		{
 			datum_delete(particle_data, particle_index);
 		}

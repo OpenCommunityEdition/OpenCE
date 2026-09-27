@@ -377,6 +377,28 @@ void contrails_update(
 	real dt)
 {
 	long contrail_index;
+#ifdef HALO_LINUX
+	/* The native builds update contrails every frame, several frames per
+	tick (port/linux/game/render_interpolation.c), but objects and their
+	markers move only on ticks: points due on a frame that ran no tick would
+	land on the last point, be skipped and be lost. Emit on the first frame
+	after each tick, for all the time since the last emission. */
+	static long last_point_game_time = NONE;
+	static real pending_point_dt = 0.0f;
+	real point_dt;
+
+	pending_point_dt += dt;
+	if (last_point_game_time != game_time_get())
+	{
+		last_point_game_time = game_time_get();
+		point_dt = pending_point_dt;
+		pending_point_dt = 0.0f;
+	}
+	else
+	{
+		point_dt = 0.0f;
+	}
+#endif
 
 	for (contrail_index = data_next_index(contrail_data, NONE);
 		contrail_index != NONE;
@@ -415,10 +437,17 @@ void contrails_update(
 
 			if (active)
 			{
+#ifdef HALO_LINUX
+				contrail_add_points(
+					contrail_index,
+					contrail_compute_new_point_count(contrail_index, point_dt),
+					TRUE);
+#else
 				contrail_add_points(
 					contrail_index,
 					contrail_compute_new_point_count(contrail_index, dt),
 					TRUE);
+#endif
 			}
 		}
 

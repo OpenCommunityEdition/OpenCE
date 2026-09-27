@@ -432,10 +432,28 @@ static void rasterizer_screen_effect_set_texture_transforms(
 				223,
 				main_get_window_count()<=1);
 
+#ifdef HALO_LINUX
+			/* The native builds draw several frames per tick
+			(port/linux/game/render_interpolation.c): move the noise 30 times
+			a second, as the Xbox did once a frame, not every frame. */
+			{
+				unsigned long noise_seed =
+					(unsigned long)system_milliseconds() / (MILLISECONDS_PER_SECOND / TICKS_PER_SECOND) * 0x9E3779B1UL;
+
+				noise_seed ^= noise_seed >> 16;
+				noise_seed *= 0x7FEB352DUL;
+				noise_seed ^= noise_seed >> 15;
+				random_value = real_seed_random(&noise_seed);
+				constants[4][3] += noise_scale.i * random_value * noise_size.i;
+				random_value = real_seed_random(&noise_seed);
+				constants[5][3] += noise_scale.j * random_value * noise_size.j;
+			}
+#else
 			random_value = real_seed_random(get_global_local_random_seed_address());
 			constants[4][3] += noise_scale.i * random_value * noise_size.i;
 			random_value = real_seed_random(get_global_local_random_seed_address());
 			constants[5][3] += noise_scale.j * random_value * noise_size.j;
+#endif
 		}
 
 		IDirect3DDevice8_SetVertexShaderConstant(

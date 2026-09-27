@@ -3300,11 +3300,21 @@ static void game_engine_post_rasterize_in_game(
 		!gamepad->buttons[_gamepad_binary_button_back]) &&
 		game_engine_globals.postgame_state != 1)
 	{
+#ifdef HALO_LINUX
+		/* a frame is no longer a tick (render_interpolation.c): fade in half
+		a second, not in 15 frames */
+		fade -= 0.06666667f * main_get_seconds_elapsed() * TICKS_PER_SECOND;
+#else
 		fade -= 0.06666667f;
+#endif
 	}
 	else
 	{
+#ifdef HALO_LINUX
+		fade += 0.06666667f * main_get_seconds_elapsed() * TICKS_PER_SECOND;
+#else
 		fade += 0.06666667f;
+#endif
 	}
 
 	if (fade < 0.0f)
@@ -7141,6 +7151,24 @@ static void internal_rasterize_target_name(
 			target_player_index = NONE;
 	}
 
+#ifdef HALO_LINUX
+	/* This is drawn once a frame, several frames per tick
+	(render_interpolation.c): the hold time counts ticks, as it did on the
+	Xbox. */
+	{
+		static long last_game_times[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+		long *last_game_time = NULL;
+
+		if (player->local_player_index >= 0 &&
+			player->local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		{
+			last_game_time = &last_game_times[player->local_player_index];
+		}
+		if (!last_game_time || *last_game_time != game_time_get())
+		{
+			if (last_game_time)
+				*last_game_time = game_time_get();
+#endif
 	if (player->unknown7c != target_player_index)
 	{
 		if (player->target_hold_time > 0)
@@ -7152,6 +7180,10 @@ static void internal_rasterize_target_name(
 	{
 		player->target_hold_time++;
 	}
+#ifdef HALO_LINUX
+		}
+	}
+#endif
 
 	if (player->unknown7c != NONE)
 	{

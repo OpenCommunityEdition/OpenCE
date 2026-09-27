@@ -100,6 +100,9 @@ symbols in this file:
 #include "objects/widgets/widget_types.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#ifdef HALO_LINUX
+#include "main/main.h"
+#endif
 
 /* ---------- constants */
 
@@ -665,6 +668,33 @@ void rasterizer_lights_begin_for_new_frame(
 			{
 				byte previous_visibility= *occlusion_test_result;
 
+#ifdef HALO_LINUX
+				/* The native builds draw several frames per tick
+				(port/linux/game/render_interpolation.c): move a quarter of the
+				way up and half of the way down per 30 Hz tick, not per frame,
+				at least a step a frame for as long as a tick's step would still
+				move it. */
+				real frame_ticks= main_get_seconds_elapsed()*TICKS_PER_SECOND;
+
+				if (latest_visibility>previous_visibility)
+				{
+					long difference= latest_visibility - previous_visibility;
+
+					if (difference>=4)
+					{
+						long step= (long)(difference*(1.f - (real)pow(0.75f, frame_ticks)) + 0.5f);
+
+						*occlusion_test_result= (byte)(previous_visibility + PIN(step, 1, difference));
+					}
+				}
+				else if (latest_visibility<previous_visibility)
+				{
+					long difference= previous_visibility - latest_visibility;
+					long step= (long)(difference*(1.f - (real)pow(0.5f, frame_ticks)) + 0.5f);
+
+					*occlusion_test_result= (byte)(previous_visibility - PIN(step, 1, difference));
+				}
+#else
 				if (latest_visibility>previous_visibility)
 				{
 					*occlusion_test_result= (byte)((3*previous_visibility + latest_visibility)/4);
@@ -673,6 +703,7 @@ void rasterizer_lights_begin_for_new_frame(
 				{
 					*occlusion_test_result= (byte)((previous_visibility + latest_visibility)/2);
 				}
+#endif
 			}
 		}
 

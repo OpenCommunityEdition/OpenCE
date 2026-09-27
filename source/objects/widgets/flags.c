@@ -545,7 +545,27 @@ void flag_update(
 					SET_FLAG(physics_flags, _point_physics_ignore_position_under_water_bit, TRUE);
 				}
 
+#ifdef HALO_LINUX
+				/* The native builds update flags every frame, several frames a
+				tick (port/linux/game/render_interpolation.c): a new random push
+				every frame would mostly cancel out and leave the cloth stiller
+				the higher the frame rate. Keep each vertex's push for the whole
+				tick, as long as it lasted on the Xbox. */
+				{
+					unsigned long seed = (unsigned long)game_time_get() * 0x9E3779B1UL ^
+						(unsigned long)(size_t)flag ^
+						((unsigned long)column << 16 | (unsigned short)row);
+
+					seed ^= seed >> 16;
+					seed *= 0x7FEB352DUL;
+					seed ^= seed >> 15;
+					seed *= 0x846CA68BUL;
+					seed ^= seed >> 16;
+					seed_random_direction3d(&seed, &turbulence);
+				}
+#else
 				local_random_direction3d(&turbulence);
+#endif
 				scale_vector3d(&turbulence, wind_scale, &turbulence);
 
 				new_position = vertex->position;

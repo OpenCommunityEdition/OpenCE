@@ -767,7 +767,14 @@ static void particle_system_new_particles(
 
 	if ((real)type->particle_count < type->variables.minimum_particle_count)
 	{
+#ifdef HALO_LINUX
+		/* cut short at the rate of 0.3 a tick, not a frame: the native
+		builds update several frames a tick
+		(port/linux/game/render_interpolation.c) */
+		type->time_left_in_state *= (real)pow(0.30000001f, delta_time * TICKS_PER_SECOND);
+#else
 		type->time_left_in_state *= 0.30000001f;
+#endif
 	}
 
 	return;
