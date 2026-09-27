@@ -105,3 +105,20 @@ call-first negative. No duplicate compile sweeps were run. Full witnesses and
 reopen criteria remain in `scratch/astra_one_more_20260927/next_target/`.
 This is a bounded negative result, not a claim that further reconstruction is
 impossible. No unrelated hold was lifted.
+
+## Admission checkpoint
+
+Source prerequisites committed as `27c97361`. The subsequent single status
+change to Matching was independently gated again: full build/report succeeds;
+strict snapshot unchanged (0 gains / 0 losses); parks 72/0/0; admission audit
+11 candidates / 0 contradicted / 1 rejected / 0 audit revocations; complete
+fake-scan JSON unchanged; pytest 1,161 passed / 5 skipped / 26 subtests.
+Fresh report confirms 389/468 Halo objects, with code and data exactly as in
+the accounting section above. The only inherited exact loss in the complete
+sequence remains the explicitly approved P1 draw debit.
+
+Final local receipts: `after_admission.json`, `hardware_admission_build.log`,
+`admission_final.json`, `parks_admission.json`, `fake_admission.json`, and
+`pytest_admission.log` under the same scratch root. Only the reviewed source,
+configuration and compact provenance documents are committed; inherited
+README and untracked research changes remain untouched.
