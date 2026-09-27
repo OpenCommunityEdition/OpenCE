@@ -801,7 +801,7 @@
 				{ "name": "source/ai/path_structure_bsp.c", "index": 426, "status": "NonMatching" },
 				{ "name": "source/ai/path_smoothing.c", "index": 427, "status": "Matching" },
 				{ "name": "source/ai/path_obstacles.c", "index": 428, "status": "NonMatching" },
-				{ "name": "source/ai/path_obstacle_avoidance.c", "index": 429, "status": "NonMatching" },
+				{ "name": "source/ai/path_obstacle_avoidance.c", "index": 429, "status": "Matching" },
 				{ "name": "source/ai/path.c", "index": 430, "status": "Matching" },
 				{ "name": "source/ai/encounters.c", "index": 431, "status": "Matching" },
 				{ "name": "source/ai/ai_script.c", "index": 432, "status": "Matching" },

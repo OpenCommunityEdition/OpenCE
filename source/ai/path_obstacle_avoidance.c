@@ -19,33 +19,33 @@ symbols in this file:
 0004E870 0060:
 	_heap_cost (0000)
 0004E8D0 00d0:
-	_code_0004e8d0 (0000)
+	_error_heap (0000)
 0004E9A0 01b0:
-	_code_0004e9a0 (0000)
+	_heap_verify (0000)
 0004EB50 0190:
-	_code_0004eb50 (0000)
+	_heap_up (0000)
 0004ECE0 02a0:
-	_code_0004ece0 (0000)
+	_heap_down (0000)
 0004EF80 0060:
-	_code_0004ef80 (0000)
+	_heap_insert (0000)
 0004EFE0 0070:
-	_code_0004efe0 (0000)
+	_heap_remove (0000)
 0004F050 0260:
 	_render_debug_path (0000)
 0004F2B0 0040:
 	_valid_real_point2d (0000)
 0004F2F0 0220:
-	_code_0004f2f0 (0000)
+	_path_add_step (0000)
 0004F510 01e0:
-	_code_0004f510 (0000)
+	_path_new (0000)
 0004F6F0 0200:
-	_code_0004f6f0 (0000)
+	_path_test_pill2d (0000)
 0004F8F0 0330:
-	_code_0004f8f0 (0000)
+	_path_add_steps (0000)
 0004FC20 0130:
-	_code_0004fc20 (0000)
+	_path_iterate (0000)
 0004FD50 0070:
-	_code_0004fd50 (0000)
+	_path_find (0000)
 0004FDC0 0550:
 	_path_avoid_obstacles (0000)
 00050310 00e0:
@@ -99,7 +99,8 @@ symbols in this file:
 0024E8D0 0030:
 	??_C@_0DA@BINHGJIJ@input_step_count?5?$DM?$DN?5MAXIMUM_SMOO@ (0000)
 00319D08 2142:
-	_bss_00319d08 (0000)
+	_debug_path (0000)
+	_debug_obstacles (1538)
 	_debug_obstacle_path_on_failure (2140)
 	_debug_obstacle_path (2141)
 */
@@ -219,7 +220,11 @@ static boolean path_find(
 /* ---------- globals */
 
 /* the failing search copied out by path_avoid_obstacles for
- * render_debug_obstacle_path to replay */
+ * render_debug_obstacle_path to replay.
+ * the names debug_path and debug_obstacles are descriptive, not recovered: no
+ * first-party record names these two file statics (the feature is debug-only and
+ * compiled out of every build whose symbols record statics). their storage, types
+ * and January offsets (+0, +0x1538 of 0x00319D08) are January-proven. */
 static struct obstacle_path debug_path;
 static struct obstacles debug_obstacles;
 
