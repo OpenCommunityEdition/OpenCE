@@ -2395,6 +2395,34 @@ boolean network_game_server_remove_client_machine_from_game(
 				}
 			}
 
+#ifdef HALO_LINUX
+			{
+				/* players this machine queued to join in game go with it: a
+				machine that joins later may get its index */
+				long waiting_index = 0;
+
+				if (server->queued_player_valid &&
+					server->queued_player.machine_index == client->machine_index)
+				{
+					server->queued_player_valid = FALSE;
+				}
+				while (waiting_index < server->waiting_player_count)
+				{
+					if (server->waiting_players[waiting_index].machine_index == client->machine_index)
+					{
+						server->waiting_player_count--;
+						csmemmove(
+							&server->waiting_players[waiting_index],
+							&server->waiting_players[waiting_index + 1],
+							(server->waiting_player_count - waiting_index) * sizeof(struct network_player));
+					}
+					else
+					{
+						waiting_index++;
+					}
+				}
+			}
+#endif
 			server->client_machines[i].connection = NULL;
 			server->client_machines[i].last_received_update_sequence_number = 0;
 			server->client_machines[i].stall_start_time = 0;
@@ -3451,7 +3479,10 @@ static boolean network_game_server_idle_pregame_tasks(
 				_message_server_pregame_keep_alive,
 				&message_packet,
 				sizeof(message_packet));
-			network_game_server_send_message_to_all_machines(server, message);
+			if (message)
+			{
+				network_game_server_send_message_to_all_machines(server, message);
+			}
 
 			server->time_of_last_keep_alive = now;
 		}

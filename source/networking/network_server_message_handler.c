@@ -763,7 +763,10 @@ boolean network_game_server_send_game_settings_to_all_machines(
 		0x1C8,
 		server);
 
-	for (offset = 0; result && offset < game_size; offset += sizeof(message.data))
+	/* every piece goes out even if one fails for a machine: the others
+	would otherwise keep the old settings (a machine whose connection failed
+	is closed, and is skipped when the update is sent again) */
+	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
 		void *encoded_message;
 
@@ -793,7 +796,7 @@ boolean network_game_server_send_game_settings_to_all_machines(
 		}
 	}
 
-	network_game_settings_update_pending = FALSE;
+	network_game_settings_update_pending = !result;
 	network_game_settings_update_time = system_milliseconds();
 
 	return result;

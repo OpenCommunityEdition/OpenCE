@@ -26,7 +26,13 @@ Two settings adjust the addressing:
 - HALO_NET_BROADCAST=a.b.c.d[,e.f.g.h...] sends the game's broadcasts (a
   client's system link game search, a host's game advertisement) to those
   addresses instead of 255.255.255.255, to reach machines that broadcasts
-  do not: other loopback addresses, or machines across a VPN.
+  do not: other loopback addresses, or machines across a VPN (listing
+  255.255.255.255 too still broadcasts). A socket bound to one address
+  receives no broadcasts, so machines with HALO_NET_ADDRESS find each
+  other only through these lists: each must list the others.
+
+Both are read once, when the game starts its networking; a value that is
+not an IPv4 address is reported and ignored.
 */
 
 #include "platform.h"
@@ -37,25 +43,119 @@ Two settings adjust the addressing:
 
 /* ---------- address settings */
 
-static int address_setting(const char *name, unsigned long *address)
+enum
 {
-	const char *text = getenv(name);
-	unsigned long value;
+	MAXIMUM_BROADCAST_TARGETS = 256,
+};
 
-	if (!text || !*text)
+/* HALO_NET_ADDRESS and HALO_NET_BROADCAST, read once (net_settings_read),
+in network byte order */
+static struct
+{
+	int read;
+	int has_local_address;
+	unsigned long local_address;
+	int broadcast_count;
+	unsigned long broadcast_targets[MAXIMUM_BROADCAST_TARGETS];
+} net_settings;
+
+/* a dotted quad of decimal numbers up to 255 filling [text, end), spaces
+around it allowed; the address in network byte order */
+static int parse_ipv4(const char *text, const char *end, unsigned long *address)
+{
+	unsigned long value = 0;
+	int part;
+
+	while (text < end && (*text == ' ' || *text == '\t'))
+		text++;
+	while (end > text && (end[-1] == ' ' || end[-1] == '\t'))
+		end--;
+	for (part = 0; part < 4; part++)
+	{
+		unsigned long number = 0;
+		int digits = 0;
+
+		while (text < end && *text >= '0' && *text <= '9' && digits < 3)
+		{
+			number = number * 10 + (unsigned long)(*text++ - '0');
+			digits++;
+		}
+		if (!digits || number > 255)
+			return 0;
+		value = value << 8 | number;
+		if (part < 3)
+		{
+			if (text >= end || *text != '.')
+				return 0;
+			text++;
+		}
+	}
+	if (text != end)
 		return 0;
-	/* INADDR_NONE (also 255.255.255.255) is no use as either setting */
-	value = halo_ws_inet_addr(text);
-	if (value == INADDR_NONE)
-		return 0;
-	*address = value;
+	*address = halo_ws_htonl(value);
 	return 1;
+}
+
+static void net_settings_read(void)
+{
+	const char *text;
+
+	if (net_settings.read)
+		return;
+	text = getenv("HALO_NET_ADDRESS");
+	if (text && *text)
+	{
+		unsigned long address;
+
+		/* neither 0.0.0.0 nor 255.255.255.255 is a machine's address */
+		if (parse_ipv4(text, text + strlen(text), &address) && address != 0 && address != INADDR_BROADCAST)
+		{
+			net_settings.local_address = address;
+			net_settings.has_local_address = 1;
+		}
+		else
+		{
+			platform_log("HALO_NET_ADDRESS=%s is not a usable IPv4 address: ignored", text);
+		}
+	}
+	text = getenv("HALO_NET_BROADCAST");
+	while (text && *text)
+	{
+		const char *end = text + strcspn(text, ",");
+		unsigned long address;
+
+		if (parse_ipv4(text, end, &address) && address != 0)
+		{
+			if (net_settings.broadcast_count < MAXIMUM_BROADCAST_TARGETS)
+				net_settings.broadcast_targets[net_settings.broadcast_count++] = address;
+			else if (net_settings.broadcast_count++ == MAXIMUM_BROADCAST_TARGETS)
+				platform_log("HALO_NET_BROADCAST: only the first %d addresses are used", MAXIMUM_BROADCAST_TARGETS);
+		}
+		else if (end > text)
+		{
+			platform_log("HALO_NET_BROADCAST: %.*s is not an IPv4 address: ignored", (int)(end - text), text);
+		}
+		text = *end ? end + 1 : end;
+	}
+	if (net_settings.broadcast_count > MAXIMUM_BROADCAST_TARGETS)
+		net_settings.broadcast_count = MAXIMUM_BROADCAST_TARGETS;
+	if (net_settings.has_local_address && !net_settings.broadcast_count)
+	{
+		platform_log("HALO_NET_ADDRESS without HALO_NET_BROADCAST: sockets bound to one address "
+			"receive no broadcasts, so this machine sees other machines' games and searches only if "
+			"they list its address in their HALO_NET_BROADCAST");
+	}
+	net_settings.read = 1;
 }
 
 /* the address to use in place of INADDR_ANY, if HALO_NET_ADDRESS is set */
 static int local_address_setting(unsigned long *address)
 {
-	return address_setting("HALO_NET_ADDRESS", address);
+	net_settings_read();
+	if (!net_settings.has_local_address)
+		return 0;
+	*address = net_settings.local_address;
+	return 1;
 }
 
 /* 127.0.0.1 in network byte order */
@@ -94,36 +194,16 @@ static void incoming_address(struct sockaddr *address, const int *address_length
 	}
 }
 
-enum
-{
-	MAXIMUM_BROADCAST_TARGETS = 256,
-};
-
 /* the addresses to send broadcasts to instead, if HALO_NET_BROADCAST is
-set; returns their count */
+set (255.255.255.255 among them sends a real broadcast too); returns their
+count */
 static int broadcast_targets(unsigned long *targets, int maximum_count)
 {
-	const char *text = getenv("HALO_NET_BROADCAST");
-	int count = 0;
+	int count;
 
-	while (text && *text && count < maximum_count)
-	{
-		char address[16];
-		size_t length = strcspn(text, ",");
-		unsigned long value;
-
-		if (length < sizeof(address))
-		{
-			memcpy(address, text, length);
-			address[length] = 0;
-			value = halo_ws_inet_addr(address);
-			if (value != INADDR_NONE)
-				targets[count++] = value;
-		}
-		text += length;
-		if (*text == ',')
-			text++;
-	}
+	net_settings_read();
+	count = net_settings.broadcast_count < maximum_count ? net_settings.broadcast_count : maximum_count;
+	memcpy(targets, net_settings.broadcast_targets, (size_t)count * sizeof(*targets));
 	return count;
 }
 
@@ -153,6 +233,8 @@ void WSAAPI WSASetLastError(int error)
 
 int WSAAPI WSAStartup(WORD version_requested, LPWSADATA data)
 {
+	/* here, before the game's network threads start */
+	net_settings_read();
 	if (data)
 	{
 		memset(data, 0, sizeof(*data));

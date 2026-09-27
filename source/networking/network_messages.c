@@ -829,6 +829,17 @@ void *create_network_game_message(
 
 	if (encode_network_game_message(message_struct, encoded_message, &encoded_message_size.encoded, message_type, 1))
 	{
+#ifdef HALO_LINUX
+		/* a message header holds lengths up to HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE-1,
+		header included: a longer message would go out with a wrong length and
+		derail the stream (create_message only asserts on it) */
+		if (encoded_message_size.value + sizeof(word) >= HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE)
+		{
+			network_event("create_network_game_message(): the encoded message is too long");
+			message = NULL;
+		}
+		else
+#endif
 		message = create_message(3, encoded_message, encoded_message_size.value, network_game_message_buffer, sizeof(network_game_message_buffer));
 		if (!message)
 		{

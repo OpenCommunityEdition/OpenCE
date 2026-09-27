@@ -903,6 +903,7 @@ boolean network_connection_write(
 		{
 			long bytes_sent = 0;
 			unsigned long start_time = system_milliseconds();
+			boolean timed_out = FALSE;
 
 			bytes_written = 0;
 			while (bytes_sent < buffer_size)
@@ -916,10 +917,15 @@ boolean network_connection_write(
 				{
 					bytes_sent += sent;
 				}
-				else if (sent != _transport_result_operation_would_block ||
-					system_milliseconds() - start_time >= NETWORK_CONNECTION_WRITE_TIMEOUT)
+				else if (sent != _transport_result_operation_would_block)
 				{
 					bytes_written = sent < 0 ? sent : _transport_error_endpoint_io;
+					break;
+				}
+				else if (system_milliseconds() - start_time >= NETWORK_CONNECTION_WRITE_TIMEOUT)
+				{
+					bytes_written = _transport_error_endpoint_io;
+					timed_out = TRUE;
 					break;
 				}
 			}
@@ -927,9 +933,12 @@ boolean network_connection_write(
 			{
 				bytes_written = bytes_sent;
 			}
-			else if (bytes_sent > 0)
+			else if (bytes_sent > 0 || timed_out)
 			{
-				/* part of a message is on its way: the stream cannot recover */
+				/* part of a message is on its way, or the peer has stopped
+				reading: the stream cannot recover, and going on without this
+				message would leave the peer out of step (a client that misses
+				a game update puts the whole game out of sync) */
 				SET_FLAG(connection->flags, _connection_closed_bit, TRUE);
 			}
 		}

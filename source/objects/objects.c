@@ -3826,6 +3826,19 @@ void object_delete_immediately(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* the active garbage limits are per 16 players: a session of up to 128
+keeps proportionally more garbage around, campaign and smaller games the
+Xbox's amount */
+static long active_garbage_limit(
+	long limit_per_16_players)
+{
+	long player_count = player_data ? player_data->actual_count : 0;
+
+	return limit_per_16_players * MAX(16, player_count) / 16;
+}
+
+#endif
 void objects_garbage_collection(
 	void)
 {
@@ -3852,7 +3865,11 @@ void objects_garbage_collection(
 		}
 		else
 		{
+#ifdef HALO_LINUX
+			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER))
+#else
 			if (object_globals->active_garbage_object_count>=GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER)
+#endif
 			{
 				garbage_collect_mode = _garbage_collect_active_objects;
 			}
@@ -3909,7 +3926,12 @@ void objects_garbage_collection(
 					should_collect = FALSE;
 					break;
 				case _garbage_collect_active_objects:
+#ifdef HALO_LINUX
+					should_collect = object_globals->active_garbage_object_count<=
+						active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET);
+#else
 					should_collect = object_globals->active_garbage_object_count<=GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET;
+#endif
 					break;
 				case _garbage_collect_for_space:
 					should_collect =

@@ -88,7 +88,7 @@ further gamepads become controllers 2-4.
 | `HALO_EXIT_AFTER=<seconds>` | quit that long after the window opens (profile training, benchmarks) |
 | `mesa_glthread=false` | with Mesa drivers, make the GL calls on the game's own thread (the game turns Mesa's GL thread on otherwise) |
 | `HALO_NET_ADDRESS=<IPv4>` | this machine's system link address: sockets bind to it instead of to every address, other machines see games at it, and traffic to 127.0.0.1 goes to it. Lets several copies of the game play together on one computer, each on its own loopback address (see System link) |
-| `HALO_NET_BROADCAST=<IPv4>,...` | send the game search broadcast to these addresses instead of 255.255.255.255, for example to the loopback address of a host on the same computer |
+| `HALO_NET_BROADCAST=<IPv4>,...` | send the game's broadcasts (a client's game search, a host's game advertisement) to these addresses instead of 255.255.255.255, for example to the other copies' loopback addresses on the same computer (listing 255.255.255.255 too still broadcasts). Machines with `HALO_NET_ADDRESS` receive no broadcasts, so they find each other only through these lists |
 | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | write every Nth presented frame as a BMP |
 | `HALO_GPU_STATS`, `HALO_GPU_TRACE=<frame>` (with `HALO_GPU_TRACE_CONSTANTS`), `HALO_GPU_DUMP_SHADERS=<dir>`, `HALO_TEXTURE_DUMP=<dir>`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | renderer debugging: per-frame counts, a full state trace of one frame, the generated GLSL, uploaded textures |
 | `HALO_GPU_SKIP_VS=<id>,...`, `HALO_GPU_DEBUG_EXPR=<glsl>`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | renderer debugging: drop draws by vertex shader, or replace every pixel shader's output with a GLSL expression (for example `t0.rgb` or `xD0.rgb`) |
@@ -139,9 +139,16 @@ limits: every change is under `#ifdef HALO_LINUX`.
   of upload for a host of 128 machines (measured). The traffic grows with
   the square of the session; a host of 32 machines with one player each
   sends about 8 Mbit/s.
+  A 100 Mbit/s network carries about 100 machines, Wi-Fi far fewer.
 - The host waits up to 60 seconds (15 on the Xbox) for slower machines to
   load the map, and keeps the machines that have loaded connected
-  meanwhile.
+  meanwhile. A machine that stops reading the host's messages for two
+  seconds is dropped from the game rather than holding everyone up.
+- The game state is saved whole, so checkpoints and saved games are 16 MB
+  (3.4 MB on the Xbox), and saves from earlier native builds do not carry
+  over. Garbage (bodies, dropped weapons) is collected as on the Xbox in
+  campaign and games of up to 16 players, and in proportion to the players
+  in larger games.
 - The lobby has panels for the local machine and three remote machines,
   and shows the first three remote machines to join; the others are in
   the game all the same. Finishing places past 16th, which the game's
@@ -150,13 +157,22 @@ limits: every change is under `#ifdef HALO_LINUX`.
 
 Several copies of the game can play together on one computer. The host
 tells machines apart by address, so every copy needs its own loopback
-address, the host included: for example
-`HALO_NET_ADDRESS=127.0.0.200` for the host, and
-`HALO_NET_ADDRESS=127.0.0.201` (`.202`, ...) with
-`HALO_NET_BROADCAST=127.0.0.200` for the others, which then find the
-host's game. Never give a copy 127.0.0.1: every copy reaches its own
-address through 127.0.0.1. Linux and Windows route all of 127.0.0.0/8 to
-the loopback interface without configuration.
+address, the host included. A copy bound to one address receives no
+broadcasts, so each lists the others in `HALO_NET_BROADCAST`: the clients
+send their game search to the host, and the host its game advertisement
+to the clients. For a host and two clients:
+
+```sh
+HALO_NET_ADDRESS=127.0.0.200 HALO_NET_BROADCAST=127.0.0.201,127.0.0.202 build/linux/halo
+HALO_NET_ADDRESS=127.0.0.201 HALO_NET_BROADCAST=127.0.0.200 build/linux/halo
+HALO_NET_ADDRESS=127.0.0.202 HALO_NET_BROADCAST=127.0.0.200 build/linux/halo
+```
+
+Never give a copy 127.0.0.1: every copy reaches its own address through
+127.0.0.1. Linux and Windows route all of 127.0.0.0/8 to the loopback
+interface without configuration. Pinning a machine to a network card's
+address with `HALO_NET_ADDRESS` works the same way: every machine must list
+the others' addresses.
 
 `tools/system_link_bots.py` fills a session without a hundred copies of the
 game. It joins a host with lightweight stand-in machines, one player each,

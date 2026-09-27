@@ -25,6 +25,8 @@ record in pieces of HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE bytes.
 """
 
 import argparse
+import errno
+import ipaddress
 import math
 import selectors
 import socket
@@ -137,6 +139,10 @@ class Machine:
         self.load_seconds = 1.0
         self.tcp = None
         self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # the host's own client holds 0.0.0.0 on this port (with SO_REUSEADDR);
+        # Linux lets another socket bind a single address on it only if it
+        # sets SO_REUSEADDR too
+        self.udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.udp.bind((address, CLIENT_PORT))
         self.udp.setblocking(False)
 
@@ -152,18 +158,31 @@ class Machine:
         except BlockingIOError:
             pass
         except OSError as error:
-            if error.errno not in (10035, 115, 36):  # WSAEWOULDBLOCK / EINPROGRESS
+            # a non-blocking connect in progress (Windows says would block)
+            if error.errno not in (errno.EINPROGRESS, errno.EWOULDBLOCK, 10035):
                 raise
+
+    def close(self, selector):
+        """stops using the connection: a connection the host keeps but no one
+        reads would fill its send buffer"""
+        self.state = "closed"
+        if self.tcp:
+            try:
+                selector.unregister(self.tcp)
+            except (KeyError, ValueError):
+                pass
+            self.tcp.close()
+            self.tcp = None
 
     def send(self, data):
         view = memoryview(data)
-        deadline = time.time() + 5
+        deadline = time.monotonic() + 5
         while view:
             try:
                 sent = self.tcp.send(view)
                 view = view[sent:]
             except BlockingIOError:
-                if time.time() > deadline:
+                if time.monotonic() > deadline:
                     raise
                 time.sleep(0.001)
 
@@ -225,7 +244,7 @@ class Machine:
                                       network_player(self.name, self.machine_index, color)))
         elif packet_type == SERVER_BEGIN_GAME:
             self.state = "loading"
-            self.loaded_at = time.time() + self.load_seconds
+            self.loaded_at = time.monotonic() + self.load_seconds
         elif packet_type == SERVER_GAME_UPDATE:
             update_number = struct.unpack(">I", payload[:4])[0]
             self.last_update_number = update_number
@@ -279,16 +298,23 @@ def main():
     parser.add_argument("--status-every", type=float, default=5.0)
     options = parser.parse_args()
 
-    started = time.time()
+    started = time.monotonic()
 
     def log(text):
-        print("[%7.2f] %s" % (time.time() - started, text), flush=True)
+        print("[%7.2f] %s" % (time.monotonic() - started, text), flush=True)
 
-    base = [int(part) for part in options.first_address.split(".")]
+    try:
+        first_address = ipaddress.IPv4Address(options.first_address)
+        last_address = ipaddress.IPv4Address(int(first_address) + max(options.machines, 1) - 1)
+    except ValueError as error:
+        parser.error("--first-address: %s" % error)
+    if first_address.is_loopback and not last_address.is_loopback:
+        parser.error("--first-address: %d machines from %s run past 127.255.255.255" % (options.machines, first_address))
+    if not first_address.is_loopback:
+        log("warning: %s is not a loopback address; the machines bind real addresses" % first_address)
     machines = []
     for index in range(options.machines):
-        value = (base[0] << 24 | base[1] << 16 | base[2] << 8 | base[3]) + index
-        address = "%d.%d.%d.%d" % (value >> 24, value >> 16 & 255, value >> 8 & 255, value & 255)
+        address = str(first_address + index)
         machine = Machine(index + 1, address, options.host, log)
         machine.state = "waiting"
         machine.load_seconds = options.load_seconds
@@ -307,7 +333,7 @@ def main():
     last_input = 0
     try:
         while True:
-            now = time.time()
+            now = time.monotonic()
             if waiting and now >= next_connect_time:
                 machine = next((m for m in waiting if m.retry_time <= now), None)
                 if machine:
@@ -320,9 +346,8 @@ def main():
                 if machine.state == "connecting" and events & selectors.EVENT_WRITE:
                     error = machine.tcp.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
                     if error:
-                        selector.unregister(machine.tcp)
-                        machine.tcp.close()
-                        if error in (10061, 111) and machine.connect_attempts < 20:  # connection refused
+                        machine.close(selector)
+                        if error in (errno.ECONNREFUSED, 10061) and machine.connect_attempts < 20:
                             machine.state = "waiting"
                             machine.retry_time = now + 0.5
                             waiting.append(machine)
@@ -333,8 +358,13 @@ def main():
                     selector.modify(machine.tcp, selectors.EVENT_READ, machine)
                     machine.joined()
                 if events & selectors.EVENT_READ and machine.state != "closed":
-                    if not machine.receive():
-                        selector.unregister(machine.tcp)
+                    try:
+                        if not machine.receive() or machine.state == "closed":
+                            machine.close(selector)
+                    except OSError as error:
+                        # a reply the host stopped reading, or a reset
+                        log("%s: %s" % (machine.name, error))
+                        machine.close(selector)
             if now - last_input >= 1.0 / options.rate:
                 last_input = now
                 for machine in machines:
@@ -343,7 +373,7 @@ def main():
                             machine.tick(now)
                         except OSError as error:
                             log("%s: %s" % (machine.name, error))
-                            machine.state = "closed"
+                            machine.close(selector)
             if options.start and not start_requested:
                 ready = [m for m in machines if m.state == "pregame" and m.player_added and m.settings_complete]
                 if len(ready) == len(machines) and all_in_time is None:
@@ -352,7 +382,12 @@ def main():
                 if all_in_time is not None and now - all_in_time >= options.start_delay:
                     start_requested = True
                     log("asking the host to start the game")
-                    machines[0].send(message(CLIENT_GAME_START_REQUEST, struct.pack(">h", COUNTDOWN_EVENT_START_IMMEDIATELY)))
+                    try:
+                        machines[0].send(message(CLIENT_GAME_START_REQUEST,
+                                                 struct.pack(">h", COUNTDOWN_EVENT_START_IMMEDIATELY)))
+                    except OSError as error:
+                        log("%s: %s" % (machines[0].name, error))
+                        machines[0].close(selector)
             if now - last_status >= options.status_every:
                 last_status = now
                 states = {}

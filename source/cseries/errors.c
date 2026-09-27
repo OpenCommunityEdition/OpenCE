@@ -117,6 +117,69 @@ char *error_get(
 	return error_globals.message_buffer;
 }
 
+#ifdef HALO_LINUX
+/* The native builds keep the log open and flush each line: opening and
+closing it per line takes milliseconds on Windows, and a host logs
+thousands of lines when a hundred machines join, load or leave. The file is
+opened once even if threads log their first lines at once, and each line is
+one write, so lines from several threads do not interleave. */
+static void write_to_debug_file(
+	char const *string,
+	boolean date)
+{
+	static FILE *volatile debug_file = NULL;
+	FILE *file = debug_file;
+	char prefix[32];
+
+	if (!file)
+	{
+		FILE *opened = fopen("d:\\debug.txt", "a+b");
+
+		if (!opened)
+		{
+			return;
+		}
+		file = __sync_val_compare_and_swap(&debug_file, (FILE *)NULL, opened);
+		if (file)
+		{
+			fclose(opened);
+		}
+		else
+		{
+			file = opened;
+		}
+	}
+
+	prefix[0] = 0;
+	if (date)
+	{
+		long timeptr;
+		struct tm *_time;
+
+		time(&timeptr);
+		_time = localtime(&timeptr);
+		if (_time)
+		{
+			sprintf(
+				prefix,
+				"%02d.%02d.%02d %02d:%02d:%02d  ",
+				_time->tm_mon + 1,
+				_time->tm_mday,
+				_time->tm_year % 100,
+				_time->tm_hour,
+				_time->tm_min,
+				_time->tm_sec);
+		}
+		else
+		{
+			csstrcpy(prefix, "<TIME UNAVAILABLE>  ");
+		}
+	}
+	fprintf(file, "%s%s", prefix, string);
+	fflush(file);
+}
+
+#endif
 void write_to_error_file(
 	char *string,
 	boolean date)
@@ -138,18 +201,10 @@ void write_to_error_file(
 	if (error_globals.output_to_debug_file)
 	{
 #ifdef HALO_LINUX
-		/* the native builds keep the log open and flush each line: opening
-		and closing it per line takes milliseconds on Windows, and a host logs
-		thousands of lines when a hundred machines join, load or leave */
-		static FILE *handle = NULL;
-
-		if (!handle)
-		{
-			handle = fopen("d:\\debug.txt", "a+b");
-		}
+		write_to_debug_file(string, date);
+	}
 #else
 		FILE *handle = fopen("d:\\debug.txt", "a+b");
-#endif
 		if (handle)
 		{
 			if (date)
@@ -177,13 +232,10 @@ void write_to_error_file(
 				}
 			}
 			fprintf(handle, "%s", string);
-#ifdef HALO_LINUX
-			fflush(handle);
-#else
 			fclose(handle);
-#endif
 		}
 	}
+#endif
 
 	return;
 }

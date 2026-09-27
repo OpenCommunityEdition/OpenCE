@@ -19,6 +19,11 @@ codes, so this passes nearly everything straight through.
 
 #include "posix.h"
 
+/* mstcpip.h has it only in some Windows SDKs */
+#ifndef SIO_UDP_CONNRESET
+#define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
+#endif
+
 static __thread int last_error;
 
 static int fail(void)
@@ -66,6 +71,17 @@ int posix_socket(int family, int type, int protocol)
 	result = WSASocketW(family, type, protocol, NULL, 0, WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
 	if (result == INVALID_SOCKET)
 		return fail();
+	if (type == SOCK_DGRAM)
+	{
+		/* Windows reports an ICMP port unreachable (a datagram to an address
+		nothing listens on, such as a HALO_NET_BROADCAST machine not running)
+		as a WSAECONNRESET from the socket's next recvfrom; neither the Xbox
+		nor Linux does */
+		BOOL report = FALSE;
+		DWORD returned = 0;
+
+		WSAIoctl(result, SIO_UDP_CONNRESET, &report, sizeof(report), NULL, 0, &returned, NULL, NULL);
+	}
 	last_error = 0;
 	return from_socket(result);
 }

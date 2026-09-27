@@ -1712,6 +1712,13 @@ static SOCKET create_socket(
 			winsock_error_to_string(WSAGetLastError());
 		}
 
+#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+		/* Linux (and Android) grow a stream socket's buffers as far as the
+		connection needs, to several megabytes; setting a size would fix them,
+		at no more than the system's limit (about 416 KB by default) */
+		if (socket_type != SOCK_STREAM)
+		{
+#endif
 		option_length = sizeof(option);
 		if (getsockopt(endpoint_socket, SOL_SOCKET, SO_SNDBUF,
 			(char *)&option, &option_length) == 0)
@@ -1749,6 +1756,9 @@ static SOCKET create_socket(
 		{
 			winsock_error_to_string(WSAGetLastError());
 		}
+#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+		}
+#endif
 	}
 	else
 	{
