@@ -13,11 +13,17 @@ the same bytes as before (see [Verification](#verification)).
 **Two maps have been seen running, with limits.** In the Windows debug build,
 the stock Custom Edition `bloodgulch.map` and the OpenSauce
 `beavercreek_halo3.yelo` load, draw their levels, models, sky and HUD with
-their textures, spawn a player in a slayer game, and run with sound enabled
-without an error. That is what was observed, from screenshots and
-`debug.txt`; [Tested](#tested) lists what was not (nobody played either
-map). Running one map says nothing about the next: Custom Edition maps can
-use features this build does not have, and OpenSauce ones usually do.
+their textures and spawn a player: `bloodgulch.map` in slayer,
+`beavercreek_halo3.yelo` in slayer, capture the flag, king of the hill and
+oddball. Custom Edition's tags were made for Halo PC's renderer, and this
+build draws with the Xbox's: where Halo PC wants data the Xbox does not (a
+channel order, a bitmap resolution, a text placeholder), the data is
+converted, and what was found of that so far is below; what is left is under
+[Limits](#limits-and-remaining-work). That is what was observed, from
+screenshots and `debug.txt`; [Tested](#tested) lists what was not (nobody
+played either map). Running one map says nothing about the next: Custom
+Edition maps can use features this build does not have, and OpenSauce ones
+usually do.
 
 ## What "support" means
 
@@ -47,7 +53,9 @@ multiplayer scenario needs a game variant, or no starting location
 qualifies and no player spawns (`match_game_type` in `game_engine.c`
 accepts none of a map's typed starting locations without a game engine).
 `beavercreek_halo3.yelo`'s scenario is
-`zteam\scenarios\multi_player\beavercreek\beavercreek_halo3`.
+`zteam\scenarios\multi_player\beavercreek\beavercreek_halo3`. The score
+shows while the Xbox's BACK button is held: F1 on the keyboard, or the
+controller's Back button.
 
 ## What the native builds do
 
@@ -174,6 +182,23 @@ changed:
   name none, which the game skips. `beavercreek_halo3.yelo` has two; Custom
   Edition reads past the graph's animations there, and this build's debug
   builds stop on it.
+- **HUD elements drawn from double-resolution bitmaps.** Halo PC added a
+  third scaling flag to HUD placements, *use high resolution scale*
+  (OpenSauce `hud_definitions.hpp`), and draws a flagged element at half the
+  size of its bitmap. Custom Edition's HUD bitmaps are made for that: in
+  `bloodgulch.map` every flagged element draws a bitmap exactly twice the
+  size of the one its Xbox counterpart draws (256×64 for 128×32, 512×512 for
+  256×256), with the same scale, and every unflagged one a bitmap of the same
+  size ([Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)).
+  This build ignores the flag, so it drew them twice too large; the
+  placements of the unit, weapon and grenade HUD interfaces and the HUD
+  globals' messages that have it get half their scale, and lose the flag (32
+  in `bloodgulch.map`, 14 in `beavercreek_halo3.yelo`).
+- **The score hint.** String 100 of `ui\multiplayer_game_text` is Halo PC's
+  `Hold "%s" for score`, which Halo PC fills in with its score key; this
+  build copies it as it is (`game_engine.c`, the press-back-for-score
+  message), so `"%s"` becomes `BACK`, the button this build reads for the
+  score, in the same four characters.
 
 ### In the game (`custom_edition_cache.c`, `custom_edition_geometry.c`, `custom_edition_bitmaps.c`)
 
@@ -206,12 +231,46 @@ changed:
   Xbox map has such layers, so January never hung on it, but Custom Edition
   maps do (`beavercreek_halo3.yelo` has two shaders with them): the native
   builds advance the loop.
+- **Channel orders.** Halo PC keeps two kinds of texture in other channels
+  than this build reads them from (`enum custom_edition_channel_order`,
+  [Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)):
+  a model shader's *multipurpose map*, whose auxiliary (detail) mask,
+  self-illumination, specular and color change masks Halo PC keeps in red,
+  green, blue and alpha, where this build's model shaders read specular from
+  red, self-illumination from green, color change from blue and the
+  auxiliary mask from alpha; and a *HUD meter*, whose shape Halo PC keeps in
+  color and fill order in alpha, where this build's meter shader
+  (`rasterizer_xbox_dynavobgeom.c`) compares the color with the meter's value
+  and discards what has no alpha. Reordering the pixels would mean
+  decompressing them, which the texture cache has no room for, so the game
+  finds the bitmaps drawn as multipurpose maps (by model shaders) and as
+  meters (by unit and weapon HUD interfaces) when the map loads, and tells
+  the renderer where each bitmap's pixels arrive and in which order their
+  channels are; the renderer samples them with each channel taken from where
+  Halo PC keeps it (`port/linux/src/xbox_textures.c`, a texture swizzle,
+  which leaves them compressed). A bitmap also drawn another way (a
+  multipurpose map that is also a base map, say) keeps its channels, since
+  the renderer has one order for each texture, and is logged: 3 in
+  `bloodgulch.map`, 4 in `beavercreek_halo3.yelo`, all multipurpose maps.
+- **Reads.** The renderer write-protects the memory it has made textures of
+  and learns of changes from the faults writes take; the kernel fails a read
+  into such memory instead. Every read of the map is therefore made into a
+  64 KB staging buffer and copied, as the platform's file layer does.
+- **Texture memory.** A frame of `beavercreek_halo3.yelo` draws more than the
+  22 MB of textures the Xbox texture cache holds, and textures that did not
+  fit were drawn as the default one. The native builds' texture cache is
+  twice the Xbox's (`halo_port_capacity.h`), for every map; with that map
+  loaded, 52 MB of the 128 MB memory window were still free.
+- **Multiplayer vehicles.** `game_engine_predict_resources` takes the three
+  multiplayer vehicles Xbox globals always have; `beavercreek_halo3.yelo` has
+  one, and oddball stopped on it. With fewer than three, the native builds
+  predict none (`game_engine.c`, under `HALO_LINUX`).
 
 ## Tested
 
 ### Automated tests
 
-`python -m pytest tools/test_cache_file_formats.py` (127 tests; needs clang).
+`python -m pytest tools/test_cache_file_formats.py` (131 tests; needs clang).
 The tests build complete synthetic caches and resource maps in memory (no
 game data is stored in the repository) and run the report tool, compiled with
 `-Wall -Wextra -Wpedantic -Werror` and undefined-behaviour trapping
@@ -231,7 +290,10 @@ silences them.
   bitmaps and sound permutations naming their own tags; sound header fields
   taken from `sounds.map`; an Ogg Vorbis sound made unplayable; upgraded
   script nodes reduced, stock ones kept, too many refused; animation overlays
-  kept and disabled.
+  kept and disabled; HUD placements with the high resolution scale halved
+  (in a weapon HUD's statics and crosshair items) and ones without it kept;
+  the score hint made to name BACK, and a placeholder left alone in another
+  string list and in another string.
 - Malformed input: every check of the loader and the conversion, with at
   least one case each (94 tests: header fields, OpenSauce fields, tag index, instances, names,
   addresses, scenario, structure BSP block, range, header and materials,
@@ -318,6 +380,19 @@ holding one map and the stock resource maps, and the `init.txt` above, for
 | `bloodgulch.map` | on | the same, plus one `attempt to play a sound that was not a mono 22k compressed sound ...` in 40 s |
 | `beavercreek_halo3.yelo` | off | loaded and converted as above; the level, the map's Halo 3 style HUD, and its first-person arms and plasma pistol, all textured, with no error in 40 s |
 | `beavercreek_halo3.yelo` | on | the same for 60 s, with no sound refused |
+
+After the owner reported visual bugs, the maps were run again, 20 to 25
+seconds each, with the conversions above added one at a time and the frames
+compared with the Xbox's data and with a screenshot the owner supplied of
+`beavercreek_halo3.yelo` as Custom Edition draws it:
+
+| Map, game | Observed |
+| --- | --- |
+| `beavercreek_halo3.yelo`, slayer | before the texture memory change, `YOU GOT STABBED` (the texture cache's failure) twice in 25 s and flat grey surfaces where textures did not fit; after it, neither |
+| `beavercreek_halo3.yelo`, oddball | stopped in `game_engine_predict_resources` before the multiplayer vehicles guard; runs after it |
+| `beavercreek_halo3.yelo`, capture the flag | before the staging buffer, a flood of `cannot read` messages and black patches; after it, none. With every change: the Halo 3 style HUD (grenades, shield meter, ammunition, motion sensor) placed and sized as in the owner's screenshot, and the first-person arms in the team's red, as there |
+| `bloodgulch.map`, slayer | the HUD at the Xbox's size (the shield meter, the health meter under it, the ammunition counters and meters, with each round drawn) and `Hold BACK for score` |
+| both | multipurpose maps drawn with their masks where this build's shaders read them (66 in `beavercreek_halo3.yelo`, 56 in `bloodgulch.map`), and the ammunition and unit meters (3 and 2) in this build's order |
 
 Before the sound conversion, the log filled with that message: the map's
 copy of every resource-held sound's header says it is uncompressed. The game
@@ -413,6 +488,10 @@ every layout used was then checked against the sample maps.
 | Font style references in `loc.map` are all `NONE` | all 3 fonts |
 | Sound compression value 3 is Ogg Vorbis, value 1 is Xbox ADPCM | in `sounds.map`, all 106 value-3 permutations start with `OggS`; all 1,365 value-1 permutations are whole 36-byte blocks |
 | `bitmaps.map` bitmaps are not swizzled, and cube maps hold each level's six faces together | all 1,467; 38 of 40 cube maps match that order when checked against their next level (one is uniform, one does not match) |
+| Multipurpose maps: Custom Edition's red, green, blue and alpha hold what the Xbox's alpha, green, red and blue do | the multipurpose maps the Custom Edition and the Xbox `bloodgulch.map` share, decoded and compared channel by channel (the cyborg's, the warthog's, the boulders') |
+| HUD meters: Custom Edition's alpha holds the Xbox's color (the fill order), and its color the Xbox's alpha (the shape) | `hud_ammo_meters`: Custom Edition's 512×512 A8R8G8B8 averaged down to the Xbox's 256×256 A8Y8 differs from the Xbox's luminance by 6.6 on average in alpha and 23 in color, and from its alpha by 12.3 in color and 23.4 in alpha; `hud_unit_meters` has its sprites rearranged, and shows the same swap when viewed. January's meter shader reads the fill order from color and discards texels without alpha |
+| HUD elements flagged *use high resolution scale* draw bitmaps twice the Xbox's size; others the same size | every unit and weapon HUD placement of `bloodgulch.map` whose tag the Xbox map also has (the motion sensor's foreground, unflagged, uses a 128×128 bitmap in both) |
+| Bitmaps the Xbox keeps in monochrome formats and Custom Edition as 32-bit color at the same size keep their channels (A8Y8 as A8R8G8B8 with red the luminance and alpha the alpha) | 24 of the 26 such bitmaps of `bloodgulch.map` decode to exactly the Xbox's values; the other 2 have other content |
 
 ### Assumptions (not verified)
 
@@ -454,8 +533,25 @@ every layout used was then checked against the sample maps.
   the wrong row pitch: the texture cache gives the texture header the
   unpadded pitch rounded down. They are logged; none is in the maps run (the
   6 known are in `extinctionrevanepic2.map`).
-- **HUD text.** `bloodgulch.map`'s "Hold "%s" for score" is drawn with the
-  `%s` as it stands; how Custom Edition fills it in was not investigated.
+- **Button prompts on replaced icon sheets.** HUD messages draw a button
+  from sequence 0 to 3 of the HUD globals' icon bitmap, as the Xbox does;
+  Halo PC names the key instead. `beavercreek_halo3.yelo` replaces the icon
+  bitmap, and its sequence 2 is an energy sword, so `Hold [X] to pick up`
+  shows the sword. Stock maps keep the Xbox's button icons.
+- **A team icon.** The owner's screenshot of `beavercreek_halo3.yelo` in a
+  team game shows a team-colored figure beside the ammunition counter; no
+  unit, weapon or grenade HUD interface of the map draws one (the unit HUD's
+  auxiliary overlays, where this build draws team icons, are empty), so it
+  comes from something this build does not have, not identified.
+- **Channel orders are per texture.** The multipurpose maps and meters also
+  drawn another way keep Halo PC's channels (above); only the uses found in
+  model shaders and HUD interfaces are looked at.
+- **The texture cache** holds 44 MB; a map that draws more in a frame is
+  drawn with default textures where they do not fit, and the game reports
+  it (`YOU GOT STABBED`).
+- **Silenced sounds still log.** Playing a silenced Ogg Vorbis sound logs
+  `attempt to play a sound that was not a mono 22k compressed sound ...`,
+  which debug builds also print on the screen.
 - **Scripts** of Custom Edition maps are untested (above), and OpenSauce's
   script extensions and other runtime features (`project_yellow`) do not
   exist here.
@@ -525,14 +621,16 @@ python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<X
 - **The byte-matched build is unchanged.** All 621 matching objects
   (`ninja all_source`, XDK `CL.exe`) were built from the January sources as
   they are on this branch and as they are at `f2fa457f`: every section and
-  symbol table is identical, and the files differ only in byte 4, part of the
-  COFF time stamp, in the 55 objects the changed files made the second build
-  recompile. The game-source changes are all under `#ifdef HALO_LINUX`:
-  `cache/cache_files.c`, `cache/cache_files_windows.c`,
-  `rasterizer/rasterizer_geometry.h` (declarations of the buffer functions)
-  and `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` (the chicago
-  extra layers). No matching tool, reference binary or scoring rule was
-  touched.
+  symbol table is identical, and the files differ only in bytes 4 and 5,
+  part of the COFF time stamp, in the 58 objects the changed files made the
+  second build recompile. The game-source changes are all under
+  `#ifdef HALO_LINUX`: `cache/cache_files.c`, `cache/cache_files_windows.c`,
+  `rasterizer/rasterizer_geometry.h` (declarations of the buffer functions),
+  `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` (the chicago
+  extra layers), `cache/physical_memory_map.c` and
+  `cache/xbox_texture_cache.c` (the texture cache's size) and
+  `game/game_engine.c` (the multiplayer vehicles). No matching tool,
+  reference binary or scoring rule was touched.
 - The new game units (`custom_edition_*.c`) compile without warnings under
   `-Wall -Wextra` as well as the game's usual flags, which silence warnings.
 - `tools/test_linux_port.py` fails 3 tests on this Windows host before and
