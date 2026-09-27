@@ -829,7 +829,7 @@ real_matrix3x3 *matrix3x3_from_forward_and_up(
 	real_vector3d const *forward,
 	real_vector3d const *up);
 real_vector3d *matrix3x3_transform_vector(real_matrix3x3 const *matrix, real_vector3d const *vector, real_vector3d *result);
-boolean valid_real_plane3d(real_plane3d const *plane);
+
 
 /* ---------- prototypes/RANDOM_MATH.C */
 
@@ -1872,6 +1872,14 @@ __inline boolean valid_real_normal3d(
 	real_vector3d const *n)
 {
 	return valid_realcmp(magnitude_squared3d(n), 1.f);
+}
+
+__inline boolean valid_real_plane3d(
+	real_plane3d const *plane)
+{
+	return
+		valid_real_normal3d(&plane->n) &&
+		valid_real(plane->d);
 }
 
 __inline boolean valid_real_vector3d_axes2(

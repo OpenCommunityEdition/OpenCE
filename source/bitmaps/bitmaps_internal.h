@@ -21,8 +21,6 @@ pixel32 bitmap_format_to_a8r8g8b8(
 byte palette_find_closest_match(
 	pixel32 const *palette,
 	pixel32 color);
-void bitmap_delete(
-	struct bitmap_data *bitmap);
 void *bitmap_3d_address(
 	struct bitmap_data *bitmap,
 	short x,

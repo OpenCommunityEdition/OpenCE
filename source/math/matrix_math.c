@@ -1095,12 +1095,4 @@ void matrix4x3_from_plane(
 	return;
 }
 
-boolean valid_real_plane3d(
-	real_plane3d const *plane)
-{
-	return
-		valid_real_normal3d(&plane->n) &&
-		valid_real(plane->d);
-}
-
 /* ---------- private code */
