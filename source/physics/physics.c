@@ -798,8 +798,8 @@ void physics_compute_new(
 
 		if (mass_point->water_depth > 0.0f)
 		{
-			real depth_fraction = mass_point->water_depth >= physics->water_depth ?
-				1.0f : mass_point->water_depth/physics->water_depth;
+			real depth_fraction = mass_point->water_depth < physics->water_depth ?
+				mass_point->water_depth/physics->water_depth : 1.0f;
 			real water_scale = -mass_point_definition->mass*physics->water_friction;
 
 			if (mass_point_definition->density > 0.0f && physics->water_depth > 0.0f)
@@ -1765,8 +1765,8 @@ static void physics_update_old(
 
 		if (mass_point->water_depth > 0.0f)
 		{
-			real depth_fraction = mass_point->water_depth >= physics->water_depth ?
-				1.0f : mass_point->water_depth/physics->water_depth;
+			real depth_fraction = mass_point->water_depth < physics->water_depth ?
+				mass_point->water_depth/physics->water_depth : 1.0f;
 			real water_scale = -mass_point_definition->mass*physics->water_friction;
 
 			if (mass_point_definition->density > 0.0f && physics->water_depth > 0.0f)
