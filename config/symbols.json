@@ -19966,6 +19966,7 @@
 { "file_offset": 2689324, "flags": 0, "name": "??_C@_0O@MNIAMCLP@E_OUTOFMEMORY?$AA@" },
 { "file_offset": 2689340, "flags": 0, "name": "??_C@_0BI@COEEDFFO@?$DMcan?8t?5get?5description?$DO?$AA@" },
 { "file_offset": 2689368, "flags": 0, "name": "_rasterizer_bitmap_format_table", "static": true },
+{ "file_offset": 2689440, "flags": 0, "name": "_face_mapping_table", "static": true },
 { "file_offset": 2689452, "flags": 0, "name": "??_C@_0DC@CBFADDNN@?$CD?$CD?$CD?5ERROR?5failed?5to?5create?5bitma@" },
 { "file_offset": 2689504, "flags": 0, "name": "??_C@_0NL@DPJLAHAC@IDirect3DDevice8_CreateTexture?$CIg@" },
 { "file_offset": 2689728, "flags": 0, "name": "??_C@_0PG@MPKBLAC@IDirect3DDevice8_CreateVolumeTex@" },
