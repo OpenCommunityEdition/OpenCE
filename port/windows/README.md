@@ -38,6 +38,10 @@ profile-guided optimisation with `pgo/halo_windows.profdata`, which
 runtime, compiled for 32-bit x86 from its sources, since LLVM for Windows
 ships it for x86-64 only: `pgo/halo_profile_runtime.c`).
 
+`launcher/HaloLauncher.cmd` does all of this for players: it installs what is
+missing, takes the game data from the files they choose, builds, and starts
+the game (`launcher/README.md`).
+
 ## Running
 
 ```bat

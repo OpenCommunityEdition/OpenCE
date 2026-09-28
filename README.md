@@ -64,6 +64,8 @@ The native builds draw a frame at every refresh of the display (60, 90, 120, 240
 
 `ninja windows`, run on Windows, compiles the game with clang into a native 32-bit Windows executable, `build/windows/halo.exe` (with `SDL3.dll`), sharing the Linux build's platform layer. It needs LLVM, Python and ninja, plus Visual Studio's x86 C++ libraries and a Windows SDK. Put the game data under `assets/` as for Linux. See [port/windows/README.md](port/windows/README.md).
 
+To install it on a PC without setting any of this up, run `port/windows/launcher/HaloLauncher.cmd`: you choose your game data, and it downloads, checks and builds the rest, then starts the game. See [port/windows/launcher/README.md](port/windows/launcher/README.md).
+
 ### Android build
 
 `ninja android_apk` builds an arm64 Android app (`port/android/app/build/outputs/apk/debug/app-debug.apk`) that runs the game natively on 64-bit ARM phones, with OpenGL ES 3 rendering at the device's aspect ratio, SDL3 audio and game controller support (including a PS5 DualSense over Bluetooth). It needs the Android NDK and a clang with the `arm64_32` target in addition to the Linux build's requirements. The game data goes in the app's storage (the app offers to import it). See [port/android/README.md](port/android/README.md).
