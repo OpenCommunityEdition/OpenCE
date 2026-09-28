@@ -1793,6 +1793,13 @@ void network_game_server_update_ticks(
 				game_update.random_seed = get_random_seed();
 				game_update.game_time = game_time_get();
 				game_update.player_count = update.player_count;
+#ifdef HALO_LINUX
+				/* (the distributed netcode relays the actions unreliably, each
+				tick's buttons with the next ticks', network_distributed.c: this
+				update only keeps the clients' count of the host's ticks) */
+				if (network_game_distributed())
+					game_update.player_count = 0;
+#endif
 
 				csmemcpy(
 					game_update.player_updates,

@@ -46,6 +46,14 @@ enum
 	_distributed_message_vehicle_prediction,
 	/* what players picked up, for their clients to show (reliable) */
 	_distributed_message_pickups,
+	/* a client's own players' input, every tick, each tick's buttons with
+	the next ticks' (unreliable) */
+	_distributed_message_player_inputs,
+	/* every player's input as the host ran it, every tick, the same way
+	(unreliable) */
+	_distributed_message_relayed_actions,
+	/* the unreliable messages of a tick to one machine, in one datagram */
+	_distributed_message_batch,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -58,6 +66,16 @@ enum
 	_distributed_to_host,
 	_distributed_to_host_reliably,
 };
+
+/* how far part of an error is closed rather than jumped (world units): the
+host's copy of a client's own player's unit or vehicle, and a client's copy
+of the host's units and objects, which it moves half of the way there each
+tick, drawn as it goes; further, it is put there, drawn gliding
+(network_objects_reconcile). Later Halo engines do the same. */
+#define HOST_BLEND_DISTANCE 0.25f
+#define HOST_VEHICLE_BLEND_DISTANCE 0.5f
+#define REMOTE_BLEND_DISTANCE 1.0f
+#define REMOTE_VEHICLE_BLEND_DISTANCE 2.0f
 
 enum
 {
@@ -78,6 +96,15 @@ struct distributed_message_header
 	long game_time;
 };
 
+/* a vector in 16-bit parts: a unit vector's of 1/32767, a velocity's of
+1/1024 world units a tick, an angular velocity's of 1/4096 of a radian */
+struct distributed_vector
+{
+	short i;
+	short j;
+	short k;
+};
+
 /* ---------- macros */
 
 /* the entries of a type that fit one unreliable message */
@@ -89,8 +116,11 @@ struct distributed_message_header
 
 /* ---------- prototypes/NETWORK_DISTRIBUTED.C */
 
-/* sends a message (its header filled in here) where destination says */
+/* sends a message (its header filled in here) where destination says: the
+unreliable ones gathered into one datagram a machine each tick */
 void distributed_send(void *message, byte type, short count, word size, short destination);
+/* ... unreliably to one client (the host) */
+void distributed_send_to_machine(long machine_index, void *message, byte type, short count, word size);
 /* ... reliably to one client (the host) */
 void distributed_send_to_machine_reliably(long machine_index, void *message, byte type, short count, word size);
 /* the player at an absolute index, or NULL */
@@ -106,6 +136,18 @@ long distributed_living_unit(struct player_datum const *player);
 boolean distributed_machine_has_player(long machine_index, short player_index);
 void distributed_count_sent(void);
 void distributed_count_correction(void);
+/* (the host) the client machines in the game, but for its own; their count */
+short distributed_client_machines(long *machine_indices, short maximum);
+/* (the host) how long a message takes that client and its answer back, in
+ticks (and its jitter), as its players' input messages tell */
+real distributed_machine_round_trip_ticks(long machine_index);
+/* the vectors in 16 bits a part (struct distributed_vector) */
+void distributed_vector_pack(real_vector3d const *vector, real scale, struct distributed_vector *result);
+void distributed_vector_unpack(struct distributed_vector const *vector, real scale, real_vector3d *result);
+void distributed_unit_vector_unpack(struct distributed_vector const *vector, real_vector3d *result);
+#define DISTRIBUTED_UNIT_SCALE 32767.0f
+#define DISTRIBUTED_VELOCITY_SCALE 1024.0f
+#define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
 
 /* ---------- prototypes/NETWORK_OBJECTS.C */
 
@@ -119,12 +161,19 @@ void network_objects_handle_synchronized(void);
 void network_objects_handle_states(void const *entries, short count);
 void network_objects_handle_inventories(void const *entries, short count);
 void network_objects_handle_vehicle_prediction(long machine_index, void const *entries, short count);
+/* (the host) the vehicle predictions come in since the last tick, taken */
+void network_objects_apply_vehicle_predictions(void);
 word network_objects_entry_size(byte type);
 /* whether this client has the host's object at this index */
 boolean network_objects_client_has(long object_index);
 /* moves the object where the host has it, drawn gliding from where it was */
 void network_objects_correct(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity);
+/* ... or, within blend_distance of it, half of the way there (drawn as it
+moves); TRUE when it was put there */
+boolean network_objects_reconcile(long object_index, real_point3d const *position, real_vector3d const *forward,
+	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity,
+	real blend_distance);
 /* a unit in the vehicle's seat as the host has it (NONE: in none) */
 void network_objects_set_seat(long unit_index, long vehicle_index, short seat_index);
 

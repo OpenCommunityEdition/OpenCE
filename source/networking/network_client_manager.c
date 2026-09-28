@@ -878,6 +878,16 @@ static boolean network_game_client_idle_postgame(
 
 /* ---------- globals */
 
+#ifdef HALO_LINUX
+/* each advertised game's host's network version and netcode, by its place
+in the client's available_games (HALO_PORT_NETWORK_VERSION) */
+static struct
+{
+	word version;
+	byte flags;
+} network_game_client_advertised_versions[MAXIMUM_NETWORK_ADVERTISED_GAMES];
+
+#endif
 struct network_game_client network_game_client_dont_use_directly;
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
@@ -2475,6 +2485,18 @@ static boolean add_advertised_game(
 
 		advertised_game->update_time = system_milliseconds();
 		advertised_game->platform = advertisement->platform;
+#ifdef HALO_LINUX
+		/* (a host built before there was a version sends zeros: 0) */
+		{
+			long game_index = advertised_game - available_games;
+
+			network_game_client_advertised_versions[game_index].version = (word)(
+				advertisement->__unknown5A[HALO_PORT_ADVERTISED_VERSION_OFFSET] |
+				(advertisement->__unknown5A[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] << 8));
+			network_game_client_advertised_versions[game_index].flags =
+				advertisement->__unknown5A[HALO_PORT_ADVERTISED_FLAGS_OFFSET];
+		}
+#endif
 
 		if (advertisement->game_name[0] != L'\0')
 		{
@@ -2987,6 +3009,60 @@ static void network_game_client_set_error(
 /* the native ports' automated network tests (port/linux/game/network_test.c):
 joins the first open game the client's search has found, as picking it in
 the system link list does (network_game_join_game_from_server_list) */
+/* the platform layer's (sdl_platform.c) */
+void platform_show_message(char const *title, char const *message);
+
+/* whether this client can join the advertised game: its host's network
+version is this machine's (HALO_PORT_NETWORK_VERSION). If so this machine
+plays the host's netcode from now on; if not the player is told (when tell)
+which of the two is the newer, and nothing is joined. */
+boolean network_game_client_advertised_game_compatible(
+	struct network_game_client *client,
+	struct network_advertised_game const *game,
+	boolean tell)
+{
+	long game_index = client ? game - client->available_games : NONE;
+	unsigned int ours = HALO_PORT_NETWORK_VERSION;
+	unsigned int theirs;
+	boolean distributed;
+	char message[400];
+
+	if (game_index < 0 || game_index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
+		return FALSE;
+	theirs = network_game_client_advertised_versions[game_index].version;
+	distributed = (network_game_client_advertised_versions[game_index].flags &
+		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
+	if (theirs == ours)
+	{
+		network_event("joining a host of network version %u, with the %s netcode", theirs,
+			distributed ? "distributed" : "lockstep");
+		network_game_follow_host_netcode(distributed);
+		return TRUE;
+	}
+	if (theirs > ours)
+	{
+		csprintf(message,
+			"The host is using a newer version of the network code than you.\n\n"
+			"You are on version %u. The host is on version %u.\n\n"
+			"Update the game to join this host.",
+			ours, theirs);
+	}
+	else
+	{
+		csprintf(message,
+			"The host is using an older version of the network code than you.\n\n"
+			"You are on version %u. The host is on version %u.\n\n"
+			"Ask the host to update the game.",
+			ours, theirs);
+	}
+	if (tell)
+	{
+		network_event("not joining a host of network version %u (this machine's is %u)", theirs, ours);
+		platform_show_message("Halo: cannot join this game", message);
+	}
+	return FALSE;
+}
+
 boolean network_game_client_join_first_available_game(
 	void)
 {
@@ -3007,6 +3083,15 @@ boolean network_game_client_join_first_available_game(
 		{
 			struct transport_address address = { { { 0 } } };
 			struct network_join_parameters join_parameters;
+
+			/* (the automated tests try every frame: told once) */
+			static boolean told;
+
+			if (!network_game_client_advertised_game_compatible(client, game, !told))
+			{
+				told = TRUE;
+				return FALSE;
+			}
 
 			csmemset(&join_parameters, 0, sizeof(join_parameters));
 			transport_client_start((XNADDR const *)&game->xnaddr, (XNKEY const *)&game->key,

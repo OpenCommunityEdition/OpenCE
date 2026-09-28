@@ -319,6 +319,9 @@ SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	/* (the game's connections: every tick's messages go at once) */
+	if (type == SOCK_STREAM)
+		posix_socket_set_nodelay(result);
 	return (SOCKET)result;
 }
 
@@ -398,6 +401,7 @@ SOCKET WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int *addre
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	posix_socket_set_nodelay(result);
 	peer_incoming_address(1, address, address_length);
 	return (SOCKET)result;
 }

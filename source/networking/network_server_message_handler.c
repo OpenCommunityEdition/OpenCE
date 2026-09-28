@@ -657,44 +657,74 @@ boolean network_game_server_send_message_to_machine(
 }
 
 #ifdef HALO_LINUX
+/* the client machines in the game, as the message handlers number them
+(the distributed netcode sends each its own datagram); their count */
+short network_distributed_server_machines(
+	long *machine_indices,
+	short maximum)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	short count = 0;
+	long client_index;
+
+	if (!server)
+		return 0;
+	for (client_index = 0; client_index < MAXIMUM_NETWORK_MACHINE_COUNT && count < maximum; client_index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, client_index);
+		struct network_connection *connection;
+		long game_machine_index;
+
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine))
+			continue;
+		connection = network_game_server_get_client_connection(machine);
+		if (!connection || !network_connection_active(connection))
+			continue;
+		network_game_server_get_client_machine(server, machine, &game_machine_index);
+		machine_indices[count++] = game_machine_index;
+	}
+	return count;
+}
+
 /* the distributed netcode's per-tick state (port/linux/game/network_distributed.c),
-unreliably (a lost one is overtaken by the next) to every machine in the game */
-boolean network_distributed_server_send_to_all(
+unreliably (a lost one is overtaken by the next) to one machine in the game */
+boolean network_distributed_server_send_to_machine(
+	long machine_index,
 	void *message,
 	word size)
 {
 	struct network_game_server *server = global_network_game_server_get();
-	boolean result = TRUE;
-	long machine_index;
+	byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+	long client_index;
 
-	if (!server)
+	if (!server || size > sizeof(buffer))
 		return FALSE;
-	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	for (client_index = 0; client_index < MAXIMUM_NETWORK_MACHINE_COUNT; client_index++)
 	{
 		struct network_game_server_client_machine *machine =
-			network_game_server_get_client_machine_at_index(server, machine_index);
+			network_game_server_get_client_machine_at_index(server, client_index);
+		struct network_connection *connection;
+		struct transport_address address;
+		long game_machine_index;
 
-		if (network_game_server_client_machine_is_joined_to_game(server, machine))
-		{
-			struct network_connection *connection = network_game_server_get_client_connection(machine);
-			byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
-
-			if (connection && network_connection_active(connection) && size <= sizeof(buffer))
-			{
-				struct transport_address address;
-
-				/* from the game's public datagram endpoint (the one clients send
-				their game updates to) to the client's, at the address its
-				connection comes from */
-				network_connection_get_address(connection, &address, NULL);
-				address.port = NETWORK_GAME_CLIENT_PORT;
-				/* (the write swaps the header in place) */
-				csmemcpy(buffer, message, size);
-				result &= network_game_server_write(network_game_server_get_connection(server), buffer, size, &address, 0);
-			}
-		}
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine))
+			continue;
+		network_game_server_get_client_machine(server, machine, &game_machine_index);
+		if (game_machine_index != machine_index)
+			continue;
+		connection = network_game_server_get_client_connection(machine);
+		if (!connection || !network_connection_active(connection))
+			return FALSE;
+		/* from the game's public datagram endpoint (the one clients send
+		their game updates to) to the client's, at the address its
+		connection comes from (the write swaps the header in place) */
+		network_connection_get_address(connection, &address, NULL);
+		address.port = NETWORK_GAME_CLIENT_PORT;
+		csmemcpy(buffer, message, size);
+		return network_game_server_write(network_game_server_get_connection(server), buffer, size, &address, 0);
 	}
-	return result;
+	return FALSE;
 }
 
 /* reliably to one machine in the game (the host's objects, to a client
@@ -1510,6 +1540,15 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 				advertisement.flags |= FLAG(_game_advertisement_oddball_variant_bit);
 			}
 
+#ifdef HALO_LINUX
+			/* the native builds' network version and netcode (a client
+			refuses a host of another version, and plays the host's netcode:
+			network_client_manager.c) */
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(HALO_PORT_NETWORK_VERSION & 0xFF);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
+			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
+				network_game_distributed() ? HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG : 0;
+#endif
 			if (network_game_server_game_is_open(server))
 			{
 				advertisement.flags |= FLAG(_game_advertisement_open_bit);

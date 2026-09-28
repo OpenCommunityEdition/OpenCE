@@ -1120,6 +1120,14 @@ boolean network_game_client_initiate_join_game(
 	void *server,
 	struct network_game_join_descriptor *join_descriptor,
 	struct transport_address *address);
+#ifdef HALO_LINUX
+/* network_client_manager.c's: whether the host's network version is this
+machine's (else the player is told, and it is not joined) */
+boolean network_game_client_advertised_game_compatible(
+	void *client,
+	void const *game,
+	boolean tell);
+#endif
 void *network_game_get_game(
 	void);
 short network_game_client_get_local_machine_index(
@@ -2040,6 +2048,12 @@ static boolean network_game_join_game_from_server_list(
 						struct transport_address address = { { { 0 } } };
 						struct network_game_join_descriptor join_descriptor;
 
+#ifdef HALO_LINUX
+						/* (a host of another network version: the player is told
+						which is the newer, and stays in the list) */
+						if (!network_game_client_advertised_game_compatible(global_network_game_client_get(), server, TRUE))
+							return FALSE;
+#endif
 						transport_client_start(server + 0x18, server + 8, server, 0x141E, &address);
 						if (address.address.long_words[0] != zero && address.port != zero)
 						{

@@ -336,14 +336,27 @@ boolean network_game_distributed_client(
 	return game_connection() == _game_connection_network_client && network_game_distributed();
 }
 
+/* the netcode of the host this machine joined (network_client_manager.c),
+NONE when it hosts, or has joined none: then its own setting */
+static short network_game_host_distributed = NONE;
+
 boolean network_game_distributed(
 	void)
 {
 	static short distributed = NONE;
 
+	if (network_game_host_distributed != NONE)
+		return network_game_host_distributed;
 	if (distributed == NONE)
 		distributed = !csstrcmp(config_string("network.netcode"), "distributed");
 	return distributed;
+}
+
+/* joining a host: its netcode is this machine's until it hosts */
+void network_game_follow_host_netcode(
+	boolean distributed)
+{
+	network_game_host_distributed = distributed ? TRUE : FALSE;
 }
 
 #endif
@@ -641,7 +654,14 @@ boolean network_game_client_end_frame(
 	else if (network_game_client_get_state(global_network_game_client, NULL) == _network_game_client_state_ingame)
 	{
 		now = system_milliseconds();
-		if (now-bss_004566dc.last_client_update_time >= 0x10 &&
+		if (now-bss_004566dc.last_client_update_time >=
+#ifdef HALO_LINUX
+			/* (the distributed netcode's input goes in its own message,
+			network_distributed.c: this one only says the client is there) */
+			(network_game_distributed() ? 100 : 0x10) &&
+#else
+			0x10 &&
+#endif
 			network_game_client_server_has_started_game(global_network_game_client))
 		{
 			network_game_client_get_next_update_number(global_network_game_client);
@@ -825,6 +845,10 @@ boolean create_global_network_game_server(
 		0xD6,
 		global_network_game_server==NULL);
 
+#ifdef HALO_LINUX
+	/* (hosting: this machine's own netcode setting) */
+	network_game_host_distributed = NONE;
+#endif
 	global_network_game_server = network_game_server_create();
 	if (global_network_game_server)
 	{

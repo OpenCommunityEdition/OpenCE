@@ -11,6 +11,7 @@ with the host ABI.
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <poll.h>
 #include <spawn.h>
 #include <stdio.h>
@@ -211,6 +212,13 @@ int posix_socket_set_nonblocking(int socket, int nonblocking)
 		return fail();
 	flags = nonblocking ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
 	return succeed(fcntl(socket, F_SETFL, flags));
+}
+
+int posix_socket_set_nodelay(int socket)
+{
+	int value = 1;
+
+	return succeed(setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, &value, sizeof(value)));
 }
 
 int posix_socket_bytes_available(int socket, posix_ulong *count)

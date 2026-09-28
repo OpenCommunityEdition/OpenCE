@@ -74,6 +74,14 @@ bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xo
 	return host_sdl_show_toast(message, duration, gravity, xoffset, yoffset) != 0;
 }
 
+/* ---------- a message for the player (sdl_platform.c): the host's own window */
+
+bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char *title, const char *message, SDL_Window *window)
+{
+	(void)window;
+	return host_sdl_show_simple_message_box((unsigned int)flags, title, message) != 0;
+}
+
 void SDL_Delay(Uint32 milliseconds)
 {
 	struct timespec duration;

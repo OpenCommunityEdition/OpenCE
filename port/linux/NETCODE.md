@@ -15,22 +15,35 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   client no longer runs only the ticks the host has sent.
 - **Own player predicted.** A client drives its own player (and the
   vehicle it drives) from its local input at once. Remote players are
-  driven by the inputs the host relays (the existing per-tick game update),
-  the latest one held until a newer arrives.
+  driven by the inputs the host relays every tick, the latest one held
+  until a newer arrives.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
 - **Corrections.** The host sends each client the authoritative state of
-  the players' units and the game's moving objects; a client puts its
-  copies there, drawn gliding from where they were. A client's own unit and
+  the players' units and the game's moving objects; a client moves its
+  copies toward it, a small error half of the way each tick, a larger one
+  at once, drawn gliding from where they were. A client's own unit and
   vehicle are only corrected past a tolerance, so prediction does not
   rubber-band.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, the target where
-  the host has it, no faster than weapons fire) and deals the damage. What
-  the shooter saw hit, hits.
+  the host had it when the shooter saw it, no faster than weapons fire) and
+  deals the damage. What the shooter saw hit, hits.
 
-Every machine in a game must use the same netcode.
+A client plays whichever netcode its host plays (the host's
+`network.netcode`, which its game's advertisement carries).
+
+## Versions
+
+The native builds' network code has a version, an unsigned 16-bit number
+(`HALO_PORT_NETWORK_VERSION` in `port/linux/include/halo_port_limits.h`),
+raised with any change to what the machines send each other. A host puts it
+in its game's advertisement (reserved bytes that hosts built before there
+was a version send as zeros, so they are version 0). A client does not join
+a host of another version: it shows a message box that says which of the
+two is newer, with both versions ("update the game" or "ask the host to
+update"), and stays in the list of games. Version 1 is this netcode.
 
 ## Stages
 
@@ -99,6 +112,48 @@ Every machine in a game must use the same netcode.
      who the HUD shows hit them. A killing blow it replays whole, so the
      body falls as the shot had it and the kill is announced with the
      host's killer.
+
+## Transport
+
+What reaches the other machines, and how, decides how the game feels over
+a real network as much as the model does (compared with Quake III, Source,
+Unity's Netcode for Entities, lightyear, netfox and the Ares source):
+
+- **Nothing held back.** The game's connections (the reliable messages:
+  objects made and deleted, the game type's state, hits, pickups) send each
+  write at once (`TCP_NODELAY`, in `xnet.c` for the game's sockets and in
+  `p2p.c` for internet play's): with Nagle's algorithm a small write waited
+  for the other end's delayed acknowledgement, up to 200 ms on Windows.
+- **Input every tick, unreliably, each tick's buttons several times.** A
+  client sends the host its players' input after each tick, with the
+  buttons of the three ticks before it, and the host sends every client
+  every player's input as its tick ran it, the same way. Each tick's
+  buttons are taken once, from whichever message brings them first
+  (`player_queues_new.c`), so a press is lost only with four datagrams lost
+  in a row, and nothing waits for a lost one to be sent again (the game's
+  own per-tick update, reliable and so held up by any loss, now carries no
+  input). The host's clock still reaches the clients in it, and the game's
+  own client update, whose input the host no longer takes, goes ten times
+  a second instead of sixty.
+- **One datagram a tick.** The unreliable messages of a tick to a machine
+  go together (`_distributed_message_batch`), saving each one's headers
+  (internet play's tunnel adds 35 bytes to every datagram).
+- **Stamped with their tick.** Every message carries the sender's tick
+  (its header's game time); an unreliable one that arrives after a newer of
+  its kind is dropped, so a late datagram never puts anything back.
+- **Taken at the tick.** The host takes a client's players' and vehicles'
+  positions (the latest of each) at its next tick, not as each arrives.
+- **Fewer bytes.** Vectors travel in 16 bits a part, shields and health in
+  16 bits; players far from a client's own (25 and 60 world units) are sent
+  to it every second and third tick (any change of life or seat at once);
+  what a unit carries is sent when it changes (and once a second); the
+  objects at rest are sent round all of them, four a tick.
+- **The round trip.** A client's input messages tell the host the latest
+  host tick the client has had, which gives the host each client's round
+  trip (smoothed as TCP smooths its own). The host keeps a second of where
+  players' units and vehicles were, and checks a client's hit against where
+  the target was as far back as that round trip, instead of against where
+  it is now with a wide margin.
 
 ## Testing
 

@@ -20,17 +20,18 @@ same datum index (identifier and all), so that any message can name one:
   it sees) take indices from the upper half of the array, which the host's
   do not reach in practice; a host's object that does comes first.
 - Every tick the host sends where its moving objects are (vehicles, items,
-  bodies), and a few of those at rest, round the lot; a client puts its
-  copies there, drawn gliding from where they were rather than jumping
-  (render_interpolation.c). A client's own player's vehicle is its own, as
-  its own player's unit is: it sends the host where it drives it, which the
-  host takes within a tolerance, and puts it where the host has it only
-  when far off.
-- Ten times a second, the host sends what every unit carries: which
-  weapons, slot for slot, their ammunition, the weapon in hand and the
-  grenades; a client moves its copies of those weapons in and out of its
-  copies of the units to match (it decides no pickups, swaps or drops
-  itself).
+  bodies), and a few of those at rest, round the lot; a client moves its
+  copies there, a little off half of the way each tick, further drawn
+  gliding from where they were rather than jumping (render_interpolation.c).
+  A client's own player's vehicle is its own, as its own player's unit is:
+  it sends the host where it drives it, which the host takes within a
+  tolerance at its next tick, and puts it where the host has it only when
+  far off.
+- Ten times a second, the host sends what a unit carries when that has
+  changed (and once a second whatever it is): which weapons, slot for slot,
+  their ammunition, the weapon in hand and the grenades; a client moves its
+  copies of those weapons in and out of its copies of the units to match (it
+  decides no pickups, swaps or drops itself).
 */
 
 #include "cseries.h"
@@ -55,6 +56,9 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 enum
 {
 	INVENTORY_INTERVAL_TICKS = 3,
+	/* a unit's inventory is sent this often even unchanged (one lost is
+	made good) */
+	INVENTORY_REFRESH_TICKS = TICKS_PER_SECOND,
 	/* the host's objects at rest sent each tick, round them all */
 	RESTING_STATES_PER_TICK = 4,
 	/* a client asks for the host's objects again this often until it has
@@ -115,10 +119,10 @@ struct distributed_object_state
 	byte flags;
 	byte pad[3];
 	real_point3d position;
-	real_vector3d forward;
-	real_vector3d up;
-	real_vector3d translational_velocity;
-	real_vector3d angular_velocity;
+	struct distributed_vector forward;
+	struct distributed_vector up;
+	struct distributed_vector translational_velocity;
+	struct distributed_vector angular_velocity;
 };
 
 struct distributed_inventory
@@ -157,7 +161,22 @@ struct distributed_inventory_message
 /* the host: the objects it has told its clients of, by absolute index
 (the object's datum index), NONE for none */
 static long objects_host_told[MAXIMUM_TRACKED_OBJECTS];
-static short objects_host_resting_cursor;
+/* ... the next object at rest to send, round them all */
+static long objects_host_resting_cursor;
+/* ... what each unit's inventory was last sent as, and when */
+static struct
+{
+	unsigned long checksum;
+	long time;
+} objects_host_inventories[MAXIMUM_TRACKED_OBJECTS];
+/* ... each client's player's latest vehicle prediction, taken at the next
+tick */
+static struct
+{
+	boolean valid;
+	long machine_index;
+	struct distributed_object_state state;
+} objects_host_vehicle_predictions[MAXIMUM_TRACKED_PLAYERS];
 /* a client: the host's objects it has, by absolute index */
 static long objects_client_has[MAXIMUM_TRACKED_OBJECTS];
 /* ... all of them (the host said so), and when it last asked for them */
@@ -312,6 +331,52 @@ void network_objects_correct(
 	render_interpolation_correct_object(object_index, &offset);
 }
 
+boolean network_objects_reconcile(
+	long object_index,
+	real_point3d const *position,
+	real_vector3d const *forward,
+	real_vector3d const *up,
+	real_vector3d const *velocity,
+	real_vector3d const *angular_velocity,
+	real blend_distance)
+{
+	struct object_datum *object = object_get(object_index);
+	real_point3d blended;
+	real dx = position->x - object->object.position.x;
+	real dy = position->y - object->object.position.y;
+	real dz = position->z - object->object.position.z;
+
+	if (dx * dx + dy * dy + dz * dz > blend_distance * blend_distance)
+	{
+		network_objects_correct(object_index, position, forward, up, velocity, angular_velocity);
+		return TRUE;
+	}
+	/* (half of the way: the tick's snapshots draw it moving, no jump) */
+	blended.x = object->object.position.x + dx * 0.5f;
+	blended.y = object->object.position.y + dy * 0.5f;
+	blended.z = object->object.position.z + dz * 0.5f;
+	object_set_position(object_index, &blended, forward, up);
+	if (velocity)
+		object->object.translational_velocity = *velocity;
+	if (angular_velocity)
+		object->object.angular_velocity = *angular_velocity;
+	return FALSE;
+}
+
+/* an object's state as the host sent it, in full */
+static void distributed_object_state_unpack(
+	struct distributed_object_state const *state,
+	real_vector3d *forward,
+	real_vector3d *up,
+	real_vector3d *velocity,
+	real_vector3d *angular_velocity)
+{
+	distributed_unit_vector_unpack(&state->forward, forward);
+	distributed_unit_vector_unpack(&state->up, up);
+	distributed_vector_unpack(&state->translational_velocity, DISTRIBUTED_VELOCITY_SCALE, velocity);
+	distributed_vector_unpack(&state->angular_velocity, DISTRIBUTED_ANGULAR_VELOCITY_SCALE, angular_velocity);
+}
+
 static void distributed_state_from_object(
 	long object_index,
 	struct distributed_object_state *state)
@@ -322,10 +387,12 @@ static void distributed_state_from_object(
 	state->object_index = object_index;
 	SET_FLAG(state->flags, _distributed_object_at_rest_bit, TEST_FLAG(object->object.flags, _object_at_rest_bit));
 	state->position = object->object.position;
-	state->forward = object->object.forward;
-	state->up = object->object.up;
-	state->translational_velocity = object->object.translational_velocity;
-	state->angular_velocity = object->object.angular_velocity;
+	distributed_vector_pack(&object->object.forward, DISTRIBUTED_UNIT_SCALE, &state->forward);
+	distributed_vector_pack(&object->object.up, DISTRIBUTED_UNIT_SCALE, &state->up);
+	distributed_vector_pack(&object->object.translational_velocity, DISTRIBUTED_VELOCITY_SCALE,
+		&state->translational_velocity);
+	distributed_vector_pack(&object->object.angular_velocity, DISTRIBUTED_ANGULAR_VELOCITY_SCALE,
+		&state->angular_velocity);
 }
 
 /* the vehicle the player's unit drives, or NONE */
@@ -481,8 +548,30 @@ void network_objects_client_ready(
 		(word)sizeof(message.header));
 }
 
-/* where the moving objects are (not players' living units, which have
-their own messages, nor what is attached or carried), and a few at rest */
+/* the host's object at an absolute index whose state goes to its clients
+(not players' living units, which have their own messages, nor what is
+attached or carried), NONE for none */
+static long distributed_host_placed_object(
+	long absolute_index)
+{
+	long object_index = objects_host_told[absolute_index];
+	struct object_datum *object;
+
+	if (object_index == NONE || !object_try_and_get(object_index))
+		return NONE;
+	object = object_get(object_index);
+	if (object->object.parent_object_index != NONE || !TEST_FLAG(object->object.flags, _object_connected_to_map_bit))
+		return NONE;
+	if (TEST_FLAG(_object_mask_unit, object->object.type) && unit_get(object_index)->unit.player_index != NONE &&
+		!TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+	{
+		return NONE;
+	}
+	return object_index;
+}
+
+/* where the moving objects are, and a few at rest, round them all (one
+whose last move was lost is put right when its turn comes) */
 static void distributed_host_send_states(
 	void)
 {
@@ -491,38 +580,32 @@ static void distributed_host_send_states(
 	short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_object_state));
 	short resting = 0;
 	long absolute_index;
+	long step;
 
-	for (absolute_index = 0; absolute_index < MAXIMUM_TRACKED_OBJECTS; absolute_index++)
+	for (step = 0; step < 2 * MAXIMUM_TRACKED_OBJECTS; step++)
 	{
-		long object_index = objects_host_told[absolute_index];
-		struct object_datum *object;
-		boolean send;
+		long object_index;
+		boolean at_rest;
 
-		if (object_index == NONE || !object_try_and_get(object_index))
+		/* (the first pass the moving ones, the second those at rest from
+		the cursor on, round to it) */
+		if (step < MAXIMUM_TRACKED_OBJECTS)
+			absolute_index = step;
+		else if (resting < RESTING_STATES_PER_TICK)
+			absolute_index = (objects_host_resting_cursor + step - MAXIMUM_TRACKED_OBJECTS) % MAXIMUM_TRACKED_OBJECTS;
+		else
+			break;
+		object_index = distributed_host_placed_object(absolute_index);
+		if (object_index == NONE)
 			continue;
-		object = object_get(object_index);
-		if (object->object.parent_object_index != NONE ||
-			!TEST_FLAG(object->object.flags, _object_connected_to_map_bit))
-		{
+		at_rest = TEST_FLAG(object_get(object_index)->object.flags, _object_at_rest_bit);
+		if (step < MAXIMUM_TRACKED_OBJECTS ? at_rest : !at_rest)
 			continue;
-		}
-		if (TEST_FLAG(_object_mask_unit, object->object.type))
+		if (step >= MAXIMUM_TRACKED_OBJECTS)
 		{
-			struct unit_datum *unit = unit_get(object_index);
-
-			if (unit->unit.player_index != NONE && !TEST_FLAG(object->object.damage_flags, _object_dead_bit))
-				continue;
-		}
-		send = !TEST_FLAG(object->object.flags, _object_at_rest_bit);
-		/* (the resting ones round the lot, a few a tick) */
-		if (!send && resting < RESTING_STATES_PER_TICK &&
-			((absolute_index - objects_host_resting_cursor) & 63) == 0)
-		{
-			send = TRUE;
 			resting++;
+			objects_host_resting_cursor = (absolute_index + 1) % MAXIMUM_TRACKED_OBJECTS;
 		}
-		if (!send)
-			continue;
 		distributed_state_from_object(object_index, &message.states[count]);
 		if (++count == limit)
 		{
@@ -532,7 +615,6 @@ static void distributed_host_send_states(
 			count = 0;
 		}
 	}
-	objects_host_resting_cursor = (short)((objects_host_resting_cursor + 1) & 63);
 	if (count)
 	{
 		distributed_send(&message, _distributed_message_object_states, count,
@@ -573,7 +655,22 @@ static void distributed_inventory_from_unit(
 	}
 }
 
-/* what every unit carries */
+/* the bytes' checksum (FNV-1a) */
+static unsigned long distributed_checksum(
+	void const *data,
+	long size)
+{
+	byte const *bytes = (byte const *)data;
+	unsigned long checksum = 2166136261UL;
+	long index;
+
+	for (index = 0; index < size; index++)
+		checksum = (checksum ^ bytes[index]) * 16777619UL;
+	return checksum;
+}
+
+/* what every unit carries, when that has changed or not been sent for a
+while */
 static void distributed_host_send_inventories(
 	void)
 {
@@ -597,6 +694,18 @@ static void distributed_host_send_inventories(
 			continue;
 		}
 		distributed_inventory_from_unit(iterator.index, &message.inventories[count]);
+		{
+			long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index);
+			unsigned long checksum = distributed_checksum(&message.inventories[count], sizeof(struct distributed_inventory));
+
+			if (objects_host_inventories[absolute_index].checksum == checksum &&
+				game_time_get() - objects_host_inventories[absolute_index].time < INVENTORY_REFRESH_TICKS)
+			{
+				continue;
+			}
+			objects_host_inventories[absolute_index].checksum = checksum;
+			objects_host_inventories[absolute_index].time = game_time_get();
+		}
 		if (++count == limit)
 		{
 			distributed_send(&message, _distributed_message_inventories, count,
@@ -613,8 +722,8 @@ static void distributed_host_send_inventories(
 	}
 }
 
-/* (a client) the vehicles its own players drive: taken as they are,
-within a tolerance, if that machine's player drives it */
+/* (the host) the vehicles a client's own players drive: the latest of
+each, taken at the next tick */
 void network_objects_handle_vehicle_prediction(
 	long machine_index,
 	void const *entries,
@@ -628,25 +737,60 @@ void network_objects_handle_vehicle_prediction(
 		struct distributed_object_state const *state = &states[index];
 		struct unit_datum *vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(
 			state->object_index, _object_mask_vehicle);
+		short player_index;
+
+		if (!vehicle || vehicle->unit.driver_object_index == NONE)
+			continue;
+		if (unit_get(vehicle->unit.driver_object_index)->unit.player_index == NONE)
+			continue;
+		player_index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_get(vehicle->unit.driver_object_index)->unit.player_index);
+		if (player_index < 0 || player_index >= MAXIMUM_TRACKED_PLAYERS ||
+			!distributed_machine_has_player(machine_index, player_index))
+		{
+			continue;
+		}
+		objects_host_vehicle_predictions[player_index].valid = TRUE;
+		objects_host_vehicle_predictions[player_index].machine_index = machine_index;
+		objects_host_vehicle_predictions[player_index].state = *state;
+	}
+}
+
+/* ... taken as they are, within a tolerance, if that machine's player
+still drives it: a little off closed by half, more put there */
+void network_objects_apply_vehicle_predictions(
+	void)
+{
+	short player_index;
+
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		struct distributed_object_state const *state = &objects_host_vehicle_predictions[player_index].state;
+		struct unit_datum *vehicle;
 		struct unit_datum *driver;
+		real_vector3d forward, up, velocity, angular_velocity;
 		real dx, dy, dz;
 
+		if (!objects_host_vehicle_predictions[player_index].valid)
+			continue;
+		objects_host_vehicle_predictions[player_index].valid = FALSE;
+		vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(state->object_index, _object_mask_vehicle);
 		if (!vehicle || vehicle->unit.driver_object_index == NONE || vehicle->object.parent_object_index != NONE)
 			continue;
 		driver = unit_get(vehicle->unit.driver_object_index);
 		if (driver->unit.player_index == NONE ||
-			!distributed_machine_has_player(machine_index, (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(driver->unit.player_index)))
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(driver->unit.player_index) != player_index ||
+			!distributed_machine_has_player(objects_host_vehicle_predictions[player_index].machine_index, player_index))
 		{
 			continue;
 		}
 		dx = state->position.x - vehicle->object.position.x;
 		dy = state->position.y - vehicle->object.position.y;
 		dz = state->position.z - vehicle->object.position.z;
-		if (dx * dx + dy * dy + dz * dz <= HOST_VEHICLE_ACCEPT_TOLERANCE * HOST_VEHICLE_ACCEPT_TOLERANCE)
-		{
-			network_objects_correct(state->object_index, &state->position, &state->forward, &state->up,
-				&state->translational_velocity, &state->angular_velocity);
-		}
+		if (dx * dx + dy * dy + dz * dz > HOST_VEHICLE_ACCEPT_TOLERANCE * HOST_VEHICLE_ACCEPT_TOLERANCE)
+			continue;
+		distributed_object_state_unpack(state, &forward, &up, &velocity, &angular_velocity);
+		network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity, &angular_velocity,
+			HOST_VEHICLE_BLEND_DISTANCE);
 	}
 }
 
@@ -852,6 +996,8 @@ void network_objects_handle_states(
 		struct distributed_object_state const *state = &states[index];
 		struct object_datum *object;
 		real tolerance = REMOTE_OBJECT_TOLERANCE;
+		real blend_distance = REMOTE_BLEND_DISTANCE;
+		real_vector3d forward, up, velocity, angular_velocity;
 		real dx, dy, dz;
 
 		if (!network_objects_client_has(state->object_index))
@@ -867,10 +1013,12 @@ void network_objects_handle_states(
 		{
 			struct unit_datum *vehicle = unit_get(state->object_index);
 
+			blend_distance = REMOTE_VEHICLE_BLEND_DISTANCE;
 			if (vehicle->unit.driver_object_index != NONE &&
 				distributed_player_is_local(unit_get(vehicle->unit.driver_object_index)->unit.player_index))
 			{
 				tolerance = LOCAL_VEHICLE_TOLERANCE;
+				blend_distance = 0.0f;
 			}
 		}
 		dx = state->position.x - object->object.position.x;
@@ -878,9 +1026,12 @@ void network_objects_handle_states(
 		dz = state->position.z - object->object.position.z;
 		if (dx * dx + dy * dy + dz * dz <= tolerance * tolerance)
 			continue;
-		distributed_count_correction();
-		network_objects_correct(state->object_index, &state->position, &state->forward, &state->up,
-			&state->translational_velocity, &state->angular_velocity);
+		distributed_object_state_unpack(state, &forward, &up, &velocity, &angular_velocity);
+		if (network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
+			&angular_velocity, blend_distance))
+		{
+			distributed_count_correction();
+		}
 		SET_FLAG(object->object.flags, _object_at_rest_bit, TEST_FLAG(state->flags, _distributed_object_at_rest_bit));
 	}
 }
@@ -1089,6 +1240,8 @@ void network_objects_new_game(
 		objects_client_has[absolute_index] = NONE;
 	}
 	objects_host_resting_cursor = 0;
+	csmemset(objects_host_inventories, 0, sizeof(objects_host_inventories));
+	csmemset(objects_host_vehicle_predictions, 0, sizeof(objects_host_vehicle_predictions));
 	objects_client_synchronized = FALSE;
 	objects_client_ready_time = NONE;
 	objects_client_local_allocation = FALSE;

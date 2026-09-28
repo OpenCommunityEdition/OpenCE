@@ -340,6 +340,9 @@ static int open_socket(int type, unsigned long ip, unsigned short port, unsigned
 		posix_socket_close(result);
 		return -1;
 	}
+	/* (the game's connections, carried over the tunnel: nothing held back) */
+	if (type == SOCK_STREAM)
+		posix_socket_set_nodelay(result);
 	if (bound_port)
 		*bound_port = address.sin_port;
 	return result;
@@ -1182,6 +1185,7 @@ static void listener_readable(struct listener *listener)
 		if (socket < 0)
 			return;
 		posix_socket_set_nonblocking(socket, 1);
+		posix_socket_set_nodelay(socket);
 		posix_random_bytes(&conversation, sizeof(conversation));
 		stream = stream_new(listener->peer, conversation | 1);
 		if (!stream)

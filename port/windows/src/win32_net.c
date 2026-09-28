@@ -150,6 +150,13 @@ int posix_socket_set_nonblocking(int socket, int nonblocking)
 	return succeed(ioctlsocket((SOCKET)socket, FIONBIO, &value));
 }
 
+int posix_socket_set_nodelay(int socket)
+{
+	BOOL value = TRUE;
+
+	return succeed(setsockopt((SOCKET)socket, IPPROTO_TCP, TCP_NODELAY, (const char *)&value, sizeof(value)));
+}
+
 int posix_socket_bytes_available(int socket, posix_ulong *count)
 {
 	u_long available = 0;

@@ -60,6 +60,48 @@ void update_client_handle_server_update(
 
 void update_queues_reset_and_fill_with_lies(
 	void);
+
+#ifdef HALO_LINUX
+/* the distributed netcode's inputs (port/linux/game/network_distributed.c):
+each tick's buttons are sent again with the ticks after it, and taken once,
+from whichever message brings them first. control_flags holds the buttons
+of the tick and of the ones before it, newest first. */
+enum
+{
+	/* the ticks of buttons in each message */
+	DISTRIBUTED_INPUT_HISTORY = 4,
+};
+
+/* (the host) a client machine's player's action at the client's tick */
+void update_server_handle_distributed_input(
+	long player_index,
+	long tick,
+	struct player_action const *action,
+	unsigned short const *control_flags,
+	short count);
+/* (the host) the update its last tick ran (NONE for none), and an update's
+actions (NULL once it is gone) */
+long update_server_ticked_update_number(
+	void);
+struct player_action const *update_server_update_actions(
+	long update_number,
+	short *count);
+/* (a client) the host's action for the player at that absolute index, of
+the host's update */
+void update_client_handle_relayed_action(
+	short player_index,
+	long update_number,
+	struct player_action const *action,
+	unsigned short const *control_flags,
+	short count);
+/* (a client) a local player's last tick, its action and the buttons of the
+ticks up to it; FALSE before its first */
+boolean update_client_distributed_input(
+	short local_player_index,
+	long *tick,
+	struct player_action *action,
+	unsigned short *control_flags);
+#endif
 long player_new_queue(
 	long player_index);
 

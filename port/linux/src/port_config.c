@@ -111,7 +111,8 @@ static const struct config_setting config_settings[] =
 	{ "network.netcode", _config_string, "\"distributed\"", "HALO_NETCODE", _environment_value, _platform_all,
 		"\"distributed\" (work in progress, port/linux/NETCODE.md) predicts each\n"
 		"player's own moves and lets the host decide the rest; \"lockstep\" plays\n"
-		"system link as the Xbox game did. Every machine must use the same." },
+		"system link as the Xbox game did. The host's is played: a machine that\n"
+		"joins a game plays its host's." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"

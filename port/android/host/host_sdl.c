@@ -388,3 +388,10 @@ int host_sdl_show_toast(const char *message, int duration, int gravity, int x, i
 {
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
 }
+
+/* ---------- a message for the player (a host of another network version) */
+
+int host_sdl_show_simple_message_box(uint32_t flags, const char *title, const char *message)
+{
+	return SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL) ? 1 : 0;
+}

@@ -101,6 +101,10 @@ int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 int posix_socket_shutdown(int socket, int how);
 int posix_socket_set_nonblocking(int socket, int nonblocking);
 int posix_socket_bytes_available(int socket, posix_ulong *count);
+/* a stream socket sends each write at once (no Nagle delay): the game's
+connections carry small messages every tick, which would otherwise wait on
+the other end's delayed acknowledgement */
+int posix_socket_set_nodelay(int socket);
 /* Winsock option levels and names are translated for SOL_SOCKET options */
 int posix_socket_setsockopt(int socket, int level, int name, const void *value, int length);
 int posix_socket_getsockopt(int socket, int level, int name, void *value, int *length);

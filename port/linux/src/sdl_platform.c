@@ -611,6 +611,60 @@ static void platform_invite_clipboard(BOOL look)
 	}
 }
 
+/* ---------- messages for the player */
+
+/* a message waiting for the event pump to show it (on the window's thread,
+between frames) */
+static pthread_mutex_t platform_message_lock = PTHREAD_MUTEX_INITIALIZER;
+static char platform_message_title[80];
+static char platform_message_text[600];
+static BOOL platform_message_pending;
+
+/* shows the player a message in a box of its own (the network code's: a
+host of another version), and logs it */
+void platform_show_message(const char *title, const char *message)
+{
+	platform_log("%s: %s", title, message);
+	/* (a run nobody watches: the log only) */
+	if (config_boolean("debug.hidden_window") || config_boolean("debug.null_renderer"))
+		return;
+	pthread_mutex_lock(&platform_message_lock);
+	snprintf(platform_message_title, sizeof(platform_message_title), "%s", title);
+	snprintf(platform_message_text, sizeof(platform_message_text), "%s", message);
+	platform_message_pending = TRUE;
+	pthread_mutex_unlock(&platform_message_lock);
+}
+
+static void platform_show_pending_message(void)
+{
+	char title[sizeof(platform_message_title)];
+	char text[sizeof(platform_message_text)];
+	BOOL pending;
+
+	pthread_mutex_lock(&platform_message_lock);
+	pending = platform_message_pending;
+	platform_message_pending = FALSE;
+	memcpy(title, platform_message_title, sizeof(title));
+	memcpy(text, platform_message_text, sizeof(text));
+	pthread_mutex_unlock(&platform_message_lock);
+	if (!pending)
+		return;
+#ifdef HALO_ANDROID
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, title, text, NULL);
+#else
+	{
+		/* (a box cannot show above a fullscreen game) */
+		int fullscreen = (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+
+		if (fullscreen)
+			SDL_SetWindowFullscreen(platform_window, false);
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, title, text, platform_window);
+		if (fullscreen)
+			SDL_SetWindowFullscreen(platform_window, true);
+	}
+#endif
+}
+
 /* ---------- events */
 
 void platform_pump_events(void)
@@ -635,6 +689,7 @@ void platform_pump_events(void)
 		platform_log("exiting after debug.exit_after");
 		exit(EXIT_SUCCESS);
 	}
+	platform_show_pending_message();
 #ifndef HALO_ANDROID
 	updater_poll(platform_window);
 #endif
