@@ -34,6 +34,11 @@ release. The [Releases](https://github.com/cybersecurity/halo-ce-universal/relea
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
 
+
+On Windows, `port/windows/launcher/HaloLauncher.cmd` sets the game up from
+the source instead. Its setup wizard takes the disc image, installs the
+build tools that are missing, builds the game and starts it. Refer to
+[port/windows/launcher/README.md](port/windows/launcher/README.md).
 ## Game data
 
 The port does not include the game data. Download an Xbox disc image

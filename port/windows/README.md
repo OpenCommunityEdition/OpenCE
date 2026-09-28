@@ -40,6 +40,10 @@ For a new optimization profile (`--pgo=train`), the build compiles the
 profile runtime of LLVM for 32-bit x86 (`pgo/halo_profile_runtime.c`).
 LLVM for Windows supplies this runtime only for x86-64.
 
+
+`launcher\HaloLauncher.cmd` does these steps for players. It installs the
+tools that are missing, takes the game data from a disc image, builds the
+game and starts it. Refer to [launcher/README.md](launcher/README.md).
 ## Start the game
 
 Enter `build\windows\halo.exe`.
