@@ -62,6 +62,11 @@ LINUX_ABI_FLAGS = [
     # the game keeps EBP frames (MSVC /Oy-): get_return_eip and the stack
     # walker follow the frame chain
     "-fno-omit-frame-pointer",
+    # the same floating point results on every port (system link games run
+    # in lockstep, and a machine whose results differ goes out of sync): no
+    # fused multiply-adds, which -march=native and ARM64 would otherwise
+    # emit (port/include/halo_math.h)
+    "-ffp-contract=off",
     OPTIMISATION,
     "-g",
     # glibc's wide string functions assume a 32-bit wchar_t; stop clang from
@@ -91,6 +96,7 @@ GAME_FLAGS = [
 # the TOML parser the platform layer reads config.toml with (port_config.c)
 TOML_DIR = Path("port/third_party/tomlc17")
 KCP_DIR = Path("port/third_party/kcp")
+MUSL_MATH_DIR = Path("port/third_party/musl-math")
 
 PLATFORM_FLAGS = [
     "-std=gnu11",
@@ -131,6 +137,17 @@ PROFILE_USE_FLAGS = [
     "-Wno-profile-instr-missing",
     "-Wno-backend-plugin",
 ]
+
+
+def musl_math_sources() -> List[Path]:
+    """musl's maths functions the game uses (port/third_party/musl-math)"""
+    return sorted((MUSL_MATH_DIR / "src").glob("*.c"))
+
+
+def musl_math_cflags(abi: str) -> str:
+    """their flags: the game's ABI, and the headers standing in for musl's"""
+    return " ".join([abi, "-std=gnu11", "-w", f"-I{MUSL_MATH_DIR}/include",
+                     f"-include {MUSL_MATH_DIR}/include/libm.h"])
 
 
 def march_flag(sln: Any) -> str:
@@ -383,6 +400,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
         # internet play's reliable streams (port/third_party/kcp; p2p.c)
         add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # the game's sin, pow and the rest, the same on every port
+        # (port/include/halo_math.h)
+        for source in musl_math_sources():
+            add_object(source, musl_math_cflags(abi))
 
         n.build(
             outputs=output,

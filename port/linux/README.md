@@ -188,6 +188,13 @@ limits: every change is under `#ifdef HALO_LINUX`.
   string lists lack, are written out in English (17th, 21st, 22nd, ...),
   and in free-for-all games every player is a team of one.
 
+Linux, Windows and Android machines play together: the game runs in
+lockstep, so every machine computes the same floating point results to the
+last bit. Every port compiles without fused multiply-adds
+(`-ffp-contract=off`), and the game's `sin`, `pow` and the rest are
+musl's, built into every port (`port/include/halo_math.h`,
+`port/third_party/musl-math`) instead of each system's C library.
+
 Several copies of the game can play together on one computer. The host
 tells machines apart by address, so every copy needs its own loopback
 address, the host included. A copy bound to one address receives no

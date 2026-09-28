@@ -27,7 +27,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import LINUX_PROFILE, XDK_INCLUDE, compile_launcher, pgo_mode, pgo_profile, profile_use_flags, xdk_headers
+from .linux_build import (LINUX_PROFILE, MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher, musl_math_sources, pgo_mode,
+                          pgo_profile, profile_use_flags, xdk_headers)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -423,6 +424,14 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     objects.append(guest_object(TOML_DIR / "tomlc17.c", platform_cflags))
     # internet play's reliable streams (port/third_party/kcp; p2p.c)
     objects.append(guest_object(KCP_DIR / "ikcp.c", platform_cflags))
+    # the game's sin, pow and the rest, the same on every port
+    # (port/include/halo_math.h)
+    musl_math_cflags = " ".join([
+        guest_abi, "-std=gnu11", "-w", profile_flags, *libc_includes, f"-I{MUSL_MATH_DIR}/include",
+        f"-include {MUSL_MATH_DIR}/include/libm.h",
+    ])
+    for source in musl_math_sources():
+        objects.append(guest_object(source, musl_math_cflags))
     runtime_internal_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-D_GNU_SOURCE",
         f"-I{PORT_DIR}/guest/runtime", f"-I{PORT_DIR}/include",

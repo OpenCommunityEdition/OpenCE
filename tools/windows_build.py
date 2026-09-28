@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode, march_flag, pgo_mode,
-                          compile_launcher, pgo_profile, profile_use_flags, xdk_headers)
+                          compile_launcher, musl_math_cflags, musl_math_sources, pgo_profile, profile_use_flags,
+                          xdk_headers)
 from .ninja_syntax import Writer
 
 LINUX_DIR = Path("port/linux")
@@ -57,6 +58,10 @@ WINDOWS_ABI_FLAGS = [
     "-fwrapv",
     "-fno-delete-null-pointer-checks",
     "-fno-omit-frame-pointer",
+    # the same floating point results on every port (system link games run
+    # in lockstep, and a machine whose results differ goes out of sync): no
+    # fused multiply-adds (port/include/halo_math.h)
+    "-ffp-contract=off",
     OPTIMISATION,
     "-g",
     "-gcodeview",
@@ -377,6 +382,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
         # internet play's reliable streams (port/third_party/kcp; p2p.c)
         add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # the game's sin, pow and the rest, the same on every port
+        # (port/include/halo_math.h)
+        for source in musl_math_sources():
+            add_object(source, musl_math_cflags(abi))
 
         n.build(
             outputs=output,
