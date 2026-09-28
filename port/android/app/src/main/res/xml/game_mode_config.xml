@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android's game modes (Android 12 and later, GameManager): the game runs
+     in the system's performance and battery modes, and the Game Dashboard
+     (Pixel) may cap its frame rate -->
+<game-mode-config xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsPerformanceGameMode="true"
+    android:supportsBatteryGameMode="true"
+    android:allowGameFpsOverride="true"
+    android:allowGameDownscaling="false"
+    android:allowGameAngleDriver="false" />

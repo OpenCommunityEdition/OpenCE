@@ -27,6 +27,15 @@
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
         android:hardwareAccelerated="true">
 
+        <!-- a game, for the system (isGame and appCategory above; the game
+             modes' configuration) and for launchers that look for this -->
+        <meta-data
+            android:name="android.game_mode_config"
+            android:resource="@xml/game_mode_config" />
+        <meta-data
+            android:name="android.app.category"
+            android:value="game" />
+
         <!-- checks for the game data (importing it on first run), then
              starts the game -->
         <activity
@@ -34,6 +43,9 @@
             android:exported="true"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode">
+            <meta-data
+                android:name="android.app.category"
+                android:value="game" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -56,7 +68,11 @@
             android:screenOrientation="sensorLandscape"
             android:resizeableActivity="false"
             android:preferMinimalPostProcessing="true"
-            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation" />
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation">
+            <meta-data
+                android:name="android.app.category"
+                android:value="game" />
+        </activity>
 
         <!-- the downloaded new version, for the package installer (Updater) -->
         <provider
