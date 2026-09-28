@@ -73,6 +73,21 @@ The game can play system link games on a local network and on the internet:
   and the host makes the decisions for the game. Refer to
   [port/linux/NETCODE.md](port/linux/NETCODE.md).
 
+## Halo Custom Edition maps
+
+The game can load Halo Custom Edition maps (`.map`) and OpenSauce maps
+(`.yelo`). This function is experimental, and it is off by default:
+
+1. Set `custom_edition = true` in the `[game]` section of `config.toml`.
+2. Put the map in the `maps/` folder, with the `bitmaps.map`, `sounds.map`
+   and `loc.map` of Halo Custom Edition.
+3. Start the map from `init.txt` in the data root.
+
+The Windows build was tested with three maps: `bloodgulch.map`,
+`beavercreek_halo3.yelo` and `hugeass.map`. Other maps can use functions
+that the port does not have. Ogg Vorbis sounds do not play. Refer to
+[docs/custom_edition_caches.md](docs/custom_edition_caches.md).
+
 ## Build the game
 
 You do not need the Xbox SDK. The port supplies the SDK declarations that

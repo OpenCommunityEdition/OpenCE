@@ -60,6 +60,11 @@ The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
 the game asks for the disc image again at the next start.
 
+The game refuses Halo Custom Edition maps and OpenSauce (`.yelo`) maps.
+With the setting `game.custom_edition`, it loads and runs them. This
+function is experimental. Refer to
+[docs/custom_edition_caches.md](../../docs/custom_edition_caches.md).
+
 ## Files and folders
 
 | Xbox drive | Folder |
@@ -157,6 +162,7 @@ the setting for one start of the game. It has priority over the file.
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
+| `game.custom_edition` | `false` | `HALO_CUSTOM_EDITION=1` sets `true` | `true`: the game loads and runs Halo Custom Edition and OpenSauce maps. This function is experimental. Refer to [docs/custom_edition_caches.md](../../docs/custom_edition_caches.md). `false`: the game refuses these maps. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `network.netcode` | `"distributed"` | `HALO_NETCODE` | `"distributed"`: each machine moves its own player at once, and the host makes the decisions (refer to `NETCODE.md`). `"lockstep"`: as on the Xbox. The host's setting applies: a machine that joins a game uses the netcode of the host. |
@@ -479,6 +485,12 @@ Other changes are in `#ifdef HALO_LINUX`. All the native ports define
 | `cseries/errors.c` | `debug.txt` stays open between lines. |
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
+| `cache/cache_files.c`, `cache/cache_files_windows.c` | The game names a Halo Custom Edition map and refuses it, not as "an old version". It finds an OpenSauce `.yelo` map when there is no `.map`. With `game.custom_edition`, it reads such a map where it is and converts it (`game/custom_edition_cache.c`). Refer to [docs/custom_edition_caches.md](../../docs/custom_edition_caches.md). |
+| `rasterizer/rasterizer_geometry.h` | The declarations of the vertex and triangle buffer functions of `rasterizer_xbox_hardware_geometry.c`, for the geometry of Custom Edition maps. |
+| `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` | The loop over the extra layers of a transparent chicago shader goes to the next layer. In January it does not (a bug). No Xbox map has such layers, but Custom Edition maps have them, and the game then stops. |
+| `cache/physical_memory_map.c`, `cache/xbox_texture_cache.c` | The texture cache is two times the 22 MB of the Xbox (`include/halo_port_capacity.h`). A frame of a Custom Edition map can use more textures than the Xbox cache holds. |
+| `game/game_engine.c` | The prediction of the multiplayer vehicles needs the three vehicles that all Xbox maps have. The vehicles of a Custom Edition map keep their types (`game/custom_edition_objects.c`). |
+| `objects/object_types.c` | The game places the vehicles of a Custom Edition map by their multiplayer spawn flags, as retail Halo does (`game/custom_edition_objects.c`). |
 
 The x86 inline assembly of the game has C replacements in
 `#ifdef HALO_LINUX`. Thus the compiler can optimize that code for each

@@ -1,9 +1,11 @@
 # Halo Custom Edition and OpenSauce caches in the native builds
 
 Experimental work on branch `experimental/custom-edition-yelo-loading`,
-based on `bnunu/halo-ce-universal` `main` at `f2fa457f`. It teaches the
-native builds (Windows, Linux, Android) to recognize, load and, with
-`HALO_CUSTOM_EDITION` set, run Halo Custom Edition caches (`.map`, cache
+begun on `bnunu/halo-ce-universal` `main` at `f2fa457f`, and merged since
+with that `main` at `223fa93f` and with `cybersecurity/halo-ce-universal`
+`main` at `cd47170f`. It teaches the native builds (Windows, Linux,
+Android) to recognize, load and, with the `game.custom_edition` setting
+on, run Halo Custom Edition caches (`.map`, cache
 version 609), OpenSauce caches (`.yelo`, and `.map` files with an OpenSauce
 header), with the Custom Edition resource maps `bitmaps.map`, `sounds.map`
 and `loc.map`. The byte-matching build is not affected: every game-source
@@ -36,9 +38,15 @@ usually do.
 
 ## Running a map
 
-Custom Edition maps run only when the environment variable
-`HALO_CUSTOM_EDITION` is set (to anything); without it they are refused as
-before. Put the map and the stock resource maps in the data root's `maps`
+Custom Edition maps run only when the `game.custom_edition` setting is on:
+`custom_edition = true` under `[game]` in `config.toml`, which the desktop
+builds keep next to the executable and write with every setting and its
+default the first time they run (upstream's settings file,
+`port/linux/src/port_config.c`), or, for one run, the environment variable
+`HALO_CUSTOM_EDITION` set to anything. Without it they are refused as
+before. The Android build's `config.toml` does not list the setting: that
+build was never built with this work (below). Put the map and the stock
+resource maps in the data root's `maps`
 folder (an OpenSauce map built with a mod set needs its
 `maps\data_files\<mod>-bitmaps.map` and so on instead), and start a
 multiplayer map without the menus from `init.txt` in the data root:
@@ -60,9 +68,9 @@ controller's Back button.
 
 ## What the native builds do
 
-- **Without `HALO_CUSTOM_EDITION`**, a Custom Edition cache in `maps\` is
-  named and refused, instead of being rejected as "an old version" of this
-  build's caches:
+- **With the setting off** (the default), a Custom Edition cache in
+  `maps\` is named and refused, instead of being rejected as "an old
+  version" of this build's caches:
 
   ```
   'd:\maps\ui.map' is a Halo Custom Edition cache (build 01.00.00.0609): this build recognizes it but cannot run it (docs/custom_edition_caches.md)
@@ -75,16 +83,17 @@ controller's Back button.
 - **An OpenSauce `.yelo` file** is found when there is no `.map` of that name,
   as OpenSauce looks for one (`cache_file_get_map_path` in
   `source/cache/cache_files_windows.c`), and refused the same way.
-- **With `HALO_CUSTOM_EDITION` set**, the platform reserves the address
-  window Custom Edition tag data is linked to, `0x40440000`â€“`0x426C0000`
-  (`port/linux/src/xbox_memory.c`; 36 MB of address space, backed as it is
-  touched), and a Custom Edition map is loaded into it, converted as below,
-  and run. It is read in place: it is never copied to the cache partition,
-  and every read the game makes of it (structure BSPs, bitmap pixels, sound
-  samples) is served from the map, `bitmaps.map` or `sounds.map` according to
-  where the offset falls in their combined offset space
-  (`custom_edition_cache_read`). A map that fails any check is logged and not
-  loaded.
+- **With the setting on**, the platform reserves the address window Custom
+  Edition tag data is linked to, `0x40440000`â€“`0x426C0000`
+  (`port/linux/src/xbox_memory.c`, which reads the setting at start-up,
+  before anything else can map into the window; 36 MB of address space,
+  backed as it is touched), and a Custom Edition map is loaded into it,
+  converted as below, and run. It is read in place: it is never copied to
+  the cache partition, and every read the game makes of it (structure BSPs,
+  bitmap pixels, sound samples) is served from the map, `bitmaps.map` or
+  `sounds.map` according to where the offset falls in their combined offset
+  space (`custom_edition_cache_read`). A map that fails any check is logged
+  and not loaded.
 - **Xbox caches** take exactly the path they took before: the new code
   returns at once for them, and the original checks and messages follow
   unchanged.
@@ -188,8 +197,8 @@ changed:
   (OpenSauce `hud_definitions.hpp`), and draws a flagged element at half the
   size of its bitmap. Custom Edition's HUD bitmaps are made for that: in
   `bloodgulch.map` every flagged element draws a bitmap exactly twice the
-  size of the one its Xbox counterpart draws (256×64 for 128×32, 512×512 for
-  256×256), with the same scale, and every unflagged one a bitmap of the same
+  size of the one its Xbox counterpart draws (256Ã—64 for 128Ã—32, 512Ã—512 for
+  256Ã—256), with the same scale, and every unflagged one a bitmap of the same
   size ([Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)).
   This build ignores the flag, so it drew them twice too large; the
   placements of the unit, weapon and grenade HUD interfaces and the HUD
@@ -454,6 +463,39 @@ checked. The sound system accepting sounds is what was observed; whether
 they are heard right was not checked, on a machine whose audio output could
 not be listened to.
 
+### After the merge with upstream
+
+Upstream `main` at `223fa93f` brought a settings file, headers of its own
+in place of the Xbox SDK's, a fullscreen mode as wide as the display, and
+changes throughout the game sources; `HALO_CUSTOM_EDITION`, which this
+branch read directly before, became the `game.custom_edition` setting. The
+debug build was then built again and run, windowed, for 15 to 40 seconds
+each:
+
+| Run | Observed |
+| --- | --- |
+| `bloodgulch.map`, slayer, no `config.toml` and no variable | the game wrote `config.toml` with `custom_edition = false` under `[game]`, named the map and refused it, and the debug build stopped on it, as before |
+| `bloodgulch.map`, slayer, `custom_edition = true` in that file and no variable | loaded and converted with the counts of the table above (32 HUD elements rescaled, the score hint, 56 multipurpose maps and 2 HUD meters reordered); 3,000 frames in 30 s, the level and HUD drawn as before, and no error but the silenced sounds' message |
+| `beavercreek_halo3.yelo`, capture the flag, `HALO_CUSTOM_EDITION=1` | as before the merge: the Halo 3 style HUD and the red team's arms |
+| `hugeass.map`, slayer, `HALO_CUSTOM_EDITION=1` | 3 calls and 1 engine global given this build's index; the day structure BSP kept for the 40 s; the hangar, HUD and score hint as before |
+
+The Windows release build (`python tools/ci_build.py windows release`, as
+upstream's workflow builds it, with link-time and profile-guided
+optimisation) was built too, and ran `hugeass.map` in slayer for 30 seconds
+with the same log and the day structure BSP kept.
+
+Upstream `main` at `cd47170f` then brought internet play, a distributed
+netcode (the default), an updater, extraction of the game data from a disc
+image, deterministic floating-point maths, and native builds that accept
+Xbox cache files of any build. The debug build was built again and run,
+windowed, with the updater, internet play, joining from the clipboard and
+Discord turned off: `bloodgulch.map` in slayer (`custom_edition = true` in
+`config.toml`) and `beavercreek_halo3.yelo` in capture the flag for 30
+seconds, `hugeass.map` in slayer for 40. The logs report the conversions of
+the tables above, the level and HUD were drawn as before, and `hugeass.map`
+kept its day structure BSP. Every run was one machine's local game: no
+network game, with either netcode, was played on a Custom Edition map.
+
 ### Not tested or not observed
 
 - **Playing.** Nobody played: the runs were given no input on purpose, and
@@ -465,12 +507,17 @@ not be listened to.
   play reaches: its day and night switch was not seen to happen. Every call
   and engine global of the other maps' scripts is found by name here too
   (the table below), but what they do was not watched.
+- **Fullscreen**, upstream's default since the merge, drawing as wide as the
+  display: every run was windowed, at the Xbox's 640x480.
 - **Other maps.** Only the three above were run. The stock maps load and
   convert in the report tool with the same code; the game-side conversion
   was not tried on them.
-- **Release builds** (`configure.py --release`), and the **Linux and Android
-  builds**, were not built (no 32-bit Linux sysroot or SDL3, no Android NDK
-  on the machine used). Their build scripts compile the same units.
+- **The Linux and Android builds** were never run: the machine used has
+  no 32-bit Linux sysroot or SDL3 and no Android NDK. Upstream's workflow
+  (`.github/workflows/build.yml`) built them for the merged branch
+  (`0fe82574`), debug and release, with the Windows builds, and ran
+  `tools/test_linux_port.py` on Linux: all passed. Only one release run
+  was made (above).
 - **OpenSauce itself**: mod sets (none available; the file names are an
   assumption, below), protected caches, OpenSauce compression parameters,
   tag symbol or string id storage, and the runtime features `project_yellow`
@@ -542,8 +589,8 @@ every layout used was then checked against the sample maps.
 | Sound compression value 3 is Ogg Vorbis, value 1 is Xbox ADPCM | in `sounds.map`, all 106 value-3 permutations start with `OggS`; all 1,365 value-1 permutations are whole 36-byte blocks |
 | `bitmaps.map` bitmaps are not swizzled, and cube maps hold each level's six faces together | all 1,467; 38 of 40 cube maps match that order when checked against their next level (one is uniform, one does not match) |
 | Multipurpose maps: Custom Edition's red, green, blue and alpha hold what the Xbox's alpha, green, red and blue do | the multipurpose maps the Custom Edition and the Xbox `bloodgulch.map` share, decoded and compared channel by channel (the cyborg's, the warthog's, the boulders') |
-| HUD meters: Custom Edition's alpha holds the Xbox's color (the fill order), and its color the Xbox's alpha (the shape) | `hud_ammo_meters`: Custom Edition's 512×512 A8R8G8B8 averaged down to the Xbox's 256×256 A8Y8 differs from the Xbox's luminance by 6.6 on average in alpha and 23 in color, and from its alpha by 12.3 in color and 23.4 in alpha; `hud_unit_meters` has its sprites rearranged, and shows the same swap when viewed. January's meter shader reads the fill order from color and discards texels without alpha |
-| HUD elements flagged *use high resolution scale* draw bitmaps twice the Xbox's size; others the same size | every unit and weapon HUD placement of `bloodgulch.map` whose tag the Xbox map also has (the motion sensor's foreground, unflagged, uses a 128×128 bitmap in both) |
+| HUD meters: Custom Edition's alpha holds the Xbox's color (the fill order), and its color the Xbox's alpha (the shape) | `hud_ammo_meters`: Custom Edition's 512Ã—512 A8R8G8B8 averaged down to the Xbox's 256Ã—256 A8Y8 differs from the Xbox's luminance by 6.6 on average in alpha and 23 in color, and from its alpha by 12.3 in color and 23.4 in alpha; `hud_unit_meters` has its sprites rearranged, and shows the same swap when viewed. January's meter shader reads the fill order from color and discards texels without alpha |
+| HUD elements flagged *use high resolution scale* draw bitmaps twice the Xbox's size; others the same size | every unit and weapon HUD placement of `bloodgulch.map` whose tag the Xbox map also has (the motion sensor's foreground, unflagged, uses a 128Ã—128 bitmap in both) |
 | Vehicle placements: the byte at 0x58 is the multiplayer team and the word at 0x5A the multiplayer spawn flags, default bits 0 to 3 (slayer, capture the flag, king of the hill, oddball) and allowed bits 8 to 11 | `hugeass.map`'s 78 vehicle placements: the byte is 1 on exactly the blue team's; the word is 0x0303 on warthogs, tachikomas and pelicans, 0x0F0F on ghosts, 0x0404 on 16 unnamed jets, 0x0808 on the night jet and 0 on vehicles its scripts create; OpenSauce leaves these bytes unnamed |
 | Script function and engine global tables: Halo PC's have entries this build's lacks, so a compiled index names another entry from some point on; value types are numbered alike | the compiled scripts of the sample, each call's function index against the name its first child keeps, and each engine global's index against its name: `timberland.map` 23 calls shifted (`player_effect_start` by 29), `ui.map` 11 (`camera_set` by 1), `hugeass.map` 3 calls and 1 global (`rider_ejection`, 158 against 147), `extinctionrevanepic2.map` 9 calls, and 4 of a function this build lacks; no other stock map has scripts; each call's value type is the type of its function here (1,485 of 1,485 in `hugeass.map`), or one the call site casts to |
 | Bitmaps the Xbox keeps in monochrome formats and Custom Edition as 32-bit color at the same size keep their channels (A8Y8 as A8R8G8B8 with red the luminance and alpha the alpha) | 24 of the 26 such bitmaps of `bloodgulch.map` decode to exactly the Xbox's values; the other 2 have other content |
@@ -606,7 +653,7 @@ every layout used was then checked against the sample maps.
   it (`YOU GOT STABBED`).
 - **Silenced sounds still log.** Playing a silenced Ogg Vorbis sound logs
   `attempt to play a sound that was not a mono 22k compressed sound ...`,
-  which debug builds also print on the screen.
+  which the game also prints on the screen, in the release build too.
 - **Scripts that use what this build does not have** are refused: of the
   sample, `extinctionrevanepic2.map` calls OpenSauce's
   `pp_set_effect_instance_active` (4 times), and needs a mod set anyway.
@@ -676,20 +723,28 @@ python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<X
 
 - **The byte-matched build is unchanged.** All 621 matching objects
   (`ninja all_source`, XDK `CL.exe`) were built from the January sources as
-  they are on this branch and as they are at `f2fa457f`: every section and
-  symbol table is identical, and the files differ only in their COFF time
-  stamp, in the 59 objects the changed files made the second build
-  recompile. The game-source changes are all under
-  `#ifdef HALO_LINUX`: `cache/cache_files.c`, `cache/cache_files_windows.c`,
-  `rasterizer/rasterizer_geometry.h` (declarations of the buffer functions),
+  they are on this branch and as they are at `f2fa457f`, and again after
+  each merge, as they are on the branch and at `223fa93f`, then at
+  `cd47170f`: each time every section and symbol table is identical, and
+  the files differ only in their COFF time stamp, in the 59 objects the
+  changed files made the second build recompile. Upstream's
+  `configure.py` no longer writes the matching graph (the Xbox SDK it
+  needs cannot be redistributed); for this check it
+  was turned on in `tools/project_x86.py` (`SolutionConfig.matching`), in a
+  checkout with the SDK's compiler, and turned off again. The game-source
+  changes are all under `#ifdef HALO_LINUX`: `cache/cache_files.c`,
+  `cache/cache_files_windows.c`, `rasterizer/rasterizer_geometry.h`
+  (declarations of the buffer functions),
   `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` (the chicago
   extra layers), `cache/physical_memory_map.c` and
   `cache/xbox_texture_cache.c` (the texture cache's size) and
   `game/game_engine.c` (the multiplayer vehicles and their placement) and
-  `objects/object_types.c` (their placement). No matching tool,
-  reference binary or scoring rule was touched.
+  `objects/object_types.c` (their placement). No matching tool, reference
+  binary or scoring rule was touched.
 - The new game units (`custom_edition_*.c`) compile without warnings under
   `-Wall -Wextra` as well as the game's usual flags, which silence warnings.
-- `tools/test_linux_port.py` fails 3 tests on this Windows host before and
-  after these changes alike (symlink privilege, a case-insensitive file
-  system, a Linux-only UASM rule).
+- `tools/test_linux_port.py` fails 3 tests on this Windows host, on the
+  merged branch and on upstream's `223fa93f` and `cd47170f` alike: two from
+  the case-insensitive file system (`<StdDef.h>` and `POPPACK.H` spelt in
+  another case), and a Linux-only UASM rule. Upstream's workflow runs it on
+  Linux.

@@ -35,8 +35,8 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
-/* the Custom Edition tag cache window, or NULL unless HALO_CUSTOM_EDITION
-reserved it (port/linux/src/xbox_memory.c) */
+/* the Custom Edition tag cache window, or NULL unless the
+game.custom_edition setting reserved it (port/linux/src/xbox_memory.c) */
 void *halo_custom_edition_tag_cache(void);
 /* where Halo PC keeps the channels of the pixels a Custom Edition bitmap
 just arrived at (an enum custom_edition_channel_order,

@@ -46,8 +46,10 @@ enum config_environment
 /* the builds a setting means something in, and is written for */
 enum
 {
-	_platform_desktop = 1,
+	_platform_linux = 1,
 	_platform_android = 2,
+	_platform_windows = 4,
+	_platform_desktop = _platform_linux | _platform_windows,
 	_platform_all = _platform_desktop | _platform_android,
 };
 
@@ -92,6 +94,10 @@ static const struct config_setting config_settings[] =
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
+	{ "game.custom_edition", _config_boolean, "false", "HALO_CUSTOM_EDITION", _environment_set_is_true, _platform_desktop,
+		"Load and run Halo Custom Edition and OpenSauce (.yelo) maps, which are\n"
+		"otherwise refused. Experimental: docs/custom_edition_caches.md in the\n"
+		"source says what works." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
@@ -210,17 +216,21 @@ static const struct config_setting config_settings[] =
 		"Log texture uploads." },
 	{ "debug.texture_no_cache", _config_boolean, "false", "HALO_TEXTURE_NO_CACHE", _environment_set_is_true, _platform_all,
 		"Upload textures again every time they are used." },
-	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
-		"Log where every game thread is this often, in seconds (read by the\n"
-		"app, port/android/host/host_debug.c); 0 never." },
+	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value,
+		_platform_android | _platform_windows,
+		"Log where the game is this often, in seconds; 0 never. On Android every\n"
+		"game thread (read by the app, port/android/host/host_debug.c), on\n"
+		"Windows the main thread (port/windows/src/win32_memory_watch.c)." },
 };
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))
 
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID)
 #define CONFIG_PLATFORM _platform_android
+#elif defined(_WIN32)
+#define CONFIG_PLATFORM _platform_windows
 #else
-#define CONFIG_PLATFORM _platform_desktop
+#define CONFIG_PLATFORM _platform_linux
 #endif
 
 struct config_value

@@ -53,6 +53,12 @@ The game finds the game data as on Linux. Refer to "Start the game" in
 | Saved games | `%APPDATA%\halo`, or `paths.saves` in `config.toml` |
 | Log | `debug.txt` in the data root (the folder that contains `maps\`) |
 
+On Windows, the setting `debug.sample_seconds` (`HALO_SAMPLE`) writes the
+location of the main thread to the log at this interval, in seconds. Thus
+you can find a hang without a debugger. Subtract the image address in the
+log from each address, add `0x400000`, and give the result to
+`llvm-symbolizer --obj=build\windows\halo.exe`.
+
 ## How the port operates
 
 The game is 32-bit code, as on Linux, because its data contains 32-bit
@@ -86,7 +92,7 @@ These files use only the Windows SDK:
 | --- | --- |
 | `src/win32_files.c`, `src/win32_net.c` | The file and socket functions of `port/linux/src/posix.h`. |
 | `src/win32_posix.c` | The POSIX functions on Windows threads, critical sections, condition variables, `VirtualAlloc` and the performance counter. |
-| `src/win32_memory_watch.c` | The write tracking of textures, with a vectored exception handler. It also writes reports of crashes. |
+| `src/win32_memory_watch.c` | The write tracking of textures, with a vectored exception handler. It also writes reports of crashes, and the `debug.sample_seconds` reports. |
 
 `port.json` gives the Linux files that these files replace, and the Windows
 libraries of the link.

@@ -14,15 +14,15 @@ placed requests at exactly the address asked for, the rest top-down as the
 Xbox kernel does.
 
 The experimental Halo Custom Edition map loading needs the window Custom
-Edition tag data are linked to, 0x40440000, reserved the same way when
-HALO_CUSTOM_EDITION is set (docs/custom_edition_caches.md).
+Edition tag data are linked to, 0x40440000, reserved the same way when the
+game.custom_edition setting is on (docs/custom_edition_caches.md).
 */
 
 #include "platform.h"
+#include "port_config.h"
 #include "../game/cache_file_formats.h"
 
 #include <errno.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -82,7 +82,7 @@ static void custom_edition_tag_cache_reserve(void)
 	void *wanted = (void *)CUSTOM_EDITION_TAG_CACHE_ADDRESS;
 	void *result;
 
-	if (!getenv("HALO_CUSTOM_EDITION"))
+	if (!config_boolean("game.custom_edition"))
 		return;
 	result = mmap(wanted, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);

@@ -6,12 +6,13 @@ loader (custom_edition_cache.h). The loader runs only Xbox caches of this
 build; without this unit it rejects a Custom Edition cache as "an old
 version" and never looks for a ".yelo" file at all.
 
-With HALO_CUSTOM_EDITION set (the platform then reserves the Custom Edition
-tag cache, port/linux/src/xbox_memory.c), a Custom Edition map is loaded
-instead: it is read in place rather than copied to the cache partition, and
-its tags go to 0x40440000 through cache_file_formats.c, which also converts
-what only needs their bytes changed. custom_edition_bitmaps.c and
-custom_edition_geometry.c convert the rest with the game's own functions.
+With the game.custom_edition setting on (the platform then reserves the
+Custom Edition tag cache, port/linux/src/xbox_memory.c), a Custom Edition
+map is loaded instead: it is read in place rather than copied to the cache
+partition, and its tags go to 0x40440000 through cache_file_formats.c, which
+also converts what only needs their bytes changed. custom_edition_bitmaps.c
+and custom_edition_geometry.c convert the rest with the game's own
+functions.
 Every read the game makes of the map (structure BSPs, bitmap pixels, sound
 samples) is served from the map, bitmaps.map or sounds.map according to
 where its offset falls in their combined offset space.
