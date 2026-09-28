@@ -62,11 +62,28 @@ public class LauncherActivity extends Activity {
         // readable (a directory adb creates there belongs to the shell user)
         if (dataRoot != null)
             new File(dataRoot, "maps").mkdirs();
+        passOnInvite(getIntent());
         if (haveData()) {
             startGame();
             return;
         }
         buildInterface();
+    }
+
+    /**
+     * An internet play invite link the app was opened with: the game
+     * (port/linux/src/p2p.c) picks it up from join_link.txt, whether it is
+     * starting now or already running.
+     */
+    private void passOnInvite(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null
+            || dataRoot == null)
+            return;
+        try (OutputStream out = new FileOutputStream(new File(dataRoot, "join_link.txt"))) {
+            out.write(intent.getData().toString().getBytes("UTF-8"));
+        } catch (java.io.IOException e) {
+            // the link is lost; the player can copy it instead
+        }
     }
 
     private boolean haveData() {

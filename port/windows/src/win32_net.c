@@ -326,3 +326,20 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 {
 	BCryptGenRandom(NULL, buffer, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
 }
+
+posix_ulong posix_resolve_ipv4(const char *host)
+{
+	struct addrinfo hints, *results;
+	posix_ulong address = 0;
+
+	start_winsock();
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	if (getaddrinfo(host, NULL, &hints, &results) != 0)
+		return 0;
+	if (results && results->ai_addr && results->ai_addr->sa_family == AF_INET)
+		address = ((struct sockaddr_in *)results->ai_addr)->sin_addr.s_addr;
+	freeaddrinfo(results);
+	return address;
+}

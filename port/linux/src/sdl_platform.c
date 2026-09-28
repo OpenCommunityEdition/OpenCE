@@ -13,8 +13,10 @@ and the debug keyboard that the game's console reads.
 #include "sdl_platform.h"
 #include "gl.h"
 #include "port_config.h"
+#include "p2p.h"
 
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +45,10 @@ BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+	/* a copy of the game started to open an invite link hands it to the
+	one already running, and goes */
+	if (p2p_hand_off_invite())
+		exit(EXIT_SUCCESS);
 	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
 #ifdef HALO_ANDROID
 	/* landscape only; the back key arrives as a key event (xinput_sdl.c)
@@ -341,6 +347,49 @@ BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
 	return result;
 }
 
+/* ---------- internet play's invite links (p2p.c) */
+
+#ifdef HALO_ANDROID
+/* SDL declares it for Android builds only, which the guest is not
+(guest/runtime/guest_sdl.c passes it to the host) */
+bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset);
+#endif
+
+/* puts a new invite on the clipboard, and joins one found there when the
+game comes to the front */
+static void platform_invite_clipboard(BOOL look)
+{
+	/* the last clipboard text looked at, so each invite is joined once */
+	static char seen[256];
+	const char *invite = p2p_take_clipboard_text();
+
+	if (invite)
+	{
+		SDL_SetClipboardText(invite);
+		snprintf(seen, sizeof(seen), "%s", invite);
+		platform_log("Internet play: the invite link is on the clipboard");
+#ifdef HALO_ANDROID
+		SDL_ShowAndroidToast("Hosting: the invite link is on the clipboard", 1, -1, 0, 0);
+#endif
+	}
+	if (look && config_boolean("network.join_from_clipboard"))
+	{
+		char *text = SDL_GetClipboardText();
+
+		if (text && strcmp(text, seen) && strlen(text) < sizeof(seen))
+		{
+			snprintf(seen, sizeof(seen), "%s", text);
+			if (p2p_join_invite(text))
+			{
+#ifdef HALO_ANDROID
+				SDL_ShowAndroidToast("Joining the invite on the clipboard", 1, -1, 0, 0);
+#endif
+			}
+		}
+		SDL_free(text);
+	}
+}
+
 /* ---------- events */
 
 void platform_pump_events(void)
@@ -349,6 +398,8 @@ void platform_pump_events(void)
 	opens, as closing it does (tools/pgo_train.py) */
 	static Uint64 exit_ticks = (Uint64)-1;
 	SDL_Event event;
+	static BOOL looked_at_clipboard;
+	BOOL look_at_clipboard = !looked_at_clipboard;
 
 	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
 		return;
@@ -463,6 +514,7 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			input_state.focused = TRUE;
+			look_at_clipboard = TRUE;
 #ifndef HALO_ANDROID
 			if (!input_state.mouse_released && !input_state.ui_pointer)
 				platform_mouse_capture(TRUE);
@@ -476,6 +528,8 @@ void platform_pump_events(void)
 		}
 	}
 	pthread_mutex_unlock(&input_lock);
+	looked_at_clipboard = TRUE;
+	platform_invite_clipboard(look_at_clipboard);
 }
 
 #ifndef HALO_ANDROID

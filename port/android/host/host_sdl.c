@@ -327,3 +327,23 @@ int host_sdl_resume_audio_stream_device(uint32_t stream)
 
 	return object ? SDL_ResumeAudioStreamDevice(object) : 0;
 }
+
+/* ---------- the clipboard (internet play's invite links) */
+
+int host_sdl_set_clipboard_text(const char *text)
+{
+	return SDL_SetClipboardText(text) ? 1 : 0;
+}
+
+void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
+{
+	char *text = SDL_GetClipboardText();
+
+	SDL_strlcpy(buffer, text ? text : "", size);
+	SDL_free(text);
+}
+
+int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y)
+{
+	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;
+}

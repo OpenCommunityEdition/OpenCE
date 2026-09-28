@@ -101,6 +101,12 @@ variable, which wins over the file; the tools use those
 | `paths.data`, `paths.saves` | `""` | `HALO_DATA_ROOT`, `HALO_SAVE_ROOT` | see Running |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | this machine's system link IPv4 address: sockets bind to it instead of to every address, other machines see games at it, and traffic to 127.0.0.1 goes to it. Lets several copies of the game play together on one computer, each on its own loopback address (see System link) |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | comma-separated IPv4 addresses to send the game's broadcasts (a client's game search, a host's game advertisement) to instead of 255.255.255.255, for example the other copies' loopback addresses on the same computer (listing 255.255.255.255 too still broadcasts). Machines with an address receive no broadcasts, so they find each other only through these lists |
+| `network.online` | `true` | `HALO_NET_ONLINE` | internet play (see Internet play); `false` keeps system link to the local network |
+| `network.join_from_clipboard` | `true` | `HALO_NET_JOIN_FROM_CLIPBOARD` | join the game of an invite link on the clipboard when the game comes to the front |
+| `network.tunnel_port` | `0` | `HALO_NET_TUNNEL_PORT` | internet play's UDP port; `0` picks one. Forwarding a fixed one on the router lets machines behind strict NATs reach this one |
+| `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | comma-separated `host:port` of the public MQTT brokers through which an invite's machines find each other |
+| `network.stun_servers` | Google's and Cloudflare's | `HALO_NET_STUN` | comma-separated `host:port` of the public STUN servers that tell a machine its internet address |
+| `discord.application_id` | the project's application | `HALO_DISCORD_APPLICATION` | the Discord application invites go through (see Internet play); empty for none |
 | `debug.exit_after` | `0.0` | `HALO_EXIT_AFTER` | quit that many seconds after the window opens (profile training, benchmarks) |
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | write every Nth presented frame as a BMP |
 | `debug.gpu_stats`, `debug.gpu_trace_frame` (with `debug.gpu_trace_constants`), `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | renderer debugging: per-frame counts, a full state trace of one frame, the generated GLSL, uploaded textures |
@@ -207,6 +213,60 @@ python tools/system_link_bots.py --host 127.0.0.200 --machines 127 --start
 `--start` starts the game once every stand-in is in the lobby. A host
 without `network.address` is found at the default `--host 127.0.0.1`.
 
+### Internet play
+
+Machines that share an invite play system link over the internet, with
+nothing hosted by this project. When a copy of the game starts hosting a
+system link game it makes an invite link, `halo://join/<44 hexadecimal
+digits>`, logs it to standard error and puts it on the clipboard (on
+Android, with a notice). Whoever has the link joins by:
+
+- opening it: the game registers itself as the handler of `halo://` links
+  (a desktop entry and `xdg-mime` on Linux, the registry under
+  `HKEY_CURRENT_USER` on Windows, the app's manifest on Android). A copy
+  started for a link while the game already runs hands the link to it and
+  quits;
+- copying it (or the bare 44 digits) and switching to the game
+  (`network.join_from_clipboard`);
+- running `halo <link>`;
+- accepting a Discord invite (below).
+
+Once the machines connect, the host's game is listed under Multiplayer,
+System Link, and joining it works as on a LAN. LAN play is unchanged and
+needs no invite.
+
+Only machines with the invite can join: nothing about a game is published
+where it can be found without one. The link holds the host's identifier and
+a random 16-byte token. The machines exchange their addresses through
+public MQTT brokers (`network.signalling_brokers`), on topics that are
+HMACs of the token, with messages encrypted and authenticated with a key
+derived from it (`src/p2p_signal.c`, `src/p2p_crypto.c`). Each machine
+learns its public address from public STUN servers, and both send to each
+other's addresses until packets get through (UDP hole punching). There is
+no relay: two machines behind NATs that give each destination its own
+port (some mobile and corporate networks) cannot connect, unless one of
+them forwards `network.tunnel_port` on its router. Every packet between two
+machines is authenticated and encrypted with a key the host chose for them.
+An invite works for as long as the copy of the game that made it runs.
+
+Inside, each peer gets an address in 100.64.0.0/10, which the game sees:
+its XNADDR carries its machine's identifier (`abEnet`), which
+`XNetXnAddrToInAddr` maps to that address. `src/xnet.c` rewrites the game's
+traffic to such an address to local stand-in sockets on 127.0.0.1 (or
+`network.address`) that `src/p2p.c` forwards through one UDP socket: UDP
+datagrams as they are, and TCP connections as KCP streams
+(`port/third_party/kcp`), and reports traffic from the stand-ins as coming
+from the peer. The game's broadcasts also go to every peer, which is how a
+host's game reaches its joiners' lists.
+
+Discord: with the Discord desktop client running, a hosting game's activity
+(through the Discord application in `discord.application_id`, whose name is
+what Discord shows as being played)
+carries a private party whose join secret is the invite, so the host can
+send it with Discord's invite button, and accepting it joins (Discord
+starts the game if it is not running). Discord only gives the secret to the
+people the host invites; requests to join are not answered.
+
 ## What works
 
 | Area | Status |
@@ -221,7 +281,7 @@ without `network.address` is found at the default `--host 127.0.0.1`.
 | Time | Tick count, performance counter (1 MHz), system time, x87 control word (`_control87`). |
 | Save games and signatures | `XCreateSaveGame` & co. with the Xbox `UDATA` layout; SHA-1 content signatures. |
 | C runtime | MSVC-only functions, and a 16-bit `wchar_t` runtime (UTF-16 like the Xbox) including MSVC-style wide `printf`. |
-| Networking | Winsock over BSD sockets; XNet addresses collapse to plain IPv4 (system link on a LAN), with games of up to 128 players on up to 128 machines (see System link). |
+| Networking | Winsock over BSD sockets; XNet addresses collapse to plain IPv4 (system link on a LAN), with games of up to 128 players on up to 128 machines (see System link), and over the internet by invite (see Internet play). |
 | Bink video | Not supported (the RAD SDK is proprietary); `BinkOpen` fails and the game skips the movie. |
 | Debug monitor (`xbdm`) | Empty module lists. |
 

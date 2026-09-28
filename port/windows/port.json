@@ -12,6 +12,7 @@
     "iphlpapi",
     "bcrypt",
     "winmm",
-    "user32"
+    "user32",
+    "advapi32"
   ]
 }

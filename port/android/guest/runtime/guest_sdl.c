@@ -54,6 +54,26 @@ void SDL_free(void *memory)
 	free(memory);
 }
 
+/* ---------- the clipboard (internet play's invite links, sdl_platform.c) */
+
+bool SDL_SetClipboardText(const char *text)
+{
+	return host_sdl_set_clipboard_text(text) != 0;
+}
+
+char *SDL_GetClipboardText(void)
+{
+	char buffer[1024];
+
+	host_sdl_get_clipboard_text(buffer, sizeof(buffer));
+	return strdup(buffer);
+}
+
+bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset)
+{
+	return host_sdl_show_toast(message, duration, gravity, xoffset, yoffset) != 0;
+}
+
 void SDL_Delay(Uint32 milliseconds)
 {
 	struct timespec duration;

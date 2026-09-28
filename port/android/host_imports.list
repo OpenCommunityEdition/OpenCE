@@ -27,6 +27,9 @@ host_sdl_gl_make_current
 host_sdl_gl_set_swap_interval
 host_sdl_gl_swap_window
 host_sdl_poll_event
+host_sdl_set_clipboard_text
+host_sdl_get_clipboard_text
+host_sdl_show_toast
 host_sdl_get_gamepads
 host_sdl_open_gamepad
 host_sdl_gamepad_from_id

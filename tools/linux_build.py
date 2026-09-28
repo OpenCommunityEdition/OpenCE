@@ -90,6 +90,7 @@ GAME_FLAGS = [
 
 # the TOML parser the platform layer reads config.toml with (port_config.c)
 TOML_DIR = Path("port/third_party/tomlc17")
+KCP_DIR = Path("port/third_party/kcp")
 
 PLATFORM_FLAGS = [
     "-std=gnu11",
@@ -367,6 +368,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{platform_dir}",
             f"-I{port_include}",
             f"-I{TOML_DIR}",
+            f"-I{KCP_DIR}",
             "-Isource -Isource/cseries",
             sdk_flags,
         ])
@@ -379,6 +381,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI (its structs hold doubles) and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # internet play's reliable streams (port/third_party/kcp; p2p.c)
+        add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
 
         n.build(
             outputs=output,

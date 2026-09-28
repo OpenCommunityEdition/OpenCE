@@ -91,6 +91,15 @@ plus:
 | `display.interpolation` | `false`: the original 30 frames per second instead of one per display refresh (port/linux/README.md, "Frame rate") |
 | `debug.sample_seconds` | see Debugging |
 
+## Internet play
+
+Internet play works as on the desktop (the Linux README's Internet play),
+except for Discord. Hosting a system link game puts its invite link on the
+clipboard, with a notice, to paste into a message. To join, open the link
+(the app handles `halo://join/...` links, whether or not the game is
+running: the launcher writes it to `files/join_link.txt`, where the game
+picks it up), or copy it and switch to the game.
+
 ## Widescreen
 
 The game renders 480 lines at the display's aspect ratio instead of the

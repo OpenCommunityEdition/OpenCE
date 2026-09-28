@@ -114,5 +114,29 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 posix_ulong posix_local_ipv4_address(void);
 /* fills buffer with cryptographically random bytes */
 void posix_random_bytes(void *buffer, posix_ulong size);
+/* the IPv4 address (network byte order) of host, a name or a dotted quad,
+or 0 if it cannot be resolved; may block while a name is looked up */
+posix_ulong posix_resolve_ipv4(const char *host);
+
+/* ---------- the process and the desktop (internet play, p2p.c) */
+
+/* copies the command line argument at index (0 is the program) into buffer;
+returns 0 if there is none (always, on Android) */
+int posix_command_line_argument(int index, char *buffer, posix_ulong size);
+posix_ulong posix_process_id(void);
+/* registers this executable as the desktop's handler of links with this
+scheme (scheme://...); returns 0 where there is no such thing (Android,
+whose app declares its links in its manifest) */
+int posix_register_url_scheme(const char *scheme, const char *description);
+
+/* a connection to the Discord desktop client's local socket or pipe, or -1
+if none is running (always, on Android) */
+int posix_discord_connect(void);
+/* writes all of buffer; returns length, or -1 if the connection failed */
+int posix_discord_write(int handle, const void *buffer, int length);
+/* reads what has arrived, without waiting: the bytes read, 0 if nothing has,
+or -1 if the connection closed */
+int posix_discord_read(int handle, void *buffer, int length);
+void posix_discord_close(int handle);
 
 #endif
