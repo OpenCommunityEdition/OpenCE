@@ -410,6 +410,9 @@ static boolean code_001af4f0(
 {
 	boolean valid = FALSE;
 
+#ifndef HALO_LINUX
+	/* (the native builds take a game state whatever build wrote it; the map,
+	allocation checksum and player count below still have to match) */
 	if (csstrcmp(header->build_number, "01.01.14.2342"))
 	{
 		if (halt_on_error)
@@ -423,7 +426,9 @@ static boolean code_001af4f0(
 				csprintf(temporary, "expected build #%d but got #%d", "01.01.14.2342", header->build_number));
 		}
 	}
-	else if (csstrcmp(header->map_name, tag_get_name(global_scenario_index)))
+	else
+#endif
+	if (csstrcmp(header->map_name, tag_get_name(global_scenario_index)))
 	{
 		if (halt_on_error)
 		{
