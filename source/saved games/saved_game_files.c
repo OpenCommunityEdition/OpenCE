@@ -1878,6 +1878,12 @@ static void enumerate_memory_units(
 										find_data.szSaveGameName,
 										find_data.wfd.cFileName);
 									message[MAXIMUM_FILENAME_LENGTH] = 0;
+									/* BUG (preserved for exact matching): the message embeds the save's display name
+									 * and file name and is passed as the format (January 0x5b4b00 +0x263 pushes the
+									 * converted text as error's format), so a '%' in either is taken as a conversion.
+									 * Reached for a saved-game directory holding neither blam.sav nor blam.lst; whether
+									 * such a directory occurs is not shown. A corrected build should pass the text
+									 * through "%s". Source-policy approval pending (2026-09-27 audit). */
 									error(
 										_error_silent,
 										wide_to_ascii(message, (char *)message, sizeof(message)));

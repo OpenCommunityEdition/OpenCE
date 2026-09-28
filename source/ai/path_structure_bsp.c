@@ -641,6 +641,17 @@ boolean structure_test_pill2d(
 			best_result = NULL;
 		}
 
+		/* BUG (preserved for exact matching): a side whose p0 surface index is NONE gets only
+		 * its collision flag, so when p0_surface_index is NONE the copy below returns
+		 * left_result's point, surface_index, edge_index and t unassigned (January 0x452500
+		 * writes only the byte [ebp-0x4c] at +0x189 and copies seven dwords from [ebp-0x4c]
+		 * at +0x24f..+0x25a), and the function returns FALSE. actor_move_try_evasion_vector
+		 * passes the actor's pathfinding surface as p0 and, on a FALSE return, reads
+		 * result->point.z to accept or reject the evasion point; actor_find_pathfinding_location
+		 * leaves that surface NONE for a non-flying actor when no ground surface is found or
+		 * when the actor's vehicle is not a ground vehicle. A runtime occurrence was not
+		 * traced. A corrected build should fill both side results before selecting.
+		 * Source-policy approval pending (2026-09-27 audit). */
 		if (!best_result ||
 			distance_squared2d((real_point2d const *)&best_result->point, p1) < radius * radius)
 		{

@@ -315,23 +315,6 @@ struct rasterizer_lens_flare_submit_parameters
 	long internal__occlusion_pixels;
 };
 
-struct rasterizer_light_submit_parameters
-{
-	struct point_light_definition *definition;
-	real_point3d position;
-	real_vector3d forward;
-	real_vector3d up;
-	real_rgb_color color;
-	real radius;
-};
-
-struct rasterizer_lights_globals
-{
-	long light_count;
-	struct rasterizer_light_submit_parameters lights[MAXIMUM_LIGHTS_PER_WINDOW];
-	long fixed_function_light_count;
-};
-
 typedef char verify_structure_cluster_size[
 	sizeof(struct structure_cluster) == 0x68 ? 1 : -1];
 typedef char verify_structure_cluster_lens_flare_marker_count_offset[
@@ -373,7 +356,6 @@ static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_
 static byte local_lens_flare_occlusion_test_results2[MAXIMUM_LENS_FLARE_MARKERS_PER_STRUCTURE+MAXIMUM_QUEUED_LENS_FLARES][MAXIMUM_WINDOWS];
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
-extern struct rasterizer_lights_globals rasterizer_lights;
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern short global_screenshot_count;
 extern short global_screenshot_size;

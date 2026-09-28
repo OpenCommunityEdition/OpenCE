@@ -85,6 +85,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
 #include "interface/terminal.h"
@@ -190,13 +191,6 @@ struct weapon_flash_state_definition
 	long unused0C[8];
 };
 
-struct hud_absolute_placement_definition
-{
-	short corner;
-	short pad02;
-	long unused04[8];
-};
-
 struct icon_hud_element_definition
 {
 	short sequence_index;
@@ -255,8 +249,6 @@ typedef char weapon_hud_interface_definition_screen_effects_offset_assert[
 	offsetof(struct weapon_hud_interface_definition, screen_effects) == 0xAC ? 1 : -1];
 typedef char weapon_flash_state_definition_size_assert[
 	sizeof(struct weapon_flash_state_definition) == 0x2C ? 1 : -1];
-typedef char hud_absolute_placement_definition_size_assert[
-	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
 typedef char icon_hud_element_definition_size_assert[
 	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
 typedef char weapon_hud_interface_definition_size_assert[
@@ -297,19 +289,8 @@ struct interface_hud_scripted_globals
 	byte unused[2];
 };
 
-struct interface_hud_defaults_definition
-{
-	struct tag_reference default_weapon_hud;
-};
-
-struct interface_hud_globals_definition
-{
-	byte unused[0x2C0];
-	struct interface_hud_defaults_definition defaults;
-};
-
 typedef char interface_hud_globals_default_weapon_hud_index_offset_assert[
-	offsetof(struct interface_hud_globals_definition, defaults.default_weapon_hud.index) == 0x2CC ? 1 : -1];
+	offsetof(struct hud_globals_definition, defaults.default_weapon_hud.index) == 0x2CC ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -325,7 +306,6 @@ static void render_debug_profile_stall_tick(
 	real scale);
 /* ---------- globals */
 
-extern struct interface_hud_globals_definition *hud_globals;
 extern struct interface_hud_scripted_globals *hud_scripted_globals;
 
 static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;

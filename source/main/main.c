@@ -363,6 +363,7 @@ symbols in this file:
 #include "bitmaps/bitmaps_internal.h"
 #include "bitmaps/tiff_file.h"
 #include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/attract_mode.h"
 #include "interface/interface.h"
 #include "interface/terminal.h"
@@ -554,14 +555,8 @@ struct _main_globals
 	byte reserved61C[4];
 };
 
-struct main_hud_globals_definition
-{
-	byte reserved00[0x54];
-	long font_tag_index;
-};
-
 typedef char main_hud_globals_font_tag_index_offset_assert[
-	offsetof(struct main_hud_globals_definition, font_tag_index) == 0x54 ? 1 : -1];
+	offsetof(struct hud_globals_definition, messaging.single_player_font.index) == 0x54 ? 1 : -1];
 
 typedef char main_globals_size_assert[
 	sizeof(struct _main_globals) == 0x620 ? 1 : -1];
@@ -640,12 +635,6 @@ struct game_options
 typedef char game_options_size_assert[
 	sizeof(struct game_options) == 0x10C ? 1 : -1];
 
-struct _main_window_storage
-{
-	struct render_window window;
-	byte reservedAC[4];
-};
-
 #pragma pack(push, 1)
 struct _screenshot_and_framerate_globals
 {
@@ -687,7 +676,6 @@ extern void scripted_camera_set(
 	word camera_point_index0,
 	word camera_point_index1,
 	long transition_time);
-extern struct main_hud_globals_definition *hud_globals;
 
 /* ---------- globals */
 
@@ -710,7 +698,6 @@ static char const *scenario_paths[10] =
 	"levels\\d40\\d40"
 };
 
-static struct _main_window_storage window_storage = { 0 };
 static struct _main_globals main_globals = { 0 };
 boolean debug_force_frame_rate_update = FALSE;
 boolean debug_no_drawing = FALSE;
@@ -1789,6 +1776,12 @@ void main_roll_credits(
 void main_pregame_render(
 	void)
 {
+	/* Name, type and function scope from the 2003 PC demo PDB and the HCEX PDB (static local
+	   struct render_window window of main_pregame_render). Neither PDB records the block: placing it
+	   at the top of the function is unattested. January corroborates: .bss +0, the 0xAC-byte window
+	   padded to 0xB0 before main_globals, referenced only by this function. */
+	static struct render_window window;
+
 	collision_log_continue_period(TRUE);
 	sound_render();
 	{
@@ -1796,13 +1789,13 @@ void main_pregame_render(
 		real_vector3d forward = { 0.0f, 0.0f, 1.0f };
 		real_vector3d up = { 0.0f, 1.0f, 0.0f };
 
-		window_storage.window.local_player_index = NONE;
-		window_storage.window.console_window = TRUE;
-		window_storage.window.rasterizer_camera.position = position;
-		window_storage.window.rasterizer_camera.forward = forward;
-		window_storage.window.rasterizer_camera.up = up;
-		window_storage.window.rasterizer_camera.mirrored = FALSE;
-		window_storage.window.rasterizer_camera.vertical_field_of_view =
+		window.local_player_index = NONE;
+		window.console_window = TRUE;
+		window.rasterizer_camera.position = position;
+		window.rasterizer_camera.forward = forward;
+		window.rasterizer_camera.up = up;
+		window.rasterizer_camera.mirrored = FALSE;
+		window.rasterizer_camera.vertical_field_of_view =
 			2.0f * arctangent(
 				0.75f * render_camera_get_adjusted_field_of_view_tangent(
 					DEGREES_TO_RADIANS(80.0f)),
@@ -1810,13 +1803,13 @@ void main_pregame_render(
 		compute_window_bounds(
 			0,
 			1,
-			&window_storage.window.rasterizer_camera.viewport_bounds,
-			&window_storage.window.rasterizer_camera.window_bounds);
-		window_storage.window.rasterizer_camera.z_near = 0.01f;
-		window_storage.window.rasterizer_camera.z_far = 1.0f;
-		window_storage.window.render_camera = window_storage.window.rasterizer_camera;
+			&window.rasterizer_camera.viewport_bounds,
+			&window.rasterizer_camera.window_bounds);
+		window.rasterizer_camera.z_near = 0.01f;
+		window.rasterizer_camera.z_far = 1.0f;
+		window.render_camera = window.rasterizer_camera;
 		render_frame_pregame(
-			&window_storage.window,
+			&window,
 			main_globals.movie);
 	}
 	collision_log_end_period();
@@ -2708,7 +2701,7 @@ void main_framerate_render(
 	{
 		long font_tag_index;
 
-		font_tag_index = hud_globals->font_tag_index;
+		font_tag_index = hud_globals->messaging.single_player_font.index;
 		if (font_tag_index != NONE)
 		{
 			real frame_seconds;
@@ -2779,7 +2772,7 @@ void main_framerate_render(
 	{
 		long font_tag_index;
 
-		font_tag_index = hud_globals->font_tag_index;
+		font_tag_index = hud_globals->messaging.single_player_font.index;
 		if (font_tag_index != NONE)
 		{
 			short index;
@@ -2816,7 +2809,7 @@ void main_framerate_render(
 	{
 		long font_tag_index;
 
-		font_tag_index = hud_globals->font_tag_index;
+		font_tag_index = hud_globals->messaging.single_player_font.index;
 		if (font_tag_index != NONE)
 		{
 			real progress;

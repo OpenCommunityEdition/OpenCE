@@ -2039,6 +2039,13 @@ void rasterizer_debug_model_vertices(
 				camera_dot = dot_product3d(
 					&camera_to_vertex,
 					&global_window_parameters.camera.forward);
+				/* BUG (preserved for exact matching): closest_debug_vertex_dot is never initialised
+				 * (only closest_debug_vertex_index is), so the first vertex compares an unassigned
+				 * real here (January 0x56cb00 reads [ebp-0x2c] at +0x496 and +0x4a3; its only store
+				 * is +0x4b9). Reached whenever the hs global rasterizer_debug_model_vertices is set
+				 * and the obscuring object is drawn; the value only chooses which vertex label is
+				 * drawn red. A corrected build should initialise it to -1.0f. Source-policy approval
+				 * pending (2026-09-27 audit). */
 				if ((dot_product3d(&camera_to_vertex, &normal) < 0.f &&
 					closest_debug_vertex_dot < camera_dot) ||
 					closest_debug_vertex_dot == -1.f)

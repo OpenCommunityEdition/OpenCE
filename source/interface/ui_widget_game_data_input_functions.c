@@ -373,7 +373,6 @@ enum
 	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
 #endif
 	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
-	MAXIMUM_DISPLAYED_SERVERS = 10,
 };
 
 #ifdef HALO_LINUX
@@ -665,9 +664,6 @@ static byte const local_player_controller_bitmap_frames[2][MAXIMUM_LOCAL_PLAYERS
 	{{3, 5, 4}, {6, 8, 7}, {9, 11, 10}, {12, 14, 13}}
 };
 
-static struct network_advertised_game *displayed_servers[MAXIMUM_DISPLAYED_SERVERS];
-static wchar_t ui_widget_game_data_build_version_wide_string[64];
-
 /* ---------- public code */
 
 void ui_widget_game_data_function_invoke(
@@ -920,6 +916,11 @@ void difficulty_select_menu_update_extended_description(
 void server_list_menu_update(
 	struct widget_instance *widget)
 {
+	/* Name, nine-element size and function scope from the 2003 PC demo PDB and the HCEX PDB (static
+	   local of server_list_menu_update; their element type is named advertised_game_data). Neither
+	   PDB records the block: placing it at the top of the function is unattested. January
+	   corroborates: .bss +0, referenced only by this function. */
+	static struct network_advertised_game *displayed_servers[MAXIMUM_NETWORK_ADVERTISED_GAMES];
 	struct network_game_client *client = global_network_game_client_get();
 	long displayed_server_count = 0;
 
@@ -2024,19 +2025,24 @@ void netgame_prejoin_players(
 void set_textbox_to_build_number(
 	struct widget_instance *widget)
 {
-	if (!ui_widget_game_data_build_version_wide_string[0])
+	/* Name, type and function scope from the 2003 PC demo PDB and the HCEX PDB (static local
+	   wchar_t build_number_string[0x40]). Neither PDB records the block: placing it at the top of
+	   the function is unattested. January corroborates: .bss +0x28, referenced only here. */
+	static wchar_t build_number_string[64];
+
+	if (!build_number_string[0])
 	{
 		ascii_to_wide(
 			"01.01.14.2342",
-			ui_widget_game_data_build_version_wide_string,
-			sizeof(ui_widget_game_data_build_version_wide_string));
+			build_number_string,
+			sizeof(build_number_string));
 	}
 
 	if (!widget->parameters.text_box.text)
 	{
 		widget->parameters.text_box.text = ui_widget_realloc(
 			NULL,
-			sizeof(ui_widget_game_data_build_version_wide_string),
+			sizeof(build_number_string),
 			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
 			0x25E);
 		if (widget->parameters.text_box.text)
@@ -2044,7 +2050,7 @@ void set_textbox_to_build_number(
 			csmemset(
 				widget->parameters.text_box.text,
 				0,
-				sizeof(ui_widget_game_data_build_version_wide_string));
+				sizeof(build_number_string));
 		}
 	}
 
@@ -2052,9 +2058,9 @@ void set_textbox_to_build_number(
 	{
 		ustrncpy(
 			widget->parameters.text_box.text,
-			ui_widget_game_data_build_version_wide_string,
-			NUMBEROF(ui_widget_game_data_build_version_wide_string) - 1);
-		widget->parameters.text_box.text[NUMBEROF(ui_widget_game_data_build_version_wide_string) - 1] = 0;
+			build_number_string,
+			NUMBEROF(build_number_string) - 1);
+		widget->parameters.text_box.text[NUMBEROF(build_number_string) - 1] = 0;
 	}
 	return;
 }
@@ -2325,6 +2331,12 @@ static void game_options_menu_update_text_desc(
 		}
 	}
 
+	/* BUG (preserved for exact matching): description_index is assigned only when the
+	 * list has a focused child. Without one, January stores the low word of the widget
+	 * argument slot instead (0x4e1ce0: +0xa4 branches to +0x119 mov dx,[ebp+8]; the slot
+	 * is never written). Whether a game options list is updated without a focused child
+	 * is not shown. A corrected build should initialise description_index to 0.
+	 * Source-policy approval pending (2026-09-27 audit). */
 	extended_description->parameters.text_box.string_list_index = (short)description_index;
 	return;
 }
@@ -2386,6 +2398,11 @@ static void game_options_menu_update_pic_desc(
 		}
 	}
 
+	/* BUG (preserved for exact matching): as in game_options_menu_update_text_desc,
+	 * without a focused child January stores the low word of the widget argument slot
+	 * (0x4e1ea0 +0x119 mov dx,[ebp+8]). Whether that occurs is not shown. A corrected
+	 * build should initialise description_index to 0. Source-policy approval pending
+	 * (2026-09-27 audit). */
 	extended_description->animation.current_frame_index = (short)description_index;
 	return;
 }

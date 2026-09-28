@@ -128,6 +128,7 @@ symbols in this file:
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
@@ -361,22 +362,6 @@ struct hud_timer_data_definition
 	boolean enabled;
 };
 
-struct hud_absolute_placement_definition
-{
-	short corner;
-	short pad;
-	long unused[8];
-};
-
-struct hud_placement_definition
-{
-	point2d offset;
-	real_vector2d scale;
-	short multiplayer_scaling_flags;
-	short pad;
-	long unused[5];
-};
-
 struct hud_objective_runtime_definition
 {
 	struct hud_state_message_definition *message;
@@ -394,27 +379,6 @@ struct hud_messaging_globals_definition
 	struct hud_state_message_definition *help_message;
 	struct hud_objective_runtime_definition objective;
 	struct hud_timer_data_definition timer;
-};
-
-struct hud_color_definition
-{
-	unsigned long color;
-	unsigned long flash_color;
-	real flash_period;
-	real flash_delay;
-	short number_of_flashes;
-	word flash_flags;
-	real flash_length;
-	unsigned long disabled_color;
-	union
-	{
-		long unused;
-		struct
-		{
-			short up_ticks;
-			short fade_ticks;
-		} objective;
-	} custom;
 };
 
 struct number_hud_element_definition
@@ -439,40 +403,6 @@ struct hud_number_definition
 	char colon_width;
 	short pad;
 	long unused[19];
-};
-
-struct hud_timer_definition
-{
-	struct hud_color_definition color;
-	struct hud_color_definition time_up_color;
-	long unused[10];
-};
-
-struct hud_messaging_parameters_definition
-{
-	struct hud_absolute_placement_definition absolute_placement;
-	struct hud_placement_definition placement;
-	struct tag_reference single_player_font;
-	struct tag_reference multi_player_font;
-	real up_time;
-	real fade_time;
-	real_argb_color state_color;
-	real_argb_color text_color;
-	real spacing;
-	struct tag_reference hud_item_messages;
-	struct tag_reference messaging_icons;
-	struct tag_reference alternate_icon_text;
-	struct tag_block button_icons;
-	struct hud_color_definition color;
-	struct tag_reference hud_messages;
-	struct hud_color_definition objective_color;
-};
-
-struct hud_globals_definition
-{
-	struct hud_messaging_parameters_definition messaging;
-	byte reserved120[0x240];
-	struct hud_timer_definition timer_definition;
 };
 
 typedef char hud_timer_data_size_assert[
@@ -560,7 +490,6 @@ static void render_state_bitmap(
 /* ---------- globals */
 
 static struct hud_messaging_globals_definition *hud_messaging_globals;
-extern struct hud_globals_definition *hud_globals;
 extern struct hud_messaging_parameters_definition *hud_msg_def;
 extern struct hud_scripted_globals_definition *hud_scripted_globals;
 static char button_mappings[_icon_custom_1 - _icon_action] =

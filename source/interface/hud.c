@@ -86,6 +86,7 @@ symbols in this file:
 #include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
@@ -197,24 +198,12 @@ struct weapon_interface_state
 	struct weapon_interface_magazine_state magazines[2];
 };
 
-struct hud_globals_definition
-{
-	byte reserved000[0x94];
-	struct tag_reference hud_item_messages;
-	byte reserved0A4[0x334];
-	short loading_begin_index;
-	short loading_end_index;
-	short checkpoint_begin_index;
-	short checkpoint_end_index;
-	struct tag_reference checkpoint_sound;
-};
-
 typedef char hud_scripted_globals_size_assert[
 	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
 typedef char hud_scripted_globals_show_hud_help_text_offset_assert[
 	offsetof(struct hud_scripted_globals, show_hud_help_text) == 0x1 ? 1 : -1];
 typedef char hud_globals_hud_item_messages_index_offset_assert[
-	offsetof(struct hud_globals_definition, hud_item_messages.index) == 0xA0 ? 1 : -1];
+	offsetof(struct hud_globals_definition, messaging.hud_item_messages.index) == 0xA0 ? 1 : -1];
 typedef char hud_globals_loading_begin_index_offset_assert[
 	offsetof(struct hud_globals_definition, loading_begin_index) == 0x3D8 ? 1 : -1];
 typedef char hud_globals_checkpoint_sound_index_offset_assert[
@@ -744,7 +733,7 @@ static void hud_show_action_response(
 wchar_t const *hud_get_item_string(
 	long string_index)
 {
-	long string_list_index = hud_globals->hud_item_messages.index;
+	long string_list_index = hud_globals->messaging.hud_item_messages.index;
 	wchar_t const *string = default_string;
 
 	if (string_list_index != NONE)

@@ -216,6 +216,12 @@ void render_particles(
 						rendered_particle->attached_to_first_person_weapon ==
 							previous_attached_to_first_person_weapon)
 					{
+						/* current_sprite_group is not initialised. Not reached unassigned: the first
+						 * rendered particle cannot take this arm, because its definition index differs from
+						 * the initial NONE (particle_new returns for NONE and otherwise calls
+						 * particle_definition_get, whose tag lookup halts unless the low word of the index
+						 * is non-negative; the field is written nowhere else). Source-policy approval
+						 * pending (2026-09-27 audit). */
 						(*current_sprite_group)++;
 					}
 					else

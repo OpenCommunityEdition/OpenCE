@@ -1040,6 +1040,10 @@ void render_debug_trigger_volumes(
 				matrix4x3_transform_vector(&matrix, &local_extent, &world_extent);
 				break;
 
+			/* matrix is left unassigned only by this default arm. Not reached unassigned: the
+			 * arm's assertion failure calls system_exit, which does not return in January
+			 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+			 * Source-policy approval pending (2026-09-27 audit). */
 			default:
 				match_assert(
 					"c:\\halo\\SOURCE\\hs\\hs_runtime.c",
@@ -2061,6 +2065,10 @@ void hs_evaluate_inspect(
 		if (hs_type_inspectors[expression->type])
 		{
 			hs_type_inspectors[expression->type](expression->type, *value, string);
+			/* BUG (preserved for exact matching): the inspected value's text is passed as the
+			 * format (January 0x4bc840 +0xdd..+0xe6), so inspecting a string that contains '%'
+			 * reads arguments that were never passed. A corrected build should print it through
+			 * "%s". Source-policy approval pending (2026-09-27 audit). */
 			console_printf(FALSE, string);
 		}
 

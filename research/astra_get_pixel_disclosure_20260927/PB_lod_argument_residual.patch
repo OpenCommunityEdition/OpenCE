@@ -1,0 +1,91 @@
+diff --git a/source/bitmaps/bitmaps.c b/source/bitmaps/bitmaps.c
+--- a/source/bitmaps/bitmaps.c
++++ b/source/bitmaps/bitmaps.c
+@@ -1129,6 +1129,12 @@
+ 			x &= 3;
+ 			y &= 3;
+ 
++			/* Not January: both messages end "lod=%f", and January passes the short mipmap_index there
++			 * (0x46c140 +0x2d2 movsx eax,[ebp-0x10], +0x2e2 push eax; +0x363/+0x373; likewise the August and
++			 * September 2001 builds and the later /Od build), a mismatched vararg. That form is held by the
++			 * owner (bitmaps_obj_opus5_150k_w2_20260914.md), so this body passes lod as the format requires
++			 * and is not exact: lod stays live, so its home can no longer double as January's scratch slot
++			 * (0x28 frame against 0x24). */
+ 			match_vassert(
+ 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+ 				0x2A0,
+@@ -1142,7 +1148,7 @@
+ 					(short)bitmap->mipmap_count,
+ 					fast_ftol((real)width * point->x - 0.5f) % width,
+ 					fast_ftol((real)height * point->y - 0.5f) % height,
+-					mipmap_index));
++					lod));
+ 			match_vassert(
+ 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
+ 				0x2A9,
+@@ -1156,7 +1162,7 @@
+ 					(short)bitmap->mipmap_count,
+ 					fast_ftol((real)width * point->x - 0.5f) % width,
+ 					fast_ftol((real)height * point->y - 0.5f) % height,
+-					mipmap_index));
++					lod));
+ 
+ 			switch (bitmap->format)
+ 			{
+@@ -1193,6 +1199,10 @@
+ 				break;
+ 			}
+ 
++			/* BUG (preserved for exact matching): the unsupported-format default arm leaves pixel unassigned and
++			 * January returns it after the fatal assertion (0x46c140 +0x3ed mov eax,[ebp+8]); system_exit never
++			 * returns, so the read is not executed in this build (as in bitmap_mipmap_address). A corrected build
++			 * should assign pixel in that arm. */
+ 			return pixel;
+ 		}
+ 
+diff --git a/config/config.json b/config/config.json
+--- a/config/config.json
++++ b/config/config.json
+@@ -760,7 +760,7 @@
+ 				{ "name": "source/bitmaps/targa_file.c", "index": 385, "status": "Matching" },
+ 				{ "name": "source/bitmaps/color_table_group.c", "index": 386, "status": "Matching" },
+ 				{ "name": "source/bitmaps/bitmaps_quantitize.c", "index": 387, "status": "Matching" },
+-				{ "name": "source/bitmaps/bitmaps.c", "index": 388, "status": "Matching" },
++				{ "name": "source/bitmaps/bitmaps.c", "index": 388, "status": "NonMatching" },
+ 				{ "name": "source/bitmaps/bitmap_utilities.c", "index": 389, "status": "Matching" },
+ 				{ "name": "source/bitmaps/bitmap_group.c", "index": 390, "status": "NonMatching" },
+ 				{ "name": "source/bitmaps/bitmap_extract.c", "index": 391, "status": "Matching" },
+diff --git a/config/semantic_data_matches.json b/config/semantic_data_matches.json
+--- a/config/semantic_data_matches.json
++++ b/config/semantic_data_matches.json
+@@ -314,7 +314,8 @@
+   {
+     "unit": "source/bitmaps/bitmaps",
+     "symbol": "_global_vector_palette",
+-    "reason": "January and rebuilt 1116-byte palette data have equal payload, section flags, owner storage and offsets, and all 21 relocations resolve to the same image destinations. All 34 target functions are strict exact; the sole extra fast_ftol COMDAT is byte-identical to its selected January provider and pair-links in either order.",
++    "allow_incomplete_unit": true,
++    "reason": "January and rebuilt 1116-byte palette data have equal payload, section flags, owner storage and offsets, and all 21 relocations resolve to the same image destinations; the sole extra fast_ftol COMDAT is byte-identical to its selected January provider and pair-links in either order. The object is not complete: _bitmap_2d_get_pixel is debited under its standing owner hold (mismatched lod=%f vararg), so this data credit stands on its own section evidence only.",
+     "measurements": {
+       "size": 1116,
+       "relocation_count": 21,
+diff --git a/config/parked.json b/config/parked.json
+--- a/config/parked.json
++++ b/config/parked.json
+@@ -1028,6 +1028,17 @@
+       }
+     },
+     {
++      "unit": "source/bitmaps/bitmaps",
++      "function": "_bitmap_2d_get_pixel",
++      "class": "unclassified",
++      "evidence": "OWNER HOLD (binding; owner 2026-09-27: \"its earlier hold remains binding - existing credit does not retroactively authorize that landing\"). January's body (0x46c140, strictly reproduced by the c313dec6/4f4c8502 landing) passes the short mipmap_index for the \"lod=%f\" conversion of both block-range csprintf messages (+0x2d2 movsx eax,[ebp-0x10], +0x2e2 push eax; +0x363/+0x373; Aug-2001, Sept-2001 and the later /Od build push the same), and docs/object_matching_logs/bitmaps_obj_opus5_150k_w2_20260914.md blocked that form pending an owner ruling that never came. This body keeps every other recovered source fact of the exact form and passes lod, as the format requires. Keeping lod live costs its home slot, which January reuses as scratch, so the frame grows 0x24 -> 0x28 and every slot shifts: 1,312 padded bytes against 1,296, relocations equal (67). The exact variant is preserved in research/remaining_frontier_20260926/workers/RF-BL. The fatal default arm still returns the unassigned pixel after system_exit, as in January (unreachable; /Od RTC names it). Zero exact credit. Reopen only on an owner ruling on the original-bug admission.",
++      "measurements": {
++        "target": { "size": 1296, "relocation_count": 67, "normalized_sha256": "8d11e53e96af45f9a8b00f2daf6140159157cd09cfe9d79b4afa06acb787c215" },
++        "base": { "size": 1312, "relocation_count": 67, "normalized_sha256": "295575a9b35d1bd865d99a16d3e6b4ba9a605cfbd66272085bc9b563ca6cd556" },
++        "objdiff_percent": 92.6967
++      }
++    },
++    {
+       "unit": "source/main/main",
+       "function": "_main_frame_rate_debug",
+       "class": "unclassified",

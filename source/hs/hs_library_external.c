@@ -199,6 +199,11 @@ boolean hs_not(
 void hs_print(
 	char const *message)
 {
+	/* BUG (preserved for exact matching): the printed string is passed as the format
+	 * (January 0x4b8970 +0x0c pushes it as terminal_printf's format), so a '%' in the
+	 * text, from a scenario script or typed at this build's console, reads arguments
+	 * that were never passed. A corrected build should print it through "%s".
+	 * Source-policy approval pending (2026-09-27 audit). */
 	terminal_printf(global_real_argb_green, message);
 
 	return;

@@ -2792,6 +2792,7 @@ symbols in this file:
 #include "cutscene/recorded_animations.h"
 #include "devices/devices.h"
 #include "game/game.h"
+#include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
@@ -3331,12 +3332,6 @@ struct hs_arguments_long_long_long
 	long value0;
 	char const *value1;
 	long value2;
-};
-
-struct hud_globals_definition
-{
-	byte reserved_000[0x160];
-	struct tag_block waypoint_arrows;
 };
 
 struct hud_message_text_definition
@@ -13747,7 +13742,7 @@ static void hs_enumerate_navpoints(
 		hud_globals = hud_globals_definition_get(
 			interface_get_tag_index(_interface_hud_globals));
 		hs_enumerate_block_data(
-			&hud_globals->waypoint_arrows,
+			&hud_globals->waypoint.arrows,
 			0,
 			sizeof(struct hud_waypoint_arrow_definition));
 	}

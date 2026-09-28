@@ -211,15 +211,6 @@ typedef char verify_rasterizer_model_begin_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
 
 /* January scenario flag layout consumed by the King map scan. */
-struct scenario_netgame_flag
-{
-	real_point3d position;
-	real facing;
-	short type;
-	short team_index;
-	byte unused[0x80];
-};
-
 typedef char verify_scenario_netgame_flag_size[
 	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
 typedef char verify_scenario_netgame_flags_offset[

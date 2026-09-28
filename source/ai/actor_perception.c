@@ -1623,6 +1623,10 @@ void actor_situation_update_target_status(
 				(target_prop->definitely_located != FALSE) + 5;
 			break;
 
+		/* target_type is left unassigned only by this default arm. Not reached unassigned: the
+		 * arm's assertion failure calls system_exit, which does not return in January
+		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			display_assert(
 				NULL,
@@ -6685,6 +6689,10 @@ void actor_perception_update(
 						awareness_delta = 1.0f;
 						break;
 
+					/* awareness_delta is left unassigned only by this default arm. Not reached unassigned: the
+					 * arm's assertion failure calls system_exit, which does not return in January
+					 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+					 * Source-policy approval pending (2026-09-27 audit). */
 					default:
 #line 516 "c:\\halo\\SOURCE\\ai\\actor_perception.c"
 						assert(!"unreachable");

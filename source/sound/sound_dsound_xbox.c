@@ -2826,6 +2826,11 @@ static void dsound_error(
 			break;
 	}
 
+	/* BUG (preserved for exact matching): the format has three conversions but January
+	 * passes two values (0x5b93e0 +0x93..+0xa2), so "#%d" prints the next stack word.
+	 * Reached on every DirectSound failure reported through dsound_error. A corrected
+	 * build should pass result as the third value. Source-policy approval pending
+	 * (2026-09-27 audit). */
 	error(_error_silent, "DirectSound:  '%s' (%s#%d)", message, result_name);
 
 	return;

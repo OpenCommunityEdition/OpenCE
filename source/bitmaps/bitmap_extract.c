@@ -1450,6 +1450,10 @@ struct bitmap_data *extract_build_debug_plate(
 		case _bitmap_type_cube_map:
 			slice_count = 6;
 			break;
+		/* slice_count is left unassigned only by this default arm. Not reached unassigned: the
+		 * arm's assertion failure calls system_exit, which does not return in January
+		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
@@ -1522,6 +1526,10 @@ struct bitmap_data *extract_build_debug_plate(
 					case _bitmap_type_cube_map:
 						mipmap_slice_count = 6;
 						break;
+					/* mipmap_slice_count is left unassigned only by this default arm. Not reached unassigned: the
+					 * arm's assertion failure calls system_exit, which does not return in January
+					 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+					 * Source-policy approval pending (2026-09-27 audit). */
 					default:
 						match_vassert(
 							"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",

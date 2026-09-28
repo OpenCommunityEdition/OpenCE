@@ -54,6 +54,22 @@ struct item_definition
 	struct _item_definition item;
 };
 
+struct item_permutation_definition
+{
+	long unused1[8];
+	real weight;
+	struct tag_reference item;
+	long unused2[8];
+};
+
+struct item_collection_definition
+{
+	struct tag_block permutations;
+	short spawn_time;
+	short pad;
+	long unused[19];
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */

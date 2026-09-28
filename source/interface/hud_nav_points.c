@@ -160,35 +160,6 @@ enum hud_number_show_flags
 
 /* ---------- structures */
 
-struct hud_absolute_placement_definition
-{
-	short corner;
-	short pad;
-	long unused[8];
-};
-
-struct hud_placement_definition
-{
-	point2d offset;
-	real_vector2d scale;
-	short multiplayer_scaling_flags;
-	short pad;
-	long unused0[5];
-};
-
-struct hud_color_definition
-{
-	unsigned long color;
-	unsigned long flash_color;
-	real flash_period;
-	real flash_delay;
-	short number_of_flashes;
-	unsigned short flash_flags;
-	real flash_length;
-	unsigned long disabled_color;
-	unsigned long custom;
-};
-
 struct number_hud_element_definition
 {
 	struct hud_placement_definition placement;
@@ -198,26 +169,6 @@ struct number_hud_element_definition
 	byte fractional_digits;
 	byte pad;
 	long unused[3];
-};
-
-struct hud_messaging_parameters_definition
-{
-	struct hud_absolute_placement_definition absolute_placement;
-	struct hud_placement_definition placement;
-	struct tag_reference single_player_font;
-	struct tag_reference multi_player_font;
-	real up_time;
-	real fade_time;
-	real_argb_color state_color;
-	real_argb_color text_color;
-	real spacing;
-	struct tag_reference hud_item_messages;
-	struct tag_reference messaging_icons;
-	struct tag_reference alternate_icon_text;
-	struct tag_block button_icons;
-	struct hud_color_definition color;
-	struct tag_reference hud_messages;
-	struct hud_color_definition objective_color;
 };
 
 struct hud_waypoint_arrow
@@ -232,25 +183,6 @@ struct hud_waypoint_arrow
 	long unused1[4];
 	unsigned long flags;
 	long unused2[6];
-};
-
-struct hud_waypoint_definition
-{
-	real top_offset;
-	real bottom_offset;
-	real left_offset;
-	real right_offset;
-	long unused0[8];
-	struct tag_reference arrow_bitmap;
-	struct tag_block arrows;
-	long unused1[0x14];
-};
-
-struct hud_globals_definition
-{
-	struct hud_messaging_parameters_definition messaging;
-	struct hud_waypoint_definition waypoint;
-	byte unknown1BC[0x294];
 };
 
 struct hud_nav_point_datum
@@ -317,8 +249,6 @@ void unit_get_head_position(
 	real_point3d *head_position);
 
 /* ---------- globals */
-
-extern struct hud_globals_definition *hud_globals;
 
 static struct hud_nav_point_player_datum *nav_point_data;
 
@@ -1047,6 +977,10 @@ void hud_render_nav_points(
 				}
 				break;
 
+			/* position is left unassigned only by this default arm. Not reached unassigned: the
+			 * arm's assertion failure calls system_exit, which does not return in January
+			 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
+			 * Source-policy approval pending (2026-09-27 audit). */
 			default:
 				match_assert("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 725, !"unreachable");
 				break;
@@ -1148,6 +1082,11 @@ static void hud_update_nav_point_local_player(
 				break;
 			}
 
+			/* The default arm leaves position unassigned. Not reached: every store to
+			 * nav_point->type in this file writes one of the three types handled above or NONE
+			 * (the map-start memset and the deactivations), the nav point array is private to
+			 * this file, and NONE entries are skipped above. Source-policy approval pending
+			 * (2026-09-27 audit). */
 			position.z += nav_point->z_offset;
 			nav_point->screen_type = hud_get_nav_point_render_type(
 				local_player_index,

@@ -1129,6 +1129,18 @@ pixel32 bitmap_2d_get_pixel(
 			x &= 3;
 			y &= 3;
 
+			/* BUG (original, preserved for exact matching; admitted narrowly by the owner 2026-09-27 - no general
+			 * varargs exception): both messages end "lod=%f" but January passes the short mipmap_index there
+			 * (0x46c140 +0x2d2 movsx eax,[ebp-0x10] / +0x2e2 push eax, and +0x363 / +0x373; the same defect occurs
+			 * in the August and September 2001 builds and the later /Od build). Stack at the csprintf call: six ints for
+			 * the %d conversions, then mipmap_index, then display_assert's __FILE__ pointer pushed just before it.
+			 * %f is the last conversion, so it consumes exactly those two pushed dwords (no later argument shifts).
+			 * Passing an int where the format reads a double is undefined behaviour in C; the bound below is a
+			 * property of this compiler, CRT and linked image, not of the source: for every mipmap_index value with
+			 * January's __FILE__ address as the high dword the double is a tiny positive normal and the halt message
+			 * shows "lod=0.000000" (at most 182 characters plus NUL in the 256-byte buffer; January's formatter has no x87 code).
+			 * display_assert then returns into an unconditional system_exit, which never returns (halt_and_catch_fire).
+			 * A corrected build passes lod; see docs/object_matching_logs/astra_get_pixel_disclosure_20260927.md. */
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
 				0x2A0,
@@ -1193,6 +1205,12 @@ pixel32 bitmap_2d_get_pixel(
 				break;
 			}
 
+			/* BUG (original, preserved for exact matching; admitted narrowly by the owner 2026-09-27): the
+			 * unsupported-format default arm leaves pixel unassigned and January returns it after the fatal
+			 * assertion (0x46c140 +0x3ed mov eax,[ebp+8]). In this image the assertion is followed by an
+			 * unconditional system_exit, which never returns (halt_and_catch_fire loops or calls _exit on re-entry).
+			 * The uninitialised return expression would read an indeterminate value if the halt returned, but is
+			 * not executed on this path. A corrected build assigns pixel in that arm. */
 			return pixel;
 		}
 
