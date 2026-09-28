@@ -1303,3 +1303,45 @@ struct game_engine oddball_engine =
 	oddball_test_trait,
 	NULL,
 };
+
+#ifdef HALO_LINUX
+/* the parts of oddball_globals that are the same on every machine */
+struct oddball_network_state
+{
+	long team_score[NUMBEROF(oddball_globals.team_score)];
+	long individual_score[NUMBEROF(oddball_globals.individual_score)];
+	long ball_spawn_timer[MAXIMUM_ODDBALLS];
+};
+
+/* the distributed netcode (port/linux/game/network_distributed.c): the game
+type's state the host sends its clients, which take it as it is (not
+the balls' carriers, which follow each machine's own ball objects) */
+long game_engine_oddball_write_network_state(
+	byte *buffer,
+	long size)
+{
+	struct oddball_network_state state;
+
+	if (size < (long)sizeof(state))
+		return 0;
+	csmemcpy(state.team_score, oddball_globals.team_score, sizeof(state.team_score));
+	csmemcpy(state.individual_score, oddball_globals.individual_score, sizeof(state.individual_score));
+	csmemcpy(state.ball_spawn_timer, oddball_globals.ball_spawn_timer, sizeof(state.ball_spawn_timer));
+	csmemcpy(buffer, &state, sizeof(state));
+	return sizeof(state);
+}
+
+void game_engine_oddball_read_network_state(
+	byte const *buffer,
+	long size)
+{
+	struct oddball_network_state state;
+
+	if (size != (long)sizeof(state))
+		return;
+	csmemcpy(&state, buffer, sizeof(state));
+	csmemcpy(oddball_globals.team_score, state.team_score, sizeof(state.team_score));
+	csmemcpy(oddball_globals.individual_score, state.individual_score, sizeof(state.individual_score));
+	csmemcpy(oddball_globals.ball_spawn_timer, state.ball_spawn_timer, sizeof(state.ball_spawn_timer));
+}
+#endif

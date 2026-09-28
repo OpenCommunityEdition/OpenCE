@@ -73,6 +73,15 @@ void network_game_client_request_immediate_start(
 	void);
 boolean create_global_network_game_server(
 	void);
+#ifdef HALO_LINUX
+/* network.netcode = "distributed": every machine ticks on its own clock
+and predicts its own players, instead of the lockstep of the Xbox game
+(port/linux/NETCODE.md) */
+boolean network_game_distributed(
+	void);
+boolean network_game_distributed_client(
+	void);
+#endif
 
 /* ---------- globals */
 

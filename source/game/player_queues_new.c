@@ -255,6 +255,25 @@ static struct update *update_client_get_update(
 
 /* ---------- globals */
 
+#ifdef HALO_LINUX
+/* The host takes a client's input as it comes, each packet replacing the
+last, and a client sends one a frame (several per tick): a button pressed
+in only one packet between two of the host's ticks would be lost. Every
+button seen since the host's last tick stays down for the next. */
+static unsigned long update_server_pending_control_flags[MAXIMUM_NUMBER_OF_PLAYERS];
+
+/* the distributed netcode (port/linux/NETCODE.md): the latest action the
+host relayed for each player, and the buttons of every relayed update since
+this client's last tick */
+static struct
+{
+	boolean valid;
+	struct player_action action;
+	unsigned long pending_control_flags;
+} update_client_relayed_actions[MAXIMUM_NUMBER_OF_PLAYERS];
+
+#endif
+
 static struct update_server_globals update_server_globals = { 0 };
 static struct update_client_globals update_client_globals = { 0 };
 
@@ -373,6 +392,10 @@ void update_server_next_update(
 			&update->update.actions[queue_index],
 			&queue->current_action,
 			sizeof(struct player_action));
+#ifdef HALO_LINUX
+		update->update.actions[queue_index].control_flags |= update_server_pending_control_flags[queue_index];
+		update_server_pending_control_flags[queue_index] = 0;
+#endif
 		update->update.action_count += 1;
 	}
 	update_client_handle_server_update(&update->update, update_number);
@@ -571,6 +594,66 @@ void update_client_queue_push(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* the local player (of this machine) controlling the player at player_index,
+or NONE */
+static short update_client_local_player_index(
+	short player_index)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		long local_player = local_player_get_player_index(local_player_index);
+
+		if (local_player != NONE && DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player) == player_index)
+			return local_player_index;
+	}
+	return NONE;
+}
+
+/* the distributed netcode's tick (port/linux/NETCODE.md): this machine's
+players from its own input at once, the others from what the host last
+relayed */
+static boolean update_client_dequeue_distributed(
+	struct player_action *actions)
+{
+	struct update_client_queue_datum *queue = (struct update_client_queue_datum *)update_client_globals.queues->data;
+	short queue_index;
+
+	for (queue_index = 0; queue_index < update_client_globals.queues->count; ++queue_index, ++queue)
+	{
+		struct player_action action;
+		short local_player_index = update_client_local_player_index(queue_index);
+
+		csmemset(&action, 0, sizeof(action));
+		action.desired_weapon_index = NONE;
+		action.desired_grenade_index = NONE;
+		action.desired_zoom_level = NONE;
+		if (local_player_index != NONE)
+		{
+			action = update_client_globals.saved_action_collection.actions[local_player_index];
+		}
+		else if (queue_index < MAXIMUM_NUMBER_OF_PLAYERS && update_client_relayed_actions[queue_index].valid)
+		{
+			action = update_client_relayed_actions[queue_index].action;
+			action.control_flags |= update_client_relayed_actions[queue_index].pending_control_flags;
+			update_client_relayed_actions[queue_index].pending_control_flags = 0;
+		}
+		actions[queue_index].control_flags = action.control_flags & ~queue->latched_control_flags;
+		queue->latched_control_flags = action.control_flags & LATCHED_CONTROL_FLAGS;
+		actions[queue_index].desired_facing = action.desired_facing;
+		actions[queue_index].throttle = action.throttle;
+		actions[queue_index].primary_trigger = action.primary_trigger;
+		actions[queue_index].desired_weapon_index = action.desired_weapon_index;
+		actions[queue_index].desired_grenade_index = action.desired_grenade_index;
+		actions[queue_index].desired_zoom_level = action.desired_zoom_level;
+	}
+	update_client_globals.next_update_number_to_dequeue += 1;
+	return TRUE;
+}
+
+#endif
 boolean update_client_dequeue(
 	struct player_action *actions)
 {
@@ -582,6 +665,10 @@ boolean update_client_dequeue(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 		0x1AF,
 		update_client_globals.initialized);
+#ifdef HALO_LINUX
+	if (game_connection() == _game_connection_network_client && network_game_distributed())
+		return update_client_dequeue_distributed(actions);
+#endif
 	update = update_client_get_update(update_client_globals.next_update_number_to_dequeue);
 	if (!update ||
 		update_client_globals.next_update_number_to_dequeue>update_client_globals.latest_update_number_received ||
@@ -721,6 +808,10 @@ void update_server_handle_client_update(
 				player_list[player_index]);
 
 			queue->current_action = actions[action_index++];
+#ifdef HALO_LINUX
+			update_server_pending_control_flags[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[player_index])] |=
+				queue->current_action.control_flags;
+#endif
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 				0x238,
@@ -756,6 +847,21 @@ void update_client_handle_server_update(
 {
 	struct update *client_update = update_client_get_update(update_number);
 
+#ifdef HALO_LINUX
+	if (game_connection() == _game_connection_network_client && network_game_distributed())
+	{
+		short action_index;
+
+		for (action_index = 0;
+			action_index < update->action_count && action_index < MAXIMUM_NUMBER_OF_PLAYERS;
+			action_index++)
+		{
+			update_client_relayed_actions[action_index].valid = TRUE;
+			update_client_relayed_actions[action_index].action = update->actions[action_index];
+			update_client_relayed_actions[action_index].pending_control_flags |= update->actions[action_index].control_flags;
+		}
+	}
+#endif
 	if (client_update)
 	{
 		client_update->update_number = update_number;
@@ -795,6 +901,10 @@ void update_client_handle_server_update(
 void update_queues_reset_and_fill_with_lies(
 	void)
 {
+#ifdef HALO_LINUX
+	csmemset(update_server_pending_control_flags, 0, sizeof(update_server_pending_control_flags));
+	csmemset(update_client_relayed_actions, 0, sizeof(update_client_relayed_actions));
+#endif
 	if (update_server_globals.initialized)
 	{
 		update_server_globals.next_update_number_to_build = 0;

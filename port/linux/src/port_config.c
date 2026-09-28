@@ -108,6 +108,10 @@ static const struct config_setting config_settings[] =
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
+	{ "network.netcode", _config_string, "\"distributed\"", "HALO_NETCODE", _environment_value, _platform_all,
+		"\"distributed\" (work in progress, port/linux/NETCODE.md) predicts each\n"
+		"player's own moves and lets the host decide the rest; \"lockstep\" plays\n"
+		"system link as the Xbox game did. Every machine must use the same." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
@@ -134,6 +138,17 @@ static const struct config_setting config_settings[] =
 		"The Discord application internet play invites go through while the\n"
 		"Discord desktop client runs; empty for none." },
 
+	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
+		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
+		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found;\n"
+		"empty for none." },
+	{ "debug.network_test_start", _config_real, "15.0", "HALO_NETWORK_TEST_START", _environment_value, _platform_all,
+		"Seconds after hosting that an automated test game starts." },
+	{ "debug.network_test_kill", _config_real, "0.0", "HALO_NETWORK_TEST_KILL", _environment_value, _platform_all,
+		"Every this many seconds an automated test host kills its last player; 0 never." },
+	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
+		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
+		"network tests); empty for none." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,

@@ -267,6 +267,11 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #endif
 
+#ifdef HALO_LINUX
+/* port/linux/game/network_distributed.c's */
+void network_distributed_handle_message(long machine_index, word const *message, word size);
+#endif
+
 /* ---------- constants */
 
 enum
@@ -651,6 +656,80 @@ boolean network_game_server_send_message_to_machine(
 	return result;
 }
 
+#ifdef HALO_LINUX
+/* the distributed netcode's per-tick state (port/linux/game/network_distributed.c),
+unreliably (a lost one is overtaken by the next) to every machine in the game */
+boolean network_distributed_server_send_to_all(
+	void *message,
+	word size)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	boolean result = TRUE;
+	long machine_index;
+
+	if (!server)
+		return FALSE;
+	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, machine_index);
+
+		if (network_game_server_client_machine_is_joined_to_game(server, machine))
+		{
+			struct network_connection *connection = network_game_server_get_client_connection(machine);
+			byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+
+			if (connection && network_connection_active(connection) && size <= sizeof(buffer))
+			{
+				struct transport_address address;
+
+				/* from the game's public datagram endpoint (the one clients send
+				their game updates to) to the client's, at the address its
+				connection comes from */
+				network_connection_get_address(connection, &address, NULL);
+				address.port = NETWORK_GAME_CLIENT_PORT;
+				/* (the write swaps the header in place) */
+				csmemcpy(buffer, message, size);
+				result &= network_game_server_write(network_game_server_get_connection(server), buffer, size, &address, 0);
+			}
+		}
+	}
+	return result;
+}
+
+/* the same, reliably (the netcode's items appearing and going must not be
+lost) */
+boolean network_distributed_server_send_to_all_reliably(
+	void *message,
+	word size)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	boolean result = TRUE;
+	long machine_index;
+
+	if (!server)
+		return FALSE;
+	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, machine_index);
+
+		if (network_game_server_client_machine_is_joined_to_game(server, machine))
+		{
+			struct network_connection *connection = network_game_server_get_client_connection(machine);
+			byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+
+			if (connection && network_connection_active(connection) && size <= sizeof(buffer))
+			{
+				csmemcpy(buffer, message, size);
+				result &= network_game_server_write(connection, buffer, size, NULL, 1);
+			}
+		}
+	}
+	return result;
+}
+
+#endif
 boolean network_game_server_send_message_to_all_machines(
 	struct network_game_server *server,
 	struct network_message *message)
@@ -1094,7 +1173,18 @@ boolean network_game_server_handle_client_message(
 				break;
 
 			case _message_type_data:
+#ifdef HALO_LINUX
+				/* the distributed netcode's messages (port/linux/NETCODE.md) */
+				if (network_game_server_client_machine_is_joined_to_game(server, machine))
+				{
+					long machine_index;
+
+					network_game_server_get_client_machine(server, machine, &machine_index);
+					network_distributed_handle_message(machine_index, message, message_buffer_size);
+				}
+#else
 				network_event("server received a bad message type from a client (_message_type_data)");
+#endif
 				break;
 
 			case _message_type_error:
@@ -1268,9 +1358,25 @@ boolean network_game_server_handle_datagram(
 			break;
 
 			case _message_type_data:
+#ifdef HALO_LINUX
+				/* the distributed netcode's messages (port/linux/NETCODE.md) */
+				{
+					struct network_game_server_client_machine *client_machine =
+						network_game_server_get_client_machine_at_address(server, source_address->address.long_words[0]);
+
+					if (client_machine && network_game_server_get_state(server, NULL) == _network_game_server_state_ingame)
+					{
+						long machine_index;
+
+						network_game_server_get_client_machine(server, client_machine, &machine_index);
+						network_distributed_handle_message(machine_index, message, datagram_size);
+					}
+				}
+#else
 				network_event(
 					"server received a bad message type (_message_type_data); sender= '%s'",
 					transport_address_to_string(source_address));
+#endif
 				break;
 
 			case _message_type_error:

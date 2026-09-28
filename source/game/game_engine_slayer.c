@@ -704,3 +704,25 @@ struct game_engine slayer_engine =
 	NULL,
 	NULL,
 };
+
+#ifdef HALO_LINUX
+/* the distributed netcode (port/linux/game/network_distributed.c): the game
+type's state the host sends its clients, which take it as it is */
+long game_engine_slayer_write_network_state(
+	byte *buffer,
+	long size)
+{
+	if (size < (long)sizeof(slayer_globals))
+		return 0;
+	csmemcpy(buffer, &slayer_globals, sizeof(slayer_globals));
+	return sizeof(slayer_globals);
+}
+
+void game_engine_slayer_read_network_state(
+	byte const *buffer,
+	long size)
+{
+	if (size == (long)sizeof(slayer_globals))
+		csmemcpy(&slayer_globals, buffer, sizeof(slayer_globals));
+}
+#endif

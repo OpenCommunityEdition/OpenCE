@@ -1725,7 +1725,13 @@ boolean network_game_client_handle_game_update(
 			message_packet->update_number);
 		network_game_client_game_out_of_sync(client);
 	}
-	else if (!global_network_game_server_get())
+	else if (!global_network_game_server_get()
+#ifdef HALO_LINUX
+		/* (the distributed netcode's machines simulate on their own clocks,
+		so the host's seed at a tick says nothing about a client's) */
+		&& !network_game_distributed()
+#endif
+		)
 	{
 		if (game_time_get() == message_packet->update_number &&
 			message_packet->game_time != game_time_get())
@@ -2976,3 +2982,42 @@ static void network_game_client_set_error(
 
 	return;
 }
+#ifdef HALO_LINUX
+
+/* the native ports' automated network tests (port/linux/game/network_test.c):
+joins the first open game the client's search has found, as picking it in
+the system link list does (network_game_join_game_from_server_list) */
+boolean network_game_client_join_first_available_game(
+	void)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	long game_index;
+
+	if (!client || client->state != _network_game_client_state_searching || client->join_in_progress ||
+		!client->connection || network_connection_connected(client->connection))
+	{
+		return FALSE;
+	}
+	for (game_index = 0; game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; game_index++)
+	{
+		struct network_advertised_game *game = &client->available_games[game_index];
+
+		if (network_game_client_advertised_game_is_valid(game) &&
+			game->platform == network_game_get_local_platform() && game->open)
+		{
+			struct transport_address address = { { { 0 } } };
+			struct network_join_parameters join_parameters;
+
+			csmemset(&join_parameters, 0, sizeof(join_parameters));
+			transport_client_start((XNADDR const *)&game->xnaddr, (XNKEY const *)&game->key,
+				(XNKID const *)&game->key_id, NETWORK_GAME_SERVER_PORT, &address);
+			if (!address.address.long_words[0] || !address.port)
+				return FALSE;
+			network_game_generate_join_game_token(join_parameters.join_token);
+			return network_game_client_initiate_join_game(client, game, &join_parameters, &address);
+		}
+	}
+	return FALSE;
+}
+
+#endif

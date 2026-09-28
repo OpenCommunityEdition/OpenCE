@@ -200,6 +200,11 @@ symbols in this file:
 #include "networking/network_client_message_handler.h"
 #include "networking/network_messages.h"
 
+#ifdef HALO_LINUX
+/* port/linux/game/network_distributed.c's */
+void network_distributed_handle_message(long machine_index, word const *message, word size);
+#endif
+
 /* ---------- constants */
 
 #define NETWORK_CLIENT_MESSAGE_HANDLER_FILE "c:\\halo\\SOURCE\\networking\\network_client_message_handler.c"
@@ -731,7 +736,12 @@ boolean network_game_client_handle_message(
 				break;
 
 			case _message_type_data:
+#ifdef HALO_LINUX
+				/* the distributed netcode's messages (port/linux/NETCODE.md) */
+				network_distributed_handle_message(NONE, message, message_size);
+#else
 				network_event("client received a bad message type (_message_type_data)");
+#endif
 				break;
 
 			case _message_type_error:

@@ -35,6 +35,10 @@ void network_game_client_keep_alive(
 short network_game_client_get_state(
 	struct network_game_client *client,
 	short *state_data);
+#ifdef HALO_LINUX
+boolean network_game_client_join_first_available_game(
+	void);
+#endif
 boolean network_game_client_initiate_join_game(
 	struct network_game_client *client,
 	struct network_advertised_game *game,

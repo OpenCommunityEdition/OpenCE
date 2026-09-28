@@ -205,6 +205,38 @@ once a frame, at the display's refresh rate. */
 #define WHEEL_PRESS_MS 50
 #define WHEEL_SCROLL_GAP_MS 200
 
+/* debug.test_input "bot:<seed>": a scripted player for the automated
+network tests (port/linux/game/network_test.c), different for each seed:
+it walks and strafes in circles, turns, fires every few seconds and jumps
+now and then */
+static void test_input_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static int checked;
+	static int seed = -1;
+	double t;
+
+	if (!checked)
+	{
+		const char *setting = config_string("debug.test_input");
+
+		checked = 1;
+		if (!strncmp(setting, "bot:", 4))
+			seed = atoi(setting + 4);
+		else if (!strcmp(setting, "bot"))
+			seed = 0;
+	}
+	if (seed < 0)
+		return;
+	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
+	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
+	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
+	pad->sThumbRX = (SHORT)(sin(t * 0.4) * 14000.0);
+	if (fmod(t, 3.0) < 0.3)
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+	if (fmod(t, 5.0) < 0.1)
+		pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+}
+
 static void wheel_update(void)
 {
 	Uint64 now = SDL_GetTicks();
@@ -449,6 +481,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			keyboard_gamepad(&input, &state->Gamepad);
 		if (count > 0)
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		test_input_gamepad(&state->Gamepad);
 	}
 	else if (port < count)
 	{

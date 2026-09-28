@@ -1146,3 +1146,26 @@ struct game_engine king_engine =
 	NULL,
 	NULL,
 };
+
+#ifdef HALO_LINUX
+/* the distributed netcode (port/linux/game/network_distributed.c): the game
+type's state the host sends its clients, which take it as it is (the
+scores and the hill, which moves) */
+long game_engine_king_write_network_state(
+	byte *buffer,
+	long size)
+{
+	if (size < (long)sizeof(king_globals))
+		return 0;
+	csmemcpy(buffer, &king_globals, sizeof(king_globals));
+	return sizeof(king_globals);
+}
+
+void game_engine_king_read_network_state(
+	byte const *buffer,
+	long size)
+{
+	if (size == (long)sizeof(king_globals))
+		csmemcpy(&king_globals, buffer, sizeof(king_globals));
+}
+#endif

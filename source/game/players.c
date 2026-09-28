@@ -276,6 +276,18 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 
+#ifdef HALO_LINUX
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
+/* whether this machine decides pickups: not a client of the distributed
+netcode, whose players' weapons, grenades and power-ups are the host's
+(port/linux/game/network_distributed.c) */
+#define players_decide_pickups() (!network_game_distributed_client())
+#else
+#define players_decide_pickups() TRUE
+#endif
+
 /* ---------- constants */
 
 enum
@@ -1384,6 +1396,24 @@ static void player_spawn(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* the distributed netcode: a client spawns a player when the host has
+(port/linux/game/network_distributed.c), where the host's state then puts
+it */
+void network_player_spawn(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	if (player->unit_index != NONE)
+		return;
+	game_engine_prespawn_player_update(player_index);
+	player_spawn(player_index);
+	if (player->unit_index != NONE)
+		game_engine_postspawn_player_update(player_index);
+}
+#endif
+
 /* Exact: January emits this private dead-unit replacement helper from the
    reconstructed player_teleport_internal caller below. */
 static void player_pseudo_kill(
@@ -2412,6 +2442,8 @@ static boolean player_handle_weapon_swap(
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	result = FALSE;
+	if (!players_decide_pickups())
+		return result;
 	switch (player->action_result)
 	{
 	case _player_action_result_swap_for_weapon:
@@ -2836,7 +2868,7 @@ static void player_examine_nearby_item(
 		{
 			inventory_item_index =
 				unit->unit.weapon_object_indices[inventory_index];
-			if (inventory_item_index != NONE &&
+			if (inventory_item_index != NONE && players_decide_pickups() &&
 				weapon_handle_potential_inventory_item(
 					inventory_item_index,
 					item_index,
@@ -2861,7 +2893,7 @@ static void player_examine_nearby_item(
 		equipment_definition = equipment_definition_get(equipment->definition_index);
 		if (equipment_definition->equipment.powerup_type == _equipment_powerup_grenade)
 		{
-			if (unit_add_grenade_to_inventory(player->unit_index, item_index))
+			if (players_decide_pickups() && unit_add_grenade_to_inventory(player->unit_index, item_index))
 			{
 				hud_picked_up_grenade(
 					player->local_player_index,
@@ -2873,7 +2905,8 @@ static void player_examine_nearby_item(
 			current_equipment_index = unit_get_current_equipment(player->unit_index);
 			if (current_equipment_index == NONE)
 			{
-				player_handle_powerup_equipment(player_index, item_index);
+				if (players_decide_pickups())
+					player_handle_powerup_equipment(player_index, item_index);
 			}
 			else
 			{
@@ -2950,7 +2983,8 @@ static void player_examine_nearby_item(
 
 		if (unit_should_autopick_weapon(player->unit_index, weapon_item_index))
 		{
-			if (unit_add_weapon_to_inventory(
+			if (players_decide_pickups() &&
+				unit_add_weapon_to_inventory(
 				player->unit_index,
 				weapon_item_index,
 				TRUE))
@@ -3412,7 +3446,13 @@ void players_update_before_game(
 			{
 				if (game_engine_running())
 				{
-					if (game_engine_should_spawn_player(iterator.datum_index))
+					/* (a client of the distributed netcode spawns players when the
+					host has, network_player_spawn) */
+					if (
+#ifdef HALO_LINUX
+						!network_game_distributed_client() &&
+#endif
+						game_engine_should_spawn_player(iterator.datum_index))
 					{
 						game_engine_prespawn_player_update(iterator.datum_index);
 						player_spawn(iterator.datum_index);

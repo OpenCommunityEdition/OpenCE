@@ -138,6 +138,15 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 
+#ifdef HALO_LINUX
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
+/* set while a distributed client carries out a kill it does not decide (an
+act of god: the host's word, network_distributed.c, or the world's) */
+static boolean distributed_damage_authorized;
+#endif
+
 /* ---------- constants */
 
 enum
@@ -1360,6 +1369,13 @@ void object_cause_damage(
 	short object_number;
 	long damaged_object_indices[16];
 
+#ifdef HALO_LINUX
+	/* the distributed netcode: only the host decides damage, which reaches
+	the clients as the units' state (port/linux/NETCODE.md) */
+	if (network_game_distributed_client() && !distributed_damage_authorized)
+		return;
+#endif
+
 	damage_effect = damage_effect_definition_get(damage->definition_index);
 	damage_definition = &damage_effect->damage;
 	damage_was_modified = FALSE;
@@ -1870,6 +1886,9 @@ void object_damage_update(
 					SET_FLAG(damage.flags, _damage_no_statistics_bit, TRUE);
 				}
 
+#ifdef HALO_LINUX
+				distributed_damage_authorized = TRUE;
+#endif
 				object_cause_damage(
 					&damage,
 					object_index,
@@ -1877,6 +1896,9 @@ void object_damage_update(
 					NONE,
 					NONE,
 					NULL);
+#ifdef HALO_LINUX
+				distributed_damage_authorized = FALSE;
+#endif
 			}
 		}
 
@@ -2501,3 +2523,30 @@ static void object_permutation_shield_regions(
 
 	return;
 }
+
+#ifdef HALO_LINUX
+/* the automated network tests (port/linux/game/network_test.c): kills the
+object as falling damage does (an act of god), but credited to a player, so
+that the kill counts in the game's scores */
+void damage_kill_object_for_player(
+	long object_index,
+	long player_index)
+{
+	struct game_globals_falling_damage *falling_damage = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->falling_damage,
+		0,
+		struct game_globals_falling_damage);
+	struct player_datum *player = player_get(player_index);
+	struct damage_data damage;
+
+	if (falling_damage->falling_damage.index == NONE)
+		return;
+	damage_data_new(&damage, falling_damage->falling_damage.index);
+	damage.scale = 1.f;
+	SET_FLAG(damage.flags, _damage_kill_instantly_bit, TRUE);
+	damage.owner_player_index = player_index;
+	damage.owner_object_index = player->unit_index;
+	damage.owner_team_index = (short)player->team_index;
+	object_cause_damage(&damage, object_index, NONE, NONE, NONE, NULL);
+}
+#endif

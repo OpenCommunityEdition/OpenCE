@@ -292,6 +292,46 @@ struct player_action_collection_definition player_action_collection_definition =
 
 /* ---------- public code */
 
+#ifdef HALO_LINUX
+/* the distributed netcode's per-tick state (port/linux/game/network_distributed.c),
+unreliably to the host, as the game update is */
+boolean network_distributed_client_send(
+	void *message,
+	word size)
+{
+	struct transport_address remote_server_address;
+	byte buffer[0x1000];
+
+	if (!global_network_game_client || size > sizeof(buffer))
+		return FALSE;
+	/* (the write swaps the header in place) */
+	csmemcpy(buffer, message, size);
+	network_game_client_get_remote_server_address(global_network_game_client, &remote_server_address);
+	return network_game_client_write(network_game_client_get_connection(global_network_game_client),
+		(message_header *)buffer, size, &remote_server_address, 0);
+}
+
+/* the platform layer's (port/linux/src/port_config.c) */
+char const *config_string(char const *name);
+
+/* a client of the distributed netcode, which decides nothing the host does */
+boolean network_game_distributed_client(
+	void)
+{
+	return game_connection() == _game_connection_network_client && network_game_distributed();
+}
+
+boolean network_game_distributed(
+	void)
+{
+	static short distributed = NONE;
+
+	if (distributed == NONE)
+		distributed = !csstrcmp(config_string("network.netcode"), "distributed");
+	return distributed;
+}
+
+#endif
 boolean network_game_is_active(
 	void)
 {
