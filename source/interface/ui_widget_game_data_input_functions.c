@@ -2914,22 +2914,25 @@ static void multiplayer_game_directions(
 
 	if (server)
 	{
-		if (!network_game_is_splitscreen_local() &&
+		boolean waiting_for_machines = !network_game_is_splitscreen_local() &&
 			game &&
-			game->machine_count < 2)
-		{
-			widget->parameters.text_box.string_list_index =
-				_multiplayer_game_text_string_waiting_for_machine;
-			widget->visible = TRUE;
-			return;
-		}
+			game->machine_count < 2;
 
-		if (network_game_is_splitscreen_local() &&
+		if (!waiting_for_machines &&
+			network_game_is_splitscreen_local() &&
 			game &&
 			game->player_count < 2)
 		{
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_waiting_for_player;
+			widget->visible = TRUE;
+			return;
+		}
+
+		if (waiting_for_machines)
+		{
+			widget->parameters.text_box.string_list_index =
+				_multiplayer_game_text_string_waiting_for_machine;
 			widget->visible = TRUE;
 			return;
 		}
@@ -2939,8 +2942,8 @@ static void multiplayer_game_directions(
 		game->variant.has_teams == TRUE &&
 		network_game_client_get_seconds_to_game_start(global_network_game_client_get()) < 0)
 	{
-		long team_zero_player_count = 0;
 		long team_one_player_count = 0;
+		long team_zero_player_count = 0;
 		long player_index;
 
 		for (player_index = 0;
@@ -2965,12 +2968,13 @@ static void multiplayer_game_directions(
 		{
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_teams_ready;
-			widget->visible = TRUE;
-			return;
+		}
+		else
+		{
+			widget->parameters.text_box.string_list_index =
+				_multiplayer_game_text_string_waiting_for_teams;
 		}
 
-		widget->parameters.text_box.string_list_index =
-			_multiplayer_game_text_string_waiting_for_teams;
 		widget->visible = TRUE;
 		return;
 	}
