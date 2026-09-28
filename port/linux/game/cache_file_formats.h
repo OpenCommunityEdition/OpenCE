@@ -430,6 +430,16 @@ void *custom_edition_cache_block_element(
 	int32_t element_index,
 	uint32_t element_bytes);
 
+/* The bytes the tag data field at `data` holds, in a tag of a tag cache
+custom_edition_cache_load filled, with their count in `*size`, or NULL
+unless there are some and they lie within the tag cache: any value may be
+asked about. */
+void *custom_edition_cache_data_get(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	void const *data,
+	uint32_t *size);
+
 /* The path of tag `tag_index` of a tag cache custom_edition_cache_load
 filled, for messages. */
 char const *custom_edition_cache_tag_name(

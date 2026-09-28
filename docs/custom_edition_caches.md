@@ -10,12 +10,13 @@ and `loc.map`. The byte-matching build is not affected: every game-source
 change is under `#ifdef HALO_LINUX`, and all 621 matching objects compile to
 the same bytes as before (see [Verification](#verification)).
 
-**Two maps have been seen running, with limits.** In the Windows debug build,
-the stock Custom Edition `bloodgulch.map` and the OpenSauce
-`beavercreek_halo3.yelo` load, draw their levels, models, sky and HUD with
-their textures and spawn a player: `bloodgulch.map` in slayer,
-`beavercreek_halo3.yelo` in slayer, capture the flag, king of the hill and
-oddball. Custom Edition's tags were made for Halo PC's renderer, and this
+**Three maps have been seen running, with limits.** In the Windows debug
+build, the stock Custom Edition `bloodgulch.map`, the OpenSauce
+`beavercreek_halo3.yelo` and the custom `hugeass.map` load, draw their
+levels, models, sky and HUD with their textures and spawn a player:
+`bloodgulch.map` in slayer, `beavercreek_halo3.yelo` in slayer, capture the
+flag, king of the hill and oddball, `hugeass.map` (which runs scripts) in
+slayer and capture the flag. Custom Edition's tags were made for Halo PC's renderer, and this
 build draws with the Xbox's: where Halo PC wants data the Xbox does not (a
 channel order, a bitmap resolution, a text placeholder), the data is
 converted, and what was found of that so far is below; what is left is under
@@ -31,7 +32,7 @@ usually do.
 | --- | --- | --- |
 | **1. Recognize** | Tell the format and variant from the header alone, check every header field against the file, and name what the map needs: its resource maps, an OpenSauce mod set, memory upgrades | **Done**, in the loader, the report tool and the game (which, by default, names the format and refuses the map) |
 | **2. Load** | Put the map's tag data where its pointers expect it (`0x40440000`), read the tags kept in resource maps and relocate their pointers, and check every tag instance, name and address, every structure BSP (file range, header, lightmap materials), every model part's geometry, every bitmap's pixels and every sound's samples (range in their file), and the header checksum | **Done** in the loader, the report tool (`cache_file_report`) and the game, with the limits under [Assumptions](#assumptions-not-verified) |
-| **3. Run** | The game starts the map, draws it, plays its sounds and runs its scripts | **Reached for `bloodgulch.map` and `beavercreek_halo3.yelo`, as far as observed** (below); not established for any other map, and not for scripts, Ogg Vorbis sounds or OpenSauce's own features |
+| **3. Run** | The game starts the map, draws it, plays its sounds and runs its scripts | **Reached for `bloodgulch.map`, `beavercreek_halo3.yelo` and `hugeass.map`, as far as observed** (below); not established for any other map, and not for Ogg Vorbis sounds or OpenSauce's own features |
 
 ## Running a map
 
@@ -261,6 +262,18 @@ changed:
   fit were drawn as the default one. The native builds' texture cache is
   twice the Xbox's (`halo_port_capacity.h`), for every map; with that map
   loaded, 52 MB of the 128 MB memory window were still free.
+- **Scripts.** A compiled script names each function it calls, and each
+  engine global it uses, by its index in the engine's tables, and Halo PC's
+  tables have entries this build's do not, in among the ones both have: from
+  some point on, an index names another entry here
+  ([Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)).
+  `hugeass.map`'s day and night script would call `playback` instead of
+  `switch_bsp`. A compiled script also keeps every name, in its string data,
+  so every call and every engine global is found again by name with the
+  game's own `hs_find_function_by_name` and `hs_find_global_by_name`
+  (`custom_edition_scripts.c`); a map whose scripts use one this build does
+  not have is refused and the names logged. The value types are numbered
+  alike in both builds.
 - **Multiplayer vehicles.** `game_engine_predict_resources` takes the three
   multiplayer vehicles Xbox globals always have; `beavercreek_halo3.yelo` has
   one, and oddball stopped on it. With fewer than three, the native builds
@@ -394,6 +407,20 @@ compared with the Xbox's data and with a screenshot the owner supplied of
 | `bloodgulch.map`, slayer | the HUD at the Xbox's size (the shield meter, the health meter under it, the ammunition counters and meters, with each round drawn) and `Hold BACK for score` |
 | both | multipurpose maps drawn with their masks where this build's shaders read them (66 in `beavercreek_halo3.yelo`, 56 in `bloodgulch.map`), and the ammunition and unit meters (3 and 2) in this build's order |
 
+`hugeass.map` (59 MB, a custom map from 2005, with the stock resource maps)
+was run next, at the owner's request: in slayer for 40 and 60 seconds and in
+capture the flag for 45. Before the script conversion its scripts ran with
+Halo PC's indices; with it, 3 calls (`switch_bsp` twice,
+`cinematic_set_title`) and 1 engine global (`rider_ejection`) were given
+this build's index, as the offline comparison predicted. The player spawned
+in the map's hangar, which opens on a starfield, walked, got into a jet and
+fired; no error was logged but the map's own `NETGAME MAP FAILURE: failed to
+find enough spawn points for king 2/4` and the silenced sounds' message.
+Whether the hangar is as dark as Custom Edition draws it was not checked
+(its lightmaps average 78 to 184 of 255, as bright as Blood Gulch's). A
+failure after the models are converted used to stop on the game's `free` of
+NULL when releasing what was never allocated; that path now checks first.
+
 Before the sound conversion, the log filled with that message: the map's
 copy of every resource-held sound's header says it is uncompressed. The game
 checks a sound's format before its pitch ranges (`sound_new_impulse` in
@@ -405,14 +432,16 @@ not be listened to.
 
 ### Not tested or not observed
 
-- **Playing.** No input was given: the player spawned and stood still. No
-  weapon was fired, no vehicle driven, no second player joined, and no game
-  was played to its end.
+- **Playing.** Nobody played: the runs were given no input on purpose, and
+  what the player did in them (in later runs it moved, fired and got into
+  vehicles) was not directed and its source was not identified. No second
+  player joined, and no game was played to its end.
 - **Sound output** was not listened to (above).
-- **Scripts.** Neither map runs a script (both have no script nodes in use);
-  whether Custom Edition's compiled scripts call the functions this build
-  has at the same indices is not established.
-- **Other maps.** Only the two above were run. The stock maps load and
+- **Scripts.** Only `hugeass.map`'s were run, and only as far as a minute of
+  play reaches: its day and night switch was not seen to happen. Every call
+  and engine global of the other maps' scripts is found by name here too
+  (the table below), but what they do was not watched.
+- **Other maps.** Only the three above were run. The stock maps load and
   convert in the report tool with the same code; the game-side conversion
   was not tried on them.
 - **Release builds** (`configure.py --release`), and the **Linux and Android
@@ -491,6 +520,7 @@ every layout used was then checked against the sample maps.
 | Multipurpose maps: Custom Edition's red, green, blue and alpha hold what the Xbox's alpha, green, red and blue do | the multipurpose maps the Custom Edition and the Xbox `bloodgulch.map` share, decoded and compared channel by channel (the cyborg's, the warthog's, the boulders') |
 | HUD meters: Custom Edition's alpha holds the Xbox's color (the fill order), and its color the Xbox's alpha (the shape) | `hud_ammo_meters`: Custom Edition's 512×512 A8R8G8B8 averaged down to the Xbox's 256×256 A8Y8 differs from the Xbox's luminance by 6.6 on average in alpha and 23 in color, and from its alpha by 12.3 in color and 23.4 in alpha; `hud_unit_meters` has its sprites rearranged, and shows the same swap when viewed. January's meter shader reads the fill order from color and discards texels without alpha |
 | HUD elements flagged *use high resolution scale* draw bitmaps twice the Xbox's size; others the same size | every unit and weapon HUD placement of `bloodgulch.map` whose tag the Xbox map also has (the motion sensor's foreground, unflagged, uses a 128×128 bitmap in both) |
+| Script function and engine global tables: Halo PC's have entries this build's lacks, so a compiled index names another entry from some point on; value types are numbered alike | the compiled scripts of the sample, each call's function index against the name its first child keeps, and each engine global's index against its name: `timberland.map` 23 calls shifted (`player_effect_start` by 29), `ui.map` 11 (`camera_set` by 1), `hugeass.map` 3 calls and 1 global (`rider_ejection`, 158 against 147), `extinctionrevanepic2.map` 9 calls, and 4 of a function this build lacks; no other stock map has scripts; each call's value type is the type of its function here (1,485 of 1,485 in `hugeass.map`), or one the call site casts to |
 | Bitmaps the Xbox keeps in monochrome formats and Custom Edition as 32-bit color at the same size keep their channels (A8Y8 as A8R8G8B8 with red the luminance and alpha the alpha) | 24 of the 26 such bitmaps of `bloodgulch.map` decode to exactly the Xbox's values; the other 2 have other content |
 
 ### Assumptions (not verified)
@@ -552,9 +582,10 @@ every layout used was then checked against the sample maps.
 - **Silenced sounds still log.** Playing a silenced Ogg Vorbis sound logs
   `attempt to play a sound that was not a mono 22k compressed sound ...`,
   which debug builds also print on the screen.
-- **Scripts** of Custom Edition maps are untested (above), and OpenSauce's
-  script extensions and other runtime features (`project_yellow`) do not
-  exist here.
+- **Scripts that use what this build does not have** are refused: of the
+  sample, `extinctionrevanepic2.map` calls OpenSauce's
+  `pp_set_effect_instance_active` (4 times), and needs a mod set anyway.
+  OpenSauce's other runtime features (`project_yellow`) do not exist here.
 - **The conversions are one-way and in memory:** nothing is written to the
   map files.
 

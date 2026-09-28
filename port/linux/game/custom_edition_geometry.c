@@ -593,8 +593,16 @@ void custom_edition_models_dispose(
 		rasterizer_triangle_buffer_delete(&globals->model_parts[part_index]->triangle_buffer);
 		rasterizer_vertex_buffer_delete(&globals->model_parts[part_index]->vertex_buffer);
 	}
-	free(globals->model_parts);
-	free(globals->model_geometry);
+	/* the game's free stops on NULL (cseries.h), and a map can fail before
+	its models are converted */
+	if (globals->model_parts)
+	{
+		free(globals->model_parts);
+	}
+	if (globals->model_geometry)
+	{
+		free(globals->model_geometry);
+	}
 	globals->model_parts = NULL;
 	globals->model_part_count = 0;
 	globals->model_geometry = NULL;

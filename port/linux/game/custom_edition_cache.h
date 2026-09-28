@@ -98,6 +98,16 @@ void custom_edition_bitmap_pixels_arrived(
 	long offset,
 	void *pixels);
 
+/* ---------- prototypes/CUSTOM_EDITION_SCRIPTS.C */
+
+/* Gives every function call and engine global reference of the scripts of
+a tag cache custom_edition_cache_load filled this build's index for the
+name the script keeps; FALSE after logging why when a script uses one this
+build does not have or does not keep its name. */
+boolean custom_edition_scripts_convert(
+	byte *tag_cache,
+	unsigned long loaded_bytes);
+
 /* ---------- prototypes/CUSTOM_EDITION_GEOMETRY.C */
 
 /* Gives every model of a tag cache custom_edition_cache_load filled

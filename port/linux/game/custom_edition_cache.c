@@ -293,6 +293,7 @@ static boolean custom_edition_cache_tags_convert(
 
 	return custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&
 		custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes) &&
+		custom_edition_scripts_convert(tag_cache, loaded_bytes) &&
 		custom_edition_cache_models_convert(tag_cache, report);
 }
 

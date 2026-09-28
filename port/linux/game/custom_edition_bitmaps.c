@@ -615,7 +615,12 @@ void custom_edition_bitmaps_dispose(
 {
 	struct custom_edition_bitmaps_globals *globals = &custom_edition_bitmaps_globals;
 
-	free(globals->reordered_bitmaps);
+	/* the game's free stops on NULL (cseries.h), and a map can fail before
+	its bitmaps are listed */
+	if (globals->reordered_bitmaps)
+	{
+		free(globals->reordered_bitmaps);
+	}
 	globals->reordered_bitmaps = NULL;
 	globals->reordered_bitmap_count = 0;
 	globals->reordered_bitmap_capacity = 0;

@@ -2497,6 +2497,34 @@ void *custom_edition_cache_block_element(
 	return tag_cache + elements_offset + (uint32_t)element_index * element_bytes;
 }
 
+void *custom_edition_cache_data_get(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes,
+	void const *data,
+	uint32_t *size)
+{
+	struct load_state state;
+	uint8_t const *field = data;
+	int32_t data_size;
+	uint32_t data_offset;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	if (field < tag_cache ||
+		!range_fits((uint32_t)(field - tag_cache), TAG_DATA_BYTES, loaded_bytes))
+	{
+		return NULL;
+	}
+	data_size = read_s32(field + TAG_DATA_SIZE_OFFSET);
+	if (data_size <= 0 ||
+		!tag_cache_offset(&state, read_u32(field + TAG_DATA_ADDRESS_OFFSET), (uint32_t)data_size, &data_offset))
+	{
+		return NULL;
+	}
+	*size = (uint32_t)data_size;
+
+	return tag_cache + data_offset;
+}
+
 char const *custom_edition_cache_tag_name(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes,
