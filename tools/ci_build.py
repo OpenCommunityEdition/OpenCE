@@ -73,6 +73,11 @@ def main() -> int:
     for output in outputs:
         shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)
+    if args.platform != "android":
+        # the desktop builds' disc image reader (port/linux/src/xiso.c)
+        # follows extract-xiso, whose license asks binaries to carry its
+        # notice
+        shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
     return 0
 
 

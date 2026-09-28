@@ -34,9 +34,18 @@ build/linux/halo
 
 The game data (the directory holding `maps/`) is found automatically:
 `paths.data` in `config.toml` if set (see Settings), else the current
-directory when it has `maps/`, else `assets/`, looked up in the current
-directory and in the repository that holds the executable. It must be the PAL data of this build
+directory when it has `maps/`, else the executable's directory, else
+`assets/`, looked up in the current directory and in the repository that
+holds the executable. It must be the PAL data of this build
 (01.01.14.2342); the game rejects cache files from any other build.
+
+Without game data, the desktop ports (Linux and Windows) offer to extract
+the `maps` folder from an Xbox disc image (`.iso`) of the game: answering
+No quits; Yes opens a file picker, then copies the folder next to the
+executable with a progress window (`src/xiso.c`, which reads the disc image
+as [extract-xiso](../third_party/extract-xiso) does). It is written to
+`maps.partial` and renamed to `maps` once complete, so an interrupted
+extraction is simply asked for again at the next start.
 
 `d:\` is the data root. Every other Xbox drive `X:\` is the directory `X/`
 below the save root, which is `paths.saves`, else

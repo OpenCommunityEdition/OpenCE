@@ -68,10 +68,27 @@ const char *platform_data_root(void)
 		else
 		{
 			char executable[MAX_PATH];
+			char executable_directory[MAX_PATH] = "";
 			ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
 
+			if (length > 0)
+			{
+				char *slash;
+
+				executable[length] = '\0';
+				snprintf(executable_directory, sizeof(executable_directory), "%s", executable);
+				slash = strrchr(executable_directory, '/');
+				if (slash)
+					*slash = '\0';
+			}
 			snprintf(root, sizeof(root), ".");
-			if (has_maps("assets"))
+			if (executable_directory[0] && has_maps(executable_directory))
+			{
+				/* next to the executable, where the desktop ports' first start
+				extracts it (platform_offer_game_data) */
+				snprintf(root, sizeof(root), "%s", executable_directory);
+			}
+			else if (has_maps("assets"))
 			{
 				snprintf(root, sizeof(root), "assets");
 			}
@@ -91,6 +108,13 @@ const char *platform_data_root(void)
 						snprintf(root, sizeof(root), "%s", executable);
 				}
 			}
+#ifndef HALO_ANDROID
+			if (!has_maps(root) && executable_directory[0] && platform_offer_game_data(executable_directory) &&
+				has_maps(executable_directory))
+			{
+				snprintf(root, sizeof(root), "%s", executable_directory);
+			}
+#endif
 			if (!has_maps(root))
 				platform_log("no maps/ folder found; set paths.data in config.toml to the folder that holds maps/");
 		}
