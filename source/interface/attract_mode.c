@@ -37,7 +37,7 @@ extern short seed_random_range(unsigned long *seed, short lower_bound, short upp
 static unsigned long attract_mode_countdown_timer;
 static char bss_00453ae8[128];
 
-short data_002e4c84 = NONE;
+static short data_002e4c84 = NONE;
 
 /* ---------- public code */
 

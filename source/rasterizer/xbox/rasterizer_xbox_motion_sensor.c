@@ -124,10 +124,9 @@ void SetRenderStateSmart(
 
 extern void *global_d3d_device;
 extern struct motion_sensor_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
-boolean bss_00465e27 = {0};
+static boolean bss_00465e27 = {0};
 
 /* ---------- public code */
 

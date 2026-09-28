@@ -75,6 +75,7 @@ symbols in this file:
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
+#include "main/main.h"
 #include "rasterizer/rasterizer.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
@@ -260,13 +261,10 @@ typedef char detail_object_view_data_size_assert[
 
 /* ---------- prototypes */
 
-short main_get_window_count(
-	void);
-
 /* ---------- globals */
 
 extern struct detail_objects_debug_options rasterizer_debug_options;
-D3DVertexBuffer *bss_0045e904 = NULL;
+static D3DVertexBuffer *bss_0045e904 = NULL;
 
 #define local_d3d_vertex_buffer bss_0045e904
 

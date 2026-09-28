@@ -114,7 +114,7 @@ static void wind_variance_get(
 	real_vector3d *wind,
 	real local_variation_rate,
 	real maximum_magnitude);
-void wind_variance_initialize(
+static void wind_variance_initialize(
 	void);
 void uniform_cubic_spline_vector3d(
 	real_vector3d *result,
@@ -446,7 +446,7 @@ void scenario_get_water_current(
 
 /* ---------- private code */
 
-void wind_variance_initialize(
+static void wind_variance_initialize(
 	void)
 {
 	short control_point_index;

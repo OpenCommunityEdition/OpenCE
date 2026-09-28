@@ -222,13 +222,6 @@ struct rasterizer_debug_options
 	unsigned long zbias;
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	void const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
 struct rasterizer_model_effect_parameters
 {
 	short type;
@@ -245,7 +238,7 @@ struct rasterizer_model_begin_parameters
 {
 	unsigned long geometry_flags;
 	long unique_identifier;
-	struct rasterizer_model_skinning_parameters skinning;
+	struct render_skinning skinning;
 	struct render_lighting lighting;
 	struct render_animation animation;
 	struct rasterizer_model_effect_parameters effect;
@@ -637,7 +630,6 @@ static boolean local_do_not_change_z_stencil_states = FALSE;
 static boolean local_reported_too_many_transparent_geometry_groups = FALSE;
 static boolean local_pixel_shader_dirty_flag = TRUE;
 extern boolean rasterizer_model_cortana_hack;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct rasterizer_models_frame_statistics rasterizer_frame_statistics;
 
 /* ---------- public code */

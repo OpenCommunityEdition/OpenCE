@@ -161,7 +161,6 @@ static long transparent_geometry_group_count2 = 0;
 static short *transparent_geometry_group_sorted_indices = NULL;
 static short transparent_geometry_next_group_sorted_index = 0;
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -415,7 +414,7 @@ static void rasterizer_sort_internal(
 	return;
 }
 
-int __cdecl group_sorted_indices_cmpfn(
+static int __cdecl group_sorted_indices_cmpfn(
 	void const *group_index1_pointer,
 	void const *group_index2_pointer)
 {

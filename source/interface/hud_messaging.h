@@ -15,6 +15,7 @@ header included in hcex build.
 /* ---------- structures */
 
 struct icon_hud_element_definition;
+union real_argb_color;
 
 /* ---------- prototypes/HUD_MESSAGING.C */
 
@@ -78,6 +79,10 @@ void hud_set_state_text(
 	wchar_t const *message);
 wchar_t *hud_messaging_get_objective(
 	void);
+long hud_get_font_index(
+	void);
+union real_argb_color *hud_get_text_color(
+	union real_argb_color *result);
 
 /* ---------- globals */
 

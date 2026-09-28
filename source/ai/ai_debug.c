@@ -151,7 +151,7 @@ typedef char ai_debug_actor_iterator_size_assert[
 
 /* ---------- prototypes */
 
-void ai_debug_drawstack_setup(
+static void ai_debug_drawstack_setup(
 	union real_point3d const *drawstack_base);
 static real_point3d *ai_debug_drawstack(
 	void);
@@ -249,7 +249,6 @@ static short global_ai_debug_path_render_id = 0;
 real_point3d global_ai_debug_drawstack_next_position;
 real_point3d global_ai_debug_drawstack_last_position;
 real global_ai_debug_drawstack_height;
-real_argb_color global_temporary_render_color;
 long global_ai_debug_firing_position_color_count = NONE;
 
 static char const *postcombat_type_strings[NUMBER_OF_ACTOR_POSTCOMBAT_ACTIONS] =

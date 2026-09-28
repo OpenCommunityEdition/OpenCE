@@ -87,7 +87,7 @@ enum
 
 /* ---------- globals */
 
-char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
+static char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
 /* January emits this otherwise unreferenced byte after cheat_strings.
  * Its original name and purpose are unknown; the name is descriptive only. */
 static boolean cheats_unused_flag = FALSE;

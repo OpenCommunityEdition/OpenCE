@@ -134,7 +134,7 @@ static long get_sound_length_in_ticks(
 
 /* ---------- globals */
 
-boolean sound_is_queueable[_multiplayer_sound_ting] =
+static boolean sound_is_queueable[_multiplayer_sound_ting] =
 {
 	TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
 	TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
@@ -146,7 +146,7 @@ boolean sound_is_queueable[_multiplayer_sound_ting] =
 };
 
 struct multiplayer_sound_queue_count mp_sound_queue_count = { 0 };
-struct queued_multiplayer_sound mp_sound_queue[
+static struct queued_multiplayer_sound mp_sound_queue[
 	MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS] = { 0 };
 
 #define multiplayer_sound_queue_count mp_sound_queue_count.count

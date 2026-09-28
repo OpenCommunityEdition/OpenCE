@@ -89,7 +89,7 @@ symbols in this file:
 00283D80 0021:
 	??_C@_0CB@MPOLIODB@global_network_game_server?$DN?$DNNULL@ (0000)
 0030A988 00da:
-	_data_0030a988 (0000)
+	_player_action_packet_definition_fields (0000)
 	_player_action_packet_definition (0028)
 	_player_action_collection_definition (00c4)
 004566DC 0010:
@@ -228,8 +228,10 @@ unsigned short seed_random(
 
 /* ---------- globals */
 
-struct network_game_globals bss_004566dc = { 0 };
-struct data_packet_field data_0030a988[4] =
+static struct network_game_globals bss_004566dc = { 0 };
+/* name from the 2003 PC demo PDB and the HCEX PDB (file static struct data_packet_field[4]); January's
+ * 40 bytes are identical to the demo's and it has no public for it (static) */
+static struct data_packet_field player_action_packet_definition_fields[4] =
 {
 	{ _data_packet_field_longs, 6, 0, 0, 0 },
 	{ _data_packet_field_shorts, 3, 0, 0, 0 },
@@ -243,7 +245,7 @@ struct player_action_packet_definition_storage player_action_packet_definition =
 		0,
 		0x20,
 		1,
-		data_0030a988,
+		player_action_packet_definition_fields,
 		FALSE,
 	},
 	0,

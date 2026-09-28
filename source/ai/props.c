@@ -100,7 +100,7 @@ void prop_status_refresh(
 	struct actor_position_data *position);
 /* ---------- globals */
 
-long last_prop_data_full_warn_time = NONE;
+static long last_prop_data_full_warn_time = NONE;
 
 /* ---------- public code */
 

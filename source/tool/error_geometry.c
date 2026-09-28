@@ -191,9 +191,9 @@ static boolean error_geometry_file_is_open(
 
 /* ---------- globals */
 
-FILE *error_geometry_file = NULL;
+static FILE *error_geometry_file = NULL;
 
-struct error_geometry_globals error_geometry_globals =
+static struct error_geometry_globals error_geometry_globals =
 {
 	"debug.wrl",
 	{

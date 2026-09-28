@@ -273,7 +273,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
-#include "main/main_internal.h"
+#include "main/main.h"
 #include "game/players.h"
 
 /* ---------- constants */

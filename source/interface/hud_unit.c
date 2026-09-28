@@ -140,13 +140,6 @@ struct unit_hud_globals
 	long script_flags;
 };
 
-struct hud_scripted_globals
-{
-	boolean show_hud;
-	boolean show_hud_help_text;
-	byte reserved2[2];
-};
-
 typedef char unit_hud_state_auxilary_flash_time_offset_assert[
 	offsetof(struct unit_hud_state, auxilary_flash_time) == 0x22 ? 1 : -1];
 typedef char unit_hud_state_sound_flags_offset_assert[
@@ -160,7 +153,7 @@ typedef char unit_hud_globals_script_flags_offset_assert[
 typedef char unit_hud_globals_size_assert[
 	sizeof(struct unit_hud_globals) == 0x164 ? 1 : -1];
 typedef char hud_scripted_globals_size_assert[
-	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
+	sizeof(struct hud_scripted_globals_definition) == 0x4 ? 1 : -1];
 typedef char hud_messaging_parameters_definition_size_assert[
 	sizeof(struct hud_messaging_parameters_definition) == 0x120 ? 1 : -1];
 typedef char hud_waypoint_definition_size_assert[
@@ -186,7 +179,6 @@ static void hud_update_unit_local_player(
 /* ---------- globals */
 
 static struct unit_hud_globals *unit_hud_globals = NULL;
-extern struct hud_scripted_globals *hud_scripted_globals;
 
 /* ---------- private code */
 

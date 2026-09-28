@@ -1265,7 +1265,7 @@ boolean network_game_server_start_network_game(
 	return success;
 }
 
-void network_game_server_send_player_quit_messages_ingame(
+static void network_game_server_send_player_quit_messages_ingame(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine)
 {

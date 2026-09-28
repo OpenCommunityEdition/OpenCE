@@ -35,9 +35,9 @@ symbols in this file:
 000A5070 0050:
 	_game_time_set_speed (0000)
 000A50C0 0010:
-	_code_000a50c0 (0000)
+	_game_time_statistics_new (0000)
 000A50D0 01e0:
-	_code_000a50d0 (0000)
+	_game_time_statistics_frame (0000)
 000A52B0 00e0:
 	_game_time_start (0000)
 000A5390 0360:
@@ -293,7 +293,7 @@ void game_time_set_speed(
 	return;
 }
 
-void code_000a50c0(
+static void game_time_statistics_new(
 	void)
 {
 	game_time_statistics.first_line = TRUE;
@@ -302,7 +302,7 @@ void code_000a50c0(
 	return;
 }
 
-static void code_000a50d0(
+static void game_time_statistics_frame(
 	short latency,
 	short server_updates,
 	short predicted_updates,
@@ -417,7 +417,7 @@ void game_time_start(
 	game_time_globals->leftover_dt = 0;
 	game_time_globals->active = TRUE;
 	
-	code_000a50c0();
+	game_time_statistics_new();
 
 	connection = game_connection();
 
@@ -585,7 +585,7 @@ void game_time_update(
 					server_updates = 0;
 				}
 
-				code_000a50d0((short)(maximum_possible_server_time - game_time_globals->local_time),
+				game_time_statistics_frame((short)(maximum_possible_server_time - game_time_globals->local_time),
 					(short)server_updates, 0, FALSE);
 
 				game_time_globals->last_local_time_elapsed = (short)ticks_elapsed;

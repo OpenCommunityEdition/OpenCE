@@ -314,6 +314,8 @@ static void get_local_player_input_blob(
 static void handle_one_player_input(
 	short local_player_index,
 	real time_delta_sec);
+static boolean player_control_camera_control_is_active(
+	void);
 
 /* ---------- globals */
 
@@ -376,7 +378,7 @@ void player_control_dispose_from_old_map(
 	return;
 }
 
-boolean player_control_camera_control_is_active(
+static boolean player_control_camera_control_is_active(
 	void)
 {
 	return (boolean)(!TEST_FLAG(

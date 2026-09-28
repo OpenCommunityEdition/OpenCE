@@ -118,7 +118,6 @@ struct shader;
 struct triangle_buffer;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
-struct rasterizer_model_skinning;
 
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 typedef void (*rasterizer_widget_render_proc)(
@@ -749,6 +748,7 @@ extern struct rasterizer_globals_definition rasterizer_globals;
 
 /* comm. not sure where this should be */
 extern struct rasterizer_frame_begin_parameters global_frame_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 

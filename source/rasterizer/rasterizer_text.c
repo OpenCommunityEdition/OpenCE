@@ -149,7 +149,7 @@ struct hardware_character_cache
 
 /* ---------- prototypes */
 
-struct bitmap_data *hardware_character_cache_get_bitmap(
+static struct bitmap_data *hardware_character_cache_get_bitmap(
 	void);
 void draw_string(
 	draw_character_proc draw_character,
@@ -199,7 +199,6 @@ static void rasterizer_draw_character_with_dropshadow(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static struct hardware_character_cache hardware_character_cache;
 static pixel32 global_shadow_color = 0;
@@ -582,7 +581,7 @@ rasterizer_draw_character_with_dropshadow(
 
 /* ---------- private code */
 
-struct bitmap_data *
+static struct bitmap_data *
 hardware_character_cache_get_bitmap(
 	void)
 {

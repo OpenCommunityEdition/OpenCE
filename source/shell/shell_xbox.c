@@ -38,7 +38,7 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void fuck_code_in_the_eye(
+static void fuck_code_in_the_eye(
 	void);
 
 void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
@@ -46,7 +46,7 @@ void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 
 /* ---------- globals */
 
-char faked_xbox_command_line[8] = { 0 };
+static char faked_xbox_command_line[8] = { 0 };
 
 /* ---------- public code */
 
@@ -128,7 +128,7 @@ int main(
 
 /* ---------- private code */
 
-void
+static void
 fuck_code_in_the_eye(
 	void)
 {

@@ -63,85 +63,6 @@ typedef char verify_king_globals_hill_id_offset[
 
 /* ---------- prototypes/GAME_ENGINE_KING.C */
 
-void king_engine_dispose(
-	void);
-
-boolean king_engine_initialize_for_new_map(
-	void);
-
-void king_engine_dispose_from_old_map(
-	void);
-
-void king_engine_player_added(
-	long player_index);
-
-void king_engine_game_ending(
-	void);
-
-void king_engine_game_starting(
-	void);
-
-void king_engine_statistics_append(
-	long statistic);
-
-void king_engine_handle_client_message(
-	void *message);
-
-void king_engine_handle_server_message(
-	void *message);
-
-void king_engine_pregame_post_rasterize(
-	void);
-
-void king_engine_post_rasterize(
-	void);
-
-void king_engine_player_update(
-	long player_index);
-
-void king_engine_player_damaged_player(
-	long damaging_player_index,
-	long dead_player_index,
-	boolean damage_type);
-
-void king_engine_player_killed_player(
-	long killing_player_index,
-	long killing_object_index,
-	long dead_player_index,
-	boolean friendly_fire);
-
-boolean king_engine_display_score(
-	long player_index,
-	long message,
-	long message_player_index,
-	wchar_t *buffer,
-	long buffer_size);
-
-void king_engine_prespawn_player_update(
-	long player_index);
-
-long king_get_score(
-	long player_index,
-	enum get_score_type score_type);
-
-wchar_t *king_get_score_string(
-	long player_index,
-	wchar_t *buffer);
-
-wchar_t *king_get_score_header_string(
-	wchar_t *buffer);
-
-wchar_t *king_get_team_score_string(
-	long team_index,
-	wchar_t *buffer);
-
-boolean king_engine_goal_matches_player(
-	long player_index,
-	long goal_index);
-
-void king_engine_update(
-	void);
-
 void render_dynamic_quad_initialize(
 	void);
 
@@ -156,6 +77,5 @@ void render_dynamic_quad(
 /* ---------- globals */
 
 extern struct game_engine king_engine;
-extern struct king_globals king_globals;
 
 #endif // __GAME_ENGINE_KING_H

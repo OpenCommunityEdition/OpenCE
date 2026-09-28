@@ -911,6 +911,7 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "interface/player_ui.h"
+#include "main/main.h"
 #include "saved games/player_profile.h"
 #include "interface/ui_widget_definitions.h"
 
@@ -1007,15 +1008,7 @@ struct playlist_profile_item_options_prefix
 
 /* ---------- prototypes */
 
-void main_revert_map(
-	void);
-void main_reset_map(
-	void);
 void game_state_save_to_persistent_storage(
-	void);
-void main_goto_main_menu(
-	void);
-void main_run_demos(
 	void);
 void xbox_dashboard_launch(
 	void);
@@ -1031,10 +1024,6 @@ void game_engine_playlist_next(
 	long);
 void network_game_set_quickstart_local(
 	void);
-void game_connection_set(
-	long);
-void main_menu_switch_to_single_player(
-	void);
 void network_game_server_open_game(
 	void *server);
 void network_game_server_pause_countdown(
@@ -1049,12 +1038,6 @@ void ui_stop_main_menu_music(
 void ui_widgets_pop_stack(
 	short local_player_index);
 boolean ui_main_menu_music_active(
-	void);
-void main_set_difficulty(
-	word difficulty);
-void main_set_map_name(
-	char *map_name);
-void main_defer_map_map_change(
 	void);
 void *widget_free(
 	void *pointer);
@@ -1097,8 +1080,6 @@ void display_error(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
-char *main_get_map_name(
-	void);
 void *global_network_game_client_get(
 	void);
 void *network_game_client_get_game(
@@ -1596,7 +1577,6 @@ boolean widget_event_function_list_widget_goto_previous_item(
 
 /* ---------- globals */
 
-extern short player_spawn_count;
 static wchar_t new_campaign_profile_name[12] = { 0 };
 byte single_player_level_data[0x50] = { 0 };
 struct persistent_game_difficulty

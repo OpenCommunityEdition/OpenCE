@@ -1,6 +1,6 @@
 /* header created automatically with -DGEN_TREES_H */
 
-const static_tree_tables rdata_0027c170 = {
+static const static_tree_tables rdata_0027c170 = {
 {
 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
 },

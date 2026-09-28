@@ -40,7 +40,11 @@ void *system_realloc(
 	long size);
 unsigned long system_get_used_memory_size(
 	void *pointer);
-struct system_memory_information;
+struct system_memory_information
+{
+	long free;
+	long total;
+};
 void system_memory_information_get(
 	struct system_memory_information *information);
 void system_show_wait_cursor(

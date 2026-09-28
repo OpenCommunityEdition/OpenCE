@@ -270,8 +270,6 @@ void objects_dispose(
 	void);
 void director_dispose(
 	void);
-void interface_dispose(
-	void);
 void game_allegiance_dispose(
 	void);
 void saved_game_files_dispose(
@@ -325,8 +323,6 @@ void director_dispose_from_old_map(
 	void);
 void observer_dispose_from_old_map(
 	void);
-void interface_dispose_from_old_map(
-	void);
 void players_dispose_from_old_map(
 	void);
 void contrails_dispose_from_old_map(
@@ -363,7 +359,6 @@ void numeric_countdown_timer_update(
 static struct game_runtime_globals_prefix *game_globals = NULL;
 extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
-extern short player_spawn_count;
 
 char const *global_game_difficulty_level_names[NUMBER_OF_GAME_DIFFICULTY_LEVELS] =
 {

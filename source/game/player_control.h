@@ -135,8 +135,6 @@ void player_control_dispose(
 	void);
 void player_control_dispose_from_old_map(
 	void);
-boolean player_control_camera_control_is_active(
-	void);
 struct player_control *player_control_get(
 	short local_player_index);
 void player_control_inhibit_buttons(
@@ -152,6 +150,8 @@ void player_control_get_unit_camera_info(
 	struct player_control_unit_camera_info *camera_info);
 long player_control_get_unit_index(
 	short local_player_index);
+short unit_get_local_player_index(
+	long unit_index);
 long player_control_get_desired_weapon(
 	short local_player_index,
 	long unit_index);

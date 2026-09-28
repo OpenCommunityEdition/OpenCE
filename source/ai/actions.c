@@ -706,6 +706,8 @@ static boolean actor_action_allowed_to_enter_vehicle(
 
 extern struct ai_globals_action_data *ai_globals;
 
+real_argb_color global_temporary_render_color;
+
 struct action_specification const global_action_functions[NUMBER_OF_ACTOR_ACTIONS] =
 {
 

@@ -1833,17 +1833,15 @@ void ai_scripting_vehicle_enterable_distance(
 
 void ai_scripting_vehicle_enterable_team(
 	long unit_index,
-	long team_index)
+	short team_index)
 {
-	short team = team_index;
-
 	if (ai_debug.print_scripting)
 	{
 		error(
 			_error_silent,
 			"%s: ai_vehicle_enterable_team <some vehicle> %d",
 			hs_runtime_get_executing_thread_name(),
-			team);
+			team_index);
 	}
 
 	if (unit_index != NONE)
@@ -1851,7 +1849,7 @@ void ai_scripting_vehicle_enterable_team(
 		struct ai_script_vehicle_enterable *vehicle_enterable =
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
-			vehicle_enterable->team_bitmask |= 1 << team;
+			vehicle_enterable->team_bitmask |= 1 << team_index;
 	}
 
 	return;
@@ -1859,17 +1857,15 @@ void ai_scripting_vehicle_enterable_team(
 
 void ai_scripting_vehicle_enterable_actor_type(
 	long unit_index,
-	long actor_type)
+	short actor_type)
 {
-	short type = actor_type;
-
 	if (ai_debug.print_scripting)
 	{
 		error(
 			_error_silent,
 			"%s: ai_vehicle_enterable_actor_type <some vehicle> %d",
 			hs_runtime_get_executing_thread_name(),
-			type);
+			actor_type);
 	}
 
 	if (unit_index != NONE)
@@ -1877,7 +1873,7 @@ void ai_scripting_vehicle_enterable_actor_type(
 		struct ai_script_vehicle_enterable *vehicle_enterable =
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
-			vehicle_enterable->actor_type_bitmask |= 1 << type;
+			vehicle_enterable->actor_type_bitmask |= 1 << actor_type;
 	}
 
 	return;
@@ -2848,10 +2844,8 @@ boolean ai_scripting_allegiance_broken(
 }
 
 boolean ai_scripting_conversation(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2859,11 +2853,11 @@ boolean ai_scripting_conversation(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
+				conversation_index,
 				struct ai_script_conversation_definition)->name;
 		}
 
@@ -2874,14 +2868,12 @@ boolean ai_scripting_conversation(
 			conversation_name);
 	}
 
-	return ai_conversation(conversation, TRUE);
+	return ai_conversation(conversation_index, TRUE);
 }
 
 void ai_scripting_conversation_stop(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2889,11 +2881,11 @@ void ai_scripting_conversation_stop(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
+				conversation_index,
 				struct ai_script_conversation_definition)->name;
 		}
 
@@ -2904,16 +2896,14 @@ void ai_scripting_conversation_stop(
 			conversation_name);
 	}
 
-	ai_conversation_stop(conversation);
+	ai_conversation_stop(conversation_index);
 
 	return;
 }
 
 void ai_scripting_conversation_advance(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2921,11 +2911,11 @@ void ai_scripting_conversation_advance(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
+				conversation_index,
 				struct ai_script_conversation_definition)->name;
 		}
 
@@ -2936,7 +2926,7 @@ void ai_scripting_conversation_advance(
 			conversation_name);
 	}
 
-	ai_conversation_advance(conversation);
+	ai_conversation_advance(conversation_index);
 
 	return;
 }

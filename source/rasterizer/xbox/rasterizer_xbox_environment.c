@@ -557,8 +557,7 @@ extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 static boolean warned = FALSE;
 extern struct pixel_shader_definition pixel_shader;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
-short specular_light_vertex_shader_permutation_index= NONE;
+static short specular_light_vertex_shader_permutation_index= NONE;
 
 /* ---------- public code */
 

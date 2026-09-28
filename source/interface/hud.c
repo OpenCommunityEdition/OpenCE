@@ -92,6 +92,7 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/motion_sensor.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "memory/data.h"
@@ -153,31 +154,6 @@ enum hud_state_message_type
 
 /* ---------- structures */
 
-struct hud_scripted_globals
-{
-	boolean show_hud;
-	boolean show_hud_help_text;
-	byte reserved2[2];
-};
-
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	unsigned long color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
-struct weapon_hud_interface_definition
-{
-	byte reserved000[0x13C];
-	struct icon_hud_element_definition messaging_icon;
-	byte reserved14C[0x30];
-};
-
 struct weapon_interface_magazine_state
 {
 	boolean reloading;
@@ -199,9 +175,9 @@ struct weapon_interface_state
 };
 
 typedef char hud_scripted_globals_size_assert[
-	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
+	sizeof(struct hud_scripted_globals_definition) == 0x4 ? 1 : -1];
 typedef char hud_scripted_globals_show_hud_help_text_offset_assert[
-	offsetof(struct hud_scripted_globals, show_hud_help_text) == 0x1 ? 1 : -1];
+	offsetof(struct hud_scripted_globals_definition, show_hud_help_text) == 0x1 ? 1 : -1];
 typedef char hud_globals_hud_item_messages_index_offset_assert[
 	offsetof(struct hud_globals_definition, messaging.hud_item_messages.index) == 0xA0 ? 1 : -1];
 typedef char hud_globals_loading_begin_index_offset_assert[
@@ -220,7 +196,7 @@ typedef char weapon_interface_state_size_assert[
 /* ---------- globals */
 
 struct hud_globals_definition *hud_globals = NULL;
-struct hud_scripted_globals *hud_scripted_globals = NULL;
+struct hud_scripted_globals_definition *hud_scripted_globals = NULL;
 extern boolean temporary_hud;
 
 wchar_t const *default_string = L"";

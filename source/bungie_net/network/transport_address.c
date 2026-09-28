@@ -105,7 +105,7 @@ symbols in this file:
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-char transport_address_string[256];
+static char transport_address_string[256];
 #pragma bss_seg()
 
 /* ---------- public code */

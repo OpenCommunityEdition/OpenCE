@@ -506,7 +506,7 @@ static void cache_copy_run_decompression(
 	struct simple_decompressor_definition *self);
 static unsigned long __stdcall simple_cache_copy_thread(
 	void *parameter);
-static void CALLBACK cache_copy_FileIOCompletionRoutine(
+void CALLBACK cache_copy_FileIOCompletionRoutine(
 	unsigned long error_code,
 	unsigned long bytes_transferred,
 	OVERLAPPED *overlapped);
@@ -1085,7 +1085,7 @@ void cache_copy_end(
 	return;
 }
 
-static void CALLBACK cache_copy_FileIOCompletionRoutine(
+void CALLBACK cache_copy_FileIOCompletionRoutine(
 	unsigned long error_code,
 	unsigned long bytes_transferred,
 	OVERLAPPED *overlapped)

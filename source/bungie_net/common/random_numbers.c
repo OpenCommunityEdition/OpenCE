@@ -33,7 +33,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-boolean random_numbers_initialized = FALSE;
+static boolean random_numbers_initialized = FALSE;
 
 /* ---------- public code */
 

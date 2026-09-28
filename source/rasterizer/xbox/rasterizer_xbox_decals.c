@@ -322,10 +322,9 @@ static boolean locked_decal_reported = FALSE;
 static boolean permanent_decal_reported = FALSE;
 static boolean local_filthy_decal_fog_hack_enabled = FALSE;
 extern struct rasterizer_decals_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
-long last_decal_index_queried_by_lruv_cache = NONE;
+static long last_decal_index_queried_by_lruv_cache = NONE;
 
 /* ---------- public code */
 

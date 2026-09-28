@@ -208,13 +208,6 @@ struct shader_model_definition
 	real translucency;
 };
 
-struct rasterizer_model_skinning
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
-};
-
 struct render_sort_filth
 {
 	short *previous_group_presorted_index_reference;
@@ -237,7 +230,7 @@ struct rasterizer_model_begin_parameters
 {
 	unsigned long geometry_flags;
 	long unique_identifier;
-	struct rasterizer_model_skinning skinning;
+	struct render_skinning skinning;
 	struct render_lighting lighting;
 	struct render_animation animation;
 	struct render_model_effect effect;
@@ -265,7 +258,7 @@ typedef char verify_rasterizer_debug_options_size[sizeof(struct rasterizer_debug
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
 	short forced_shader_permutation_index,
@@ -287,14 +280,14 @@ static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_P
 static struct render_model_effect default_render_model_effect = { 0 };
 static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL] = { 0 };
 
-struct profile_section render_model_section = { "render_model", NONE, TRUE };
+static struct profile_section render_model_section = { "render_model", NONE, TRUE };
 
 /* ---------- private code */
 
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
 	short forced_shader_permutation_index,

@@ -53,6 +53,17 @@ struct render_lighting
 	real_rgb_color shadow_color;
 };
 
+/* HCEX and the PC-demo PDB type node_matrices as a non-const `real_matrix4x3 *`.
+   It is declared const here because its users store const node-matrix pointers
+   into it (transparent_geometry_group.node_matrices is const in HCEX as well);
+   the qualifier changes no emitted byte, and the non-const spelling would add
+   eleven C4090 const-qualifier warnings in five translation units. */
+struct render_skinning
+{
+	real_matrix4x3 const *node_matrices;
+	short node_matrix_count;
+};
+
 
 struct rendered_cluster
 {

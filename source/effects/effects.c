@@ -509,7 +509,7 @@ typedef char effect_event_definition_size_assert[
 
 /* ---------- prototypes */
 
-struct effect_location_datum *effect_location_get_next_instance(
+static struct effect_location_datum *effect_location_get_next_instance(
 	struct effect_datum const *effect,
 	long *location_datum_index,
 	short camera_mode);
@@ -1223,7 +1223,7 @@ void effects_reconnect_to_structure_bsp(
 	return;
 }
 
-struct effect_location_datum *effect_location_get_next_instance(
+static struct effect_location_datum *effect_location_get_next_instance(
 	struct effect_datum const *effect,
 	long *location_datum_index,
 	short camera_mode)

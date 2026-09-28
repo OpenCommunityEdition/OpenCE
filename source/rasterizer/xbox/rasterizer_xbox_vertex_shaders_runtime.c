@@ -91,7 +91,7 @@ void rasterizer_error(
 
 /* ---------- globals */
 
-short const vertex_shader_translation_tables[] =
+static short const vertex_shader_translation_tables[] =
 {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, 0, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1,
@@ -150,7 +150,7 @@ short const vertex_shader_translation_tables[] =
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 33, 11,
 };
 
-struct rasterizer_vertex_shader_runtime_globals vertex_shader_runtime_globals =
+static struct rasterizer_vertex_shader_runtime_globals vertex_shader_runtime_globals =
 {
 	NONE,
 	0,

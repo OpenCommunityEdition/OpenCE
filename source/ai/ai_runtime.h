@@ -20,8 +20,6 @@ void ai_globals_ai_active(
 	boolean enabled);
 void ai_globals_grenades_enabled(
 	boolean enabled);
-boolean ai_enemies_endanger_player(
-	boolean must_be_attacking);
 long ai_get_responsible_unit(
 	long object_index,
 	boolean responsible_for_weapon_fire);
@@ -53,8 +51,6 @@ void ai_handle_unit_effect(
 	long unit_index,
 	short effect_type,
 	short volume);
-void ai_flush_spatial_effects(
-	void);
 void ai_erase(
 	long encounter_index,
 	long platoon_index,

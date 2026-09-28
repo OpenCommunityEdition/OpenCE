@@ -160,7 +160,6 @@ void rasterizer_set_pixel_shader(
 
 extern void *global_d3d_device;
 extern struct rasterizer_text_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */

@@ -330,13 +330,6 @@ struct shader_transparent_chicago_definition
 	struct tag_reference map;
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
 struct rasterizer_model_effect_parameters
 {
 	short type;
@@ -353,7 +346,7 @@ struct rasterizer_model_begin_parameters
 {
 	unsigned long geometry_flags;
 	long unique_identifier;
-	struct rasterizer_model_skinning_parameters skinning;
+	struct render_skinning skinning;
 	struct render_lighting lighting;
 	struct render_animation animation;
 	struct rasterizer_model_effect_parameters effect;
@@ -415,7 +408,7 @@ typedef char rasterizer_environment_fog_screen_window_wind_offset_assert[
 typedef char rasterizer_environment_fog_chicago_map_scale_offset_assert[
 	offsetof(struct shader_transparent_chicago_definition, map_u_scale) == 0x9C ? 1 : -1];
 typedef char rasterizer_environment_fog_model_skinning_size_assert[
-	sizeof(struct rasterizer_model_skinning_parameters) == 0x8 ? 1 : -1];
+	sizeof(struct render_skinning) == 0x8 ? 1 : -1];
 typedef char rasterizer_environment_fog_model_map_scale_offset_assert[
 	offsetof(struct rasterizer_model_begin_parameters, base_map_scale) == 0xC4 ? 1 : -1];
 typedef char rasterizer_environment_fog_transparent_group_size_assert[
@@ -449,7 +442,6 @@ static boolean reported_too_many_opaque_models = FALSE;
 static boolean local_fog_screen_first_time = TRUE;
 
 extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static boolean rasterizer_environment_fog_screen_is_active(
 	void);
@@ -1457,7 +1449,7 @@ void _rasterizer_environment_fog_screen_begin(
 				{
 					struct transparent_geometry_group *group =
 						&opaque_model_submit_parameters[group_index];
-					struct rasterizer_model_skinning_parameters skinning;
+					struct render_skinning skinning;
 
 					if (group->shader->base.type == _shader_type_transparent_chicago &&
 						!TEST_FLAG(

@@ -243,7 +243,6 @@ static void frame_callback_function(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static LARGE_INTEGER rasterizer_profile_performance_counter_frequency = { 1 };
 static struct rasterizer_profile_globals rasterizer_profile_globals =

@@ -54,7 +54,7 @@ void rasterizer_error(
 
 extern void *global_d3d_device;
 
-unsigned long const vertex_shader_declarations[] =
+static unsigned long const vertex_shader_declarations[] =
 {
 	0x20000000, 0x40320000, 0x40400009, 0xFFFFFFFF,
 	0x20000000, 0x40320000, 0x40210004, 0xFFFFFFFF,

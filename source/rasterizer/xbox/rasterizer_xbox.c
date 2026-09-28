@@ -29,19 +29,19 @@ symbols in this file:
 00144BC0 0010:
 	_IDirect3DDevice8_GetBackBuffer@16 (0000)
 00144BD0 0020:
-	_code_00144bd0 (0000)
+	_IDirect3DDevice8_CreateTexture@32 (0000)
 00144BF0 0030:
-	_code_00144bf0 (0000)
+	_IDirect3DDevice8_CreateVolumeTexture@36 (0000)
 00144C20 0020:
-	_code_00144c20 (0000)
+	_IDirect3DDevice8_CreateCubeTexture@28 (0000)
 00144C40 0010:
-	_code_00144c40 (0000)
+	_IDirect3DDevice8_CreatePalette@12 (0000)
 00144C50 0010:
 	_IDirect3DDevice8_SetRenderTarget@12 (0000)
 00144C60 0120:
 	_rasterizer_preinitialize__fill_you_up_with_the_devils_cock (0000)
 00144D80 0010:
-	_code_00144d80 (0000)
+	_IDirect3DDevice8_GetDepthStencilSurface@8 (0000)
 00144D90 0010:
 	_IDirect3DDevice8_BeginScene@4 (0000)
 00144DA0 0010:
@@ -57,23 +57,23 @@ symbols in this file:
 001450A0 0010:
 	_IDirect3DDevice8_GetRenderState@12 (0000)
 001450B0 0010:
-	_code_001450b0 (0000)
+	_IDirect3DDevice8_SetTexture@12 (0000)
 001450C0 0010:
-	_code_001450c0 (0000)
+	_IDirect3DDevice8_SetPalette@12 (0000)
 001450D0 0020:
 	_IDirect3DDevice8_GetTextureStageState@16 (0000)
 001450F0 0060:
 	_IDirect3DDevice8_SetTextureStageState@16 (0000)
 00145150 0010:
-	_code_00145150 (0000)
+	_IDirect3DDevice8_SetVertexShader@8 (0000)
 00145160 0010:
-	_code_00145160 (0000)
+	_IDirect3DDevice8_SetVertexShaderConstant@16 (0000)
 00145170 0010:
-	_code_00145170 (0000)
+	_IDirect3DDevice8_SetShaderConstantMode@8 (0000)
 00145180 0010:
-	_code_00145180 (0000)
+	_IDirect3DDevice8_SetStreamSource@16 (0000)
 00145190 0010:
-	_code_00145190 (0000)
+	_IDirect3DDevice8_SetIndices@12 (0000)
 001451A0 0010:
 	_IDirect3DDevice8_SetPixelShaderProgram@8 (0000)
 001451B0 0010:
@@ -101,9 +101,9 @@ symbols in this file:
 001452D0 00d0:
 	__rasterizer_frame_end (0000)
 001453A0 0010:
-	_code_001453a0 (0000)
+	_IDirect3DTexture8_GetSurfaceLevel@12 (0000)
 001453B0 0020:
-	_code_001453b0 (0000)
+	_IDirect3DTexture8_LockRect@20 (0000)
 001453D0 0010:
 	_IDirect3DTexture8_UnlockRect@8 (0000)
 001453E0 0010:
@@ -113,7 +113,7 @@ symbols in this file:
 00145460 0010:
 	__rasterizer_set_vblank_callback (0000)
 00145470 0020:
-	_code_00145470 (0000)
+	_IDirect3DVolumeTexture8_LockBox@20 (0000)
 00145490 0010:
 	_IDirect3DVolumeTexture8_UnlockBox@8 (0000)
 001454A0 00a0:
@@ -127,7 +127,7 @@ symbols in this file:
 001456D0 01f0:
 	_rasterizer_set_texture (0000)
 001458C0 0020:
-	_code_001458c0 (0000)
+	_IDirect3DCubeTexture8_LockRect@24 (0000)
 001458E0 0010:
 	_IDirect3DCubeTexture8_UnlockRect@12 (0000)
 001458F0 01b0:
@@ -137,7 +137,7 @@ symbols in this file:
 00145C60 0010:
 	_D3DPalette_Unlock@4 (0000)
 00145C70 0010:
-	_code_00145c70 (0000)
+	_IDirect3DPalette8_Lock@12 (0000)
 00145C80 0010:
 	_IDirect3DPalette8_Unlock@4 (0000)
 00145C90 00d0:
@@ -396,7 +396,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
-#include "main/main_internal.h"
+#include "main/main.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "cseries/errors.h"
 #include "rasterizer/rasterizer.h"
@@ -736,13 +736,6 @@ struct window_data
 	char window_title[0x40];
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
-};
-
 /* ---------- prototypes */
 
 static void rasterizer_filthy_bitmap_defaults_initialize(
@@ -758,8 +751,8 @@ void SetupSmartStates(
  * the object's own IDirect3D*() error strings and their relocation offsets. */
 struct rasterizer_xbox_d3d_globals
 {
-	real node_matrix_constants
-		[RASTERIZER_MAXIMUM_NODES_PER_MODEL][3][4];         /* +0    */
+	real vsh_constants__nodematrices
+		[RASTERIZER_MAXIMUM_NODES_PER_MODEL][3][4];         /* +0; name inferred from the PC demo/HCEX PDBs and /Od, not attested in January */
 	point2d bitmap_dimensions_non_blocking;             /* +2112 */
 	point2d bitmap_dimensions;                          /* +2116 */
 	Direct3D *d3d;                                      /* +2120 */
@@ -789,9 +782,9 @@ struct rasterizer_xbox_d3d_globals
 	D3DSurface *global_d3d_surface_render_primary_copy; /* +2212 */
 };
 
-struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals = { 0 };
+static struct rasterizer_xbox_d3d_globals rasterizer_xbox_d3d_globals = { 0 };
 
-#define node_matrix_constants rasterizer_xbox_d3d_globals.node_matrix_constants
+#define vsh_constants__nodematrices rasterizer_xbox_d3d_globals.vsh_constants__nodematrices
 #define d3d rasterizer_xbox_d3d_globals.d3d
 #define bitmap_dimensions_non_blocking rasterizer_xbox_d3d_globals.bitmap_dimensions_non_blocking
 #define bitmap_dimensions rasterizer_xbox_d3d_globals.bitmap_dimensions
@@ -843,7 +836,6 @@ static struct rasterizer_hardware_state_cache rasterizer_state_cache =
 
 extern struct window_data window_globals;
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 /* owned by source/bitmaps/bitmaps.c */
 extern pixel32 global_vector_palette[NUMBER_OF_ENTRIES_IN_PALETTE];
 
@@ -1262,7 +1254,7 @@ void rasterizer_set_model_lighting(
 }
 
 void rasterizer_set_model_skinning(
-	struct rasterizer_model_skinning_parameters const *skinning)
+	struct render_skinning const *skinning)
 {
 	short node_index;
 
@@ -1282,7 +1274,7 @@ void rasterizer_set_model_skinning(
 	{
 		real scale = skinning->node_matrices[node_index].scale;
 		real_matrix4x3 const *matrix = &skinning->node_matrices[node_index];
-		real (*constants)[4] = node_matrix_constants[node_index];
+		real (*constants)[4] = vsh_constants__nodematrices[node_index];
 
 		constants[0][0] = scale * matrix->forward.i;
 		constants[0][1] = scale * matrix->left.i;
@@ -1299,11 +1291,11 @@ void rasterizer_set_model_skinning(
 	}
 	D3DDevice_SetVertexShaderConstant(
 		-36,
-		node_matrix_constants,
+		vsh_constants__nodematrices,
 		skinning->node_matrix_count * 3);
 	if (rasterizer_debug_options.stats)
 		rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes +=
-			skinning->node_matrix_count * sizeof(node_matrix_constants[0]);
+			skinning->node_matrix_count * sizeof(vsh_constants__nodematrices[0]);
 	return;
 }
 
@@ -2426,22 +2418,22 @@ void _rasterizer_present(
 			bounds.x1 <= screenshot_bitmap->width &&
 			bounds.y1 <= screenshot_bitmap->height)
 		{
-			D3DSurface *d3d_backbuffer = NULL;
-			D3DSURFACE_DESC d3d_surface_desc;
+			D3DSurface *d3d_surface = NULL;
+			D3DSURFACE_DESC d3d_surfacedesc;
 
 			IDirect3DDevice8_GetBackBuffer(
 				global_d3d_device,
 				0,
 				D3DBACKBUFFER_TYPE_MONO,
-				&d3d_backbuffer);
-			IDirect3DSurface8_GetDesc(d3d_backbuffer, &d3d_surface_desc);
-			if (d3d_surface_desc.Size ==
-				d3d_surface_desc.Width * d3d_surface_desc.Height * sizeof(pixel32))
+				&d3d_surface);
+			IDirect3DSurface8_GetDesc(d3d_surface, &d3d_surfacedesc);
+			if (d3d_surfacedesc.Size ==
+				d3d_surfacedesc.Width * d3d_surfacedesc.Height * sizeof(pixel32))
 			{
 				D3DLOCKED_RECT d3d_locked_rect;
 
 				IDirect3DSurface8_LockRect(
-					d3d_backbuffer,
+					d3d_surface,
 					&d3d_locked_rect,
 					NULL,
 					D3DLOCK_TILED | D3DLOCK_READONLY);
@@ -2470,8 +2462,17 @@ void _rasterizer_present(
 							(byte *)d3d_locked_rect.pBits + y * d3d_locked_rect.Pitch,
 							d3d_locked_rect.Pitch);
 					}
-					IDirect3DSurface8_UnlockRect(d3d_backbuffer);
-					success = TRUE;
+					if (IDirect3DSurface8_UnlockRect(d3d_surface) >= 0 && success)
+					{
+						success = TRUE;
+					}
+					else
+					{
+						success = FALSE;
+						rasterizer_error(
+							0,
+							"IDirect3DSurface8_UnlockRect(d3d_surface)");
+					}
 				}
 				else
 				{
@@ -3568,29 +3569,72 @@ static void rasterizer_filthy_bitmap_defaults_initialize(
 	{
 		pixels[0] = DEFAULT_BITMAP_PIXEL0;
 		pixels[1] = DEFAULT_BITMAP_PIXEL1;
-		IDirect3DTexture8_LockRect(
+		result = IDirect3DTexture8_LockRect(
 			default_2d_hardware_format,
 			0,
 			&d3d_locked_rect,
 			NULL,
 			0);
+		if (success && result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DTexture8_LockRect((IDirect3DTexture8*)default_2d_hardware_format, 0, &d3d_locked_rect, NULL, 0)");
+		}
 		for (pixel_index = 0, pixel_count = DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE; pixel_count; pixel_index++, pixel_count--)
 			((word *)d3d_locked_rect.pBits)[pixel_index] = pixels[pixel_index & 1];
-		IDirect3DTexture8_UnlockRect(
+		result = IDirect3DTexture8_UnlockRect(
 			default_2d_hardware_format,
 			0);
-		IDirect3DVolumeTexture8_LockBox(
+		if (success && result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DTexture8_UnlockRect((IDirect3DTexture8*)default_2d_hardware_format, 0)");
+		}
+		result = IDirect3DVolumeTexture8_LockBox(
 			default_3d_hardware_format,
 			0,
 			&d3d_locked_box,
 			NULL,
 			0);
+		if (success && result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DVolumeTexture8_LockBox((IDirect3DVolumeTexture8*)default_3d_hardware_format, 0, &d3d_locked_box, NULL, 0)");
+		}
 		for (pixel_index = 0, pixel_count = DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE * DEFAULT_BITMAP_SIZE; pixel_count; pixel_index++, pixel_count--)
 			((word *)d3d_locked_box.pBits)[pixel_index] = pixels[pixel_index & 1];
-		IDirect3DVolumeTexture8_UnlockBox(
+		result = IDirect3DVolumeTexture8_UnlockBox(
 			default_3d_hardware_format,
 			0);
-		success = TRUE;
+		if (success && result >= 0)
+		{
+			success = TRUE;
+		}
+		else
+		{
+			success = FALSE;
+			rasterizer_error(
+				result,
+				"IDirect3DVolumeTexture8_UnlockBox((IDirect3DVolumeTexture8*)default_3d_hardware_format, 0)");
+		}
 		for (face_index = 0, face_count = NUMBER_OF_CUBE_MAP_FACES; face_count; face_index++, face_count--)
 		{
 			result = IDirect3DCubeTexture8_LockRect(

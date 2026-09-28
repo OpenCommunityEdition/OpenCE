@@ -27,8 +27,6 @@ void unlock_rasterizer_text_data(
 	void);
 boolean rasterizer_text_cache_initialize(
 	void);
-struct bitmap_data *hardware_character_cache_get_bitmap(
-	void);
 void rasterizer_text_draw_character(
 	struct dynamic_screen_vertex const *vertices);
 void rasterizer_draw_character(

@@ -156,9 +156,6 @@ short ai_conversation_status(
 boolean ai_conversation(
 	short scenario_conversation_index,
 	boolean scripted);
-long ai_conversation_new(
-	short scenario_conversation_index,
-	boolean scripted);
 short ai_conversation_line(
 	short scenario_conversation_index);
 void ai_conversation_advance(

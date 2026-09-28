@@ -132,13 +132,14 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
-#include "main/main_internal.h"
+#include "main/main.h"
 #include "real_math.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_active_camouflage.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
+#include "render/render.h"
 #include "render/render_debug.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
@@ -622,13 +623,6 @@ typedef char shader_transparent_meter_gradient_min_color_offset_assert[
 typedef char shader_transparent_meter_brightness_source_offset_assert[
 	offsetof(struct shader_transparent_meter_definition, meter_brightness_source) == 0xD8 ? 1 : -1];
 
-struct rasterizer_model_skinning_parameters
-{
-	void const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -715,7 +709,6 @@ static struct rasterizer_xbox_transparent_geometry_globals
 
 extern struct rasterizer_transparent_geometry_debug_options_prefix
 	rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -1070,7 +1063,7 @@ void rasterizer_transparent_geometry_group_draw(
 
 		if (rasterizer_debug_options.debug_transparent_geometry)
 		{
-			struct rasterizer_model_skinning_parameters skinning;
+			struct render_skinning skinning;
 
 			if (!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit) &&
 				group->shader &&
@@ -1326,7 +1319,7 @@ void rasterizer_transparent_geometry_group_draw(
 
 						if (!shader_ignores_effect(source_group->shader))
 						{
-							struct rasterizer_model_skinning_parameters skinning;
+							struct render_skinning skinning;
 
 							if (source_group->node_matrices && source_group->node_matrix_count)
 							{
@@ -1403,7 +1396,7 @@ void rasterizer_transparent_geometry_group_draw(
 
 				if (!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit))
 				{
-					struct rasterizer_model_skinning_parameters skinning;
+					struct render_skinning skinning;
 
 					if (group->node_matrices && group->node_matrix_count)
 					{

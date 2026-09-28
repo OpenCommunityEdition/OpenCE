@@ -65,6 +65,7 @@ symbols in this file:
 #include "interface/hud_definitions.h"
 #include "interface/hud_weapon.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -275,35 +276,6 @@ struct grenade_hud_interface_definition
 	long unused0[17];
 	struct tag_reference messaging_icon_bitmap;
 	long unused1[12];
-};
-
-struct weapon_flash_state_definition
-{
-	short flags;
-	short pad;
-	short total_ammo;
-	short loaded_ammo;
-	short heat;
-	short age;
-	long unused[8];
-};
-
-struct weapon_hud_interface_definition
-{
-	struct tag_reference parent_hud;
-	struct weapon_flash_state_definition flash_cutoffs;
-	struct hud_absolute_placement_definition absolute_placement;
-	struct tag_block statics;
-	struct tag_block meters;
-	struct tag_block numbers;
-	struct tag_block crosshairs;
-	struct tag_block overlays;
-	unsigned long valid_crosshair_types_flags;
-	struct tag_block warning_sounds;
-	struct tag_block screen_effects;
-	long unused1[33];
-	byte messaging_icon[0x10];
-	long unused2[12];
 };
 
 struct weapon_hud_element_header

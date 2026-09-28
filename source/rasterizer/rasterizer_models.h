@@ -14,7 +14,7 @@ RASTERIZER_MODELS.H
 
 struct model_geometry_part;
 struct rasterizer_model_begin_parameters;
-struct rasterizer_model_skinning;
+struct render_skinning;
 struct render_sort_filth;
 struct shader;
 struct triangle_buffer;
@@ -57,7 +57,7 @@ void rasterizer_environment_shadow_model_draw(
 	struct vertex_buffer const *vertex_buffer);
 void rasterizer_debug_model_vertices(
 	long object_index,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	struct model_geometry_part const *part);
 
 #endif // __RASTERIZER_MODELS_H

@@ -198,7 +198,6 @@ static boolean rasterizer_widget_project_billboard(
 
 extern D3DDevice *global_d3d_device;
 extern struct rasterizer_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 static boolean warned_about_too_many_transparent_geometry_groups;

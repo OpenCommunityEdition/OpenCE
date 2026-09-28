@@ -41,7 +41,7 @@ static void *object_shadow_get_object(
 	return object_get_and_verify_type(object_index, _object_mask_all);
 }
 
-void object_build_shadow_recursive(
+static void object_build_shadow_recursive(
 	long object_index,
 	void const *context,
 	struct object_shadow *shadow)

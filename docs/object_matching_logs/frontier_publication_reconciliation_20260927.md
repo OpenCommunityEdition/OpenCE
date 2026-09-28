@@ -76,3 +76,124 @@ B3 and INC-3 are not imported by this packet. B3's two new incompatible-pointer
 warnings remain under the owner's requested investigation. Other donor source,
 storage, data-verifier and admission packets require their own current-base
 reconciliation; donor-relative credits are not automatically additive.
+
+## Final approved production reconciliation
+
+The remaining approved production packets were tested first in an isolated
+worktree, then applied to canonical. Donor research/history was not merged:
+7,429 research paths, private reference objects, SDK/compiler assets and held
+candidate bodies remain outside the publication set. Existing canonical physics
+corrections and the genuine virtual-keyboard helper call/private storage survive.
+The unrelated README edit and seven untracked research directories are preserved.
+
+This is not an all-zero-loss merge. The owner approved the following specific
+header-correction debits, independently reproduced on the landing base:
+
+| Function | Meaningful / padded bytes | Approved packet |
+|---|---:|---|
+| `_bitmap_2d_alpha_bleed` | 548 / 560 | T: attested color unions |
+| `_player_profile_3wide_list_update` | 1,222 / 1,232 | Revised E01c |
+| `_rasterizer_dynamic_geometry_initialize` | 473 / 480 | Revised E01c |
+| `_collision_move_point` | 4,744 / 4,752 | Interface MP |
+| Total debit | **6,987 / 7,024** | No additional exact loss authorized |
+
+All four exact variants remain in ancestor `e59d5ca9`, before the combined
+production correction. Fresh baseline/trial objects and instruction-level
+comparisons are retained locally. Three already-residual functions also change
+only allocation/encoding details: ballistic line-of-fire, frame-statistics draw,
+and model draw. The required park rebaselines preserve the recorded history.
+
+The admitted Halo objects are dynavobgeom, object_lights, interface, hs_runtime,
+game_engine and bitmap_drawing. Draw-primitives and bitmap_utilities are honestly
+revoked. Net objects: **390 -> 394 of 468**. The six admissions have independently
+passing January section, data, storage and resolved-relocation audits. Across
+their helper/provider checks plus ioinit, 136 surplus definitions are identical;
+one is the specifically approved object_lights file-path-only exception.
+
+The narrow object_lights selection check uses all 621 current objects in the
+reconstructed January module order. It selects action_vehicle's January-identical
+provider; the absolute-path alternative is unreferenced. Reversing the relevant
+provider order selects the other path, so the control detects the difference.
+This probe uses forced handling of inherited duplicate definitions and terminal
+stubs for unrelated unresolved names. It is bounded selection evidence, **not**
+a successful ordinary whole-program link or a boot test. The 130 ordered pair
+link receipts likewise establish duplicate compatibility, not program completeness.
+
+## Storage, source policy and alignment
+
+The reduced 148 storage packets comprise 126 Halo and 22 incidental vendor
+packets. A fresh whole-build census checks 640 overlapping owner/name rows,
+including all 598 newly static config rows. They resolve to the intended static
+definitions, with no undefined reference from another built TU. The only COMMON
+owner changes are the approved object-list pointers (seven owners -> object_lists)
+and temporary render color (ai_debug -> actions). No speculative owner, padding,
+initializer or fabricated retaining call is added.
+
+The key-agreement, AIFF and RIFF de-aggregations are separate zero-credit commits.
+Their 20 file statics have freshly checked later-build PDB names/types and January
+offsets. Key-agreement and AIFF restore alignment 4 instead of 8; RIFF removes
+the inherited alignment directive and two aliases while preserving resolved
+bytes and relocations. The fourth RIFF name is later-build-attested; January's
+literal remains `riff chunk`. No header changes are bundled with these packets.
+
+The inherited TIFF self-alias macros exposed by the vendor static renames were
+removed rather than retained as invented macros; the entire object remains
+identical. Vendor `__ioterm` becomes strict exact (35 bytes) through the reviewed
+one-past relocation alias/name correction, and libcmt ioinit is admitted. It was
+already credited by the semantic scorer: **zero new credited vendor code**, and
+never Halo credit. All other vendor storage edits also earn zero Halo credit.
+
+Approved BUG disclosures remain site-specific. Existing byte credit is not
+blanket source-policy approval. The hs_runtime long ABI retains its explicit
+partial-write disclosures, including upper bytes copied or CRC'd rather than
+claiming that indeterminate data never escapes. No new assembly or pragma is
+introduced. B3, INC-3, fast_ftol and every other unapproved packet stay held.
+
+## Final evidence and accounting
+
+Fresh stock-build warning census: **199 -> 74**. The only added normalized warning
+is the disclosed hs_library_external C4090 at the const permutation-name argument.
+The actual callee only reads the string through `_stricmp`; no suppressing cast
+is added. The 126 removed warnings are the reviewed hs_runtime/hs ABI mismatches.
+This is stock-flag evidence, not a claim of a new whole-board /W3 run.
+
+The shell temporary rebinding is checked sequentially. Comparing directly across
+the combined packet initially fails the unchanged external-symbol set because
+two separately approved statics changed storage. A fresh control containing only
+those storage fixes preserves all sections and relocations; the original checker
+then passes all 31 checks against the final form. `$T18302` -> `$T18502` changes
+only the binding name. Both targets remain `_main+81` and `_main+99`. The failing
+combined receipt is preserved, not discarded or hidden by weakening the checker.
+
+Final canonical build passes. The 8,252-row strict sweep has **7,639 exact**:
+two gains (main_crash and vendor ioterm), exactly the four listed approved losses.
+Tools: **1,318 passed, 5 skipped, 100 subtests**. Parks: **72 active, 0 stale,
+0 invalid**. Admission: 6 candidates, 0 contradicted/rejected/revoked audit rows.
+The 26 inherited fake-match leads are unchanged; `git diff --check` passes.
+
+Final independent binding finds all **621 configured compiled objects** equal to
+the audited trial outside debug records, including raw auxiliary selection fields,
+symbols, COMMON and undefineds. All **833 split objects are raw-file-identical**.
+An extra pre-existing canonical `build/base/libs/libcmt/chkstk.obj` is preserved:
+its unit is MISSING with no base_path, base recipe or response-file input. It is
+not part of this source build or the bounded link proof, and earns no credit.
+
+| Halo measure | Final |
+|---|---:|
+| Meaningful credited code | **1,591,266 / 1,770,166** |
+| Credited functions | **7,466 / 7,574** |
+| Complete objects | **394 / 468** |
+| Credited data | **2,648,123 / 3,923,451** |
+
+Relative to the pre-publication source, new Halo code is +11 meaningful bytes,
+approved debits are -6,987, and the net is **-6,976**. Data increases **59,220**:
+main 1,796 + HS 54,780 + bitmap_drawing 2,644. Of the HS amount, 1,658 is modeled
+padding as disclosed above. Object admissions, restored attribution and vendor
+changes are not misreported as new source-code matches. No scorer upgrade occurs.
+
+Local receipts: `scratch/astra_publish_20260927/final.*`, `inventory/FRESH_AUDIT.md`,
+`main_review/c_align/`, `q11_review/`, and the isolated trial's `scratch/reconcile/`.
+These include complete provider, storage and section comparisons. Public commits
+contain source/config/tools and this curated report, not private executable or
+compiler-derived binary evidence. Publication is fast-forward-only to the two
+authorized `jonas/exact-pilots` branches; neither repository's main branch changes.

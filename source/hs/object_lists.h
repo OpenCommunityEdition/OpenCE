@@ -50,8 +50,8 @@ void object_list_gc(
 
 /* ---------- globals */
 
-struct data_array *object_list_header_data;
-struct data_array *object_list_data;
+extern struct data_array *object_list_header_data;
+extern struct data_array *object_list_data;
 
 /* ---------- public code */
 

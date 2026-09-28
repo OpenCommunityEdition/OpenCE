@@ -215,7 +215,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "cseries/errors.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "rasterizer.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_xbox_draw_primitives.h"
@@ -342,7 +342,6 @@ static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 /* ---------- globals */
 
 extern struct rasterizer_draw_primitives_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER_TYPES] =
 {
@@ -351,7 +350,7 @@ static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER
 };
 
 
-struct dynamic_vertices_globals dynamic_vertices = {0};
+static struct dynamic_vertices_globals dynamic_vertices = {0};
 static struct dynamic_triangles_globals dynamic_triangles = {0};
 static D3DVertexBuffer *aux_dynamic_unlit_vb = NULL;
 static boolean dynamic_triangles_overflow_warning = FALSE;

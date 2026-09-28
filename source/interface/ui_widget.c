@@ -657,7 +657,6 @@ struct widget_instance;
 #include "interface/ui_widget_text_search_and_replace_functions.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
-#include "main/main_runtime.h"
 #include "memory/stack_memory_pool.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_connection.h"
@@ -959,32 +958,12 @@ struct stack_memory_pool_medium
 	struct stack_memory_pool_block *blocks[MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS - 1];
 };
 
-/* narrow views of the tag definitions this file reaches through; the owning
-translation units (HUD.C, HUD_MESSAGING.C, INTERFACE.C) keep their own */
-
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	pixel32 color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
-struct interface_tag_references_definition
-{
-	struct tag_reference tags[NUMBER_OF_INTERFACE_TAGS];
-	byte unused[48];
-};
-
 typedef char verify_icon_hud_element_definition_size[
 	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
 typedef char verify_hud_globals_button_icons_offset[
 	offsetof(struct hud_globals_definition, messaging.button_icons) == 0xC4 ? 1 : -1];
 typedef char verify_interface_tag_references_definition_size[
-	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
+	sizeof(struct game_globals_interface_tag_references) == 0x130 ? 1 : -1];
 /* narrow views of the 'DeLa' widget definition tag and of the three block
 elements this file walks; only the members this file reaches are named and
 every other span is left explicitly unknown */
@@ -1574,9 +1553,9 @@ static char button_mappings[_icon_custom_1 - _icon_action] =
 	_icon_right_stick	/* look */
 };
 
-real global_ui_white_red = 0.8f;
-real global_ui_white_green = 0.8f;
-real global_ui_white_blue = 0.8f;
+static real global_ui_white_red = 0.8f;
+static real global_ui_white_green = 0.8f;
+static real global_ui_white_blue = 0.8f;
 
 
 /* ---------- public code */
@@ -3781,7 +3760,7 @@ static void render_state_bitmap(
 	struct icon_hud_element_definition *icon)
 {
 	struct game_globals *game_globals;
-	struct interface_tag_references_definition *interface_tag_references;
+	struct game_globals_interface_tag_references *interface_tag_references;
 	long bitmap_group_index;
 	long frame_index;
 	struct bitmap_data const *bitmap;
@@ -3795,9 +3774,9 @@ static void render_state_bitmap(
 		? TAG_BLOCK_GET_ELEMENT(
 			&game_globals->interface_tag_references,
 			0,
-			struct interface_tag_references_definition)
+			struct game_globals_interface_tag_references)
 		: NULL;
-	bitmap_group_index = interface_tag_references->tags[_interface_bitmap_iface_map2].index;
+	bitmap_group_index = interface_tag_references->interface_tag_references[_interface_bitmap_iface_map2].index;
 	frame_index = 0;
 	bitmap = NULL;
 	clip = NULL;

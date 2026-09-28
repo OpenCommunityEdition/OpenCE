@@ -166,7 +166,6 @@ void rasterizer_debug_triangle_shaded(
 static struct rasterizer_debug_data debug_data;
 
 extern struct rasterizer_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 

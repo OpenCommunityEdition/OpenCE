@@ -236,7 +236,6 @@ static void submit_screen_vertex(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 

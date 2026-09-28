@@ -252,11 +252,10 @@ typedef char verify_transparent_geometry_group_animation_offset[
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
-boolean local_active_camouflage_visibility_flag = FALSE;
-boolean local_active_camouflage_debug_cached_flag = FALSE;
-short local_active_camouflage_debug_cache_count = 0;
+static boolean local_active_camouflage_visibility_flag = FALSE;
+static boolean local_active_camouflage_debug_cached_flag = FALSE;
+static short local_active_camouflage_debug_cache_count = 0;
 
 /* ---------- public code */
 

@@ -77,6 +77,9 @@ enum
 
 /* ---------- globals */
 
+struct data_array *object_list_header_data;
+struct data_array *object_list_data;
+
 /* ---------- public code */
 
 void object_lists_initialize(

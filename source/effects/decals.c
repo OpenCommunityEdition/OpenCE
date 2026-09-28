@@ -483,7 +483,8 @@ struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] 
 	{ 10.0f,  10.0f, 1.5f, FALSE }
 };
 
-static real const seconds_per_tick = 1.0f / TICKS_PER_SECOND;
+/* SECONDS_PER_TICK: name from the 2003 PC demo PDB and the HCEX PDB (decals file static const float) */
+static real const SECONDS_PER_TICK = 1.0f / TICKS_PER_SECOND;
 
 /* ---------- public code */
 
@@ -2325,7 +2326,7 @@ static void decal_update(
 	long decal_index)
 {
 	struct decal_datum *decal = DECAL_GET(decal_index);
-	real elapsed = (game_time_get() - decal->creation_time) * seconds_per_tick;
+	real elapsed = (game_time_get() - decal->creation_time) * SECONDS_PER_TICK;
 
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 307, decal->definition_index!=NONE);
 

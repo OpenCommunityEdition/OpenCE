@@ -140,7 +140,7 @@ symbols in this file:
 #include "errors.h"
 #include "game/players.h"
 #include "interface/interface.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "math/integer_math.h"
 #include "rasterizer.h"
 #include "rasterizer_debug_options.h"

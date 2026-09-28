@@ -76,6 +76,7 @@ symbols in this file:
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "render/render.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 
@@ -164,13 +165,6 @@ struct pixel_shader_definition
 	unsigned long final_combiner_constants;
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	void const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
 struct rasterizer_model_lighting_parameters
 {
 	byte data[0x74];
@@ -188,7 +182,7 @@ struct rasterizer_model_begin_parameters
 {
 	unsigned long geometry_flags;
 	long unique_identifier;
-	struct rasterizer_model_skinning_parameters skinning;
+	struct render_skinning skinning;
 	struct rasterizer_model_lighting_parameters lighting;
 	struct render_animation animation;
 	struct rasterizer_model_effect_parameters effect;
@@ -248,7 +242,6 @@ static void rasterizer_shadow_convolve(
 
 extern D3DDevice *global_d3d_device;
 extern struct rasterizer_shadows_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 static boolean shadow_restored = TRUE;

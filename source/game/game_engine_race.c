@@ -250,16 +250,78 @@ static long find_closest_vehicle(
 	long ignore_these_count);
 static void spawn_race_vehicles(
 	void);
+static void race_engine_dispose(
+	void);
+static boolean race_engine_initialize_for_new_map(
+	void);
+static void race_engine_dispose_from_old_map(
+	void);
+static void race_engine_player_added(
+	long player_index);
+static void race_engine_game_ending(
+	void);
+static void race_engine_game_starting(
+	void);
+static void race_engine_statistics_append(
+	long statistic);
+static void race_engine_handle_client_message(
+	void *message);
+static void race_engine_handle_server_message(
+	void *message);
+static void race_engine_pregame_post_rasterize(
+	void);
+static void race_engine_post_rasterize(
+	void);
+static void race_engine_player_update(
+	long player_index);
+static void race_engine_weapon_update(
+	long item_index,
+	struct weapon_datum *weapon);
+static void race_engine_player_damaged_player(
+	long killing_player_index,
+	long dead_player_index,
+	boolean friendly_fire);
+static void race_engine_player_killed_player(
+	long killing_player_index,
+	long killing_object_index,
+	long dead_player_index,
+	boolean friendly_fire);
+static boolean race_engine_display_score(
+	long player_index,
+	long message,
+	long message_player_index,
+	wchar_t *buffer,
+	long buffer_size);
+static void race_engine_prespawn_player_update(
+	long player_index);
+static boolean race_goal_matches_player(
+	long player_index,
+	long goal_index);
+static long race_engine_get_score(
+	long player_index,
+	enum get_score_type score_type);
+static wchar_t *race_get_score_string(
+	long player_index,
+	wchar_t *string);
+static wchar_t *race_get_score_header_string(
+	wchar_t *string);
+static wchar_t *race_get_team_score_string(
+	long team_index,
+	wchar_t *string);
+static long race_engine_did_player_win(
+	long player_index);
+static void race_engine_update(
+	void);
 
 /* ---------- globals */
 
 extern long timeout_for_endgame_sound;
 
-struct race_globals race_globals = { 0 };
+static struct race_globals race_globals = { 0 };
 
 /* ---------- public code */
 
-void race_engine_dispose(
+static void race_engine_dispose(
 	void)
 {
 	return;
@@ -380,13 +442,13 @@ void race_flags_make_unique(
 	return;
 }
 
-void race_engine_dispose_from_old_map(
+static void race_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void race_engine_player_added(
+static void race_engine_player_added(
 	long player_index)
 {
 	player_get(player_index)->multiplayer_special = 0;
@@ -394,43 +456,43 @@ void race_engine_player_added(
 	return;
 }
 
-void race_engine_game_ending(
+static void race_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void race_engine_game_starting(
+static void race_engine_game_starting(
 	void)
 {
 	return;
 }
 
-void race_engine_statistics_append(
+static void race_engine_statistics_append(
 	long statistic)
 {
 	return;
 }
 
-void race_engine_handle_client_message(
+static void race_engine_handle_client_message(
 	void *message)
 {
 	return;
 }
 
-void race_engine_handle_server_message(
+static void race_engine_handle_server_message(
 	void *message)
 {
 	return;
 }
 
-void race_engine_pregame_post_rasterize(
+static void race_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void race_engine_post_rasterize(
+static void race_engine_post_rasterize(
 	void)
 {
 	return;
@@ -682,7 +744,7 @@ static void race_touch_flag(
 	return;
 }
 
-void race_engine_weapon_update(
+static void race_engine_weapon_update(
 	long item_index,
 	struct weapon_datum *weapon)
 {
@@ -752,7 +814,7 @@ static void build_player_speeds(
 	return;
 }
 
-void race_engine_player_damaged_player(
+static void race_engine_player_damaged_player(
 	long killing_player_index,
 	long dead_player_index,
 	boolean friendly_fire)
@@ -760,7 +822,7 @@ void race_engine_player_damaged_player(
 	return;
 }
 
-void race_engine_player_killed_player(
+static void race_engine_player_killed_player(
 	long killing_player_index,
 	long killing_object_index,
 	long dead_player_index,
@@ -769,7 +831,7 @@ void race_engine_player_killed_player(
 	return;
 }
 
-boolean race_engine_display_score(
+static boolean race_engine_display_score(
 	long player_index,
 	long message,
 	long message_player_index,
@@ -1007,13 +1069,13 @@ boolean race_engine_display_score(
 	return result;
 }
 
-void race_engine_prespawn_player_update(
+static void race_engine_prespawn_player_update(
 	long player_index)
 {
 	return;
 }
 
-boolean race_goal_matches_player(
+static boolean race_goal_matches_player(
 	long player_index,
 	long goal_index)
 {
@@ -1050,7 +1112,7 @@ static long count_bits_32(
 	return count;
 }
 
-long race_engine_get_score(
+static long race_engine_get_score(
 	long player_index,
 	enum get_score_type score_type)
 {
@@ -1073,7 +1135,7 @@ long race_engine_get_score(
 	return score;
 }
 
-wchar_t *race_get_score_string(
+static wchar_t *race_get_score_string(
 	long player_index,
 	wchar_t *string)
 {
@@ -1088,7 +1150,7 @@ wchar_t *race_get_score_string(
 	return string;
 }
 
-wchar_t *race_get_score_header_string(
+static wchar_t *race_get_score_header_string(
 	wchar_t *string)
 {
 	short string_index =
@@ -1107,7 +1169,7 @@ wchar_t *race_get_score_header_string(
 	return string;
 }
 
-wchar_t *race_get_team_score_string(
+static wchar_t *race_get_team_score_string(
 	long team_index,
 	wchar_t *string)
 {
@@ -1116,7 +1178,7 @@ wchar_t *race_get_team_score_string(
 	return string;
 }
 
-long race_engine_did_player_win(
+static long race_engine_did_player_win(
 	long player_index)
 {
 	if (game_engine_has_teams())
@@ -1265,7 +1327,7 @@ static void spawn_race_vehicles(
 	return;
 }
 
-void race_engine_player_update(
+static void race_engine_player_update(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -1308,7 +1370,7 @@ void race_engine_player_update(
 	return;
 }
 
-void race_engine_update(
+static void race_engine_update(
 	void)
 {
 	if (game_time_get() == 2)
@@ -1355,7 +1417,7 @@ void race_engine_update(
 	return;
 }
 
-boolean race_engine_initialize_for_new_map(
+static boolean race_engine_initialize_for_new_map(
 	void)
 {
 	long lowest_flag_index = MAXIMUM_RACE_FLAGS;

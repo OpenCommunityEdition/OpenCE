@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002db040[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_read.c,v 1.43 92/02/10 19:06:41 sam Exp $";
+static char data_002db040[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_read.c,v 1.43 92/02/10 19:06:41 sam Exp $";
 #endif
 
 /*

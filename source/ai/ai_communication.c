@@ -1127,6 +1127,9 @@ void actor_handle_communication(
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;
+static long ai_conversation_new(
+	short scenario_conversation_index,
+	boolean scripted);
 
 /* ---------- globals */
 
@@ -5266,7 +5269,7 @@ void ai_conversation_unit_died(
 	return;
 }
 
-long ai_conversation_new(
+static long ai_conversation_new(
 	short scenario_conversation_index,
 	boolean scripted)
 {

@@ -319,7 +319,7 @@ DEFINE_NETWORK_GAME_MESSAGE(message_client_graceful_game_exit_postgame, 0x04);
 
 /* ---------- globals */
 
-struct network_game_message_packet_definitions data_0030aa68 =
+static struct network_game_message_packet_definitions data_0030aa68 =
 {
 	{
 		DATA_PACKET_FIELD(_data_packet_field_shorts, 2),

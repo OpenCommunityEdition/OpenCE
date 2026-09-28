@@ -69,7 +69,7 @@ long const step_size_table[STEP_SIZE_TABLE_COUNT] =
 	15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767,
 };
 
-struct bungie_ima_adpcm_header_byte_swap_data bungie_ima_adpcm_header_bs =
+static struct bungie_ima_adpcm_header_byte_swap_data bungie_ima_adpcm_header_bs =
 {
 	{
 		_begin_bs_array, 1,

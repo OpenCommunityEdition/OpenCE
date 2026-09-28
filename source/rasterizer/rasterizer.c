@@ -362,13 +362,6 @@ struct model_geometry_part
 	struct vertex_buffer vertex_buffer;
 };
 
-struct rasterizer_model_skinning
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
-};
-
 struct rasterizer_debug_model_vertex
 {
 	real_point3d position;
@@ -691,10 +684,9 @@ struct rasterizer_debug_options_definition rasterizer_debug_options =
 	FALSE, /* transparent_pixel_counter */
 	{ 0 }, /* pad8A[2] */
 };
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
 #pragma bss_seg(".bss")
-long bss_004662ec;
+static long bss_004662ec;
 real_argb_color *global_rasterizer_model_ambient_reflection_tint;
 #pragma bss_seg()
 
@@ -1883,7 +1875,7 @@ void rasterizer_debug_immediate_vector(
 
 void rasterizer_debug_model_vertices(
 	long object_index,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	struct model_geometry_part const *part)
 {
 	long debug_vertex_count;

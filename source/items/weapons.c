@@ -491,7 +491,7 @@ struct weapons_globals
 	struct profile_section update_profile;
 };
 
-struct weapons_globals data_00307140 =
+static struct weapons_globals data_00307140 =
 {
 	{"~primary-blur", "~secondary-blur"},
 	{"weapon_update", NONE, TRUE}

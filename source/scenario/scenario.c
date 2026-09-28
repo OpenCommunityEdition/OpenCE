@@ -3,9 +3,9 @@ SCENARIO.C
 
 symbols in this file:
 0017DA90 0020:
-	_code_0017da90 (0000)
+	_scenario_call_disconnect_from_structure_bsp_procs (0000)
 0017DAB0 0020:
-	_code_0017dab0 (0000)
+	_scenario_call_reconnect_to_structure_bsp_procs (0000)
 0017DAD0 0020:
 	_scenario_initialize (0000)
 0017DAF0 0050:
@@ -91,7 +91,7 @@ symbols in this file:
 0017EE50 0520:
 	_scenario_get_sound_environment (0000)
 0017F370 00a0:
-	_code_0017f370 (0000)
+	_interpolate_real_rgb_color (0000)
 0017F410 0330:
 	_scenario_get_atmospheric_fog (0000)
 002A053C 0011:
@@ -307,7 +307,7 @@ static struct memory_status scenario_memory_status =
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
 struct collision_bsp *global_collision_bsp;
-byte bss_004c0520[0x375] = { 0 };
+static byte bss_004c0520[0x375] = { 0 };
 #define default_material_definition (*(struct material_definition *)&bss_004c0520[0])
 #define default_material_initialized (*(boolean *)&bss_004c0520[0x374])
 struct bsp3d *global_bsp3d;
@@ -315,7 +315,7 @@ struct game_globals *global_game_globals;
 
 /* ---------- public code */
 
-void code_0017da90(
+void scenario_call_disconnect_from_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -326,7 +326,7 @@ void code_0017da90(
 	return;
 }
 
-void code_0017dab0(
+void scenario_call_reconnect_to_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -1306,7 +1306,7 @@ void scenario_get_sound_environment(
 	return;
 }
 
-static void code_0017f370(
+static void interpolate_real_rgb_color(
 	real_rgb_color *current,
 	real_rgb_color const *desired,
 	real maximum_step)
@@ -1440,7 +1440,7 @@ void scenario_get_atmospheric_fog(
 			interpolate_scalar(&fog_state->atmospheric_opaque_distance, fog->opaque_distance, distance);
 			distance *= 0.05f;
 			interpolate_scalar(&fog_state->atmospheric_maximum_density, fog->maximum_density, distance);
-			code_0017f370(&fog_state->atmospheric_color, &fog->color, distance);
+			interpolate_real_rgb_color(&fog_state->atmospheric_color, &fog->color, distance);
 			interpolate_scalar(&fog_state->indoor_fog_scale, indoor_fog_scale, distance);
 		}
 		else

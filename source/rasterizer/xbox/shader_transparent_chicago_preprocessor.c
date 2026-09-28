@@ -79,7 +79,7 @@ struct shader_transparent_chicago_combiner_table
 
 /* ---------- prototypes */
 
-boolean shader_map_verify(
+static boolean shader_map_verify(
 	struct shader_transparent_chicago_map *map,
 	short map_index);
 
@@ -89,7 +89,7 @@ boolean shader_transparent_chicago_create(
 
 /* ---------- globals */
 
-const struct shader_transparent_chicago_combiner_table shader_transparent_chicago_combiner_table =
+static const struct shader_transparent_chicago_combiner_table shader_transparent_chicago_combiner_table =
 {
 	{
 		{
@@ -117,7 +117,7 @@ const struct shader_transparent_chicago_combiner_table shader_transparent_chicag
 
 /* ---------- public code */
 
-boolean shader_map_verify(
+static boolean shader_map_verify(
 	struct shader_transparent_chicago_map *map,
 	short map_index)
 {

@@ -496,6 +496,10 @@ typedef char ai_prop_unopposable_enemy_offset_assert[
 
 static void ai_place_pending_mounted_weapons(
 	void);
+static boolean ai_enemies_endanger_player(
+	boolean must_be_attacking);
+static void ai_flush_spatial_effects(
+	void);
 
 /* ---------- globals */
 
@@ -755,7 +759,7 @@ boolean ai_release_inactive_swarms(
 	return released_unit_count > 0;
 }
 
-int compare_potentially_releasable_entities(
+static int compare_potentially_releasable_entities(
 	void const *element0,
 	void const *element1)
 {
@@ -1575,7 +1579,7 @@ void ai_handle_exit_vehicle(
 	return;
 }
 
-void ai_flush_spatial_effects(
+static void ai_flush_spatial_effects(
 	void)
 {
 	ai_globals->spatial_effect_last_index = 0;
@@ -2001,7 +2005,7 @@ void ai_update(
 	return;
 }
 
-boolean ai_enemies_endanger_player(
+static boolean ai_enemies_endanger_player(
 	boolean must_be_attacking)
 {
 	long current_time = game_time_get();

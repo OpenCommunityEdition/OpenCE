@@ -86,7 +86,7 @@ void rasterizer_models_end(
 	void);
 /* ---------- globals */
 
-real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
+static real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
 
 /* ---------- public code */
 

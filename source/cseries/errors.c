@@ -80,8 +80,8 @@ struct error_suppression_globals
 
 /* ---------- globals */
 
-boolean data_002dcd2c = TRUE;
-struct error_suppression_globals bss_0031df2c = { 0, 0 };
+static boolean data_002dcd2c = TRUE;
+static struct error_suppression_globals bss_0031df2c = { 0, 0 };
 boolean find_all_fucked_up_shit = FALSE;
 long fucked_up_shit_count = 0;
 

@@ -346,7 +346,6 @@ symbols in this file:
 #include "game/local_players.h"
 #include "game/player_queues_new.h"
 #include "integer_math.h"
-#include "main/main_runtime.h"
 #include "input.h"
 #include "shell.h"
 #include "event_manager.h"

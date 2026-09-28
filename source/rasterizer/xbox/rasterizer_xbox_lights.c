@@ -171,7 +171,6 @@ static short rasterizer_sun_glow_convolve(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */

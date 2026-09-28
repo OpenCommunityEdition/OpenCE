@@ -98,6 +98,7 @@ symbols in this file:
 #include "rasterizer_geometry_compression.h"
 #include "rasterizer_debug_options.h"
 #include "objects/widgets/widget_types.h"
+#include "main/main.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 
@@ -353,9 +354,7 @@ static struct lens_flare_occlusion_test_results local_lens_flare_occlusion_test_
 static byte local_lens_flare_occlusion_test_results2[MAXIMUM_LENS_FLARE_MARKERS_PER_STRUCTURE+MAXIMUM_QUEUED_LENS_FLARES][MAXIMUM_WINDOWS];
 static struct rasterizer_lens_flare_submit_parameters local_lens_flare_parameters[MAXIMUM_LENS_FLARES_PER_FRAME] = {0};
 static long local_lens_flare_count = 0;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern short global_screenshot_count;
-extern short global_screenshot_size;
 
 /* ---------- private code */
 

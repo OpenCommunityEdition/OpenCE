@@ -201,7 +201,7 @@ enum
 
 /* ---------- globals */
 
-real previous_projection_coefficients[4]= {0};
+static real previous_projection_coefficients[4]= {0};
 static real render_camera_warning_values[MAXIMUM_RENDER_CAMERA_WARNING_CONDITIONS]= {0};
 static boolean render_camera_warnings_initialized= {0};
 boolean debug_no_frustum_clip= {0};

@@ -151,7 +151,7 @@ real real_random_range(
 
 void infection_decide_action(
 	long actor_index);
-void infection_swarm_control(
+static void infection_swarm_control(
 	long actor_index);
 void infection_swarm_aim_jump(
 	long actor_index,
@@ -285,7 +285,7 @@ static short infection_wander_move_time(
 	return MIN(result, 255);
 }
 
-void infection_swarm_control(
+static void infection_swarm_control(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);

@@ -97,7 +97,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmaps_inlines.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"
 #include "render/render_cameras.h"
@@ -192,7 +192,6 @@ typedef char rasterizer_screen_effect_pixel_shader_size_assert[
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- private code */
 

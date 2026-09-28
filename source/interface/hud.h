@@ -17,6 +17,14 @@ header included in hcex build.
 struct hud_globals_definition;
 struct tag_block;
 union real_argb_color;
+union real_point3d;
+
+struct hud_scripted_globals_definition
+{
+	boolean show_hud;
+	boolean show_hud_help_text;
+	byte pad[2];
+};
 
 /* ---------- prototypes/HUD.C */
 
@@ -74,6 +82,21 @@ void temporary_hud_draw(
 void hud_draw_screen(
 	void);
 
+/* ---------- prototypes/HUD_NAV_POINTS.C */
+
+short find_nav_point(
+	char const *name);
+short hud_get_nav_point_render_type(
+	short local_player_index,
+	union real_point3d const *head,
+	union real_point3d const *position,
+	long reference_object_index);
+void custom_render_nav_point(
+	short local_player_index,
+	union real_point3d const *position,
+	short nav_index,
+	short waypoint_type);
+
 /* ---------- prototypes/HUD_SOUNDS.C */
 
 void hud_play_sound(
@@ -86,6 +109,7 @@ void hud_play_sound(
 /* ---------- globals */
 
 extern struct hud_globals_definition *hud_globals;
+extern struct hud_scripted_globals_definition *hud_scripted_globals;
 
 /* ---------- public code */
 

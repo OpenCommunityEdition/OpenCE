@@ -15,11 +15,11 @@ symbols in this file:
 00120980 0020:
 	_antenna_delete (0000)
 001209A0 0130:
-	_code_001209a0 (0000)
+	_antenna_update_attachment (0000)
 00120AD0 0170:
-	_code_00120ad0 (0000)
+	_antenna_render_proper (0000)
 00120C40 0310:
-	_code_00120c40 (0000)
+	_antenna_update (0000)
 00120F50 0090:
 	_antenna_render (0000)
 00120FE0 00b0:
@@ -57,16 +57,16 @@ struct bitmap_data *bitmap_group_try_and_get_bitmap(
 	long bitmap_group_index,
 	short bitmap_index);
 
-static void code_001209a0(
+static void antenna_update_attachment(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition,
 	struct location *attachment_location,
 	real_point3d *attachment_point,
 	real_vector3d *attachment_vector);
-static void code_00120ad0(
+static void antenna_render_proper(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition);
-static void code_00120c40(
+static void antenna_update(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition,
 	real delta);
@@ -239,13 +239,13 @@ void antenna_render(
 		antenna->object_index = object_index;
 		if (antenna->updates_since_last_render > 5)
 		{
-			code_00120c40(antenna, definition, 0.05f);
-			code_00120c40(antenna, definition, 0.05f);
-			code_00120c40(antenna, definition, 0.05f);
+			antenna_update(antenna, definition, 0.05f);
+			antenna_update(antenna, definition, 0.05f);
+			antenna_update(antenna, definition, 0.05f);
 		}
 
 		antenna->updates_since_last_render = 0;
-		code_00120ad0(antenna, definition);
+		antenna_render_proper(antenna, definition);
 	}
 
 	return;
@@ -267,7 +267,7 @@ void antennas_update(
 		{
 			antenna->updates_since_last_render++;
 			if (antenna->object_index != NONE && antenna->updates_since_last_render < 5)
-				code_00120c40(antenna, definition, MIN(delta, 1.0f / 15.0f));
+				antenna_update(antenna, definition, MIN(delta, 1.0f / 15.0f));
 		}
 	}
 
@@ -276,7 +276,7 @@ void antennas_update(
 
 /* ---------- private code */
 
-static void code_001209a0(
+static void antenna_update_attachment(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition,
 	struct location *attachment_location,
@@ -322,7 +322,7 @@ static void code_001209a0(
 	return;
 }
 
-static void code_00120ad0(
+static void antenna_render_proper(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition)
 {
@@ -390,7 +390,7 @@ static void code_00120ad0(
 	return;
 }
 
-static void code_00120c40(
+static void antenna_update(
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition,
 	real delta)
@@ -399,7 +399,7 @@ static void code_00120c40(
 	real_point3d attachment_point;
 	real_vector3d attachment_vector;
 
-	code_001209a0(
+	antenna_update_attachment(
 		antenna,
 		definition,
 		&attachment_location,

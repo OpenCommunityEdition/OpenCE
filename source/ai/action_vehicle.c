@@ -109,7 +109,7 @@ static boolean action_vehicle_desirable(
 	boolean already_inside,
 	boolean already_attempting_entry);
 
-boolean action_vehicle_evaluate_seat(
+static boolean action_vehicle_evaluate_seat(
 	long actor_index,
 	long vehicle_index,
 	short seat_index,
@@ -267,7 +267,7 @@ static boolean action_vehicle_desirable(
 	return desirable;
 }
 
-boolean action_vehicle_evaluate_seat(
+static boolean action_vehicle_evaluate_seat(
 	long actor_index,
 	long vehicle_index,
 	short seat_index,

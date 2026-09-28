@@ -230,9 +230,9 @@ void sound_idle(
 
 /* ---------- globals */
 
-struct cache_file_globals cache_file_globals = { 0 };
+static struct cache_file_globals cache_file_globals = { 0 };
 extern struct cache_file_tag_instance *global_tag_instances;
-char const *data_00316820[] =
+static char const *data_00316820[] =
 {
 	"d:\\maps_de\\",
 	"d:\\maps_fr\\",

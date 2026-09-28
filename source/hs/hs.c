@@ -2775,6 +2775,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "camera/director.h"
 #include "cache/sound_cache.h"
@@ -2803,6 +2804,7 @@ symbols in this file:
 #include "structures/structure_lens_flares.h"
 #include "structures/structure_visibility.h"
 #include "tag_files/files.h"
+#include "main/main.h"
 
 /* ---------- constants */
 
@@ -3048,21 +3050,6 @@ static void evaluator( \
 	return; \
 }
 
-#define HS_EVALUATE_VOID_LONG_LONG_LONG(evaluator, function) \
-static void evaluator( \
-	short function_index, \
-	long thread_index, \
-	boolean initialize) \
-{ \
-	long *arguments = hs_macro_function_evaluate(function_index, thread_index, initialize); \
-	if (arguments) \
-	{ \
-		function(arguments[0], arguments[1], arguments[2]); \
-		hs_return(thread_index, 0); \
-	} \
-	return; \
-}
-
 #define HS_EVALUATE_VOID_SHORT_SHORT(evaluator, function) \
 static void evaluator( \
 	short function_index, \
@@ -3266,6 +3253,7 @@ union hs_evaluation_argument
 	short short_value;
 	unsigned short unsigned_short_value;
 	boolean boolean_value;
+	char const *string_value;
 };
 
 struct hs_arguments_boolean
@@ -3473,9 +3461,9 @@ struct hs_arguments_long_real_real
 	real value2;
 };
 
-struct hs_arguments_long_real_real_word
+struct hs_arguments_real_real_real_word
 {
-	long value0;
+	real value0;
 	real value1;
 	real value2;
 	word value3;
@@ -3537,7 +3525,7 @@ struct scenario *global_scenario_get(
 	void);
 void hs_teleport_players_not_in_trigger_volume(
 	short trigger_volume_index,
-	word cutscene_flag_index);
+	short cutscene_flag_index);
 void hs_object_set_shield(
 	long object_index,
 	real shield_vitality);
@@ -3555,10 +3543,10 @@ boolean hs_objects_can_see_object(
 	real degrees);
 boolean hs_objects_can_see_flag(
 	long object_list_index,
-	word cutscene_flag_index,
+	short cutscene_flag_index,
 	real degrees);
 void hs_sound_set_gain(
-	long sound_index,
+	char const *tag_name,
 	real gain);
 void objects_scripting_set_scale(
 	long object_index,
@@ -3619,15 +3607,15 @@ void ai_scripting_follow_distance(
 	long ai_reference,
 	real distance);
 void player_effect_screen_fade_in(
-	long color,
-	real initial_opacity,
-	real final_opacity,
-	short duration_ticks);
+	real red,
+	real green,
+	real blue,
+	short ticks);
 void player_effect_screen_fade_out(
-	long color,
-	real initial_opacity,
-	real final_opacity,
-	short duration_ticks);
+	real red,
+	real green,
+	real blue,
+	short ticks);
 void cinematic_set_title_delayed(
 	short title_index,
 	real delay);
@@ -3643,23 +3631,23 @@ void sound_class_set_gain(
 	real gain,
 	short interpolation_ticks);
 void hud_unit_activate_nav_point_with_flag(
-	word player_index,
+	short player_index,
 	long unit_index,
-	word flag_index,
+	short flag_index,
 	real vertical_offset);
 void hud_unit_activate_nav_point_with_object(
-	word player_index,
+	short player_index,
 	long unit_index,
 	long object_index,
 	real vertical_offset);
 void hud_activate_team_nav_point_with_flag(
-	word player_index,
-	word team,
-	word flag_index,
+	short player_index,
+	short team,
+	short flag_index,
 	real vertical_offset);
 void hud_activate_team_nav_point_with_object(
-	word player_index,
-	word team,
+	short player_index,
+	short team,
 	long object_index,
 	real vertical_offset);
 void scripted_player_effect_set_translation(
@@ -3685,7 +3673,7 @@ short object_list_count(
 	long object_list_index);
 short numeric_countdown_timer_get(
 	short digit_index);
-short recorded_animation_get_time_left(
+long recorded_animation_get_time_left(
 	long unit_index);
 short scenery_get_animation_time(
 	long scenery_index);
@@ -3706,9 +3694,9 @@ short ai_scripting_nonswarm_count(
 short ai_scripting_status(
 	long ai_reference);
 short ai_scripting_conversation_line(
-	word conversation_index);
+	short conversation_index);
 short ai_scripting_conversation_status(
-	word conversation_index);
+	short conversation_index);
 short scripted_camera_time(
 	void);
 short global_structure_bsp_index_get(
@@ -3724,22 +3712,20 @@ boolean unit_solo_player_integrated_night_vision_is_active(
 	void);
 void hud_unit_deactivate_nav_point_with_flag(
 	long unit_index,
-	word flag_index);
+	short flag_index);
 void hud_unit_deactivate_nav_point_with_object(
 	long unit_index,
 	long object_index);
 void hud_deactivate_team_nav_point_with_flag(
 	short team,
-	word flag_index);
+	short flag_index);
 void hud_deactivate_team_nav_point_with_object(
 	short team,
 	long object_index);
-void errors_overflow_suppression_enable(
-	boolean enabled);
 void scripted_player_effect_stop(
 	real decay_time);
 void scripted_hud_set_state_message(
-	word message_index);
+	short message_index);
 void scripted_hud_set_timer_warning_cutoff(
 	short minutes,
 	word seconds);
@@ -3758,7 +3744,7 @@ void rasterizer_set_near_clip_distance(
 void ui_widget_debug_show_path(
 	boolean show);
 void display_scenario_help(
-	word string_index);
+	short string_index);
 void xbox_set_machine_name(
 	char const *machine_name);
 void hs_help(
@@ -3791,7 +3777,7 @@ boolean unit_custom_animation_at_frame(
 	long animation_graph_index,
 	char const *animation_name,
 	boolean interpolate,
-	word frame_index);
+	short frame_index);
 boolean unit_is_playing_custom_animation(
 	long unit_index);
 boolean unit_scripting_vehicle_test_seat_list(
@@ -3813,7 +3799,7 @@ boolean unit_get_current_flashlight_state(
 boolean ai_scripting_is_attacking(
 	long encounter_index);
 boolean ai_scripting_conversation(
-	word conversation_index);
+	short conversation_index);
 boolean scripted_player_control_set_camera_control(
 	boolean enabled);
 boolean scripted_show_hud(
@@ -3834,15 +3820,15 @@ long object_list_from_ai_reference(
 	long ai_reference);
 long hs_object_list_get_element(
 	long object_list_index,
-	unsigned short element_index);
+	short element_index);
 void hs_object_destroy(
 	long object_index);
 void hs_object_create(
-	word object_name_index);
+	short object_name_index);
 void hs_object_create_anew(
-	word object_name_index);
+	short object_name_index);
 void cheat_active_camouflage_local_player(
-	word player_index);
+	short player_index);
 void breakable_surfaces_enable(
 	boolean enabled);
 void render_effects(
@@ -3990,16 +3976,16 @@ void ai_scripting_magically_see_units(
 	long object_list_index);
 void hs_object_teleport(
 	long object_index,
-	word cutscene_flag_index);
+	short cutscene_flag_index);
 void hs_object_set_facing(
 	long object_index,
-	word cutscene_flag_index);
+	short cutscene_flag_index);
 void hs_effect_new(
 	long effect_definition_index,
-	word cutscene_flag_index);
+	short cutscene_flag_index);
 void hs_damage_new(
 	long damage_definition_index,
-	word cutscene_flag_index);
+	short cutscene_flag_index);
 void numeric_countdown_timer_set(
 	long milliseconds,
 	boolean auto_start);
@@ -4017,7 +4003,7 @@ void unit_scripting_enter_vehicle(
 	long vehicle_index,
 	char const *seat_name);
 real hs_sound_get_gain(
-	long sound_index);
+	char const *tag_name);
 real unit_scripting_get_health(
 	long unit_index);
 real unit_scripting_get_shield(
@@ -4064,12 +4050,6 @@ void players_unzoom_all(
 	void);
 void player_control_action_test_reset(
 	void);
-void main_reset_map(
-	void);
-void main_print_version(
-	void);
-void main_set_game_connection_to_film_playback(
-	void);
 void texture_cache_flush(
 	void);
 void debug_dump_memory(
@@ -4089,26 +4069,6 @@ void cinematic_skip_start(
 void cinematic_skip_stop(
 	void);
 void attract_mode_start(
-	void);
-void main_won_map(
-	void);
-void main_lost_map(
-	void);
-void main_save_map_safe(
-	void);
-void main_save_cancel(
-	void);
-void main_save_map_no_timeout(
-	void);
-void main_save_map_nonsafe(
-	void);
-void main_revert_map(
-	void);
-void main_load_core(
-	void);
-void main_load_core_at_startup(
-	void);
-void main_save_core(
 	void);
 void scripted_hud_restart_flashing(
 	void);
@@ -4141,20 +4101,20 @@ void ai_scripting_migrate(
 	long source_ai_index,
 	long destination_ai_index);
 void ai_scripting_migrate_and_speak(
-	long source_ai_index,
-	long destination_ai_index,
-	long dialogue_index);
+	long source_ai_reference,
+	long target_ai_reference,
+	char const *speech_type);
 void ai_scripting_allegiance_remove(
 	short team_a,
-	unsigned short team_b);
+	short team_b);
 void ai_scripting_go_to_vehicle(
-	long ai_index,
+	long ai_reference,
 	long unit_index,
-	long vehicle_index);
+	char const *seat_substring_name);
 void ai_scripting_go_to_vehicle_override(
-	long ai_index,
+	long ai_reference,
 	long unit_index,
-	long vehicle_index);
+	char const *seat_substring_name);
 void ai_scripting_exit_vehicle(
 	long ai_index);
 void ai_scripting_braindead(
@@ -4180,10 +4140,10 @@ void ai_scripting_try_to_fight_player(
 	long ai_index);
 void ai_scripting_command_list(
 	long ai_index,
-	unsigned short command_list_index);
+	short command_list_index);
 void ai_scripting_command_list_by_unit(
 	long unit_index,
-	unsigned short command_list_index);
+	short command_list_index);
 void ai_scripting_command_list_advance(
 	long ai_index);
 void ai_scripting_command_list_advance_by_unit(
@@ -4196,10 +4156,10 @@ void ai_scripting_force_active_by_unit(
 	boolean force_active);
 void ai_scripting_set_return_state(
 	long ai_index,
-	unsigned short state);
+	short state);
 void ai_scripting_set_current_state(
 	long ai_index,
-	unsigned short state);
+	short state);
 void ai_scripting_playfight(
 	long ai_index,
 	boolean playfight);
@@ -4208,10 +4168,10 @@ void ai_scripting_vehicle_encounter(
 	long encounter_index);
 void ai_scripting_vehicle_enterable_team(
 	long object_list_index,
-	unsigned short team);
+	short team);
 void ai_scripting_vehicle_enterable_actor_type(
 	long object_list_index,
-	unsigned short actor_type);
+	short actor_type);
 void ai_scripting_vehicle_enterable_actors(
 	long vehicle_index,
 	long actor_list_index);
@@ -4236,9 +4196,9 @@ void ai_scripting_follow_target_ai(
 	long ai_index,
 	long target_ai_index);
 void ai_scripting_conversation_stop(
-	unsigned short conversation_index);
+	short conversation_index);
 void ai_scripting_conversation_advance(
-	unsigned short conversation_index);
+	short conversation_index);
 void ai_scripting_link_activation(
 	long source_ai_index,
 	long target_ai_index);
@@ -4247,7 +4207,7 @@ void ai_scripting_berserk(
 	boolean enable);
 void ai_scripting_set_team(
 	long ai_index,
-	unsigned short team);
+	short team);
 void ai_scripting_allow_charge(
 	long ai_index,
 	boolean allow_charge);
@@ -4292,14 +4252,6 @@ boolean player0_look_pitch_is_inverted(
 	void);
 boolean player0_joystick_set_is_normal(
 	void);
-void main_set_map_name(
-	char const *map_name);
-void main_set_multiplayer_map_name(
-	char const *map_name);
-void main_set_difficulty(
-	unsigned short difficulty);
-void main_crash(
-	char const *reason);
 void debug_dump_memory_for_file(
 	char const *file_name);
 void profile_sections_activate(
@@ -4307,8 +4259,8 @@ void profile_sections_activate(
 void profile_sections_deactivate(
 	char const *section_name);
 void ai_debug_vocalize(
-	long ai_index,
-	char const *vocalization);
+	char const *priority_name,
+	char const *vocalization_name);
 void ai_debug_teleport_to(
 	long ai_index);
 void ai_debug_speak(
@@ -4319,39 +4271,31 @@ void scripted_camera_set_absolute(
 	short camera_point_index,
 	word transition_time);
 void scripted_camera_set(
-	word camera_point_index0,
+	short camera_point_index0,
 	word camera_point_index1,
 	long transition_time);
 void scripted_camera_set_animation(
-	long animation_index,
-	long object_index);
+	long animation_graph_index,
+	char const *animation_name);
 void game_time_set_speed(
 	real speed);
 void player_add_equipment(
 	long player_index,
-	word equipment_definition_index,
+	short equipment_definition_index,
 	boolean force);
 void debug_player_teleport(
 	short player_index,
-	word location_index);
+	short location_index);
 boolean scenario_switch_structure_bsp(
-	word structure_bsp_index);
+	short structure_bsp_index);
 void cinematic_show_letterbox(
 	boolean show);
 void cinematic_set_title(
 	unsigned short title_index);
 void cinematic_suppress_bsp_object_creation(
 	boolean suppress);
-void main_load_core_name(
-	char const *core_name);
-void main_load_core_name_at_startup(
-	char const *core_name);
-void main_save_core_name(
-	char const *core_name);
-void main_skip(
-	unsigned short skip_type);
 void debug_sound_classes_enable(
-	long sound_class,
+	char const *name,
 	boolean enable);
 void sound_enable(
 	boolean enable);
@@ -4386,8 +4330,6 @@ boolean hs_scenario_postprocess(
 	boolean restore_syntax_data);
 void object_lists_dispose(
 	void);
-boolean main_saving_map(
-	void);
 boolean game_state_reverted(
 	void);
 
@@ -4407,7 +4349,7 @@ static boolean hs_syntax_data_allocated = FALSE;
 struct data_array *hs_syntax_data;
 extern long global_scenario_index;
 extern struct hs_function_table_storage hs_function_table;
-extern short hs_external_global_count;
+extern short const hs_external_global_count;
 extern struct hs_external_global_definition *hs_external_globals[];
 extern char const *hs_script_type_names[];
 extern char const *hs_type_names[];
@@ -6301,7 +6243,12 @@ long const _hs_type_weapon_default= NONE;
 long const _hs_type_device_default= NONE;
 long const _hs_type_scenery_default= NONE;
 
-static struct hs_function_definition const hs_begin_definition=
+/* the <script>_definition names below are recovered from the 2003 PC demo PDB and the HCEX PDB (file
+ * statics in hs.obj): each demo struct has January's script-name string, return type and parameter
+ * list, in the same table order. four stems differ from the script names (add, subtract, multiply,
+ * object_to_unit); xbox_set_machine_name_definition is HCEX-only; the eight hs_*_definition names that
+ * neither PDB attests keep their descriptive hs_ prefix. */
+static struct hs_function_definition const begin_definition=
 {
 	_hs_passthrough,
 	0,
@@ -6313,7 +6260,7 @@ static struct hs_function_definition const hs_begin_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_begin_random_definition=
+static struct hs_function_definition const begin_random_definition=
 {
 	_hs_passthrough,
 	0,
@@ -6325,7 +6272,7 @@ static struct hs_function_definition const hs_begin_random_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_if_definition=
+static struct hs_function_definition const if_definition=
 {
 	_hs_passthrough,
 	0,
@@ -6337,7 +6284,7 @@ static struct hs_function_definition const hs_if_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cond_definition=
+static struct hs_function_definition const cond_definition=
 {
 	_hs_passthrough,
 	0,
@@ -6349,7 +6296,7 @@ static struct hs_function_definition const hs_cond_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_set_definition=
+static struct hs_function_definition const set_definition=
 {
 	_hs_passthrough,
 	0,
@@ -6361,7 +6308,7 @@ static struct hs_function_definition const hs_set_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_and_definition=
+static struct hs_function_definition const and_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6373,7 +6320,7 @@ static struct hs_function_definition const hs_and_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_or_definition=
+static struct hs_function_definition const or_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6385,7 +6332,7 @@ static struct hs_function_definition const hs_or_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_plus_definition=
+static struct hs_function_definition const add_definition=
 {
 	_hs_type_real,
 	0,
@@ -6397,7 +6344,7 @@ static struct hs_function_definition const hs_plus_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_minus_definition=
+static struct hs_function_definition const subtract_definition=
 {
 	_hs_type_real,
 	0,
@@ -6409,7 +6356,7 @@ static struct hs_function_definition const hs_minus_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_times_definition=
+static struct hs_function_definition const multiply_definition=
 {
 	_hs_type_real,
 	0,
@@ -6421,7 +6368,7 @@ static struct hs_function_definition const hs_times_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_divide_definition=
+static struct hs_function_definition const divide_definition=
 {
 	_hs_type_real,
 	0,
@@ -6433,7 +6380,7 @@ static struct hs_function_definition const hs_divide_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_min_definition=
+static struct hs_function_definition const min_definition=
 {
 	_hs_type_real,
 	0,
@@ -6445,7 +6392,7 @@ static struct hs_function_definition const hs_min_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_max_definition=
+static struct hs_function_definition const max_definition=
 {
 	_hs_type_real,
 	0,
@@ -6457,7 +6404,7 @@ static struct hs_function_definition const hs_max_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_equal_definition=
+static struct hs_function_definition const equal_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6469,7 +6416,7 @@ static struct hs_function_definition const hs_equal_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_not_equal_definition=
+static struct hs_function_definition const not_equal_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6481,7 +6428,7 @@ static struct hs_function_definition const hs_not_equal_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_gt_definition=
+static struct hs_function_definition const gt_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6493,7 +6440,7 @@ static struct hs_function_definition const hs_gt_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_lt_definition=
+static struct hs_function_definition const lt_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6505,7 +6452,7 @@ static struct hs_function_definition const hs_lt_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_gte_definition=
+static struct hs_function_definition const gte_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6517,7 +6464,7 @@ static struct hs_function_definition const hs_gte_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_lte_definition=
+static struct hs_function_definition const lte_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -6529,7 +6476,7 @@ static struct hs_function_definition const hs_lte_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_sleep_definition=
+static struct hs_function_definition const sleep_definition=
 {
 	_hs_type_void,
 	0,
@@ -6541,7 +6488,7 @@ static struct hs_function_definition const hs_sleep_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_sleep_until_definition=
+static struct hs_function_definition const sleep_until_definition=
 {
 	_hs_type_void,
 	0,
@@ -6553,7 +6500,7 @@ static struct hs_function_definition const hs_sleep_until_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_wake_definition=
+static struct hs_function_definition const wake_definition=
 {
 	_hs_type_void,
 	0,
@@ -6565,7 +6512,7 @@ static struct hs_function_definition const hs_wake_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_inspect_definition=
+static struct hs_function_definition const inspect_definition=
 {
 	_hs_type_void,
 	0,
@@ -6577,7 +6524,7 @@ static struct hs_function_definition const hs_inspect_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_unit_definition=
+static struct hs_function_definition const object_to_unit_definition=
 {
 	_hs_type_unit,
 	0,
@@ -6589,7 +6536,7 @@ static struct hs_function_definition const hs_unit_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_ai_debug_communication_suppress_definition=
+static struct hs_function_definition const ai_debug_communication_suppress_definition=
 {
 	_hs_type_void,
 	0,
@@ -6601,7 +6548,7 @@ static struct hs_function_definition const hs_ai_debug_communication_suppress_de
 	0,
 };
 
-static struct hs_function_definition const hs_ai_debug_communication_ignore_definition=
+static struct hs_function_definition const ai_debug_communication_ignore_definition=
 {
 	_hs_type_void,
 	0,
@@ -6613,7 +6560,7 @@ static struct hs_function_definition const hs_ai_debug_communication_ignore_defi
 	0,
 };
 
-static struct hs_function_definition const hs_ai_debug_communication_focus_definition=
+static struct hs_function_definition const ai_debug_communication_focus_definition=
 {
 	_hs_type_void,
 	0,
@@ -6625,7 +6572,7 @@ static struct hs_function_definition const hs_ai_debug_communication_focus_defin
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_not_definition=
+static struct hs_function_definition_with_1_parameter const not_definition=
 {
 	{
 		_hs_type_boolean,
@@ -6640,7 +6587,7 @@ static struct hs_function_definition_with_1_parameter const hs_not_definition=
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_print_definition=
+static struct hs_function_definition_with_1_parameter const print_definition=
 {
 	{
 		_hs_type_void,
@@ -6655,7 +6602,7 @@ static struct hs_function_definition_with_1_parameter const hs_print_definition=
 	},
 };
 
-static struct hs_function_definition const hs_players_definition=
+static struct hs_function_definition const players_definition=
 {
 	_hs_type_object_list,
 	0,
@@ -6667,7 +6614,7 @@ static struct hs_function_definition const hs_players_definition=
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_volume_teleport_players_not_inside_definition=
+static struct hs_function_definition_with_2_parameters const volume_teleport_players_not_inside_definition=
 {
 	{
 		_hs_type_void,
@@ -6683,7 +6630,7 @@ static struct hs_function_definition_with_2_parameters const hs_volume_teleport_
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_volume_test_object_definition=
+static struct hs_function_definition_with_2_parameters const volume_test_object_definition=
 {
 	{
 		_hs_type_boolean,
@@ -6699,7 +6646,7 @@ static struct hs_function_definition_with_2_parameters const hs_volume_test_obje
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_volume_test_objects_definition=
+static struct hs_function_definition_with_2_parameters const volume_test_objects_definition=
 {
 	{
 		_hs_type_boolean,
@@ -6715,7 +6662,7 @@ static struct hs_function_definition_with_2_parameters const hs_volume_test_obje
 	{ _hs_type_object_list },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_volume_test_objects_all_definition=
+static struct hs_function_definition_with_2_parameters const volume_test_objects_all_definition=
 {
 	{
 		_hs_type_boolean,
@@ -6731,7 +6678,7 @@ static struct hs_function_definition_with_2_parameters const hs_volume_test_obje
 	{ _hs_type_object_list },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_create_definition=
+static struct hs_function_definition_with_1_parameter const object_create_definition=
 {
 	{
 		_hs_type_void,
@@ -6746,7 +6693,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_create_def
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_destroy_definition=
+static struct hs_function_definition_with_1_parameter const object_destroy_definition=
 {
 	{
 		_hs_type_void,
@@ -6761,7 +6708,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_destroy_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_create_anew_definition=
+static struct hs_function_definition_with_1_parameter const object_create_anew_definition=
 {
 	{
 		_hs_type_void,
@@ -6776,7 +6723,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_create_ane
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_create_containing_definition=
+static struct hs_function_definition_with_1_parameter const object_create_containing_definition=
 {
 	{
 		_hs_type_void,
@@ -6791,7 +6738,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_create_con
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_create_anew_containing_definition=
+static struct hs_function_definition_with_1_parameter const object_create_anew_containing_definition=
 {
 	{
 		_hs_type_void,
@@ -6806,7 +6753,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_create_ane
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_destroy_containing_definition=
+static struct hs_function_definition_with_1_parameter const object_destroy_containing_definition=
 {
 	{
 		_hs_type_void,
@@ -6821,7 +6768,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_destroy_co
 	},
 };
 
-static struct hs_function_definition const hs_object_destroy_all_definition=
+static struct hs_function_definition const object_destroy_all_definition=
 {
 	_hs_type_void,
 	0,
@@ -6833,7 +6780,7 @@ static struct hs_function_definition const hs_object_destroy_all_definition=
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_teleport_definition=
+static struct hs_function_definition_with_2_parameters const object_teleport_definition=
 {
 	{
 		_hs_type_void,
@@ -6849,7 +6796,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_teleport_
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_set_facing_definition=
+static struct hs_function_definition_with_2_parameters const object_set_facing_definition=
 {
 	{
 		_hs_type_void,
@@ -6865,7 +6812,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_set_facin
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_set_shield_definition=
+static struct hs_function_definition_with_2_parameters const object_set_shield_definition=
 {
 	{
 		_hs_type_void,
@@ -6881,7 +6828,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_set_shiel
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_object_set_permutation_definition=
+static struct hs_function_definition_with_3_parameters const object_set_permutation_definition=
 {
 	{
 		_hs_type_void,
@@ -6897,7 +6844,7 @@ static struct hs_function_definition_with_3_parameters const hs_object_set_permu
 	{ _hs_type_string, _hs_type_string },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_list_get_definition=
+static struct hs_function_definition_with_2_parameters const list_get_definition=
 {
 	{
 		_hs_type_object,
@@ -6913,7 +6860,7 @@ static struct hs_function_definition_with_2_parameters const hs_list_get_definit
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_list_count_definition=
+static struct hs_function_definition_with_1_parameter const list_count_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -6928,7 +6875,7 @@ static struct hs_function_definition_with_1_parameter const hs_list_count_defini
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_effect_new_definition=
+static struct hs_function_definition_with_2_parameters const effect_new_definition=
 {
 	{
 		_hs_type_void,
@@ -6944,7 +6891,7 @@ static struct hs_function_definition_with_2_parameters const hs_effect_new_defin
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_effect_new_on_object_marker_definition=
+static struct hs_function_definition_with_3_parameters const effect_new_on_object_marker_definition=
 {
 	{
 		_hs_type_void,
@@ -6960,7 +6907,7 @@ static struct hs_function_definition_with_3_parameters const hs_effect_new_on_ob
 	{ _hs_type_object, _hs_type_string },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_damage_new_definition=
+static struct hs_function_definition_with_2_parameters const damage_new_definition=
 {
 	{
 		_hs_type_void,
@@ -6976,7 +6923,7 @@ static struct hs_function_definition_with_2_parameters const hs_damage_new_defin
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_damage_object_definition=
+static struct hs_function_definition_with_2_parameters const damage_object_definition=
 {
 	{
 		_hs_type_void,
@@ -6992,7 +6939,7 @@ static struct hs_function_definition_with_2_parameters const hs_damage_object_de
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_objects_can_see_object_definition=
+static struct hs_function_definition_with_3_parameters const objects_can_see_object_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7008,7 +6955,7 @@ static struct hs_function_definition_with_3_parameters const hs_objects_can_see_
 	{ _hs_type_object, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_objects_can_see_flag_definition=
+static struct hs_function_definition_with_3_parameters const objects_can_see_flag_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7024,7 +6971,7 @@ static struct hs_function_definition_with_3_parameters const hs_objects_can_see_
 	{ _hs_type_cutscene_flag, _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_objects_delete_by_definition_definition=
+static struct hs_function_definition_with_1_parameter const objects_delete_by_definition_definition=
 {
 	{
 		_hs_type_void,
@@ -7039,7 +6986,7 @@ static struct hs_function_definition_with_1_parameter const hs_objects_delete_by
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_sound_set_gain_definition=
+static struct hs_function_definition_with_2_parameters const sound_set_gain_definition=
 {
 	{
 		_hs_type_void,
@@ -7055,7 +7002,7 @@ static struct hs_function_definition_with_2_parameters const hs_sound_set_gain_d
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_get_gain_definition=
+static struct hs_function_definition_with_1_parameter const sound_get_gain_definition=
 {
 	{
 		_hs_type_real,
@@ -7070,7 +7017,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_get_gain_de
 	},
 };
 
-static struct hs_function_definition const hs_script_recompile_definition=
+static struct hs_function_definition const script_recompile_definition=
 {
 	_hs_type_void,
 	0,
@@ -7082,7 +7029,7 @@ static struct hs_function_definition const hs_script_recompile_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_script_doc_definition=
+static struct hs_function_definition const script_doc_definition=
 {
 	_hs_type_void,
 	0,
@@ -7094,7 +7041,7 @@ static struct hs_function_definition const hs_script_doc_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_help_definition=
+static struct hs_function_definition_with_1_parameter const help_definition=
 {
 	{
 		_hs_type_void,
@@ -7109,7 +7056,7 @@ static struct hs_function_definition_with_1_parameter const hs_help_definition=
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_random_range_definition=
+static struct hs_function_definition_with_2_parameters const random_range_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7125,7 +7072,7 @@ static struct hs_function_definition_with_2_parameters const hs_random_range_def
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_real_random_range_definition=
+static struct hs_function_definition_with_2_parameters const real_random_range_definition=
 {
 	{
 		_hs_type_real,
@@ -7141,7 +7088,7 @@ static struct hs_function_definition_with_2_parameters const hs_real_random_rang
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_numeric_countdown_timer_set_definition=
+static struct hs_function_definition_with_2_parameters const numeric_countdown_timer_set_definition=
 {
 	{
 		_hs_type_void,
@@ -7157,7 +7104,7 @@ static struct hs_function_definition_with_2_parameters const hs_numeric_countdow
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_numeric_countdown_timer_get_definition=
+static struct hs_function_definition_with_1_parameter const numeric_countdown_timer_get_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7172,7 +7119,7 @@ static struct hs_function_definition_with_1_parameter const hs_numeric_countdown
 	},
 };
 
-static struct hs_function_definition const hs_numeric_countdown_timer_stop_definition=
+static struct hs_function_definition const numeric_countdown_timer_stop_definition=
 {
 	_hs_type_void,
 	0,
@@ -7184,7 +7131,7 @@ static struct hs_function_definition const hs_numeric_countdown_timer_stop_defin
 	0,
 };
 
-static struct hs_function_definition const hs_numeric_countdown_timer_restart_definition=
+static struct hs_function_definition const numeric_countdown_timer_restart_definition=
 {
 	_hs_type_void,
 	0,
@@ -7196,7 +7143,7 @@ static struct hs_function_definition const hs_numeric_countdown_timer_restart_de
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_breakable_surfaces_enable_definition=
+static struct hs_function_definition_with_1_parameter const breakable_surfaces_enable_definition=
 {
 	{
 		_hs_type_void,
@@ -7211,7 +7158,7 @@ static struct hs_function_definition_with_1_parameter const hs_breakable_surface
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_recording_play_definition=
+static struct hs_function_definition_with_2_parameters const recording_play_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7227,7 +7174,7 @@ static struct hs_function_definition_with_2_parameters const hs_recording_play_d
 	{ _hs_type_cutscene_recording },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_recording_play_and_delete_definition=
+static struct hs_function_definition_with_2_parameters const recording_play_and_delete_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7243,7 +7190,7 @@ static struct hs_function_definition_with_2_parameters const hs_recording_play_a
 	{ _hs_type_cutscene_recording },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_recording_play_and_hover_definition=
+static struct hs_function_definition_with_2_parameters const recording_play_and_hover_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7259,7 +7206,7 @@ static struct hs_function_definition_with_2_parameters const hs_recording_play_a
 	{ _hs_type_cutscene_recording },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_recording_kill_definition=
+static struct hs_function_definition_with_1_parameter const recording_kill_definition=
 {
 	{
 		_hs_type_void,
@@ -7274,7 +7221,7 @@ static struct hs_function_definition_with_1_parameter const hs_recording_kill_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_recording_time_definition=
+static struct hs_function_definition_with_1_parameter const recording_time_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7289,7 +7236,7 @@ static struct hs_function_definition_with_1_parameter const hs_recording_time_de
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_set_ranged_attack_inhibited_definition=
+static struct hs_function_definition_with_2_parameters const object_set_ranged_attack_inhibited_definition=
 {
 	{
 		_hs_type_void,
@@ -7305,7 +7252,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_set_range
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_set_melee_attack_inhibited_definition=
+static struct hs_function_definition_with_2_parameters const object_set_melee_attack_inhibited_definition=
 {
 	{
 		_hs_type_void,
@@ -7321,7 +7268,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_set_melee
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition const hs_objects_dump_memory_definition=
+static struct hs_function_definition const objects_dump_memory_definition=
 {
 	_hs_type_void,
 	0,
@@ -7333,7 +7280,7 @@ static struct hs_function_definition const hs_objects_dump_memory_definition=
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_set_collideable_definition=
+static struct hs_function_definition_with_2_parameters const object_set_collideable_definition=
 {
 	{
 		_hs_type_void,
@@ -7349,7 +7296,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_set_colli
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_object_set_scale_definition=
+static struct hs_function_definition_with_3_parameters const object_set_scale_definition=
 {
 	{
 		_hs_type_void,
@@ -7365,7 +7312,7 @@ static struct hs_function_definition_with_3_parameters const hs_object_set_scale
 	{ _hs_type_real, _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_objects_attach_definition=
+static struct hs_function_definition_with_4_parameters const objects_attach_definition=
 {
 	{
 		_hs_type_void,
@@ -7381,7 +7328,7 @@ static struct hs_function_definition_with_4_parameters const hs_objects_attach_d
 	{ _hs_type_string, _hs_type_object, _hs_type_string },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_objects_detach_definition=
+static struct hs_function_definition_with_2_parameters const objects_detach_definition=
 {
 	{
 		_hs_type_void,
@@ -7397,7 +7344,7 @@ static struct hs_function_definition_with_2_parameters const hs_objects_detach_d
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition const hs_garbage_collect_now_definition=
+static struct hs_function_definition const garbage_collect_now_definition=
 {
 	_hs_type_void,
 	0,
@@ -7409,7 +7356,7 @@ static struct hs_function_definition const hs_garbage_collect_now_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_cannot_take_damage_definition=
+static struct hs_function_definition_with_1_parameter const object_cannot_take_damage_definition=
 {
 	{
 		_hs_type_void,
@@ -7424,7 +7371,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_cannot_tak
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_can_take_damage_definition=
+static struct hs_function_definition_with_1_parameter const object_can_take_damage_definition=
 {
 	{
 		_hs_type_void,
@@ -7439,7 +7386,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_can_take_d
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_object_beautify_definition=
+static struct hs_function_definition_with_2_parameters const object_beautify_definition=
 {
 	{
 		_hs_type_void,
@@ -7455,7 +7402,7 @@ static struct hs_function_definition_with_2_parameters const hs_object_beautify_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_objects_predict_definition=
+static struct hs_function_definition_with_1_parameter const objects_predict_definition=
 {
 	{
 		_hs_type_void,
@@ -7470,7 +7417,7 @@ static struct hs_function_definition_with_1_parameter const hs_objects_predict_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_type_predict_definition=
+static struct hs_function_definition_with_1_parameter const object_type_predict_definition=
 {
 	{
 		_hs_type_void,
@@ -7485,7 +7432,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_type_predi
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_object_definition=
+static struct hs_function_definition_with_1_parameter const object_pvs_set_object_definition=
 {
 	{
 		_hs_type_void,
@@ -7500,7 +7447,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_ob
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_camera_definition=
+static struct hs_function_definition_with_1_parameter const object_pvs_set_camera_definition=
 {
 	{
 		_hs_type_void,
@@ -7515,7 +7462,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_pvs_set_ca
 	},
 };
 
-static struct hs_function_definition const hs_object_pvs_clear_definition=
+static struct hs_function_definition const object_pvs_clear_definition=
 {
 	_hs_type_void,
 	0,
@@ -7527,7 +7474,7 @@ static struct hs_function_definition const hs_object_pvs_clear_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_object_pvs_activate_definition=
+static struct hs_function_definition_with_1_parameter const object_pvs_activate_definition=
 {
 	{
 		_hs_type_void,
@@ -7542,7 +7489,7 @@ static struct hs_function_definition_with_1_parameter const hs_object_pvs_activa
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_render_lights_definition=
+static struct hs_function_definition_with_1_parameter const render_lights_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7557,7 +7504,7 @@ static struct hs_function_definition_with_1_parameter const hs_render_lights_def
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_scenery_get_animation_time_definition=
+static struct hs_function_definition_with_1_parameter const scenery_get_animation_time_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7572,7 +7519,7 @@ static struct hs_function_definition_with_1_parameter const hs_scenery_get_anima
 	},
 };
 
-static struct hs_function_definition_with_3_parameters const hs_scenery_animation_start_definition=
+static struct hs_function_definition_with_3_parameters const scenery_animation_start_definition=
 {
 	{
 		_hs_type_void,
@@ -7588,7 +7535,7 @@ static struct hs_function_definition_with_3_parameters const hs_scenery_animatio
 	{ _hs_type_animation_graph, _hs_type_string },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_scenery_animation_start_at_frame_definition=
+static struct hs_function_definition_with_4_parameters const scenery_animation_start_at_frame_definition=
 {
 	{
 		_hs_type_void,
@@ -7604,7 +7551,7 @@ static struct hs_function_definition_with_4_parameters const hs_scenery_animatio
 	{ _hs_type_animation_graph, _hs_type_string, _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_render_effects_definition=
+static struct hs_function_definition_with_1_parameter const render_effects_definition=
 {
 	{
 		_hs_type_void,
@@ -7619,7 +7566,7 @@ static struct hs_function_definition_with_1_parameter const hs_render_effects_de
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_can_blink_definition=
+static struct hs_function_definition_with_2_parameters const unit_can_blink_definition=
 {
 	{
 		_hs_type_void,
@@ -7635,7 +7582,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_can_blink_d
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_open_definition=
+static struct hs_function_definition_with_1_parameter const unit_open_definition=
 {
 	{
 		_hs_type_void,
@@ -7650,7 +7597,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_open_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_close_definition=
+static struct hs_function_definition_with_1_parameter const unit_close_definition=
 {
 	{
 		_hs_type_void,
@@ -7665,7 +7612,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_close_defini
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_kill_definition=
+static struct hs_function_definition_with_1_parameter const unit_kill_definition=
 {
 	{
 		_hs_type_void,
@@ -7680,7 +7627,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_kill_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_kill_silent_definition=
+static struct hs_function_definition_with_1_parameter const unit_kill_silent_definition=
 {
 	{
 		_hs_type_void,
@@ -7695,7 +7642,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_kill_silent_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_get_custom_animation_time_definition=
+static struct hs_function_definition_with_1_parameter const unit_get_custom_animation_time_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7710,7 +7657,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_get_custom_a
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_stop_custom_animation_definition=
+static struct hs_function_definition_with_1_parameter const unit_stop_custom_animation_definition=
 {
 	{
 		_hs_type_void,
@@ -7725,7 +7672,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_stop_custom_
 	},
 };
 
-static struct hs_function_definition_with_4_parameters const hs_custom_animation_definition=
+static struct hs_function_definition_with_4_parameters const custom_animation_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7741,7 +7688,7 @@ static struct hs_function_definition_with_4_parameters const hs_custom_animation
 	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_custom_animation_list_definition=
+static struct hs_function_definition_with_4_parameters const custom_animation_list_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7757,7 +7704,7 @@ static struct hs_function_definition_with_4_parameters const hs_custom_animation
 	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_5_parameters const hs_unit_custom_animation_at_frame_definition=
+static struct hs_function_definition_with_5_parameters const unit_custom_animation_at_frame_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7773,7 +7720,7 @@ static struct hs_function_definition_with_5_parameters const hs_unit_custom_anim
 	{ _hs_type_animation_graph, _hs_type_string, _hs_type_boolean, _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_is_playing_custom_animation_definition=
+static struct hs_function_definition_with_1_parameter const unit_is_playing_custom_animation_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7788,7 +7735,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_is_playing_c
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_aim_without_turning_definition=
+static struct hs_function_definition_with_2_parameters const unit_aim_without_turning_definition=
 {
 	{
 		_hs_type_void,
@@ -7804,7 +7751,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_aim_without
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion_definition=
+static struct hs_function_definition_with_2_parameters const unit_set_emotion_definition=
 {
 	{
 		_hs_type_void,
@@ -7820,7 +7767,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_set_enterable_by_player_definition=
+static struct hs_function_definition_with_2_parameters const unit_set_enterable_by_player_definition=
 {
 	{
 		_hs_type_void,
@@ -7836,7 +7783,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_set_enterab
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_unit_enter_vehicle_definition=
+static struct hs_function_definition_with_3_parameters const unit_enter_vehicle_definition=
 {
 	{
 		_hs_type_void,
@@ -7852,7 +7799,7 @@ static struct hs_function_definition_with_3_parameters const hs_unit_enter_vehic
 	{ _hs_type_vehicle, _hs_type_string },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_vehicle_test_seat_list_definition=
+static struct hs_function_definition_with_3_parameters const vehicle_test_seat_list_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7868,7 +7815,7 @@ static struct hs_function_definition_with_3_parameters const hs_vehicle_test_sea
 	{ _hs_type_string, _hs_type_object_list },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_vehicle_test_seat_definition=
+static struct hs_function_definition_with_3_parameters const vehicle_test_seat_definition=
 {
 	{
 		_hs_type_boolean,
@@ -7884,7 +7831,7 @@ static struct hs_function_definition_with_3_parameters const hs_vehicle_test_sea
 	{ _hs_type_string, _hs_type_unit },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion_animation_definition=
+static struct hs_function_definition_with_2_parameters const unit_set_emotion_animation_definition=
 {
 	{
 		_hs_type_void,
@@ -7900,7 +7847,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_set_emotion
 	{ _hs_type_string },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_exit_vehicle_definition=
+static struct hs_function_definition_with_1_parameter const unit_exit_vehicle_definition=
 {
 	{
 		_hs_type_void,
@@ -7915,7 +7862,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_exit_vehicle
 	},
 };
 
-static struct hs_function_definition_with_3_parameters const hs_unit_set_maximum_vitality_definition=
+static struct hs_function_definition_with_3_parameters const unit_set_maximum_vitality_definition=
 {
 	{
 		_hs_type_void,
@@ -7931,7 +7878,7 @@ static struct hs_function_definition_with_3_parameters const hs_unit_set_maximum
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_units_set_maximum_vitality_definition=
+static struct hs_function_definition_with_3_parameters const units_set_maximum_vitality_definition=
 {
 	{
 		_hs_type_void,
@@ -7947,7 +7894,7 @@ static struct hs_function_definition_with_3_parameters const hs_units_set_maximu
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_unit_set_current_vitality_definition=
+static struct hs_function_definition_with_3_parameters const unit_set_current_vitality_definition=
 {
 	{
 		_hs_type_void,
@@ -7963,7 +7910,7 @@ static struct hs_function_definition_with_3_parameters const hs_unit_set_current
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_units_set_current_vitality_definition=
+static struct hs_function_definition_with_3_parameters const units_set_current_vitality_definition=
 {
 	{
 		_hs_type_void,
@@ -7979,7 +7926,7 @@ static struct hs_function_definition_with_3_parameters const hs_units_set_curren
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_vehicle_load_magic_definition=
+static struct hs_function_definition_with_3_parameters const vehicle_load_magic_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -7995,7 +7942,7 @@ static struct hs_function_definition_with_3_parameters const hs_vehicle_load_mag
 	{ _hs_type_string, _hs_type_object_list },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_vehicle_unload_definition=
+static struct hs_function_definition_with_2_parameters const vehicle_unload_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -8011,7 +7958,7 @@ static struct hs_function_definition_with_2_parameters const hs_vehicle_unload_d
 	{ _hs_type_string },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_magic_seat_name_definition=
+static struct hs_function_definition_with_1_parameter const magic_seat_name_definition=
 {
 	{
 		_hs_type_void,
@@ -8026,7 +7973,7 @@ static struct hs_function_definition_with_1_parameter const hs_magic_seat_name_d
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_set_seat_definition=
+static struct hs_function_definition_with_2_parameters const unit_set_seat_definition=
 {
 	{
 		_hs_type_void,
@@ -8042,7 +7989,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_set_seat_de
 	{ _hs_type_string },
 };
 
-static struct hs_function_definition const hs_magic_melee_attack_definition=
+static struct hs_function_definition const magic_melee_attack_definition=
 {
 	_hs_type_void,
 	0,
@@ -8054,7 +8001,7 @@ static struct hs_function_definition const hs_magic_melee_attack_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_vehicle_riders_definition=
+static struct hs_function_definition_with_1_parameter const vehicle_riders_definition=
 {
 	{
 		_hs_type_object_list,
@@ -8069,7 +8016,7 @@ static struct hs_function_definition_with_1_parameter const hs_vehicle_riders_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_vehicle_driver_definition=
+static struct hs_function_definition_with_1_parameter const vehicle_driver_definition=
 {
 	{
 		_hs_type_unit,
@@ -8084,7 +8031,7 @@ static struct hs_function_definition_with_1_parameter const hs_vehicle_driver_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_vehicle_gunner_definition=
+static struct hs_function_definition_with_1_parameter const vehicle_gunner_definition=
 {
 	{
 		_hs_type_unit,
@@ -8099,7 +8046,7 @@ static struct hs_function_definition_with_1_parameter const hs_vehicle_gunner_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_get_health_definition=
+static struct hs_function_definition_with_1_parameter const unit_get_health_definition=
 {
 	{
 		_hs_type_real,
@@ -8114,7 +8061,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_get_health_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_get_shield_definition=
+static struct hs_function_definition_with_1_parameter const unit_get_shield_definition=
 {
 	{
 		_hs_type_real,
@@ -8129,7 +8076,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_get_shield_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_get_total_grenade_count_definition=
+static struct hs_function_definition_with_1_parameter const unit_get_total_grenade_count_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -8144,7 +8091,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_get_total_gr
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_definition=
+static struct hs_function_definition_with_2_parameters const unit_has_weapon_definition=
 {
 	{
 		_hs_type_boolean,
@@ -8160,7 +8107,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_
 	{ _hs_type_object_definition },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_readied_definition=
+static struct hs_function_definition_with_2_parameters const unit_has_weapon_readied_definition=
 {
 	{
 		_hs_type_boolean,
@@ -8176,7 +8123,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_has_weapon_
 	{ _hs_type_object_definition },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_doesnt_drop_items_definition=
+static struct hs_function_definition_with_1_parameter const unit_doesnt_drop_items_definition=
 {
 	{
 		_hs_type_void,
@@ -8191,7 +8138,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_doesnt_drop_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_impervious_definition=
+static struct hs_function_definition_with_2_parameters const unit_impervious_definition=
 {
 	{
 		_hs_type_void,
@@ -8207,7 +8154,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_impervious_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_suspended_definition=
+static struct hs_function_definition_with_2_parameters const unit_suspended_definition=
 {
 	{
 		_hs_type_void,
@@ -8223,7 +8170,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_suspended_d
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition const hs_unit_solo_player_integrated_night_vision_is_active_definition=
+static struct hs_function_definition const unit_solo_player_integrated_night_vision_is_active_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -8235,7 +8182,7 @@ static struct hs_function_definition const hs_unit_solo_player_integrated_night_
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_units_set_desired_flashlight_state_definition=
+static struct hs_function_definition_with_2_parameters const units_set_desired_flashlight_state_definition=
 {
 	{
 		_hs_type_void,
@@ -8251,7 +8198,7 @@ static struct hs_function_definition_with_2_parameters const hs_units_set_desire
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_unit_set_desired_flashlight_state_definition=
+static struct hs_function_definition_with_2_parameters const unit_set_desired_flashlight_state_definition=
 {
 	{
 		_hs_type_void,
@@ -8267,7 +8214,7 @@ static struct hs_function_definition_with_2_parameters const hs_unit_set_desired
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_unit_get_current_flashlight_state_definition=
+static struct hs_function_definition_with_1_parameter const unit_get_current_flashlight_state_definition=
 {
 	{
 		_hs_type_boolean,
@@ -8282,7 +8229,7 @@ static struct hs_function_definition_with_1_parameter const hs_unit_get_current_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_set_never_appears_locked_definition=
+static struct hs_function_definition_with_2_parameters const device_set_never_appears_locked_definition=
 {
 	{
 		_hs_type_void,
@@ -8298,7 +8245,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_set_never
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_set_power_definition=
+static struct hs_function_definition_with_2_parameters const device_set_power_definition=
 {
 	{
 		_hs_type_void,
@@ -8314,7 +8261,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_set_power
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_device_get_power_definition=
+static struct hs_function_definition_with_1_parameter const device_get_power_definition=
 {
 	{
 		_hs_type_real,
@@ -8329,7 +8276,7 @@ static struct hs_function_definition_with_1_parameter const hs_device_get_power_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_set_position_definition=
+static struct hs_function_definition_with_2_parameters const device_set_position_definition=
 {
 	{
 		_hs_type_boolean,
@@ -8345,7 +8292,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_set_posit
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_device_get_position_definition=
+static struct hs_function_definition_with_1_parameter const device_get_position_definition=
 {
 	{
 		_hs_type_real,
@@ -8360,7 +8307,7 @@ static struct hs_function_definition_with_1_parameter const hs_device_get_positi
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_set_position_immediate_definition=
+static struct hs_function_definition_with_2_parameters const device_set_position_immediate_definition=
 {
 	{
 		_hs_type_void,
@@ -8376,7 +8323,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_set_posit
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_device_group_get_definition=
+static struct hs_function_definition_with_1_parameter const device_group_get_definition=
 {
 	{
 		_hs_type_real,
@@ -8391,7 +8338,7 @@ static struct hs_function_definition_with_1_parameter const hs_device_group_get_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_group_set_definition=
+static struct hs_function_definition_with_2_parameters const device_group_set_definition=
 {
 	{
 		_hs_type_boolean,
@@ -8407,7 +8354,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_group_set
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_group_set_immediate_definition=
+static struct hs_function_definition_with_2_parameters const device_group_set_immediate_definition=
 {
 	{
 		_hs_type_void,
@@ -8423,7 +8370,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_group_set
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_one_sided_set_definition=
+static struct hs_function_definition_with_2_parameters const device_one_sided_set_definition=
 {
 	{
 		_hs_type_void,
@@ -8439,7 +8386,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_one_sided
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_operates_automatically_set_definition=
+static struct hs_function_definition_with_2_parameters const device_operates_automatically_set_definition=
 {
 	{
 		_hs_type_void,
@@ -8455,7 +8402,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_operates_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_device_group_change_only_once_more_set_definition=
+static struct hs_function_definition_with_2_parameters const device_group_change_only_once_more_set_definition=
 {
 	{
 		_hs_type_void,
@@ -8471,7 +8418,7 @@ static struct hs_function_definition_with_2_parameters const hs_device_group_cha
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition const hs_breakable_surfaces_reset_definition=
+static struct hs_function_definition const breakable_surfaces_reset_definition=
 {
 	_hs_type_void,
 	0,
@@ -8483,7 +8430,7 @@ static struct hs_function_definition const hs_breakable_surfaces_reset_definitio
 	0,
 };
 
-static struct hs_function_definition const hs_cheat_all_powerups_definition=
+static struct hs_function_definition const cheat_all_powerups_definition=
 {
 	_hs_type_void,
 	0,
@@ -8495,7 +8442,7 @@ static struct hs_function_definition const hs_cheat_all_powerups_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cheat_all_weapons_definition=
+static struct hs_function_definition const cheat_all_weapons_definition=
 {
 	_hs_type_void,
 	0,
@@ -8507,7 +8454,7 @@ static struct hs_function_definition const hs_cheat_all_weapons_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cheat_all_vehicles_definition=
+static struct hs_function_definition const cheat_all_vehicles_definition=
 {
 	_hs_type_void,
 	0,
@@ -8519,7 +8466,7 @@ static struct hs_function_definition const hs_cheat_all_vehicles_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cheat_teleport_to_camera_definition=
+static struct hs_function_definition const cheat_teleport_to_camera_definition=
 {
 	_hs_type_void,
 	0,
@@ -8531,7 +8478,7 @@ static struct hs_function_definition const hs_cheat_teleport_to_camera_definitio
 	0,
 };
 
-static struct hs_function_definition const hs_cheat_active_camouflage_definition=
+static struct hs_function_definition const cheat_active_camouflage_definition=
 {
 	_hs_type_void,
 	0,
@@ -8543,7 +8490,7 @@ static struct hs_function_definition const hs_cheat_active_camouflage_definition
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cheat_active_camouflage_local_player_definition=
+static struct hs_function_definition_with_1_parameter const cheat_active_camouflage_local_player_definition=
 {
 	{
 		_hs_type_void,
@@ -8558,7 +8505,7 @@ static struct hs_function_definition_with_1_parameter const hs_cheat_active_camo
 	},
 };
 
-static struct hs_function_definition const hs_cheats_load_definition=
+static struct hs_function_definition const cheats_load_definition=
 {
 	_hs_type_void,
 	0,
@@ -8570,7 +8517,7 @@ static struct hs_function_definition const hs_cheats_load_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_definition=
+static struct hs_function_definition_with_1_parameter const ai_definition=
 {
 	{
 		_hs_type_void,
@@ -8585,7 +8532,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_definition=
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_dialogue_triggers_definition=
+static struct hs_function_definition_with_1_parameter const ai_dialogue_triggers_definition=
 {
 	{
 		_hs_type_void,
@@ -8600,7 +8547,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_dialogue_trigg
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_grenades_definition=
+static struct hs_function_definition_with_1_parameter const ai_grenades_definition=
 {
 	{
 		_hs_type_void,
@@ -8615,7 +8562,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_grenades_defin
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_free_definition=
+static struct hs_function_definition_with_1_parameter const ai_free_definition=
 {
 	{
 		_hs_type_void,
@@ -8630,7 +8577,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_free_definitio
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_free_units_definition=
+static struct hs_function_definition_with_1_parameter const ai_free_units_definition=
 {
 	{
 		_hs_type_void,
@@ -8645,7 +8592,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_free_units_def
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_attach_definition=
+static struct hs_function_definition_with_2_parameters const ai_attach_definition=
 {
 	{
 		_hs_type_void,
@@ -8661,7 +8608,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_attach_defini
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_attach_units_definition=
+static struct hs_function_definition_with_2_parameters const ai_attach_units_definition=
 {
 	{
 		_hs_type_void,
@@ -8677,7 +8624,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_attach_units_
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_attach_free_definition=
+static struct hs_function_definition_with_2_parameters const ai_attach_free_definition=
 {
 	{
 		_hs_type_void,
@@ -8693,7 +8640,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_attach_free_d
 	{ _hs_type_actor_variant },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_detach_definition=
+static struct hs_function_definition_with_1_parameter const ai_detach_definition=
 {
 	{
 		_hs_type_void,
@@ -8708,7 +8655,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_detach_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_detach_units_definition=
+static struct hs_function_definition_with_1_parameter const ai_detach_units_definition=
 {
 	{
 		_hs_type_void,
@@ -8723,7 +8670,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_detach_units_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_place_definition=
+static struct hs_function_definition_with_1_parameter const ai_place_definition=
 {
 	{
 		_hs_type_void,
@@ -8738,7 +8685,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_place_definiti
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_kill_definition=
+static struct hs_function_definition_with_1_parameter const ai_kill_definition=
 {
 	{
 		_hs_type_void,
@@ -8753,7 +8700,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_kill_definitio
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_kill_silent_definition=
+static struct hs_function_definition_with_1_parameter const ai_kill_silent_definition=
 {
 	{
 		_hs_type_void,
@@ -8768,7 +8715,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_kill_silent_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_erase_definition=
+static struct hs_function_definition_with_1_parameter const ai_erase_definition=
 {
 	{
 		_hs_type_void,
@@ -8783,7 +8730,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_erase_definiti
 	},
 };
 
-static struct hs_function_definition const hs_ai_erase_all_definition=
+static struct hs_function_definition const ai_erase_all_definition=
 {
 	_hs_type_void,
 	0,
@@ -8795,7 +8742,7 @@ static struct hs_function_definition const hs_ai_erase_all_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_select_definition=
+static struct hs_function_definition_with_1_parameter const ai_select_definition=
 {
 	{
 		_hs_type_void,
@@ -8810,7 +8757,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_select_definit
 	},
 };
 
-static struct hs_function_definition const hs_ai_deselect_definition=
+static struct hs_function_definition const ai_deselect_definition=
 {
 	_hs_type_void,
 	0,
@@ -8822,7 +8769,7 @@ static struct hs_function_definition const hs_ai_deselect_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_spawn_actor_definition=
+static struct hs_function_definition_with_1_parameter const ai_spawn_actor_definition=
 {
 	{
 		_hs_type_void,
@@ -8837,7 +8784,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_spawn_actor_de
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_respawn_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_respawn_definition=
 {
 	{
 		_hs_type_void,
@@ -8853,7 +8800,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_respawn_d
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_deaf_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_deaf_definition=
 {
 	{
 		_hs_type_void,
@@ -8869,7 +8816,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_deaf_defi
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_blind_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_blind_definition=
 {
 	{
 		_hs_type_void,
@@ -8885,7 +8832,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_blind_def
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_encounter_definition=
+static struct hs_function_definition_with_2_parameters const ai_magically_see_encounter_definition=
 {
 	{
 		_hs_type_void,
@@ -8901,7 +8848,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_magically_see
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_magically_see_players_definition=
+static struct hs_function_definition_with_1_parameter const ai_magically_see_players_definition=
 {
 	{
 		_hs_type_void,
@@ -8916,7 +8863,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_magically_see_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_magically_see_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -8932,7 +8879,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_magically_see
 	{ _hs_type_unit },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_magically_see_units_definition=
+static struct hs_function_definition_with_2_parameters const ai_magically_see_units_definition=
 {
 	{
 		_hs_type_void,
@@ -8948,7 +8895,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_magically_see
 	{ _hs_type_object_list },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_timer_start_definition=
+static struct hs_function_definition_with_1_parameter const ai_timer_start_definition=
 {
 	{
 		_hs_type_void,
@@ -8963,7 +8910,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_timer_start_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_timer_expire_definition=
+static struct hs_function_definition_with_1_parameter const ai_timer_expire_definition=
 {
 	{
 		_hs_type_void,
@@ -8978,7 +8925,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_timer_expire_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_attack_definition=
+static struct hs_function_definition_with_1_parameter const ai_attack_definition=
 {
 	{
 		_hs_type_void,
@@ -8993,7 +8940,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_attack_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_defend_definition=
+static struct hs_function_definition_with_1_parameter const ai_defend_definition=
 {
 	{
 		_hs_type_void,
@@ -9008,7 +8955,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_defend_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_retreat_definition=
+static struct hs_function_definition_with_1_parameter const ai_retreat_definition=
 {
 	{
 		_hs_type_void,
@@ -9023,7 +8970,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_retreat_defini
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_maneuver_definition=
+static struct hs_function_definition_with_1_parameter const ai_maneuver_definition=
 {
 	{
 		_hs_type_void,
@@ -9038,7 +8985,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_maneuver_defin
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_maneuver_enable_definition=
+static struct hs_function_definition_with_2_parameters const ai_maneuver_enable_definition=
 {
 	{
 		_hs_type_void,
@@ -9054,7 +9001,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_maneuver_enab
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_migrate_definition=
+static struct hs_function_definition_with_2_parameters const ai_migrate_definition=
 {
 	{
 		_hs_type_void,
@@ -9070,7 +9017,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_migrate_defin
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_ai_migrate_and_speak_definition=
+static struct hs_function_definition_with_3_parameters const ai_migrate_and_speak_definition=
 {
 	{
 		_hs_type_void,
@@ -9086,7 +9033,7 @@ static struct hs_function_definition_with_3_parameters const hs_ai_migrate_and_s
 	{ _hs_type_ai, _hs_type_string },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_migrate_by_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_migrate_by_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9102,7 +9049,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_migrate_by_un
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_definition=
+static struct hs_function_definition_with_2_parameters const ai_allegiance_definition=
 {
 	{
 		_hs_type_void,
@@ -9118,7 +9065,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_de
 	{ _hs_type_enum_team },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_remove_definition=
+static struct hs_function_definition_with_2_parameters const ai_allegiance_remove_definition=
 {
 	{
 		_hs_type_void,
@@ -9134,7 +9081,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_re
 	{ _hs_type_enum_team },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle_definition=
+static struct hs_function_definition_with_3_parameters const ai_go_to_vehicle_definition=
 {
 	{
 		_hs_type_void,
@@ -9150,7 +9097,7 @@ static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle
 	{ _hs_type_unit, _hs_type_string },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle_override_definition=
+static struct hs_function_definition_with_3_parameters const ai_go_to_vehicle_override_definition=
 {
 	{
 		_hs_type_void,
@@ -9166,7 +9113,7 @@ static struct hs_function_definition_with_3_parameters const hs_ai_go_to_vehicle
 	{ _hs_type_unit, _hs_type_string },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_exit_vehicle_definition=
+static struct hs_function_definition_with_1_parameter const ai_exit_vehicle_definition=
 {
 	{
 		_hs_type_void,
@@ -9181,7 +9128,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_exit_vehicle_d
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_braindead_definition=
+static struct hs_function_definition_with_2_parameters const ai_braindead_definition=
 {
 	{
 		_hs_type_void,
@@ -9197,7 +9144,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_braindead_def
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_braindead_by_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_braindead_by_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9213,7 +9160,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_braindead_by_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_disregard_definition=
+static struct hs_function_definition_with_2_parameters const ai_disregard_definition=
 {
 	{
 		_hs_type_void,
@@ -9229,7 +9176,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_disregard_def
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_prefer_target_definition=
+static struct hs_function_definition_with_2_parameters const ai_prefer_target_definition=
 {
 	{
 		_hs_type_void,
@@ -9245,7 +9192,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_prefer_target
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_starting_location_definition=
+static struct hs_function_definition_with_1_parameter const ai_teleport_to_starting_location_definition=
 {
 	{
 		_hs_type_void,
@@ -9260,7 +9207,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_st
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_starting_location_if_unsupported_definition=
+static struct hs_function_definition_with_1_parameter const ai_teleport_to_starting_location_if_unsupported_definition=
 {
 	{
 		_hs_type_void,
@@ -9275,7 +9222,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_teleport_to_st
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_renew_definition=
+static struct hs_function_definition_with_1_parameter const ai_renew_definition=
 {
 	{
 		_hs_type_void,
@@ -9290,7 +9237,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_renew_definiti
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_nothing_definition=
+static struct hs_function_definition_with_1_parameter const ai_try_to_fight_nothing_definition=
 {
 	{
 		_hs_type_void,
@@ -9305,7 +9252,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_n
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_try_to_fight_definition=
+static struct hs_function_definition_with_2_parameters const ai_try_to_fight_definition=
 {
 	{
 		_hs_type_void,
@@ -9321,7 +9268,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_try_to_fight_
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_player_definition=
+static struct hs_function_definition_with_1_parameter const ai_try_to_fight_player_definition=
 {
 	{
 		_hs_type_void,
@@ -9336,7 +9283,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_try_to_fight_p
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_command_list_definition=
+static struct hs_function_definition_with_2_parameters const ai_command_list_definition=
 {
 	{
 		_hs_type_void,
@@ -9352,7 +9299,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_command_list_
 	{ _hs_type_ai_command_list },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_command_list_by_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_command_list_by_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9368,7 +9315,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_command_list_
 	{ _hs_type_ai_command_list },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_command_list_advance_definition=
+static struct hs_function_definition_with_1_parameter const ai_command_list_advance_definition=
 {
 	{
 		_hs_type_void,
@@ -9383,7 +9330,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_command_list_a
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_command_list_advance_by_unit_definition=
+static struct hs_function_definition_with_1_parameter const ai_command_list_advance_by_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9398,7 +9345,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_command_list_a
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_force_active_definition=
+static struct hs_function_definition_with_2_parameters const ai_force_active_definition=
 {
 	{
 		_hs_type_void,
@@ -9414,7 +9361,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_force_active_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_force_active_by_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_force_active_by_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9430,7 +9377,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_force_active_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_return_state_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_return_state_definition=
 {
 	{
 		_hs_type_void,
@@ -9446,7 +9393,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_return_st
 	{ _hs_type_enum_ai_default_state },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_current_state_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_current_state_definition=
 {
 	{
 		_hs_type_void,
@@ -9462,7 +9409,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_current_s
 	{ _hs_type_enum_ai_default_state },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_playfight_definition=
+static struct hs_function_definition_with_2_parameters const ai_playfight_definition=
 {
 	{
 		_hs_type_void,
@@ -9478,7 +9425,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_playfight_def
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition const hs_ai_reconnect_definition=
+static struct hs_function_definition const ai_reconnect_definition=
 {
 	_hs_type_void,
 	0,
@@ -9490,7 +9437,7 @@ static struct hs_function_definition const hs_ai_reconnect_definition=
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_encounter_definition=
+static struct hs_function_definition_with_2_parameters const ai_vehicle_encounter_definition=
 {
 	{
 		_hs_type_void,
@@ -9506,7 +9453,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_encou
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_distance_definition=
+static struct hs_function_definition_with_2_parameters const ai_vehicle_enterable_distance_definition=
 {
 	{
 		_hs_type_void,
@@ -9522,7 +9469,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enter
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_team_definition=
+static struct hs_function_definition_with_2_parameters const ai_vehicle_enterable_team_definition=
 {
 	{
 		_hs_type_void,
@@ -9538,7 +9485,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enter
 	{ _hs_type_enum_team },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_actor_type_definition=
+static struct hs_function_definition_with_2_parameters const ai_vehicle_enterable_actor_type_definition=
 {
 	{
 		_hs_type_void,
@@ -9554,7 +9501,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enter
 	{ _hs_type_enum_actor_type },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enterable_actors_definition=
+static struct hs_function_definition_with_2_parameters const ai_vehicle_enterable_actors_definition=
 {
 	{
 		_hs_type_void,
@@ -9570,7 +9517,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_vehicle_enter
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_vehicle_enterable_disable_definition=
+static struct hs_function_definition_with_1_parameter const ai_vehicle_enterable_disable_definition=
 {
 	{
 		_hs_type_void,
@@ -9585,7 +9532,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_vehicle_entera
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_look_at_object_definition=
+static struct hs_function_definition_with_2_parameters const ai_look_at_object_definition=
 {
 	{
 		_hs_type_void,
@@ -9601,7 +9548,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_look_at_objec
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_stop_looking_definition=
+static struct hs_function_definition_with_1_parameter const ai_stop_looking_definition=
 {
 	{
 		_hs_type_void,
@@ -9616,7 +9563,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_stop_looking_d
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_automatic_migration_target_definition=
+static struct hs_function_definition_with_2_parameters const ai_automatic_migration_target_definition=
 {
 	{
 		_hs_type_void,
@@ -9632,7 +9579,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_automatic_mig
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_disable_definition=
+static struct hs_function_definition_with_1_parameter const ai_follow_target_disable_definition=
 {
 	{
 		_hs_type_void,
@@ -9647,7 +9594,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_players_definition=
+static struct hs_function_definition_with_1_parameter const ai_follow_target_players_definition=
 {
 	{
 		_hs_type_void,
@@ -9662,7 +9609,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_follow_target_
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_follow_target_unit_definition=
+static struct hs_function_definition_with_2_parameters const ai_follow_target_unit_definition=
 {
 	{
 		_hs_type_void,
@@ -9678,7 +9625,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_follow_target
 	{ _hs_type_unit },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_follow_target_ai_definition=
+static struct hs_function_definition_with_2_parameters const ai_follow_target_ai_definition=
 {
 	{
 		_hs_type_void,
@@ -9694,7 +9641,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_follow_target
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_follow_distance_definition=
+static struct hs_function_definition_with_2_parameters const ai_follow_distance_definition=
 {
 	{
 		_hs_type_void,
@@ -9710,7 +9657,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_follow_distan
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_conversation_stop_definition=
+static struct hs_function_definition_with_1_parameter const ai_conversation_stop_definition=
 {
 	{
 		_hs_type_void,
@@ -9725,7 +9672,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_conversation_s
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_conversation_advance_definition=
+static struct hs_function_definition_with_1_parameter const ai_conversation_advance_definition=
 {
 	{
 		_hs_type_void,
@@ -9740,7 +9687,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_conversation_a
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_link_activation_definition=
+static struct hs_function_definition_with_2_parameters const ai_link_activation_definition=
 {
 	{
 		_hs_type_void,
@@ -9756,7 +9703,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_link_activati
 	{ _hs_type_ai },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_berserk_definition=
+static struct hs_function_definition_with_2_parameters const ai_berserk_definition=
 {
 	{
 		_hs_type_void,
@@ -9772,7 +9719,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_berserk_defin
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_set_team_definition=
+static struct hs_function_definition_with_2_parameters const ai_set_team_definition=
 {
 	{
 		_hs_type_void,
@@ -9788,7 +9735,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_set_team_defi
 	{ _hs_type_enum_team },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_allow_charge_definition=
+static struct hs_function_definition_with_2_parameters const ai_allow_charge_definition=
 {
 	{
 		_hs_type_void,
@@ -9804,7 +9751,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_allow_charge_
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_allow_dormant_definition=
+static struct hs_function_definition_with_2_parameters const ai_allow_dormant_definition=
 {
 	{
 		_hs_type_void,
@@ -9820,7 +9767,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_allow_dormant
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_is_attacking_definition=
+static struct hs_function_definition_with_1_parameter const ai_is_attacking_definition=
 {
 	{
 		_hs_type_boolean,
@@ -9835,7 +9782,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_is_attacking_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_command_list_status_definition=
+static struct hs_function_definition_with_1_parameter const ai_command_list_status_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9850,7 +9797,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_command_list_s
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_going_to_vehicle_definition=
+static struct hs_function_definition_with_1_parameter const ai_going_to_vehicle_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9865,7 +9812,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_going_to_vehic
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_living_count_definition=
+static struct hs_function_definition_with_1_parameter const ai_living_count_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9880,7 +9827,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_living_count_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_living_fraction_definition=
+static struct hs_function_definition_with_1_parameter const ai_living_fraction_definition=
 {
 	{
 		_hs_type_real,
@@ -9895,7 +9842,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_living_fractio
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_strength_definition=
+static struct hs_function_definition_with_1_parameter const ai_strength_definition=
 {
 	{
 		_hs_type_real,
@@ -9910,7 +9857,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_strength_defin
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_swarm_count_definition=
+static struct hs_function_definition_with_1_parameter const ai_swarm_count_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9925,7 +9872,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_swarm_count_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_nonswarm_count_definition=
+static struct hs_function_definition_with_1_parameter const ai_nonswarm_count_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9940,7 +9887,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_nonswarm_count
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_actors_definition=
+static struct hs_function_definition_with_1_parameter const ai_actors_definition=
 {
 	{
 		_hs_type_object_list,
@@ -9955,7 +9902,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_actors_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_status_definition=
+static struct hs_function_definition_with_1_parameter const ai_status_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -9970,7 +9917,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_status_definit
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_conversation_definition=
+static struct hs_function_definition_with_1_parameter const ai_conversation_definition=
 {
 	{
 		_hs_type_boolean,
@@ -9985,7 +9932,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_conversation_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_conversation_line_definition=
+static struct hs_function_definition_with_1_parameter const ai_conversation_line_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -10000,7 +9947,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_conversation_l
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_conversation_status_definition=
+static struct hs_function_definition_with_1_parameter const ai_conversation_status_definition=
 {
 	{
 		_hs_type_short_integer,
@@ -10015,7 +9962,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_conversation_s
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_broken_definition=
+static struct hs_function_definition_with_2_parameters const ai_allegiance_broken_definition=
 {
 	{
 		_hs_type_boolean,
@@ -10031,7 +9978,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_allegiance_br
 	{ _hs_type_enum_team },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_camera_control_definition=
+static struct hs_function_definition_with_1_parameter const camera_control_definition=
 {
 	{
 		_hs_type_void,
@@ -10046,7 +9993,7 @@ static struct hs_function_definition_with_1_parameter const hs_camera_control_de
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_camera_set_definition=
+static struct hs_function_definition_with_2_parameters const camera_set_definition=
 {
 	{
 		_hs_type_void,
@@ -10062,7 +10009,7 @@ static struct hs_function_definition_with_2_parameters const hs_camera_set_defin
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_camera_set_relative_definition=
+static struct hs_function_definition_with_3_parameters const camera_set_relative_definition=
 {
 	{
 		_hs_type_void,
@@ -10078,7 +10025,7 @@ static struct hs_function_definition_with_3_parameters const hs_camera_set_relat
 	{ _hs_type_short_integer, _hs_type_object },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_camera_set_animation_definition=
+static struct hs_function_definition_with_2_parameters const camera_set_animation_definition=
 {
 	{
 		_hs_type_void,
@@ -10094,7 +10041,7 @@ static struct hs_function_definition_with_2_parameters const hs_camera_set_anima
 	{ _hs_type_string },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_camera_set_first_person_definition=
+static struct hs_function_definition_with_1_parameter const camera_set_first_person_definition=
 {
 	{
 		_hs_type_void,
@@ -10109,7 +10056,7 @@ static struct hs_function_definition_with_1_parameter const hs_camera_set_first_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_camera_set_dead_definition=
+static struct hs_function_definition_with_1_parameter const camera_set_dead_definition=
 {
 	{
 		_hs_type_void,
@@ -10124,7 +10071,7 @@ static struct hs_function_definition_with_1_parameter const hs_camera_set_dead_d
 	},
 };
 
-static struct hs_function_definition const hs_camera_time_definition=
+static struct hs_function_definition const camera_time_definition=
 {
 	_hs_type_short_integer,
 	0,
@@ -10136,7 +10083,7 @@ static struct hs_function_definition const hs_camera_time_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_debug_camera_save_definition=
+static struct hs_function_definition const debug_camera_save_definition=
 {
 	_hs_type_void,
 	0,
@@ -10148,7 +10095,7 @@ static struct hs_function_definition const hs_debug_camera_save_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_debug_camera_load_definition=
+static struct hs_function_definition const debug_camera_load_definition=
 {
 	_hs_type_void,
 	0,
@@ -10160,7 +10107,7 @@ static struct hs_function_definition const hs_debug_camera_load_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_game_speed_definition=
+static struct hs_function_definition_with_1_parameter const game_speed_definition=
 {
 	{
 		_hs_type_void,
@@ -10175,7 +10122,7 @@ static struct hs_function_definition_with_1_parameter const hs_game_speed_defini
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_game_variant_definition=
+static struct hs_function_definition_with_1_parameter const game_variant_definition=
 {
 	{
 		_hs_type_void,
@@ -10190,7 +10137,7 @@ static struct hs_function_definition_with_1_parameter const hs_game_variant_defi
 	},
 };
 
-static struct hs_function_definition const hs_game_time_definition=
+static struct hs_function_definition const game_time_definition=
 {
 	_hs_type_long_integer,
 	0,
@@ -10202,7 +10149,7 @@ static struct hs_function_definition const hs_game_time_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_difficulty_get_definition=
+static struct hs_function_definition const game_difficulty_get_definition=
 {
 	_hs_type_enum_game_difficulty,
 	0,
@@ -10214,7 +10161,7 @@ static struct hs_function_definition const hs_game_difficulty_get_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_difficulty_get_real_definition=
+static struct hs_function_definition const game_difficulty_get_real_definition=
 {
 	_hs_type_enum_game_difficulty,
 	0,
@@ -10226,7 +10173,7 @@ static struct hs_function_definition const hs_game_difficulty_get_real_definitio
 	0,
 };
 
-static struct hs_function_definition const hs_players_unzoom_all_definition=
+static struct hs_function_definition const players_unzoom_all_definition=
 {
 	_hs_type_void,
 	0,
@@ -10238,7 +10185,7 @@ static struct hs_function_definition const hs_players_unzoom_all_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_player_enable_input_definition=
+static struct hs_function_definition_with_1_parameter const player_enable_input_definition=
 {
 	{
 		_hs_type_void,
@@ -10253,7 +10200,7 @@ static struct hs_function_definition_with_1_parameter const hs_player_enable_inp
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_player_camera_control_definition=
+static struct hs_function_definition_with_1_parameter const player_camera_control_definition=
 {
 	{
 		_hs_type_boolean,
@@ -10268,7 +10215,7 @@ static struct hs_function_definition_with_1_parameter const hs_player_camera_con
 	},
 };
 
-static struct hs_function_definition const hs_player_action_test_reset_definition=
+static struct hs_function_definition const player_action_test_reset_definition=
 {
 	_hs_type_void,
 	0,
@@ -10280,7 +10227,7 @@ static struct hs_function_definition const hs_player_action_test_reset_definitio
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_jump_definition=
+static struct hs_function_definition const player_action_test_jump_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10292,7 +10239,7 @@ static struct hs_function_definition const hs_player_action_test_jump_definition
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_primary_trigger_definition=
+static struct hs_function_definition const player_action_test_primary_trigger_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10304,7 +10251,7 @@ static struct hs_function_definition const hs_player_action_test_primary_trigger
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_grenade_trigger_definition=
+static struct hs_function_definition const player_action_test_grenade_trigger_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10316,7 +10263,7 @@ static struct hs_function_definition const hs_player_action_test_grenade_trigger
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_zoom_definition=
+static struct hs_function_definition const player_action_test_zoom_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10328,7 +10275,7 @@ static struct hs_function_definition const hs_player_action_test_zoom_definition
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_action_definition=
+static struct hs_function_definition const player_action_test_action_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10340,7 +10287,7 @@ static struct hs_function_definition const hs_player_action_test_action_definiti
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_accept_definition=
+static struct hs_function_definition const player_action_test_accept_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10352,7 +10299,7 @@ static struct hs_function_definition const hs_player_action_test_accept_definiti
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_back_definition=
+static struct hs_function_definition const player_action_test_back_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10364,7 +10311,7 @@ static struct hs_function_definition const hs_player_action_test_back_definition
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_look_relative_up_definition=
+static struct hs_function_definition const player_action_test_look_relative_up_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10376,7 +10323,7 @@ static struct hs_function_definition const hs_player_action_test_look_relative_u
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_look_relative_down_definition=
+static struct hs_function_definition const player_action_test_look_relative_down_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10388,7 +10335,7 @@ static struct hs_function_definition const hs_player_action_test_look_relative_d
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_look_relative_left_definition=
+static struct hs_function_definition const player_action_test_look_relative_left_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10400,7 +10347,7 @@ static struct hs_function_definition const hs_player_action_test_look_relative_l
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_look_relative_right_definition=
+static struct hs_function_definition const player_action_test_look_relative_right_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10412,7 +10359,7 @@ static struct hs_function_definition const hs_player_action_test_look_relative_r
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_look_relative_all_directions_definition=
+static struct hs_function_definition const player_action_test_look_relative_all_directions_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10424,7 +10371,7 @@ static struct hs_function_definition const hs_player_action_test_look_relative_a
 	0,
 };
 
-static struct hs_function_definition const hs_player_action_test_move_relative_all_directions_definition=
+static struct hs_function_definition const player_action_test_move_relative_all_directions_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -10436,7 +10383,7 @@ static struct hs_function_definition const hs_player_action_test_move_relative_a
 	0,
 };
 
-static struct hs_function_definition_with_3_parameters const hs_player_add_equipment_definition=
+static struct hs_function_definition_with_3_parameters const player_add_equipment_definition=
 {
 	{
 		_hs_type_void,
@@ -10468,7 +10415,7 @@ static struct hs_function_definition_with_2_parameters const hs_debug_teleport_p
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition const hs_map_reset_definition=
+static struct hs_function_definition const map_reset_definition=
 {
 	_hs_type_void,
 	0,
@@ -10480,7 +10427,7 @@ static struct hs_function_definition const hs_map_reset_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_map_name_definition=
+static struct hs_function_definition_with_1_parameter const map_name_definition=
 {
 	{
 		_hs_type_void,
@@ -10495,7 +10442,7 @@ static struct hs_function_definition_with_1_parameter const hs_map_name_definiti
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_multiplayer_map_name_definition=
+static struct hs_function_definition_with_1_parameter const multiplayer_map_name_definition=
 {
 	{
 		_hs_type_void,
@@ -10510,7 +10457,7 @@ static struct hs_function_definition_with_1_parameter const hs_multiplayer_map_n
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_game_difficulty_set_definition=
+static struct hs_function_definition_with_1_parameter const game_difficulty_set_definition=
 {
 	{
 		_hs_type_void,
@@ -10525,7 +10472,7 @@ static struct hs_function_definition_with_1_parameter const hs_game_difficulty_s
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_crash_definition=
+static struct hs_function_definition_with_1_parameter const crash_definition=
 {
 	{
 		_hs_type_void,
@@ -10540,7 +10487,7 @@ static struct hs_function_definition_with_1_parameter const hs_crash_definition=
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_switch_bsp_definition=
+static struct hs_function_definition_with_1_parameter const switch_bsp_definition=
 {
 	{
 		_hs_type_void,
@@ -10555,7 +10502,7 @@ static struct hs_function_definition_with_1_parameter const hs_switch_bsp_defini
 	},
 };
 
-static struct hs_function_definition const hs_structure_bsp_index_definition=
+static struct hs_function_definition const structure_bsp_index_definition=
 {
 	_hs_type_short_integer,
 	0,
@@ -10567,7 +10514,7 @@ static struct hs_function_definition const hs_structure_bsp_index_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_version_definition=
+static struct hs_function_definition const version_definition=
 {
 	_hs_type_void,
 	0,
@@ -10579,7 +10526,7 @@ static struct hs_function_definition const hs_version_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_playback_definition=
+static struct hs_function_definition const playback_definition=
 {
 	_hs_type_void,
 	0,
@@ -10591,7 +10538,7 @@ static struct hs_function_definition const hs_playback_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_texture_cache_flush_definition=
+static struct hs_function_definition const texture_cache_flush_definition=
 {
 	_hs_type_void,
 	0,
@@ -10603,7 +10550,7 @@ static struct hs_function_definition const hs_texture_cache_flush_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_sound_cache_flush_definition=
+static struct hs_function_definition const sound_cache_flush_definition=
 {
 	_hs_type_void,
 	0,
@@ -10615,7 +10562,7 @@ static struct hs_function_definition const hs_sound_cache_flush_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_debug_memory_definition=
+static struct hs_function_definition const debug_memory_definition=
 {
 	_hs_type_void,
 	0,
@@ -10627,7 +10574,7 @@ static struct hs_function_definition const hs_debug_memory_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_debug_memory_by_file_definition=
+static struct hs_function_definition const debug_memory_by_file_definition=
 {
 	_hs_type_void,
 	0,
@@ -10639,7 +10586,7 @@ static struct hs_function_definition const hs_debug_memory_by_file_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_debug_memory_for_file_definition=
+static struct hs_function_definition_with_1_parameter const debug_memory_for_file_definition=
 {
 	{
 		_hs_type_void,
@@ -10654,7 +10601,7 @@ static struct hs_function_definition_with_1_parameter const hs_debug_memory_for_
 	},
 };
 
-static struct hs_function_definition const hs_debug_tags_definition=
+static struct hs_function_definition const debug_tags_definition=
 {
 	_hs_type_void,
 	0,
@@ -10666,7 +10613,7 @@ static struct hs_function_definition const hs_debug_tags_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_profile_reset_definition=
+static struct hs_function_definition const profile_reset_definition=
 {
 	_hs_type_void,
 	0,
@@ -10678,7 +10625,7 @@ static struct hs_function_definition const hs_profile_reset_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_profile_dump_definition=
+static struct hs_function_definition_with_1_parameter const profile_dump_definition=
 {
 	{
 		_hs_type_void,
@@ -10693,7 +10640,7 @@ static struct hs_function_definition_with_1_parameter const hs_profile_dump_defi
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_profile_activate_definition=
+static struct hs_function_definition_with_1_parameter const profile_activate_definition=
 {
 	{
 		_hs_type_void,
@@ -10708,7 +10655,7 @@ static struct hs_function_definition_with_1_parameter const hs_profile_activate_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_profile_deactivate_definition=
+static struct hs_function_definition_with_1_parameter const profile_deactivate_definition=
 {
 	{
 		_hs_type_void,
@@ -10723,7 +10670,7 @@ static struct hs_function_definition_with_1_parameter const hs_profile_deactivat
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_profile_graph_toggle_definition=
+static struct hs_function_definition_with_1_parameter const profile_graph_toggle_definition=
 {
 	{
 		_hs_type_void,
@@ -10789,7 +10736,7 @@ static struct hs_function_definition const hs_radiosity_debug_point_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_ai_lines_definition=
+static struct hs_function_definition const ai_lines_definition=
 {
 	_hs_type_void,
 	0,
@@ -10801,7 +10748,7 @@ static struct hs_function_definition const hs_ai_lines_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_ai_debug_sound_point_set_definition=
+static struct hs_function_definition const ai_debug_sound_point_set_definition=
 {
 	_hs_type_void,
 	0,
@@ -10813,7 +10760,7 @@ static struct hs_function_definition const hs_ai_debug_sound_point_set_definitio
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_ai_debug_vocalize_definition=
+static struct hs_function_definition_with_2_parameters const ai_debug_vocalize_definition=
 {
 	{
 		_hs_type_void,
@@ -10829,7 +10776,7 @@ static struct hs_function_definition_with_2_parameters const hs_ai_debug_vocaliz
 	{ _hs_type_string },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_debug_teleport_to_definition=
+static struct hs_function_definition_with_1_parameter const ai_debug_teleport_to_definition=
 {
 	{
 		_hs_type_void,
@@ -10844,7 +10791,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_debug_teleport
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_definition=
+static struct hs_function_definition_with_1_parameter const ai_debug_speak_definition=
 {
 	{
 		_hs_type_void,
@@ -10859,7 +10806,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_list_definition=
+static struct hs_function_definition_with_1_parameter const ai_debug_speak_list_definition=
 {
 	{
 		_hs_type_void,
@@ -10874,7 +10821,7 @@ static struct hs_function_definition_with_1_parameter const hs_ai_debug_speak_li
 	},
 };
 
-static struct hs_function_definition_with_4_parameters const hs_fade_in_definition=
+static struct hs_function_definition_with_4_parameters const fade_in_definition=
 {
 	{
 		_hs_type_void,
@@ -10890,7 +10837,7 @@ static struct hs_function_definition_with_4_parameters const hs_fade_in_definiti
 	{ _hs_type_real, _hs_type_real, _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_fade_out_definition=
+static struct hs_function_definition_with_4_parameters const fade_out_definition=
 {
 	{
 		_hs_type_void,
@@ -10906,7 +10853,7 @@ static struct hs_function_definition_with_4_parameters const hs_fade_out_definit
 	{ _hs_type_real, _hs_type_real, _hs_type_short_integer },
 };
 
-static struct hs_function_definition const hs_cinematic_start_definition=
+static struct hs_function_definition const cinematic_start_definition=
 {
 	_hs_type_void,
 	0,
@@ -10918,7 +10865,7 @@ static struct hs_function_definition const hs_cinematic_start_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cinematic_stop_definition=
+static struct hs_function_definition const cinematic_stop_definition=
 {
 	_hs_type_void,
 	0,
@@ -10930,7 +10877,7 @@ static struct hs_function_definition const hs_cinematic_stop_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_cinematic_skip_start_internal_definition=
+static struct hs_function_definition const cinematic_skip_start_internal_definition=
 {
 	_hs_type_void,
 	0,
@@ -10942,7 +10889,7 @@ static struct hs_function_definition const hs_cinematic_skip_start_internal_defi
 	0,
 };
 
-static struct hs_function_definition const hs_cinematic_skip_stop_internal_definition=
+static struct hs_function_definition const cinematic_skip_stop_internal_definition=
 {
 	_hs_type_void,
 	0,
@@ -10954,7 +10901,7 @@ static struct hs_function_definition const hs_cinematic_skip_stop_internal_defin
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cinematic_show_letterbox_definition=
+static struct hs_function_definition_with_1_parameter const cinematic_show_letterbox_definition=
 {
 	{
 		_hs_type_void,
@@ -10969,7 +10916,7 @@ static struct hs_function_definition_with_1_parameter const hs_cinematic_show_le
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cinematic_set_title_definition=
+static struct hs_function_definition_with_1_parameter const cinematic_set_title_definition=
 {
 	{
 		_hs_type_void,
@@ -10984,7 +10931,7 @@ static struct hs_function_definition_with_1_parameter const hs_cinematic_set_tit
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_cinematic_set_title_delayed_definition=
+static struct hs_function_definition_with_2_parameters const cinematic_set_title_delayed_definition=
 {
 	{
 		_hs_type_void,
@@ -11000,7 +10947,7 @@ static struct hs_function_definition_with_2_parameters const hs_cinematic_set_ti
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cinematic_suppress_bsp_object_creation_definition=
+static struct hs_function_definition_with_1_parameter const cinematic_suppress_bsp_object_creation_definition=
 {
 	{
 		_hs_type_void,
@@ -11015,7 +10962,7 @@ static struct hs_function_definition_with_1_parameter const hs_cinematic_suppres
 	},
 };
 
-static struct hs_function_definition const hs_attract_mode_start_definition=
+static struct hs_function_definition const attract_mode_start_definition=
 {
 	_hs_type_void,
 	0,
@@ -11027,7 +10974,7 @@ static struct hs_function_definition const hs_attract_mode_start_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_won_definition=
+static struct hs_function_definition const game_won_definition=
 {
 	_hs_type_void,
 	0,
@@ -11039,7 +10986,7 @@ static struct hs_function_definition const hs_game_won_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_lost_definition=
+static struct hs_function_definition const game_lost_definition=
 {
 	_hs_type_void,
 	0,
@@ -11051,7 +10998,7 @@ static struct hs_function_definition const hs_game_lost_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_safe_to_save_definition=
+static struct hs_function_definition const game_safe_to_save_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11063,7 +11010,7 @@ static struct hs_function_definition const hs_game_safe_to_save_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_all_quiet_definition=
+static struct hs_function_definition const game_all_quiet_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11075,7 +11022,7 @@ static struct hs_function_definition const hs_game_all_quiet_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_safe_to_speak_definition=
+static struct hs_function_definition const game_safe_to_speak_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11087,7 +11034,7 @@ static struct hs_function_definition const hs_game_safe_to_speak_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_is_cooperative_definition=
+static struct hs_function_definition const game_is_cooperative_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11099,7 +11046,7 @@ static struct hs_function_definition const hs_game_is_cooperative_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_save_definition=
+static struct hs_function_definition const game_save_definition=
 {
 	_hs_type_void,
 	0,
@@ -11111,7 +11058,7 @@ static struct hs_function_definition const hs_game_save_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_save_cancel_definition=
+static struct hs_function_definition const game_save_cancel_definition=
 {
 	_hs_type_void,
 	0,
@@ -11123,7 +11070,7 @@ static struct hs_function_definition const hs_game_save_cancel_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_save_no_timeout_definition=
+static struct hs_function_definition const game_save_no_timeout_definition=
 {
 	_hs_type_void,
 	0,
@@ -11135,7 +11082,7 @@ static struct hs_function_definition const hs_game_save_no_timeout_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_save_totally_unsafe_definition=
+static struct hs_function_definition const game_save_totally_unsafe_definition=
 {
 	_hs_type_void,
 	0,
@@ -11147,7 +11094,7 @@ static struct hs_function_definition const hs_game_save_totally_unsafe_definitio
 	0,
 };
 
-static struct hs_function_definition const hs_game_saving_definition=
+static struct hs_function_definition const game_saving_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11159,7 +11106,7 @@ static struct hs_function_definition const hs_game_saving_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_game_revert_definition=
+static struct hs_function_definition const game_revert_definition=
 {
 	_hs_type_void,
 	0,
@@ -11171,7 +11118,7 @@ static struct hs_function_definition const hs_game_revert_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_core_load_definition=
+static struct hs_function_definition const core_load_definition=
 {
 	_hs_type_void,
 	0,
@@ -11183,7 +11130,7 @@ static struct hs_function_definition const hs_core_load_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_core_load_at_startup_definition=
+static struct hs_function_definition const core_load_at_startup_definition=
 {
 	_hs_type_void,
 	0,
@@ -11195,7 +11142,7 @@ static struct hs_function_definition const hs_core_load_at_startup_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_core_load_name_definition=
+static struct hs_function_definition_with_1_parameter const core_load_name_definition=
 {
 	{
 		_hs_type_void,
@@ -11210,7 +11157,7 @@ static struct hs_function_definition_with_1_parameter const hs_core_load_name_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_core_load_name_at_startup_definition=
+static struct hs_function_definition_with_1_parameter const core_load_name_at_startup_definition=
 {
 	{
 		_hs_type_void,
@@ -11225,7 +11172,7 @@ static struct hs_function_definition_with_1_parameter const hs_core_load_name_at
 	},
 };
 
-static struct hs_function_definition const hs_core_save_definition=
+static struct hs_function_definition const core_save_definition=
 {
 	_hs_type_void,
 	0,
@@ -11237,7 +11184,7 @@ static struct hs_function_definition const hs_core_save_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_core_save_name_definition=
+static struct hs_function_definition_with_1_parameter const core_save_name_definition=
 {
 	{
 		_hs_type_void,
@@ -11252,7 +11199,7 @@ static struct hs_function_definition_with_1_parameter const hs_core_save_name_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_game_skip_ticks_definition=
+static struct hs_function_definition_with_1_parameter const game_skip_ticks_definition=
 {
 	{
 		_hs_type_void,
@@ -11267,7 +11214,7 @@ static struct hs_function_definition_with_1_parameter const hs_game_skip_ticks_d
 	},
 };
 
-static struct hs_function_definition const hs_game_reverted_definition=
+static struct hs_function_definition const game_reverted_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -11279,7 +11226,7 @@ static struct hs_function_definition const hs_game_reverted_definition=
 	0,
 };
 
-static struct hs_function_definition_with_3_parameters const hs_sound_impulse_start_definition=
+static struct hs_function_definition_with_3_parameters const sound_impulse_start_definition=
 {
 	{
 		_hs_type_void,
@@ -11295,7 +11242,7 @@ static struct hs_function_definition_with_3_parameters const hs_sound_impulse_st
 	{ _hs_type_object, _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_impulse_time_definition=
+static struct hs_function_definition_with_1_parameter const sound_impulse_time_definition=
 {
 	{
 		_hs_type_long_integer,
@@ -11310,7 +11257,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_impulse_tim
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_impulse_stop_definition=
+static struct hs_function_definition_with_1_parameter const sound_impulse_stop_definition=
 {
 	{
 		_hs_type_void,
@@ -11325,7 +11272,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_impulse_sto
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_looping_predict_definition=
+static struct hs_function_definition_with_1_parameter const sound_looping_predict_definition=
 {
 	{
 		_hs_type_void,
@@ -11340,7 +11287,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_looping_pre
 	},
 };
 
-static struct hs_function_definition_with_3_parameters const hs_sound_looping_start_definition=
+static struct hs_function_definition_with_3_parameters const sound_looping_start_definition=
 {
 	{
 		_hs_type_void,
@@ -11356,7 +11303,7 @@ static struct hs_function_definition_with_3_parameters const hs_sound_looping_st
 	{ _hs_type_object, _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_looping_stop_definition=
+static struct hs_function_definition_with_1_parameter const sound_looping_stop_definition=
 {
 	{
 		_hs_type_void,
@@ -11371,7 +11318,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_looping_sto
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_sound_looping_set_scale_definition=
+static struct hs_function_definition_with_2_parameters const sound_looping_set_scale_definition=
 {
 	{
 		_hs_type_void,
@@ -11387,7 +11334,7 @@ static struct hs_function_definition_with_2_parameters const hs_sound_looping_se
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_sound_looping_set_alternate_definition=
+static struct hs_function_definition_with_2_parameters const sound_looping_set_alternate_definition=
 {
 	{
 		_hs_type_void,
@@ -11403,7 +11350,7 @@ static struct hs_function_definition_with_2_parameters const hs_sound_looping_se
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_debug_sounds_enable_definition=
+static struct hs_function_definition_with_2_parameters const debug_sounds_enable_definition=
 {
 	{
 		_hs_type_void,
@@ -11419,7 +11366,7 @@ static struct hs_function_definition_with_2_parameters const hs_debug_sounds_ena
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_debug_sounds_distances_definition=
+static struct hs_function_definition_with_3_parameters const debug_sounds_distances_definition=
 {
 	{
 		_hs_type_void,
@@ -11435,7 +11382,7 @@ static struct hs_function_definition_with_3_parameters const hs_debug_sounds_dis
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_debug_sounds_wet_definition=
+static struct hs_function_definition_with_2_parameters const debug_sounds_wet_definition=
 {
 	{
 		_hs_type_void,
@@ -11451,7 +11398,7 @@ static struct hs_function_definition_with_2_parameters const hs_debug_sounds_wet
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_sound_class_set_gain_definition=
+static struct hs_function_definition_with_3_parameters const sound_class_set_gain_definition=
 {
 	{
 		_hs_type_void,
@@ -11467,7 +11414,7 @@ static struct hs_function_definition_with_3_parameters const hs_sound_class_set_
 	{ _hs_type_real, _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_sound_enable_definition=
+static struct hs_function_definition_with_1_parameter const sound_enable_definition=
 {
 	{
 		_hs_type_void,
@@ -11482,7 +11429,7 @@ static struct hs_function_definition_with_1_parameter const hs_sound_enable_defi
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_vehicle_hover_definition=
+static struct hs_function_definition_with_2_parameters const vehicle_hover_definition=
 {
 	{
 		_hs_type_void,
@@ -11498,7 +11445,7 @@ static struct hs_function_definition_with_2_parameters const hs_vehicle_hover_de
 	{ _hs_type_boolean },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_show_hud_definition=
+static struct hs_function_definition_with_1_parameter const show_hud_definition=
 {
 	{
 		_hs_type_boolean,
@@ -11513,7 +11460,7 @@ static struct hs_function_definition_with_1_parameter const hs_show_hud_definiti
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_show_hud_help_text_definition=
+static struct hs_function_definition_with_1_parameter const show_hud_help_text_definition=
 {
 	{
 		_hs_type_boolean,
@@ -11528,7 +11475,7 @@ static struct hs_function_definition_with_1_parameter const hs_show_hud_help_tex
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_enable_hud_help_flash_definition=
+static struct hs_function_definition_with_1_parameter const enable_hud_help_flash_definition=
 {
 	{
 		_hs_type_void,
@@ -11543,7 +11490,7 @@ static struct hs_function_definition_with_1_parameter const hs_enable_hud_help_f
 	},
 };
 
-static struct hs_function_definition const hs_hud_help_flash_restart_definition=
+static struct hs_function_definition const hud_help_flash_restart_definition=
 {
 	_hs_type_void,
 	0,
@@ -11555,7 +11502,7 @@ static struct hs_function_definition const hs_hud_help_flash_restart_definition=
 	0,
 };
 
-static struct hs_function_definition_with_4_parameters const hs_activate_nav_point_flag_definition=
+static struct hs_function_definition_with_4_parameters const activate_nav_point_flag_definition=
 {
 	{
 		_hs_type_void,
@@ -11571,7 +11518,7 @@ static struct hs_function_definition_with_4_parameters const hs_activate_nav_poi
 	{ _hs_type_unit, _hs_type_cutscene_flag, _hs_type_real },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_activate_nav_point_object_definition=
+static struct hs_function_definition_with_4_parameters const activate_nav_point_object_definition=
 {
 	{
 		_hs_type_void,
@@ -11587,7 +11534,7 @@ static struct hs_function_definition_with_4_parameters const hs_activate_nav_poi
 	{ _hs_type_unit, _hs_type_object, _hs_type_real },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_activate_team_nav_point_flag_definition=
+static struct hs_function_definition_with_4_parameters const activate_team_nav_point_flag_definition=
 {
 	{
 		_hs_type_void,
@@ -11603,7 +11550,7 @@ static struct hs_function_definition_with_4_parameters const hs_activate_team_na
 	{ _hs_type_enum_team, _hs_type_cutscene_flag, _hs_type_real },
 };
 
-static struct hs_function_definition_with_4_parameters const hs_activate_team_nav_point_object_definition=
+static struct hs_function_definition_with_4_parameters const activate_team_nav_point_object_definition=
 {
 	{
 		_hs_type_void,
@@ -11619,7 +11566,7 @@ static struct hs_function_definition_with_4_parameters const hs_activate_team_na
 	{ _hs_type_enum_team, _hs_type_object, _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_point_flag_definition=
+static struct hs_function_definition_with_2_parameters const deactivate_nav_point_flag_definition=
 {
 	{
 		_hs_type_void,
@@ -11635,7 +11582,7 @@ static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_p
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_point_object_definition=
+static struct hs_function_definition_with_2_parameters const deactivate_nav_point_object_definition=
 {
 	{
 		_hs_type_void,
@@ -11651,7 +11598,7 @@ static struct hs_function_definition_with_2_parameters const hs_deactivate_nav_p
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_deactivate_team_nav_point_flag_definition=
+static struct hs_function_definition_with_2_parameters const deactivate_team_nav_point_flag_definition=
 {
 	{
 		_hs_type_void,
@@ -11667,7 +11614,7 @@ static struct hs_function_definition_with_2_parameters const hs_deactivate_team_
 	{ _hs_type_cutscene_flag },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_deactivate_team_nav_point_object_definition=
+static struct hs_function_definition_with_2_parameters const deactivate_team_nav_point_object_definition=
 {
 	{
 		_hs_type_void,
@@ -11683,7 +11630,7 @@ static struct hs_function_definition_with_2_parameters const hs_deactivate_team_
 	{ _hs_type_object },
 };
 
-static struct hs_function_definition const hs_cls_definition=
+static struct hs_function_definition const cls_definition=
 {
 	_hs_type_void,
 	0,
@@ -11695,7 +11642,7 @@ static struct hs_function_definition const hs_cls_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_error_overflow_suppression_definition=
+static struct hs_function_definition_with_1_parameter const error_overflow_suppression_definition=
 {
 	{
 		_hs_type_void,
@@ -11710,7 +11657,7 @@ static struct hs_function_definition_with_1_parameter const hs_error_overflow_su
 	},
 };
 
-static struct hs_function_definition const hs_structure_lens_flares_place_definition=
+static struct hs_function_definition const structure_lens_flares_place_definition=
 {
 	_hs_type_void,
 	0,
@@ -11722,7 +11669,7 @@ static struct hs_function_definition const hs_structure_lens_flares_place_defini
 	0,
 };
 
-static struct hs_function_definition_with_3_parameters const hs_player_effect_set_max_translation_definition=
+static struct hs_function_definition_with_3_parameters const player_effect_set_max_translation_definition=
 {
 	{
 		_hs_type_void,
@@ -11738,7 +11685,7 @@ static struct hs_function_definition_with_3_parameters const hs_player_effect_se
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_player_effect_set_max_rotation_definition=
+static struct hs_function_definition_with_3_parameters const player_effect_set_max_rotation_definition=
 {
 	{
 		_hs_type_void,
@@ -11770,7 +11717,7 @@ static struct hs_function_definition_with_2_parameters const hs_player_effect_se
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_player_effect_start_definition=
+static struct hs_function_definition_with_2_parameters const player_effect_start_definition=
 {
 	{
 		_hs_type_void,
@@ -11786,7 +11733,7 @@ static struct hs_function_definition_with_2_parameters const hs_player_effect_st
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_player_effect_stop_definition=
+static struct hs_function_definition_with_1_parameter const player_effect_stop_definition=
 {
 	{
 		_hs_type_void,
@@ -11801,7 +11748,7 @@ static struct hs_function_definition_with_1_parameter const hs_player_effect_sto
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_show_health_definition=
+static struct hs_function_definition_with_1_parameter const hud_show_health_definition=
 {
 	{
 		_hs_type_void,
@@ -11816,7 +11763,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_show_health_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_blink_health_definition=
+static struct hs_function_definition_with_1_parameter const hud_blink_health_definition=
 {
 	{
 		_hs_type_void,
@@ -11831,7 +11778,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_blink_health_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_show_shield_definition=
+static struct hs_function_definition_with_1_parameter const hud_show_shield_definition=
 {
 	{
 		_hs_type_void,
@@ -11846,7 +11793,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_show_shield_d
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_blink_shield_definition=
+static struct hs_function_definition_with_1_parameter const hud_blink_shield_definition=
 {
 	{
 		_hs_type_void,
@@ -11861,7 +11808,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_blink_shield_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_show_motion_sensor_definition=
+static struct hs_function_definition_with_1_parameter const hud_show_motion_sensor_definition=
 {
 	{
 		_hs_type_void,
@@ -11876,7 +11823,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_show_motion_s
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_blink_motion_sensor_definition=
+static struct hs_function_definition_with_1_parameter const hud_blink_motion_sensor_definition=
 {
 	{
 		_hs_type_void,
@@ -11891,7 +11838,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_blink_motion_
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_show_crosshair_definition=
+static struct hs_function_definition_with_1_parameter const hud_show_crosshair_definition=
 {
 	{
 		_hs_type_void,
@@ -11906,7 +11853,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_show_crosshai
 	},
 };
 
-static struct hs_function_definition const hs_hud_clear_messages_definition=
+static struct hs_function_definition const hud_clear_messages_definition=
 {
 	_hs_type_void,
 	0,
@@ -11918,7 +11865,7 @@ static struct hs_function_definition const hs_hud_clear_messages_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_set_help_text_definition=
+static struct hs_function_definition_with_1_parameter const hud_set_help_text_definition=
 {
 	{
 		_hs_type_void,
@@ -11933,7 +11880,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_set_help_text
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_hud_set_objective_text_definition=
+static struct hs_function_definition_with_1_parameter const hud_set_objective_text_definition=
 {
 	{
 		_hs_type_void,
@@ -11948,7 +11895,7 @@ static struct hs_function_definition_with_1_parameter const hs_hud_set_objective
 	},
 };
 
-static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_time_definition=
+static struct hs_function_definition_with_2_parameters const hud_set_timer_time_definition=
 {
 	{
 		_hs_type_void,
@@ -11964,7 +11911,7 @@ static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_ti
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_warning_time_definition=
+static struct hs_function_definition_with_2_parameters const hud_set_timer_warning_time_definition=
 {
 	{
 		_hs_type_void,
@@ -11980,7 +11927,7 @@ static struct hs_function_definition_with_2_parameters const hs_hud_set_timer_wa
 	{ _hs_type_short_integer },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_hud_set_timer_position_definition=
+static struct hs_function_definition_with_3_parameters const hud_set_timer_position_definition=
 {
 	{
 		_hs_type_void,
@@ -11996,7 +11943,7 @@ static struct hs_function_definition_with_3_parameters const hs_hud_set_timer_po
 	{ _hs_type_short_integer, _hs_type_enum_hud_corner },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_show_hud_timer_definition=
+static struct hs_function_definition_with_1_parameter const show_hud_timer_definition=
 {
 	{
 		_hs_type_void,
@@ -12011,7 +11958,7 @@ static struct hs_function_definition_with_1_parameter const hs_show_hud_timer_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_pause_hud_timer_definition=
+static struct hs_function_definition_with_1_parameter const pause_hud_timer_definition=
 {
 	{
 		_hs_type_void,
@@ -12026,7 +11973,7 @@ static struct hs_function_definition_with_1_parameter const hs_pause_hud_timer_d
 	},
 };
 
-static struct hs_function_definition const hs_hud_get_timer_ticks_definition=
+static struct hs_function_definition const hud_get_timer_ticks_definition=
 {
 	_hs_type_short_integer,
 	0,
@@ -12038,7 +11985,7 @@ static struct hs_function_definition const hs_hud_get_timer_ticks_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_time_code_show_definition=
+static struct hs_function_definition_with_1_parameter const time_code_show_definition=
 {
 	{
 		_hs_type_void,
@@ -12053,7 +12000,7 @@ static struct hs_function_definition_with_1_parameter const hs_time_code_show_de
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_time_code_start_definition=
+static struct hs_function_definition_with_1_parameter const time_code_start_definition=
 {
 	{
 		_hs_type_void,
@@ -12068,7 +12015,7 @@ static struct hs_function_definition_with_1_parameter const hs_time_code_start_d
 	},
 };
 
-static struct hs_function_definition const hs_time_code_reset_definition=
+static struct hs_function_definition const time_code_reset_definition=
 {
 	_hs_type_void,
 	0,
@@ -12080,7 +12027,7 @@ static struct hs_function_definition const hs_time_code_reset_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_rasterizer_decals_flush_definition=
+static struct hs_function_definition const rasterizer_decals_flush_definition=
 {
 	_hs_type_void,
 	0,
@@ -12092,7 +12039,7 @@ static struct hs_function_definition const hs_rasterizer_decals_flush_definition
 	0,
 };
 
-static struct hs_function_definition const hs_rasterizer_fps_accumulate_definition=
+static struct hs_function_definition const rasterizer_fps_accumulate_definition=
 {
 	_hs_type_void,
 	0,
@@ -12104,7 +12051,7 @@ static struct hs_function_definition const hs_rasterizer_fps_accumulate_definiti
 	0,
 };
 
-static struct hs_function_definition_with_4_parameters const hs_rasterizer_model_ambient_reflection_tint_definition=
+static struct hs_function_definition_with_4_parameters const rasterizer_model_ambient_reflection_tint_definition=
 {
 	{
 		_hs_type_void,
@@ -12120,7 +12067,7 @@ static struct hs_function_definition_with_4_parameters const hs_rasterizer_model
 	{ _hs_type_real, _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition const hs_rasterizer_lights_reset_for_new_map_definition=
+static struct hs_function_definition const rasterizer_lights_reset_for_new_map_definition=
 {
 	_hs_type_void,
 	0,
@@ -12132,7 +12079,7 @@ static struct hs_function_definition const hs_rasterizer_lights_reset_for_new_ma
 	0,
 };
 
-static struct hs_function_definition_with_2_parameters const hs_script_screen_effect_set_value_definition=
+static struct hs_function_definition_with_2_parameters const script_screen_effect_set_value_definition=
 {
 	{
 		_hs_type_void,
@@ -12148,7 +12095,7 @@ static struct hs_function_definition_with_2_parameters const hs_script_screen_ef
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cinematic_screen_effect_start_definition=
+static struct hs_function_definition_with_1_parameter const cinematic_screen_effect_start_definition=
 {
 	{
 		_hs_type_void,
@@ -12163,7 +12110,7 @@ static struct hs_function_definition_with_1_parameter const hs_cinematic_screen_
 	},
 };
 
-static struct hs_function_definition_with_5_parameters const hs_cinematic_screen_effect_set_convolution_definition=
+static struct hs_function_definition_with_5_parameters const cinematic_screen_effect_set_convolution_definition=
 {
 	{
 		_hs_type_void,
@@ -12179,7 +12126,7 @@ static struct hs_function_definition_with_5_parameters const hs_cinematic_screen
 	{ _hs_type_short_integer, _hs_type_real, _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_6_parameters const hs_cinematic_screen_effect_set_filter_definition=
+static struct hs_function_definition_with_6_parameters const cinematic_screen_effect_set_filter_definition=
 {
 	{
 		_hs_type_void,
@@ -12195,7 +12142,7 @@ static struct hs_function_definition_with_6_parameters const hs_cinematic_screen
 	{ _hs_type_real, _hs_type_real, _hs_type_real, _hs_type_boolean, _hs_type_real },
 };
 
-static struct hs_function_definition_with_3_parameters const hs_cinematic_screen_effect_set_filter_desaturation_tint_definition=
+static struct hs_function_definition_with_3_parameters const cinematic_screen_effect_set_filter_desaturation_tint_definition=
 {
 	{
 		_hs_type_void,
@@ -12211,7 +12158,7 @@ static struct hs_function_definition_with_3_parameters const hs_cinematic_screen
 	{ _hs_type_real, _hs_type_real },
 };
 
-static struct hs_function_definition_with_2_parameters const hs_cinematic_screen_effect_set_video_definition=
+static struct hs_function_definition_with_2_parameters const cinematic_screen_effect_set_video_definition=
 {
 	{
 		_hs_type_void,
@@ -12227,7 +12174,7 @@ static struct hs_function_definition_with_2_parameters const hs_cinematic_screen
 	{ _hs_type_real },
 };
 
-static struct hs_function_definition const hs_cinematic_screen_effect_stop_definition=
+static struct hs_function_definition const cinematic_screen_effect_stop_definition=
 {
 	_hs_type_void,
 	0,
@@ -12239,7 +12186,7 @@ static struct hs_function_definition const hs_cinematic_screen_effect_stop_defin
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_cinematic_set_near_clip_distance_definition=
+static struct hs_function_definition_with_1_parameter const cinematic_set_near_clip_distance_definition=
 {
 	{
 		_hs_type_void,
@@ -12266,7 +12213,7 @@ static struct hs_function_definition const hs_enumerate_memory_units_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_delete_save_game_files_definition=
+static struct hs_function_definition const delete_save_game_files_definition=
 {
 	_hs_type_void,
 	0,
@@ -12278,7 +12225,7 @@ static struct hs_function_definition const hs_delete_save_game_files_definition=
 	0,
 };
 
-static struct hs_function_definition const hs_fast_setup_network_server_definition=
+static struct hs_function_definition const fast_setup_network_server_definition=
 {
 	_hs_type_void,
 	0,
@@ -12290,7 +12237,7 @@ static struct hs_function_definition const hs_fast_setup_network_server_definiti
 	0,
 };
 
-static struct hs_function_definition const hs_profile_unlock_solo_levels_definition=
+static struct hs_function_definition const profile_unlock_solo_levels_definition=
 {
 	_hs_type_void,
 	0,
@@ -12302,7 +12249,7 @@ static struct hs_function_definition const hs_profile_unlock_solo_levels_definit
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_player0_look_invert_pitch_definition=
+static struct hs_function_definition_with_1_parameter const player0_look_invert_pitch_definition=
 {
 	{
 		_hs_type_void,
@@ -12317,7 +12264,7 @@ static struct hs_function_definition_with_1_parameter const hs_player0_look_inve
 	},
 };
 
-static struct hs_function_definition const hs_player0_look_pitch_is_inverted_definition=
+static struct hs_function_definition const player0_look_pitch_is_inverted_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -12329,7 +12276,7 @@ static struct hs_function_definition const hs_player0_look_pitch_is_inverted_def
 	0,
 };
 
-static struct hs_function_definition const hs_player0_joystick_set_is_normal_definition=
+static struct hs_function_definition const player0_joystick_set_is_normal_definition=
 {
 	_hs_type_boolean,
 	0,
@@ -12341,7 +12288,7 @@ static struct hs_function_definition const hs_player0_joystick_set_is_normal_def
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_ui_widget_show_path_definition=
+static struct hs_function_definition_with_1_parameter const ui_widget_show_path_definition=
 {
 	{
 		_hs_type_void,
@@ -12356,7 +12303,7 @@ static struct hs_function_definition_with_1_parameter const hs_ui_widget_show_pa
 	},
 };
 
-static struct hs_function_definition_with_1_parameter const hs_display_scenario_help_definition=
+static struct hs_function_definition_with_1_parameter const display_scenario_help_definition=
 {
 	{
 		_hs_type_void,
@@ -12383,7 +12330,7 @@ static struct hs_function_definition const hs_network_game_start_now_definition=
 	0,
 };
 
-static struct hs_function_definition_with_1_parameter const hs_xbox_set_machine_name_definition=
+static struct hs_function_definition_with_1_parameter const xbox_set_machine_name_definition=
 {
 	{
 		_hs_type_void,
@@ -12412,424 +12359,424 @@ struct hs_enum_definition const hs_enum_table[]=
 struct hs_function_table_storage hs_function_table=
 {
 	{
-		&hs_begin_definition,
-		&hs_begin_random_definition,
-		&hs_if_definition,
-		&hs_cond_definition,
-		&hs_set_definition,
-		&hs_and_definition,
-		&hs_or_definition,
-		&hs_plus_definition,
-		&hs_minus_definition,
-		&hs_times_definition,
-		&hs_divide_definition,
-		&hs_min_definition,
-		&hs_max_definition,
-		&hs_equal_definition,
-		&hs_not_equal_definition,
-		&hs_gt_definition,
-		&hs_lt_definition,
-		&hs_gte_definition,
-		&hs_lte_definition,
-		&hs_sleep_definition,
-		&hs_sleep_until_definition,
-		&hs_wake_definition,
-		&hs_inspect_definition,
-		&hs_unit_definition,
-		&hs_ai_debug_communication_suppress_definition,
-		&hs_ai_debug_communication_ignore_definition,
-		&hs_ai_debug_communication_focus_definition,
-		&hs_not_definition.definition,
-		&hs_print_definition.definition,
-		&hs_players_definition,
-		&hs_volume_teleport_players_not_inside_definition.definition,
-		&hs_volume_test_object_definition.definition,
-		&hs_volume_test_objects_definition.definition,
-		&hs_volume_test_objects_all_definition.definition,
-		&hs_object_teleport_definition.definition,
-		&hs_object_set_facing_definition.definition,
-		&hs_object_set_shield_definition.definition,
-		&hs_object_set_permutation_definition.definition,
-		&hs_object_create_definition.definition,
-		&hs_object_destroy_definition.definition,
-		&hs_object_create_anew_definition.definition,
-		&hs_object_create_containing_definition.definition,
-		&hs_object_create_anew_containing_definition.definition,
-		&hs_object_destroy_containing_definition.definition,
-		&hs_object_destroy_all_definition,
-		&hs_list_get_definition.definition,
-		&hs_list_count_definition.definition,
-		&hs_effect_new_definition.definition,
-		&hs_effect_new_on_object_marker_definition.definition,
-		&hs_damage_new_definition.definition,
-		&hs_damage_object_definition.definition,
-		&hs_objects_can_see_object_definition.definition,
-		&hs_objects_can_see_flag_definition.definition,
-		&hs_objects_delete_by_definition_definition.definition,
-		&hs_sound_set_gain_definition.definition,
-		&hs_sound_get_gain_definition.definition,
-		&hs_script_recompile_definition,
-		&hs_script_doc_definition,
-		&hs_help_definition.definition,
-		&hs_random_range_definition.definition,
-		&hs_real_random_range_definition.definition,
-		&hs_numeric_countdown_timer_set_definition.definition,
-		&hs_numeric_countdown_timer_get_definition.definition,
-		&hs_numeric_countdown_timer_stop_definition,
-		&hs_numeric_countdown_timer_restart_definition,
-		&hs_breakable_surfaces_enable_definition.definition,
-		&hs_recording_play_definition.definition,
-		&hs_recording_play_and_delete_definition.definition,
-		&hs_recording_play_and_hover_definition.definition,
-		&hs_recording_kill_definition.definition,
-		&hs_recording_time_definition.definition,
-		&hs_object_set_ranged_attack_inhibited_definition.definition,
-		&hs_object_set_melee_attack_inhibited_definition.definition,
-		&hs_objects_dump_memory_definition,
-		&hs_object_set_collideable_definition.definition,
-		&hs_object_set_scale_definition.definition,
-		&hs_objects_attach_definition.definition,
-		&hs_objects_detach_definition.definition,
-		&hs_garbage_collect_now_definition,
-		&hs_object_cannot_take_damage_definition.definition,
-		&hs_object_can_take_damage_definition.definition,
-		&hs_object_beautify_definition.definition,
-		&hs_objects_predict_definition.definition,
-		&hs_object_type_predict_definition.definition,
-		&hs_object_pvs_activate_definition.definition,
-		&hs_object_pvs_set_object_definition.definition,
-		&hs_object_pvs_set_camera_definition.definition,
-		&hs_object_pvs_clear_definition,
-		&hs_render_lights_definition.definition,
-		&hs_scenery_get_animation_time_definition.definition,
-		&hs_scenery_animation_start_definition.definition,
-		&hs_scenery_animation_start_at_frame_definition.definition,
-		&hs_render_effects_definition.definition,
-		&hs_unit_can_blink_definition.definition,
-		&hs_unit_open_definition.definition,
-		&hs_unit_close_definition.definition,
-		&hs_unit_kill_definition.definition,
-		&hs_unit_kill_silent_definition.definition,
-		&hs_unit_get_custom_animation_time_definition.definition,
-		&hs_unit_stop_custom_animation_definition.definition,
-		&hs_unit_custom_animation_at_frame_definition.definition,
-		&hs_custom_animation_definition.definition,
-		&hs_custom_animation_list_definition.definition,
-		&hs_unit_is_playing_custom_animation_definition.definition,
-		&hs_unit_aim_without_turning_definition.definition,
-		&hs_unit_set_emotion_definition.definition,
-		&hs_unit_set_enterable_by_player_definition.definition,
-		&hs_unit_enter_vehicle_definition.definition,
-		&hs_vehicle_test_seat_list_definition.definition,
-		&hs_vehicle_test_seat_definition.definition,
-		&hs_unit_set_emotion_animation_definition.definition,
-		&hs_unit_exit_vehicle_definition.definition,
-		&hs_unit_set_maximum_vitality_definition.definition,
-		&hs_units_set_maximum_vitality_definition.definition,
-		&hs_unit_set_current_vitality_definition.definition,
-		&hs_units_set_current_vitality_definition.definition,
-		&hs_vehicle_load_magic_definition.definition,
-		&hs_vehicle_unload_definition.definition,
-		&hs_magic_seat_name_definition.definition,
-		&hs_unit_set_seat_definition.definition,
-		&hs_magic_melee_attack_definition,
-		&hs_vehicle_riders_definition.definition,
-		&hs_vehicle_driver_definition.definition,
-		&hs_vehicle_gunner_definition.definition,
-		&hs_unit_get_health_definition.definition,
-		&hs_unit_get_shield_definition.definition,
-		&hs_unit_get_total_grenade_count_definition.definition,
-		&hs_unit_has_weapon_definition.definition,
-		&hs_unit_has_weapon_readied_definition.definition,
-		&hs_unit_doesnt_drop_items_definition.definition,
-		&hs_unit_impervious_definition.definition,
-		&hs_unit_suspended_definition.definition,
-		&hs_unit_solo_player_integrated_night_vision_is_active_definition,
-		&hs_units_set_desired_flashlight_state_definition.definition,
-		&hs_unit_set_desired_flashlight_state_definition.definition,
-		&hs_unit_get_current_flashlight_state_definition.definition,
-		&hs_device_set_never_appears_locked_definition.definition,
-		&hs_device_get_power_definition.definition,
-		&hs_device_set_power_definition.definition,
-		&hs_device_set_position_definition.definition,
-		&hs_device_get_position_definition.definition,
-		&hs_device_set_position_immediate_definition.definition,
-		&hs_device_group_get_definition.definition,
-		&hs_device_group_set_definition.definition,
-		&hs_device_group_set_immediate_definition.definition,
-		&hs_device_one_sided_set_definition.definition,
-		&hs_device_operates_automatically_set_definition.definition,
-		&hs_device_group_change_only_once_more_set_definition.definition,
-		&hs_breakable_surfaces_reset_definition,
-		&hs_cheat_all_powerups_definition,
-		&hs_cheat_all_weapons_definition,
-		&hs_cheat_all_vehicles_definition,
-		&hs_cheat_teleport_to_camera_definition,
-		&hs_cheat_active_camouflage_definition,
-		&hs_cheat_active_camouflage_local_player_definition.definition,
-		&hs_cheats_load_definition,
-		&hs_ai_free_definition.definition,
-		&hs_ai_free_units_definition.definition,
-		&hs_ai_attach_definition.definition,
-		&hs_ai_attach_free_definition.definition,
-		&hs_ai_detach_definition.definition,
-		&hs_ai_place_definition.definition,
-		&hs_ai_kill_definition.definition,
-		&hs_ai_kill_silent_definition.definition,
-		&hs_ai_erase_definition.definition,
-		&hs_ai_erase_all_definition,
-		&hs_ai_select_definition.definition,
-		&hs_ai_deselect_definition,
-		&hs_ai_spawn_actor_definition.definition,
-		&hs_ai_set_respawn_definition.definition,
-		&hs_ai_set_deaf_definition.definition,
-		&hs_ai_set_blind_definition.definition,
-		&hs_ai_magically_see_encounter_definition.definition,
-		&hs_ai_magically_see_players_definition.definition,
-		&hs_ai_magically_see_unit_definition.definition,
-		&hs_ai_timer_start_definition.definition,
-		&hs_ai_timer_expire_definition.definition,
-		&hs_ai_attack_definition.definition,
-		&hs_ai_defend_definition.definition,
-		&hs_ai_retreat_definition.definition,
-		&hs_ai_maneuver_definition.definition,
-		&hs_ai_maneuver_enable_definition.definition,
-		&hs_ai_migrate_definition.definition,
-		&hs_ai_migrate_and_speak_definition.definition,
-		&hs_ai_migrate_by_unit_definition.definition,
-		&hs_ai_allegiance_definition.definition,
-		&hs_ai_allegiance_remove_definition.definition,
-		&hs_ai_living_count_definition.definition,
-		&hs_ai_living_fraction_definition.definition,
-		&hs_ai_strength_definition.definition,
-		&hs_ai_swarm_count_definition.definition,
-		&hs_ai_nonswarm_count_definition.definition,
-		&hs_ai_actors_definition.definition,
-		&hs_ai_go_to_vehicle_definition.definition,
-		&hs_ai_go_to_vehicle_override_definition.definition,
-		&hs_ai_going_to_vehicle_definition.definition,
-		&hs_ai_exit_vehicle_definition.definition,
-		&hs_ai_braindead_definition.definition,
-		&hs_ai_braindead_by_unit_definition.definition,
-		&hs_ai_disregard_definition.definition,
-		&hs_ai_prefer_target_definition.definition,
-		&hs_ai_teleport_to_starting_location_definition.definition,
-		&hs_ai_teleport_to_starting_location_if_unsupported_definition.definition,
-		&hs_ai_renew_definition.definition,
-		&hs_ai_try_to_fight_nothing_definition.definition,
-		&hs_ai_try_to_fight_definition.definition,
-		&hs_ai_try_to_fight_player_definition.definition,
-		&hs_ai_command_list_definition.definition,
-		&hs_ai_command_list_by_unit_definition.definition,
-		&hs_ai_command_list_advance_definition.definition,
-		&hs_ai_command_list_advance_by_unit_definition.definition,
-		&hs_ai_command_list_status_definition.definition,
-		&hs_ai_is_attacking_definition.definition,
-		&hs_ai_force_active_definition.definition,
-		&hs_ai_force_active_by_unit_definition.definition,
-		&hs_ai_set_return_state_definition.definition,
-		&hs_ai_set_current_state_definition.definition,
-		&hs_ai_playfight_definition.definition,
-		&hs_ai_status_definition.definition,
-		&hs_ai_reconnect_definition,
-		&hs_ai_vehicle_encounter_definition.definition,
-		&hs_ai_vehicle_enterable_distance_definition.definition,
-		&hs_ai_vehicle_enterable_team_definition.definition,
-		&hs_ai_vehicle_enterable_actor_type_definition.definition,
-		&hs_ai_vehicle_enterable_actors_definition.definition,
-		&hs_ai_vehicle_enterable_disable_definition.definition,
-		&hs_ai_look_at_object_definition.definition,
-		&hs_ai_stop_looking_definition.definition,
-		&hs_ai_automatic_migration_target_definition.definition,
-		&hs_ai_follow_target_disable_definition.definition,
-		&hs_ai_follow_target_players_definition.definition,
-		&hs_ai_follow_target_unit_definition.definition,
-		&hs_ai_follow_target_ai_definition.definition,
-		&hs_ai_follow_distance_definition.definition,
-		&hs_ai_conversation_definition.definition,
-		&hs_ai_conversation_stop_definition.definition,
-		&hs_ai_conversation_advance_definition.definition,
-		&hs_ai_conversation_line_definition.definition,
-		&hs_ai_conversation_status_definition.definition,
-		&hs_ai_link_activation_definition.definition,
-		&hs_ai_berserk_definition.definition,
-		&hs_ai_set_team_definition.definition,
-		&hs_ai_allow_charge_definition.definition,
-		&hs_ai_allow_dormant_definition.definition,
-		&hs_ai_allegiance_broken_definition.definition,
-		&hs_camera_control_definition.definition,
-		&hs_camera_set_definition.definition,
-		&hs_camera_set_relative_definition.definition,
-		&hs_camera_set_animation_definition.definition,
-		&hs_camera_set_first_person_definition.definition,
-		&hs_camera_set_dead_definition.definition,
-		&hs_camera_time_definition,
-		&hs_debug_camera_load_definition,
-		&hs_debug_camera_save_definition,
-		&hs_game_speed_definition.definition,
-		&hs_game_time_definition,
-		&hs_game_variant_definition.definition,
-		&hs_game_difficulty_get_definition,
-		&hs_game_difficulty_get_real_definition,
-		&hs_map_reset_definition,
-		&hs_map_name_definition.definition,
-		&hs_multiplayer_map_name_definition.definition,
-		&hs_game_difficulty_set_definition.definition,
-		&hs_crash_definition.definition,
-		&hs_switch_bsp_definition.definition,
-		&hs_structure_bsp_index_definition,
-		&hs_version_definition,
-		&hs_playback_definition,
-		&hs_texture_cache_flush_definition,
-		&hs_sound_cache_flush_definition,
-		&hs_debug_memory_definition,
-		&hs_debug_memory_by_file_definition,
-		&hs_debug_memory_for_file_definition.definition,
-		&hs_debug_tags_definition,
-		&hs_profile_reset_definition,
-		&hs_profile_dump_definition.definition,
-		&hs_profile_activate_definition.definition,
-		&hs_profile_deactivate_definition.definition,
-		&hs_profile_graph_toggle_definition.definition,
+		&begin_definition,
+		&begin_random_definition,
+		&if_definition,
+		&cond_definition,
+		&set_definition,
+		&and_definition,
+		&or_definition,
+		&add_definition,
+		&subtract_definition,
+		&multiply_definition,
+		&divide_definition,
+		&min_definition,
+		&max_definition,
+		&equal_definition,
+		&not_equal_definition,
+		&gt_definition,
+		&lt_definition,
+		&gte_definition,
+		&lte_definition,
+		&sleep_definition,
+		&sleep_until_definition,
+		&wake_definition,
+		&inspect_definition,
+		&object_to_unit_definition,
+		&ai_debug_communication_suppress_definition,
+		&ai_debug_communication_ignore_definition,
+		&ai_debug_communication_focus_definition,
+		&not_definition.definition,
+		&print_definition.definition,
+		&players_definition,
+		&volume_teleport_players_not_inside_definition.definition,
+		&volume_test_object_definition.definition,
+		&volume_test_objects_definition.definition,
+		&volume_test_objects_all_definition.definition,
+		&object_teleport_definition.definition,
+		&object_set_facing_definition.definition,
+		&object_set_shield_definition.definition,
+		&object_set_permutation_definition.definition,
+		&object_create_definition.definition,
+		&object_destroy_definition.definition,
+		&object_create_anew_definition.definition,
+		&object_create_containing_definition.definition,
+		&object_create_anew_containing_definition.definition,
+		&object_destroy_containing_definition.definition,
+		&object_destroy_all_definition,
+		&list_get_definition.definition,
+		&list_count_definition.definition,
+		&effect_new_definition.definition,
+		&effect_new_on_object_marker_definition.definition,
+		&damage_new_definition.definition,
+		&damage_object_definition.definition,
+		&objects_can_see_object_definition.definition,
+		&objects_can_see_flag_definition.definition,
+		&objects_delete_by_definition_definition.definition,
+		&sound_set_gain_definition.definition,
+		&sound_get_gain_definition.definition,
+		&script_recompile_definition,
+		&script_doc_definition,
+		&help_definition.definition,
+		&random_range_definition.definition,
+		&real_random_range_definition.definition,
+		&numeric_countdown_timer_set_definition.definition,
+		&numeric_countdown_timer_get_definition.definition,
+		&numeric_countdown_timer_stop_definition,
+		&numeric_countdown_timer_restart_definition,
+		&breakable_surfaces_enable_definition.definition,
+		&recording_play_definition.definition,
+		&recording_play_and_delete_definition.definition,
+		&recording_play_and_hover_definition.definition,
+		&recording_kill_definition.definition,
+		&recording_time_definition.definition,
+		&object_set_ranged_attack_inhibited_definition.definition,
+		&object_set_melee_attack_inhibited_definition.definition,
+		&objects_dump_memory_definition,
+		&object_set_collideable_definition.definition,
+		&object_set_scale_definition.definition,
+		&objects_attach_definition.definition,
+		&objects_detach_definition.definition,
+		&garbage_collect_now_definition,
+		&object_cannot_take_damage_definition.definition,
+		&object_can_take_damage_definition.definition,
+		&object_beautify_definition.definition,
+		&objects_predict_definition.definition,
+		&object_type_predict_definition.definition,
+		&object_pvs_activate_definition.definition,
+		&object_pvs_set_object_definition.definition,
+		&object_pvs_set_camera_definition.definition,
+		&object_pvs_clear_definition,
+		&render_lights_definition.definition,
+		&scenery_get_animation_time_definition.definition,
+		&scenery_animation_start_definition.definition,
+		&scenery_animation_start_at_frame_definition.definition,
+		&render_effects_definition.definition,
+		&unit_can_blink_definition.definition,
+		&unit_open_definition.definition,
+		&unit_close_definition.definition,
+		&unit_kill_definition.definition,
+		&unit_kill_silent_definition.definition,
+		&unit_get_custom_animation_time_definition.definition,
+		&unit_stop_custom_animation_definition.definition,
+		&unit_custom_animation_at_frame_definition.definition,
+		&custom_animation_definition.definition,
+		&custom_animation_list_definition.definition,
+		&unit_is_playing_custom_animation_definition.definition,
+		&unit_aim_without_turning_definition.definition,
+		&unit_set_emotion_definition.definition,
+		&unit_set_enterable_by_player_definition.definition,
+		&unit_enter_vehicle_definition.definition,
+		&vehicle_test_seat_list_definition.definition,
+		&vehicle_test_seat_definition.definition,
+		&unit_set_emotion_animation_definition.definition,
+		&unit_exit_vehicle_definition.definition,
+		&unit_set_maximum_vitality_definition.definition,
+		&units_set_maximum_vitality_definition.definition,
+		&unit_set_current_vitality_definition.definition,
+		&units_set_current_vitality_definition.definition,
+		&vehicle_load_magic_definition.definition,
+		&vehicle_unload_definition.definition,
+		&magic_seat_name_definition.definition,
+		&unit_set_seat_definition.definition,
+		&magic_melee_attack_definition,
+		&vehicle_riders_definition.definition,
+		&vehicle_driver_definition.definition,
+		&vehicle_gunner_definition.definition,
+		&unit_get_health_definition.definition,
+		&unit_get_shield_definition.definition,
+		&unit_get_total_grenade_count_definition.definition,
+		&unit_has_weapon_definition.definition,
+		&unit_has_weapon_readied_definition.definition,
+		&unit_doesnt_drop_items_definition.definition,
+		&unit_impervious_definition.definition,
+		&unit_suspended_definition.definition,
+		&unit_solo_player_integrated_night_vision_is_active_definition,
+		&units_set_desired_flashlight_state_definition.definition,
+		&unit_set_desired_flashlight_state_definition.definition,
+		&unit_get_current_flashlight_state_definition.definition,
+		&device_set_never_appears_locked_definition.definition,
+		&device_get_power_definition.definition,
+		&device_set_power_definition.definition,
+		&device_set_position_definition.definition,
+		&device_get_position_definition.definition,
+		&device_set_position_immediate_definition.definition,
+		&device_group_get_definition.definition,
+		&device_group_set_definition.definition,
+		&device_group_set_immediate_definition.definition,
+		&device_one_sided_set_definition.definition,
+		&device_operates_automatically_set_definition.definition,
+		&device_group_change_only_once_more_set_definition.definition,
+		&breakable_surfaces_reset_definition,
+		&cheat_all_powerups_definition,
+		&cheat_all_weapons_definition,
+		&cheat_all_vehicles_definition,
+		&cheat_teleport_to_camera_definition,
+		&cheat_active_camouflage_definition,
+		&cheat_active_camouflage_local_player_definition.definition,
+		&cheats_load_definition,
+		&ai_free_definition.definition,
+		&ai_free_units_definition.definition,
+		&ai_attach_definition.definition,
+		&ai_attach_free_definition.definition,
+		&ai_detach_definition.definition,
+		&ai_place_definition.definition,
+		&ai_kill_definition.definition,
+		&ai_kill_silent_definition.definition,
+		&ai_erase_definition.definition,
+		&ai_erase_all_definition,
+		&ai_select_definition.definition,
+		&ai_deselect_definition,
+		&ai_spawn_actor_definition.definition,
+		&ai_set_respawn_definition.definition,
+		&ai_set_deaf_definition.definition,
+		&ai_set_blind_definition.definition,
+		&ai_magically_see_encounter_definition.definition,
+		&ai_magically_see_players_definition.definition,
+		&ai_magically_see_unit_definition.definition,
+		&ai_timer_start_definition.definition,
+		&ai_timer_expire_definition.definition,
+		&ai_attack_definition.definition,
+		&ai_defend_definition.definition,
+		&ai_retreat_definition.definition,
+		&ai_maneuver_definition.definition,
+		&ai_maneuver_enable_definition.definition,
+		&ai_migrate_definition.definition,
+		&ai_migrate_and_speak_definition.definition,
+		&ai_migrate_by_unit_definition.definition,
+		&ai_allegiance_definition.definition,
+		&ai_allegiance_remove_definition.definition,
+		&ai_living_count_definition.definition,
+		&ai_living_fraction_definition.definition,
+		&ai_strength_definition.definition,
+		&ai_swarm_count_definition.definition,
+		&ai_nonswarm_count_definition.definition,
+		&ai_actors_definition.definition,
+		&ai_go_to_vehicle_definition.definition,
+		&ai_go_to_vehicle_override_definition.definition,
+		&ai_going_to_vehicle_definition.definition,
+		&ai_exit_vehicle_definition.definition,
+		&ai_braindead_definition.definition,
+		&ai_braindead_by_unit_definition.definition,
+		&ai_disregard_definition.definition,
+		&ai_prefer_target_definition.definition,
+		&ai_teleport_to_starting_location_definition.definition,
+		&ai_teleport_to_starting_location_if_unsupported_definition.definition,
+		&ai_renew_definition.definition,
+		&ai_try_to_fight_nothing_definition.definition,
+		&ai_try_to_fight_definition.definition,
+		&ai_try_to_fight_player_definition.definition,
+		&ai_command_list_definition.definition,
+		&ai_command_list_by_unit_definition.definition,
+		&ai_command_list_advance_definition.definition,
+		&ai_command_list_advance_by_unit_definition.definition,
+		&ai_command_list_status_definition.definition,
+		&ai_is_attacking_definition.definition,
+		&ai_force_active_definition.definition,
+		&ai_force_active_by_unit_definition.definition,
+		&ai_set_return_state_definition.definition,
+		&ai_set_current_state_definition.definition,
+		&ai_playfight_definition.definition,
+		&ai_status_definition.definition,
+		&ai_reconnect_definition,
+		&ai_vehicle_encounter_definition.definition,
+		&ai_vehicle_enterable_distance_definition.definition,
+		&ai_vehicle_enterable_team_definition.definition,
+		&ai_vehicle_enterable_actor_type_definition.definition,
+		&ai_vehicle_enterable_actors_definition.definition,
+		&ai_vehicle_enterable_disable_definition.definition,
+		&ai_look_at_object_definition.definition,
+		&ai_stop_looking_definition.definition,
+		&ai_automatic_migration_target_definition.definition,
+		&ai_follow_target_disable_definition.definition,
+		&ai_follow_target_players_definition.definition,
+		&ai_follow_target_unit_definition.definition,
+		&ai_follow_target_ai_definition.definition,
+		&ai_follow_distance_definition.definition,
+		&ai_conversation_definition.definition,
+		&ai_conversation_stop_definition.definition,
+		&ai_conversation_advance_definition.definition,
+		&ai_conversation_line_definition.definition,
+		&ai_conversation_status_definition.definition,
+		&ai_link_activation_definition.definition,
+		&ai_berserk_definition.definition,
+		&ai_set_team_definition.definition,
+		&ai_allow_charge_definition.definition,
+		&ai_allow_dormant_definition.definition,
+		&ai_allegiance_broken_definition.definition,
+		&camera_control_definition.definition,
+		&camera_set_definition.definition,
+		&camera_set_relative_definition.definition,
+		&camera_set_animation_definition.definition,
+		&camera_set_first_person_definition.definition,
+		&camera_set_dead_definition.definition,
+		&camera_time_definition,
+		&debug_camera_load_definition,
+		&debug_camera_save_definition,
+		&game_speed_definition.definition,
+		&game_time_definition,
+		&game_variant_definition.definition,
+		&game_difficulty_get_definition,
+		&game_difficulty_get_real_definition,
+		&map_reset_definition,
+		&map_name_definition.definition,
+		&multiplayer_map_name_definition.definition,
+		&game_difficulty_set_definition.definition,
+		&crash_definition.definition,
+		&switch_bsp_definition.definition,
+		&structure_bsp_index_definition,
+		&version_definition,
+		&playback_definition,
+		&texture_cache_flush_definition,
+		&sound_cache_flush_definition,
+		&debug_memory_definition,
+		&debug_memory_by_file_definition,
+		&debug_memory_for_file_definition.definition,
+		&debug_tags_definition,
+		&profile_reset_definition,
+		&profile_dump_definition.definition,
+		&profile_activate_definition.definition,
+		&profile_deactivate_definition.definition,
+		&profile_graph_toggle_definition.definition,
 		&hs_debug_pvs_definition.definition,
 		&hs_radiosity_start_definition,
 		&hs_radiosity_save_definition,
 		&hs_radiosity_debug_point_definition,
-		&hs_ai_definition.definition,
-		&hs_ai_dialogue_triggers_definition.definition,
-		&hs_ai_grenades_definition.definition,
-		&hs_ai_lines_definition,
-		&hs_ai_debug_sound_point_set_definition,
-		&hs_ai_debug_vocalize_definition.definition,
-		&hs_ai_debug_teleport_to_definition.definition,
-		&hs_ai_debug_speak_definition.definition,
-		&hs_ai_debug_speak_list_definition.definition,
-		&hs_fade_in_definition.definition,
-		&hs_fade_out_definition.definition,
-		&hs_cinematic_start_definition,
-		&hs_cinematic_stop_definition,
-		&hs_cinematic_skip_start_internal_definition,
-		&hs_cinematic_skip_stop_internal_definition,
-		&hs_cinematic_show_letterbox_definition.definition,
-		&hs_cinematic_set_title_definition.definition,
-		&hs_cinematic_set_title_delayed_definition.definition,
-		&hs_cinematic_suppress_bsp_object_creation_definition.definition,
-		&hs_attract_mode_start_definition,
-		&hs_game_won_definition,
-		&hs_game_lost_definition,
-		&hs_game_safe_to_save_definition,
-		&hs_game_all_quiet_definition,
-		&hs_game_safe_to_speak_definition,
-		&hs_game_is_cooperative_definition,
-		&hs_game_save_definition,
-		&hs_game_save_cancel_definition,
-		&hs_game_save_no_timeout_definition,
-		&hs_game_save_totally_unsafe_definition,
-		&hs_game_saving_definition,
-		&hs_game_revert_definition,
-		&hs_game_reverted_definition,
-		&hs_core_save_definition,
-		&hs_core_save_name_definition.definition,
-		&hs_core_load_definition,
-		&hs_core_load_at_startup_definition,
-		&hs_core_load_name_definition.definition,
-		&hs_core_load_name_at_startup_definition.definition,
-		&hs_game_skip_ticks_definition.definition,
-		&hs_sound_impulse_start_definition.definition,
-		&hs_sound_impulse_time_definition.definition,
-		&hs_sound_impulse_stop_definition.definition,
-		&hs_sound_looping_predict_definition.definition,
-		&hs_sound_looping_start_definition.definition,
-		&hs_sound_looping_stop_definition.definition,
-		&hs_sound_looping_set_scale_definition.definition,
-		&hs_sound_looping_set_alternate_definition.definition,
-		&hs_debug_sounds_enable_definition.definition,
-		&hs_debug_sounds_distances_definition.definition,
-		&hs_debug_sounds_wet_definition.definition,
-		&hs_sound_enable_definition.definition,
-		&hs_sound_class_set_gain_definition.definition,
-		&hs_vehicle_hover_definition.definition,
-		&hs_players_unzoom_all_definition,
-		&hs_player_enable_input_definition.definition,
-		&hs_player_camera_control_definition.definition,
-		&hs_player_action_test_reset_definition,
-		&hs_player_action_test_jump_definition,
-		&hs_player_action_test_primary_trigger_definition,
-		&hs_player_action_test_grenade_trigger_definition,
-		&hs_player_action_test_zoom_definition,
-		&hs_player_action_test_action_definition,
-		&hs_player_action_test_accept_definition,
-		&hs_player_action_test_back_definition,
-		&hs_player_action_test_look_relative_up_definition,
-		&hs_player_action_test_look_relative_down_definition,
-		&hs_player_action_test_look_relative_left_definition,
-		&hs_player_action_test_look_relative_right_definition,
-		&hs_player_action_test_look_relative_all_directions_definition,
-		&hs_player_action_test_move_relative_all_directions_definition,
-		&hs_player_add_equipment_definition.definition,
+		&ai_definition.definition,
+		&ai_dialogue_triggers_definition.definition,
+		&ai_grenades_definition.definition,
+		&ai_lines_definition,
+		&ai_debug_sound_point_set_definition,
+		&ai_debug_vocalize_definition.definition,
+		&ai_debug_teleport_to_definition.definition,
+		&ai_debug_speak_definition.definition,
+		&ai_debug_speak_list_definition.definition,
+		&fade_in_definition.definition,
+		&fade_out_definition.definition,
+		&cinematic_start_definition,
+		&cinematic_stop_definition,
+		&cinematic_skip_start_internal_definition,
+		&cinematic_skip_stop_internal_definition,
+		&cinematic_show_letterbox_definition.definition,
+		&cinematic_set_title_definition.definition,
+		&cinematic_set_title_delayed_definition.definition,
+		&cinematic_suppress_bsp_object_creation_definition.definition,
+		&attract_mode_start_definition,
+		&game_won_definition,
+		&game_lost_definition,
+		&game_safe_to_save_definition,
+		&game_all_quiet_definition,
+		&game_safe_to_speak_definition,
+		&game_is_cooperative_definition,
+		&game_save_definition,
+		&game_save_cancel_definition,
+		&game_save_no_timeout_definition,
+		&game_save_totally_unsafe_definition,
+		&game_saving_definition,
+		&game_revert_definition,
+		&game_reverted_definition,
+		&core_save_definition,
+		&core_save_name_definition.definition,
+		&core_load_definition,
+		&core_load_at_startup_definition,
+		&core_load_name_definition.definition,
+		&core_load_name_at_startup_definition.definition,
+		&game_skip_ticks_definition.definition,
+		&sound_impulse_start_definition.definition,
+		&sound_impulse_time_definition.definition,
+		&sound_impulse_stop_definition.definition,
+		&sound_looping_predict_definition.definition,
+		&sound_looping_start_definition.definition,
+		&sound_looping_stop_definition.definition,
+		&sound_looping_set_scale_definition.definition,
+		&sound_looping_set_alternate_definition.definition,
+		&debug_sounds_enable_definition.definition,
+		&debug_sounds_distances_definition.definition,
+		&debug_sounds_wet_definition.definition,
+		&sound_enable_definition.definition,
+		&sound_class_set_gain_definition.definition,
+		&vehicle_hover_definition.definition,
+		&players_unzoom_all_definition,
+		&player_enable_input_definition.definition,
+		&player_camera_control_definition.definition,
+		&player_action_test_reset_definition,
+		&player_action_test_jump_definition,
+		&player_action_test_primary_trigger_definition,
+		&player_action_test_grenade_trigger_definition,
+		&player_action_test_zoom_definition,
+		&player_action_test_action_definition,
+		&player_action_test_accept_definition,
+		&player_action_test_back_definition,
+		&player_action_test_look_relative_up_definition,
+		&player_action_test_look_relative_down_definition,
+		&player_action_test_look_relative_left_definition,
+		&player_action_test_look_relative_right_definition,
+		&player_action_test_look_relative_all_directions_definition,
+		&player_action_test_move_relative_all_directions_definition,
+		&player_add_equipment_definition.definition,
 		&hs_debug_teleport_player_definition.definition,
-		&hs_show_hud_definition.definition,
-		&hs_show_hud_help_text_definition.definition,
-		&hs_enable_hud_help_flash_definition.definition,
-		&hs_hud_help_flash_restart_definition,
-		&hs_activate_nav_point_flag_definition.definition,
-		&hs_activate_nav_point_object_definition.definition,
-		&hs_activate_team_nav_point_flag_definition.definition,
-		&hs_activate_team_nav_point_object_definition.definition,
-		&hs_deactivate_nav_point_flag_definition.definition,
-		&hs_deactivate_nav_point_object_definition.definition,
-		&hs_deactivate_team_nav_point_flag_definition.definition,
-		&hs_deactivate_team_nav_point_object_definition.definition,
-		&hs_cls_definition,
-		&hs_error_overflow_suppression_definition.definition,
-		&hs_structure_lens_flares_place_definition,
-		&hs_player_effect_set_max_translation_definition.definition,
-		&hs_player_effect_set_max_rotation_definition.definition,
+		&show_hud_definition.definition,
+		&show_hud_help_text_definition.definition,
+		&enable_hud_help_flash_definition.definition,
+		&hud_help_flash_restart_definition,
+		&activate_nav_point_flag_definition.definition,
+		&activate_nav_point_object_definition.definition,
+		&activate_team_nav_point_flag_definition.definition,
+		&activate_team_nav_point_object_definition.definition,
+		&deactivate_nav_point_flag_definition.definition,
+		&deactivate_nav_point_object_definition.definition,
+		&deactivate_team_nav_point_flag_definition.definition,
+		&deactivate_team_nav_point_object_definition.definition,
+		&cls_definition,
+		&error_overflow_suppression_definition.definition,
+		&structure_lens_flares_place_definition,
+		&player_effect_set_max_translation_definition.definition,
+		&player_effect_set_max_rotation_definition.definition,
 		&hs_player_effect_set_max_rumble_definition.definition,
-		&hs_player_effect_start_definition.definition,
-		&hs_player_effect_stop_definition.definition,
-		&hs_hud_show_health_definition.definition,
-		&hs_hud_blink_health_definition.definition,
-		&hs_hud_show_shield_definition.definition,
-		&hs_hud_blink_shield_definition.definition,
-		&hs_hud_show_motion_sensor_definition.definition,
-		&hs_hud_blink_motion_sensor_definition.definition,
-		&hs_hud_show_crosshair_definition.definition,
-		&hs_hud_clear_messages_definition,
-		&hs_hud_set_help_text_definition.definition,
-		&hs_hud_set_objective_text_definition.definition,
-		&hs_hud_set_timer_time_definition.definition,
-		&hs_hud_set_timer_warning_time_definition.definition,
-		&hs_hud_set_timer_position_definition.definition,
-		&hs_show_hud_timer_definition.definition,
-		&hs_pause_hud_timer_definition.definition,
-		&hs_hud_get_timer_ticks_definition,
-		&hs_time_code_show_definition.definition,
-		&hs_time_code_start_definition.definition,
-		&hs_time_code_reset_definition,
-		&hs_rasterizer_decals_flush_definition,
-		&hs_rasterizer_fps_accumulate_definition,
-		&hs_rasterizer_model_ambient_reflection_tint_definition.definition,
-		&hs_rasterizer_lights_reset_for_new_map_definition,
-		&hs_script_screen_effect_set_value_definition.definition,
-		&hs_cinematic_screen_effect_start_definition.definition,
-		&hs_cinematic_screen_effect_set_convolution_definition.definition,
-		&hs_cinematic_screen_effect_set_filter_definition.definition,
-		&hs_cinematic_screen_effect_set_filter_desaturation_tint_definition.definition,
-		&hs_cinematic_screen_effect_set_video_definition.definition,
-		&hs_cinematic_screen_effect_stop_definition,
-		&hs_cinematic_set_near_clip_distance_definition.definition,
+		&player_effect_start_definition.definition,
+		&player_effect_stop_definition.definition,
+		&hud_show_health_definition.definition,
+		&hud_blink_health_definition.definition,
+		&hud_show_shield_definition.definition,
+		&hud_blink_shield_definition.definition,
+		&hud_show_motion_sensor_definition.definition,
+		&hud_blink_motion_sensor_definition.definition,
+		&hud_show_crosshair_definition.definition,
+		&hud_clear_messages_definition,
+		&hud_set_help_text_definition.definition,
+		&hud_set_objective_text_definition.definition,
+		&hud_set_timer_time_definition.definition,
+		&hud_set_timer_warning_time_definition.definition,
+		&hud_set_timer_position_definition.definition,
+		&show_hud_timer_definition.definition,
+		&pause_hud_timer_definition.definition,
+		&hud_get_timer_ticks_definition,
+		&time_code_show_definition.definition,
+		&time_code_start_definition.definition,
+		&time_code_reset_definition,
+		&rasterizer_decals_flush_definition,
+		&rasterizer_fps_accumulate_definition,
+		&rasterizer_model_ambient_reflection_tint_definition.definition,
+		&rasterizer_lights_reset_for_new_map_definition,
+		&script_screen_effect_set_value_definition.definition,
+		&cinematic_screen_effect_start_definition.definition,
+		&cinematic_screen_effect_set_convolution_definition.definition,
+		&cinematic_screen_effect_set_filter_definition.definition,
+		&cinematic_screen_effect_set_filter_desaturation_tint_definition.definition,
+		&cinematic_screen_effect_set_video_definition.definition,
+		&cinematic_screen_effect_stop_definition,
+		&cinematic_set_near_clip_distance_definition.definition,
 		&hs_enumerate_memory_units_definition,
-		&hs_delete_save_game_files_definition,
-		&hs_fast_setup_network_server_definition,
-		&hs_profile_unlock_solo_levels_definition,
-		&hs_player0_look_invert_pitch_definition.definition,
-		&hs_player0_look_pitch_is_inverted_definition,
-		&hs_player0_joystick_set_is_normal_definition,
-		&hs_ui_widget_show_path_definition.definition,
-		&hs_display_scenario_help_definition.definition,
+		&delete_save_game_files_definition,
+		&fast_setup_network_server_definition,
+		&profile_unlock_solo_levels_definition,
+		&player0_look_invert_pitch_definition.definition,
+		&player0_look_pitch_is_inverted_definition,
+		&player0_joystick_set_is_normal_definition,
+		&ui_widget_show_path_definition.definition,
+		&display_scenario_help_definition.definition,
 		&hs_network_game_start_now_definition,
-		&hs_xbox_set_machine_name_definition.definition,
+		&xbox_set_machine_name_definition.definition,
 	},
 	{
 		"hs_update",
@@ -14031,7 +13978,7 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS_WITH_REAL(
 	hs_sound_set_gain_evaluate,
 	union hs_evaluation_argument,
 	1,
-	hs_sound_set_gain(arguments[0].long_value, real_argument))
+	hs_sound_set_gain(arguments[0].string_value, real_argument))
 static void objects_scripting_set_scale_evaluate(
 	short function_index,
 	long thread_index,
@@ -14209,9 +14156,9 @@ static void player_effect_screen_fade_in_evaluate(
 	long thread_index,
 	boolean initialize)
 {
-	struct hs_arguments_long_real_real_word const *arguments;
+	struct hs_arguments_real_real_real_word const *arguments;
 
-	arguments = (struct hs_arguments_long_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	arguments = (struct hs_arguments_real_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
 	if (arguments)
 	{
 		double value1 = arguments->value1;
@@ -14228,9 +14175,9 @@ static void player_effect_screen_fade_out_evaluate(
 	long thread_index,
 	boolean initialize)
 {
-	struct hs_arguments_long_real_real_word const *arguments;
+	struct hs_arguments_real_real_real_word const *arguments;
 
-	arguments = (struct hs_arguments_long_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	arguments = (struct hs_arguments_real_real_real_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
 	if (arguments)
 	{
 		double value1 = arguments->value1;
@@ -14508,7 +14455,20 @@ static void hs_object_list_get_element_evaluate(
 	return;
 }
 
-HS_EVALUATE_REAL_FROM_LONG(hs_sound_get_gain_evaluate, hs_sound_get_gain)
+static void hs_sound_get_gain_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		union hs_real_value result;
+		result.real_value = hs_sound_get_gain(arguments[0].string_value);
+		hs_return(thread_index, result.long_value);
+	}
+	return;
+}
 HS_EVALUATE_REAL_FROM_LONG(unit_scripting_get_health_evaluate, unit_scripting_get_health)
 HS_EVALUATE_REAL_FROM_LONG(unit_scripting_get_shield_evaluate, unit_scripting_get_shield)
 HS_EVALUATE_REAL_FROM_LONG(device_get_power_evaluate, device_get_power)
@@ -14519,12 +14479,12 @@ HS_EVALUATE_REAL_FROM_LONG(ai_scripting_strength_evaluate, ai_scripting_strength
 HS_EVALUATE_VOID_LONG(ai_scripting_maneuver_evaluate, ai_scripting_maneuver)
 HS_EVALUATE_VOID_LONG_BOOLEAN(ai_scripting_maneuver_enable_evaluate, ai_scripting_maneuver_enable)
 HS_EVALUATE_VOID_LONG_LONG(ai_scripting_migrate_evaluate, ai_scripting_migrate)
-HS_EVALUATE_VOID_LONG_LONG_LONG(ai_scripting_migrate_and_speak_evaluate, ai_scripting_migrate_and_speak)
+HS_EVALUATE_VOID_LONG_LONG_STRING(ai_scripting_migrate_and_speak_evaluate, ai_scripting_migrate_and_speak)
 HS_EVALUATE_VOID_LONG_LONG(ai_scripting_migrate_by_unit_evaluate, ai_scripting_migrate_by_unit)
 HS_EVALUATE_VOID_SHORT_SHORT(ai_scripting_allegiance_evaluate, ai_scripting_allegiance)
 HS_EVALUATE_VOID_SHORT_SHORT(ai_scripting_allegiance_remove_evaluate, ai_scripting_allegiance_remove)
-HS_EVALUATE_VOID_LONG_LONG_LONG(ai_scripting_go_to_vehicle_evaluate, ai_scripting_go_to_vehicle)
-HS_EVALUATE_VOID_LONG_LONG_LONG(ai_scripting_go_to_vehicle_override_evaluate, ai_scripting_go_to_vehicle_override)
+HS_EVALUATE_VOID_LONG_LONG_STRING(ai_scripting_go_to_vehicle_evaluate, ai_scripting_go_to_vehicle)
+HS_EVALUATE_VOID_LONG_LONG_STRING(ai_scripting_go_to_vehicle_override_evaluate, ai_scripting_go_to_vehicle_override)
 HS_EVALUATE_VOID_LONG(ai_scripting_exit_vehicle_evaluate, ai_scripting_exit_vehicle)
 HS_EVALUATE_VOID_LONG_BOOLEAN(ai_scripting_braindead_evaluate, ai_scripting_braindead)
 HS_EVALUATE_VOID_LONG_BOOLEAN(ai_scripting_braindead_by_unit_evaluate, ai_scripting_braindead_by_unit)
@@ -14567,7 +14527,7 @@ HS_EVALUATE_VOID_LONG_BOOLEAN(ai_scripting_allow_dormant_evaluate, ai_scripting_
 HS_EVALUATE_VOID_FROM_ARGUMENTS(director_script_camera_evaluate, struct hs_arguments_boolean, (director_script_camera(arguments->value)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_absolute_evaluate, struct hs_arguments_short_word, (scripted_camera_set_absolute(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_evaluate, struct hs_arguments_word_word_long, (scripted_camera_set(arguments->value0, arguments->value1, arguments->value2)))
-HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_animation_evaluate, struct hs_arguments_long_long, (scripted_camera_set_animation(arguments->value0, arguments->value1)))
+HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_camera_set_animation_evaluate, struct hs_arguments_long_string, (scripted_camera_set_animation(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_LONG(scripted_camera_set_first_person_evaluate, scripted_camera_set_first_person)
 HS_EVALUATE_VOID_LONG(scripted_camera_set_dead_evaluate, scripted_camera_set_dead)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(game_time_set_speed_evaluate, struct hs_arguments_real, (game_time_set_speed(arguments->value)))
@@ -14599,7 +14559,19 @@ HS_EVALUATE_VOID_STRING(profile_sections_activate_evaluate, profile_sections_act
 HS_EVALUATE_VOID_STRING(profile_sections_deactivate_evaluate, profile_sections_deactivate)
 HS_EVALUATE_VOID_STRING(profile_graph_toggle_evaluate, profile_graph_toggle)
 HS_EVALUATE_VOID_BOOLEAN(debug_pvs_evaluate, debug_pvs)
-HS_EVALUATE_VOID_LONG_STRING(ai_debug_vocalize_evaluate, ai_debug_vocalize)
+static void ai_debug_vocalize_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		ai_debug_vocalize(arguments[0].string_value, arguments[1].string_value);
+		hs_return(thread_index, 0);
+	}
+	return;
+}
 HS_EVALUATE_VOID_LONG(ai_debug_teleport_to_evaluate, ai_debug_teleport_to)
 HS_EVALUATE_VOID_STRING(ai_debug_speak_evaluate, ai_debug_speak)
 HS_EVALUATE_VOID_STRING(ai_debug_speak_list_evaluate, ai_debug_speak_list)
@@ -14614,7 +14586,19 @@ HS_EVALUATE_VOID_LONG(scripted_sound_stop_evaluate, scripted_sound_stop)
 HS_EVALUATE_VOID_LONG(scripted_foley_predict_evaluate, scripted_foley_predict)
 HS_EVALUATE_VOID_LONG(scripted_looping_sound_stop_evaluate, scripted_looping_sound_stop)
 HS_EVALUATE_VOID_LONG_BOOLEAN(scripted_looping_sound_set_alternate_evaluate, scripted_looping_sound_set_alternate)
-HS_EVALUATE_VOID_LONG_BOOLEAN(debug_sound_classes_enable_evaluate, debug_sound_classes_enable)
+static void debug_sound_classes_enable_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	union hs_evaluation_argument *arguments = (union hs_evaluation_argument *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		debug_sound_classes_enable(arguments[0].string_value, arguments[1].boolean_value);
+		hs_return(thread_index, 0);
+	}
+	return;
+}
 HS_EVALUATE_VOID_BOOLEAN(sound_enable_evaluate, sound_enable)
 HS_EVALUATE_VOID_LONG_BOOLEAN(vehicle_hover_evaluate, vehicle_hover)
 HS_EVALUATE_VOID_FROM_ARGUMENTS(scripted_hud_set_flashing_state_evaluate, struct hs_arguments_boolean, (scripted_hud_set_flashing_state(arguments->value)))

@@ -69,7 +69,7 @@ short convex_polygon3d_clip_to_plane(
 	real epsilon,
 	boolean keep_degenerate);
 
-long bsp3d_clip_polygon_to_leaves_recursive(
+static long bsp3d_clip_polygon_to_leaves_recursive(
 	struct bsp3d const *bsp,
 	long node_index,
 	long plane_designator,
@@ -227,7 +227,7 @@ long bsp3d_clip_polygon_to_leaves(
 
 /* ---------- private code */
 
-long bsp3d_clip_polygon_to_leaves_recursive(
+static long bsp3d_clip_polygon_to_leaves_recursive(
 	struct bsp3d const *bsp,
 	long node_index,
 	long plane_designator,

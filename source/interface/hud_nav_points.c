@@ -235,12 +235,6 @@ real_point3d *game_engine_get_goal_position(
 	real_point3d *position,
 	short goal_index);
 
-void custom_render_nav_point(
-	short local_player_index,
-	real_point3d const *position,
-	short nav_index,
-	short render_type);
-
 void game_engine_render_nav_points(
 	short local_player_index);
 

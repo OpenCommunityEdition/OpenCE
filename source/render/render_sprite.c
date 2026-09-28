@@ -67,7 +67,7 @@ symbols in this file:
 002A042C 001f:
 	??_C@_0BP@HLIODOFJ@untransformed_axis_of_rotation?$AA@ (0000)
 0030E778 0018:
-	_data_0030e778 (0000)
+	_global_sprite_render_orientations_enum_strings (0000)
 	_global_sprite_render_orientations_enum (000c)
 004C0518 0001:
 	_bss_004c0518 (0000)
@@ -187,7 +187,9 @@ static void build_sprite_compute_basis(
 extern boolean debug_sprites;
 extern struct build_sprite_globals_data build_sprite_globals;
 
-static char *sprite_render_orientation_names[NUMBER_OF_BUILD_SPRITE_ORIENTATIONS] =
+/* name from the 2003 PC demo PDB and the HCEX PDB (file static char *[3]); January's three pointers
+ * name the same strings in the same order, followed by the enum definition at +0xC as in the demo */
+static char *global_sprite_render_orientations_enum_strings[NUMBER_OF_BUILD_SPRITE_ORIENTATIONS] =
 {
 	"screen facing",
 	"parallel to direction",
@@ -197,7 +199,7 @@ static char *sprite_render_orientation_names[NUMBER_OF_BUILD_SPRITE_ORIENTATIONS
 struct tag_enum_definition global_sprite_render_orientations_enum =
 {
 	NUMBER_OF_BUILD_SPRITE_ORIENTATIONS,
-	sprite_render_orientation_names,
+	global_sprite_render_orientations_enum_strings,
 	NULL,
 };
 

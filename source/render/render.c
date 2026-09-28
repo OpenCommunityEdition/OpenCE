@@ -76,11 +76,13 @@ symbols in this file:
 #include "game.h"
 #include "game_engine.h"
 #include "interface/first_person_weapons.h"
+#include "interface/interface.h"
 #include "editor_stubs.h"
 #include "render_debug.h"
 #include "objects/object_lights_rendering.h"
 #include "effects/particle_systems.h"
 #include "effects/weather_particle_systems.h"
+#include "main/main.h"
 
 /* ---------- constants */
 
@@ -144,15 +146,11 @@ void render_object_shadows(
 	void);
 void rasterizer_transparent_geometry_stop(
 	void);
-void interface_draw_fullscreen_overlays(
-	void);
 void rasterizer_debug_draw(
 	void);
 void render_debug(
 	void);
 void progress_bar_eachframe(
-	void);
-short main_get_window_count(
 	void);
 
 /* ---------- globals */
@@ -162,7 +160,6 @@ struct render_globals render;
 static boolean render_invalid_fog_warning_displayed;
 
 extern short global_screenshot_count;
-extern short global_screenshot_size;
 
 boolean render_contrails_enabled = TRUE;
 boolean render_particles_enabled = TRUE;

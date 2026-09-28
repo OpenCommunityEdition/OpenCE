@@ -295,11 +295,11 @@ static void draw_initial_layer(
 	real_rgb_color const *color,
 	real progress);
 
-void do_convoluation_coords(
+static void do_convoluation_coords(
 	real x,
 	real y);
 
-void draw_fade_layer(
+static void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha);
@@ -338,7 +338,7 @@ extern struct pixel_shader_definition blur_shader;
 extern struct pixel_shader_definition regular_shader;
 extern unsigned long current_time;
 
-boolean progress_bar_rendering_enabled= TRUE;
+static boolean progress_bar_rendering_enabled= TRUE;
 
 /* the compressed monk chant played behind the loading screen */
 byte compressed_monk_tone[18396]=
@@ -1953,7 +1953,7 @@ static void draw_initial_layer(
 	return;
 }
 
-void do_convoluation_coords(
+static void do_convoluation_coords(
 	real x,
 	real y)
 {
@@ -1965,7 +1965,7 @@ void do_convoluation_coords(
 	return;
 }
 
-void draw_fade_layer(
+static void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha)

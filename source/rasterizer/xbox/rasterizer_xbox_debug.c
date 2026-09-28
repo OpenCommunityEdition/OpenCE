@@ -65,7 +65,6 @@ struct pixel_shader_definition
 /* ---------- globals */
 
 extern struct rasterizer_xbox_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 

@@ -377,10 +377,10 @@ typedef char tag_group_size_assert[sizeof(struct tag_group) == 0x60 ? 1 : -1];
 
 /* ---------- prototypes */
 
-boolean postprocess_bitmap(
+static boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing);
-void delete_bitmap(
+static void delete_bitmap(
 	struct tag_block *block,
 	long element_index);
 static boolean postprocess_bitmap_group(
@@ -987,14 +987,14 @@ short bitmap_group_add_bitmap(
 
 /* ---------- private code */
 
-boolean postprocess_bitmap(
+static boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing)
 {
 	return TRUE;
 }
 
-void delete_bitmap(
+static void delete_bitmap(
 	struct tag_block *block,
 	long element_index)
 {
