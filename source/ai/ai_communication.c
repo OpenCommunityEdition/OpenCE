@@ -2315,10 +2315,11 @@ static real ai_communication_actor_talk_weight(
 
 		if (has_target)
 		{
-			boolean cause_matches;
 			boolean subject_matches;
+			boolean cause_matches;
 
-			cause_matches = subject_matches = FALSE;
+			subject_matches = FALSE;
+			cause_matches = FALSE;
 			if (subject_unit_index != NONE)
 			{
 				if (actor->meta.unit_index == subject_unit_index)
@@ -2350,28 +2351,35 @@ static real ai_communication_actor_talk_weight(
 						{
 							subject_matches = FALSE;
 						}
-						else if ((prop->state >=
-									_prop_state_becoming_unacknowledged &&
-								 prop->state <= _prop_state_acknowledged) ||
-								(!prop->enemy &&
-									(communication_type != 0 ||
-									 prop->audibility >= _ai_sound_volume_loud ||
-									 prop->ineffability >= 2 ||
-									 actor_visibility_at_point(
-										actor_index,
-										&actor->input.position,
-										&prop->head_position,
-										prop->flashlight ?
-											_prop_lighting_bright :
-											prop->lighting,
-										(word)prop->line_of_sight,
-										TRUE,
-										FALSE,
-										actor_get_perception_knowledge(
-											actor_index,
-											prop_index)) >= 2)))
+						else if (prop->state >= _prop_state_becoming_unacknowledged &&
+							prop->state <= _prop_state_acknowledged)
 						{
 							subject_matches = TRUE;
+						}
+						else if (!prop->enemy)
+						{
+							if (communication_type != 0)
+							{
+								subject_matches = TRUE;
+							}
+							else if (prop->audibility >= _ai_sound_volume_loud ||
+								prop->ineffability >= 2 ||
+								actor_visibility_at_point(
+									actor_index,
+									&actor->input.position,
+									&prop->head_position,
+									prop->flashlight ?
+										_prop_lighting_bright :
+										prop->lighting,
+									(word)prop->line_of_sight,
+									TRUE,
+									FALSE,
+									actor_get_perception_knowledge(
+										actor_index,
+										prop_index)) >= 2)
+							{
+								subject_matches = TRUE;
+							}
 						}
 						if (subject_matches)
 						{
@@ -2412,10 +2420,12 @@ static real ai_communication_actor_talk_weight(
 						{
 							cause_matches = FALSE;
 						}
-						else if ((prop->state >=
-									_prop_state_becoming_unacknowledged &&
-								 prop->state <= _prop_state_acknowledged) ||
-								!prop->enemy)
+						else if (prop->state >= _prop_state_becoming_unacknowledged &&
+							prop->state <= _prop_state_acknowledged)
+						{
+							cause_matches = TRUE;
+						}
+						else if (!prop->enemy)
 						{
 							cause_matches = TRUE;
 						}
