@@ -144,10 +144,29 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 - **Taken at the tick.** The host takes a client's players' and vehicles'
   positions (the latest of each) at its next tick, not as each arrives.
 - **Fewer bytes.** Vectors travel in 16 bits a part, shields and health in
-  16 bits; players far from a client's own (25 and 60 world units) are sent
-  to it every second and third tick (any change of life or seat at once);
-  what a unit carries is sent when it changes (and once a second); the
-  objects at rest are sent round all of them, four a tick.
+  16 bits; what a unit carries is sent when it changes (and once a second);
+  the objects at rest are sent round all of them, four a tick; the players'
+  statistics when they change (with every kill, twice a second), with
+  sixteen more players' each time round them all.
+- **The players each client needs, when it needs them.** The host sends a
+  client every player's unit and input every tick when they are within 25
+  world units of the client's own players, every second tick within 60,
+  every third within 120, every fourth further off, and every sixth when no
+  cluster of the client's players' can see theirs (the map's potentially
+  visible set, which errs on the side of seeing: Halo's are coarse, and
+  most of a map sees most of it). None is ever left out. Whatever changes
+  what a client sees goes at once:
+  - a player's death, spawn or seat, and a player coming into sight;
+  - a player's input every tick while their buttons or weapon choices
+    change (the ticks it carries), so no jump, grenade or melee of theirs
+    is missed, even out of sight;
+  - a player a client's player aims at within 35 degrees at least every
+    second tick, and within 20 degrees through a scope every tick, so a
+    sniper sees a far player move as smoothly as a near one (as Ares
+    raises the priority of what a player zooms onto).
+
+  A client's own players' units go to it every tick, their input never (it
+  has its own).
 - **The round trip.** A client's input messages tell the host the latest
   host tick the client has had, which gives the host each client's round
   trip (smoothed as TCP smooths its own). The host keeps a second of where

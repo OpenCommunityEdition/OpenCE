@@ -14,8 +14,8 @@ rest as the host has it:
 - Every tick, a client sends the host its own players' input, each tick's
   buttons again with the next three ticks' (a press is lost only with four
   datagrams in a row), and the host takes each tick's buttons once. The
-  host sends every client every player's input as its tick ran it, the
-  same way, and the clients drive the other players with it
+  host sends every client the other players' input as its tick ran it, the
+  same way, and the clients drive those players with it
   (player_queues_new.c).
 - Every tick, a client sends the host where its own players' units are (it
   predicts them from its own input); the host takes that as they are,
@@ -26,9 +26,12 @@ rest as the host has it:
   killed it, which a client announces when its copy dies). A client binds,
   kills, seats and places its copies to match (it decides no deaths or
   spawns itself), and its own only when far off (a respawn, a teleport).
-  Players far from a client's own are sent to it less often.
-- Twice a second, and with every kill, the host sends every player's
-  statistics (kills, deaths, ...), which clients take as they are.
+  Players far from a client's own, or out of their sight, are sent to it
+  (their units and their input) less often, but at once when they come into
+  sight, and their input every tick while their buttons change.
+- Twice a second, and with every kill, the host sends the players'
+  statistics (kills, deaths, ...) that changed, and a few more round them
+  all, which clients take as they are.
 - Five times a second, the host sends the game type's state (the scores,
   the flags, the balls and the hill), which clients take as it is
   (game_engine_write_network_state).
@@ -51,6 +54,8 @@ machine (their datum identifiers need not be).
 #include "networking/network_game_globals.h"
 #include "objects/objects.h"
 #include "objects/damage.h"
+#include "scenario/scenario.h"
+#include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 #include "network_distributed.h"
 
@@ -74,6 +79,8 @@ void game_engine_read_network_state(byte const *buffer, long size);
 enum
 {
 	STATISTICS_INTERVAL_TICKS = 15,
+	/* the players' statistics sent each time unchanged, round them all */
+	STATISTICS_REFRESH_PLAYERS = 16,
 	GAME_STATE_INTERVAL_TICKS = 6,
 	MAXIMUM_GAME_STATE_SIZE = 0xF00,
 	MAXIMUM_UNIT_STATES_PER_MESSAGE = 64,
@@ -124,9 +131,24 @@ good, the host's player somewhere its own is not) */
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
 
 /* how far players are from a client's own (world units) before the host
-sends them to it every second tick, and every third */
+sends them to it (their units and their input) every second tick, every
+third, and every fourth; one no cluster of the client's players' can see
+(the map's potentially visible set) every sixth. The set errs on the side of
+seeing: a player comes into view in it before any line of sight does, and is
+sent at once when they do, as a player whose buttons have changed in the
+ticks their input carries is sent every tick. A player a client's player
+aims near is sent at least every second tick, and every tick through a
+scope (a sniper sees a far player as well as a near one, as Ares does).
+(Cosines of the half angles.) */
 #define NEAR_PLAYER_DISTANCE 25.0f
-#define FAR_PLAYER_DISTANCE 60.0f
+#define MIDDLE_PLAYER_DISTANCE 60.0f
+#define FAR_PLAYER_DISTANCE 120.0f
+#define AIMED_AT_COSINE 0.819f /* 35 degrees: on the screen */
+#define SCOPED_AT_COSINE 0.940f /* 20 degrees: in a scope's view, and round it */
+enum
+{
+	HIDDEN_PLAYER_PERIOD_TICKS = 6,
+};
 
 /* shields, health and the damage they show in 16 bits: 0 to 4 */
 #define VITALITY_SCALE 16384.0f
@@ -273,6 +295,14 @@ static struct
 	long vehicle_index;
 	short seat_index;
 } distributed_sent_units[MAXIMUM_TRACKED_PLAYERS];
+
+/* the host: whether each client's players could see each player last tick
+(one who comes into sight is sent at once) */
+static boolean distributed_seen[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_TRACKED_PLAYERS];
+/* the host: each player's statistics as last sent (only a change is sent,
+and a few players' each time whatever they are, round them all) */
+static unsigned long distributed_sent_statistics[MAXIMUM_TRACKED_PLAYERS];
+static short distributed_statistics_cursor;
 
 /* the latest tick of each kind of unreliable message had from each sender
 (a machine, or the host), NONE for none */
@@ -767,113 +797,6 @@ static void distributed_client_send_predictions(
 	}
 }
 
-/* (the host) every player's unit, to each client: all of them every tick
-but for those far from its own players (every second or third tick), and
-any whose life, seat or shields' state changed at once */
-static void distributed_host_send_unit_states(
-	void)
-{
-	static struct distributed_unit_state states[MAXIMUM_TRACKED_PLAYERS];
-	static boolean present[MAXIMUM_TRACKED_PLAYERS];
-	static boolean changed[MAXIMUM_TRACKED_PLAYERS];
-	static real_point3d origins[MAXIMUM_TRACKED_PLAYERS];
-	static boolean placed[MAXIMUM_TRACKED_PLAYERS];
-	struct distributed_unit_state_message message;
-	long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
-	short machine_count = distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
-	short limit = MIN(MAXIMUM_UNIT_STATES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_unit_state));
-	short player_index;
-	short machine_number;
-
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		struct player_datum *player = distributed_player(player_index);
-		struct distributed_unit_state *state = &states[player_index];
-		long unit_index;
-
-		present[player_index] = player != NULL;
-		placed[player_index] = FALSE;
-		if (!player)
-			continue;
-		distributed_state_from_player(player_index, state);
-		unit_index = distributed_living_unit(player);
-		if (unit_index != NONE)
-		{
-			object_get_origin(unit_index, &origins[player_index]);
-			placed[player_index] = TRUE;
-		}
-		changed[player_index] =
-			distributed_sent_units[player_index].flags != state->flags ||
-			distributed_sent_units[player_index].unit_index != state->unit_index ||
-			distributed_sent_units[player_index].vehicle_index != state->vehicle_index ||
-			distributed_sent_units[player_index].seat_index != state->seat_index;
-		distributed_sent_units[player_index].flags = state->flags;
-		distributed_sent_units[player_index].unit_index = state->unit_index;
-		distributed_sent_units[player_index].vehicle_index = state->vehicle_index;
-		distributed_sent_units[player_index].seat_index = state->seat_index;
-	}
-	for (machine_number = 0; machine_number < machine_count; machine_number++)
-	{
-		long machine_index = machine_indices[machine_number];
-		long *player_list = machine_get_player_list(machine_index);
-		real_point3d viewers[MAXIMUM_LOCAL_PLAYERS];
-		short viewer_count = 0;
-		short count = 0;
-		short index;
-
-		for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
-		{
-			short viewer_index = player_list[index] != NONE ?
-				(short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[index]) : NONE;
-
-			if (viewer_index >= 0 && viewer_index < MAXIMUM_TRACKED_PLAYERS && placed[viewer_index])
-				viewers[viewer_count++] = origins[viewer_index];
-		}
-		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-		{
-			boolean send;
-
-			if (!present[player_index])
-				continue;
-			send = changed[player_index] || !placed[player_index] || !viewer_count ||
-				distributed_machine_has_player(machine_index, player_index);
-			if (!send)
-			{
-				real nearest = -1.0f;
-				short period;
-
-				for (index = 0; index < viewer_count; index++)
-				{
-					real dx = origins[player_index].x - viewers[index].x;
-					real dy = origins[player_index].y - viewers[index].y;
-					real dz = origins[player_index].z - viewers[index].z;
-					real distance_squared = dx * dx + dy * dy + dz * dz;
-
-					if (nearest < 0.0f || distance_squared < nearest)
-						nearest = distance_squared;
-				}
-				period = nearest < NEAR_PLAYER_DISTANCE * NEAR_PLAYER_DISTANCE ? 1 :
-					nearest < FAR_PLAYER_DISTANCE * FAR_PLAYER_DISTANCE ? 2 : 3;
-				send = (game_time_get() + player_index) % period == 0;
-			}
-			if (!send)
-				continue;
-			message.states[count++] = states[player_index];
-			if (count == limit)
-			{
-				distributed_send_to_machine(machine_index, &message, _distributed_message_unit_states, count,
-					(word)(sizeof(message.header) + count * sizeof(struct distributed_unit_state)));
-				count = 0;
-			}
-		}
-		if (count)
-		{
-			distributed_send_to_machine(machine_index, &message, _distributed_message_unit_states, count,
-				(word)(sizeof(message.header) + count * sizeof(struct distributed_unit_state)));
-		}
-	}
-}
-
 /* (the host) a client's own players: the latest of each, taken at the next
 tick */
 static void distributed_handle_predictions(
@@ -1126,70 +1049,262 @@ static void distributed_handle_inputs(
 	}
 }
 
-/* (the host) every player's input as its last tick ran it, with the
-buttons of the ticks before it, to every client */
-static void distributed_host_send_actions(
+/* the cluster the object (or what it rides) is in, NONE for none */
+static short distributed_object_cluster(
+	long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+
+	while (object->object.parent_object_index != NONE)
+		object = object_get(object->object.parent_object_index);
+	return object->object.location.cluster_index;
+}
+
+/* the player's input as the host's tick ran it, in fewer bytes; whether
+their buttons or choices changed in the ticks it carries */
+static boolean distributed_relayed_action_from(
+	short player_index,
+	long update_number,
+	struct player_action const **recent,
+	short const *recent_counts,
+	struct distributed_relayed_action *relayed)
+{
+	struct player_action const *action = &recent[0][player_index];
+	real throttle_i = action->throttle.i > 1.0f ? 1.0f : action->throttle.i < -1.0f ? -1.0f : action->throttle.i;
+	real throttle_j = action->throttle.j > 1.0f ? 1.0f : action->throttle.j < -1.0f ? -1.0f : action->throttle.j;
+	real trigger = action->primary_trigger > 1.0f ? 1.0f : action->primary_trigger < 0.0f ? 0.0f :
+		action->primary_trigger;
+	boolean changed = FALSE;
+	short history;
+
+	csmemset(relayed, 0, sizeof(*relayed));
+	relayed->player_index = (byte)player_index;
+	relayed->update_number = update_number;
+	relayed->desired_weapon_index = (signed char)action->desired_weapon_index;
+	relayed->desired_grenade_index = (signed char)action->desired_grenade_index;
+	relayed->desired_zoom_level = (signed char)MIN(action->desired_zoom_level, 127);
+	for (history = 0; history < DISTRIBUTED_INPUT_HISTORY; history++)
+	{
+		struct player_action const *past = recent[history] && player_index < recent_counts[history] ?
+			&recent[history][player_index] : NULL;
+
+		relayed->control_flags[history] = past ? (unsigned short)past->control_flags : 0;
+		if (history > 0 && (!past || relayed->control_flags[history] != relayed->control_flags[history - 1] ||
+			past->desired_weapon_index != action->desired_weapon_index ||
+			past->desired_grenade_index != action->desired_grenade_index ||
+			past->desired_zoom_level != action->desired_zoom_level))
+		{
+			changed = TRUE;
+		}
+	}
+	relayed->yaw = distributed_angle_pack(action->desired_facing.yaw);
+	relayed->pitch = distributed_angle_pack(action->desired_facing.pitch);
+	relayed->throttle_i = (signed char)(long)floor(throttle_i * 127.0f + 0.5f);
+	relayed->throttle_j = (signed char)(long)floor(throttle_j * 127.0f + 0.5f);
+	relayed->primary_trigger = (byte)(long)floor(trigger * 255.0f + 0.5f);
+	return changed;
+}
+
+/* (the host) every player's unit, and their input as its last tick ran it
+(with the buttons of the ticks before it), to each client: those near the
+client's own players every tick, those further, or out of their sight, less
+often (NEAR_PLAYER_DISTANCE); whose life, seat or shields' state changed, or
+who came into sight, at once; whose buttons changed lately, their input
+every tick. A client's own players' units every tick, their input never
+(it has its own). */
+static void distributed_host_send_players(
 	void)
 {
+	static struct distributed_unit_state states[MAXIMUM_TRACKED_PLAYERS];
+	static struct distributed_relayed_action actions[MAXIMUM_TRACKED_PLAYERS];
+	static boolean present[MAXIMUM_TRACKED_PLAYERS];
+	static boolean changed[MAXIMUM_TRACKED_PLAYERS];
+	static boolean has_action[MAXIMUM_TRACKED_PLAYERS];
+	static boolean action_changed[MAXIMUM_TRACKED_PLAYERS];
+	static real_point3d origins[MAXIMUM_TRACKED_PLAYERS];
+	static short clusters[MAXIMUM_TRACKED_PLAYERS];
+	static boolean placed[MAXIMUM_TRACKED_PLAYERS];
+	struct distributed_unit_state_message state_message;
 	struct
 	{
 		struct distributed_message_header header;
 		struct distributed_relayed_action actions[MAXIMUM_UNIT_STATES_PER_MESSAGE];
-	} message;
-	short limit = MIN(MAXIMUM_UNIT_STATES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_relayed_action));
+	} action_message;
+	short state_limit = MIN(MAXIMUM_UNIT_STATES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_unit_state));
+	short action_limit = MIN(MAXIMUM_UNIT_STATES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_relayed_action));
+	long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	short machine_count = distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	short cluster_count = structure_bsp ? (short)structure_bsp->clusters.count : 0;
 	long update_number = update_server_ticked_update_number();
 	struct player_action const *recent[DISTRIBUTED_INPUT_HISTORY];
 	short recent_counts[DISTRIBUTED_INPUT_HISTORY];
+	short player_index;
+	short machine_number;
 	short history;
-	short action_index;
-	short count = 0;
 
-	if (update_number == NONE)
-		return;
 	for (history = 0; history < DISTRIBUTED_INPUT_HISTORY; history++)
-		recent[history] = update_server_update_actions(update_number - history, &recent_counts[history]);
-	if (!recent[0])
-		return;
-	for (action_index = 0; action_index < recent_counts[0] && action_index < MAXIMUM_TRACKED_PLAYERS; action_index++)
 	{
-		struct player_action const *action = &recent[0][action_index];
-		struct distributed_relayed_action *relayed = &message.actions[count];
-		real throttle_i = action->throttle.i > 1.0f ? 1.0f : action->throttle.i < -1.0f ? -1.0f : action->throttle.i;
-		real throttle_j = action->throttle.j > 1.0f ? 1.0f : action->throttle.j < -1.0f ? -1.0f : action->throttle.j;
-		real trigger = action->primary_trigger > 1.0f ? 1.0f : action->primary_trigger < 0.0f ? 0.0f :
-			action->primary_trigger;
+		recent[history] = update_number != NONE ?
+			update_server_update_actions(update_number - history, &recent_counts[history]) : NULL;
+	}
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		struct player_datum *player = distributed_player(player_index);
+		struct distributed_unit_state *state = &states[player_index];
+		long unit_index;
 
-		if (!distributed_player(action_index))
+		present[player_index] = player != NULL;
+		placed[player_index] = FALSE;
+		has_action[player_index] = FALSE;
+		if (!player)
 			continue;
-		csmemset(relayed, 0, sizeof(*relayed));
-		relayed->player_index = (byte)action_index;
-		relayed->update_number = update_number;
-		relayed->desired_weapon_index = (signed char)action->desired_weapon_index;
-		relayed->desired_grenade_index = (signed char)action->desired_grenade_index;
-		relayed->desired_zoom_level = (signed char)MIN(action->desired_zoom_level, 127);
-		for (history = 0; history < DISTRIBUTED_INPUT_HISTORY; history++)
+		distributed_state_from_player(player_index, state);
+		unit_index = distributed_living_unit(player);
+		if (unit_index != NONE)
 		{
-			relayed->control_flags[history] = recent[history] && action_index < recent_counts[history] ?
-				(unsigned short)recent[history][action_index].control_flags : 0;
+			object_get_origin(unit_index, &origins[player_index]);
+			clusters[player_index] = distributed_object_cluster(unit_index);
+			placed[player_index] = TRUE;
 		}
-		relayed->yaw = distributed_angle_pack(action->desired_facing.yaw);
-		relayed->pitch = distributed_angle_pack(action->desired_facing.pitch);
-		relayed->throttle_i = (signed char)(long)floor(throttle_i * 127.0f + 0.5f);
-		relayed->throttle_j = (signed char)(long)floor(throttle_j * 127.0f + 0.5f);
-		relayed->primary_trigger = (byte)(long)floor(trigger * 255.0f + 0.5f);
-		if (++count == limit)
+		changed[player_index] =
+			distributed_sent_units[player_index].flags != state->flags ||
+			distributed_sent_units[player_index].unit_index != state->unit_index ||
+			distributed_sent_units[player_index].vehicle_index != state->vehicle_index ||
+			distributed_sent_units[player_index].seat_index != state->seat_index;
+		distributed_sent_units[player_index].flags = state->flags;
+		distributed_sent_units[player_index].unit_index = state->unit_index;
+		distributed_sent_units[player_index].vehicle_index = state->vehicle_index;
+		distributed_sent_units[player_index].seat_index = state->seat_index;
+		if (recent[0] && player_index < recent_counts[0])
 		{
-			distributed_send(&message, _distributed_message_relayed_actions, count,
-				(word)(sizeof(message.header) + count * sizeof(struct distributed_relayed_action)),
-				_distributed_to_clients);
-			count = 0;
+			has_action[player_index] = TRUE;
+			action_changed[player_index] = distributed_relayed_action_from(player_index, update_number, recent,
+				recent_counts, &actions[player_index]);
 		}
 	}
-	if (count)
+	for (machine_number = 0; machine_number < machine_count; machine_number++)
 	{
-		distributed_send(&message, _distributed_message_relayed_actions, count,
-			(word)(sizeof(message.header) + count * sizeof(struct distributed_relayed_action)),
-			_distributed_to_clients);
+		long machine_index = machine_indices[machine_number];
+		long *player_list = machine_get_player_list(machine_index);
+		real_point3d viewers[MAXIMUM_LOCAL_PLAYERS];
+		short viewer_clusters[MAXIMUM_LOCAL_PLAYERS];
+		real_vector3d viewer_aims[MAXIMUM_LOCAL_PLAYERS];
+		boolean viewer_scoped[MAXIMUM_LOCAL_PLAYERS];
+		short viewer_count = 0;
+		short state_count = 0;
+		short action_count = 0;
+		short index;
+
+		for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+		{
+			short viewer_index = player_list[index] != NONE ?
+				(short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[index]) : NONE;
+
+			if (viewer_index >= 0 && viewer_index < MAXIMUM_TRACKED_PLAYERS && placed[viewer_index])
+			{
+				struct unit_datum *viewer = unit_get(distributed_living_unit(distributed_player(viewer_index)));
+
+				viewers[viewer_count] = origins[viewer_index];
+				viewer_clusters[viewer_count] = clusters[viewer_index];
+				viewer_aims[viewer_count] = viewer->unit.aiming_vector;
+				/* (NONE unzoomed: a char, which is unsigned on ARM) */
+				viewer_scoped[viewer_count++] = (signed char)viewer->unit.current_zoom_level >= 0;
+			}
+		}
+		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+		{
+			boolean own = present[player_index] && distributed_machine_has_player(machine_index, player_index);
+			boolean send = FALSE;
+			short period = 1;
+
+			if (!present[player_index])
+				continue;
+			/* (a client with no player in the world, dead, watches anyone) */
+			if (!own && placed[player_index] && viewer_count)
+			{
+				real nearest = -1.0f;
+				boolean visible = FALSE;
+				short aimed_period = HIDDEN_PLAYER_PERIOD_TICKS;
+
+				for (index = 0; index < viewer_count; index++)
+				{
+					real dx = origins[player_index].x - viewers[index].x;
+					real dy = origins[player_index].y - viewers[index].y;
+					real dz = origins[player_index].z - viewers[index].z;
+					real distance_squared = dx * dx + dy * dy + dz * dz;
+					short from = viewer_clusters[index];
+					short to = clusters[player_index];
+
+					if (nearest < 0.0f || distance_squared < nearest)
+						nearest = distance_squared;
+					/* (outside the map's clusters: in sight, to be safe) */
+					if (from < 0 || from >= cluster_count || to < 0 || to >= cluster_count || scenario_test_pvs(from, to))
+					{
+						real along = dx * viewer_aims[index].i + dy * viewer_aims[index].j + dz * viewer_aims[index].k;
+
+						visible = TRUE;
+						/* aimed near: the cosine of the angle off the aim, compared
+						squared (along / distance >= cosine) */
+						if (along > 0.0f && along * along >= SCOPED_AT_COSINE * SCOPED_AT_COSINE * distance_squared &&
+							viewer_scoped[index])
+						{
+							aimed_period = 1;
+						}
+						else if (along > 0.0f && along * along >= AIMED_AT_COSINE * AIMED_AT_COSINE * distance_squared)
+						{
+							aimed_period = MIN(aimed_period, 2);
+						}
+					}
+				}
+				period = !visible ? HIDDEN_PLAYER_PERIOD_TICKS :
+					nearest < NEAR_PLAYER_DISTANCE * NEAR_PLAYER_DISTANCE ? 1 :
+					nearest < MIDDLE_PLAYER_DISTANCE * MIDDLE_PLAYER_DISTANCE ? 2 :
+					nearest < FAR_PLAYER_DISTANCE * FAR_PLAYER_DISTANCE ? 3 : 4;
+				period = MIN(period, aimed_period);
+				/* (came into sight: at once) */
+				if (visible && !distributed_seen[machine_index][player_index])
+					send = TRUE;
+				distributed_seen[machine_index][player_index] = visible;
+			}
+			else
+			{
+				distributed_seen[machine_index][player_index] = TRUE;
+			}
+			send |= changed[player_index] || (game_time_get() + player_index) % period == 0;
+			if (send || own)
+			{
+				state_message.states[state_count++] = states[player_index];
+				if (state_count == state_limit)
+				{
+					distributed_send_to_machine(machine_index, &state_message, _distributed_message_unit_states,
+						state_count, (word)(sizeof(state_message.header) + state_count * sizeof(struct distributed_unit_state)));
+					state_count = 0;
+				}
+			}
+			if (!own && has_action[player_index] && (send || action_changed[player_index]))
+			{
+				action_message.actions[action_count++] = actions[player_index];
+				if (action_count == action_limit)
+				{
+					distributed_send_to_machine(machine_index, &action_message, _distributed_message_relayed_actions,
+						action_count,
+						(word)(sizeof(action_message.header) + action_count * sizeof(struct distributed_relayed_action)));
+					action_count = 0;
+				}
+			}
+		}
+		/* (the input before the units, as the host's tick had them) */
+		if (action_count)
+		{
+			distributed_send_to_machine(machine_index, &action_message, _distributed_message_relayed_actions,
+				action_count, (word)(sizeof(action_message.header) + action_count * sizeof(struct distributed_relayed_action)));
+		}
+		if (state_count)
+		{
+			distributed_send_to_machine(machine_index, &state_message, _distributed_message_unit_states, state_count,
+				(word)(sizeof(state_message.header) + state_count * sizeof(struct distributed_unit_state)));
+		}
 	}
 }
 
@@ -1354,18 +1469,49 @@ static void distributed_send_pickups(
 
 /* ---------- statistics */
 
+/* the bytes' checksum (FNV-1a) */
+static unsigned long distributed_checksum(
+	void const *data,
+	long size)
+{
+	byte const *bytes = (byte const *)data;
+	unsigned long checksum = 2166136261UL;
+	long index;
+
+	for (index = 0; index < size; index++)
+		checksum = (checksum ^ bytes[index]) * 16777619UL;
+	return checksum;
+}
+
+/* the players' statistics that changed since they were last sent, and
+STATISTICS_REFRESH_PLAYERS more whatever they are, round them all (a client
+that lost a change has it again within a few seconds) */
 static void distributed_send_statistics(
 	void)
 {
 	struct distributed_statistics_message message;
-	struct data_iterator iterator;
-	struct player_datum *player;
 	short count = 0;
+	short refreshed = 0;
+	short step;
 
-	data_iterator_new(&iterator, player_data);
-	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	for (step = 0; step < MAXIMUM_TRACKED_PLAYERS; step++)
 	{
-		message.players[count].player_index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		short player_index = (short)((distributed_statistics_cursor + step) % MAXIMUM_TRACKED_PLAYERS);
+		struct player_datum *player = distributed_player(player_index);
+		unsigned long checksum;
+
+		if (!player)
+			continue;
+		checksum = distributed_checksum(&player->statistics, sizeof(player->statistics));
+		if (checksum == distributed_sent_statistics[player_index])
+		{
+			if (refreshed >= STATISTICS_REFRESH_PLAYERS)
+				continue;
+			refreshed++;
+			distributed_statistics_cursor = (short)((player_index + 1) % MAXIMUM_TRACKED_PLAYERS);
+		}
+		distributed_sent_statistics[player_index] = checksum;
+		message.players[count].player_index = player_index;
 		message.players[count].pad = 0;
 		message.players[count].statistics = player->statistics;
 		count++;
@@ -1421,6 +1567,10 @@ void network_distributed_new_game(
 	csmemset(distributed_seat_disagreements, 0, sizeof(distributed_seat_disagreements));
 	csmemset(distributed_predictions, 0, sizeof(distributed_predictions));
 	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
+	csmemset(distributed_seen, 0, sizeof(distributed_seen));
+	/* (none sent: every player's the first time) */
+	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
+	distributed_statistics_cursor = 0;
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
 		distributed_sent_units[player_index].flags = 0;
@@ -1464,8 +1614,7 @@ void network_distributed_tick(
 		if (distributed_statistics_due || game_time_get() % STATISTICS_INTERVAL_TICKS == 0)
 			distributed_send_statistics();
 		distributed_statistics_due = FALSE;
-		distributed_host_send_actions();
-		distributed_host_send_unit_states();
+		distributed_host_send_players();
 		distributed_send_pickups();
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)
 			distributed_send_game_state();
