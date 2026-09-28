@@ -585,6 +585,9 @@ boolean cache_file_header_verify(
 		return FALSE;
 	}
 
+#ifndef HALO_LINUX
+	/* (the native builds try a cache file whatever build made it, NTSC's
+	01.10.12.2276 included) */
 	if (csstrcmp(header->build, "01.01.14.2342"))
 	{
 		if (fatal)
@@ -602,6 +605,7 @@ boolean cache_file_header_verify(
 
 		return FALSE;
 	}
+#endif
 
 	return TRUE;
 }
