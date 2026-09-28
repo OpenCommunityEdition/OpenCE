@@ -115,6 +115,7 @@ These settings are only for Android:
 | --- | --- |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
+| `debug.fence_stats` | Refer to "Measure the frame". |
 
 ## Internet play
 
@@ -205,7 +206,9 @@ and supplies the thread pointer and TLS.
 
 - Reserves the address space of the guest below 4 GB: the Xbox memory at
   `0x80000000`, the image, and pools for the memory of the guest
-  (`host/host_memory.c`).
+  (`host/host_memory.c`). The two fixed ranges are claimed first, before
+  the pools and SDL map anything; when a reservation fails, the log names
+  the mappings that are in the way.
 - Loads the image and fills its import table (`host/host_loader.c`).
 - Starts the `main` of the game and each guest thread on a stack in guest
   memory, because ILP32 code keeps stack addresses in 32-bit registers
@@ -292,12 +295,51 @@ assembly of the port is necessary:
 - Set `gl_debug = true` in `[debug]` of `config.toml`. The log then shows
   the OpenGL ES errors.
 
+## Measure the frame
+
+These settings exist to settle why the game slows down and stops on some
+devices, ahead of the larger change planned for it. See
+[docs/android_graphics_threading_investigation.md](../../docs/android_graphics_threading_investigation.md)
+for what the numbers decide. Both are off by default, and both cost two clock
+reads per draw when on, so turn them off once the question is answered.
+
+- Set `fence_stats = true` in `[debug]` of `config.toml`. Once a second the
+  log then shows how long each frame's wait for the GPU blocked, and how many
+  of those waits gave up:
+
+  ```text
+  fences: 58 frames, 58.0 fps; 55 already signalled, 3 waited, 0 TIMED OUT, 0 failed; blocked 4.2 ms of 1000.0 ms, worst 2.8 ms
+  uploads: 1420 calls, 1420 mapped, 604 KB; 0 RACE against a buffer the GPU is still reading
+  ```
+
+  `already signalled` means the GPU was ready and the frame cost the main
+  thread nothing. `waited` means it was a little behind. `TIMED OUT` means it
+  fell more than a second behind, and the renderer then went on to fill a
+  buffer the GPU may still have been reading; `RACE` counts those fills. A
+  `RACE` count above zero means the slowdown is a buffer race rather than the
+  GPU falling behind, and no amount of threading will fix it.
+
+- Set `gpu_stats = true` in `[debug]` of `config.toml` (as on Linux). The log
+  then shows where a frame's time went, once every 60 frames:
+
+  ```text
+  timing: 17.03 ms per frame (worst 21.40), 1.62 in Present (worst 4.10), 6.81 submitting draws, 8.60 elsewhere
+  ```
+
+  `Present` is where the game waits for the GPU. If it dominates the frame,
+  moving the GL calls to another thread is close to the whole fix. If
+  `submitting draws` dominates, the CPU is the wall and threading buys roughly
+  that share of the frame. `elsewhere` is the game's own work, which no
+  rendering change will touch.
+
 ## Limits
 
 - Bink video is not available. The game skips the movies.
 - The device must let the app reserve the fixed guest addresses, from
-  `0x80000000` to approximately `0x89000000`. If the addresses are not
-  available, the app shows a message.
+  `0x80000000` to approximately `0x89000000`. The game data is linked to
+  them (the tag cache of a map file sits at `0x803a6000`), so they cannot
+  move. Where the Java runtime maps a large object space over that range,
+  the app cannot run; the log names the mapping in the way.
 - The game does not accept touch input. Use a controller or a keyboard.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.

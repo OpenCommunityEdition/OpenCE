@@ -93,4 +93,8 @@ void *host_resolve_import(const char *name);
 
 void *host_gl_resolve(const char *name);
 
+/* debug.fence_stats: time and classify every frame fence wait, and count
+the buffer fills that race a wait which gave up (host_gl.c) */
+void host_gl_fence_stats(int enabled);
+
 #endif

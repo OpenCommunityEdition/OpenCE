@@ -56,6 +56,7 @@ int host_sdl_init(unsigned int flags);
 int host_sdl_set_hint(const char *name, const char *value);
 void host_sdl_get_error(char *buffer, unsigned int size);
 long long host_sdl_ticks(void);
+long long host_sdl_ticks_ns(void);
 long long host_sdl_thread_id(void);
 unsigned int host_sdl_create_window(const char *title, int width, int height, long long flags);
 void host_sdl_window_size_in_pixels(unsigned int window, int *width, int *height);

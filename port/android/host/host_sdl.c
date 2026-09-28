@@ -103,6 +103,12 @@ int64_t host_sdl_ticks(void)
 	return (int64_t)SDL_GetTicks();
 }
 
+/* nanoseconds, for the frame timing the GPU statistics need (d3d8_gl.c) */
+int64_t host_sdl_ticks_ns(void)
+{
+	return (int64_t)SDL_GetTicksNS();
+}
+
 int64_t host_sdl_thread_id(void)
 {
 	return (int64_t)SDL_GetCurrentThreadID();

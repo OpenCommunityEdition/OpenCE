@@ -213,6 +213,10 @@ static const struct config_setting config_settings[] =
 	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
 		"Log where every game thread is this often, in seconds (read by the\n"
 		"app, port/android/host/host_debug.c); 0 never." },
+	{ "debug.fence_stats", _config_boolean, "false", "HALO_FENCE_STATS", _environment_set_is_true, _platform_android,
+		"Log how long each frame's GPU wait blocks, whether it timed out, and\n"
+		"how many buffer uploads raced it (read by the app,\n"
+		"port/android/host/host_gl.c)." },
 };
 
 #define NUMBER_OF_CONFIG_SETTINGS (sizeof(config_settings) / sizeof(config_settings[0]))

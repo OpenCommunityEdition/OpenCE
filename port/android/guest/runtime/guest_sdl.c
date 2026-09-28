@@ -44,6 +44,11 @@ Uint64 SDL_GetTicks(void)
 	return (Uint64)host_sdl_ticks();
 }
 
+Uint64 SDL_GetTicksNS(void)
+{
+	return (Uint64)host_sdl_ticks_ns();
+}
+
 SDL_ThreadID SDL_GetCurrentThreadID(void)
 {
 	return (SDL_ThreadID)host_sdl_thread_id();

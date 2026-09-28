@@ -158,6 +158,25 @@ static void environment_set(struct environment *environment, const char *name, c
 		free(entry);
 }
 
+/* debug.fence_stats from config.toml: true to have the host time and
+classify every frame fence wait */
+static int config_fence_stats(const char *path)
+{
+	toml_result_t result = toml_parse_file_ex(path);
+	toml_datum_t datum;
+	int enabled = 0;
+
+	if (!result.ok)
+		return 0;
+	datum = toml_seek(result.toptab, "debug.fence_stats");
+	if (datum.type == TOML_BOOLEAN)
+		enabled = datum.u.boolean;
+	else if (datum.type == TOML_INT64)
+		enabled = datum.u.int64 != 0;
+	toml_free(result);
+	return enabled;
+}
+
 /* debug.sample_seconds from config.toml, as text for the sampler, or 0 */
 static int config_sample_seconds(const char *path, char *text, size_t size)
 {
@@ -293,6 +312,8 @@ static void *game_main(void *unused)
 	{
 		char seconds[32];
 
+		if (config_fence_stats(path))
+			host_gl_fence_stats(1);
 		if (config_sample_seconds(path, seconds, sizeof(seconds)))
 			host_debug_start_sampler(seconds);
 	}

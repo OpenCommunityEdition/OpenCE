@@ -17,6 +17,7 @@ host_sdl_init
 host_sdl_set_hint
 host_sdl_get_error
 host_sdl_ticks
+host_sdl_ticks_ns
 host_sdl_thread_id
 host_sdl_create_window
 host_sdl_window_size_in_pixels
