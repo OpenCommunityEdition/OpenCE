@@ -20,6 +20,11 @@ instead of sweeping across the world.
 
 Particles, contrails and other effects already move every frame
 (game_frame), so they need nothing here.
+
+An object the distributed netcode moves to where the host has it
+(port/linux/game/network_objects.c) is drawn gliding there over a few ticks
+rather than jumping: its snapshots move with it, and the difference is drawn
+on top of it, fading each tick.
 */
 
 #include "cseries.h"
@@ -41,6 +46,10 @@ Particles, contrails and other effects already move every frame
 /* world units (10 feet each) a node may move in one tick before it snaps:
 well beyond any vehicle, short of any teleport */
 #define OBJECT_SNAP_DISTANCE 10.0f
+/* a correction's difference left drawn after each tick (of 1) */
+#define CORRECTION_DECAY 0.6f
+/* ... and small enough to be none */
+#define CORRECTION_NEGLIGIBLE 0.001f
 /* a camera cut: a jump or turn no player or scripted camera makes in 33 ms */
 #define CAMERA_CUT_DISTANCE 3.0f
 #define CAMERA_CUT_COSINE 0.5f
@@ -61,6 +70,8 @@ struct interpolated_object
 	boolean has_previous;
 	byte latest; /* which snapshot is the latest */
 	long blended_frame;
+	/* where it is drawn from where it is: a correction fading */
+	real_vector3d correction;
 	/* [0] and [1]: the two snapshots, [2]: the blend drawn this frame */
 	real_matrix4x3 *nodes;
 };
@@ -320,7 +331,18 @@ void render_interpolation_tick(void)
 			record->node_count == node_count &&
 			record->tick == previous_tick;
 		if (continuing)
+		{
 			record->latest ^= 1;
+			record->correction.i *= CORRECTION_DECAY;
+			record->correction.j *= CORRECTION_DECAY;
+			record->correction.k *= CORRECTION_DECAY;
+			if (fabs(record->correction.i) + fabs(record->correction.j) + fabs(record->correction.k) < CORRECTION_NEGLIGIBLE)
+				record->correction = *global_zero_vector3d;
+		}
+		else
+		{
+			record->correction = *global_zero_vector3d;
+		}
 		memcpy(
 			record->nodes + record->latest * record->node_capacity,
 			object_get_node_matrices(iterator.index),
@@ -382,9 +404,69 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 			for (node_index = 0; node_index < record->node_count; node_index++)
 				matrix_blend(&previous[node_index], &latest[node_index], interpolation_fraction, &blended[node_index]);
 		}
+		/* (a correction fading through the tick as it does tick to tick) */
+		if (record->correction.i != 0.0f || record->correction.j != 0.0f || record->correction.k != 0.0f)
+		{
+			real fade = lerp(1.0f, CORRECTION_DECAY, interpolation_fraction);
+
+			for (node_index = 0; node_index < record->node_count; node_index++)
+			{
+				blended[node_index].position.x += record->correction.i * fade;
+				blended[node_index].position.y += record->correction.j * fade;
+				blended[node_index].position.z += record->correction.k * fade;
+			}
+		}
 		record->blended_frame = interpolation_frame;
 	}
 	return record->nodes + 2 * record->node_capacity;
+}
+
+/* ---------- corrections */
+
+/* the object (and what it carries) moved by the netcode from where it was,
+offset from where it is now: drawn from there, gliding */
+void render_interpolation_correct_object(long object_index, real_vector3d const *offset)
+{
+	struct object_datum *object;
+	long child_index;
+	long absolute_index;
+
+	if (!interpolated_objects || object_index == NONE ||
+		offset->i * offset->i + offset->j * offset->j + offset->k * offset->k > OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE)
+	{
+		return;
+	}
+	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+	if (absolute_index < MAXIMUM_INTERPOLATED_OBJECTS &&
+		interpolated_objects[absolute_index].object_index == object_index)
+	{
+		struct interpolated_object *record = &interpolated_objects[absolute_index];
+		short snapshot;
+		short node_index;
+
+		/* the snapshots where it would have been, the difference drawn */
+		for (snapshot = 0; snapshot < 2; snapshot++)
+		{
+			real_matrix4x3 *nodes = record->nodes + snapshot * record->node_capacity;
+
+			for (node_index = 0; node_index < record->node_count; node_index++)
+			{
+				nodes[node_index].position.x -= offset->i;
+				nodes[node_index].position.y -= offset->j;
+				nodes[node_index].position.z -= offset->k;
+			}
+		}
+		record->correction.i += offset->i;
+		record->correction.j += offset->j;
+		record->correction.k += offset->k;
+		record->blended_frame = NONE;
+	}
+	object = object_get(object_index);
+	for (child_index = object->object.first_child_object_index; child_index != NONE;
+		child_index = object_get(child_index)->object.next_object_index)
+	{
+		render_interpolation_correct_object(child_index, offset);
+	}
 }
 
 /* ---------- camera */

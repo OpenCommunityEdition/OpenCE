@@ -1397,20 +1397,47 @@ static void player_spawn(
 }
 
 #ifdef HALO_LINUX
-/* the distributed netcode: a client spawns a player when the host has
-(port/linux/game/network_distributed.c), where the host's state then puts
-it */
-void network_player_spawn(
+/* the distributed netcode (port/linux/game/network_distributed.c): a
+client's player takes the unit the host spawned it with (the host's object,
+at the host's index, with the host's weapons), as player_spawn gives a
+player the unit it makes */
+void network_player_attach_unit(
+	long player_index,
+	long unit_index)
+{
+	struct player_datum *player = player_get(player_index);
+	struct unit_datum *unit = unit_get(unit_index);
+
+	unit->object.owner_player_index = player_index;
+	unit->object.owner_team_index = (short)player->team_index;
+	unit->unit.player_index = player_index;
+	player->unit_index = unit_index;
+	unit_set_actively_controlled(unit_index, TRUE);
+	if (player->local_player_index != NONE)
+		player_control_new_unit(player->local_player_index, unit_index);
+	csmemset(player->powerup_durations, 0, sizeof(player->powerup_durations));
+	player->action_result = _player_action_result_reload;
+	player->action_object_index = NONE;
+	if (player->local_player_index != NONE)
+		observer_obsolete_position(player->local_player_index);
+}
+
+/* ... and gives up the one it has (the host's unit for it is another) */
+void network_player_detach_unit(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
+	struct unit_datum *unit = player->unit_index != NONE ?
+		(struct unit_datum *)object_try_and_get_and_verify_type(player->unit_index, _object_mask_unit) : NULL;
 
-	if (player->unit_index != NONE)
-		return;
-	game_engine_prespawn_player_update(player_index);
-	player_spawn(player_index);
-	if (player->unit_index != NONE)
-		game_engine_postspawn_player_update(player_index);
+	if (unit)
+	{
+		unit->unit.player_index = NONE;
+		unit_set_actively_controlled(player->unit_index, FALSE);
+	}
+	player->unit_index = NONE;
+	if (player->local_player_index != NONE)
+		player_control_new_unit(player->local_player_index, NONE);
 }
 #endif
 
@@ -3446,8 +3473,8 @@ void players_update_before_game(
 			{
 				if (game_engine_running())
 				{
-					/* (a client of the distributed netcode spawns players when the
-					host has, network_player_spawn) */
+					/* (a client of the distributed netcode's players take the units
+					the host spawns them with, network_player_attach_unit) */
 					if (
 #ifdef HALO_LINUX
 						!network_game_distributed_client() &&

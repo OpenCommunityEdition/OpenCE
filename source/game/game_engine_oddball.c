@@ -1311,19 +1311,30 @@ struct oddball_network_state
 	long team_score[NUMBEROF(oddball_globals.team_score)];
 	long individual_score[NUMBEROF(oddball_globals.individual_score)];
 	long ball_spawn_timer[MAXIMUM_ODDBALLS];
+	/* the balls' carriers, by absolute index (their datum identifiers are
+	each machine's own) */
+	byte current_ball_owner[MAXIMUM_ODDBALLS];
 };
 
+/* port/linux/game/network_distributed.c's */
+byte distributed_player_to_byte(long player_index);
+long distributed_player_from_byte(byte player_index);
+
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
-type's state the host sends its clients, which take it as it is (not
-the balls' carriers, which follow each machine's own ball objects) */
+type's state the host sends its clients, which take it as it is */
 long game_engine_oddball_write_network_state(
 	byte *buffer,
 	long size)
 {
 	struct oddball_network_state state;
 
+	short ball_index;
+
 	if (size < (long)sizeof(state))
 		return 0;
+	csmemset(&state, 0, sizeof(state));
+	for (ball_index = 0; ball_index < MAXIMUM_ODDBALLS; ball_index++)
+		state.current_ball_owner[ball_index] = distributed_player_to_byte(oddball_globals.current_ball_owner[ball_index]);
 	csmemcpy(state.team_score, oddball_globals.team_score, sizeof(state.team_score));
 	csmemcpy(state.individual_score, oddball_globals.individual_score, sizeof(state.individual_score));
 	csmemcpy(state.ball_spawn_timer, oddball_globals.ball_spawn_timer, sizeof(state.ball_spawn_timer));
@@ -1336,10 +1347,13 @@ void game_engine_oddball_read_network_state(
 	long size)
 {
 	struct oddball_network_state state;
+	short ball_index;
 
 	if (size != (long)sizeof(state))
 		return;
 	csmemcpy(&state, buffer, sizeof(state));
+	for (ball_index = 0; ball_index < MAXIMUM_ODDBALLS; ball_index++)
+		oddball_globals.current_ball_owner[ball_index] = distributed_player_from_byte(state.current_ball_owner[ball_index]);
 	csmemcpy(oddball_globals.team_score, state.team_score, sizeof(state.team_score));
 	csmemcpy(oddball_globals.individual_score, state.individual_score, sizeof(state.individual_score));
 	csmemcpy(oddball_globals.ball_spawn_timer, state.ball_spawn_timer, sizeof(state.ball_spawn_timer));

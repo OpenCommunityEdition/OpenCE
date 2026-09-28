@@ -3020,4 +3020,28 @@ boolean network_game_client_join_first_available_game(
 	return FALSE;
 }
 
+/* ... and puts this machine's players on a team (a team game needs both
+teams), as the pregame screen's team choice does */
+boolean network_game_client_set_team(
+	char team_index)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	boolean success = FALSE;
+	short player_index;
+
+	if (!client || client->state != _network_game_client_state_pregame)
+		return FALSE;
+	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS; player_index++)
+	{
+		struct network_player player = client->game.players[player_index];
+
+		if (network_player_is_valid(&player) && player.machine_index == (char)client->machine_index)
+		{
+			player.team_index = team_index;
+			success |= network_game_client_update_local_player_data(client, &player);
+		}
+	}
+	return success;
+}
+
 #endif

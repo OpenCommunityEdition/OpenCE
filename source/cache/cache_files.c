@@ -807,6 +807,29 @@ void *tag_get(
 	return tag_instance->base_address;
 }
 
+#ifdef HALO_LINUX
+/* whether the index is a loaded tag of the group (or a group it inherits
+from): the distributed netcode names tags another machine sent
+(port/linux/game/network_damage.c), which tag_get would only assert on */
+boolean tag_index_is_group(
+	long tag_index,
+	long group_tag)
+{
+	short absolute_index = (short)tag_index;
+	struct cache_file_tag_instance *tag_instance;
+
+	if (tag_index == NONE || !cache_file_globals.tags_loaded || !global_tag_instances ||
+		absolute_index < 0 || absolute_index >= cache_file_globals.tag_header->tag_count)
+	{
+		return FALSE;
+	}
+	tag_instance = &global_tag_instances[absolute_index];
+	return tag_instance->tag_index == tag_index && tag_instance->base_address &&
+		(tag_instance->group_tag == group_tag || tag_instance->parent_group_tags[0] == group_tag ||
+			tag_instance->parent_group_tags[1] == group_tag);
+}
+
+#endif
 char *tag_get_name(
 	long tag_index)
 {

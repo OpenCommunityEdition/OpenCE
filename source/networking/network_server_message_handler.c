@@ -697,8 +697,44 @@ boolean network_distributed_server_send_to_all(
 	return result;
 }
 
-/* the same, reliably (the netcode's items appearing and going must not be
-lost) */
+/* reliably to one machine in the game (the host's objects, to a client
+that has loaded) */
+boolean network_distributed_server_send_to_machine_reliably(
+	long machine_index,
+	void *message,
+	word size)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+	long client_index;
+
+	if (!server || size > sizeof(buffer))
+		return FALSE;
+	/* (machine_index is the game's machine, as the message handlers have
+	it: the client machine of that machine) */
+	for (client_index = 0; client_index < MAXIMUM_NETWORK_MACHINE_COUNT; client_index++)
+	{
+		struct network_game_server_client_machine *machine =
+			network_game_server_get_client_machine_at_index(server, client_index);
+		struct network_connection *connection;
+		long game_machine_index;
+
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine))
+			continue;
+		network_game_server_get_client_machine(server, machine, &game_machine_index);
+		if (game_machine_index != machine_index)
+			continue;
+		connection = network_game_server_get_client_connection(machine);
+		if (!connection || !network_connection_active(connection))
+			return FALSE;
+		csmemcpy(buffer, message, size);
+		return network_game_server_write(connection, buffer, size, NULL, 1);
+	}
+	return FALSE;
+}
+
+/* to every machine, reliably (the netcode's objects appearing and going
+must not be lost) */
 boolean network_distributed_server_send_to_all_reliably(
 	void *message,
 	word size)

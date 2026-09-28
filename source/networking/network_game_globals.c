@@ -311,6 +311,21 @@ boolean network_distributed_client_send(
 		(message_header *)buffer, size, &remote_server_address, 0);
 }
 
+/* ... reliably (a client's players' hits, network_damage.c) */
+boolean network_distributed_client_send_reliably(
+	void *message,
+	word size)
+{
+	byte buffer[0x1000];
+
+	if (!global_network_game_client || size > sizeof(buffer))
+		return FALSE;
+	/* (the write swaps the header in place) */
+	csmemcpy(buffer, message, size);
+	return network_game_client_write(network_game_client_get_connection(global_network_game_client),
+		(message_header *)buffer, size, NULL, 1);
+}
+
 /* the platform layer's (port/linux/src/port_config.c) */
 char const *config_string(char const *name);
 

@@ -141,10 +141,25 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port/linux/game/network_damage.c's */
+boolean network_damage_deals(struct damage_data const *damage, long object_index, short node_index,
+	short region_index, short material_index, real_vector3d const *object_normal, boolean authorized);
+boolean network_damage_replaying_kill(void);
+void network_damage_player_effect(long player_index, struct damage_data const *damage, real total_damage);
+void network_damage_aftermath(long object_index, struct damage_data const *damage, unsigned long being_damaged_flags,
+	real shield_damage, real body_damage, real body_damage_multiplier, short body_part, short node_index,
+	short region_index, short material_index);
 
 /* set while a distributed client carries out a kill it does not decide (an
 act of god: the host's word, network_distributed.c, or the world's) */
 static boolean distributed_damage_authorized;
+
+/* whether this machine runs objects' shields (their stun, recharge and
+overcharge): not a client of the distributed netcode, which has the host's
+(damage_set_network_state) */
+#define objects_update_shields() (!network_game_distributed_client())
+#else
+#define objects_update_shields() TRUE
 #endif
 
 /* ---------- constants */
@@ -1370,10 +1385,14 @@ void object_cause_damage(
 	long damaged_object_indices[16];
 
 #ifdef HALO_LINUX
-	/* the distributed netcode: only the host decides damage, which reaches
-	the clients as the units' state (port/linux/NETCODE.md) */
-	if (network_game_distributed_client() && !distributed_damage_authorized)
+	/* the distributed netcode (port/linux/NETCODE.md): the host deals
+	damage; a client reports its own players' hits instead, and the host
+	deals those (port/linux/game/network_damage.c) */
+	if (!network_damage_deals(damage, object_index, node_index, region_index, material_index, object_normal,
+		distributed_damage_authorized))
+	{
 		return;
+	}
 #endif
 
 	damage_effect = damage_effect_definition_get(damage->definition_index);
@@ -1552,6 +1571,12 @@ void object_cause_damage(
 
 			if (player_index != NONE)
 			{
+#ifdef HALO_LINUX
+				/* (the host's, for its clients; a client replaying the host's
+				killing blow has had its player effect already) */
+				network_damage_player_effect(player_index, damage, total_damage);
+				if (!network_damage_replaying_kill())
+#endif
 				player_effect_start(
 					player_index,
 					damage,
@@ -1780,6 +1805,20 @@ void object_cause_damage(
 				body_damage,
 				body_damage_multiplier,
 				body_part);
+#ifdef HALO_LINUX
+			/* (the host's, for its clients) */
+			network_damage_aftermath(
+				current_object_index,
+				damage,
+				being_damaged_flags,
+				shield_damage,
+				body_damage,
+				body_damage_multiplier,
+				body_part,
+				current_object_index == object_index ? node_index : NONE,
+				current_object_index == object_index ? region_index : NONE,
+				current_object_index == object_index ? material_index : NONE);
+#endif
 			if (TEST_FLAG(
 				being_damaged_flags,
 				_object_being_damaged_body_destroyed_bit))
@@ -1908,9 +1947,11 @@ void object_damage_update(
 				FLAG(_object_die_act_of_god_no_statistics_bit));
 	}
 
-	SET_FLAG(object->object.damage_flags, _object_shield_charging_bit, FALSE);
+	if (objects_update_shields())
+		SET_FLAG(object->object.damage_flags, _object_shield_charging_bit, FALSE);
 	damage_flags = object->object.damage_flags;
-	if (object->object.maximum_shield_vitality > 0.f &&
+	if (objects_update_shields() &&
+		object->object.maximum_shield_vitality > 0.f &&
 		!TEST_FLAG(damage_flags, _object_dead_bit))
 	{
 		if (TEST_FLAG(damage_flags, _object_shield_over_charging_bit))
@@ -2525,6 +2566,106 @@ static void object_permutation_shield_regions(
 }
 
 #ifdef HALO_LINUX
+/* the distributed netcode (port/linux/game/network_distributed.c): a
+client's copy of an object takes the host's vitality and recent damage
+(what the shields' and the HUD's effects show), with the effects of its
+shields going down and coming back up as the host's do */
+void damage_set_network_state(
+	long object_index,
+	struct damage_network_state const *state)
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *object_definition =
+		object_definition_get(object->definition_index);
+	long collision_model_index = object_definition->object.collision_model.index;
+
+	if (state->shield_depleted && !TEST_FLAG(object->object.damage_flags, _object_shield_depleted_bit))
+	{
+		object_deplete_shield(object_index);
+	}
+	else if (!state->shield_depleted && TEST_FLAG(object->object.damage_flags, _object_shield_depleted_bit))
+	{
+		/* (as object_damage_update's recharge begins) */
+		if (collision_model_index != NONE)
+		{
+			damage_effect_new_on_object(
+				collision_model_definition_get(collision_model_index)->resistance.shield_recharging_effect.index,
+				object_index);
+		}
+		SET_FLAG(object->object.damage_flags, _object_shield_depleted_bit, FALSE);
+		object_permutation_shield_regions(object_index, TRUE);
+	}
+	SET_FLAG(object->object.damage_flags, _object_shield_charging_bit, state->shield_charging);
+	SET_FLAG(object->object.damage_flags, _object_shield_over_charging_bit, state->shield_over_charging);
+	object->object.body_vitality = state->body_vitality;
+	object->object.shield_vitality = state->shield_vitality;
+	object->object.current_body_damage = state->current_body_damage;
+	object->object.recent_body_damage = state->recent_body_damage;
+	object->object.current_shield_damage = state->current_shield_damage;
+	object->object.recent_shield_damage = state->recent_shield_damage;
+}
+
+/* the distributed netcode's client, replaying the damage its host dealt
+(port/linux/game/network_damage.c): a player's screen shaken and flashed */
+void damage_replay_player_effect(
+	long player_index,
+	struct damage_data *damage,
+	real total_damage)
+{
+	player_effect_start(player_index, damage, &damage->direction, damage->scale, total_damage);
+}
+
+/* ... what the damage did to the object, but for the harm (the host's
+vitality comes with its state): knockback, a unit's flinch, pain sound,
+stun and unzooming, and whom it was hit by */
+void damage_replay_aftermath(
+	long object_index,
+	struct damage_data *damage,
+	unsigned long being_damaged_flags,
+	real shield_damage,
+	real body_damage,
+	real body_damage_multiplier,
+	short body_part)
+{
+	/* (no statistics, which object_damage_aftermath otherwise keeps: the
+	host's come as they are) */
+	SET_FLAG(damage->flags, _damage_no_statistics_bit, FALSE);
+	object_damage_aftermath(object_index, damage, being_damaged_flags & ~FLAG(_object_being_damaged_body_depleted_bit),
+		shield_damage, body_damage, body_damage_multiplier, body_part);
+}
+
+/* ... a player's killing blow, dealt as the host dealt it */
+void damage_replay_kill(
+	long object_index,
+	struct damage_data *damage,
+	short node_index,
+	short region_index,
+	short material_index)
+{
+	SET_FLAG(damage->flags, _damage_kill_instantly_bit, TRUE);
+	distributed_damage_authorized = TRUE;
+	object_cause_damage(damage, object_index, node_index, region_index, material_index, NULL);
+	distributed_damage_authorized = FALSE;
+}
+
+/* the host's: what damage_set_network_state takes */
+void damage_get_network_state(
+	long object_index,
+	struct damage_network_state *state)
+{
+	struct object_datum *object = object_get(object_index);
+
+	state->shield_depleted = TEST_FLAG(object->object.damage_flags, _object_shield_depleted_bit);
+	state->shield_charging = TEST_FLAG(object->object.damage_flags, _object_shield_charging_bit);
+	state->shield_over_charging = TEST_FLAG(object->object.damage_flags, _object_shield_over_charging_bit);
+	state->body_vitality = object->object.body_vitality;
+	state->shield_vitality = object->object.shield_vitality;
+	state->current_body_damage = object->object.current_body_damage;
+	state->recent_body_damage = object->object.recent_body_damage;
+	state->current_shield_damage = object->object.current_shield_damage;
+	state->recent_shield_damage = object->object.recent_shield_damage;
+}
+
 /* the automated network tests (port/linux/game/network_test.c): kills the
 object as falling damage does (an act of god), but credited to a player, so
 that the kill counts in the game's scores */

@@ -111,6 +111,15 @@ struct dump_datum
 
 /* ---------- prototypes */
 
+#ifdef HALO_LINUX
+/* port/linux/game/network_objects.c's: a client of the distributed netcode
+makes the host's objects at the host's datum indices, and deletes them only
+on the host's word */
+long network_objects_new_object_index(void);
+boolean network_objects_creating_host_object(void);
+boolean network_objects_may_delete(long object_index);
+#endif
+
 static void object_connect_lights(long object_index, boolean disconnect, boolean reconnect);
 static void object_name_list_allocate(void);
 static void object_name_list_free(void);
@@ -1740,6 +1749,10 @@ static void object_delete_initial_recursive(
 void object_delete(
 	long object_index)
 {
+#ifdef HALO_LINUX
+	if (!network_objects_may_delete(object_index))
+		return;
+#endif
 	object_delete_initial_recursive(object_index, FALSE);
 
 	return;
@@ -3277,7 +3290,12 @@ long object_new(
 	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\objects\\objects.c", 620, &data->angular_velocity);
 	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\objects\\objects.c", 621, &data->translational_velocity);
 
-	if (game_engine_running() && definition_index!=NONE)
+	if (game_engine_running() && definition_index!=NONE
+#ifdef HALO_LINUX
+		/* (the host's object, which the host made as the game type has it) */
+		&& !network_objects_creating_host_object()
+#endif
+		)
 	{
 		definition_index = game_engine_remap_object_definition(definition_index);
 	}
@@ -3287,7 +3305,12 @@ long object_new(
 		struct object_definition *object_definition = object_definition_get(definition_index);
 		struct object_type_definition *type_definition = object_type_definition_get(object_definition->object.type);
 
+#ifdef HALO_LINUX
+		object_index = object_header_new(object_header_data, network_objects_new_object_index(),
+			type_definition->game_datum_size);
+#else
 		object_index = object_header_new(object_header_data, NONE, type_definition->game_datum_size);
+#endif
 
 		if (object_index!=NONE)
 		{
@@ -3830,6 +3853,10 @@ void objects_scripting_attach(
 void object_delete_immediately(
 	long object_index)
 {
+#ifdef HALO_LINUX
+	if (!network_objects_may_delete(object_index))
+		return;
+#endif
 	object_delete_initial_recursive(object_index, FALSE);
 	object_delete_recursive(object_index, FALSE);
 

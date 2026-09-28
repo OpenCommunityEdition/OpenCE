@@ -1018,6 +1018,10 @@ static void unit_cause_continuous_melee_damage(long unit_index);
 
 static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
+#ifdef HALO_LINUX
+/* port/linux/game/network_objects.c's */
+boolean network_objects_creating_host_object(void);
+#endif
 static void unit_drop_grenades(
 	long unit_index);
 static void unit_drop_inventory_weapons(
@@ -2492,6 +2496,12 @@ static void unit_add_initial_weapons(
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 
+#ifdef HALO_LINUX
+	/* (a client of the distributed netcode making the host's unit: its
+	weapons are the host's objects, port/linux/game/network_objects.c) */
+	if (network_objects_creating_host_object())
+		return;
+#endif
 	for (initial_weapon_index = 0;
 		initial_weapon_index < unit_definition->unit.initial_weapons.count;
 		initial_weapon_index++)
@@ -11698,3 +11708,61 @@ static boolean unit_integrated_night_vision_is_active(
 /* Verify the public seat-helper declaration without perturbing this legacy
  * translation unit's authenticated function-declaration order. */
 #include "vehicle_scripting.h"
+
+#ifdef HALO_LINUX
+/* the distributed netcode (port/linux/game/network_objects.c): a client's
+unit carries the host's weapons, the same objects, moved in and out as the
+host's unit had them (the host has applied the game's rules) */
+
+void unit_network_forget_weapon(long unit_index, short slot);
+
+/* the weapon into the slot, as unit_add_weapon_to_inventory puts one in */
+void unit_network_add_weapon(
+	long unit_index,
+	long weapon_index,
+	short slot)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+
+	if (weapon->object.parent_object_index != NONE)
+		object_detach(weapon_index);
+	if (TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit))
+		object_disconnect_from_map(weapon_index);
+	object_set_visibility(weapon_index, FALSE);
+	item_in_unit_inventory(weapon_index, unit_index);
+	unit->unit.weapon_object_indices[slot] = weapon_index;
+	unit->unit.weapon_last_used_at_game_time[slot] = 0;
+}
+
+/* the slot's weapon out onto the ground, as unit_drop_current_weapon drops
+one (where the host has it the objects' states say) */
+void unit_network_drop_weapon(
+	long unit_index,
+	short slot)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	long weapon_index = unit->unit.weapon_object_indices[slot];
+
+	if (weapon_index == NONE)
+		return;
+	if (unit->unit.current_weapon_index == slot)
+		first_person_weapon_message_from_unit(unit_index, 13);
+	unit_drop_item(unit_index, weapon_index);
+	unit_network_forget_weapon(unit_index, slot);
+}
+
+/* the slot emptied, its weapon about to be deleted */
+void unit_network_forget_weapon(
+	long unit_index,
+	short slot)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	unit->unit.weapon_object_indices[slot] = NONE;
+	if (unit->unit.current_weapon_index == slot)
+		unit->unit.current_weapon_index = NONE;
+	if (unit->unit.desired_weapon_index == slot || unit->unit.desired_weapon_index == NONE)
+		unit->unit.desired_weapon_index = unit_weapon_next_index(unit_index, NONE, 0);
+}
+#endif

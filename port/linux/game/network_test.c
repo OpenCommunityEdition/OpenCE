@@ -14,6 +14,13 @@ Automated system link sessions for testing the netcode without the menus
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
 
+Scripted play for the netcode's parts the bots' wandering does not reach:
+debug.network_test_kill (the host kills the last player every so often),
+debug.network_test_shoot (every so often each machine's player hits the
+next with their weapon's projectile: a client's through its report to the
+host) and debug.network_test_vehicle (the host seats the last player as a
+vehicle's driver that many seconds in, and takes them out 15 seconds on).
+
 Called from the main loop every frame (main.c).
 */
 
@@ -29,8 +36,13 @@ Called from the main loop every frame (main.c).
 #include "game/players.h"
 #include "objects/objects.h"
 #include "units/units.h"
+#include "units/unit_definitions.h"
 #include "items/weapons.h"
+#include "items/weapon_definitions.h"
+#include "items/projectile_definitions.h"
 #include "items/items.h"
+#include "objects/damage.h"
+#include "scenario/scenario.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -44,6 +56,7 @@ void damage_kill_object_for_player(long object_index, long player_index);
 /* network_distributed.c's */
 void network_distributed_statistics(long *sent, long *received, long *corrections);
 void network_distributed_item_statistics(long *creates, long *deletes, long *failures, long *removed);
+void network_damage_statistics(long *sent_reports, long *dealt_reports, long *rejected_reports, long *replayed_events);
 
 enum
 {
@@ -67,7 +80,10 @@ static struct
 	boolean map_set;
 	boolean player_added;
 	real joined_seconds;
+	boolean team_set;
 	real kill_interval;
+	real shoot_interval;
+	real vehicle_time;
 	long logged_time;
 } network_test;
 
@@ -97,6 +113,8 @@ static void network_test_read_settings(
 	}
 	network_test.start_delay = (real)config_real("debug.network_test_start");
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
+	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
+	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
 }
@@ -119,10 +137,15 @@ static void network_test_log_players(
 			struct unit_datum *unit = unit_get(player->unit_index);
 			short slot;
 
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) g%d/%d w",
-				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), object->object.position.x,
-				object->object.position.y, object->object.position.z, unit->unit.grenade_counts[0],
-				unit->unit.grenade_counts[1]);
+			/* (riding: where its vehicle is) */
+			struct object_datum *placed = object->object.parent_object_index != NONE ?
+				object_get(object->object.parent_object_index) : object;
+
+			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s g%d/%d w",
+				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), placed->object.position.x,
+				placed->object.position.y, placed->object.position.z, object->object.body_vitality,
+				object->object.shield_vitality, placed != object ? " riding" : "",
+				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
 			for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
 			{
 				long weapon_index = unit->unit.weapon_object_indices[slot];
@@ -169,10 +192,148 @@ static void network_test_log_players(
 		network_distributed_statistics(&sent, &received, &corrections);
 		long creates, deletes, failures, removed;
 
+		long sent_reports, dealt_reports, rejected_reports, replayed_events;
+
 		network_distributed_item_statistics(&creates, &deletes, &failures, &removed);
-		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s | sent %ld received %ld corrected %ld",
+		network_damage_statistics(&sent_reports, &dealt_reports, &rejected_reports, &replayed_events);
+		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s | sent %ld received %ld corrected %ld"
+			" | hits %ld dealt %ld rejected %ld replayed %ld",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
-			game_engine_can_score() ? "playing" : "game over", sent, received, corrections);
+			game_engine_can_score() ? "playing" : "game over", sent, received, corrections,
+			sent_reports, dealt_reports, rejected_reports, replayed_events);
+	}
+}
+
+/* each of this machine's players hits the next player with their weapon's
+projectile, as its impact would */
+static void network_test_shoot(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		struct data_iterator targets;
+		struct player_datum *target = NULL;
+		struct player_datum *candidate;
+		struct unit_datum *unit;
+		long weapon_index;
+		struct weapon_definition *weapon;
+		struct weapon_trigger_definition *trigger;
+		long damage_index = NONE;
+		struct damage_data damage;
+		struct object_datum *target_object;
+		real_vector3d direction;
+
+		if (player->local_player_index == NONE || player->unit_index == NONE)
+			continue;
+		data_iterator_new(&targets, player_data);
+		while ((candidate = (struct player_datum *)data_iterator_next(&targets)) != NULL)
+		{
+			if (candidate != player && candidate->unit_index != NONE)
+			{
+				target = candidate;
+				break;
+			}
+		}
+		unit = unit_get(player->unit_index);
+		if (!target || unit->unit.current_weapon_index == NONE ||
+			TEST_FLAG(object_get(target->unit_index)->object.damage_flags, _object_dead_bit))
+		{
+			continue;
+		}
+		weapon_index = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
+		if (weapon_index == NONE)
+			continue;
+		weapon = weapon_definition_get(object_get(weapon_index)->definition_index);
+		if (weapon->weapon.triggers.count > 0)
+		{
+			trigger = TAG_BLOCK_GET_ELEMENT(&weapon->weapon.triggers, 0, struct weapon_trigger_definition);
+			if (trigger->projectile.index != NONE)
+				damage_index = projectile_definition_get(trigger->projectile.index)->projectile.impact_damage.index;
+		}
+		if (damage_index == NONE)
+			damage_index = weapon->weapon.melee_attack_damage.index;
+		if (damage_index == NONE)
+			continue;
+		target_object = object_get(target->unit_index);
+		damage_data_new(&damage, damage_index);
+		damage.owner_player_index = iterator.datum_index;
+		damage.owner_object_index = player->unit_index;
+		damage.owner_team_index = unit->object.owner_team_index;
+		damage.origin = target_object->object.position;
+		damage.epicenter = target_object->object.position;
+		direction.i = target_object->object.position.x - unit->object.position.x;
+		direction.j = target_object->object.position.y - unit->object.position.y;
+		direction.k = target_object->object.position.z - unit->object.position.z;
+		normalize3d(&direction);
+		damage.direction = direction;
+		damage.scale = 1.0f;
+		scenario_location_from_point(&damage.location, &damage.epicenter);
+		object_cause_damage(&damage, target->unit_index, NONE, NONE, NONE, NULL);
+		platform_log("network test: player %ld shoots player %ld",
+			(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), (long)(target - (struct player_datum *)player_data->data));
+	}
+}
+
+/* the host seats the last player as the nearest vehicle's driver, or out */
+static void network_test_vehicle(
+	boolean enter)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	if (!last || last->unit_index == NONE)
+		return;
+	if (!enter)
+	{
+		if (object_get(last->unit_index)->object.parent_object_index != NONE)
+		{
+			unit_exit_seat_end(last->unit_index);
+			platform_log("network test: the last player leaves the vehicle");
+		}
+		return;
+	}
+	{
+		struct object_iterator vehicles;
+		long nearest_index = NONE;
+		real nearest_distance = 0.0f;
+		real_point3d const *position = &object_get(last->unit_index)->object.position;
+		short seat_index;
+
+		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+		while (object_iterator_next(&vehicles))
+		{
+			real_point3d const *vehicle_position = &object_get(vehicles.index)->object.position;
+			real distance = distance_squared3d(position, vehicle_position);
+
+			if (nearest_index == NONE || distance < nearest_distance)
+			{
+				nearest_index = vehicles.index;
+				nearest_distance = distance;
+			}
+		}
+		if (nearest_index == NONE)
+		{
+			platform_log("network test: no vehicle");
+			return;
+		}
+		for (seat_index = 0; seat_index < unit_definition_get(object_get(nearest_index)->definition_index)->unit.seats.count; seat_index++)
+		{
+			if (unit_seat_is_driver(nearest_index, seat_index) &&
+				unit_enter_seat(last->unit_index, nearest_index, seat_index))
+			{
+				platform_log("network test: the last player drives vehicle %lx", nearest_index);
+				return;
+			}
+		}
+		platform_log("network test: the last player cannot drive vehicle %lx", nearest_index);
 	}
 }
 
@@ -190,6 +351,23 @@ void network_test_update(
 	{
 		network_test.logged_time = game_time_get();
 		network_test_log_players();
+		if (network_test.shoot_interval > 0.0f &&
+			game_time_get() % (long)(network_test.shoot_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+		{
+			network_test_shoot();
+		}
+		if (network_test.mode == _network_test_host && network_test.vehicle_time > 0.0f)
+		{
+			long enter_time = (long)(network_test.vehicle_time * TICKS_PER_SECOND);
+
+			if (game_time_get() >= enter_time && game_time_get() - enter_time < TICKS_PER_SECOND)
+				network_test_vehicle(TRUE);
+			if (game_time_get() >= enter_time + 15 * TICKS_PER_SECOND &&
+				game_time_get() - enter_time - 15 * TICKS_PER_SECOND < TICKS_PER_SECOND)
+			{
+				network_test_vehicle(FALSE);
+			}
+		}
 		/* debug.network_test_kill: the host kills the last player every so
 		often, to test deaths and respawns reaching the clients */
 		if (network_test.mode == _network_test_host && network_test.kill_interval > 0.0f &&
@@ -314,6 +492,13 @@ void network_test_update(
 			network_test.joined_seconds += seconds;
 			if (network_test.joined_seconds >= 3.0f && global_network_game_client_get())
 				network_test.player_added = network_game_client_add_player(global_network_game_client_get(), 0);
+		}
+		/* (the other team from the host's player: a team game needs both) */
+		else if (network_test.player_added && !network_test.team_set)
+		{
+			network_test.joined_seconds += seconds;
+			if (network_test.joined_seconds >= 5.0f)
+				network_test.team_set = network_game_client_set_team(1);
 		}
 		break;
 	}

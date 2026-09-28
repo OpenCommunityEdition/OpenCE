@@ -581,6 +581,9 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port/linux/game/network_distributed.c's */
+void network_distributed_player_killed(long *killing_player_index, long *killing_object_index,
+	long dead_player_index, boolean *friendly_fire);
 #endif
 
 /* ---------- constants */
@@ -4062,6 +4065,12 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
+#ifdef HALO_LINUX
+	/* the distributed netcode: a client's copy of a death has the host's
+	killer (port/linux/game/network_distributed.c) */
+	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
+		&friendly_fire);
+#endif
 	dead_player->death_time = game_time_get();
 	if (game_engine->player_killed_player)
 	{
@@ -4687,6 +4696,12 @@ void game_engine_player_damaged_player(
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xA20, dead_player_index != NONE);
 
+#ifdef HALO_LINUX
+	/* (a client of the distributed netcode replaying the host's damage has
+	the host's game type state, game_engine_read_network_state) */
+	if (network_game_distributed_client())
+		return;
+#endif
 	if (game_engine && game_engine->player_damaged_player)
 		game_engine->player_damaged_player(damaging_player_index, dead_player_index, damage_type);
 

@@ -1379,10 +1379,12 @@ struct game_engine ctf_engine =
 };
 
 #ifdef HALO_LINUX
-/* the parts of ctf_globals that are the same on every machine (not the flag
-objects, whose indices are this machine's own) */
+/* the parts of ctf_globals that are the same on every machine (the flag
+objects are the host's, at the same indices everywhere: the flags' scenario
+places are each machine's own pointers) */
 struct ctf_network_state
 {
+	long weapon_indices[NUMBER_OF_CTF_TEAMS];
 	long scores[NUMBER_OF_CTF_TEAMS];
 	boolean flag_warnings[NUMBER_OF_CTF_TEAMS];
 	long flag_warning_ticks[NUMBER_OF_CTF_TEAMS];
@@ -1390,8 +1392,7 @@ struct ctf_network_state
 };
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
-type's state the host sends its clients, which take it as it is (not
-its flag objects, which are each machine's own) */
+type's state the host sends its clients, which take it as it is */
 long game_engine_ctf_write_network_state(
 	byte *buffer,
 	long size)
@@ -1401,6 +1402,7 @@ long game_engine_ctf_write_network_state(
 	if (size < (long)sizeof(state))
 		return 0;
 	csmemset(&state, 0, sizeof(state));
+	csmemcpy(state.weapon_indices, ctf_globals.weapon_indices, sizeof(state.weapon_indices));
 	csmemcpy(state.scores, ctf_globals.scores, sizeof(state.scores));
 	csmemcpy(state.flag_warnings, ctf_globals.flag_warnings, sizeof(state.flag_warnings));
 	csmemcpy(state.flag_warning_ticks, ctf_globals.flag_warning_ticks, sizeof(state.flag_warning_ticks));
@@ -1418,6 +1420,7 @@ void game_engine_ctf_read_network_state(
 	if (size != (long)sizeof(state))
 		return;
 	csmemcpy(&state, buffer, sizeof(state));
+	csmemcpy(ctf_globals.weapon_indices, state.weapon_indices, sizeof(state.weapon_indices));
 	csmemcpy(ctf_globals.scores, state.scores, sizeof(state.scores));
 	csmemcpy(ctf_globals.flag_warnings, state.flag_warnings, sizeof(state.flag_warnings));
 	csmemcpy(ctf_globals.flag_warning_ticks, state.flag_warning_ticks, sizeof(state.flag_warning_ticks));
