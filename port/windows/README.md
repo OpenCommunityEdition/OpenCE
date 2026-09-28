@@ -1,125 +1,116 @@
-# Native Windows build
+# Windows
 
-`ninja windows` compiles the decompiled game with clang for 32-bit x86
-Windows and links a native executable, `build/windows/halo.exe`, with
-`SDL3.dll` next to it. It is built on Windows, for Windows. Like the Linux
-build (`port/linux/README.md`), it is a separate graph from the
-byte-matching build, and it shares the Linux port's platform layer
-(`port/linux/src`): the Xbox SDK implemented over SDL3, OpenGL and the host
-operating system. It renders with OpenGL 4.5, plays sound through SDL3 and
-takes the same keyboard, mouse and gamepad input as the Linux build.
+`ninja windows` compiles the game with clang for 32-bit x86 Windows. The
+result is a native executable, `build/windows/halo.exe`, with `SDL3.dll`
+next to it. You must build on Windows.
 
-## Building
+The Windows build uses the platform layer of the Linux build
+(`port/linux/src`). The graphics, the sound, the input, the settings and
+the multiplayer functions are the same as on Linux. Refer to
+[port/linux/README.md](../linux/README.md).
 
-Requirements, on Windows (no part of the Xbox SDK):
+## Requirements
 
-- Visual Studio (or the Build Tools) with the C++ workload: the 32-bit
-  (x86) MSVC libraries and a Windows 10/11 SDK. Only the libraries and
-  headers are used; the compiler is clang.
-- LLVM (clang and lld), Python 3 and ninja on the PATH (for example
-  `scoop install llvm python ninja`).
-- Network access the first time: `configure.py` downloads SDL 3.4.16's
-  Visual C++ development package into `build/windows/third_party`.
+You do not need the Xbox SDK.
 
-```bat
-python configure.py
-ninja windows
-```
+- Visual Studio or the Visual Studio Build Tools, with the C++ workload.
+  The build uses the 32-bit (x86) MSVC libraries and a Windows 10 or 11
+  SDK. It does not use the MSVC compiler.
+- LLVM (clang and lld), Python 3 and ninja in the `PATH`. For example,
+  enter `scoop install llvm python ninja`.
+- A network connection for the first build. `configure.py` downloads the
+  Visual C++ development package of SDL 3.4.16 to
+  `build/windows/third_party`.
 
-`configure.py` generates the Windows build only when it runs on Windows.
+## Build the game
 
-The executable is optimised for the processor of the computer that builds
-it (`-march=native`) and may not start on another; `python configure.py
---portable` builds one that runs on any x86-64 processor, for sharing. Full
-link-time optimisation makes the final link take a while; see
-[Optimisation](../../README.md#optimisation) for this and for the
-profile-guided optimisation with `pgo/halo_windows.profdata`, which
-`--pgo=train` records again (the instrumented build uses LLVM's profile
-runtime, compiled for 32-bit x86 from its sources, since LLVM for Windows
-ships it for x86-64 only: `pgo/halo_profile_runtime.c`).
+1. Go to the root folder of the repository.
+2. Enter `python configure.py`.
+3. Enter `ninja windows`.
 
-## Running
+`configure.py` generates the Windows build only on Windows.
 
-```bat
-build\windows\halo.exe
-```
+The build uses all the instructions of the processor of the computer that
+builds it (`-march=native`). Such a build does not always start on a
+different computer. To make a build for other computers, enter
+`python configure.py --portable`. Refer to the build options in the main
+[README](../../README.md#build-options).
 
-The game data is found as on Linux: `paths.data` in `config.toml` if set, else the
-current directory when it has `maps\`, else `assets\` in the current
-directory or in the repository that holds the executable. It must be the PAL
-data of this build (01.01.14.2342). Saves go to `%APPDATA%\halo`
-(`paths.saves` overrides it). The settings are in `config.toml` next to
-`halo.exe`, written with the defaults on the first run; they and the
-controls are those of the Linux build (`port/linux/README.md`); like it, the game draws
-a frame at every refresh of the display, between its 30 Hz ticks ("Frame
-rate" there).
+For a new optimization profile (`--pgo=train`), the build compiles the
+profile runtime of LLVM for 32-bit x86 (`pgo/halo_profile_runtime.c`).
+LLVM for Windows supplies this runtime only for x86-64.
 
-## How it works
+## Start the game
 
-The game is 32-bit code for the same reason as on Linux: its data formats
-embed 32-bit pointers. Clang's `i686-pc-windows-msvc` target gives it the
-ABI it was written against natively (MSVC structure layout, 16-bit
-`wchar_t`, calling conventions), so much less adaptation is
-needed than on Linux. The executable is large-address-aware: the Xbox memory
-window the platform layer reserves is at 0x80000000.
+Enter `build\windows\halo.exe`.
+
+The game finds the game data as on Linux. Refer to "Start the game" in
+[port/linux/README.md](../linux/README.md#start-the-game).
+
+| Item | Location |
+| --- | --- |
+| Settings | `config.toml` next to `halo.exe` |
+| Saved games | `%APPDATA%\halo`, or `paths.saves` in `config.toml` |
+| Log | `debug.txt` in the data root (the folder that contains `maps\`) |
+
+## How the port operates
+
+The game is 32-bit code, as on Linux, because its data contains 32-bit
+pointers. The clang target `i686-pc-windows-msvc` gives the ABI of MSVC:
+the structure layout, the 16-bit `wchar_t` and the calling conventions.
+Thus the Windows build needs fewer changes than the Linux build.
+
+The executable is large-address-aware, because the platform layer reserves
+the Xbox memory at `0x80000000`.
 
 ### Headers
 
-- Game and platform units see the Xbox SDK declarations, not the Windows
-  SDK's of the same names (`winbase.h`, `windef.h`, ...): `port/include/xdk`,
-  which stands in for the Xbox SDK's headers, comes ahead of the Windows SDK.
-  The C runtime is the Windows one (the static UCRT).
-- `include/halo_windows_prefix.h` is force-included into game and platform
-  units. It renames the Xbox SDK functions that the platform layer
-  implements under Windows names (`CreateFileA`, `ReadFile`, `Sleep`, ...;
-  `include/halo_windows_api_names.h`), so that the Windows-facing code
-  reaches Windows, and it shares the Linux build's Winsock renames and
-  source fixups.
-- `include/crt` wraps a few C runtime headers: the game's `fopen`, `open`,
-  `mkdir` and similar calls with Xbox paths go through path translation
-  (`src/windows_crt.c`); `stdlib.h` does not leak `limits.h` macros that the
-  game's `cseries.h` declares itself; the game's own `strnlen` coexists with
-  the runtime's.
-- `include/posix` declares the POSIX calls the shared platform layer makes
-  (threads, clocks, `mmap`, positional I/O, `sysconf`).
+- The game and the platform layer use the Xbox SDK declarations of
+  `port/include/xdk`, not the Windows SDK declarations with the same names.
+  The compiler reads `port/include/xdk` before the Windows SDK.
+- The C runtime is the static UCRT of Windows.
+- `include/halo_windows_prefix.h` is the first header of each file. It gives
+  Windows names to the Xbox SDK functions of the platform layer (for example
+  `CreateFileA`, `ReadFile`, `Sleep`). Thus the code for Windows gets to
+  Windows. The list of names is in `include/halo_windows_api_names.h`.
+- `include/crt` changes some C runtime headers. The file functions of the
+  game (`fopen`, `open`, `mkdir`) go through the translation of Xbox paths
+  (`src/windows_crt.c`).
+- `include/posix` declares the POSIX functions that the platform layer uses.
 
-### Windows-facing code
+### Code for Windows
 
-The files named `src/win32_*.c` are compiled against the Windows SDK only:
+These files use only the Windows SDK:
 
-- `win32_files.c` and `win32_net.c` implement the file and socket boundary
-  of `port/linux/src/posix.h` (on Linux, `posix_files.c` and `posix_net.c`);
-- `win32_posix.c` implements the POSIX calls above over Windows threads,
-  critical sections, condition variables, `VirtualAlloc` and the
-  performance counter, and sets binary file mode and a 1 ms timer period at
-  start-up;
-- `win32_memory_watch.c` replaces `memory_watch.c` (texture write tracking
-  with a vectored exception handler) and reports crashes.
+| File | Contents |
+| --- | --- |
+| `src/win32_files.c`, `src/win32_net.c` | The file and socket functions of `port/linux/src/posix.h`. |
+| `src/win32_posix.c` | The POSIX functions on Windows threads, critical sections, condition variables, `VirtualAlloc` and the performance counter. |
+| `src/win32_memory_watch.c` | The write tracking of textures, with a vectored exception handler. It also writes reports of crashes. |
 
-`port.json` lists the Linux platform files these replace, and the Windows
-libraries linked.
+`port.json` gives the Linux files that these files replace, and the Windows
+libraries of the link.
 
 ### Inline functions
 
-MSVC emits a C `__inline` function with external linkage as a COMDAT
-wherever a call to it is not inlined, and some units call such functions
-through ordinary prototypes. Clang's Microsoft target has the same COMDAT
-linkage, but inlines more, so a function can end up emitted nowhere:
+MSVC makes a COMDAT copy of an external `__inline` function where it does
+not inline a call. Some files call such functions through a prototype.
+clang inlines more calls. Thus a function can have no copy. The build
+prevents this:
 
-- header inlines reached through prototypes get one weak definition each
-  from `port/linux/game/msvc_comdat.c` (COFF allows only one weak
-  definition of a name; a COMDAT copy or an outright definition overrides
-  it);
-- the few `__inline` functions defined in `.c` files are exported by
-  compiling their unit through a generated wrapper that takes their
-  addresses (`inline_export_wrapper` in `tools/windows_build.py`).
+- `port/linux/game/msvc_comdat.c` gives one weak definition of each header
+  inline function.
+- A wrapper takes the address of each `__inline` function in a `.c` file.
+  Thus the compiler makes an external copy (`inline_export_wrapper` in
+  `tools/windows_build.py`).
 
-Structure tags first named in a prototype get file scope in MSVC but not in
-clang, so the Linux build's generated forward declarations are
-force-included too (`build/windows/halo_msvc_tags.h`).
+MSVC gives file scope to a structure tag in a prototype. clang does not.
+Thus the build also includes the declarations of the Linux build
+(`build/windows/halo_msvc_tags.h`).
 
-## Known limitations
+## Limits
 
-- Bink video is not supported (as on Linux): the intro movies are skipped.
-- Only the narrow (ANSI code page) file APIs are used: data or save paths
-  with characters outside the system code page may not work.
+- Bink video is not available. The game skips the movies.
+- The game uses only the ANSI file functions. A path to the data or the
+  saved games with characters that are not in the code page of the system
+  does not always operate.

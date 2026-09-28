@@ -1,270 +1,283 @@
-# Android build
+# Android
 
-`ninja android` builds the decompiled game for 64-bit ARM Android
-(arm64-v8a), and `ninja android_apk` packages it as an app,
-`port/android/app/build/outputs/apk/debug/app-debug.apk`. It renders with
-OpenGL ES 3, plays sound through SDL3 (AAudio), and takes input from game
-controllers, including a PlayStation 5 DualSense over Bluetooth. It targets
-Android 9 (API 28) and later, and is tested against 64-bit-only devices
-such as the Pixel 9 Pro XL (Tensor G4, Mali-G715).
+`ninja android` builds the game for 64-bit ARM Android (arm64-v8a).
+`ninja android_apk` makes an app from it:
+`port/android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Like the Linux build (`port/linux/README.md`), it is a separate graph from
-the byte-matching build, and it shares the Linux port's platform layer
-(`port/linux/src`): the Xbox SDK implemented over SDL3, OpenGL and POSIX.
+The game shows its graphics with OpenGL ES 3. It plays sound through SDL3
+(AAudio). It accepts input from game controllers, for example a PlayStation
+5 DualSense on Bluetooth. The app needs Android 9 (API 28) or later. It
+operates on 64-bit-only devices, for example the Pixel 9 Pro XL.
 
-## Building
+The Android build uses the platform layer of the Linux build
+(`port/linux/src`). Refer to [port/linux/README.md](../linux/README.md).
 
-Requirements, in addition to what the Linux build needs (Python, ninja; no
-part of the Xbox SDK):
+## Requirements
 
-- a clang with the `arm64_32` target (any recent LLVM, e.g. the system
-  clang; `--android-guest-cc` selects another);
-- the Android NDK (found through `ANDROID_NDK_HOME`, or the newest under
-  `$ANDROID_HOME/ndk`, `~/Android/Sdk/ndk` or `/opt/android-sdk/ndk`;
-  `--android-ndk` selects one), CMake and a JDK 17+ for Gradle;
-- network access the first time: `configure.py` downloads musl 1.2.5 and
-  clones SDL 3.4.16 into `build/android/third_party`, and Gradle fetches the
+You do not need the Xbox SDK. You need the tools of the Linux build (Python,
+ninja) and these items:
+
+- A clang with the `arm64_32` target, for example the clang of the system.
+  The option `--android-guest-cc` of `configure.py` selects a different
+  compiler.
+- The Android NDK. `configure.py` looks for it in `ANDROID_NDK_HOME`, then
+  in `$ANDROID_HOME/ndk`, `~/Android/Sdk/ndk` and `/opt/android-sdk/ndk`.
+  The option `--android-ndk` selects a different NDK.
+- CMake, and a JDK 17 or later for Gradle.
+- A network connection for the first build. `configure.py` downloads musl
+  1.2.5 and SDL 3.4.16 to `build/android/third_party`. Gradle downloads the
   Android Gradle Plugin.
 
-```sh
-python configure.py
-ninja android          # the game image and native libraries
-ninja android_apk      # the APK (runs Gradle in port/android)
-adb install -r port/android/app/build/outputs/apk/debug/app-debug.apk
-```
+## Build and install the app
+
+1. Go to the root folder of the repository.
+2. Enter `python configure.py`.
+3. Enter `ninja android_apk`.
+4. Connect the device with adb.
+5. Enter `adb install -r port/android/app/build/outputs/apk/debug/app-debug.apk`.
+
+`ninja android` builds only the game image and the native libraries.
 
 ## Game data
 
-The game needs the PAL game data of this build (01.01.14.2342), the folder
-that holds `maps/`, exactly as the Linux build does. The app keeps it in its
-external files directory, `/sdcard/Android/data/com.halo.decomp/files`.
+The game needs the `maps/` folder from an Xbox disc image of any version of
+the game. The app cannot extract the disc image. Extract `maps/` with the
+Linux or Windows version (refer to the main
+[README](../../README.md#game-data)), then copy it to the phone. The app
+keeps the data in `/sdcard/Android/data/com.halo.decomp/files`.
 
-- On first launch the app shows a screen with a button that opens the
-  system folder picker: choose the folder that contains `maps` (or `maps`
-  itself) and the app copies it (about 1.8 GB).
-- Or, with the app installed and started once (so that it creates its
-  directories), push it from a computer:
-  `adb push <folder>/. /sdcard/Android/data/com.halo.decomp/files/`
+To install the data with the app:
 
-Saves go to `files/save` (`z:\` and `u:\` of the Xbox, as on Linux), and the
-game's log to `files/debug.txt`; the app keeps them readable over adb
-(`adb pull /sdcard/Android/data/com.halo.decomp/files/save` backs them up).
+1. Start the app.
+2. Push the button. The folder picker of the system opens.
+3. Select the folder that contains `maps`, or `maps` itself.
+4. Wait while the app copies the data (approximately 1.8 GB).
+
+To install the data from a computer:
+
+1. Start the app one time. The app makes its folders.
+2. Enter `adb push <folder>/. /sdcard/Android/data/com.halo.decomp/files/`.
+
+| Item | Location in `/sdcard/Android/data/com.halo.decomp/files` |
+| --- | --- |
+| Saved games (`z:\` and `u:\`) | `save` |
+| Log | `debug.txt` |
+| Settings | `config.toml` |
+
+To make a copy of the saved games, enter
+`adb pull /sdcard/Android/data/com.halo.decomp/files/save`.
 
 ## Controls
 
-Controllers are read through SDL3's gamepad API, so any controller Android
-recognises works; the first recognised one is player 1, further ones
-players 2-4 (split screen). Buttons map by position to the Xbox controller:
+The game reads controllers through the gamepad functions of SDL3. All the
+controllers that Android knows operate. The first controller is player 1.
+The other controllers are players 2 to 4 (split screen). The buttons agree
+with the positions on the Xbox controller:
 
-| DualSense | Xbox | Halo (default layout) |
+| DualSense | Xbox | Function in the game |
 | --- | --- | --- |
-| left stick / right stick | left stick / right stick | move / look |
+| left stick, right stick | left stick, right stick | move, look |
 | R2 | right trigger | fire |
-| L2 | left trigger | throw grenade |
+| L2 | left trigger | throw a grenade |
 | Cross | A | jump, accept |
 | Circle | B | melee, back |
 | Square | X | action, reload |
-| Triangle | Y | switch weapon |
+| Triangle | Y | change the weapon |
 | L1 | white | flashlight |
-| R1 | black | switch grenade |
-| L3 / R3 | left / right stick click | crouch / zoom |
+| R1 | black | change the grenade |
+| L3, R3 | left and right stick clicks | crouch, zoom |
 | D-pad | D-pad | |
-| Options | Start | pause menu |
-| Create | Back | |
+| Options | start | pause menu |
+| Create | back | |
 
-Rumble is passed to the controller. The Android back gesture acts as B,
-and a Bluetooth or USB keyboard works as described in the Linux README.
+The controller gets the rumble. The back gesture of Android is the B
+button. A Bluetooth or USB keyboard operates as on Linux. The screen does
+not accept touch input.
 
 ## Settings
 
-The settings are in `files/config.toml`, next to `maps`
-(`adb pull /sdcard/Android/data/com.halo.decomp/files/config.toml`, edit,
-`adb push` it back). The game writes it with the defaults and a comment on
-each setting the first time it runs; delete it to get the defaults back.
-The settings are those of the Linux README's Settings (volume, language,
-vsync, renderer debugging) without the desktop's window, mouse and paths,
-plus:
+The settings are in `config.toml` in the data folder of the app. To change
+them:
 
-| Setting | Effect |
+1. Enter `adb pull /sdcard/Android/data/com.halo.decomp/files/config.toml`.
+2. Change the file.
+3. Enter `adb push config.toml /sdcard/Android/data/com.halo.decomp/files/`.
+
+At the first start, the game writes the file with the default values. To
+get the default values again, delete the file.
+
+The settings are the settings of Linux, without the window, the mouse and
+the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+These settings are only for Android:
+
+| Setting | Function |
 | --- | --- |
-| `display.screen_width` | columns of the 480-line picture; `0` (the default) for the display's aspect ratio (1068 on a 20:9 phone), `640` for the Xbox's 4:3 |
-| `display.interpolation` | `false`: the original 30 frames per second instead of one per display refresh (port/linux/README.md, "Frame rate") |
-| `debug.sample_seconds` | see Debugging |
+| `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
+| `debug.sample_seconds` | Refer to "Find problems". |
 
 ## Internet play
 
-Internet play works as on the desktop (the Linux README's Internet play),
-except for Discord. Hosting a system link game puts its invite link on the
-clipboard, with a notice, to paste into a message. To join, open the link
-(the app handles `halo://join/...` links, whether or not the game is
-running: the launcher writes it to `files/join_link.txt`, where the game
-picks it up), or copy it and switch to the game.
+Internet play operates as on Linux, but without Discord. When the game
+hosts a system link game, it puts the invite link on the clipboard and
+shows a notice.
+
+To join a game, do one of these steps:
+
+- Open the link. The app is the handler of `halo://join/...` links. If the
+  game does not operate, the app starts it. The app writes the link to
+  `files/join_link.txt`, and the game reads it.
+- Copy the link and go to the game.
 
 ## Widescreen
 
-The game renders 480 lines at the display's aspect ratio instead of the
-Xbox's 640x480. Its camera derives the horizontal field of view from the
-viewport's shape with a fixed vertical one, so the 3D view simply widens
-("Hor+"). The HUD anchors to the title-safe frame, which widens with the
-screen; the menus, the loading bar and the post-game screens are laid out
-for 640 columns and are drawn centered (the vertex shaders shift them,
-`halo_screen_ui_offset`); chapter titles keep their place relative to the
-screen's sides; letterbox bars and fades cover the whole width. The
-changes are in `rasterizer_xbox.c`, `render.c`, `ui_widget.c`,
-`cinematics.c`, `main.c` and `rasterizer_xbox_screen_effect.c`, under
-`#ifdef HALO_ANDROID`.
+The game shows 480 lines in the shape of the display, not the 640x480 of
+the Xbox:
 
-## How it works
+- The 3D view is wider. The camera keeps the vertical field of view.
+- The HUD stays at the edges of the screen.
+- The menus, the loading bar and the screens after a game have 640
+  columns, at the center of the screen.
+- Black bars and fades cover all of the screen.
 
-### Why the game is not an ordinary arm64 library
+The changes are in `#ifdef HALO_ANDROID` in `rasterizer_xbox.c`, `render.c`,
+`ui_widget.c`, `cinematics.c`, `main.c` and
+`rasterizer_xbox_screen_effect.c`.
 
-The game's data formats embed 32-bit pointers: cache files are laid out for
-the Xbox's address space, game state is saved as a memory image, and
-Direct3D resources carry 32-bit physical addresses. The Linux build
-therefore compiles the game as 32-bit x86. Android devices no longer run
-32-bit ARM code (the Tensor G4 and other current SoCs have no AArch32 at
-all), and compiling the game for 64-bit pointers would change the layout of
-every structure it reads from disk.
+## How the port operates
 
-So the game runs as **ILP32 AArch64 code**: native 64-bit ARM instructions
-with 32-bit `int`, `long` and pointers, inside an ordinary 64-bit app.
+### ILP32 code
+
+The data of the game contains 32-bit pointers. The cache files have the
+layout of the Xbox memory. The saved games are copies of the memory.
+Direct3D resources contain 32-bit physical addresses. Current Android
+devices cannot execute 32-bit ARM code. 64-bit pointers change the layout of
+the structures that the game reads from its files.
+
+Thus the game is ILP32 AArch64 code: 64-bit ARM instructions with 32-bit
+`int`, `long` and pointers, in a 64-bit app.
 
 ### The guest image
 
-The game, the platform layer shared with Linux, and a small runtime are the
-*guest*. Clang offers ILP32 AArch64 only as Apple's `arm64_32` watchOS
-target, so the guest is compiled for `arm64_32-apple-watchos` with the
-Darwin environment hidden (`-U__APPLE__`, `-fno-define-target-os-macros`),
-to assembly; `tools/android_asm_convert.py` rewrites that Mach-O assembly as
-ELF assembly (symbol decoration, sections, `@PAGE`/`@PAGEOFF` relocations,
-GOT loads relaxed to direct addresses), which the ordinary AArch64 assembler
-turns into objects. `ld.lld` links them with `guest/guest.ld` into a static
-image, `build/android/halo_guest.elf`, at a fixed address just above the
-Xbox memory window (`include/halo_android_abi.h`). The APK carries it as an
-asset.
+The guest is the game, the platform layer and a small runtime:
 
-Its C library is a subset of musl built for a new `arm64_32` arch
-(`guest/libc/arch/arm64_32`): ILP32 types, a 32-bit `time_t` as in the MSVC
-runtime the game was written against, and a system call layer
-(`syscall_arch.h`) that forwards every call to the host. musl's futex-based
-locks, condition variables, stdio and malloc are used unchanged; thread
-creation, the thread pointer and clang's emulated TLS are in
-`guest/runtime/guest_thread.c`.
+1. clang compiles the guest for `arm64_32-apple-watchos`, the only ILP32
+   AArch64 target of clang. The options `-U__APPLE__` and
+   `-fno-define-target-os-macros` hide the Darwin environment.
+2. `tools/android_asm_convert.py` changes the Mach-O assembly to ELF
+   assembly.
+3. The AArch64 assembler makes the objects.
+4. `ld.lld` links the objects with `guest/guest.ld` to a static image,
+   `build/android/halo_guest.elf`, at a fixed address above the Xbox memory
+   (`include/halo_android_abi.h`).
+
+The APK contains the image as an asset.
+
+The C library of the guest is a part of musl for a new `arm64_32`
+architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
+`time_t`, as in the MSVC runtime of the game. Its system calls go to the
+host (`syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
+and supplies the thread pointer and TLS.
 
 ### The host library
 
-`libmain.so` is an ordinary arm64 NDK library started by SDL3's activity
-(`app/.../HaloActivity.java`). It
+`libmain.so` is an arm64 NDK library. The activity of SDL3 starts it
+(`app/.../HaloActivity.java`). The host library:
 
-- reserves the guest's address space below 4 GB: the Xbox window at
-  0x80000000, the image's range, and pools for the guest's mappings, which
-  it claims above the image first because ART keeps its own low-4 GB heaps
-  at the bottom of the address space (`host/host_memory.c`);
-- loads the image and fills its import table (`host/host_loader.c`);
-- runs the game's `main`, and every guest thread, on a thread whose stack
-  is in guest memory, since ILP32 code keeps stack addresses in 32-bit
-  registers (`host/host_thread.c`); the stack is given to `pthread_create`,
-  so it is also the stack ART knows, and SDL may call into Java from it;
-- hands SDL's audio callback, which SDL calls on its own thread, to a
-  thread with a guest stack that runs the game's callback
-  (`host/host_sdl.c`);
-- serves the guest's calls: system calls, converting the few structures
-  whose layout differs and keeping mappings below 4 GB
-  (`host/host_syscall.c`); SDL, whose objects become small handles
-  (`host/host_sdl.c`); OpenGL ES (`host/host_gl.c`); and the file system
-  and socket helpers of `port/linux/src/posix_*.c`, compiled into the host.
+- Reserves the address space of the guest below 4 GB: the Xbox memory at
+  `0x80000000`, the image, and pools for the memory of the guest
+  (`host/host_memory.c`).
+- Loads the image and fills its import table (`host/host_loader.c`).
+- Starts the `main` of the game and each guest thread on a stack in guest
+  memory, because ILP32 code keeps stack addresses in 32-bit registers
+  (`host/host_thread.c`).
+- Gives the audio callback of SDL to a thread with a guest stack
+  (`host/host_sdl.c`).
+- Does the calls of the guest: system calls (`host/host_syscall.c`), SDL
+  (`host/host_sdl.c`), OpenGL ES (`host/host_gl.c`), and the file and socket
+  functions of `port/linux/src/posix_*.c`.
 
-The guest calls the host through stubs (`tools/android_imports.py`) that
-branch through a table of host function pointers; the two ABIs agree on
-register use for 32-bit integers, floats and pointers, which arm64_32
-passes zero-extended. The OpenGL ES entry points are generated from the list
-in `port/linux/src/gl.h` (`tools/android_gl_stubs.py`), widening
-`GLsizeiptr` arguments, stack-passed arguments and the string array of
-`glShaderSource`. The `posix_*` helpers get wrappers that copy the host's
-`errno` back (`tools/android_posix_stubs.py`).
+The guest calls the host through stubs (`tools/android_imports.py`). The
+two ABIs use the same registers for 32-bit integers, floats and pointers.
+`tools/android_gl_stubs.py` makes the OpenGL ES stubs from
+`port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
+`posix_*` functions, which copy the `errno` of the host.
 
 ### OpenGL ES
 
-The renderer (`port/linux/src/d3d8_gl.c` and the NV2A shader translators)
-targets OpenGL ES 3.0 with optional 3.2 features under `HALO_ANDROID`:
+The renderer (`port/linux/src/d3d8_gl.c`) uses OpenGL ES 3.0, and some
+functions of OpenGL ES 3.2 if they are available:
 
-- clip control is emulated in the generated vertex shaders (y flipped and
-  depth remapped from 0..1), with the front-face winding inverted to match;
-- BGRA texels are uploaded as RGBA with a texture swizzle, and DXT textures
-  are decoded on the CPU when the driver lacks S3TC (Mali GPUs do);
-- the sampler LOD bias (used by water ripples) is applied in the pixel
-  shaders;
-- `D3DCOLOR` vertex attributes are byte-swapped on upload;
-- vertex and index data that is not drawn from the copy of the contiguous
-  memory (`d3d8_gl.c`, dynamic vertices and colour streams) streams into a
-  ring of three buffers, one per frame in flight, with unsynchronized mapped
-  writes: Mali copies a whole buffer for every `glBufferSubData` into one
-  that queued draws still use, and orphaning a large buffer each frame costs
-  as much, which exhausted the phone's memory within seconds. For the same
-  reason pages enter the copy with unsynchronized writes too (no queued draw
-  reads a page before its first upload);
-- indexed draws use base-vertex draws on ES 3.2, and are rebased on the CPU
-  before that;
-- border clamping, anisotropy and image copies are used where available;
-- visibility tests (lens flare occlusion) count samples with a fragment
-  shader atomic counter on OpenGL ES 3.1 and later, as the NV2A did; ES 3.0
-  only reports whether any sample passed, which reads as fully visible.
+- The vertex shaders flip y and change the depth range from 0..1. The front
+  face winding is inverted.
+- BGRA textures go to the GPU as RGBA with a swizzle. If the driver has no
+  S3TC (Mali GPUs), the CPU decodes the DXT textures.
+- The pixel shaders apply the LOD bias of the sampler.
+- The upload changes the byte order of `D3DCOLOR` vertex attributes.
+- Dynamic vertex and index data goes into a ring of three buffers, one for
+  each frame. On Mali, other methods used too much memory.
+- On OpenGL ES 3.2, indexed draws use a base vertex. Before 3.2, the CPU
+  changes the indices.
+- On OpenGL ES 3.1 and later, the visibility tests (lens flares) count
+  samples with an atomic counter, as the NV2A did. OpenGL ES 3.0 tells only
+  if a sample is visible.
 
-### Calling convention hazards
+### Calling conventions
 
-The decompiled sources sometimes declare a function differently in the file
-that calls it than where it is defined, or call it with no prototype at
-all. Under 32-bit x86 every argument is a stack slot and that goes
-unnoticed; under the guest's convention (Darwin's arm64) floating-point
-arguments travel in their own registers and variadic arguments on the
-stack, so such a call passes garbage. `tools/android_abi_check.py` compares
-every declaration with its definition in the LLVM IR of the sources
-compiled with the guest's flags; the unsafe ones are fixed: `hs.c` declared
-the script fades' red component as a `long` (the cause of a garbage fade
-colour at the end of a30's intro), and a dozen files call `error`,
-`console_printf` or `terminal_printf` without a prototype
-(`include/halo_android_variadic_prototypes.h` is force-included into them).
-The same target also turns some libm calls into Darwin library functions
-(`__sincos_stret`, `__exp10f`), which `guest/runtime/guest_misc.c`
-provides. The guest is compiled without floating-point contraction, as the
-x86 original had no fused multiply-add.
+Some files of the game declare a function differently from its definition,
+or call a function without a prototype. On 32-bit x86, this has no effect.
+The guest ABI passes floating-point arguments in their own registers and
+variadic arguments on the stack. Thus such a call gives incorrect values.
+
+`tools/android_abi_check.py` compares each declaration with its definition
+in the LLVM IR. The problems are repaired:
+
+- `hs.c` declared the red component of the script fades as `long`.
+- Some files call `error`, `console_printf` or `terminal_printf` without a
+  prototype. `include/halo_android_variadic_prototypes.h` gives the
+  prototypes.
+
+`guest/runtime/guest_misc.c` supplies the Darwin library functions that the
+target calls (`__sincos_stret`, `__exp10f`). The guest compiles without
+floating-point contraction, as on x86.
 
 ### Game source changes
 
-The game's x86 inline assembly has C equivalents under `#ifdef HALO_LINUX`,
-shared by all native ports ([port/linux/README.md](../linux/README.md#game-source-edits));
-the Xbox SDK declarations the ports use (`port/include/xdk`) contain none. Under
-`#ifdef HALO_ANDROID` are the seven `#pragma bss_seg(".bss")` lines
-Darwin's section syntax rejects, and a stack walker for the assertion
-handler that follows AArch64 frame records, so an assertion's log
-(`debug.txt`) lists the call sites. The MSVC build defines neither.
+The C replacements of the x86 inline assembly are in `#ifdef HALO_LINUX`
+(refer to [port/linux/README.md](../linux/README.md#game-source-changes)).
+These changes are in `#ifdef HALO_ANDROID`:
 
-The guest's musl uses its generic C math rather than the AArch64 inline
-assembly versions, leaving the choice of instructions to the compiler. The
-only assembly the port itself contains is necessary: the generated import
-stubs through which the guest calls the host (a 32-bit guest cannot hold
-or branch to a 64-bit host address), and the symbol aliases in
-`guest/libc/src_include/features.h` (the Darwin target rejects alias
-attributes).
+- Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
+  not accept them.
+- A stack walker follows the AArch64 frame records. Thus the log of an
+  assertion (`debug.txt`) shows the call sites.
 
-## Debugging
+The musl of the guest uses its C math, not the AArch64 assembly. The only
+assembly of the port is necessary:
 
-- `adb logcat -s halo` shows the port's log and the game's error output;
-  `files/debug.txt` is the game's own log.
-- A crash in guest code is logged with its registers and frame chain;
-  `llvm-symbolizer --obj=build/android/halo_guest.elf <address>` names the
-  functions.
-- `sample_seconds = <seconds>` in `config.toml`'s `[debug]` logs every guest thread's program
-  counter and frame chain that often, which finds hangs on devices without
-  root.
-- `gl_debug = true` in `config.toml`'s `[debug]` reports OpenGL ES errors around draws.
+- The import stubs. A 32-bit guest cannot keep or go to a 64-bit host
+  address.
+- The symbol aliases in `guest/libc/src_include/features.h`. The Darwin
+  target does not accept alias attributes.
 
-## Known limitations
+## Find problems
 
-- Bink video is not supported (as on Linux): the intro movies are skipped.
-- The device must allow the fixed guest address ranges (0x80000000 up to
-  about 0x89000000) to be reserved; the app reports it if they are taken.
-- Screen touches do nothing: the game is played with a controller (or a
-  keyboard).
-- Kernels with 16 KB pages (an Android 15 developer option) are not
-  supported: the Xbox memory emulation works in 4 KB pages.
+- Enter `adb logcat -s halo` to see the log of the port and the errors of
+  the game. `files/debug.txt` is the log of the game.
+- If the guest code stops, the log shows the registers and the frame chain.
+  To find the functions, enter
+  `llvm-symbolizer --obj=build/android/halo_guest.elf <address>`.
+- Set `sample_seconds = <seconds>` in `[debug]` of `config.toml`. The log
+  then shows the program counter and the frame chain of each guest thread
+  at this interval. This finds hangs on devices without root access.
+- Set `gl_debug = true` in `[debug]` of `config.toml`. The log then shows
+  the OpenGL ES errors.
+
+## Limits
+
+- Bink video is not available. The game skips the movies.
+- The device must let the app reserve the fixed guest addresses, from
+  `0x80000000` to approximately `0x89000000`. If the addresses are not
+  available, the app shows a message.
+- The game does not accept touch input. Use a controller or a keyboard.
+- Kernels with 16 KB pages (a developer option of Android 15) do not
+  operate. The Xbox memory uses 4 KB pages.

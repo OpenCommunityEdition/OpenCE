@@ -14,6 +14,11 @@ name: Build
 # - pushes that only change documentation do not build;
 # - Windows, whose minutes cost twice Linux's, builds only Windows;
 # - artifacts are kept for three days.
+#
+# A successful build of main is also published as a GitHub release, the
+# newest marked latest, so that
+# https://github.com/<repository>/releases/latest/download/<file> always
+# gives the latest build; the last five are kept.
 on:
   push:
     paths-ignore:
@@ -192,12 +197,66 @@ jobs:
           path: dist/halo-windows-release
           retention-days: 3
 
+  release:
+    # The six builds as a release, tagged build-<run number> and marked latest
+    # (every file keeps its name from release to release, for the README's
+    # latest/download links); then all but the newest five build-* releases
+    # go, tags and all. Only for main, and only when every platform built.
+    needs: [linux, android, windows]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.publish.outputs.tag }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: halo-*
+          path: artifacts
+
+      - name: Package
+        run: |
+          mkdir release
+          for build in artifacts/*/; do
+            name="$(basename "$build")"
+            (cd "$build" && zip -qr "$GITHUB_WORKSPACE/release/$name.zip" .)
+          done
+          ls -l release
+
+      - name: Publish
+        id: publish
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          tag="build-$GITHUB_RUN_NUMBER"
+          subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1)"
+          printf '%s\n\nCommit: %s\nBuild: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
+            "$subject" "$COMMIT_URL" "$RUN_URL" > notes.md
+          gh release create "$tag" release/*.zip --target "$GITHUB_SHA" --latest \
+            --title "Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" --notes-file notes.md
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Keep the last five
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+          while read -r tag; do
+            gh release delete "$tag" --cleanup-tag --yes
+          done
+
   notify:
     # A Discord embed for the run, to the DISCORD_WEBHOOK secret (nothing
-    # without it): green when every platform built, red when one did not, with each
-    # platform's result and links to the latest release builds (nightly.link
-    # serves the branch's latest successful run's artifacts).
-    needs: [linux, android, windows]
+    # without it): green when every platform built, red when one did not,
+    # with each platform's result, this run's release (main only), and links
+    # to the latest release's builds.
+    needs: [linux, android, windows, release]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -208,6 +267,8 @@ jobs:
           LINUX: ${{ needs.linux.result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+          SERVER: ${{ github.server_url }}
           REPOSITORY: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
@@ -233,13 +294,18 @@ jobs:
           else
             title="Build failed"; color=15548997
           fi
-          links="https://nightly.link/$REPOSITORY/workflows/build.yml/$BRANCH"
-          downloads="[Linux]($links/halo-linux-release.zip) · [Windows]($links/halo-windows-release.zip) · [Android]($links/halo-android-release.zip)"
+          latest="$SERVER/$REPOSITORY/releases/latest"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
+          if [ -n "$RELEASE_TAG" ]; then
+            release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
+          else
+            release="None (only a successful build of main makes one)"
+          fi
           subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1 | cut -c1-200)"
           jq -n \
             --arg title "$title" --argjson color "$color" --arg url "$RUN_URL" \
-            --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR" \
-            --arg branch "$BRANCH" --arg downloads "$downloads" \
+            --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR ($BRANCH)" \
+            --arg release "$release" --arg downloads "$downloads" \
             --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{
@@ -248,7 +314,8 @@ jobs:
                 {name: "Linux", value: $linux, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
-                {name: ("Latest release builds (" + $branch + ")"), value: $downloads}
+                {name: "Release", value: $release},
+                {name: "Latest release builds", value: $downloads}
               ]
             }]}' > payload.json
           curl -fsS -H "Content-Type: application/json" -d @payload.json "$WEBHOOK"
