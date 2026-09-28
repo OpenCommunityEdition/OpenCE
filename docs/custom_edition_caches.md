@@ -274,6 +274,20 @@ changed:
   (`custom_edition_scripts.c`); a map whose scripts use one this build does
   not have is refused and the names logged. The value types are numbered
   alike in both builds.
+- **Multiplayer vehicle placement.** This build places a multiplayer game's
+  vehicles by type: only the first three of the globals' multiplayer
+  vehicles are created, and of those the ones the variant's vehicle set
+  names (`game_engine_remap_vehicle`; the built-in variants name the first).
+  Custom Edition maps are made for retail Halo's rules: a vehicle placement's
+  multiplayer spawn flags name the game types it is placed in by default,
+  and a script may create any vehicle. `hugeass.map` depends on that (above).
+  For a Custom Edition map in slayer, capture the flag, king of the hill or
+  oddball, the native builds place the vehicles whose spawn flags name the
+  game type by default and let any vehicle be created
+  (`custom_edition_objects.c`, called from `object_types_place_all` and
+  `game_engine_remap_vehicle` under `HALO_LINUX`); a variant without
+  vehicles still has none, and race, which has no spawn flag, keeps this
+  build's rule.
 - **Multiplayer vehicles.** `game_engine_predict_resources` takes the three
   multiplayer vehicles Xbox globals always have; `beavercreek_halo3.yelo` has
   one, and oddball stopped on it. With fewer than three, the native builds
@@ -413,13 +427,23 @@ capture the flag for 45. Before the script conversion its scripts ran with
 Halo PC's indices; with it, 3 calls (`switch_bsp` twice,
 `cinematic_set_title`) and 1 engine global (`rider_ejection`) were given
 this build's index, as the offline comparison predicted. The player spawned
-in the map's hangar, which opens on a starfield, walked, got into a jet and
-fired; no error was logged but the map's own `NETGAME MAP FAILURE: failed to
-find enough spawn points for king 2/4` and the silenced sounds' message.
-Whether the hangar is as dark as Custom Edition draws it was not checked
-(its lightmaps average 78 to 184 of 255, as bright as Blood Gulch's). A
-failure after the models are converted used to stop on the game's `free` of
-NULL when releasing what was never allocated; that path now checks first.
+in the map's hangar, walked, got into a jet and fired; no error was logged
+but the map's own `NETGAME MAP FAILURE: failed to find enough spawn points
+for king 2/4` and the silenced sounds' message.
+
+The hangar opened on a starfield, though, where the owner's screenshot of
+the map in Custom Edition shows day: two seconds in, the map switched to its
+night structure BSP (the log now names each structure BSP loaded by its
+lightmap bitmap). Its `bsp` script turns the map to night when the unit
+named `die` has no health, and `die` is a biped placed under an oddball-only
+jet, which another script recreates every two seconds while it exists: this
+build placed that jet in slayer, and the recreated jet killed the biped.
+With the multiplayer vehicle placement below, the jet is not placed in
+slayer, the map stays in its day structure BSP (40 seconds), and a jet flown
+out of the hangar shows the sky, ring and green hills of the owner's
+screenshot. A failure after the models are converted used to stop on the
+game's `free` of NULL when releasing what was never allocated; that path now
+checks first.
 
 Before the sound conversion, the log filled with that message: the map's
 copy of every resource-held sound's header says it is uncompressed. The game
@@ -520,6 +544,7 @@ every layout used was then checked against the sample maps.
 | Multipurpose maps: Custom Edition's red, green, blue and alpha hold what the Xbox's alpha, green, red and blue do | the multipurpose maps the Custom Edition and the Xbox `bloodgulch.map` share, decoded and compared channel by channel (the cyborg's, the warthog's, the boulders') |
 | HUD meters: Custom Edition's alpha holds the Xbox's color (the fill order), and its color the Xbox's alpha (the shape) | `hud_ammo_meters`: Custom Edition's 512×512 A8R8G8B8 averaged down to the Xbox's 256×256 A8Y8 differs from the Xbox's luminance by 6.6 on average in alpha and 23 in color, and from its alpha by 12.3 in color and 23.4 in alpha; `hud_unit_meters` has its sprites rearranged, and shows the same swap when viewed. January's meter shader reads the fill order from color and discards texels without alpha |
 | HUD elements flagged *use high resolution scale* draw bitmaps twice the Xbox's size; others the same size | every unit and weapon HUD placement of `bloodgulch.map` whose tag the Xbox map also has (the motion sensor's foreground, unflagged, uses a 128×128 bitmap in both) |
+| Vehicle placements: the byte at 0x58 is the multiplayer team and the word at 0x5A the multiplayer spawn flags, default bits 0 to 3 (slayer, capture the flag, king of the hill, oddball) and allowed bits 8 to 11 | `hugeass.map`'s 78 vehicle placements: the byte is 1 on exactly the blue team's; the word is 0x0303 on warthogs, tachikomas and pelicans, 0x0F0F on ghosts, 0x0404 on 16 unnamed jets, 0x0808 on the night jet and 0 on vehicles its scripts create; OpenSauce leaves these bytes unnamed |
 | Script function and engine global tables: Halo PC's have entries this build's lacks, so a compiled index names another entry from some point on; value types are numbered alike | the compiled scripts of the sample, each call's function index against the name its first child keeps, and each engine global's index against its name: `timberland.map` 23 calls shifted (`player_effect_start` by 29), `ui.map` 11 (`camera_set` by 1), `hugeass.map` 3 calls and 1 global (`rider_ejection`, 158 against 147), `extinctionrevanepic2.map` 9 calls, and 4 of a function this build lacks; no other stock map has scripts; each call's value type is the type of its function here (1,485 of 1,485 in `hugeass.map`), or one the call site casts to |
 | Bitmaps the Xbox keeps in monochrome formats and Custom Edition as 32-bit color at the same size keep their channels (A8Y8 as A8R8G8B8 with red the luminance and alpha the alpha) | 24 of the 26 such bitmaps of `bloodgulch.map` decode to exactly the Xbox's values; the other 2 have other content |
 
@@ -652,15 +677,16 @@ python tools/custom_edition_tag_footprints.py --blocks assets/custom_edition "<X
 - **The byte-matched build is unchanged.** All 621 matching objects
   (`ninja all_source`, XDK `CL.exe`) were built from the January sources as
   they are on this branch and as they are at `f2fa457f`: every section and
-  symbol table is identical, and the files differ only in bytes 4 and 5,
-  part of the COFF time stamp, in the 58 objects the changed files made the
-  second build recompile. The game-source changes are all under
+  symbol table is identical, and the files differ only in their COFF time
+  stamp, in the 59 objects the changed files made the second build
+  recompile. The game-source changes are all under
   `#ifdef HALO_LINUX`: `cache/cache_files.c`, `cache/cache_files_windows.c`,
   `rasterizer/rasterizer_geometry.h` (declarations of the buffer functions),
   `rasterizer/xbox/rasterizer_xbox_transparent_geometry.c` (the chicago
   extra layers), `cache/physical_memory_map.c` and
   `cache/xbox_texture_cache.c` (the texture cache's size) and
-  `game/game_engine.c` (the multiplayer vehicles). No matching tool,
+  `game/game_engine.c` (the multiplayer vehicles and their placement) and
+  `objects/object_types.c` (their placement). No matching tool,
   reference binary or scoring rule was touched.
 - The new game units (`custom_edition_*.c`) compile without warnings under
   `-Wall -Wextra` as well as the game's usual flags, which silence warnings.

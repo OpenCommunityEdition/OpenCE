@@ -18,6 +18,7 @@ cache_file_formats.c.
 
 struct cache_file_tag_header;
 struct custom_edition_load_report;
+struct scenario_object_datum;
 struct structure_bsp;
 
 /* ---------- prototypes/CUSTOM_EDITION_CACHE.C */
@@ -107,6 +108,18 @@ build does not have or does not keep its name. */
 boolean custom_edition_scripts_convert(
 	byte *tag_cache,
 	unsigned long loaded_bytes);
+
+/* ---------- prototypes/CUSTOM_EDITION_OBJECTS.C */
+
+/* Whether a Custom Edition map is running a multiplayer game whose vehicles
+are chosen by their placements' spawn flags (also declared for the game in
+halo_linux_source_fixups.h). */
+boolean custom_edition_vehicles_by_placement(
+	void);
+/* Whether the vehicle placement `placement` is placed at the start of the
+running game. */
+boolean custom_edition_vehicle_placement_allowed(
+	struct scenario_object_datum const *placement);
 
 /* ---------- prototypes/CUSTOM_EDITION_GEOMETRY.C */
 

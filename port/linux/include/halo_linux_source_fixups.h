@@ -45,6 +45,13 @@ this build's order; forgotten together when the map goes
 (port/linux/src/xbox_textures.c) */
 void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order);
 void halo_custom_edition_texels_forget(void);
+/* whether a Halo Custom Edition map's multiplayer vehicles are chosen by
+their placements' spawn flags, as in retail Halo, and whether a vehicle
+placement is placed in the running game
+(port/linux/game/custom_edition_objects.c) */
+struct scenario_object_datum;
+unsigned char custom_edition_vehicles_by_placement(void);
+unsigned char custom_edition_vehicle_placement_allowed(struct scenario_object_datum const *placement);
 
 /* the width of the screen the game draws, 480 lines tall: the device's or
 the display's shape, or 640 (port/linux/src/d3d8_gl.c) */

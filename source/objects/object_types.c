@@ -1261,6 +1261,16 @@ void object_types_place_all(
 							scenario_datum_index,
 							element_size);
 
+#ifdef HALO_LINUX
+					/* a Halo Custom Edition map places the vehicles its placements'
+					multiplayer spawn flags name for the game type, as retail Halo
+					does (port/linux/game/custom_edition_objects.c) */
+					if (object_type == _object_type_vehicle &&
+						!custom_edition_vehicle_placement_allowed(scenario_object))
+					{
+						continue;
+					}
+#endif
 					object_new_from_scenario(scenario_object, scenario_palette);
 					objects_garbage_collection();
 				}

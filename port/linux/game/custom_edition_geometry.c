@@ -679,7 +679,15 @@ boolean custom_edition_structure_bsp_load(
 			vertices_offset += material->compressed_vertex_data.size;
 		}
 	}
-	if (!success)
+	if (success)
+	{
+		error(
+			_error_silent,
+			"custom edition: the structure BSP lit by bitmap tag 0x%08lX has its vertices compressed (0x%lX bytes)",
+			(unsigned long)structure_bsp->lightmap_group.index,
+			vertices_size);
+	}
+	else
 	{
 		error(_error_silent, "custom edition: cannot make the buffers of the structure BSP's materials");
 		custom_edition_structure_bsp_unload();
