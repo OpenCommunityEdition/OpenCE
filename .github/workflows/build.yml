@@ -191,3 +191,64 @@ jobs:
           name: halo-windows-release
           path: dist/halo-windows-release
           retention-days: 3
+
+  notify:
+    # A Discord embed for the run, to the DISCORD_WEBHOOK secret (nothing
+    # without it): green when every platform built, red when one did not, with each
+    # platform's result and links to the latest release builds (nightly.link
+    # serves the branch's latest successful run's artifacts).
+    needs: [linux, android, windows]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          LINUX: ${{ needs.linux.result }}
+          ANDROID: ${{ needs.android.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "no DISCORD_WEBHOOK secret: nothing to post"
+            exit 0
+          fi
+          status() {
+            case "$1" in
+              success) echo "✅ Built" ;;
+              failure) echo "❌ Failed" ;;
+              cancelled) echo "⏹️ Cancelled" ;;
+              *) echo "➖ Skipped" ;;
+            esac
+          }
+          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
+            title="Build succeeded"; color=5763719
+          else
+            title="Build failed"; color=15548997
+          fi
+          links="https://nightly.link/$REPOSITORY/workflows/build.yml/$BRANCH"
+          downloads="[Linux]($links/halo-linux-release.zip) · [Windows]($links/halo-windows-release.zip) · [Android]($links/halo-android-release.zip)"
+          subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1 | cut -c1-200)"
+          jq -n \
+            --arg title "$title" --argjson color "$color" --arg url "$RUN_URL" \
+            --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR" \
+            --arg branch "$BRANCH" --arg downloads "$downloads" \
+            --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{embeds: [{
+              title: $title, url: $url, color: $color, description: $description, timestamp: $timestamp,
+              fields: [
+                {name: "Linux", value: $linux, inline: true},
+                {name: "Windows", value: $windows, inline: true},
+                {name: "Android", value: $android, inline: true},
+                {name: ("Latest release builds (" + $branch + ")"), value: $downloads}
+              ]
+            }]}' > payload.json
+          curl -fsS -H "Content-Type: application/json" -d @payload.json "$WEBHOOK"
