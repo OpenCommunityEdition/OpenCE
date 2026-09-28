@@ -97,6 +97,19 @@ GAME_FLAGS = [
 TOML_DIR = Path("port/third_party/tomlc17")
 KCP_DIR = Path("port/third_party/kcp")
 MUSL_MATH_DIR = Path("port/third_party/musl-math")
+# the self-updater's TLS (port/linux/src/posix_update.c)
+MBEDTLS_DIR = Path("port/third_party/mbedtls")
+
+
+def updater_defines(release: bool) -> str:
+    """the self-updater's build (port/linux/src/updater.c): its number, from
+    HALO_BUILD_NUMBER (tools/ci_build.py gives it for builds of main; none
+    elsewhere, which never look for updates), and its configuration"""
+    number = os.environ.get("HALO_BUILD_NUMBER", "0")
+    if not number.isdigit():
+        number = "0"
+    flavor = "release" if release else "debug"
+    return f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
 
 PLATFORM_FLAGS = [
     "-std=gnu11",
@@ -390,11 +403,24 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             sdk_flags,
         ])
         posix_cflags = " ".join(POSIX_FLAGS + [march_flag(sln), f"-I{platform_dir}"])
+        mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
         for source in sorted(platform_dir.glob("*.c")):
-            if source.name.startswith("posix_"):
+            if source.name == "posix_update.c":
+                add_object(source, f"{posix_cflags} {mbedtls_include}", posix=True)
+            elif source.name.startswith("posix_"):
                 add_object(source, posix_cflags, posix=True)
+            elif source.name == "updater.c":
+                add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
+        # the self-updater's TLS (port/third_party/mbedtls), with the host's
+        # ABI as the posix_*.c that use it (and no loop turned into glibc's
+        # wcslen, which linux_link_check.py rejects: the game's wchar_t is
+        # 16-bit)
+        for source in sorted((MBEDTLS_DIR / "library").glob("*.c")):
+            add_object(source, " ".join(POSIX_FLAGS + [march_flag(sln), mbedtls_include,
+                                                       f"-I{MBEDTLS_DIR / 'library'}", "-fno-builtin-wcslen",
+                                                       "-w"]), posix=True)
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI (its structs hold doubles) and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))

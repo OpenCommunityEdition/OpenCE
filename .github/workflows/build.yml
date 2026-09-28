@@ -121,10 +121,30 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('port/android/**/*.gradle*', 'port/android/gradle/wrapper/gradle-wrapper.properties') }}
 
+      # the app's signing key, from the ANDROID_KEYSTORE_BASE64 secret (a
+      # keystore, base64) and ANDROID_KEYSTORE_PASSWORD (its password, and
+      # the key's, alias halo): every build signed with it installs over the
+      # one before, as the app's self-updater (Updater.java) needs. Without
+      # them each build is signed with the runner's own debug key.
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/halo.keystore"
+            echo "HALO_ANDROID_KEYSTORE=$RUNNER_TEMP/halo.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::no ANDROID_KEYSTORE_BASE64 secret: the Android builds cannot update over each other"
+          fi
+
       - name: Debug
+        env:
+          HALO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: python3 tools/ci_build.py android debug
 
       - name: Release
+        env:
+          HALO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: python3 tools/ci_build.py android release
 
       - name: Compile cache

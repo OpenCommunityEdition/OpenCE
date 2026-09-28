@@ -6,6 +6,17 @@ plugins {
 // native libraries (jniLibs) and the guest image (assets)
 def staged = new File(rootDir, "../../build/android")
 
+// a build of main knows its number (tools/ci_build.py), which names its
+// release and which the self-updater (Updater.java) compares; others have
+// none and never look for updates
+def buildNumberText = System.getenv("HALO_BUILD_NUMBER") ?: "0"
+def buildNumber = buildNumberText.isInteger() ? buildNumberText.toInteger() : 0
+
+// the workflow's signing key (.github/workflows/build.yml): every build of
+// main signed with it can install over the one before; without it, the
+// debug key of the computer that builds
+def signingKey = System.getenv("HALO_ANDROID_KEYSTORE")
+
 android {
     namespace "com.halo.decomp"
     compileSdk 35
@@ -14,8 +25,9 @@ android {
         applicationId "com.halo.decomp"
         minSdk 28
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode Math.max(1, buildNumber)
+        versionName buildNumber > 0 ? "build " + buildNumber : "1.0"
+        buildConfigField "int", "HALO_BUILD_NUMBER", "${buildNumber}"
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -40,14 +52,30 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        if (signingKey) {
+            halo {
+                storeFile file(signingKey)
+                storePassword System.getenv("HALO_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("HALO_ANDROID_KEY_ALIAS") ?: "halo"
+                keyPassword System.getenv("HALO_ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
             minifyEnabled false
+            signingConfig signingKey ? signingConfigs.halo : signingConfigs.debug
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig signingKey ? signingConfigs.halo : signingConfigs.debug
         }
     }
 

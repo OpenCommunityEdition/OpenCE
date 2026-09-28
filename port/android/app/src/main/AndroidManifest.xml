@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- installing a new version of the game (Updater) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"
@@ -55,5 +57,21 @@
             android:resizeableActivity="false"
             android:preferMinimalPostProcessing="true"
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation" />
+
+        <!-- the downloaded new version, for the package installer (Updater) -->
+        <provider
+            android:name=".UpdateProvider"
+            android:authorities="com.halo.decomp.update"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <!-- the game started again once a new version is installed -->
+        <receiver
+            android:name=".UpdateReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

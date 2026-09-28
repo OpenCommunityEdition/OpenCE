@@ -10,7 +10,9 @@ computers. Debug builds skip link-time and profile-guided optimisation,
 which only make the build slower; release builds use both, as a local
 release build does (profile-guided optimisation needs clang 22 or later,
 and is skipped with an older one). CI_COMPILER_LAUNCHER (ccache, say) is
-passed on as --compiler-launcher.
+passed on as --compiler-launcher. A build of the main branch gets the run's
+number (HALO_BUILD_NUMBER), which its release is named after and the
+self-updater compares.
 """
 
 import argparse
@@ -53,6 +55,12 @@ def main() -> int:
     launcher = os.environ.get("CI_COMPILER_LAUNCHER")
     if launcher:
         configure += ["--compiler-launcher", launcher]
+    # a build of main knows its number, which names its release (build-<n>),
+    # for the self-updater (port/linux/src/updater.c, and the Android app);
+    # other builds have none, and never look for updates
+    if os.environ.get("GITHUB_REF") == "refs/heads/main" and os.environ.get("GITHUB_RUN_NUMBER", "").isdigit():
+        os.environ["HALO_BUILD_NUMBER"] = os.environ["GITHUB_RUN_NUMBER"]
+        print(f"build number {os.environ['HALO_BUILD_NUMBER']}", flush=True)
     run(configure)
 
     if args.platform == "android":
@@ -78,6 +86,10 @@ def main() -> int:
         # follows extract-xiso, whose license asks binaries to carry its
         # notice
         shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
+    if args.platform == "linux":
+        # the self-updater's TLS (port/third_party/mbedtls), whose Apache
+        # license asks the same
+        shutil.copy2(ROOT / "port/third_party/mbedtls/LICENSE", dist / "mbedtls-LICENSE.txt")
     return 0
 
 

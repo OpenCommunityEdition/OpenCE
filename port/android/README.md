@@ -128,6 +128,25 @@ To join a game, do one of these steps:
   `files/join_link.txt`, and the game reads it.
 - Copy the link and go to the game.
 
+## Updates
+
+The app from GitHub Actions can update itself, as on Linux (refer to
+"Updates" in [port/linux/README.md](../linux/README.md#updates)). When you
+select "Yes":
+
+1. The app downloads the new version.
+2. The package installer of Android opens. At the first update, Android asks
+   you to let Halo install apps. Allow it.
+3. Select "Update". Android replaces the app.
+4. Select "Open" to start the new version.
+
+To install over the previous version, each build must have the same
+signature. GitHub Actions signs each build with the key in the
+`ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` secrets of the
+repository. If you installed a build that has a different signature, remove
+that build before you install a new build. Removing the app deletes its data
+folder: first make a copy of `maps/` and `save/`.
+
 ## Widescreen
 
 The game shows 480 lines in the shape of the display, not the 640x480 of

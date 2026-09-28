@@ -21,6 +21,8 @@ public class HaloActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         preferHighestRefreshRate();
+        // a new version looked for while the game starts
+        Updater.start(this);
     }
 
     /**

@@ -50,6 +50,17 @@ SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 TOML_DIR = Path("port/third_party/tomlc17")
 KCP_DIR = Path("port/third_party/kcp")
 
+
+def updater_defines(release: bool) -> str:
+    """the self-updater's build (port/linux/src/updater.c): its number, from
+    HALO_BUILD_NUMBER (tools/ci_build.py gives it for builds of main; none
+    elsewhere, which never look for updates), and its configuration"""
+    number = os.environ.get("HALO_BUILD_NUMBER", "0")
+    if not number.isdigit():
+        number = "0"
+    flavor = "release" if release else "debug"
+    return f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
+
 WINDOWS_ABI_FLAGS = [
     "--target=i686-pc-windows-msvc",
     "-fms-extensions",
@@ -374,7 +385,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         for source in sorted(linux_platform.glob("*.c")):
             if source.name in replaced:
                 continue
-            add_object(source, platform_cflags)
+            if source.name == "updater.c":
+                add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
+            else:
+                add_object(source, platform_cflags)
         for source in sorted((PORT_DIR / "src").glob("*.c")):
             add_object(source, win32_cflags if source.name.startswith("win32_") else platform_cflags)
         # the settings file's parser (port/third_party/tomlc17), with the

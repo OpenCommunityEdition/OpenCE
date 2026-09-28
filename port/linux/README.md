@@ -168,6 +168,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
+| `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
+| `debug.update_answer` | `""` | `HALO_UPDATE_ANSWER` | The answer to the update question, for automatic tests: `yes`, `no` or `never`. Empty: the game asks. |
 | `debug.exit_after` | `0.0` | `HALO_EXIT_AFTER` | The game stops after this number of seconds. `0`: never. |
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | The game writes each Nth frame to this folder as a BMP file. |
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
@@ -178,6 +180,32 @@ the setting for one start of the game. It has priority over the file.
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
+
+## Updates
+
+The builds from GitHub Actions (refer to the main [README](../../README.md#download))
+can update themselves. At start-up, the game asks GitHub for the latest
+release. The game does not wait for the answer. If the latest release is not
+newer, the game does nothing.
+
+If the latest release is newer, the game asks: "Do you want to update?"
+
+- Select "Yes" to update. The game downloads the release for this platform,
+  replaces its files and starts the new version. The old files get the
+  extension `.old`. The new version deletes them.
+- Select "No" to continue. The game asks again at the next start.
+- Select "Do not ask again", then "Yes", to stop the questions. The game
+  writes `auto = false` in the `[update]` section of `config.toml`. To get
+  the questions again, set `auto = true`.
+
+The game downloads through HTTPS. It examines the certificate of the server
+against the certificate authorities of the system: on Linux, the bundle of
+the distribution (`src/posix_update.c`, with Mbed TLS); on Windows, the
+certificate store of Windows (WinHTTP). The folder of the executable must
+let the game write to it.
+
+Builds that you make yourself have no build number. They do not look for
+updates.
 
 ## Frame rate
 

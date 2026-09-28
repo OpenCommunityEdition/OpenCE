@@ -25,6 +25,10 @@ Use the release build to play. The debug build stops at the first failed
 assertion and writes it to the log. Use the debug build to find and report
 problems.
 
+The game updates itself. At start-up it looks for a newer release, and asks
+if you want to install it. Refer to "Updates" in
+[port/linux/README.md](port/linux/README.md#updates).
+
 Each build of the `main` branch that passes on all three platforms is a new
 release. The [Releases](https://github.com/cybersecurity/halo-ce-universal/releases)
 page keeps the last five releases. If the latest build has a problem, get

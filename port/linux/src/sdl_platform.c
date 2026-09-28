@@ -42,6 +42,12 @@ static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct platform_keystroke keystroke_queue[KEYSTROKE_QUEUE_SIZE];
 static unsigned long keystroke_head, keystroke_count;
 
+#ifndef HALO_ANDROID
+/* updater.c's: the desktop self-updater */
+void updater_start(void);
+void updater_poll(SDL_Window *window);
+#endif
+
 BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
@@ -70,6 +76,8 @@ BOOL platform_sdl_initialize(void)
 	/* found (or offered to the player, platform_offer_game_data) before the
 	game's window opens */
 	platform_data_root();
+	/* (a new version looked for meanwhile, updater_poll asking about it) */
+	updater_start();
 #endif
 	return TRUE;
 }
@@ -627,6 +635,9 @@ void platform_pump_events(void)
 		platform_log("exiting after debug.exit_after");
 		exit(EXIT_SUCCESS);
 	}
+#ifndef HALO_ANDROID
+	updater_poll(platform_window);
+#endif
 	pthread_mutex_lock(&input_lock);
 	while (SDL_PollEvent(&event))
 	{

@@ -138,6 +138,10 @@ static const struct config_setting config_settings[] =
 		"The Discord application internet play invites go through while the\n"
 		"Discord desktop client runs; empty for none." },
 
+	{ "update.auto", _config_boolean, "true", "HALO_UPDATE_AUTO", _environment_value, _platform_all,
+		"Look for a new version when the game starts, and offer to update to it;\n"
+		"false never looks (the game's \"Do not ask again\" writes false here)." },
+
 	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
 		"\"host:<map>\" hosts a game on that map, \"join\" joins the first game found;\n"
@@ -163,6 +167,9 @@ static const struct config_setting config_settings[] =
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); empty for none." },
+	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
+		"The answer to the new version question, for automated tests: \"yes\",\n"
+		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
@@ -720,6 +727,118 @@ static const struct config_value *config_value(const char *name, enum config_typ
 		return &none;
 	}
 	return &config_values[index];
+}
+
+/* ---------- writing a setting */
+
+/* the line's key, if it is "key = ..." (after spaces), in key */
+static int config_line_key(const char *line, const char *end, const char *key)
+{
+	size_t length = strlen(key);
+
+	while (line < end && (*line == ' ' || *line == '\t'))
+		line++;
+	if ((size_t)(end - line) <= length || strncmp(line, key, length) != 0)
+		return 0;
+	line += length;
+	while (line < end && (*line == ' ' || *line == '\t'))
+		line++;
+	return line < end && *line == '=';
+}
+
+/* the section the line opens, if it is "[section]" (after spaces) */
+static int config_line_section(const char *line, const char *end, char *section, size_t size)
+{
+	const char *close;
+
+	while (line < end && (*line == ' ' || *line == '\t'))
+		line++;
+	if (line >= end || *line != '[')
+		return 0;
+	close = memchr(line, ']', (size_t)(end - line));
+	if (!close || (size_t)(close - line - 1) >= size)
+		return 0;
+	memcpy(section, line + 1, (size_t)(close - line - 1));
+	section[close - line - 1] = 0;
+	return 1;
+}
+
+/* sets a boolean setting, for now and in config.toml: its line there is
+changed (or added), the rest of the file kept as it is */
+int config_write_boolean(const char *name, int value)
+{
+	const char *dot = strchr(name, '.');
+	long index = config_setting_index(name);
+	char section[64], key[64], wanted[80], current[64] = "", line_text[96], path[1024];
+	struct config_text out = { 0 };
+	size_t size = 0;
+	char *text;
+	const char *line;
+	int written = 0, in_section = 0, succeeded;
+
+	if (index < 0 || config_settings[index].type != _config_boolean || !dot || (size_t)(dot - name) >= sizeof(section))
+		return 0;
+	/* (the file read first, as the other settings are) */
+	config_boolean(name);
+	pthread_mutex_lock(&config_lock);
+	config_values[index].boolean = value != 0;
+	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
+	snprintf(key, sizeof(key), "%s", dot + 1);
+	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value ? "true" : "false");
+	snprintf(wanted, sizeof(wanted), "%s", section);
+	config_path(path, sizeof(path));
+	text = config_read_file(path, &size);
+	for (line = text ? text : ""; *line;)
+	{
+		const char *end = line + strcspn(line, "\n");
+		const char *next = *end ? end + 1 : end;
+
+		if (config_line_section(line, end, current, sizeof(current)))
+		{
+			/* (leaving the section without the key: it goes at its end) */
+			if (in_section && !written)
+			{
+				config_append(&out, line_text);
+				written = 1;
+			}
+			in_section = !strcmp(current, wanted);
+		}
+		else if (in_section && !written && config_line_key(line, end, key))
+		{
+			config_append(&out, line_text);
+			written = 1;
+			line = next;
+			continue;
+		}
+		{
+			char *copy = config_copy(line, (size_t)(next - line));
+
+			if (copy)
+			{
+				config_append(&out, copy);
+				free(copy);
+			}
+		}
+		line = next;
+	}
+	if (!written)
+	{
+		if (out.length && out.buffer[out.length - 1] != '\n')
+			config_append(&out, "\n");
+		if (!in_section)
+		{
+			char header[80];
+
+			snprintf(header, sizeof(header), "\n[%s]\n", section);
+			config_append(&out, header);
+		}
+		config_append(&out, line_text);
+	}
+	succeeded = out.buffer && config_write_file(path, out.buffer);
+	pthread_mutex_unlock(&config_lock);
+	free(out.buffer);
+	free(text);
+	return succeeded;
 }
 
 /* ---------- public code */
