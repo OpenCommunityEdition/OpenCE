@@ -27,6 +27,13 @@ XDK_INCLUDE = Path("port/include/xdk")
 def xdk_headers() -> List[Path]:
     return sorted(XDK_INCLUDE.glob("*.h"))
 
+
+def compile_launcher(sln: Any) -> str:
+    """what the native ports' compile commands start with: the
+    --compiler-launcher (ccache, say) and a space, or nothing"""
+    launcher = getattr(sln, "compiler_launcher", None)
+    return f"{launcher} " if launcher else ""
+
 # The optimisation level of every unit, and of link-time optimisation.
 OPTIMISATION = "-O2"
 
@@ -266,7 +273,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     )
     n.rule(
         name="linux_cc",
-        command="$linux_cc -MMD -MF $out.d $cflags -c $in -o $out",
+        command=f"{compile_launcher(sln)}$linux_cc -MMD -MF $out.d $cflags -c $in -o $out",
         description="LINUX CC $out",
         depfile="$out.d",
         deps="gcc",

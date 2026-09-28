@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import LINUX_PROFILE, XDK_INCLUDE, pgo_mode, pgo_profile, profile_use_flags, xdk_headers
+from .linux_build import LINUX_PROFILE, XDK_INCLUDE, compile_launcher, pgo_mode, pgo_profile, profile_use_flags, xdk_headers
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -315,7 +315,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
 
     n.rule(
         name="android_guest_cc",
-        command=(f"$android_guest_cc -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
+        command=(f"{compile_launcher(sln)}$android_guest_cc -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
                  f"{python} tools/android_asm_convert.py $out.darwin.s $out.s && "
                  f"$android_guest_cc --target=aarch64-linux-android -c $out.s -o $out"),
         description="ANDROID CC $out",

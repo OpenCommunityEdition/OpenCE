@@ -19,6 +19,8 @@ This is based on [bnunu](https://github.com/bnunu/halo)'s decompilation project,
 
 You need Python and [ninja-build](https://ninja-build.org/) on your PATH; run `configure.py` from the repository root, then `ninja` with the target below (plain `ninja` builds the one for the computer you are on). No part of the Xbox SDK is needed: the SDK declarations the game uses are in [port/include/xdk](port/include/xdk/README.md).
 
+Every pushed commit is built by GitHub Actions ([.github/workflows/build.yml](.github/workflows/build.yml)): debug and release builds for Linux, Windows and Android, made by `tools/ci_build.py` (which also works locally, e.g. `python tools/ci_build.py linux release`) and kept as artifacts for three days.
+
 ### Native Linux build
 
 `ninja linux` compiles the game with clang into a native 32-bit Linux executable, `build/linux/halo`. It needs clang, 32-bit glibc development files and 32-bit SDL3. It renders with OpenGL, plays sound through SDL3 audio, and takes keyboard, mouse and gamepad input. Put the PAL game data (build 01.01.14.2342) under `assets/` so that `assets/maps` exists, then run `build/linux/halo`. See [port/linux/README.md](port/linux/README.md) for controls and settings.

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode, march_flag, pgo_mode,
-                          pgo_profile, profile_use_flags, xdk_headers)
+                          compile_launcher, pgo_profile, profile_use_flags, xdk_headers)
 from .ninja_syntax import Writer
 
 LINUX_DIR = Path("port/linux")
@@ -252,7 +252,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             implicit=[Path("tools/linux_msvc_semantics.py"), *game_headers])
     n.rule(
         name="windows_cc",
-        command="$windows_cc -MMD -MF $out.d $cflags -c $in -o $out",
+        command=f"{compile_launcher(sln)}$windows_cc -MMD -MF $out.d $cflags -c $in -o $out",
         description="WINDOWS CC $out",
         depfile="$out.d",
         deps="gcc",

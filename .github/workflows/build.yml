@@ -1,14 +1,193 @@
 name: Build
 
-# Builds are disabled for now. The native builds no longer need the Xbox
-# SDK (port/include/xdk), so they can be set up here. This placeholder runs
-# only when started manually and builds nothing.
+# Debug and release builds of the native ports (Linux, Windows, Android) for
+# every pushed commit, uploaded as artifacts. tools/ci_build.py does each
+# build; see it for the options.
+#
+# Kept cheap:
+# - one job per platform builds both configurations, so its set-up (tools,
+#   downloads, caches) is paid once;
+# - compiles go through ccache, whose cache carries over from run to run, so
+#   a commit only recompiles what it changed; downloads (SDL, musl, Gradle)
+#   are cached too;
+# - a newer push to the same branch cancels a run still going;
+# - pushes that only change documentation do not build;
+# - Windows, whose minutes cost twice Linux's, builds only Windows;
+# - artifacts are kept for three days.
 on:
+  push:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "research/**"
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI_COMPILER_LAUNCHER: ccache
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_MAXSIZE: 1G
+
 jobs:
-  disabled:
-    runs-on: ubuntu-latest
+  linux:
+    # Arch Linux has what the build needs as packages: clang 22 (for the
+    # profile-guided optimisation in pgo/) and 32-bit SDL 3.
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 40
     steps:
-    - name: Builds disabled
-      run: echo "Builds are disabled for now."
+      - name: Install the toolchain
+        run: |
+          printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          pacman -Syu --noconfirm --needed git zstd python python-pytest ninja ccache \
+            clang lld gcc lib32-glibc lib32-gcc-libs lib32-sdl3
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
+
+      - name: Debug
+        run: python tools/ci_build.py linux debug
+
+      - name: Release
+        run: python tools/ci_build.py linux release
+
+      - name: Test
+        run: python -m pytest -q tools/test_linux_port.py
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-debug
+          path: dist/halo-linux-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-linux-release
+          path: dist/halo-linux-release
+          retention-days: 3
+
+  android:
+    # The runner image has the Android SDK and NDK, a JDK and CMake.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools"
+          curl -fsSL -o ninja.zip https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
+          unzip -q ninja.zip -d "$RUNNER_TEMP/tools" && rm ninja.zip
+          curl -fsSL https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-linux-x86_64.tar.xz \
+            | tar -xJ -C "$RUNNER_TEMP/tools" --strip-components=1 ccache-4.10.2-linux-x86_64/ccache
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-android-${{ github.sha }}
+          restore-keys: ccache-android-
+
+      # musl and SDL, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: build/android/third_party
+          key: android-third-party-${{ hashFiles('tools/android_build.py') }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('port/android/**/*.gradle*', 'port/android/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Debug
+        run: python3 tools/ci_build.py android debug
+
+      - name: Release
+        run: python3 tools/ci_build.py android release
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-android-debug
+          path: dist/halo-android-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-android-release
+          path: dist/halo-android-release
+          retention-days: 3
+
+  windows:
+    # The runner image has LLVM, Python and Visual Studio's x86 libraries and
+    # Windows SDK.
+    runs-on: windows-2025
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the toolchain
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -OutFile ninja.zip https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip
+          Expand-Archive ninja.zip -DestinationPath "$env:RUNNER_TEMP\tools"
+          Invoke-WebRequest -OutFile ccache.zip https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-windows-x86_64.zip
+          Expand-Archive ccache.zip -DestinationPath $env:RUNNER_TEMP
+          Copy-Item "$env:RUNNER_TEMP\ccache-4.10.2-windows-x86_64\ccache.exe" "$env:RUNNER_TEMP\tools"
+          Remove-Item ninja.zip, ccache.zip
+          "$env:RUNNER_TEMP\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-windows-${{ github.sha }}
+          restore-keys: ccache-windows-
+
+      # SDL's development package, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: build/windows/third_party
+          key: windows-third-party-${{ hashFiles('tools/windows_build.py') }}
+
+      - name: Debug
+        run: python tools/ci_build.py windows debug
+
+      - name: Release
+        run: python tools/ci_build.py windows release
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-windows-debug
+          path: dist/halo-windows-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-windows-release
+          path: dist/halo-windows-release
+          retention-days: 3
