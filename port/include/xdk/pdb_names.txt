@@ -471,6 +471,7 @@ GlobalMemoryStatus
 GlobalReAlloc
 HANDLE
 HGLOBAL
+HINSTANCE
 HLOCAL
 HRESULT
 htonl
@@ -644,8 +645,8 @@ Sleep
 SleepEx
 sockaddr
 sockaddr_in
-socket
 SOCKET
+socket
 SwitchToThread
 SYSTEMTIME
 SystemTimeToFileTime
@@ -671,8 +672,8 @@ WORD
 WriteFile
 WriteFileEx
 WSACleanup
-WSAData
 WSADATA
+WSAData
 WSAGetLastError
 WSASetLastError
 WSAStartup
