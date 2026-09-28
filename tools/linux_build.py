@@ -19,6 +19,13 @@ from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux")
 PORT_CONFIG = PORT_DIR / "port.json"
+# the Xbox SDK declarations the game and the platform layer use, in place of
+# the SDK's headers (port/include/xdk/README.md)
+XDK_INCLUDE = Path("port/include/xdk")
+
+
+def xdk_headers() -> List[Path]:
+    return sorted(XDK_INCLUDE.glob("*.h"))
 
 # The optimisation level of every unit, and of link-time optimisation.
 OPTIMISATION = "-O2"
@@ -208,7 +215,7 @@ def linux_configure_inputs() -> List[Path]:
     """Files whose change must re-run configure.py."""
     if not PORT_CONFIG.is_file():
         return [Path(__file__)]
-    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game"]
+    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE]
 
 
 def _quote(path: Any) -> str:
@@ -222,8 +229,6 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         return
     config = _load_port_config()
     build_dir: Path = sln.build_dir / "linux"
-    overlay_dir = build_dir / "sdk_include"
-    overlay_stamp = build_dir / "sdk_include.stamp"
     obj_dir = build_dir / "obj"
     output = build_dir / "halo"
     cc = sln.linux_cc or "clang"
@@ -234,16 +239,6 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     n.comment("Native Linux build (ninja linux)")
     n.variable("linux_cc", cc)
     n.rule(
-        name="linux_sdk_overlay",
-        command=f"$python tools/linux_sdk_overlay.py --output {overlay_dir} --stamp $out",
-        description="LINUX SDK HEADERS",
-    )
-    n.build(
-        outputs=overlay_stamp,
-        rule="linux_sdk_overlay",
-        implicit=[Path("tools/linux_sdk_overlay.py")],
-    )
-    n.rule(
         name="linux_msvc_semantics",
         command="$python tools/linux_msvc_semantics.py --output $out $scan",
         description="LINUX MSVC SEMANTICS $out",
@@ -252,22 +247,22 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     game_headers = sorted(
         p for p in Path("source").rglob("*") if p.suffix in (".c", ".h")
     )
-    # The game sees its own tags and inline functions plus the XDK's; the
-    # platform layer only includes XDK headers (the overlay, which omits the
-    # SDK's C runtime headers) and so only needs the XDK's inline functions.
+    # The game sees its own tags and inline functions and those of the SDK
+    # declarations (port/include/xdk); the platform layer only includes the
+    # SDK declarations and so only needs their inline functions.
     n.build(
         outputs=semantics_header,
         rule="linux_msvc_semantics",
-        implicit=[Path("tools/linux_msvc_semantics.py"), overlay_stamp, *game_headers],
+        implicit=[Path("tools/linux_msvc_semantics.py"), *xdk_headers(), *game_headers],
         variables={
-            "scan": f"--all-inlines --tags source --inlines source --inlines {overlay_dir}"
+            "scan": f"--all-inlines --tags source --inlines source --inlines {XDK_INCLUDE}"
         },
     )
     n.build(
         outputs=platform_semantics_header,
         rule="linux_msvc_semantics",
-        implicit=[Path("tools/linux_msvc_semantics.py"), overlay_stamp],
-        variables={"scan": f"--inlines {overlay_dir}"},
+        implicit=[Path("tools/linux_msvc_semantics.py"), *xdk_headers()],
+        variables={"scan": f"--inlines {XDK_INCLUDE}"},
     )
     n.rule(
         name="linux_cc",
@@ -296,7 +291,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
 
     abi = " ".join(LINUX_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     port_include = PORT_DIR / "include"
-    sdk_flags = f"-idirafter {overlay_dir}"
+    sdk_flags = f"-idirafter {XDK_INCLUDE}"
     excluded = set(config.get("exclude_sources", []))
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
@@ -317,7 +312,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 outputs=obj,
                 rule="linux_cc",
                 inputs=source,
-                implicit=[overlay_stamp, prefix_header, semantics_header, platform_semantics_header,
+                # (the SDK declarations are system headers, which the depfile
+                # leaves out)
+                implicit=[*xdk_headers(), prefix_header, semantics_header, platform_semantics_header,
                           *implicit_inputs],
                 variables={"cflags": f"{cflags} {posix_extra if posix else extra}"},
             )

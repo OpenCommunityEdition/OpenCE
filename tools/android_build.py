@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import LINUX_PROFILE, pgo_mode, pgo_profile, profile_use_flags
+from .linux_build import LINUX_PROFILE, XDK_INCLUDE, pgo_mode, pgo_profile, profile_use_flags, xdk_headers
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -222,8 +222,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     libc_include = guest_dir / "libc_include"
     libc_internal = guest_dir / "libc_internal"
     gl_include = guest_dir / "gl_include"
-    sdk_overlay = BUILD / "sdk_include"
-    sdk_stamp = BUILD / "sdk_include.stamp"
     arch = PORT_DIR / "guest" / "libc" / "arch" / "arm64_32"
     semantics_header = Path("build/linux/halo_msvc_semantics.h")
     platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
@@ -242,14 +240,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.variable("android_ndk_bin", str(ndk_bin))
 
     # ---------- generated headers and sources
-
-    n.rule(
-        name="android_sdk_overlay",
-        command=f"{python} tools/linux_sdk_overlay.py --output {sdk_overlay} --stamp $out",
-        description="ANDROID SDK HEADERS",
-    )
-    n.build(outputs=sdk_stamp, rule="android_sdk_overlay",
-            implicit=[Path("tools/linux_sdk_overlay.py")])
 
     alltypes = libc_include / "bits" / "alltypes.h"
     syscall_h = libc_include / "bits" / "syscall.h"
@@ -318,7 +308,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
             inputs=[host_imports_list, posix_imports, gl_imports],
             implicit=[Path("tools/android_imports.py")])
 
-    generated_headers = [sdk_stamp, alltypes, syscall_h, version_h, gl_stamp,
+    generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
                          semantics_header, platform_semantics_header]
 
     # ---------- guest compilation: C -> Darwin assembly -> ELF assembly -> object
@@ -402,7 +392,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         game_cflags = " ".join([
             guest_abi, guest_code, " ".join(game_flags), profile_flags,
             f"-include {prefix_header}", f"-include {semantics_header}", defines,
-            f"-I{LINUX_DIR}/include", includes, *libc_includes, f"-idirafter {sdk_overlay}",
+            f"-I{LINUX_DIR}/include", includes, *libc_includes, f"-idirafter {XDK_INCLUDE}",
         ])
         for obj in proj.objects:
             name = str(obj.file_path).replace(os.sep, "/")
@@ -421,7 +411,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-include {prefix_header}", f"-include {platform_semantics_header}",
         f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
         f"-I{PORT_DIR}/include", f"-I{TOML_DIR}", "-Isource -Isource/cseries",
-        f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {sdk_overlay}",
+        f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
     guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
     for source in sorted((LINUX_DIR / "src").glob("*.c")):

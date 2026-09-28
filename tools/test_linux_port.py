@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import linux_link_check, linux_msvc_semantics, linux_sdk_overlay, msvc_deps_filter
+from tools import linux_build, linux_link_check, linux_msvc_semantics, msvc_deps_filter
 from tools.download_tool import uasm_url
 from tools.project_x86 import (
     Object,
@@ -72,59 +72,61 @@ def test_render_skips_tags_used_as_both_struct_and_union():
     assert "#pragma weak f" in text
 
 
-# ---------- SDK header overlay
+# ---------- Xbox SDK declarations (port/include/xdk)
 
 
-# winnt.h's shift helpers, written in x86 assembly as the XDK's are
-WINNT_HELPERS = "".join(
-    f"""
-__inline ULONGLONG NTAPI {name}(ULONGLONG Value, DWORD ShiftCount)
-{{
-    __asm {{
-        mov ecx, ShiftCount
-        mov eax, dword ptr [Value]
-        mov edx, dword ptr [Value+4]
-        {instruction}
-    }}
-}}
-"""
-    for name, instruction in (
-        ("Int64ShllMod32", "shld edx, eax, cl"),
-        ("Int64ShraMod32", "shrd eax, edx, cl"),
-        ("Int64ShrlMod32", "shrd eax, edx, cl"),
-    )
-)
+XDK_INCLUDE = Path(__file__).resolve().parent.parent / "port" / "include" / "xdk"
 
 
-def test_sdk_overlay_writes_winnt_helpers_in_c():
-    patched = linux_sdk_overlay.patch_winnt(WINNT_HELPERS)
-    assert "__asm" not in patched
-    for name, body in linux_sdk_overlay.C_BODIES.items():
-        assert f"{name}(ULONGLONG Value, DWORD ShiftCount)\n{{\n    {body}\n}}" in patched
+def test_xdk_headers_use_the_sdk_spellings():
+    # each port gives the SDK's keywords and names its own meaning (its
+    # prefix header), so none of one port's must be written into them
+    for header in sorted(XDK_INCLUDE.glob("*.h")):
+        text = re.sub(r"/\*.*?\*/", "", header.read_text(encoding="utf-8"), flags=re.S)
+        assert "__attribute__" not in text, header.name
+        assert not re.findall(r"\bhalo_\w+", text), header.name
 
 
-def test_sdk_overlay_links_every_spelling_but_not_crt_headers(tmp_path):
-    sdk = tmp_path / "sdk"
-    write(sdk / "WinNT.h", WINNT_HELPERS)
-    write(sdk / "WinBase.h", "")
-    write(sdk / "StdIO.h", "")
-    write(sdk / "Vector", "")  # extensionless C++ header
-    output = tmp_path / "overlay"
-    write(output / "stale.h", "")
-    (output / "gone.h").symlink_to(sdk / "WinNT.h")
+@pytest.mark.skipif(shutil.which("clang") is None, reason="clang is needed to compile the headers")
+def test_xdk_headers_compile_for_the_game(tmp_path):
+    root = XDK_INCLUDE.parent.parent.parent
+    source = write(tmp_path / "unit.c", "".join(
+        f"#include <{name}>\n" for name in ("xtl.h", "xbdm.h", "xkbd.h", "d3d8perf.h")
+    ))
+    flags = [flag for flag in linux_build.LINUX_ABI_FLAGS + linux_build.GAME_FLAGS if flag != "-w"]
+    for defines in ([], ["-DDEBUG_KEYBOARD"], ["-DNOD3D", "-DNODSOUND"]):
+        subprocess.run(
+            ["clang", *flags, *defines, "-Werror", "-fsyntax-only",
+             "-include", str(root / "port/linux/include/halo_linux_prefix.h"),
+             "-I", str(root / "port/linux/include"), "-idirafter", str(XDK_INCLUDE), str(source)],
+            check=True,
+        )
 
-    linux_sdk_overlay.generate(sdk, output)
 
-    names = {path.name for path in output.iterdir()}
-    assert {"WinNT.h", "winnt.h", "WINNT.H", "WinBase.h", "winbase.h", "WINBASE.H"} <= names
-    assert not {"StdIO.h", "stdio.h", "Vector", "gone.h"} & names
-    # regular files in the output are left alone, stale links removed
-    assert "stale.h" in names
-    assert (output / "winbase.h").resolve() == (sdk / "WinBase.h").resolve()
-    # winnt.h is a copy with its helpers in C
-    for spelling in ("WinNT.h", "winnt.h", "WINNT.H"):
-        assert not (output / spelling).is_symlink()
-        assert "__asm" not in (output / spelling).read_text()
+def pdb_writer():
+    """An xdk_headers Writer over an empty type table: basic types only."""
+    from tools import pdb200_types, xdk_headers
+    pdb = object.__new__(pdb200_types.Pdb)
+    pdb.types, pdb.aggregates = {}, {}
+    return xdk_headers, xdk_headers.Writer(pdb)
+
+
+def test_xdk_headers_regroups_anonymous_members():
+    # the PDB lists an anonymous structure's or union's members in their
+    # container, at their offsets
+    xdk_headers, writer = pdb_writer()
+    member = xdk_headers.Member
+    ulong, int64 = 0x22, 0x13
+    union = writer.render(writer.group(
+        [member("LowPart", ulong, 0), member("HighPart", ulong, 4), member("QuadPart", int64, 0)], True), "", "u")
+    assert union == ["struct {", "    unsigned long LowPart;", "    unsigned long HighPart;", "};",
+                     "__int64 QuadPart;"]
+    structure = writer.render(writer.group(
+        [member("Tag", ulong, 0), member("Low", ulong, 4), member("High", ulong, 8),
+         member("Whole", int64, 4), member("After", ulong, 12)], False), "", "s")
+    assert structure == ["unsigned long Tag;", "union {", "    struct {", "        unsigned long Low;",
+                         "        unsigned long High;", "    };", "    __int64 Whole;", "};",
+                         "unsigned long After;"]
 
 
 # ---------- /showIncludes filter

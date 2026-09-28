@@ -47,8 +47,6 @@ def source_files(roots: Iterable[Path]) -> List[Path]:
             path
             for path in sorted(root.rglob("*"))
             if path.suffix.lower() in SOURCE_SUFFIXES and path.is_file()
-            # the SDK overlay lists each header under several spellings
-            and (not path.is_symlink() or path.name == path.name.lower())
         )
     return files
 

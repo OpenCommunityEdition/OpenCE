@@ -11,8 +11,7 @@ takes the same keyboard, mouse and gamepad input as the Linux build.
 
 ## Building
 
-Requirements, on Windows, in addition to the XDK headers already needed by
-the matching build (`xbox/include`):
+Requirements, on Windows (no part of the Xbox SDK):
 
 - Visual Studio (or the Build Tools) with the C++ workload: the 32-bit
   (x86) MSVC libraries and a Windows 10/11 SDK. Only the libraries and
@@ -66,11 +65,10 @@ window the platform layer reserves is at 0x80000000.
 
 ### Headers
 
-- The Xbox SDK and the Windows SDK both have `winnt.h`, `winbase.h`,
-  `dsound.h` and more. Game and platform units must see the Xbox ones, so
-  `tools/windows_sdk_overlay.py` copies the Xbox SDK's headers, minus its C
-  runtime, into `build/windows/sdk_include`, which comes ahead of the Windows
-  SDK. The C runtime is the Windows one (the static UCRT).
+- Game and platform units see the Xbox SDK declarations, not the Windows
+  SDK's of the same names (`winbase.h`, `windef.h`, ...): `port/include/xdk`,
+  which stands in for the Xbox SDK's headers, comes ahead of the Windows SDK.
+  The C runtime is the Windows one (the static UCRT).
 - `include/halo_windows_prefix.h` is force-included into game and platform
   units. It renames the Xbox SDK functions that the platform layer
   implements under Windows names (`CreateFileA`, `ReadFile`, `Sleep`, ...;

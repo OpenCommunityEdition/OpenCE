@@ -14,8 +14,8 @@ the byte-matching build, and it shares the Linux port's platform layer
 
 ## Building
 
-Requirements, in addition to what the Linux build needs (the XDK headers in
-`xbox/include`, Python, ninja):
+Requirements, in addition to what the Linux build needs (Python, ninja; no
+part of the Xbox SDK):
 
 - a clang with the `arm64_32` target (any recent LLVM, e.g. the system
   clang; `--android-guest-cc` selects another);
@@ -223,8 +223,8 @@ x86 original had no fused multiply-add.
 ### Game source changes
 
 The game's x86 inline assembly has C equivalents under `#ifdef HALO_LINUX`,
-shared by all native ports ([port/linux/README.md](../linux/README.md#game-source-edits)),
-and so has the XDK `winnt.h`'s (`tools/linux_sdk_overlay.py`). Under
+shared by all native ports ([port/linux/README.md](../linux/README.md#game-source-edits));
+the Xbox SDK declarations the ports use (`port/include/xdk`) contain none. Under
 `#ifdef HALO_ANDROID` are the seven `#pragma bss_seg(".bss")` lines
 Darwin's section syntax rejects, and a stack walker for the assertion
 handler that follows AArch64 frame records, so an assertion's log

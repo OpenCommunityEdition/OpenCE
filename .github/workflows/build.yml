@@ -1,8 +1,8 @@
 name: Build
 
-# Builds are disabled for now: the game needs the Xbox SDK headers, which
-# this repository does not include. This placeholder runs only when started
-# manually and builds nothing.
+# Builds are disabled for now. The native builds no longer need the Xbox
+# SDK (port/include/xdk), so they can be set up here. This placeholder runs
+# only when started manually and builds nothing.
 on:
   workflow_dispatch:
 

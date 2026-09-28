@@ -17,7 +17,7 @@ This is based on [bnunu](https://github.com/bnunu/halo)'s decompilation project,
 
 ## Build instructions
 
-You must source the August 2001 Xbox SDK yourself, and you need Python and [ninja-build](https://ninja-build.org/) on your PATH. Extract the `XDK/xbox` folder from the installer into the repository root such that `xbox/{bin,include}` are valid paths, then run `configure.py` from the repository root.
+You need Python and [ninja-build](https://ninja-build.org/) on your PATH; run `configure.py` from the repository root, then `ninja` with the target below (plain `ninja` builds the one for the computer you are on). No part of the Xbox SDK is needed: the SDK declarations the game uses are in [port/include/xdk](port/include/xdk/README.md).
 
 ### Native Linux build
 
@@ -68,7 +68,7 @@ The native builds draw a frame at every refresh of the display (60, 90, 120, 240
 
 ### Matching build
 
-The byte-matching build also needs `cachebeta.exe` from the Halo 1 PAL debug build in the repository root. Run `ninja` to compile the game and report progress statistics. On Linux it runs the XDK compiler through [wibo](https://github.com/decompals/wibo) (downloaded automatically), assembles the CRT `.asm` units with UASM when no MASM is available, and builds csplit from source; see [port/linux/README.md](port/linux/README.md#the-matching-build-on-a-linux-host).
+This fork builds only the native ports. The upstream project's byte-matching build, which compiles the game with the Xbox SDK's own compiler and compares it with `cachebeta.exe`, needs the August 2001 Xbox SDK, which cannot be redistributed, so `configure.py` no longer writes it. Its sources, configuration and `#ifdef`s are kept as they are, so that upstream's matching work still merges; `SolutionConfig.matching` in `tools/project_x86.py` turns it back on, for a checkout with the SDK's `XDK/xbox` folder extracted to `xbox/` and `cachebeta.exe` in the repository root. See [port/linux/README.md](port/linux/README.md#the-matching-build-on-a-linux-host) for running it on Linux.
 
 ## Where's all the type information?
 

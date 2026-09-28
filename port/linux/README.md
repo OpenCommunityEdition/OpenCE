@@ -8,8 +8,8 @@ verified to leave every MSVC object byte-identical (see below).
 
 ## Building
 
-Requirements, in addition to the XDK headers already needed by the matching
-build (`xbox/include`):
+Requirements (no part of the Xbox SDK: the declarations the game uses from
+it are in `port/include/xdk`):
 
 - clang (any recent version; `--linux-cc` selects another compiler)
 - 32-bit glibc development files (`lib32-glibc` on Arch,
@@ -250,10 +250,9 @@ editing the game:
 - `include/` shims extend or replace C runtime headers: MSVC names in
   `stdio.h`/`stdlib.h`/`string.h`/`math.h`/`float.h`, a complete 16-bit
   `wchar.h`, `io.h`, `direct.h`, `sys/stat.h` with the MSVC `struct _stat`.
-- The XDK's own headers are used through a case-insensitive symlink overlay
-  (`tools/linux_sdk_overlay.py`), which leaves out the XDK's C runtime
-  headers in favour of glibc. `winnt.h` is a copy whose three 64-bit shift
-  helpers are C instead of x86 assembly; the SDK itself is not modified.
+- The Xbox SDK declarations come from `port/include/xdk` (after every other
+  include directory), which stands in for the SDK's headers; the C runtime
+  headers they include are glibc's and the shims above.
 - `tools/linux_msvc_semantics.py` generates a header that forward-declares
   every struct/union tag at file scope (MSVC gives a tag first seen in a
   prototype file scope; C gives it prototype scope) and marks header inline
@@ -276,9 +275,10 @@ Files named `posix_*.c` talk to glibc and are compiled with the host ABI:
 glibc structures with 64-bit members (`struct stat`, `struct dirent`) have a
 different layout under `-malign-double`. With link-time optimisation they
 stay native objects, as LLVM will not optimise code with glibc's 32-bit
-`wchar_t` together with the game's 16-bit one. Everything else includes the XDK
-headers through `platform.h`, so each definition is type-checked against the
-SDK prototype it implements, calling convention included.
+`wchar_t` together with the game's 16-bit one. Everything else includes the
+SDK declarations (`port/include/xdk`) through `platform.h`, so each definition
+is type-checked against the SDK prototype it implements, calling convention
+included.
 `src/halo_linker_common.c` holds weak, zero-filled storage for globals that
 the January link pooled from tentative definitions in units not yet
 reconstructed, plus stand-ins for `fast_ftol_C` and `main_crash`. Being
@@ -351,7 +351,9 @@ builtins on Android.
 
 ## The matching build on a Linux host
 
-The byte-matching build (`ninja`, `ninja all_source`) also works on Linux:
+This fork no longer generates the byte-matching build (see the main
+README), but with it turned back on and the Xbox SDK in `xbox/`, it (`ninja`,
+`ninja all_source`) also works on Linux:
 
 - The nine vendor-assembly CRT units are assembled with UASM (downloaded
   automatically) when no MASM is available. Their code sections are

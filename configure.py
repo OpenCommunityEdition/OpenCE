@@ -212,7 +212,7 @@ for build_project in build_config["projects"]:
 # build file generation
 
 if args.mode == "configure":
-    if any(
+    if sln.matching and any(
         obj["status"] != "MISSING" and obj["name"].startswith("libs/d3d8/")
         for project in build_config["projects"]
         for obj in project["objects"]

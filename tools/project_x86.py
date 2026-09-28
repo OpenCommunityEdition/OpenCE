@@ -147,6 +147,11 @@ class SolutionConfig:
         
         # Progress output and report.json config
         self.progress = True  # Enable report.json generation and CLI progress output
+        # The byte-matching build needs the Xbox SDK's compiler and headers.
+        # This fork builds only the native ports, which need neither (see
+        # port/include/xdk); the matching graph is kept for merging upstream
+        # but not generated.
+        self.matching: bool = False
         self.print_progress_categories: bool = True
         self.progress_report_args: Optional[List[str]] = (
             None  # Flags to `objdiff-cli report generate`
@@ -240,12 +245,70 @@ EXE = ".exe" if is_windows() else ""
 
 # Generate all build files
 def generate_build(sln: SolutionConfig) -> None:
+    if not sln.matching:
+        generate_native_build_ninja(sln)
+        return
     sln.validate()
     generate_build_ninja(sln)
     generate_objdiff_config(sln)
     generate_compile_commands(sln)
     if is_windows():
         generate_solution(sln)
+
+# Generate build.ninja with only the native ports (sln.matching off)
+def generate_native_build_ninja(sln: SolutionConfig) -> None:
+    out = io.StringIO()
+    n = ninja_syntax.Writer(out)
+    n.variable("ninja_required_version", "1.3")
+    n.newline()
+
+    configure_script = Path(os.path.relpath(os.path.abspath(sys.argv[0])))
+    python_lib = Path(os.path.relpath(__file__))
+    python_lib_dir = python_lib.parent
+    n.comment("The arguments passed to configure.py, for rerunning it.")
+    n.variable(
+        "configure_args",
+        [f'"{arg}"' if any(ch.isspace() for ch in arg) else arg for arg in sys.argv[1:]],
+    )
+    n.variable("python", f'"{sys.executable}"')
+    n.newline()
+
+    generate_linux_build(n, sln)
+    generate_android_build(n, sln)
+    generate_windows_build(n, sln)
+
+    n.comment("Reconfigure on change")
+    n.rule(
+        name="configure",
+        command=f"$python {configure_script} $configure_args",
+        generator=True,
+        description=f"RUN {configure_script}",
+    )
+    n.build(
+        outputs="build.ninja",
+        rule="configure",
+        implicit=[
+            sln.config_dir / "config.json",
+            configure_script,
+            python_lib,
+            python_lib_dir / "ninja_syntax.py",
+            *linux_configure_inputs(),
+            *android_configure_inputs(),
+            *windows_configure_inputs(),
+        ],
+    )
+    n.newline()
+
+    # the build for this computer, where it could be generated (the Windows
+    # build is left out when SDL cannot be fetched, for instance)
+    default = "windows" if is_windows() else "linux"
+    if f"\nbuild {default}: " in out.getvalue():
+        n.comment("Default rule: the build for this computer")
+        n.default(default)
+
+    with open("build.ninja", "w", encoding="utf-8") as f:
+        f.write(out.getvalue())
+    out.close()
 
 # Generate build.ninja
 def generate_build_ninja(sln: SolutionConfig) -> None:
