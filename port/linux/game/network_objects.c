@@ -71,7 +71,9 @@ enum
 /* world units */
 #define REMOTE_OBJECT_TOLERANCE 0.05f
 #define LOCAL_VEHICLE_TOLERANCE 4.0f
-#define HOST_VEHICLE_ACCEPT_TOLERANCE 4.0f
+/* (the host takes further than a client puts right: between the two they
+would disagree for good) */
+#define HOST_VEHICLE_ACCEPT_TOLERANCE 5.0f
 
 enum
 {

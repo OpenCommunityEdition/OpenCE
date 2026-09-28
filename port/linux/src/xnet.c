@@ -466,16 +466,163 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 }
 
+/* debug.network_latency and debug.network_loss: what this machine receives
+is held back that many milliseconds (both ways between two machines: a
+round trip of twice it) and that share of its datagrams lost, to test the
+netcode as over the internet */
+#define DELAYED_PACKET_SIZE 1500
+#define MAXIMUM_DELAYED_PACKETS 4096
+
+struct delayed_packet
+{
+	int socket;
+	int length;
+	int offset;
+	int address_length;
+	DWORD time;
+	/* (large enough for any address the sockets give) */
+	char address[128];
+	char data[DELAYED_PACKET_SIZE];
+};
+
+static struct
+{
+	int checked;
+	DWORD latency;
+	int loss_percent;
+	struct delayed_packet *packets;
+	int first;
+	int count;
+} delayed;
+
+static int delayed_enabled(void)
+{
+	if (!delayed.checked)
+	{
+		delayed.checked = 1;
+		delayed.latency = (DWORD)config_real("debug.network_latency");
+		delayed.loss_percent = (int)config_real("debug.network_loss");
+		if (delayed.latency || delayed.loss_percent)
+		{
+			delayed.packets = calloc(MAXIMUM_DELAYED_PACKETS, sizeof(*delayed.packets));
+			platform_log("network: receiving %lu ms late, losing %d%% of datagrams (testing)",
+				(unsigned long)delayed.latency, delayed.loss_percent);
+		}
+	}
+	return delayed.packets != NULL;
+}
+
+/* whether something held back for the socket is due */
+static int delayed_due(int socket)
+{
+	int index;
+
+	for (index = 0; index < delayed.count; index++)
+	{
+		struct delayed_packet const *packet = &delayed.packets[(delayed.first + index) % MAXIMUM_DELAYED_PACKETS];
+
+		if (packet->socket == socket)
+			return GetTickCount() - packet->time >= delayed.latency;
+	}
+	return 0;
+}
+
+/* what the socket has now, held back; then the oldest of the socket's that
+has waited long enough, or would-block */
+static int delayed_receive(SOCKET socket, char *buffer, int length, int flags,
+	struct sockaddr *address, int *address_length, int datagram)
+{
+	int index;
+
+	while (delayed.count < MAXIMUM_DELAYED_PACKETS)
+	{
+		struct delayed_packet *packet = &delayed.packets[(delayed.first + delayed.count) % MAXIMUM_DELAYED_PACKETS];
+		int address_size = (int)sizeof(packet->address);
+		int readable = (int)socket;
+		int readable_count = 1;
+		int result;
+
+		/* (only what is there now: some of the game's sockets block) */
+		if (posix_socket_select(&readable, &readable_count, NULL, NULL, NULL, NULL, 0, 0, 0) <= 0 ||
+			readable_count == 0)
+		{
+			break;
+		}
+		result = datagram ?
+			posix_socket_recvfrom((int)socket, packet->data, DELAYED_PACKET_SIZE, flags,
+				(struct sockaddr *)&packet->address, &address_size) :
+			posix_socket_recv((int)socket, packet->data, DELAYED_PACKET_SIZE, flags);
+
+		if (result < 0)
+		{
+			/* (an error but would-block is the caller's now) */
+			if (posix_socket_last_error() != WSAEWOULDBLOCK)
+				return winsock_result(result);
+			break;
+		}
+		/* (a stream closing is at once) */
+		if (!datagram && result == 0)
+			return 0;
+		if (datagram && rand() % 100 < delayed.loss_percent)
+			continue;
+		packet->socket = (int)socket;
+		packet->length = result;
+		packet->offset = 0;
+		packet->address_length = address_size;
+		packet->time = GetTickCount();
+		delayed.count++;
+	}
+	for (index = 0; index < delayed.count; index++)
+	{
+		struct delayed_packet *packet = &delayed.packets[(delayed.first + index) % MAXIMUM_DELAYED_PACKETS];
+		int size;
+
+		if (packet->socket != (int)socket)
+			continue;
+		if (GetTickCount() - packet->time < delayed.latency)
+			break;
+		size = packet->length - packet->offset;
+		if (size > length)
+			size = length;
+		memcpy(buffer, packet->data + packet->offset, (size_t)size);
+		if (datagram && address && address_length)
+		{
+			int copied = packet->address_length < *address_length ? packet->address_length : *address_length;
+
+			memcpy(address, &packet->address, (size_t)copied);
+			*address_length = copied;
+			peer_incoming_address(0, address, address_length);
+		}
+		packet->offset += size;
+		if (datagram || packet->offset >= packet->length)
+			packet->socket = -1;
+		/* (the spent ones at the front go) */
+		while (delayed.count > 0 && delayed.packets[delayed.first].socket == -1)
+		{
+			delayed.first = (delayed.first + 1) % MAXIMUM_DELAYED_PACKETS;
+			delayed.count--;
+		}
+		return size;
+	}
+	WSASetLastError(WSAEWOULDBLOCK);
+	return SOCKET_ERROR;
+}
+
 int WSAAPI halo_ws_recv(SOCKET socket, char *buffer, int length, int flags)
 {
+	if (delayed_enabled())
+		return delayed_receive(socket, buffer, length, flags, NULL, NULL, 0);
 	return winsock_result(posix_socket_recv((int)socket, buffer, length, flags));
 }
 
 int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 	struct sockaddr *address, int *address_length)
 {
-	int result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
+	int result;
 
+	if (delayed_enabled())
+		return delayed_receive(socket, buffer, length, flags, address, address_length, 1);
+	result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
 	if (result >= 0)
 		peer_incoming_address(0, address, address_length);
 	return winsock_result(result);
@@ -552,8 +699,11 @@ int WSAAPI halo_ws_select(int descriptor_count, halo_ws_fd_set *read_set, halo_w
 	int write_count = write_set ? descriptors_from_set(write_set, write) : 0;
 	int error_count = error_set ? descriptors_from_set(error_set, error) : 0;
 	int result;
+	int asked[FD_SETSIZE];
+	int asked_count = read_count;
 
 	(void)descriptor_count;
+	memcpy(asked, read, sizeof(int) * (size_t)read_count);
 	result = posix_socket_select(
 		read_set ? read : NULL, &read_count,
 		write_set ? write : NULL, &write_count,
@@ -561,6 +711,25 @@ int WSAAPI halo_ws_select(int descriptor_count, halo_ws_fd_set *read_set, halo_w
 		timeout ? timeout->tv_sec : 0, timeout ? timeout->tv_usec : 0, timeout == NULL);
 	if (result < 0)
 		return winsock_result(result);
+	/* (debug.network_latency: what is held back and due is there to read) */
+	if (read_set && delayed_enabled())
+	{
+		int asked_index;
+
+		for (asked_index = 0; asked_index < asked_count; asked_index++)
+		{
+			int index;
+			int present = 0;
+
+			for (index = 0; index < read_count; index++)
+				present |= read[index] == asked[asked_index];
+			if (!present && read_count < FD_SETSIZE && delayed_due(asked[asked_index]))
+			{
+				read[read_count++] = asked[asked_index];
+				result++;
+			}
+		}
+	}
 	if (read_set)
 		set_from_descriptors(read_set, read, read_count);
 	if (write_set)

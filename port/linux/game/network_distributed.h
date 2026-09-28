@@ -44,6 +44,8 @@ enum
 	_distributed_message_hit_reports,
 	/* the vehicle a client's own player drives, every tick (unreliable) */
 	_distributed_message_vehicle_prediction,
+	/* what players picked up, for their clients to show (reliable) */
+	_distributed_message_pickups,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

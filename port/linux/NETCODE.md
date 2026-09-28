@@ -43,8 +43,11 @@ Every machine in a game must use the same netcode.
    (`port/linux/game/network_distributed.c`):
    - every tick, every player's unit: which it is, alive or not, the seat
      it rides, shields and health (down, recharging, the damage they show),
-     where it is (a client's own player's position is its own, within a
-     tolerance, and the host takes it), and when dead who killed it;
+     its powerups (camouflage and how long each has left), where it is (a
+     client's own player's position is its own, within a tolerance, and the
+     host takes it), and when dead who killed it;
+   - what a client's players pick up, which the host decides: the client
+     shows it (the HUD's message, the sound, a powerup's screen flash);
    - twice a second and with every kill, the players' statistics; five
      times a second, the game type's state (scores, the flags, the balls
      and their carriers, the king's hill) and whether the game is over.
@@ -106,5 +109,13 @@ machine logs every player's position, health and shields, weapons,
 grenades, score, kills and deaths every second, with the objects made and
 removed and the hits reported, dealt, rejected and replayed, so two
 machines' views of one game can be compared. `debug.network_test_kill`,
-`debug.network_test_shoot` and `debug.network_test_vehicle` script kills,
-hits and a vehicle ride the bots' wandering does not reach.
+`debug.network_test_shoot`, `debug.network_test_vehicle` and
+`debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
+swap the bots' wandering does not reach. `debug.network_latency` and
+`debug.network_loss` hold back what a machine receives and drop some of its
+datagrams, to test as over the internet.
+
+The host logs to `debug.txt` when a player on another machine presses the
+action button where the host has nothing for them to pick up, with where it
+has them and the nearest item: a client that sees a pickup the host does
+not.

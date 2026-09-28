@@ -279,12 +279,36 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port/linux/game/network_distributed.c's */
+void network_distributed_player_picked_up(long player_index, short kind, long definition_index, short count);
+/* game_sound.c's */
+long unspatialized_impulse_sound_new(long sound_definition_index, real scale);
+
+/* what a player picked up, for the distributed netcode's client whose
+player it is: the host decides the pickup, the client shows it
+(network_player_show_pickup) */
+enum
+{
+	_network_pickup_weapon,
+	_network_pickup_ammunition,
+	_network_pickup_grenade,
+	_network_pickup_equipment,
+	_network_pickup_powerup,
+};
+
+#define player_network_picked_up(player, player_index, kind, definition_index, count) \
+	if ((player)->local_player_index == NONE) \
+		network_distributed_player_picked_up(player_index, kind, definition_index, count)
+
+static void network_player_log_idle_action(long player_index, unsigned long control_flags);
+boolean network_game_distributed(void);
 
 /* whether this machine decides pickups: not a client of the distributed
 netcode, whose players' weapons, grenades and power-ups are the host's
 (port/linux/game/network_distributed.c) */
 #define players_decide_pickups() (!network_game_distributed_client())
 #else
+#define player_network_picked_up(player, player_index, kind, definition_index, count)
 #define players_decide_pickups() TRUE
 #endif
 
@@ -1422,6 +1446,115 @@ void network_player_attach_unit(
 		observer_obsolete_position(player->local_player_index);
 }
 
+/* ... and shows what the host says its player picked up (the host decides
+pickups): the HUD's message, the pickup's sound, a powerup's screen flash */
+void network_player_show_pickup(
+	long player_index,
+	short kind,
+	long definition_index,
+	short count)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean tag_index_is_group(long tag_index, long group_tag);
+
+	if (player->local_player_index == NONE)
+		return;
+	switch (kind)
+	{
+	case _network_pickup_weapon:
+		if (tag_index_is_group(definition_index, WEAPON_DEFINITION_TAG))
+		{
+			hud_picked_up_weapon(player->local_player_index, definition_index);
+			if (player->unit_index != NONE)
+				player_control_unzoom(player->unit_index);
+		}
+		break;
+	case _network_pickup_ammunition:
+		if (tag_index_is_group(definition_index, WEAPON_DEFINITION_TAG))
+		{
+			struct weapon_definition *weapon_definition = weapon_definition_get(definition_index);
+
+			hud_picked_up_ammunition(player->local_player_index, definition_index, count);
+			if (weapon_definition->weapon.pickup_sound.index != NONE)
+				unspatialized_impulse_sound_new(weapon_definition->weapon.pickup_sound.index, 1.0f);
+		}
+		break;
+	case _network_pickup_grenade:
+		if (tag_index_is_group(definition_index, EQUIPMENT_DEFINITION_TAG))
+		{
+			hud_picked_up_grenade(player->local_player_index, definition_index);
+			equipment_definition_handle_pickup(definition_index);
+		}
+		break;
+	case _network_pickup_equipment:
+		if (tag_index_is_group(definition_index, EQUIPMENT_DEFINITION_TAG))
+			hud_picked_up_powerup(player->local_player_index, definition_index);
+		break;
+	case _network_pickup_powerup:
+		if (tag_index_is_group(definition_index, EQUIPMENT_DEFINITION_TAG))
+		{
+			/* (as player_handle_powerup_equipment shows its player) */
+			switch (equipment_definition_get(definition_index)->equipment.powerup_type)
+			{
+			case _equipment_powerup_overshield: player_over_shield_screen_effect(player_index); break;
+			case _equipment_powerup_health: player_health_pack_screen_effect(player_index); break;
+			case _equipment_powerup_active_camouflage: player_active_camo_screen_effect(player_index); break;
+			}
+			hud_picked_up_powerup(player->local_player_index, definition_index);
+			equipment_definition_handle_pickup(definition_index);
+		}
+		break;
+	}
+}
+
+/* the host: a player on another machine presses the action button with
+nothing here to do (to pick up, swap for, enter): what the host has around
+them, to the log, at most every few seconds (a client sees what to pick up
+where the host has nothing) */
+static void network_player_log_idle_action(
+	long player_index,
+	unsigned long control_flags)
+{
+	static long logged_times[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	struct player_datum *player = player_get(player_index);
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	struct object_iterator iterator;
+	struct unit_datum *unit;
+	long nearest_index = NONE;
+	real nearest_distance = 0.0f;
+
+	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+		player->local_player_index != NONE || player->action_result != _player_action_result_reload ||
+		!(control_flags & (FLAG(_unit_control_action_bit) | FLAG(_unit_control_swap_weapons_bit))) ||
+		absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
+		(logged_times[absolute_index] && game_time_get() - logged_times[absolute_index] < 3 * TICKS_PER_SECOND))
+	{
+		return;
+	}
+	logged_times[absolute_index] = game_time_get();
+	unit = unit_get(player->unit_index);
+	object_iterator_new(&iterator, _object_mask_weapon | _object_mask_equipment, 0);
+	while (object_iterator_next(&iterator))
+	{
+		struct object_datum *object = object_get(iterator.index);
+		real distance;
+
+		if (object->object.parent_object_index != NONE || !TEST_FLAG(object->object.flags, _object_connected_to_map_bit))
+			continue;
+		distance = distance3d(&unit->object.position, &object->object.position);
+		if (nearest_index == NONE || distance < nearest_distance)
+		{
+			nearest_index = iterator.index;
+			nearest_distance = distance;
+		}
+	}
+	error(2, "distributed: player %ld pressed action with nothing to pick up here: unit %lx at %.2f %.2f %.2f, "
+		"nearest item %lx %s at %.2f",
+		absolute_index, player->unit_index, unit->object.position.x, unit->object.position.y, unit->object.position.z,
+		nearest_index, nearest_index != NONE ? tag_get_name(object_get(nearest_index)->definition_index) : "",
+		nearest_distance);
+}
+
 /* ... and gives up the one it has (the host's unit for it is another) */
 void network_player_detach_unit(
 	long player_index)
@@ -1618,6 +1751,7 @@ static boolean player_handle_action(
 			hud_picked_up_powerup(
 				player->local_player_index,
 				equipment->definition_index);
+			player_network_picked_up(player, player_index, _network_pickup_equipment, equipment->definition_index, 0);
 		}
 		result = TRUE;
 		break;
@@ -2484,6 +2618,7 @@ static boolean player_handle_weapon_swap(
 			hud_picked_up_weapon(
 				player->local_player_index,
 				weapon->definition_index);
+			player_network_picked_up(player, player_index, _network_pickup_weapon, weapon->definition_index, 0);
 			player_control_unzoom(player->unit_index);
 		}
 		result = TRUE;
@@ -2499,6 +2634,7 @@ static boolean player_handle_weapon_swap(
 			hud_picked_up_weapon(
 				player->local_player_index,
 				weapon->definition_index);
+			player_network_picked_up(player, player_index, _network_pickup_weapon, weapon->definition_index, 0);
 		}
 		break;
 	}
@@ -2908,6 +3044,8 @@ static void player_examine_nearby_item(
 						player->local_player_index,
 						weapon_get(inventory_item_index)->definition_index,
 						ammunition_count);
+					player_network_picked_up(player, player_index, _network_pickup_ammunition,
+						weapon_get(inventory_item_index)->definition_index, ammunition_count);
 				}
 				break;
 			}
@@ -2925,6 +3063,7 @@ static void player_examine_nearby_item(
 				hud_picked_up_grenade(
 					player->local_player_index,
 					equipment->definition_index);
+				player_network_picked_up(player, player_index, _network_pickup_grenade, equipment->definition_index, 0);
 			}
 		}
 		else if (equipment_definition->equipment.powerup_type != _equipment_powerup_none)
@@ -3019,6 +3158,8 @@ static void player_examine_nearby_item(
 				hud_picked_up_weapon(
 					player->local_player_index,
 					weapon_get(weapon_item_index)->definition_index);
+				player_network_picked_up(player, player_index, _network_pickup_weapon,
+					weapon_get(weapon_item_index)->definition_index, 0);
 				player_control_unzoom(player->unit_index);
 			}
 		}
@@ -3152,6 +3293,7 @@ static void player_handle_powerup_equipment(
 	hud_picked_up_powerup(
 		(unsigned short)player->local_player_index,
 		equipment->definition_index);
+	player_network_picked_up(player, player_index, _network_pickup_powerup, equipment->definition_index, 0);
 	if (player->local_player_index != NONE)
 		equipment_handle_pickup(equipment_index);
 	object_delete(equipment_index);
@@ -3503,6 +3645,9 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
+#ifdef HALO_LINUX
+					network_player_log_idle_action(iterator.datum_index, action->control_flags);
+#endif
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
 						!player_handle_action(iterator.datum_index))

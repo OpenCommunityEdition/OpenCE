@@ -19,7 +19,10 @@ debug.network_test_kill (the host kills the last player every so often),
 debug.network_test_shoot (every so often each machine's player hits the
 next with their weapon's projectile: a client's through its report to the
 host) and debug.network_test_vehicle (the host seats the last player as a
-vehicle's driver that many seconds in, and takes them out 15 seconds on).
+vehicle's driver that many seconds in, and takes them out 15 seconds on)
+and debug.network_test_pickup (the last player stands on a weapon lying
+about that many seconds in, and a joining machine's player holds the action
+button a second later, to pick it up).
 
 Called from the main loop every frame (main.c).
 */
@@ -57,6 +60,8 @@ void damage_kill_object_for_player(long object_index, long player_index);
 void network_distributed_statistics(long *sent, long *received, long *corrections);
 void network_distributed_item_statistics(long *creates, long *deletes, long *failures, long *removed);
 void network_damage_statistics(long *sent_reports, long *dealt_reports, long *rejected_reports, long *replayed_events);
+/* xinput_sdl.c's */
+void test_input_hold_action(int hold);
 
 enum
 {
@@ -84,6 +89,7 @@ static struct
 	real kill_interval;
 	real shoot_interval;
 	real vehicle_time;
+	real pickup_time;
 	long logged_time;
 } network_test;
 
@@ -115,6 +121,7 @@ static void network_test_read_settings(
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
+	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
 }
@@ -141,10 +148,11 @@ static void network_test_log_players(
 			struct object_datum *placed = object->object.parent_object_index != NONE ?
 				object_get(object->object.parent_object_index) : object;
 
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s g%d/%d w",
+			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s%s g%d/%d w",
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), placed->object.position.x,
 				placed->object.position.y, placed->object.position.z, object->object.body_vitality,
 				object->object.shield_vitality, placed != object ? " riding" : "",
+				TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit) ? " camo" : "",
 				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
 			for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
 			{
@@ -337,6 +345,97 @@ static void network_test_vehicle(
 	}
 }
 
+/* the host gives the last player a second weapon, lying about */
+static void network_test_second_weapon(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+	struct object_iterator weapons;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	if (!last || last->unit_index == NONE)
+		return;
+	object_iterator_new(&weapons, _object_mask_weapon, 0);
+	while (object_iterator_next(&weapons))
+	{
+		struct object_datum *weapon = object_get(weapons.index);
+		struct unit_datum *unit = unit_get(last->unit_index);
+		long current_index = unit->unit.weapon_object_indices[0];
+
+		if (weapon->object.parent_object_index == NONE && TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit) &&
+			(current_index == NONE || object_get(current_index)->definition_index != weapon->definition_index) &&
+			unit_add_weapon_to_inventory(last->unit_index, weapons.index, TRUE))
+		{
+			platform_log("network test: the last player takes a second weapon (%lx)", weapon->definition_index);
+			/* (and camouflage, as a powerup gives) */
+			player_handle_powerup(DATUM_INDEX_NEW(last - (struct player_datum *)player_data->data, last->identifier),
+				_player_powerup_active_camouflage, 10 * TICKS_PER_SECOND);
+			return;
+		}
+	}
+}
+
+/* both machines stand the last player on the first weapon lying about that
+it does not carry (the same object on both: a client's own player is where
+it has it, within a tolerance) */
+static void network_test_pickup(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct player_datum *last = NULL;
+	struct object_iterator weapons;
+	long nearest_index = NONE;
+	real nearest_distance = 0.0f;
+	struct unit_datum *unit;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		last = player;
+	if (!last || last->unit_index == NONE)
+		return;
+	unit = unit_get(last->unit_index);
+	object_iterator_new(&weapons, _object_mask_weapon, 0);
+	while (object_iterator_next(&weapons))
+	{
+		struct object_datum *weapon = object_get(weapons.index);
+		short slot;
+		boolean carried = FALSE;
+		real distance;
+
+		if (weapon->object.parent_object_index != NONE ||
+			!TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit))
+		{
+			continue;
+		}
+		for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+		{
+			long carried_index = unit->unit.weapon_object_indices[slot];
+
+			carried |= carried_index != NONE && object_get(carried_index)->definition_index == weapon->definition_index;
+		}
+		distance = (real)DATUM_INDEX_TO_ABSOLUTE_INDEX(weapons.index);
+		if (!carried && (nearest_index == NONE || distance < nearest_distance))
+		{
+			nearest_index = weapons.index;
+			nearest_distance = distance;
+		}
+	}
+	if (nearest_index != NONE)
+	{
+		real_point3d position = object_get(nearest_index)->object.position;
+
+		position.z += 0.1f;
+		object_set_position(last->unit_index, &position, NULL, NULL);
+		platform_log("network test: the last player stands on weapon %lx (%lx)", nearest_index,
+			object_get(nearest_index)->definition_index);
+	}
+}
+
 void network_test_update(
 	boolean main_menu_loaded,
 	real seconds)
@@ -355,6 +454,31 @@ void network_test_update(
 			game_time_get() % (long)(network_test.shoot_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
 		{
 			network_test_shoot();
+		}
+		if (network_test.pickup_time > 0.0f)
+		{
+			long pickup_time = (long)(network_test.pickup_time * TICKS_PER_SECOND);
+
+			/* (two weapons first: picking up a third swaps) */
+			if (network_test.mode == _network_test_host && game_time_get() >= pickup_time - 3 * TICKS_PER_SECOND &&
+				game_time_get() - (pickup_time - 3 * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+			{
+				network_test_second_weapon();
+			}
+
+			if (game_time_get() >= pickup_time && game_time_get() - pickup_time < TICKS_PER_SECOND)
+			{
+				network_test_pickup();
+			}
+			/* (standing there for four seconds, the button held from a second
+			on) */
+			if (network_test.mode == _network_test_join)
+			{
+				boolean hold = game_time_get() >= pickup_time &&
+					game_time_get() < pickup_time + 4 * TICKS_PER_SECOND;
+
+				test_input_hold_action(hold);
+			}
 		}
 		if (network_test.mode == _network_test_host && network_test.vehicle_time > 0.0f)
 		{

@@ -209,6 +209,19 @@ once a frame, at the display's refresh rate. */
 network tests (port/linux/game/network_test.c), different for each seed:
 it walks and strafes in circles, turns, fires every few seconds and jumps
 now and then */
+static int test_input_holding_action;
+static Uint64 test_input_holding_action_since;
+
+/* the automated tests (port/linux/game/network_test.c): the scripted player
+stands still, holding the action button (X: picking up, swapping weapons)
+after a second */
+void test_input_hold_action(int hold)
+{
+	if (hold && !test_input_holding_action)
+		test_input_holding_action_since = SDL_GetTicks();
+	test_input_holding_action = hold;
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
@@ -227,6 +240,13 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 	}
 	if (seed < 0)
 		return;
+	if (test_input_holding_action)
+	{
+		/* (standing still, the button held from a second on) */
+		if (SDL_GetTicks() - test_input_holding_action_since >= 1000)
+			pad->bAnalogButtons[XINPUT_GAMEPAD_X] = 255;
+		return;
+	}
 	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);

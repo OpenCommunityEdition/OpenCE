@@ -51,6 +51,7 @@ boolean network_distributed_server_send_to_machine_reliably(long machine_index, 
 /* players.c's */
 void network_player_attach_unit(long player_index, long unit_index);
 void network_player_detach_unit(long player_index);
+void network_player_show_pickup(long player_index, short kind, long definition_index, short count);
 /* game_engine.c's */
 long game_engine_write_network_state(byte *buffer, long size);
 void game_engine_read_network_state(byte const *buffer, long size);
@@ -62,6 +63,7 @@ enum
 	MAXIMUM_GAME_STATE_SIZE = 0xF00,
 	MAXIMUM_UNIT_STATES_PER_MESSAGE = 64,
 	MAXIMUM_STATISTICS_PER_MESSAGE = 64,
+	MAXIMUM_PICKUPS_PER_TICK = 64,
 	/* ticks a client's own player may ride where the host says it does not
 	(or the other way round) before it is put where the host has it: its
 	own prediction reaches the host and comes back in about a round trip */
@@ -84,8 +86,19 @@ enum
 	_distributed_unit_shield_over_charging_bit,
 };
 
-/* world units */
-#define HOST_ACCEPT_TOLERANCE 2.5f
+/* struct distributed_unit_state unit flags */
+enum
+{
+	/* (alive) camouflaged, and doubly so */
+	_distributed_unit_camouflaged_bit = 0,
+	_distributed_unit_super_camouflaged_bit,
+};
+
+/* world units: how far a client's own player's unit may be from the host's
+before the host takes it no longer, and before the client is put where the
+host has it (no further than that: between the two they would disagree for
+good, the host's player somewhere its own is not) */
+#define HOST_ACCEPT_TOLERANCE 3.5f
 #define REMOTE_CORRECTION_TOLERANCE 0.05f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
 
@@ -95,7 +108,7 @@ struct distributed_unit_state
 	byte flags;
 	/* (dead) the player who killed it, NO_PLAYER for none */
 	byte killing_player_index;
-	byte pad;
+	byte unit_flags;
 	/* the player's unit (the host's), NONE for none */
 	long unit_index;
 	/* the vehicle it rides and its seat, NONE for none */
@@ -113,6 +126,18 @@ struct distributed_unit_state
 	real recent_body_damage;
 	real current_shield_damage;
 	real recent_shield_damage;
+	/* the player's powerups: how long each has left, and how camouflaged the
+	unit is */
+	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+	real active_camouflage;
+};
+
+struct distributed_pickup
+{
+	byte player_index;
+	byte kind;
+	short count;
+	long definition_index;
 };
 
 struct distributed_player_statistics
@@ -151,6 +176,9 @@ static struct distributed_death
 /* the host: a kill this tick, whose statistics the clients should have
 with it */
 static boolean distributed_statistics_due;
+/* the host: what players on other machines picked up this tick */
+static struct distributed_pickup distributed_pickups[MAXIMUM_PICKUPS_PER_TICK];
+static short distributed_pickup_count;
 /* a client: the ticks each of its own players has ridden other than as
 the host has it */
 static short distributed_seat_disagreements[MAXIMUM_TRACKED_PLAYERS];
@@ -332,6 +360,12 @@ static void distributed_state_from_player(
 		state->recent_body_damage = damage.recent_body_damage;
 		state->current_shield_damage = damage.current_shield_damage;
 		state->recent_shield_damage = damage.recent_shield_damage;
+		csmemcpy(state->powerup_durations, player->powerup_durations, sizeof(state->powerup_durations));
+		SET_FLAG(state->unit_flags, _distributed_unit_camouflaged_bit,
+			TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit));
+		SET_FLAG(state->unit_flags, _distributed_unit_super_camouflaged_bit,
+			TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
+		state->active_camouflage = unit->unit.active_camouflage;
 	}
 	state->killing_player_index = NO_PLAYER;
 	if (unit_index == NONE && player_index < MAXIMUM_TRACKED_PLAYERS && distributed_deaths[player_index].valid)
@@ -526,6 +560,17 @@ static void distributed_handle_unit_states(
 			damage.recent_shield_damage = state->recent_shield_damage;
 			damage_set_network_state(unit_index, &damage);
 		}
+		/* the host's powerups (the host decides pickups) */
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+
+			csmemcpy(player->powerup_durations, state->powerup_durations, sizeof(player->powerup_durations));
+			SET_FLAG(unit->unit.flags, _unit_active_camouflaged_bit,
+				TEST_FLAG(state->unit_flags, _distributed_unit_camouflaged_bit));
+			SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit,
+				TEST_FLAG(state->unit_flags, _distributed_unit_super_camouflaged_bit));
+			unit->unit.active_camouflage = state->active_camouflage;
+		}
 		if (TEST_FLAG(state->flags, _distributed_unit_placed_bit) &&
 			object_get(unit_index)->object.parent_object_index == NONE)
 		{
@@ -624,6 +669,48 @@ boolean distributed_get_death(
 	return death->valid;
 }
 
+/* ---------- pickups */
+
+/* (the host) a player on another machine picked something up (players.c),
+for that machine to show */
+void network_distributed_player_picked_up(
+	long player_index,
+	short kind,
+	long definition_index,
+	short count)
+{
+	struct distributed_pickup *pickup;
+
+	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+		distributed_pickup_count >= MAXIMUM_PICKUPS_PER_TICK)
+	{
+		return;
+	}
+	pickup = &distributed_pickups[distributed_pickup_count++];
+	pickup->player_index = distributed_player_to_byte(player_index);
+	pickup->kind = (byte)kind;
+	pickup->count = count;
+	pickup->definition_index = definition_index;
+}
+
+static void distributed_send_pickups(
+	void)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_pickup pickups[MAXIMUM_PICKUPS_PER_TICK];
+	} message;
+
+	if (!distributed_pickup_count)
+		return;
+	csmemcpy(message.pickups, distributed_pickups, distributed_pickup_count * sizeof(struct distributed_pickup));
+	distributed_send(&message, _distributed_message_pickups, distributed_pickup_count,
+		(word)(sizeof(message.header) + distributed_pickup_count * sizeof(struct distributed_pickup)),
+		_distributed_to_clients_reliably);
+	distributed_pickup_count = 0;
+}
+
 /* ---------- statistics */
 
 static void distributed_send_statistics(
@@ -688,6 +775,7 @@ void network_distributed_new_game(
 	csmemset(distributed_deaths, 0, sizeof(distributed_deaths));
 	csmemset(distributed_seat_disagreements, 0, sizeof(distributed_seat_disagreements));
 	distributed_statistics_due = FALSE;
+	distributed_pickup_count = 0;
 	network_objects_new_game();
 	network_damage_new_game();
 }
@@ -713,6 +801,7 @@ void network_distributed_tick(
 			distributed_send_statistics();
 		distributed_statistics_due = FALSE;
 		distributed_send_unit_states(TRUE);
+		distributed_send_pickups();
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)
 			distributed_send_game_state();
 	}
@@ -745,6 +834,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_prediction:
 	case _distributed_message_unit_states: entry_size = sizeof(struct distributed_unit_state); break;
 	case _distributed_message_player_statistics: entry_size = sizeof(struct distributed_player_statistics); break;
+	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
 	case _distributed_message_game_state:
 	case _distributed_message_objects_synchronized:
 	case _distributed_message_client_ready: entry_size = 0; break;
@@ -824,5 +914,22 @@ void network_distributed_handle_message(
 	case _distributed_message_vehicle_prediction:
 		network_objects_handle_vehicle_prediction(machine_index, entries, header.count);
 		break;
+	case _distributed_message_pickups:
+	{
+		/* what the host says this machine's players picked up */
+		struct distributed_pickup const *pickups = (struct distributed_pickup const *)entries;
+
+		for (index = 0; index < header.count; index++)
+		{
+			long player_index = distributed_player_from_byte(pickups[index].player_index);
+
+			if (distributed_player_is_local(player_index))
+			{
+				network_player_show_pickup(player_index, pickups[index].kind, pickups[index].definition_index,
+					pickups[index].count);
+			}
+		}
+		break;
+	}
 	}
 }

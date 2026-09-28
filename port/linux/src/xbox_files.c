@@ -119,7 +119,7 @@ const char *platform_data_root(void)
 				platform_log("no maps/ folder found; set paths.data in config.toml to the folder that holds maps/");
 		}
 		trim_separators(root);
-		platform_log("data root: %s", root);
+		platform_log("data root: %s (the game's log: debug.txt there)", root);
 	}
 	return root;
 }
