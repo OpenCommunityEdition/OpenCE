@@ -62,6 +62,7 @@ build adds:
 
 | Key | Function |
 | --- | --- |
+| F8 | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
 | F9 | Switch the ray-traced lighting on or off. |
 | F11 | Switch between fullscreen and a window. |
 | F12 | Release or capture the mouse. |
@@ -70,6 +71,8 @@ These settings are new, or have a different default on macOS:
 
 | Setting | Default on macOS | Function |
 | --- | --- | --- |
+| `display.resolution` | `"native"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
+| `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
 | `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |
 | `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |

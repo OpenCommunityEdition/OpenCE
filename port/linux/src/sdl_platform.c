@@ -409,6 +409,38 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	return TRUE;
 }
 
+#ifndef HALO_ANDROID
+/* the pixels the picture goes to: the display's in fullscreen, else the
+window's (as display.window_scale makes it, before there is one) */
+BOOL platform_output_size(long *width, long *height)
+{
+	if (platform_screen_mode(width, height))
+		return TRUE;
+	if (platform_window)
+	{
+		int w = 0, h = 0;
+
+		SDL_GetWindowSizeInPixels(platform_window, &w, &h);
+		if (w > 0 && h > 0)
+		{
+			*width = w;
+			*height = h;
+			return TRUE;
+		}
+		return FALSE;
+	}
+	{
+		long scale = config_integer("display.window_scale");
+
+		if (scale < 1)
+			scale = 1;
+		*width = 640 * scale;
+		*height = 480 * scale;
+		return TRUE;
+	}
+}
+#endif
+
 void platform_video_drawable_size(int *width, int *height)
 {
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
@@ -718,6 +750,9 @@ void platform_pump_events(void)
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 			}
+			/* F8 steps through the resolutions (d3d8_gl.c) */
+			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F8)
+				halo_screen_resolution_next();
 			/* F9 switches the ray-traced lighting (raytrace_gl.c) */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F9)
 				halo_ray_tracing_toggle();

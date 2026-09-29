@@ -81,8 +81,15 @@ made for; off elsewhere */
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
-		"Start fullscreen, drawing at the display's resolution and shape; false\n"
-		"starts in a window, which draws the Xbox's 640x480. F11 switches." },
+		"Start fullscreen, in the display's shape; false starts in a window, in\n"
+		"the window's shape. display.resolution sets the pixels. F11 switches." },
+	{ "display.resolution", _config_string, "\"native\"", "HALO_RESOLUTION", _environment_value, _platform_desktop,
+		"The picture's pixels: \"native\" (the display's in fullscreen, the window's\n"
+		"in a window), \"720p\", \"1080p\", \"1440p\", \"2160p\", \"<width>x<height>\",\n"
+		"or \"xbox\" for the Xbox's 640x480. F8 steps through them while playing." },
+	{ "display.render_scale", _config_real, "1.0", "HALO_RENDER_SCALE", _environment_value, _platform_desktop,
+		"Multiplies the resolution: below 1.0 draws fewer pixels (faster),\n"
+		"above 1.0 more (supersampling, smoother edges); up to 4.0." },
 	{ "display.window_scale", _config_integer, "2", "HALO_WINDOW_SCALE", _environment_value, _platform_desktop,
 		"The window's size as a multiple of 640x480 (it can be resized)." },
 	{ "display.screen_width", _config_integer, "0", "HALO_SCREEN_WIDTH", _environment_value, _platform_android,

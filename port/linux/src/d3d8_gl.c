@@ -82,6 +82,70 @@ static float screen_scale[2] = { 1.0f, 1.0f };
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
+#ifndef HALO_ANDROID
+/* ---------- the resolution (display.resolution, F8)
+
+"native" draws the output's pixels: the display's in fullscreen, the
+window's in a window. "720p", "1080p", "1440p", "2160p" (or any "<lines>p")
+draw that many lines in the output's shape; "<width>x<height>" draws that
+picture, letterboxed if its shape is not the output's; "xbox" draws the
+Xbox's 640x480. display.render_scale multiplies it (below 1 for speed,
+above 1 to supersample). F8 steps through native and the presets. */
+
+static const char *const resolution_presets[] = { "native", "2160p", "1440p", "1080p", "720p", "xbox" };
+/* F8's choice, -1 until F8 is pressed (display.resolution then) */
+static int resolution_preset = -1;
+
+void halo_screen_resolution_next(void)
+{
+	const char *current = resolution_preset >= 0 ? resolution_presets[resolution_preset] :
+		config_string("display.resolution");
+	int index, count = (int)(sizeof(resolution_presets) / sizeof(resolution_presets[0]));
+
+	resolution_preset = 0;
+	for (index = 0; index < count; index++)
+	{
+		if (!strcmp(current, resolution_presets[index]))
+		{
+			resolution_preset = (index + 1) % count;
+			break;
+		}
+	}
+	platform_log("screen: resolution %s (F8)", resolution_presets[resolution_preset]);
+}
+
+/* the picture's pixels for an output of display_width x display_height;
+FALSE for the Xbox's 640x480 */
+static BOOL resolution_target(long display_width, long display_height, long *width, long *height)
+{
+	const char *setting = resolution_preset >= 0 ? resolution_presets[resolution_preset] :
+		config_string("display.resolution");
+	long a = 0, b = 0;
+	char unit = 0;
+
+	*width = display_width;
+	*height = display_height;
+	if (!setting || !*setting || !strcmp(setting, "native"))
+		return TRUE;
+	if (!strcmp(setting, "xbox"))
+		return FALSE;
+	if (sscanf(setting, "%ldx%ld", &a, &b) == 2 && a >= 320 && b >= 240)
+	{
+		*width = a;
+		*height = b;
+		return TRUE;
+	}
+	if (sscanf(setting, "%ld%c", &a, &unit) >= 1 && a >= 240 && (unit == 'p' || unit == 0))
+	{
+		*height = a;
+		*width = (a * display_width + display_height / 2) / display_height;
+		return TRUE;
+	}
+	platform_log("display.resolution \"%s\" is not native, xbox, <lines>p or <width>x<height>: native", setting);
+	return TRUE;
+}
+#endif
+
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
@@ -99,19 +163,35 @@ static void screen_mode_choose(long *width, float scale[2])
 	*width &= ~1L;
 	scale[0] = scale[1] = 1.0f;
 #else
-	long display_width, display_height;
+	long display_width, display_height, target_width, target_height;
+	float render_scale = (float)config_real("display.render_scale");
 
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
-	if (platform_screen_mode(&display_width, &display_height) && display_width > 0 && display_height > 0)
+	if (!platform_output_size(&display_width, &display_height) || display_width <= 0 || display_height <= 0)
+		return;
+	/* the picture's pixels (display.resolution, F8), in the output's shape
+	unless given both ways */
+	if (!resolution_target(display_width, display_height, &target_width, &target_height))
+		return;
+	if (render_scale > 0.1f && render_scale <= 4.0f)
 	{
-		long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
+		target_width = (long)(target_width * render_scale + 0.5f);
+		target_height = (long)(target_height * render_scale + 0.5f);
+	}
+	if (target_height > 8192)
+	{
+		target_width = target_width * 8192 / target_height;
+		target_height = 8192;
+	}
+	{
+		long wanted = (SCREEN_HEIGHT * target_width + target_height / 2) / target_height;
 
 		*width = wanted < 640 ? 640 : wanted > SCREEN_MAXIMUM_WIDTH ? SCREEN_MAXIMUM_WIDTH : wanted & ~1L;
-		scale[0] = (float)display_width / (float)*width;
-		scale[1] = (float)display_height / (float)SCREEN_HEIGHT;
-		/* a display narrower or wider than the game can be: the picture
-		keeps its shape and the display blit letterboxes it */
+		scale[0] = (float)target_width / (float)*width;
+		scale[1] = (float)target_height / (float)SCREEN_HEIGHT;
+		/* a picture narrower or wider than the game can be: it keeps its
+		shape and the display blit letterboxes it */
 		if (*width != wanted && *width != (wanted & ~1L))
 			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
 	}
