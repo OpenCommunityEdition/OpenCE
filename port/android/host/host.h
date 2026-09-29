@@ -35,7 +35,10 @@ Xbox window and the image's range at start-up, and hands out pages for
 everything else (the guest's malloc arenas, thread stacks, anonymous
 mappings) from pools of address space it reserves below 4 GB on demand. */
 
-/* reserves the fixed ranges; returns 0 on success */
+/* claims the image's range and the Xbox window before anything else in the
+process maps memory below 4 GB; returns 0 on success */
+int host_memory_reserve_guest(void);
+/* narrows the reservation to the image the host has just read */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 /* page-granular allocations below 4 GB; NULL on failure */
 void *host_low_map(size_t size, int protection);

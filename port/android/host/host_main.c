@@ -328,6 +328,10 @@ int main(int argc, char *argv[])
 	(void)argv;
 	host_logf(HOST_LOG_INFO, "Halo for Android starting");
 	host_install_signal_handlers();
+	/* the guest's own address space, before the first pool or SDL takes any */
+	if (host_memory_reserve_guest() != 0)
+		host_fatal("The device has no free address space below 4 GB for the game.\n\n"
+			"Another app or the system holds the memory the game needs.");
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");
 	/* the game ends the process itself (host_exit) */

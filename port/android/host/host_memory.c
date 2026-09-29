@@ -22,6 +22,9 @@ passed on to the previous handler.
 
 #include "host.h"
 
+#include <SDL3/SDL_system.h>
+#include <jni.h>
+
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
@@ -34,6 +37,12 @@ passed on to the previous handler.
 
 #ifndef MAP_FIXED_NOREPLACE
 #define MAP_FIXED_NOREPLACE 0x100000
+#endif
+#ifndef MREMAP_MAYMOVE
+#define MREMAP_MAYMOVE 1
+#endif
+#ifndef MREMAP_FIXED
+#define MREMAP_FIXED 2
 #endif
 
 #define PAGE 0x1000ULL
@@ -70,8 +79,8 @@ static int in_range(uint64_t address, uint64_t size, uint64_t base, uint64_t end
 /* ---------- reserving address space below 4 GB */
 
 /* the lowest free gap of at least size bytes at or above minimum, from
-/proc/self/maps; 0 if none */
-static uint64_t find_gap(uint64_t size, uint64_t minimum)
+/proc/self/maps, at a multiple of alignment; 0 if none */
+static uint64_t find_gap(uint64_t size, uint64_t minimum, uint64_t alignment)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
@@ -95,12 +104,165 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 			break;
 	}
 	fclose(maps);
-	previous_end = round_up(previous_end);
+	previous_end = (round_up(previous_end) + alignment - 1) & ~(alignment - 1);
 	if (previous_end + size <= LOW_LIMIT)
 		result = previous_end;
 	return result;
 }
 
+static void log_conflicts(uint64_t address, uint64_t size)
+{
+	FILE *maps = fopen("/proc/self/maps", "r");
+	char line[512];
+
+	while (maps && fgets(line, sizeof(line), maps))
+	{
+		unsigned long long start, end;
+
+		if (sscanf(line, "%llx-%llx", &start, &end) != 2)
+			continue;
+		if (end > address && start < address + size)
+			host_logf(HOST_LOG_ERROR, "  %s", line);
+	}
+	if (maps)
+		fclose(maps);
+}
+
+/* ---------- moving the Java runtime's heap out of the way
+
+The game data is linked to 0x80000000, so the window cannot move. On some
+devices the runtime has already mapped its large object space across it,
+which is one anonymous mapping the kernel can move whole. The app does not
+write to that space itself, and a collection beforehand gives the runtime
+the chance to give back whatever it had in it; how much of it was in use
+is written to the log, since a space that was in use would have objects
+pointing into the address the runtime still remembers. */
+
+#define RUNTIME_HEAP_NAME "dalvik-free list large object space"
+
+/* how much of that space may be in use for moving it to be safe: whatever
+the runtime still has in it is reachable by pointers it kept, and those
+pointers are not moved with it */
+#define RUNTIME_HEAP_RESIDENT_LIMIT (1024UL * 1024UL)
+
+static int find_runtime_heap(uint64_t address, uint64_t size, uint64_t *start, uint64_t *end)
+{
+	FILE *maps = fopen("/proc/self/maps", "r");
+	char line[512];
+	int found = 0;
+
+	while (maps && !found && fgets(line, sizeof(line), maps))
+	{
+		unsigned long long first, last;
+		char name[128];
+
+		if (sscanf(line, "%llx-%llx", &first, &last) != 2)
+			continue;
+		name[0] = 0;
+		sscanf(line, "%*s %*s %*s %*s %*s %127[^\n]", name);
+		if (strstr(name, RUNTIME_HEAP_NAME) && last > address && first < address + size)
+		{
+			*start = first;
+			*end = last;
+			found = 1;
+		}
+	}
+	if (maps)
+		fclose(maps);
+	return found;
+}
+
+/* the resident size of a mapping, from /proc/self/smaps; 0 if unknown */
+static unsigned long mapping_resident_kilobytes(uint64_t start, uint64_t end)
+{
+	FILE *smaps = fopen("/proc/self/smaps", "r");
+	char line[512];
+	unsigned long resident = 0;
+	int inside = 0;
+
+	while (smaps && fgets(line, sizeof(line), smaps))
+	{
+		unsigned long long first, last;
+
+		if (sscanf(line, "%llx-%llx", &first, &last) == 2)
+		{
+			inside = first == start && last == end;
+			continue;
+		}
+		if (inside && sscanf(line, "Rss: %lu kB", &resident) == 1)
+			break;
+	}
+	if (smaps)
+		fclose(smaps);
+	return resident;
+}
+
+/* a collection, so the runtime gives back what it has in the space */
+static void collect_runtime_memory(void)
+{
+	JNIEnv *environment = (JNIEnv *)SDL_GetAndroidJNIEnv();
+	jclass system;
+	jmethodID collect;
+
+	if (!environment)
+		return;
+	system = (*environment)->FindClass(environment, "java/lang/System");
+	if (!system)
+		return;
+	collect = (*environment)->GetStaticMethodID(environment, system, "gc", "()V");
+	if (!collect)
+		return;
+	(*environment)->CallStaticVoidMethod(environment, system, collect);
+	(*environment)->ExceptionClear(environment);
+}
+
+static int move_runtime_heap(uint64_t address, uint64_t size)
+{
+	uint64_t start, end, length, destination;
+	unsigned long resident;
+	int moved = 0;
+
+	if (!find_runtime_heap(address, size, &start, &end))
+		return 0;
+	length = end - start;
+	collect_runtime_memory();
+	resident = mapping_resident_kilobytes(start, end) * 1024UL;
+	host_logf(HOST_LOG_INFO, "the runtime's large object space %llx-%llx holds %lu kB",
+		(unsigned long long)start, (unsigned long long)end, resident / 1024UL);
+	if (resident > RUNTIME_HEAP_RESIDENT_LIMIT)
+	{
+		host_logf(HOST_LOG_ERROR,
+			"the runtime still has %lu kB in it; moving it would lose them",
+			resident / 1024UL);
+		return 0;
+	}
+	destination = find_gap(length, LOW_START, HALO_GUEST_WINDOW_ALIGNMENT);
+	if (!destination)
+		destination = find_gap(length, 0, HALO_GUEST_WINDOW_ALIGNMENT);
+	if (!destination)
+	{
+		host_logf(HOST_LOG_ERROR, "no free range for the runtime's large object space");
+		return 0;
+	}
+	/* MREMAP_FIXED puts the mapping where the search above says is free */
+	if (mremap((void *)start, length, length, MREMAP_MAYMOVE | MREMAP_FIXED,
+		(void *)destination) == (void *)destination)
+	{
+		host_logf(HOST_LOG_INFO, "moved the runtime's large object space %llx-%llx to %llx",
+			(unsigned long long)start, (unsigned long long)end,
+			(unsigned long long)destination);
+		moved = 1;
+	}
+	else
+	{
+		host_logf(HOST_LOG_ERROR, "cannot move the runtime's large object space %llx-%llx (%s)",
+			(unsigned long long)start, (unsigned long long)end, strerror(errno));
+	}
+	return moved;
+}
+
+/* address space the guest will have to itself; the mappings that are in
+the way are named in the log when the reservation fails */
 static int reserve(uint64_t address, uint64_t size)
 {
 	void *result = mmap((void *)address, size, PROT_NONE,
@@ -125,12 +287,12 @@ static struct pool *pool_new(void)
 		return NULL;
 	for (attempt = 0; attempt < 64; attempt++)
 	{
-		uint64_t address = find_gap(POOL_SIZE, minimum);
+		uint64_t address = find_gap(POOL_SIZE, minimum, PAGE);
 
 		if (!address && minimum != LOW_START)
 		{
 			minimum = LOW_START;
-			address = find_gap(POOL_SIZE, minimum);
+			address = find_gap(POOL_SIZE, minimum, PAGE);
 		}
 		if (!address)
 			return NULL;
@@ -149,23 +311,56 @@ static struct pool *pool_new(void)
 	return NULL;
 }
 
-int host_memory_initialize(uint32_t base, uint32_t size)
+/* The guest needs the Xbox memory window, 128 MB whose address both the
+game and the game data name, and the range its image is linked at. Android's
+Java runtime maps a large part of the low 4 GB for its own heaps, so both
+are claimed here, before the first pool and before SDL maps anything. */
+int host_memory_reserve_guest(void)
 {
+	/* the window comes first: where it sits decides whether the image's
+	range is free */
+	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
+	{
+		host_logf(HOST_LOG_INFO, "the runtime's heaps cover the window:");
+		log_conflicts(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
+		move_runtime_heap(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
+		if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
+		{
+			host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx:",
+				(unsigned long long)HALO_GUEST_WINDOW_BASE);
+			log_conflicts(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
+			return -1;
+		}
+	}
 	window_base = HALO_GUEST_WINDOW_BASE;
 	window_end = window_base + HALO_GUEST_WINDOW_SIZE;
-	if (reserve(window_base, HALO_GUEST_WINDOW_SIZE) != 0)
+	image_base = HALO_GUEST_IMAGE_BASE;
+	image_end = image_base + HALO_GUEST_IMAGE_RESERVE;
+	if (reserve(image_base, HALO_GUEST_IMAGE_RESERVE) != 0)
 	{
-		host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx (%s)",
-			(unsigned long long)window_base, strerror(errno));
+		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image at %08llx:",
+			(unsigned long long)image_base);
+		log_conflicts(image_base, HALO_GUEST_IMAGE_RESERVE);
 		return -1;
 	}
-	image_base = base;
-	image_end = base + round_up(size);
-	if (reserve(image_base, image_end - image_base) != 0)
+	return 0;
+}
+
+int host_memory_initialize(uint32_t base, uint32_t size)
+{
+	uint64_t end = (uint64_t)base + round_up(size);
+
+	/* the range was reserved at start-up, for the pools to keep out of */
+	if (base != image_base || end > image_end)
 	{
-		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image range at %08llx (%s)",
-			(unsigned long long)image_base, strerror(errno));
+		host_logf(HOST_LOG_ERROR, "the guest image at %08x is not where it was reserved",
+			base);
 		return -1;
+	}
+	if (end < image_end)
+	{
+		munmap((void *)(uintptr_t)end, image_end - end);
+		image_end = end;
 	}
 	return 0;
 }
@@ -356,19 +551,19 @@ static int watch_active;
 
 static int in_window(uint64_t address)
 {
-	return address >= HALO_GUEST_WINDOW_BASE && address - HALO_GUEST_WINDOW_BASE < HALO_GUEST_WINDOW_SIZE;
+	return address >= window_base && address - window_base < HALO_GUEST_WINDOW_SIZE;
 }
 
 static uint64_t watch_page(uint64_t address)
 {
-	return (address - HALO_GUEST_WINDOW_BASE) / PAGE;
+	return (address - window_base) / PAGE;
 }
 
 static void mark_written(uint64_t page)
 {
 	page_generation[page] = __sync_add_and_fetch(&current_generation, 1);
 	page_protected[page] = 0;
-	mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ | PROT_WRITE);
+	mprotect((void *)(window_base + page * PAGE), PAGE, PROT_READ | PROT_WRITE);
 }
 
 static struct sigaction previous_segv, previous_bus, previous_ill;
@@ -491,7 +686,7 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 		if (!page_protected[page])
 		{
 			page_protected[page] = 1;
-			mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ);
+			mprotect((void *)(window_base + page * PAGE), PAGE, PROT_READ);
 		}
 	}
 }
@@ -526,10 +721,10 @@ void host_memory_watch_prepare_write(uint32_t address, uint32_t size)
 
 	if (!watch_active || !size)
 		return;
-	if (start + size <= HALO_GUEST_WINDOW_BASE || start >= (uint64_t)HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+	if (start + size <= window_base || start >= (uint64_t)window_base + HALO_GUEST_WINDOW_SIZE)
 		return;
-	if (start < HALO_GUEST_WINDOW_BASE)
-		start = HALO_GUEST_WINDOW_BASE;
+	if (start < window_base)
+		start = window_base;
 	first = watch_page(start);
 	last = watch_page((uint64_t)address + size - 1);
 	if (last >= WATCH_PAGE_COUNT)
