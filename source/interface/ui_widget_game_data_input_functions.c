@@ -1350,7 +1350,13 @@ void network_pregame_status_screen_update(
 			short seconds_to_game_start = network_game_client_get_seconds_to_game_start(
 				global_network_game_client_get());
 			boolean waiting_for_machines = (global_network_game_server_get() &&
-				game->machine_count < 2);
+				game->machine_count <
+#ifdef HALO_WEB
+				(network_game_distributed() ? 1 : 2)
+#else
+				2
+#endif
+			);
 
 			ustrncpy(countdown_text->parameters.text_box.text, L"-:--", 15);
 			status_text->visible = TRUE;
@@ -2917,7 +2923,13 @@ void multiplayer_game_directions(
 	{
 		if (!network_game_is_splitscreen_local() &&
 			game &&
-			game->machine_count < 2)
+			game->machine_count <
+#ifdef HALO_WEB
+				(network_game_distributed() ? 1 : 2)
+#else
+				2
+#endif
+			)
 		{
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_waiting_for_machine;

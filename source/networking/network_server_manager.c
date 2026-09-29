@@ -2997,6 +2997,9 @@ void network_game_server_update_countdown(
 				else
 				{
 					if (network_game_should_accept_remote_connections() == FALSE ||
+#ifdef HALO_WEB
+						(network_game_distributed() && server_has_enough_machines(server)) ||
+#endif
 						network_game_server_get_client_machine_count(server) > 1)
 					{
 						unsigned long countdown;
