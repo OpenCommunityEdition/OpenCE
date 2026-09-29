@@ -287,8 +287,9 @@ def build(args: argparse.Namespace) -> dict:
             shutil.copy2(library, destinations[library])
         for original, packaged in destinations.items():
             packaged.chmod(0o755)
-            subprocess.run(["codesign", "--remove-signature", str(packaged)],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Rewrite signed Mach-O files first, then replace their signatures.
+            # Removing signatures beforehand leaves a LINKEDIT layout that older
+            # Xcode install_name_tool versions reject.
             for old, dependency in graph[original]:
                 run("install_name_tool", "-change", old, "@rpath/" + dependency.name, packaged)
             if original != binary:
