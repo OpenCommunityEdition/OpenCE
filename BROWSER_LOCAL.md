@@ -1,7 +1,8 @@
 # Local browser runner
 
 Run the published [bnunu Apollo browser beta](https://bnunu.itch.io/apollobeta)
-locally with an opaque canvas fix and batched WebGL stream uploads.
+locally with an opaque canvas fix, batched WebGL stream uploads, and render-state
+caches.
 
 For a hosted demo or to publish the same runtime on GitHub Pages, see
 [GITHUB_PAGES.md](GITHUB_PAGES.md).
@@ -64,6 +65,18 @@ buffers. Batching avoids repeatedly modifying these large buffers between
 draws, at the cost of approximately 54 MiB of CPU shadow memory. The shaders,
 vertex values, published WASM, and engine JavaScript are unchanged.
 
+`replay-cache.js` skips unchanged uniforms, constant vertex attributes, and
+render state before the recorder copies their arguments. Uniform caches track
+overlapping array ranges and invalidate on alternate setters and program
+changes. `vertex-state-cache.js` separately tracks attribute enable bits per
+VAO and sampler bindings per texture unit. Neither cache removes draws or
+changes buffer uploads. Both run after the stream recorder is installed.
+
+Use `?replay_cache=0&vertex_state_cache=0` to compare with batching alone;
+either cache can also be disabled independently. Local helper script URLs carry
+content hashes so re-running setup picks up changed code despite browser caches.
+The local server also revalidates cached HTML and scripts on each visit.
+
 This wrapper relies on Halo's append-only allocator contract; it is not a
 general-purpose WebGL optimizer. Add `?batch_streams=0` to disable it for a
 comparison. The FPS HUD counts engine presents rather than animation callbacks.
@@ -88,10 +101,38 @@ matching views and warm shaders; background windows and scene changes affect
 results. Textured rendering, firing, weapon switching, and pause/resume were
 checked. This does not validate a full campaign or multiplayer.
 
+A second rendering comparison on the same Mac used a 2450 × 1305 canvas,
+with the beach scene held at the same pause menu throughout. Diagnostic buttons
+changed the caches without reloading or moving the camera. Each row uses the
+last ten one-second readings after allowing the setting to settle:
+
+| State, in measurement order | Median FPS | Range |
+| --- | ---: | ---: |
+| Both caches enabled | 35.00 | 32.07–37.24 |
+| Render-state cache only | 32.57 | 31.82–35.61 |
+| Both caches disabled; stream batching retained | 27.78 | 24.75–29.39 |
+| Both caches re-enabled | 34.29 | 30.43–36.38 |
+
+This is a 23–26% improvement in that fixed rendering workload, not a claim
+about every gameplay scene. An independent fresh gameplay run of the faster
+render-state cache measured 35.36 FPS median over frames 2700–3300 versus
+32.67 with the earlier batched build; moving combat scenes are less controlled.
+The temporary live-toggle controls are not shipped. Larger command batches and
+pooled uniform snapshots did not improve the live comparison and were excluded.
+
+Recorder CPU overhead also fell by roughly 35% in a separate synthetic no-GPU
+benchmark. It is reproducible with
+`node tools/test_stream_batch.mjs --benchmark --baseline-ref=b9da047`; these
+numbers are not game FPS. Reload after WebGL context loss; complete context
+recovery is not validated by this runner.
+
 Run the regression checks without game data:
 
 ```sh
 node tools/test_stream_batch.mjs
+node tools/test_replay_cache.js
+node tools/test_vertex_state_cache.cjs
+python3 -m unittest discover -s tools -p 'test_setup_browser.py'
 python3 -m unittest discover -s tools -p 'test_serve_browser.py'
 ```
 

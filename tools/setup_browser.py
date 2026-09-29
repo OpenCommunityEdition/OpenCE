@@ -3,7 +3,6 @@
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +16,8 @@ FILES = {
     "halo-asyncify.wasm": "77edefd9f55f564d69e9b16491a11ab173c6123f830663873a5cbe877a745696",
     "sw.js": "1b3d773d5f575cc45276d1b9aeefa6b62106023059457c6c8c31a2d87ef49430",
 }
-LOCAL_SCRIPTS = ("opaque-canvas.js", "stream-batch.js", "performance.js")
+LOCAL_SCRIPTS = ("opaque-canvas.js", "stream-batch.js", "replay-cache.js",
+                 "vertex-state-cache.js", "performance.js")
 
 
 def digest(data):
@@ -54,21 +54,27 @@ def main(output=None):
     html = html.replace('href="guide.html"', f'href="{BASE}guide.html"')
     html = html.replace('<p class="hint-big">Finding Halo NTSC .XISO is easy. Google could be your friend :)</p>',
         '<p class="help">Local copy of <a href="https://bnunu.itch.io/apollobeta" target="_blank" rel="noopener">bnunu’s Apollo browser beta</a>.</p>')
-    scripts = "\n".join(f'<script src="{name}"></script>' for name in LOCAL_SCRIPTS)
+    # Hash the exact bytes installed, not timestamps: rapid edits and static
+    # hosting caches can otherwise reuse an older helper under the same URL.
+    local_files = {}
+    for name in LOCAL_SCRIPTS:
+        data = (ROOT / "port/web" / name).read_bytes()
+        (output / name).write_bytes(data)
+        sha256 = digest(data)
+        local_files[name] = {"bytes": len(data), "sha256": sha256,
+                             "url": f"{name}?v={sha256}"}
+    scripts = "\n".join(f'<script src="{local_files[name]["url"]}"></script>'
+                        for name in LOCAL_SCRIPTS)
     html = html.replace('<script src="launcher.js"></script>',
                         scripts + '\n<script src="launcher.js"></script>')
     index.write_text(html)
-    for name in LOCAL_SCRIPTS:
-        shutil.copyfile(ROOT / "port/web" / name, output / name)
     receipt["local_changes"] = [
         "Opaque WebGL canvas", "Default stream upload batching with batch_streams=0 opt-out",
+        "Render-state and vertex-state caches with independent opt-outs",
         "FPS display", "Removed itch.io host script",
-        "Publisher credit and guide link",
+        "Publisher credit and guide link", "Content-versioned local scripts",
     ]
-    receipt["local_files"] = {
-        name: {"bytes": (output / name).stat().st_size, "sha256": digest((output / name).read_bytes())}
-        for name in LOCAL_SCRIPTS
-    }
+    receipt["local_files"] = local_files
     receipt["installed_engine"] = {
         name: digest((output / name).read_bytes())
         for name in ("halo.js", "halo.wasm", "halo-asyncify.js", "halo-asyncify.wasm")

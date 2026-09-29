@@ -58,6 +58,7 @@ class MockGL {
         this.arrays.get(this.vao).attributes.set(index, { buffer: this.bindings.get(this.ARRAY_BUFFER), size, type, stride: stride || size, offset, enabled: true });
     }
     uniform4fv(location, data, offset = 0, length = 0) { if (location !== null) this.color = Array.from(data).slice(offset, offset + (length || data.length - offset)); }
+    uniform4iv(location, data) { if (location !== null) this.color = Array.from(data); }
     uniform1f(location, value) { if (location !== null) this.color = [value]; }
     drawArrays(mode, first, count) { this.capture(Array.from({ length: count }, (_, i) => first + i)); }
     drawElements(mode, count, type, offset) {
@@ -91,13 +92,14 @@ function environment(batched, search = "?batch_streams") {
     const gl = new MockGL();
     const canvas = { getContext: () => gl };
     const window = { requestAnimationFrame: () => 1 };
+    const timers = [], output = { dataset: {} };
     if (batched) {
         vm.runInNewContext(source, { URLSearchParams, Uint8Array, ArrayBuffer,
-            location: { search }, document: { getElementById: id => id === "canvas" ? canvas : null }, window,
-            WebGLRenderingContext: { prototype: MockGL.prototype }, WebGL2RenderingContext: { prototype: {} }, setInterval() {} });
+            location: { search }, document: { getElementById: id => id === "canvas" ? canvas : output }, window,
+            WebGLRenderingContext: { prototype: MockGL.prototype }, WebGL2RenderingContext: { prototype: {} }, setInterval(fn) { timers.push(fn); } });
         canvas.getContext("webgl2");
     }
-    return { gl, frame: () => window.requestAnimationFrame(() => {}) };
+    return { gl, frame: () => window.requestAnimationFrame(() => {}), tick: () => timers.forEach(fn => fn()), stats: () => JSON.parse(output.dataset.streamBatch) };
 }
 
 function vertexBuffer(gl, size = vertexCapacity, usage = gl.STREAM_DRAW) {
@@ -239,4 +241,130 @@ compare("transform-feedback binding separates pending uploads from GPU writes", 
     assert.equal(gl.presented.length, 1, "canvas presentation must flush without requestAnimationFrame");
     assert.deepEqual(gl.presented[0][0].vertices, [1, 2, 3]);
     process.stdout.write("PASS presentation without RAF and offscreen blit batching\n");
+}
+
+
+compare("nonmonotonic disjoint writes keep earlier draw inputs", (gl, frame) => {
+    vertexBuffer(gl);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Uint8Array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110])); frame();
+    gl.bufferSubData(gl.ARRAY_BUFFER, 8, new Uint8Array([1, 2, 3]));
+    gl.vertexAttribPointer(0, 1, gl.UNSIGNED_BYTE, false, 1, 4); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 4, new Uint8Array([4, 5, 6])); gl.drawArrays(gl.TRIANGLES, 0, 3);
+}, (original, batched) => assert.equal(batched.uploads, original.uploads));
+
+compare("mixed uniform snapshots retain source offsets and survive later source mutations", (gl, frame) => {
+    vertexBuffer(gl);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Uint8Array([1, 2, 3]));
+    const values = new Float32Array(770), integers = new Int32Array(4);
+    for (let tick = 0; tick < 3; tick++) {
+        for (let draw = 0; draw < 30; draw++) {
+            values.fill(tick * 100 + draw); gl.uniform4fv({}, values, 1, 768); gl.drawArrays(gl.TRIANGLES, 0, 3);
+            integers.fill(-draw); gl.uniform4iv({}, integers); gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+        values.fill(-1); integers.fill(-1); frame();
+    }
+});
+
+
+{
+    const run = environment(true);
+    run.tick(); assert.equal(run.stats().commandLimit, 40000);
+    for (let i = 0; i < 50000; i++) run.gl.uniform1f({}, i);
+    assert.deepEqual(run.gl.color, [40000], "a large frame must flush once at the fixed queue bound");
+    run.frame(); assert.deepEqual(run.gl.color, [49999], "the final queued updates must replay in order");
+}
+process.stdout.write("PASS fixed queue bound and complete large-frame replay\n");
+
+// Optional CPU-only comparison of recorder overhead. This uses no-op native GL
+// methods; it cannot predict GPU time or game FPS. Pin a checked-in baseline:
+// node tools/test_stream_batch.mjs --benchmark --baseline-ref=b9da047
+if (process.argv.includes("--benchmark")) {
+    const { execFileSync } = await import("node:child_process");
+    const { performance } = await import("node:perf_hooks");
+    const baselineRef = process.argv.find(value => value.startsWith("--baseline-ref="))?.slice(15);
+    assert(baselineRef, "--benchmark requires --baseline-ref=<git-ref>");
+    const baseline = execFileSync("git", ["show", `${baselineRef}:port/web/stream-batch.js`], { cwd: new URL("..", import.meta.url), encoding: "utf8" });
+    const drawsPerFrame = 400, framesPerSample = 24, rounds = 3;
+
+    function benchmarkEnvironment(script) {
+        let checksum = 0, presents = 0, calls = 0, datasetWrites = 0;
+        const methods = {
+            createBuffer() { return {}; },
+            bufferData() {},
+            bufferSubData(target, offset, data) { calls++; checksum += data[0] || 0; },
+            uniform4fv(location, values) { calls++; if (location) checksum += values[0] || 0; },
+            drawElements() { calls++; },
+            blitFramebuffer() { calls++; presents++; },
+        };
+        for (const name of ["bindBuffer", "bindVertexArray", "bindFramebuffer", "activeTexture", "bindTexture", "bindSampler", "samplerParameteri", "useProgram", "uniform1f", "enableVertexAttribArray", "vertexAttribPointer"]) methods[name] = function () { calls++; };
+        const gl = Object.assign({ ARRAY_BUFFER: 34962, ELEMENT_ARRAY_BUFFER: 34963, STREAM_DRAW: 35040,
+            UNSIGNED_SHORT: 5123, FLOAT: 5126, TRIANGLES: 4, FRAMEBUFFER: 36160, DRAW_FRAMEBUFFER: 36009,
+            COLOR_BUFFER_BIT: 16384, NEAREST: 9728 }, methods);
+        const canvas = { getContext: () => gl };
+        const output = { dataset: {} };
+        Object.defineProperty(output.dataset, "streamBatch", { set() { datasetWrites++; } });
+        const window = { requestAnimationFrame() {} };
+        vm.runInNewContext(script, { URLSearchParams, Uint8Array, ArrayBuffer,
+            location: { search: "?batch_streams" }, document: { getElementById: id => id === "canvas" ? canvas : output }, window,
+            WebGLRenderingContext: { prototype: methods }, WebGL2RenderingContext: { prototype: {} }, setInterval() {} });
+        canvas.getContext("webgl2");
+        const vertex = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vertex); gl.bufferData(gl.ARRAY_BUFFER, vertexCapacity, gl.STREAM_DRAW);
+        const index = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexCapacity, gl.STREAM_DRAW);
+        window.requestAnimationFrame(() => {});
+        const vertexData = new Uint8Array(8192), indexData = new Uint8Array(768);
+        const constants = new Float32Array(768), material = new Float32Array(32);
+        const locations = Array.from({ length: 12 }, () => ({}));
+        const textures = Array.from({ length: 4 }, () => ({})), samplers = textures.map(() => ({}));
+        const program = {};
+        const frame = frameNumber => {
+            for (let draw = 0; draw < drawsPerFrame; draw++) {
+                gl.useProgram(program);
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertex); vertexData[0] = draw & 255;
+                gl.bufferSubData(gl.ARRAY_BUFFER, draw * vertexData.byteLength, vertexData);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index); indexData[0] = draw & 255;
+                gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, draw * indexData.byteLength, indexData);
+                constants[0] = frameNumber + draw;
+                gl.uniform4fv(locations[0], constants);
+                for (let field = 1; field <= 10; field++) { material[0] = field + draw; gl.uniform4fv(locations[field], material); }
+                gl.uniform1f(locations[11], frameNumber);
+                for (let unused = 0; unused < 6; unused++) gl.uniform4fv(null, material);
+                for (let unit = 0; unit < 4; unit++) {
+                    gl.activeTexture(33984 + unit); gl.bindTexture(3553, textures[unit]); gl.bindSampler(unit, samplers[unit]);
+                    gl.samplerParameteri(samplers[unit], 10241, 9729); gl.samplerParameteri(samplers[unit], 10242, 10497); gl.samplerParameteri(samplers[unit], 10243, 10497);
+                }
+                for (let attribute = 0; attribute < 8; attribute++) {
+                    gl.enableVertexAttribArray(attribute); gl.vertexAttribPointer(attribute, 3, gl.FLOAT, false, 32, draw * vertexData.byteLength);
+                }
+                gl.drawElements(gl.TRIANGLES, 384, gl.UNSIGNED_SHORT, draw * indexData.byteLength);
+            }
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.blitFramebuffer(0, 0, 640, 480, 0, 0, 640, 480, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        };
+        return { frame, counters: () => ({ checksum, presents, calls, datasetWrites }) };
+    }
+
+    const cases = { baseline, current: source };
+    const results = Object.fromEntries(Object.keys(cases).map(name => [name, []]));
+    for (let round = 0; round < rounds; round++) {
+        const order = Object.keys(cases);
+        if (round % 2) order.reverse();
+        const counters = {};
+        for (const name of order) {
+            const run = benchmarkEnvironment(cases[name]);
+            for (let frame = 0; frame < 6; frame++) run.frame(frame);
+            const start = performance.now();
+            for (let frame = 0; frame < framesPerSample; frame++) run.frame(frame);
+            const elapsed = performance.now() - start;
+            results[name].push(elapsed / framesPerSample);
+            counters[name] = run.counters();
+        }
+        for (const name of Object.keys(cases).filter(name => name !== "baseline")) for (const field of ["checksum", "presents", "calls"]) assert.equal(counters[name][field], counters.baseline[field], `benchmark ${name} changed native ${field}`);
+    }
+    const summary = {};
+    for (const [name, samples] of Object.entries(results)) {
+        const sorted = samples.slice().sort((a, b) => a - b);
+        summary[name] = { medianMsPerFrame: +sorted[Math.floor(sorted.length / 2)].toFixed(3), samplesMsPerFrame: samples.map(value => +value.toFixed(3)) };
+    }
+    console.log(JSON.stringify({ benchmark: "CPU recorder/replay only; no GPU or game FPS", baselineRef, drawsPerFrame,
+        recordedCommandsPerFrame: 400 * 58 + 2, streamBytesPerFrame: drawsPerFrame * (8192 + 768), framesPerSample, rounds, results: summary }, null, 2));
 }
