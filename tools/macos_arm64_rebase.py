@@ -48,7 +48,7 @@ MEMORY = re.compile(
     r"^(ldr|ldrb|ldrh|ldrsb|ldrsh|ldrsw|str|strb|strh|ldur|ldurb|ldurh|ldursb|ldursh|ldursw|stur|sturb|sturh|"
     r"ldp|stp|ldpsw|ldnp|stnp|ldtr\w*|sttr\w*|"
     r"ldxr|ldxrb|ldxrh|ldxp|ldaxr|ldaxrb|ldaxrh|ldaxp|stxr|stxrb|stxrh|stxp|stlxr|stlxrb|stlxrh|stlxp|"
-    r"ldar|ldarb|ldarh|stlr|stlrb|stlrh|ldapr\w*|stlur\w*|ldlar\w*|stllr\w*|"
+    r"ldar|ldarb|ldarh|stlr|stlrb|stlrh|ldapr\w*|ldapur\w*|stlur\w*|ldlar\w*|stllr\w*|"
     r"ld1|ld2|ld3|ld4|st1|st2|st3|st4|ld1r|ld2r|ld3r|ld4r|"
     r"prfm|prfum|"
     r"cas\w*|swp\w*|ld(add|clr|eor|set|smax|smin|umax|umin)\w*|st(add|clr|eor|set|smax|smin|umax|umin)\w*)$"
@@ -101,6 +101,10 @@ def rewrite(line):
         return [f"{indent}add\t{SCRATCH}, {BASE}, w{register[1:]}, uxtw",
                 f"{indent}{mnemonic}\t{SCRATCH}"]
     if not MEMORY.match(base_mnemonic):
+        # an instruction this pass does not know that addresses memory
+        # through a register would escape the rebasing: refuse it
+        if re.search(r"\[\s*x\d+", operands):
+            raise RebaseError(f"unknown instruction with a memory operand: {line.strip()}")
         return [line]
     m = BRACKET.search(operands)
     if not m:

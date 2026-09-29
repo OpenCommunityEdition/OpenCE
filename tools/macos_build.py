@@ -61,7 +61,12 @@ HOST_FRAMEWORKS = ["Cocoa", "Metal", "QuartzCore", "IOKit"]
 
 # the native build: the Android port's guest ABI, rebased (x28 the base,
 # x27 the rebasing's scratch register), with the desktop platform layer
-NATIVE_ABI_FLAGS = [flag for flag in ANDROID_ABI_FLAGS if flag != "-DHALO_ANDROID=1"] + [
+# Apple silicon rather than the Android port's ARMv8.0 (-mcpu=cortex-a53):
+# the M1's instructions and scheduling. Floating-point results do not
+# change: no fused multiply-add (-ffp-contract=off), no reassociation, and
+# NEON's lanes round as scalar instructions do.
+NATIVE_ABI_FLAGS = [("-mcpu=apple-m1" if flag == "-mcpu=cortex-a53" else flag)
+                    for flag in ANDROID_ABI_FLAGS if flag != "-DHALO_ANDROID=1"] + [
     "-DHALO_MACOS=1", "-ffixed-x27", "-ffixed-x28",
     # the rebasing lengthens functions past what byte-sized jump table
     # entries reach
@@ -251,7 +256,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         command=(f"{compile_launcher(sln)}clang -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
                  "$python tools/android_asm_convert.py $out.darwin.s $out.elf.s && "
                  "$python tools/macos_arm64_rebase.py $out.elf.s $out.s && "
-                 "clang --target=aarch64-linux-gnu -c $out.s -o $out"),
+                 "clang --target=aarch64-linux-gnu -mcpu=apple-m1 -c $out.s -o $out"),
         description="MACOS CC $out",
         depfile="$out.d",
         deps="gcc",
@@ -463,8 +468,10 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         guest_abi, "-std=gnu11", "-w", *libc_includes, f"-I{MUSL_MATH_DIR}/include",
         f"-include {MUSL_MATH_DIR}/include/libm.h",
     ])
+    math_objects: List[Path] = []
     for source in musl_math_sources():
-        objects.append(guest_object(source, musl_math_cflags))
+        math_objects.append(guest_object(source, musl_math_cflags))
+    objects += math_objects
     runtime_internal_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-D_GNU_SOURCE",
         runtime_dirs, f"-I{arch}", f"-I{MUSL_DIR}/arch/generic", f"-I{libc_internal}", *darwin_features,
@@ -488,7 +495,7 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
     runtime_objects.append(guest_object(guest_posix_c, runtime_cflags))
     imports_o = obj_dir / "gen" / "imports.o"
     n.build(outputs=imports_o, rule="macos_as", inputs=imports_s,
-            variables={"asflags": "--target=aarch64-linux-gnu" if native else "--target=x86_64-linux-gnux32"})
+            variables={"asflags": "--target=aarch64-linux-gnu -mcpu=apple-m1" if native else "--target=x86_64-linux-gnux32"})
     runtime_objects.append(imports_o)
     objects += runtime_objects
 
@@ -581,4 +588,23 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         n.build(outputs=test_stage / built.name, rule="macos_copy", inputs=built)
         test_staged.append(test_stage / built.name)
     n.build(outputs=target + "_test", rule="phony", inputs=[test_image, *test_staged])
+
+    # the maths determinism test (port/macos/tests/math_determinism_test.c):
+    # the game's matrix maths and halo_ functions, as compiled for the game;
+    # what they would call on a failed assertion is left unresolved
+    math_stage = build / "math_test" / "Halo"
+    math_test_object = guest_object(PORT_DIR / "tests" / "math_determinism_test.c", runtime_cflags)
+    matrix_object = next(o for o in objects if o.as_posix().endswith("source/math/matrix_math.o"))
+    math_image = math_stage / "halo_guest.elf"
+    n.build(outputs=math_image, rule="macos_guest_link",
+            inputs=[math_test_object, matrix_object, *math_objects, *test_runtime],
+            implicit=[libguestc, linker_script],
+            variables={"ldflags": f"-m {'aarch64linux' if native else 'elf32_x86_64'} -T {linker_script} "
+                                  "--unresolved-symbols=ignore-all",
+                       "libs": str(libguestc)})
+    math_staged = []
+    for built in (host_executable, *staged):
+        n.build(outputs=math_stage / built.name, rule="macos_copy", inputs=built)
+        math_staged.append(math_stage / built.name)
+    n.build(outputs=target + "_math_test", rule="phony", inputs=[math_image, *math_staged])
 
