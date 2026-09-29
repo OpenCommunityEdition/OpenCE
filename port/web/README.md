@@ -90,9 +90,9 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 
 ## Online play
 
-Automatic startup, solo System Link, room switching and cached-launcher
+Automatic startup, solo System Link, host recovery, room switching and cached-launcher
 compatibility are published on both public sites as runtime
-`be34d552e3965228` (source `7e66a846`, September 29, 2026).
+`0780c5587f467c15` (source `fd30ebe3`, September 29, 2026).
 Chrome testing on September 29, 2026 confirmed a one-player Blood Gulch
 start and a second player joining the running match (two players on two
 machines). Both tabs later suffered renderer crashes with error 11.
@@ -120,6 +120,11 @@ who choose *Main menu* or *Leave*, idle launchers, and native invites do not
 participate. An older returning host yields to the room's newer election
 epoch. Disconnected network partitions can temporarily form separate matches;
 the public brokers are not a consensus service and this is not seamless HA.
+On September 29, Chrome's saved engine log confirmed a two-player client
+joined at tick 655, lost the host connection, created a replacement local
+server and started a new solo match automatically. The tabs later suffered
+the existing renderer crash. All 83 JavaScript cases, the production engine
+restart/cancellation checks under sanitizers, and Web/build CI passed.
 
 Connection, hosting and map-loading progress are shown on the page. Sound
 starts automatically where allowed; normal game input unlocks it and mouse
