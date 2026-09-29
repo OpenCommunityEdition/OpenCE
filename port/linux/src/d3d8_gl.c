@@ -22,6 +22,7 @@ Conventions carried over from the Xbox:
 */
 
 #include "xgpu.h"
+#include "halo_port_window.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
@@ -3328,7 +3329,10 @@ void WINAPI D3DDevice_SetStreamSource(UINT stream_number, D3DVertexBuffer *strea
 void WINAPI D3DDevice_SetIndices(D3DIndexBuffer *index_data, UINT base_vertex_index)
 {
 	device.base_vertex_index = base_vertex_index;
-	D3D__IndexData = index_data ? (WORD *)index_data->Data : NULL;
+	/* an index buffer's Data is a window address, not an offset within one:
+	from a map file it is the address the window was linked at, and from
+	CreateIndexBuffer ordinary memory, which the move leaves alone */
+	D3D__IndexData = index_data ? (WORD *)PORT_WINDOW_REBASE(index_data->Data) : NULL;
 }
 
 void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_vertex, UINT vertex_count)

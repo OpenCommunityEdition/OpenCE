@@ -59,6 +59,28 @@ struct triangle_buffer
 	void *hardware_format;
 };
 
+/* Where a vertex or triangle buffer's data is. A map writes both of these
+as addresses in the window the game was linked for, so a port that puts the
+window somewhere else has to move them; where the window is where the game
+expects it these are the fields themselves. A read of either has to go
+through here, or the game hands the rasterizer a link-time address. Each
+takes the buffer, which is a pointer. */
+#ifdef HALO_ANDROID
+void *vertex_buffer_base_address(struct vertex_buffer const *buffer);
+void *vertex_buffer_hardware_format(struct vertex_buffer const *buffer);
+void *triangle_buffer_base_address(struct triangle_buffer const *buffer);
+void *triangle_buffer_hardware_format(struct triangle_buffer const *buffer);
+#define VERTEX_BUFFER_BASE_ADDRESS(buffer) vertex_buffer_base_address(buffer)
+#define VERTEX_BUFFER_HARDWARE_FORMAT(buffer) vertex_buffer_hardware_format(buffer)
+#define TRIANGLE_BUFFER_BASE_ADDRESS(buffer) triangle_buffer_base_address(buffer)
+#define TRIANGLE_BUFFER_HARDWARE_FORMAT(buffer) triangle_buffer_hardware_format(buffer)
+#else
+#define VERTEX_BUFFER_BASE_ADDRESS(buffer) ((buffer)->base_address)
+#define VERTEX_BUFFER_HARDWARE_FORMAT(buffer) ((buffer)->hardware_format)
+#define TRIANGLE_BUFFER_BASE_ADDRESS(buffer) ((buffer)->base_address)
+#define TRIANGLE_BUFFER_HARDWARE_FORMAT(buffer) ((buffer)->hardware_format)
+#endif
+
 /* ---------- prototypes/RASTERIZER_GEOMETRY.C */
 
 union real_vector3d uncompress_int32_to_real_vector3d(
