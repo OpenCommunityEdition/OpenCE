@@ -16,7 +16,10 @@ guest wrapper that widens such arguments and calls an import named
 hostgl_<function>, which the host resolves to the real entry point. Functions
 returning a string go through host_gl_get_string instead.
 
-Usage: android_gl_stubs.py gl.h gl32.h gl2ext.h output.c imports.list
+Usage: android_gl_stubs.py [--integer-registers N] gl.h gl32.h gl2ext.h output.c imports.list
+
+The macOS port's x32 guest passes 6 integer arguments in registers
+(x86-64), not 8 (--integer-registers 6).
 """
 
 import re
@@ -55,7 +58,12 @@ def split_parameter(param: str):
 
 
 def main():
-    gl_header, gl32, gl2ext, output, imports = sys.argv[1:6]
+    global INTEGER_REGISTER_COUNT
+    arguments = sys.argv[1:]
+    if arguments[0] == "--integer-registers":
+        INTEGER_REGISTER_COUNT = int(arguments[1])
+        arguments = arguments[2:]
+    gl_header, gl32, gl2ext, output, imports = arguments[:5]
     functions = android_functions(gl_header)
     protos = prototypes(gl32, gl2ext)
     out = [
