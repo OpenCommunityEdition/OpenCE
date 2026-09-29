@@ -198,7 +198,7 @@ enum ui_audio_feedback_sound
 #define virtual_keyboard_definition_get(index) \
 	((struct virtual_keyboard_definition *)tag_get(VIRTUAL_KEYBOARD_TAG, (index)))
 #define virtual_keyboard_key_get(definition, index) \
-	((struct virtual_keyboard_key *)(definition)->keys.address + (index))
+	((struct virtual_keyboard_key *)TAG_BLOCK_ADDRESS((definition)->keys) + (index))
 
 /* ---------- structures */
 
@@ -740,7 +740,7 @@ static void virtual_keyboard_render_internal(
 
 	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 2, 0, &text_color);
 	{
-		struct virtual_keyboard_key *keys = virtual_keyboard_globals.keyboard->keys.address;
+		struct virtual_keyboard_key *keys = TAG_BLOCK_ADDRESS(virtual_keyboard_globals.keyboard->keys);
 		wchar_t string[24] = {0};
 		long key_index;
 

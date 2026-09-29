@@ -1126,7 +1126,7 @@ static void leaf_map_build_leaf_face_for_leaf_on_node(
 
 			if (tag_block_resize(&face->vertices, result.vertex_count))
 			{
-				csmemcpy(face->vertices.address, result.vertices, result.vertex_count * sizeof(real_point2d));
+				csmemcpy(TAG_BLOCK_ADDRESS(face->vertices), result.vertices, result.vertex_count * sizeof(real_point2d));
 			}
 			else if (!leaf_map_globals.error)
 			{
@@ -1283,9 +1283,9 @@ static void leaf_map_build_portal_from_leaves(
 
 		vertex_count = convex_hull2d_intersect(
 			(word)face0->vertices.count,
-			face0->vertices.address,
+			TAG_BLOCK_ADDRESS(face0->vertices),
 			(word)face1->vertices.count,
-			face1->vertices.address,
+			TAG_BLOCK_ADDRESS(face1->vertices),
 			MAXIMUM_PORTAL_VERTICES,
 			vertices,
 			0.00048828125f);

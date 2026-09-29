@@ -508,7 +508,7 @@ static void bitmap_draw_character(
 {
 	short format = draw_character_software_globals.bitmap->format;
 	short coverage_scale = (short)(color >> 24);
-	byte *glyph_pixels = (byte *)font->pixels.address + character->pixels_offset;
+	byte *glyph_pixels = (byte *)TAG_DATA_ADDRESS(font->pixels) + character->pixels_offset;
 	word destination_color;
 	short row;
 

@@ -35,11 +35,21 @@ Xbox window and the image's range at start-up, and hands out pages for
 everything else (the guest's malloc arenas, thread stacks, anonymous
 mappings) from pools of address space it reserves below 4 GB on demand. */
 
+/* what host_memory_reserve_guest() could not claim */
+#define HOST_MEMORY_NO_WINDOW 1
+#define HOST_MEMORY_NO_IMAGE 2
 /* claims the image's range and the Xbox window before anything else in the
-process maps memory below 4 GB; returns 0 on success */
+process maps memory below 4 GB; 0 on success, one of the above otherwise */
 int host_memory_reserve_guest(void);
+/* where the window was placed, for the guest's boot structure */
+uint32_t host_memory_window_base(void);
 /* narrows the reservation to the image the host has just read */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
+/* starts the thread that reports the window's own contents (host_probe.c) */
+void host_probe_start(void);
+/* 1 if a fault on this thread, inside the window, is the probe's to
+handle, and has been sent back to it */
+int host_probe_skip_fault(uintptr_t address);
 /* page-granular allocations below 4 GB; NULL on failure */
 void *host_low_map(size_t size, int protection);
 void host_low_unmap(void *address, size_t size);
@@ -57,6 +67,10 @@ struct host_guest_image
 {
 	const struct halo_guest_header *header;
 	uint32_t base, end;
+	/* addresses of named guest globals, found in the ELF's symbol table when
+	the image was read, so that host-side diagnostics do not carry addresses
+	that a rebuild would move (0 for a name the build does not have) */
+	uint32_t cache_file_globals, global_tag_instances;
 };
 
 extern struct host_guest_image host_image;

@@ -96,6 +96,10 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries_windows.h"
+#ifdef HALO_LINUX
+/* where the window is in this process (port/linux/include/halo_port_window.h) */
+#include "halo_port_window.h"
+#endif
 #include "real_math.h"
 #include "console.h"
 #include "game_state.h"
@@ -654,7 +658,7 @@ void game_state_initialize(
 #ifdef HALO_LINUX
 	/* the native builds place their larger game state above the tag cache
 	(halo_port_capacity.h, cache/physical_memory_map.c) */
-	game_state_globals.base_address = game_state_allocate_buffer(HALO_PORT_GAME_STATE_BASE_ADDRESS, GAME_STATE_CPU_SIZE, GAME_STATE_GPU_SIZE);
+	game_state_globals.base_address = game_state_allocate_buffer(PORT_WINDOW_ADDRESS(HALO_PORT_GAME_STATE_XBOX_ADDRESS), GAME_STATE_CPU_SIZE, GAME_STATE_GPU_SIZE);
 #else
 	game_state_globals.base_address = game_state_allocate_buffer(0x80061000, GAME_STATE_CPU_SIZE, 0x40000);
 #endif

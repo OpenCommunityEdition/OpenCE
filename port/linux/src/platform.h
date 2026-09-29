@@ -108,11 +108,26 @@ const char *platform_save_root(void);
 
 The Xbox maps physical memory at virtual 0x80000000 + P. The layer reserves
 that window at start-up and hands out page-granular blocks from it, so the
-physical/virtual arithmetic the game and Direct3D rely on keeps working. */
+physical/virtual arithmetic the game and Direct3D rely on keeps working.
 
+On Android the process shares the low 4 GB with the Java runtime, which maps
+memory of its own there, so the host looks for the window where the address
+space is free and passes its address to the guest in the boot structure
+(port/android). Everything that names a fixed place in the window must then
+be PLATFORM_CONTIGUOUS_ADDRESS(offset) rather than a literal. The window
+stays a multiple of 256 MB, which keeps the masking below correct. */
+
+#ifdef HALO_ANDROID
+extern unsigned long platform_contiguous_base;
+#define PLATFORM_CONTIGUOUS_BASE (platform_contiguous_base)
+#else
 #define PLATFORM_CONTIGUOUS_BASE 0x80000000UL
+#endif
 #define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL /* a 128 MB development kit */
 #define PLATFORM_ANY_PHYSICAL_ADDRESS 0xffffffffUL
+
+/* the address of a fixed place in the window, as the game data was built */
+#define PLATFORM_CONTIGUOUS_ADDRESS(offset) (PLATFORM_CONTIGUOUS_BASE + (unsigned long)(offset))
 
 /* returns NULL on failure; physical_address places the block exactly */
 void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,

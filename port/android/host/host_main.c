@@ -245,6 +245,7 @@ static uint32_t make_boot(const struct environment *environment)
 	boot->argv = (uint32_t)(uintptr_t)argv;
 	boot->environment = (uint32_t)(uintptr_t)environ_list;
 	boot->page_size = (uint32_t)getpagesize();
+	boot->contiguous_base = host_memory_window_base();
 	return (uint32_t)(uintptr_t)boot;
 }
 
@@ -329,9 +330,21 @@ int main(int argc, char *argv[])
 	host_logf(HOST_LOG_INFO, "Halo for Android starting");
 	host_install_signal_handlers();
 	/* the guest's own address space, before the first pool or SDL takes any */
-	if (host_memory_reserve_guest() != 0)
-		host_fatal("The device has no free address space below 4 GB for the game.\n\n"
-			"Another app or the system holds the memory the game needs.");
+	switch (host_memory_reserve_guest())
+	{
+	case 0:
+		break;
+	case HOST_MEMORY_NO_IMAGE:
+		host_fatal("This device is using the memory the game's code needs.\n\n"
+			"About 16 MB at 0x88000000, just above the game's own memory window.");
+		break;
+	default:
+		host_fatal("This device is using the memory the game needs.\n\n"
+			"128 MB at 0x80000000, which the game's data is written for; "
+			"the log says what is holding it.");
+		break;
+	}
+	host_probe_start();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");
 	/* the game ends the process itself (host_exit) */

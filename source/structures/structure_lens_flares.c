@@ -316,7 +316,7 @@ boolean build_structure_lens_flares(
 
 			if (lens_flare_index != NONE)
 			{
-			struct structure_environment_vertex *vertices = material->uncompressed_vertex_data.address;
+			struct structure_environment_vertex *vertices = TAG_DATA_ADDRESS(material->uncompressed_vertex_data);
 
 			connected_geometry_new(&geometry);
 			for (surface_offset = 0; surface_offset < material->surface_count; surface_offset++)

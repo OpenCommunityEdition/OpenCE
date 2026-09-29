@@ -712,7 +712,7 @@ cache_hardware_format_character(
 		hardware_character->x0 = hardware_character_cache.x0;
 		hardware_character->y0 = hardware_character_cache.y0;
 
-		source = (byte *)font->pixels.address + font_character->pixels_offset;
+		source = (byte *)TAG_DATA_ADDRESS(font->pixels) + font_character->pixels_offset;
 
 		for (y = 0; y < font_character->bitmap_height; y++)
 		{

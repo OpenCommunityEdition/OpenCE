@@ -318,7 +318,7 @@ static short action_alert_next_position(
 				if (move_position_order == _move_position_order_random)
 				{
 					result = choose_random_array_element(
-						squad->move_positions.address,
+						TAG_BLOCK_ADDRESS(squad->move_positions),
 						sizeof(struct move_position_definition),
 						move_positions->count,
 						offsetof(struct move_position_definition, weight),

@@ -55,6 +55,7 @@ static int pool_count;
 static pthread_mutex_t memory_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static uint64_t window_base, window_end;
+static int reserved;
 static uint64_t image_base, image_end;
 
 static uint64_t round_up(uint64_t value)
@@ -70,8 +71,8 @@ static int in_range(uint64_t address, uint64_t size, uint64_t base, uint64_t end
 /* ---------- reserving address space below 4 GB */
 
 /* the lowest free gap of at least size bytes at or above minimum, from
-/proc/self/maps; 0 if none */
-static uint64_t find_gap(uint64_t size, uint64_t minimum)
+/proc/self/maps, at a multiple of alignment; 0 if none */
+static uint64_t find_gap(uint64_t size, uint64_t minimum, uint64_t alignment)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
@@ -95,7 +96,7 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 			break;
 	}
 	fclose(maps);
-	previous_end = round_up(previous_end);
+	previous_end = (round_up(previous_end) + alignment - 1) & ~(alignment - 1);
 	if (previous_end + size <= LOW_LIMIT)
 		result = previous_end;
 	return result;
@@ -118,6 +119,8 @@ static void log_conflicts(uint64_t address, uint64_t size)
 	if (maps)
 		fclose(maps);
 }
+
+int host_probe_skip_fault(uintptr_t address);
 
 /* address space the guest will have to itself; the mappings that are in
 the way are named in the log when the reservation fails */
@@ -145,12 +148,12 @@ static struct pool *pool_new(void)
 		return NULL;
 	for (attempt = 0; attempt < 64; attempt++)
 	{
-		uint64_t address = find_gap(POOL_SIZE, minimum);
+		uint64_t address = find_gap(POOL_SIZE, minimum, PAGE);
 
 		if (!address && minimum != LOW_START)
 		{
 			minimum = LOW_START;
-			address = find_gap(POOL_SIZE, minimum);
+			address = find_gap(POOL_SIZE, minimum, PAGE);
 		}
 		if (!address)
 			return NULL;
@@ -175,45 +178,74 @@ Java runtime maps a large part of the low 4 GB for its own heaps, so both
 are claimed here, before the first pool and before SDL maps anything. */
 int host_memory_reserve_guest(void)
 {
-	/* the game data is linked to the addresses of the window (the tag cache
-	of a map file sits at 0x803a6000), so it must be where the game was
-	built for. Android's Java runtime has usually mapped its large object
-	space across that range by then, and that space cannot be given up: the
-	runtime goes on handing memory out of the address it remembers, so a
-	device that holds the range cannot run the game. */
-	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
-	{
-		host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx:",
-			(unsigned long long)HALO_GUEST_WINDOW_BASE);
-		log_conflicts(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
-		return -1;
-	}
-	window_base = HALO_GUEST_WINDOW_BASE;
-	window_end = window_base + HALO_GUEST_WINDOW_SIZE;
+	/* The game's memory window and the guest's own code both sit at fixed
+	addresses: the game data is written for 0x80000000, and the image is
+	linked where it is. Android's Java runtime has mapped its large object
+	space across 0x80000000 by the time the app runs, and that space cannot
+	be taken from it, so the window goes to the first free 256 MB-aligned
+	range below 4 GB and the guest is told where (halo_guest_boot).
+	contiguous_base); the port moves the data with it
+	(source/cache/cache_files.c). The image is claimed first, so the window
+	search sees it and does not land on top of it. */
+	uint64_t minimum = LOW_START, window = 0;
+	int attempt;
+
 	image_base = HALO_GUEST_IMAGE_BASE;
 	image_end = image_base + HALO_GUEST_IMAGE_RESERVE;
 	if (reserve(image_base, HALO_GUEST_IMAGE_RESERVE) != 0)
 	{
-		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image at %08llx:",
-			(unsigned long long)image_base);
+		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image at %08llx-%08llx:",
+			(unsigned long long)image_base, (unsigned long long)image_end);
 		log_conflicts(image_base, HALO_GUEST_IMAGE_RESERVE);
-		return -1;
+		return HOST_MEMORY_NO_IMAGE;
 	}
+	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) == 0)
+	{
+		window = HALO_GUEST_WINDOW_BASE;
+	}
+	else
+	{
+		host_logf(HOST_LOG_INFO, "0x80000000 is taken; the window goes elsewhere");
+		for (attempt = 0; attempt < 128 && !window; attempt++)
+		{
+			window = find_gap(HALO_GUEST_WINDOW_SIZE, minimum, HALO_GUEST_WINDOW_ALIGNMENT);
+			if (!window)
+				break;
+			if (reserve(window, HALO_GUEST_WINDOW_SIZE) == 0)
+				break;
+			/* taken between the search and the reservation; look further up */
+			host_logf(HOST_LOG_INFO, "  %08llx is taken, looking on",
+				(unsigned long long)window);
+			minimum = window + PAGE;
+			window = 0;
+		}
+	}
+	if (!window)
+	{
+		host_logf(HOST_LOG_ERROR, "no free range of %u MB for the Xbox memory window;"
+			" what holds the low 4 GB:", (unsigned int)(HALO_GUEST_WINDOW_SIZE / (1024 * 1024)));
+		log_conflicts(LOW_START, LOW_LIMIT - LOW_START);
+		return HOST_MEMORY_NO_WINDOW;
+	}
+	window_base = window;
+	window_end = window_base + HALO_GUEST_WINDOW_SIZE;
+	host_logf(HOST_LOG_INFO, "Xbox memory window at %08llx-%08llx, guest image at %08llx",
+		(unsigned long long)window_base, (unsigned long long)window_end,
+		(unsigned long long)image_base);
+	reserved = 1;
 	return 0;
 }
 
-/* The app loads this library before anything else in the process runs, so
-the claim is made while the address space below 4 GB is still as the
-system left it; whoever claims a range first keeps it. */
-__attribute__((constructor))
-static void host_memory_claim(void)
+/* where the window ended up, for the guest's boot structure */
+uint32_t host_memory_window_base(void)
 {
-	host_memory_reserve_guest();
+	return (uint32_t)window_base;
 }
 
 int host_memory_initialize(uint32_t base, uint32_t size)
 {
 	uint64_t end = (uint64_t)base + round_up(size);
+
 
 	/* the range was reserved at start-up, for the pools to keep out of */
 	if (base != image_base || end > image_end)
@@ -490,6 +522,10 @@ static void segv_handler(int signal_number, siginfo_t *information, void *contex
 {
 	uint64_t address = (uint64_t)information->si_addr;
 
+	/* the probe reads memory the guest may unmap under it (host_probe.c);
+	it handles its own faults and skips the page */
+	if (host_probe_skip_fault((uintptr_t)address))
+		return;
 	if (watch_active && in_window(address))
 	{
 		uint64_t page = watch_page(address);

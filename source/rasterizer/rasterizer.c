@@ -1917,9 +1917,9 @@ void rasterizer_debug_model_vertices(
 			triangle_vertex_index < part->triangle_buffer.count + 2;
 			triangle_vertex_index++)
 		{
-			word model_vertex_index = ((word const *)part->triangles.address)[triangle_vertex_index];
+			word model_vertex_index = ((word const *)TAG_BLOCK_ADDRESS(part->triangles))[triangle_vertex_index];
 			struct rasterizer_model_vertex_compressed const *vertex =
-				&((struct rasterizer_model_vertex_compressed const *)part->compressed_vertices.address)[model_vertex_index];
+				&((struct rasterizer_model_vertex_compressed const *)TAG_BLOCK_ADDRESS(part->compressed_vertices))[model_vertex_index];
 			short node_index0;
 			short node_index1;
 			real node_weight0;

@@ -31,6 +31,12 @@ static unsigned long block_page_count[CONTIGUOUS_PAGE_COUNT];
 static BOOL arena_reserved = FALSE;
 static pthread_mutex_t arena_lock = PTHREAD_MUTEX_INITIALIZER;
 
+#ifdef HALO_ANDROID
+/* the host puts the window where the address space was free and passes the
+address in the boot structure, before the constructor below runs */
+unsigned long platform_contiguous_base = 0x80000000UL;
+#endif
+
 static int protection_to_host(DWORD protect)
 {
 	switch (protect & 0xff)

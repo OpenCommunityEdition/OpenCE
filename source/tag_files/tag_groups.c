@@ -8,6 +8,13 @@ TAG_GROUPS.C
 #include "tag_files.h"
 #include "byte_swapping.h"
 #include "tag_groups.h"
+#ifdef HALO_LINUX
+/* where the window is in this process (port/linux/include/halo_port_window.h) */
+#include "halo_port_window.h"
+#endif
+#ifdef HALO_ANDROID
+#include "platform.h"
+#endif
 
 /* ---------- public code */
 
@@ -17,7 +24,12 @@ long verify_tag_reference(
 	long index;
 
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3055, reference);
+#ifdef HALO_ANDROID
+	/* the map data names this string as the window was linked */
+	index = tag_loaded(reference->group_tag, (char const *)PORT_WINDOW_REBASE(reference->name));
+#else
 	index = tag_loaded(reference->group_tag, reference->name);
+#endif
 	
 	match_vassert(
 		"c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3061, reference->index==index,
@@ -30,6 +42,20 @@ long verify_tag_reference(
 	return index;
 }
 
+#ifdef HALO_ANDROID
+void *tag_data_address(
+	struct tag_data const *data)
+{
+	return PORT_WINDOW_REBASE(data->address);
+}
+
+void *tag_block_address(
+	struct tag_block const *block)
+{
+	return PORT_WINDOW_REBASE(block->address);
+}
+#endif
+
 void* tag_data_get_pointer(
 	const struct tag_data *data,
 	long offset, 
@@ -38,7 +64,7 @@ void* tag_data_get_pointer(
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3073, size>=0);
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3074, offset>=0 && offset+size<=data->size);
 
-	return (void *)((byte *)data->address + offset);
+	return (void *)((byte *)TAG_DATA_ADDRESS(*data) + offset);
 }
 
 void *tag_block_get_element_with_size(
@@ -57,5 +83,5 @@ void *tag_block_get_element_with_size(
 			block->definition ? block->definition->name : "<unknown>", block->count));
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3090, block->address);
 
-	return (void *)((byte *)block->address + (index * element_size));
+	return (void *)((byte *)TAG_BLOCK_ADDRESS(*block) + (index * element_size));
 }

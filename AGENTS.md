@@ -118,6 +118,19 @@ ninja android_apk           # Produces port/android/app/build/outputs/apk/debug/
 
   It carries `platforms/android-34` and `android-35`, `build-tools/34.0.0` and `36.0.0`, `ndk/26.1.10909125`, `cmdline-tools/latest` and accepted licenses. There is also a second, older NDK at `/home/carlo/projects/Wiicompiled/.android-ndk/r27c`, which the Android port does not use.
 
+- The Android builds here are **release** builds (`--release`, which defines
+  `HALO_RELEASE` and strips the assertions). Configure them with the NDK and
+  the compilers named, or the build quietly becomes a debug build that behaves
+  differently on a device:
+
+  ```bash
+  python configure.py --release --android-ndk /home/carlo/projects/Wiicompiled/.android-sdk/ndk/26.1.10909125 \
+      --android-guest-cc clang-22 --linux-cc clang-22
+  ```
+
+  The guest image is the check that the configuration is right: a correct
+  `build/android/halo_guest.elf` starts `3082cd20` when only the host changes.
+
 - Gradle finds it through `port/android/local.properties` (gitignored, machine-local):
 
   ```properties

@@ -124,16 +124,32 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries_windows.h"
+#ifdef HALO_LINUX
+/* where the window is in this process (port/linux/include/halo_port_window.h) */
+#include "halo_port_window.h"
+#endif
 #include "errors.h"
 #include "tag_files/tag_groups.h"
 #include "tag_files/files.h"
 #include "cache_files.h"
 #include "physical_memory_map.h"
+#ifdef HALO_ANDROID
+/* (the window's address, and the moving of the data with it) */
+#include "platform.h"
+#include "halo_port_window.h"
+#endif
 #include "sound_cache.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
 
 /* ---------- constants */
+
+#ifdef HALO_LINUX
+/* where the tag cache is in this process (halo_port_window.h) */
+#define TAG_CACHE_ADDRESS PORT_WINDOW_ADDRESS(0x803A6000)
+#else
+#define TAG_CACHE_ADDRESS 0x803A6000
+#endif
 
 /* ---------- macros */
 
@@ -243,6 +259,47 @@ char const *data_00316820[] =
 };
 
 /* ---------- private code */
+
+#ifdef HALO_ANDROID
+/* A map's tag directory is linked to the addresses of the window the game
+was built for: the header names its vertex and index buffers, and every tag
+instance names where its data and its name live. Where the host put the
+window instead, all of those addresses move by the same amount, so the
+loaded tag data is moved here once it is in memory. */
+
+/* An address the game data was written with, moved to where the window
+actually is. A value that is not one (already moved, or a count) is left
+alone, so this can be done where the value is used even if that happens
+more than once for the same field. */
+static void *cache_file_rebase_address(
+	void *address)
+{
+	return PORT_WINDOW_REBASE(address);
+}
+
+static void cache_file_rebase_tag_data(
+	struct cache_file_tag_header *header)
+{
+	long index;
+
+	header->tag_instances = (struct cache_file_tag_instance *)cache_file_rebase_address(header->tag_instances);
+	header->vertex_buffers = (D3DVertexBuffer *)cache_file_rebase_address(header->vertex_buffers);
+	header->index_buffers = (D3DIndexBuffer *)cache_file_rebase_address(header->index_buffers);
+	for (index = 0; index < header->tag_count; index++)
+	{
+		header->tag_instances[index].name = (char *)cache_file_rebase_address(header->tag_instances[index].name);
+		header->tag_instances[index].base_address = cache_file_rebase_address(header->tag_instances[index].base_address);
+	}
+}
+
+static void cache_file_rebase_structure_bsp(
+	struct cache_file_structure_bsp_header *header)
+{
+	header->base_address = cache_file_rebase_address(header->base_address);
+	header->vertex_buffers = cache_file_rebase_address(header->vertex_buffers);
+	header->index_buffers = cache_file_rebase_address(header->index_buffers);
+}
+#endif
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index)
@@ -407,7 +464,7 @@ long tag_loaded(
 void cache_files_enable_writes(
 	void)
 {
-	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READWRITE);
+	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, 0x01600000, PAGE_READWRITE);
 
 	return;
 }
@@ -415,7 +472,7 @@ void cache_files_enable_writes(
 void cache_files_disable_writes(
 	void)
 {
-	XPhysicalProtect((void *)0x803A6000, 0x01600000, PAGE_READONLY);
+	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, 0x01600000, PAGE_READONLY);
 	XPhysicalProtect(
 		cache_file_globals.tag_header->vertex_buffers,
 		cache_file_globals.tag_header->vertex_buffer_count * 12,
@@ -679,6 +736,9 @@ long scenario_tags_load(
 			}
 
 			cache_file_globals.tag_header = tag_cache_base_address;
+#ifdef HALO_ANDROID
+			cache_file_rebase_tag_data(cache_file_globals.tag_header);
+#endif
 			match_vassert(
 				"c:\\halo\\SOURCE\\cache\\cache_files.c",
 				0x94,
@@ -718,6 +778,9 @@ boolean scenario_structure_bsp_load(
 	struct cache_file_tag_instance *tag_instance;
 	byte *tag_cache_base_address;
 
+	/* the scenario's own tag data names where the level is read to, in an
+	address the map was written with */
+	reference->base_address = cache_file_rebase_address(reference->base_address);
 	tag_cache_base_address = physical_memory_get_tag_cache_base_address();
 	csmemset(
 		tag_cache_base_address + cache_file_globals.header.tag_data_size,
@@ -743,6 +806,9 @@ boolean scenario_structure_bsp_load(
 		}
 	}
 
+#ifdef HALO_ANDROID
+	cache_file_rebase_structure_bsp((struct cache_file_structure_bsp_header *)reference->base_address);
+#endif
 	cache_file_globals.structure_bsp_header = reference->base_address;
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",

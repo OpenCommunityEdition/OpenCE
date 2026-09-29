@@ -380,8 +380,8 @@ void cheat_all_vehicles(
 	if (globals->multiplayer_information.count)
 	{
 		cheat_objects(
-			TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
-				struct game_globals_multiplayer_information)->vehicles.address,
+			TAG_BLOCK_ADDRESS(TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
+				struct game_globals_multiplayer_information)->vehicles),
 			(short)TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
 				struct game_globals_multiplayer_information)->vehicles.count);
 	}

@@ -12893,7 +12893,7 @@ boolean hs_scenario_merge(
 				csstrcpy(file->name, source_file->name);
 				if (tag_data_resize(&file->source, source_file->source.size))
 				{
-					csmemcpy(file->source.address, source_file->source.address, source_file->source.size);
+					csmemcpy(TAG_DATA_ADDRESS(file->source), TAG_DATA_ADDRESS(source_file->source), source_file->source.size);
 				}
 				else
 				{
@@ -12933,7 +12933,7 @@ static void hs_allocate(
 		data_make_valid(hs_syntax_data);
 		if (scenario)
 		{
-			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, scenario->hs_syntax_data.address);
+			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, TAG_DATA_ADDRESS(scenario->hs_syntax_data));
 			scenario->hs_syntax_data.address = hs_syntax_data;
 			scenario->hs_syntax_data.size =
 				sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
@@ -14743,7 +14743,7 @@ boolean hs_scenario_postprocess(
 	saved_syntax_data = hs_syntax_data;
 	hs_allocate();
 	recompile = scenario->hs_scripts.count == 0 && scenario->hs_source_files.count>0;
-	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
+	hs_syntax_data = (struct data_array *)TAG_DATA_ADDRESS(scenario->hs_syntax_data);
 	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
 	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
 	{

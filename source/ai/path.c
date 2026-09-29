@@ -1202,7 +1202,7 @@ static short build_path_edges_for_surface(
 	long surface_index,
 	struct path_edge *edges)
 {
-	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+	byte const *pathfinding_surfaces = TAG_BLOCK_ADDRESS(structure->pathfinding_surfaces);
 	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(
 		&structure->collision_bsp,
 		0,

@@ -123,6 +123,25 @@ long verify_tag_reference(struct tag_reference const *reference);
 void *tag_data_get_pointer(struct tag_data const *data, long offset, long size);
 void *tag_block_get_element_with_size(struct tag_block const *block, long index, long element_size);
 
+/* Where a tag_data's or tag_block's data is in this process. A map file names
+these as the window the game was linked for, so a port that puts the window
+elsewhere has to move them (port/linux/include/halo_port_window.h); a read of
+->address goes through here, or the game follows a link-time address. Each
+macro takes the tag_data or tag_block structure itself, so a caller writes
+TAG_DATA_ADDRESS(foo->bar).
+
+Where the window is where the game expects it these are the field itself, so
+the original code and the byte-matching build are unaffected. */
+#ifdef HALO_ANDROID
+void *tag_data_address(struct tag_data const *data);
+void *tag_block_address(struct tag_block const *block);
+#define TAG_DATA_ADDRESS(data) tag_data_address(&(data))
+#define TAG_BLOCK_ADDRESS(block) tag_block_address(&(block))
+#else
+#define TAG_DATA_ADDRESS(data) ((data).address)
+#define TAG_BLOCK_ADDRESS(block) ((block).address)
+#endif
+
 /* ---------- prototypes/CACHE_FILES.C */
 
 long tag_loaded(long group_tag, const char *name);

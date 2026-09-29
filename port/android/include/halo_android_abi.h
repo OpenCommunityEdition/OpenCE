@@ -26,14 +26,23 @@ This header is included by both halves.
 
 #include <stdint.h>
 
-/* the guest image is linked to run here, just above the Xbox window: ART
-keeps its heaps low in the address space and fills it upwards */
-#define HALO_GUEST_IMAGE_BASE 0x88000000u
+/* the guest image is linked to run here. The window is 256 MB-aligned and
+	128 MB long, so it can neither cover nor reach this address, and the host
+	reserves the range before the guest's own pools take any of it */
+#define HALO_GUEST_IMAGE_BASE 0x40000000u
 #define HALO_GUEST_IMAGE_RESERVE 0x01000000u
 
-/* the Xbox contiguous memory window (port/linux/src/platform.h) */
+/* the Xbox contiguous memory window (port/linux/src/platform.h). The game
+data is linked to the addresses of the window, so the host looks for
+HALO_GUEST_WINDOW_SIZE of free space below 4 GB at start-up, prefers
+HALO_GUEST_WINDOW_BASE, hands the guest the address it found
+(halo_guest_boot.contiguous_base), and the port moves the data with it */
 #define HALO_GUEST_WINDOW_BASE 0x80000000u
 #define HALO_GUEST_WINDOW_SIZE 0x08000000u
+/* the window is a whole number of these, so the game's arithmetic on
+physical addresses (an offset, or an address masked with ~base) still
+works wherever it lands */
+#define HALO_GUEST_WINDOW_ALIGNMENT 0x10000000u
 
 #define HALO_GUEST_MAGIC 0x4f4c4148u /* 'HALO' */
 #define HALO_GUEST_ABI_VERSION 1
@@ -61,6 +70,7 @@ struct halo_guest_boot
 	uint32_t argv;               /* char ** in guest memory */
 	uint32_t environment;        /* char ** in guest memory, NULL-terminated */
 	uint32_t page_size;
+	uint32_t contiguous_base;     /* where the host put the Xbox window */
 };
 
 #endif

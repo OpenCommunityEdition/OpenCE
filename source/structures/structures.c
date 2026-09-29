@@ -90,7 +90,7 @@ enum
 
 #define structure_material_get_vertex(material, vertex_index) \
 	((struct environment_vertex_compressed const *) \
-		(material)->compressed_vertex_data.address + (vertex_index))
+		TAG_DATA_ADDRESS((material)->compressed_vertex_data) + (vertex_index))
 
 /* ---------- structures */
 

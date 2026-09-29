@@ -11,10 +11,84 @@ host functions of the same names.
 #include "host.h"
 
 #include <elf.h>
+#include <stddef.h>
 #include <string.h>
 #include <sys/mman.h>
 
 struct host_guest_image host_image;
+
+/* guest globals host-side diagnostics want to read; the addresses come from
+the ELF rather than being written down here, because a rebuild moves them */
+static const struct
+{
+	const char *name;
+	size_t offset;
+} host_image_symbols[] = {
+	{ "cache_file_globals", offsetof(struct host_guest_image, cache_file_globals) },
+	{ "global_tag_instances", offsetof(struct host_guest_image, global_tag_instances) },
+};
+
+/* finds a named symbol's address in the ELF file; 0 if it has none. A name can
+appear more than once (a tentative definition and the real one), so a bound
+definition is preferred over an undefined one, and the first of those. */
+static uint32_t host_image_find_symbol(
+	const void *file,
+	size_t size,
+	const char *wanted)
+{
+	const Elf64_Ehdr *elf = file;
+	const Elf64_Shdr *sections;
+	const char *strings;
+	uint32_t found = 0;
+	uint64_t index;
+
+	if (size < sizeof(*elf) || elf->e_shoff == 0 || elf->e_shnum == 0)
+		return 0;
+	if (elf->e_shoff + (uint64_t)elf->e_shnum * sizeof(Elf64_Shdr) > size)
+		return 0;
+	sections = (const Elf64_Shdr *)((const char *)file + elf->e_shoff);
+	for (index = 0; index < elf->e_shnum; index++)
+	{
+		const Elf64_Shdr *symtab = &sections[index];
+		const Elf64_Sym *symbols;
+		uint64_t symbol_index;
+
+		if (symtab->sh_type != SHT_SYMTAB || symtab->sh_link >= elf->e_shnum)
+			continue;
+		if (symtab->sh_offset + symtab->sh_size > size)
+			continue;
+		strings = (const char *)file + sections[symtab->sh_link].sh_offset;
+		symbols = (const Elf64_Sym *)((const char *)file + symtab->sh_offset);
+		for (symbol_index = 0; symbol_index < symtab->sh_size / sizeof(*symbols); symbol_index++)
+		{
+			const Elf64_Sym *symbol = &symbols[symbol_index];
+			unsigned char bind = ELF64_ST_BIND(symbol->st_info);
+
+			if (symbol->st_name == 0 ||
+				symbol->st_name >= sections[symtab->sh_link].sh_size ||
+				strcmp(strings + symbol->st_name, wanted) ||
+				symbol->st_value >= 0x100000000ULL)
+			{
+				continue;
+			}
+			/* the game compiles with -fcommon, so a tentative definition and
+			the definition that won can both be in the table; take the one that
+			is actually in a section */
+			if (symbol->st_shndx == SHN_UNDEF)
+			{
+				if (found)
+					continue;
+			}
+			else if (bind != STB_GLOBAL && bind != STB_WEAK)
+			{
+				continue;
+			}
+			return (uint32_t)symbol->st_value;
+		}
+	}
+
+	return found;
+}
 
 static void missing_import(void)
 {
@@ -79,6 +153,9 @@ int host_load_image(const void *file, size_t size)
 	host_image.header = header;
 	host_image.base = (uint32_t)low;
 	host_image.end = (uint32_t)high;
+	for (index = 0; index < sizeof(host_image_symbols) / sizeof(*host_image_symbols); index++)
+		*(uint32_t *)((char *)&host_image + host_image_symbols[index].offset) =
+			host_image_find_symbol(file, size, host_image_symbols[index].name);
 
 	table = (uint64_t *)(uintptr_t)header->import_table;
 	name = (const char *)(uintptr_t)header->import_names;
@@ -100,6 +177,9 @@ int host_load_image(const void *file, size_t size)
 	}
 	host_logf(HOST_LOG_INFO, "guest image %08llx-%08llx, %u imports (%d unavailable)",
 		(unsigned long long)low, (unsigned long long)high, count, missing);
+	for (index = 0; index < sizeof(host_image_symbols) / sizeof(*host_image_symbols); index++)
+		host_logf(HOST_LOG_INFO, "  guest %s at %08x", host_image_symbols[index].name,
+			*(const uint32_t *)((const char *)&host_image + host_image_symbols[index].offset));
 
 	/* code becomes read-only and executable */
 	for (index = 0; index < elf->e_phnum; index++)

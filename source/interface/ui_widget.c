@@ -2195,7 +2195,7 @@ void ui_widget_delete(
 		handler_index++)
 	{
 		struct ui_widget_event_handler_reference *handler =
-			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+			(struct ui_widget_event_handler_reference *)TAG_BLOCK_ADDRESS(definition->event_handlers) + handler_index;
 
 		if (handler->event_type == _widget_event_deleted &&
 			TEST_FLAG(handler->flags, _event_handler_run_function_bit))
@@ -3380,7 +3380,7 @@ static void event_handler_dispatch(
 				conditional_index++)
 			{
 				struct ui_widget_conditional_reference *conditional =
-					(struct ui_widget_conditional_reference *)definition->conditional_widgets.address +
+					(struct ui_widget_conditional_reference *)TAG_BLOCK_ADDRESS(definition->conditional_widgets) +
 					conditional_index;
 
 				if (function_failed == TRUE &&
@@ -3471,7 +3471,7 @@ static boolean ui_widget_load_children_recursive(
 		child_index++)
 	{
 		struct ui_widget_child_reference *reference =
-			(struct ui_widget_child_reference *)definition->child_widgets.address + child_index;
+			(struct ui_widget_child_reference *)TAG_BLOCK_ADDRESS(definition->child_widgets) + child_index;
 		short controller_index = widget->local_player_index;
 
 		if (TEST_FLAG(reference->flags, _child_widget_use_custom_controller_index_bit))
@@ -3617,7 +3617,7 @@ static void widget_instance_initialize(
 		handler_index++)
 	{
 		struct ui_widget_event_handler_reference *handler =
-			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+			(struct ui_widget_event_handler_reference *)TAG_BLOCK_ADDRESS(definition->event_handlers) + handler_index;
 
 		if (handler->event_type == _widget_event_created)
 		{
@@ -4907,7 +4907,7 @@ static void widget_instance_render_text_box(
 	{
 		struct ui_widget_search_and_replace_reference *reference =
 			(struct ui_widget_search_and_replace_reference *)
-				definition->search_and_replace_functions.address +
+				TAG_BLOCK_ADDRESS(definition->search_and_replace_functions) +
 			search_index;
 
 		if (reference && reference->search_string[0])
@@ -5100,7 +5100,7 @@ static void widget_instance_render_spinner_list(
 				{
 					struct ui_widget_search_and_replace_reference *reference =
 						(struct ui_widget_search_and_replace_reference *)
-							definition->search_and_replace_functions.address +
+							TAG_BLOCK_ADDRESS(definition->search_and_replace_functions) +
 						search_index;
 
 					if (reference && reference->search_string[0])
@@ -5746,7 +5746,7 @@ static void widget_instance_render_recursive(
 	{
 		struct ui_widget_game_data_input_reference *input =
 			(struct ui_widget_game_data_input_reference *)
-				definition->game_data_inputs.address +
+				TAG_BLOCK_ADDRESS(definition->game_data_inputs) +
 			input_index;
 
 		ui_widget_game_data_function_invoke(widget, input->function);
@@ -6323,7 +6323,7 @@ static void widget_instance_process_one_event_recursive(
 				{
 					struct ui_widget_event_handler_reference *handler =
 						(struct ui_widget_event_handler_reference *)
-							definition->event_handlers.address + handler_index;
+							TAG_BLOCK_ADDRESS(definition->event_handlers) + handler_index;
 
 					if (handler->event_type == _widget_event_back_button)
 					{
@@ -6340,7 +6340,7 @@ static void widget_instance_process_one_event_recursive(
 				{
 					struct ui_widget_event_handler_reference *handler =
 						(struct ui_widget_event_handler_reference *)
-							definition->event_handlers.address + handler_index;
+							TAG_BLOCK_ADDRESS(definition->event_handlers) + handler_index;
 
 					if (handler->event_type == _widget_event_b_button)
 					{
@@ -6610,7 +6610,7 @@ static void widget_instance_process_one_event_recursive(
 			if (widget_deleted)
 				break;
 			handler = (struct ui_widget_event_handler_reference *)
-				definition->event_handlers.address + handler_index;
+				TAG_BLOCK_ADDRESS(definition->event_handlers) + handler_index;
 			switch (event->type)
 			{
 			case _event_type_left_stick:

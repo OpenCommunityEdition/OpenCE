@@ -490,14 +490,14 @@ boolean bitmaps_extract(
 		if (extract_data.plate)
 		{
 			decompressed_plate_size = data_decompressed_size(
-				group->import_bitmap.address,
+				TAG_DATA_ADDRESS(group->import_bitmap),
 				group->import_bitmap.size);
 			match_assert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 				0x104,
 				decompressed_plate_size==sizeof(pixel32)*group->import_width*group->import_height);
 			if (data_decompress(
-				group->import_bitmap.address,
+				TAG_DATA_ADDRESS(group->import_bitmap),
 				group->import_bitmap.size,
 				bitmap_mipmap_address(extract_data.plate, 0),
 				&decompressed_plate_size,
@@ -579,19 +579,19 @@ boolean bitmaps_extract_from_plate(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 		0x8A,
 		compressed_color_plate_size);
-	if (group->import_bitmap.address)
+	if (TAG_DATA_ADDRESS(group->import_bitmap))
 	{
 		if (data_compress(
 			bitmap_mipmap_address(plate, 0),
 			compressed_color_plate_size,
-			group->import_bitmap.address,
+			TAG_DATA_ADDRESS(group->import_bitmap),
 			&compressed_color_plate_size,
 			compressed_color_plate_size))
 		{
 			compressed_color_plate = match_realloc(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_extract.c",
 				0x90,
-				group->import_bitmap.address,
+				TAG_DATA_ADDRESS(group->import_bitmap),
 				compressed_color_plate_size);
 			if (compressed_color_plate)
 			{

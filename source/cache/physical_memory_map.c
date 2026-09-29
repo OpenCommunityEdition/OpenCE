@@ -38,20 +38,30 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "cache/physical_memory_map.h"
 
+#ifdef HALO_LINUX
+/* where the window is in this process (port/linux/include/halo_port_window.h) */
+#include "halo_port_window.h"
+#endif
+
 /* ---------- constants */
 
 #ifdef HALO_LINUX
 /* the native builds' larger game state, placed above the tag cache
 (halo_port_capacity.h); the verified part is the CPU part, as on the Xbox */
-#define GAME_STATE_BASE_ADDRESS HALO_PORT_GAME_STATE_BASE_ADDRESS
+#define GAME_STATE_XBOX_ADDRESS HALO_PORT_GAME_STATE_XBOX_ADDRESS
 #define GAME_STATE_SIZE HALO_PORT_GAME_STATE_SIZE
 #define GAME_STATE_VERIFY_SIZE HALO_PORT_GAME_STATE_CPU_SIZE
+#define TAG_CACHE_XBOX_ADDRESS 0x803A6000
 #else
-#define GAME_STATE_BASE_ADDRESS 0x80061000
+#define GAME_STATE_XBOX_ADDRESS 0x80061000
 #define GAME_STATE_SIZE 0x345000
 #define GAME_STATE_VERIFY_SIZE 0x305000
+#define TAG_CACHE_XBOX_ADDRESS 0x803A6000
 #endif
-#define TAG_CACHE_BASE_ADDRESS 0x803A6000
+/* where those places of the window are in this process (the same on the
+desktop ports, shifted where the host put the window on Android) */
+#define GAME_STATE_BASE_ADDRESS PORT_WINDOW_ADDRESS(GAME_STATE_XBOX_ADDRESS)
+#define TAG_CACHE_BASE_ADDRESS PORT_WINDOW_ADDRESS(TAG_CACHE_XBOX_ADDRESS)
 #define TAG_CACHE_SIZE 0x1600000
 #define TEXTURE_CACHE_SIZE 0x1600000
 #define SOUND_CACHE_SIZE 0x400000
@@ -79,11 +89,11 @@ static struct physical_memory_map_globals physical_memory_map_globals;
 void physical_memory_allocate(
 	void)
 {
-	physical_memory_map_globals.game_state_base_address = XPhysicalAlloc(GAME_STATE_SIZE, GAME_STATE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+	physical_memory_map_globals.game_state_base_address = XPhysicalAlloc(GAME_STATE_SIZE, PORT_WINDOW_PHYSICAL_ADDRESS(GAME_STATE_XBOX_ADDRESS), 0, PAGE_READWRITE);
 #line 46 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.game_state_base_address==GAME_STATE_BASE_ADDRESS);
 
-	physical_memory_map_globals.tag_cache_base_address = XPhysicalAlloc(TAG_CACHE_SIZE, TAG_CACHE_BASE_ADDRESS & 0x7FFFFFFF, 0, PAGE_READWRITE);
+	physical_memory_map_globals.tag_cache_base_address = XPhysicalAlloc(TAG_CACHE_SIZE, PORT_WINDOW_PHYSICAL_ADDRESS(TAG_CACHE_XBOX_ADDRESS), 0, PAGE_READWRITE);
 #line 50 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, (unsigned long)physical_memory_map_globals.tag_cache_base_address==TAG_CACHE_BASE_ADDRESS);
 

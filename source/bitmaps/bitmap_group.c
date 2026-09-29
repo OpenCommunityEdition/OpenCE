@@ -926,15 +926,15 @@ short bitmap_group_add_bitmap(
 					0x34D,
 					!bitmap->hardware_format);
 				bitmap->base_address =
-					(byte *)group->pixel_data.address + bitmap->pixels_offset;
+					(byte *)TAG_DATA_ADDRESS(group->pixel_data) + bitmap->pixels_offset;
 				match_assert(
 					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 					0x352,
-					(byte*)bitmap->base_address>=(byte*)group->pixel_data.address);
+					(byte*)bitmap->base_address>=(byte*)TAG_DATA_ADDRESS(group->pixel_data));
 				match_assert(
 					"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 					0x354,
-					(byte*)bitmap->base_address + bitmap_get_pixel_data_size(bitmap) <= (byte*)group->pixel_data.address + group->pixel_data.size);
+					(byte*)bitmap->base_address + bitmap_get_pixel_data_size(bitmap) <= (byte*)TAG_DATA_ADDRESS(group->pixel_data) + group->pixel_data.size);
 
 				if (previous_bitmap)
 				{
@@ -971,7 +971,7 @@ short bitmap_group_add_bitmap(
 				new_bitmap);
 			csmemcpy(new_bitmap, &new_bitmap_data, sizeof(new_bitmap_data));
 			new_bitmap->pixels_offset = pixels_end;
-			new_bitmap->base_address = (byte *)group->pixel_data.address + pixels_end;
+			new_bitmap->base_address = (byte *)TAG_DATA_ADDRESS(group->pixel_data) + pixels_end;
 			csmemset(new_bitmap->base_address, 0, pixel_data_size);
 		}
 
