@@ -767,6 +767,7 @@ can run the game, copies the game data out of the player's disc image
         const module = window.Module;
         state.shared = module._web_shared_state();
         state.offsets = readOffsets(module);
+        onVisibility();
         updateDisplaySize();
         HaloInput.attach({
           memory: state.memory,
@@ -1096,10 +1097,12 @@ can run the game, copies the game data out of the player's disc image
     $('delete-data').onclick = deleteData;
     $('download-retry').onclick = downloadMaps;
     $('download-cancel').onclick = () => state.cacheAbort?.abort();
-    $('show-log').onclick = async () => {
+    const showLog = async () => {
       $('log-text').textContent = await fullLog();
       $('log-view').hidden = false;
     };
+    $('show-log').onclick = showLog;
+    $('quick-log').onclick = showLog;
     $('log-close').onclick = () => { $('log-view').hidden = true; };
     $('log-copy').onclick = async () => {
       try { await navigator.clipboard.writeText(await fullLog()); toast('Copied.'); } catch { toast('Could not copy.'); }

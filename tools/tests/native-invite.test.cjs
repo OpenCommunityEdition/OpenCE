@@ -356,6 +356,37 @@ test('existing host selection joins its exact address without a menu click', asy
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
 });
 
+test('connection-panel Show log opens the same current runtime and saved diagnostic log as Settings', async () => {
+  const page = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: ADDRESS }) });
+  let diskLog = 'native search attempt one';
+  page.context.navigator.storage.getDirectory = async () => ({
+    async getFileHandle(name) {
+      assert.equal(name, 'debug.txt');
+      return { getFile: async () => ({ text: async () => diskLog }) };
+    },
+  });
+  const module = page.context.Module;
+  module.print('runtime: searching for the elected host');
+  module.haloMessage(6, JSON.stringify({ phase: 'searching', message: 'Finding game…' }));
+  assert.equal(page.element('quick-panel').hidden, false);
+  assert.equal(page.element('log-view').hidden, true, 'connecting does not open the log by itself');
+  assert.equal(page.element('quick-log').onclick, page.element('show-log').onclick);
+  await page.element('quick-log').onclick();
+  assert.equal(page.element('log-view').hidden, false);
+  assert.match(page.element('log-text').textContent, /runtime: searching for the elected host/);
+  assert.match(page.element('log-text').textContent, /--- debug.txt ---\nnative search attempt one/);
+  page.element('log-close').onclick();
+  assert.equal(page.element('log-view').hidden, true);
+  diskLog += '\nnative search timed out';
+  module.printErr('runtime: no game response');
+  module.haloMessage(6, JSON.stringify({ phase: 'error', message: 'No game response.' }));
+  assert.equal(page.element('quick-panel').hidden, false);
+  assert.equal(page.element('log-view').hidden, true, 'an error leaves the viewer closed until requested');
+  await page.element('quick-log').onclick();
+  assert.match(page.element('log-text').textContent, /runtime: no game response/);
+  assert.match(page.element('log-text').textContent, /native search timed out/);
+});
+
 test('map downloaders remain ineligible until complete, then launch automatically', async () => {
   let finishMaps;
   const loading = await launcher(undefined, {

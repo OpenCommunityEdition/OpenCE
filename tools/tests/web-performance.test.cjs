@@ -6,9 +6,9 @@ const vm = require('node:vm');
 // Run the real launcher and its public Play/Module/visibility callbacks.
 // As in native-invite.test.cjs, browser services are stubbed; only 64 KB of
 // shared memory is needed to exercise the page's runtime handshake.
-async function launch(query = '', viewport = {}) {
+async function launch(query = '', viewport = {}, initiallyHidden = false) {
   const elements = new Map(), listeners = new Map(), timers = [], rafs = [];
-  let now = 0, delivered = 0, attached;
+  let now = 0, delivered = 0, attached, hiddenAtAttach;
   const bitmapContext = { transferFromImageBitmap() { delivered++; } };
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -27,7 +27,7 @@ async function launch(query = '', viewport = {}) {
     navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} } },
     location: new URL('http://localhost:8780/' + query),
     document: {
-      hidden: false, getElementById: element, createElement: () => element(Symbol()),
+      hidden: initiallyHidden, getElementById: element, createElement: () => element(Symbol()),
       body: element('body'), documentElement: {},
       addEventListener(name, callback) {
         if (!listeners.has(name)) listeners.set(name, []);
@@ -44,7 +44,10 @@ async function launch(query = '', viewport = {}) {
     HALO_BROWSER_CONFIG: { relayUrl: '', defaultRoom: '' },
     HaloNet: { on() {}, addressText: () => '100.64.2.1',
       status: () => ({ room: null }), attach() {} },
-    HaloInput: { attach(value) { attached = value; }, setLookSensitivity() {}, pollGamepads() {} },
+    HaloInput: { attach(value) {
+      attached = value;
+      hiddenAtAttach = new Int32Array(value.memory.buffer)[(value.base + value.offsets.pageHidden) >> 2];
+    }, setLookSensitivity() {}, pollGamepads() {} },
     HaloCache: { mapsState: async () => ({ files: ['ui.map'], bytes: 2048,
       dataRoot: '/data', saveRoot: '/data/save' }) },
   };
@@ -61,7 +64,7 @@ async function launch(query = '', viewport = {}) {
   module._web_shared_offsets = () => 128;
   module.onRuntimeInitialized();
   return {
-    context, timers,
+    context, timers, hiddenAtAttach,
     output: () => element('body').children.find(child => child.id === 'performance-stats'),
     samples() { return JSON.parse(this.output().dataset.samples); },
     tick(milliseconds = 1000) {
@@ -77,12 +80,23 @@ async function launch(query = '', viewport = {}) {
       for (const callback of listeners.get('visibilitychange') || []) callback();
     },
     delivered: () => delivered,
+    pageHidden: () => new Int32Array(attached.memory.buffer)[(attached.base + attached.offsets.pageHidden) >> 2],
     displaySize() {
       const words = new Int32Array(attached.memory.buffer);
       return ['displayWidth', 'displayHeight'].map(name => words[(attached.base + attached.offsets[name]) >> 2]);
     },
   };
 }
+
+test('runtime initializes current visibility before attaching game input, including an already hidden tab', async () => {
+  for (const hidden of [true, false]) {
+    const page = await launch('', {}, hidden);
+    assert.equal(page.hiddenAtAttach, Number(hidden), 'initial visibility is published before runtime consumers attach');
+    assert.equal(page.pageHidden(), Number(hidden), 'startup does not need a visibilitychange event');
+    page.visibility(!hidden);
+    assert.equal(page.pageHidden(), Number(!hidden), 'later visibility changes still reach the engine');
+  }
+});
 
 test('FPS diagnostics are opt-in and count bitmap delivery rather than animation callbacks', async () => {
   for (const query of ['', '?fps=0']) {
