@@ -45,7 +45,9 @@ a host of another version: it shows a message box that says which of the
 two is newer, with both versions ("update the game" or "ask the host to
 update"), and stays in the list of games. Version 1 was the first of this
 netcode; version 2 lets a machine join a game in progress; version 3 puts
-each player in its slot of the host's player list on every machine.
+each player in its slot of the host's player list on every machine;
+version 4 plays the European (PAL) maps as the North American ones
+(`port/linux/game/pal_tags.c`).
 
 ## Joining a game in progress
 

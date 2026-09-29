@@ -697,6 +697,14 @@ long scenario_tags_load(
 			global_tag_instances = cache_file_globals.tag_header->tag_instances;
 			tags_header_register_vertex_and_index_buffers(cache_file_globals.tag_header);
 			cache_file_globals.tags_loaded = TRUE;
+#ifdef HALO_LINUX
+			/* port: a PAL map played as the NTSC maps are (port/linux/game/pal_tags.c) */
+			{
+				extern void pal_tags_loaded(char const *build);
+
+				pal_tags_loaded(cache_file_globals.header.build);
+			}
+#endif
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
 	}
