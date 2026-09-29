@@ -44,7 +44,8 @@ was a version send as zeros, so they are version 0). A client does not join
 a host of another version: it shows a message box that says which of the
 two is newer, with both versions ("update the game" or "ask the host to
 update"), and stays in the list of games. Version 1 was the first of this
-netcode; version 2 lets a machine join a game in progress.
+netcode; version 2 lets a machine join a game in progress; version 3 puts
+each player in its slot of the host's player list on every machine.
 
 ## Joining a game in progress
 
@@ -61,6 +62,16 @@ from the first game update if it is ahead (so that the game's timers read
 as the host's). It takes up the host's count of updates where it is. When it has loaded, the distributed netcode
 gives it the host's objects (network_objects.c), every player's statistics
 and the game type's state, and it plays on as any other client.
+
+The netcode names a player by its datum's index, which must be the same on
+every machine, the one that joined too. That machine has not the players
+who left (their datums stay until the game ends), nor the order in which
+the others added players. So in a distributed game each player's datum is
+its slot in the host's player list: every machine makes it there, and the
+host gives a player added to the game in progress a slot whose datum is
+free (`network_game_manager.c`). A player added to the game in progress
+also gets its team and the game type's data, as the players at the start
+do (in free for all, a team of its own).
 
 Until it has loaded, the machine hears none of the game's messages (which a
 machine in the pregame refuses, and which the others no longer need), only

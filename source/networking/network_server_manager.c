@@ -1754,6 +1754,12 @@ boolean network_game_server_add_player_to_game(
 		if (player->primary_color_index == NONE)
 			get_unique_random_color(server, player);
 
+#ifdef HALO_LINUX
+		/* (the host chooses the player's slot, which in the distributed
+		netcode's games is its datum on every machine: network_game_add_player) */
+		if (network_game_distributed())
+			player->player_list_index = NONE;
+#endif
 		success = network_game_add_player(&server->game, player);
 		if (success == TRUE)
 		{

@@ -174,10 +174,11 @@ static void network_test_log_players(
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index));
 		}
 		/* the game type's score and the kills and deaths */
-		length += snprintf(line + length, sizeof(line) - (size_t)length, " s%ld k%d d%d",
+		length += snprintf(line + length, sizeof(line) - (size_t)length, " s%ld k%d d%d f%d t%ld m%d",
 			game_engine && game_engine->get_player_score ?
 				game_engine->get_player_score(iterator.datum_index, _get_score_individual) : -1L,
-			player->statistics.kills[0], player->statistics.deaths);
+			player->statistics.kills[0], player->statistics.deaths, player->statistics.friendly_fire_kills, (long)player->team_index,
+			(int)player->network_player_data.machine_index);
 	}
 	{
 		long sent, received, corrections;

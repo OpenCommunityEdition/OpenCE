@@ -2124,7 +2124,28 @@ boolean network_game_client_add_player_to_game(
 		{
 			if (client->state == _network_game_client_state_ingame)
 			{
+#ifdef HALO_LINUX
+				/* port: the slot it went in, which in the distributed netcode's
+				games need not be the last (network_game_add_player) */
+				{
+					struct network_player const *added = player;
+					long slot;
+
+					player = &client->game.players[client->game.player_count - 1];
+					for (slot = 0; slot < MAXIMUM_NUMBER_OF_PLAYERS; slot++)
+					{
+						if (network_player_is_valid(&client->game.players[slot]) &&
+							client->game.players[slot].machine_index == added->machine_index &&
+							client->game.players[slot].controller_index == added->controller_index)
+						{
+							player = &client->game.players[slot];
+							break;
+						}
+					}
+				}
+#else
 				player = &client->game.players[client->game.player_count - 1];
+#endif
 
 				success = network_game_spawn_player(player);
 
@@ -2132,6 +2153,18 @@ boolean network_game_client_add_player_to_game(
 				{
 					long player_index = unstrip_player_index(player->player_list_index);
 
+#ifdef HALO_LINUX
+					/* port: a player added to the game in progress gets its team
+					and the game type's data, as the players at the start have
+					(game_initial_pulse); otherwise it keeps player_new's team 1,
+					in free for all the team of the player in slot 1, whose kills
+					of it and its of them count as betrayals */
+					{
+						extern void game_engine_player_added(long player_index);
+
+						game_engine_player_added(player_index);
+					}
+#endif
 					if (player->machine_index == client->machine_index)
 					{
 						local_player_set_player_index(
