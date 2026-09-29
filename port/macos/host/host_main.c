@@ -79,7 +79,9 @@ void host_fatal(const char *format, ...)
 	vsnprintf(message, sizeof(message), format, arguments);
 	va_end(arguments);
 	host_log(HOST_LOG_ERROR, message);
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
+	/* (not for runs nobody watches: debug.hidden_window's variable) */
+	if (!getenv("HALO_HIDDEN_WINDOW"))
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
 	_exit(1);
 }
 

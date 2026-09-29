@@ -473,19 +473,21 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
     ])
     runtime_sources = sorted((ANDROID_DIR / "guest" / "runtime").glob("*.c")) + \
         sorted((PORT_DIR / "guest" / "runtime").glob("*.c"))
+    runtime_objects: List[Path] = []
     for source in runtime_sources:
         if source.name in ("guest_thread.c", "guest_start.c"):
-            objects.append(guest_object(source, runtime_internal_cflags))
+            runtime_objects.append(guest_object(source, runtime_internal_cflags))
         elif source.name == "guest_memory_watch.c":
-            objects.append(guest_object(source, platform_cflags))
+            runtime_objects.append(guest_object(source, platform_cflags))
         else:
-            objects.append(guest_object(source, runtime_cflags))
-    objects.append(guest_object(guest_gl_c, runtime_cflags))
-    objects.append(guest_object(guest_posix_c, runtime_cflags))
+            runtime_objects.append(guest_object(source, runtime_cflags))
+    runtime_objects.append(guest_object(guest_gl_c, runtime_cflags))
+    runtime_objects.append(guest_object(guest_posix_c, runtime_cflags))
     imports_o = obj_dir / "gen" / "imports.o"
     n.build(outputs=imports_o, rule="macos_as", inputs=imports_s,
             variables={"asflags": "--target=aarch64-linux-gnu" if native else "--target=x86_64-linux-gnux32"})
-    objects.append(imports_o)
+    runtime_objects.append(imports_o)
+    objects += runtime_objects
 
     linker_script = (ANDROID_DIR / "guest" / "guest.ld") if native else (PORT_DIR / "guest" / "guest.ld")
     n.build(outputs=image, rule="macos_guest_link", inputs=objects, implicit=[libguestc, linker_script],
@@ -536,4 +538,23 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         n.build(outputs=stage / name, rule="macos_copy", inputs=angle / name)
         staged.append(stage / name)
     n.build(outputs=target, rule="phony", inputs=[host_executable, image, *staged])
+
+    # ---------- the runtime test (port/macos/tests): its own guest image,
+    # staged with the same host
+
+    test_stage = build / "test" / "Halo"
+    test_source = PORT_DIR / "tests" / "guest_runtime_test.c"
+    test_object = guest_object(test_source, runtime_cflags)
+    test_image = test_stage / "halo_guest.elf"
+    # (the memory watch is the renderer's, and brings in the platform layer)
+    test_runtime = [o for o in runtime_objects if o.name != "guest_memory_watch.o"]
+    n.build(outputs=test_image, rule="macos_guest_link", inputs=[test_object, *test_runtime],
+            implicit=[libguestc, linker_script],
+            variables={"ldflags": f"-m {'aarch64linux' if native else 'elf32_x86_64'} -T {linker_script}",
+                       "libs": str(libguestc)})
+    test_staged = []
+    for built in (host_executable, *staged):
+        n.build(outputs=test_stage / built.name, rule="macos_copy", inputs=built)
+        test_staged.append(test_stage / built.name)
+    n.build(outputs=target + "_test", rule="phony", inputs=[test_image, *test_staged])
 
