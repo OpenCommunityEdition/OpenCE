@@ -101,6 +101,50 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 	return result;
 }
 
+/* ART reserves its spaces (notably the free-list large object space) at
+addresses chosen at zygote start; on some devices (for example the Retroid
+Pocket Flip2, kernel 4.19) that reservation covers the fixed Xbox memory
+window. Those reservations commit pages lazily from their bottom, and the
+Java side of this app never allocates a large object up there, so the
+overlapping slice is idle address space: unmap exactly the intersection
+(never more) and let the caller retry. */
+static int reclaim_art_overlap(uint64_t address, uint64_t size)
+{
+	FILE *maps = fopen("/proc/self/maps", "r");
+	char line[512];
+	int reclaimed = 0;
+
+	if (!maps)
+		return 0;
+	while (fgets(line, sizeof(line), maps))
+	{
+		uint64_t lo, hi, from, to;
+		char perms[8], name[128];
+		int fields;
+
+		name[0] = '\0';
+		fields = sscanf(line, "%llx-%llx %4s %*s %*s %*s %127s",
+			(unsigned long long *) &lo, (unsigned long long *) &hi,
+			perms, name);
+		/* only anonymous ART space reservations, never file mappings */
+		if (fields < 4 || strncmp(name, "[anon:dalvik-", 13))
+			continue;
+		if (hi <= address || lo >= address + size)
+			continue;
+		from = lo > address ? lo : address;
+		to = hi < address + size ? hi : address + size;
+		if (munmap((void *) from, to - from) == 0)
+		{
+			host_logf(HOST_LOG_INFO,
+				"reclaimed idle ART range %08llx-%08llx (%s)",
+				(unsigned long long) from, (unsigned long long) to, name);
+			reclaimed = 1;
+		}
+	}
+	fclose(maps);
+	return reclaimed;
+}
+
 static int reserve(uint64_t address, uint64_t size)
 {
 	void *result = mmap((void *)address, size, PROT_NONE,
@@ -110,6 +154,16 @@ static int reserve(uint64_t address, uint64_t size)
 		return 0;
 	if (result != MAP_FAILED)
 		munmap(result, size);
+	if (errno == EEXIST && reclaim_art_overlap(address, size))
+	{
+		result = mmap((void *)address, size, PROT_NONE,
+			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE,
+			-1, 0);
+		if (result == (void *)address)
+			return 0;
+		if (result != MAP_FAILED)
+			munmap(result, size);
+	}
 	return -1;
 }
 
