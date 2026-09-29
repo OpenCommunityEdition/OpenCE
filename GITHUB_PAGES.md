@@ -7,6 +7,8 @@ Open the link in current desktop Chrome or Edge. The first visit downloads
 about 1.9 GB of map data automatically; keep the tab open, then click **Play**.
 Completed maps and saves stay in that browser's storage. Reloading resumes
 missing maps, and a complete cache needs no map downloads on later visits.
+The download panel shows a progress bar, percentage and downloaded size;
+cached visits show a full bar labeled **Already downloaded**.
 Browser storage can be cleared or evicted; each device/browser has its own cache.
 Use **Cancel download** or `?manual` to import your own Xbox Halo disc image
 instead. Multiplayer is not verified.

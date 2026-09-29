@@ -15,11 +15,13 @@ async function scenario({cached = [], corrupt = false, quota = true, badManifest
     const committed = new Map(cached.map(name => [name, bytes.length]));
     const staged = new Map();
     const requests = [];
+    const ui = Object.fromEntries(["download-panel", "download-title", "download-percent", "download-progress", "download-detail"]
+        .map(id => [id, {dataset: {}, removeAttribute() {}}]));
     let busy = false, status = "", button;
     const context = {window: {}, URL, Uint8Array, ReadableStream, AbortSignal, AbortController, crypto: webcrypto,
         location: {href: "https://site.example/game/"}, setTimeout: callback => callback(),
         navigator: {storage: {persist: async () => true}},
-        document: {createElement: () => button = {remove() {}}},
+        document: {getElementById: id => ui[id], createElement: () => button = {remove() {}}},
         fetch: async (url, options) => {
             requests.push(String(url));
             if (String(url).endsWith("manifest.json")) {
@@ -40,7 +42,8 @@ async function scenario({cached = [], corrupt = false, quota = true, badManifest
         setBusy: value => busy = value, setStatus: value => status = value,
         withGameLock: task => task(), canGrowBy: async () => quota, cacheBytes: 1,
         folderBytes: async () => 0, storageMessage: () => "Not enough storage",
-        formatBytes: String, currentManifest: async () => ({}), refreshMaps: async () => {},
+        formatBytes: String, currentManifest: async () => ({}),
+        refreshMaps: async () => context.window.haloAutoCache.refresh(await api.storedMaps()),
         directory: async () => ({getFileHandle: async name => ({getFile: async () => new Blob([staged.get(name)])})}),
         storeMap: async (manifest, name, stream, size, progress, verify) => {
             committed.delete(name);
@@ -53,11 +56,14 @@ async function scenario({cached = [], corrupt = false, quota = true, badManifest
     const result = await context.window.haloAutoCache(api);
     assert.equal(busy, false);
     assert.equal(api.elements.discInput.disabled || false, false);
-    return {result, requests, committed, status};
+    return {result, requests, committed, status, ui};
 }
 
 let r = await scenario({cached: names.map(name => name + ".map")});
 assert.equal(r.result, true); assert.equal(r.requests.length, 0);
+assert.equal(r.ui["download-panel"].hidden, false);
+assert.equal(r.ui["download-title"].textContent, "Already downloaded");
+assert.equal(r.ui["download-percent"].textContent, "100%");
 console.log("PASS complete browser cache makes zero network requests");
 r = await scenario({cached: names.slice(1).map(name => name + ".map")});
 assert.equal(r.result, true); assert.equal(r.requests.length, 3); assert.equal(r.committed.size, 24);

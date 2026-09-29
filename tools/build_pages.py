@@ -14,6 +14,35 @@ import setup_browser
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "dist/github-pages"
 
+DOWNLOAD_PANEL = '''<section id="download-panel" hidden aria-label="Game download">
+    <div class="download-heading"><strong id="download-title">Preparing download</strong>
+        <span id="download-percent">…</span></div>
+    <progress id="download-progress" max="1" aria-label="Game download progress"></progress>
+    <div id="download-detail">Checking this browser's storage…</div>
+</section>'''
+
+DOWNLOAD_STYLE = '''<style>
+    #download-panel { margin: 16px 0; padding: 18px; border: 1px solid #365b85;
+        border-radius: 10px; background: #0b1726; }
+    #download-panel[hidden] { display: none; }
+    .download-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    #download-title { font-size: 16px; }
+    #download-percent { font-size: 22px; font-weight: 700; color: var(--accent);
+        font-variant-numeric: tabular-nums; }
+    #download-progress { display: block; width: 100%; height: 18px; margin: 12px 0;
+        border: 0; border-radius: 9px; overflow: hidden; accent-color: var(--accent-strong); }
+    #download-progress::-webkit-progress-bar { background: #202f42; border-radius: 9px; }
+    #download-progress::-webkit-progress-value { background: var(--accent-strong); border-radius: 9px; }
+    #download-progress::-moz-progress-bar { background: var(--accent-strong); border-radius: 9px; }
+    #download-detail { font-size: 13px; color: #afbdcd; font-variant-numeric: tabular-nums; }
+    #download-panel[data-state="ready"] { border-color: #37674a; }
+    #download-panel[data-state="ready"] #download-percent { color: var(--ok); }
+    #download-panel[data-state="ready"] #download-progress::-webkit-progress-value { background: var(--ok); }
+    #download-panel[data-state="ready"] #download-progress::-moz-progress-bar { background: var(--ok); }
+    #download-panel[data-state="error"] { border-color: var(--danger); }
+    @media (max-height: 850px) { #launcher { align-items: flex-start; } }
+</style>'''
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -41,6 +70,7 @@ def main():
         html = html.replace("Local copy of", "Self-hosted copy of")
         shutil.copyfile(ROOT / "port/web/auto-cache.js", staging / "auto-cache.js")
         if args.data_source:
+            html = html.replace('</head>', DOWNLOAD_STYLE + '\n</head>')
             html = html.replace('<script src="launcher.js"></script>',
                 f'<meta name="halo-data-source" content="{html_utils.escape(args.data_source, quote=True)}">\n'
                 '<script src="auto-cache.js"></script>\n<script src="launcher.js"></script>')
@@ -48,13 +78,16 @@ def main():
             end = html.index('</p>', start) + len('</p>')
             html = html[:start] + ('<p class="help">Game data downloads automatically on your first visit '
                 '(about 1.9 GB) and stays in this browser for next time. Keep this tab open until '
-                'the download finishes, then press Play. You can also choose your own Xbox disc image below.</p>') + html[end:]
+                'the download finishes, then press Play. You can also choose your own Xbox disc image below.</p>') + DOWNLOAD_PANEL + html[end:]
             launcher = staging / "launcher.js"
             script = launcher.read_text()
             patches = {
                 'async function storeMap(manifest, name, source, size, onProgress) {':
                     'async function storeMap(manifest, name, source, size, onProgress, verify) {',
                 '\t\tmanifest[name] = size;': '\t\tif (verify) await verify();\n\t\tmanifest[name] = size;',
+                '\t\tconst ready = maps.length > 0 && !problems.length;':
+                    '\t\tconst ready = maps.length > 0 && !problems.length;\n'
+                    '\t\tif (!busy) window.haloAutoCache.refresh?.(maps);',
                 '\t\tif (parameters.get("data")) {': '''\t\tif (!parameters.get("data") && !parameters.has("manual")) {
             const ready = await window.haloAutoCache({
                 base: document.querySelector('meta[name="halo-data-source"]').content,
