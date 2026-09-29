@@ -57,6 +57,7 @@ Each platform has its own instructions:
 | Linux (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/linux/README.md](port/linux/README.md) |
 | Windows (32-bit x86 executable, OpenGL 4.5, SDL3) | [port/windows/README.md](port/windows/README.md) |
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
+| Browser (local runner for the published Apollo WASM beta) | [BROWSER_LOCAL.md](BROWSER_LOCAL.md) |
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.

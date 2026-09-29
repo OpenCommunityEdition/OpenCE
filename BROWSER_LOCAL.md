@@ -1,0 +1,111 @@
+# Local browser runner
+
+Run the published [bnunu Apollo browser beta](https://bnunu.itch.io/apollobeta)
+locally with an opaque canvas fix and batched WebGL stream uploads.
+
+This is a runner for the publisher's pinned HTML build `19421784`, **not an
+Emscripten source-build target for this checkout**. The setup script verifies
+SHA-256 hashes before installing the runtime into ignored `build/web/` and
+records provenance in `build/web/download-provenance.json`. No game maps,
+disc images, downloaded runtime binaries, or Xbox SDK files are committed.
+
+## Start
+
+Requires Python 3.9+ and a recent Chrome with WebAssembly threads and WebGL 2.
+From the repository root:
+
+```sh
+python3 tools/setup_browser.py
+python3 tools/serve_browser.py
+```
+
+Open <http://127.0.0.1:8767/> and select the disc image of your own Xbox copy
+of Halo: Combat Evolved. The publisher's importer stores the maps in this
+browser once; nothing is uploaded. Later visits reuse the stored maps and
+saves. Keep the same host and port to retain access to that storage.
+
+Alternatively, serve maps directly from an existing supported disc image:
+
+```sh
+python3 tools/serve_browser.py --image '/path/to/Halo.xiso.iso'
+```
+
+Then open <http://127.0.0.1:8767/?data=/assets/> and click **Play**. This route
+validates all 24 maps and supports NTSC build `01.10.12.2276` and PAL build
+`01.01.14.2342`. The server reads only the requested map bytes from the image;
+it does not extract an additional copy to disk. `run-browser.command` is a
+shell shortcut for the server and accepts the same arguments.
+
+The server binds to `127.0.0.1`, disables directory listings, serves the WASM
+MIME type, and supplies the cross-origin isolation headers needed by threads.
+Stop it with Ctrl-C. Re-run the setup script to restore the pinned runtime.
+
+The publisher's Asyncify compatibility build is available with
+`?build=asyncify` if the default JSPI runtime is unsupported.
+
+## Rendering fixes
+
+`port/web/opaque-canvas.js` requests `alpha: false` when creating the game
+context. The Xbox renderer often disables alpha writes; a transparent browser
+canvas otherwise hides valid rendered RGB content.
+
+`port/web/stream-batch.js` records GL commands and merges append-only vertex
+and index uploads before their draws. The supported rings are identified by
+Halo's exact allocation sizes and usage. Uniform data and upload bytes are
+snapshotted before the WASM heap changes; untouched gap bytes are preserved.
+Overlaps retain their original order, and readbacks, transfers, and presentation
+boundaries flush queued commands. GPU writes invalidate CPU shadow data.
+
+The browser build uses three 16 MiB vertex buffers and three 2 MiB index
+buffers. Batching avoids repeatedly modifying these large buffers between
+draws, at the cost of approximately 54 MiB of CPU shadow memory. The shaders,
+vertex values, published WASM, and engine JavaScript are unchanged.
+
+This wrapper relies on Halo's append-only allocator contract; it is not a
+general-purpose WebGL optimizer. Add `?batch_streams=0` to disable it for a
+comparison. The FPS HUD counts engine presents rather than animation callbacks.
+`?profile=1` enables GL call timing and adds measurement overhead.
+
+## Local validation
+
+On an Apple Silicon Mac in Chrome 153, with a 3022 × 1540 canvas and the
+Silent Cartographer campaign:
+
+| Scene | Original uploads | Batched uploads |
+| --- | --- | --- |
+| Early intro, frame range 10–80 | ~3.5 FPS | 21–29 FPS across two runs |
+| Later intro | scene-dependent | roughly 48–100 FPS in the first run |
+| First beach combat | not used for a matched comparison | roughly 25–30 FPS |
+
+The baseline included attribute telemetry. Samples were collected once per
+second; the early range contained 19 baseline readings and two or three batched
+readings. The observed improvement is approximately 6–8× for that opening
+scene, not a steady 120 FPS claim or a hardware-independent benchmark. Compare
+matching views and warm shaders; background windows and scene changes affect
+results. Textured rendering, firing, weapon switching, and pause/resume were
+checked. This does not validate a full campaign or multiplayer.
+
+Run the regression checks without game data:
+
+```sh
+node tools/test_stream_batch.mjs
+python3 -m unittest discover -s tools -p 'test_serve_browser.py'
+```
+
+## Controls and launch options
+
+- Click the canvas to capture the mouse; Esc releases it.
+- WASD moves, mouse aims, left click fires, Space jumps.
+- E uses, R reloads, F melees, Tab switches weapons, P pauses/resumes.
+- Enter/Space accepts menus; Backspace goes back.
+
+In the launcher's Options field, `(set terminal_render false)` hides beta
+debug text. To start the Silent Cartographer directly, use:
+
+```text
+(set terminal_render false);map_name levels\b30\b30
+```
+
+Options persist. Remove the `map_name` command to return to the main menu.
+The publisher build skips Bink movies and reports no network link; multiplayer
+is not verified by this runner.
