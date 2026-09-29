@@ -80,7 +80,11 @@ can run the game, copies the game data out of the player's disc image
 
   async function debugText() {
     try {
-      const root = await navigator.storage.getDirectory();
+      // WasmFS mounts OPFS at /data; reused Apollo maps run from /data/halo/data.
+      const directories = (state.maps?.dataRoot || '/data').split('/').filter(Boolean);
+      if (directories.shift() !== 'data') return '';
+      let root = await navigator.storage.getDirectory();
+      for (const directory of directories) root = await root.getDirectoryHandle(directory);
       const file = await (await root.getFileHandle('debug.txt')).getFile();
       const text = await file.text();
       return text.length > 200000 ? text.slice(-200000) : text;

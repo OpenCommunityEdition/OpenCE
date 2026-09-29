@@ -387,6 +387,46 @@ test('connection-panel Show log opens the same current runtime and saved diagnos
   assert.match(page.element('log-text').textContent, /native search timed out/);
 });
 
+for (const dataRoot of ['/data', '/data/halo/data']) {
+  test(`Show log reads the active ${dataRoot} game directory without confusing the OPFS mount`, async () => {
+    const page = await launcher(undefined, { url: 'http://localhost:8780/?menu=1',
+      mapsState: async () => ({ files: ['ui.map'], bytes: 2048, dataRoot, saveRoot: '/data/save' }) });
+    const reads = [];
+    const directory = path => ({
+      async getDirectoryHandle(name, options) {
+        assert.equal(options?.create, undefined, 'log lookup never creates directories');
+        return directory(path + name + '/');
+      },
+      async getFileHandle(name) {
+        reads.push(path + name);
+        return { getFile: async () => ({ text: async () => 'log from ' + path + name }) };
+      },
+    });
+    page.context.navigator.storage.getDirectory = async () => directory('');
+    await page.element('show-log').onclick();
+    const expected = dataRoot === '/data' ? 'debug.txt' : 'halo/data/debug.txt';
+    assert.deepEqual(reads, [expected]);
+    assert.ok(page.element('log-text').textContent.includes('log from ' + expected));
+  });
+}
+
+test('an unavailable legacy log does not display an unrelated stale root log', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?menu=1',
+    mapsState: async () => ({ files: ['ui.map'], bytes: 2048, dataRoot: '/data/halo/data', saveRoot: '/data/save' }) });
+  let rootReads = 0;
+  page.context.navigator.storage.getDirectory = async () => ({
+    getDirectoryHandle: async () => { throw new Error('Log directory unavailable'); },
+    async getFileHandle() {
+      rootReads++;
+      return { getFile: async () => ({ text: async () => 'stale root log' }) };
+    },
+  });
+  await page.element('show-log').onclick();
+  assert.equal(rootReads, 0);
+  assert.equal(page.element('log-text').textContent.includes('stale root log'), false);
+  assert.equal(page.element('log-view').hidden, false, 'page diagnostics remain readable');
+});
+
 test('map downloaders remain ineligible until complete, then launch automatically', async () => {
   let finishMaps;
   const loading = await launcher(undefined, {
