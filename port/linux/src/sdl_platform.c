@@ -15,6 +15,7 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "xiso.h"
+#include "raytrace_gl.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -717,6 +718,9 @@ void platform_pump_events(void)
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 			}
+			/* F9 switches the ray-traced lighting (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F9)
+				halo_ray_tracing_toggle();
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */

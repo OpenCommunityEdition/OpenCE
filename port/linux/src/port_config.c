@@ -63,6 +63,14 @@ struct config_setting
 	const char *comment;
 };
 
+/* the ray-traced lighting's default: on for the macOS port, which it was
+made for; off elsewhere */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_RAY_TRACING "\"on\""
+#else
+#define HALO_CONFIG_RAY_TRACING "\"off\""
+#endif
+
 /* a default the macOS port turns off */
 #ifdef HALO_MACOS
 #define HALO_CONFIG_MACOS_FALSE "false"
@@ -85,6 +93,21 @@ static const struct config_setting config_settings[] =
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
+
+	{ "display.ray_tracing", _config_string, HALO_CONFIG_RAY_TRACING, "HALO_RAY_TRACING", _environment_value,
+		_platform_all,
+		"Screen-space ray-traced lighting on the 3D world (port/linux/src/raytrace_gl.c):\n"
+		"\"on\", \"off\", or \"occlusion\" and \"depth\" to see what it works from.\n"
+		"F9 switches it while playing." },
+	{ "display.ray_tracing_occlusion", _config_real, "0.8", "HALO_RAY_TRACING_OCCLUSION", _environment_value,
+		_platform_all,
+		"How much traced ambient occlusion darkens creases and corners, 0.0 to 1.0." },
+	{ "display.ray_tracing_reflections", _config_real, "0.25", "HALO_RAY_TRACING_REFLECTIONS", _environment_value,
+		_platform_all,
+		"How strongly surfaces reflect the traced scene, 0.0 to 1.0." },
+	{ "display.ray_tracing_bounce", _config_real, "0.25", "HALO_RAY_TRACING_BOUNCE", _environment_value,
+		_platform_all,
+		"How much light one traced bounce carries between surfaces, 0.0 to 1.0." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

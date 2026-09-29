@@ -42,6 +42,9 @@ long halo_screen_width(void);
 long halo_screen_commit(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* screen-space ray-traced lighting, after a window's opaque world
+(port/linux/src/raytrace_gl.c) */
+void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 
