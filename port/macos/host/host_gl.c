@@ -17,9 +17,19 @@ need copying back.
 
 void *host_gles_library;
 
-void *host_gl_resolve(const char *name)
+static void *library_symbol(const char *name)
 {
 	return host_gles_library ? dlsym(host_gles_library, name) : NULL;
+}
+
+/* the generated thunks' (tools/android_gl_stubs.py --host-thunks) */
+void *host_gl_thunk(const char *name, void *(*resolve)(const char *));
+
+/* a guest import: the function's thunk, which turns guest pointers into
+host ones */
+void *host_gl_resolve(const char *name)
+{
+	return host_gl_thunk(name, library_symbol);
 }
 
 /* the entry points this file calls itself, from the same library (the
@@ -41,7 +51,7 @@ HOST_GL_FUNCTIONS(HOST_GL_DECLARE)
 
 int host_gl_load(void)
 {
-#define HOST_GL_LOAD(type, name) host_##name = (type)host_gl_resolve(#name); if (!host_##name) return 0;
+#define HOST_GL_LOAD(type, name) host_##name = (type)library_symbol(#name); if (!host_##name) return 0;
 	HOST_GL_FUNCTIONS(HOST_GL_LOAD)
 	return 1;
 }

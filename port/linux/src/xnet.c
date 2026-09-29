@@ -250,16 +250,131 @@ static void peer_incoming_address(int stream, struct sockaddr *address, const in
 	incoming_address(address, address_length);
 }
 
+/* ---------- Tailscale (network.tailscale)
+
+A tailnet carries no broadcasts, so system link's announcements also go to
+each of the tailnet's online machines (broadcast_targets), which the host
+side asks the tailscale command for (posix_tailscale_addresses). A game's
+announcement names its host by the host's XNADDR, whose address is the one
+on the local network: in announcements sent to a tailnet address it becomes
+this machine's Tailscale address (tailnet_payload), which the other machine
+can reach. */
+
+#define TAILSCALE_PEERS 128
+
+static int tailscale_enabled(void)
+{
+	static int enabled = -1;
+
+	if (enabled < 0)
+		enabled = config_boolean("network.tailscale") ? 1 : 0;
+	return enabled;
+}
+
+/* this machine's Tailscale address and the online peers'; -1 if none */
+static int tailscale_addresses(unsigned long *self, unsigned long *peers, int capacity)
+{
+	posix_ulong own = 0, list[TAILSCALE_PEERS];
+	int count, index;
+
+	*self = 0;
+	if (!tailscale_enabled())
+		return -1;
+	if (capacity > TAILSCALE_PEERS)
+		capacity = TAILSCALE_PEERS;
+	count = posix_tailscale_addresses(&own, list, capacity);
+	if (count < 0)
+		return -1;
+	*self = (unsigned long)own;
+	for (index = 0; index < count; index++)
+		peers[index] = (unsigned long)list[index];
+	{
+		/* once, so the log tells whether Tailscale was found */
+		static int logged;
+
+		if (!logged)
+		{
+			unsigned long host = halo_ws_ntohl(own);
+
+			logged = 1;
+			platform_log("tailscale: this machine is %lu.%lu.%lu.%lu; %d other machine(s) online; system link "
+				"announcements go to them too", (host >> 24) & 255, (host >> 16) & 255, (host >> 8) & 255,
+				host & 255, count);
+		}
+	}
+	return count;
+}
+
+/* 100.64.0.0/10, the addresses Tailscale gives out */
+static int is_tailnet_address(unsigned long address)
+{
+	return (halo_ws_ntohl(address) & 0xffc00000UL) == 0x64400000UL;
+}
+
+static unsigned long title_address(void);
+
+/* the datagram to send to destination: buffer, or a copy in scratch whose
+XNADDR of this machine (its identifier, then its address) names its
+Tailscale address instead, for a destination on the tailnet */
+static const char *tailnet_payload(const char *buffer, int length, unsigned long destination, char *scratch,
+	int scratch_size)
+{
+	unsigned long self, lan, peers[1];
+	unsigned char pattern[10];
+	int index, copied = 0;
+
+	if (!tailscale_enabled() || !is_tailnet_address(destination) || length < (int)sizeof(pattern) ||
+		length > scratch_size || tailscale_addresses(&self, peers, 0) < 0 || !self)
+	{
+		return buffer;
+	}
+	lan = title_address();
+	if (!lan || lan == self)
+		return buffer;
+	memcpy(pattern, p2p_identifier(), 6);
+	memcpy(pattern + 6, &lan, 4);
+	for (index = 0; index + (int)sizeof(pattern) <= length; index++)
+	{
+		if (memcmp(buffer + index, pattern, sizeof(pattern)))
+			continue;
+		if (!copied)
+		{
+			memcpy(scratch, buffer, (size_t)length);
+			copied = 1;
+		}
+		memcpy(scratch + index + 6, &self, 4);
+	}
+	return copied ? scratch : buffer;
+}
+
 /* the addresses to send broadcasts to instead, if network.broadcast is
-set (255.255.255.255 among them sends a real broadcast too); returns their
-count */
+set (255.255.255.255 among them sends a real broadcast too), and the
+tailnet's online machines; returns their count */
 static int broadcast_targets(unsigned long *targets, int maximum_count)
 {
-	int count;
+	unsigned long self, peers[TAILSCALE_PEERS];
+	int count, peer_count, index;
 
 	net_settings_read();
 	count = net_settings.broadcast_count < maximum_count ? net_settings.broadcast_count : maximum_count;
 	memcpy(targets, net_settings.broadcast_targets, (size_t)count * sizeof(*targets));
+	peer_count = tailscale_addresses(&self, peers, TAILSCALE_PEERS);
+	if (peer_count > 0)
+	{
+		/* the local network's broadcast as well, unless network.broadcast
+		said where announcements go */
+		if (!net_settings.broadcast_count && count < maximum_count)
+			targets[count++] = INADDR_BROADCAST;
+		for (index = 0; index < peer_count && count < maximum_count; index++)
+		{
+			int known, other;
+
+			for (known = 0, other = 0; other < count; other++)
+				known |= targets[other] == peers[index];
+			if (!known)
+				targets[count++] = peers[index];
+		}
+	}
 	return count;
 }
 
@@ -310,6 +425,62 @@ int WSAAPI WSACleanup(void)
 	return 0;
 }
 
+/* ---------- the game's own sockets
+
+Internet play's tunnel (p2p.c) delivers a peer's traffic only to ports the
+game's own sockets are bound to (xnet_is_game_port), never to other
+programs listening on this machine. */
+
+#define MAXIMUM_GAME_SOCKETS 256
+
+static int game_sockets[MAXIMUM_GAME_SOCKETS];
+static int game_socket_count;
+static pthread_mutex_t game_sockets_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void game_socket_add(int socket)
+{
+	pthread_mutex_lock(&game_sockets_lock);
+	if (game_socket_count < MAXIMUM_GAME_SOCKETS)
+		game_sockets[game_socket_count++] = socket;
+	pthread_mutex_unlock(&game_sockets_lock);
+}
+
+static void game_socket_remove(int socket)
+{
+	int index;
+
+	pthread_mutex_lock(&game_sockets_lock);
+	for (index = 0; index < game_socket_count; index++)
+	{
+		if (game_sockets[index] == socket)
+		{
+			game_sockets[index] = game_sockets[--game_socket_count];
+			break;
+		}
+	}
+	pthread_mutex_unlock(&game_sockets_lock);
+}
+
+int xnet_is_game_port(unsigned short port)
+{
+	int index, found = 0;
+
+	pthread_mutex_lock(&game_sockets_lock);
+	for (index = 0; index < game_socket_count && !found; index++)
+	{
+		struct sockaddr_in bound;
+		int length = sizeof(bound);
+
+		if (posix_socket_getsockname(game_sockets[index], &bound, &length) == 0 &&
+			bound.sin_family == AF_INET && bound.sin_port == port)
+		{
+			found = 1;
+		}
+	}
+	pthread_mutex_unlock(&game_sockets_lock);
+	return found;
+}
+
 SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 {
 	int result = posix_socket(family, type, protocol);
@@ -319,6 +490,7 @@ SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	game_socket_add(result);
 	/* (the game's connections: every tick's messages go at once) */
 	if (type == SOCK_STREAM)
 		posix_socket_set_nodelay(result);
@@ -327,6 +499,7 @@ SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 
 int WSAAPI halo_ws_closesocket(SOCKET socket)
 {
+	game_socket_remove((int)socket);
 	p2p_socket_closed((int)socket);
 	return winsock_result(posix_socket_close((int)socket));
 }
@@ -401,6 +574,7 @@ SOCKET WSAAPI halo_ws_accept(SOCKET socket, struct sockaddr *address, int *addre
 		WSASetLastError(posix_socket_last_error());
 		return INVALID_SOCKET;
 	}
+	game_socket_add(result);
 	posix_socket_set_nodelay(result);
 	peer_incoming_address(1, address, address_length);
 	return (SOCKET)result;
@@ -436,8 +610,11 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 			{
 				int sent;
 
+				char scratch[2048];
+				const char *data = tailnet_payload(buffer, length, targets[index], scratch, sizeof(scratch));
+
 				target.sin_addr.s_addr = targets[index];
-				sent = posix_socket_sendto((int)socket, buffer, length, flags, &target, sizeof(target));
+				sent = posix_socket_sendto((int)socket, data, length, flags, &target, sizeof(target));
 				if (sent >= 0 || index == 0)
 					result = sent;
 			}
@@ -464,10 +641,16 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	}
 	{
 		const struct sockaddr *peer = peer_outgoing_address(0, address, address_length, &target);
+		char scratch[2048];
 
 		address = peer ? peer : outgoing_address(address, address_length, &target);
+		if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in))
+		{
+			buffer = tailnet_payload(buffer, length, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
+				scratch, sizeof(scratch));
+		}
+		return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 	}
-	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 }
 
 /* debug.network_latency and debug.network_loss: what this machine receives

@@ -1,24 +1,27 @@
-"""Ninja rules for the macOS build (``ninja macos``).
+"""Ninja rules for the macOS builds (``ninja macos``, ``ninja macos_x86_64``).
 
 The macOS port (port/macos/README.md) runs the game the way the Android port
 does: as ILP32 code - 32-bit pointers, as the game's data formats require -
-inside an ordinary 64-bit process. On macOS that code is x32 (x86-64
-instructions with 32-bit pointers) and the process is an x86-64 executable,
-which Rosetta 2 runs on Apple silicon: arm64 macOS processes cannot map
-anything below 4 GB, x86-64 ones linked with a small __PAGEZERO can. This
-graph builds
+inside an ordinary 64-bit process, a host that loads it and serves its
+requests. There are two builds:
 
-- the guest image, build/macos/Halo/halo_guest.elf: the game sources, the
-  platform layer shared with the Linux port (port/linux/src), the Android
-  port's guest runtime (port/android/guest/runtime) with the desktop's SDL
-  functions (port/macos/guest/runtime) and a subset of musl as its C
-  library, compiled by clang for x86_64-linux-gnux32 and linked by ld.lld at
-  a fixed address below 2 GB;
-- the host executable, build/macos/Halo/halo: the loader and the services
-  the guest calls (port/macos/host), over SDL3;
-- SDL3 itself, for x86-64;
+- ``ninja macos``, native on Apple silicon (build/macos/Halo): the guest is
+  compiled as the Android port's is, for arm64_32 (tools/android_asm_convert.py
+  makes ELF assembly of it), and its memory accesses are rebased onto a
+  4 GB-aligned region of the host's address space
+  (tools/macos_arm64_rebase.py): arm64 macOS processes cannot map anything
+  below 4 GB. The host is an arm64 executable.
+- ``ninja macos_x86_64``, for Intel Macs or Rosetta 2
+  (build/macos-x86_64/Halo): the guest is x32 code (x86-64 instructions with
+  32-bit pointers) linked below 2 GB, and the host an x86-64 executable with
+  a 64 KB __PAGEZERO, whose low 4 GB is the guest's region itself.
 
-and stages them with ANGLE (OpenGL ES over Metal: libEGL.dylib and
+Both guests are the game sources, the platform layer shared with the Linux
+port (port/linux/src, as on the desktop: HALO_MACOS), the Android port's
+guest runtime (port/android/guest/runtime) with the desktop's SDL functions
+(port/macos/guest/runtime) and a subset of musl, linked by ld.lld at a fixed
+guest address. Both hosts (port/macos/host) run over SDL3 (built universal)
+and draw with OpenGL ES through ANGLE on Metal (libEGL.dylib and
 libGLESv2.dylib, taken from an installed Chromium-based application unless
 --macos-angle names a folder holding them).
 
@@ -34,8 +37,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .android_build import (GUEST_CODE_FLAGS, MUSL_URL, MUSL_VERSION, SDL_TAG, SDL_URL, VARIADIC_PROTOTYPE_FILES,
-                            KCP_DIR, TOML_DIR, _musl_sources, _quote)
+from .android_build import (GUEST_ABI_FLAGS as ANDROID_ABI_FLAGS, GUEST_CODE_FLAGS, MUSL_URL, MUSL_VERSION, SDL_TAG,
+                            SDL_URL, VARIADIC_PROTOTYPE_FILES, KCP_DIR, TOML_DIR, _musl_sources, _quote)
 from .linux_build import (MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher,
                           miniupnpc_sources, musl_math_sources, xdk_headers)
 from .ninja_syntax import Writer
@@ -52,21 +55,29 @@ SDL_COMMIT = "fa2c02bb6e21974a89ea9824bc53c9932abe5f9c"  # release-3.4.16
 KHRONOS_DIR = THIRD_PARTY / "khronos"
 KHRONOS_OPENGL = "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/main/api"
 KHRONOS_EGL = "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/main/api"
-STAGE = BUILD / "Halo"
+SDL_BUILD = BUILD / "sdl3-build"
 MACOS_MINIMUM = "14.4"
+HOST_FRAMEWORKS = ["Cocoa", "Metal", "QuartzCore", "IOKit"]
 
-# the guest image's address: below 2 GB, where x86-64 code can use
-# sign-extended 32-bit absolute addresses; the host reserves the region
-# above it (port/macos/host/host_memory.c)
-GUEST_IMAGE_BASE = 0x20000000
+# the native build: the Android port's guest ABI, rebased (x28 the base,
+# x27 the rebasing's scratch register), with the desktop platform layer
+NATIVE_ABI_FLAGS = [flag for flag in ANDROID_ABI_FLAGS if flag != "-DHALO_ANDROID=1"] + [
+    "-DHALO_MACOS=1", "-ffixed-x27", "-ffixed-x28",
+    # the rebasing lengthens functions past what byte-sized jump table
+    # entries reach
+    "-mllvm", "-aarch64-enable-compress-jump-tables=false",
+]
 
-GUEST_ABI_FLAGS = [
+# the x86-64 build: x32, linked below 2 GB (where x86-64 code can use
+# sign-extended 32-bit absolute addresses)
+X86_IMAGE_BASE = 0x20000000
+X86_ABI_FLAGS = [
     "--target=x86_64-linux-gnux32",
     "-DHALO_MACOS=1",
-    f"-DHALO_GUEST_IMAGE_BASE=0x{GUEST_IMAGE_BASE:08x}u",
+    f"-DHALO_GUEST_IMAGE_BASE=0x{X86_IMAGE_BASE:08x}u",
     # what Rosetta 2 translates
     "-march=x86-64-v2",
-    # as the MSVC runtime, and as the Android guest's musl headers say
+    # as the MSVC runtime, and as the guest's musl headers say
     "-mlong-double-64",
     "-nostdinc",
     "-fshort-wchar",
@@ -76,13 +87,11 @@ GUEST_ABI_FLAGS = [
     "-femulated-tls",
     "-fno-pic",
     "-fno-pie",
-    # no fused multiply-add, as on x86 (the game's debug assertions trip
-    # on the different rounding)
+    # no fused multiply-add (the game's debug assertions trip on the
+    # different rounding)
     "-ffp-contract=off",
     "-O2",
 ]
-
-HOST_FRAMEWORKS = ["Cocoa", "Metal", "QuartzCore", "IOKit"]
 
 
 def _find_tool(name: str) -> Optional[str]:
@@ -101,7 +110,8 @@ def _find_tool(name: str) -> Optional[str]:
 
 
 def _find_angle(sln: Any) -> Optional[Path]:
-    """a folder holding libEGL.dylib and libGLESv2.dylib with x86-64 code"""
+    """a folder holding libEGL.dylib and libGLESv2.dylib for both
+    architectures"""
     wanted = getattr(sln, "macos_angle", None)
     candidates = [Path(wanted)] if wanted else []
     home = Path.home()
@@ -120,9 +130,23 @@ def _find_angle(sln: Any) -> Optional[Path]:
             archs = subprocess.run(["lipo", "-archs", str(gles)], capture_output=True, text=True, check=True).stdout
         except (OSError, subprocess.CalledProcessError):
             continue
-        if "x86_64" in archs.split():
+        if {"x86_64", "arm64"} <= set(archs.split()):
             return folder
     return None
+
+
+def _stage_angle(folder: Path, arch: str) -> Path:
+    """one architecture of ANGLE, copied to build/macos/third_party/angle-<arch>
+    (the originals' paths have spaces, which ninja commands do not quote)"""
+    target = THIRD_PARTY / f"angle-{arch}"
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("libEGL.dylib", "libGLESv2.dylib"):
+        source = folder / name
+        staged = target / name
+        if staged.is_file() and staged.stat().st_mtime >= source.stat().st_mtime:
+            continue
+        subprocess.run(["lipo", str(source), "-thin", arch, "-output", str(staged)], check=True)
+    return target
 
 
 def fetch_third_party() -> None:
@@ -156,23 +180,20 @@ def fetch_third_party() -> None:
             subprocess.run(["curl", "-sSfL", "-o", str(target), f"{base}/{name}"], check=True)
 
 
-def _stage_angle(folder: Path) -> Path:
-    """the x86-64 parts of ANGLE, copied to build/macos/third_party/angle
-    (the originals' paths have spaces, which ninja commands do not quote)"""
-    target = THIRD_PARTY / "angle"
-    target.mkdir(parents=True, exist_ok=True)
-    for name in ("libEGL.dylib", "libGLESv2.dylib"):
-        source = folder / name
-        staged = target / name
-        if staged.is_file() and staged.stat().st_mtime >= source.stat().st_mtime:
-            continue
-        subprocess.run(["lipo", str(source), "-thin", "x86_64", "-output", str(staged)], check=True)
-    return target
-
-
 def macos_configure_inputs() -> List[Path]:
     return [Path(__file__), PORT_DIR / "host", PORT_DIR / "guest" / "runtime", ANDROID_DIR / "guest" / "runtime",
             LINUX_DIR / "src"]
+
+
+def _musl_sources_in(musl_dir: Path) -> List[Path]:
+    """android_build._musl_sources, for this build's copy of musl"""
+    from . import android_build
+    saved = android_build.MUSL_DIR
+    android_build.MUSL_DIR = musl_dir
+    try:
+        return _musl_sources()
+    finally:
+        android_build.MUSL_DIR = saved
 
 
 def generate_macos_build(n: Writer, sln: Any) -> None:
@@ -186,139 +207,53 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         return
     angle = _find_angle(sln)
     if not angle:
-        n.comment("macOS build: no x86-64 ANGLE (libEGL.dylib, libGLESv2.dylib) found; pass --macos-angle")
+        n.comment("macOS build: no universal ANGLE (libEGL.dylib, libGLESv2.dylib) found; pass --macos-angle")
         return
     try:
         fetch_third_party()
-        angle = _stage_angle(angle)
+        angles = {arch: _stage_angle(angle, arch) for arch in ("arm64", "x86_64")}
     except (subprocess.CalledProcessError, OSError) as error:
         print(f"macOS build disabled: cannot fetch musl/SDL3/Khronos headers ({error})", file=sys.stderr)
         return
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    guest_cc = "clang"
-    guest_dir = BUILD / "guest"
-    obj_dir = guest_dir / "obj"
-    gen_dir = guest_dir / "gen"
-    libc_include = guest_dir / "libc_include"
-    libc_internal = guest_dir / "libc_internal"
-    arch = PORT_DIR / "guest" / "libc" / "arch" / "x32"
-    semantics_header = Path("build/linux/halo_msvc_semantics.h")
-    platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
-    prefix_header = LINUX_DIR / "include" / "halo_linux_prefix.h"
-    image = STAGE / "halo_guest.elf"
-    sdl_build = BUILD / "sdl3-build"
-    libsdl = sdl_build / "libSDL3.0.dylib"
-    host_executable = STAGE / "halo"
-    python = "$python"
-
-    n.comment("macOS build (ninja macos); see port/macos/README.md")
-    n.variable("macos_guest_cc", guest_cc)
+    n.comment("macOS builds (ninja macos, ninja macos_x86_64); see port/macos/README.md")
     n.variable("macos_lld", lld)
     n.variable("macos_ar", ar)
 
-    # ---------- generated headers and sources
+    # ---------- shared: SDL3 (universal), the rules
 
-    alltypes = libc_include / "bits" / "alltypes.h"
-    syscall_h = libc_include / "bits" / "syscall.h"
-    version_h = libc_internal / "version.h"
+    libsdl = SDL_BUILD / "libSDL3.0.dylib"
     n.rule(
-        name="macos_alltypes",
-        command=f"mkdir -p $$(dirname $out) && sed -f {MUSL_DIR}/tools/mkalltypes.sed $in > $out",
-        description="MACOS MUSL $out",
+        name="macos_sdl3",
+        command=(f"cmake -S {SDL_DIR} -B {SDL_BUILD} -G Ninja \"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64\" "
+                 f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MACOS_MINIMUM} -DCMAKE_BUILD_TYPE=Release "
+                 f"-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF "
+                 f"> {BUILD}/sdl3-configure.log && ninja -C {SDL_BUILD} > {BUILD}/sdl3-build.log"),
+        description="MACOS SDL3",
+        pool="console",
     )
-    n.build(outputs=alltypes, rule="macos_alltypes",
-            inputs=[arch / "bits" / "alltypes.h.in", MUSL_DIR / "include" / "alltypes.h.in"])
-    n.rule(
-        name="macos_syscall_h",
-        command="mkdir -p $$(dirname $out) && cp $in $out && sed -n -e s/__NR_/SYS_/p < $in >> $out",
-        description="MACOS MUSL $out",
-    )
-    n.build(outputs=syscall_h, rule="macos_syscall_h", inputs=arch / "bits" / "syscall.h.in")
-    n.rule(
-        name="macos_version_h",
-        command=f"mkdir -p $$(dirname $out) && echo '#define VERSION \"{MUSL_VERSION}\"' > $out",
-        description="MACOS MUSL $out",
-    )
-    n.build(outputs=version_h, rule="macos_version_h")
-
-    guest_gl_c = gen_dir / "guest_gl.c"
-    gl_imports = gen_dir / "gl_imports.list"
-    n.rule(
-        name="macos_gl_stubs",
-        command=(f"{python} tools/android_gl_stubs.py --integer-registers 6 {LINUX_DIR}/src/gl.h "
-                 f"{KHRONOS_DIR}/GLES3/gl32.h {KHRONOS_DIR}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"),
-        description="MACOS GL STUBS",
-    )
-    n.build(outputs=[guest_gl_c, gl_imports], rule="macos_gl_stubs",
-            implicit=[Path("tools/android_gl_stubs.py"), LINUX_DIR / "src" / "gl.h"])
-
-    guest_posix_c = gen_dir / "guest_posix.c"
-    posix_imports = gen_dir / "posix_imports.list"
-    n.rule(
-        name="macos_posix_stubs",
-        command=f"{python} tools/android_posix_stubs.py {LINUX_DIR}/src/posix.h {guest_posix_c} {posix_imports}",
-        description="MACOS POSIX STUBS",
-    )
-    n.build(outputs=[guest_posix_c, posix_imports], rule="macos_posix_stubs",
-            implicit=[Path("tools/android_posix_stubs.py"), LINUX_DIR / "src" / "posix.h"])
-
-    imports_s = gen_dir / "imports.s"
-    host_table_c = BUILD / "host" / "host_import_table.c"
-    host_imports_list = PORT_DIR / "host_imports.list"
-    n.rule(
-        name="macos_imports",
-        command=f"{python} tools/android_imports.py --arch x86_64 --host-table {host_table_c} {imports_s} $in",
-        description="MACOS IMPORTS",
-    )
-    n.build(outputs=[imports_s, host_table_c], rule="macos_imports",
-            inputs=[host_imports_list, posix_imports, gl_imports],
-            implicit=[Path("tools/android_imports.py")])
-
-    generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, semantics_header, platform_semantics_header]
-
-    # ---------- guest compilation: C -> x32 ELF object
-
+    n.build(outputs=libsdl, rule="macos_sdl3", implicit=[SDL_DIR / "CMakeLists.txt"])
+    n.rule(name="macos_copy", command="mkdir -p $$(dirname $out) && cp $in $out", description="MACOS STAGE $out")
     n.rule(
         name="macos_guest_cc",
-        command=f"{compile_launcher(sln)}$macos_guest_cc -MMD -MF $out.d $cflags -c $in -o $out",
+        command=f"{compile_launcher(sln)}clang -MMD -MF $out.d $cflags -c $in -o $out",
         description="MACOS CC $out",
         depfile="$out.d",
         deps="gcc",
     )
     n.rule(
-        name="macos_guest_as",
-        command="$macos_guest_cc --target=x86_64-linux-gnux32 -c $in -o $out",
-        description="MACOS AS $out",
+        name="macos_native_cc",
+        command=(f"{compile_launcher(sln)}clang -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
+                 "$python tools/android_asm_convert.py $out.darwin.s $out.elf.s && "
+                 "$python tools/macos_arm64_rebase.py $out.elf.s $out.s && "
+                 "clang --target=aarch64-linux-gnu -c $out.s -o $out"),
+        description="MACOS CC $out",
+        depfile="$out.d",
+        deps="gcc",
     )
-
-    libc_includes = [
-        f"-isystem {libc_include}", f"-isystem {arch}", f"-isystem {MUSL_DIR}/arch/generic",
-        f"-isystem {MUSL_DIR}/include",
-    ]
-    guest_abi = " ".join(GUEST_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
-    guest_code = " ".join(GUEST_CODE_FLAGS)
-    tool_implicit = list(generated_headers)
-
-    def guest_object(source: Path, cflags: str, prefix: str = "") -> Path:
-        obj = obj_dir / prefix / Path(str(source).lstrip("/")).with_suffix(".o")
-        if str(source).startswith(str(BUILD)):
-            obj = obj_dir / prefix / source.relative_to(BUILD).with_suffix(".o")
-        n.build(outputs=obj, rule="macos_guest_cc", inputs=source, implicit=tool_implicit,
-                variables={"cflags": cflags})
-        return obj
-
-    # musl
-    musl_cflags = " ".join([
-        guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-w",
-        f"-I{arch}", f"-I{MUSL_DIR}/arch/generic", f"-I{libc_internal}",
-        f"-I{MUSL_DIR}/src/include", f"-I{MUSL_DIR}/src/internal", f"-I{libc_include}", f"-I{MUSL_DIR}/include",
-    ])
-    musl_objects = []
-    for source in _musl_sources_in(MUSL_DIR):
-        musl_objects.append(guest_object(source, musl_cflags, "musl"))
-    libguestc = guest_dir / "libguestc.a"
+    n.rule(name="macos_as", command="clang $asflags -c $in -o $out", description="MACOS AS $out")
     n.rule(
         name="macos_ar",
         command="rm -f $out && $macos_ar rcs $out @$out.rsp",
@@ -326,6 +261,145 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
+    n.rule(
+        name="macos_guest_link",
+        command="mkdir -p $$(dirname $out) && $macos_lld $ldflags -static -nostdlib -Map $out.map -o $out @$out.rsp $libs",
+        description="MACOS LINK $out",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+    )
+    n.rule(
+        name="macos_host_cc",
+        command="clang -MMD -MF $out.d $cflags -c $in -o $out",
+        description="MACOS HOST CC $out",
+        depfile="$out.d",
+        deps="gcc",
+    )
+    n.rule(
+        name="macos_host_link",
+        command=(f"mkdir -p $$(dirname $out) && clang $ldflags -mmacosx-version-min={MACOS_MINIMUM} -o $out $in "
+                 f"-L{SDL_BUILD} -lSDL3 -Wl,-rpath,@executable_path "
+                 + " ".join(f"-framework {f}" for f in HOST_FRAMEWORKS)),
+        description="MACOS HOST LINK $out",
+    )
+
+    n.rule(name="macos_alltypes", command=f"mkdir -p $$(dirname $out) && sed -f {MUSL_DIR}/tools/mkalltypes.sed $in > $out",
+           description="MACOS MUSL $out")
+    n.rule(name="macos_syscall_h",
+           command="mkdir -p $$(dirname $out) && cp $in $out && sed -n -e s/__NR_/SYS_/p < $in >> $out",
+           description="MACOS MUSL $out")
+    n.rule(name="macos_version_h", command=f"mkdir -p $$(dirname $out) && echo '#define VERSION \"{MUSL_VERSION}\"' > $out",
+           description="MACOS MUSL $out")
+    n.rule(name="macos_gl_stubs", command="mkdir -p $gen_dir $host_dir && $python tools/android_gl_stubs.py $command_arguments",
+           description="MACOS GL STUBS $out")
+    n.rule(name="macos_posix_stubs",
+           command=f"mkdir -p $gen_dir && $python tools/android_posix_stubs.py {LINUX_DIR}/src/posix.h $out_c $out_list",
+           description="MACOS POSIX STUBS $out")
+    n.rule(name="macos_imports", command="$python tools/android_imports.py $arch_arguments $out_s $in",
+           description="MACOS IMPORTS $out")
+    n.rule(name="macos_host_thunks",
+           command="mkdir -p $$(dirname $out) && $python tools/macos_host_thunks.py $out --headers $headers --lists $in",
+           description="MACOS HOST THUNKS $out")
+
+    _generate_variant(n, sln, config, "native", angles["arm64"], libsdl)
+    _generate_variant(n, sln, config, "x86_64", angles["x86_64"], libsdl)
+    n.newline()
+
+
+def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str, angle: Path, libsdl: Path) -> None:
+    native = variant == "native"
+    build = BUILD if native else Path("build/macos-x86_64")
+    stage = build / "Halo"
+    guest_dir = build / "guest"
+    obj_dir = guest_dir / "obj"
+    gen_dir = guest_dir / "gen"
+    libc_include = guest_dir / "libc_include"
+    libc_internal = guest_dir / "libc_internal"
+    arch = (ANDROID_DIR / "guest" / "libc" / "arch" / "arm64_32") if native else \
+        (PORT_DIR / "guest" / "libc" / "arch" / "x32")
+    semantics_header = Path("build/linux/halo_msvc_semantics.h")
+    platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
+    prefix_header = LINUX_DIR / "include" / "halo_linux_prefix.h"
+    image = stage / "halo_guest.elf"
+    host_executable = stage / "halo"
+    python = "$python"
+    target = "macos" if native else "macos_x86_64"
+    cc_rule = "macos_native_cc" if native else "macos_guest_cc"
+    host_arch = "arm64" if native else "x86_64"
+
+    # ---------- generated headers and sources
+
+    alltypes = libc_include / "bits" / "alltypes.h"
+    syscall_h = libc_include / "bits" / "syscall.h"
+    version_h = libc_internal / "version.h"
+    n.build(outputs=alltypes, rule="macos_alltypes",
+            inputs=[arch / "bits" / "alltypes.h.in", MUSL_DIR / "include" / "alltypes.h.in"])
+    n.build(outputs=syscall_h, rule="macos_syscall_h", inputs=arch / "bits" / "syscall.h.in")
+    n.build(outputs=version_h, rule="macos_version_h")
+
+    guest_gl_c = gen_dir / "guest_gl.c"
+    gl_imports = gen_dir / "gl_imports.list"
+    gl_thunks_c = build / "host" / "host_gl_thunks.c"
+    registers = 8 if native else 6
+    n.build(outputs=[guest_gl_c, gl_imports, gl_thunks_c], rule="macos_gl_stubs",
+            implicit=[Path("tools/android_gl_stubs.py"), LINUX_DIR / "src" / "gl.h"],
+            variables={"command_arguments": (f"--integer-registers {registers} --host-thunks {gl_thunks_c} "
+                                             f"{LINUX_DIR}/src/gl.h {KHRONOS_DIR}/GLES3/gl32.h "
+                                             f"{KHRONOS_DIR}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"),
+                       "gen_dir": str(gen_dir), "host_dir": str(build / "host")})
+
+    guest_posix_c = gen_dir / "guest_posix.c"
+    posix_imports = gen_dir / "posix_imports.list"
+    n.build(outputs=[guest_posix_c, posix_imports], rule="macos_posix_stubs",
+            implicit=[Path("tools/android_posix_stubs.py"), LINUX_DIR / "src" / "posix.h"],
+            variables={"out_c": str(guest_posix_c), "out_list": str(posix_imports), "gen_dir": str(gen_dir)})
+
+    imports_s = gen_dir / "imports.s"
+    host_imports_list = PORT_DIR / "host_imports.list"
+    n.build(outputs=imports_s, rule="macos_imports", inputs=[host_imports_list, posix_imports, gl_imports],
+            implicit=[Path("tools/android_imports.py")],
+            variables={"out_s": str(imports_s), "arch_arguments": "" if native else "--arch x86_64"})
+    host_table_c = build / "host" / "host_import_table.c"
+    thunk_headers = [ANDROID_DIR / "guest" / "runtime" / "guest_host.h",
+                     PORT_DIR / "guest" / "runtime" / "guest_host_desktop.h", LINUX_DIR / "src" / "posix.h"]
+    n.build(outputs=host_table_c, rule="macos_host_thunks", inputs=[host_imports_list, posix_imports],
+            implicit=[Path("tools/macos_host_thunks.py"), *thunk_headers],
+            variables={"headers": " ".join(str(h) for h in thunk_headers)})
+
+    generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, semantics_header, platform_semantics_header]
+
+    # ---------- the guest
+
+    libc_includes = [
+        f"-isystem {libc_include}", f"-isystem {arch}", f"-isystem {MUSL_DIR}/arch/generic",
+        f"-isystem {MUSL_DIR}/include",
+    ]
+    abi_flags = NATIVE_ABI_FLAGS if native else X86_ABI_FLAGS
+    guest_abi = " ".join(abi_flags + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
+    guest_code = " ".join(GUEST_CODE_FLAGS)
+    tool_implicit = list(generated_headers)
+    if native:
+        tool_implicit += [Path("tools/android_asm_convert.py"), Path("tools/macos_arm64_rebase.py")]
+    # Darwin's weak aliases for the arm64_32 compiler (the Android port's)
+    darwin_features = [f"-I{ANDROID_DIR}/guest/libc/src_include"] if native else []
+
+    def guest_object(source: Path, cflags: str, prefix: str = "") -> Path:
+        obj = obj_dir / prefix / Path(str(source).lstrip("/")).with_suffix(".o")
+        if str(source).startswith(str(build)):
+            obj = obj_dir / prefix / source.relative_to(build).with_suffix(".o")
+        elif str(source).startswith(str(BUILD)):
+            obj = obj_dir / prefix / source.relative_to(BUILD).with_suffix(".o")
+        n.build(outputs=obj, rule=cc_rule, inputs=source, implicit=tool_implicit, variables={"cflags": cflags})
+        return obj
+
+    # musl
+    musl_cflags = " ".join([
+        guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-w",
+        f"-I{arch}", f"-I{MUSL_DIR}/arch/generic", f"-I{libc_internal}", *darwin_features,
+        f"-I{MUSL_DIR}/src/include", f"-I{MUSL_DIR}/src/internal", f"-I{libc_include}", f"-I{MUSL_DIR}/include",
+    ])
+    musl_objects = [guest_object(source, musl_cflags, "musl") for source in _musl_sources_in(MUSL_DIR)]
+    libguestc = guest_dir / "libguestc.a"
     n.build(outputs=libguestc, rule="macos_ar", inputs=musl_objects)
 
     # the game
@@ -390,7 +464,7 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         objects.append(guest_object(source, musl_math_cflags))
     runtime_internal_cflags = " ".join([
         guest_abi, "-std=c99", "-ffreestanding", "-fno-common", "-D_XOPEN_SOURCE=700", "-D_GNU_SOURCE",
-        runtime_dirs, f"-I{arch}", f"-I{MUSL_DIR}/arch/generic", f"-I{libc_internal}",
+        runtime_dirs, f"-I{arch}", f"-I{MUSL_DIR}/arch/generic", f"-I{libc_internal}", *darwin_features,
         f"-I{MUSL_DIR}/src/include", f"-I{MUSL_DIR}/src/internal", f"-I{libc_include}", f"-I{MUSL_DIR}/include",
     ])
     runtime_cflags = " ".join([
@@ -409,49 +483,23 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     objects.append(guest_object(guest_gl_c, runtime_cflags))
     objects.append(guest_object(guest_posix_c, runtime_cflags))
     imports_o = obj_dir / "gen" / "imports.o"
-    n.build(outputs=imports_o, rule="macos_guest_as", inputs=imports_s)
+    n.build(outputs=imports_o, rule="macos_as", inputs=imports_s,
+            variables={"asflags": "--target=aarch64-linux-gnu" if native else "--target=x86_64-linux-gnux32"})
     objects.append(imports_o)
 
-    # ---------- the guest image
+    linker_script = (ANDROID_DIR / "guest" / "guest.ld") if native else (PORT_DIR / "guest" / "guest.ld")
+    n.build(outputs=image, rule="macos_guest_link", inputs=objects, implicit=[libguestc, linker_script],
+            variables={"ldflags": f"-m {'aarch64linux' if native else 'elf32_x86_64'} -T {linker_script}",
+                       "libs": str(libguestc)})
 
-    linker_script = PORT_DIR / "guest" / "guest.ld"
-    n.rule(
-        name="macos_guest_link",
-        command=(f"mkdir -p {STAGE} && $macos_lld -m elf32_x86_64 -static -nostdlib -T {linker_script} "
-                 f"-Map {BUILD}/halo_guest.map -o $out @$out.rsp {libguestc}"),
-        description="MACOS LINK $out",
-        rspfile="$out.rsp",
-        rspfile_content="$in_newline",
-    )
-    n.build(outputs=image, rule="macos_guest_link", inputs=objects, implicit=[libguestc, linker_script])
-
-    # ---------- SDL3 (x86-64)
-
-    n.rule(
-        name="macos_sdl3",
-        command=(f"cmake -S {SDL_DIR} -B {sdl_build} -G Ninja -DCMAKE_OSX_ARCHITECTURES=x86_64 "
-                 f"-DCMAKE_OSX_DEPLOYMENT_TARGET={MACOS_MINIMUM} -DCMAKE_BUILD_TYPE=Release "
-                 f"-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF "
-                 f"> {BUILD}/sdl3-configure.log && ninja -C {sdl_build} > {BUILD}/sdl3-build.log"),
-        description="MACOS SDL3",
-        pool="console",
-    )
-    n.build(outputs=libsdl, rule="macos_sdl3", implicit=[SDL_DIR / "CMakeLists.txt"])
-
-    # ---------- the host executable
+    # ---------- the host
 
     host_objects: List[Path] = []
-    host_obj_dir = BUILD / "host" / "obj"
-    n.rule(
-        name="macos_host_cc",
-        command="clang -arch x86_64 -MMD -MF $out.d $cflags -c $in -o $out",
-        description="MACOS HOST CC $out",
-        depfile="$out.d",
-        deps="gcc",
-    )
+    host_obj_dir = build / "host" / "obj"
+    image_define = [] if native else [f"-DHALO_GUEST_IMAGE_BASE=0x{X86_IMAGE_BASE:08x}u"]
     host_cflags = " ".join([
-        f"-mmacosx-version-min={MACOS_MINIMUM}", "-O2", "-g", "-Wall", "-Wno-unused-function",
-        "-Wno-deprecated-declarations", f"-DHALO_GUEST_IMAGE_BASE=0x{GUEST_IMAGE_BASE:08x}u",
+        f"-arch {host_arch}", f"-mmacosx-version-min={MACOS_MINIMUM}", "-O2", "-g", "-Wall", "-Wno-unused-function",
+        "-Wno-deprecated-declarations", *image_define,
         f"-I{ANDROID_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
         f"-I{TOML_DIR}", f"-I{KHRONOS_DIR}",
     ])
@@ -471,39 +519,21 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         n.build(outputs=obj, rule="macos_host_cc", inputs=source,
                 variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")})
         host_objects.append(obj)
-    table_obj = host_obj_dir / "host_import_table.c.o"
-    n.build(outputs=table_obj, rule="macos_host_cc", inputs=host_table_c, variables={"cflags": host_cflags})
-    host_objects.append(table_obj)
-    n.rule(
-        name="macos_host_link",
-        # a 64 KB __PAGEZERO leaves the low 4 GB to the guest
-        command=(f"mkdir -p {STAGE} && clang -arch x86_64 -mmacosx-version-min={MACOS_MINIMUM} "
-                 f"-Wl,-pagezero_size,0x10000 -o $out $in -L{sdl_build} -lSDL3 -Wl,-rpath,@executable_path "
-                 + " ".join(f"-framework {f}" for f in HOST_FRAMEWORKS)),
-        description="MACOS HOST LINK $out",
-    )
-    n.build(outputs=host_executable, rule="macos_host_link", inputs=host_objects, implicit=[libsdl])
+    for generated in (host_table_c, gl_thunks_c):
+        obj = host_obj_dir / (generated.name + ".o")
+        n.build(outputs=obj, rule="macos_host_cc", inputs=generated, variables={"cflags": host_cflags + " -w"})
+        host_objects.append(obj)
+    # the x86-64 host leaves the low 4 GB to the guest (a 64 KB __PAGEZERO)
+    host_ldflags = f"-arch {host_arch}" + ("" if native else " -Wl,-pagezero_size,0x10000")
+    n.build(outputs=host_executable, rule="macos_host_link", inputs=host_objects, implicit=[libsdl],
+            variables={"ldflags": host_ldflags})
 
     # ---------- staging: SDL3 and ANGLE next to the executable
 
-    staged_sdl = STAGE / "libSDL3.0.dylib"
-    n.rule(name="macos_copy", command="mkdir -p $$(dirname $out) && cp $in $out", description="MACOS STAGE $out")
-    n.build(outputs=staged_sdl, rule="macos_copy", inputs=libsdl)
-    staged_angle = []
+    staged = [stage / "libSDL3.0.dylib"]
+    n.build(outputs=staged[0], rule="macos_copy", inputs=libsdl)
     for name in ("libEGL.dylib", "libGLESv2.dylib"):
-        staged = STAGE / name
-        n.build(outputs=staged, rule="macos_copy", inputs=angle / name)
-        staged_angle.append(staged)
-    n.build(outputs="macos", rule="phony", inputs=[host_executable, image, staged_sdl, *staged_angle])
-    n.newline()
+        n.build(outputs=stage / name, rule="macos_copy", inputs=angle / name)
+        staged.append(stage / name)
+    n.build(outputs=target, rule="phony", inputs=[host_executable, image, *staged])
 
-
-def _musl_sources_in(musl_dir: Path) -> List[Path]:
-    """android_build._musl_sources, for this build's copy of musl"""
-    from . import android_build
-    saved = android_build.MUSL_DIR
-    android_build.MUSL_DIR = musl_dir
-    try:
-        return _musl_sources()
-    finally:
-        android_build.MUSL_DIR = saved

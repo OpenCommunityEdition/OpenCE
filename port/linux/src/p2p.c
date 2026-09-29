@@ -1110,6 +1110,9 @@ static void datagram_received(struct peer *peer, const unsigned char *inner, int
 
 	if (size < 5)
 		return;
+	/* only to the game's own sockets */
+	if (!xnet_is_game_port(get_short(inner + 3)))
+		return;
 	proxy = find_proxy((int)(peer - p2p.peers), get_short(inner + 1), 1);
 	if (!proxy)
 		return;
@@ -1234,6 +1237,13 @@ static void stream_opened(struct stream *stream, const unsigned char *data, int 
 	if (stream->state != _stream_awaiting_open || size < 4)
 		return;
 	stream->remote_port = get_short(data + 2);
+	/* only to the game's own sockets */
+	if (!xnet_is_game_port(get_short(data)))
+	{
+		stream->local_port = 0;
+		stream_local_closed(stream);
+		return;
+	}
 	stream->socket = open_socket(SOCK_STREAM, p2p.local_address, 0, &stream->local_port);
 	make_address(&to, p2p.local_address, get_short(data));
 	if (stream->socket < 0 || (posix_socket_connect(stream->socket, &to, sizeof(to)) < 0 && !would_block()))

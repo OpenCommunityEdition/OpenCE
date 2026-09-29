@@ -104,6 +104,58 @@ void host_android_path(int which, char *buffer, uint32_t size)
 	snprintf(buffer, size, "%s", host_data_root);
 }
 
+/* ---------- handles for host pointers the guest keeps (the thunks of
+functions returning them, tools/macos_host_thunks.py) */
+
+#define HANDLE_COUNT 4096
+
+static void *handle_pointers[HANDLE_COUNT];
+static pthread_mutex_t handle_lock = PTHREAD_MUTEX_INITIALIZER;
+
+uint32_t host_handle_new(void *pointer)
+{
+	uint32_t index;
+
+	if (!pointer)
+		return 0;
+	pthread_mutex_lock(&handle_lock);
+	for (index = 1; index < HANDLE_COUNT; index++)
+	{
+		if (!handle_pointers[index])
+		{
+			handle_pointers[index] = pointer;
+			pthread_mutex_unlock(&handle_lock);
+			return index;
+		}
+	}
+	pthread_mutex_unlock(&handle_lock);
+	host_logf(HOST_LOG_ERROR, "out of handles for host pointers");
+	return 0;
+}
+
+void *host_handle_get(uint32_t handle)
+{
+	void *pointer = NULL;
+
+	if (handle > 0 && handle < HANDLE_COUNT)
+	{
+		pthread_mutex_lock(&handle_lock);
+		pointer = handle_pointers[handle];
+		pthread_mutex_unlock(&handle_lock);
+	}
+	return pointer;
+}
+
+void host_handle_release(uint32_t handle)
+{
+	if (handle > 0 && handle < HANDLE_COUNT)
+	{
+		pthread_mutex_lock(&handle_lock);
+		handle_pointers[handle] = NULL;
+		pthread_mutex_unlock(&handle_lock);
+	}
+}
+
 /* ---------- debugging hooks (the Android port's sampler is not needed:
 lldb attaches to Rosetta processes) */
 
@@ -186,7 +238,7 @@ static uint32_t make_boot(int argc, char **argv, const struct environment *envir
 		if (strings + length > memory + size)
 			break;
 		memcpy(strings, text, length);
-		guest_argv[count++] = (uint32_t)(uintptr_t)strings;
+		guest_argv[count++] = GUEST_ADDRESS(strings);
 		strings += length;
 	}
 	guest_argv[count] = 0;
@@ -197,15 +249,15 @@ static uint32_t make_boot(int argc, char **argv, const struct environment *envir
 		if (strings + length > memory + size)
 			break;
 		memcpy(strings, environment->entries[index], length);
-		environ_list[index] = (uint32_t)(uintptr_t)strings;
+		environ_list[index] = GUEST_ADDRESS(strings);
 		strings += length;
 	}
 	environ_list[index] = 0;
 	boot->argc = (uint32_t)count;
-	boot->argv = (uint32_t)(uintptr_t)guest_argv;
-	boot->environment = (uint32_t)(uintptr_t)environ_list;
+	boot->argv = GUEST_ADDRESS(guest_argv);
+	boot->environment = GUEST_ADDRESS(environ_list);
 	boot->page_size = (uint32_t)getpagesize();
-	return (uint32_t)(uintptr_t)boot;
+	return GUEST_ADDRESS(boot);
 }
 
 /* ---------- start-up */
@@ -282,8 +334,7 @@ int main(int argc, char *argv[])
 
 	if (host_memory_reserve() != 0)
 	{
-		fprintf(stderr, "halo: the low 4 GB of the address space is not free; is this the x86-64 build "
-			"(run under Rosetta on Apple silicon)?\n");
+		fprintf(stderr, "halo: cannot reserve the game's 4 GB of address space\n");
 		return 1;
 	}
 	find_folders();

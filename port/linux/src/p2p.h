@@ -42,6 +42,11 @@ int p2p_incoming(int stream, unsigned long *address, unsigned short *port);
 peer; returns their count */
 int p2p_broadcast_targets(unsigned short port, unsigned long *addresses, unsigned short *ports, int maximum_count);
 
+/* nonzero if one of the game's own sockets (xnet.c) is bound to port: a
+peer's datagrams and connections may only reach those, not whatever else
+listens on this machine */
+int xnet_is_game_port(unsigned short port);
+
 /* the game listens (it is hosting) on socket, or closes a socket */
 void p2p_socket_listening(int socket);
 void p2p_socket_closed(int socket);

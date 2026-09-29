@@ -3,8 +3,11 @@ HOST_THREAD.C
 
 Threads that run guest code.
 
-Guest (x32) code keeps stack addresses in 32-bit registers, so every thread
-that runs it needs its stack in guest memory. Threads the guest creates get
+Guest code keeps stack addresses in 32-bit registers, so every thread that
+runs it needs its stack in guest memory. The native build's guest code
+also needs the region's base in x28 (tools/macos_arm64_rebase.py), which
+the trampolines here set: x28 is callee-saved, so it survives the guest's
+calls into the host, and the guest never changes it. Threads the guest creates get
 one from pthread_create (pthread_attr_setstack). The game's main thread is
 the process's main thread, because Cocoa creates windows and delivers
 events only there; host_run_guest_main moves its stack pointer to a stack in
@@ -60,20 +63,64 @@ static int on_guest_stack(void)
 {
 	uint64_t sp = (uint64_t)__builtin_frame_address(0);
 
-	return sp < 0x100000000ULL;
+	return sp >= host_guest_base && sp - host_guest_base < 0x100000000ULL;
 }
 
 /* ---------- calling into the guest */
 
+#ifdef __aarch64__
+/* calls the guest function at host address function with four 32-bit
+arguments and x28 = the guest's base; the host's x27 and x28 are kept */
+__attribute__((naked, noinline)) static uint32_t guest_call4(uint64_t function, uint64_t base, uint32_t a,
+	uint32_t b, uint32_t c, uint32_t d)
+{
+	__asm__ volatile(
+		"stp x29, x30, [sp, #-32]!\n\t"
+		"mov x29, sp\n\t"
+		"stp x27, x28, [sp, #16]\n\t"
+		"mov x28, x1\n\t"
+		"mov x9, x0\n\t"
+		"mov w0, w2\n\t"
+		"mov w1, w3\n\t"
+		"mov w2, w4\n\t"
+		"mov w3, w5\n\t"
+		"blr x9\n\t"
+		"ldp x27, x28, [sp, #16]\n\t"
+		"ldp x29, x30, [sp], #32\n\t"
+		"ret\n\t");
+}
+
+/* calls function(argument), a host function, with the stack pointer at
+stack_top (16-byte aligned), and returns on the original stack */
+__attribute__((naked, noinline)) static void call_on_stack(void (*function)(uint64_t), uint64_t argument,
+	uint64_t stack_top)
+{
+	__asm__ volatile(
+		"stp x29, x30, [sp, #-16]!\n\t"
+		"mov x29, sp\n\t"
+		"mov x9, sp\n\t"
+		"mov sp, x2\n\t"
+		"sub sp, sp, #16\n\t"
+		"str x9, [sp]\n\t"
+		"mov x9, x0\n\t"
+		"mov x0, x1\n\t"
+		"blr x9\n\t"
+		"ldr x9, [sp]\n\t"
+		"mov sp, x9\n\t"
+		"ldp x29, x30, [sp], #16\n\t"
+		"ret\n\t");
+}
+
+static uint32_t guest_call(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+{
+	return guest_call4(host_guest_base + function, host_guest_base, a, b, c, d);
+}
+#else
 typedef uint32_t (*guest_function)(uint32_t, uint32_t, uint32_t, uint32_t);
 
-uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+static uint32_t guest_call(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
 {
-	if (!on_guest_stack())
-		host_fatal("guest code called on a thread without a guest stack");
-	if (!guest_tp)
-		((guest_function)(uintptr_t)host_image.header->thread_attach)(0, 0, 0, 0);
-	return ((guest_function)(uintptr_t)function)(a, b, c, d);
+	return ((guest_function)(uintptr_t)(host_guest_base + function))(a, b, c, d);
 }
 
 /* calls function(argument) with the stack pointer at stack_top (16-byte
@@ -97,10 +144,20 @@ __attribute__((naked, noinline)) static void call_on_stack(void (*function)(uint
 		"popq %rbp\n\t"
 		"retq\n\t");
 }
+#endif
+
+uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+{
+	if (!on_guest_stack())
+		host_fatal("guest code called on a thread without a guest stack");
+	if (!guest_tp)
+		guest_call(host_image.header->thread_attach, 0, 0, 0, 0);
+	return guest_call(function, a, b, c, d);
+}
 
 static void run_guest_start(uint64_t boot)
 {
-	((void (*)(uint32_t))(uintptr_t)host_image.header->start)((uint32_t)boot);
+	guest_call(host_image.header->start, (uint32_t)boot, 0, 0, 0);
 }
 
 void host_run_guest_main(uint32_t boot)

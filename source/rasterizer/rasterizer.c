@@ -693,12 +693,12 @@ struct rasterizer_debug_options_definition rasterizer_debug_options =
 };
 extern struct rasterizer_window_begin_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
-#ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
+#if !(defined(__aarch64__) && defined(__ILP32__)) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 long bss_004662ec;
 real_argb_color *global_rasterizer_model_ambient_reflection_tint;
-#ifndef HALO_ANDROID
+#if !(defined(__aarch64__) && defined(__ILP32__))
 #pragma bss_seg()
 #endif
 

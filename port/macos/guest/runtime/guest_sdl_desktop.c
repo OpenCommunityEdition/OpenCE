@@ -20,32 +20,7 @@ and with structures that hold pointers passed as their parts.
 #include <SDL3/SDL.h>
 
 #include "guest_host.h"
-
-/* ---------- the host's desktop services (port/macos/host_imports.list) */
-
-void host_sdl_destroy_window(unsigned int window);
-long long host_sdl_get_window_flags(unsigned int window);
-int host_sdl_set_window_fullscreen(unsigned int window, int fullscreen);
-int host_sdl_get_window_size(unsigned int window, int *width, int *height);
-void host_sdl_warp_mouse_in_window(unsigned int window, float x, float y);
-unsigned int host_sdl_get_primary_display(void);
-unsigned int host_sdl_get_display_for_window(unsigned int window);
-int host_sdl_get_desktop_display_mode(unsigned int display, int *fields, float *reals);
-int host_sdl_wait_event_timeout(void *event, int milliseconds);
-unsigned int host_sdl_create_renderer(unsigned int window);
-void host_sdl_destroy_renderer(unsigned int renderer);
-int host_sdl_set_render_vsync(unsigned int renderer, int vsync);
-int host_sdl_set_render_draw_color(unsigned int renderer, unsigned int r, unsigned int g, unsigned int b,
-	unsigned int a);
-int host_sdl_set_render_scale(unsigned int renderer, float x, float y);
-int host_sdl_render_clear(unsigned int renderer);
-int host_sdl_render_fill_rect(unsigned int renderer, const float *rectangle);
-int host_sdl_render_debug_text(unsigned int renderer, float x, float y, const char *text);
-int host_sdl_render_present(unsigned int renderer);
-int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message, int count,
-	const int *button_flags, const int *button_ids, const char *texts, int *chosen);
-void host_sdl_show_open_file_dialog(const char *filters, int count);
-int host_sdl_file_dialog_result(char *buffer, unsigned int size);
+#include "guest_host_desktop.h"
 
 /* ---------- atomics and mutexes */
 

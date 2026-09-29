@@ -41,7 +41,6 @@ performed with the macOS equivalent, converting
 
 #include "../guest/libc/arch/x32/bits/syscall.h.in"
 
-#define GUEST(type, value) ((type)(uintptr_t)(uint32_t)(value))
 
 /* ---------- errno values */
 

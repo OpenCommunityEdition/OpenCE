@@ -5,10 +5,21 @@ Internals of the macOS port's host executable. See port/macos/README.md for
 the design and port/android/include/halo_android_abi.h for the guest
 contract, which the macOS port shares with the Android port.
 
-The host is an x86-64 Mach-O executable that runs under Rosetta 2 on Apple
-silicon (and natively on Intel Macs). It is linked with a small __PAGEZERO so
-the low 4 GB of its address space is free for the guest: the game compiled
-as x32 code (x86-64 instructions, 32-bit pointers) into a static ELF image.
+The host comes in two builds (tools/macos_build.py):
+
+- native (Apple silicon): an arm64 executable running the game compiled as
+  arm64_32 code, as on Android, whose memory accesses are rebased onto a
+  4 GB-aligned region of the host's address space
+  (tools/macos_arm64_rebase.py): arm64 macOS processes cannot map the low
+  4 GB;
+- x86-64 (Intel Macs, or Rosetta 2): an executable linked with a small
+  __PAGEZERO, whose low 4 GB is the guest's region itself, running the game
+  compiled as x32 code.
+
+A guest address is a 32-bit offset into the region; the host address of it
+is host_guest_base plus the offset (GUEST), 0 for the x86-64 build. The
+thunks between the guest's imports and the host functions translate
+pointer arguments (tools/macos_host_thunks.py).
 */
 
 #ifndef __HALO_MACOS_HOST_H
@@ -38,6 +49,19 @@ extern char host_data_root[1024];
 /* the path the guest sees as /proc/self/exe */
 extern char host_executable_path[1024];
 
+/* ---------- guest addresses */
+
+extern uint64_t host_guest_base;
+/* a guest address as a host pointer */
+#define GUEST(type, value) ((type)(uintptr_t)(host_guest_base + (uint32_t)(value)))
+/* a host pointer into the guest's region as a guest address */
+#define GUEST_ADDRESS(pointer) ((uint32_t)((uintptr_t)(pointer) - host_guest_base))
+
+/* host pointers the guest holds as small handles (host_main.c) */
+uint32_t host_handle_new(void *pointer);
+void *host_handle_get(uint32_t handle);
+void host_handle_release(uint32_t handle);
+
 /* ---------- errno and flag translation (host_syscall.c) */
 
 /* the Linux errno value for a macOS one */
@@ -51,10 +75,16 @@ out the Xbox window, the image's range and pages for everything else (the
 guest's malloc arenas, thread stacks, anonymous mappings) from it. */
 
 int host_memory_reserve(void);
+/* the image's range, in guest addresses */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
+/* page-granular allocations in the region, as host pointers */
 void *host_low_map(size_t size, int protection);
 void host_low_unmap(void *address, size_t size);
-int host_low_owns(uintptr_t address, size_t size);
+/* the host's page size (16 KB on Apple silicon, 4 KB on x86-64) */
+size_t host_page_size(void);
+/* 1 if the guest range [address, address + size) was handed out or is one
+of the fixed ranges */
+int host_low_owns(uint64_t address, uint64_t size);
 long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags, int fd, int64_t offset);
 long host_guest_munmap(uint64_t address, uint64_t size);
 long host_guest_mprotect(uint64_t address, uint64_t size, int protection);

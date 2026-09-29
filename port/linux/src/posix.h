@@ -136,6 +136,15 @@ int posix_upnp_forward_udp(unsigned short port, posix_ulong *external_address, u
 posix_upnp_forward_udp set up; blocks */
 void posix_upnp_stop_forwarding_udp(unsigned short external_port);
 
+/* ---------- Tailscale (system link across a tailnet, xnet.c) */
+
+/* this machine's Tailscale IPv4 address and the IPv4 addresses of the
+tailnet's online machines (network byte order), as the tailscale command
+last reported them; it is asked again every 15 seconds in the background.
+Returns the number of peers written, or -1 (and self 0) if Tailscale does
+not run here (always, on Android) */
+int posix_tailscale_addresses(posix_ulong *self, posix_ulong *peers, int capacity);
+
 /* ---------- the process and the desktop (internet play, p2p.c) */
 
 /* copies the command line argument at index (0 is the program) into buffer;

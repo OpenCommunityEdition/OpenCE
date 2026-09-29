@@ -63,6 +63,13 @@ struct config_setting
 	const char *comment;
 };
 
+/* a default the macOS port turns off */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_MACOS_FALSE "false"
+#else
+#define HALO_CONFIG_MACOS_FALSE "true"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -108,6 +115,11 @@ static const struct config_setting config_settings[] =
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
+	{ "network.tailscale", _config_boolean, "true", "HALO_NET_TAILSCALE", _environment_value, _platform_all,
+		"System link across a Tailscale network: when Tailscale runs here, the\n"
+		"game's announcements also go to the tailnet's online machines, and a\n"
+		"game hosted here is reached through this machine's Tailscale address by\n"
+		"machines on the tailnet. The local network is searched as well." },
 	{ "network.netcode", _config_string, "\"distributed\"", "HALO_NETCODE", _environment_value, _platform_all,
 		"\"distributed\" (work in progress, port/linux/NETCODE.md) predicts each\n"
 		"player's own moves and lets the host decide the rest; \"lockstep\" plays\n"
@@ -118,14 +130,19 @@ static const struct config_setting config_settings[] =
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
 		"link (or copying one before switching to the game) joins. Only people\n"
 		"with the invite can join. Off keeps system link to the local network." },
-	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
+	/* off on macOS: a link that happens to be on the clipboard should not
+	join a stranger's game (port/macos/README.md) */
+	{ "network.join_from_clipboard", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_JOIN_FROM_CLIPBOARD",
+		_environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"
 		"comes to the front." },
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"
 		"forwarded on the router, for networks whose NAT stops connections." },
-	{ "network.allow_upnp", _config_boolean, "true", "HALO_NET_ALLOW_UPNP", _environment_value, _platform_all,
+	/* off on macOS: Tailscale and the local network need no forwarded port */
+	{ "network.allow_upnp", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_ALLOW_UPNP", _environment_value,
+		_platform_all,
 		"Let internet play ask the router (UPnP) to forward its port, for\n"
 		"networks whose NAT stops connections: when a player joins this\n"
 		"machine's game, and when joining a game takes too long. False never\n"
