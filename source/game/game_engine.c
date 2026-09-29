@@ -702,6 +702,10 @@ typedef char verify_item_permutation_definition_size[
 /* ---------- prototypes */
 
 #ifdef HALO_WEB
+boolean web_quick_play_pistol_starts(void);
+#endif
+
+#ifdef HALO_WEB
 /* the definition's parameter types: a WebAssembly call must match them */
 short hud_get_nav_point_render_type(
 	short local_player_index,
@@ -7692,6 +7696,18 @@ static void handle_custom_starting_equipment(
 				long definition_index = random_item(*item_collection);
 				struct object_placement_data placement_data;
 				long weapon_index;
+
+#ifdef HALO_WEB
+				/* Change only the automatic lobby's plasma-pistol start.
+				Map pickups and other starting equipment retain their tags. */
+				if (web_quick_play_pistol_starts() && definition_index != NONE &&
+					definition_index == tag_loaded('weap', "weapons\\plasma pistol\\plasma pistol"))
+				{
+					long pistol = tag_loaded('weap', "weapons\\pistol\\pistol");
+					if (pistol != NONE)
+						definition_index = pistol;
+				}
+#endif
 
 				object_placement_data_new(
 					&placement_data,

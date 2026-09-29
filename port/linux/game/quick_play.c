@@ -99,6 +99,13 @@ int web_multiplayer_active(void)
 		 game_connection() == _game_connection_network_client);
 }
 
+/* The quick-play host owns every spawn, including late joins and respawns. */
+boolean web_quick_play_pistol_starts(void)
+{
+	return quick_play.host && quick_play.owned && quick_play.map_set &&
+		(quick_play.phase == QUICK_STARTING || quick_play.phase == QUICK_PLAYING);
+}
+
 void quick_play_update(boolean main_menu_loaded)
 {
 	unsigned long now = system_milliseconds();

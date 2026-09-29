@@ -143,6 +143,8 @@ Once the maps are ready, the launcher enters multiplayer automatically.
 The first ready player hosts Blood Gulch Slayer; the others join that host
 without navigating the game's System Link menus. The public room does not
 run a permanent game server.
+Players spawn with the human pistol in place of the map's plasma pistol,
+including late joins and respawns.
 
 When the host disconnects, surviving quick-play participants automatically
 elect a replacement and restart Blood Gulch Slayer in the same room. The

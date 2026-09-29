@@ -97,6 +97,7 @@ int main(void)
 	assert(!quick_play_parse_address("100.86.56", &address));
 
 	reset(""); step(1000000, TRUE); assert(!created && !reports);
+	assert(!web_quick_play_pistol_starts());
 	/* Manual System Link has no quick-play mode, but must keep simulating
 	while hidden so later players can discover and join its host. */
 	assert(!web_multiplayer_active()); client = &mock_client;
@@ -131,12 +132,15 @@ int main(void)
 	launch("host"); mock_client.state = _network_game_client_state_pregame;
 	step(500, TRUE); mock_client.player = TRUE; step(1, TRUE);
 	step(2999, TRUE); assert(!starts); step(1, TRUE); assert(starts == 1);
+	assert(web_quick_play_pistol_starts());
 	step(999, TRUE); assert(starts == 1); step(1, TRUE); assert(starts == 2);
 	countdown = 0; step(10000, TRUE); assert(starts == 2 && maps == 1 && policy_requests == 1);
 	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	assert(!strcmp(last_phase, "playing")); step(1000000, FALSE);
+	assert(web_quick_play_pistol_starts());
 	assert(starts == 2 && !aborts); web_quick_play_cancel(); step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
+	assert(!web_quick_play_pistol_starts());
 
 	launch("host"); quick_policy = FALSE; mock_client.state = _network_game_client_state_pregame;
 	step(500, TRUE); assert(!strcmp(last_phase, "error") && !starts && aborts == 1);
@@ -152,6 +156,7 @@ int main(void)
 	assert(add_requests == 1 && !starts); mock_client.player = TRUE; step(1, TRUE);
 	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	assert(!strcmp(last_phase, "playing") && !starts);
+	assert(!web_quick_play_pistol_starts());
 	mock_client.state = _network_game_client_state_postgame; step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
 	step(1000000, TRUE); assert(created == 1 && searches == 1 && !starts);
