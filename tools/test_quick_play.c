@@ -95,6 +95,12 @@ int main(void)
 	assert(!quick_play_parse_address("100.86.56", &address));
 
 	reset(""); step(1000000, TRUE); assert(!created && !reports);
+	/* Manual System Link has no quick-play mode, but must keep simulating
+	while hidden so later players can discover and join its host. */
+	assert(!web_multiplayer_active()); client = &mock_client;
+	assert(!web_multiplayer_active()); connection = _game_connection_network_server;
+	assert(web_multiplayer_active()); connection = _game_connection_network_client;
+	assert(web_multiplayer_active()); client = NULL; assert(!web_multiplayer_active());
 	reset("invalid"); step(0, TRUE); assert(!strcmp(last_phase, "error") && !created);
 	reset("join"); target = "invalid"; step(0, TRUE); assert(!strcmp(last_phase, "error") && !created);
 	reset("join"); step(0, FALSE); cancel = 1; step(1, FALSE);

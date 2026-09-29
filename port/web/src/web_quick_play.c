@@ -4,6 +4,7 @@
 #include <string.h>
 
 void web_js_post(int kind, const char *text);
+int web_multiplayer_active(void);
 static int cancel_requested;
 static int background_active;
 /* Give deferred network/menu teardown a few frames after a terminal event. */
@@ -22,7 +23,8 @@ int web_quick_play_take_cancel(void)
 int web_quick_play_background_active(void)
 {
 	/* A cancel must also wake a game that was waiting for a hidden page. */
-	return __atomic_load_n(&background_active, __ATOMIC_ACQUIRE) ||
+	return web_multiplayer_active() ||
+		__atomic_load_n(&background_active, __ATOMIC_ACQUIRE) ||
 		__atomic_load_n(&cancel_requested, __ATOMIC_ACQUIRE) ||
 		emscripten_get_now() < background_drain_until;
 }

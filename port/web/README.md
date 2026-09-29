@@ -107,6 +107,11 @@ play; `?menu=1` opens the normal launcher and game menu instead.
 For a separate group, choose *New room*, then *Share link*. Opening that
 link joins its browser room, and the launcher remembers the chosen room.
 *Leave* stays out across reloads; *Join default room* returns to FQLX01.
+Manual System Link also allows a one-player start with distributed networking,
+including hosting a non-team game while waiting for other players. The host
+continues simulating in background tabs. Team readiness checks and lockstep
+requirements still apply.
+
 Quick play starts only when the maps and room are ready. Idle or downloading
 tabs do not participate in host selection.
 

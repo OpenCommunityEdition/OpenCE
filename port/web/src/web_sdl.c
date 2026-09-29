@@ -327,7 +327,7 @@ bool SDL_GL_SwapWindow(SDL_Window *window)
 		web_js_gl_flush();
 
 	/* the next frame waits for the page's next animation frame, as a swap
-	interval of one waits for the display. Quick play keeps a bounded 30Hz
+	interval of one waits for the display. Multiplayer keeps a bounded 30Hz
 	worker cadence while hidden; requestAnimationFrame stops in hidden tabs. */
 	if (shared_state.page_hidden && web_quick_play_background_active())
 	{

@@ -38,7 +38,10 @@ room is not a persistent game server.
 
 The page shows connection and loading progress. A browser may require a tap
 to enable sound and pointer capture, but no System Link menu navigation is
-needed. **Main menu** opts out of quick play; `?menu=1` opens the normal
+needed. Manual browser System Link also allows a single player to start a
+non-team game with distributed networking; the game stays open for later
+players. Team readiness and the two-machine requirement for lockstep remain.
+**Main menu** opts out of quick play; `?menu=1` opens the normal
 launcher and game menu. A failed attempt shows an error instead of repeatedly
 restarting the game. Private room links use the same quick-play flow.
 

@@ -56,6 +56,7 @@ jobs:
           build/test_web_net
           clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Itools -Isource tools/test_quick_play.c -o build/test_quick_play
           build/test_quick_play
+          python3 tools/test_web_server_policy.py
 
       - uses: actions/upload-artifact@v4
         with:

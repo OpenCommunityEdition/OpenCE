@@ -90,6 +90,14 @@ static void quick_play_show_lobby(void)
 		NONE, NULL, NONE, NONE, NONE, NONE);
 }
 
+/* SDL's swap wait runs on the game thread, including in manual System Link. */
+int web_multiplayer_active(void)
+{
+	return global_network_game_client_get() &&
+		(game_connection() == _game_connection_network_server ||
+		 game_connection() == _game_connection_network_client);
+}
+
 void quick_play_update(boolean main_menu_loaded)
 {
 	unsigned long now = system_milliseconds();
