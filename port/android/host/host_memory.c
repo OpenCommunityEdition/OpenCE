@@ -64,6 +64,7 @@ static int pool_count;
 static pthread_mutex_t memory_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static uint64_t window_base, window_end;
+static int reserved;
 static uint64_t image_base, image_end;
 
 static uint64_t round_up(uint64_t value)
@@ -142,8 +143,10 @@ pointing into the address the runtime still remembers. */
 
 /* how much of that space may be in use for moving it to be safe: whatever
 the runtime still has in it is reachable by pointers it kept, and those
-pointers are not moved with it */
-#define RUNTIME_HEAP_RESIDENT_LIMIT (1024UL * 1024UL)
+pointers are not moved with it, so a space with anything live in it is
+left alone. Moving one with a live object in it takes the runtime down
+within milliseconds (seen on a device that had 984 kB in it) */
+#define RUNTIME_HEAP_RESIDENT_LIMIT (64UL * 1024UL)
 
 static int find_runtime_heap(uint64_t address, uint64_t size, uint64_t *start, uint64_t *end)
 {
@@ -317,6 +320,10 @@ Java runtime maps a large part of the low 4 GB for its own heaps, so both
 are claimed here, before the first pool and before SDL maps anything. */
 int host_memory_reserve_guest(void)
 {
+	/* called once when the library is loaded, which the app does before
+	anything else in the process, and again when the game starts */
+	if (reserved)
+		return 0;
 	/* the window comes first: where it sits decides whether the image's
 	range is free */
 	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
@@ -343,7 +350,17 @@ int host_memory_reserve_guest(void)
 		log_conflicts(image_base, HALO_GUEST_IMAGE_RESERVE);
 		return -1;
 	}
+	reserved = 1;
 	return 0;
+}
+
+/* The app loads this library before anything else in the process runs, so
+the claim is made while the address space below 4 GB is still as the
+system left it; whoever claims a range first keeps it. */
+__attribute__((constructor))
+static void host_memory_claim(void)
+{
+	host_memory_reserve_guest();
 }
 
 int host_memory_initialize(uint32_t base, uint32_t size)
