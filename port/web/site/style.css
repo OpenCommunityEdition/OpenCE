@@ -161,92 +161,216 @@ code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
   max-width: calc(100vw - 32px);
 }
 
-/* ---------- touch controls */
+/* ---------- touch controls
+
+Laid out like an Xbox controller: the left stick appears where the left
+thumb lands; A, B, X and Y sit in a diamond in their colours on the right,
+with the bumpers and triggers above each side, the stick clicks beside the
+sticks, the d-pad under the left thumb and view and menu in the middle. */
 
 .touch-layer {
   position: fixed;
   inset: 0;
   z-index: 10;
   touch-action: none;
+  --edge-left: env(safe-area-inset-left);
+  --edge-right: env(safe-area-inset-right);
+  --edge-bottom: env(safe-area-inset-bottom);
+  --face: 58px;
+  --gap: 6px;
+  --fill: rgba(22, 24, 28, 0.42);
+  --rim: rgba(255, 255, 255, 0.34);
+  --pressed: rgba(255, 255, 255, 0.34);
 }
 
 body.has-controller .touch-layer { display: none; }
 
 .touch-button {
   position: absolute;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.92);
+  background: var(--fill);
+  border: 1.5px solid var(--rim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   -webkit-user-select: none;
   user-select: none;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  transition: transform 0.06s, background 0.06s;
 }
 
-.touch-button.pressed { background: rgba(127, 209, 255, 0.45); }
-.touch-button.big { width: 84px; height: 84px; font-size: 14px; }
+.touch-button.pressed {
+  background: var(--pressed);
+  transform: scale(0.94);
+}
 
-/* the right hand: fire in its corner, the rest around it */
-.touch-button.right-1 { right: calc(28px + env(safe-area-inset-right)); bottom: calc(40px + env(safe-area-inset-bottom)); }
-.touch-button.right-2 { right: calc(124px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
-.touch-button.right-3 { right: calc(22px + env(safe-area-inset-right)); bottom: calc(140px + env(safe-area-inset-bottom)); }
-.touch-button.right-4 { right: calc(196px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
-.touch-button.right-5 { right: calc(22px + env(safe-area-inset-right)); bottom: calc(210px + env(safe-area-inset-bottom)); }
-.touch-button.right-6 { right: calc(110px + env(safe-area-inset-right)); bottom: calc(110px + env(safe-area-inset-bottom)); }
-.touch-button.right-7 { right: calc(268px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); width: 64px; height: 40px; border-radius: 12px; }
-.touch-button.right-8 { right: calc(92px + env(safe-area-inset-right)); bottom: calc(186px + env(safe-area-inset-bottom)); width: 64px; height: 40px; border-radius: 12px; }
+.touch-button .glyph { font-weight: 700; line-height: 1; }
+.touch-button .caption {
+  position: absolute;
+  top: 100%;
+  margin-top: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
 
-.touch-button.top-1, .touch-button.top-2, .touch-button.top-3, .touch-button.top-4 {
+/* A, B, X and Y: round, the letter in the button's colour */
+.touch-button.face {
+  width: var(--face);
+  height: var(--face);
+  border-radius: 50%;
+  --diamond-right: calc(34px + var(--edge-right));
+  --diamond-bottom: calc(34px + var(--edge-bottom));
+}
+
+.touch-button.face .glyph { font-size: 24px; }
+.face-a .glyph { color: #7ed957; }
+.face-b .glyph { color: #ff5a5f; }
+.face-x .glyph { color: #4aa3ff; }
+.face-y .glyph { color: #ffd23f; }
+.face-a.pressed { background: rgba(126, 217, 87, 0.5); }
+.face-b.pressed { background: rgba(255, 90, 95, 0.5); }
+.face-x.pressed { background: rgba(74, 163, 255, 0.5); }
+.face-y.pressed { background: rgba(255, 210, 63, 0.5); }
+.face-a.pressed .glyph, .face-b.pressed .glyph, .face-x.pressed .glyph, .face-y.pressed .glyph { color: #fff; }
+
+.face-a { right: calc(var(--diamond-right) + var(--face) + var(--gap)); bottom: var(--diamond-bottom); }
+.face-b { right: var(--diamond-right); bottom: calc(var(--diamond-bottom) + var(--face) + var(--gap)); }
+.face-x { right: calc(var(--diamond-right) + 2 * (var(--face) + var(--gap))); bottom: calc(var(--diamond-bottom) + var(--face) + var(--gap)); }
+.face-y { right: calc(var(--diamond-right) + var(--face) + var(--gap)); bottom: calc(var(--diamond-bottom) + 2 * (var(--face) + var(--gap))); }
+
+/* bumpers and triggers: pills above each side, the trigger outermost */
+.touch-button.shoulder {
+  width: 84px;
+  height: 40px;
+  bottom: calc(var(--edge-bottom) + 232px);
+}
+
+.touch-button.shoulder .glyph { font-size: 15px; }
+.touch-button.trigger { bottom: calc(var(--edge-bottom) + 282px); height: 44px; }
+.touch-button.right-side { right: calc(34px + var(--edge-right)); }
+.touch-button.left-side { left: calc(28px + var(--edge-left)); }
+.touch-button.bumper.right-side { border-radius: 22px 22px 10px 10px; }
+.touch-button.bumper.left-side { border-radius: 22px 22px 10px 10px; }
+.touch-button.trigger.right-side { border-radius: 12px 22px 12px 12px; }
+.touch-button.trigger.left-side { border-radius: 22px 12px 12px 12px; }
+.touch-button.shoulder .caption { top: auto; bottom: 100%; margin: 0 0 2px; }
+
+/* the stick clicks */
+.touch-button.stick-click {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+.touch-button.stick-click .glyph { font-size: 12px; }
+.touch-button.left-click { left: calc(196px + var(--edge-left)); bottom: calc(var(--edge-bottom) + 150px); }
+.touch-button.right-click { right: calc(236px + var(--edge-right)); bottom: calc(var(--edge-bottom) + 150px); }
+
+/* view and menu: small round buttons in the middle, with their icons */
+.touch-button.system {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
   top: calc(12px + env(safe-area-inset-top));
-  width: 70px;
-  height: 36px;
-  border-radius: 10px;
-  font-size: 11px;
 }
 
-.touch-button.top-1 { left: calc(16px + env(safe-area-inset-left)); }
-.touch-button.top-2 { left: calc(96px + env(safe-area-inset-left)); }
-.touch-button.top-3 { right: calc(96px + env(safe-area-inset-right)); }
-.touch-button.top-4 { right: calc(16px + env(safe-area-inset-right)); }
+.touch-button.view { left: calc(50% - 54px); }
+.touch-button.menu { left: calc(50% + 12px); }
 
-.touch-button.dpad { width: 40px; height: 40px; border-radius: 8px; font-size: 14px; }
-.touch-button.dpad.up { left: calc(58px + env(safe-area-inset-left)); top: calc(64px + env(safe-area-inset-top)); }
-.touch-button.dpad.down { left: calc(58px + env(safe-area-inset-left)); top: calc(148px + env(safe-area-inset-top)); }
-.touch-button.dpad.left { left: calc(16px + env(safe-area-inset-left)); top: calc(106px + env(safe-area-inset-top)); }
-.touch-button.dpad.right { left: calc(100px + env(safe-area-inset-left)); top: calc(106px + env(safe-area-inset-top)); }
+.touch-button.view::before, .touch-button.view::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 9px;
+  border: 1.8px solid rgba(255, 255, 255, 0.9);
+  border-radius: 2px;
+}
 
+.touch-button.view::before { transform: translate(-3px, -3px); }
+.touch-button.view::after { transform: translate(3px, 3px); background: rgba(22, 24, 28, 0.9); }
+
+.touch-button.menu::before {
+  content: "";
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 -5px 0 rgba(255, 255, 255, 0.9), 0 5px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* the d-pad: one cross, each arm a button */
+.touch-dpad {
+  position: absolute;
+  left: calc(196px + var(--edge-left));
+  bottom: calc(var(--edge-bottom) + 14px);
+  width: 120px;
+  height: 120px;
+}
+
+.touch-dpad .touch-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.touch-dpad .up { left: 40px; top: 0; border-radius: 8px 8px 2px 2px; }
+.touch-dpad .down { left: 40px; bottom: 0; border-radius: 2px 2px 8px 8px; }
+.touch-dpad .left { left: 0; top: 40px; border-radius: 8px 2px 2px 8px; }
+.touch-dpad .right { right: 0; top: 40px; border-radius: 2px 8px 8px 2px; }
+
+.touch-dpad .touch-button::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+.touch-dpad .up::after { border-bottom-color: rgba(255, 255, 255, 0.85); transform: translateY(-3px); }
+.touch-dpad .down::after { border-top-color: rgba(255, 255, 255, 0.85); transform: translateY(3px); }
+.touch-dpad .left::after { border-right-color: rgba(255, 255, 255, 0.85); transform: translateX(-3px); }
+.touch-dpad .right::after { border-left-color: rgba(255, 255, 255, 0.85); transform: translateX(3px); }
+
+/* the left stick: a ring where the thumb lands, resting bottom left */
 .touch-stick {
   position: absolute;
-  width: 112px;
-  height: 112px;
+  width: 128px;
+  height: 128px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.06);
-  left: calc(48px + env(safe-area-inset-left));
-  bottom: calc(48px + env(safe-area-inset-bottom));
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: radial-gradient(circle, rgba(22, 24, 28, 0.15) 0%, rgba(22, 24, 28, 0.45) 100%);
+  left: calc(44px + var(--edge-left));
+  bottom: calc(40px + var(--edge-bottom));
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.6;
+  transition: opacity 0.1s;
 }
 
 .touch-stick.active { opacity: 1; }
 
 .touch-knob {
   position: absolute;
-  left: 32px;
-  top: 32px;
-  width: 48px;
-  height: 48px;
+  left: 34px;
+  top: 34px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
+  background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.55), rgba(200, 204, 212, 0.35) 70%);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
+/* smaller phones in landscape */
 @media (max-height: 380px) {
-  .touch-button { width: 50px; height: 50px; }
-  .touch-button.big { width: 72px; height: 72px; }
+  .touch-layer { --face: 50px; }
+  .touch-button.shoulder { width: 72px; height: 36px; bottom: calc(var(--edge-bottom) + 200px); }
+  .touch-button.trigger { bottom: calc(var(--edge-bottom) + 244px); height: 38px; }
+  .touch-button.left-click, .touch-button.right-click { bottom: calc(var(--edge-bottom) + 132px); }
+  .touch-button.right-click { right: calc(206px + var(--edge-right)); }
 }

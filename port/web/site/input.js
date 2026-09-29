@@ -231,24 +231,26 @@ const HaloInput = (() => {
   // ---------- touch controls
 
   function buildTouchControls(root) {
+    // an Xbox-style layout: the face buttons in a diamond with their colours,
+    // bumpers and triggers above each side, view and menu in the middle
     const layout = [
-      // [id, label, button bit or trigger axis, class]
-      ['fire', 'FIRE', { axis: 5 }, 'big right-1'],
-      ['jump', 'A', { bit: BUTTON.SOUTH }, 'right-2'],
-      ['melee', 'B', { bit: BUTTON.EAST }, 'right-3'],
-      ['reload', 'X', { bit: BUTTON.WEST }, 'right-4'],
-      ['swap', 'Y', { bit: BUTTON.NORTH }, 'right-5'],
-      ['grenade', 'NADE', { axis: 4 }, 'right-6'],
-      ['crouch', 'CROUCH', { bit: BUTTON.LEFT_STICK }, 'right-7'],
-      ['zoom', 'ZOOM', { bit: BUTTON.RIGHT_STICK }, 'right-8'],
-      ['light', 'LIGHT', { bit: BUTTON.LEFT_SHOULDER }, 'top-1'],
-      ['nadeswap', 'NADE ⇄', { bit: BUTTON.RIGHT_SHOULDER }, 'top-2'],
-      ['back', 'BACK', { bit: BUTTON.BACK }, 'top-3'],
-      ['start', 'PAUSE', { bit: BUTTON.START }, 'top-4'],
-      ['up', '▲', { bit: BUTTON.DPAD_UP }, 'dpad up'],
-      ['down', '▼', { bit: BUTTON.DPAD_DOWN }, 'dpad down'],
-      ['left', '◀', { bit: BUTTON.DPAD_LEFT }, 'dpad left'],
-      ['right', '▶', { bit: BUTTON.DPAD_RIGHT }, 'dpad right'],
+      // [id, label, button bit or trigger axis, class, caption]
+      ['a', 'A', { bit: BUTTON.SOUTH }, 'face face-a', 'Jump'],
+      ['b', 'B', { bit: BUTTON.EAST }, 'face face-b', 'Melee'],
+      ['x', 'X', { bit: BUTTON.WEST }, 'face face-x', 'Reload'],
+      ['y', 'Y', { bit: BUTTON.NORTH }, 'face face-y', 'Swap'],
+      ['fire', 'RT', { axis: 5 }, 'shoulder trigger right-side', 'Fire'],
+      ['rb', 'RB', { bit: BUTTON.RIGHT_SHOULDER }, 'shoulder bumper right-side', 'Grenade'],
+      ['lt', 'LT', { axis: 4 }, 'shoulder trigger left-side', 'Throw'],
+      ['lb', 'LB', { bit: BUTTON.LEFT_SHOULDER }, 'shoulder bumper left-side', 'Light'],
+      ['ls', 'LS', { bit: BUTTON.LEFT_STICK }, 'stick-click left-click', 'Crouch'],
+      ['rs', 'RS', { bit: BUTTON.RIGHT_STICK }, 'stick-click right-click', 'Zoom'],
+      ['back', '', { bit: BUTTON.BACK }, 'system view', ''],
+      ['start', '', { bit: BUTTON.START }, 'system menu', ''],
+      ['up', '', { bit: BUTTON.DPAD_UP }, 'dpad up', ''],
+      ['down', '', { bit: BUTTON.DPAD_DOWN }, 'dpad down', ''],
+      ['left', '', { bit: BUTTON.DPAD_LEFT }, 'dpad left', ''],
+      ['right', '', { bit: BUTTON.DPAD_RIGHT }, 'dpad right', ''],
     ];
     const held = new Map(); // touch identifier -> control
     const buttonState = new Map(); // control id -> count of touches
@@ -265,12 +267,27 @@ const HaloInput = (() => {
     stick.knob = knob;
 
     const controls = {};
-    for (const [id, label, action, cls] of layout) {
+    const dpad = document.createElement('div');
+    dpad.className = 'touch-dpad';
+    root.appendChild(dpad);
+    for (const [id, label, action, cls, caption] of layout) {
       const element = document.createElement('div');
       element.className = 'touch-button ' + cls;
-      element.textContent = label;
       element.dataset.control = id;
-      root.appendChild(element);
+      element.setAttribute('aria-label', caption || id);
+      if (label) {
+        const glyph = document.createElement('span');
+        glyph.className = 'glyph';
+        glyph.textContent = label;
+        element.appendChild(glyph);
+      }
+      if (caption) {
+        const hint = document.createElement('span');
+        hint.className = 'caption';
+        hint.textContent = caption;
+        element.appendChild(hint);
+      }
+      (cls.startsWith('dpad') ? dpad : root).appendChild(element);
       controls[id] = { element, action };
     }
 
@@ -311,8 +328,9 @@ const HaloInput = (() => {
           stick.id = touch.identifier;
           stick.x = touch.clientX;
           stick.y = touch.clientY;
-          stick.element.style.left = (touch.clientX - STICK_RADIUS) + 'px';
-          stick.element.style.top = (touch.clientY - STICK_RADIUS) + 'px';
+          stick.element.style.left = (touch.clientX - 64) + 'px';
+          stick.element.style.top = (touch.clientY - 64) + 'px';
+          stick.element.style.bottom = 'auto';
           stick.element.classList.add('active');
           held.set(touch.identifier, { kind: 'stick' });
         } else if (look.id === null) {
@@ -362,6 +380,10 @@ const HaloInput = (() => {
           stick.id = null;
           stick.knob.style.transform = '';
           stick.element.classList.remove('active');
+          // back to its resting place
+          stick.element.style.left = '';
+          stick.element.style.top = '';
+          stick.element.style.bottom = '';
           touchPad.axes[0] = 0;
           touchPad.axes[1] = 0;
         }
