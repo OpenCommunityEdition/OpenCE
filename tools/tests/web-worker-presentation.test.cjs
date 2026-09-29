@@ -17,8 +17,8 @@ function runtime(batching, options = {}) {
       transferToImageBitmap() {
         events.push('bitmap');
         if (options.failTransfer) throw new Error('bitmap allocation failed');
-        const bitmap = { width: options.emptyBitmap ? 0 : 640,
-          height: options.emptyBitmap ? 0 : 480, closed: false,
+        const size = options.emptyBitmap ? [0, 0] : (options.bitmapSizes?.[bitmaps.length] || [640, 480]);
+        const bitmap = { width: size[0], height: size[1], closed: false,
           close() { this.closed = true; } };
         bitmaps.push(bitmap);
         return bitmap;
@@ -33,7 +33,7 @@ function runtime(batching, options = {}) {
     postMessage(message, transfer) {
       events.push('post');
       if (options.failPost) throw new Error('post failed');
-      assert.equal(transfer[0], message.args[0], 'the bitmap is transferred');
+      if (message.handler === 'haloPresent') assert.equal(transfer[0], message.args[0], 'the bitmap is transferred');
       messages.push(message);
     },
   });
@@ -92,17 +92,17 @@ test('empty GPU surface frames close before posting and the next valid frame can
       worker.library.web_js_gl_present();
       assert.equal(worker.bitmaps.length, 1);
       assert.equal(worker.bitmaps[0].closed, true, 'the unusable bitmap is released');
-      assert.equal(worker.messages.length, 0, 'the native serializer never receives an empty surface');
+      assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 0, 'the native serializer never receives an empty surface');
       assert.equal(worker.pending(), presentAck ? 0 : null, 'no queue slot is occupied');
-      assert.deepEqual(worker.events, batching ? ['replay', 'bitmap', 'submit'] : ['bitmap', 'submit']);
+      assert.deepEqual(worker.events, batching ? ['replay', 'bitmap', 'submit', 'post'] : ['bitmap', 'submit', 'post']);
 
       options.emptyBitmap = false;
       worker.library.web_js_gl_present();
-      assert.equal(worker.messages.length, 1, 'an empty frame does not stop future presentation');
+      assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 1, 'an empty frame does not stop future presentation');
       assert.equal(worker.bitmaps[1].closed, false);
       assert.equal(worker.pending(), presentAck ? 1 : null);
       const consumer = page();
-      consumer.present(...worker.messages[0].args);
+      consumer.present(...worker.messages.find(message => message.handler === 'haloPresent').args);
       assert.equal(worker.bitmaps[1].closed, true);
       assert.equal(worker.pending(), presentAck ? 0 : null);
       assert.equal(consumer.presented(), 1);
@@ -160,6 +160,24 @@ test('bitmap transfer failures do not leave occupied queue slots', () => {
     assert.throws(() => worker.library.web_js_gl_present(), /failed/);
     assert.equal(worker.pending(), 0);
     if (failure === 'failPost') assert.equal(worker.bitmaps[0].closed, true);
+  }
+});
+
+test('empty browser bitmaps are closed before serialization and later frames recover', () => {
+  for (const presentAck of [false, true]) {
+    const worker = runtime(true, { presentAck, bitmapSizes: [[0, 480], [640, 0], [640, 480]] });
+    worker.library.web_js_gl_present();
+    worker.library.web_js_gl_present();
+    assert.equal(worker.pending(), presentAck ? 0 : null, 'discarded bitmaps never occupy a queue slot');
+    assert.equal(worker.bitmaps[0].closed, true);
+    assert.equal(worker.bitmaps[1].closed, true);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 0);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloMessage').length, 1,
+      'the diagnostic is logged once without transferring an empty bitmap');
+    worker.library.web_js_gl_present();
+    assert.equal(worker.pending(), presentAck ? 1 : null);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 1);
+    assert.equal(worker.bitmaps[2].closed, false);
   }
 });
 

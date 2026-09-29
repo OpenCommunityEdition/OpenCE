@@ -111,11 +111,58 @@ test('a host disappearing during reservation produces a retryable error', () => 
   assert.match(joiner.tick(10500, [], true).error, /host left/);
 });
 
+test('surviving players elect one replacement and converge after the old host returns', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0);
+  const b = new Coordinator(B, ADDRESS_B, 0), d = new Coordinator('3333333333333333', ADDRESS_C, 0);
+  runTogether([host, b, d]);
+  for (const coordinator of [host, b, d]) coordinator.launched('playing');
+  for (let now = 11000; now <= 31000; now += 100) {
+    const snapshot = [b, d].map(coordinator => peer(coordinator));
+    for (const coordinator of [b, d]) coordinator.tick(now, snapshot.filter(p => p.id !== coordinator.id), true);
+  }
+  assert.equal(b.epoch, 1); assert.equal(d.epoch, 1);
+  assert.equal(b.result.role, 'host'); assert.equal(d.result.role, 'join');
+  assert.equal(d.result.hostAddress, ADDRESS_B);
+  b.launched('playing'); d.launched('playing');
+  assert.equal(host.tick(32000, [peer(b), peer(d)], true).result, undefined);
+  assert.equal(host.tick(33500, [peer(b), peer(d)], true).result.hostId, B);
+  assert.equal(host.result.role, 'join', 'a returning former host yields to the newer room epoch');
+});
+
+test('a brief lost host connection recovers without restarting the match', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, joiner]); host.launched('playing'); joiner.launched('playing');
+  assert.equal(joiner.tick(11000, [], true).state, 'reconnecting');
+  assert.equal(joiner.tick(20999, [], true).result, undefined);
+  assert.equal(joiner.tick(21000, [peer(host)], true).result.hostId, A);
+  assert.equal(joiner.epoch, 0); assert.equal(joiner.recovering, false);
+});
+
+test('a silent open host channel eventually fails over despite healthy signalling', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, joiner]);
+  const silent = { ...peer(host), lastPacketAt: 10000 };
+  assert.equal(joiner.tick(34999, [silent], true).result.hostId, A);
+  assert.equal(joiner.tick(35000, [silent], true).state, 'reconnecting');
+  joiner.tick(45000, [silent], true);
+  assert.equal(joiner.epoch, 1); assert.equal(joiner.result, null);
+  joiner.tick(51000, [silent], true);
+  assert.equal(joiner.tick(52500, [silent], true).result.role, 'host');
+});
+
+test('recovery cannot elect a host while all signalling brokers are unavailable', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, joiner]);
+  joiner.tick(10000, [], false); joiner.tick(20000, [], false);
+  assert.equal(joiner.tick(30000, [], false).result, undefined);
+  assert.equal(joiner.presence.role, 'candidate');
+});
+
 // Exercise the real public API and encrypted presence publication with a fake
 // broker and deterministic clock. This does not open a network or run Halo.
 async function network() {
-  let now = 0, nextTimer = 0;
-  const timers = new Map(), sockets = [], messages = [], encryption = [];
+  let now = 0, nextTimer = 0, roomKey;
+  const timers = new Map(), sockets = [], messages = [], encryption = [], decryption = [], connections = [];
   class Socket {
     readyState = 1;
     constructor() { sockets.push(this); }
@@ -123,8 +170,12 @@ async function network() {
     close() { this.readyState = 3; }
   }
   const subtle = {};
-  for (const method of ['importKey', 'deriveKey', 'digest', 'decrypt'])
+  for (const method of ['importKey', 'digest'])
     subtle[method] = webcrypto.subtle[method].bind(webcrypto.subtle);
+  subtle.deriveKey = async (...args) => (roomKey = await webcrypto.subtle.deriveKey(...args));
+  subtle.decrypt = (...args) => {
+    const pending = webcrypto.subtle.decrypt(...args); decryption.push(pending); return pending;
+  };
   subtle.encrypt = (...args) => {
     messages.push(JSON.parse(new TextDecoder().decode(args[2])));
     const pending = webcrypto.subtle.encrypt(...args);
@@ -136,6 +187,16 @@ async function network() {
     Date: class extends Date { static now() { return now; } },
     TextEncoder, TextDecoder, Uint8Array, DOMException,
     localStorage: { getItem() { return null; }, setItem() {} }, WebSocket: Socket,
+    RTCPeerConnection: class {
+      constructor() { connections.push(this); this.channels = []; }
+      createDataChannel() {
+        const channel = { readyState: 'open', bufferedAmount: 0, send() {} };
+        this.channels.push(channel); return channel;
+      }
+      async createOffer() { return { sdp: 'offer' }; }
+      async setLocalDescription(value) { this.localDescription = value; }
+      close() {}
+    },
     setInterval: fn => { const id = ++nextTimer; timers.set(id, fn); return id; },
     clearInterval: id => timers.delete(id), setTimeout() {}, clearTimeout() {},
   };
@@ -147,8 +208,41 @@ async function network() {
     tick(time) { now = time; for (const fn of [...timers.values()]) fn(); },
     async close() { await context.net.leave(); await Promise.all(encryption); },
     latest() { return messages.filter(message => message.type === 'hello').at(-1); },
+    async hostPresence(epoch = 0) {
+      const iv = webcrypto.getRandomValues(new Uint8Array(12));
+      const plain = new TextEncoder().encode(JSON.stringify({ type: 'hello', from: 'ffffffffffffffff',
+        mid: webcrypto.randomUUID(), address: ADDRESS_B, name: 'Host', quickSequence: epoch + 1,
+        quick: { role: 'host', hostId: 'ffffffffffffffff', phase: 'launched', gamePhase: 'playing', epoch, failover: true } }));
+      const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, roomKey, plain));
+      const body = [0, 1, 120, ...iv, ...encrypted], length = [];
+      let size = body.length;
+      do { let byte = size % 128; size = Math.floor(size / 128); length.push(size ? byte | 128 : byte); } while (size);
+      sockets[0].onmessage({ data: new Uint8Array([0x30, ...length, ...body]).buffer });
+      await Promise.all(decryption); await new Promise(setImmediate);
+      return connections.at(-1);
+    },
   };
 }
+
+test('public API monitors after launch and calls failover once with the new host', async () => {
+  const fixture = await network(), replacements = [], statuses = [];
+  try {
+    const pc = await fixture.hostPresence();
+    // A signalling hello creates the real production peer callbacks.
+    // Complete its channel opening, then lose that established connection.
+    pc.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
+      onStatus: value => statuses.push(value) });
+    fixture.tick(1500); const selected = await attempt;
+    assert.equal(selected.role, 'join'); fixture.net.quickPlayStarted();
+    pc.connectionState = 'failed'; pc.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].role, 'host');
+    assert.equal(replacements[0].room, 'TEST42'); assert.equal(replacements[0].hostAddress, fixture.net.address);
+    fixture.tick(21000); assert.equal(replacements.length, 1);
+    assert.ok(statuses.some(status => status.state === 'recovering'));
+  } finally { await fixture.close(); }
+});
 
 test('public quick-play API withdraws cancelled eligibility and allows a fresh attempt', async () => {
   const fixture = await network();

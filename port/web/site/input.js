@@ -48,6 +48,7 @@ const HaloInput = (() => {
   let touchEnabled = false;
   let touchUsed = false;
   let lookSensitivity = 1.4;
+  let uiActive = false;
   const gamepadIds = new Map(); // Gamepad.index -> slot
   let nextGamepadId = 1;
   const touchPad = { buttons: 0, axes: [0, 0, 0, 0, 0, 0] };
@@ -95,7 +96,7 @@ const HaloInput = (() => {
   }
 
   function onKey(event, down) {
-    if (!shared) return;
+    if (!shared || uiActive || event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
     const scancode = SCANCODES[event.code];
     if (scancode === undefined) return;
     // keep the browser's shortcuts (reload, developer tools) with Ctrl/Cmd
@@ -422,6 +423,11 @@ const HaloInput = (() => {
     lookSensitivity = value;
   }
 
+  function setUIActive(active) {
+    uiActive = active;
+    pushEvent(EVENT.FOCUS, active ? 0 : 1);
+  }
+
   // the controller's B for a moment (the system's back gesture): the
   // keyboard's Backspace, which the controller emulation reads as B
   function pressBack() {
@@ -429,5 +435,5 @@ const HaloInput = (() => {
     setTimeout(() => pushEvent(EVENT.KEY, 42, 0, 0, 8), 120);
   }
 
-  return { attach, pollGamepads, setLookSensitivity, pressBack };
+  return { attach, pollGamepads, setLookSensitivity, pressBack, setUIActive };
 })();

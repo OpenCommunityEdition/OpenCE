@@ -7,16 +7,32 @@ Both sites serve the source-built browser port in `port/web`. The game runs
 in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
-**Release status (September 29, 2026):** both sites publish automatic match
-startup and one-player System Link in runtime `3217cbdfcc8f02a7`, packaged
-from source `1fbb8730`. The Pages commits are `f5c1f05` for the GitHub site
-and `a7fec88` for the mirror. Existing visitors can reload and choose
+**September 29, 2026 release update:** automatic match startup, one-player
+System Link, host recovery, room switching and cached-launcher compatibility
+are combined with the Chrome/macOS presentation and repeated-rejoin fixes.
+Use each site's `deployment.json` for its current source commit, runtime and
+packaged file hashes. Cached launchers remain compatible with the prompt-free
+page while the service worker updates. Existing visitors can reload and choose
 **Update**; downloaded maps and saves are retained.
 
-**Known issue:** local Chrome tests started a solo match and joined it with
-a second player, but later hit renderer crashes ("Aw, Snap", error 11).
-The cause remains unresolved; this release does not establish sustained
-multiplayer stability.
+Chrome-family browsers on macOS use owned RGBA frame transfers instead of the
+ImageBitmap serialization path that crashed in Chrome 153. Frame queues are
+bounded, empty bitmaps are rejected, and same-address reconnects retire the
+old RTC/native connection before accepting its replacement. Departed players
+release input ownership while retaining their scores. A distributed browser
+Free-for-All Slayer host can keep waiting when an opponent reloads or leaves.
+
+Historical tests on the earlier runtime `0780c5587f467c15` started a solo
+match and joined it with a second player, then hit renderer crashes
+("Aw, Snap", error 11). Those failures describe the old runtime. The later
+local crash/rejoin build passed an initial late join and five consecutive
+same-address reload/rejoin cycles; the same host stayed playable for over
+six minutes. That run predates combining these fixes with the host-recovery
+and room changes. The combined release passed `ninja web`, all 104 browser
+tests, cache and stream-recorder checks, and native lifecycle/restart tests
+under AddressSanitizer and UndefinedBehaviorSanitizer. These checks do not
+verify physical-iPhone gameplay or connections across different Internet/NAT
+networks.
 
 This replaces the pinned Apollo runtime, which froze during game startup
 in desktop WebKit 26.4. The worker-based port reached the Halo main menu
@@ -44,8 +60,15 @@ After the maps are ready, the launcher starts multiplayer automatically.
 The first ready participant hosts **Blood Gulch Slayer**; later participants
 join that host, including while the match is running. Only players preparing
 to launch participate in host selection, so an idle tab or a download does
-not become the host. The hosting player must keep the game open; the public
-room is not a persistent game server.
+not become the host. The public room is not a persistent game server.
+
+Surviving players automatically elect a replacement when the host disconnects
+and restart the same room's Blood Gulch Slayer match. Scores, positions and
+the match timer reset; all players need the updated browser build. A brief
+connection loss has a 10-second grace period, and silent channels are detected
+after 25 seconds, followed by election and map loading. Returning hosts join
+the newer room epoch. Network partitions can temporarily create separate
+matches; this is recovery by restarting the match, not seamless state migration.
 
 The page shows connection and loading progress. A browser may require a tap
 to enable sound and pointer capture, but no System Link menu navigation is
@@ -55,6 +78,12 @@ players. Team readiness and the two-machine requirement for lockstep remain.
 **Main menu** opts out of quick play; `?menu=1` opens the normal
 launcher and game menu. A failed attempt shows an error instead of repeatedly
 restarting the game. Private room links use the same quick-play flow.
+
+Use the in-game **Room** button to open the room controls, then choose
+**New room** or enter another code. Switching rooms restarts Halo into the
+selected room using cached maps. **Share link** includes the currently
+joined room; a `?room=FQLX01` link always selects FQLX01. **Leave** closes
+the current game and returns to the launcher without automatically rejoining.
 
 Browser rooms use the existing public signaling and STUN services. Some
 networks still require a TURN relay in Settings; no TURN account or native

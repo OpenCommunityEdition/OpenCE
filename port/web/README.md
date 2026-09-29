@@ -90,17 +90,19 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 
 ## Online play
 
-The automatic startup and solo System Link behavior described below is
-published on both public sites as runtime `3217cbdfcc8f02a7` (source
-`1fbb8730`, September 29, 2026).
-Chrome testing on September 29, 2026 confirmed a one-player Blood Gulch
-start and a second player joining the running match (two players on two
-machines). Both tabs later suffered renderer crashes with error 11.
-Reliable-channel backpressure and explicit hidden-frame GPU submission
-have regression coverage, but neither establishes a fix for those crashes.
-Sustained multiplayer on that published runtime remains unverified.
+The September 29, 2026 release combines automatic startup, solo System Link,
+host recovery, room switching and cached-launcher compatibility with the
+Chrome/macOS presentation and repeated-rejoin fixes. Each public site's
+`deployment.json` identifies the current source commit, runtime and packaged
+file hashes. Apply an offered update to use the new worker frame path.
 
-The local crash fix adds a separate frame path for Chrome on macOS. It reads
+Historical Chrome testing on the earlier runtime `0780c5587f467c15` confirmed
+a one-player Blood Gulch start and a second player joining the running match
+(two players on two machines). Both tabs later suffered renderer crashes
+with error 11. Those observations describe the old runtime, before the
+presentation and reconnect fixes below.
+
+Chrome-family browsers on macOS use a separate frame path. It reads
 the completed default framebuffer into owned RGBA bytes and transfers those
 bytes to a 2D page canvas, avoiding Chrome's crashing ImageBitmap serializer.
 Readback preserves GL state, reverses rows, and limits queued frames to two.
@@ -108,24 +110,29 @@ The presentation height defaults to 480 lines to bound readback cost. Other
 browsers retain ImageBitmap presentation, with an empty-frame guard before
 transfer. `?frame_transport=rgba` and `?frame_transport=bitmap` select a path
 for controlled diagnostics; `?render_height=...` overrides presentation size.
-This change is local until separately packaged and published. A new launcher
-can display frames from an older cached runtime, but apply its offered update
-to use the new worker frame path.
+A new launcher can display frames from an older cached runtime; applying
+its offered update enables the new worker frame path.
 
-Reloads also retire the old RTC peer at its virtual address and replace its
-native stream only after the game releases the old endpoint. Departed players
-leave their machine's input slots while their scores remain available. A
-browser host in distributed Free-for-All Slayer with unlimited lives keeps
+Reloads retire the old RTC peer at its virtual address, deliver native EOF on
+connection loss, and replace its native stream only after the game releases
+the old endpoint. Pending validation cleanup closes accepted endpoints too;
+joining clients ignore gameplay traffic left over from the prior connection.
+Departed players leave their machine's input slots while their scores remain
+available. A browser host in distributed Free-for-All Slayer with unlimited lives keeps
 waiting when an opponent leaves; score limits and other game modes retain
 their own end conditions. These changes have socket and player lifecycle
 regressions alongside the browser transport tests.
 
-The local build passed an initial late join followed by five consecutive
-same-address reload/rejoin cycles in Chrome on macOS. The same host match
+The prior local crash/rejoin build passed an initial late join followed by five
+consecutive same-address reload/rejoin cycles in Chrome on macOS. The same host match
 remained playable for over six minutes, including over two minutes after the
-final rejoin. All 85 browser/quick-play tests and native lifecycle regressions
-passed. These are local results; the fixes have not been published, and other
-browsers and public Internet/NAT conditions still need live verification.
+final rejoin. Browser transport and native lifecycle regressions passed for
+that build. It predates combining the fixes with the host-recovery and room
+changes. The combined release passed `ninja web`, all 104 browser tests,
+cache and stream-recorder checks, and native lifecycle/restart regressions
+under AddressSanitizer and UndefinedBehaviorSanitizer. Physical-iPhone
+gameplay, other browsers and connections across different Internet/NAT
+networks still need live verification.
 
 Browser players can play together over the internet, with the game's own
 system link. The launcher joins the public **FQLX01** room on a first visit.
@@ -134,16 +141,44 @@ Both hosted domains use that same room. Share a link ending in
 
 Once the maps are ready, the launcher enters multiplayer automatically.
 The first ready player hosts Blood Gulch Slayer; the others join that host
-without navigating the game's System Link menus. The host must keep the
-game open. The public room does not run a permanent game server.
+without navigating the game's System Link menus. The public room does not
+run a permanent game server.
 
-Connection, hosting and map-loading progress are shown on the page. Tap
-when prompted to enable sound and mouse controls. *Main menu* cancels quick
+When the host disconnects, surviving quick-play participants automatically
+elect a replacement and restart Blood Gulch Slayer in the same room. The
+engine does not migrate a running match's state: scores, positions and the
+match timer reset. Everyone needs the updated browser build. A brief lost
+connection has a 10-second grace period; silent WebRTC channels are detected
+after 25 seconds. Election and map loading add time after detection. Players
+who choose *Main menu* or *Leave*, idle launchers, and native invites do not
+participate. An older returning host yields to the room's newer election
+epoch. Disconnected network partitions can temporarily form separate matches;
+the public brokers are not a consensus service and this is not seamless HA.
+In historical September 29 testing on runtime `0780c5587f467c15`, Chrome's
+saved engine log confirmed that a two-player client joined at tick 655,
+lost the host connection, created a replacement local
+server and started a new solo match automatically. Those tabs later suffered
+the old runtime's renderer crash. The production restart/cancellation checks
+under sanitizers and Web/build CI passed for that release; the engine log
+does not establish sustained gameplay for the combined update.
+
+Connection, hosting and map-loading progress are shown on the page. Sound
+starts automatically where allowed; normal game input unlocks it and mouse
+controls when browser permissions require a gesture. *Main menu* cancels quick
 play; `?menu=1` opens the normal launcher and game menu instead.
 
 For a separate group, choose *New room*, then *Share link*. Opening that
 link joins its browser room, and the launcher remembers the chosen room.
+The in-game *Room* button opens the room controls. Choosing another room
+restarts Halo into that room using the cached maps; *Leave* closes the session
+and returns to the launcher. A link joins only the room named in `?room=`.
 *Leave* stays out across reloads; *Join default room* returns to FQLX01.
+Historical September 29 testing on the earlier runtime switched Chrome from
+FQLXQTEST8 into a fresh FQLXQTEST9
+match with cached maps, and a later client joined it as the second player
+on a second machine. The tabs subsequently crashed on that old runtime.
+Room-navigation regressions passed; these older observations do not verify
+sustained gameplay for the combined update.
 Manual System Link also allows a one-player start with distributed networking,
 including hosting a non-team game while waiting for other players. The host
 continues simulating in background tabs. Team readiness checks and lockstep
@@ -220,9 +255,10 @@ The page's main thread (`site/app.js`, `site/input.js`) serves it through
 memory both share (`src/web_shared.h`):
 
 - Graphics: the game's WebGL 2 context draws into an OffscreenCanvas of its
-  own thread (`src/web_library.js`). Each frame is taken out with
-  `transferToImageBitmap` and posted to the page, which shows it on its
-  canvas. The page advances a counter each animation frame; the game waits for
+  own thread (`src/web_library.js`). Chrome-family browsers on macOS transfer
+  owned RGBA pixels; other browsers use `transferToImageBitmap`. The page
+  shows the completed frame on its canvas. The page advances a counter each
+  animation frame; the game waits for
   it after each frame (`display.vsync`).
 - Input: the page writes keyboard, mouse and focus events into a ring that
   `SDL_PollEvent` reads, and the state of the controllers (Gamepad API, and
@@ -262,12 +298,13 @@ Hidden time is excluded, while visible stalls count toward the measured FPS.
 Compare `?fps=1&batch_streams=0` to disable batching (or pass
 `--HALO_WEB_BATCH_STREAMS=0` to the runtime). Reload between comparisons.
 `?fps=1&render_height=720` overrides the presentation-height cap for diagnostics
-(480–1440 lines). The default cap is 480 lines on iPhone/iPad and 1440 elsewhere;
+(480–1440 lines). The default cap is 480 lines on iPhone/iPad and for RGBA
+presentation, and 1440 elsewhere;
 the engine still renders 480 lines, and CSS scales the displayed canvas to the
-screen. At most two bitmap transfers can await the page's acknowledgement.
+screen. At most two frame transfers can await the page's acknowledgement.
 When that queue is full, the worker submits GPU commands without creating
-another bitmap or blocking simulation. Hidden or failed presentations release
-their bitmap and acknowledgement too.
+another bitmap or pixel readback, or blocking simulation. Hidden or failed
+presentations release their frame and acknowledgement too.
 
 `?fps=1&geometry_cache=1` enables an experimental native geometry path (runtime
 argument `--HALO_WEB_GEOMETRY_CACHE=1`) and automatically disables JavaScript

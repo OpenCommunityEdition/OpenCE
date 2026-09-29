@@ -47,6 +47,22 @@ body.playing {
 
 body.playing #screen { display: block; }
 body.playing #launcher { display: none; }
+body.playing.room-settings { touch-action: auto; user-select: text; -webkit-user-select: text; }
+body.playing.room-settings #launcher {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow: auto;
+  align-items: flex-start;
+  background: rgba(11, 13, 18, 0.96);
+}
+.room-toggle {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 15;
+}
 
 .quick-panel {
   position: fixed;

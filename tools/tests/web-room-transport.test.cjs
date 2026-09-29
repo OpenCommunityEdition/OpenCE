@@ -5,6 +5,7 @@ const vm = require('node:vm');
 
 function fixture(options = {}) {
   const intervals = [], connections = [];
+  let now = 0;
   class RTC {
     constructor() { this.channels = []; connections.push(this); }
     createDataChannel() {
@@ -24,6 +25,7 @@ function fixture(options = {}) {
     async addIceCandidate() {}
   }
   const context = { RTCPeerConnection: RTC, Uint8Array, Int32Array, DataView, Atomics,
+    Date: class extends Date { static now() { return now; } },
     crypto: { getRandomValues(bytes) { bytes.fill(1); return bytes; } },
     localStorage: { getItem() { return null; }, setItem() {} },
     setInterval(fn) { intervals.push(fn); }, clearInterval() {}, clearTimeout() {},
@@ -33,7 +35,7 @@ function fixture(options = {}) {
   let source = fs.readFileSync(require.resolve('../../port/web/site/net.js'), 'utf8');
   assert.ok(source.includes('return { attach, join, leave,'));
   source = source.replace('return { attach, join, leave,',
-    'return { peerFor, createConnection, dropPeer, handleSignal, pump, attach, join, leave,');
+    'return { peerFor, createConnection, dropPeer, handleSignal, pump, sweep, attach, join, leave,');
   vm.runInNewContext(source + '\nglobalThis.net = HaloNet;', context);
   const net = context.net;
   const memory = { buffer: new SharedArrayBuffer(1024) };
@@ -45,6 +47,7 @@ function fixture(options = {}) {
   peer.reliable.onopen();
   const words = new Int32Array(memory.buffer), bytes = new Uint8Array(memory.buffer);
   return { net, peer, pc, words, bytes, intervals, connections,
+    tick(time) { now = time; net.sweep(); },
     receive(packet) { peer.reliable.onmessage({ data: packet.buffer }); },
     consume() {
       const result = [];
@@ -320,4 +323,27 @@ test('a fresh RTC generation discards old reliable DATA until its stream OPEN', 
   f.net.pump();
   assert.deepEqual(current.reliable.sent.map(p => new DataView(p.buffer).getUint32(4, true)), [2, 3]);
   assert.deepEqual(Array.from(current.reliable.sent[1]), Array.from(fresh));
+});
+
+test('room heartbeats acknowledge liveness without entering the game packet ring', () => {
+  const f = fixture(); f.peer.quick = { failover: true };
+  f.tick(3000);
+  assert.equal(f.peer.unreliable.sent.at(-1), 'halo-room-ping-v1');
+  f.peer.unreliable.onmessage({ data: 'halo-room-ping-v1' });
+  assert.equal(f.peer.unreliable.sent.at(-1), 'halo-room-pong-v1');
+  assert.equal(f.peer.lastPacketAt, 3000); assert.equal(f.words[0], 0);
+  f.tick(27000); assert.equal(f.net.status().players, 1);
+  f.tick(28001); assert.equal(f.net.status().players, 0);
+});
+
+test('heartbeat expiry retires native streams and obsolete pongs cannot revive the peer', () => {
+  const f = fixture(), oldUnreliable = f.peer.unreliable;
+  f.peer.quick = { failover: true };
+  f.receive(streamPacket(f, 2)); f.consume();
+  f.tick(25001);
+  assert.equal(f.net.status().players, 0);
+  assert.deepEqual(f.consume(), Array.from(streamPacket(f, 4)), 'failover timeout also releases the native endpoint');
+  oldUnreliable.onmessage({ data: 'halo-room-pong-v1' });
+  assert.equal(f.peer.lastPacketAt, 0, 'obsolete liveness callbacks stop before updating peer state');
+  assert.equal(f.consume().length, 0);
 });

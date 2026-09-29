@@ -20,6 +20,7 @@ addToLibrary({
     flushContext: null,
     pendingFrames: null,
     readFrame: null,
+    emptyBitmapReported: false,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -156,12 +157,16 @@ addToLibrary({
       return;
     }
     var bitmap = webHalo.readFrame ? webHalo.readFrame() : canvas.transferToImageBitmap();
-    // Chrome can return an empty ImageBitmap when the GPU surface allocation
-    // fails. Its native serializer dereferences that missing surface before
-    // JavaScript can catch an error, so never send an empty frame.
-    if (!bitmap.width || !bitmap.height) {
-      bitmap.close?.();
+    // Chrome can return an empty ImageBitmap after GPU allocation failure.
+    // Its serializer dereferences the absent backing image; the dimensions
+    // safely report zero, so discard it before passing a transfer list.
+    if (!bitmap || !bitmap.width || !bitmap.height) {
+      bitmap?.close?.();
       webHalo.flushContext?.();
+      if (!webHalo.emptyBitmapReported) {
+        webHalo.emptyBitmapReported = true;
+        webHalo.post('haloMessage', [0, 'Skipped an empty browser frame before transfer.']);
+      }
       return;
     }
     if (pending) Atomics.add(pending, 0, 1);
