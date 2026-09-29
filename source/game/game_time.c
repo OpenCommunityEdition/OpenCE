@@ -71,6 +71,8 @@ symbols in this file:
 #include "real_math.h"
 #include "game.h"
 #include "player_queues_new.h"
+#include "networking/network_game_globals.h"
+#include "saved games/game_state.h"
 
 /* ---------- constants */
 
@@ -121,9 +123,7 @@ struct game_time_globals_struct
 
 /* ---------- prototypes */
 
-extern void *game_state_malloc(char const *, char const *, long);
 struct network_game_server;
-extern struct network_game_server *global_network_game_server_get(void);
 extern long network_game_server_get_oldest_client_update_received(struct network_game_server *server);
 extern void network_game_server_stalled_on_client(struct network_game_server *server, boolean stalled);
 extern void network_game_server_update_ticks(struct network_game_server *server, long ticks);

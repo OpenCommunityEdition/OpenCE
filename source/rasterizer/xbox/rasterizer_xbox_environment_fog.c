@@ -131,8 +131,8 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "interface/hud_draw.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/common/rasterizer_common.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
@@ -144,6 +144,8 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_water.h"
 
 /* ---------- constants */
@@ -235,17 +237,6 @@ struct real_bounds
 	real upper;
 };
 
-struct rasterizer_environment_fog_debug_options
-{
-	byte reserved00[2];
-	short statistics_mode;
-	short drawing_mode;
-	byte reserved06[0x16];
-	boolean draw_environment_fog;
-	boolean draw_environment_fog_screen;
-	boolean draw_water;
-};
-
 struct fog_screen
 {
 	word flags;
@@ -269,28 +260,6 @@ struct fog_screen
 	struct real_bounds wind_period;
 	real wind_acceleration_weight;
 	real wind_perpendicular_weight;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long constant_1[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long alpha_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long rgb_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 struct rasterizer_environment_fog_screen_wind
@@ -440,8 +409,6 @@ static struct render_lighting const *cached_lighting = NULL;
 static struct render_animation const *cached_animation = NULL;
 static boolean reported_too_many_opaque_models = FALSE;
 static boolean local_fog_screen_first_time = TRUE;
-
-extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
 
 static boolean rasterizer_environment_fog_screen_is_active(
 	void);

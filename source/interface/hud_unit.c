@@ -98,11 +98,6 @@ enum
 	_hud_panel_motion_sensor_blink_bit
 };
 
-enum
-{
-	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
-};
-
 enum hud_damage_indicator_direction
 {
 	_hud_damage_indicator_top = 0,

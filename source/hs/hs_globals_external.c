@@ -903,7 +903,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "physics/collision_debug.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
 
@@ -1091,9 +1091,9 @@ static struct hs_external_global_definition rasterizer_first_person_weapon_near_
 
 static struct hs_external_global_definition rasterizer_first_person_weapon_far_clip_distance_definition = { "rasterizer_first_person_weapon_far_clip_distance", _hs_type_real, 0, &rasterizer_globals.first_person_weapon_far_clip_distance };
 
-static struct hs_external_global_definition rasterizer_pushbuffer_size_definition = { "rasterizer_pushbuffer_size", _hs_type_short_integer, 0, &rasterizer_globals.reserved38[0] };
+static struct hs_external_global_definition rasterizer_pushbuffer_size_definition = { "rasterizer_pushbuffer_size", _hs_type_short_integer, 0, &rasterizer_globals.push_buffer_size };
 
-static struct hs_external_global_definition rasterizer_pushbuffer_kickoff_size_definition = { "rasterizer_pushbuffer_kickoff_size", _hs_type_short_integer, 0, &rasterizer_globals.reserved38[2] };
+static struct hs_external_global_definition rasterizer_pushbuffer_kickoff_size_definition = { "rasterizer_pushbuffer_kickoff_size", _hs_type_short_integer, 0, &rasterizer_globals.kick_off_size };
 
 static struct hs_external_global_definition rasterizer_floating_point_zbuffer_definition = { "rasterizer_floating_point_zbuffer", _hs_type_boolean, 0, &rasterizer_globals.floating_point_zbuffer };
 
@@ -1111,127 +1111,127 @@ static struct hs_external_global_definition rasterizer_frame_bounds_top_definiti
 
 static struct hs_external_global_definition rasterizer_frame_bounds_bottom_definition = { "rasterizer_frame_bounds_bottom", _hs_type_short_integer, 0, &rasterizer_globals.reserved04.frame_bounds.y1 };
 
-static struct hs_external_global_definition rasterizer_stats_definition = { "rasterizer_stats", _hs_type_short_integer, 0, &rasterizer_debug_options.stats };
+static struct hs_external_global_definition rasterizer_stats_definition = { "rasterizer_stats", _hs_type_short_integer, 0, &rasterizer_debug_options.statistics_mode };
 
-static struct hs_external_global_definition rasterizer_mode_definition = { "rasterizer_mode", _hs_type_short_integer, 0, &rasterizer_debug_options.mode };
+static struct hs_external_global_definition rasterizer_mode_definition = { "rasterizer_mode", _hs_type_short_integer, 0, &rasterizer_debug_options.drawing_mode };
 
-static struct hs_external_global_definition rasterizer_wireframe_definition = { "rasterizer_wireframe", _hs_type_boolean, 0, &rasterizer_debug_options.wireframe };
+static struct hs_external_global_definition rasterizer_wireframe_definition = { "rasterizer_wireframe", _hs_type_boolean, 0, &rasterizer_debug_options.wireframe_enabled };
 
-static struct hs_external_global_definition rasterizer_smart_definition = { "rasterizer_smart", _hs_type_boolean, 0, &rasterizer_debug_options.smart };
+static struct hs_external_global_definition rasterizer_smart_definition = { "rasterizer_smart", _hs_type_boolean, 0, &rasterizer_debug_options.smart_states_enabled };
 
-static struct hs_external_global_definition rasterizer_debug_model_vertices_definition = { "rasterizer_debug_model_vertices", _hs_type_boolean, 0, &rasterizer_debug_options.debug_model_vertices };
+static struct hs_external_global_definition rasterizer_debug_model_vertices_definition = { "rasterizer_debug_model_vertices", _hs_type_boolean, 0, &rasterizer_debug_options.debug_model_vertices_enabled };
 
 static struct hs_external_global_definition rasterizer_debug_model_lod_definition = { "rasterizer_debug_model_lod", _hs_type_short_integer, 0, &rasterizer_debug_options.debug_model_lod };
 
-static struct hs_external_global_definition rasterizer_debug_transparents_definition = { "rasterizer_debug_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.debug_transparents };
+static struct hs_external_global_definition rasterizer_debug_transparents_definition = { "rasterizer_debug_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.debug_transparent_geometry_enabled };
 
-static struct hs_external_global_definition rasterizer_debug_meter_shader_definition = { "rasterizer_debug_meter_shader", _hs_type_boolean, 0, &rasterizer_debug_options.debug_meter_shader };
+static struct hs_external_global_definition rasterizer_debug_meter_shader_definition = { "rasterizer_debug_meter_shader", _hs_type_boolean, 0, &rasterizer_debug_options.debug_meter_shader_enabled };
 
-static struct hs_external_global_definition rasterizer_models_definition = { "rasterizer_models", _hs_type_boolean, 0, &rasterizer_debug_options.models };
+static struct hs_external_global_definition rasterizer_models_definition = { "rasterizer_models", _hs_type_boolean, 0, &rasterizer_debug_options.draw_models };
 
-static struct hs_external_global_definition rasterizer_model_transparents_definition = { "rasterizer_model_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.model_transparents };
+static struct hs_external_global_definition rasterizer_model_transparents_definition = { "rasterizer_model_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.draw_model_transparent_geometry };
 
 static struct hs_external_global_definition rasterizer_draw_first_person_weapon_first_definition = { "rasterizer_draw_first_person_weapon_first", _hs_type_boolean, 0, &rasterizer_debug_options.draw_first_person_weapon_first };
 
-static struct hs_external_global_definition rasterizer_stencil_mask_definition = { "rasterizer_stencil_mask", _hs_type_boolean, 0, &rasterizer_debug_options.stencil_mask };
+static struct hs_external_global_definition rasterizer_stencil_mask_definition = { "rasterizer_stencil_mask", _hs_type_boolean, 0, &rasterizer_debug_options.stencil_mask_enabled };
 
-static struct hs_external_global_definition rasterizer_environment_definition = { "rasterizer_environment", _hs_type_boolean, 0, &rasterizer_debug_options.environment };
+static struct hs_external_global_definition rasterizer_environment_definition = { "rasterizer_environment", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment };
 
-static struct hs_external_global_definition rasterizer_environment_lightmaps_definition = { "rasterizer_environment_lightmaps", _hs_type_boolean, 0, &rasterizer_debug_options.environment_lightmaps };
+static struct hs_external_global_definition rasterizer_environment_lightmaps_definition = { "rasterizer_environment_lightmaps", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_lightmaps };
 
-static struct hs_external_global_definition rasterizer_environment_shadows_definition = { "rasterizer_environment_shadows", _hs_type_boolean, 0, &rasterizer_debug_options.environment_shadows };
+static struct hs_external_global_definition rasterizer_environment_shadows_definition = { "rasterizer_environment_shadows", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_shadows };
 
-static struct hs_external_global_definition rasterizer_environment_diffuse_lights_definition = { "rasterizer_environment_diffuse_lights", _hs_type_boolean, 0, &rasterizer_debug_options.environment_diffuse_lights };
+static struct hs_external_global_definition rasterizer_environment_diffuse_lights_definition = { "rasterizer_environment_diffuse_lights", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_diffuse_lights };
 
-static struct hs_external_global_definition rasterizer_environment_diffuse_textures_definition = { "rasterizer_environment_diffuse_textures", _hs_type_boolean, 0, &rasterizer_debug_options.environment_diffuse_textures };
+static struct hs_external_global_definition rasterizer_environment_diffuse_textures_definition = { "rasterizer_environment_diffuse_textures", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_textures };
 
-static struct hs_external_global_definition rasterizer_environment_decals_definition = { "rasterizer_environment_decals", _hs_type_boolean, 0, &rasterizer_debug_options.environment_decals };
+static struct hs_external_global_definition rasterizer_environment_decals_definition = { "rasterizer_environment_decals", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_decals };
 
-static struct hs_external_global_definition rasterizer_environment_specular_lights_definition = { "rasterizer_environment_specular_lights", _hs_type_boolean, 0, &rasterizer_debug_options.environment_specular_lights };
+static struct hs_external_global_definition rasterizer_environment_specular_lights_definition = { "rasterizer_environment_specular_lights", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_specular_lights };
 
-static struct hs_external_global_definition rasterizer_environment_specular_lightmaps_definition = { "rasterizer_environment_specular_lightmaps", _hs_type_boolean, 0, &rasterizer_debug_options.environment_specular_lightmaps };
+static struct hs_external_global_definition rasterizer_environment_specular_lightmaps_definition = { "rasterizer_environment_specular_lightmaps", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_specular_lightmaps };
 
-static struct hs_external_global_definition rasterizer_environment_reflection_lightmap_mask_definition = { "rasterizer_environment_reflection_lightmap_mask", _hs_type_boolean, 0, &rasterizer_debug_options.environment_reflection_lightmap_mask };
+static struct hs_external_global_definition rasterizer_environment_reflection_lightmap_mask_definition = { "rasterizer_environment_reflection_lightmap_mask", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_reflection_lightmap_masks };
 
-static struct hs_external_global_definition rasterizer_environment_reflection_mirrors_definition = { "rasterizer_environment_reflection_mirrors", _hs_type_boolean, 0, &rasterizer_debug_options.environment_reflection_mirrors };
+static struct hs_external_global_definition rasterizer_environment_reflection_mirrors_definition = { "rasterizer_environment_reflection_mirrors", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_reflection_mirrors };
 
-static struct hs_external_global_definition rasterizer_environment_reflections_definition = { "rasterizer_environment_reflections", _hs_type_boolean, 0, &rasterizer_debug_options.environment_reflections };
+static struct hs_external_global_definition rasterizer_environment_reflections_definition = { "rasterizer_environment_reflections", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_reflections };
 
-static struct hs_external_global_definition rasterizer_environment_transparents_definition = { "rasterizer_environment_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.environment_transparents };
+static struct hs_external_global_definition rasterizer_environment_transparents_definition = { "rasterizer_environment_transparents", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_transparent_geometry };
 
-static struct hs_external_global_definition rasterizer_environment_fog_definition = { "rasterizer_environment_fog", _hs_type_boolean, 0, &rasterizer_debug_options.environment_fog };
+static struct hs_external_global_definition rasterizer_environment_fog_definition = { "rasterizer_environment_fog", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_fog };
 
-static struct hs_external_global_definition rasterizer_environment_fog_screen_definition = { "rasterizer_environment_fog_screen", _hs_type_boolean, 0, &rasterizer_debug_options.environment_fog_screen };
+static struct hs_external_global_definition rasterizer_environment_fog_screen_definition = { "rasterizer_environment_fog_screen", _hs_type_boolean, 0, &rasterizer_debug_options.draw_environment_fog_screen };
 
-static struct hs_external_global_definition rasterizer_water_definition = { "rasterizer_water", _hs_type_boolean, 0, &rasterizer_debug_options.water };
+static struct hs_external_global_definition rasterizer_water_definition = { "rasterizer_water", _hs_type_boolean, 0, &rasterizer_debug_options.draw_water };
 
-static struct hs_external_global_definition rasterizer_lens_flares_definition = { "rasterizer_lens_flares", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flares };
+static struct hs_external_global_definition rasterizer_lens_flares_definition = { "rasterizer_lens_flares", _hs_type_boolean, 0, &rasterizer_debug_options.draw_lens_flares };
 
-static struct hs_external_global_definition rasterizer_dynamic_unlit_geometry_definition = { "rasterizer_dynamic_unlit_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.dynamic_unlit_geometry };
+static struct hs_external_global_definition rasterizer_dynamic_unlit_geometry_definition = { "rasterizer_dynamic_unlit_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.draw_dynamic_unlit_geometry };
 
-static struct hs_external_global_definition rasterizer_dynamic_lit_geometry_definition = { "rasterizer_dynamic_lit_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.dynamic_lit_geometry };
+static struct hs_external_global_definition rasterizer_dynamic_lit_geometry_definition = { "rasterizer_dynamic_lit_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.draw_dynamic_lit_geometry };
 
-static struct hs_external_global_definition rasterizer_dynamic_screen_geometry_definition = { "rasterizer_dynamic_screen_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.dynamic_screen_geometry };
+static struct hs_external_global_definition rasterizer_dynamic_screen_geometry_definition = { "rasterizer_dynamic_screen_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.draw_dynamic_screen_geometry };
 
-static struct hs_external_global_definition rasterizer_hud_motion_sensor_definition = { "rasterizer_hud_motion_sensor", _hs_type_boolean, 0, &rasterizer_debug_options.hud_motion_sensor };
+static struct hs_external_global_definition rasterizer_hud_motion_sensor_definition = { "rasterizer_hud_motion_sensor", _hs_type_boolean, 0, &rasterizer_debug_options.draw_hud_motion_sensor };
 
-static struct hs_external_global_definition rasterizer_detail_objects_definition = { "rasterizer_detail_objects", _hs_type_boolean, 0, &rasterizer_debug_options.detail_objects };
+static struct hs_external_global_definition rasterizer_detail_objects_definition = { "rasterizer_detail_objects", _hs_type_boolean, 0, &rasterizer_debug_options.draw_detail_objects };
 
-static struct hs_external_global_definition rasterizer_debug_geometry_definition = { "rasterizer_debug_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.debug_geometry };
+static struct hs_external_global_definition rasterizer_debug_geometry_definition = { "rasterizer_debug_geometry", _hs_type_boolean, 0, &rasterizer_debug_options.draw_debug_geometry };
 
 static struct hs_external_global_definition rasterizer_debug_geometry_multipass_definition = { "rasterizer_debug_geometry_multipass", _hs_type_boolean, 0, &rasterizer_debug_options.debug_geometry_multipass };
 
-static struct hs_external_global_definition rasterizer_fog_atmosphere_definition = { "rasterizer_fog_atmosphere", _hs_type_boolean, 0, &rasterizer_debug_options.fog_atmosphere };
+static struct hs_external_global_definition rasterizer_fog_atmosphere_definition = { "rasterizer_fog_atmosphere", _hs_type_boolean, 0, &rasterizer_debug_options.fog_atmospheric_enabled };
 
-static struct hs_external_global_definition rasterizer_fog_plane_definition = { "rasterizer_fog_plane", _hs_type_boolean, 0, &rasterizer_debug_options.fog_plane };
+static struct hs_external_global_definition rasterizer_fog_plane_definition = { "rasterizer_fog_plane", _hs_type_boolean, 0, &rasterizer_debug_options.fog_planar_enabled };
 
-static struct hs_external_global_definition rasterizer_bump_mapping_definition = { "rasterizer_bump_mapping", _hs_type_boolean, 0, &rasterizer_debug_options.bump_mapping };
+static struct hs_external_global_definition rasterizer_bump_mapping_definition = { "rasterizer_bump_mapping", _hs_type_boolean, 0, &rasterizer_debug_options.bump_mapping_enabled };
 
 static struct hs_external_global_definition rasterizer_lightmap_ambient_definition = { "rasterizer_lightmap_ambient", _hs_type_real, 0, &rasterizer_debug_options.lightmap_ambient };
 
 static struct hs_external_global_definition rasterizer_lightmap_mode_definition = { "rasterizer_lightmap_mode", _hs_type_short_integer, 0, &rasterizer_globals.lightmap_mode };
 
-static struct hs_external_global_definition rasterizer_lightmaps_incident_radiosity_definition = { "rasterizer_lightmaps_incident_radiosity", _hs_type_boolean, 0, &rasterizer_debug_options.lightmaps_incident_radiosity };
+static struct hs_external_global_definition rasterizer_lightmaps_incident_radiosity_definition = { "rasterizer_lightmaps_incident_radiosity", _hs_type_boolean, 0, &rasterizer_debug_options.lightmap_incident_radiosity_enabled };
 
-static struct hs_external_global_definition rasterizer_lightmaps_filtering_definition = { "rasterizer_lightmaps_filtering", _hs_type_boolean, 0, &rasterizer_debug_options.lightmaps_filtering };
+static struct hs_external_global_definition rasterizer_lightmaps_filtering_definition = { "rasterizer_lightmaps_filtering", _hs_type_boolean, 0, &rasterizer_debug_options.lightmap_filtering_enabled };
 
 static struct hs_external_global_definition rasterizer_model_lighting_ambient_definition = { "rasterizer_model_lighting_ambient", _hs_type_real, 0, &rasterizer_debug_options.model_lighting_ambient };
 
-static struct hs_external_global_definition rasterizer_environment_alpha_testing_definition = { "rasterizer_environment_alpha_testing", _hs_type_boolean, 0, &rasterizer_debug_options.environment_alpha_testing };
+static struct hs_external_global_definition rasterizer_environment_alpha_testing_definition = { "rasterizer_environment_alpha_testing", _hs_type_boolean, 0, &rasterizer_debug_options.environment_alpha_testing_enabled };
 
-static struct hs_external_global_definition rasterizer_environment_specular_mask_definition = { "rasterizer_environment_specular_mask", _hs_type_boolean, 0, &rasterizer_debug_options.environment_specular_mask };
+static struct hs_external_global_definition rasterizer_environment_specular_mask_definition = { "rasterizer_environment_specular_mask", _hs_type_boolean, 0, &rasterizer_debug_options.environment_specular_mask_enabled };
 
-static struct hs_external_global_definition rasterizer_shadows_convolution_definition = { "rasterizer_shadows_convolution", _hs_type_boolean, 0, &rasterizer_debug_options.shadows_convolution };
+static struct hs_external_global_definition rasterizer_shadows_convolution_definition = { "rasterizer_shadows_convolution", _hs_type_boolean, 0, &rasterizer_debug_options.shadow_convolution_enabled };
 
-static struct hs_external_global_definition rasterizer_shadows_debug_definition = { "rasterizer_shadows_debug", _hs_type_boolean, 0, &rasterizer_debug_options.shadows_debug };
+static struct hs_external_global_definition rasterizer_shadows_debug_definition = { "rasterizer_shadows_debug", _hs_type_boolean, 0, &rasterizer_debug_options.shadow_debug_enabled };
 
-static struct hs_external_global_definition rasterizer_water_mipmapping_definition = { "rasterizer_water_mipmapping", _hs_type_boolean, 0, &rasterizer_debug_options.water_mipmapping };
+static struct hs_external_global_definition rasterizer_water_mipmapping_definition = { "rasterizer_water_mipmapping", _hs_type_boolean, 0, &rasterizer_debug_options.water_mipmapping_enabled };
 
-static struct hs_external_global_definition rasterizer_active_camouflage_definition = { "rasterizer_active_camouflage", _hs_type_boolean, 0, &rasterizer_debug_options.active_camouflage };
+static struct hs_external_global_definition rasterizer_active_camouflage_definition = { "rasterizer_active_camouflage", _hs_type_boolean, 0, &rasterizer_debug_options.active_camouflage_enabled };
 
-static struct hs_external_global_definition rasterizer_active_camouflage_multipass_definition = { "rasterizer_active_camouflage_multipass", _hs_type_boolean, 0, &rasterizer_debug_options.active_camouflage_multipass };
+static struct hs_external_global_definition rasterizer_active_camouflage_multipass_definition = { "rasterizer_active_camouflage_multipass", _hs_type_boolean, 0, &rasterizer_debug_options.active_camouflage_multipass_enabled };
 
-static struct hs_external_global_definition rasterizer_plasma_energy_definition = { "rasterizer_plasma_energy", _hs_type_boolean, 0, &rasterizer_debug_options.plasma_energy };
+static struct hs_external_global_definition rasterizer_plasma_energy_definition = { "rasterizer_plasma_energy", _hs_type_boolean, 0, &rasterizer_debug_options.plasma_energy_enabled };
 
-static struct hs_external_global_definition rasterizer_lens_flares_occlusion_definition = { "rasterizer_lens_flares_occlusion", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flares_occlusion };
+static struct hs_external_global_definition rasterizer_lens_flares_occlusion_definition = { "rasterizer_lens_flares_occlusion", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flare_occlusion_enabled };
 
-static struct hs_external_global_definition rasterizer_lens_flares_occlusion_debug_definition = { "rasterizer_lens_flares_occlusion_debug", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flares_occlusion_debug };
+static struct hs_external_global_definition rasterizer_lens_flares_occlusion_debug_definition = { "rasterizer_lens_flares_occlusion_debug", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flare_occlusion_debug };
 
-static struct hs_external_global_definition rasterizer_ray_of_buddha_definition = { "rasterizer_ray_of_buddha", _hs_type_boolean, 0, &rasterizer_debug_options.ray_of_buddha };
+static struct hs_external_global_definition rasterizer_ray_of_buddha_definition = { "rasterizer_ray_of_buddha", _hs_type_boolean, 0, &rasterizer_debug_options.lens_flare_sun_glow_enabled };
 
-static struct hs_external_global_definition rasterizer_screen_flashes_definition = { "rasterizer_screen_flashes", _hs_type_boolean, 0, &rasterizer_debug_options.screen_flashes };
+static struct hs_external_global_definition rasterizer_screen_flashes_definition = { "rasterizer_screen_flashes", _hs_type_boolean, 0, &rasterizer_debug_options.screen_flash_enabled };
 
-static struct hs_external_global_definition rasterizer_screen_effects_definition = { "rasterizer_screen_effects", _hs_type_boolean, 0, &rasterizer_debug_options.screen_effects };
+static struct hs_external_global_definition rasterizer_screen_effects_definition = { "rasterizer_screen_effects", _hs_type_boolean, 0, &rasterizer_debug_options.screen_effects_enabled };
 
-static struct hs_external_global_definition rasterizer_DXTC_noise_definition = { "rasterizer_DXTC_noise", _hs_type_boolean, 0, &rasterizer_debug_options.DXTC_noise };
+static struct hs_external_global_definition rasterizer_DXTC_noise_definition = { "rasterizer_DXTC_noise", _hs_type_boolean, 0, &rasterizer_debug_options.DXTC_noise_enabled };
 
-static struct hs_external_global_definition rasterizer_soft_filter_definition = { "rasterizer_soft_filter", _hs_type_boolean, 0, &rasterizer_debug_options.soft_filter };
+static struct hs_external_global_definition rasterizer_soft_filter_definition = { "rasterizer_soft_filter", _hs_type_boolean, 0, &rasterizer_debug_options.soft_filter_enabled };
 
-static struct hs_external_global_definition rasterizer_secondary_render_target_debug_definition = { "rasterizer_secondary_render_target_debug", _hs_type_boolean, 0, &rasterizer_debug_options.secondary_render_target_debug };
+static struct hs_external_global_definition rasterizer_secondary_render_target_debug_definition = { "rasterizer_secondary_render_target_debug", _hs_type_boolean, 0, &rasterizer_debug_options.secondary_render_target_debug_enabled };
 
-static struct hs_external_global_definition rasterizer_profile_log_definition = { "rasterizer_profile_log", _hs_type_boolean, 0, &rasterizer_debug_options.profile_log };
+static struct hs_external_global_definition rasterizer_profile_log_definition = { "rasterizer_profile_log", _hs_type_boolean, 0, &rasterizer_debug_options.profile_log_enabled };
 
-static struct hs_external_global_definition rasterizer_detail_objects_offset_multiplier_definition = { "rasterizer_detail_objects_offset_multiplier", _hs_type_real, 0, &rasterizer_debug_options.detail_objects_offset_multiplier };
+static struct hs_external_global_definition rasterizer_detail_objects_offset_multiplier_definition = { "rasterizer_detail_objects_offset_multiplier", _hs_type_real, 0, &rasterizer_debug_options.detail_object_screen_facing_offset_multiplier };
 
 static struct hs_external_global_definition rasterizer_zbias_definition = { "rasterizer_zbias", _hs_type_long_integer, 0, &rasterizer_debug_options.zbias };
 
@@ -1239,15 +1239,15 @@ static struct hs_external_global_definition rasterizer_zoffset_definition = { "r
 
 static struct hs_external_global_definition force_all_player_views_to_default_player_definition = { "force_all_player_views_to_default_player", _hs_type_boolean, 0, &rasterizer_debug_options.force_all_player_views_to_default_player };
 
-static struct hs_external_global_definition rasterizer_safe_frame_bounds_definition = { "rasterizer_safe_frame_bounds", _hs_type_boolean, 0, &rasterizer_debug_options.safe_frame_bounds };
+static struct hs_external_global_definition rasterizer_safe_frame_bounds_definition = { "rasterizer_safe_frame_bounds", _hs_type_boolean, 0, &rasterizer_debug_options.safe_frame_bounds_adjust_enabled };
 
 static struct hs_external_global_definition freeze_flying_camera_definition = { "freeze_flying_camera", _hs_type_short_integer, 0, &rasterizer_debug_options.freeze_flying_camera };
 
-static struct hs_external_global_definition rasterizer_zsprites_definition = { "rasterizer_zsprites", _hs_type_boolean, 0, &rasterizer_debug_options.zsprites };
+static struct hs_external_global_definition rasterizer_zsprites_definition = { "rasterizer_zsprites", _hs_type_boolean, 0, &rasterizer_debug_options.zsprite_enabled };
 
-static struct hs_external_global_definition rasterizer_filthy_decal_fog_hack_definition = { "rasterizer_filthy_decal_fog_hack", _hs_type_boolean, 0, &rasterizer_debug_options.filthy_decal_fog_hack };
+static struct hs_external_global_definition rasterizer_filthy_decal_fog_hack_definition = { "rasterizer_filthy_decal_fog_hack", _hs_type_boolean, 0, &rasterizer_debug_options.filthy_decal_fog_hack_enabled };
 
-static struct hs_external_global_definition rasterizer_splitscreen_VB_optimization_definition = { "rasterizer_splitscreen_VB_optimization", _hs_type_boolean, 0, &rasterizer_debug_options.splitscreen_VB_optimization };
+static struct hs_external_global_definition rasterizer_splitscreen_VB_optimization_definition = { "rasterizer_splitscreen_VB_optimization", _hs_type_boolean, 0, &rasterizer_debug_options.splitscreen_VB_optimization_enabled };
 
 static struct hs_external_global_definition rasterizer_profile_print_locks_definition = { "rasterizer_profile_print_locks", _hs_type_boolean, 0, &rasterizer_debug_options.profile_print_locks };
 

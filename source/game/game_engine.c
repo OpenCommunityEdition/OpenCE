@@ -543,7 +543,6 @@ symbols in this file:
 #include "game_engine.h"
 #include "game_engine_list.h"
 #include "game_engine_place.h"
-#include "game_engine_runtime.h"
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_group_lookup.h"
@@ -570,12 +569,11 @@ symbols in this file:
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
 #include "physics/collision_features.h"
-#include "player_control.h"
 #include "player_rumble.h"
 #include "players.h"
 #include "players_runtime.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "render/render.h"
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
@@ -824,14 +822,6 @@ static void netgame_verify_spawn_points(
 static void netgame_verify_equipment(
 	short game_type,
 	char const *error_message);
-
-long game_engine_did_player_win_default(
-	long player_index);
-
-void game_show_score_extended(
-	long player_index,
-	long score,
-	long team_index);
 
 boolean multiple_teams_alive(
 	void);

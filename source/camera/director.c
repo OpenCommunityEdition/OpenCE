@@ -129,7 +129,6 @@ symbols in this file:
 #include "orbiting_camera.h"
 
 #include "editor/editor_stubs.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "main/console.h"

@@ -42,6 +42,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint.h"
 #include "hs/hs.h"

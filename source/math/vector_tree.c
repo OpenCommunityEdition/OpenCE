@@ -15,13 +15,7 @@ symbols in this file:
 */
 
 #include "cseries/cseries.h"
-
-struct dynamic_array
-{
-	long element_size;
-	long count;
-	void *elements;
-};
+#include "memory/array.h"
 
 struct vector_tree_node
 {
@@ -44,11 +38,6 @@ struct vector_tree
 	vector_tree_get_vector get_vector;
 	vector_tree_compare_component compare_component;
 };
-
-void dynamic_array_new(struct dynamic_array *array, long element_size);
-void dynamic_array_delete(struct dynamic_array *array);
-long dynamic_array_add_element(struct dynamic_array *array);
-void *dynamic_array_get_element(struct dynamic_array *array, long index, long element_size);
 
 void vector_tree_new(
 	struct vector_tree *tree,

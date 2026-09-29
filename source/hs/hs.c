@@ -2780,11 +2780,37 @@ symbols in this file:
 #include "camera/director.h"
 #include "cache/sound_cache.h"
 #include "hs.h"
-#include "hs_library_internal_compile.h"
+#include "hs_library_external.h"
+#include "hs_library_internal.h"
 #include "object_lists.h"
 #include "hs_scenario_definitions.h"
+#include "ai/ai.h"
+#include "ai/ai_debug.h"
+#include "cache/cache_files.h"
+#include "cache/texture_cache.h"
+#include "camera/camera_scripting.h"
+#include "cutscene/cinematics.h"
+#include "effects/player_effects.h"
+#include "game/cheats.h"
+#include "game/players.h"
+#include "interface/attract_mode.h"
+#include "interface/hud.h"
+#include "interface/terminal.h"
+#include "interface/ui_widget.h"
+#include "main/console.h"
 #include "math/real_math.h"
 #include "memory/data.h"
+#include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
+#include "objects/damage.h"
+#include "objects/object_lights.h"
+#include "objects/scenery.h"
+#include "physics/breakable_surfaces.h"
+#include "rasterizer/rasterizer.h"
+#include "render/render.h"
+#include "saved games/game_state.h"
+#include "saved games/saved_game_files.h"
+#include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/ai_profile.h"
@@ -2800,11 +2826,16 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/player_ui.h"
 #include "rasterizer/rasterizer_cinematics.h"
+#include "shaders/shaders.h"
 #include "sound/game_sound.h"
+#include "sound/sound_classes.h"
+#include "sound/sound_manager.h"
 #include "structures/structure_lens_flares.h"
 #include "structures/structure_visibility.h"
 #include "tag_files/files.h"
 #include "main/main.h"
+#include "units/units.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -3514,61 +3545,9 @@ union hs_boolean_result
 
 /* ---------- prototypes */
 
-void console_printf(
-	boolean clear,
-	char const *format,
-	...);
 static long alphabetize(
 	char const **left,
 	char const **right);
-struct scenario *global_scenario_get(
-	void);
-void hs_teleport_players_not_in_trigger_volume(
-	short trigger_volume_index,
-	short cutscene_flag_index);
-void hs_object_set_shield(
-	long object_index,
-	real shield_vitality);
-void hs_object_set_permutation(
-	long object_index,
-	char const *region_name,
-	char const *permutation_name);
-void hs_effect_new_from_object_marker(
-	long effect_definition_index,
-	long object_index,
-	char const *marker_name);
-boolean hs_objects_can_see_object(
-	long object_list_index,
-	long object_index,
-	real degrees);
-boolean hs_objects_can_see_flag(
-	long object_list_index,
-	short cutscene_flag_index,
-	real degrees);
-void hs_sound_set_gain(
-	char const *tag_name,
-	real gain);
-void objects_scripting_set_scale(
-	long object_index,
-	real scale,
-	short interpolation_frame_count);
-void objects_scripting_attach(
-	long parent_object_index,
-	char const *parent_marker_name,
-	long child_object_index,
-	char const *child_marker_name);
-void object_beautify(
-	long object_index,
-	boolean beautiful);
-void scenery_animation_start(
-	long object_index,
-	long animation_graph_index,
-	char const *animation_name);
-void scenery_animation_start_at_frame(
-	long object_index,
-	long animation_graph_index,
-	char const *animation_name,
-	short frame_index);
 void unit_scripting_set_maximum_vitality(
 	long unit_index,
 	real body_vitality,
@@ -3585,736 +3564,40 @@ void units_scripting_set_current_vitality(
 	long object_list_index,
 	real body_vitality,
 	real shield_vitality);
-void device_set_power(
-	long device_index,
-	real power);
-boolean device_set_desired_position(
-	long device_index,
-	real position);
-void device_set_actual_position(
-	long device_index,
-	real position);
-boolean device_group_set_desired_value(
-	short group_index,
-	real desired_value);
-void device_group_set_actual_value(
-	short group_index,
-	real actual_value);
-void ai_scripting_vehicle_enterable_distance(
-	long ai_reference,
-	real distance);
-void ai_scripting_follow_distance(
-	long ai_reference,
-	real distance);
-void player_effect_screen_fade_in(
-	real red,
-	real green,
-	real blue,
-	short ticks);
-void player_effect_screen_fade_out(
-	real red,
-	real green,
-	real blue,
-	short ticks);
-void cinematic_set_title_delayed(
-	short title_index,
-	real delay);
-void debug_sound_classes_set_distances(
-	char const *name,
-	real minimum_distance,
-	real maximum_distance);
-void debug_sound_classes_set_wet(
-	char const *name,
-	real wet);
-void sound_class_set_gain(
-	char const *name,
-	real gain,
-	short interpolation_ticks);
-void hud_unit_activate_nav_point_with_flag(
-	short player_index,
-	long unit_index,
-	short flag_index,
-	real vertical_offset);
-void hud_unit_activate_nav_point_with_object(
-	short player_index,
-	long unit_index,
-	long object_index,
-	real vertical_offset);
-void hud_activate_team_nav_point_with_flag(
-	short player_index,
-	short team,
-	short flag_index,
-	real vertical_offset);
-void hud_activate_team_nav_point_with_object(
-	short player_index,
-	short team,
-	long object_index,
-	real vertical_offset);
-void scripted_player_effect_set_translation(
-	real horizontal,
-	real vertical,
-	real depth);
-void scripted_player_effect_set_rotation(
-	real yaw,
-	real pitch,
-	real roll);
-void scripted_player_effect_set_rumble(
-	real left_motor,
-	real right_motor);
-void scripted_player_effect_start(
-	real maximum_intensity,
-	real attack_time);
 void rasterizer_model_ambient_reflection_tint(
 	real alpha,
 	real red,
 	real green,
 	real blue);
-short object_list_count(
-	long object_list_index);
-short numeric_countdown_timer_get(
-	short digit_index);
-long recorded_animation_get_time_left(
-	long unit_index);
-short scenery_get_animation_time(
-	long scenery_index);
-short unit_get_custom_animation_time(
-	long unit_index);
 short unit_scripting_get_grenade_count(
 	long unit_index);
-short ai_scripting_command_list_status(
-	long ai_reference);
-short ai_scripting_going_to_vehicle(
-	long ai_reference);
-short ai_scripting_living_count(
-	long ai_reference);
-short ai_scripting_swarm_count(
-	long ai_reference);
-short ai_scripting_nonswarm_count(
-	long ai_reference);
-short ai_scripting_status(
-	long ai_reference);
-short ai_scripting_conversation_line(
-	short conversation_index);
-short ai_scripting_conversation_status(
-	short conversation_index);
-short scripted_camera_time(
-	void);
-short global_structure_bsp_index_get(
-	void);
-short vehicle_scripting_load_magic(
-	long vehicle_index,
-	char const *seat_name,
-	long object_list_index);
-short vehicle_scripting_unload(
-	long vehicle_index,
-	char const *seat_name);
-boolean unit_solo_player_integrated_night_vision_is_active(
-	void);
-void hud_unit_deactivate_nav_point_with_flag(
-	long unit_index,
-	short flag_index);
-void hud_unit_deactivate_nav_point_with_object(
-	long unit_index,
-	long object_index);
-void hud_deactivate_team_nav_point_with_flag(
-	short team,
-	short flag_index);
-void hud_deactivate_team_nav_point_with_object(
-	short team,
-	long object_index);
-void scripted_player_effect_stop(
-	real decay_time);
-void scripted_hud_set_state_message(
-	short message_index);
-void scripted_hud_set_timer_warning_cutoff(
-	short minutes,
-	word seconds);
-void scripted_hud_show_timer(
-	boolean show);
-void scripted_hud_pause_timer(
-	boolean pause);
-void scripted_hud_time_code_show(
-	boolean show);
-void scripted_hud_time_code_start(
-	boolean start);
-void rasterizer_screen_effect_start(
-	boolean clear);
-void rasterizer_set_near_clip_distance(
-	real distance);
-void ui_widget_debug_show_path(
-	boolean show);
-void display_scenario_help(
-	short string_index);
-void xbox_set_machine_name(
-	char const *machine_name);
 void hs_help(
 	char const *function_name);
-boolean hs_not(
-	boolean value);
-boolean scenario_trigger_volume_test_object(
-	short trigger_volume_index,
-	long object_index);
-boolean hs_trigger_volume_test_objects_any(
-	short trigger_volume_index,
-	long object_list_index);
-boolean hs_trigger_volume_test_objects_all(
-	short trigger_volume_index,
-	long object_list_index);
-boolean lights_enable(
-	boolean enable);
-boolean unit_start_user_animation(
-	long unit_index,
-	long animation_graph_index,
-	char const *animation_name,
-	boolean interpolate);
 boolean unit_scripting_start_user_animation_list(
 	long object_list_index,
 	long animation_graph_index,
 	char const *animation_name,
 	boolean interpolate);
-boolean unit_custom_animation_at_frame(
-	long unit_index,
-	long animation_graph_index,
-	char const *animation_name,
-	boolean interpolate,
-	short frame_index);
-boolean unit_is_playing_custom_animation(
-	long unit_index);
-boolean unit_scripting_vehicle_test_seat_list(
-	long vehicle_index,
-	char const *seat_name,
-	long object_list_index);
-boolean unit_scripting_vehicle_test_seat(
-	long vehicle_index,
-	char const *seat_name,
-	long unit_index);
 boolean unit_scripting_has_weapon(
 	long unit_index,
 	long weapon_definition_index);
 boolean unit_scripting_has_weapon_readied(
 	long unit_index,
 	long weapon_definition_index);
-boolean unit_get_current_flashlight_state(
-	long unit_index);
-boolean ai_scripting_is_attacking(
-	long encounter_index);
-boolean ai_scripting_conversation(
-	short conversation_index);
-boolean scripted_player_control_set_camera_control(
-	boolean enabled);
-boolean scripted_show_hud(
-	boolean show);
-boolean scripted_show_hud_help_text(
-	boolean show);
-long hs_players(
-	void);
-long game_time_get(
-	void);
-long unit_scripting_unit_riders(
-	long unit_index);
-long unit_scripting_unit_driver(
-	long unit_index);
-long unit_scripting_unit_gunner(
-	long unit_index);
-long object_list_from_ai_reference(
-	long ai_reference);
-long hs_object_list_get_element(
-	long object_list_index,
-	short element_index);
-void hs_object_destroy(
-	long object_index);
-void hs_object_create(
-	short object_name_index);
-void hs_object_create_anew(
-	short object_name_index);
-void cheat_active_camouflage_local_player(
-	short player_index);
-void breakable_surfaces_enable(
-	boolean enabled);
-void render_effects(
-	boolean enabled);
-void ai_globals_ai_active(
-	boolean enabled);
-void ai_globals_dialogue_triggers_enabled(
-	boolean enabled);
-void ai_globals_grenades_enabled(
-	boolean enabled);
-void recorded_animation_kill(
-	long unit_index);
-void object_cannot_take_damage(
-	long object_list_index);
-void object_can_take_damage(
-	long object_list_index);
-void hs_objects_predict(
-	long object_list_index);
-void object_definition_predict(
-	long definition_index);
-void object_pvs_set_object(
-	long object_index);
-void object_pvs_activate(
-	long object_index);
-void unit_open(
-	long unit_index);
-void unit_close(
-	long unit_index);
-void unit_kill(
-	long unit_index);
-void unit_kill_silent(
-	long unit_index);
-void unit_stop_custom_animation(
-	long unit_index);
-void unit_scripting_exit_vehicle(
-	long unit_index);
-void unit_scripting_doesnt_drop_items(
-	long unit_index);
-void ai_scripting_free(
-	long ai_reference);
-void ai_scripting_free_units(
-	long ai_reference);
-void ai_scripting_detach_unit(
-	long unit_index);
-void ai_scripting_detach_units(
-	long object_list_index);
-void ai_scripting_place(
-	long ai_reference);
-void ai_scripting_kill(
-	long ai_reference);
-void ai_scripting_kill_silent(
-	long ai_reference);
-void ai_scripting_erase(
-	long ai_reference);
-void ai_scripting_select(
-	long ai_reference);
-void ai_scripting_spawn_actor(
-	long ai_reference);
-void ai_scripting_magically_see_players(
-	long ai_reference);
-void ai_scripting_timer_start(
-	long ai_reference);
-void ai_scripting_timer_expire(
-	long ai_reference);
-void ai_scripting_attack(
-	long ai_reference);
-void ai_scripting_defend(
-	long ai_reference);
-void ai_scripting_retreat(
-	long ai_reference);
-void hs_print(
-	char const *message);
-void hs_object_create_containing(
-	char const *object_name);
-void hs_object_create_anew_containing(
-	char const *object_name);
-void hs_object_destroy_containing(
-	char const *object_name);
-void hs_objects_delete_by_definition(
-	long definition_index);
-void scripting_set_magic_base_seat(
-	char const *seat_name);
-void object_set_ranged_attack_inhibited(
-	long object_index,
-	boolean inhibited);
-void object_set_melee_attack_inhibited(
-	long object_index,
-	boolean inhibited);
-void object_scripting_set_collideable(
-	long object_index,
-	boolean collideable);
-void unit_scripting_can_blink(
-	long unit_index,
-	boolean can_blink);
-void unit_aim_without_turning(
-	long unit_index,
-	boolean enabled);
-void unit_set_enterable_by_player(
-	long unit_index,
-	boolean enterable);
 void unit_scripting_impervious(
 	long object_list_index,
 	boolean impervious);
-void unit_scripting_suspended(
-	long unit_index,
-	boolean suspended);
-void units_set_desired_flashlight_state(
-	long object_list_index,
-	boolean desired_state);
-void unit_set_desired_flashlight_state(
-	long unit_index,
-	boolean desired_state);
-void ai_scripting_set_respawn(
-	long ai_reference,
-	boolean respawn);
-void ai_scripting_set_deaf(
-	long ai_reference,
-	boolean deaf);
-void ai_scripting_set_blind(
-	long ai_reference,
-	boolean blind);
-void hs_damage_object(
-	long damage_definition_index,
-	long object_index);
-void objects_scripting_detach(
-	long parent_object_index,
-	long child_object_index);
-void ai_scripting_attach_unit(
-	long ai_reference,
-	long unit_index);
-void ai_scripting_attach_units(
-	long ai_reference,
-	long object_list_index);
-void ai_scripting_attach_free(
-	long ai_reference,
-	long unit_index);
-void ai_scripting_magically_see_encounter(
-	long ai_reference,
-	long encounter_index);
-void ai_scripting_magically_see_unit(
-	long ai_reference,
-	long unit_index);
-void ai_scripting_magically_see_units(
-	long ai_reference,
-	long object_list_index);
-void hs_object_teleport(
-	long object_index,
-	short cutscene_flag_index);
-void hs_object_set_facing(
-	long object_index,
-	short cutscene_flag_index);
-void hs_effect_new(
-	long effect_definition_index,
-	short cutscene_flag_index);
-void hs_damage_new(
-	long damage_definition_index,
-	short cutscene_flag_index);
-void numeric_countdown_timer_set(
-	long milliseconds,
-	boolean auto_start);
-void unit_scripting_set_emotion_animation(
-	long unit_index,
-	char const *animation_name);
-void unit_scripting_set_seat(
-	long unit_index,
-	char const *seat_name);
-void unit_set_emotion(
-	long unit_index,
-	word emotion_index);
-void unit_scripting_enter_vehicle(
-	long unit_index,
-	long vehicle_index,
-	char const *seat_name);
-real hs_sound_get_gain(
-	char const *tag_name);
 real unit_scripting_get_health(
 	long unit_index);
 real unit_scripting_get_shield(
 	long unit_index);
-real ai_scripting_living_fraction(
-	long ai_reference);
-real ai_scripting_strength(
-	long ai_reference);
-void hs_object_destroy_all(
-	void);
-void numeric_countdown_timer_stop(
-	void);
-void numeric_countdown_timer_restart(
-	void);
-void objects_dump_memory(
-	void);
-void garbage_collect_now(
-	void);
-void object_pvs_clear(
-	void);
-void breakable_surfaces_reset(
-	void);
-void cheat_all_powerups(
-	void);
-void cheat_all_weapons(
-	void);
-void cheat_all_vehicles(
-	void);
-void cheat_teleport_to_camera(
-	void);
-void cheat_active_camouflage(
-	void);
-void scripting_magic_melee_attack(
-	void);
-void cheats_load(
-	void);
-void ai_scripting_erase_all(
-	void);
-void ai_scripting_deselect(
-	void);
-void ai_scripting_reconnect(
-	void);
-void players_unzoom_all(
-	void);
-void player_control_action_test_reset(
-	void);
-void texture_cache_flush(
-	void);
-void debug_dump_memory(
-	void);
-void debug_dump_memory_by_file(
-	void);
-void profile_initialize(
-	void);
-void ai_debug_sound_point_set(
-	void);
-void cinematic_start(
-	void);
-void cinematic_stop(
-	void);
-void cinematic_skip_start(
-	void);
-void cinematic_skip_stop(
-	void);
-void attract_mode_start(
-	void);
-void scripted_hud_restart_flashing(
-	void);
-void terminal_clear(
-	void);
-void scripted_hud_time_code_reset(
-	void);
-void rasterizer_decals_flush(
-	void);
-void rasterizer_fps_accumulate(
-	void);
-void rasterizer_lights_reset_for_new_map(
-	void);
-void rasterizer_screen_effect_stop(
-	void);
-void enumerate_memory_units_test(
-	void);
-void saved_game_files_delete_all_custom_profiles(
-	void);
-void network_game_client_request_immediate_start(
-	void);
 void hs_doc(
 	void);
-void ai_scripting_maneuver(
-	long ai_index);
-void ai_scripting_maneuver_enable(
-	long ai_index,
-	boolean enable);
-void ai_scripting_migrate(
-	long source_ai_index,
-	long destination_ai_index);
-void ai_scripting_migrate_and_speak(
-	long source_ai_reference,
-	long target_ai_reference,
-	char const *speech_type);
-void ai_scripting_allegiance_remove(
-	short team_a,
-	short team_b);
-void ai_scripting_go_to_vehicle(
-	long ai_reference,
-	long unit_index,
-	char const *seat_substring_name);
-void ai_scripting_go_to_vehicle_override(
-	long ai_reference,
-	long unit_index,
-	char const *seat_substring_name);
-void ai_scripting_exit_vehicle(
-	long ai_index);
-void ai_scripting_braindead(
-	long ai_index,
-	boolean braindead);
-void ai_scripting_braindead_by_unit(
-	long unit_index,
-	boolean braindead);
-void ai_scripting_ignore(
-	long ai_index,
-	boolean ignore);
-void ai_scripting_prefer_target(
-	long ai_index,
-	boolean prefer);
-void ai_scripting_renew(
-	long ai_index);
-void ai_scripting_try_to_fight_nothing(
-	long ai_index);
-void ai_scripting_try_to_fight(
-	long source_ai_index,
-	long target_ai_index);
-void ai_scripting_try_to_fight_player(
-	long ai_index);
-void ai_scripting_command_list(
-	long ai_index,
-	short command_list_index);
-void ai_scripting_command_list_by_unit(
-	long unit_index,
-	short command_list_index);
-void ai_scripting_command_list_advance(
-	long ai_index);
-void ai_scripting_command_list_advance_by_unit(
-	long unit_index);
-void ai_scripting_force_active(
-	long ai_index,
-	boolean force_active);
-void ai_scripting_force_active_by_unit(
-	long unit_index,
-	boolean force_active);
-void ai_scripting_set_return_state(
-	long ai_index,
-	short state);
-void ai_scripting_set_current_state(
-	long ai_index,
-	short state);
-void ai_scripting_playfight(
-	long ai_index,
-	boolean playfight);
-void ai_scripting_vehicle_encounter(
-	long vehicle_index,
-	long encounter_index);
-void ai_scripting_vehicle_enterable_team(
-	long object_list_index,
-	short team);
-void ai_scripting_vehicle_enterable_actor_type(
-	long object_list_index,
-	short actor_type);
-void ai_scripting_vehicle_enterable_actors(
-	long vehicle_index,
-	long actor_list_index);
-void ai_scripting_vehicle_enterable_disable(
-	long vehicle_index);
-void ai_scripting_look_at_object(
-	long ai_index,
-	long object_index);
-void ai_scripting_stop_looking(
-	long ai_index);
-void ai_scripting_automatic_migration_target(
-	long ai_index,
-	boolean enable);
-void ai_scripting_follow_target_disable(
-	long ai_index);
-void ai_scripting_follow_target_players(
-	long ai_index);
-void ai_scripting_follow_target_unit(
-	long ai_index,
-	long unit_index);
-void ai_scripting_follow_target_ai(
-	long ai_index,
-	long target_ai_index);
-void ai_scripting_conversation_stop(
-	short conversation_index);
-void ai_scripting_conversation_advance(
-	short conversation_index);
-void ai_scripting_link_activation(
-	long source_ai_index,
-	long target_ai_index);
-void ai_scripting_berserk(
-	long ai_index,
-	boolean enable);
-void ai_scripting_set_team(
-	long ai_index,
-	short team);
-void ai_scripting_allow_charge(
-	long ai_index,
-	boolean allow_charge);
-void ai_scripting_allow_dormant(
-	long ai_index,
-	boolean allow_dormant);
-void scripted_camera_set_first_person(
-	long object_index);
-void scripted_camera_set_dead(
-	long object_index);
-void game_set_game_variant_from_name(
-	char const *name);
-void player_input_enable(
-	boolean enable);
-boolean player_control_action_test_jump(
-	void);
-boolean player_control_action_test_primary_trigger(
-	void);
-boolean player_control_action_test_grenade_trigger(
-	void);
-boolean player_control_action_test_zoom(
-	void);
-boolean player_control_action_test_action(
-	void);
-boolean player_control_action_test_accept(
-	void);
-boolean player_control_action_test_back(
-	void);
-boolean player_control_action_test_look_relative_up(
-	void);
-boolean player_control_action_test_look_relative_down(
-	void);
-boolean player_control_action_test_look_relative_left(
-	void);
-boolean player_control_action_test_look_relative_right(
-	void);
-boolean player_control_action_test_look_relative_all_directions(
-	void);
-boolean player_control_action_test_move_relative_all_directions(
-	void);
-boolean player0_look_pitch_is_inverted(
-	void);
-boolean player0_joystick_set_is_normal(
-	void);
-void debug_dump_memory_for_file(
-	char const *file_name);
-void profile_sections_activate(
-	char const *section_name);
-void profile_sections_deactivate(
-	char const *section_name);
-void ai_debug_vocalize(
-	char const *priority_name,
-	char const *vocalization_name);
-void ai_debug_teleport_to(
-	long ai_index);
-void ai_debug_speak(
-	char const *vocalization);
-void ai_debug_speak_list(
-	char const *list_name);
-void scripted_camera_set_absolute(
-	short camera_point_index,
-	word transition_time);
-void scripted_camera_set(
-	short camera_point_index0,
-	word camera_point_index1,
-	long transition_time);
-void scripted_camera_set_animation(
-	long animation_graph_index,
-	char const *animation_name);
-void game_time_set_speed(
-	real speed);
-void player_add_equipment(
-	long player_index,
-	short equipment_definition_index,
-	boolean force);
-void debug_player_teleport(
-	short player_index,
-	short location_index);
-boolean scenario_switch_structure_bsp(
-	short structure_bsp_index);
-void cinematic_show_letterbox(
-	boolean show);
-void cinematic_set_title(
-	unsigned short title_index);
-void cinematic_suppress_bsp_object_creation(
-	boolean suppress);
-void debug_sound_classes_enable(
-	char const *name,
-	boolean enable);
-void sound_enable(
-	boolean enable);
-void vehicle_hover(
-	long vehicle_index,
-	boolean hover);
 void hs_dispose_from_old_map(
 	void);
 static long alphabetize_file_references(
 	struct file_reference const *left,
 	struct file_reference const *right);
-boolean tag_data_resize(
-	struct tag_data *data,
-	long size);
-boolean tag_block_resize(
-	struct tag_block *block,
-	long count);
-long tag_block_add_element(
-	struct tag_block *block);
 int isspace(
 	int character);
 boolean hs_scenario_merge(
@@ -4328,10 +3611,6 @@ static boolean hs_compile_source(
 	void);
 boolean hs_scenario_postprocess(
 	boolean restore_syntax_data);
-void object_lists_dispose(
-	void);
-boolean game_state_reverted(
-	void);
 
 /* ---------- constants */
 
@@ -5035,58 +4314,6 @@ static void hs_effect_new_evaluate(
 	long thread_index,
 	boolean initialize);
 static void hs_effect_new_from_object_marker_evaluate(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_arithmetic(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_begin(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_begin_random(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_debug_string(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_equality(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_if(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_inequality(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_inspect(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_logical(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_object_cast_up(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_set(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_sleep(
-	short function_index,
-	long thread_index,
-	boolean initialize);
-void hs_evaluate_sleep_until(
 	short function_index,
 	long thread_index,
 	boolean initialize);

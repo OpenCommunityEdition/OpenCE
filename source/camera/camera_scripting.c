@@ -137,8 +137,6 @@ void scripted_camera_set(
 	short camera_point_index,
 	word transition_time,
 	long relative_object_index);
-void observer_update(
-	real dt);
 void first_person_camera_fake(
 	long unit_index,
 	struct scripted_camera_command *result);

@@ -72,6 +72,7 @@ symbols in this file:
 #include "game/game.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -79,6 +80,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
 
@@ -242,15 +244,6 @@ struct rasterizer_model_begin_parameters
 typedef char verify_render_model_effect_size[sizeof(struct render_model_effect) == 0x28 ? 1 : -1];
 typedef char verify_rasterizer_model_begin_parameters_size[sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
 
-struct rasterizer_debug_options
-{
-	byte reserved[8];
-	short debug_model_lod;
-	byte trailing[0x5E];
-};
-
-typedef char verify_rasterizer_debug_options_size[sizeof(struct rasterizer_debug_options) == 0x68 ? 1 : -1];
-
 /* ---------- prototypes */
 
 #include "rasterizer/rasterizer_models.h"
@@ -263,10 +256,11 @@ static void render_model_parts(
 	short geometry_detail_level_index,
 	short forced_shader_permutation_index,
 	long flags);
+static void model_geometry_part_build_tangent_matrices(
+	struct model_geometry_part *part);
 
 /* ---------- globals */
 
-extern struct rasterizer_debug_options rasterizer_debug_options;
 extern boolean rasterizer_model_cortana_hack;
 
 extern boolean render_model_nodes;
@@ -733,17 +727,17 @@ void model_build_tangent_matrices(
 
 		for (part_index = 0; part_index < geometry->parts.count; part_index++)
 		{
-			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(
+			model_geometry_part_build_tangent_matrices(TAG_BLOCK_GET_ELEMENT(
 				&geometry->parts,
 				part_index,
-				struct model_geometry_part);
+				struct model_geometry_part));
 		}
 	}
 
 	return;
 }
 
-void model_geometry_part_build_tangent_matrices(
+static void model_geometry_part_build_tangent_matrices(
 	struct model_geometry_part *part)
 {
 	return;

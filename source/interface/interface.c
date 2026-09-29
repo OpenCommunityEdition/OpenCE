@@ -82,7 +82,6 @@ symbols in this file:
 #include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "interface/hud.h"

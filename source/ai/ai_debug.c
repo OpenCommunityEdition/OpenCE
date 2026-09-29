@@ -5,6 +5,7 @@ AI_DEBUG.C
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "ai_debug.h"
 
 #include "actions.h"
@@ -22,8 +23,8 @@ AI_DEBUG.C
 #include "camera/observer.h"
 #include "editor/editor_stubs.h"
 #include "game/game.h"
-#include "game/player_control.h"
 #include "game/players.h"
+#include "main/console.h"
 #include "memory/data.h"
 #include "objects/damage.h"
 #include "physics/collision_bsp_definitions.h"
@@ -231,11 +232,6 @@ static void ai_debug_render_path_nodes(
 	boolean render_polygons,
 	boolean render_costs,
 	boolean render_closest);
-void actor_iterator_new(
-	struct actor_iterator *iterator,
-	boolean active_only);
-struct actor_datum *actor_iterator_next(
-	struct actor_iterator *iterator);
 /* ---------- globals */
 
 struct ai_debug_state ai_debug;
@@ -4221,13 +4217,13 @@ static void ai_debug_communication_toggle_bits(
 	if (clear_count)
 	{
 		bit_vector_or(vector_size, new_vector, vector, vector);
-		console_printf(NULL, "set %d flags", clear_count);
+		console_printf(FALSE, "set %d flags", clear_count);
 	}
 	else if (set_count)
 	{
 		bit_vector_not(vector_size, new_vector, new_vector);
 		bit_vector_and(vector_size, new_vector, vector, vector);
-		console_printf(NULL, "cleared %d flags", set_count);
+		console_printf(FALSE, "cleared %d flags", set_count);
 	}
 
 	return;

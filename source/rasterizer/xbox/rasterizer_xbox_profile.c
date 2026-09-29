@@ -136,7 +136,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile_rasterizer.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 #include <xtl.h>
 
@@ -604,8 +604,8 @@ void rasterizer_profile_dispose(
 static boolean rasterizer_profile_enabled(
 	void)
 {
-	return rasterizer_debug_options.stats == 3 ||
-		rasterizer_debug_options.profile_log;
+	return rasterizer_debug_options.statistics_mode == 3 ||
+		rasterizer_debug_options.profile_log_enabled;
 }
 
 static void profile_assert(

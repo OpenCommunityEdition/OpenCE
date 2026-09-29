@@ -639,7 +639,6 @@ struct widget_instance;
 #include "event_manager.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "hs/hs.h"
 #include "input/input.h"

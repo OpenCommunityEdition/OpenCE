@@ -571,11 +571,6 @@
   },
   {
     "unit": "source/interface/ui_widget_game_data_input_functions",
-    "function": "_mutliplayer_settings_select_list_update_displayed_items",
-    "reason": "hardened COFF comparison proves all 1424 padded bytes and all 73 semantic relocations exact (SHA-256 adce7f9ab32aee72ec9d542efc297df9295a839a27406848eb8467ffea97594f); objdiff reports compiler-local switch-table labels as a false negative; January's original misspelling of multiplayer in the owner name is preserved"
-  },
-  {
-    "unit": "source/interface/ui_widget_game_data_input_functions",
     "function": "_server_list_menu_update",
     "reason": "hardened COFF comparison proves all 2016 padded bytes and all 115 semantic relocations exact (SHA-256 f7a5f8c39ab8f6200fa4dfe798c533c40d76e0f8acd06935cea2d5a696c73334); objdiff reports this complete typed server-list graph as a false negative"
   },

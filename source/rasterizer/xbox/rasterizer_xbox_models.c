@@ -106,6 +106,7 @@ symbols in this file:
 #include "math/real_math.h"
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_models.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
@@ -117,6 +118,7 @@ symbols in this file:
 
 #include "interface/progress_bar_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox_models.h"
@@ -206,21 +208,6 @@ enum
 };
 
 /* ---------- structures */
-
-struct rasterizer_debug_options
-{
-	byte reserved00[2];
-	short statistics_mode;
-	byte reserved04[8];
-	boolean draw_models;
-	boolean draw_transparent_models;
-	byte reserved0E[0xE];
-	boolean fog;
-	byte reserved1D[0x24];
-	boolean active_camouflage;
-	byte reserved42[0x12];
-	unsigned long zbias;
-};
 
 struct rasterizer_model_effect_parameters
 {
@@ -344,52 +331,6 @@ struct transparent_geometry_group
 	byte pad9E[2];
 };
 
-struct rasterizer_models_frame_statistics
-{
-	byte reserved000[0x14];
-	unsigned long vertices_by_permutation[
-		NUMBER_OF_MODEL_VERTEX_SHADER_PERMUTATIONS];
-	byte reserved024[0xB0];
-	unsigned long model_count;
-	unsigned long model_vertex_count;
-	unsigned long model_triangle_count;
-	unsigned long model_draw_count;
-	long transparent_model_vertex_count;
-	long transparent_model_triangle_count;
-	long transparent_model_maximum_triangle_count;
-	long transparent_model_submit_count;
-	byte reserved0F4[0x5C];
-	unsigned long skinning_work;
-	unsigned long lighting_work;
-	unsigned long vertex_shader_work;
-	unsigned long pushbuffer_words;
-	unsigned long skinning_work_accumulated;
-	unsigned long lighting_work_accumulated;
-	unsigned long vertex_shader_work_accumulated;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 struct shader_environment_diffuse_properties
 {
 	byte reserved00[0x1C];
@@ -451,13 +392,6 @@ struct shader_environment_definition
 	struct shader_environment_properties environment;
 };
 
-typedef char verify_rasterizer_models_draw_models_offset[
-	offsetof(struct rasterizer_debug_options, draw_models) == 0x0C
-		? 1 : -1];
-typedef char verify_rasterizer_models_active_camouflage_offset[
-	offsetof(
-		struct rasterizer_debug_options,
-		active_camouflage) == 0x41 ? 1 : -1];
 typedef char verify_rasterizer_model_parameters_skinning_offset[
 	offsetof(struct rasterizer_model_begin_parameters, skinning) == 0x08
 		? 1 : -1];
@@ -472,15 +406,15 @@ typedef char verify_rasterizer_models_window_fog_offset[
 		? 1 : -1];
 typedef char verify_rasterizer_models_statistics_skinning_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
-		skinning_work) == 0x150 ? 1 : -1];
+		struct rasterizer_frame_statistics_globals,
+		vertex_shader_skinning_constant_bytes) == 0x150 ? 1 : -1];
 typedef char verify_rasterizer_models_statistics_pushbuffer_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
-		pushbuffer_words) == 0x15C ? 1 : -1];
+		struct rasterizer_frame_statistics_globals,
+		pixel_shader_pushbuffer_bytes) == 0x15C ? 1 : -1];
 typedef char verify_rasterizer_models_statistics_vertex_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
+		struct rasterizer_frame_statistics_globals,
 		model_vertex_count) == 0xD8 ? 1 : -1];
 typedef char verify_rasterizer_model_parameters_position_offset[
 	offsetof(struct rasterizer_model_begin_parameters, centroid) == 0xB4
@@ -506,7 +440,7 @@ typedef char verify_transparent_geometry_group_cortana_hack_offset[
 		? 1 : -1];
 typedef char verify_rasterizer_models_statistics_transparent_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
+		struct rasterizer_frame_statistics_globals,
 		transparent_model_vertex_count) == 0xE4 ? 1 : -1];
 typedef char verify_rasterizer_model_pixel_shader_size[
 	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
@@ -533,9 +467,6 @@ typedef char verify_shader_environment_cube_map_offset[
 		struct shader_environment_definition,
 		environment.reflection.cube_map) == 0x324 ? 1 : -1];
 
-typedef char verify_rasterizer_models_debug_options_zbias_offset[
-	offsetof(struct rasterizer_debug_options, zbias) == 0x54
-		? 1 : -1];
 typedef char verify_rasterizer_model_parameters_effect_shader_offset[
 	offsetof(struct rasterizer_model_begin_parameters, effect.shader) == 0xA8
 		? 1 : -1];
@@ -544,12 +475,12 @@ typedef char verify_rasterizer_model_parameters_effect_animation_offset[
 		? 1 : -1];
 typedef char verify_rasterizer_models_statistics_vertex_shader_work_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
-		vertex_shader_work) == 0x158 ? 1 : -1];
+		struct rasterizer_frame_statistics_globals,
+		vertex_shader_instruction_count) == 0x158 ? 1 : -1];
 typedef char verify_rasterizer_models_statistics_vertex_shader_accum_offset[
 	offsetof(
-		struct rasterizer_models_frame_statistics,
-		vertex_shader_work_accumulated) == 0x168 ? 1 : -1];
+		struct rasterizer_frame_statistics_globals,
+		model_vertex_shader_work_accumulated) == 0x168 ? 1 : -1];
 typedef char verify_shader_plasma_intensity_exponent_source_offset[
 	offsetof(
 		struct shader_transparent_plasma_definition,
@@ -614,7 +545,6 @@ typedef char verify_shader_model_reflection_cube_map_offset[
 
 /* ---------- globals */
 
-extern struct rasterizer_debug_options rasterizer_debug_options;
 static struct render_animation const *transparent_geometry_cached_animation = NULL;
 static struct render_lighting const *transparent_geometry_cached_lighting = NULL;
 static short transparent_geometry_cached_node_matrix_count = 0;
@@ -630,7 +560,6 @@ static boolean local_do_not_change_z_stencil_states = FALSE;
 static boolean local_reported_too_many_transparent_geometry_groups = FALSE;
 static boolean local_pixel_shader_dirty_flag = TRUE;
 extern boolean rasterizer_model_cortana_hack;
-extern struct rasterizer_models_frame_statistics rasterizer_frame_statistics;
 
 /* ---------- public code */
 
@@ -748,7 +677,7 @@ void _rasterizer_model_begin(
 		local_do_not_change_z_stencil_states =
 			do_not_change_z_stencil_states;
 
-		if (rasterizer_debug_options.active_camouflage &&
+		if (rasterizer_debug_options.active_camouflage_enabled &&
 			global_window_parameters.rasterizer_target == 0 &&
 			parameters->effect.type == _render_model_effect_type_active_camouflage &&
 			parameters->effect.intensity > 0.0f)
@@ -764,16 +693,16 @@ void _rasterizer_model_begin(
 		}
 		else
 		{
-			skinning_work = rasterizer_frame_statistics.skinning_work;
+			skinning_work = rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes;
 			rasterizer_set_model_skinning(&parameters->skinning);
 			skinning_work =
-				rasterizer_frame_statistics.skinning_work - skinning_work;
-			lighting_work = rasterizer_frame_statistics.lighting_work;
+				rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes - skinning_work;
+			lighting_work = rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes;
 			rasterizer_set_model_lighting(&parameters->lighting);
-			rasterizer_frame_statistics.skinning_work_accumulated +=
+			rasterizer_frame_statistics.model_skinning_constant_bytes +=
 				skinning_work;
-			rasterizer_frame_statistics.lighting_work_accumulated +=
-				rasterizer_frame_statistics.lighting_work - lighting_work;
+			rasterizer_frame_statistics.model_lighting_constant_bytes +=
+				rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes - lighting_work;
 			local_model_effect_type = _render_model_effect_type_none;
 		}
 
@@ -1146,7 +1075,7 @@ static void set_environment_shader_pixel_shader(
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)
 		{
-			rasterizer_frame_statistics.pushbuffer_words += 44;
+			rasterizer_frame_statistics.pixel_shader_pushbuffer_bytes += 44;
 		}
 	}
 
@@ -1469,7 +1398,7 @@ void rasterizer_model_draw_environment_shader(
 			439,
 			global_window_parameters.fog.planar_maximum_depth>0.0f);
 
-		if (rasterizer_debug_options.fog &&
+		if (rasterizer_debug_options.draw_environment_fog &&
 			!TEST_FLAG(
 				local_parameters->geometry_flags,
 				_rasterizer_geometry_no_fog_bit))
@@ -1674,7 +1603,7 @@ void rasterizer_model_draw_environment_shader(
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)
 		{
-			rasterizer_frame_statistics.pushbuffer_words += 24;
+			rasterizer_frame_statistics.pixel_shader_pushbuffer_bytes += 24;
 			rasterizer_frame_statistics.model_draw_count++;
 			rasterizer_frame_statistics.model_triangle_count += triangle_count;
 			rasterizer_frame_statistics.model_vertex_count +=
@@ -2102,7 +2031,7 @@ void _rasterizer_model_draw(
 				}
 
 				vertex_shader_work =
-					rasterizer_frame_statistics.vertex_shader_work;
+					rasterizer_frame_statistics.vertex_shader_instruction_count;
 
 				if (!TEST_FLAG(
 						shader_model->model.flags,
@@ -2157,8 +2086,8 @@ void _rasterizer_model_draw(
 				if (rasterizer_debug_options.statistics_mode >=
 					_rasterizer_statistics_mode_summary)
 				{
-					rasterizer_frame_statistics.vertex_shader_work_accumulated +=
-						rasterizer_frame_statistics.vertex_shader_work -
+					rasterizer_frame_statistics.model_vertex_shader_work_accumulated +=
+						rasterizer_frame_statistics.vertex_shader_instruction_count -
 						vertex_shader_work;
 					rasterizer_frame_statistics.vertices_by_permutation[
 						vertex_shader_permutation] += vertex_buffer->count;
@@ -2280,7 +2209,7 @@ void _rasterizer_model_draw(
 					1077,
 					global_window_parameters.fog.planar_maximum_depth>0.0f);
 
-				if (rasterizer_debug_options.fog &&
+				if (rasterizer_debug_options.draw_environment_fog &&
 					!TEST_FLAG(
 						local_parameters->geometry_flags,
 						_rasterizer_geometry_no_fog_bit))
@@ -2550,7 +2479,7 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 	boolean submit_decals;
 
 	if (rasterizer_debug_options.draw_models &&
-		rasterizer_debug_options.draw_transparent_models)
+		rasterizer_debug_options.draw_model_transparent_geometry)
 	{
 		alpha_blended_decal =
 			shader &&

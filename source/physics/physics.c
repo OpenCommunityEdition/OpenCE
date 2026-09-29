@@ -103,7 +103,7 @@ symbols in this file:
 #include "effects/material_effect_definitions.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "math/matrix_math.h"
+#include "math/real_math.h"
 #include "objects/damage.h"
 #include "objects/object_definitions.h"
 #include "objects/object_types.h"

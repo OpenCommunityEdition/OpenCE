@@ -90,19 +90,20 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "interface/terminal.h"
 #include "main/console.h"
 #include "memory/data.h"
 #include "models/model_definitions.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "effects/effects.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "items/items.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_definitions.h"
 #include "units/units.h"
+#include "object_lists.h"
 
 /* ---------- constants */
 
@@ -147,19 +148,6 @@ struct hs_looping_sound_definition
 
 /* ---------- prototypes */
 
-long object_index_from_name_index(
-	short name_index);
-long object_list_new(
-	void);
-void object_list_add(
-	long object_list_index,
-	long object_index);
-long object_list_get_first(
-	long object_list_index,
-	long *reference_index);
-long object_list_get_next(
-	long object_list_index,
-	long *reference_index);
 boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
@@ -170,19 +158,6 @@ void hs_object_create_anew(
 	short object_name_index);
 void hs_object_destroy(
 	long object_index);
-void terminal_printf(
-	union real_argb_color const *color,
-	char const *format,
-	...);
-void area_of_effect_cause_damage(
-	struct damage_data *damage,
-	long unlucky_object_index);
-boolean player_teleport(
-	long player_index,
-	long source_unit_index,
-	real_point3d const *position);
-void unit_exit_seat_end(
-	long unit_index);
 
 /* ---------- globals */
 

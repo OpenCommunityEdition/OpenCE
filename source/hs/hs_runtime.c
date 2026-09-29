@@ -265,6 +265,7 @@ symbols in this file:
 #include "ai/ai_debug_scripting.h"
 #include "ai/ai_script.h"
 #include "hs/hs.h"
+#include "hs/hs_library_internal.h"
 #include "hs/hs_library_internal_runtime.h"
 #include "hs/object_lists.h"
 #include "hs/hs_scenario_definitions.h"

@@ -177,25 +177,10 @@ struct client_game_update_message
 	byte update[0x80];
 };
 
-struct network_machine
-{
-	byte __unknown0[0x40];
-	char machine_index;
-};
-
 struct local_network_player
 {
 	byte __unknown0[0x1C];
 	boolean machine_index;
-};
-
-struct network_game
-{
-	byte __unknown0[0x226];
-	struct network_player players[16];
-	byte __unknown426[2];
-	long random_seed;
-	long number_of_games_played;
 };
 
 typedef char network_machine_index_offset_assert[
@@ -220,11 +205,6 @@ typedef char network_game_globals_size_assert[
 	sizeof(struct network_game_globals) == 0x10 ? 1 : -1];
 
 /* ---------- prototypes */
-
-unsigned long *get_global_local_random_seed_address(
-	void);
-unsigned short seed_random(
-	unsigned long *seed);
 
 /* ---------- globals */
 

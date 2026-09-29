@@ -65,7 +65,6 @@ symbols in this file:
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug.h"
 #include "rasterizer/rasterizer_geometry_environment.h"
 #include "render/render.h"
 #include "scenario/scenario.h"

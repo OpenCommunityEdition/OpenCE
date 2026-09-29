@@ -166,13 +166,14 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "ai/actor_looking.h"
+#include "math/real_math.h"
 
 #include "actors.h"
 #include "actor_definitions.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #include "items/weapon_definitions.h"
 #include "main/console.h"
 #include "physics/collisions.h"

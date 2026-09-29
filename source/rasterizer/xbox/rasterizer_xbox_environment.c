@@ -152,9 +152,9 @@ symbols in this file:
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #undef REAL_MATH_EXTERNAL_SCALE_VECTOR3D
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_environment.h"
 #include "rasterizer/common/rasterizer_common.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_lights.h"
 #include "rasterizer/rasterizer_memory_pool.h"
@@ -166,6 +166,7 @@ symbols in this file:
 
 #include "interface/progress_bar_internal.h"
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_internal.h"
 
@@ -292,36 +293,6 @@ enum
 
 struct bitmap_data;
 
-struct rasterizer_environment_debug_options
-{
-	byte reserved0[0x2];
-	short statistics_mode;
-	short drawing_mode;
-	byte reserved06[0xB];
-	boolean draw_environment_lightmaps;
-	boolean draw_environment_shadows;
-	boolean draw_environment_diffuse_lights;
-	boolean draw_environment_textures;
-	boolean draw_environment_decals;
-	boolean draw_environment_specular_lights;
-	boolean draw_environment_specular_lightmaps;
-	boolean draw_environment_reflection_lightmap_masks;
-	boolean draw_environment_reflection_mirrors;
-	boolean draw_environment_reflections;
-	boolean draw_environment_transparent_geometry;
-	byte reserved1C[0x10];
-	real lightmap_ambient;
-	byte reserved30[0x2];
-	short vector_drawing_mode;
-	boolean lightmap_bump_enabled;
-	boolean lightmap_filtering;
-	byte reserved36[0x6];
-	boolean alpha_testing_enabled;
-	boolean environment_specular_mask_enabled;
-	byte reserved3E[0x2E];
-	real vector_scale;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -364,28 +335,6 @@ struct rasterizer_environment_globals
 	boolean lightmap_missing;
 	byte reservedAD[0x3];
 	real specular_light_brightness;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 struct point_light_geometry_parameters
@@ -553,7 +502,6 @@ static void rasterizer_environment_specular_spot_light_begin(
 
 /* ---------- globals */
 
-extern struct rasterizer_environment_debug_options rasterizer_debug_options;
 static struct rasterizer_environment_globals rasterizer_environment_globals;
 static boolean warned = FALSE;
 extern struct pixel_shader_definition pixel_shader;
@@ -637,8 +585,8 @@ void _rasterizer_environment_lightmap_draw(
 			short vector_bitmap_index;
 			boolean vector_test_pattern;
 
-			vector_index = (short)(rasterizer_debug_options.vector_drawing_mode % 1000);
-			vector_bitmap_index = (short)(rasterizer_debug_options.vector_drawing_mode / 1000);
+			vector_index = (short)(rasterizer_debug_options.pad3 % 1000);
+			vector_bitmap_index = (short)(rasterizer_debug_options.pad3 / 1000);
 			if (vector_index >= 0 &&
 				vector_index < NUMBER_OF_RASTERIZER_ENVIRONMENT_VECTOR_MODES &&
 				vector_modes[vector_index].vertex_shader_permutation_index != NONE)
@@ -722,7 +670,7 @@ void _rasterizer_environment_lightmap_draw(
 				pixel_shader.texture_modes = 0x00018C60 | (vector_test_pattern ? 1 : 3);
 				if (vector_test_pattern)
 				{
-					texture_transform_constants[0].i = rasterizer_debug_options.vector_scale;
+					texture_transform_constants[0].i = rasterizer_debug_options.pad3_scale;
 					texture_transform_constants[0].j = 1.0f;
 					texture_transform_constants[0].k = 1.0f;
 					texture_transform_constants[0].l = 1.0f;
@@ -806,7 +754,7 @@ void _rasterizer_environment_lightmap_draw(
 			TEST_FLAG(
 				shader_environment->environment.flags,
 				_shader_environment_alpha_tested_bit) &&
-				rasterizer_debug_options.alpha_testing_enabled);
+				rasterizer_debug_options.environment_alpha_testing_enabled);
 		rasterizer_set_texture(
 			0,
 			0,
@@ -877,7 +825,7 @@ void _rasterizer_environment_lightmap_draw(
 					? 0x00018001
 					: 0x00018401;
 			pixel_shader.rgb_inputs[0] =
-				rasterizer_debug_options.lightmap_bump_enabled
+				rasterizer_debug_options.lightmap_incident_radiosity_enabled
 					? 0x484B0A01
 					: 0x20200000;
 			pixel_shader.rgb_outputs[0] = 0x0000208C;
@@ -958,7 +906,7 @@ void _rasterizer_environment_lightmap_draw(
 			pixel_shader.alpha_inputs[1] = 0xDCDCCCCC;
 			pixel_shader.alpha_outputs[1] = 0x00024C00;
 			pixel_shader.rgb_inputs[1] =
-				rasterizer_debug_options.lightmap_bump_enabled
+				rasterizer_debug_options.lightmap_incident_radiosity_enabled
 					? 0x484B0A01
 					: 0x20200000;
 			pixel_shader.rgb_outputs[1] = 0x00002080;
@@ -1160,9 +1108,9 @@ void _rasterizer_environment_lightmap_begin(
 			rasterizer_set_texture_bitmap_data(2, lightmap_bitmap);
 			D3DDevice_SetTextureState_Deferred(2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
 			D3DDevice_SetTextureState_Deferred(2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
-			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MAGFILTER, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MINFILTER, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MIPFILTER, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MAGFILTER, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MINFILTER, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(2, D3DTSS_MIPFILTER, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
 			rasterizer_environment_globals.lightmap_missing = FALSE;
 		}
 		else
@@ -2232,9 +2180,9 @@ void _rasterizer_environment_specular_lightmap_begin(
 			rasterizer_set_texture_bitmap_data(1, lightmap_bitmap);
 			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_address_u, _d3d_texture_address_clamp);
 			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_address_v, _d3d_texture_address_clamp);
-			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mag_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_min_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mip_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mag_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_min_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(1, _d3d_texture_state_mip_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
 			rasterizer_environment_globals.lightmap_missing = FALSE;
 		}
 		else
@@ -2454,9 +2402,9 @@ void _rasterizer_environment_reflection_lightmap_mask_begin(
 			rasterizer_set_texture_bitmap_data(0, lightmap_bitmap);
 			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_address_u, _d3d_texture_address_clamp);
 			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_address_v, _d3d_texture_address_clamp);
-			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mag_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_min_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
-			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mip_filter, (rasterizer_debug_options.lightmap_filtering != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mag_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_min_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
+			D3DDevice_SetTextureState_Deferred(0, _d3d_texture_state_mip_filter, (rasterizer_debug_options.lightmap_filtering_enabled != FALSE) + 1);
 			rasterizer_environment_globals.lightmap_missing = FALSE;
 		}
 		else

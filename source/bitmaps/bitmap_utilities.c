@@ -228,7 +228,7 @@ symbols in this file:
 
 #include "cseries.h"
 
-#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/s3tc/s3tc.h"
@@ -2277,9 +2277,9 @@ real real_rgb_color_brightness(
 		color->blue * 0.114f;
 }
 
-struct hsv_color *rgb_color_to_hsv_color(
+union hsv_color *rgb_color_to_hsv_color(
 	union rgb_color const *rgb,
-	struct hsv_color *hsv)
+	union hsv_color *hsv)
 {
 	real red = (real)(long)rgb->red * (1.0f / 65535.0f);
 	real green = (real)(long)rgb->green * (1.0f / 65535.0f);
@@ -2367,7 +2367,7 @@ struct hsv_color *rgb_color_to_hsv_color(
 }
 
 union rgb_color *hsv_color_to_rgb_color(
-	struct hsv_color const *hsv,
+	union hsv_color const *hsv,
 	union rgb_color *rgb)
 {
 	real scaled_hue;

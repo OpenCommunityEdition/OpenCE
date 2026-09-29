@@ -34,6 +34,10 @@ void hud_dispose(
 	void);
 void hud_dispose_from_old_map(
 	void);
+boolean scripted_show_hud(
+	boolean show);
+boolean scripted_show_hud_help_text(
+	boolean show);
 void hud_update(
 	void);
 void hud_initialize_for_new_map(
@@ -46,6 +50,38 @@ void hud_dispose_nav_points_from_old_map(
 	void);
 void hud_dispose_nav_points(
 	void);
+void hud_activate_team_nav_point_with_flag(
+	short nav_index,
+	short team_index,
+	short flag_index,
+	float vertical_offset);
+void hud_activate_team_nav_point_with_object(
+	short nav_index,
+	short team_index,
+	long object_index,
+	float vertical_offset);
+void hud_deactivate_team_nav_point_with_flag(
+	short team_index,
+	short flag_index);
+void hud_deactivate_team_nav_point_with_object(
+	short team_index,
+	long object_index);
+void hud_unit_activate_nav_point_with_flag(
+	short nav_index,
+	long unit_index,
+	short flag_index,
+	float vertical_offset);
+void hud_unit_activate_nav_point_with_object(
+	short nav_index,
+	long unit_index,
+	long object_index,
+	float vertical_offset);
+void hud_unit_deactivate_nav_point_with_flag(
+	long unit_index,
+	short flag_index);
+void hud_unit_deactivate_nav_point_with_object(
+	long unit_index,
+	long object_index);
 void hud_update_nav_points(
 	void);
 
@@ -56,8 +92,6 @@ void hud_load(
 	boolean load);
 void hud_autosave(
 	boolean active);
-void hud_draw_players(
-	void);
 
 void hud_picked_up_powerup(
 	short local_player_index,
@@ -74,11 +108,6 @@ void hud_picked_up_weapon(
 	long weapon_definition_index);
 void hud_render_nav_points(
 	short local_player_index);
-void temporary_hud_draw_reticle(
-	real angle,
-	union real_argb_color const *color);
-void temporary_hud_draw(
-	void);
 void hud_draw_screen(
 	void);
 

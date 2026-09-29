@@ -302,7 +302,6 @@ symbols in this file:
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmaps_internal.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
 #include "tag_files/tag_files.h"

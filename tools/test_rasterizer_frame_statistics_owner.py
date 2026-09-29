@@ -15,8 +15,19 @@ from tools import coff_compare as cc
 ROOT = Path(__file__).resolve().parents[1]
 COMPILER = ROOT / "xbox/bin/vc7/CL.Exe"
 FIXTURE = ROOT / "tools/fixtures/rasterizer_frame_statistics_owner.c"
-HEADER = ROOT / "source/rasterizer/rasterizer_frame_statistics.h"
+HEADER = ROOT / "source/rasterizer/rasterizer.h"
 MODELS_SOURCE = ROOT / "source/rasterizer/xbox/rasterizer_xbox_models.c"
+# The owner header rasterizer.h resolves its own includes through the build's source include directories
+# (build.ninja cflags order).
+SOURCE_INCLUDE_DIRECTORIES = (
+	"source", "source/main", "source/cseries", "source/sound", "source/bink", "source/saved films",
+	"source/saved games", "source/cache", "source/units", "source/text", "source/tag_files", "source/structures",
+	"source/shell", "source/shaders", "source/scenario", "source/render", "source/rasterizer", "source/physics",
+	"source/objects", "source/objects/widgets", "source/networking", "source/models", "source/memory",
+	"source/memory/zlib", "source/math", "source/tool", "source/items", "source/interface", "source/input", "source/hs",
+	"source/game", "source/effects", "source/editor", "source/dialogs", "source/devices", "source/cutscene",
+	"source/camera", "source/bungie_net", "source/bitmaps", "source/ai",
+)
 BASE_ROOT = ROOT / "build/base"
 TARGET_ROOT = ROOT / "build/split"
 SYMBOL = "_rasterizer_frame_statistics"
@@ -30,10 +41,7 @@ FIELDS = (
 	("average_frames_per_second", 0x008, 4, None),
 	("minimum_frames_per_second", 0x00C, 4, None),
 	("maximum_frames_per_second", 0x010, 4, None),
-	("fogged_object_count", 0x014, 4, "signed"),
-	("normal_object_count", 0x018, 4, "signed"),
-	("fast_object_count", 0x01C, 4, "signed"),
-	("scenery_object_count", 0x020, 4, "signed"),
+	("vertices_by_permutation", 0x014, 0x10, "signed"),
 	("lightmap_dynamic_vertex_count", 0x024, 4, "unsigned"),
 	("lightmap_dynamic_triangle_count", 0x028, 4, "unsigned"),
 	("lightmap_dynamic_draw_count", 0x02C, 4, "unsigned"),
@@ -137,7 +145,8 @@ def compile_fixture(output, override_root=None, check=True):
 	include_roots = []
 	if override_root is not None:
 		include_roots.append(Path(override_root))
-	include_roots.extend((ROOT / "source", ROOT / "source/cseries", ROOT / "xbox/include"))
+	include_roots.extend(ROOT / directory for directory in SOURCE_INCLUDE_DIRECTORIES)
+	include_roots.append(ROOT / "xbox/include")
 	command = [str(COMPILER), "/nologo", "/c", "/Dxbox", "/W1", "/WX"]
 	command.extend("/I" + str(path) for path in include_roots)
 	command.extend(("/Fo" + str(output), str(FIXTURE)))
@@ -184,7 +193,7 @@ def require_layout(obj):
 def write_override(tmp_path, old, new):
 	source = HEADER.read_text(encoding="utf-8")
 	assert source.count(old) == 1
-	override = tmp_path / "include/rasterizer/rasterizer_frame_statistics.h"
+	override = tmp_path / "include/rasterizer/rasterizer.h"
 	override.parent.mkdir(parents=True)
 	override.write_text(source.replace(old, new), encoding="utf-8")
 	return override.parents[1]
@@ -228,7 +237,7 @@ def test_source_has_one_extern_declaration_and_no_tentative_storage():
 			continue
 		for match in pattern.finditer(path.read_text(encoding="utf-8", errors="replace")):
 			records.append((path.relative_to(ROOT).as_posix(), bool(match.group(1))))
-	assert records == [("source/rasterizer/rasterizer_frame_statistics.h", True)]
+	assert records == [("source/rasterizer/rasterizer.h", True)]
 
 
 def test_january_has_one_0x170_bss_owner_and_exact_importer_set():
@@ -273,19 +282,19 @@ def test_models_keeps_unsigned_delta_and_accumulator_contract():
 	assert body.count("unsigned long lighting_work;") == 1
 	assert body.count(
 		"skinning_work = rasterizer_frame_statistics."
-		"skinning_work;") == 1
+		"vertex_shader_skinning_constant_bytes;") == 1
 	assert body.count(
 		"skinning_work = rasterizer_frame_statistics."
-		"skinning_work - skinning_work;") == 1
+		"vertex_shader_skinning_constant_bytes - skinning_work;") == 1
 	assert body.count(
 		"lighting_work = rasterizer_frame_statistics."
-		"lighting_work;") == 1
+		"vertex_shader_lighting_constant_bytes;") == 1
 	assert body.count(
-		"rasterizer_frame_statistics.skinning_work_accumulated += "
+		"rasterizer_frame_statistics.model_skinning_constant_bytes += "
 		"skinning_work;") == 1
 	assert body.count(
-		"rasterizer_frame_statistics.lighting_work_accumulated += "
-		"rasterizer_frame_statistics.lighting_work - "
+		"rasterizer_frame_statistics.model_lighting_constant_bytes += "
+		"rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes - "
 		"lighting_work;") == 1
 
 

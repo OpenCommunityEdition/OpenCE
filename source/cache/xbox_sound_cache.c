@@ -93,7 +93,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
+#include "cache/cache_files.h"
 #include "cache/physical_memory_map.h"
 #include "cache/sound_cache.h"
 #include "interface/terminal.h"

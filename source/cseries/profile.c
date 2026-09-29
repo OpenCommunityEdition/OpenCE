@@ -1589,7 +1589,7 @@ int compare_profile_sections(
 {
 	struct profile_section *const *first = (struct profile_section *const *)section0;
 	struct profile_section *const *second = (struct profile_section *const *)section1;
-	int result = 0;
+	int result;
 
 	if ((*first)->active && !(*second)->active)
 	{
@@ -1620,6 +1620,8 @@ int compare_profile_sections(
 					result = -1;
 				else if (first_average<second_average)
 					result = 1;
+				else
+					result = 0;
 				break;
 			}
 
@@ -1628,10 +1630,23 @@ int compare_profile_sections(
 					result = -1;
 				else if ((*first)->recent_elapsed_timebase<(*second)->recent_elapsed_timebase)
 					result = 1;
+				else
+					result = 0;
 				break;
 
 			default:
 				match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 844, !"unreachable");
+				/* BUG (original, preserved for exact matching): this arm leaves result
+				 * unassigned, and January returns it after the fatal assertion: 0x47e840 +0x61 mov eax,[ebp+8]
+				 * reads the dead first-parameter home. The Sept-25-2001 build is identical; the Aug-15-2001
+				 * build reads its uninitialised [ebp-4] slot the same way. The later /Od+/RTC build attests the
+				 * uninitialised declaration: its single exit calls _RTC_UninitUse("result").
+				 * The arm is unreachable in defined execution. compare_type is written only by profile_dump,
+				 * after its sort_mode range assertion; January's two profile_dump callers pass 0/1 and 2; and
+				 * each of the NUMBER_OF_PROFILE_SORT_MODES (3) modes has a case above that assigns result.
+				 * Were the arm entered, display_assert returns into an unconditional system_exit, which never
+				 * returns: halt_and_catch_fire loops, or calls exit() on re-entry. So the uninitialised return
+				 * is not executed in January. A corrected build assigns result in this arm. */
 				break;
 		}
 	}

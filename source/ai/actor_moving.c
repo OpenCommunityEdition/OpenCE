@@ -210,7 +210,7 @@ symbols in this file:
 #define PATH_EXTERNAL_FLEE_ROUTINES
 #include "ai/actions.h"
 #include "ai/actor_definitions.h"
-#include "ai/actor_looking.h"
+#include "math/real_math.h"
 #include "ai/actor_types.h"
 #include "ai/actors.h"
 #include "ai/ai_communication.h"

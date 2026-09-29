@@ -83,10 +83,6 @@ static boolean shader_map_verify(
 	struct shader_transparent_chicago_map *map,
 	short map_index);
 
-boolean shader_transparent_chicago_create(
-	struct shader *shader,
-	struct pixel_shader_definition *pixel_shader);
-
 /* ---------- globals */
 
 static const struct shader_transparent_chicago_combiner_table shader_transparent_chicago_combiner_table =

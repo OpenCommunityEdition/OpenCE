@@ -58,11 +58,10 @@ union rgb_color
 };
 typedef union rgb_color rgb_color;
 
-struct hsv_color
+union hsv_color
 {
-	word hue;
-	word saturation;
-	word value;
+	word n[3];
+	struct { word hue, saturation, value; };
 };
 
 union argb_color
@@ -90,11 +89,11 @@ union real_hsv_color
 	};
 };
 
-struct hsv_color *rgb_color_to_hsv_color(
+union hsv_color *rgb_color_to_hsv_color(
 	union rgb_color const *rgb,
-	struct hsv_color *hsv);
+	union hsv_color *hsv);
 union rgb_color *hsv_color_to_rgb_color(
-	struct hsv_color const *hsv,
+	union hsv_color const *hsv,
 	union rgb_color *rgb);
 union real_hsv_color *real_rgb_color_to_real_hsv_color(
 	union real_rgb_color const *rgb,

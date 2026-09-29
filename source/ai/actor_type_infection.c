@@ -159,9 +159,6 @@ void infection_swarm_aim_jump(
 	real jump_magnitude,
 	real_vector3d *jump_velocity);
 
-void unit_detach_from_parent(
-	long unit_index);
-
 /* ---------- globals */
 
 struct actor_type_definition actor_type_infection =

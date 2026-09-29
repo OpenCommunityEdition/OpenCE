@@ -260,6 +260,7 @@ symbols in this file:
 #include "ai_profile.h"
 #include "encounters.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "items/projectile_definitions.h"
 #include "items/projectiles.h"
 #include "items/weapon_definitions.h"
@@ -437,31 +438,6 @@ enum
 		(delta_x) * (delta_x) + (delta_y) * (delta_y))
 
 /* ---------- structures */
-
-struct actor_perception_ai_debug_state_view
-{
-	byte __unknown000[6];
-	boolean perception_ignore_player_props;
-	boolean perception_blind_player_props;
-	byte __unknown008[3];
-	boolean perception_blind_all_props;
-	boolean perception_deaf_all_props;
-	byte __unknown00D[0x94];
-	boolean perception_trace_player_awareness;
-};
-
-struct actor_perception_debug_info_view
-{
-	byte __unknown0000[0x6578];
-	short perception_awareness_speed;
-	short evaluation_mode;
-};
-
-#define actor_perception_ai_debug_get() \
-	((struct actor_perception_ai_debug_state_view *)&ai_debug)
-
-#define actor_perception_debug_get(index) \
-	((struct actor_perception_debug_info_view *)&actor_debug_array[(index)])
 
 #define actor_perception_object_get(index) \
 	((struct object_datum *)object_get_and_verify_type( \
@@ -748,25 +724,12 @@ struct actor_target_weight_weapon_definition_view
 	real minimum_target_range;
 };
 
-struct actor_perception_projectile_datum_view
-{
-	byte __unknown000[0x1DC];
-	byte attachment_flags;
-};
-
 struct actor_perception_vehicle_definition_view
 {
 	byte __unknown000[4];
 	real bounding_radius;
 	byte __unknown008[0x2E8];
 	byte danger_zone_flags;
-};
-
-struct actor_perception_projectile_view
-{
-	byte __unknown000[0x1F0];
-	real time_remaining;
-	real arming_rate;
 };
 
 struct actor_perception_communication_context
@@ -991,20 +954,8 @@ typedef char actor_emotion_definition_minimum_stand_offset_assert[
 	offsetof(struct actor_definition, defensive.defensive_crouch_min_stand_time) == 0x304 ? 1 : -1];
 typedef char actor_emotion_definition_minimum_crouch_offset_assert[
 	offsetof(struct actor_definition, defensive.defensive_crouch_min_crouch_time) == 0x308 ? 1 : -1];
-typedef char actor_perception_ai_debug_ignore_players_offset_assert[
-	offsetof(struct actor_perception_ai_debug_state_view, perception_ignore_player_props) == 6 ? 1 : -1];
-typedef char actor_perception_ai_debug_blind_players_offset_assert[
-	offsetof(struct actor_perception_ai_debug_state_view, perception_blind_player_props) == 7 ? 1 : -1];
-typedef char actor_perception_ai_debug_blind_all_offset_assert[
-	offsetof(struct actor_perception_ai_debug_state_view, perception_blind_all_props) == 11 ? 1 : -1];
-typedef char actor_perception_ai_debug_deaf_all_offset_assert[
-	offsetof(struct actor_perception_ai_debug_state_view, perception_deaf_all_props) == 12 ? 1 : -1];
-typedef char actor_perception_ai_debug_trace_offset_assert[
-	offsetof(struct actor_perception_ai_debug_state_view, perception_trace_player_awareness) == 0xA1 ? 1 : -1];
 typedef char actor_perception_debug_awareness_speed_offset_assert[
-	offsetof(struct actor_perception_debug_info_view, perception_awareness_speed) == 0x6578 ? 1 : -1];
-typedef char actor_perception_projectile_attachment_flags_offset_assert[
-	offsetof(struct actor_perception_projectile_datum_view, attachment_flags) == 0x1DC ? 1 : -1];
+	offsetof(struct actor_debug_info, perception_awareness_speed) == 0x6578 ? 1 : -1];
 typedef char actor_perception_source_unit_sound_offset_assert[
 	offsetof(struct unit_definition, unit.constant_sound) == 0x182 ? 1 : -1];
 typedef char actor_perception_source_actor_target_offset_assert[
@@ -1097,41 +1048,6 @@ static long actor_perception_qsort_compare_optional_props(
 	void const *a,
 	void const *b);
 
-void actor_situation_update_target_status(
-	long actor_index);
-
-void actor_situation_combat_status_update(
-	long actor_index);
-
-real actor_compute_prop_target_weight(
-	long actor_index,
-	long prop_index);
-
-boolean actor_compute_prop_unopposable(
-	long actor_index,
-	long prop_index);
-
-long ai_get_responsible_unit(
-	long object_index,
-	boolean include_self);
-
-long vehicle_find_pathfinding_surface_index(
-	long vehicle_index,
-	real_point3d *position);
-
-long biped_find_pathfinding_surface_index(
-	long biped_index,
-	real_point3d *position);
-
-boolean actor_attacking_target(
-	long actor_index,
-	real_vector3d *attack_vector);
-
-void actor_stimulus_prop_sighted(
-	long actor_index,
-	long prop_index,
-	boolean initial_acknowledgement);
-
 static long actor_perception_unit_from_swarm(
 	long swarm_actor_index,
 	long actor_index,
@@ -1154,37 +1070,6 @@ static void actor_perception_refresh_test_object(
 	struct actor_perception_refresh_list *friend_list,
 	struct actor_perception_refresh_list *enemy_list);
 
-void actor_input_sample_position(
-	long actor_index,
-	long unit_index,
-	struct actor_position_data *position);
-
-boolean vehicle_causes_collision_damage(
-	long vehicle_index);
-
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-
-short actor_visibility_at_point(
-	long actor_index,
-	struct actor_position_data const *position,
-	real_point3d const *target_position,
-	char lighting,
-	short line_of_sight,
-	boolean use_maximum_distance,
-	boolean target_is_player,
-	short perception_knowledge);
-
-short actor_audibility_at_point(
-	long actor_index,
-	struct actor_position_data const *position,
-	real_point3d const *source_position,
-	struct location const *source_location,
-	short source_type,
-	real scale,
-	short line_of_sight);
-
 static boolean actor_perception_assess_suicide_danger(
 	long actor_index,
 	long object_index,
@@ -1192,10 +1077,6 @@ static boolean actor_perception_assess_suicide_danger(
 	real distance,
 	boolean enemy,
 	boolean visible);
-
-real actor_look_compute_prop_interest(
-	long actor_index,
-	long prop_index);
 
 /* TU-local copy: the same macro exists in actor_stimulus.c. */
 #define prop_acknowledged(prop) \
@@ -5513,8 +5394,8 @@ static void actor_perception_refresh_test_object(
 			}
 			else if (current_object->object.type == _object_type_projectile)
 			{
-				struct actor_perception_projectile_datum_view *projectile =
-					(struct actor_perception_projectile_datum_view *)
+				struct projectile_datum *projectile =
+					(struct projectile_datum *)
 						current_object;
 				struct projectile_definition *projectile_definition =
 					projectile_definition_get(
@@ -5522,7 +5403,7 @@ static void actor_perception_refresh_test_object(
 
 				if (projectile_definition->projectile.danger_radius > 0.0f &&
 					(current_object->object.parent_object_index == NONE ||
-						TEST_FLAG(projectile->attachment_flags, 5)))
+						TEST_FLAG(projectile->projectile.flags, 5)))
 				{
 					struct actor_position_data position;
 					real_point3d origin;
@@ -6637,7 +6518,7 @@ void actor_perception_update(
 
 		case _prop_state_becoming_acknowledged:
 			{
-				struct actor_perception_debug_info_view *debug = actor_perception_debug_get(DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index));
+				struct actor_debug_info *debug = &actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
 
 				if (prop->perception == _actor_perception_none)
 				{

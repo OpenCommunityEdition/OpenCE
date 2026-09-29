@@ -120,10 +120,6 @@ typedef char verify_hud_global_default_title_bounds_offset[
 
 /* ---------- prototypes */
 
-void draw_quad(
-	rectangle2d *rectangle,
-	pixel32 color);
-
 /* ---------- globals */
 
 struct cinematic_global_data *cinematic_globals = NULL;

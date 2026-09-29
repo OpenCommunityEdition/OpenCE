@@ -133,6 +133,7 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
 #include "items/item_definitions.h"
+#include "memory/data.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_debug.h"

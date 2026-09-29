@@ -238,7 +238,7 @@ symbols in this file:
 #include "cseries.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "ai/actors.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
@@ -454,12 +454,6 @@ struct vehicle_runtime_datum
 		short reserved;
 		byte airborne_ticks;
 	} vehicle;
-};
-
-struct unit_animation_update_data
-{
-	char state_desired;
-	boolean crouching;
 };
 
 struct scenario_object_datum

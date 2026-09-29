@@ -8,6 +8,11 @@ header included in hcex build.
 #define __NETWORK_GAME_MANAGER_H
 #pragma once
 
+/* ---------- headers */
+
+#include "game/game_engine.h"
+#include "game/players.h"
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -18,13 +23,52 @@ struct network_game;
 struct network_machine;
 struct network_player;
 
+struct network_machine
+{
+	wchar_t name[32];
+	char machine_index;
+	byte __padding41[3];
+};
+
+struct network_game_map
+{
+	long version;
+	char name[0x80];
+};
+
+struct network_game_local_data
+{
+	boolean game_objects_loaded;
+	byte __padding431[3];
+};
+
+struct network_game
+{
+	wchar_t name[16];
+	struct network_game_map map;
+	struct game_variant variant;
+	byte __padding10C;
+	char minimum_players;
+	char maximum_players;
+	byte maximum_teams;
+	short difficulty;
+	short machine_count;
+	struct network_machine machines[4];
+	short player_count;
+	struct network_player players[16];
+	short __unknown426;
+	unsigned long random_seed;
+	long number_of_games_played;
+	struct network_game_local_data local_data;
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 void network_game_invalidate_player(
 	struct network_player *player);
 void network_game_end_and_load_ui(
 	struct network_game *game);
-void network_game_dump(
+void network_game_assign_players_to_team(
 	struct network_game *game,
 	char const *prefix);
 boolean network_player_is_valid(

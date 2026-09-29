@@ -446,12 +446,9 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/ai.h"
-#include "ai/ai_runtime.h"
 #include "ai/actions.h"
-#include "ai/actor_iterators.h"
 #include "ai/actor_definitions.h"
 #include "ai/actor_types.h"
-#include "ai/actor_looking.h"
 #include "ai/actors.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
@@ -472,7 +469,6 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
-#include "units/vehicle_scripting.h"
 
 /* ---------- constants */
 

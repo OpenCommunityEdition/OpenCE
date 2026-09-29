@@ -31,9 +31,6 @@ void set_window_camera_values(
 	struct render_window *window,
 	struct observer_result const *observer);
 
-void main_game_render(
-	double time_delta_since_tick_sec);
-
 void game_connection_set(
 	short connection);
 

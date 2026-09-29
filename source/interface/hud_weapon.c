@@ -58,7 +58,6 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud_draw.h"
 #include "interface/hud.h"

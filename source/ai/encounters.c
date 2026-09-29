@@ -281,13 +281,11 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/actor_activation.h"
-#include "ai/actor_iterators.h"
 #include "encounters.h"
 
 #include "actions.h"
 #include "actors.h"
 #include "actor_definitions.h"
-#include "actor_iterators.h"
 #include "actor_placement.h"
 #include "actor_types.h"
 #include "ai.h"

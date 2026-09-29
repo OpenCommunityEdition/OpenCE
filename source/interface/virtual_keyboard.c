@@ -905,7 +905,7 @@ static void virtual_keyboard_render_internal(
 	return;
 }
 
-long virtual_keyboard_free_space_in_text_buffer(
+static long virtual_keyboard_free_space_in_text_buffer(
 	void)
 {
 	return virtual_keyboard_globals.buffer_size -
@@ -1094,15 +1094,15 @@ static boolean virtual_keyboard_select(
 			virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
 		}
 		{
-			long buffer_size = virtual_keyboard_globals.buffer_size;
-			long free_space = buffer_size - 2 * (ustrlen(virtual_keyboard_globals.text_buffer) + 1);
+			long move_size;
 
-			if (free_space >= 2)
+			if (virtual_keyboard_free_space_in_text_buffer() >= 2)
 			{
+				move_size = virtual_keyboard_globals.buffer_size - ((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) - sizeof(wchar_t);
 				csmemmove(
 					virtual_keyboard_globals.cursor + 1,
 					virtual_keyboard_globals.cursor,
-					buffer_size - ((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) - sizeof(wchar_t));
+					move_size);
 				*virtual_keyboard_globals.cursor++ = virtual_keyboard_get_current_character();
 				if (ustrcmp(virtual_keyboard_globals.text_buffer, L".fortune") == 0)
 				{

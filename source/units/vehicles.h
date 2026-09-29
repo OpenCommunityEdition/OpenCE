@@ -39,6 +39,10 @@ struct vehicle_runtime_datum;
 void vehicle_hover(
 	long vehicle_index,
 	boolean hover);
+void vehicle_reset(
+	long object_index);
+boolean vehicle_new(
+	long object_index);
 
 void vehicles_initialize(
 	void);
@@ -53,14 +57,25 @@ boolean vehicle_moving_near_any_player(
 boolean vehicle_stuck(
 	long vehicle_index,
 	real_vector3d *direction);
+void vehicle_export_function_values(
+	long object_index);
 void vehicle_delete(
+	long vehicle_index);
+boolean vehicle_causes_collision_damage(
 	long vehicle_index);
 long vehicle_find_pathfinding_surface_index(
 	long vehicle_index,
 	real_point3d *position);
+void vehicle_preprocess_node_orientations(
+	long object_index,
+	struct real_orientation *node_orientations);
+boolean vehicle_update(
+	long object_index);
 void vehicle_accelerate(
 	long vehicle_index,
 	real_vector3d const *acceleration);
+void vehicle_render_debug(
+	long object_index);
 
 /* ---------- globals */
 

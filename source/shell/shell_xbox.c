@@ -35,13 +35,11 @@ symbols in this file:
 #include "shell.h"
 #include "physical_memory_map.h"
 #include "main.h"
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- prototypes */
 
 static void fuck_code_in_the_eye(
-	void);
-
-void rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 	void);
 
 /* ---------- globals */

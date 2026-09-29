@@ -28,7 +28,6 @@ symbols in this file:
 
 #include "cseries.h"
 #include "actions.h"
-#include "action_converse.h"
 
 #include "actors.h"
 #include "ai_communication.h"

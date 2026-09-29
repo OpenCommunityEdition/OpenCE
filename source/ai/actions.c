@@ -416,41 +416,6 @@ typedef char firing_position_evaluation_context_size_assert[
 
 /* ---------- prototypes */
 
-boolean action_guard_setup_from_fleeing(
-	long actor_index,
-	struct flee_state_data *flee_state,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_from_combat_transition(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_current_position(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_find_position(
-	long actor_index,
-	long wait_ticks,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_postcombat(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-void actor_action_change(
-	long actor_index,
-	long new_action_type,
-	struct action_state_data *new_action_data);
-
-long actor_perception_find_recent_damaging_prop_index(
-	long actor_index,
-	boolean enemies_only);
-
-long ai_get_responsible_unit(
-	long object_index,
-	boolean include_self);
-
 boolean actor_action_handle_combat_selection(
 	long actor_index);
 
@@ -460,34 +425,6 @@ boolean actor_action_handle_lost_contact(
 boolean actor_action_allow_cover_seeking(
 	long actor_index,
 	boolean unopposable);
-
-short vehicle_scripting_find_available_seats(
-	long vehicle_index,
-	char const *seat_substring_name,
-	short seat_desire_type,
-	short *seat_indices,
-	short maximum_seat_count);
-
-boolean action_vehicle_setup_specific(
-	long actor_index,
-	long vehicle_index,
-	short seat_index,
-	struct vehicle_state_data *state_data);
-
-void actor_perception_tried_to_uncover(
-	long actor_index,
-	long prop_index);
-
-void actor_perception_tried_to_search(
-	long actor_index,
-	long prop_index);
-
-void actor_perception_abandoned_search(
-	long actor_index,
-	long prop_index);
-
-boolean actor_action_consider_grenade(
-	long actor_index);
 
 boolean actor_action_test_grenade(
 	long actor_index);
@@ -507,63 +444,6 @@ boolean actor_action_try_to_throw_grenade(
 	long actor_index,
 	boolean known_trajectory);
 
-boolean action_vehicle_setup_impromptu(
-	long actor_index,
-	long vehicle_index,
-	real attempt_distance,
-	real continue_distance,
-	struct vehicle_state_data *state_data);
-
-boolean action_charge_setup(
-	long actor_index,
-	short goal,
-	struct charge_state_data *state_data);
-
-boolean action_fight_setup(
-	long actor_index,
-	struct fight_state_data *state_data);
-
-boolean action_uncover_setup_target(
-	long actor_index,
-	boolean able_to_search,
-	struct uncover_state_data *state_data);
-
-boolean action_uncover_setup_pursuit(
-	long actor_index,
-	short firing_position_index,
-	struct uncover_state_data *state_data);
-
-boolean action_search_setup_target(
-	long actor_index,
-	boolean must_charge,
-	struct search_state_data *state_data);
-
-boolean action_search_setup_pursuit(
-	long actor_index,
-	short firing_position_index,
-	boolean tenacious,
-	struct search_state_data *state_data);
-
-boolean action_search_setup_undirected(
-	long actor_index,
-	boolean tenacious,
-	struct search_state_data *state_data);
-
-boolean action_wait_setup(
-	long actor_index,
-	boolean was_actively_searching,
-	struct wait_state_data *state_data);
-
-boolean action_avoid_setup(
-	long actor_index,
-	struct avoid_state_data *state_data);
-
-real vector_to_line_distance_squared3d(
-	real_point3d const *point,
-	real_vector3d const *vector,
-	real_point3d const *base,
-	real_vector3d const *height);
-
 boolean actor_move_try_evasion_direction(
 	long actor_index,
 	real_vector2d *alignment_vector,
@@ -581,122 +461,6 @@ boolean actor_move_try_evasion_vector(
 	boolean *is_ledge,
 	void *collision_result);
 
-void actor_stimulus_was_surprised(
-	long actor_index);
-
-boolean actor_situation_try_new_target(
-	long actor_index,
-	long prop_index);
-
-void action_sleep_control(
-	long actor_index);
-
-void action_fight_begin(
-	long actor_index);
-boolean action_fight_perform(
-	long actor_index);
-void action_fight_update(
-	long actor_index);
-void action_fight_control(
-	long actor_index);
-void action_fight_end(
-	long actor_index);
-
-void action_uncover_begin(
-	long actor_index);
-boolean action_uncover_perform(
-	long actor_index);
-void action_uncover_update(
-	long actor_index);
-void action_uncover_control(
-	long actor_index);
-void action_uncover_modify_color(
-	long actor_index,
-	real_argb_color *color);
-void action_uncover_flush_position_indices(
-	long actor_index);
-
-void action_guard_begin(
-	long actor_index);
-boolean action_guard_perform(
-	long actor_index);
-void action_guard_update(
-	long actor_index);
-void action_guard_control(
-	long actor_index);
-void action_guard_end(
-	long actor_index);
-void action_guard_modify_color(
-	long actor_index,
-	real_argb_color *color);
-void action_guard_replace_prop(
-	long actor_index,
-	long invalid_prop_index,
-	long replacement_prop_index);
-void action_guard_flush_position_indices(
-	long actor_index);
-void action_guard_flush_structure_indices(
-	long actor_index);
-
-void action_search_begin(
-	long actor_index);
-boolean action_search_perform(
-	long actor_index);
-void action_search_update(
-	long actor_index);
-void action_search_control(
-	long actor_index);
-void action_search_flush_position_indices(
-	long actor_index);
-
-void action_wait_begin(
-	long actor_index);
-boolean action_wait_perform(
-	long actor_index);
-void action_wait_update(
-	long actor_index);
-void action_wait_control(
-	long actor_index);
-
-boolean action_vehicle_perform(
-	long actor_index);
-void action_vehicle_update(
-	long actor_index);
-
-void action_charge_begin(
-	long actor_index);
-boolean action_charge_perform(
-	long actor_index);
-void action_charge_update(
-	long actor_index);
-void action_charge_control(
-	long actor_index);
-
-void action_converse_begin(
-	long actor_index);
-boolean action_converse_perform(
-	long actor_index);
-void action_converse_update(
-	long actor_index);
-void action_converse_control(
-	long actor_index);
-void action_converse_end(
-	long actor_index);
-void action_converse_replace_prop(
-	long actor_index,
-	long invalid_prop_index,
-	long replacement_prop_index);
-
-void action_avoid_begin(
-	long actor_index);
-boolean action_avoid_perform(
-	long actor_index);
-void action_avoid_update(
-	long actor_index);
-void action_avoid_control(
-	long actor_index);
-void action_avoid_end(
-	long actor_index);
 
 static boolean actor_action_allowed_to_enter_vehicle(
 	long actor_index,

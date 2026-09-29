@@ -143,8 +143,7 @@ symbols in this file:
 #include "main/main.h"
 #include "math/integer_math.h"
 #include "rasterizer.h"
-#include "rasterizer_debug_options.h"
-#include "rasterizer_frame_statistics.h"
+#include "rasterizer_console_vars.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "text/draw_string.h"
@@ -271,7 +270,7 @@ void rasterizer_frame_statistics_begin(
 void rasterizer_frame_statistics_get_fps(
 	struct rasterizer_frame_statistics_globals *frame_statistics)
 {
-	if (rasterizer_debug_options.stats && frame_statistics)
+	if (rasterizer_debug_options.statistics_mode && frame_statistics)
 	{
 		unsigned long current_time = system_milliseconds();
 		short sample_count = fps_sample_count;
@@ -459,7 +458,7 @@ long rasterizer_frame_statistics_count_dynamic_vertices(
 void rasterizer_frame_statistics_draw(
 	void)
 {
-	if (rasterizer_debug_options.stats)
+	if (rasterizer_debug_options.statistics_mode)
 	{
 		char string[STATISTICS_TEXT_BUFFER_SIZE];
 		point2d cursor = { 0, 0 };
@@ -572,17 +571,17 @@ void rasterizer_frame_statistics_draw(
 		rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
 		bounds.y0 = cursor.y + line_advance;
 
-		if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_objects)
+		if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_objects)
 		{
 			tab_stops[0] = left;
 			draw_string_set_tab_stops(tab_stops, NUMBER_OF_STATISTICS_TAB_STOPS);
 			draw_string_set_color(&data_color);
 
 			sprintf(string, "|tfogged|t%d|n|tnormal|t%d|n|tfast|t%d|n|tscenery|t%d|n",
-				rasterizer_frame_statistics.fogged_object_count,
-				rasterizer_frame_statistics.normal_object_count,
-				rasterizer_frame_statistics.fast_object_count,
-				rasterizer_frame_statistics.scenery_object_count);
+				rasterizer_frame_statistics.vertices_by_permutation[0],
+				rasterizer_frame_statistics.vertices_by_permutation[1],
+				rasterizer_frame_statistics.vertices_by_permutation[2],
+				rasterizer_frame_statistics.vertices_by_permutation[3]);
 			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
 			bounds.y0 = cursor.y + line_advance;
 
@@ -599,7 +598,7 @@ void rasterizer_frame_statistics_draw(
 			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
 			bounds.y0 = cursor.y + line_advance;
 		}
-		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_geometry)
+		else if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_geometry)
 		{
 			sprintf(string, "|t|tvertices|ttriangles|tprimitives");
 			tab_stops[0] = left;
@@ -725,7 +724,7 @@ void rasterizer_frame_statistics_draw(
 			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
 			bounds.y0 = cursor.y + line_advance;
 		}
-		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_profile)
+		else if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_profile)
 		{
 			short profile;
 
@@ -771,7 +770,7 @@ void rasterizer_frame_statistics_draw(
 			rasterizer_draw_string(&bounds, NULL, &cursor, height_adjust, string);
 			bounds.y0 = cursor.y + line_advance;
 		}
-		else if (rasterizer_debug_options.stats == _rasterizer_statistics_mode_memory)
+		else if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_memory)
 		{
 			long total_allocation = 0;
 			long total_unique_allocation = 0;
@@ -843,7 +842,7 @@ void rasterizer_frame_statistics_draw(
 		draw_string_set_color(&default_color);
 	}
 
-	if (rasterizer_debug_options.profile_log)
+	if (rasterizer_debug_options.profile_log_enabled)
 	{
 		if (!rasterizer_frame_statistics_private_globals.profile_log_file)
 		{
@@ -856,7 +855,7 @@ void rasterizer_frame_statistics_draw(
 					_error_silent,
 					"### ERROR failed to open rasterizer profile log (%s)",
 					profile_log_path);
-				rasterizer_debug_options.profile_log = FALSE;
+				rasterizer_debug_options.profile_log_enabled = FALSE;
 			}
 
 			profile_accumulated_time = 0.0f;

@@ -549,9 +549,7 @@ symbols in this file:
 #include "ai_profile.h"
 #include "ai_script.h"
 #include "actions.h"
-#include "action_converse.h"
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "actor_types.h"
 #include "ai_scenario_definitions.h"
@@ -1054,8 +1052,6 @@ static boolean ai_conversation_line_perform(
 	long conversation_index);
 static void ai_conversation_line_end(
 	long conversation_index);
-boolean actor_is_fighting(
-	long actor_index);
 static void actor_reset_idle_vocalization_timer(
 	long actor_index);
 static void ai_communication_handle_received_looking(
@@ -1068,29 +1064,8 @@ static void ai_communication_update_speech_timers(
 	short vocalization_type,
 	short dialogue_type_index,
 	short reply_table_index);
-short unit_test_speech(
-	long unit_index,
-	short priority,
-	boolean allow_recursive_lookup,
-	boolean allow_queue,
-	long *unit_last_speech_time,
-	short *vocalization_type_reference,
-	long *sound_definition_index_reference);
-void unit_speak(
-	long unit_index,
-	short play_type,
-	struct unit_speech_item const *speech_item);
 boolean sound_scripted_dialog_is_playing(
 	void);
-void ai_handle_allegiance_broken_notification(
-	short team1_index,
-	short team2_index,
-	boolean broken);
-void actor_iterator_new(
-	struct actor_iterator *iterator,
-	boolean active_only);
-struct actor_datum *actor_iterator_next(
-	struct actor_iterator *iterator);
 static boolean ai_conversation_find_participant(
 	long conversation_index,
 	short participant_index,
@@ -1107,23 +1082,6 @@ static long ai_communication_find_actor_to_reply_to_player(
 	short vocalization_type,
 	short damage_category,
 	real *reply_rating_reference);
-void actor_perception_find_sense_position(
-	long actor_index,
-	real_point3d const *position,
-	long prop_index,
-	struct actor_position_data *sense_position);
-short actor_audibility_at_point(
-	long actor_index,
-	struct actor_position_data const *position,
-	real_point3d const *source_position,
-	struct location const *source_location,
-	short source_type,
-	real scale,
-	short line_of_sight);
-void actor_handle_communication(
-	long actor_index,
-	long prop_index,
-	struct ai_information_packet *information);
 
 extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 extern struct ai_communication_globals_view *ai_globals;

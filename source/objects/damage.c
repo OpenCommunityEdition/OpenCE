@@ -325,10 +325,6 @@ typedef char object_damage_body_body_destroyed_threshold_offset_assert[
 static long get_player_index_from_object_or_parents(
 	long object_index);
 
-boolean unit_unsuspecting(
-	long unit_index,
-	real_point3d const *point);
-
 static void object_permutation_shield_regions(
 	long object_index,
 	boolean active);

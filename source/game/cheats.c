@@ -49,6 +49,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cheats.h"
 #include "cache/cache_files.h"
 #include "camera/director.h"

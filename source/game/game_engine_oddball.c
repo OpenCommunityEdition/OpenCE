@@ -107,7 +107,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game/game_engine_place.h"
-#include "game/game_engine_runtime.h"
+#include "game/game_engine.h"
 #include "game.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"

@@ -83,7 +83,6 @@ symbols in this file:
 #include "devices/device_controls.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
@@ -192,6 +191,13 @@ typedef char weapon_interface_state_size_assert[
 	sizeof(struct weapon_interface_state) == 0x20 ? 1 : -1];
 
 /* ---------- prototypes */
+static void hud_draw_players(
+	void);
+static void temporary_hud_draw_reticle(
+	real angle,
+	union real_argb_color const *color);
+static void temporary_hud_draw(
+	void);
 
 /* ---------- globals */
 
@@ -199,7 +205,7 @@ struct hud_globals_definition *hud_globals = NULL;
 struct hud_scripted_globals_definition *hud_scripted_globals = NULL;
 extern boolean temporary_hud;
 
-wchar_t const *default_string = L"";
+static wchar_t const *default_string = L"";
 
 /* ---------- public code */
 
@@ -792,7 +798,7 @@ void hud_picked_up_powerup(
 	return;
 }
 
-void temporary_hud_draw_reticle(
+static void temporary_hud_draw_reticle(
 	real angle,
 	real_argb_color const *color)
 {
@@ -945,7 +951,7 @@ static void hud_draw_friendly_indicator(
 	return;
 }
 
-void hud_draw_players(
+static void hud_draw_players(
 	void)
 {
 	long player_index = local_player_get_player_index(render.local_player_index);
@@ -981,7 +987,7 @@ void hud_draw_players(
 	return;
 }
 
-void temporary_hud_draw(
+static void temporary_hud_draw(
 	void)
 {
 	long player_index = local_player_get_player_index(render.local_player_index);

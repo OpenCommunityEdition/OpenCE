@@ -455,9 +455,6 @@ static void cache_copy_block_on_raw_write(
 	struct simple_decompressor_definition *self);
 static void cache_copy_wait_for_async_io(
 	struct simple_decompressor_definition *self);
-struct cache_copy_read_request *acquire_read_request(
-	struct simple_decompressor_definition *self,
-	short read_sequence_index);
 static void cache_copy_issue_read(
 	struct simple_decompressor_definition *self,
 	void *buffer,

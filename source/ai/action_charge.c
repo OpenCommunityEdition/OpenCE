@@ -86,7 +86,6 @@ symbols in this file:
 #include "actions.h"
 
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "ai.h"
 #include "ai_communication.h"
@@ -120,14 +119,6 @@ enum
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-boolean unit_get_melee_range_and_ticks(
-	long unit_index,
-	boolean secondary,
-	short *melee_tick,
-	real *attack_time,
-	short *frame_count,
-	real *damage_time);
 
 static real action_charge_find_target_range(
 	long actor_index,

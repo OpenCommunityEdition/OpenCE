@@ -211,7 +211,7 @@ symbols in this file:
 #include "projectiles.h"
 
 #include "ai/actors.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "cache/cache_files.h"
 #include "cseries/profile.h"
 #include "effects/effect_definitions.h"
@@ -221,6 +221,7 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
+#include "math/periodic_functions.h"
 #include "models/model_animation_definitions.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
@@ -356,13 +357,6 @@ struct trigger_firing_effect
 };
 
 /* ---------- prototypes */
-
-real transition_function_evaluate(
-	short function_type,
-	real value);
-void unit_handle_weapon_state_change(
-	long object_index,
-	short new_state);
 
 static struct weapon_trigger *weapon_trigger_get(
 	struct weapon_datum *weapon,
@@ -2018,7 +2012,8 @@ static boolean weapon_state_interruptable(
 }
 
 void weapon_preprocess_node_orientations(
-	long weapon_index)
+	long weapon_index,
+	struct real_orientation *node_orientations)
 {
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);

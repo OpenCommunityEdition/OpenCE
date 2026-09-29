@@ -168,13 +168,17 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
+#include "effects/contrails.h"
+#include "effects/decals.h"
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "effects/particle_systems.h"
+#include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "camera/observer.h"
 #include "main/main.h"
+#include "objects/object_lights.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_usage.h"
@@ -187,6 +191,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "scenario/wind.h"
 #include "sound/sound_definitions.h"
+#include "sound/sound_manager.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 
@@ -216,40 +221,6 @@ struct memory_status
 void _ReadWriteBarrier(
 	void);
 #pragma intrinsic(_ReadWriteBarrier)
-
-void objects_reconnect_to_structure_bsp(
-	void);
-void lights_reconnect_to_structure_bsp(
-	void);
-void particles_reconnect_to_structure_bsp(
-	void);
-void contrails_reconnect_to_structure_bsp(
-	void);
-void decals_reconnect_to_structure_bsp(
-	void);
-void structure_decals_reconnect_to_structure_bsp(
-	void);
-void players_reconnect_to_structure_bsp(
-	void);
-void sound_reconnect_to_structure_bsp(
-	void);
-void object_types_reconnect_to_structure_bsp(
-	void);
-
-void object_types_disconnect_from_structure_bsp(
-	void);
-void objects_disconnect_from_structure_bsp(
-	void);
-void lights_disconnect_from_structure_bsp(
-	void);
-void particles_disconnect_from_structure_bsp(
-	void);
-void contrails_disconnect_from_structure_bsp(
-	void);
-void structure_decals_disconnect_from_structure_bsp(
-	void);
-void decals_disconnect_from_structure_bsp(
-	void);
 
 typedef void (*scenario_structure_bsp_connection_proc)(
 	void);
@@ -315,7 +286,7 @@ struct game_globals *global_game_globals;
 
 /* ---------- public code */
 
-void scenario_call_disconnect_from_structure_bsp_procs(
+static void scenario_call_disconnect_from_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -326,7 +297,7 @@ void scenario_call_disconnect_from_structure_bsp_procs(
 	return;
 }
 
-void scenario_call_reconnect_to_structure_bsp_procs(
+static void scenario_call_reconnect_to_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -1017,7 +988,6 @@ boolean scenario_switch_structure_bsp(
 {
 	boolean result = FALSE;
 	boolean had_old_structure_bsp;
-	short proc_index;
 	struct scenario_structure_bsp_reference *reference;
 
 	if (structure_bsp_index != global_structure_bsp_index &&
@@ -1036,8 +1006,7 @@ boolean scenario_switch_structure_bsp(
 
 		if (global_structure_bsp_index != NONE)
 		{
-			for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_disconnect_proc_table); proc_index++)
-				scenario_structure_bsp_disconnect_procs[proc_index]();
+			scenario_call_disconnect_from_structure_bsp_procs();
 
 			had_old_structure_bsp = TRUE;
 			scenario_structure_bsp_unload(TAG_BLOCK_GET_ELEMENT(
@@ -1064,8 +1033,7 @@ boolean scenario_switch_structure_bsp(
 
 			if (had_old_structure_bsp)
 			{
-				for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_reconnect_proc_table); proc_index++)
-					scenario_structure_bsp_reconnect_procs[proc_index]();
+				scenario_call_reconnect_to_structure_bsp_procs();
 			}
 			result = TRUE;
 		}

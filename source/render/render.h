@@ -142,6 +142,13 @@ void render_objects_dispose_from_old_map(
 	void);
 void render_objects_dispose(
 	void);
+struct render_lighting *object_get_cached_render_lighting(
+	long object_index,
+	real level_of_detail_pixels);
+void render_objects(
+	void);
+void render_object_shadows(
+	void);
 
 /* ---------- globals */
 

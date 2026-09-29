@@ -336,6 +336,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/cseries_windows.h"
+#include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
 #include "interface/ui_widget.h"
 #include "interface/ui_widget_definitions.h"
@@ -483,25 +484,6 @@ struct widget_instance
 	struct ui_widget_animation_data animation;
 };
 
-struct ui_game_variant
-{
-	byte padding00[0x18];
-	enum game_engine_type engine_type;
-	boolean has_teams;
-	byte padding1D[0x23];
-	long score_to_win;
-	byte padding44[0x08];
-	union
-	{
-		boolean ctf_assault;
-		long race_type;
-	} game_mode;
-	long single_flag_time;
-	byte padding54[0x08];
-	long oddball_ball_type;
-	byte padding60[0x08];
-};
-
 struct network_advertised_game
 {
 	byte padding00[0x30];
@@ -518,29 +500,6 @@ struct network_advertised_game
 	boolean valid;
 	boolean has_teams;
 	boolean oddball_variant;
-};
-
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte padding41[3];
-};
-
-struct network_game
-{
-	byte padding000[0x24];
-	char map_name[0x80];
-	struct ui_game_variant variant;
-	byte padding10C;
-	byte game_mode;
-	byte maximum_player_count;
-	byte padding10F;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[16];
 };
 
 typedef char network_advertised_game_size_assert[
@@ -1424,7 +1383,7 @@ static void network_pregame_status_screen_update(
 						seconds_to_game_start - (hours * 60 + minutes) * 60);
 				}
 			}
-			else if (waiting_for_machines || game->variant.has_teams == TRUE)
+			else if (waiting_for_machines || game->variant.universal_variant.teams == TRUE)
 			{
 				status_text->visible = FALSE;
 				countdown_text->visible = FALSE;
@@ -1528,7 +1487,7 @@ static void network_pregame_status_screen_update(
 				team_list && team_list->type == _ui_widget_type_spinner_list,
 				"expected a spinner list for local player team display");
 
-			if (!game->variant.has_teams)
+			if (!game->variant.universal_variant.teams)
 				widget_instance_set_visibility_recursive(team_list, FALSE);
 			else
 				widget_instance_set_visibility_recursive(team_list, TRUE);
@@ -1564,7 +1523,7 @@ static void network_pregame_status_screen_update(
 					name_text->parameters.text_box.text[name_length] = 0;
 				}
 
-				if (!game->variant.has_teams)
+				if (!game->variant.universal_variant.teams)
 				{
 					controller_bitmap->animation.current_frame_index = 1;
 				}
@@ -1705,7 +1664,7 @@ static void network_pregame_status_screen_update(
 						{
 							player_widget->animation.current_frame_index = 2;
 						}
-						else if (!game->variant.has_teams)
+						else if (!game->variant.universal_variant.teams)
 						{
 							player_widget->animation.current_frame_index =
 								local_player_controller_bitmap_frames[0][local_player_index][0];
@@ -1822,7 +1781,7 @@ static void splitscreen_pregame_status_screen_update(
 						seconds_to_game_start - (hours * 60 + minutes) * 60);
 				}
 			}
-			else if (game->player_count < 2 || game->variant.has_teams == TRUE)
+			else if (game->player_count < 2 || game->variant.universal_variant.teams == TRUE)
 			{
 				status_text->visible = FALSE;
 				countdown_text->visible = FALSE;
@@ -1912,7 +1871,7 @@ static void splitscreen_pregame_status_screen_update(
 			name_text = controller_bitmap->next;
 			team_list = name_text->next;
 
-			if (!game->variant.has_teams)
+			if (!game->variant.universal_variant.teams)
 				widget_instance_set_visibility_recursive(team_list, FALSE);
 
 			if (local_player_indices[local_player_index] == NONE)
@@ -1946,7 +1905,7 @@ static void splitscreen_pregame_status_screen_update(
 					name_text->parameters.text_box.text[name_length] = 0;
 				}
 
-				if (!game->variant.has_teams)
+				if (!game->variant.universal_variant.teams)
 				{
 					controller_bitmap->animation.current_frame_index = 1;
 				}
@@ -2427,7 +2386,7 @@ static void multiplayer_game_set_text_box_for_map_name(
 	game = network_game_get_game();
 	if (game)
 	{
-		map_name = game->map_name;
+		map_name = game->map.name;
 	if (strstr(map_name, "beavercreek"))
 	{
 		widget->parameters.text_box.string_list_index = 0;
@@ -2511,20 +2470,20 @@ static void multiplayer_game_set_text_box_for_game_ruleset(
 	game = network_game_get_game();
 	if (game)
 	{
-		switch (game->variant.engine_type)
+		switch (game->variant.game_engine_index)
 		{
 		case game_engine_ctf:
-			if (game->variant.game_mode.ctf_assault == TRUE)
+			if (game->variant.game_engine_variant.ctf.assault == TRUE)
 			{
 				widget->parameters.text_box.string_list_index =
-					game->variant.single_flag_time ?
+					game->variant.game_engine_variant.ctf.single_flag_time ?
 						_multiplayer_game_text_string_single_flag_assault :
 						_multiplayer_game_text_string_assault;
 			}
 			else
 			{
 				widget->parameters.text_box.string_list_index =
-					game->variant.single_flag_time ?
+					game->variant.game_engine_variant.ctf.single_flag_time ?
 						_multiplayer_game_text_string_single_flag_ctf :
 						_multiplayer_game_text_string_capture_the_flag;
 			}
@@ -2534,7 +2493,7 @@ static void multiplayer_game_set_text_box_for_game_ruleset(
 				_multiplayer_game_text_string_slayer;
 			break;
 		case game_engine_oddball:
-			switch (game->variant.oddball_ball_type)
+			switch (game->variant.game_engine_variant.oddball.oddball_ball_type)
 			{
 			case 1:
 				widget->parameters.text_box.string_list_index =
@@ -2555,7 +2514,7 @@ static void multiplayer_game_set_text_box_for_game_ruleset(
 				_multiplayer_game_text_string_king_of_the_hill;
 			break;
 		case game_engine_race:
-			switch (game->variant.game_mode.race_type)
+			switch (game->variant.game_engine_variant.race.race_type)
 			{
 			case 2:
 				widget->parameters.text_box.string_list_index =
@@ -2593,7 +2552,7 @@ static void multiplayer_game_set_text_box_for_teams_noteams(
 	game = network_game_get_game();
 	if (game)
 	{
-		widget->parameters.text_box.string_list_index = game->variant.has_teams != TRUE ? 13 : 12;
+		widget->parameters.text_box.string_list_index = game->variant.universal_variant.teams != TRUE ? 13 : 12;
 		return;
 	}
 
@@ -2622,7 +2581,7 @@ static void multiplayer_game_set_text_box_for_score_limit(
 			0xAC8);
 		if (widget->parameters.text_box.text)
 		{
-			usnprintf(widget->parameters.text_box.text, 7, L"%d", game->variant.score_to_win);
+			usnprintf(widget->parameters.text_box.text, 7, L"%d", game->variant.universal_variant.score_to_win);
 			widget->parameters.text_box.text[7] = 0;
 		}
 		return;
@@ -2646,7 +2605,7 @@ static void multiplayer_game_set_text_box_for_score_limit_type(
 	game = network_game_get_game();
 	if (game)
 	{
-		switch (game->variant.engine_type)
+		switch (game->variant.game_engine_index)
 		{
 		case game_engine_ctf:
 			widget->parameters.text_box.string_list_index =
@@ -2657,7 +2616,7 @@ static void multiplayer_game_set_text_box_for_score_limit_type(
 				_multiplayer_game_text_string_frags;
 			break;
 		case game_engine_oddball:
-			widget->parameters.text_box.string_list_index = game->variant.oddball_ball_type == 2 ?
+			widget->parameters.text_box.string_list_index = game->variant.game_engine_variant.oddball.oddball_ball_type == 2 ?
 				_multiplayer_game_text_string_frags : _multiplayer_game_text_string_minutes;
 			break;
 		case game_engine_king:
@@ -2695,7 +2654,7 @@ static void multiplayer_game_set_bitmap_for_map(
 	game = network_game_get_game();
 	if (game)
 	{
-		map_name = game->map_name;
+		map_name = game->map.name;
 	if (strstr(map_name, "beavercreek"))
 	{
 		widget->animation.current_frame_index = 0;
@@ -2779,7 +2738,7 @@ static void multiplayer_game_set_bitmap_for_ruleset(
 	game = network_game_get_game();
 	if (game)
 	{
-		switch (game->variant.engine_type)
+		switch (game->variant.game_engine_index)
 		{
 		case game_engine_ctf:
 			widget->animation.current_frame_index = _multiplayer_game_bitmap_ctf;
@@ -2939,7 +2898,7 @@ static void multiplayer_game_directions(
 	}
 
 	if (game &&
-		game->variant.has_teams == TRUE &&
+		game->variant.universal_variant.teams == TRUE &&
 		network_game_client_get_seconds_to_game_start(global_network_game_client_get()) < 0)
 	{
 		long team_one_player_count = 0;
@@ -2995,7 +2954,7 @@ static void teams_no_teams_mp_game_bitmap_update(
 		"expected a container bitmap for mp pregame header widget");
 
 	if (game)
-		widget->animation.current_frame_index = game->variant.has_teams != TRUE;
+		widget->animation.current_frame_index = game->variant.universal_variant.teams != TRUE;
 	return;
 }
 

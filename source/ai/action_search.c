@@ -55,13 +55,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-long actor_target_unit_index(
-	long actor_index);
-
-boolean actors_searching_same_position(
-	long actor_index,
-	long other_actor_index);
-
 /* ---------- public code */
 
 boolean action_search_setup_target(

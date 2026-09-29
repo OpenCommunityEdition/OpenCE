@@ -208,10 +208,8 @@ symbols in this file:
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
 #include "ai/ai_profile.h"
-#include "ai/ai_runtime.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/ai_script.h"
-#include "ai/actor_iterators.h"
 #include "ai/actor_placement.h"
 #include "ai/actor_types.h"
 #include "ai/actions.h"
@@ -228,6 +226,7 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "game/players.h"
 
+#include "main/console.h"
 #include "memory/data.h"
 #include "objects/damage.h"
 #include "physics/collision_usage.h"

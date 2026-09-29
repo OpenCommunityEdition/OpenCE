@@ -651,20 +651,23 @@ symbols in this file:
 #include "dialogue_definitions.h"
 #include "unit_definitions.h"
 
-#include "ai/actor_looking.h"
+#include "math/real_math.h"
 #include "ai/actors.h"
 #include "ai/ai_debug.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
+#include "devices/device_machines.h"
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "game/cheats.h"
+#include "game/game_allegiance.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
+#include "interface/first_person_weapons.h"
 #include "items/equipment.h"
 #include "items/equipment_definitions.h"
 #include "items/projectiles.h"
@@ -676,6 +679,7 @@ symbols in this file:
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
 #include "objects/object_lights.h"
+#include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp.h"
 #include "physics/collision_models.h"
 #include "physics/collision_usage.h"
@@ -817,15 +821,6 @@ struct unit_control_data
 typedef char unit_control_data_size_assert[
 	sizeof(struct unit_control_data) == 0x40 ? 1 : -1];
 
-struct unit_animation_update_data
-{
-	char state_desired;
-	boolean crouching;
-};
-
-typedef char unit_animation_update_data_size_assert[
-	sizeof(struct unit_animation_update_data) == 0x2 ? 1 : -1];
-
 struct unit_initial_weapon
 {
 	struct tag_reference weapon;
@@ -852,17 +847,7 @@ typedef char game_globals_flaming_death_offset_check[
 
 /* ---------- prototypes */
 
-void player_died(
-	long player_index);
-void actor_died(
-	long actor_index);
-void actor_swarm_unit_died(
-	long swarm_actor_index,
-	long unit_index);
-
 void unit_detach_from_parent(
-	long unit_index);
-void unit_start_running_blindly(
 	long unit_index);
 void unit_start_flaming_to_death(
 	long unit_index,
@@ -872,15 +857,6 @@ void unit_flame_to_death(
 boolean unit_unsuspecting(
 	long unit_index,
 	real_point3d const *point);
-void unit_impact_melee_damage(
-	long unit_index,
-	long target_object_index,
-	short node_index,
-	short region_index,
-	short material_index,
-	real_point3d const *position,
-	real_vector3d const *object_normal,
-	struct location const *location);
 void unit_cause_melee_damage(
 	long unit_index,
 	boolean melee_hit,
@@ -895,10 +871,6 @@ static short seat_label_to_base_seat_index(char const *seat_label);
 static char const *base_weapon_label_get(short base_weapon_index);
 
 static void unit_refresh_illumination(long unit_index);
-
-void unit_animation_start_action(
-	long unit_index,
-	short action);
 
 static boolean unit_euler_axis_doplan(
 	struct unit_acceleration_plan *plan,
@@ -965,21 +937,6 @@ static void unit_align_facing(
 	long unit_index,
 	real_vector2d const *alignment_vector);
 
-void player_control_set_desired_weapon(
-	long unit_index,
-	short desired_weapon_index);
-boolean ai_try_vehicle_eviction(
-	long actor_index,
-	long entering_unit_index,
-	boolean immediate);
-void biped_stop_melee_attack(
-	long unit_index);
-void first_person_weapon_message_from_unit(
-	long unit_index,
-	short message_type);
-void weapon_stop_reload(
-	long weapon_index);
-
 static short unit_weapon_next_index(long unit_index, short current_index, short delta);
 static void unit_ready_desired_weapon(
 	long unit_index,
@@ -1003,9 +960,6 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 static boolean unit_animation_set_state(
 	long unit_index,
 	short new_state);
-short unit_update_animation(
-	long unit_index,
-	struct unit_animation_update_data *data);
 
 static boolean unit_vectors_are_valid(long unit_index);
 static void unit_throw_grenade_release(long unit_index, boolean premature);
@@ -1028,32 +982,8 @@ static void unit_running_blind(long unit_index, real_vector3d *run_vector);
 
 static boolean unit_integrated_night_vision_is_active(long unit_index);
 
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
-void player_died(
-	long player_index);
-void actor_died(
-	long actor_index);
-void actor_swarm_unit_died(
-	long swarm_actor_index,
-	long unit_index);
 void unit_detach_from_parent(
 	long unit_index);
-void unit_exit_seat_end(
-	long unit_index);
-void aiming_screen_apply(
-	struct animation const *animation,
-	struct animation_aiming_screen_bounds const *aiming_screen_bounds,
-	real yaw,
-	real pitch,
-	struct real_orientation *node_orientations);
-void biped_exit_seat_end(
-	long biped_index,
-	long parent_unit_index);
-short animation_choose_random_permutation(
-	long animation_graph_index,
-	short animation_index);
 
 extern char const *base_seat_labels[NUMBER_OF_UNIT_BASE_SEATS];
 
@@ -8658,16 +8588,6 @@ enum
 	_collision_result_breakable_surface_bit = 3,
 };
 
-void breakable_surface_damage(
-	short breakable_surface_index,
-	struct damage_data *damage_data,
-	long seed_surface_index);
-void machine_try_to_open_with_damage(
-	long machine_index);
-void vehicle_accelerate(
-	long vehicle_index,
-	real_vector3d const *acceleration);
-
 void unit_cause_player_melee_damage(
 	long unit_index)
 {
@@ -11697,4 +11617,3 @@ static boolean unit_integrated_night_vision_is_active(
 
 /* Verify the public seat-helper declaration without perturbing this legacy
  * translation unit's authenticated function-declaration order. */
-#include "vehicle_scripting.h"

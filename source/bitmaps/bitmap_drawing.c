@@ -47,7 +47,7 @@ symbols in this file:
 
 #include "bitmaps/bitmap_drawing.h"
 
-#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "cseries/errors.h"

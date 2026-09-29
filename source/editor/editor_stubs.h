@@ -6,11 +6,15 @@ EDITOR_STUBS.H
 #define __EDITOR_STUBS_H
 #pragma once
 
+/* ---------- structures */
+
+struct render_lighting;
+
 /* ---------- prototypes/EDITOR_STUBS.C */
 
 void editor_render(void);
 boolean game_in_editor(void);
-boolean editor_preprocess_rendered_object(void);
+boolean editor_preprocess_rendered_object(long object_index, struct render_lighting *lighting);
 boolean editor_should_exit(void);
 void editor_initialize(void);
 void editor_dispose(void);

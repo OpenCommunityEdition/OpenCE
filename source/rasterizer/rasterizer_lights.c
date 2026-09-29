@@ -80,7 +80,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "errors.h"
 #include "bitmaps/bitmaps.h"
@@ -96,7 +95,7 @@ symbols in this file:
 #include "rasterizer_lights.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_geometry_compression.h"
-#include "rasterizer_debug_options.h"
+#include "rasterizer_console_vars.h"
 #include "objects/widgets/widget_types.h"
 #include "main/main.h"
 #include <xtl.h>
@@ -528,7 +527,7 @@ void rasterizer_lens_flare_submit(
 		268,
 		(parameters->compressed_window_index&_lens_flare_window_index_mask)==global_window_parameters.window_index);
 
-	if (rasterizer_debug_options.lens_flares && !screenshot_in_progress() &&
+	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress() &&
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
 	{
 		if (local_lens_flare_count<MAXIMUM_LENS_FLARES_PER_FRAME)
@@ -592,7 +591,7 @@ void rasterizer_lens_flare_submit(
 					}
 				}
 
-				if (rasterizer_debug_options.stats==_rasterizer_statistics_mode_geometry)
+				if (rasterizer_debug_options.statistics_mode==_rasterizer_statistics_mode_geometry)
 				{
 					rasterizer_frame_statistics.lens_flare_count++;
 				}
@@ -616,7 +615,7 @@ void rasterizer_lights_begin_for_new_frame(
 {
 	rasterizer_profile_begin(_rasterizer_profile_lens_flare_occlusion_query);
 
-	if (rasterizer_debug_options.lens_flares && !screenshot_in_progress())
+	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress())
 	{
 		short lens_flare_index;
 
@@ -700,7 +699,7 @@ long rasterizer_light_submit(
 		light_index= rasterizer_lights.light_count++;
 		rasterizer_lights.lights[light_index]= *parameters;
 
-		if (rasterizer_debug_options.stats==_rasterizer_statistics_mode_geometry)
+		if (rasterizer_debug_options.statistics_mode==_rasterizer_statistics_mode_geometry)
 		{
 			rasterizer_frame_statistics.dynamic_light_count++;
 		}
@@ -722,7 +721,7 @@ void rasterizer_lights_end(
 void rasterizer_lens_flare_submit_for_cluster(
 	short cluster_index)
 {
-	if (rasterizer_debug_options.lens_flares && !screenshot_in_progress())
+	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress())
 	{
 		struct structure_bsp *structure_bsp= global_structure_bsp_get();
 		struct structure_cluster *cluster= TAG_BLOCK_GET_ELEMENT(&structure_bsp->clusters, cluster_index, struct structure_cluster);
@@ -774,7 +773,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 {
 	rasterizer_profile_begin(_rasterizer_profile_lens_flare_occlusion_submit);
 
-	if (rasterizer_debug_options.lens_flares && !screenshot_in_progress() &&
+	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress() &&
 		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary &&
 		local_lens_flare_count > 0)
 	{
@@ -846,7 +845,7 @@ void rasterizer_lens_flares_draw(
 {
 	rasterizer_profile_begin(_rasterizer_profile_lens_flares);
 
-	if (rasterizer_debug_options.lens_flares &&
+	if (rasterizer_debug_options.draw_lens_flares &&
 		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary &&
 		local_lens_flare_count > 0)
 	{
@@ -1107,7 +1106,7 @@ void rasterizer_lens_flares_draw(
 		rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
 		rasterizer_widget_end();
 
-		if (rasterizer_debug_options.ray_of_buddha)
+		if (rasterizer_debug_options.lens_flare_sun_glow_enabled)
 		{
 			for (lens_flare_index = 0; lens_flare_index < local_lens_flare_count; lens_flare_index++)
 			{

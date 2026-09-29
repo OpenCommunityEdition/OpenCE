@@ -74,7 +74,6 @@ symbols in this file:
 #include "bitmaps/bitmap_color_conversion.h"
 #include "interface/hud_draw.h"
 #include "rasterizer/common/rasterizer_common.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "render/render.h"
 #include "shaders/shader_definitions.h"
@@ -84,8 +83,10 @@ symbols in this file:
  * the real device calls below. Keep the stock inline definitions and do not
  * replace these wrappers with handwritten bodies. */
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 
 /* ---------- constants */
@@ -132,39 +133,6 @@ enum
 
 /* ---------- structures */
 
-struct rasterizer_shadows_debug_options_prefix
-{
-	byte reserved00[2];
-	short statistics_mode;
-	byte reserved04[0xE];
-	boolean draw_environment_shadows;
-	byte reserved13[0x2B];
-	boolean shadows_convolution;
-	boolean shadows_debug;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 struct rasterizer_model_lighting_parameters
 {
 	byte data[0x74];
@@ -206,10 +174,6 @@ struct shader_model_definition
 	struct shader_texture_animation animation;
 };
 
-typedef char verify_rasterizer_shadows_draw_shadows_offset[
-	offsetof(
-		struct rasterizer_shadows_debug_options_prefix,
-		draw_environment_shadows) == 0x12 ? 1 : -1];
 typedef char verify_rasterizer_shadows_model_shadow_count_offset[
 	offsetof(
 		struct rasterizer_frame_statistics_globals,
@@ -241,7 +205,6 @@ static void rasterizer_shadow_convolve(
 /* ---------- globals */
 
 extern D3DDevice *global_d3d_device;
-extern struct rasterizer_shadows_debug_options_prefix rasterizer_debug_options;
 extern struct pixel_shader_definition pixel_shader;
 
 static boolean shadow_restored = TRUE;
@@ -363,7 +326,7 @@ boolean _rasterizer_environment_shadow_begin(
 		rasterizer_set_target(
 			2,
 			0,
-			rasterizer_debug_options.shadows_debug ? 0x88888888 : 0,
+			rasterizer_debug_options.shadow_debug_enabled ? 0x88888888 : 0,
 			TRUE,
 			FALSE);
 		rasterizer_set_stencil_mode(0);
@@ -638,14 +601,14 @@ void _rasterizer_environment_shadow_draw(
 	{
 		if (!shadow_setup)
 		{
-			if (rasterizer_debug_options.shadows_convolution)
+			if (rasterizer_debug_options.shadow_convolution_enabled)
 			{
 				rasterizer_shadow_convolve();
 			}
 
 			rasterizer_set_target_as_texture(
 				0,
-				(rasterizer_debug_options.shadows_convolution != FALSE) + 2,
+				(rasterizer_debug_options.shadow_convolution_enabled != FALSE) + 2,
 				FALSE);
 			IDirect3DDevice8_SetTextureStageState(
 				global_d3d_device,
@@ -802,7 +765,7 @@ void _rasterizer_environment_shadow_draw(
 			pixel_shader.rgb_outputs[3] = 0x000020D0;
 			pixel_shader.final_combiner_inputs_abcd = 0x0000002C;
 			pixel_shader.final_combiner_inputs_efg = 0x00000D00;
-			if (rasterizer_debug_options.shadows_debug)
+			if (rasterizer_debug_options.shadow_debug_enabled)
 			{
 				pixel_shader.final_combiner_inputs_abcd = 0x0000000C;
 				IDirect3DDevice8_SetRenderState(
@@ -919,7 +882,7 @@ static void rasterizer_shadow_convolve(
 		global_d3d_device);
 
 	if (rasterizer_debug_options.draw_environment_shadows &&
-		rasterizer_debug_options.shadows_convolution)
+		rasterizer_debug_options.shadow_convolution_enabled)
 	{
 		for (stage = 0; stage < 4; stage++)
 		{

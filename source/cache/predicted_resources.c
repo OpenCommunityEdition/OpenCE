@@ -14,6 +14,7 @@ symbols in this file:
 #include "cache/predicted_resources.h"
 #include "cache/sound_cache.h"
 #include "bitmaps/bitmap_group.h"
+#include "cache/texture_cache.h"
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_groups.h"
 
@@ -24,11 +25,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-void *_texture_cache_bitmap_get_hardware_format(
-	struct bitmap_data *bitmap,
-	boolean block,
-	boolean load);
 
 static void predicted_resources_sound_precache(long sound_definition_index);
 

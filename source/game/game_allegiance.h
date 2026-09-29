@@ -37,6 +37,7 @@ boolean game_team_is_enemy(
 boolean game_team_is_ally(
 	short our_team_index,
 	short other_team_index);
+boolean game_team_ally_status_changed(short team_index0, short team_index1);
 short game_allegiance_get_incidents(
 	short our_team_index,
 	short other_team_index,

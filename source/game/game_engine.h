@@ -329,6 +329,8 @@ void game_engine_post_rasterize(
 
 void game_engine_nonplayer_post_rasterize(
 	void);
+void game_engine_update(
+	void);
 
 void game_engine_update_non_deterministic(
 	real delta_seconds);
@@ -337,12 +339,17 @@ boolean match_game_type(
 	long game_type,
 	long count,
 	short const *game_types);
+void game_engine_flag_reset(
+	long weapon_index,
+	union real_point3d const *position);
 
 void game_engine_initialize(
 	struct game_variant *variant);
 
 void game_engine_initialize_for_new_map(
 	void);
+void game_engine_player_added(
+	long player_index);
 
 real game_engine_get_distance_rating_for_spawn(
 	long player_index,
@@ -385,6 +392,8 @@ void game_engine_prespawn_player_update(
 
 long game_engine_did_player_win(
 	long player_index);
+long game_engine_did_player_win_default(
+	long player_index);
 
 struct game_variant *game_engine_get_variant(
 	void);
@@ -394,6 +403,9 @@ struct game_variant *game_engine_get_variant_by_name(
 	char const *name);
 
 boolean game_engine_get_goal_in_use(
+	short goal_index);
+real_point3d *game_engine_get_goal_position(
+	real_point3d *position,
 	short goal_index);
 
 void game_engine_set_goal_position(
@@ -522,6 +534,19 @@ long game_engine_remap_object_definition(long definition_index);
 
 long game_engine_remap_vehicle(long vehicle_definition_index);
 long game_engine_remap_equipment(long equipment_definition_index);
+void game_show_score_team(
+	long team_index,
+	long score);
+void game_show_score_you_ally_enemy(
+	long player_index,
+	long you_score,
+	long ally_score,
+	long enemy_score,
+	long other_player_index);
+void game_show_score_extended(
+	long player_index,
+	long score,
+	long team_index);
 long game_engine_remap_weapon(long weapon_definition_index);
 
 

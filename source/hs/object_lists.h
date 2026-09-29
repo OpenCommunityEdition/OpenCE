@@ -46,6 +46,8 @@ void object_list_remove_reference(
 	long object_list_index);
 void object_list_gc(
 	void);
+short object_list_count(
+	long object_list_index);
 
 
 /* ---------- globals */

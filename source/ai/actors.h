@@ -1341,6 +1341,15 @@ boolean actor_compute_prop_unopposable(
 real actor_compute_prop_target_weight(
 	long actor_index,
 	long prop_index);
+short actor_visibility_at_point(
+	long actor_index,
+	struct actor_position_data const *position,
+	union real_point3d const *target_position,
+	char lighting,
+	short line_of_sight,
+	boolean use_maximum_distance,
+	boolean target_is_player,
+	short perception_knowledge);
 boolean actor_perception_desire_prop(
 	long actor_index,
 	short desired_target_state,
@@ -1363,10 +1372,17 @@ void actor_perception_acknowledge(
 	long prop_index,
 	boolean had_orphan,
 	boolean expected_acknowledgement);
+short actor_get_perception_knowledge(
+	long actor_index,
+	long prop_index);
 boolean actor_perception_become_acknowledged(
 	long actor_index,
 	long prop_index,
 	boolean *expected_acknowledgement_out);
+void prop_status_refresh(
+	long actor_index,
+	long prop_index,
+	struct actor_position_data *position);
 boolean actor_perception_create_orphan_from_friend(
 	long actor_index,
 	long unit_index,
@@ -1376,7 +1392,23 @@ long actor_perception_find_killer_prop_index(
 	long actor_index,
 	long prop_index,
 	boolean enemies_only);
+long actor_perception_find_recent_damaging_prop_index(
+	long actor_index,
+	boolean enemies_only);
+void actor_perception_forget_recent_damage(
+	long actor_index);
+void actor_perception_retreat_successful(
+	long actor_index);
 void actor_perception_find_prop_pathfinding_location(
+	long actor_index,
+	long prop_index);
+void actor_perception_tried_to_uncover(
+	long actor_index,
+	long prop_index);
+void actor_perception_tried_to_search(
+	long actor_index,
+	long prop_index);
+void actor_perception_abandoned_search(
 	long actor_index,
 	long prop_index);
 void actor_perception_find_sense_position(
@@ -1384,6 +1416,12 @@ void actor_perception_find_sense_position(
 	real_point3d const *position,
 	long prop_index,
 	struct actor_position_data *sense_position);
+void prop_position_refresh(
+	long actor_index,
+	long prop_index,
+	struct actor_position_data *position,
+	boolean refresh_position,
+	boolean refresh_vehicle);
 short actor_audibility_at_point(
 	long actor_index,
 	struct actor_position_data const *sense_position,
@@ -1396,11 +1434,22 @@ void actor_perception_update(
 	long actor_index);
 void actor_situation_update(
 	long actor_index);
+boolean actor_perception_friend_prop_is_attacking(
+	long actor_index,
+	long friend_prop_index,
+	real_vector3d *attack_vector);
 void actor_emotion_update(
 	long actor_index);
+void actor_perception_unreachable(
+	long actor_index,
+	long prop_index,
+	boolean unreachable);
 boolean actor_emotion_flee_with_friends(
 	long actor_index,
 	real *desire_to_flee);
+boolean actor_situation_try_new_target(
+	long actor_index,
+	long prop_index);
 
 /* ---------- prototypes/ACTOR_STIMULUS.C */
 
@@ -1411,6 +1460,10 @@ void actor_stimulus_surprise(
 	short surprise_level,
 	long prop_index,
 	real_vector3d const *surprise_vector);
+void actor_stimulus_suspicion(
+	long actor_index,
+	short suspicion_combat_status,
+	long suspicion_timer);
 void actor_stimulus_enter_combat_found_body(
 	long actor_index,
 	long prop_index);
@@ -1433,6 +1486,10 @@ void actor_stimulus_environmental_noise(
 void actor_stimulus_heard_shooting(
 	long actor_index,
 	long prop_index);
+void actor_stimulus_prop_sighted(
+	long actor_index,
+	long prop_index,
+	boolean initial_acknowledgement);
 void actor_stimulus_noticed_danger_zone(
 	long actor_index,
 	short danger_type,
@@ -1471,13 +1528,24 @@ void actor_stimulus_prop_acknowledged(
 	long prop_index,
 	boolean reappearance,
 	boolean expected_acknowledgement);
+void actor_stimulus_was_surprised(
+	long actor_index);
 
 // prototypes/ACTOR_LOOKING.C
+void actor_look_secondary_stop(
+	long actor_index);
+real actor_look_compute_prop_interest(
+	long actor_index,
+	long prop_index);
 void actor_looking_test_validity(
 	long actor_index,
 	real_vector3d const *vector,
 	boolean *aiming_valid,
 	boolean *looking_valid);
+void actor_look_update(
+	long actor_index);
+void actor_look_affect_movement(
+	long actor_index);
 
 void actor_get_vision_distances(
 	long actor_index,
@@ -1486,6 +1554,10 @@ void actor_get_vision_distances(
 	real horizontal_angle,
 	real *full_distance_reference,
 	real *partial_distance_reference);
+void actor_situation_update_target_status(
+	long actor_index);
+void actor_situation_combat_status_update(
+	long actor_index);
 
 void actor_berserk(
 	long actor_index,

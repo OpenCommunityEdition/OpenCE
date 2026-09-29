@@ -283,14 +283,13 @@ symbols in this file:
 #include "cseries.h"
 #include "actors.h"
 #include "actor_definitions.h"
-#include "actor_iterators.h"
 #include "actor_placement.h"
 #include "actor_types.h"
 #include "encounters.h"
 #include "props.h"
 
 #include "ai.h"
-#include "actor_looking.h"
+#include "math/real_math.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
@@ -2372,7 +2371,7 @@ long actor_new(
 				actor_debug_info->charge_last_time = NONE;
 				actor_debug_info->field_19C = NONE;
 				actor_debug_info->vision_last_time = NONE;
-				actor_debug_info->num_debug_evaluations = NONE;
+				actor_debug_info->perception_awareness_speed = NONE;
 
 				actor_type_initialize(actor_index);
 			}

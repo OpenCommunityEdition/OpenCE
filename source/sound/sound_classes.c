@@ -138,9 +138,6 @@ typedef char verify_sound_class_definition_size[
 
 /* ---------- prototypes */
 
-struct sound_class_definition *sound_class_get(
-	short sound_class);
-
 /* ---------- globals */
 
 extern struct sound_class_runtime *sound_class_data;

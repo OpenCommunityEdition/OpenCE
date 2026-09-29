@@ -160,13 +160,13 @@ void props_initialize_for_new_map(
 	void);
 void props_dispose(
 	void);
+void props_dispose_from_old_map(
+	void);
 void prop_delete(
 	long actor_index,
 	long prop_index);
 void prop_iterator_new(struct prop_iterator *iterator, long actor_index);
 struct prop_datum *prop_iterator_next(struct prop_iterator *iterator);
-long prop_new_blank(
-	long actor_index);
 long prop_new_unacknowledged(
 	long actor_index,
 	long unit_index,

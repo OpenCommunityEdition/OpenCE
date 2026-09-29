@@ -36,6 +36,7 @@ symbols in this file:
 /* The January object retains exact out-of-line copies of the two D3D wrappers. */
 #define D3DINLINE static
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- constants */
 
@@ -51,8 +52,6 @@ void rasterizer_error(
 	...);
 
 /* ---------- globals */
-
-extern void *global_d3d_device;
 
 static unsigned long const vertex_shader_declarations[] =
 {

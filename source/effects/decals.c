@@ -212,12 +212,10 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define plane2d_from_points plane2d_from_points_inline
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
-#undef plane2d_from_points
 
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -233,7 +231,7 @@ symbols in this file:
 #include "bitmaps/bitmaps.h"
 #include "cache/texture_cache.h"
 #include "effects/decal_definitions.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "render/render.h"
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
@@ -808,26 +806,6 @@ static void decal_sprite_get_bounds(
 		- sprite->bounds.y0) * height_scale;
 
 	return;
-}
-
-real_plane2d *plane2d_from_points(
-	real_plane2d *plane,
-	real_point2d const *point0,
-	real_point2d const *point1)
-{
-	plane->n.i = point1->y - point0->y;
-	plane->n.j = point0->x - point1->x;
-
-	if (normalize2d(&plane->n) == 0.0f)
-	{
-		plane->d = 0.0f;
-
-		return NULL;
-	}
-
-	plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
-
-	return plane;
 }
 
 pixel32 real_a_rgb_color_to_pixel32(

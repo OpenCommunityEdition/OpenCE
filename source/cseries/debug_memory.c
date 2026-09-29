@@ -167,10 +167,6 @@ struct file_pointer_totals
 
 /* ---------- prototypes */
 
-unsigned long *get_global_local_random_seed_address(
-	void);
-word seed_random(
-	unsigned long *seed);
 static int compare_file_pointer_totals(
 	const void *a,
 	const void *b);

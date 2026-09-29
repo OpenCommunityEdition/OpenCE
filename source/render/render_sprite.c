@@ -86,6 +86,7 @@ symbols in this file:
 #include "render/render_cameras_internal.h"
 #include "render/render_debug.h"
 #include "render/render_sprite.h"
+#include "cache/texture_cache.h"
 #include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
 
@@ -151,11 +152,6 @@ typedef char build_sprite_globals_data_size_assert[
 	sizeof(struct build_sprite_globals_data) == 0x28 ? 1 : -1];
 
 /* ---------- prototypes */
-
-void *_texture_cache_bitmap_get_hardware_format(
-	struct bitmap_data *bitmap,
-	boolean block,
-	boolean load);
 
 static void build_sprite_transform_origin_and_direction(
 	struct build_sprite_data const *data,

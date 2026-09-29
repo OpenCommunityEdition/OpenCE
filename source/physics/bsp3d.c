@@ -30,6 +30,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bsp3d.h"
+#include "math/geometry.h"
 
 /* ---------- constants */
 
@@ -58,16 +59,6 @@ typedef void (*bsp3d_polygon_leaf_proc)(
 	void *context);
 
 /* ---------- prototypes */
-
-short convex_polygon3d_clip_to_plane(
-	short vertex_count,
-	real_point3d const *vertices,
-	real_plane3d const *plane,
-	short maximum_vertex_count,
-	real_point3d *clipped_vertices,
-	short *vertex_indices,
-	real epsilon,
-	boolean keep_degenerate);
 
 static long bsp3d_clip_polygon_to_leaves_recursive(
 	struct bsp3d const *bsp,

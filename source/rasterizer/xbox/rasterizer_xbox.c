@@ -389,7 +389,6 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmap_group_internal.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmap_strings_internal.h"
 #include "cache/texture_cache.h"
 #include "cseries/profile.h"
 #include "effects/decals.h"
@@ -401,12 +400,9 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
-#include "rasterizer/rasterizer_debug.h"
-#include "rasterizer/rasterizer_debug_options.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_lights.h"
 #include "rasterizer/rasterizer_text.h"
-#include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "render/render.h"
 #include "render/render_cameras.h"
@@ -638,27 +634,8 @@ enum
 	DEFAULT_BITMAP_PIXEL1 = 0xf0f0
 };
 
-enum
-{
-	NUMBER_OF_ENTRIES_IN_PALETTE = 256
-};
-
 /* ---------- macros */
 
-#define rasterizer_push_buffer_size \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->push_buffer_size)
-#define rasterizer_kick_off_size \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->kick_off_size)
-#define rasterizer_floating_point_z_buffer \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->floating_point_z_buffer)
-#define rasterizer_refresh_rate \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->refresh_rate)
-#define rasterizer_default_2d_hardware_format \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->default_2d_hardware_format)
-#define rasterizer_default_3d_hardware_format \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->default_3d_hardware_format)
-#define rasterizer_default_cm_hardware_format \
-	(((struct rasterizer_xbox_rasterizer_globals *)&rasterizer_globals)->default_cm_hardware_format)
 
 /* ---------- structures */
 
@@ -836,9 +813,6 @@ static struct rasterizer_hardware_state_cache rasterizer_state_cache =
 
 extern struct window_data window_globals;
 
-/* owned by source/bitmaps/bitmaps.c */
-extern pixel32 global_vector_palette[NUMBER_OF_ENTRIES_IN_PALETTE];
-
 /* the shadow tables of the SetRenderStateSmart family; that object owns them,
  * this one only primes them from the XDK's own shadows at initialization. */
 extern unsigned long renderstate_table[D3DRS_MAX];
@@ -914,7 +888,7 @@ void _rasterizer_window_set_fog(
 	if (global_window_parameters.fog.atmospheric_maximum_density <= 0.0f)
 		global_window_parameters.fog.atmospheric_maximum_density = 1.0f;
 	if (global_window_parameters.fog.atmospheric_maximum_distance == 0.0f ||
-		!rasterizer_debug_options.fog_atmosphere)
+		!rasterizer_debug_options.fog_atmospheric_enabled)
 	{
 		global_window_parameters.fog.atmospheric_maximum_density = 0.0f;
 		global_window_parameters.fog.atmospheric_minimum_distance =
@@ -926,7 +900,7 @@ void _rasterizer_window_set_fog(
 		global_window_parameters.fog.planar_maximum_density = 1.0f;
 	if (global_window_parameters.fog.planar_mode &&
 		!TEST_FLAG(fog->fog_definition_flags, _fog_definition_screen_effect_only_bit) &&
-		rasterizer_debug_options.fog_plane)
+		rasterizer_debug_options.fog_planar_enabled)
 	{
 		if (global_window_parameters.fog.planar_mode ==
 			_render_planar_fog_mode_fully_fogged)
@@ -1098,7 +1072,7 @@ void rasterizer_set_pixel_shader(
 					D3DRS_PSCONSTANT1_0 + combiner_index,
 					pixel_shader->constant_1[combiner_index]);
 		}
-		if (rasterizer_debug_options.stats == 2)
+		if (rasterizer_debug_options.statistics_mode == 2)
 			rasterizer_frame_statistics.pixel_shader_pushbuffer_bytes +=
 				(4 + unique_constant_0 + unique_constant_1) * combiner_count *
 					sizeof(unsigned long) + 32;
@@ -1108,7 +1082,7 @@ void rasterizer_set_pixel_shader(
 		IDirect3DDevice8_SetPixelShaderProgram(
 			global_d3d_device,
 			(D3DPIXELSHADERDEF *)pixel_shader);
-		if (rasterizer_debug_options.stats == 2)
+		if (rasterizer_debug_options.statistics_mode == 2)
 			rasterizer_frame_statistics.pixel_shader_pushbuffer_bytes += 228;
 	}
 	return;
@@ -1247,7 +1221,7 @@ void rasterizer_set_model_lighting(
 		-79,
 		&lighting_constants,
 		NUMBER_OF_MODEL_LIGHTING_CONSTANTS);
-	if (rasterizer_debug_options.stats)
+	if (rasterizer_debug_options.statistics_mode)
 		rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes +=
 			sizeof(lighting_constants);
 	return;
@@ -1293,7 +1267,7 @@ void rasterizer_set_model_skinning(
 		-36,
 		vsh_constants__nodematrices,
 		skinning->node_matrix_count * 3);
-	if (rasterizer_debug_options.stats)
+	if (rasterizer_debug_options.statistics_mode)
 		rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes +=
 			skinning->node_matrix_count * sizeof(vsh_constants__nodematrices[0]);
 	return;
@@ -1320,7 +1294,7 @@ boolean rasterizer_set_texture_non_blocking(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		2144,
 		usage>=0 && usage<NUMBER_OF_BITMAP_USAGES);
-	if ((rasterizer_debug_options.bump_mapping ||
+	if ((rasterizer_debug_options.bump_mapping_enabled ||
 		usage != _bitmap_usage_bump_map) &&
 		bitmap_definition_index != NONE)
 	{
@@ -1726,7 +1700,7 @@ void _rasterizer_window_begin(
 	rasterizer_profile_window_begin();
 	rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
 	rasterizer_window_set_fog(&parameters->fog);
-	if (rasterizer_debug_options.mode == _rasterizer_mode_clear_to_black)
+	if (rasterizer_debug_options.drawing_mode == _rasterizer_mode_clear_to_black)
 		clear_color = 0;
 	else
 		clear_color = real_rgb_color_to_pixel32(
@@ -1760,7 +1734,7 @@ void _rasterizer_window_begin(
 	rasterizer_set_frustum_z(-1.0f, -1.0f);
 	D3DDevice_SetRenderState(
 		D3DRS_FILLMODE,
-		rasterizer_debug_options.wireframe ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
+		rasterizer_debug_options.wireframe_enabled ? D3DFILL_WIREFRAME : D3DFILL_SOLID);
 	return;
 }
 
@@ -2044,7 +2018,7 @@ union point2d *rasterizer_set_texture(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		2060,
 		usage>=0 && usage<NUMBER_OF_BITMAP_USAGES);
-	if ((rasterizer_debug_options.bump_mapping ||
+	if ((rasterizer_debug_options.bump_mapping_enabled ||
 		usage != _bitmap_usage_bump_map) &&
 		bitmap_definition_index != NONE)
 	{
@@ -2188,8 +2162,8 @@ void _rasterizer_frame_begin(
 	IDirect3DDevice8_SetRenderState(
 		global_d3d_device,
 		D3DRS_DXT1NOISEENABLE,
-		rasterizer_debug_options.DXTC_noise);
-	if (rasterizer_debug_options.environment_decals)
+		rasterizer_debug_options.DXTC_noise_enabled);
+	if (rasterizer_debug_options.draw_environment_decals)
 	{
 		rasterizer_decal_vertices_begin_update();
 		decals_update();
@@ -2209,7 +2183,7 @@ void rasterizer_secondary_render_target_debug(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		2533,
 		global_d3d_device);
-	if (rasterizer_debug_options.secondary_render_target_debug &&
+	if (rasterizer_debug_options.secondary_render_target_debug_enabled &&
 		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		real screen_constants[5][4];
@@ -2529,7 +2503,7 @@ void rasterizer_set_stencil_mode(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		3034,
 		global_d3d_device);
-	if (!rasterizer_debug_options.stencil_mask)
+	if (!rasterizer_debug_options.stencil_mask_enabled)
 		stencil_mode = RASTERIZER_STENCIL_MODE_NONE;
 	mode = (short)stencil_mode;
 	if (mode != rasterizer_state_cache.stencil_mode)
@@ -2785,7 +2759,7 @@ void rasterizer_set_vertex_shader(
 				global_d3d_device,
 				vertex_shader_table[vertex_shader_index].handle);
 			success = TRUE;
-			if (rasterizer_debug_options.stats)
+			if (rasterizer_debug_options.statistics_mode)
 				rasterizer_frame_statistics.vertex_shader_instruction_count +=
 					vertex_shader_table[vertex_shader_index].instruction_count;
 		}
@@ -2806,38 +2780,17 @@ void rasterizer_set_vertex_shader(
 
 
 
-/* January's Xbox backend owns the fields beyond rasterizer.h's shared public
- * prefix.  This typed private view is backed by this object's option handling,
- * initialization constants, and texture-creation destinations. */
-struct rasterizer_xbox_rasterizer_globals
-{
-	byte reserved00[0x38];
-	short push_buffer_size;
-	short kick_off_size;
-	boolean floating_point_z_buffer;
-	byte reserved3D[3];
-	short refresh_rate;
-	byte reserved42[0x12];
-	void *default_2d_hardware_format;
-	void *default_3d_hardware_format;
-	void *default_cm_hardware_format;
-	byte reserved60[8];
-};
-
-typedef char verify_rasterizer_xbox_rasterizer_globals_size[
-	sizeof(struct rasterizer_xbox_rasterizer_globals) ==
-		sizeof(struct rasterizer_globals_definition) ? 1 : -1];
 typedef char verify_rasterizer_xbox_push_buffer_size_offset[
 	offsetof(
-		struct rasterizer_xbox_rasterizer_globals,
+		struct rasterizer_globals_definition,
 		push_buffer_size) == 0x38 ? 1 : -1];
 typedef char verify_rasterizer_xbox_refresh_rate_offset[
 	offsetof(
-		struct rasterizer_xbox_rasterizer_globals,
-		refresh_rate) == 0x40 ? 1 : -1];
+		struct rasterizer_globals_definition,
+		framerate_throttle_target) == 0x40 ? 1 : -1];
 typedef char verify_rasterizer_xbox_default_2d_hardware_format_offset[
 	offsetof(
-		struct rasterizer_xbox_rasterizer_globals,
+		struct rasterizer_globals_definition,
 		default_2d_hardware_format) == 0x54 ? 1 : -1];
 
 boolean _rasterizer_initialize(
@@ -2845,13 +2798,13 @@ boolean _rasterizer_initialize(
 {
 	boolean success;
 
-	if (rasterizer_push_buffer_size == 0)
-		rasterizer_push_buffer_size = RASTERIZER_DEFAULT_PUSH_BUFFER_SIZE;
-	if (rasterizer_kick_off_size == 0)
-		rasterizer_kick_off_size = RASTERIZER_DEFAULT_KICK_OFF_SIZE;
+	if (rasterizer_globals.push_buffer_size == 0)
+		rasterizer_globals.push_buffer_size = RASTERIZER_DEFAULT_PUSH_BUFFER_SIZE;
+	if (rasterizer_globals.kick_off_size == 0)
+		rasterizer_globals.kick_off_size = RASTERIZER_DEFAULT_KICK_OFF_SIZE;
 	Direct3D_SetPushBufferSize(
-		rasterizer_push_buffer_size * RASTERIZER_PUSH_BUFFER_SIZE_UNIT,
-		rasterizer_kick_off_size * RASTERIZER_PUSH_BUFFER_SIZE_UNIT);
+		rasterizer_globals.push_buffer_size * RASTERIZER_PUSH_BUFFER_SIZE_UNIT,
+		rasterizer_globals.kick_off_size * RASTERIZER_PUSH_BUFFER_SIZE_UNIT);
 	d3d = Direct3DCreate8(D3D_SDK_VERSION);
 	if (!d3d)
 	{
@@ -2877,14 +2830,14 @@ boolean _rasterizer_initialize(
 		d3d_present_parameters.Windowed = FALSE;
 		d3d_present_parameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
 		d3d_present_parameters.EnableAutoDepthStencil = TRUE;
-		d3d_present_parameters.AutoDepthStencilFormat = rasterizer_floating_point_z_buffer ?
+		d3d_present_parameters.AutoDepthStencilFormat = rasterizer_globals.floating_point_zbuffer ?
 			D3DFMT_F24S8 : D3DFMT_D24S8;
 		d3d_present_parameters.BackBufferFormat = D3DFMT_A8R8G8B8;
 		d3d_present_parameters.BackBufferWidth = rasterizer_globals.reserved04.screen_bounds.x1 -
 			rasterizer_globals.reserved04.screen_bounds.x0;
 		d3d_present_parameters.BackBufferHeight = rasterizer_globals.reserved04.screen_bounds.y1 -
 			rasterizer_globals.reserved04.screen_bounds.y0;
-		switch (rasterizer_refresh_rate)
+		switch (rasterizer_globals.framerate_throttle_target)
 		{
 		case NONE:
 			d3d_present_parameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
@@ -2902,13 +2855,13 @@ boolean _rasterizer_initialize(
 			break;
 
 		default:
-			if (rasterizer_refresh_rate != 0)
+			if (rasterizer_globals.framerate_throttle_target != 0)
 			{
 				error(
 					_error_silent,
 					"### ERROR unsupported refresh rate (%dHz), switching to default",
-					rasterizer_refresh_rate);
-				rasterizer_refresh_rate = 0;
+					rasterizer_globals.framerate_throttle_target);
+				rasterizer_globals.framerate_throttle_target = 0;
 			}
 			d3d_present_parameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 			global_frame_rate_throttle = TRUE;
@@ -3451,15 +3404,15 @@ void *rasterizer_get_bitmap_default_hardware_format(
 	switch (bitmap->type)
 	{
 	case _bitmap_type_2d:
-		hardware_format = rasterizer_default_2d_hardware_format;
+		hardware_format = rasterizer_globals.default_2d_hardware_format;
 		break;
 
 	case _bitmap_type_3d:
-		hardware_format = rasterizer_default_2d_hardware_format;
+		hardware_format = rasterizer_globals.default_2d_hardware_format;
 		break;
 
 	case _bitmap_type_cube_map:
-		hardware_format = rasterizer_default_cm_hardware_format;
+		hardware_format = rasterizer_globals.default_cm_hardware_format;
 		break;
 
 	/* hardware_format is left unassigned only by this default arm. Not reached unassigned: the
@@ -3683,8 +3636,8 @@ static void rasterizer_filthy_bitmap_defaults_initialize(
 		311,
 		success,
 		"### ERROR rasterizer_filthy_bitmap_default_initialize failed");
-	rasterizer_default_2d_hardware_format = default_2d_hardware_format;
-	rasterizer_default_3d_hardware_format = default_3d_hardware_format;
-	rasterizer_default_cm_hardware_format = default_cm_hardware_format;
+	rasterizer_globals.default_2d_hardware_format = default_2d_hardware_format;
+	rasterizer_globals.default_3d_hardware_format = default_3d_hardware_format;
+	rasterizer_globals.default_cm_hardware_format = default_cm_hardware_format;
 	return;
 }
