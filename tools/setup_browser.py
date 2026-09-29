@@ -24,8 +24,8 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def main():
-    output = ROOT / "build/web"
+def main(output=None):
+    output = Path(output) if output is not None else ROOT / "build/web"
     cache = ROOT / "build/browser-downloads"
     output.mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
