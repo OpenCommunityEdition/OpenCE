@@ -15,6 +15,7 @@ addToLibrary({
   $webHalo: {
     canvas: null,
     streamBatch: null,
+    flushContext: null,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -52,6 +53,7 @@ addToLibrary({
     // The shared recorder is bundled into halo.js with --pre-js, including
     // the pthread runtime. Native state caches already suppress redundant
     // setters; this merges append-only streamed uploads before their draws.
+    webHalo.flushContext = context.flush.bind(context);
     webHalo.streamBatch = batchStreams ? globalThis.HaloStreamBatch.install(context) : null;
     canvas.addEventListener?.('webglcontextlost', (event) => {
       event.preventDefault();
@@ -81,6 +83,10 @@ addToLibrary({
   web_js_gl_flush__deps: ['$webHalo'],
   web_js_gl_flush: () => {
     webHalo.streamBatch?.flush();
+    // Hidden frames have no bitmap transfer (the normal implicit GL flush),
+    // and this worker never yields to its event loop. Submit their commands
+    // explicitly after replaying the recorder.
+    webHalo.flushContext?.();
   },
 
   web_js_gl_present__deps: ['$webHalo'],
