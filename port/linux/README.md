@@ -49,16 +49,21 @@ sequence:
 4. `assets/` in the current folder, and `assets/` in the repository that
    contains the executable.
 
-If the game finds no data, it asks for an Xbox disc image (`.xiso` or
-`.iso`). This occurs at the first start:
+If the game finds no data, it looks for an Xbox disc image (`.xiso` or
+`.iso`) of Halo that already is on the computer: the one the last install
+used, then the Downloads, Desktop and Documents folders. This occurs at the
+first start:
 
-- Select "No" to stop the game.
-- Select "Yes" to open a file picker. Select the disc image. The game copies
-  `maps/` next to the executable and shows the progress.
+- When it finds a whole Halo disc, select "Install it" to copy `maps/` next
+  to the executable, "Choose another" to open a file picker, or "No" to stop
+  the game.
+- With no disc found, select "Yes" to open a file picker, or "No" to stop
+  the game.
 
 The game writes the copy to `maps.partial`. When the copy is complete, the
-game changes the name to `maps`. If the copy stops before it is complete,
-the game asks for the disc image again at the next start.
+game changes the name to `maps` and offers to delete the disc image to get
+its space back. If the copy stops before it is complete, the game asks for
+the disc image again at the next start.
 
 ## Files and folders
 

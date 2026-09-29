@@ -241,14 +241,167 @@ static BOOL data_choose_image(char *path, int size)
 	return TRUE;
 }
 
-BOOL platform_offer_game_data(const char *destination)
+/* ---------- finding a disc image to install from (xiso.c) */
+
+#define DATA_MAXIMUM_IMAGES 8
+#define DATA_SCAN_DEPTH 2
+
+struct data_scan
+{
+	char paths[DATA_MAXIMUM_IMAGES][1024];
+	int count;
+	int depth;
+};
+
+static BOOL data_is_disc_image(const char *name)
+{
+	const char *dot = strrchr(name, '.');
+
+	return dot && (!SDL_strcasecmp(dot, ".iso") || !SDL_strcasecmp(dot, ".xiso"));
+}
+
+static SDL_EnumerationResult SDLCALL data_scan_entry(void *userdata, const char *directory, const char *name)
+{
+	struct data_scan *scan = userdata;
+	char path[1024];
+	SDL_PathInfo information;
+
+	if (scan->count >= DATA_MAXIMUM_IMAGES)
+		return SDL_ENUM_SUCCESS;
+	SDL_snprintf(path, sizeof(path), "%s/%s", directory, name);
+	if (!SDL_GetPathInfo(path, &information))
+		return SDL_ENUM_CONTINUE;
+	if (information.type == SDL_PATHTYPE_DIRECTORY)
+	{
+		if (scan->depth < DATA_SCAN_DEPTH && SDL_strcmp(name, ".") && SDL_strcmp(name, ".."))
+		{
+			scan->depth++;
+			SDL_EnumerateDirectory(path, data_scan_entry, scan);
+			scan->depth--;
+		}
+	}
+	else if (information.type == SDL_PATHTYPE_FILE && data_is_disc_image(name))
+	{
+		SDL_snprintf(scan->paths[scan->count], sizeof(scan->paths[scan->count]), "%s", path);
+		scan->count++;
+	}
+	return SDL_ENUM_CONTINUE;
+}
+
+/* nonzero when the image is a whole Halo disc */
+static BOOL data_image_is_halo(const char *path)
+{
+	struct xiso_probe_result result;
+
+	return xiso_probe(path, &result) && result.halo && result.complete;
+}
+
+/* the image the last install used, from a note beside the game data */
+static BOOL data_load_remembered(const char *destination, char *path, int size)
+{
+	char note[1200];
+	FILE *file;
+	size_t length;
+
+	SDL_snprintf(note, sizeof(note), "%s/disc_image.txt", destination);
+	file = fopen(note, "rb");
+	if (!file)
+		return FALSE;
+	if (!fgets(path, size, file))
+	{
+		fclose(file);
+		return FALSE;
+	}
+	fclose(file);
+	length = strlen(path);
+	while (length > 0 && (path[length - 1] == '\n' || path[length - 1] == '\r'))
+		path[--length] = '\0';
+	return path[0] != '\0';
+}
+
+static void data_remember(const char *destination, const char *path)
+{
+	char note[1200];
+	FILE *file;
+
+	SDL_snprintf(note, sizeof(note), "%s/disc_image.txt", destination);
+	file = fopen(note, "wb");
+	if (!file)
+		return;
+	fprintf(file, "%s\n", path);
+	fclose(file);
+}
+
+/* asks whether to delete the image once its maps are installed */
+static void data_offer_delete(const char *image)
 {
 	static const SDL_MessageBoxButtonData buttons[] =
+	{
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Delete" },
+		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Keep" },
+	};
+	char message[1400];
+	SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 2, buttons, NULL };
+	int answer = 0;
+
+	SDL_snprintf(message, sizeof(message),
+		"The maps folder is installed. Delete the disc image to get its space back?\n\n%s", image);
+	if (SDL_ShowMessageBox(&question, &answer) && answer == 1)
+	{
+		if (remove(image) == 0)
+			platform_log("deleted the disc image %s", image);
+		else
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo",
+				"Could not delete the disc image. You can delete it yourself.", NULL);
+	}
+}
+
+/* a whole Halo disc image on this computer: what the last install used,
+then the folders a player keeps downloads in; FALSE if there is none. The
+same disc is then installed with one press (platform_offer_game_data) */
+static BOOL data_find_ready_image(const char *destination, char *path, int size)
+{
+	static const SDL_Folder folders[] = { SDL_FOLDER_DOWNLOADS, SDL_FOLDER_DESKTOP, SDL_FOLDER_DOCUMENTS };
+	struct data_scan scan;
+	unsigned long index;
+
+	if (data_load_remembered(destination, path, size) && data_image_is_halo(path))
+		return TRUE;
+	memset(&scan, 0, sizeof(scan));
+	for (index = 0; index < sizeof(folders) / sizeof(folders[0]); index++)
+	{
+		const char *folder = SDL_GetUserFolder(folders[index]);
+
+		if (folder && scan.count < DATA_MAXIMUM_IMAGES)
+			SDL_EnumerateDirectory(folder, data_scan_entry, &scan);
+	}
+	for (index = 0; index < (unsigned long)scan.count; index++)
+	{
+		if (data_image_is_halo(scan.paths[index]))
+		{
+			SDL_snprintf(path, (size_t)size, "%s", scan.paths[index]);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+BOOL platform_offer_game_data(const char *destination)
+{
+	static const SDL_MessageBoxButtonData buttons_choose[] =
 	{
 		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Yes" },
 		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No" },
 	};
+	static const SDL_MessageBoxButtonData buttons_found[] =
+	{
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Install it" },
+		{ 0, 2, "Choose another" },
+		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No" },
+	};
 	char message[1400];
+	char ready[1024];
+	BOOL found;
 
 	/* not for runs nobody is watching */
 	if (config_boolean("debug.hidden_window") || config_real("debug.exit_after") > 0.0 ||
@@ -256,35 +409,62 @@ BOOL platform_offer_game_data(const char *destination)
 	{
 		return FALSE;
 	}
-	snprintf(message, sizeof(message),
-		"Halo's game data (its maps folder) was not found.\n\n"
-		"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
-		"It is copied to %s/maps (about 2 GB).\n\n"
-		"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
-		destination);
+	found = data_find_ready_image(destination, ready, sizeof(ready));
+	if (found)
+		platform_log("found a Halo disc image: %s", ready);
 	for (;;)
 	{
-		SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 2, buttons, NULL };
+		SDL_MessageBoxData question;
 		char image[1024];
 		char error[512];
 		int answer = 0;
 
-		if (!SDL_ShowMessageBox(&question, &answer) || answer != 1)
+		if (found)
+		{
+			snprintf(message, sizeof(message),
+				"Halo's game data (its maps folder) was not found.\n\n"
+				"A Halo disc image is on this computer:\n%s\n\n"
+				"Install the maps folder from it? It is copied to %s/maps (about 2 GB).\n\n"
+				"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
+				ready, destination);
+			question = (SDL_MessageBoxData) { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 3, buttons_found, NULL };
+		}
+		else
+		{
+			snprintf(message, sizeof(message),
+				"Halo's game data (its maps folder) was not found.\n\n"
+				"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
+				"It is copied to %s/maps (about 2 GB).\n\n"
+				"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
+				destination);
+			question = (SDL_MessageBoxData) { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 2, buttons_choose, NULL };
+		}
+		if (!SDL_ShowMessageBox(&question, &answer) || answer == 0)
 		{
 			platform_log("no game data: quitting");
 			exit(EXIT_SUCCESS);
 		}
-		/* no image picked: ask again */
-		if (!data_choose_image(image, sizeof(image)))
+		if (found && answer == 1)
+		{
+			snprintf(image, sizeof(image), "%s", ready);
+		}
+		/* the player asked to choose, or the found image failed below */
+		else if (!data_choose_image(image, sizeof(image)))
+		{
 			continue;
+		}
 		platform_log("extracting the maps folder from %s to %s", image, destination);
 		if (data_extract(image, destination, error, sizeof(error)))
 		{
 			platform_log("extracted the maps folder");
+			data_remember(destination, image);
+			data_offer_delete(image);
 			return TRUE;
 		}
 		platform_log("extraction failed: %s", error);
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", error, NULL);
+		/* that image is not usable: ask for another next time */
+		found = FALSE;
 	}
 }
 #endif

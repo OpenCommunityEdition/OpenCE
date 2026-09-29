@@ -224,3 +224,230 @@ def test_build_graph_without_port_has_no_linux_target(tmp_path, monkeypatch):
     ninja = Path("build.ninja").read_text(encoding="utf-8")
     assert "linux_cc" not in ninja
     assert "build linux:" not in ninja
+
+
+# ---------- the disc image importer (port/linux/src/xiso.c)
+
+
+# The importer is built for 32-bit Windows and Linux, but its disc reading is
+# plain POSIX file I/O, so it can be compiled for the test host with a small
+# harness. platform.h is a stub: the importer only uses platform_log from it,
+# and that keeps the Xbox SDK headers out of the test.
+XISO_HARNESS = r"""
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "posix.h"
+#include "xiso.h"
+
+void platform_log(const char *format, ...)
+{
+	(void)format;
+}
+
+int posix_seek(int descriptor, posix_long offset_low, posix_long offset_high, int whence,
+	posix_ulong *position_low, posix_ulong *position_high)
+{
+	off_t offset = (off_t)(unsigned int)offset_low | ((off_t)(unsigned int)offset_high << 32);
+	off_t result = lseek(descriptor, offset, whence);
+
+	if (result < 0)
+		return -1;
+	*position_low = (posix_ulong)result;
+	*position_high = (posix_ulong)((unsigned long long)result >> 32);
+	return 0;
+}
+
+int posix_fstat(int descriptor, struct posix_file_information *information)
+{
+	struct stat status;
+
+	if (fstat(descriptor, &status) != 0)
+		return -1;
+	memset(information, 0, sizeof(*information));
+	information->size_low = (posix_ulong)((unsigned long long)status.st_size & 0xFFFFFFFFu);
+	information->size_high = (posix_ulong)((unsigned long long)status.st_size >> 32);
+	return 0;
+}
+
+int posix_make_directory(const char *path)
+{
+	return mkdir(path, 0755);
+}
+
+int main(int argc, char **argv)
+{
+	if (argc < 3)
+		return 2;
+	if (!strcmp(argv[1], "probe"))
+	{
+		struct xiso_probe_result result;
+		int read = xiso_probe(argv[2], &result);
+
+		printf("read=%d halo=%d maps=%d data=%llu file=%llu complete=%d\n",
+			read, result.halo, result.map_count, result.data_size, result.file_size, result.complete);
+		return 0;
+	}
+	if (!strcmp(argv[1], "extract"))
+	{
+		char error[512];
+		int ok;
+
+		memset(error, 0, sizeof(error));
+		ok = xiso_extract_maps(argv[2], argv[3], NULL, NULL, error, sizeof(error));
+		printf("ok=%d error=%s\n", ok, error);
+		return ok ? 0 : 1;
+	}
+	return 2;
+}
+"""
+
+REPOSITORY = Path(__file__).resolve().parent.parent
+XISO_SOURCE = REPOSITORY / "port" / "linux" / "src" / "xiso.c"
+
+
+@pytest.fixture(scope="module")
+def xiso_harness(tmp_path_factory):
+    """The importer compiled for this host, or a skip where there is no clang."""
+    if shutil.which("clang") is None:
+        pytest.skip("clang is needed to compile the disc image importer")
+    directory = tmp_path_factory.mktemp("xiso")
+    (directory / "platform.h").write_text(
+        "#ifndef TEST_PLATFORM_H\n#define TEST_PLATFORM_H\n"
+        "void platform_log(const char *format, ...);\n#endif\n",
+        encoding="latin-1",
+    )
+    shutil.copy2(XISO_SOURCE, directory / "xiso_under_test.c")
+    (directory / "harness.c").write_text(XISO_HARNESS, encoding="latin-1")
+    binary = directory / "xiso_harness"
+    built = subprocess.run(
+        [
+            "clang", "-std=gnu11", "-O0", "-g", "-Wall",
+            "-I", str(directory),
+            "-I", str(REPOSITORY / "port" / "linux" / "src"),
+            "-o", str(binary), str(directory / "harness.c"), str(directory / "xiso_under_test.c"),
+        ],
+        capture_output=True, text=True,
+    )
+    if built.returncode != 0:
+        # some hosts (a macOS SDK newer than their clang's linker) cannot
+        # link an executable although they compile the source; the tests then
+        # have nothing to run. CI's Arch Linux container links it.
+        pytest.skip("cannot link the disc image harness on this host:\n" + built.stderr.strip())
+    return binary
+
+
+SECTOR_SIZE = 2048
+
+
+def directory_table(entries) -> bytes:
+    """An XDVDFS directory: entries (sector, size, attributes, name) chained
+    through their right-subtree offsets, as the Xbox disc format stores them."""
+    offsets = []
+    offset = 0
+    for _, _, _, name in entries:
+        offsets.append(offset)
+        offset += (14 + len(name) + 3) & ~3
+    table = bytearray(offset)
+    for index, (sector, size, attributes, name) in enumerate(entries):
+        at = offsets[index]
+        table[at + 4:at + 8] = sector.to_bytes(4, "little")
+        table[at + 8:at + 12] = size.to_bytes(4, "little")
+        table[at + 12] = attributes
+        table[at + 13] = len(name)
+        table[at + 14:at + 14 + len(name)] = name.encode("ascii")
+        if index + 1 < len(offsets):
+            table[at + 2:at + 4] = (offsets[index + 1] // 4).to_bytes(2, "little")
+    return bytes(table)
+
+
+def halo_image(files=None, maps_name="maps", ui=True) -> bytes:
+    """A small but valid XDVDFS image holding a maps folder."""
+    if files is None:
+        files = {"ui.map": b"ui" * 16, "a10.map": b"a10" * 32}
+    if not ui:
+        files = {name: data for name, data in files.items() if name != "ui.map"}
+    payloads = list(files.items())
+    sectors = []
+    cursor = 35
+    for _, payload in payloads:
+        sectors.append(cursor)
+        cursor += max(1, (len(payload) + SECTOR_SIZE - 1) // SECTOR_SIZE)
+    maps_table = directory_table(
+        [(sectors[i], len(payloads[i][1]), 0, payloads[i][0]) for i in range(len(payloads))]
+    )
+    root_table = directory_table([(34, len(maps_table), 0x10, maps_name)])
+    assert len(root_table) <= SECTOR_SIZE
+    image = bytearray(cursor * SECTOR_SIZE)
+    descriptor = 32 * SECTOR_SIZE
+    image[descriptor:descriptor + 20] = b"MICROSOFT*XBOX*MEDIA"
+    image[descriptor + 0x7EC:descriptor + 0x7EC + 20] = b"MICROSOFT*XBOX*MEDIA"
+    image[descriptor + 20:descriptor + 24] = (33).to_bytes(4, "little")
+    image[descriptor + 24:descriptor + 28] = len(root_table).to_bytes(4, "little")
+    image[33 * SECTOR_SIZE:33 * SECTOR_SIZE + len(root_table)] = root_table
+    image[34 * SECTOR_SIZE:34 * SECTOR_SIZE + len(maps_table)] = maps_table
+    for (_, payload), sector in zip(payloads, sectors):
+        image[sector * SECTOR_SIZE:sector * SECTOR_SIZE + len(payload)] = payload
+    return bytes(image)
+
+
+def probe(xiso_harness, path):
+    result = subprocess.run([xiso_harness, "probe", path], capture_output=True, text=True, check=True)
+    return {key: int(value) for key, value in (part.split("=") for part in result.stdout.split())}
+
+
+def test_xiso_probe_recognises_a_halo_disc(xiso_harness, tmp_path):
+    image = tmp_path / "halo.iso"
+    image.write_bytes(halo_image())
+    fields = probe(xiso_harness, image)
+    assert fields["read"] == 1
+    assert fields["halo"] == 1
+    assert fields["maps"] == 2
+    assert fields["complete"] == 1
+    assert fields["file"] == image.stat().st_size
+
+
+def test_xiso_probe_rejects_a_disc_without_halo_maps(xiso_harness, tmp_path):
+    image = tmp_path / "other.iso"
+    image.write_bytes(halo_image(maps_name="content"))
+    fields = probe(xiso_harness, image)
+    assert fields["read"] == 1
+    assert fields["halo"] == 0
+
+
+def test_xiso_probe_requires_ui_map(xiso_harness, tmp_path):
+    image = tmp_path / "nohud.iso"
+    image.write_bytes(halo_image(ui=False))
+    assert probe(xiso_harness, image)["halo"] == 0
+
+
+def test_xiso_probe_marks_a_truncated_image_incomplete(xiso_harness, tmp_path):
+    image = tmp_path / "cut.iso"
+    image.write_bytes(halo_image()[:-SECTOR_SIZE])
+    fields = probe(xiso_harness, image)
+    assert fields["halo"] == 1
+    assert fields["complete"] == 0
+
+
+def test_xiso_probe_ignores_a_file_that_is_not_a_disc(xiso_harness, tmp_path):
+    image = tmp_path / "notes.txt"
+    image.write_bytes(b"not an Xbox disc image" * 64)
+    fields = probe(xiso_harness, image)
+    assert fields["read"] == 1
+    assert fields["halo"] == 0
+
+
+def test_xiso_extracts_the_maps_folder(xiso_harness, tmp_path):
+    files = {"ui.map": b"ui-data", "a10.map": b"a10-data"}
+    image = tmp_path / "halo.iso"
+    image.write_bytes(halo_image(files=files))
+    destination = tmp_path / "data"
+    destination.mkdir()
+    subprocess.run([xiso_harness, "extract", image, destination], check=True)
+    for name, payload in files.items():
+        assert (destination / "maps" / name).read_bytes() == payload
+    assert not (destination / "maps.partial").exists()

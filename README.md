@@ -41,8 +41,10 @@ The port does not include the game data. Download an Xbox disc image
 operate.
 
 1. Start the game.
-2. At the first start, the game asks for the disc image. Select it.
-3. The game extracts the `maps/` folder. Then the game starts.
+2. At the first start, the game looks for a Halo disc image already on the
+   computer and offers to install it. If it finds none, select it yourself.
+3. The game extracts the `maps/` folder, then offers to delete the disc
+   image to get its space back. Then the game starts.
 
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its

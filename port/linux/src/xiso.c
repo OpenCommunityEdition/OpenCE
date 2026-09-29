@@ -118,7 +118,9 @@ static unsigned long read_u32(const unsigned char *bytes)
 
 static int fail(struct xiso_image *image, const char *format, const char *detail)
 {
-	snprintf(image->error, (size_t)image->error_size, format, detail ? detail : "");
+	/* (xiso_probe passes no buffer: it only wants the answer) */
+	if (image->error && image->error_size > 0)
+		snprintf(image->error, (size_t)image->error_size, format, detail ? detail : "");
 	return 0;
 }
 
@@ -290,18 +292,119 @@ static int copy_file(struct xiso_image *image, const struct xiso_file *file, con
 	return 1;
 }
 
+/* the maps folder's files: the entries, their count, their total size, and
+whether ui.map is among them; returns nonzero when the image holds Halo's
+maps. The probe and the extraction both use this */
+static int find_maps(struct xiso_image *image, struct xiso_file *entries, int *count,
+	unsigned long long *total, int *has_ui)
+{
+	unsigned long root_sector, root_size;
+	unsigned char *table;
+	struct directory_walk walk;
+	int index;
+
+	if (!find_volume(image, &root_sector, &root_size))
+		return 0;
+	table = read_directory(image, root_sector, root_size);
+	if (!table)
+		return fail(image, "The disc image's file system is damaged.%s", NULL);
+	walk.table = table;
+	walk.size = root_size;
+	walk.entries = entries;
+	walk.entry_count = 0;
+	walk.maximum_count = MAXIMUM_FILES;
+	walk.visited = 0;
+	walk.directories = 1;
+	walk_directory(&walk, 0, 0);
+	for (index = 0; index < walk.entry_count && !names_match(entries[index].name, "maps"); index++)
+		;
+	if (index == walk.entry_count)
+	{
+		free(table);
+		return fail(image, "The disc image has no maps folder: it is not a Halo disc.%s", NULL);
+	}
+	{
+		unsigned long sector = entries[index].sector;
+		unsigned long size = entries[index].size;
+
+		free(table);
+		table = read_directory(image, sector, size);
+		if (!table)
+			return fail(image, "The disc image's maps folder is damaged.%s", NULL);
+		walk.table = table;
+		walk.size = size;
+		walk.entry_count = 0;
+		walk.visited = 0;
+		walk.directories = 0;
+		walk_directory(&walk, 0, 0);
+	}
+	*total = 0;
+	*has_ui = 0;
+	for (index = 0; index < walk.entry_count; index++)
+	{
+		*total += entries[index].size;
+		*has_ui |= names_match(entries[index].name, "ui.map");
+	}
+	free(table);
+	if (!*has_ui)
+		return fail(image, "The disc image's maps folder has no ui.map: it is not a Halo disc.%s", NULL);
+	*count = walk.entry_count;
+	return 1;
+}
+
+int xiso_probe(const char *image_path, struct xiso_probe_result *result)
+{
+	struct xiso_image image;
+	struct xiso_file *entries;
+	struct posix_file_information information;
+	unsigned long long total = 0;
+	int count = 0, has_ui = 0, index;
+
+	memset(result, 0, sizeof(*result));
+	image.error = NULL;
+	image.error_size = 0;
+	image.descriptor = open(image_path, O_RDONLY | O_LARGEFILE | O_CLOEXEC);
+	if (image.descriptor < 0)
+		return 0;
+	if (posix_fstat(image.descriptor, &information) == 0)
+		result->file_size = (unsigned long long)information.size_low |
+			(unsigned long long)information.size_high << 32;
+	entries = calloc(MAXIMUM_FILES, sizeof(*entries));
+	if (!entries)
+	{
+		close(image.descriptor);
+		return 0;
+	}
+	if (find_maps(&image, entries, &count, &total, &has_ui))
+	{
+		result->halo = 1;
+		result->map_count = count;
+		result->data_size = total;
+		result->complete = 1;
+		for (index = 0; index < count; index++)
+		{
+			unsigned long long end = image.partition +
+				(unsigned long long)entries[index].sector * SECTOR_SIZE + entries[index].size;
+
+			if (end > result->file_size)
+				result->complete = 0;
+		}
+	}
+	close(image.descriptor);
+	free(entries);
+	return 1;
+}
+
 int xiso_extract_maps(const char *image_path, const char *destination, xiso_progress_proc progress, void *context,
 	char *error, int error_size)
 {
 	struct xiso_image image;
 	struct xiso_file *entries = NULL;
-	unsigned char *table = NULL;
 	unsigned char *buffer = NULL;
-	unsigned long root_sector, root_size;
 	unsigned long long total = 0, done = 0;
 	char partial[1024], final[1024], path[1300];
 	int result = 0;
-	int index;
+	int count = 0, has_ui = 0, index;
 
 	image.error = error;
 	image.error_size = error_size;
@@ -315,74 +418,27 @@ int xiso_extract_maps(const char *image_path, const char *destination, xiso_prog
 		fail(&image, "Out of memory.%s", NULL);
 		goto done;
 	}
-	if (!find_volume(&image, &root_sector, &root_size))
+	if (!find_maps(&image, entries, &count, &total, &has_ui))
 		goto done;
-
-	/* the root's maps folder */
-	table = read_directory(&image, root_sector, root_size);
-	if (!table)
+	snprintf(partial, sizeof(partial), "%s/maps.partial", destination);
+	snprintf(final, sizeof(final), "%s/maps", destination);
+	posix_make_directory(partial);
+	for (index = 0; index < count; index++)
 	{
-		fail(&image, "The disc image's file system is damaged.%s", NULL);
+		snprintf(path, sizeof(path), "%s/%s", partial, entries[index].name);
+		platform_log("extracting maps/%s (%lu bytes)", entries[index].name, entries[index].size);
+		if (!copy_file(&image, &entries[index], path, buffer, &done, total, progress, context))
+			goto done;
+	}
+	if (rename(partial, final) != 0)
+	{
+		fail(&image, "Could not create %s.", final);
 		goto done;
-	}
-	{
-		struct directory_walk walk = { table, root_size, entries, 0, MAXIMUM_FILES, 0, 1 };
-
-		walk_directory(&walk, 0, 0);
-		for (index = 0; index < walk.entry_count && !names_match(entries[index].name, "maps"); index++)
-			;
-		if (index == walk.entry_count)
-		{
-			fail(&image, "The disc image has no maps folder: it is not a Halo disc.%s", NULL);
-			goto done;
-		}
-		free(table);
-		table = read_directory(&image, entries[index].sector, entries[index].size);
-		if (!table)
-		{
-			fail(&image, "The disc image's maps folder is damaged.%s", NULL);
-			goto done;
-		}
-		root_size = entries[index].size;
-	}
-
-	/* its files */
-	{
-		struct directory_walk walk = { table, root_size, entries, 0, MAXIMUM_FILES, 0, 0 };
-		int has_ui = 0;
-
-		walk_directory(&walk, 0, 0);
-		for (index = 0; index < walk.entry_count; index++)
-		{
-			total += entries[index].size;
-			has_ui |= names_match(entries[index].name, "ui.map");
-		}
-		if (!has_ui)
-		{
-			fail(&image, "The disc image's maps folder has no ui.map: it is not a Halo disc.%s", NULL);
-			goto done;
-		}
-		snprintf(partial, sizeof(partial), "%s/maps.partial", destination);
-		snprintf(final, sizeof(final), "%s/maps", destination);
-		posix_make_directory(partial);
-		for (index = 0; index < walk.entry_count; index++)
-		{
-			snprintf(path, sizeof(path), "%s/%s", partial, entries[index].name);
-			platform_log("extracting maps/%s (%lu bytes)", entries[index].name, entries[index].size);
-			if (!copy_file(&image, &entries[index], path, buffer, &done, total, progress, context))
-				goto done;
-		}
-		if (rename(partial, final) != 0)
-		{
-			fail(&image, "Could not create %s.", final);
-			goto done;
-		}
 	}
 	result = 1;
 
 done:
 	close(image.descriptor);
-	free(table);
 	free(entries);
 	free(buffer);
 	return result;
