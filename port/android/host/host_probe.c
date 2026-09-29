@@ -153,7 +153,7 @@ static unsigned long page_pointers(unsigned long address, uint32_t *values, unsi
 
 			if (value & 3)
 				continue;
-			if (value < HALO_GUEST_WINDOW_BASE || value >= (uintptr_t)host_memory_window_base() + HALO_GUEST_WINDOW_SIZE)
+			if (value < host_memory_window_base() || value >= (uintptr_t)host_memory_window_base() + HALO_GUEST_WINDOW_SIZE)
 				continue;
 			if (kept < capacity)
 				values[kept++] = value;
@@ -239,8 +239,42 @@ static void probe_tag_directory(void)
 	}
 }
 
-/* the values of one page that still name the window as the game was linked,
-which is how a pointer the port has not moved yet shows up */
+/* whether the guest has that page of the window mapped, out of the ranges
+already read; a pointer moved to where the window is should land on one */
+static int probe_mapped(unsigned long address)
+{
+	int index;
+
+	for (index = 0; index < probe_range_count; index++)
+	{
+		if (address >= probe_ranges[index].start && address < probe_ranges[index].end)
+			return 1;
+	}
+	return 0;
+}
+
+/* whether a value read out of the game data is a pointer the port has not
+moved. Plenty of ordinary data looks like an address in the old window (a
+float of -0.0f is 0x80000000, and there are thousands of those), so looking
+at the value is not enough: moved to where the window is, it has to land on
+a page this process has mapped. Noise moves to nothing. */
+static int probe_value_is_missed_pointer(uint32_t value)
+{
+	int32_t shift;
+	unsigned long moved;
+
+	if (value & 3)
+		return 0;
+	if (value < HALO_GUEST_WINDOW_BASE || value >= HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+		return 0;
+	/* the guest is 32-bit, so the shift wraps in 32 bits; computed in 64 it
+	lands above the window and nothing is ever found */
+	shift = (int32_t)((int32_t)host_memory_window_base() - (int32_t)HALO_GUEST_WINDOW_BASE);
+	moved = (unsigned long)(uint32_t)(value + shift);
+	return probe_mapped(moved);
+}
+
+/* the missed pointers in one page */
 static unsigned long page_stale(unsigned long address)
 {
 	const uint32_t *words = (const uint32_t *)(uintptr_t)address;
@@ -252,11 +286,7 @@ static unsigned long page_stale(unsigned long address)
 	{
 		for (index = 0; index < PROBE_PAGE / 4; index++)
 		{
-			uint32_t value = words[index];
-
-			if (value & 3)
-				continue;
-			if (value >= HALO_GUEST_WINDOW_BASE && value < HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+			if (probe_value_is_missed_pointer(words[index]))
 				found++;
 		}
 	}
@@ -278,9 +308,7 @@ static unsigned long page_stale_values(unsigned long address, uint32_t *values, 
 		{
 			uint32_t value = words[index];
 
-			if (value & 3)
-				continue;
-			if (value < HALO_GUEST_WINDOW_BASE || value >= HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+			if (!probe_value_is_missed_pointer(value))
 				continue;
 			if (kept < capacity)
 				values[kept++] = value;
