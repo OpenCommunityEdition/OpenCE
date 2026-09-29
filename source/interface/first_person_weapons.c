@@ -387,6 +387,12 @@ static short first_person_weapon_index_from_weapon_index(
 static short first_person_weapon_index_from_unit_index(
 	long unit_index);
 
+#ifdef HALO_LINUX
+/* port/linux/game/pal_tags.c's */
+boolean pal_tags_first_person_advance(short local_player_index, long graph_index, short animation_index,
+	short frame_index);
+#endif
+
 /* ---------- globals */
 
 static struct first_person_weapon *first_person_weapons;
@@ -1724,6 +1730,18 @@ static void first_person_weapon_update(
 			}
 		}
 
+#ifdef HALO_LINUX
+		/* port: a PAL map's first-person animation at the NTSC maps' pace,
+		which the weapon's timing keeps (port/linux/game/pal_tags.c) */
+		if (!pal_tags_first_person_advance(local_player_index,
+			weapon_definition->weapon.interface_definition.first_person_animations.index,
+			first_person_weapon->state_animation.index, first_person_weapon->state_animation.frame_index))
+		{
+			animation_update_result= _animation_no_key_frame;
+			sound_definition_index= NONE;
+		}
+		else
+#endif
 		animation_update_result= animation_update_render_only(
 			weapon_definition->weapon.interface_definition.first_person_animations.index,
 			&first_person_weapon->state_animation,

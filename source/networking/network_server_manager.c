@@ -2018,6 +2018,40 @@ void network_game_server_queue_player_for_addition(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5DE, server && player);
 
+#ifdef HALO_LINUX
+	/* port: a player already in the game or queued to join it, asked for
+	again: the pregame screen asks every frame until its player is in the
+	settings, which a machine joining the game in progress has only once
+	started, and that waits for the machine's queued players (the repeats
+	among them, which fail to join) */
+	{
+		long index;
+
+		if (server->queued_player_valid &&
+			server->queued_player.machine_index == player->machine_index &&
+			server->queued_player.controller_index == player->controller_index)
+		{
+			return;
+		}
+		for (index = 0; index < server->waiting_player_count; index++)
+		{
+			if (server->waiting_players[index].machine_index == player->machine_index &&
+				server->waiting_players[index].controller_index == player->controller_index)
+			{
+				return;
+			}
+		}
+		for (index = 0; index < (long)NUMBEROF(server->game.players); index++)
+		{
+			if (network_player_is_valid(&server->game.players[index]) &&
+				server->game.players[index].machine_index == player->machine_index &&
+				server->game.players[index].controller_index == player->controller_index)
+			{
+				return;
+			}
+		}
+	}
+#endif
 	if (!server->queued_player_valid && network_player_is_valid(player))
 	{
 		csmemcpy(&server->queued_player, player, sizeof(server->queued_player));

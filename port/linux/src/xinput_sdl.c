@@ -207,8 +207,8 @@ once a frame, at the display's refresh rate. */
 
 /* debug.test_input "bot:<seed>": a scripted player for the automated
 network tests (port/linux/game/network_test.c), different for each seed:
-it walks and strafes in circles, turns, fires every few seconds and jumps
-now and then */
+it walks and strafes in circles, turns, fires every few seconds, jumps now
+and then and throws a grenade every seven seconds */
 static int test_input_holding_action;
 static Uint64 test_input_holding_action_since;
 
@@ -255,6 +255,8 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
 	if (fmod(t, 5.0) < 0.1)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 255;
+	if (fmod(t, 7.0) < 0.2)
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
 }
 
 static void wheel_update(void)

@@ -1492,11 +1492,14 @@ static void distributed_send_statistics(
 	struct distributed_statistics_message message;
 	short count = 0;
 	short refreshed = 0;
+	/* (where this round starts: the cursor moves past the last player it
+	refreshed, which must not shift the players this round visits) */
+	short first = distributed_statistics_cursor;
 	short step;
 
 	for (step = 0; step < MAXIMUM_TRACKED_PLAYERS; step++)
 	{
-		short player_index = (short)((distributed_statistics_cursor + step) % MAXIMUM_TRACKED_PLAYERS);
+		short player_index = (short)((first + step) % MAXIMUM_TRACKED_PLAYERS);
 		struct player_datum *player = distributed_player(player_index);
 		unsigned long checksum;
 

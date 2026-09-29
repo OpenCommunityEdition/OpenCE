@@ -38,7 +38,9 @@ an older build from that page.
 
 The port does not include the game data. Download an Xbox disc image
 (`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
-operate.
+operate. The maps of the European (PAL) version were made for a slower
+console. The port changes them to play as the North American (NTSC) maps do,
+so players of the two versions can play together.
 
 1. Start the game.
 2. At the first start, the game asks for the disc image. Select it.

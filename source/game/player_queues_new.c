@@ -411,6 +411,25 @@ void update_server_next_update(
 	queue = (struct update_server_queue_datum *)update_server_globals.queues->data;
 	for (queue_index = 0; queue_index<update_server_globals.queues->count; ++queue_index, ++queue)
 	{
+#ifdef HALO_LINUX
+		/* port: a slot no player holds (the distributed netcode's players keep
+		their slots in the host's player list, which may leave gaps:
+		network_game_manager.c) has an idle action, not what its queue's
+		memory last held (a weapon index past the unit's, which every machine
+		dequeuing it asserted on) */
+		if (!queue->identifier)
+		{
+			struct player_action *action = &update->update.actions[queue_index];
+
+			csmemset(action, 0, sizeof(*action));
+			action->desired_weapon_index = NONE;
+			action->desired_grenade_index = NONE;
+			action->desired_zoom_level = NONE;
+			update_server_pending_control_flags[queue_index] = 0;
+			update->update.action_count += 1;
+			continue;
+		}
+#endif
 		csmemcpy(
 			&update->update.actions[queue_index],
 			&queue->current_action,

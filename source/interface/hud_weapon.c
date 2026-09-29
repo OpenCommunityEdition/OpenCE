@@ -1192,10 +1192,18 @@ static void crosshairs_draw(
 
 							draw_crosshair:
 #ifdef HALO_LINUX
-								/* port: a state not yet worked out has no frame: nothing
-								drawn, rather than a sprite before the first */
-								if (frame_index == NONE)
+								/* port: a frame that is not one of the item's sprites draws
+								nothing, rather than a sprite outside its sequence: a state not
+								yet worked out has none, and the states are worked out each tick
+								for the weapon then held, while a distributed client's weapons
+								change when the host's word arrives, between ticks, so a frame
+								can draw one weapon's crosshairs from another's states (the aim
+								state's 1 on the no-weapon crosshair's single sprite) */
+								if (frame_index < 0 ||
+									(sequence && frame_index >= sequence->sprites.count))
+								{
 									continue;
+								}
 #endif
 								match_vassert(
 									"c:\\halo\\SOURCE\\interface\\hud_weapon.c",

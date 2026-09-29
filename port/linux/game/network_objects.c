@@ -562,6 +562,10 @@ static long distributed_host_placed_object(
 	object = object_get(object_index);
 	if (object->object.parent_object_index != NONE || !TEST_FLAG(object->object.flags, _object_connected_to_map_bit))
 		return NONE;
+	/* (out of the map, where nobody sees it: a body fallen through the
+	ground falls on for good, ever faster, never at rest) */
+	if (TEST_FLAG(object->object.flags, _object_outside_of_map_bit))
+		return NONE;
 	if (TEST_FLAG(_object_mask_unit, object->object.type) && unit_get(object_index)->unit.player_index != NONE &&
 		!TEST_FLAG(object->object.damage_flags, _object_dead_bit))
 	{
@@ -862,6 +866,23 @@ static void distributed_client_delete(
 			player_get(unit->unit.player_index)->unit_index == object_index)
 		{
 			network_player_detach_unit(unit->unit.player_index);
+		}
+	}
+	/* (a player's action on it, the prompt the hud draws: deleted between
+	ticks, it would draw on with the object gone until the next tick looked
+	again) */
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (player->action_object_index == object_index)
+			{
+				player->action_result = _player_action_result_reload;
+				player->action_object_index = NONE;
+			}
 		}
 	}
 	objects_client_deleting = TRUE;

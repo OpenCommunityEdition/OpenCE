@@ -229,6 +229,11 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 
+#ifdef HALO_LINUX
+/* port/linux/game/pal_tags.c's */
+short pal_tags_first_person_frames(long graph_index, short animation_index, short frames);
+#endif
+
 /* ---------- constants */
 
 enum weapon_trigger_flags
@@ -1249,6 +1254,11 @@ short weapon_get_first_person_animation_time(
 					{
 					case _weapon_first_person_animation_time_frame_count:
 						time = animation->frame_count;
+#ifdef HALO_LINUX
+						/* port: a PAL map's animation, the NTSC maps' frame count (port/linux/game/pal_tags.c) */
+						time = pal_tags_first_person_frames(weapon_definition->weapon.interface_definition.first_person_animations.index,
+							animation_index, time);
+#endif
 						break;
 
 					case _weapon_first_person_animation_time_private_key_frame:
@@ -1279,6 +1289,18 @@ short weapon_get_first_person_animation_time(
 							time = shotgun_enter->frame_count;
 							break;
 						}
+#ifdef HALO_LINUX
+						/* port: the NTSC maps' frame count, as above */
+						if ((shotgun_reload_type == _shotgun_reload_type_first_round ||
+							shotgun_reload_type == _shotgun_reload_type_first_and_last_round) &&
+							_first_person_weapon_animation_shotgun_enter < weapon_animations->animations.count)
+						{
+							time = pal_tags_first_person_frames(
+								weapon_definition->weapon.interface_definition.first_person_animations.index,
+								animation_graph_animation_index_get(&weapon_animations->animations)[_first_person_weapon_animation_shotgun_enter].animation_index,
+								time);
+						}
+#endif
 					}
 				}
 			}

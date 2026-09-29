@@ -1808,6 +1808,15 @@ boolean network_game_client_handle_game_update(
 		message_packet->player_actions,
 		update.local_player_count * sizeof(struct player_action));
 
+#ifdef HALO_LINUX
+	/* port: the distributed netcode's client plays on its own clock with the
+	inputs the host relays (network_distributed.c, update_client_dequeue);
+	the host's game update carries no actions and only keeps the count of
+	updates. There is nothing to queue, and its queue follows this machine's
+	ticks rather than the host's update numbers, so queueing it failed (and
+	logged "failed to get an update") on every tick. */
+	if (!network_game_distributed())
+#endif
 	update_client_handle_server_update(&update, message_packet->update_number);
 
 	client->next_update_number++;

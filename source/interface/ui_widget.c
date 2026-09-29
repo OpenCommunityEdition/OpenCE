@@ -2762,6 +2762,14 @@ void ui_widgets_close_all(
 {
 	long local_player_index;
 
+#ifdef HALO_LINUX
+	/* port: the virtual keyboard goes with the widgets (while the widget
+	whose text it edits is still there): left open, it drew on after a game
+	loaded, with the menu map's font, which the game's tags no longer have
+	(a player typing when the host started the game) */
+	if (virtual_keyboard_active())
+		virtual_keyboard_close();
+#endif
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)

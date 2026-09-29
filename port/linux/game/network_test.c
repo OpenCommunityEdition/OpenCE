@@ -132,7 +132,7 @@ static void network_test_log_players(
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
-	char line[1024];
+	char line[4096];
 	int length = 0;
 
 	data_iterator_new(&iterator, player_data);
