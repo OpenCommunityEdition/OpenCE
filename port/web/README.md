@@ -91,7 +91,8 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 ## Online play
 
 The automatic startup and solo System Link behavior described below is
-implemented in the PR branch and is not yet deployed to the public sites.
+published on both public sites as runtime `3217cbdfcc8f02a7` (source
+`1fbb8730`, September 29, 2026).
 Chrome testing on September 29, 2026 confirmed a one-player Blood Gulch
 start and a second player joining the running match (two players on two
 machines). Both tabs later suffered renderer crashes with error 11.

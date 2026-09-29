@@ -7,11 +7,16 @@ Both sites serve the source-built browser port in `port/web`. The game runs
 in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
-**Release status (September 29, 2026):** the automatic match startup and
-one-player System Link changes below are in the PR branch, not the public
-Pages release. Local Chrome tests started a solo match and joined it with
+**Release status (September 29, 2026):** both sites publish automatic match
+startup and one-player System Link in runtime `3217cbdfcc8f02a7`, packaged
+from source `1fbb8730`. The Pages commits are `f5c1f05` for the GitHub site
+and `a7fec88` for the mirror. Existing visitors can reload and choose
+**Update**; downloaded maps and saves are retained.
+
+**Known issue:** local Chrome tests started a solo match and joined it with
 a second player, but later hit renderer crashes ("Aw, Snap", error 11).
-The cause is unresolved, so this update has not replaced the public build.
+The cause remains unresolved; this release does not establish sustained
+multiplayer stability.
 
 This replaces the pinned Apollo runtime, which froze during game startup
 in desktop WebKit 26.4. The worker-based port reached the Halo main menu
