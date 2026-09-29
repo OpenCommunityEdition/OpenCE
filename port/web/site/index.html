@@ -38,6 +38,14 @@
         (or <em>Add to Home screen</em>).</span>
     </div>
 
+    <div id="iphone-tips" class="hint" hidden>
+      <strong>iPhone tips:</strong> swipe down from the top-right to open Control Center.
+      Turn off <strong>Portrait Orientation Lock</strong> to play sideways.
+      For sound, turn off <strong>Silent Mode</strong> and raise the volume.
+      <p class="small">With a Home button, swipe up from the bottom instead.
+        If Silent Mode isn't in Control Center, use your Ring/Silent switch or Action button.</p>
+    </div>
+
     <section id="download-panel" class="download-panel" aria-label="Game download" hidden>
       <div class="download-heading"><strong id="download-title">Checking game download</strong>
         <strong id="download-percent">0%</strong></div>
@@ -122,7 +130,18 @@
   </section>
 </main>
 
-<div id="rotate" class="overlay" hidden><p>Turn your device sideways to play.</p></div>
+<div id="rotate" class="overlay" hidden>
+  <div class="panel">
+    <p>Turn your device sideways to play.</p>
+    <div id="rotate-iphone-tips" hidden>
+      <p>Still upright? <strong>Portrait Orientation Lock</strong> may be on.
+        Swipe down from the top-right to open Control Center and turn it off.</p>
+      <p>For sound, turn off <strong>Silent Mode</strong> in Control Center and raise the volume.</p>
+      <p class="small">With a Home button, swipe up from the bottom instead.
+        If Silent Mode isn't in Control Center, use your Ring/Silent switch or Action button.</p>
+    </div>
+  </div>
+</div>
 <div id="toast" class="toast" hidden></div>
 <div id="fatal" class="overlay fatal" hidden>
   <div class="panel">

@@ -879,6 +879,8 @@ can run the game, copies the game data out of the player's disc image
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     $('install-hint').hidden = standalone || !ios;
+    $('iphone-tips').hidden = !ios;
+    $('rotate-iphone-tips').hidden = !ios;
     // Android (Chrome, Edge, Samsung Internet): the browser's own install
     // prompt when it offers one, otherwise where to find it
     const android = /Android/i.test(navigator.userAgent);

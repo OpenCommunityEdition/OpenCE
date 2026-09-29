@@ -62,6 +62,23 @@ without use: install the app to keep it.
 
 ## Controls
 
+### iPhone rotation and sound
+
+- If the page stays upright when you turn the phone sideways, Portrait
+  Orientation Lock may be on. Swipe down from the top-right to open Control
+  Center and turn it off (the padlock with a circular arrow).
+- For sound, swipe down to Control Center, turn off Silent Mode if its control
+  is available, and raise the volume. Otherwise, use the Ring/Silent switch
+  or the Action button if it is assigned to Silent Mode.
+- On iPhones with a Home button, open Control Center by swiping up from the
+  bottom instead.
+
+Apple's guides cover [screen rotation](https://support.apple.com/guide/iphone/rotate-your-iphone-screen-iph3badf94ec/ios),
+[Control Center](https://support.apple.com/guide/iphone/use-and-customize-control-center-iph59095ec58/ios),
+and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7fd7d1/ios).
+
+### Game input
+
 - A controller that the browser knows (Xbox, PlayStation, MFi, Switch Pro):
   as on Android. The browser sees a controller only after a button is pushed.
 - Touch: the left half of the screen is a stick for moving; drag on the right
