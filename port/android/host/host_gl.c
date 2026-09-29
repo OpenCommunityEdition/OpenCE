@@ -10,6 +10,7 @@ already have host types by then. Only strings need copying back.
 
 #include <EGL/egl.h>
 #include <GLES3/gl32.h>
+#include <android/log.h>
 #include <dlfcn.h>
 #include <string.h>
 
@@ -122,7 +123,13 @@ void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const
 	{
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
 
-		buffer_write_by_subdata = renderer && strstr(renderer, "Adreno") != NULL;
+		/* (only decide once a context gives a renderer) */
+		if (renderer)
+		{
+			buffer_write_by_subdata = strstr(renderer, "Adreno") != NULL;
+			__android_log_print(ANDROID_LOG_INFO, "halo", "stream uploads: %s on %s",
+				buffer_write_by_subdata ? "glBufferSubData" : "mapped range", renderer);
+		}
 	}
 	if (!buffer_write_by_subdata)
 	{
