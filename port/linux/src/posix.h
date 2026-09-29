@@ -122,6 +122,20 @@ void posix_random_bytes(void *buffer, posix_ulong size);
 or 0 if it cannot be resolved; may block while a name is looked up */
 posix_ulong posix_resolve_ipv4(const char *host);
 
+/* ---------- UPnP (internet play, p2p.c; posix_upnp.c, with
+port/third_party/miniupnpc) */
+
+/* asks the local network's router (its UPnP Internet Gateway Device) to
+forward UDP port (network byte order) of the router's to the same port of
+this machine; blocks for a few seconds. 1 on success, with the router's
+internet address and the port it forwards (network byte order); else 0 and
+why in error. Asking again for the same port renews the forwarding. */
+int posix_upnp_forward_udp(unsigned short port, posix_ulong *external_address, unsigned short *external_port,
+	char *error, int error_size);
+/* stops the router forwarding that port (network byte order) of its, which
+posix_upnp_forward_udp set up; blocks */
+void posix_upnp_stop_forwarding_udp(unsigned short external_port);
+
 /* ---------- the process and the desktop (internet play, p2p.c) */
 
 /* copies the command line argument at index (0 is the program) into buffer;

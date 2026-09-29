@@ -17,7 +17,13 @@ link games as if they were on one LAN, without a server of this project's.
 - The tunnel is one UDP socket. Each machine learns its public address from
   public STUN servers, and both then send to each other's addresses until
   packets get through (hole punching). There is no relay: two machines whose
-  NATs both map every destination to a new port cannot connect. Every
+  NATs both map every destination to a new port cannot connect, unless a
+  router forwards one of them a port. So a host asks its router to forward
+  the tunnel's port (UPnP, posix_upnp.c) as soon as a player reaches out
+  with its invite, and a joiner asks its own when it has not reached the
+  host in a few seconds (network.allow_upnp); the forwarded port is one more
+  of the addresses a machine offers (the joiner asks the host again every
+  few seconds until they meet, and the host answers with them all). Every
   tunnel packet is sealed with the pair's key.
 - Each peer gets a virtual address in 100.64.0.0/10, which the game sees
   (XNetXnAddrToInAddr maps the peer's XNADDR to it). xnet.c rewrites the
@@ -77,6 +83,12 @@ enum
 	STUN_RETRY_INTERVAL = 500,
 	STUN_REFRESH_INTERVAL = 25000,
 	STUN_ATTEMPTS = 6,
+	/* a joiner asks its router to forward the tunnel's port when it has not
+	reached a peer in this long; a forwarding is renewed this often (its
+	lease is an hour), and one refused asked for again this long after */
+	UPNP_JOIN_DELAY = 5000,
+	UPNP_RENEW_INTERVAL = 30 * 60 * 1000,
+	UPNP_RETRY_INTERVAL = 5 * 60 * 1000,
 
 	/* where a running copy of the game takes invites from another one
 	started to open a link (127.0.0.1) */
@@ -221,6 +233,15 @@ static struct
 
 	char clipboard[P2P_LINK_SIZE];
 	int has_clipboard;
+
+	/* UPnP (posix_upnp.c): a thread asking the router; the port it forwards
+	here, and when it was last asked */
+	int upnp_working;
+	int upnp_asked;
+	int upnp_forwarded;
+	int upnp_release_registered;
+	struct p2p_candidate upnp_candidate;
+	unsigned long upnp_time;
 } p2p = { 0, 0, -1, 0, -1, .hosting_socket = -1 };
 
 static unsigned char identifier[P2P_IDENTIFIER_SIZE];
@@ -626,7 +647,8 @@ static void update_peers(void)
 		else if (elapsed(peer->offered_time, PUNCH_TIMEOUT))
 		{
 			drop_peer(peer, "could not connect (both networks' NATs may be too strict for a direct "
-				"connection; forwarding network.tunnel_port on one router helps)");
+				"connection; forwarding network.tunnel_port on one router helps, as UPnP does where the "
+				"router allows it: network.allow_upnp)");
 		}
 		else if (elapsed(peer->sent_time, PUNCH_INTERVAL))
 		{
@@ -814,6 +836,9 @@ int p2p_local_candidates(struct p2p_candidate *candidates, int maximum_count)
 		candidates[count].address = lan;
 		candidates[count++].port = p2p.tunnel_port;
 	}
+	/* (the port the router forwards here, UPnP) */
+	if (p2p.upnp_forwarded && count < maximum_count)
+		candidates[count++] = p2p.upnp_candidate;
 	for (index = 0; index < p2p.stun_count && count < maximum_count; index++)
 	{
 		int known;
@@ -1607,6 +1632,119 @@ static void update_hosting(void)
 	}
 }
 
+/* ---------- UPnP (posix_upnp.c): the router forwards a port here */
+
+/* the router asked, on a thread of its own (it takes seconds) */
+static void *upnp_thread(void *unused)
+{
+	unsigned short port;
+	posix_ulong address = 0;
+	unsigned short external_port = 0;
+	char error[160] = "";
+	int forwarded;
+
+	(void)unused;
+	pthread_mutex_lock(&p2p_lock);
+	port = p2p.tunnel_port;
+	pthread_mutex_unlock(&p2p_lock);
+	forwarded = posix_upnp_forward_udp(port, &address, &external_port, error, sizeof(error));
+	pthread_mutex_lock(&p2p_lock);
+	p2p.upnp_working = 0;
+	p2p.upnp_time = p2p_now();
+	if (forwarded)
+	{
+		char text[32];
+
+		if (!p2p.upnp_forwarded || p2p.upnp_candidate.address != address ||
+			p2p.upnp_candidate.port != external_port)
+		{
+			platform_log("Internet play: the router forwards %s to this machine (UPnP)",
+				address_text(address, external_port, text));
+		}
+		p2p.upnp_forwarded = 1;
+		p2p.upnp_candidate.address = address;
+		p2p.upnp_candidate.port = external_port;
+	}
+	else if (!p2p.upnp_forwarded)
+	{
+		platform_log("Internet play: UPnP: %s", error);
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	return NULL;
+}
+
+/* the game exits: the router forwards the port no longer */
+static void upnp_release(void)
+{
+	unsigned short external_port = 0;
+
+	pthread_mutex_lock(&p2p_lock);
+	if (p2p.upnp_forwarded && !p2p.upnp_working)
+	{
+		external_port = p2p.upnp_candidate.port;
+		p2p.upnp_forwarded = 0;
+		p2p.upnp_working = 1;
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	if (external_port)
+		posix_upnp_stop_forwarding_udp(external_port);
+}
+
+/* whether a forwarded port would help: a player reaching this host (at
+once: they may need it), or a peer not reached in a while (every copy of
+the game listens, and so has an invite, from its start: a host asks only
+when its invite is used) */
+static int upnp_needed(void)
+{
+	int index;
+
+	if (p2p.joining && elapsed(p2p.join_time, UPNP_JOIN_DELAY))
+		return 1;
+	for (index = 0; index < P2P_MAXIMUM_PEERS; index++)
+	{
+		struct peer const *peer = &p2p.peers[index];
+
+		if (peer->used && !peer->connected &&
+			((p2p.hosting && !peer->is_host) || elapsed(peer->offered_time, UPNP_JOIN_DELAY)))
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void update_upnp(void)
+{
+	static int allowed = -1;
+	int ask;
+	pthread_t thread;
+
+	if (allowed < 0)
+		allowed = config_boolean("network.allow_upnp") ? 1 : 0;
+	if (!allowed || p2p.upnp_working)
+		return;
+	if (p2p.upnp_forwarded)
+		ask = elapsed(p2p.upnp_time, UPNP_RENEW_INTERVAL);
+	else
+		ask = upnp_needed() && (!p2p.upnp_asked || elapsed(p2p.upnp_time, UPNP_RETRY_INTERVAL));
+	if (!ask)
+		return;
+	p2p.upnp_working = 1;
+	p2p.upnp_asked = 1;
+	if (!p2p.upnp_release_registered)
+	{
+		p2p.upnp_release_registered = 1;
+		atexit(upnp_release);
+	}
+	if (pthread_create(&thread, NULL, upnp_thread, NULL) != 0)
+	{
+		p2p.upnp_working = 0;
+		p2p.upnp_time = p2p_now();
+		return;
+	}
+	pthread_detach(thread);
+}
+
 void p2p_socket_listening(int socket)
 {
 	if (!p2p.running)
@@ -1857,6 +1995,7 @@ static void *p2p_thread(void *unused)
 		stun_update();
 		update_hosting();
 		update_joining();
+		update_upnp();
 		p2p_discord_update();
 #ifdef HALO_ANDROID
 		poll_invite_file();
