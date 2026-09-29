@@ -37,7 +37,7 @@ android {
         main {
             java.srcDirs += new File(staged, "third_party/SDL3/android-project/app/src/main/java")
             jniLibs.srcDirs = [new File(staged, "jniLibs")]
-            assets.srcDirs = [new File(staged, "assets")]
+            assets.srcDirs = [new File(staged, "assets"), new File(projectDir, "src/main/assets")]
         }
     }
 
@@ -83,4 +83,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // torrent downloads of the game data (TorrentDownload.java)
+    implementation "org.libtorrent4j:libtorrent4j:2.1.0-39"
+    implementation "org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-39"
 }

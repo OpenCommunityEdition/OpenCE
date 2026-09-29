@@ -63,6 +63,7 @@ public class LauncherActivity extends Activity {
     private static final int PICK_FOLDER = 1;
     private static final int PICK_IMAGE = 2;
     private static final int REQUEST_STORAGE = 3;
+    private static final int PICK_TORRENT = 4;
 
     private static final int COLOR_ACTIVE = HaloUi.CYAN;
     private static final String TAG = "halo-import";
@@ -82,6 +83,10 @@ public class LauncherActivity extends Activity {
     private File currentImage;
     private Uri currentUri;
     private boolean showingChooser;
+    private volatile boolean downloading;
+    private TorrentDownload download;
+    private File builtIn;
+    private boolean builtInChecked;
     private boolean scannedOnce;
     private boolean rescanOnResume;
     private boolean archiveAccess;
@@ -528,6 +533,11 @@ public class LauncherActivity extends Activity {
         }
 
         sectionLabel("ACTIONS");
+        File shipped = builtInTorrent();
+        if (shipped != null)
+            addPrimaryButton("Download Halo", () -> startDownload(download -> download.runFile(shipped)));
+        else
+            addPrimaryButton("Download game data", this::downloadGameData);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -955,8 +965,203 @@ public class LauncherActivity extends Activity {
         }
     }
 
+    private interface DownloadJob {
+        String run(TorrentDownload download);
+    }
+
+    /**
+     * Offers to fetch the game data over BitTorrent. Nothing is shipped or
+     * searched for: the player pastes a magnet link or picks a .torrent, so
+     * what is downloaded is their choice and responsibility.
+     */
+    private void downloadGameData() {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackground(HaloUi.panel(this));
+        int pad = HaloUi.dp(this, 24);
+        panel.setPadding(pad, pad, pad, pad);
+        panel.addView(HaloUi.heading(this, "Download game data", HaloUi.CYAN, 17));
+        panel.addView(HaloUi.readout(this, "Paste a magnet link, or pick a .torrent file. This is plain "
+            + "BitTorrent: the app ships no link and looks for none.", HaloUi.TEXT_DIM, 12), margins(0, 10, 0, 0));
+
+        final EditText input = new EditText(this);
+        input.setHint("magnet:?xt=urn:btih:…");
+        input.setSingleLine(false);
+        input.setMaxLines(3);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setTextColor(HaloUi.TEXT);
+        input.setHintTextColor(HaloUi.CYAN_DIM);
+        input.setTypeface(HaloUi.MONO);
+        input.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        panel.addView(input, margins(0, 14, 0, 0));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.END);
+        Button file = new Button(this);
+        file.setText("Pick .torrent");
+        HaloUi.styleButton(this, file);
+        file.setOnClickListener(view -> {
+            dialog.dismiss();
+            pickTorrent();
+        });
+        Button start = new Button(this);
+        start.setText("Download");
+        HaloUi.styleButton(this, start);
+        start.setOnClickListener(view -> {
+            String magnet = input.getText().toString().trim();
+            dialog.dismiss();
+            if (magnet.startsWith("magnet:"))
+                startDownload(torrent -> torrent.runMagnet(magnet));
+            else
+                reset("That does not look like a magnet link.");
+        });
+        actions.addView(file, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        startParams.leftMargin = HaloUi.dp(this, 12);
+        actions.addView(start, startParams);
+        panel.addView(actions, margins(0, 16, 0, 0));
+
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(0));
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.86f),
+                WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+    }
+
+    /** a torrent shipped in the APK's assets, if the builder put one there */
+    private File builtInTorrent() {
+        if (builtIn == null && !builtInChecked) {
+            builtInChecked = true;
+            try (InputStream in = getAssets().open("game.torrent")) {
+                File file = new File(getCacheDir(), "game.torrent");
+                try (OutputStream out = new FileOutputStream(file)) {
+                    byte[] buffer = new byte[1 << 16];
+                    int count;
+                    while ((count = in.read(buffer)) > 0)
+                        out.write(buffer, 0, count);
+                }
+                builtIn = file;
+            } catch (Exception exception) {
+                builtIn = null;
+            }
+        }
+        return builtIn;
+    }
+
+    private void pickTorrent() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES,
+            new String[] { "application/x-bittorrent", "application/octet-stream" });
+        startActivityForResult(intent, PICK_TORRENT);
+    }
+
+    private void startDownload(DownloadJob job) {
+        if (downloading || extracting)
+            return;
+        downloading = true;
+        cancelled = false;
+        lastLoggedPercent = -1;
+        buttons.removeAllViews();
+        seal.setText("LIVE");
+        seal.setTextColor(HaloUi.AMBER);
+        setStatus("Finding peers");
+        showProgress(true);
+        progress.setProgress(0f);
+        percent.setText("");
+        log("> downloading game data");
+        final File directory = new File(getFilesDir(), "download");
+        final TorrentDownload torrent = new TorrentDownload(directory, (state, done, total, rate) -> {
+            if (cancelled)
+                return false;
+            handler.post(() -> reportDownload(state, done, total, rate));
+            return true;
+        });
+        download = torrent;
+        new Thread(() -> {
+            String error = job.run(torrent);
+            handler.post(() -> finishDownload(error, directory));
+        }, "game-download").start();
+    }
+
+    private void reportDownload(String state, long done, long total, long rate) {
+        if (total > 0) {
+            float fraction = (float) done / total;
+            progress.setProgress(fraction);
+            percent.setText(human(done) + " / " + human(total) + "  ·  " + (int) (fraction * 100) + "%");
+        } else {
+            progress.setIndeterminate(true);
+            percent.setText(human(done));
+        }
+        String left = "";
+        if (total > done && rate > 0)
+            left = "  ·  " + humanTime((total - done) / rate) + " left";
+        setStatus(state.equals("downloading") ? "Downloading  " + human(rate) + "/s" + left : "Finding peers");
+        int current = total > 0 ? (int) (done * 100 / total) : -1;
+        if (current >= 0 && current / 10 != lastLoggedPercent / 10) {
+            lastLoggedPercent = current;
+            log("> " + human(done) + " of " + human(total) + "  " + current + "%");
+        }
+    }
+
+    /** a rough "1h 04m" for the time left */
+    private static String humanTime(long seconds) {
+        if (seconds < 60)
+            return seconds + "s";
+        if (seconds < 3600)
+            return (seconds / 60) + "m " + (seconds % 60) + "s";
+        return (seconds / 3600) + "h " + ((seconds % 3600) / 60) + "m";
+    }
+
+    private void finishDownload(String error, File directory) {
+        downloading = false;
+        showProgress(false);
+        if (error != null) {
+            reset("Download stopped: " + error);
+            return;
+        }
+        File image = findDownloadedImage(directory);
+        if (image == null) {
+            reset("The download finished but no disc image turned up.");
+            return;
+        }
+        log("> downloaded " + image.getName() + " (" + human(image.length()) + ")");
+        beginExtract(image, image.getName());
+    }
+
+    /** the largest .iso/.xiso anywhere under a directory, or null */
+    private static File findDownloadedImage(File directory) {
+        File best = null;
+        File[] entries = directory.listFiles();
+        if (entries == null)
+            return null;
+        for (File entry : entries) {
+            File found;
+            if (entry.isDirectory()) {
+                found = findDownloadedImage(entry);
+            } else {
+                String name = entry.getName().toLowerCase(Locale.US);
+                found = name.endsWith(".iso") || name.endsWith(".xiso") ? entry : null;
+            }
+            if (found != null && (best == null || found.length() > best.length()))
+                best = found;
+        }
+        return best;
+    }
+
     private void reset(String message) {
         extracting = false;
+        downloading = false;
         seal.setText("HALTED");
         seal.setTextColor(HaloUi.AMBER);
         showProgress(false);
@@ -977,8 +1182,10 @@ public class LauncherActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (extracting) {
+        if (extracting || downloading) {
             cancelled = true;
+            if (download != null)
+                download.cancel();
             log("> halt requested…");
             return;
         }
@@ -998,6 +1205,19 @@ public class LauncherActivity extends Activity {
                 // some providers do not offer a persistable grant
             }
             beginExtract(uri, displayName(uri));
+        } else if (requestCode == PICK_TORRENT) {
+            File torrent = new File(getCacheDir(), "game.torrent");
+            try (InputStream in = getContentResolver().openInputStream(uri);
+                 OutputStream out = new FileOutputStream(torrent)) {
+                byte[] buffer = new byte[1 << 16];
+                int count;
+                while ((count = in.read(buffer)) > 0)
+                    out.write(buffer, 0, count);
+            } catch (Exception exception) {
+                reset("Could not read that torrent file.");
+                return;
+            }
+            startDownload(download -> download.runFile(torrent));
         } else if (requestCode == PICK_FOLDER) {
             extracting = true;
             cancelled = false;
