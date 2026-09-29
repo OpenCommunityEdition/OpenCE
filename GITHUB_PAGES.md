@@ -3,11 +3,13 @@
 Hosted demo: <https://abwburns.com/halo-ce-universal/> (GitHub Pages on the
 `fqlx` fork; <https://fqlx.github.io/halo-ce-universal/> redirects there).
 
-Open the link in current desktop Chrome or Edge, choose your own Xbox Halo
-disc image, and click **Play** after import. The maps and saves stay in that
-browser's storage. Import once on each device/browser; localhost storage does
-not transfer to the public site's origin. No game data is uploaded or included
-in the site. Multiplayer is not verified.
+Open the link in current desktop Chrome or Edge. The first visit downloads
+about 1.9 GB of map data automatically; keep the tab open, then click **Play**.
+Completed maps and saves stay in that browser's storage. Reloading resumes
+missing maps, and a complete cache needs no map downloads on later visits.
+Browser storage can be cleared or evicted; each device/browser has its own cache.
+Use **Cancel download** or `?manual` to import your own Xbox Halo disc image
+instead. Multiplayer is not verified.
 
 This self-hosts the pinned Apollo browser runtime, with the rendering fixes
 documented in [BROWSER_LOCAL.md](BROWSER_LOCAL.md). The engine, WebAssembly,
@@ -31,6 +33,28 @@ web directory, maps, disc images, Xbox SDK, or experimental scripts.
 Optionally add `--source-repository https://github.com/OWNER/REPOSITORY` to
 record your public source URL. The current Git commit is recorded regardless;
 the packager does not assume a particular fork or remote.
+
+For automatic downloads, add `--data-source https://HOST/PINNED-DATA-DIRECTORY/`.
+The directory must serve `manifest.json` and its chunks with CORS enabled.
+Without that option the site keeps the manual disc-import flow. Downloads
+stream into browser storage, check each reconstructed map's SHA-256 before
+committing it, and retry interruptions twice. Cancellation retains completed
+maps. Storage checks include room for the game's decompressed map cache.
+
+To prepare a compatible directory from a supported local disc image:
+
+```sh
+python3 tools/package_browser_maps.py /path/to/Halo.xiso.iso --output build/map-data
+```
+
+This extracts only the 24 maps, split into chunks of at most 48 MiB. The
+ISO is not required after extraction. The hosted demo stores those chunks
+on the fork's separate `fqlx/game-data` branch and uses a commit-pinned
+`raw.githubusercontent.com` URL. The 1.9 GB of map data exceeds GitHub Pages'
+1 GB site limit, so only the small launcher/runtime goes on Pages. The source
+PR contains the downloader and packaging tools; the data branch is separate.
+There is no download proxy or additional hosting service. Game assets retain
+their own copyrights and are not covered by the source-code license.
 
 Publish only the contents of that output directory to a deployment branch in
 your repository, then configure GitHub Pages to deploy that branch's root.
@@ -60,4 +84,6 @@ python3 -m http.server 8778 --bind 127.0.0.1 --directory dist
 ```
 
 Open <http://127.0.0.1:8778/github-pages/>. The launcher should reload once,
-then show its import controls without a missing-features error.
+then show its import controls (or begin the configured download) without a
+missing-features error. Run `node tools/test_auto_cache.mjs` to check cache
+reuse, chunk assembly, integrity failures, quota handling and cancellation.
