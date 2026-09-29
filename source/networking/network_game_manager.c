@@ -81,6 +81,8 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "interface/player_ui.h"
+#include "saved games/player_profile.h"
 #include "main/main.h"
 #include "memory/data.h"
 #include "network_game_globals.h"
@@ -277,7 +279,40 @@ void network_game_generate_local_machine_name(
 	wchar_t *machine_name)
 {
 	char ascii_machine_name[32];
-	HANDLE find_handle = XFindFirstNicknameW(FALSE, machine_name, 32);
+	HANDLE find_handle;
+
+#ifdef HALO_LINUX
+	/* port: a machine that brings one player to the game (the one who
+	joined multiplayer on it) is named after that player's profile, not the
+	system's random nickname: the system link list shows a host's game by it */
+	{
+		short local_player_index;
+		short joined_player_index = NONE;
+		short joined_player_count = 0;
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+		{
+			if (player_ui_local_player_wants_to_play_multiplayer(local_player_index))
+			{
+				joined_player_index = local_player_index;
+				joined_player_count++;
+			}
+		}
+		if (joined_player_count == 1)
+		{
+			struct player_profile profile;
+
+			player_ui_get_active_player_profile(joined_player_index, &profile);
+			if (profile.player_name[0])
+			{
+				ustrncpy(machine_name, profile.player_name, MAXIMUM_PLAYER_PROFILE_NAME_LENGTH);
+				machine_name[MIN(MAXIMUM_PLAYER_PROFILE_NAME_LENGTH, 32) - 1] = 0;
+				return;
+			}
+		}
+	}
+#endif
+	find_handle = XFindFirstNicknameW(FALSE, machine_name, 32);
 
 	if (find_handle == INVALID_HANDLE_VALUE)
 	{
