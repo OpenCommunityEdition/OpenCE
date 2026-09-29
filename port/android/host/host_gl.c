@@ -10,7 +10,6 @@ already have host types by then. Only strings need copying back.
 
 #include <EGL/egl.h>
 #include <GLES3/gl32.h>
-#include <android/log.h>
 #include <dlfcn.h>
 #include <string.h>
 
@@ -109,39 +108,21 @@ void host_gl_wait_frame(uint32_t slot)
 /* writes data into the buffer bound to target without waiting for the
 GPU: the renderer only streams into ranges no queued draw uses.
 
-Mali copies the whole buffer for a glBufferSubData into a buffer that
-queued draws still reference; with hundreds of small uploads per frame
-that exhausts memory within seconds, so it streams through a mapped
-range instead. Adreno instead allocates a fresh backing store for every
-mapped range (a kgsl alloc and free per upload), so there it is much
-cheaper to let the driver handle glBufferSubData. */
-static int buffer_write_by_subdata = -1;
-
+Mapping unsynchronised, but without invalidating the range: with an
+invalidate the Adreno driver allocates a fresh kgsl buffer for the range
+and frees it again, which costs more than the copy. (On Mali a
+glBufferSubData into a buffer queued draws reference copies the whole
+buffer, which is why the mapped write is here at all.) */
 void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const void *data)
 {
-	if (buffer_write_by_subdata < 0)
-	{
-		const char *renderer = (const char *)glGetString(GL_RENDERER);
+	void *mapping = glMapBufferRange(target, offset, size,
+		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 
-		/* (only decide once a context gives a renderer) */
-		if (renderer)
-		{
-			buffer_write_by_subdata = strstr(renderer, "Adreno") != NULL;
-			__android_log_print(ANDROID_LOG_INFO, "halo", "stream uploads: %s on %s",
-				buffer_write_by_subdata ? "glBufferSubData" : "mapped range", renderer);
-		}
-	}
-	if (!buffer_write_by_subdata)
+	if (mapping)
 	{
-		void *mapping = glMapBufferRange(target, offset, size,
-			GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-
-		if (mapping)
-		{
-			memcpy(mapping, data, size);
-			glUnmapBuffer(target);
-			return;
-		}
+		memcpy(mapping, data, size);
+		glUnmapBuffer(target);
+		return;
 	}
 	glBufferSubData(target, offset, size, data);
 }
